@@ -1,4 +1,4 @@
-# Marble Rumble
+# Heavy metal GP
 
 A 2D Matter.js racer with ten marbles, procedural circuits, deployable items,
 Peggle-inspired sectors, and a six-event championship.

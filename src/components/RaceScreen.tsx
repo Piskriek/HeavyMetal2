@@ -1,6 +1,7 @@
+import * as storage from '../game/storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { ArrowLeft, ArrowRight, Pause, Play, Flag, ChevronRight, FastForward, Timer, Gauge, Coins, Snowflake } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Pause, Play, Flag, ChevronRight, FastForward, Timer, Gauge, Coins, Snowflake, ZoomIn, ZoomOut } from 'lucide-react';
 import { Game } from '../game/engine';
 import { render } from '../game/render';
 import { W } from '../game/track';
@@ -27,6 +28,13 @@ interface Props {
   payout: RacePayout | null;
   onShop: () => void;
 }
+const ZOOM_KEY = 'heavy-metal-gp:zoom';
+const ZOOM_MIN = 0.35;
+const ZOOM_MAX = 2.5;
+function loadZoom(): number {
+  try { const n = Number(storage.getItem(ZOOM_KEY)); return n >= ZOOM_MIN && n <= ZOOM_MAX ? n : 1; } catch { return 1; }
+}
+
 interface LiveRow { id: number; rank: number; time: number | null; x: number; y: number }
 interface Hud {
   rank: number; time: number; inventory: Inventory; remaining: Record<ItemType, number>; coolingDown: boolean; speed: number; cap: number;
@@ -42,6 +50,14 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
   const controls = useRef({ left: false, right: false, touch: 0 });
   const pausedRef = useRef(false);
   const fastRef = useRef(false);
+  const zoomRef = useRef(loadZoom());
+  const [zoom, setZoomState] = useState(zoomRef.current);
+  const setZoom = useCallback((value: number) => {
+    const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
+    zoomRef.current = next;
+    setZoomState(next);
+    try { storage.setItem(ZOOM_KEY, String(next)); } catch { /* storage unavailable */ }
+  }, []);
   const doneRef = useRef(false);
   const [paused, setPaused] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
@@ -86,7 +102,7 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
     gameRef.current = game;
     doneRef.current = false;
     let toastTimer: ReturnType<typeof setTimeout> | undefined;
-    game.onEvent = (message, color = '#d7ff3f') => {
+    game.onEvent = (message, color = '#d63e2e') => {
       clearTimeout(toastTimer);
       setToast({ message, color });
       toastTimer = setTimeout(() => setToast(null), 2400);
@@ -113,12 +129,33 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
     };
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
+
+    const wheel = (event: WheelEvent) => { event.preventDefault(); setZoom(zoomRef.current * Math.exp(-event.deltaY * 0.0015)); };
+    const pointers = new Map<number, { x: number; y: number }>();
+    let pinchStart = 0;
+    let pinchZoom = 1;
+    const spread = () => { const [a, b] = [...pointers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    const pointerDown = (event: PointerEvent) => { pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); if (pointers.size === 2) { pinchStart = spread(); pinchZoom = zoomRef.current; } };
+    const pointerMove = (event: PointerEvent) => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2 && pinchStart > 0) setZoom(pinchZoom * spread() / pinchStart);
+    };
+    const pointerUp = (event: PointerEvent) => { pointers.delete(event.pointerId); if (pointers.size < 2) pinchStart = 0; };
+    canvas.addEventListener('wheel', wheel, { passive: false });
+    canvas.addEventListener('pointerdown', pointerDown);
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('pointerup', pointerUp);
+    canvas.addEventListener('pointercancel', pointerUp);
     resize();
 
     const onKey = (event: KeyboardEvent, down: boolean) => {
       if (doneRef.current || (event.target instanceof HTMLElement && (['INPUT', 'TEXTAREA'].includes(event.target.tagName) || event.target.isContentEditable))) return;
       if (event.code === 'Space' && event.target instanceof HTMLButtonElement) return;
       if (['ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) event.preventDefault();
+      if (down && (event.code === 'Equal' || event.code === 'NumpadAdd')) { setZoom(zoomRef.current * 1.2); return; }
+      if (down && (event.code === 'Minus' || event.code === 'NumpadSubtract')) { setZoom(zoomRef.current / 1.2); return; }
+      if (down && (event.code === 'Digit0' || event.code === 'Numpad0')) { setZoom(1); return; }
       if (event.code === 'KeyP' && down && !event.repeat) { setPause(!pausedRef.current); return; }
       if (event.code === 'Escape' && down && !event.repeat) { if (!pausedRef.current) setPause(true); return; }
       if (pausedRef.current) return;
@@ -174,7 +211,9 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
         const rightRail = width >= 980 ? 142 : 0;
         const availableWidth = width - sidebar - rightRail;
         const fitWidth = Math.min(availableWidth / (W + 70), 1.55);
-        const targetScale = width < 700 && game.gateOpen ? Math.max(fitWidth, Math.min(height / 850, 0.83)) : fitWidth;
+        // Default view shows roughly 900 world units of height so wide screens are not zoomed in; the player's zoom scales that.
+        const baseScale = width < 700 && game.gateOpen ? Math.max(fitWidth, Math.min(height / 850, 0.83)) : Math.min(fitWidth, height / 900);
+        const targetScale = baseScale * zoomRef.current;
         const scale = camera.scale + (targetScale - camera.scale) * (1 - Math.exp(-dt / 180));
         const halfWidth = availableWidth / 2 / scale;
         const halfHeight = height / 2 / scale;
@@ -182,7 +221,7 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
         camera.scale = scale;
         camera.x += (targetX - camera.x) * (1 - Math.exp(-dt / 150));
         camera.y += (p.y + 115 - camera.y) * (1 - Math.exp(-dt / 150));
-        camera.y = Math.max(halfHeight - 15, Math.min(game.track.height - halfHeight + 15, camera.y));
+        camera.y = halfHeight * 2 >= game.track.height ? game.track.height / 2 : Math.max(halfHeight - 15, Math.min(game.track.height - halfHeight + 15, camera.y));
         render(ctx, game, camera, width, height, pausedRef.current || doneRef.current ? game.time : now, { shake: !reduceMotion, minimap: false });
       }
 
@@ -214,10 +253,12 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
     return () => {
       cancelAnimationFrame(raf); clearTimeout(toastTimer); observer.disconnect();
       window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp);
+      canvas.removeEventListener('wheel', wheel); canvas.removeEventListener('pointerdown', pointerDown); canvas.removeEventListener('pointermove', pointerMove);
+      canvas.removeEventListener('pointerup', pointerUp); canvas.removeEventListener('pointercancel', pointerUp);
       window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', hidden);
       game.destroy(); gameRef.current = null;
     };
-  }, [seed, roster, profile, gridOrder, setPause]);
+  }, [seed, roster, profile, gridOrder, setPause, setZoom]);
 
   const byId = (id: number) => roster.find((m) => m.id === id)!;
   const preStart = hud.lights >= 0;
@@ -239,13 +280,14 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
   return <div className="race-shell">
     <header className="race-topbar"><Brand compact /><div className="race-event"><span>{subtitle}</span><h1>{title}</h1></div><div className="race-clock"><span>RACE TIME</span><strong>{formatTime(hud.time)}</strong></div><div className="race-top-actions"><button className="icon-button" onClick={() => setPause(true)} aria-label="Pause race" disabled={!!results}><Pause size={18} /></button><button className="text-button" onClick={requestExit} disabled={!!results}>Exit <ArrowUpRightIcon /></button></div></header>
     <div className="race-stage">
-      <canvas ref={canvasRef} className="race-canvas" aria-label="2D marble race. Arrow keys nudge. Keys 1 to 8 deploy power-ups; Space repeats the last item. P pauses." />
+      <canvas ref={canvasRef} className="race-canvas" aria-label="2D marble race. Arrow keys nudge. Keys 1 to 8 deploy power-ups; plus and minus zoom; Space repeats the last item. P pauses." />
       {mapTrack && <RaceMinimap track={mapTrack} racers={hud.field} roster={roster} viewTop={hud.viewTop} viewBottom={hud.viewBottom} progress={hud.progress} />}
       <aside className="timing-tower" aria-label={preStart ? 'Starting grid' : 'Live classification'}><div className="timing-heading"><i className="live-dot" />{preStart ? 'STARTING GRID' : 'LIVE CLASSIFICATION'}</div><ol>{hud.field.map((r) => {
         const m = byId(r.id);
         const leading = hud.field[0];
         return <li key={r.id} className={m.isPlayer ? 'timing-player' : ''}><span className="timing-rank">{r.rank}</span><i style={{ background: teamOf(r.id).color }} /><span className="timing-name">{m.isPlayer ? 'YOU' : m.name.toUpperCase()}</span><span className="timing-gap">{preStart ? teamOf(r.id).short : r.time !== null ? <Flag size={11} /> : leading.time !== null ? 'RACING' : r.rank === 1 ? 'LEADER' : `+${Math.max(0, (leading.y - r.y) / 100).toFixed(1)}m`}</span></li>;
       })}</ol><div className="timing-footer">{hud.finishedCount} / 10 FINISHED <span>{championship ? 'CHAMPIONSHIP' : 'QUICK RACE'}</span></div></aside>
+      <div className="zoom-controls" role="group" aria-label="Zoom"><button className="icon-button" onClick={() => setZoom(zoom * 1.25)} disabled={zoom >= ZOOM_MAX} aria-label="Zoom in"><ZoomIn size={16} /></button><button className="zoom-level" onClick={() => setZoom(1)} aria-label="Reset zoom">{Math.round(zoom * 100)}%</button><button className="icon-button" onClick={() => setZoom(zoom / 1.25)} disabled={zoom <= ZOOM_MIN} aria-label="Zoom out"><ZoomOut size={16} /></button></div>
       <div className="race-sector"><span>SECTOR {String(hud.sectorIndex + 1).padStart(2, '0')}</span><b>{hud.sector.toUpperCase()}</b></div>
       {(preStart || showGo) && <div className={`start-sequence ${showGo ? 'lights-out' : ''}`}><div className="start-light-bank">{Array.from({ length: 5 }, (_, i) => <div key={i} className={`start-light-pair ${hud.lights > i ? 'lit' : ''}`}><i /><i /></div>)}</div><span>{showGo ? 'LIGHTS OUT. FULL SEND.' : hud.lights === 5 ? 'HOLD YOUR LINE.' : 'THE GRID IS SET.'}</span></div>}
       {toast && <div key={toast.message} className="race-toast" role="status" style={{ '--toast-color': toast.color } as CSSProperties}><span />{toast.message}</div>}

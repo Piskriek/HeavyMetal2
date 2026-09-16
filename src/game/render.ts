@@ -2,6 +2,7 @@ import Matter from 'matter-js';
 import { Game, Marble } from './engine';
 import { meta, W } from './track';
 import { MARBLE_RADIUS, ITEM_INFO } from './types';
+import { ballFor, drawSprite, drawStrip, sprite } from './sprites';
 
 export interface Camera {
   x: number;
@@ -97,7 +98,10 @@ function drawMarble(ctx: CanvasRenderingContext2D, game: Game, m: Marble, t: num
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.fill();
 
-  // body
+  // body: kit ball sprite (spiked ball while Heavy metal is active), flat gradient until sprites load
+  if (drawSprite(ctx, anvil ? 'ball-spiked' : ballFor(m.info.color), x, y, (anvil ? r * 2.9 : r * 2.2), (anvil ? r * 2.9 : r * 2.2), b.angle)) {
+    // spin is visible in the sprite texture
+  } else {
   const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
   const base = anvil ? '#475569' : m.info.color;
   g.addColorStop(0, shade(base, 1.6));
@@ -128,6 +132,7 @@ function drawMarble(ctx: CanvasRenderingContext2D, game: Game, m: Marble, t: num
   ctx.ellipse(x - r * 0.35, y - r * 0.4, r * 0.28, r * 0.18, -0.6, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(255,255,255,0.8)';
   ctx.fill();
+  }
 
   // outline
   ctx.beginPath();
@@ -221,10 +226,8 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
 
   const theme = game.track.theme;
   // background
-  const bg = ctx.createLinearGradient(0, 0, 0, ch);
-  bg.addColorStop(0, theme.bg1);
-  bg.addColorStop(1, theme.bg2);
-  ctx.fillStyle = bg;
+  // Outside the track (visible when zoomed out) is plain dark blue.
+  ctx.fillStyle = '#0a1a33';
   ctx.fillRect(0, 0, cw, ch);
 
   ctx.save();
@@ -273,6 +276,8 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         ctx.fillStyle = (i + j) % 2 === 0 ? '#f8fafc' : '#0f172a';
         ctx.fillRect(i * sq, fy - sq + j * sq, sq, sq);
       }
+    drawSprite(ctx, 'flag-checker', 34, fy - 44, 56, 52);
+    drawSprite(ctx, 'flag-checker', W - 34, fy - 44, 56, 52);
   }
 
   // oil slicks
@@ -305,9 +310,10 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
     if (md?.destroyed) continue;
     switch (md?.kind) {
       case 'ramp':
-        drawPipe(ctx, b, theme.pipe, theme.pipeEdge);
+        if (!drawStrip(ctx, b, 'strip-wood')) drawPipe(ctx, b, theme.pipe, theme.pipeEdge);
         break;
       case 'gate': {
+        if (drawStrip(ctx, b, 'strip-hazard')) break;
         // trapdoor with red/white kerb stripes
         polygon(ctx, b);
         ctx.fillStyle = '#334155';
@@ -320,6 +326,7 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         break;
       }
       case 'block': {
+        if (drawStrip(ctx, b, 'tile-metal', { tile: 36 })) break;
         polygon(ctx, b);
         ctx.fillStyle = '#94a3b8';
         ctx.fill();
@@ -336,6 +343,7 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         const hit = !!md.hit;
         const age = hit ? game.time - (md.hitAt ?? 0) : 0;
         const pulse = hit ? Math.max(0.3, 1 - age / 210) : col === 'green' ? 1 + Math.sin(t / 330 + b.position.x) * 0.06 : 1;
+        const gem = sprite(`gem-${col === 'green' && md.itemDrop ? 'purple' : col}`);
         if (hit || col === 'green') {
           ctx.beginPath();
           ctx.arc(b.position.x, b.position.y, r * 2.2, 0, Math.PI * 2);
@@ -345,6 +353,13 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
           ctx.fillStyle = glow;
           ctx.fill();
         }
+        if (gem) {
+          const size = r * 2.5 * pulse;
+          ctx.save();
+          if (hit) ctx.filter = 'brightness(1.8)';
+          ctx.drawImage(gem, b.position.x - size / 2, b.position.y - size / 2, size, size);
+          ctx.restore();
+        } else {
         const pg = ctx.createRadialGradient(b.position.x - 3, b.position.y - 3, 1, b.position.x, b.position.y, r * pulse);
         pg.addColorStop(0, hit ? '#ffffff' : lit);
         pg.addColorStop(0.5, hit ? lit : base);
@@ -356,6 +371,7 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         ctx.strokeStyle = hit ? '#fff' : 'rgba(0,0,0,0.35)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+        }
         if (col === 'green' && !hit) {
           ctx.beginPath();
           ctx.arc(b.position.x, b.position.y, r + 5, t / 450, t / 450 + Math.PI * 1.4);
@@ -411,9 +427,10 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         break;
       }
       case 'ice':
-        drawPipe(ctx, b, '#7dd3fc', '#38bdf8');
+        if (!drawStrip(ctx, b, 'strip-ice')) drawPipe(ctx, b, '#7dd3fc', '#38bdf8');
         break;
       case 'wall':
+        if (drawStrip(ctx, b, 'strip-metal')) break;
         polygon(ctx, b);
         ctx.fillStyle = '#2b3652';
         ctx.fill();
@@ -422,12 +439,15 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         ctx.stroke();
         break;
       case 'spinner':
-        polygon(ctx, b);
-        ctx.fillStyle = '#f43f5e';
-        ctx.fill();
-        ctx.strokeStyle = '#881337';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        if (!drawStrip(ctx, b, 'strip-red')) {
+          polygon(ctx, b);
+          ctx.fillStyle = '#f43f5e';
+          ctx.fill();
+          ctx.strokeStyle = '#881337';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        if (drawSprite(ctx, 'bumper-spiked', b.position.x, b.position.y, 30, 26)) break;
         ctx.beginPath();
         ctx.arc(b.position.x, b.position.y, 9, 0, Math.PI * 2);
         ctx.fillStyle = '#fecdd3';
@@ -435,6 +455,7 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         break;
       case 'peg': {
         const r = md.radius ?? 11;
+        if (drawSprite(ctx, 'bumper-crown', b.position.x, b.position.y, r * 2.9, r * 2.35)) break;
         const pg = ctx.createRadialGradient(b.position.x - 3, b.position.y - 3, 1, b.position.x, b.position.y, r);
         pg.addColorStop(0, '#94a3b8');
         pg.addColorStop(1, '#334155');
@@ -448,22 +469,24 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         break;
       }
       case 'breakable': {
-        polygon(ctx, b);
         const ratio = (md.hp ?? 1) / (md.maxHp ?? 1);
-        ctx.fillStyle = '#b45309';
-        ctx.fill();
-        ctx.strokeStyle = '#78350f';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        // brick lines
         const { min, max } = b.bounds;
-        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-        ctx.lineWidth = 1.5;
-        for (let yy = min.y + 12; yy < max.y; yy += 12) {
-          ctx.beginPath();
-          ctx.moveTo(min.x, yy);
-          ctx.lineTo(max.x, yy);
+        if (!drawStrip(ctx, b, 'crate', { tile: 40 })) {
+          polygon(ctx, b);
+          ctx.fillStyle = '#b45309';
+          ctx.fill();
+          ctx.strokeStyle = '#78350f';
+          ctx.lineWidth = 2;
           ctx.stroke();
+          // brick lines
+          ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+          ctx.lineWidth = 1.5;
+          for (let yy = min.y + 12; yy < max.y; yy += 12) {
+            ctx.beginPath();
+            ctx.moveTo(min.x, yy);
+            ctx.lineTo(max.x, yy);
+            ctx.stroke();
+          }
         }
         // cracks
         if (ratio < 0.99) {
@@ -487,6 +510,9 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         ctx.font = 'bold 11px system-ui';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(8,20,32,0.7)';
+        ctx.fillRect(-13, -21, 26, 44);
+        ctx.fillStyle = '#fff7ed';
         ctx.fillText('⚖', 0, -12);
         ctx.fillText(`${md.req}`, 0, 4);
         ctx.font = '8px system-ui';
@@ -495,10 +521,12 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         break;
       }
       case 'pad': {
-        polygon(ctx, b);
         const pulse = 0.6 + 0.4 * Math.sin(t / 150);
-        ctx.fillStyle = '#065f46';
-        ctx.fill();
+        polygon(ctx, b);
+        if (!drawStrip(ctx, b, 'strip-hazard')) {
+          ctx.fillStyle = '#065f46';
+          ctx.fill();
+        }
         ctx.strokeStyle = `rgba(52,211,153,${pulse})`;
         ctx.lineWidth = 3;
         ctx.stroke();
@@ -521,6 +549,8 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         const lh = Math.hypot(v[2].x - v[1].x, v[2].y - v[1].y);
         void w;
         void h;
+        const redStrip = sprite('strip-red');
+        if (redStrip) ctx.drawImage(redStrip, -lw / 2, -lh / 2, lw, lh);
         ctx.fillStyle = 'rgba(249,115,22,0.18)';
         ctx.fillRect(-lw / 2, -lh / 2, lw, lh);
         ctx.strokeStyle = 'rgba(251,146,60,0.5)';
@@ -560,14 +590,20 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
         const ig = ctx.createLinearGradient(-17, -17, 17, 17);
         ig.addColorStop(0, '#fde047');
         ig.addColorStop(1, '#f59e0b');
-        ctx.beginPath();
-        ctx.roundRect(-15, -15, 30, 30, 7);
-        ctx.fillStyle = ig;
-        ctx.fill();
-        ctx.strokeStyle = '#fff7ed';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = '#451a03';
+        if (!drawSprite(ctx, 'crate', 0, 0, 34, 30)) {
+          ctx.beginPath();
+          ctx.roundRect(-15, -15, 30, 30, 7);
+          ctx.fillStyle = ig;
+          ctx.fill();
+          ctx.strokeStyle = '#fff7ed';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 4;
+        ctx.font = 'bold 20px system-ui';
+        ctx.strokeText('?', 0, 1);
+        ctx.fillStyle = '#fde047';
         ctx.font = 'bold 20px system-ui';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -658,7 +694,10 @@ export function render(ctx: CanvasRenderingContext2D, game: Game, cam: Camera, c
   }
 
   // side pipe walls
-  ctx.fillStyle = '#1e2942';
+  const plate = sprite('tile-metal');
+  const platePattern = plate ? ctx.createPattern(plate, 'repeat') : null;
+  if (platePattern) platePattern.setTransform(new DOMMatrix().scaleSelf(40 / plate!.naturalWidth, 40 / plate!.naturalWidth));
+  ctx.fillStyle = platePattern ?? '#1e2942';
   ctx.fillRect(-40, viewTop, 40, viewBottom - viewTop);
   ctx.fillRect(W, viewTop, 40, viewBottom - viewTop);
   ctx.fillStyle = '#334155';

@@ -1,10 +1,13 @@
-import type { CSSProperties } from 'react';
+import { useMemo } from 'react';
 import { ArrowRight, Flag, Timer, Trophy, Check, Coins, ShoppingBag } from 'lucide-react';
 import type { HeatResult, MarbleInfo } from '../game/types';
 import { teamOf } from '../game/types';
 import { pointsFor } from '../game/season';
 import { formatTime } from '../game/physics';
 import type { RacePayout } from '../game/economy';
+import { postRaceBanter } from '../game/characters';
+import Portrait from './Portrait';
+import Banter from './Banter';
 
 export interface RaceAction { label: string; onClick: () => void; primary?: boolean }
 interface Props {
@@ -25,6 +28,7 @@ export default function RaceResults({ results, roster, title, subtitle, actions,
   const finished = results.filter((r) => r.time !== null);
   const fastest = [...finished].sort((a, b) => a.time! - b.time!)[0];
   const winnerTime = fastest?.time ?? 0;
+  const banter = useMemo(() => postRaceBanter(roster, [...results].sort((a, b) => a.rank - b.rank).map((r) => r.id), me.time !== null, Math.random), [roster, results, me.time]);
   const points = championship && me.time !== null ? pointsFor(me.rank) : 0;
 
   return <div className="results-backdrop">
@@ -33,6 +37,7 @@ export default function RaceResults({ results, roster, title, subtitle, actions,
         <div className="eyebrow"><Flag size={16} /> CHEQUERED FLAG <span className="muted">/ {subtitle}</span></div>
         <div className="results-heading-row"><div><h2 id="results-title" className="results-title">{me.time === null ? 'NEXT TIME. FULL SEND.' : me.rank === 1 ? 'THAT\'S A RACE WIN.' : me.rank <= 3 ? 'A PLACE ON THE PODIUM.' : 'EVERY POSITION COUNTS.'}</h2><p>{title}</p></div><div className="result-position"><span>YOUR FINISH</span><strong>{me.time === null ? 'DNF' : `P${me.rank}`}</strong></div></div>
         <div className="result-summary"><span><Timer size={14} /> {me.time === null ? 'Time limit reached' : formatTime(me.time)}</span>{championship && <span className="accent"><Trophy size={14} /> +{points} championship points</span>}<span><Check size={14} /> {finished.length}/{roster.length} finished</span></div>
+        <Banter lines={banter} className="results-banter" delay={600} interval={1100} />
       </header>
       <div className="results-table-wrap"><table className="results-table"><caption className="sr-only">Final race classification</caption>
         <thead><tr><th>POS</th><th>DRIVER / TEAM</th><th className="result-pegs">PEGS</th><th>TIME / GAP</th>{championship && <th>POINTS</th>}</tr></thead>
@@ -41,7 +46,7 @@ export default function RaceResults({ results, roster, title, subtitle, actions,
           const team = teamOf(m.id);
           return <tr key={m.id} className={`${m.isPlayer ? 'player-result' : ''} ${result.rank === 1 && result.time !== null ? 'winner-result' : ''}`}>
             <td className="classification-position">{String(result.rank).padStart(2, '0')}</td>
-            <td><div className="result-driver"><span className="team-stripe" style={{ background: team.color }} /><i className="tiny-marble" style={{ '--marble': m.color } as CSSProperties} /><div><strong>{m.isPlayer ? 'You' : m.name}{m.isPlayer && <small>YOU</small>}</strong><span>{team.name}</span></div></div></td>
+            <td><div className="result-driver"><span className="team-stripe" style={{ background: team.color }} /><Portrait marble={m} mood={result.rank === 1 ? 'happy' : result.time === null ? 'surprised' : 'angry'} size={36} ring={result.rank === 1 && result.time !== null ? 'spiked' : undefined} /><div><strong>{m.isPlayer ? 'You' : m.name}{m.isPlayer && <small>YOU</small>}</strong><span>{team.name}</span></div></div></td>
             <td className="result-pegs"><span className="orange-peg" />{result.pegs}</td>
             <td className="classification-time">{result.time === null ? <span className="dnf-label">DNF</span> : <><strong>{formatTime(result.time)}</strong><span>{result.rank === 1 ? 'WINNER' : `+${((result.time - winnerTime) / 1000).toFixed(2)}s`}</span></>}</td>
             {championship && <td className="classification-points">{result.time === null ? '0' : `+${pointsFor(result.rank)}`}</td>}

@@ -524,8 +524,8 @@ export class Game {
     m.deepestY = destination.y;
     m.recoveryUntil = this.time + 1600;
     m.recoveries++;
-    this.effects.push({ type: 'ring', ...destination, ttl: 30, maxTtl: 30, color: '#d7ff3f' });
-    if (m.info.isPlayer) this.onEvent?.('Race marshal: back on track', '#d7ff3f');
+    this.effects.push({ type: 'ring', ...destination, ttl: 30, maxTtl: 30, color: '#d63e2e' });
+    if (m.info.isPlayer) this.onEvent?.('Race marshal: back on track', '#d63e2e');
   }
 
   makeParticles(x: number, y: number, n: number, sp: number) {

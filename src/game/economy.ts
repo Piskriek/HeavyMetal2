@@ -1,3 +1,4 @@
+import * as storage from './storage';
 import { emptyInventory, ITEM_INFO, MAX_ITEM_STACK, normalizeInventory } from './types';
 import type { HeatResult, Inventory, ItemType } from './types';
 
@@ -72,9 +73,9 @@ export function parseAccount(raw: string | null): RacerAccount {
 }
 
 export function loadAccount(): RacerAccount {
-  try { return parseAccount(localStorage.getItem(ACCOUNT_KEY)); } catch { return createAccount(); }
+  try { return parseAccount(storage.getItem(ACCOUNT_KEY)); } catch { return createAccount(); }
 }
 
 export function saveAccount(account: RacerAccount) {
-  try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch { /* Play remains available when storage is blocked. */ }
+  try { storage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch { /* Play remains available when storage is blocked. */ }
 }

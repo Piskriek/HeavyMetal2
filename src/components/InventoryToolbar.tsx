@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { PackageCheck, CircleHelp } from 'lucide-react';
 import { ITEM_INFO, ITEM_TYPES, inventoryCount } from '../game/types';
 import type { Inventory, ItemType } from '../game/types';
-import ItemGlyph from './ItemGlyph';
+const buttonArt = import.meta.glob<string>('../assets/ui/item-*.webp', { eager: true, import: 'default' });
 
 interface Props {
   inventory: Inventory;
@@ -20,9 +20,10 @@ export default function InventoryToolbar({ inventory, remaining, selected, block
       const info = ITEM_INFO[item];
       const active = remaining[item] > 0;
       const available = inventory[item] > 0;
-      return <button key={item} className={`inventory-slot ${available ? 'stocked' : 'empty'} ${active ? 'effect-active' : ''} ${selected === item ? 'last-selected' : ''}`} style={{ '--item-color': info.color } as CSSProperties} disabled={blocked || coolingDown || active || !available} onClick={() => onUse(item)} aria-label={`Deploy ${info.name}, ${inventory[item]} charges${active ? `, active for ${(remaining[item] / 1000).toFixed(1)} seconds` : ''}`} title={`${info.name}: ${info.desc} (${inventory[item]} owned)`}>
-        <kbd>{i + 1}</kbd><span className="inventory-glyph"><ItemGlyph item={item} size={23} /></span><span className="inventory-item-name">{info.name}</span><span className="inventory-quantity">{active ? `${(remaining[item] / 1000).toFixed(1)}s` : `x${inventory[item]}`}</span>
-        <span className="inventory-item-state">{active ? item === 'jump' ? 'RECHARGING' : 'ACTIVE' : available ? 'READY' : 'COLLECT OR BUY'}</span>
+      return <button key={item} className={`inventory-slot kit-slot ${available ? 'stocked' : 'empty'} ${active ? 'effect-active' : ''} ${selected === item ? 'last-selected' : ''}`} style={{ '--item-color': info.color } as CSSProperties} disabled={blocked || coolingDown || active || !available} onClick={() => onUse(item)} aria-label={`Deploy ${info.name}, ${inventory[item]} charges${active ? `, active for ${(remaining[item] / 1000).toFixed(1)} seconds` : ''}`} title={`${info.name}: ${info.desc} (${inventory[item]} owned)`}>
+        <img className="kit-slot-art" src={buttonArt[`../assets/ui/item-${item}.webp`]} alt="" draggable={false} />
+        <kbd>{i + 1}</kbd><span className="kit-slot-count">{active ? `${(remaining[item] / 1000).toFixed(1)}s` : `x${inventory[item]}`}</span>
+        {(active || !available) && <span className="kit-slot-state">{active ? item === 'jump' ? 'RECHARGING' : 'ACTIVE' : 'EMPTY'}</span>}
         {active && <span className="effect-countdown" style={{ width: `${Math.min(100, remaining[item] / info.duration * 100)}%` }} />}
       </button>;
     })}</div>

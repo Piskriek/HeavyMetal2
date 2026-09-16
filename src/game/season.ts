@@ -1,3 +1,4 @@
+import * as storage from './storage';
 import { GrandPrix, HeatResult, MarbleInfo, POINTS, FASTEST_BONUS, HEATS_PER_GP, TEAMS, Team, TrackProfile, CIRCUIT_LENGTH_MULTIPLIER } from './types';
 import { W } from './track';
 
@@ -195,15 +196,15 @@ export function gridSlots(order: number[]): { id: number; x: number; slot: numbe
 const KEY = 'mrr-season-v1';
 export function saveSeason(s: SeasonState | null) {
   try {
-    if (s) localStorage.setItem(KEY, JSON.stringify(s));
-    else localStorage.removeItem(KEY);
+    if (s) storage.setItem(KEY, JSON.stringify(s));
+    else storage.removeItem(KEY);
   } catch {
     /* ignore */
   }
 }
 export function loadSeason(): SeasonState | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = storage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as SeasonState;
     if (!s.roster || !s.results) return null;

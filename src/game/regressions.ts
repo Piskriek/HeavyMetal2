@@ -21,7 +21,7 @@ function roster(seed = 42): MarbleInfo[] {
   const rng = mulberry32(seed);
   return Array.from({ length: 10 }, (_, id) => ({
     id, name: id === 0 ? 'You' : AI_NAMES[id - 1],
-    color: id === 0 ? '#d7ff3f' : AI_COLORS[id - 1],
+    color: id === 0 ? '#d63e2e' : AI_COLORS[id - 1],
     stats: randomStats(rng), isPlayer: id === 0,
   }));
 }

@@ -14,7 +14,7 @@ export type Inventory = Record<ItemType, number>;
 export const MAX_ITEM_STACK = 9;
 
 export const ITEM_INFO: Record<ItemType, { name: string; short: string; desc: string; color: string; price: number; duration: number; category: 'Performance' | 'Disruption'; effect: string }> = {
-  rocket: { name: 'Speed boost', short: 'BOOST', desc: 'Fire a forward thruster and raise your top speed for 3 seconds.', color: '#d7ff3f', price: 90, duration: 3000, category: 'Performance', effect: 'Extra thrust / 3s' },
+  rocket: { name: 'Speed boost', short: 'BOOST', desc: 'Fire a forward thruster and raise your top speed for 3 seconds.', color: '#d63e2e', price: 90, duration: 3000, category: 'Performance', effect: 'Extra thrust / 3s' },
   jump: { name: 'Jump', short: 'JUMP', desc: 'Launch upward instantly. Keep your sideways momentum to clear a lip or dodge the pack.', color: '#b6a0ff', price: 65, duration: 1000, category: 'Performance', effect: 'Instant lift' },
   oil: { name: 'Oil slick', short: 'OIL', desc: 'Leave a slick behind you for 9 seconds. Rivals slow down; you keep your grip.', color: '#c084fc', price: 55, duration: 0, category: 'Disruption', effect: 'Trail hazard / 9s' },
   shock: { name: 'Shockwave', short: 'SHOCK', desc: 'Blast nearby rivals away. The shock also shatters their ice.', color: '#facc15', price: 100, duration: 0, category: 'Disruption', effect: 'Area knockback' },
@@ -50,6 +50,8 @@ export interface MarbleInfo {
   color: string;
   stats: MarbleStats;
   isPlayer: boolean;
+  /** Rival sprite index, or the player's chosen portrait. */
+  character?: number;
 }
 
 export interface PhysicsProps {
@@ -125,7 +127,7 @@ export function randomStats(rng: () => number): MarbleStats {
   return s;
 }
 
-export const AI_NAMES = ['Ace', 'Crimson', 'Coral', 'Cobalt', 'Slate', 'Jade', 'Lime', 'Amber', 'Violet'];
+export const AI_NAMES = ['Ace Spadegrin', 'Duchess Vex', 'Big Grubba', 'Knuckles Blau', 'Scorch', 'Rivet Rex', 'Lucky Thirteen', 'Red Morrigan', 'Violetta Voltz'];
 export const AI_COLORS = ['#67e8f9', '#ef4444', '#fb7185', '#3b82f6', '#64748b', '#10b981', '#84cc16', '#f59e0b', '#8b5cf6'];
 
 /** F1-style points for finishing positions 1..10 */
@@ -142,8 +144,8 @@ export interface Team {
 }
 
 export const TEAMS: Team[] = [
-  { id: 0, name: 'Apex Racing', short: 'APX', color: '#d7ff3f', members: [0, 1] },
-  { id: 1, name: 'Scuderia Rosso', short: 'ROS', color: '#ef4444', members: [2, 3] },
+  { id: 0, name: 'Apex Racing', short: 'APX', color: '#d63e2e', members: [0, 1] },
+  { id: 1, name: 'Scuderia Viola', short: 'VIO', color: '#a78bfa', members: [2, 3] },
   { id: 2, name: 'Cobalt Grand Prix', short: 'COB', color: '#3b82f6', members: [4, 5] },
   { id: 3, name: 'Jade Motorsport', short: 'JDE', color: '#10b981', members: [6, 7] },
   { id: 4, name: 'Solar Amber F1', short: 'SOL', color: '#f59e0b', members: [8, 9] },
@@ -192,7 +194,7 @@ export interface GrandPrix {
   desc: string;
   profile: TrackProfile;
 }
-export const PLAYER_COLORS = ['#d7ff3f', '#22d3ee', '#fb7185', '#fb923c', '#c084fc', '#ffffff', '#2dd4bf'];
+export const PLAYER_COLORS = ['#d63e2e', '#22d3ee', '#fb7185', '#fb923c', '#c084fc', '#ffffff', '#2dd4bf'];
 
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;

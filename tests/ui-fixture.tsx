@@ -4,6 +4,8 @@ import { AI_NAMES, AI_COLORS } from '../src/game/types';
 import type { MarbleInfo } from '../src/game/types';
 import '../src/index.css';
 import '../src/powerups.css';
+import '../src/layout.css';
+import '../src/kit.css';
 import { createAccount, settleRace } from '../src/game/economy';
 
 const roster: MarbleInfo[] = Array.from({ length: 10 }, (_, id) => ({

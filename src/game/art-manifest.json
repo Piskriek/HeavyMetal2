@@ -1,0 +1,531 @@
+{
+  "generatedAt": "2026-09-17",
+  "matte": {
+    "riders": {
+      "hex": "rgb(8,248,8)",
+      "detected": "green",
+      "despill": [
+        "G"
+      ]
+    },
+    "capsules": {
+      "hex": "rgb(8,248,0)",
+      "detected": "green",
+      "despill": [
+        "G"
+      ]
+    },
+    "supply-fuel": {
+      "hex": "rgb(256,0,248)",
+      "detected": "magenta",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "supply-shield": {
+      "hex": "rgb(256,0,248)",
+      "detected": "magenta",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "supply-bounce": {
+      "hex": "rgb(256,0,248)",
+      "detected": "magenta",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "landmarks": {
+      "hex": "rgb(8,232,8)",
+      "detected": "green",
+      "despill": [
+        "G"
+      ]
+    },
+    "blimp": {
+      "hex": "rgb(16,200,16)",
+      "detected": "green",
+      "despill": [
+        "G"
+      ]
+    }
+  },
+  "sheets": {
+    "riders": {
+      "file": "art/sheets/riders-sheet.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 2,
+      "rows": 2,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 512,
+          "height": 512
+        },
+        {
+          "x": 512,
+          "y": 0,
+          "width": 512,
+          "height": 512
+        },
+        {
+          "x": 0,
+          "y": 512,
+          "width": 512,
+          "height": 512
+        },
+        {
+          "x": 512,
+          "y": 512,
+          "width": 512,
+          "height": 512
+        }
+      ]
+    },
+    "capsules": {
+      "file": "art/sheets/capsules-sheet.png",
+      "width": 1792,
+      "height": 592,
+      "columns": 3,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 597,
+          "height": 592
+        },
+        {
+          "x": 597,
+          "y": 0,
+          "width": 597,
+          "height": 592
+        },
+        {
+          "x": 1194,
+          "y": 0,
+          "width": 597,
+          "height": 592
+        }
+      ]
+    },
+    "supply-fuel": {
+      "file": "art/sheets/supply-fuel.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1264,
+          "height": 843
+        }
+      ]
+    },
+    "supply-shield": {
+      "file": "art/sheets/supply-shield.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 1024
+        }
+      ]
+    },
+    "supply-bounce": {
+      "file": "art/sheets/supply-bounce.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1264,
+          "height": 843
+        }
+      ]
+    },
+    "landmarks": {
+      "file": "art/sheets/landmarks-sheet.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 2,
+      "rows": 2,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 512,
+          "height": 512
+        },
+        {
+          "x": 512,
+          "y": 0,
+          "width": 512,
+          "height": 512
+        },
+        {
+          "x": 0,
+          "y": 512,
+          "width": 512,
+          "height": 512
+        },
+        {
+          "x": 512,
+          "y": 512,
+          "width": 512,
+          "height": 512
+        }
+      ]
+    },
+    "blimp": {
+      "file": "art/sheets/blimp.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1264,
+          "height": 843
+        }
+      ]
+    },
+    "courses": {
+      "file": "art/sheets/courses-sheet.png",
+      "width": 1792,
+      "height": 592,
+      "columns": 1,
+      "rows": 3,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1792,
+          "height": 197
+        },
+        {
+          "x": 0,
+          "y": 197,
+          "width": 1792,
+          "height": 197
+        },
+        {
+          "x": 0,
+          "y": 394,
+          "width": 1792,
+          "height": 197
+        }
+      ]
+    }
+  },
+  "cells": {
+    "rider:rivet": {
+      "sheet": "riders",
+      "sheetCell": 0,
+      "image": "art/rivet-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "pilot": "art/rivet-pilot.png",
+      "pilotRuntime": [
+        256,
+        256
+      ],
+      "eyeLine": 0.44
+    },
+    "rider:nix": {
+      "sheet": "riders",
+      "sheetCell": 1,
+      "image": "art/nix-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "pilot": "art/nix-pilot.png",
+      "pilotRuntime": [
+        256,
+        256
+      ],
+      "eyeLine": 0.44
+    },
+    "rider:grub": {
+      "sheet": "riders",
+      "sheetCell": 2,
+      "image": "art/grub-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "pilot": "art/grub-pilot.png",
+      "pilotRuntime": [
+        256,
+        256
+      ],
+      "eyeLine": 0.44
+    },
+    "rider:sprocket": {
+      "sheet": "riders",
+      "sheetCell": 3,
+      "image": "art/sprocket-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "pilot": "art/sprocket-pilot.png",
+      "pilotRuntime": [
+        256,
+        256
+      ],
+      "eyeLine": 0.44
+    },
+    "capsule:iron": {
+      "sheet": "capsules",
+      "sheetCell": 0,
+      "image": "art/iron-shell.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "shell",
+      "anchor": "center",
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "envelope": 1,
+      "hull": {
+        "diameter": 452,
+        "canvas": 512,
+        "scale": 0.8692
+      },
+      "hatch": {
+        "x": 0.66,
+        "y": 0.5,
+        "radius": 0.133,
+        "measured": true
+      }
+    },
+    "capsule:springsteel": {
+      "sheet": "capsules",
+      "sheetCell": 1,
+      "image": "art/springsteel-shell.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "shell",
+      "anchor": "center",
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "envelope": 1,
+      "hull": {
+        "diameter": 452,
+        "canvas": 512,
+        "scale": 0.8709
+      },
+      "hatch": {
+        "x": 0.648,
+        "y": 0.492,
+        "radius": 0.138,
+        "measured": true
+      }
+    },
+    "capsule:siege": {
+      "sheet": "capsules",
+      "sheetCell": 2,
+      "image": "art/siege-shell.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "shell",
+      "anchor": "center",
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "envelope": 1,
+      "hull": {
+        "diameter": 452,
+        "canvas": 512,
+        "scale": 0.8642
+      },
+      "hatch": {
+        "x": 0.66,
+        "y": 0.5,
+        "radius": 0.126,
+        "measured": true
+      }
+    },
+    "supply:fuel": {
+      "sheet": "supply-fuel",
+      "sheetCell": 0,
+      "image": "art/fuel-supply.png",
+      "runtime": {
+        "width": 256,
+        "height": 256
+      },
+      "action": "icon",
+      "anchor": "center"
+    },
+    "supply:shield": {
+      "sheet": "supply-shield",
+      "sheetCell": 0,
+      "image": "art/shield-supply.png",
+      "runtime": {
+        "width": 256,
+        "height": 256
+      },
+      "action": "icon",
+      "anchor": "center"
+    },
+    "supply:bounce": {
+      "sheet": "supply-bounce",
+      "sheetCell": 0,
+      "image": "art/bounce-supply.png",
+      "runtime": {
+        "width": 256,
+        "height": 256
+      },
+      "action": "icon",
+      "anchor": "center"
+    },
+    "landmark:pines": {
+      "sheet": "landmarks",
+      "sheetCell": 0,
+      "image": "art/landmark-pines.png",
+      "runtime": {
+        "width": 359,
+        "height": 462
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "landmark:quarry": {
+      "sheet": "landmarks",
+      "sheetCell": 1,
+      "image": "art/landmark-quarry.png",
+      "runtime": {
+        "width": 419,
+        "height": 315
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "landmark:windmill": {
+      "sheet": "landmarks",
+      "sheetCell": 2,
+      "image": "art/landmark-windmill.png",
+      "runtime": {
+        "width": 266,
+        "height": 460
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "landmark:pasture": {
+      "sheet": "landmarks",
+      "sheetCell": 3,
+      "image": "art/landmark-pasture.png",
+      "runtime": {
+        "width": 449,
+        "height": 286
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "prop:blimp": {
+      "sheet": "blimp",
+      "sheetCell": 0,
+      "image": "art/blimp.png",
+      "runtime": {
+        "width": 900,
+        "height": 636
+      },
+      "action": "prop",
+      "anchor": "center",
+      "facing": "right"
+    },
+    "course:ridge": {
+      "sheet": "courses",
+      "sheetCell": 0,
+      "image": "art/ridge-course.png",
+      "runtime": {
+        "width": 800,
+        "height": 440
+      },
+      "action": "preview",
+      "source": {
+        "x": 0,
+        "y": 0,
+        "width": 1792,
+        "height": 197
+      }
+    },
+    "course:boomtown": {
+      "sheet": "courses",
+      "sheetCell": 1,
+      "image": "art/boomtown-course.png",
+      "runtime": {
+        "width": 800,
+        "height": 440
+      },
+      "action": "preview",
+      "source": {
+        "x": 0,
+        "y": 197,
+        "width": 1792,
+        "height": 197
+      }
+    },
+    "course:sheep": {
+      "sheet": "courses",
+      "sheetCell": 2,
+      "image": "art/sheep-course.png",
+      "runtime": {
+        "width": 800,
+        "height": 440
+      },
+      "action": "preview",
+      "source": {
+        "x": 0,
+        "y": 394,
+        "width": 1792,
+        "height": 197
+      }
+    }
+  }
+}

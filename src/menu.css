@@ -21,19 +21,19 @@
 .menu-grain::after { bottom: 14px; right: 14px; border-right: 1px solid #b89d65; border-bottom: 1px solid #b89d65; }
 .menu-topline { position: absolute; top: 30px; left: 43px; right: 43px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .studio-signature { display: flex; align-items: center; gap: 10px; }
-.studio-signature .goblin-mark { width: 29px; height: 32px; color: #bfa66c; }
+.studio-signature .goblin-mark { width: 33px; height: 18px; filter: drop-shadow(0 1px 2px #000000aa); }
 .studio-signature > span { font-family: var(--fantasy); font-size: 9px; font-weight: 600; letter-spacing: 1.4px; color: #c5ba97; }
 .studio-signature small { display: block; margin-top: 5px; font: italic 10px Georgia, serif; color: #83988a; letter-spacing: .1px; }
 .menu-utilities { display: flex; gap: 10px; }
-.forged-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: 1px solid #93805288; border-radius: 4px; background: linear-gradient(#30382aeb, #0c1714ed); color: #d6c698; box-shadow: inset 0 1px #dace9226, 0 2px 5px #0006; }
-.forged-icon:hover { border-color: #d4ba7d; color: #ffe2a8; background: linear-gradient(#444b35, #18221a); }
+.forged-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: 1px solid #8a6f3a; border-radius: 3px; background: #141811e8 url('/ui/stone-tile.png') center / 110px; color: #e3d3a4; box-shadow: inset 0 1px #ffe0a01f, 0 2px 5px #0006; }
+.forged-icon:hover { border-color: #d9b96f; color: #ffe9ad; box-shadow: inset 0 1px #ffe0a030, 0 0 13px #e0b05e3d; }
 .forged-icon:focus-visible { outline: 2px solid #f6dc9e; outline-offset: 4px; }
 .menu-composition { position: relative; width: min(425px, 38vw); padding-top: clamp(100px, 12vh, 150px); margin-left: clamp(48px, 7.7vw, 148px); text-align: center; }
 .game-wordmark { position: relative; }
 .wordmark-flourish { display: flex; justify-content: center; align-items: center; gap: 15px; margin: 0 auto 9px; width: 210px; }
 .wordmark-flourish > span { height: 1px; flex: 1; background: linear-gradient(90deg, transparent, #b69854); }
 .wordmark-flourish > span:last-child { transform: scaleX(-1); }
-.wordmark-flourish .goblin-mark { width: 31px; height: 32px; color: #d2ac64; filter: drop-shadow(0 2px 2px #0008); }
+.wordmark-flourish .goblin-mark { width: 40px; height: 22px; filter: drop-shadow(0 2px 3px #000000bb); }
 .game-wordmark h1 { position: relative; font-family: var(--fantasy); font-weight: 900; line-height: .93; margin: 0; color: #dfbc70; text-shadow: 0 1px 0 #fff0b66b, 0 3px 0 #85542e, 0 5px 0 #392817, 0 8px 12px #000e; -webkit-text-stroke: .7px #7f632f; letter-spacing: -3px; }
 .wordmark-goblin { display: block; font-size: clamp(66px, 6.45vw, 98px); }
 .wordmark-rally { display: block; font-size: clamp(78px, 7.6vw, 116px); letter-spacing: 8px; margin: 4px -8px 0 0; }
@@ -49,21 +49,22 @@
 .menu-storage-warning { position: absolute; left: 0; right: 0; bottom: calc(100% + 12px); margin: 0; text-align: center; color: #e2b183; font: 9px/1.5 var(--mono); letter-spacing: .6px; }
 .high-contrast-game .menu-resume-note, .high-contrast-game .menu-storage-warning { color: #f0e8d2; }
 .main-menu-actions { margin: 31px auto 0; display: flex; flex-direction: column; gap: 11px; width: 88%; }
-.forged-menu-button { position: relative; display: flex; align-items: center; gap: 18px; width: 100%; min-height: 58px; padding: 10px 27px; border: 2px solid #857144; border-radius: 4px; color: #ddd1af; background: linear-gradient(180deg, #29372ee8 0%, #16261ff2 40%, #112018fc 100%); box-shadow: inset 0 1px #d6c28966, inset 0 -3px #050b0999, 0 3px 0 #050b098f, 0 5px 12px #0003; text-align: left; }
-.forged-menu-button::before { content: ''; position: absolute; inset: 4px; border: 1px solid #ad9a5840; border-radius: 1px; pointer-events: none; }
-.forged-menu-button::after { content: ''; position: absolute; left: 12%; right: 12%; top: -2px; height: 1px; background: linear-gradient(90deg, transparent, #e8d698, transparent); opacity: .6; }
+.forged-menu-button { position: relative; display: flex; align-items: center; gap: 18px; width: 100%; min-height: 58px; padding: 10px 24px 10px 27px; border: 13px solid transparent; border-image: url('/ui/button-gold.png') 52 86 80 86 fill / 13px 20px 12px 20px stretch; color: #f0e2ba; background: transparent; box-shadow: 0 4px 14px #00000066; text-align: left; text-shadow: 0 1px 2px #000000b0; }
+.forged-menu-button::after { content: ''; position: absolute; left: 14%; right: 14%; top: 9px; height: 1px; background: linear-gradient(90deg, transparent, #e8d69896, transparent); opacity: .7; pointer-events: none; }
 .forged-menu-button > span:not(.button-rivet) { flex: 1; font: 600 15px var(--fantasy); letter-spacing: 1px; }
-.forged-menu-button > svg:first-of-type { color: #af9b65; width: 20px; flex-shrink: 0; }
-.forged-menu-button .menu-action-arrow { color: #c8b782; opacity: 0; transform: translateX(-4px); transition: opacity .18s, transform .18s; }
-.forged-menu-button:hover, .forged-menu-button:focus-visible { border-color: #d4b575; color: #fff0c0; background: linear-gradient(180deg, #39452ffa, #203226fc 65%, #19291ffa); box-shadow: inset 0 1px #eed6a178, inset 0 -3px #050b0999, 0 0 23px #e0b05e14; }
+.forged-menu-button > svg:first-of-type { color: #e8cd8d; width: 20px; flex-shrink: 0; filter: drop-shadow(0 1px 1px #0009); }
+.forged-menu-button .menu-action-arrow { color: #f0d89a; opacity: 0; transform: translateX(-4px); transition: opacity .18s, transform .18s; }
+.forged-menu-button:hover, .forged-menu-button:focus-visible { border-image: url('/ui/button-gold-hover.png') 52 86 80 86 fill / 13px 20px 12px 20px stretch; color: #fff3cf; box-shadow: 0 6px 20px #d9a94e30, 0 4px 14px #00000066; }
 .forged-menu-button:hover .menu-action-arrow, .forged-menu-button:focus-visible .menu-action-arrow { opacity: 1; transform: translateX(0); }
 .forged-menu-button:focus-visible { outline: 2px solid #f3d49b; outline-offset: 5px; }
 .forged-menu-button:active { transform: translateY(2px) !important; }
-.forged-menu-button.forged-primary { background: linear-gradient(180deg, #853e2e 0%, #683023 14%, #572119 73%, #441b16 100%); border-color: #bc9952; color: #f6e0a8; box-shadow: inset 0 1px #ecc2819c, inset 0 -3px #210b09a6, 0 3px 0 #070c0969, 0 0 30px #ed9e3915; }
-.forged-primary > svg:first-of-type { color: #e7be78; }
+/* The primary entry keeps the gold plate and gains a crimson wash painted inside it. */
+.forged-menu-button.forged-primary::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #7d3a2ad9 0%, #57241bd6 100%); pointer-events: none; }
+.forged-menu-button.forged-primary { color: #ffe9b6; box-shadow: 0 4px 20px #c76a3a2c, 0 4px 14px #00000066; }
+.forged-primary > svg:first-of-type { color: #ffd98f; }
 .forged-primary .menu-action-arrow { opacity: .75; transform: none; }
-.forged-menu-button.forged-primary:hover, .forged-menu-button.forged-primary:focus-visible { border-color: #f0cd80; background: linear-gradient(180deg, #a75036, #793522 37%, #65271c); box-shadow: inset 0 1px #ffe2a28c, inset 0 -3px #210b09a6, 0 0 28px #f2a04426; }
-.button-rivet { position: absolute; top: 50%; margin-top: -2px; width: 4px; height: 4px; border: 1px solid #62532e; background: #d0af65; transform: rotate(45deg); box-shadow: 0 1px 1px #000; }
+.forged-menu-button.forged-primary:hover, .forged-menu-button.forged-primary:focus-visible { color: #fff3cf; box-shadow: 0 6px 26px #e08a4438, 0 4px 14px #00000066; }
+.button-rivet { display: none; }
 .rivet-left { left: 8px; }
 .rivet-right { right: 8px; }
 .menu-bottom-flourish { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 23px auto 12px; width: 62%; }
@@ -112,10 +113,11 @@
 .rune-toggle.is-on small { color: #ddce99; }
 .settings-footnote { font-size: 10px; line-height: 1.8; color: #9bab91; margin: 17px 0 1px; }
 .fantasy-dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 22px; border-top: 1px solid #95804a38; margin-top: 24px; flex-wrap: wrap; }
-.fantasy-primary, .fantasy-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 20px; gap: 12px; border: 1px solid #bd9a59; border-radius: 3px; background: linear-gradient(#823c2d, #542117); color: #f0dbab; box-shadow: inset 0 1px #e5bf746b, inset 0 -2px #210c09a1, 0 2px 2px #0005; font: 600 12px/1.5 var(--fantasy, 'Cinzel', Georgia, serif); letter-spacing: .1px; }
-.fantasy-primary:hover { border-color: #eed193; background: linear-gradient(#9c4a31, #713321); color: #fff0c7; }
-.fantasy-secondary { background: linear-gradient(#344331, #1b2a1d); border-color: #7d8155; }
-.fantasy-secondary:hover:not(:disabled) { border-color: #c6b476; background: linear-gradient(#495237, #2a3927); }
+.fantasy-primary, .fantasy-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 8px 22px; gap: 12px; border: 10px solid transparent; border-image: url('/ui/button-gold.png') 52 86 80 86 fill / 10px 16px 9px 16px stretch; background: transparent; color: #f6e7bd; text-shadow: 0 1px 2px #000000b0; box-shadow: 0 3px 12px #00000066; font: 600 12px/1.5 var(--fantasy, 'Cinzel', Georgia, serif); letter-spacing: .1px; }
+.fantasy-primary:hover { border-image: url('/ui/button-gold-hover.png') 52 86 80 86 fill / 10px 16px 9px 16px stretch; color: #fff3cf; box-shadow: 0 5px 16px #d9a94e2e, 0 3px 12px #00000066; }
+.fantasy-secondary { position: relative; }
+.fantasy-secondary::before { content: ''; position: absolute; inset: 0; background: linear-gradient(#232c1fd9, #121a12e0); pointer-events: none; }
+.fantasy-secondary:hover:not(:disabled)::before { background: linear-gradient(#333f27d9, #1c2818e0); }
 .fantasy-secondary:disabled { opacity: .55; }
 .fantasy-primary:focus-visible, .fantasy-secondary:focus-visible { outline: 2px solid #f5d598; outline-offset: 4px; }
 .fantasy-link { display: inline-flex; align-items: center; gap: 8px; color: #bfb18c; background: none; padding: 10px 0; font-size: 11px; }
@@ -230,7 +232,7 @@
   .menu-topline { top: 25px; left: 24px; right: 24px; }
   .studio-signature > span { font-size: 7px; letter-spacing: .9px; }
   .studio-signature small { display: none; }
-  .studio-signature .goblin-mark { width: 26px; height: 28px; }
+  .studio-signature .goblin-mark { width: 27px; height: 15px; }
   .menu-utilities { gap: 7px; }
   .forged-icon { width: 37px; height: 37px; }
   .menu-composition { margin: 0 auto; width: min(390px, calc(100% - 36px)); padding-top: 100px; }

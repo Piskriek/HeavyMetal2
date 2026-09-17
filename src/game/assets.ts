@@ -10,6 +10,7 @@ export type SpriteName =
   | 'loop'
   | 'ground'
   | 'deck'
+  | 'dirtArt'
   | 'ball'
   | 'sheep'
   | 'tnt'
@@ -135,11 +136,12 @@ export function loadAssets(): Promise<GameAssets> {
       ['grandstand', 'grandstand.png'],
       ['ground', 'track-tile.png'],
       ['deck', 'deck-surface.png'],
+      ['dirtArt', 'dirt-tile.png'],
     ];
     const result = {} as GameAssets;
     await Promise.all(files.map(async ([name, filename]) => {
       const image = await readImage(`/art/${filename}`);
-      result[name] = name === 'mountains' || name === 'deck' ? asSprite(image) : await cutout(image);
+      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' ? asSprite(image) : await cutout(image);
     }));
     const sheet = await readImage('/art/track-sprites.png');
     const names: SpriteName[] = ['ball', 'sheep', 'tnt', 'spring', 'boost', 'ramp'];

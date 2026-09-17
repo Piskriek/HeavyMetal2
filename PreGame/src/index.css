@@ -36,6 +36,7 @@ button, a, input { outline-offset: 5px; }
 .header-tools { margin-left: auto; display: flex; align-items: center; gap: 26px; }
 .text-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; background: none; padding: 6px 0; color: #aab3bd; font-size: 11px; font-weight: 500; white-space: nowrap; transition: color .18s; }
 .text-button:hover { color: var(--accent); }
+.exit-glyph { width: 13px; height: 13px; object-fit: contain; filter: drop-shadow(0 1px 1px #0007); }
 .profile-avatar { width: 33px; height: 33px; border: 1px solid #414937; background: #20271a; border-radius: 50%; color: #d7e9a3; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
 .garage-main { max-width: 1416px; margin: auto; padding: 32px 38px 0; }
 .garage-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 30px; }

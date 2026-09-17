@@ -269,3 +269,41 @@ no generated SVG art remains in the game modules.
 
 These checks prove the library decodes and is what the game draws. They do **not** measure
 frame pacing, gameplay balance or accessibility; Part 4.4 owns that.
+
+## 7. The painted UI pass (gold-and-iron chrome)
+
+The menus, HUD chrome and the last vector holdouts were retextured as painted art in the
+same Warcraft-inspired-but-not-Warcraft identity (dark carved stone, ornate gold trim,
+crimson accents). `scripts/cut-ui-art.mjs` is the pipeline: it is the UI-facing sibling of
+`build-art.mjs`, reusing the same matte rules — magenta `#FF00FF` detected on the border,
+fuzz-keyed in two passes, then the fringe-only despill ported from `build-art.mjs`
+(clamping only the matte's own R and B channels on semi-transparent pixels). It is
+idempotent: a source whose border is already transparent is only despilled again, and a
+grayscale-keyed source is gilded through a gold colour-ramp CLUT rather than silently
+shipping grey art.
+
+| Source | Runtime art | Used by |
+| --- | --- | --- |
+| `public/art/sheets/ui/emblem-src.png` | `public/art/goblin-emblem.png` | `GoblinMark` (brand, menus, loading) — replaces the inline `<svg>` mark |
+| `public/art/sheets/ui/favicon-src.png` | `public/favicon.png` | browser icon — replaces `favicon.svg` |
+| `public/art/sheets/ui/aim-arrow-src.png` | `public/art/aim-arrow.png` | the aiming hint — replaces the inline dashed SVG arc |
+| `public/art/sheets/ui/frame-src.png` | `public/ui/frame-gold.png` | 9-slice `border-image` for `.modal` and `.fantasy-dialog` (slice 96 fill) |
+| `public/art/sheets/ui/frame-src.png` | `public/ui/stone-tile.png` | quiet stone backdrop tile (app and menu background, stage buttons) |
+| `public/art/sheets/ui/button-src.png` | `public/ui/button-gold.png` | 9-slice `border-image` for `.primary-button`, `.forged-menu-button`, `.fantasy-primary` (slice 52 86 80 fill) |
+| `public/art/sheets/ui/button-hover-src.png` | `public/ui/button-gold-hover.png` | the hovered/glowing state of the same plates |
+| `public/art/sheets/ui/menu-vista-src.png` | `public/art/menu-vista.png` | the main-menu world painting and the loading screen |
+| `public/art/sheets/ui/dirt-src.png` | `public/art/dirt-tile.png` | the in-race dirt: `dirtMaterial()` draws the tile and re-hues it toward each course's palette with a `color` composite pass, keeping the procedural ruts, speckles and chalk lane dividers for readability |
+| `PreGame/public/art/map-panel-src.png` | `PreGame/public/art/map-panel.png` | the predecessor game's minimap: a keyed parchment panel behind the live vector course overlay (dots, camera box and finish line re-inked in warm browns) |
+| `PreGame/public/art/exit-glyph-src.png` | `PreGame/public/art/exit-glyph.png` | the predecessor game's exit button — replaces the inline SVG arrow |
+
+The dirt tile is seamless by construction: the source centre crop is mirrored into a 2x2
+windmill, so opposite edges match exactly. It loads as the `dirtArt` sprite through the
+same `loadAssets()` decode-or-fail contract as every other runtime sprite, so a broken
+file degrades to the visible loading error and retry, not a blank track.
+
+With this pass no SVG remains anywhere in either project's runtime: the favicon, the
+brand mark, the aiming arrow, the predecessor's exit glyph and the minimap's dark vector
+backing plate are all painted PNGs, and the only remaining `<svg>` elements are the
+PreGame minimap's live data overlay (course geometry, racer dots, camera window) and the
+standard `lucide-react` icon set, which are data, not art.
+

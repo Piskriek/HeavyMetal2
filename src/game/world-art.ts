@@ -17,18 +17,19 @@ const canvas = (width: number, height: number) => {
 };
 const noise = (n: number) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
 
-function dirtMaterial(track: CourseDefinition) {
+function dirtMaterial(track: CourseDefinition, assets: GameAssets) {
   const { image, context: c } = canvas(512, 512);
   const p = track.palette;
-  c.fillStyle = p.dirt; c.fillRect(0, 0, 512, 512);
-  // Broad wrapped value patches create earth without repeating high-frequency planks.
-  for (let i = 0; i < 26; i++) {
-    const x = noise(i + 3) * 512; const y = noise(i + 61) * 512;
-    c.fillStyle = i % 2 ? `${p.dirtLight}24` : `${p.bank}0d`;
-    for (const shift of [-512, 0, 512]) {
-      c.beginPath(); c.ellipse(x + shift, y, 35 + noise(i + 90) * 94, 16 + noise(i + 39) * 29, 0, 0, Math.PI * 2); c.fill();
-    }
-  }
+  // The painted track tile (public/art/dirt-tile.png, cut by scripts/cut-ui-art.mjs)
+  // carries the hand-painted earth. A 'color' composite pass re-hues it toward this
+  // course's dirt while keeping the painting's own luminance and brush texture.
+  c.drawImage(assets.dirtArt.image, 0, 0, 512, 512);
+  c.globalCompositeOperation = 'color';
+  c.globalAlpha = 0.58;
+  c.fillStyle = p.dirt;
+  c.fillRect(0, 0, 512, 512);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
   for (let lane = 0; lane < 4; lane++) {
     for (const offset of [43, 85]) {
       const y = lane * 128 + offset;
@@ -239,7 +240,7 @@ function propCanvas(id: LandmarkId, width: number, height: number) {
 export function buildCourseArt(id: CourseId, assets: GameAssets): CourseArt {
   const existing = cache.get(id); if (existing) return existing;
   const track = TRACKS[id];
-  const art = { sky: background(track, assets), dirt: dirtMaterial(track), bank: bankMaterial(track),
+  const art = { sky: background(track, assets), dirt: dirtMaterial(track, assets), bank: bankMaterial(track),
     blimp: blimpArt(track), landmarks: [landmark(track, 0), landmark(track, 1)] };
   cache.set(id, art); return art;
 }

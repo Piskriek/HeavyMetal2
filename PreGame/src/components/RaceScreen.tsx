@@ -307,4 +307,5 @@ export default function RaceScreen({ seed, roster, profile, gridOrder, title, su
   </div>;
 }
 
-function ArrowUpRightIcon() { return <svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10" stroke="currentColor" strokeWidth="1.5" /></svg>; }
+/** Painted exit glyph (PreGame/public/art/exit-glyph.png, cut by scripts/cut-ui-art.mjs). */
+function ArrowUpRightIcon() { return <img className="exit-glyph" src="/art/exit-glyph.png" alt="" aria-hidden="true" draggable={false} />; }

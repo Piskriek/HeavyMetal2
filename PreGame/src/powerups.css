@@ -100,17 +100,18 @@
 .inventory-slot.effect-active .inventory-item-state, .inventory-slot.effect-active .inventory-quantity { color: var(--item-color); }
 .inventory-slot.last-selected::after { content: ''; position: absolute; top: 0; left: 20%; width: 60%; height: 2px; background: var(--item-color); opacity: .7; }
 .effect-countdown { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--item-color); transition: width .09s linear; }
-.race-minimap { position: absolute; top: 21px; right: 18px; width: 116px; padding: 0 10px 10px; background: #0d1722ec; border: 1px solid #344758; border-radius: 4px; color: #9bb0c4; box-shadow: 0 5px 20px #0002; }
+.race-minimap { position: absolute; top: 21px; right: 18px; width: 122px; padding: 30px 15px 14px; background: url('/art/map-panel.png') center / 100% 100% no-repeat, #201509; border: 0; border-radius: 5px; color: #6b4a22; box-shadow: 0 5px 20px #0006, 0 0 0 1px #00000055; }
+.race-minimap.map-collapsed { padding-bottom: 4px; background: #1c1610 url('/art/map-panel.png') center top / 100% 78px no-repeat; }
 .minimap-toggle { width: 100%; padding: 10px 0; background: none; border: 0; color: #b8c9d9; display: flex; align-items: center; justify-content: space-between; gap: 3px; font: 6px var(--mono); letter-spacing: .4px; }
 .minimap-toggle:hover { color: var(--accent); }
 .minimap-toggle > svg { flex-shrink: 0; }
 .minimap-edge-labels { display: flex; justify-content: space-between; font: 5px var(--mono); color: #6f89a0; margin: 3px 0 7px; }
 .minimap-svg { display: block; width: 100%; max-height: 270px; overflow: hidden; }
-.minimap-finish { display: flex; align-items: center; gap: 4px; font: 6px var(--mono); color: #b1c7d9; margin-top: 6px; }
-.minimap-finish b { margin-left: auto; font: 500 10px var(--mono); color: var(--accent); }
-.minimap-legend { display: flex; align-items: center; gap: 4px; font: 5px var(--mono); color: #819eb6; padding-top: 10px; }
-.minimap-legend > i { width: 4px; height: 4px; background: white; border-radius: 50%; }
-.minimap-legend > span { width: 8px; height: 5px; border: 1px solid var(--accent); margin-left: auto; }
+.minimap-finish { display: flex; align-items: center; gap: 4px; font: 6px var(--mono); color: #57391a; margin-top: 6px; }
+.minimap-finish b { margin-left: auto; font: 500 10px var(--mono); color: #8a2d18; }
+.minimap-legend { display: flex; align-items: center; gap: 4px; font: 5px var(--mono); color: #7d5a2e; padding-top: 10px; }
+.minimap-legend > i { width: 4px; height: 4px; background: #8a2d18; border-radius: 50%; }
+.minimap-legend > span { width: 8px; height: 5px; border: 1px solid #8a2d18; margin-left: auto; }
 .map-collapsed { padding-bottom: 0; }
 .race-payout { display: flex; align-items: center; justify-content: space-between; gap: 15px; border-block: 1px solid #425639; padding: 13px 0; margin-top: 15px; }
 .payout-total { display: flex; align-items: center; gap: 11px; color: var(--accent); flex-shrink: 0; }

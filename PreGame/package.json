@@ -9,12 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^147.0.0",
+    "@types/matter-js": "^0.20.2",
     "clsx": "2.1.1",
-    "framer-motion": "^13.4.0",
     "lucide-react": "^1.46.0",
+    "matter-js": "^0.20.0",
+    "playwright-core": "^1.63.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "tailwind-merge": "3.4.0"
+    "tailwind-merge": "3.4.0",
+    "tsx": "^4.23.13",
+    "@series-inc/rundot-game-sdk": "^5.24.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.17",

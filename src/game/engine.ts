@@ -1,878 +1,837 @@
-import Matter from 'matter-js';
-import { generateTrack, meta, Track, CAT_MARBLE, CAT_WALL, CAT_SENSOR, W } from './track';
-import { ItemType, MarbleInfo, MARBLE_RADIUS, statsToPhysics, mulberry32, TrackProfile, emptyInventory, normalizeInventory, ITEM_TYPES, ITEM_INFO, MAX_ITEM_STACK } from './types';
-import type { Inventory } from './types';
-import { gridSlots } from './season';
-import { assistRolling, BASE_TICK, createMarble, downhill } from './physics';
-import type { RampSurface } from './physics';
+import type { GameAssets } from './assets';
+import { GameAudio } from './audio';
+import { RangeRenderer } from './renderer';
+import { createRacers, raceOrder, type Racer } from './racers';
+import {
+  AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
+  RADIUS, STADIUM_START, START_X, START_Y, TRACK_DISTANCE, closestLane, courseY, courseSlope,
+  laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, weightImpulse,
+  type AirSheep, type Obstacle, type Particle, type RacerFrame,
+} from './scene';
+import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
+import type { RaceConfig } from './session';
+import { createTrackLayout } from './track-layout';
+import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from './powerups';
 
-export interface GameOptions {
-  profile?: TrackProfile;
-  gridOrder?: number[]; // marble ids, P1 first
-  track?: Track;
-  recovery?: boolean;
-  effects?: boolean;
-  aiItems?: boolean;
-  inventory?: Partial<Inventory>;
-}
+const TAU = Math.PI * 2;
+const STEP = 1 / 120;
+const BUCKET = 512;
+const EMPTY: Obstacle[] = [];
+const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
+const randomAt = (id: number, time: number) => { const value = Math.sin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73; return value - Math.floor(value); };
 
-const { Engine, Bodies, Body, Composite, Events, Query } = Matter;
+export class GameEngine {
+  private readonly renderer: RangeRenderer;
+  private readonly audio = new GameAudio();
+  private frameId = 0;
+  private lastFrame = 0;
+  private lastRender = 0;
+  private lastNotify = 0;
+  private accumulator = 0;
+  private needsRender = true;
+  private visible = true;
+  private destroyed = false;
+  private controlsEnabled = true;
+  private readonly systemReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private get reducedMotion() { return this.systemReducedMotion || this.options.reducedMotion; }
+  private time = 0;
+  private runTime = 0;
+  private camera = 0;
+  private cameraY = 0;
+  private pointerDrift = 0;
+  private drift = 0;
+  private shake = 0;
+  private isDragging = false;
+  private grabOffset = { x: 0, y: 0 };
+  private topSpeed = 0;
+  private noticeUntil = 0;
+  private counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
+  private racers = createRacers();
+  private renderRacers: RacerFrame[] = [];
+  private readonly collisionTimes = new Float64Array(16).fill(-100);
+  private obstacles: Obstacle[] = [];
+  private pickups: AirPickup[] = [];
+  private readonly pickupBuckets = new Map<number, AirPickup[]>();
+  private pickupCount = 0;
+  private shieldBlocks = 0;
+  private readonly pickupCandidates = new Set<AirPickup>();
+  private readonly buckets = new Map<number, Obstacle[]>();
+  private particles: Particle[] = [];
+  private airSheep: AirSheep[] = [];
+  private trail: { x: number; y: number; z: number }[] = [];
+  private trailSample = 0;
+  private snapshot: GameSnapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
+  private lastSnapshot: GameSnapshot | null = null;
+  private standingsKey = '';
 
-const ITEM_POOL = ITEM_TYPES;
-const TICK = 1000 / 60;
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    assets: GameAssets,
+    private options: GameOptions,
+    private readonly onUpdate: (snapshot: GameSnapshot) => void,
+    private readonly onFinish: (record: RunRecord) => void,
+    private readonly config?: RaceConfig,
+  ) {
+    this.renderer = new RangeRenderer(canvas, assets, config?.course ?? options.course);
+    this.audio.setEnabled(options.sound);
+    this.audio.setVolume(options.masterVolume);
+    this.reset();
+    canvas.addEventListener('pointerdown', this.pointerDown);
+    canvas.addEventListener('pointermove', this.pointerMove);
+    canvas.addEventListener('pointerup', this.pointerUp);
+    canvas.addEventListener('pointercancel', this.pointerCancel);
+    canvas.addEventListener('pointerleave', this.pointerLeave);
+    document.addEventListener('visibilitychange', this.visibilityChanged);
+  }
 
-export interface Marble {
-  info: MarbleInfo;
-  body: Matter.Body;
-  baseDensity: number;
-  restitution: number;
-  frictionAir: number;
-  maxSpeed: number;
-  inventory: Inventory;
-  itemCooldownUntil: number;
-  aeroUntil: number;
-  jumpUntil: number;
-  aiUseAt: number;
-  frozenUntil: number;
-  ghostUntil: number;
-  anvilUntil: number;
-  rocketUntil: number;
-  padCooldownUntil: number;
-  frozen: boolean;
-  inOil: boolean;
-  finishedAt: number | null;
-  stuckTime: number;
-  lastPickupAt: number;
-  trail: { x: number; y: number }[];
-  pegs: number;
-  gridSlot: number;
-  grounded: number; // ticks since last floor contact
-  motionAnchor: Matter.Vector;
-  motionAt: number;
-  depthAt: number;
-  deepestY: number;
-  lastRecoveryAt: number;
-  recoveryUntil: number;
-  recoveries: number;
-  nudges: number;
-}
+  private get player() { return this.racers[0]; }
+  private y(x: number) { return courseY(x, this.options.course); }
+  private slope(x: number) { return courseSlope(x, this.options.course); }
+  private get customPhysics() { return !this.config || this.config.customPhysics; }
+  get status(): GameStatus { return this.snapshot.status; }
+  get inputEnabled() { return this.controlsEnabled; }
+  set inputEnabled(value: boolean) { this.controlsEnabled = value; this.lastFrame = 0; this.invalidate(); }
 
-export interface OilSlick {
-  x: number;
-  y: number;
-  r: number;
-  ownerId: number;
-  expiresAt: number;
-}
+  resize(width: number, height: number) {
+    this.renderer.resize(width, height);
+    this.renderer.view.configure(this.renderer.view.width, this.camera, this.options.downrange, this.cameraY);
+    this.invalidate();
+  }
 
-export interface Effect {
-  type: 'ring' | 'beam' | 'debris' | 'text' | 'flash' | 'snow';
-  x: number;
-  y: number;
-  x2?: number;
-  y2?: number;
-  ttl: number;
-  maxTtl: number;
-  color: string;
-  text?: string;
-  particles?: { x: number; y: number; vx: number; vy: number; s: number }[];
-}
-
-export interface RankEntry {
-  marble: Marble;
-  rank: number;
-  finished: boolean;
-  time: number | null;
-}
-
-export class Game {
-  engine: Matter.Engine;
-  world: Matter.World;
-  track: Track;
-  marbles: Marble[] = [];
-  player: Marble;
-  oils: OilSlick[] = [];
-  effects: Effect[] = [];
-  time = 0;
-  started = false;
-  gateOpen = false;
-  finishOrder: Marble[] = [];
-  nudge = 0;
-  rng: () => number;
-  shake = 0;
-  raceStartTime = 0;
-  private byId = new Map<number, Marble>();
-  private supports = new Map<number, RampSurface>();
-  private recoveryEnabled: boolean;
-  private effectsEnabled: boolean;
-  private aiItemsEnabled: boolean;
-  private pendingLaunches = new Map<number, Matter.Vector>();
-  private lastWallToast = -9999;
-  private pendingBreaks: { body: Matter.Body; marble: Marble; v: { x: number; y: number } }[] = [];
-  onEvent?: (msg: string, color?: string) => void;
-  onInventoryChange?: (inventory: Inventory) => void;
-  private poppingPegs = new Set<Matter.Body>();
-  private staticBins = new Map<number, Matter.Body[]>();
-  private globalBodies: Matter.Body[] = [];
-  private loadedBodies = new Map<number, Matter.Body>();
-  private loadedCells = '';
-  private streaming = false;
-
-  constructor(seed: number, roster: MarbleInfo[], opts: GameOptions = {}) {
-    this.rng = mulberry32(seed ^ 0x9e3779b9);
-    this.engine = Engine.create({
-      enableSleeping: false,
-      positionIterations: 10,
-      velocityIterations: 8,
-    });
-    this.engine.gravity.y = 1;
-    this.world = this.engine.world;
-    this.track = opts.track ?? generateTrack(seed, opts.profile);
-    this.recoveryEnabled = opts.recovery !== false;
-    this.effectsEnabled = opts.effects !== false;
-    this.aiItemsEnabled = opts.aiItems !== false;
-    Composite.add(this.world, this.track.bodies);
-
-    const order = opts.gridOrder && opts.gridOrder.length === roster.length ? opts.gridOrder : roster.map((r) => r.id);
-    const slots = gridSlots(order);
-    roster.forEach((info) => {
-      const ph = statsToPhysics(info.stats);
-      const slot = slots.find((s) => s.id === info.id)!;
-      const body = createMarble(info, { x: slot.x, y: this.track.startY });
-      const m: Marble = {
-        info,
-        body,
-        baseDensity: body.density,
-        restitution: ph.restitution,
-        frictionAir: ph.frictionAir,
-        maxSpeed: ph.maxSpeed,
-        inventory: info.isPlayer ? normalizeInventory(opts.inventory) : emptyInventory(),
-        itemCooldownUntil: 0,
-        aeroUntil: 0,
-        jumpUntil: 0,
-        aiUseAt: 0,
-        frozenUntil: 0,
-        ghostUntil: 0,
-        anvilUntil: 0,
-        rocketUntil: 0,
-        padCooldownUntil: 0,
-        frozen: false,
-        inOil: false,
-        finishedAt: null,
-        stuckTime: 0,
-        lastPickupAt: 0,
-        trail: [],
-        pegs: 0,
-        gridSlot: slot.slot,
-        grounded: 99,
-        motionAnchor: { ...body.position },
-        motionAt: 0,
-        depthAt: 0,
-        deepestY: this.track.startY,
-        lastRecoveryAt: -10000,
-        recoveryUntil: 0,
-        recoveries: 0,
-        nudges: 0,
-      };
-      this.marbles.push(m);
-      this.byId.set(info.id, m);
-    });
-    this.marbles.sort((a, b) => a.info.id - b.info.id);
-    Composite.add(
-      this.world,
-      this.marbles.map((m) => m.body),
-    );
-    this.player = this.marbles.find((m) => m.info.isPlayer) ?? this.marbles[0];
-    if (!this.player) throw new Error('A race needs at least one marble.');
-    this.streaming = this.track.bodies.length > 350;
-    if (this.streaming) {
-      for (const body of this.track.bodies) {
-        this.loadedBodies.set(body.id, body);
-        if (body.bounds.max.y - body.bounds.min.y > 1800) this.globalBodies.push(body);
-        else {
-          const from = Math.floor(body.bounds.min.y / 400);
-          const to = Math.floor(body.bounds.max.y / 400);
-          for (let cell = from; cell <= to; cell++) this.staticBins.set(cell, [...(this.staticBins.get(cell) ?? []), body]);
-        }
+  setOptions(options: GameOptions) {
+    const change = !this.config && options.course !== this.options.course;
+    const speedChanged = this.customPhysics && options.launchSpeed !== this.options.launchSpeed;
+    this.options = this.config ? { ...options, course: this.config.course, launchSpeed: this.customPhysics ? options.launchSpeed : this.player.launchSpeed, ballWeight: this.customPhysics ? options.ballWeight : this.player.weight } : options;
+    if (this.customPhysics) { this.player.weight = options.ballWeight; this.player.launchSpeed = options.launchSpeed; }
+    this.audio.setEnabled(options.sound);
+    this.audio.setVolume(options.masterVolume);
+    if (change) this.reset();
+    else if (speedChanged && (this.status === 'flying' || this.status === 'paused')) {
+      const player = this.player;
+      const speed = options.launchSpeed / 0.16;
+      if (player.loopRide) player.loopRide.speed = speed;
+      if (player.grounded) {
+        const slope = this.surfaceAt(player.x, player.z).slope;
+        player.vx = speed / Math.sqrt(1 + slope * slope); player.vy = player.vx * slope;
+      } else {
+        const ratio = speed / Math.max(1, Math.hypot(player.vx, player.vy));
+        player.vx *= ratio; player.vy *= ratio;
       }
-      this.syncTrack();
+      if (this.status === 'flying') this.snapshot.speed = options.launchSpeed;
+      this.notify();
     }
-
-    Events.on(this.engine, 'collisionStart', (e) => this.onCollisionStart(e));
-    Events.on(this.engine, 'collisionActive', (e) => this.onCollisionActive(e));
+    this.invalidate();
   }
 
-  marbleOf(body: Matter.Body): Marble | undefined {
-    if (body.label !== 'marble') return undefined;
-    const id = (body.plugin as { id: number }).id;
-    return this.byId.get(id);
-  }
+  reset = () => {
+    this.snapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
+    this.racers = createRacers(this.config);
+    if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
+    else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
+    this.renderRacers = this.racers.map((racer) => ({ ...racer }));
+    this.camera = this.cameraY = this.runTime = 0;
+    this.accumulator = this.lastFrame = this.lastRender = 0;
+    this.topSpeed = this.shake = 0;
+    this.isDragging = false;
+    this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
+    this.pickupCount = this.shieldBlocks = 0;
+    this.snapshot.sector = sectorAt(START_X, this.options.course);
+    this.collisionTimes.fill(-100);
+    this.particles.length = this.airSheep.length = this.trail.length = 0;
+    this.canvas.style.cursor = '';
+    this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
+    this.makeTrack();
+    this.standingsKey = '';
+    this.notify(); this.invalidate();
+  };
 
-  start() {
-    this.started = true;
-  }
-
-  private syncTrack() {
-    if (!this.streaming) return;
-    const cells = new Set<number>();
-    for (const marble of this.marbles) {
-      if (marble.finishedAt !== null && !this.allFinished()) continue;
-      const y = marble.body.position.y;
-      if (!Number.isFinite(y)) continue;
-      for (let cell = Math.floor((y - 380) / 400); cell <= Math.floor((y + 380) / 400); cell++) cells.add(cell);
+  launch = () => {
+    if (this.status !== 'ready') return;
+    for (const racer of this.racers) {
+      const velocity = launchVelocity(this.snapshot.power, racer.launchSpeed);
+      const angle = clamp(this.snapshot.angle + (racer.id ? (racer.id - 2) * 1.2 : 0), 12, 68) * Math.PI / 180;
+      racer.launchOrigin = { x: racer.x, y: racer.y };
+      racer.vx = Math.cos(angle) * velocity * racer.pace;
+      racer.vy = -Math.sin(angle) * velocity * racer.pace;
+      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
+      this.emit(racer.x, racer.y, racer.z, 7, racer.color, 100);
     }
-    const key = [...cells].sort((a, b) => a - b).join(',');
-    if (key === this.loadedCells) return;
-    this.loadedCells = key;
-    const wanted = new Map<number, Matter.Body>();
-    for (const body of this.globalBodies) if (!meta(body).destroyed) wanted.set(body.id, body);
-    for (const cell of cells) for (const body of this.staticBins.get(cell) ?? []) if (!meta(body).destroyed) wanted.set(body.id, body);
-    // Only nearby track geometry enters the solver; the renderer and map retain the full circuit.
-    for (const [id, body] of this.loadedBodies) if (!wanted.has(id)) Composite.remove(this.world, body);
-    const arriving = [...wanted.values()].filter((body) => !this.loadedBodies.has(body.id));
-    if (arriving.length) Composite.add(this.world, arriving);
-    this.loadedBodies = wanted;
+    this.snapshot.status = 'flying';
+    this.lastFrame = this.accumulator = 0;
+    this.isDragging = false;
+    this.canvas.style.cursor = '';
+    this.audio.play('launch');
+    this.say('FOUR GOBLINS. ZERO RIGHT OF WAY.'); this.notify();
+  };
+
+  changeLane = (direction: number) => {
+    const racer = this.player;
+    if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
+    this.setLane(racer, racer.targetLane + Math.sign(direction));
+    this.refreshSnapshot(); this.notify();
+  };
+
+  private setLane(racer: Racer, lane: number) {
+    const next = clamp(Math.round(lane), 0, LANE_COUNT - 1);
+    if (next === racer.targetLane) return;
+    racer.targetLane = next; racer.lastLaneChange = this.runTime;
   }
 
-  private removeTrackBody(body: Matter.Body) {
-    meta(body).destroyed = true;
-    Composite.remove(this.world, body);
-    this.loadedBodies.delete(body.id);
+  adjustAim = (powerDelta: number, angleDelta: number) => {
+    if (this.status !== 'ready' || this.isDragging) return;
+    this.snapshot.power = clamp(this.snapshot.power + powerDelta, 0.18, 1);
+    this.snapshot.angle = clamp(this.snapshot.angle + angleDelta, 12, 68);
+    const angle = this.snapshot.angle * Math.PI / 180;
+    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
+    this.player.y = AIM_ANCHOR.y + Math.sin(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
+    this.notify();
+  };
+
+  private canHop(racer: Racer) {
+    return !racer.falling && !racer.loopRide && !racer.finished && this.runTime - racer.lastHopAt >= 0.25
+      && (racer.grounded || this.runTime - racer.lastGroundedAt < 0.085);
   }
 
-  openGate() {
-    if (this.gateOpen) return;
-    this.gateOpen = true;
-    this.raceStartTime = this.time;
-    // trapdoor opens: marbles start from rest and let gravity do the work
-    this.removeTrackBody(this.track.gate);
-    this.marbles.forEach((m) => {
-      Body.setVelocity(m.body, { x: 0, y: 0 });
-      m.motionAt = m.depthAt = this.time;
-      m.motionAnchor = { ...m.body.position };
-      m.deepestY = m.body.position.y;
-    });
+  jump = () => {
+    if (this.status !== 'flying' || this.player.falling || this.player.loopRide) return;
+    if (this.canHop(this.player)) this.performHop(this.player);
+    else this.player.bufferedJump = this.runTime + 0.15;
+  };
+
+  private performHop(racer: Racer) {
+    racer.vy = racer.vx * this.surfaceAt(racer.x, racer.z).slope - 290 * weightImpulse(racer.weight) * racer.hopFactor;
+    racer.grounded = false; racer.lastHopAt = this.runTime;
+    racer.lastGroundedAt = racer.bufferedJump = -100;
+    this.emit(racer.x, racer.y + RADIUS, racer.z, 5, '#dbc294', 85);
+    if (!racer.id) { this.snapshot.hopReady = false; this.audio.play('hop'); this.notify(); }
   }
 
-  // ---------- collisions ----------
-  private onCollisionStart(e: Matter.IEventCollision<Matter.Engine>) {
-    for (const pair of e.pairs) {
-      const a = pair.bodyA;
-      const b = pair.bodyB;
-      const ma = this.marbleOf(a);
-      const mb = this.marbleOf(b);
-      if (ma && !mb) {
-        this.contactSurface(ma, b, pair);
-        this.marbleHits(ma, b);
-      } else if (mb && !ma) {
-        this.contactSurface(mb, a, pair);
-        this.marbleHits(mb, a);
+  bounce = () => {
+    if (this.status === 'ready') { this.launch(); return; }
+    if (this.status === 'flying') this.performBounce(this.player);
+  };
+
+  private performBounce(racer: Racer) {
+    if (!racer.bounces || racer.falling || racer.loopRide || racer.finished) return;
+    racer.bounces--; racer.vy = -590 * weightImpulse(racer.weight) * racer.hopFactor;
+    racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
+    racer.grounded = false; racer.lastGroundedAt = -100;
+    this.emit(racer.x, racer.y + RADIUS, racer.z, 10, '#a7dec1', 160);
+    if (!racer.id) { this.audio.play('bounce'); this.say('GRAVITY IS A SUGGESTION.'); this.refreshSnapshot(); this.notify(); }
+  }
+
+  boost = () => { if (this.status === 'flying') this.performBoost(this.player); };
+
+  private performBoost(racer: Racer) {
+    if (!racer.boosts || racer.falling || racer.finished) return;
+    const impulse = 430 * weightImpulse(racer.weight) * racer.boostFactor;
+    racer.boosts--; racer.lastBoostAt = this.runTime;
+    if (racer.loopRide) racer.loopRide.speed = Math.min(racer.maximumSpeed, racer.loopRide.speed + impulse);
+    racer.vx = Math.min(racer.maximumSpeed, racer.vx + impulse);
+    if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
+    this.emit(racer.x - RADIUS, racer.y, racer.z, 12, racer.color, 210);
+    if (!racer.id) { this.audio.play('boost'); this.say('MORE SPEED. LESS THINKING.'); this.shake = 2; this.refreshSnapshot(); this.notify(); }
+  }
+
+  togglePause = () => {
+    if (this.status === 'flying') this.snapshot.status = 'paused';
+    else if (this.status === 'paused') this.snapshot.status = 'flying';
+    this.accumulator = this.lastFrame = 0; this.notify();
+  };
+  setVisible(visible: boolean) {
+    this.visible = visible;
+    if (!visible) {
+      if (this.status === 'flying') this.togglePause();
+      cancelAnimationFrame(this.frameId); this.frameId = 0;
+    } else { this.lastFrame = 0; this.invalidate(); }
+  }
+  private schedule() { if (!this.destroyed && !this.frameId && this.visible && !document.hidden) this.frameId = requestAnimationFrame(this.frame); }
+  private invalidate() { this.needsRender = true; this.schedule(); }
+  private visibilityChanged = () => {
+    this.lastFrame = this.lastRender = this.accumulator = 0;
+    if (document.hidden) {
+      if (this.status === 'flying') this.togglePause();
+      cancelAnimationFrame(this.frameId); this.frameId = 0;
+    } else this.invalidate();
+  };
+
+  private makeTrack() {
+    this.obstacles = createTrackLayout(this.options.course);
+    this.buckets.clear(); this.pickupBuckets.clear();
+    for (const obstacle of this.obstacles) {
+      const left = obstacle.kind === 'loop' ? obstacle.x - obstacle.width / 2 : obstacle.x;
+      const right = obstacle.kind === 'loop' ? obstacle.x + obstacle.width / 2 : obstacle.x + obstacle.width;
+      for (let key = Math.floor((left - RADIUS * 2) / BUCKET); key <= Math.floor((right + RADIUS * 2) / BUCKET); key++) {
+        const bucket = this.buckets.get(key);
+        if (bucket) bucket.push(obstacle); else this.buckets.set(key, [obstacle]);
       }
-      else if (ma && mb) {
-        const sp = Math.hypot(ma.body.velocity.x - mb.body.velocity.x, ma.body.velocity.y - mb.body.velocity.y);
-        if (sp > 4) {
-          this.effects.push({
-            type: 'flash',
-            x: (a.position.x + b.position.x) / 2,
-            y: (a.position.y + b.position.y) / 2,
-            ttl: 10,
-            maxTtl: 10,
-            color: '#ffffff',
-          });
-        }
+    }
+    this.pickups = createAirPickups(this.options.course, this.obstacles);
+    for (const pickup of this.pickups) {
+      for (let key = Math.floor((pickup.x - 65) / BUCKET); key <= Math.floor((pickup.x + 65) / BUCKET); key++) {
+        const bucket = this.pickupBuckets.get(key);
+        if (bucket) bucket.push(pickup); else this.pickupBuckets.set(key, [pickup]);
       }
     }
   }
 
-  private marbleHits(m: Marble, other: Matter.Body) {
-    if (m.finishedAt !== null || m.frozen || !this.gateOpen) return;
-    const md = meta(other);
-    if (!md) return;
-    switch (md.kind) {
-      case 'breakable': {
-        const speed = Body.getSpeed(m.body);
-        const dmg = m.body.mass * speed;
-        md.hp = (md.hp ?? 0) - dmg;
-        this.effects.push({
-          type: 'debris',
-          x: other.position.x,
-          y: other.position.y,
-          ttl: 25,
-          maxTtl: 25,
-          color: '#fbbf24',
-          particles: this.makeParticles(other.position.x, other.position.y, 6, 3),
-        });
-        if (md.hp <= 0) {
-          md.hp = 0;
-          // defer removal until after this physics step, and restore the marble's momentum so it plows through
-          const v = Body.getVelocity(m.body);
-          if (!this.pendingBreaks.some((p) => p.body === other)) {
-            this.pendingBreaks.push({ body: other, marble: m, v: { x: v.x * 0.85, y: v.y } });
+  private nearby(x: number) { return this.buckets.get(Math.floor(x / BUCKET)) ?? EMPTY; }
+  private inGap(x: number, z: number) { return this.nearby(x).some((o) => o.kind === 'gap' && x > o.x && x < o.x + o.width && occupiesLane(o, z, 0)); }
+  private surfaceAt(x: number, z: number) {
+    let y = this.y(x); let slope = this.slope(x); let ramp: Obstacle | null = null;
+    for (const o of this.nearby(x)) if (o.kind === 'ramp' && x >= o.x && x <= o.x + o.width && occupiesLane(o, z, 5)) {
+      y = rampSurface(o, x, this.options.course); slope -= 1.6 * o.height / o.width * Math.pow((x - o.x) / o.width, 0.6); ramp = o;
+    }
+    return { y, slope, ramp };
+  }
+
+  private coordinates(event: PointerEvent) {
+    const rect = this.canvas.getBoundingClientRect();
+    return this.renderer.view.unproject((event.clientX - rect.left) / rect.width * this.renderer.view.width,
+      (event.clientY - rect.top) / rect.height * HEIGHT, this.player.z);
+  }
+  private pointerDown = (event: PointerEvent) => {
+    if (!this.inputEnabled || this.status !== 'ready' || !event.isPrimary || event.button !== 0) return;
+    const point = this.coordinates(event);
+    if (Math.hypot(point.x - this.player.x, point.y - this.player.y) > RADIUS * 1.75) return;
+    this.audio.unlock(); this.isDragging = true;
+    this.grabOffset = { x: this.player.x - point.x, y: this.player.y - point.y };
+    this.canvas.setPointerCapture(event.pointerId); this.canvas.focus({ preventScroll: true }); this.invalidate();
+  };
+  private pointerMove = (event: PointerEvent) => {
+    if (!this.inputEnabled) return;
+    const point = this.coordinates(event); const rect = this.canvas.getBoundingClientRect();
+    this.pointerDrift = ((event.clientX - rect.left) / rect.width - 0.5) * 10;
+    if (this.status === 'ready') this.canvas.style.cursor = this.isDragging ? 'grabbing' : Math.hypot(point.x - this.player.x, point.y - this.player.y) < 55 ? 'grab' : 'default';
+    if (!this.isDragging) return;
+    const dx = Math.max(16, AIM_ANCHOR.x - point.x - this.grabOffset.x);
+    const dy = Math.max(6, point.y + this.grabOffset.y - AIM_ANCHOR.y);
+    const distance = clamp(Math.hypot(dx, dy), 36, AIM_ANCHOR.maxDraw);
+    this.snapshot.power = clamp(distance / AIM_ANCHOR.fullPowerDraw, 0.18, 1);
+    this.snapshot.angle = clamp(Math.atan2(dy, dx) * 180 / Math.PI, 12, 68);
+    const angle = this.snapshot.angle * Math.PI / 180;
+    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * distance; this.player.y = AIM_ANCHOR.y + Math.sin(angle) * distance;
+    this.notify(false);
+  };
+  private pointerUp = (event: PointerEvent) => {
+    if (!this.isDragging) return;
+    if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
+    this.launch();
+  };
+  private pointerCancel = () => {
+    if (this.isDragging) {
+      this.isDragging = false; this.player.x = START_X; this.player.y = START_Y;
+      this.snapshot.power = 0.8; this.snapshot.angle = 36; this.notify(); this.invalidate();
+    }
+  };
+  private pointerLeave = () => { this.pointerDrift = 0; if (!this.isDragging) this.canvas.style.cursor = ''; };
+
+  private frame = (now: number) => {
+    this.frameId = 0;
+    if (this.destroyed || !this.visible || document.hidden) return;
+    const dt = Math.min(this.lastFrame ? (now - this.lastFrame) / 1000 : 1 / 60, 0.1);
+    this.lastFrame = now;
+    if (this.status !== 'paused' && this.inputEnabled) {
+      this.time += dt; this.shake *= Math.exp(-9 * dt);
+      if (this.status === 'flying') {
+        this.accumulator = Math.min(0.1, this.accumulator + dt);
+        while (this.accumulator >= STEP && this.status === 'flying') {
+          for (const racer of this.racers) {
+            racer.previous.x = racer.x; racer.previous.y = racer.y;
+            racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
           }
-          this.shake = 10;
-          this.effects.push({
-            type: 'debris',
-            x: other.position.x,
-            y: other.position.y,
-            ttl: 50,
-            maxTtl: 50,
-            color: '#f59e0b',
-            particles: this.makeParticles(other.position.x, other.position.y, 22, 7),
-          });
-          if (m.info.isPlayer) this.onEvent?.('SMASH! Shortcut opened', '#f59e0b');
-        } else if (m.info.isPlayer && this.time - this.lastWallToast > 1200 && dmg > 0.5) {
-          this.lastWallToast = this.time;
-          this.onEvent?.(`Too light! Wall at ${Math.round((md.hp / (md.maxHp ?? 1)) * 100)}%`, '#94a3b8');
+          this.stepRace(STEP); this.accumulator -= STEP;
         }
-        break;
       }
-      case 'pad': {
-        if (this.time < m.padCooldownUntil) break;
-        m.padCooldownUntil = this.time + 600;
-        const dir = md.dir ?? { x: -1, y: -1 };
-        const vy = Math.min(12.2, 3.5 + 9.5 * m.restitution);
-        this.pendingLaunches.set(m.info.id, { x: dir.x * 4.5, y: -vy });
-        this.effects.push({ type: 'ring', x: other.position.x, y: other.position.y - 10, ttl: 20, maxTtl: 20, color: '#34d399' });
-        if (m.info.isPlayer) this.onEvent?.(`Boing! Bounce power ${(m.restitution * 100).toFixed(0)}%`, '#34d399');
-        break;
-      }
-      case 'itembox': {
-        if (!md.active) break;
-        const available = ITEM_POOL.filter((item) => m.inventory[item] < MAX_ITEM_STACK);
-        if (!available.length) break;
-        md.active = false;
-        md.respawnAt = this.time + 7000;
-        this.grantItem(m, available[Math.floor(this.rng() * available.length)]);
-        this.effects.push({ type: 'ring', x: other.position.x, y: other.position.y, ttl: 18, maxTtl: 18, color: '#facc15' });
-        break;
-      }
-      case 'ppeg': {
-        if (md.hit) break;
-        md.hit = true;
-        md.hitAt = this.time;
-        this.poppingPegs.add(other);
-        const col = md.pegColor ?? 'blue';
-        const pc = col === 'orange' ? '#fb923c' : col === 'green' ? '#4ade80' : '#60a5fa';
-        this.effects.push({ type: 'ring', x: other.position.x, y: other.position.y, ttl: 14, maxTtl: 14, color: pc });
-        this.effects.push({ type: 'debris', x: other.position.x, y: other.position.y, ttl: 22, maxTtl: 22, color: pc, particles: this.makeParticles(other.position.x, other.position.y, 6, 2.5) });
-        if (col === 'orange') {
-          m.pegs++;
-          // orange pegs give a little kick of speed
-          const v = Body.getVelocity(m.body);
-          const sp = Math.hypot(v.x, v.y) || 1;
-          Body.setVelocity(m.body, { x: v.x + (v.x / sp) * 1.5, y: v.y + (v.y / sp) * 1.5 + 0.5 });
-          this.effects.push({ type: 'text', x: other.position.x, y: other.position.y - 20, ttl: 40, maxTtl: 40, color: '#fdba74', text: '+1 PEG' });
-        } else if (col === 'green') {
-          this.grantItem(m, md.itemDrop ?? ITEM_POOL[Math.floor(this.rng() * ITEM_POOL.length)]);
-          this.effects.push({ type: 'text', x: other.position.x, y: other.position.y - 20, ttl: 40, maxTtl: 40, color: '#86efac', text: 'POWER!' });
-        }
-        break;
-      }
-      case 'bucket': {
-        if (this.time < (md.cooldownUntil ?? 0)) break;
-        md.cooldownUntil = this.time + 250;
-        Body.setPosition(m.body, { x: other.position.x, y: other.position.y + 30 });
-        this.pendingLaunches.set(m.info.id, { x: 0, y: 17 });
-        m.trail = [];
-        this.shake = 6;
-        this.effects.push({ type: 'ring', x: other.position.x, y: other.position.y, ttl: 24, maxTtl: 24, color: '#f0abfc' });
-        this.effects.push({ type: 'text', x: other.position.x, y: other.position.y - 30, ttl: 60, maxTtl: 60, color: '#f0abfc', text: 'FREE BALL!' });
-        if (m.info.isPlayer) this.onEvent?.('FREE BALL! Bucket launch', '#f0abfc');
-        break;
-      }
-      case 'finish': {
-        this.finishMarble(m);
-        break;
-      }
-      default:
-        break;
+      this.updateParticles(dt);
+      if (this.time > this.noticeUntil) this.snapshot.notice = '';
     }
+    const alpha = this.status === 'flying' ? clamp(this.accumulator / STEP, 0, 1) : 1;
+    for (let i = 0; i < this.racers.length; i++) {
+      const racer = this.racers[i]; const rendered = this.renderRacers[i];
+      rendered.x = racer.previous.x + (racer.x - racer.previous.x) * alpha;
+      rendered.y = racer.previous.y + (racer.y - racer.previous.y) * alpha;
+      rendered.z = racer.previous.z + (racer.z - racer.previous.z) * alpha;
+      rendered.rotation = racer.previous.rotation + (racer.rotation - racer.previous.rotation) * alpha;
+      rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
+      rendered.falling = racer.falling; rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
+      rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
+      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
+    }
+    const player = this.player; const rendered = this.renderRacers[0];
+    if (this.status === 'flying' && this.inputEnabled) {
+      const focus = player.loopRide?.obstacle.x ?? rendered.x;
+      const target = Math.min(this.renderer.view.followOffset(focus, rendered.z), FINISH - 350);
+      this.camera += (target - this.camera) * (1 - Math.exp(-7 * dt));
+      const cameraTargetY = this.y(focus + player.vx * 0.09) - GROUND;
+      this.cameraY += (cameraTargetY - this.cameraY) * (1 - Math.exp(-10 * dt));
+    }
+    this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
+    const active = this.status === 'flying' || this.isDragging;
+    const due = active || this.needsRender || !this.lastRender || now - this.lastRender >= 1000 / 30 - 0.5;
+    if (due && (this.status !== 'paused' || this.needsRender)) {
+      const interval = this.lastRender ? now - this.lastRender : 16.67;
+      this.lastRender = now; this.needsRender = false;
+      if (this.status === 'flying' && now - this.trailSample > 16) {
+        this.trailSample = now; this.trail.push({ x: rendered.x, y: rendered.y, z: rendered.z });
+        if (this.trail.length > 9) this.trail.shift();
+      }
+      this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
+        drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
+        launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
+        obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
+        snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion }, interval);
+    }
+    if (now - this.lastNotify > 100) this.notify(false);
+    const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
+    if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient)) this.schedule();
+  };
+
+  private stepRace(dt: number) {
+    this.runTime += dt;
+    for (const racer of this.racers) {
+      if (racer.finished) continue;
+      if (racer.id && this.runTime >= racer.nextDecision) this.driveCPU(racer);
+      this.stepRacer(racer, dt);
+    }
+    this.resolveBumps();
+    this.resolvePickups();
+    this.refreshSnapshot();
+    if (this.player.finished) {
+      this.snapshot.settling = true;
+      this.snapshot.finishWait = Math.max(0, Math.ceil(10 - (this.runTime - this.player.finishTime!)));
+      if (this.racers.every((racer) => racer.finished) || this.snapshot.finishWait === 0) this.finish(true);
+    }
+    else if (this.runTime > 300) this.finish(false);
   }
 
-  private onCollisionActive(e: Matter.IEventCollision<Matter.Engine>) {
-    for (const pair of e.pairs) {
-      const a = pair.bodyA;
-      const b = pair.bodyB;
-      const ma = this.marbleOf(a);
-      const mb = this.marbleOf(b);
-      const m = ma ?? mb;
-      const other = ma ? b : a;
-      if (!m || (ma && mb) || m.frozen || m.finishedAt !== null || !this.gateOpen) continue;
-      const md = meta(other);
-      if (!md) continue;
-      this.contactSurface(m, other, pair);
-      if (md.kind === 'boost' && md.dir) {
-        const v = Body.getVelocity(m.body);
-        const k = 0.45 * Math.sqrt(1 / m.body.mass) * this.engine.timing.lastDelta / BASE_TICK;
-        Body.setVelocity(m.body, { x: v.x + md.dir.x * k, y: v.y + md.dir.y * k });
-        if (this.rng() < 0.3) {
-          this.effects.push({
-            type: 'debris',
-            x: m.body.position.x,
-            y: m.body.position.y,
-            ttl: 14,
-            maxTtl: 14,
-            color: '#fb923c',
-            particles: this.makeParticles(m.body.position.x, m.body.position.y, 2, 1.5),
-          });
+  private driveCPU(racer: Racer) {
+    const difficulty = this.config?.difficulty ?? 'racer';
+    const reaction = difficulty === 'rookie' ? 0.43 : difficulty === 'veteran' ? 0.13 : 0.19;
+    racer.nextDecision = this.runTime + reaction + racer.id * 0.023;
+    if (racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
+    const lookAhead = clamp(racer.vx * (difficulty === 'rookie' ? 0.54 : difficulty === 'veteran' ? 0.92 : 0.75), 360, 1350);
+    const current = racer.targetLane;
+    let bestLane = current; let bestScore = -Infinity;
+    const seen = new Set<Obstacle>();
+    const supplies = new Set<AirPickup>();
+    for (let key = Math.floor(racer.x / BUCKET); key <= Math.floor((racer.x + lookAhead) / BUCKET); key++) {
+      for (const obstacle of this.buckets.get(key) ?? EMPTY) seen.add(obstacle);
+      for (const pickup of this.pickupBuckets.get(key) ?? []) if (pickup.collectedBy === null) supplies.add(pickup);
+    }
+    for (let lane = Math.max(0, current - 1); lane <= Math.min(3, current + 1); lane++) {
+      let score = lane === current ? 1.1 : -0.25;
+      for (const obstacle of seen) {
+        const distance = obstacle.x - racer.x;
+        if (distance < -obstacle.width || distance > lookAhead || !occupiesLane(obstacle, laneZ(lane), 0)) continue;
+        if (obstacle.kind === 'gap') score -= distance < racer.vx * 0.45 ? 13 : 7;
+        else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
+          const proximity = 1 - clamp(distance / lookAhead, 0, 1);
+          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2 : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
+        }
+      }
+      for (const pickup of supplies) {
+        const distance = pickup.x - racer.x;
+        if (pickup.lane !== lane || distance < 45 || distance > lookAhead) continue;
+        const needed = pickup.kind === 'shield' ? racer.shieldUntil <= this.runTime : pickup.kind === 'fuel' ? racer.boosts < 2 : racer.bounces < 3;
+        score += (needed ? 4.8 : 0.8) * (1 - distance / lookAhead) * (this.y(pickup.x) - pickup.y > 160 ? 0.35 : 1);
+      }
+      for (const other of this.racers) {
+        if (other.id === racer.id || other.finished || other.falling) continue;
+        if (Math.abs(other.x - racer.x) < 125 && Math.abs(other.z - laneZ(lane)) < 90) {
+          score += racer.weight > other.weight * 1.05 && randomAt(racer.id, this.runTime) > 0.43 ? 3.8 : -2.8;
+        }
+      }
+      if (score > bestScore) { bestScore = score; bestLane = lane; }
+    }
+    if (this.runTime - racer.lastLaneChange > (difficulty === 'rookie' ? 0.9 : difficulty === 'veteran' ? 0.48 : 0.66)) this.setLane(racer, bestLane);
+    const soon = racer.x + racer.vx * 0.22;
+    if (this.canHop(racer) && (this.inGap(soon, racer.z) || this.inGap(soon, laneZ(racer.targetLane)))) this.performHop(racer);
+    if (this.canHop(racer)) {
+      const timing = hopTiming(racer.vx, 290 * weightImpulse(racer.weight) * racer.hopFactor);
+      for (const pickup of supplies) {
+        const distance = pickup.x - racer.x;
+        if (Math.abs(racer.z - pickup.z) < 52 && this.y(pickup.x) - pickup.y < 145 && distance > timing - 65 && distance < timing + 65 && !this.inGap(pickup.x, racer.z)) {
+          this.performHop(racer); break;
         }
       }
     }
+    if (!racer.grounded && racer.bounces && this.inGap(racer.x + racer.vx * 0.1, racer.z)
+      && racer.y > this.y(racer.x) - 105 && racer.vy > 90) this.performBounce(racer);
+    if (racer.boosts && this.runTime - racer.lastBoostAt > (difficulty === 'rookie' ? 5.5 : difficulty === 'veteran' ? 2.8 : 3.4) && this.runTime > 1.6
+      && (racer.vx < racer.launchSpeed / 0.16 * 0.92 || racer.x < this.player.x - 85)) this.performBoost(racer);
   }
 
-  private contactSurface(m: Marble, obstacle: Matter.Body, pair: Matter.Pair) {
-    const surface = meta(obstacle)?.surface;
-    if (!surface || m.frozen || m.finishedAt !== null) return;
-    const offset = { x: m.body.position.x - surface.start.x, y: m.body.position.y - surface.start.y };
-    if (offset.x * surface.normal.x + offset.y * surface.normal.y < 0) return;
-    this.supports.set(m.info.id, surface);
-    pair.friction = this.time < m.aeroUntil ? 0 : 0.002;
-    pair.frictionStatic = 0;
-    const velocity = Body.getVelocity(m.body);
-    const impact = Math.abs(velocity.x * surface.normal.x + velocity.y * surface.normal.y);
-    if (impact < 1.3) pair.restitution = 0;
-  }
-
-  private finishMarble(m: Marble) {
-    if (m.finishedAt !== null || !this.gateOpen) return;
-    m.finishedAt = this.raceTime();
-    this.finishOrder.push(m);
-    m.body.frictionAir = 0.045;
-    m.trail = [];
-    this.effects.push({ type: 'ring', x: m.body.position.x, y: m.body.position.y, ttl: 30, maxTtl: 30, color: m.info.color });
-  }
-
-  private updateRecovery(m: Marble, dt: number) {
-    if (!this.recoveryEnabled || m.finishedAt !== null) return;
-    // Deliberate item penalties pause the watchdog; recovery must not cancel a freeze or oil hit.
-    if (m.frozen || m.inOil) {
-      m.motionAt += dt;
-      m.depthAt += dt;
+  private stepRacer(racer: Racer, dt: number) {
+    const oldX = racer.x;
+    if (racer.falling) {
+      racer.fallingFor += dt; racer.vy += GRAVITY * dt;
+      racer.x += racer.vx * dt * 0.45; racer.y += racer.vy * dt; racer.rotation += 9 * dt;
+      if (racer.fallingFor > 0.72) this.recover(racer);
       return;
     }
-    const p = m.body.position;
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x < -MARBLE_RADIUS || p.x > W + MARBLE_RADIUS || p.y < -60) {
-      this.recoverMarble(m);
-      return;
+    if (!racer.loopRide) {
+      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling;
+      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling);
+      racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
+      const previousZ = racer.z;
+      racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+      if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
+      racer.lane = closestLane(racer.z);
     }
-    if (Math.hypot(p.x - m.motionAnchor.x, p.y - m.motionAnchor.y) > 26) {
-      m.motionAnchor = { ...p };
-      m.motionAt = this.time;
-    }
-    if (p.y > m.deepestY + 16) {
-      m.deepestY = p.y;
-      m.depthAt = this.time;
-    }
-    const stalled = this.time - m.motionAt;
-    const noDescent = this.time - m.depthAt;
-    m.stuckTime = Math.max(stalled, noDescent);
-    if (this.time - m.lastRecoveryAt < 1800) return;
-
-    if (stalled > 4700 || noDescent > 8500) {
-      this.recoverMarble(m);
-    } else if (stalled > 1300) {
-      const surface = this.supports.get(m.info.id);
-      const direction = surface ? downhill(surface).x : p.x < W / 2 ? 1 : -1;
-      const v = Body.getVelocity(m.body);
-      Body.setVelocity(m.body, { x: direction * (3.2 + (m.info.id % 3) * 0.4), y: Math.min(v.y, -2.8) });
-      m.lastRecoveryAt = this.time;
-      m.nudges++;
-    }
-  }
-
-  private recoverMarble(m: Marble) {
-    const p = m.body.position;
-    const origin = {
-      x: Number.isFinite(p.x) ? Math.max(35, Math.min(W - 35, p.x)) : W / 2,
-      y: Number.isFinite(p.y) ? Math.max(this.track.startY, p.y) : m.deepestY,
-    };
-    const blockers = [...this.track.bodies.filter((body) => !meta(body).destroyed), ...this.marbles.map((marble) => marble.body)].filter((body) => body !== m.body && !body.isSensor);
-    const probe = Bodies.circle(0, 0, MARBLE_RADIUS + 4);
-    const direction = origin.x < W / 2 ? 1 : -1;
-    let destination: Matter.Vector | undefined;
-    // Move just below the local obstruction, never to the next checkpoint or past the finish.
-    for (const dy of [60, 100, 140, 190, 240, 290]) {
-      for (const dx of [0, 42, -42, 84, -84, 140, -140, 220, -220, 320, -320]) {
-        const point = {
-          x: Math.max(32, Math.min(W - 32, origin.x + dx * direction)),
-          y: Math.min(this.track.finishY - 45, origin.y + dy),
-        };
-        Body.setPosition(probe, point);
-        if (!Query.collides(probe, blockers).length) {
-          destination = point;
-          break;
-        }
+    const dragFactor = 120 / racer.weight;
+    if (racer.loopRide) {
+      const ride = racer.loopRide; const loop = loopGeometry(ride.obstacle, this.options.course);
+      racer.z += (obstacleZ(ride.obstacle) - racer.z) * Math.min(1, dt * 16); racer.vz = 0;
+      if (ride.entryProgress < 1) {
+        ride.entryProgress = Math.min(1, ride.entryProgress + dt * 7);
+        const t = ride.entryProgress; const ease = t * t * (3 - 2 * t);
+        const x = loop.x + Math.sin(ride.entryAngle) * loop.ballRadius;
+        const y = loop.y + Math.cos(ride.entryAngle) * loop.ballRadius + this.y(x) - this.y(loop.x);
+        racer.x = ride.entry.x + (x - ride.entry.x) * ease; racer.y = ride.entry.y + (y - ride.entry.y) * ease;
+      } else {
+        ride.angle += Math.min(ride.speed, 760) / loop.ballRadius * dt;
+        racer.x = loop.x + Math.sin(ride.angle) * loop.ballRadius;
+        racer.y = loop.y + Math.cos(ride.angle) * loop.ballRadius + this.y(racer.x) - this.y(loop.x);
       }
-      if (destination) break;
-    }
-    if (!destination) {
-      m.lastRecoveryAt = this.time;
-      return;
-    }
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || m.body.vertices.some((v) => !Number.isFinite(v.x) || !Number.isFinite(v.y))) {
-      Composite.remove(this.world, m.body);
-      m.body = createMarble(m.info, destination);
-      if (m.anvilUntil > this.time) Body.setDensity(m.body, m.baseDensity * 3);
-      if (m.ghostUntil > this.time) m.body.collisionFilter.mask = CAT_WALL | CAT_SENSOR;
-      Composite.add(this.world, m.body);
-    } else Body.setPosition(m.body, destination);
-    Body.setVelocity(m.body, { x: 0, y: 1 });
-    Body.setAngularVelocity(m.body, 0);
-    m.trail = [];
-    m.motionAnchor = { ...destination };
-    m.motionAt = m.depthAt = m.lastRecoveryAt = this.time;
-    m.deepestY = destination.y;
-    m.recoveryUntil = this.time + 1600;
-    m.recoveries++;
-    this.effects.push({ type: 'ring', ...destination, ttl: 30, maxTtl: 30, color: '#d63e2e' });
-    if (m.info.isPlayer) this.onEvent?.('Race marshal: back on track', '#d63e2e');
-  }
-
-  makeParticles(x: number, y: number, n: number, sp: number) {
-    const arr = [];
-    for (let i = 0; i < n; i++) {
-      const a = this.rng() * Math.PI * 2;
-      const s = sp * (0.4 + this.rng());
-      arr.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, s: 2 + this.rng() * 3 });
-    }
-    return arr;
-  }
-
-  setFrozen(m: Marble, on: boolean) {
-    if (m.frozen === on) return;
-    m.frozen = on;
-    if (on) {
-      Body.setVelocity(m.body, { x: 0, y: 0 });
-      Body.setAngularVelocity(m.body, 0);
-      Body.setStatic(m.body, true);
+      racer.rotation += Math.min(ride.speed, 760) / RADIUS * dt;
+      if (ride.angle >= ride.exitAngle) {
+        racer.x = loop.x + 3; racer.y = loop.y + loop.ballRadius + this.y(racer.x) - this.y(loop.x);
+        racer.vx = Math.min(racer.maximumSpeed, ride.speed * 1.08); racer.vy = this.slope(racer.x) * racer.vx;
+        racer.loopRide = null; racer.grounded = false;
+        if (!racer.id) { this.snapshot.score += 350; this.counts.loops++; this.say('A WELL-ROUNDED BAD IDEA.'); this.audio.play('loop'); }
+      }
     } else {
-      Body.setStatic(m.body, false);
-      // setStatic restores original mass; re-apply current density (anvil may be active)
-      Body.setDensity(m.body, this.time < m.anvilUntil ? m.baseDensity * 3 : m.baseDensity);
-      m.body.friction = this.time < m.aeroUntil ? 0 : 0.004;
-      m.frozenUntil = 0;
-    }
-  }
-
-  // ---------- items ----------
-  grantItem(m: Marble, item: ItemType): boolean {
-    if (m.inventory[item] >= MAX_ITEM_STACK) {
-      if (m.info.isPlayer) this.onEvent?.(`${ITEM_INFO[item].name} storage full (${MAX_ITEM_STACK})`, '#a4b7c8');
-      return false;
-    }
-    m.inventory[item]++;
-    m.lastPickupAt = this.time;
-    m.aiUseAt = this.time + 800 + this.rng() * 1800;
-    if (m.info.isPlayer) {
-      this.onInventoryChange?.({ ...m.inventory });
-      this.onEvent?.(`+1 ${ITEM_INFO[item].name} / added to your loadout`, ITEM_INFO[item].color);
-    }
-    return true;
-  }
-
-  itemRemaining(m: Marble, item: ItemType): number {
-    const end = { rocket: m.rocketUntil, jump: m.jumpUntil, aero: m.aeroUntil, anvil: m.anvilUntil, ghost: m.ghostUntil, oil: 0, shock: 0, freeze: 0 }[item];
-    return Math.max(0, end - this.time);
-  }
-
-  availableItem(m: Marble = this.player): ItemType | undefined {
-    return ITEM_TYPES.find((item) => m.inventory[item] > 0 && this.itemRemaining(m, item) === 0);
-  }
-
-  canUseItem(m: Marble, item: ItemType): boolean {
-    return this.gateOpen && !m.frozen && m.finishedAt === null && m.inventory[item] > 0 && this.time >= m.itemCooldownUntil && this.itemRemaining(m, item) === 0;
-  }
-
-  speedLimit(m: Marble): number {
-    return Math.min(32, m.maxSpeed + (this.time < m.rocketUntil ? 8 : 0) + (this.time < m.anvilUntil ? 4 : 0) + (this.time < m.aeroUntil ? 3 : 0));
-  }
-
-  usePlayerItem(item = this.availableItem()): boolean {
-    return item ? this.useItem(this.player, item) : false;
-  }
-
-  useItem(m: Marble, item = this.availableItem(m)): boolean {
-    if (!item || !this.canUseItem(m, item)) return false;
-    const p = m.body.position;
-    const freezeTarget = item === 'freeze' ? this.marbles
-      .filter((rival) => rival !== m && rival.finishedAt === null && !rival.frozen && rival.body.position.y > p.y - 20 && Math.hypot(rival.body.position.x - p.x, rival.body.position.y - p.y) < 900)
-      .sort((a, b) => Math.hypot(a.body.position.x - p.x, a.body.position.y - p.y) - Math.hypot(b.body.position.x - p.x, b.body.position.y - p.y))[0] : undefined;
-    if (item === 'freeze' && !freezeTarget) {
-      if (m.info.isPlayer) this.onEvent?.('No rival in range / freeze charge kept', '#7dd3fc');
-      else m.aiUseAt = this.time + 1500;
-      return false;
-    }
-    m.inventory[item]--;
-    m.itemCooldownUntil = this.time + 450;
-    switch (item) {
-      case 'oil': {
-        this.oils.push({ x: p.x, y: p.y - 10, r: 48, ownerId: m.info.id, expiresAt: this.time + 9000 });
-        break;
-      }
-      case 'freeze': {
-        const target = freezeTarget;
-        if (target) {
-          target.frozenUntil = this.time + 2500;
-          this.setFrozen(target, true);
-          this.effects.push({ type: 'beam', x: p.x, y: p.y, x2: target.body.position.x, y2: target.body.position.y, ttl: 20, maxTtl: 20, color: '#7dd3fc' });
-          this.effects.push({ type: 'snow', x: target.body.position.x, y: target.body.position.y, ttl: 40, maxTtl: 40, color: '#bae6fd', particles: this.makeParticles(target.body.position.x, target.body.position.y, 12, 2) });
-          if (target.info.isPlayer) this.onEvent?.(`${m.info.name} froze you!`, '#7dd3fc');
-          if (m.info.isPlayer) this.onEvent?.(`Froze ${target.info.name}!`, '#7dd3fc');
-        }
-        break;
-      }
-      case 'rocket': {
-        m.rocketUntil = this.time + ITEM_INFO.rocket.duration;
-        break;
-      }
-      case 'jump': {
-        const v = Body.getVelocity(m.body);
-        Body.setVelocity(m.body, { x: v.x, y: -11.5 - m.info.stats.bounce * 0.12 });
-        m.jumpUntil = this.time + ITEM_INFO.jump.duration;
-        this.effects.push({ type: 'ring', x: p.x, y: p.y + MARBLE_RADIUS, ttl: 22, maxTtl: 22, color: ITEM_INFO.jump.color });
-        break;
-      }
-      case 'aero': {
-        m.aeroUntil = this.time + ITEM_INFO.aero.duration;
-        m.body.frictionAir = m.frictionAir * 0.05;
-        m.body.friction = 0;
-        this.effects.push({ type: 'ring', x: p.x, y: p.y, ttl: 24, maxTtl: 24, color: ITEM_INFO.aero.color });
-        break;
-      }
-      case 'shock': {
-        this.shake = 8;
-        this.effects.push({ type: 'ring', x: p.x, y: p.y, ttl: 30, maxTtl: 30, color: '#facc15' });
-        for (const o of this.marbles) {
-          if (o === m || o.finishedAt !== null) continue;
-          const dx = o.body.position.x - p.x;
-          const dy = o.body.position.y - p.y;
-          const d = Math.hypot(dx, dy);
-          if (d < 240 && d > 0.01) {
-            this.setFrozen(o, false);
-            const k = 11 * (1 - d / 240) / Math.sqrt(o.body.mass / 0.8);
-            const v = Body.getVelocity(o.body);
-            Body.setVelocity(o.body, { x: v.x + (dx / d) * k, y: v.y + (dy / d) * k - 2 });
+      if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
+      const before = this.surfaceAt(racer.x, racer.z);
+      if (racer.grounded && !this.inGap(racer.x, racer.z)) {
+        const downhill = GRAVITY * before.slope / (1 + before.slope * before.slope) / 1.4;
+        const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
+        racer.vx = Math.max(0, racer.vx + (downhill - resistance) * dt);
+        racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
+        if (this.inGap(racer.x, racer.z)) { racer.grounded = false; racer.y += racer.vy * dt; }
+        else {
+          const surface = this.surfaceAt(racer.x, racer.z);
+          racer.y = surface.y - RADIUS; racer.vy = surface.slope * racer.vx; racer.lastGroundedAt = this.runTime;
+          if (surface.ramp && !racer.visited.has(surface.ramp) && (racer.x - surface.ramp.x) / surface.ramp.width > 0.94) {
+            racer.vy -= 155 * weightImpulse(racer.weight); racer.y -= 2; racer.grounded = false;
+            racer.visited.add(surface.ramp);
+            if (!racer.id) { this.snapshot.score += 75; this.audio.play('launch'); }
           }
         }
-        break;
+      } else {
+        racer.grounded = false;
+        racer.vx *= Math.exp(-0.009 * dragFactor * dt);
+        racer.vy += GRAVITY * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
       }
-      case 'anvil': {
-        m.anvilUntil = this.time + ITEM_INFO.anvil.duration;
-        if (!m.frozen) Body.setDensity(m.body, m.baseDensity * 3);
-        this.effects.push({ type: 'ring', x: p.x, y: p.y, ttl: 20, maxTtl: 20, color: '#cbd5e1' });
-        break;
+      for (const obstacle of this.nearby(racer.x)) {
+        if (racer.visited.has(obstacle) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
+        if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep') && obstacle.hit) continue;
+        if (obstacle.kind === 'loop') {
+          const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
+          const dy = racer.y - (this.y(racer.x) - this.y(loop.x)) - loop.y;
+          if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
+            const angle = (Math.atan2(dx, dy) + TAU) % TAU;
+            racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
+            racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
+              speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
+            if (!racer.id) { this.say('HOLD ON TO YOUR GOBLIN.'); this.audio.play('boost'); }
+            break;
+          }
+        } else {
+          const center = obstacle.x + obstacle.width / 2; const base = this.y(center);
+          if (Math.abs(racer.x - center) < obstacle.width / 2 + RADIUS && racer.y + RADIUS > base - obstacle.height && racer.y - RADIUS < base + 10) this.hitObstacle(racer, obstacle);
+        }
       }
-      case 'ghost': {
-        m.ghostUntil = this.time + ITEM_INFO.ghost.duration;
-        m.body.collisionFilter.mask = CAT_WALL | CAT_SENSOR;
-        break;
+      const surface = this.surfaceAt(racer.x, racer.z); const gap = this.inGap(racer.x, racer.z);
+      if (gap && racer.y > this.y(racer.x) + RADIUS + 8) { racer.falling = true; racer.fallingFor = 0; racer.grounded = false; }
+      const normalSpeed = racer.vy - surface.slope * racer.vx;
+      if (!gap && !racer.falling && !racer.loopRide && !racer.grounded && racer.y + RADIUS >= surface.y && normalSpeed >= 0) {
+        racer.y = surface.y - RADIUS;
+        const restitution = clamp(0.28 * Math.sqrt(dragFactor), 0.17, 0.38);
+        if (normalSpeed > 260) {
+          racer.vy = surface.slope * racer.vx - normalSpeed * restitution;
+          this.emit(racer.x, surface.y, racer.z, 3, '#b8a77b', 70);
+          if (!racer.id) { this.audio.play('land'); if (normalSpeed > 500) this.shake = 1.8; }
+        } else { racer.grounded = true; racer.lastGroundedAt = this.runTime; racer.vy = surface.slope * racer.vx; }
+      }
+      racer.rotation += (racer.x - oldX) * (racer.grounded ? Math.sqrt(1 + surface.slope * surface.slope) : 1) / RADIUS;
+    }
+    racer.vx = clamp(racer.vx, 0, racer.maximumSpeed);
+    racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
+    racer.stoppedFor = racer.vx < 40 && !racer.loopRide ? racer.stoppedFor + dt : 0;
+    if (racer.x >= FINISH && !racer.falling) {
+      racer.finishTime = this.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
+      racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
+      if (racer.id) racer.y = this.y(racer.x) - RADIUS;
+    } else if (racer.y > this.y(racer.x) + 360 || racer.stoppedFor > 3) this.recover(racer);
+  }
+
+  private recover(racer: Racer) {
+    racer.x = Math.max(START_X + 440, racer.x - 200);
+    let lane = racer.targetLane;
+    for (let i = 0; i < 4; i++) {
+      const candidate = (lane + i) % 4;
+      if (!this.inGap(racer.x, laneZ(candidate)) && !this.inGap(racer.x + 110, laneZ(candidate))) { lane = candidate; break; }
+    }
+    racer.targetLane = racer.lane = lane; racer.z = laneZ(lane); racer.vz = 0;
+    racer.y = this.surfaceAt(racer.x, racer.z).y - RADIUS;
+    racer.vx = 390; racer.vy = this.slope(racer.x) * racer.vx;
+    racer.falling = false; racer.grounded = true; racer.loopRide = null;
+    racer.fallingFor = racer.stoppedFor = 0; racer.immuneUntil = this.runTime + 1.5;
+    racer.recoveryUntil = this.runTime + 1; racer.steerLockedUntil = this.runTime + 0.15;
+    racer.boosts = Math.max(1, racer.boosts);
+    racer.shieldUntil = -100;
+    Object.assign(racer.previous, { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation });
+    if (!racer.id) { this.snapshot.score = Math.max(0, this.snapshot.score - 100); this.trail.length = 0; this.say('PIT CREW TO THE RESCUE. KEEP RACING.'); }
+  }
+
+  private resolveBumps() {
+    for (let i = 0; i < this.racers.length - 1; i++) for (let j = i + 1; j < this.racers.length; j++) {
+      const a = this.racers[i]; const b = this.racers[j];
+      if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
+        || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
+      const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
+      const diameter = RADIUS * 2 + 4;
+      const distance = Math.hypot(dx, dz, dy);
+      if (distance >= diameter || Math.abs(dy) > RADIUS * 1.55) continue;
+      const planar = Math.hypot(dx, dz) || 1;
+      const nx = dx / planar; const nz = dz / planar;
+      const sum = a.weight + b.weight;
+      const penetration = (diameter - distance + 1) * 0.55;
+      a.x -= nx * penetration * b.weight / sum; b.x += nx * penetration * a.weight / sum;
+      a.z -= nz * penetration * b.weight / sum; b.z += nz * penetration * a.weight / sum;
+      a.z = clamp(a.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+      b.z = clamp(b.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+      const pair = i * 4 + j;
+      if (this.runTime - this.collisionTimes[pair] < 0.38) continue;
+      this.collisionTimes[pair] = this.runTime;
+      const shieldA = this.absorbShield(a);
+      const shieldB = this.absorbShield(b);
+      const relative = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
+      if (relative < 0) {
+        const impulse = -(1.38 * relative) / (1 / a.weight + 1 / b.weight);
+        if (!shieldA) a.vx = clamp(a.vx - impulse * nx / a.weight, 100, a.maximumSpeed);
+        if (!shieldB) b.vx = clamp(b.vx + impulse * nx / b.weight, 100, b.maximumSpeed);
+      }
+      // A rear-end hit also has a sideways component: heavy capsules shove the
+      // lighter target toward an adjacent lane, rather than stacking in place.
+      let side = Math.abs(dz) > 8 ? Math.sign(dz) : (closestLane(b.z) === 0 ? -1 : closestLane(b.z) === 3 ? 1 : ((i + j) % 2 ? 1 : -1));
+      if (!side) side = 1;
+      const closing = Math.min(380, Math.abs(a.vx - b.vx) + Math.abs(a.vz - b.vz));
+      const kick = 270 + closing * 0.22;
+      if (!shieldA) this.shove(a, -side, kick * Math.min(1.65, b.weight / a.weight));
+      if (!shieldB) this.shove(b, side, kick * Math.min(1.65, a.weight / b.weight));
+      const x = (a.x + b.x) / 2; const z = (a.z + b.z) / 2;
+      this.emit(x, (a.y + b.y) / 2, z, 10, '#ffe0a0', 140);
+      if (!a.id || !b.id) {
+        if ((!a.id && shieldA) || (!b.id && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
+        else if ((!a.id && shieldB) || (!b.id && shieldA)) {
+          this.audio.play('shield'); this.shake = 2;
+          this.say(`${a.id ? a.name : b.name}'S SHIELD HELD. FIND ANOTHER LINE.`);
+        }
+        else {
+          this.counts.bumps++; this.snapshot.score += 50; this.shake = 4;
+          this.audio.play('bump'); this.say(`MAKE ROOM! ${a.id ? a.name : b.name} GOT A NUDGE.`);
+        }
       }
     }
-    if (m.info.isPlayer) {
-      this.onInventoryChange?.({ ...m.inventory });
-      if (item !== 'freeze') this.onEvent?.(`${ITEM_INFO[item].name} deployed`, ITEM_INFO[item].color);
-    }
+  }
+
+  private shove(racer: Racer, direction: number, speed: number) {
+    const lane = closestLane(racer.z);
+    racer.targetLane = clamp(lane - Math.sign(direction), 0, 3);
+    racer.vz = clamp(racer.vz + direction * speed, -650, 650);
+    racer.z = clamp(racer.z + direction * 5, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.steerLockedUntil = this.runTime + 0.28 * racer.bumpRecovery; racer.bumpAt = this.runTime;
+    racer.lastLaneChange = this.runTime;
+  }
+
+  private absorbShield(racer: Racer) {
+    if (racer.shieldUntil <= this.runTime) return false;
+    racer.shieldUntil = -100;
+    racer.shieldHitAt = this.runTime;
+    racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.3);
+    this.emit(racer.x, racer.y, racer.z, 9, POWERUPS.shield.color, 155);
+    if (!racer.id) this.shieldBlocks++;
     return true;
   }
 
-  // ---------- main step ----------
-  /** Advance the simulation by one fixed sub-step (dt in ms). */
-  step(dt: number) {
-    const s = dt / TICK; // fraction of a 60fps tick
-    this.time += dt;
-    if (!this.gateOpen) return;
-    this.syncTrack();
-
-    // item boxes respawn
-    for (const box of this.track.itemBoxes) {
-      const md = meta(box);
-      if (!md.active && this.time >= (md.respawnAt ?? 0)) md.active = true;
-    }
-    // spinners
-    for (const sp of this.track.spinners) {
-      const md = meta(sp);
-      (Body.setAngle as unknown as (b: Matter.Body, a: number, u: boolean) => void)(sp, sp.angle + (md.spin ?? 0) * s, true);
-    }
-    // oil expiry
-    this.oils = this.oils.filter((o) => o.expiresAt > this.time);
-
-    // Peggle buckets sweep side to side
-    for (const bk of this.track.buckets) {
-      const md = meta(bk);
-      const x = W / 2 + Math.sin(this.time * 0.0011 + (md.phase ?? 0)) * (W / 2 - 90);
-      Body.setPosition(bk, { x, y: md.baseY ?? bk.position.y });
-    }
-    // hit pegs pop away after a short glow
-    for (const body of this.poppingPegs) {
-      const md = meta(body);
-      if (this.time > (md.hitAt ?? 0) + 150) {
-        this.removeTrackBody(body);
-        this.poppingPegs.delete(body);
-        this.effects.push({ type: 'ring', x: body.position.x, y: body.position.y, ttl: 10, maxTtl: 10, color: 'rgba(255,255,255,0.6)' });
+  private resolvePickups() {
+    this.pickupCandidates.clear();
+    for (const racer of this.racers) {
+      if (racer.falling || racer.finished || racer.loopRide) continue;
+      const first = Math.floor(Math.min(racer.previous.x, racer.x) / BUCKET);
+      const last = Math.floor(Math.max(racer.previous.x, racer.x) / BUCKET);
+      for (let key = first; key <= last; key++) for (const pickup of this.pickupBuckets.get(key) ?? []) {
+        if (pickup.collectedBy === null) this.pickupCandidates.add(pickup);
       }
     }
-
-    for (const m of this.marbles) {
-      const b = m.body;
-      m.grounded += s;
-      if (m.finishedAt !== null) continue;
-
-      // timers
-      if (m.aeroUntil && this.time >= m.aeroUntil) {
-        m.aeroUntil = 0;
-        b.frictionAir = m.frictionAir;
-        if (!m.frozen) b.friction = 0.004;
+    for (const pickup of this.pickupCandidates) {
+      let winner: Racer | null = null;
+      let earliest = Infinity;
+      const y = pickupY(pickup, this.runTime, this.reducedMotion);
+      for (const racer of this.racers) {
+        if (racer.falling || racer.finished || racer.loopRide || Math.abs(racer.z - pickup.z) > 110 || Math.abs(racer.x - pickup.x) > 160) continue;
+        const time = pickupIntercept(racer.previous, racer, pickup, y);
+        if (time !== null && time < earliest) { earliest = time; winner = racer; }
       }
-      if (m.anvilUntil && this.time > m.anvilUntil) {
-        m.anvilUntil = 0;
-        if (!m.frozen) Body.setDensity(b, m.baseDensity);
-      }
-      if (m.ghostUntil && this.time > m.ghostUntil) {
-        m.ghostUntil = 0;
-        b.collisionFilter.mask = CAT_WALL | CAT_MARBLE | CAT_SENSOR;
-      }
-
-      if (m.frozen) {
-        if (this.time >= m.frozenUntil) this.setFrozen(m, false);
-        else {
-          this.updateRecovery(m, dt);
-          continue;
-        }
-      }
-
-      if (!this.gateOpen) continue;
-
-      let v = Body.getVelocity(b);
-
-      // rocket
-      if (this.time < m.rocketUntil) {
-        const sp = Math.hypot(v.x, v.y);
-        const dx = sp > 1 ? v.x / sp : 0;
-        const dy = sp > 1 ? v.y / sp : 1;
-        const k = 0.6 * s * Math.sqrt(0.8 / b.mass);
-        v = { x: v.x + dx * k * 0.6, y: v.y + Math.max(dy, 0.3) * k };
-        if (this.rng() < 0.5)
-          this.effects.push({ type: 'debris', x: b.position.x, y: b.position.y, ttl: 16, maxTtl: 16, color: '#fb923c', particles: this.makeParticles(b.position.x, b.position.y, 2, 2) });
-      }
-
-      // oil
-      m.inOil = false;
-      for (const o of this.oils) {
-        if (o.ownerId === m.info.id) continue;
-        if (Math.hypot(o.x - b.position.x, o.y - b.position.y) < o.r + MARBLE_RADIUS) {
-          m.inOil = true;
-          v = { x: v.x * (1 - 0.07 * s) + (this.rng() - 0.5) * 0.4, y: v.y * (1 - 0.05 * s) };
-          Body.setAngularVelocity(b, b.angularVelocity * 1.05 + (this.rng() - 0.5) * 0.1);
-          break;
-        }
-      }
-
-      // player nudge
-      if (m.info.isPlayer && this.nudge !== 0) {
-        if (Math.abs(v.x) < 9 || Math.sign(v.x) !== Math.sign(this.nudge)) v = { x: v.x + this.nudge * 0.16 * s, y: v.y };
-      }
-
-      // speed cap
-      const cap = this.speedLimit(m);
-      const sp = Math.hypot(v.x, v.y);
-      if (sp > cap) v = { x: (v.x / sp) * cap, y: (v.y / sp) * cap };
-      Body.setVelocity(b, v);
-
-      // trail
-      if (m.info.isPlayer || this.time < m.rocketUntil) {
-        m.trail.push({ x: b.position.x, y: b.position.y });
-        if (m.trail.length > 14) m.trail.shift();
-      }
-
-      // AI item usage
-      const item = this.availableItem(m);
-      if (this.aiItemsEnabled && !m.info.isPlayer && item && this.time > m.aiUseAt) {
-        // simple smarts: don't waste freeze if nobody ahead, save shock if nobody near
-        if (item === 'freeze' && !this.marbles.some((o) => o !== m && o.finishedAt === null && o.body.position.y > b.position.y - 20 && Math.abs(o.body.position.y - b.position.y) < 900)) {
-          m.aiUseAt = this.time + 1500;
-        } else if (item === 'shock' && !this.marbles.some((o) => o !== m && Math.hypot(o.body.position.x - b.position.x, o.body.position.y - b.position.y) < 200)) {
-          m.aiUseAt = this.time + 700;
-        } else this.useItem(m);
-      }
-    }
-
-    // effects
-    for (const e of this.effects) {
-      e.ttl -= s;
-      if (e.particles)
-        for (const p of e.particles) {
-          p.x += p.vx * s;
-          p.y += p.vy * s;
-          p.vy += 0.15 * s;
-        }
-    }
-    this.effects = this.effects.filter((e) => e.ttl > 0);
-    if (this.shake > 0) this.shake = Math.max(0, this.shake - s);
-
-    this.supports.clear();
-    Engine.update(this.engine, dt);
-
-    for (const m of this.marbles) {
-      if (m.finishedAt !== null) {
-        if (!m.body.isSensor) {
-          Composite.remove(this.world, m.body);
-          m.body.isSensor = true;
-          Body.setPosition(m.body, { x: 80 + (m.info.id % 10) * 80, y: this.track.finishY + 75 });
-          Body.setVelocity(m.body, { x: 0, y: 0 });
-          Body.setAngularVelocity(m.body, 0);
-        }
-        continue;
-      }
-      if (m.frozen) continue;
-      const surface = this.supports.get(m.info.id);
-      if (surface && !m.inOil && assistRolling(m.body, surface, m.info.stats.speed + (this.time < m.aeroUntil ? 3 : 0), dt)) m.grounded = 0;
-      const launch = this.pendingLaunches.get(m.info.id);
-      if (launch) Body.setVelocity(m.body, launch);
-      const cap = this.speedLimit(m);
-      if (Body.getSpeed(m.body) > cap) Body.setSpeed(m.body, cap);
-      if (m.body.position.y >= this.track.finishY && m.body.position.x >= 0 && m.body.position.x <= W) this.finishMarble(m);
-      this.updateRecovery(m, dt);
-    }
-    this.pendingLaunches.clear();
-    if (!this.effectsEnabled) this.effects = [];
-
-    // apply deferred wall breaks after the solver ran
-    if (this.pendingBreaks.length) {
-      for (const pb of this.pendingBreaks) {
-        this.removeTrackBody(pb.body);
-        Body.setVelocity(pb.marble.body, pb.v);
-      }
-      this.pendingBreaks = [];
+      if (winner) this.collectPickup(winner, pickup);
     }
   }
 
-  ranking(): RankEntry[] {
-    const finished = [...this.finishOrder];
-    const rest = this.marbles.filter((m) => m.finishedAt === null).sort((a, b) => b.body.position.y - a.body.position.y);
-    return [...finished, ...rest].map((m, i) => ({ marble: m, rank: i + 1, finished: m.finishedAt !== null, time: m.finishedAt }));
+  private collectPickup(racer: Racer, pickup: AirPickup) {
+    pickup.collectedBy = racer.id;
+    pickup.collectedAt = this.runTime;
+    racer.pickupAt = this.runTime;
+    let notice = '';
+    if (pickup.kind === 'fuel') {
+      const full = racer.boosts >= 2;
+      racer.boosts = Math.min(2, racer.boosts + 1);
+      racer.vx = Math.min(racer.maximumSpeed, racer.vx + 115 * weightImpulse(racer.weight) * racer.boostFactor);
+      if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
+      notice = full ? 'FUEL SURGE. BOOST TANK ALREADY FULL.' : 'ROCKET FUEL! +1 BOOST';
+    } else if (pickup.kind === 'shield') {
+      racer.shieldUntil = this.runTime + SHIELD_DURATION;
+      notice = 'SKYWARD SHIELD! ONE SHOVE. SIX SECONDS.';
+    } else {
+      const full = racer.bounces >= 3;
+      racer.bounces = Math.min(3, racer.bounces + 1);
+      notice = full ? 'AIR BOUNCES FULL. +75 CHAOS.' : 'AIR SPRING! +1 AIR BOUNCE';
+    }
+    this.emit(pickup.x, pickup.y, pickup.z, 13, POWERUPS[pickup.kind].color, 120);
+    if (!racer.id) {
+      this.pickupCount++; this.snapshot.score += 75;
+      this.snapshot.lastPickup = pickup.kind;
+      this.snapshot.pickupNoticeUntil = this.runTime + 2.5;
+      this.audio.play('pickup'); this.say(notice);
+    }
   }
 
-  /** Force-classify anyone still on track (used when the heat timer expires). */
-  classify(): RankEntry[] {
-    return this.ranking();
+  private hitObstacle(racer: Racer, obstacle: Obstacle) {
+    racer.visited.add(obstacle); obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | (1 << racer.id);
+    const impulse = weightImpulse(racer.weight);
+    const x = obstacle.x + obstacle.width / 2; const y = this.y(x); const z = obstacleZ(obstacle);
+    if (obstacle.kind !== 'boost') racer.lastGroundedAt = -100;
+    switch (obstacle.kind) {
+      case 'boost':
+        racer.vx += 400 * impulse * racer.boostFactor;
+        if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
+        racer.boosts = Math.min(2, racer.boosts + 1); this.emit(x, y - 6, z, 8, '#ffbd6a', 135);
+        if (!racer.id) { this.snapshot.score += 100; this.audio.play('boost'); this.say('THROTTLE REFILLED. TRY NOT TO SHARE.'); }
+        break;
+      case 'spring':
+        racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
+        racer.bounces = Math.min(3, racer.bounces + 1); this.emit(x, y - 24, z, 10, '#a1e1bd', 160);
+        if (!racer.id) { this.snapshot.score += 100; this.audio.play('bounce'); this.say('SPRING BREAK! +1 BOUNCE'); }
+        break;
+      case 'tnt':
+        obstacle.hit = true; racer.vx += 300 * impulse; racer.vy = -450 * impulse; racer.grounded = false;
+        this.emit(x, y - 30, z, 25, '#ffb25e', 245);
+        if (!racer.id) { this.snapshot.score += 200; this.counts.explosions++; this.shake = 9; this.audio.play('boom'); this.say('THAT WAS PROBABLY LOAD-BEARING.'); }
+        break;
+      case 'sheep':
+        obstacle.hit = true; racer.vx += 75 * impulse; racer.vy = -290 * impulse; racer.grounded = false;
+        this.airSheep.push({ x, y: y - 40, z, vx: racer.vx * 0.51, vy: -520, rotation: 0, life: 3.1 });
+        this.emit(x, y - 35, z, 8, '#e9e1c6', 115);
+        if (!racer.id) { this.snapshot.score += 125; this.counts.sheep++; this.audio.play('sheep'); this.say('BAA-D DECISIONS.'); }
+        break;
+      default: break;
+    }
   }
 
-  raceTime(): number {
-    return this.gateOpen ? this.time - this.raceStartTime : 0;
+  private refreshSnapshot() {
+    const player = this.player;
+    this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / TRACK_DISTANCE;
+    this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : Math.hypot(player.vx, player.vy)) * 0.16);
+    this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling;
+    this.snapshot.grounded = player.grounded; this.snapshot.hopReady = this.canHop(player);
+    this.snapshot.bounces = player.bounces; this.snapshot.boosts = player.boosts;
+    this.snapshot.grade = Math.round(this.slope(player.x) * 100);
+    this.snapshot.lane = closestLane(player.z); this.snapshot.targetLane = player.targetLane;
+    this.snapshot.laneLocked = this.runTime < player.steerLockedUntil;
+    this.snapshot.bumps = this.counts.bumps; this.snapshot.raceTime = Math.floor(this.runTime * 10) / 10;
+    let position = 1;
+    for (const racer of this.racers) if (racer.id && raceOrder(racer, player) < 0) position++;
+    this.snapshot.position = position;
+    const sector = sectorAt(START_X + player.distance * 2, this.options.course);
+    if (sector !== this.snapshot.sector && player.x >= STADIUM_START) { this.say('FINAL STRAIGHT. NO MORE MANNERS.'); this.audio.play('finish'); }
+    this.snapshot.sector = sector; this.topSpeed = Math.max(this.topSpeed, this.snapshot.speed);
+    this.snapshot.pickups = this.pickupCount;
+    this.snapshot.shieldSeconds = Math.max(0, Math.ceil((player.shieldUntil - this.runTime) * 10) / 10);
   }
 
-  playerRank(): number {
-    return this.ranking().find((r) => r.marble === this.player)!.rank;
+  private standings(): RacerStanding[] {
+    return [...this.racers].sort(raceOrder).map((racer, index) => ({
+      id: racer.id, name: racer.name, color: racer.color, position: index + 1,
+      distance: Math.round(clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE)), lane: closestLane(racer.z),
+      finished: racer.finished, recovering: racer.falling || this.runTime < racer.recoveryUntil, finishTime: racer.finishTime,
+      loadout: { ...racer.loadout },
+    }));
   }
 
-  allFinished(): boolean {
-    return this.marbles.every((m) => m.finishedAt !== null);
+  private finish(completed: boolean) {
+    if (this.status !== 'flying') return;
+    this.snapshot.status = 'finished'; this.snapshot.speed = 0; this.snapshot.hopReady = false;
+    this.snapshot.settling = false; this.snapshot.finishWait = 0;
+    if (completed) {
+      this.snapshot.distance = TRACK_DISTANCE; this.snapshot.progress = 1;
+      this.snapshot.score += 3000 + (4 - this.snapshot.position) * 500;
+      this.emit(this.player.x, this.y(FINISH) - 140, this.player.z, 42, this.player.color, 250);
+    }
+    this.audio.play('finish');
+    const { sheep, explosions, loops, bumps } = this.counts;
+    this.onFinish({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, distance: this.snapshot.distance, topSpeed: this.topSpeed,
+      score: this.snapshot.score + this.snapshot.distance, sheep, explosions, loops, bumps,
+      course: this.options.course, date: new Date().toISOString(), completed, trackLength: TRACK_DISTANCE,
+      weight: this.options.ballWeight, launchSpeed: this.options.launchSpeed, position: this.snapshot.position,
+      raceTime: this.player.finishTime ?? this.runTime, opponents: this.standings(),
+      sessionId: this.config?.sessionId, mode: this.config?.customPhysics ? 'practice' : this.config?.mode,
+      round: this.config?.round, loadout: this.config?.loadout, difficulty: this.config?.difficulty,
+      pickups: this.pickupCount, shieldsUsed: this.shieldBlocks });
+    this.notify();
   }
 
+  private say(text: string) { this.snapshot.notice = text; this.noticeUntil = this.time + 2; }
+  private emit(x: number, y: number, z: number, count: number, color: string, speed: number) {
+    if (Math.abs(x - this.player.x) > this.renderer.view.width + 650) return;
+    if (this.renderer.lowDetail) count = Math.ceil(count * 0.65);
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * TAU; const v = speed * (0.2 + Math.random() * 0.8); const life = 0.35 + Math.random() * 0.6;
+      this.particles.push({ x, y, z, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 50, life, maxLife: life, size: 2 + Math.random() * 4, color });
+    }
+    if (this.particles.length > 160) this.particles.splice(0, this.particles.length - 160);
+  }
+  private updateParticles(dt: number) {
+    let alive = 0;
+    for (const particle of this.particles) if (particle.life > dt) {
+      particle.x += particle.vx * dt; particle.y += particle.vy * dt; particle.vy += 310 * dt; particle.life -= dt;
+      this.particles[alive++] = particle;
+    }
+    this.particles.length = alive; alive = 0;
+    for (const sheep of this.airSheep) if (sheep.life > dt) {
+      sheep.x += sheep.vx * dt; sheep.y += sheep.vy * dt; sheep.vy += 570 * dt; sheep.rotation += dt * 3; sheep.life -= dt;
+      const ground = this.y(sheep.x);
+      if (sheep.y > ground - 36 && !this.inGap(sheep.x, sheep.z)) { sheep.y = ground - 36; sheep.vy = -Math.abs(sheep.vy) * 0.4; sheep.vx *= 0.74; }
+      this.airSheep[alive++] = sheep;
+    }
+    this.airSheep.length = alive;
+  }
+  private notify(force = true) {
+    const now = performance.now();
+    if (!force && now - this.lastNotify < 100) { this.invalidate(); return; }
+    const standings = this.standings();
+    const key = standings.map((r) => `${r.id}:${r.distance}:${r.lane}:${r.finished}:${r.recovering}`).join('|');
+    if (key !== this.standingsKey) { this.snapshot.racers = standings; this.standingsKey = key; }
+    const keys = Object.keys(this.snapshot) as (keyof GameSnapshot)[];
+    if (this.lastSnapshot && keys.every((key) => this.snapshot[key] === this.lastSnapshot?.[key])) return;
+    this.lastNotify = now; this.lastSnapshot = { ...this.snapshot }; this.onUpdate({ ...this.snapshot }); this.invalidate();
+  }
   destroy() {
-    Events.off(this.engine, 'collisionStart');
-    Events.off(this.engine, 'collisionActive');
-    Composite.clear(this.world, false);
-    Engine.clear(this.engine);
+    this.destroyed = true; cancelAnimationFrame(this.frameId);
+    document.removeEventListener('visibilitychange', this.visibilityChanged);
+    this.canvas.removeEventListener('pointerdown', this.pointerDown); this.canvas.removeEventListener('pointermove', this.pointerMove);
+    this.canvas.removeEventListener('pointerup', this.pointerUp); this.canvas.removeEventListener('pointercancel', this.pointerCancel); this.canvas.removeEventListener('pointerleave', this.pointerLeave);
+    this.renderer.destroy(); this.audio.destroy(); this.buckets.clear(); this.pickupBuckets.clear(); this.pickupCandidates.clear();
   }
 }

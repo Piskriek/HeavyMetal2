@@ -1,255 +1,124 @@
-import * as storage from './game/storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import SetupScreen from './components/SetupScreen';
-import RaceScreen, { RaceAction } from './components/RaceScreen';
-import ChampionshipScreen from './components/ChampionshipScreen';
-import { MarbleInfo, MarbleStats, AI_COLORS, randomStats, mulberry32, PLAYER_COLORS, HeatResult, HEATS_PER_GP } from './game/types';
-import { SeasonState, newSeason, recordHeat, gridOrder, gpSeed, CALENDAR, saveSeason, loadSeason } from './game/season';
-import { loadAccount, saveAccount, purchaseItem, settleRace } from './game/economy';
-import type { RacerAccount, RacePayout } from './game/economy';
-import type { Inventory, ItemType } from './game/types';
-import PitShop from './components/PitShop';
-import { RIVALS, PLAYER_PORTRAIT_COUNT, preRaceBanter } from './game/characters';
-import type { Line } from './game/characters';
-import LoadingScreen from './components/LoadingScreen';
+import { AnimatePresence, MotionConfig } from 'framer-motion';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Keyboard, MousePointer2, Play, Settings2, Trophy } from 'lucide-react';
+import MainMenu from './components/MainMenu';
+import SettingsPanel from './components/SettingsPanel';
+import Modal from './components/Modal';
+import NewGameSetup from './components/NewGameSetup';
+import { AirSupplyGuide } from './components/AirSupplies';
+import RaceScreen from './screens/RaceScreen';
+import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, savePreference } from './game/preferences';
+import { COURSES, type RunRecord } from './game/types';
+import { SETUP_KEY, commitRound, createSession, nextRound, readSetup, recordModeLabel, roundComplete, sessionComplete, sessionConfig, type RaceSession, type RaceSetup } from './game/session';
+import './menu.css';
+import './setup.css';
 
-const PORTRAIT_KEY = 'heavy-metal-gp:portrait';
-function loadPortrait(): number {
-  try { const n = Number(storage.getItem(PORTRAIT_KEY)); return Number.isInteger(n) && n >= 0 && n < PLAYER_PORTRAIT_COUNT ? n : 0; } catch { return 0; }
-}
-interface Loading { eyebrow: string; title: string; cta: string; banter?: Line[]; next: Phase }
-
-function makeRivals(seed: number): MarbleInfo[] {
-  const rng = mulberry32(seed);
-  const pool = RIVALS.map((_, i) => i);
-  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
-  return AI_COLORS.map((color, i) => ({
-    id: i + 1,
-    name: RIVALS[pool[i]].name,
-    character: pool[i],
-    color,
-    stats: randomStats(rng),
-    isPlayer: false,
-  }));
-}
-
-type Phase = 'menu' | 'retune' | 'hub' | 'race' | 'quick';
+type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | null;
 
 export default function App() {
-  const [phase, setPhase] = useState<Phase>('menu');
-  const [loading, setLoading] = useState<Loading | null>({ eyebrow: 'SMALL GOBLINS. BIG BALLS. BIGGER DREAMS.', title: 'WELCOME TO THE GRID', cta: 'Enter the paddock', next: 'menu' });
-  const [portrait, setPortrait] = useState(loadPortrait);
-  useEffect(() => { try { storage.setItem(PORTRAIT_KEY, String(portrait)); } catch { /* storage unavailable */ } }, [portrait]);
-  const [stats, setStats] = useState<MarbleStats>({ weight: 5, speed: 5, bounce: 5 });
-  const [color, setColor] = useState(PLAYER_COLORS[0]);
-  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 0xffffffff));
-  const [rivalSeed, setRivalSeed] = useState(() => Math.floor(Math.random() * 0xffffffff));
-  const [raceKey, setRaceKey] = useState(0);
-  const [circuitIndex, setCircuitIndex] = useState(0);
-  const [season, setSeason] = useState<SeasonState | null>(() => loadSeason());
-  const [account, setAccount] = useState(loadAccount);
-  const accountRef = useRef(account);
-  const [shopOpen, setShopOpen] = useState(false);
-  const [raceId, setRaceId] = useState('');
-  const [payout, setPayout] = useState<RacePayout | null>(null);
+  const [options, setOptions] = useState(readOptions);
+  const [records, setRecords] = useState(readRecords);
+  const [screen, setScreen] = useState<'menu' | 'race'>('menu');
+  const [panel, setPanel] = useState<Panel>(null);
+  const [session, setSession] = useState<RaceSession | null>(null);
+  const [lastSetup, setLastSetup] = useState(readSetup);
+  const [clearRecords, setClearRecords] = useState(false);
+  const [fullscreenFallback, setFullscreenFallback] = useState(false);
+  const shell = useRef<HTMLDivElement>(null);
+  const config = useMemo(() => session ? sessionConfig(session) : null, [session?.id, session?.round]);
 
-  const publishAccount = useCallback((next: RacerAccount) => {
-    accountRef.current = next;
-    saveAccount(next);
-    setAccount(next);
+  useEffect(() => savePreference(OPTIONS_KEY, options), [options]);
+  useEffect(() => savePreference(RECORDS_KEY, records), [records]);
+  useEffect(() => savePreference(SETUP_KEY, lastSetup), [lastSetup]);
+  useEffect(() => {
+    document.documentElement.classList.toggle('high-contrast-game', options.highContrast);
+    document.documentElement.classList.toggle('reduced-motion-game', options.reducedMotion);
+    return () => { document.documentElement.classList.remove('high-contrast-game', 'reduced-motion-game'); };
+  }, [options.highContrast, options.reducedMotion]);
+
+  const closePanel = useCallback(() => { setPanel(null); setClearRecords(false); }, []);
+  const resume = useCallback(() => { setPanel(null); setScreen('race'); }, []);
+  const leaveRaceFullscreen = useCallback((action: () => void) => {
+    if (document.fullscreenElement && document.fullscreenElement !== shell.current) {
+      void document.exitFullscreen().catch(() => {}).finally(action);
+    } else action();
   }, []);
-  useEffect(() => saveAccount(accountRef.current), []);
-  const buy = useCallback((item: ItemType) => {
-    const result = purchaseItem(accountRef.current, item);
-    if (!result.error) publishAccount(result.account);
-    return result.error;
-  }, [publishAccount]);
-  const inventoryChanged = useCallback((inventory: Inventory) => {
-    publishAccount({ ...accountRef.current, inventory: { ...inventory } });
-  }, [publishAccount]);
-  const awardWinnings = (results: HeatResult[]) => {
-    const result = results.find((r) => r.id === 0);
-    if (!result) return;
-    const paid = settleRace(accountRef.current, raceId, result);
-    publishAccount(paid.account);
-    setPayout(paid.payout);
-  };
-  const openShop = () => setShopOpen(true);
-  const withShop = (screen: ReactNode) => <>{screen}{shopOpen && <PitShop account={account} onBuy={buy} onClose={() => setShopOpen(false)} />}</>;
-  const launchQuickRace = () => {
-    setRaceId(`quick:${crypto.randomUUID()}`);
-    setPayout(null);
-    setRaceKey((k) => k + 1);
-    const circuit = CALENDAR[circuitIndex];
-    setLoading({ eyebrow: 'QUICK RACE / SINGLE HEAT', title: circuit.name.toUpperCase(), cta: 'Lights out', banter: preRaceBanter(quickRoster, Math.random), next: 'quick' });
-  };
-
-  useEffect(() => saveSeason(season), [season]);
-
-  const rivals = useMemo(() => makeRivals(rivalSeed), [rivalSeed]);
-  const quickRoster = useMemo<MarbleInfo[]>(() => [{ id: 0, name: 'You', color, stats, isPlayer: true, character: portrait }, ...rivals], [rivals, color, stats, portrait]);
-  const quickGrid = useMemo(() => quickRoster.map((m) => m.id), [quickRoster]);
-  const newSeed = useCallback(() => setSeed(Math.floor(Math.random() * 0xffffffff)), []);
-
-  // ---- season helpers ----
-  const startSeason = () => {
-    if (season && !season.complete && season.results.some((gp) => gp.length) && !window.confirm('Start a new championship? This replaces your saved season.')) return;
-    const s = newSeason(quickRoster);
-    setSeason(s);
-    setPhase('hub');
+  const mainMenu = useCallback(() => {
+    const showMenu = () => { setPanel(null); setScreen('menu'); };
+    if (document.fullscreenElement && document.fullscreenElement !== shell.current) {
+      void document.exitFullscreen().catch(() => {}).finally(showMenu);
+    } else showMenu();
+  }, []);
+  const settings = useCallback(() => setPanel('settings'), []);
+  const newGame = useCallback(() => setPanel('new-game'), []);
+  const startRace = useCallback((setup: RaceSetup) => {
+    leaveRaceFullscreen(() => { setLastSetup(setup); setSession(createSession(setup)); setScreen('race'); setPanel(null); });
+  }, [leaveRaceFullscreen]);
+  const finishRound = useCallback((record: RunRecord) => {
+    setSession((current) => current ? commitRound(current, record) : current);
+  }, []);
+  const continueRace = useCallback(() => {
+    leaveRaceFullscreen(() => {
+      setSession((current) => !current ? current : sessionComplete(current) ? createSession(current.setup) : nextRound(current));
+      setScreen('race'); setPanel(null);
+    });
+  }, [leaveRaceFullscreen]);
+  const fullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (shell.current?.requestFullscreen) await shell.current.requestFullscreen();
+      else setFullscreenFallback((previous) => !previous);
+    } catch { setFullscreenFallback((previous) => !previous); }
   };
 
-  const seasonRoster = useMemo<MarbleInfo[]>(() => {
-    if (!season) return [];
-    return season.roster.map((m) => (m.isPlayer ? { ...m, stats, color, character: portrait } : m));
-  }, [season, stats, color, portrait]);
+  return (
+    <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
+      <div ref={shell} className={`game-application ${fullscreenFallback ? 'menu-fullscreen' : ''}`}>
+        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={session?.setup.mode === 'tournament' ? sessionComplete(session) ? 'View Cup Results' : roundComplete(session) ? 'Continue Tournament' : 'Resume Tournament' : session && roundComplete(session) ? 'View Race Results' : 'Resume Race'} onNewGame={newGame} onResume={resume}
+          onSettings={settings} onGuide={() => setPanel('guide')} onRecords={() => setPanel('records')}
+          onCredits={() => setPanel('credits')} onSound={() => setOptions((previous) => ({ ...previous, sound: !previous.sound }))} onFullscreen={() => void fullscreen()} />}
 
-  // sync player tune into the saved season roster when returning from retune
-  const lockSetup = () => {
-    if (season) setSeason({ ...season, roster: season.roster.map((m) => (m.isPlayer ? { ...m, stats, color } : m)) });
-    setPhase('hub');
-  };
+        {session && config && <div className="race-screen-host" hidden={screen !== 'race'} aria-hidden={screen !== 'race'} inert={screen !== 'race'}>
+          <RaceScreen key={`${session.id}:${session.round}`} active={screen === 'race' && panel === null} options={options} setOptions={setOptions}
+            config={config} session={session} onRoundComplete={finishRound} onContinue={continueRace} onNewGame={newGame}
+            records={records} setRecords={setRecords} onMainMenu={mainMenu} onSettings={settings} />
+        </div>}
 
-  const enterSeason = (s: SeasonState) => {
-    const me = s.roster.find((m) => m.isPlayer);
-    if (me) {
-      setStats(me.stats);
-      setColor(me.color);
-    }
-    setSeason(s);
-    setPhase('hub');
-  };
+        <AnimatePresence>
+          {panel === 'settings' && <SettingsPanel key="settings" options={options} onChange={setOptions} onClose={closePanel} />}
+          {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={!!session && !sessionComplete(session)} onStart={startRace} onClose={closePanel} />}
 
-  const seasonGrid = useMemo(() => (season && !season.complete ? gridOrder(season) : []), [season]);
+          {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide>
+            <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the other three riders. Falling costs time, not the whole race.</p>
+            <div className="handbook-row"><MousePointer2 size={23} /><div><h3>Launch all four goblins</h3><p>Pull your glowing ball back and release. Or adjust power and angle with the arrow keys, then press Enter.</p></div><kbd>Drag</kbd></div>
+            <div className="handbook-row"><ArrowRight size={23} /><div><h3>Take the racing line. Or theirs.</h3><p>A and D change lanes. Contact shoves rivals sideways. Heavy balls push harder, but light balls jump higher.</p></div><kbd>A / D</kbd></div>
+            <div className="handbook-row"><Play size={22} /><div><h3>A little hop, a lot of trouble</h3><p>W or J bunny-hops from the ground. Space spends an air-bounce charge. Shift boosts; chevron pads refill a charge.</p></div><kbd>W / Space / Shift</kbd></div>
+            <div className="handbook-row"><Settings2 size={23} /><div><h3>Keep the chaos under control</h3><p>P pauses. R restarts the current unfinished race. M toggles sound. Presets are fixed during competition; Quick Race custom practice enables the tuning sliders.</p></div><Keyboard size={25} /></div>
+            <AirSupplyGuide />
+            <div className="fantasy-dialog-actions"><span className="subtle-note">No brakes. No refunds. Now you know.</span><button className="fantasy-primary" onClick={closePanel}>I Feel Qualified <Check size={16} /></button></div>
+          </Modal>}
 
-  const [pendingResult, setPendingResult] = useState<HeatResult[] | null>(null);
-  const onHeatFinished = (results: HeatResult[]) => {
-    awardWinnings(results);
-    setPendingResult(results);
-    // Persist immediately, without replacing the active race's immutable roster or track.
-    if (season) saveSeason(recordHeat(season, results));
-  };
-  const commitHeat = () => {
-    if (season && pendingResult) {
-      setSeason(recordHeat(season, pendingResult));
-      setPendingResult(null);
-    }
-    setPhase('hub');
-  };
+          {panel === 'records' && <Modal key="records" title="Hall of Chaos" eyebrow="SOME BAD IDEAS BECOME LEGENDS" onClose={closePanel} className="fantasy-dialog" wide>
+            {records.length ? <>
+              <p className="fantasy-lead">Your best runs, saved on this device. No account. No witnesses required.</p>
+              <div className="fantasy-records-wrap"><table className="fantasy-records"><thead><tr><th>Rank</th><th>Track</th><th>Finish</th><th>Distance</th><th>Chaos</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td>{String(index + 1).padStart(2, '0')}</td><td>{COURSES.find((track) => track.id === record.course)?.name ?? 'Rustbucket Ridge'}<small>{recordModeLabel(record)} / {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></td><td>{record.completed ? `${record.position ?? 1} / 4` : 'DNF'}</td><td>{record.distance.toLocaleString()} m</td><td>{record.score.toLocaleString()}</td></tr>)}</tbody></table></div>
+              <div className="fantasy-dialog-actions"><button className="fantasy-link" onClick={() => { if (clearRecords) { setRecords([]); setClearRecords(false); } else setClearRecords(true); }}>{clearRecords ? 'Confirm: clear local records' : 'Clear local records'}</button>{clearRecords && <button className="fantasy-link" onClick={() => setClearRecords(false)}>Cancel</button>}<button className="fantasy-primary" onClick={closePanel}>Back <ArrowLeft size={15} /></button></div>
+            </> : <div className="menu-empty-state"><Trophy size={53} strokeWidth={1.15} /><h3>A Legend in the Making</h3><p>The record book is empty.<br />The track is not going to wreck itself.</p><button className="fantasy-primary" onClick={newGame}>Make Some History <ArrowRight size={16} /></button></div>}
+          </Modal>}
 
-  // ---- render ----
-  if (loading) {
-    const done = loading;
-    return <LoadingScreen key={`${done.next}:${raceKey}`} eyebrow={done.eyebrow} title={done.title} cta={done.cta} banter={done.banter} onContinue={() => { setPhase(done.next); setLoading(null); }} />;
-  }
-  if (phase === 'menu' || phase === 'retune') {
-    return withShop(
-      <SetupScreen
-        stats={stats}
-        onStats={setStats}
-        color={color}
-        onColor={setColor}
-        rivals={phase === 'retune' && season ? season.roster.filter((m) => !m.isPlayer) : rivals}
-        onRerollRivals={() => setRivalSeed(Math.floor(Math.random() * 0xffffffff))}
-        seed={seed}
-        onNewSeed={newSeed}
-        onStart={launchQuickRace}
-        onStartSeason={startSeason}
-        onContinueSeason={season && phase === 'menu' ? () => enterSeason(season) : undefined}
-        seasonMode={phase === 'retune'}
-        onBackToSeason={lockSetup}
-        circuitIndex={circuitIndex}
-        onCircuit={setCircuitIndex}
-        account={account}
-        onShop={openShop}
-        portrait={portrait}
-        onPortrait={setPortrait}
-      />
-    );
-  }
-
-  if (phase === 'hub' && season) {
-    return withShop(
-      <ChampionshipScreen
-        season={season}
-        onStartHeat={() => {
-          setRaceId(`champ:${season.seed}:${season.round}:${season.results[season.round].length}`);
-          setPayout(null);
-          setRaceKey((k) => k + 1);
-          const heatNo = season.results[season.round].length + 1;
-          setLoading({ eyebrow: `ROUND ${String(season.round + 1).padStart(2, '0')} / HEAT ${heatNo} OF ${HEATS_PER_GP}`, title: CALENDAR[season.round].name.toUpperCase(), cta: 'Lights out', banter: preRaceBanter(seasonRoster, Math.random), next: 'race' });
-        }}
-        onRetune={() => { setCircuitIndex(season.round); setPhase('retune'); }}
-        onAbandon={() => setPhase('menu')}
-        onNewSeason={startSeason}
-        account={account}
-        onShop={openShop}
-      />
-    );
-  }
-
-  if (phase === 'race' && season) {
-    const gp = CALENDAR[season.round];
-    const heatNo = (season.results[season.round]?.length ?? 0) + 1;
-    const isLastHeat = heatNo === HEATS_PER_GP;
-    const actions: RaceAction[] = [
-      { label: isLastHeat ? 'View Grand Prix results' : 'Standings & next heat', onClick: commitHeat, primary: true },
-    ];
-    return withShop(
-      <RaceScreen
-        key={raceKey}
-        seed={gpSeed(season.seed, season.round)}
-        roster={seasonRoster}
-        profile={gp.profile}
-        gridOrder={seasonGrid}
-        title={gp.name}
-        subtitle={`ROUND ${String(season.round + 1).padStart(2, '0')} / HEAT ${heatNo} OF ${HEATS_PER_GP}`}
-        championship
-        onExit={() => {
-          setPendingResult(null);
-          setPhase('hub');
-        }}
-        onFinished={onHeatFinished}
-        actions={actions}
-        inventory={account.inventory}
-        credits={account.credits}
-        onInventoryChange={inventoryChanged}
-        payout={payout}
-        onShop={openShop}
-      />
-    );
-  }
-
-  // quick race
-  const quickActions: RaceAction[] = [
-    { label: 'Race again', onClick: launchQuickRace, primary: true },
-    {
-      label: 'New layout',
-      onClick: () => {
-        newSeed();
-        launchQuickRace();
-      },
-    },
-    { label: 'Back to garage', onClick: () => setPhase('menu') },
-  ];
-  return withShop(
-    <RaceScreen
-      key={raceKey}
-      seed={seed}
-      roster={quickRoster}
-      profile={CALENDAR[circuitIndex].profile}
-      gridOrder={quickGrid}
-      title={CALENDAR[circuitIndex].name}
-      subtitle="QUICK RACE / SINGLE HEAT"
-      onExit={() => setPhase('menu')}
-      onFinished={awardWinnings}
-      actions={quickActions}
-      inventory={account.inventory}
-      credits={account.credits}
-      onInventoryChange={inventoryChanged}
-      payout={payout}
-      onShop={openShop}
-    />
+          {panel === 'credits' && <Modal key="credits" title="The Art & the Engineering" eyebrow="ORIGINAL GOBLINS. CAREFULLY CONSIDERED CHAOS." onClose={closePanel} className="fantasy-dialog" wide>
+            <figure className="menu-concept"><img src="/art/goblin-rally-concept.png" alt="Original Goblin Rally concept painting with a goblin slingshot, timber loop, sheep, and cheering crowds in a mountain arena." /><figcaption>THE ORIGINAL CONCEPT / GOBLIN RALLY</figcaption></figure>
+            <p className="fantasy-lead">An original fantasy racing game. The visual direction takes cues from readable, hand-painted high fantasy; no Blizzard characters, logos, or interface assets are used.</p>
+            <div className="research-links"><h3><BookOpen size={18} />Design references</h3>
+              <a href="https://news.blizzard.com/en-us/article/23737992/shadowlands-an-inside-look-at-the-character-creation-ui-redesign" target="_blank" rel="noreferrer">Blizzard: Focus, hierarchy, and choice <ArrowUpRight size={15} /></a>
+              <a href="https://80.lv/articles/matt-mcdaid-mastering-the-stylized-art" target="_blank" rel="noreferrer">Matt McDaid: Readability in stylized art <ArrowUpRight size={15} /></a>
+              <a href="https://learn.microsoft.com/en-us/gaming/accessibility/xbox-accessibility-guidelines/112" target="_blank" rel="noreferrer">Xbox: Consistent, accessible menu navigation <ArrowUpRight size={15} /></a>
+              <a href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Optimizing_canvas" target="_blank" rel="noreferrer">MDN: Keep the rendering work where it belongs <ArrowUpRight size={15} /></a>
+            </div>
+            <div className="fantasy-dialog-actions"><span className="subtle-note"><Hammer size={14} />Goblin Engineering Co.</span><button className="fantasy-primary" onClick={closePanel}>Back to the Menu <ArrowLeft size={15} /></button></div>
+          </Modal>}
+        </AnimatePresence>
+      </div>
+    </MotionConfig>
   );
 }

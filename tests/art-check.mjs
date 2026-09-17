@@ -5,7 +5,11 @@
  * appears: the setup rider/capsule picker, the cup itinerary, the starting grid, and a race
  * frame. Reports any broken image (naturalWidth 0) so a missing PNG cannot slip through.
  *
- * Usage: node scripts/art-check.mjs   (builds dist/ first, like scripts/browser-check.mjs)
+ * Usage:
+ *   node tests/art-check.mjs                  serves the built dist/ and checks it
+ *   node tests/art-check.mjs http://127.0.0.1:5173   checks a running server, e.g. the
+ *                                             live preview, so the checked art is the
+ *                                             art the user is looking at
  */
 import { spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -23,23 +27,27 @@ const artifacts = join(root, 'tests/artifacts');
 const dist = join(root, 'dist');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
-if (!existsSync(join(dist, 'index.html'))) {
-  console.error('dist/index.html is missing. Run `npm run build` first.');
+const live = process.argv[2] ?? '';
+let server = null;
+if (!live && !existsSync(join(dist, 'index.html'))) {
+  console.error('dist/index.html is missing. Run `npm run build` first, or pass a URL.');
   process.exit(1);
 }
 
-const server = createServer(async (request, response) => {
-  const url = new URL(request.url ?? '/', 'http://localhost');
-  const file = join(dist, normalize(url.pathname).replace(/^(\.\.[/\\])+/, ''));
-  const target = existsSync(file) && extname(file) ? file : join(dist, 'index.html');
-  try {
-    const body = await readFile(target);
-    response.writeHead(200, { 'content-type': MIME[extname(target)] ?? 'application/octet-stream' });
-    response.end(body);
-  } catch { response.writeHead(404).end('not found'); }
-});
-await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-const baseUrl = `http://127.0.0.1:${server.address().port}`;
+if (!live) {
+  server = createServer(async (request, response) => {
+    const url = new URL(request.url ?? '/', 'http://localhost');
+    const file = join(dist, normalize(url.pathname).replace(/^(\.\.[/\\])+/, ''));
+    const target = existsSync(file) && extname(file) ? file : join(dist, 'index.html');
+    try {
+      const body = await readFile(target);
+      response.writeHead(200, { 'content-type': MIME[extname(target)] ?? 'application/octet-stream' });
+      response.end(body);
+    } catch { response.writeHead(404).end('not found'); }
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+}
+const baseUrl = live || `http://127.0.0.1:${server.address().port}`;
 
 await mkdir(artifacts, { recursive: true });
 const libraryDir = await mkdtemp(join(tmpdir(), 'goblin-art-libs-'));
@@ -74,18 +82,26 @@ try {
   const page = await context.newPage();
   const errors = [];
   const failed = [];
-  page.on('pageerror', (error) => errors.push(error.message));
+  // A dev server (live mode) points its HMR socket at the proxied preview port, so a direct
+  // 127.0.0.1 load cannot reach it. That transport noise is not an art defect; everything
+  // else that fails still counts.
+  const noise = (text) => /WebSocket|websocket|vite:client|\[vite\]/.test(text);
+  page.on('pageerror', (error) => { if (!noise(error.message)) errors.push(error.message); });
   page.on('console', (message) => {
     if (message.type() !== 'error') return;
     // Ignore CDN problems from the sandbox network; only this app's own failures count.
     const location = message.location()?.url ?? '';
     if (location && new URL(location, baseUrl).origin !== new URL(baseUrl).origin) return;
+    if (noise(message.text())) return;
     errors.push(message.text());
   });
   // Only this app's own resources matter here: the sandbox blocks third-party font CDNs,
   // which is an environment limitation, not an art defect.
   page.on('requestfailed', (request) => {
-    if (new URL(request.url()).origin === new URL(baseUrl).origin) failed.push(`${request.url()} (${request.failure()?.errorText ?? 'unknown'})`);
+    const url = request.url();
+    if (new URL(url).origin !== new URL(baseUrl).origin) return;
+    if (noise(url) || url.includes('token=')) return;
+    failed.push(`${url} (${request.failure()?.errorText ?? 'unknown'})`);
   });
 
   await page.goto(baseUrl, { waitUntil: 'load' });
@@ -110,6 +126,56 @@ try {
   const shellWidth = await page.evaluate(() => document.querySelector('.racer-shell')?.naturalWidth ?? 0);
   const pilotWidth = await page.evaluate(() => document.querySelector('.racer-pilot')?.naturalWidth ?? 0);
   check(shellWidth > 0 && pilotWidth > 0, 'shell and pilot PNGs are decoded', `${shellWidth}x${pilotWidth}`);
+
+  // Geometry, not just presence: the pilot has to sit ON the measured hatch opening rather
+  // than floating over the shell, which is the defect that made the capsule picker wrong.
+  const geometry = await page.evaluate(() => {
+    const figure = document.querySelector('.selected-capsule .racer-figure');
+    const shell = figure?.querySelector('.racer-shell');
+    const window_ = figure?.querySelector('.racer-pilot-window');
+    const pilot = figure?.querySelector('.racer-pilot');
+    if (!figure || !shell || !window_ || !pilot) return null;
+    const shellRect = shell.getBoundingClientRect();
+    const pilotRect = pilot.getBoundingClientRect();
+    const clip = getComputedStyle(window_).clipPath;
+    const numbers = (clip.match(/[\d.]+/g) ?? []).map(Number);
+    return {
+      clip,
+      hatch: numbers.length >= 4
+        ? { rx: numbers[0] / 100, ry: numbers[1] / 100, x: numbers[2] / 100, y: numbers[3] / 100 } : null,
+      pilotInside: pilotRect.left >= shellRect.left - 1 && pilotRect.right <= shellRect.right + 1
+        && pilotRect.top >= shellRect.top - 1 && pilotRect.bottom <= shellRect.bottom + 1,
+    };
+  });
+  check(Boolean(geometry?.hatch), 'the pilot window exposes a measured hatch clip', geometry?.clip ?? 'none');
+  if (geometry?.hatch) {
+    const { x, y, rx, ry } = geometry.hatch;
+    // The painted ports measure near 0.82 / 0.61 of the shell sprite on all three capsules.
+    check(Math.abs(x - 0.817) < 0.05 && Math.abs(y - 0.615) < 0.05,
+      'the pilot window sits on the painted hatch, not on the shell middle', `x=${x.toFixed(3)} y=${y.toFixed(3)}`);
+    check(rx > 0.04 && rx < 0.18 && ry > 0.08 && ry < 0.22,
+      'the hatch window matches the measured ellipse radii', `rx=${rx.toFixed(3)} ry=${ry.toFixed(3)}`);
+  }
+  check(geometry?.pilotInside === true, 'the pilot image stays inside the capsule silhouette');
+  await page.locator('.selected-capsule').screenshot({ path: join(artifacts, 'art-1b-capsule-closeup.png') });
+
+  // Swapping rider and capsule has to swap both painted layers.
+  await page.locator('.rider-option').nth(2).click();
+  await page.locator('.capsule-option').nth(1).click();
+  await page.waitForTimeout(800);
+  const swapped = await page.evaluate(() => {
+    const shell = document.querySelector('.selected-capsule .racer-shell');
+    const pilot = document.querySelector('.selected-capsule .racer-pilot');
+    return {
+      shell: (shell?.getAttribute('src') ?? '').split('/').pop(), pilot: (pilot?.getAttribute('src') ?? '').split('/').pop(),
+      ready: Boolean(shell && shell.naturalWidth > 0 && pilot && pilot.naturalWidth > 0),
+    };
+  });
+  check(swapped.shell === 'springsteel-shell.png' && swapped.pilot === 'grub-pilot.png' && swapped.ready,
+    'choosing another rider and capsule swaps both painted layers', JSON.stringify(swapped));
+  await page.locator('.rider-option').nth(0).click();
+  await page.locator('.capsule-option').nth(0).click();
+  await page.waitForTimeout(500);
 
   // Capsule picker: all three painted shells.
   const capsules = await page.evaluate(() => [...document.querySelectorAll('.capsule-options img')].map((image) => image.naturalWidth));
@@ -199,7 +265,7 @@ try {
   await context.close();
 } finally {
   await browser.close();
-  await new Promise((resolve) => server.close(resolve));
+  if (server) await new Promise((resolve) => server.close(resolve));
   await rm(libraryDir, { recursive: true, force: true });
 }
 

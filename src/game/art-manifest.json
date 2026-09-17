@@ -318,10 +318,10 @@
       "anchor": "center",
       "note": "leather aviator cap and brass goggles",
       "pilot": "art/rivet-pilot.png",
-      "pilotRuntime": [
-        256,
-        256
-      ],
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
       "eyeLine": 0.44
     },
     "rider:nix": {
@@ -336,10 +336,10 @@
       "anchor": "center",
       "note": "asymmetric hair, goggles, wide grin",
       "pilot": "art/nix-pilot.png",
-      "pilotRuntime": [
-        256,
-        256
-      ],
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
       "eyeLine": 0.44
     },
     "rider:grub": {
@@ -354,11 +354,11 @@
       "anchor": "center",
       "note": "battered spiked helmet, heavy jaw",
       "pilot": "art/grub-pilot.png",
-      "pilotRuntime": [
-        256,
-        256
-      ],
-      "eyeLine": 0.44
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
+      "eyeLine": 0.52
     },
     "rider:sprocket": {
       "sheet": "riders",
@@ -372,11 +372,11 @@
       "anchor": "center",
       "note": "coiled-helmet tinkerer",
       "pilot": "art/sprocket-pilot.png",
-      "pilotRuntime": [
-        256,
-        256
-      ],
-      "eyeLine": 0.44
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
+      "eyeLine": 0.49
     },
     "capsule:iron": {
       "sheet": "capsules",
@@ -399,11 +399,11 @@
         "scale": 0.8496
       },
       "hatch": {
-        "x": 0.8193359375,
-        "y": 0.6171875,
-        "rx": 0.1015625,
-        "ry": 0.1435546875,
-        "radius": 0.1435546875,
+        "x": 0.8193,
+        "y": 0.6172,
+        "rx": 0.1016,
+        "ry": 0.1436,
+        "radius": 0.1436,
         "measured": true
       }
     },
@@ -428,11 +428,11 @@
         "scale": 0.8512
       },
       "hatch": {
-        "x": 0.8169921875,
-        "y": 0.6177734375,
-        "rx": 0.08984375,
-        "ry": 0.142578125,
-        "radius": 0.142578125,
+        "x": 0.817,
+        "y": 0.6178,
+        "rx": 0.0898,
+        "ry": 0.1426,
+        "radius": 0.1426,
         "measured": true
       }
     },
@@ -457,11 +457,11 @@
         "scale": 0.8433
       },
       "hatch": {
-        "x": 0.8134765625,
-        "y": 0.6103515625,
-        "rx": 0.095703125,
-        "ry": 0.1416015625,
-        "radius": 0.1416015625,
+        "x": 0.8135,
+        "y": 0.6104,
+        "rx": 0.0957,
+        "ry": 0.1416,
+        "radius": 0.1416,
         "measured": true
       }
     },

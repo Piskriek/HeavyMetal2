@@ -21,7 +21,7 @@ third-party characters, logos or implied affiliation.
 | `src/game/loadout-art.ts` | Composites the baked race capsule (shell + pilot + team rim) once per roster. |
 | `src/components/RacerFigure.tsx` | Menu-side shell + pilot composite for one loadout, using the same measured hatch. |
 | `src/components/ArtGallery.tsx` | The Sprite Lab: every runtime sprite and every source sheet, downloadable. |
-| `tests/art-check.mjs` | Headless browser checks that the drawn art is really the PNG library. |
+| `tests/art-check.mjs` | Headless browser checks that the drawn art is really the PNG library (dist build or a live URL). |
 
 Regenerate everything with:
 
@@ -107,18 +107,29 @@ never modified.
 - **Alpha trim** then removes the remaining empty margin.
 - **Hull normalisation** (capsule shells only) finds the largest opaque connected component
   (`-connected-components 4`) and scales it so the hull diameter is exactly **452 px on a
-  512 px canvas**. Armour knobs, hooks and exhaust pipes therefore never change the
-  collision envelope or the draw scale, and the pilot insert lands in the same place in
-  every shell.
+  512 px canvas**, then centres that artwork inside the canvas with a single
+  `-gravity center -extent 512x512`. (The earlier version padded and then `-roll`ed the
+  sprite by coordinates, which shifted the shell the wrong way, wrapped a band of pixels
+  around the canvas and pushed the sprite off-canvas; centring by extent cannot do either.)
+  Armour knobs, hooks and exhaust pipes therefore never change the collision envelope or the
+  draw scale, and the pilot insert lands in the same place in every shell.
 - Everything else is fitted into a fixed runtime box with `object-fit`-like behaviour at
   build time, so runtime code never scales per frame.
 
-### 3.4 The hatch is measured, not guessed
+### 3.4 The hatch is measured, then asserted on every build
 
-A shell's cockpit opening is found by scanning the lower-right quadrant for the
-near-black, opaque blob that is at least 0.5% of the canvas, then fitting an **ellipse**
-(the opening is a circle seen from an angle). The manifest stores fractions of the
-sprite:
+A shell's cockpit opening is a **near-black opaque blob in the lower-right quadrant**, and it
+is fitted to an **ellipse** (the opening is a circle seen from an angle). The numbers are
+pinned in `build-art.mjs` (`MEASURED_HATCH`) rather than scanned on every run, because each
+shell also contains the top opening, plate shadows and a large shaded hull area, and a blob
+scan kept selecting the wrong one (in one run it selected the whole shell). Pinning alone
+would rot silently, so `assertHatch()` re-checks each pinned ellipse against the freshly
+written sprite on every build: at least 90% of the samples inside the ellipse must be the
+dark opening, at least half of the opaque samples just outside it must be brighter painted
+metal, and the mean luma contrast between the two has to be at least 25. Artwork that moves a
+port fails the build instead of silently moving the pilot.
+
+The manifest stores fractions of the sprite:
 
 ```json
 "hatch": { "x": 0.8193, "y": 0.6172, "rx": 0.1016, "ry": 0.1436, "radius": 0.1436, "measured": true }
@@ -126,9 +137,26 @@ sprite:
 
 `radius` is `max(rx, ry)`, kept for callers that cannot draw an ellipse; `measured` is
 `false` when the scan failed and a conservative fallback was substituted. The pilot bust is
-then drawn at `3.4 * rx` by `3.4 * ry`, positioned so its eye line (`eyeLine`, 0.44 of the
-bust) sits on the hatch centre, and clipped to 99% of the ellipse so the painted rim stays
-visible.
+then drawn at `3.4 * rx` by `3.4 * ry`, positioned so its eye line (`eyeLine`, a fraction of
+the pilot PNG's height) sits on the hatch centre, and clipped to 99% of the ellipse so the
+painted rim stays visible.
+
+`eyeLine` is **measured per rider**, because a bust with a tall helmet carries its eyes much
+lower in the 68% head crop than a bare-headed one (one shared constant pushed Grub's face
+into the lower rim):
+
+| Rider | Crop | eyeLine |
+| --- | --- | --- |
+| Rivet | leather aviator cap, brass goggles | 0.44 |
+| Nix | asymmetric hair, goggles | 0.44 |
+| Grub | battered spiked helmet | 0.52 |
+| Sprocket | coiled brass helmet | 0.49 |
+
+`tests/artifacts/eyeline-probe.png` (rewritten on every build) renders all four pilots at 3x
+with 0.30 / 0.40 / 0.50 / 0.60 guide rows, so those numbers can
+be re-read whenever the source portraits change. Horizontally the busts are centred on the
+hatch: their alpha centroids measure 0.47-0.52 of the crop, so no per-rider x offset is
+needed.
 
 Current measurements (512x512 shells):
 
@@ -136,12 +164,12 @@ Current measurements (512x512 shells):
 | --- | --- | --- | --- |
 | Rustbucket (iron) | 0.819, 0.617 | 0.102 | 0.144 |
 | Springsteel | 0.817, 0.618 | 0.090 | 0.143 |
-| Siegebreaker (siege) | 0.813, 0.610 | 0.096 | 0.142 |
+| Siegebreaker (siege) | 0.814, 0.610 | 0.096 | 0.142 |
 
 `tests/artifacts/hatch-probe.png` re-draws each measured ellipse over its shell: if a
-future sheet moves the opening, the probe shows it immediately. A wrong measurement would
-silently move the pilot, which is exactly why it is measured by script and reviewed as an
-image.
+future sheet moves the opening, the probe shows it immediately and `assertHatch()` stops the
+build. A wrong measurement would silently move the pilot, which is exactly why it is pinned,
+asserted by pixel sampling and reviewed as an image.
 
 ## 4. Manifest schema
 
@@ -157,9 +185,17 @@ image.
                                "action": "portrait" | "pilot" | "shell" | "supply" | "prop" | "preview",
                                "anchor": "center", "pivot": { "x": 0.5, "y": 0.5 }, "envelope": 1,
                                "hull":  { "diameter": 452, "canvas": 512, "scale": 0.8496 },
-                               "hatch": { "x": 0, "y": 0, "rx": 0, "ry": 0, "radius": 0, "measured": true } } }
+                               "hatch": { "x": 0, "y": 0, "rx": 0, "ry": 0, "radius": 0, "measured": true },
+                               "pilot": "art/grub-pilot.png",
+                               "pilotRuntime": { "width": 256, "height": 256 },
+                               "eyeLine": 0.52 } }
 }
 ```
+
+`pilot` and `pilotRuntime` only exist on rider cells: the cockpit bust is a second runtime
+file derived from the same portrait, not a separate cell, which is why the build reports 18
+cells while the Sprite Lab lists 22 runtime sprites. `pilotRuntime` is an object, not a
+`[width, height]` tuple, because the typed consumers read it as `pilotRuntime.width`.
 
 `src/game/art-assets.ts` types this file and exposes only accessors — `ART`, `artUrl`,
 `riderCell`, `capsuleCell`, `supplyCell`, `courseCell`, `blimpCell`, `landmarkCell`,
@@ -190,21 +226,31 @@ reviewer can compare what was built against what was drawn).
 ## 6. Verification
 
 ```
-npm run check:art     # builds the app, then drives it in headless Chromium
+npm run check:art                          # builds the app, then drives the dist build
+node tests/art-check.mjs http://127.0.0.1:5173   # or check a running server (the preview)
 ```
 
-17 checks (see `tests/art-check.mjs`) assert that: four portrait PNGs and their pilot busts
-decode; the menu composite is one shell plus one clipped pilot; all three shells and all
-three course previews are the rasters with no inline vectors; there are no broken images on
-the setup screen, the grid and the race; HUD supply icons are the painted PNGs; the race
-frame contains painted metal/brass pixels rather than flat fills; no request fails and no
-page error fires while painting a race; the Sprite Lab lists the whole library, every tile
-decodes, and every entry is a `.png`; and each keyed sheet records its detected colour and
-the `#FF00FF` target.
+22 checks (see `tests/art-check.mjs`) assert that: four portrait PNGs and their pilot busts
+decode; the menu composite is one shell plus one clipped pilot; the pilot window's clip-path
+sits on the measured hatch centre (x 0.82 / y 0.61, rx 0.10 / ry 0.14) rather than the shell
+middle and the pilot image stays inside the capsule silhouette; choosing another rider and
+capsule swaps both layers; all three shells and all three course previews are the rasters
+with no inline vectors; there are no broken images on the setup screen, the grid and the
+race; HUD supply icons are the painted PNGs; the race frame contains painted metal/brass
+pixels rather than flat fills; no request fails and no page error fires while painting a
+race; the Sprite Lab lists the whole runtime library, every tile decodes, and every entry is
+a `.png`; and each keyed sheet records its detected colour and the `#FF00FF` target.
 
 Screenshots and a manifest copy are written to `tests/artifacts/`
-(`art-1-loadout.png` … `art-6-source-sheets.png`). `alpha-check.png` is a checkerboard
-contact sheet of fifteen sprites, and `hatch-probe.png` overlays the measured ellipses.
+(`art-1-loadout.png`, `art-1b-capsule-closeup.png` … `art-6-source-sheets.png`).
+`alpha-check.png` is a checkerboard contact sheet of fifteen sprites, `hatch-probe.png`
+overlays the measured ellipses, and `eyeline-probe.png` shows the pilot eye-line guides.
+
+File-level facts are checked outside the browser as well: every shipped sprite is verified
+to begin with the PNG signature and, for the keyed sprites, to carry a real alpha channel
+with a transparent corner (`srgba(0,0,0,0)`), while the three course previews are
+deliberately opaque. `grep` for `data:image/svg` across `src/**/*.ts{,x}` returns nothing:
+no generated SVG art remains in the game modules.
 
 These checks prove the library decodes and is what the game draws. They do **not** measure
 frame pacing, gameplay balance or accessibility; Part 4.4 owns that.

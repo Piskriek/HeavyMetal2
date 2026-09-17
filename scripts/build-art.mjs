@@ -37,6 +37,8 @@ const magick = (args) => {
 };
 const identify = (format, file) => execFileSync('identify', ['-format', format, file], { encoding: 'utf8' }).trim();
 const size = (file) => identify('%wx%h', file).split('x').map(Number);
+/** `{ width, height }` for the manifest; the typed consumers read named fields, not a tuple. */
+const runtimeSize = (file) => { const [width, height] = size(file); return { width, height }; };
 
 let step = 0;
 const temp = (tag) => join(work, `${tag}-${step}.png`);
@@ -180,17 +182,10 @@ function normalize(trimmed, target, { diameter, canvas }) {
   const scale = diameter / reference;
   const scaled = temp('scaled');
   magick([trimmed, '-resize', `${Math.max(1, Math.round(width * scale))}x${Math.max(1, Math.round(height * scale))}`, scaled]);
-  const centreX = (hull ? hull.x + hull.width / 2 : width / 2) * scale;
-  const centreY = (hull ? hull.y + hull.height / 2 : height / 2) * scale;
-  const shiftX = Math.round(canvas / 2 - centreX);
-  const shiftY = Math.round(canvas / 2 - centreY);
-  const padded = temp('padded');
-  const [scaledWidth, scaledHeight] = size(scaled);
-  // Pad with transparent pixels, then roll the object to the canvas centre.
-  magick([scaled, '-background', 'none', '-gravity', 'none',
-    '-extent', `${scaledWidth + Math.abs(shiftX)}x${scaledHeight + Math.abs(shiftY)}`,
-    '-roll', `${shiftX >= 0 ? -shiftX : -shiftX}+${shiftY >= 0 ? -shiftY : -shiftY}`, padded]);
-  magick([padded, '-background', 'none', '-gravity', 'center', '-extent', `${canvas}x${canvas}`, '-strip', target]);
+  // `-trim` above means the image bounds are the artwork bounds, so centring the image
+  // centres the hull. Padding and rolling the sprite by hand used to shift it the wrong way
+  // and wrap a band of pixels around the canvas; a centred extent cannot do either.
+  magick([scaled, '-background', 'none', '-gravity', 'center', '-extent', `${canvas}x${canvas}`, '-strip', target]);
   return { scale, hull };
 }
 
@@ -230,33 +225,92 @@ function sheetMatte(file, name) {
  * would put the pilot through the hull; `tests/artifacts/hatch-probe.png` draws the
  * measurement over the art for every build so a bad measurement is visible immediately.
  */
-function hatchOf(sprite, canvas = 512) {
-  const alpha = temp('hatchalpha');
-  magick([sprite, '-alpha', 'extract', '-threshold', '60%', alpha]);
-  const dark = temp('hatchdark');
-  magick([sprite, '-colorspace', 'gray', '-threshold', '12%', '-negate', dark]);
-  const both = temp('hatchboth');
-  magick([dark, alpha, '-compose', 'Multiply', '-composite', both]);
-  const output = execFileSync('convert', [both, '-define', 'connected-components:verbose=true', '-connected-components', '8', 'null:'],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  let best = null;
-  for (const line of output.split('\n')) {
-    const match = line.match(/^\s*\d+:\s+(\d+)x(\d+)\+([\d-]+)\+([\d-]+)\s+([\d.]+),([\d.]+)\s+(\d+)/);
+/**
+ * Cockpit openings, read from the painted shells and pinned here.
+ *
+ * They are pinned rather than auto-detected on purpose: each shell contains several dark
+ * shapes (the top opening, plate shadows, the shaded hull), and a blob scan kept selecting
+ * the wrong one. These numbers come from reading the artwork against the drawn guide in
+ * `tests/artifacts/hatch-probe.png`; `assertHatch` then re-checks every pinned ellipse
+ * against the freshly written sprite on every build, so art that moves a port fails the
+ * build instead of silently moving the pilot.
+ */
+const MEASURED_HATCH = {
+  iron: { x: 0.8193, y: 0.6172, rx: 0.1016, ry: 0.1436 },
+  springsteel: { x: 0.8170, y: 0.6178, rx: 0.0898, ry: 0.1426 },
+  siege: { x: 0.8135, y: 0.6104, rx: 0.0957, ry: 0.1416 },
+};
+
+/** Reads a sprite back as a small pixel grid, so measurements can be asserted in JS. */
+function sampleGrid(file, side = 128) {
+  const target = temp('sample');
+  magick([file, '-depth', '8', '-resize', `${side}x${side}!`, target]);
+  const text = execFileSync('convert', [target, 'txt:-'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
+  const pixels = new Array(side * side).fill(null);
+  for (const line of text.split('\n')) {
+    const match = line.match(/^(\d+),(\d+): \((\d+),(\d+),(\d+)(?:,(\d+))?\)/);
     if (!match) continue;
-    const [, width, height, x, y, cx, cy, area] = match;
-    // The hatch is the big opening towards the viewer, low and right of centre.
-    if (Number(cx) < canvas * 0.5 || Number(cy) < canvas * 0.35) continue;
-    if (!best || Number(area) > best.area) {
-      best = { area: Number(area), width: Number(width), height: Number(height), x: Number(x), y: Number(y), cx: Number(cx), cy: Number(cy) };
-    }
+    const [, x, y, r, g, b, a] = match;
+    pixels[Number(y) * side + Number(x)] = { r: +r, g: +g, b: +b, a: a === undefined ? 255 : +a };
   }
-  if (!best || best.area < canvas * canvas * 0.005) return null;
-  const rx = best.width / 2 / canvas;
-  const ry = best.height / 2 / canvas;
-  return { x: best.cx / canvas, y: best.cy / canvas, rx, ry, radius: Math.max(rx, ry), measured: true };
+  return {
+    side,
+    at: (fx, fy) => pixels[Math.round(fy * (side - 1)) * side + Math.round(fx * (side - 1))] ?? null,
+  };
 }
-/** Where the eyes sit in a trimmed rider bust, used to seat the pilot inside the hatch. */
-const EYE_LINE = 0.44;
+
+const luma = (pixel) => 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
+
+/**
+ * Verifies a pinned hatch against the sprite it belongs to: the ellipse interior must be the
+ * dark opening and the ring just outside it must be brighter painted metal. Throws when the
+ * artwork and the measurement disagree.
+ */
+function assertHatch(id, file, hatch) {
+  const grid = sampleGrid(file);
+  let interior = 0;
+  let interiorDark = 0;
+  let interiorLuma = 0;
+  let rim = 0;
+  let rimBright = 0;
+  let rimLuma = 0;
+  for (let step = 0; step < 32; step += 1) {
+    const angle = (step / 32) * Math.PI * 2;
+    for (const factor of [0.3, 0.6]) {
+      const pixel = grid.at(hatch.x + Math.cos(angle) * hatch.rx * factor, hatch.y + Math.sin(angle) * hatch.ry * factor);
+      if (!pixel) continue;
+      interior += 1;
+      interiorLuma += luma(pixel);
+      if (luma(pixel) < 60 && pixel.a > 200) interiorDark += 1;
+    }
+    const outer = grid.at(hatch.x + Math.cos(angle) * hatch.rx * 1.4, hatch.y + Math.sin(angle) * hatch.ry * 1.4);
+    // Only opaque samples count: the port sits near the shell's edge, so part of the ring
+    // falls on transparent background that says nothing about the artwork.
+    if (!outer || outer.a < 200) continue;
+    rim += 1;
+    rimLuma += luma(outer);
+    if (luma(outer) > 70) rimBright += 1;
+  }
+  const dark = interior ? interiorDark / interior : 0;
+  const bright = rim ? rimBright / rim : 0;
+  const contrast = (rim ? rimLuma / rim : 0) - (interior ? interiorLuma / interior : 0);
+  if (interior < 40 || rim < 12 || dark < 0.9 || bright < 0.5 || contrast < 25) {
+    throw new Error(`Hatch measurement for ${id} no longer matches the art (${interiorDark}/${interior} dark inside, `
+      + `${rimBright}/${rim} bright outside). Re-read tests/artifacts/hatch-probe.png and update MEASURED_HATCH.`);
+  }
+  console.log(`  capsule ${id}: hatch at ${hatch.x.toFixed(3)},${hatch.y.toFixed(3)} rx ${hatch.rx.toFixed(3)} ry ${hatch.ry.toFixed(3)} `
+    + `(verified: ${Math.round(dark * 100)}% dark opening, ${Math.round(bright * 100)}% brighter rim, contrast ${contrast.toFixed(0)})`);
+  return { ...hatch, radius: Math.max(hatch.rx, hatch.ry), measured: true };
+}
+/**
+ * Where the eyes sit in each trimmed rider bust, as a fraction of the cockpit pilot PNG's
+ * height, used to seat the head on the hatch centre. These are measured per rider rather
+ * than shared: a bust whose helmet is tall (Grub) carries its eye line much lower in the
+ * crop than a bare-headed one, and a single constant pushed that face into the lower rim.
+ * `tests/artifacts/eyeline-probe.png` renders every pilot against 0.30/0.40/0.50/0.60 guides
+ * so the numbers can be re-checked whenever the source art changes.
+ */
+const EYE_LINE = { rivet: 0.44, nix: 0.44, grub: 0.52, sprocket: 0.49 };
 
 /* ---------------------------------- riders ---------------------------------- */
 
@@ -293,7 +347,7 @@ const RIDER_CELLS = [
     fit(head, join(out, `${rider.id}-pilot.png`), 256);
     record(`rider:${rider.id}`, 'riders', sheet, rider.cell, `${rider.id}-portrait.png`, {
       action: 'portrait', anchor: 'center', note: rider.note, pilot: `art/${rider.id}-pilot.png`,
-      pilotRuntime: size(join(out, `${rider.id}-pilot.png`)), eyeLine: EYE_LINE,
+      pilotRuntime: runtimeSize(join(out, `${rider.id}-pilot.png`)), eyeLine: EYE_LINE[rider.id],
     });
   }
 }
@@ -307,10 +361,11 @@ const RIDER_CELLS = [
   manifest.sheets.capsules = sheet;
   ['iron', 'springsteel', 'siege'].forEach((id, index) => {
     const trimmed = extract(file, sheet.cells[index], matte);
-    const hull = normalize(trimmed, `${id}-shell.png`, { diameter: 452, canvas: 512 });
+    // Publish first, then measure: the path handed to `normalize` is where the sprite is
+    // written, and `hatchOf` below reads that same file back.
+    const hull = normalize(trimmed, join(out, `${id}-shell.png`), { diameter: 452, canvas: 512 });
     const sprite = join(out, `${id}-shell.png`);
-    const hatch = hatchOf(sprite) ?? { x: 0.66, y: 0.5, rx: 0.09, ry: 0.13, radius: 0.13, measured: false };
-    console.log(`  capsule ${id}: hatch at ${hatch.x.toFixed(3)},${hatch.y.toFixed(3)} rx ${hatch.rx.toFixed(3)} ry ${hatch.ry.toFixed(3)}${hatch.measured ? '' : ' (fallback measurement)'}`);
+    const hatch = assertHatch(id, sprite, MEASURED_HATCH[id]);
     record(`capsule:${id}`, 'capsules', sheet, index, `${id}-shell.png`, {
       action: 'shell', anchor: 'center', pivot: { x: 0.5, y: 0.5 }, envelope: 1,
       hull: { diameter: 452, canvas: 512, scale: Number(hull.scale.toFixed(4)) },
@@ -408,5 +463,22 @@ const probes = ['iron', 'springsteel', 'siege'].map((id, index) => {
   return target;
 });
 execFileSync('montage', ['-background', '#22262c', '-tile', '3x', '-geometry', '+6+6', ...probes, join(root, 'tests/artifacts/hatch-probe.png')]);
+
+/**
+ * The eye-line contact sheet: every cockpit pilot at 3x with the guide rows the manifest
+ * `eyeLine` values were read from (0.30 / 0.40 / 0.50 / 0.60 of the pilot PNG's height).
+ * Re-render it whenever the source portraits change and re-read the numbers.
+ */
+const guides = [['0.30', 0.30, 'orange'], ['0.40', 0.40, 'yellow'], ['0.50', 0.50, 'cyan'], ['0.60', 0.60, 'red']];
+const eyelines = ['rivet', 'nix', 'grub', 'sprocket'].map((id, index) => {
+  const target = join(work, `eyeline-${index}.png`);
+  const args = [join(out, `${id}-pilot.png`), '-resize', '300%'];
+  for (const [, fraction, colour] of guides) args.push('-stroke', colour, '-strokewidth', '2', '-draw', `line 0,${Math.round(fraction * 768)} 768,${Math.round(fraction * 768)}`);
+  args.push(target);
+  magick(args);
+  return target;
+});
+execFileSync('montage', ['-background', '#22302a', '-tile', '4x', '-geometry', '+6+6', ...eyelines, join(root, 'tests/artifacts/eyeline-probe.png')]);
+console.log(`Eye lines: ${Object.entries(EYE_LINE).map(([id, value]) => `${id} ${value}`).join(', ')} (guides at 0.30/0.40/0.50/0.60 of tests/artifacts/eyeline-probe.png)`);
 
 rmSync(work, { recursive: true, force: true });

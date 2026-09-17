@@ -1,5 +1,5 @@
 # Goblin Rally: Project Status And Codex Handoff
-
+You can find the Files to the Game predecesor "Heavy Metal 1" in the "Pregame" folder, you are free to use any png assets from there to style the game, its encouraged. You can only generate 10 images per turn before your turns need to be reset, to reset them simply say "Reset please" and stop working, you will get a reply of "turns reset" and you will be able to do 10 more. 
 ## Latest User Instruction
 
 The user asked to continue to Section 4, split that final section into four smaller parts, and implement one part at a time. They then superseded immediate implementation with: create only this status report and a prompt for a fresh Codex agent, including generating PNG artwork to replace SVG art and any additional art requirements.

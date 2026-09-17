@@ -8,6 +8,10 @@ interface MainMenuProps {
   options: GameOptions;
   hasRace: boolean;
   resumeLabel?: string;
+  /** Recovery message for the durable event, e.g. an interrupted round restarting. */
+  resumeNote?: string | null;
+  /** Set when this browser refuses to store progress; never claim otherwise. */
+  storageWarning?: string | null;
   onNewGame: () => void;
   onResume: () => void;
   onSettings: () => void;
@@ -47,7 +51,7 @@ export default function MainMenu(props: MainMenuProps) {
 
   const entries = [
     ...(props.hasRace ? [{ label: props.resumeLabel ?? 'Resume Race', sub: 'Your goblin is waiting.', icon: Play, action: props.onResume, primary: true }] : []),
-    { label: 'New Game', sub: 'A fresh start. The same bad judgment.', icon: Flag, action: props.onNewGame, primary: !props.hasRace },
+    { label: 'New Game', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A fresh start. The same bad judgment.', icon: Flag, action: props.onNewGame, primary: !props.hasRace },
     { label: 'Settings', sub: 'A little fine-tuning never hurt.', icon: Settings, action: props.onSettings, primary: false },
     { label: 'How to Play', sub: 'The very optional instruction manual.', icon: BookOpen, action: props.onGuide, primary: false },
     { label: 'Hall of Chaos', sub: 'Some things deserve to be remembered.', icon: Trophy, action: props.onRecords, primary: false },
@@ -67,7 +71,7 @@ export default function MainMenu(props: MainMenuProps) {
         </div>
       </div>
 
-      <motion.div className="menu-composition" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65 }}>
+      <motion.div className="menu-composition" data-resume-note={Boolean(props.hasRace && props.resumeNote)} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65 }}>
         <div className="game-wordmark">
           <div className="wordmark-flourish"><span /><GoblinMark small /><span /></div>
           <h1 id="menu-title"><span className="wordmark-goblin">GOBLIN</span><span className="wordmark-rally">RALLY</span></h1>
@@ -75,6 +79,7 @@ export default function MainMenu(props: MainMenuProps) {
           <p>Glory at the bottom. Trouble all the way down.</p>
         </div>
 
+        {props.hasRace && props.resumeNote && <p className="menu-resume-note" role="status"><Flag size={13} />{props.resumeNote}</p>}
         <nav ref={navigation} className="main-menu-actions" aria-label="Main menu" onKeyDown={moveFocus}>
           {entries.map(({ label, icon: Icon, action, primary }, index) => (
             <motion.button key={label} className={`forged-menu-button ${primary ? 'forged-primary' : ''}`} onClick={action}
@@ -89,6 +94,7 @@ export default function MainMenu(props: MainMenuProps) {
       </motion.div>
 
       <footer className="menu-footer">
+        {props.storageWarning ? <p className="menu-storage-warning" role="status">{props.storageWarning}</p> : null}
         <div className="menu-input-hints"><span><kbd>Enter</kbd> Select</span><span><kbd>Tab</kbd> Navigate</span>{props.hasRace && <span><kbd>Esc</kbd> Resume</span>}</div>
         <button onClick={props.onCredits}>The Art & the Engineering <ArrowRight size={13} /></button>
         <span className="menu-build">LOCAL PLAY <i /> BUILD 0.4.3</span>

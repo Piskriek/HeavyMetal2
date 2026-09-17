@@ -1,92 +1,161 @@
 {
   "generatedAt": "2026-09-17",
   "matte": {
-    "riders": {
-      "hex": "rgb(8,248,8)",
-      "detected": "green",
-      "despill": [
-        "G"
-      ]
-    },
     "capsules": {
-      "hex": "rgb(8,248,0)",
-      "detected": "green",
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
       "despill": [
-        "G"
+        "R",
+        "B"
       ]
     },
     "supply-fuel": {
-      "hex": "rgb(256,0,248)",
+      "hex": "#FF00F8",
       "detected": "magenta",
+      "canonical": "#FF00FF",
       "despill": [
         "R",
         "B"
       ]
     },
     "supply-shield": {
-      "hex": "rgb(256,0,248)",
+      "hex": "#FF00F8",
       "detected": "magenta",
+      "canonical": "#FF00FF",
       "despill": [
         "R",
         "B"
       ]
     },
     "supply-bounce": {
-      "hex": "rgb(256,0,248)",
+      "hex": "#FF00F8",
       "detected": "magenta",
+      "canonical": "#FF00FF",
       "despill": [
         "R",
         "B"
       ]
     },
     "landmarks": {
-      "hex": "rgb(8,232,8)",
-      "detected": "green",
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
       "despill": [
-        "G"
+        "R",
+        "B"
       ]
     },
     "blimp": {
-      "hex": "rgb(16,200,16)",
-      "detected": "green",
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
       "despill": [
-        "G"
+        "R",
+        "B"
       ]
     }
   },
   "sheets": {
     "riders": {
-      "file": "art/sheets/riders-sheet.png",
-      "width": 1024,
+      "file": "art/sheets/riders-source.png",
+      "width": 1536,
       "height": 1024,
-      "columns": 2,
-      "rows": 2,
+      "columns": 5,
+      "rows": 3,
       "cells": [
         {
           "x": 0,
           "y": 0,
-          "width": 512,
-          "height": 512
+          "width": 307,
+          "height": 341
         },
         {
-          "x": 512,
+          "x": 307,
           "y": 0,
-          "width": 512,
-          "height": 512
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 614,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 921,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 1228,
+          "y": 0,
+          "width": 307,
+          "height": 341
         },
         {
           "x": 0,
-          "y": 512,
-          "width": 512,
-          "height": 512
+          "y": 341,
+          "width": 307,
+          "height": 341
         },
         {
-          "x": 512,
-          "y": 512,
-          "width": 512,
-          "height": 512
+          "x": 307,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 614,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 921,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 1228,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 0,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 307,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 614,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 921,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 1228,
+          "y": 682,
+          "width": 307,
+          "height": 341
         }
-      ]
+      ],
+      "alpha": "painted"
     },
     "capsules": {
       "file": "art/sheets/capsules-sheet.png",
@@ -162,34 +231,34 @@
     },
     "landmarks": {
       "file": "art/sheets/landmarks-sheet.png",
-      "width": 1024,
-      "height": 1024,
+      "width": 1264,
+      "height": 843,
       "columns": 2,
       "rows": 2,
       "cells": [
         {
           "x": 0,
           "y": 0,
-          "width": 512,
-          "height": 512
+          "width": 632,
+          "height": 421
         },
         {
-          "x": 512,
+          "x": 632,
           "y": 0,
-          "width": 512,
-          "height": 512
+          "width": 632,
+          "height": 421
         },
         {
           "x": 0,
-          "y": 512,
-          "width": 512,
-          "height": 512
+          "y": 421,
+          "width": 632,
+          "height": 421
         },
         {
-          "x": 512,
-          "y": 512,
-          "width": 512,
-          "height": 512
+          "x": 632,
+          "y": 421,
+          "width": 632,
+          "height": 421
         }
       ]
     },
@@ -247,6 +316,7 @@
       },
       "action": "portrait",
       "anchor": "center",
+      "note": "leather aviator cap and brass goggles",
       "pilot": "art/rivet-pilot.png",
       "pilotRuntime": [
         256,
@@ -256,7 +326,7 @@
     },
     "rider:nix": {
       "sheet": "riders",
-      "sheetCell": 1,
+      "sheetCell": 8,
       "image": "art/nix-portrait.png",
       "runtime": {
         "width": 512,
@@ -264,6 +334,7 @@
       },
       "action": "portrait",
       "anchor": "center",
+      "note": "asymmetric hair, goggles, wide grin",
       "pilot": "art/nix-pilot.png",
       "pilotRuntime": [
         256,
@@ -273,7 +344,7 @@
     },
     "rider:grub": {
       "sheet": "riders",
-      "sheetCell": 2,
+      "sheetCell": 11,
       "image": "art/grub-portrait.png",
       "runtime": {
         "width": 512,
@@ -281,6 +352,7 @@
       },
       "action": "portrait",
       "anchor": "center",
+      "note": "battered spiked helmet, heavy jaw",
       "pilot": "art/grub-pilot.png",
       "pilotRuntime": [
         256,
@@ -298,6 +370,7 @@
       },
       "action": "portrait",
       "anchor": "center",
+      "note": "coiled-helmet tinkerer",
       "pilot": "art/sprocket-pilot.png",
       "pilotRuntime": [
         256,
@@ -323,12 +396,14 @@
       "hull": {
         "diameter": 452,
         "canvas": 512,
-        "scale": 0.8692
+        "scale": 0.8496
       },
       "hatch": {
-        "x": 0.66,
-        "y": 0.5,
-        "radius": 0.133,
+        "x": 0.8193359375,
+        "y": 0.6171875,
+        "rx": 0.1015625,
+        "ry": 0.1435546875,
+        "radius": 0.1435546875,
         "measured": true
       }
     },
@@ -350,12 +425,14 @@
       "hull": {
         "diameter": 452,
         "canvas": 512,
-        "scale": 0.8709
+        "scale": 0.8512
       },
       "hatch": {
-        "x": 0.648,
-        "y": 0.492,
-        "radius": 0.138,
+        "x": 0.8169921875,
+        "y": 0.6177734375,
+        "rx": 0.08984375,
+        "ry": 0.142578125,
+        "radius": 0.142578125,
         "measured": true
       }
     },
@@ -377,12 +454,14 @@
       "hull": {
         "diameter": 452,
         "canvas": 512,
-        "scale": 0.8642
+        "scale": 0.8433
       },
       "hatch": {
-        "x": 0.66,
-        "y": 0.5,
-        "radius": 0.126,
+        "x": 0.8134765625,
+        "y": 0.6103515625,
+        "rx": 0.095703125,
+        "ry": 0.1416015625,
+        "radius": 0.1416015625,
         "measured": true
       }
     },
@@ -424,8 +503,8 @@
       "sheetCell": 0,
       "image": "art/landmark-pines.png",
       "runtime": {
-        "width": 359,
-        "height": 462
+        "width": 295,
+        "height": 394
       },
       "action": "prop",
       "anchor": "bottom",
@@ -436,8 +515,8 @@
       "sheetCell": 1,
       "image": "art/landmark-quarry.png",
       "runtime": {
-        "width": 419,
-        "height": 315
+        "width": 456,
+        "height": 322
       },
       "action": "prop",
       "anchor": "bottom",
@@ -448,8 +527,8 @@
       "sheetCell": 2,
       "image": "art/landmark-windmill.png",
       "runtime": {
-        "width": 266,
-        "height": 460
+        "width": 316,
+        "height": 397
       },
       "action": "prop",
       "anchor": "bottom",
@@ -460,8 +539,8 @@
       "sheetCell": 3,
       "image": "art/landmark-pasture.png",
       "runtime": {
-        "width": 449,
-        "height": 286
+        "width": 512,
+        "height": 240
       },
       "action": "prop",
       "anchor": "bottom",
@@ -473,7 +552,7 @@
       "image": "art/blimp.png",
       "runtime": {
         "width": 900,
-        "height": 636
+        "height": 577
       },
       "action": "prop",
       "anchor": "center",

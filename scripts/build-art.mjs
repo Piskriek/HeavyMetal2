@@ -20,7 +20,7 @@
  * Usage: node scripts/build-art.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,7 +45,9 @@ const temp = (tag) => join(work, `${tag}-${step}.png`);
 
 const channelsOf = ([r, g, b]) => (r > 150 && b > 150 && g < 110 ? { name: 'magenta', clamp: ['R', 'B'] }
   : g > 120 && r < 110 && b < 110 && g > r + 60 && g > b + 60 ? { name: 'green', clamp: ['G'] } : null);
-const quantise = (value) => value.map((channel) => Math.round(channel / 8) * 8);
+// Quantised to 8-step buckets (and clamped, so a rounded 256 cannot become a 4-digit hex).
+const quantise = (value) => value.map((channel) => Math.min(255, Math.max(0, Math.round(channel / 8) * 8)));
+const hexOf = (rgb) => `#${rgb.map((channel) => channel.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
 const rgbOf = (text) => (text.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
 
 /** Reads pixel values in bulk: one ImageMagick call per strip instead of one per pixel. */
@@ -80,7 +82,7 @@ function borderKeys(file, rect) {
     .filter((entry) => channelsOf(entry.rgb))
     .sort((a, b) => b.hits - a.hits)
     .slice(0, 5)
-    .map((entry) => ({ hex: `rgb(${entry.rgb.join(',')})`, ...channelsOf(entry.rgb) }));
+    .map((entry) => ({ hex: hexOf(entry.rgb), ...channelsOf(entry.rgb) }));
 }
 
 function matteOf(file) {
@@ -135,9 +137,11 @@ function despill(file, matte) {
  * Crops a cell, keys every matte colour painted on that cell's border, despills and trims
  * to the real object bounds.
  */
-function extract(sheet, rect, sheetMatte) {
+function extract(sheet, rect, sheetMatte, { shave = 6 } = {}) {
   const crop = temp('crop');
-  magick([sheet, '-crop', `${rect.width}x${rect.height}+${rect.x}+${rect.y}`, '+repage', crop]);
+  // Shaving the cell border first drops the faint divider lines the painter draws
+  // between grid cells; without it they survive keying as stray white edges.
+  magick([sheet, '-crop', `${rect.width}x${rect.height}+${rect.x}+${rect.y}`, '+repage', '-shave', `${shave}x${shave}`, crop]);
   const cellKeys = borderKeys(crop, { x: 0, y: 0, width: rect.width, height: rect.height });
   const keys = [...new Set([sheetMatte.hex, ...cellKeys.map((entry) => entry.hex)])];
   const clamp = [...new Set([sheetMatte.clamp, ...cellKeys.flatMap((entry) => entry.clamp)])];
@@ -211,38 +215,87 @@ const record = (key, sheetName, sheet, index, target, extra = {}) => {
   const runtime = size(join(out, target));
   manifest.cells[key] = { sheet: sheetName, sheetCell: index, image: `art/${target}`, runtime: { width: runtime[0], height: runtime[1] }, ...extra };
 };
+/** Canonical key colour each detected matte targets, so the UI can state the intent. */
+const CANONICAL = { magenta: '#FF00FF', green: '#00FF00' };
 function sheetMatte(file, name) {
   const matte = matteOf(file);
-  manifest.matte[name] = { hex: matte.hex, detected: matte.name, despill: matte.clamp };
-  console.log(`  ${name}: ${matte.name} matte ${matte.hex}, despill ${matte.clamp.join('/')}`);
+  manifest.matte[name] = { hex: matte.hex, detected: matte.name, canonical: CANONICAL[matte.name], despill: matte.clamp };
+  console.log(`  ${name}: ${matte.name} matte ${matte.hex} (target ${CANONICAL[matte.name]}), despill ${matte.clamp.join('/')}`);
   return matte;
 }
 
 /**
- * Hatch circles as fractions of the normalized capsule sprite. Measured against the
- * painted art with an overlay probe (tests/artifacts/hatch-probe.png) and verified for
- * every build, because a guessed anchor would put the pilot through the hull.
+ * Measures the open cockpit hatch of a normalized shell: the near-black, fully opaque
+ * blob in the lower-right quadrant of the sprite. Automatic, because a guessed anchor
+ * would put the pilot through the hull; `tests/artifacts/hatch-probe.png` draws the
+ * measurement over the art for every build so a bad measurement is visible immediately.
  */
-const HATCH = { iron: { x: 0.660, y: 0.500, r: 0.133 }, springsteel: { x: 0.648, y: 0.492, r: 0.138 }, siege: { x: 0.660, y: 0.500, r: 0.126 } };
+function hatchOf(sprite, canvas = 512) {
+  const alpha = temp('hatchalpha');
+  magick([sprite, '-alpha', 'extract', '-threshold', '60%', alpha]);
+  const dark = temp('hatchdark');
+  magick([sprite, '-colorspace', 'gray', '-threshold', '12%', '-negate', dark]);
+  const both = temp('hatchboth');
+  magick([dark, alpha, '-compose', 'Multiply', '-composite', both]);
+  const output = execFileSync('convert', [both, '-define', 'connected-components:verbose=true', '-connected-components', '8', 'null:'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  let best = null;
+  for (const line of output.split('\n')) {
+    const match = line.match(/^\s*\d+:\s+(\d+)x(\d+)\+([\d-]+)\+([\d-]+)\s+([\d.]+),([\d.]+)\s+(\d+)/);
+    if (!match) continue;
+    const [, width, height, x, y, cx, cy, area] = match;
+    // The hatch is the big opening towards the viewer, low and right of centre.
+    if (Number(cx) < canvas * 0.5 || Number(cy) < canvas * 0.35) continue;
+    if (!best || Number(area) > best.area) {
+      best = { area: Number(area), width: Number(width), height: Number(height), x: Number(x), y: Number(y), cx: Number(cx), cy: Number(cy) };
+    }
+  }
+  if (!best || best.area < canvas * canvas * 0.005) return null;
+  const rx = best.width / 2 / canvas;
+  const ry = best.height / 2 / canvas;
+  return { x: best.cx / canvas, y: best.cy / canvas, rx, ry, radius: Math.max(rx, ry), measured: true };
+}
 /** Where the eyes sit in a trimmed rider bust, used to seat the pilot inside the hatch. */
 const EYE_LINE = 0.44;
 
 /* ---------------------------------- riders ---------------------------------- */
 
+/**
+ * The four riders are repurposed from the predecessor project's painted portrait sheet
+ * (`PreGame/assets/portraits/user_portraits.png`). That art already carries a real alpha
+ * channel, so it is only cropped, trimmed and scaled here - no keying, no loss of the soft
+ * edge antialiasing. Cells are chosen to match the existing rider personalities.
+ */
+const RIDER_CELLS = [
+  { id: 'rivet', cell: 0, note: 'leather aviator cap and brass goggles' },
+  { id: 'nix', cell: 8, note: 'asymmetric hair, goggles, wide grin' },
+  { id: 'grub', cell: 11, note: 'battered spiked helmet, heavy jaw' },
+  { id: 'sprocket', cell: 3, note: 'coiled-helmet tinkerer' },
+];
+
 {
-  const file = join(sheets, 'riders-sheet.png');
-  const sheet = grid(file, 2, 2);
-  const matte = sheetMatte(file, 'riders');
-  manifest.sheets.riders = sheet;
-  ['rivet', 'nix', 'grub', 'sprocket'].forEach((id, index) => {
-    const trimmed = extract(file, sheet.cells[index], matte);
-    fit(trimmed, join(out, `${id}-portrait.png`), 512);
-    fit(trimmed, join(out, `${id}-pilot.png`), 256);
-    record(`rider:${id}`, 'riders', sheet, index, `${id}-portrait.png`, {
-      action: 'portrait', anchor: 'center', pilot: `art/${id}-pilot.png`,
-      pilotRuntime: size(join(out, `${id}-pilot.png`)), eyeLine: EYE_LINE,
+  const source = join(root, 'PreGame/assets/portraits/user_portraits.png');
+  const shipped = join(sheets, 'riders-source.png');
+  copyFileSync(source, shipped);
+  const sheet = grid(shipped, 5, 3);
+  manifest.sheets.riders = { ...sheet, file: 'art/sheets/riders-source.png', alpha: 'painted' };
+  for (const rider of RIDER_CELLS) {
+    const rect = sheet.cells[rider.cell];
+    const crop = temp(`rider-${rider.id}`);
+    magick([shipped, '-crop', `${rect.width}x${rect.height}+${rect.x}+${rect.y}`, '+repage', '-shave', '6x6', crop]);
+    const trimmed = temp(`rider-trim-${rider.id}`);
+    magick([crop, '-trim', '+repage', trimmed]);
+    fit(trimmed, join(out, `${rider.id}-portrait.png`), 512);
+    // The cockpit insert is the head, so the face fills the hatch opening.
+    const [width, height] = size(trimmed);
+    const head = temp(`rider-head-${rider.id}`);
+    magick([trimmed, '-crop', `${width}x${Math.round(height * 0.68)}+0+0`, '+repage', head]);
+    fit(head, join(out, `${rider.id}-pilot.png`), 256);
+    record(`rider:${rider.id}`, 'riders', sheet, rider.cell, `${rider.id}-portrait.png`, {
+      action: 'portrait', anchor: 'center', note: rider.note, pilot: `art/${rider.id}-pilot.png`,
+      pilotRuntime: size(join(out, `${rider.id}-pilot.png`)), eyeLine: EYE_LINE,
     });
-  });
+  }
 }
 
 /* --------------------------------- capsules --------------------------------- */
@@ -255,11 +308,13 @@ const EYE_LINE = 0.44;
   ['iron', 'springsteel', 'siege'].forEach((id, index) => {
     const trimmed = extract(file, sheet.cells[index], matte);
     const hull = normalize(trimmed, `${id}-shell.png`, { diameter: 452, canvas: 512 });
-    const hatch = HATCH[id];
+    const sprite = join(out, `${id}-shell.png`);
+    const hatch = hatchOf(sprite) ?? { x: 0.66, y: 0.5, rx: 0.09, ry: 0.13, radius: 0.13, measured: false };
+    console.log(`  capsule ${id}: hatch at ${hatch.x.toFixed(3)},${hatch.y.toFixed(3)} rx ${hatch.rx.toFixed(3)} ry ${hatch.ry.toFixed(3)}${hatch.measured ? '' : ' (fallback measurement)'}`);
     record(`capsule:${id}`, 'capsules', sheet, index, `${id}-shell.png`, {
       action: 'shell', anchor: 'center', pivot: { x: 0.5, y: 0.5 }, envelope: 1,
       hull: { diameter: 452, canvas: 512, scale: Number(hull.scale.toFixed(4)) },
-      hatch: { x: hatch.x, y: hatch.y, radius: hatch.r, measured: true },
+      hatch,
     });
   });
 }
@@ -273,10 +328,10 @@ const EYE_LINE = 0.44;
   const file = join(sheets, `supply-${id}.png`);
   const [width, height] = size(file);
   const matte = matteOf(file);
-  manifest.matte[`supply-${id}`] = { hex: matte.hex, detected: matte.name, despill: matte.clamp };
+  manifest.matte[`supply-${id}`] = { hex: matte.hex, detected: matte.name, canonical: CANONICAL[matte.name], despill: matte.clamp };
   const sheet = { file: `art/sheets/supply-${id}.png`, width, height, columns: 1, rows: 1, cells: [{ x: 0, y: 0, width, height }] };
   manifest.sheets[`supply-${id}`] = sheet;
-  console.log(`  supply-${id}: ${matte.name} matte ${matte.hex}, despill ${matte.clamp.join('/')}`);
+  console.log(`  supply-${id}: ${matte.name} matte ${matte.hex} (target ${CANONICAL[matte.name]}), despill ${matte.clamp.join('/')}`);
   fit(extract(file, sheet.cells[0], matte), join(out, `${id}-supply.png`), 256);
   record(`supply:${id}`, `supply-${id}`, sheet, 0, `${id}-supply.png`, { action: 'icon', anchor: 'center' });
 });
@@ -346,9 +401,10 @@ const probes = ['iron', 'springsteel', 'siege'].map((id, index) => {
   const hatch = manifest.cells[`capsule:${id}`].hatch;
   const cx = Math.round(hatch.x * 512);
   const cy = Math.round(hatch.y * 512);
-  const r = Math.round(hatch.radius * 512);
+  const rx = Math.round((hatch.rx ?? hatch.radius) * 512);
+  const ry = Math.round((hatch.ry ?? hatch.radius) * 512);
   magick([join(out, `${id}-shell.png`), '-fill', 'none', '-stroke', 'magenta', '-strokewidth', '3',
-    '-draw', `circle ${cx},${cy} ${cx},${cy + r}`, target]);
+    '-draw', `ellipse ${cx},${cy} ${rx},${ry} 0,360`, target]);
   return target;
 });
 execFileSync('montage', ['-background', '#22262c', '-tile', '3x', '-geometry', '+6+6', ...probes, join(root, 'tests/artifacts/hatch-probe.png')]);

@@ -1,4 +1,5 @@
 import type { GameAssets } from './assets';
+import { LANDMARK_IDS, artUrl, blimpCell, courseCell, loadArtImage, landmarkCell, type LandmarkId } from './art-assets';
 import { TRACKS, type CourseDefinition } from './courses';
 import type { CourseId } from './types';
 
@@ -122,6 +123,15 @@ function background(track: CourseDefinition, assets: GameAssets) {
 }
 
 function blimpArt(track: CourseDefinition) {
+  const sprite = painted.get(blimpCell().image);
+  if (sprite) {
+    // One painted airship, drawn at its own aspect ratio so it is never stretched.
+    const width = 520;
+    const height = Math.round(width * sprite.naturalHeight / sprite.naturalWidth);
+    const { image, context } = canvas(width, height);
+    context.drawImage(sprite, 0, 0, width, height);
+    return image;
+  }
   const { image, context: c } = canvas(520, 270);
   const p = track.palette;
   c.fillStyle = '#263528'; c.strokeStyle = '#1b2b23'; c.lineWidth = 4;
@@ -152,6 +162,9 @@ function blimpArt(track: CourseDefinition) {
 }
 
 function landmark(track: CourseDefinition, variation: number) {
+  const id = LANDMARK_BY_COURSE[track.id]?.[variation] ?? 'pines';
+  const paintedProp = propCanvas(id, 270, 330);
+  if (paintedProp) return paintedProp;
   const { image, context: c } = canvas(270, 330);
   const p = track.palette;
   if (track.biome === 'forest') {
@@ -180,6 +193,49 @@ function landmark(track: CourseDefinition, variation: number) {
   return image;
 }
 
+/**
+ * Painted prop images, decoded before a race (`prepareWorldArt`) and composed into the
+ * canvases below. Empty until the first preparation, so the region painter still has a
+ * complete fallback if a PNG cannot be decoded.
+ */
+const painted = new Map<string, HTMLImageElement>();
+
+/** Which painted landmark each circuit uses for its two roadside variations. */
+const LANDMARK_BY_COURSE: Record<CourseId, [LandmarkId, LandmarkId]> = {
+  ridge: ['pines', 'windmill'],
+  boomtown: ['quarry', 'pasture'],
+  sheep: ['pasture', 'windmill'],
+};
+
+/**
+ * Decode the blimp and landmark sprites before racing; never called during a frame.
+ * Any course art that was already composed with the fallback fallback is invalidated, so
+ * the painted props always win once they are available.
+ */
+export async function prepareWorldArt(): Promise<boolean> {
+  const paths = [blimpCell().image, ...LANDMARK_IDS.map((id) => landmarkCell(id).image)];
+  let loaded = 0;
+  await Promise.all(paths.map(async (path) => {
+    if (painted.has(path)) { loaded += 1; return; }
+    try { painted.set(path, await loadArtImage(path)); loaded += 1; } catch { /* keep the fallback */ }
+  }));
+  if (loaded) cache.clear();
+  return loaded > 0;
+}
+
+/** Draws a painted prop into a fixed-size, bottom-aligned canvas for the scenery layer. */
+function propCanvas(id: LandmarkId, width: number, height: number) {
+  const image = painted.get(landmarkCell(id).image);
+  if (!image) return null;
+  const { image: target, context } = canvas(width, height);
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const w = image.naturalWidth * scale;
+  const h = image.naturalHeight * scale;
+  // Props stand on the ground: bottom-aligned, horizontally centred.
+  context.drawImage(image, (width - w) / 2, height - h, w, h);
+  return target;
+}
+
 export function buildCourseArt(id: CourseId, assets: GameAssets): CourseArt {
   const existing = cache.get(id); if (existing) return existing;
   const track = TRACKS[id];
@@ -188,13 +244,10 @@ export function buildCourseArt(id: CourseId, assets: GameAssets): CourseArt {
   cache.set(id, art); return art;
 }
 
-const previews = new Map<CourseId, string>();
+/**
+ * Course thumbnail for the setup screens: the generated raster painting for that circuit,
+ * so the selection art matches the world the player actually races through.
+ */
 export function coursePreview(id: CourseId) {
-  if (previews.has(id)) return previews.get(id)!;
-  const track = TRACKS[id]; const p = track.palette;
-  const land = track.biome === 'canyon'
-    ? `<path d="M0 130 20 63 75 57 91 106 132 116 161 40 209 42 228 130 282 134 315 62 367 69 400 143v77H0Z" fill="${p.middle}"/><path d="M0 153 27 95 68 89 90 162 189 165 236 88 271 87 293 161 351 169 377 113 400 145v75H0Z" fill="${p.foreground}"/>`
-    : `<path d="M0 150Q53 38 128 104T271 100T400 113v107H0Z" fill="${p.distant}"/><path d="M0 169Q88 92 160 144T300 133T400 158v62H0Z" fill="${p.middle}"/>${track.biome === 'forest' ? `<path d="m24 139 26-83 28 83H62l27 39H12l28-39Zm271-21 23-82 31 82h-17l24 38h-70l23-38Z" fill="${p.foreground}"/>` : ''}`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220"><defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="${p.sky}"/><stop offset="1" stop-color="${p.horizon}"/></linearGradient></defs><path fill="url(#s)" d="M0 0h400v220H0Z"/>${land}<path d="M0 201Q140 125 241 161T400 133v87H0Z" fill="${p.soil}"/><path d="M85 220Q141 158 281 151T400 137v19q-183 25-227 64" fill="${p.dirt}"/><path d="M157 220Q208 165 396 149" fill="none" stroke="${p.chalk}" stroke-opacity=".45" stroke-width="2" stroke-dasharray="14 14"/></svg>`;
-  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; previews.set(id, url); return url;
+  return artUrl(courseCell(id).image);
 }

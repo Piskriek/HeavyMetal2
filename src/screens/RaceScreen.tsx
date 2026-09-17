@@ -7,11 +7,14 @@ import {
   ShieldCheck, Sparkles, Trophy, Volume2, VolumeX, X, Zap,
 } from 'lucide-react';
 import Modal from '../components/Modal';
+import ArtGallery from '../components/ArtGallery';
 import GoblinMark from '../components/GoblinMark';
 import RaceControls from '../components/RaceControls';
 import RoundResult from '../components/RoundResult';
 import { AirSupplyGuide } from '../components/AirSupplies';
-import { prepareRaceCapsules } from '../game/loadout-art';
+import { mergeRunRecord } from '../game/preferences';
+import { prepareRaceCapsules, prepareRosterArt } from '../game/loadout-art';
+import { prepareWorldArt } from '../game/world-art';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
 import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../game/session';
 import { TRACK_DISTANCE } from '../game/scene';
@@ -38,6 +41,11 @@ interface RaceScreenProps {
   onRoundComplete: (record: RunRecord) => void;
   onContinue: () => void;
   onNewGame: () => void;
+  /** Reports the explicit persisted phase while the round is live. */
+  onPhase: (phase: 'grid' | 'racing') => void;
+  /** Recovery messages from the durable save, shown before the relaunch. */
+  gridNotes: string[];
+  storageWarning: string | null;
 }
 
 function download(url: string, filename: string) {
@@ -67,33 +75,23 @@ const HAZARDS: { sprite: SpriteName; name: string; description: string }[] = [
   { sprite: 'sheep', name: 'The local wildlife', description: 'Soft landings. Loud complaints. No sheep are harmed.' },
 ];
 
-const WORKSHOP_SPRITES: { name: SpriteName; label: string; alt: string }[] = [
-  { name: 'ball', label: 'THE RUSTBUCKET', alt: 'Goblin iron capsule' },
-  { name: 'sheep', label: 'WOOLLY MENACE', alt: 'Helmet-wearing sheep' },
-  { name: 'tnt', label: 'PROBLEM SOLVER', alt: 'TNT crate' },
-  { name: 'spring', label: 'BOUNCE BUTTON', alt: 'Bounce spring' },
-  { name: 'boost', label: 'MORE THROTTLE', alt: 'Speed boost pad' },
-  { name: 'ramp', label: 'FLIGHT RISK', alt: 'Perspective-matched timber ramp' },
-  { name: 'sling', label: 'REAR-LOADING MENACE', alt: 'Rear-loading timber and iron slingshot' },
-  { name: 'loop', label: 'FULL CIRCLE', alt: 'Riveted timber loop with depth-correct rails' },
-  { name: 'grandstand', label: 'THE BAD INFLUENCES', alt: 'Goblins cheering from timber grandstands' },
-];
 
-export default function RaceScreen({ active, options, setOptions, records, setRecords, onMainMenu, onSettings, config, session, onRoundComplete, onContinue, onNewGame }: RaceScreenProps) {
+export default function RaceScreen({ active, options, setOptions, records, setRecords, onMainMenu, onSettings, config, session, onRoundComplete, onContinue, onNewGame, onPhase, gridNotes, storageWarning }: RaceScreenProps) {
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [artFailures, setArtFailures] = useState<string[]>([]);
   const [loadingAttempt, setLoadingAttempt] = useState(0);
   const [snapshot, setSnapshot] = useState(INITIAL_SNAPSHOT);
   const [result, setResult] = useState<RunRecord | null>(() => session.results.find((record) => record.round === config.round) ?? null);
+  // A round that was already committed before this screen mounted is never rebuilt as a live race.
+  const [resumeOnly] = useState(() => session.results.some((record) => record.round === config.round));
   const [modal, setModal] = useState<ModalName>(null);
   const [workshopTab, setWorkshopTab] = useState<WorkshopTab>('garage');
   const [helpTab, setHelpTab] = useState<'basics' | 'hazards'>('basics');
-  const [rawSprites, setRawSprites] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [theater, setTheater] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
-  const [downloadError, setDownloadError] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -122,20 +120,27 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   useEffect(() => {
     let active = true;
     setLoadError(false);
-    Promise.all([loadAssets(), prepareRaceCapsules(config.roster), preparePowerupSprites()]).then(([loaded, raceCapsules, pickupSprites]) => {
-      if (active) setAssets({ ...loaded, raceCapsules, pickupSprites });
-    }).catch(() => { if (active) setLoadError(true); });
+    // Every painted PNG is decoded before the race starts: nothing is generated per frame.
+    // The painted scenery props are decoded first: course art bakes them at build-course
+    // time, so racing must not compose the background before the artwork is available.
+    prepareWorldArt()
+      .then(() => Promise.all([loadAssets(), prepareRaceCapsules(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster)]))
+      .then(([loaded, raceCapsules, pickupSprites, art]) => {
+        if (!active) return;
+        setArtFailures(art.failures);
+        setAssets({ ...loaded, raceCapsules, pickupSprites });
+      }).catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
   }, [loadingAttempt, config]);
 
   const handleFinish = useCallback((record: RunRecord) => {
     setResult(record);
-    setRecords((previous) => previous.some((item) => item.id === record.id) ? previous : [record, ...previous].sort((a, b) => b.distance - a.distance || b.score - a.score).slice(0, 20));
+    setRecords((previous) => mergeRunRecord(previous, record));
     finishRef.current(record);
   }, [setRecords]);
 
   useEffect(() => {
-    if (!assets || !canvasRef.current || !stageRef.current) return;
+    if (resumeOnly || !assets || !canvasRef.current || !stageRef.current) return;
     const engine = new GameEngine(canvasRef.current, assets, optionsRef.current, setSnapshot, handleFinish, config);
     engineRef.current = engine;
     engine.inputEnabled = activeRef.current && !modalRef.current;
@@ -155,7 +160,14 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       engine.destroy();
       engineRef.current = null;
     };
-  }, [assets, handleFinish, config]);
+  }, [assets, handleFinish, config, resumeOnly]);
+
+  // Persist the explicit phase: grid before launch, racing while the round is live.
+  useEffect(() => {
+    if (resumeOnly) return;
+    if (snapshot.status === 'ready') onPhase('grid');
+    else if (snapshot.status === 'flying' || snapshot.status === 'paused') onPhase('racing');
+  }, [snapshot.status, resumeOnly, onPhase]);
 
   useEffect(() => {
     engineRef.current?.setOptions(raceOptions);
@@ -275,7 +287,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   }, [retry, theater, toggleFullscreen]);
 
   const mainAction = () => {
-    if (snapshot.status === 'finished') { onContinue(); return; }
+    if (resumeOnly || snapshot.status === 'finished') { onContinue(); return; }
     if (ready) engineRef.current?.launch();
     else if (paused || playing) engineRef.current?.togglePause();
     else retry();
@@ -292,8 +304,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const showConcept = () => { setWorkshopTab('concept'); openModal('workshop'); };
   const showGarage = () => { setWorkshopTab('garage'); openModal('workshop'); };
   const saveSource = (url: string, filename: string) => {
-    setDownloadError('');
-    void downloadSourcePng(url, filename).catch(() => setDownloadError('The image could not be downloaded. Please try again.'));
+    void downloadSourcePng(url, filename).catch(() => undefined);
   };
 
   return (
@@ -319,6 +330,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         </header>
 
         <main className="main-content">
+          {storageWarning && <p className="race-storage-warning" role="status"><ShieldCheck size={15} />{storageWarning}</p>}
+          {artFailures.length > 0 && <p className="race-storage-warning" role="status"><ImageIcon size={15} />{artFailures.length} painted sprite{artFailures.length === 1 ? '' : 's'} could not be loaded, so a stand-in is shown. The race is unaffected.</p>}
           <div className="event-race-banner"><span>{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${CUP_NAME.toUpperCase()} / ROUND ${config.round + 1} OF ${config.totalRounds}` : 'QUICK RACE'}<small className="race-biome">{TRACKS[config.course].region}</small></span><span>{riderById(config.loadout.rider).name} + {capsuleById(config.loadout.capsule).name}<small>{config.difficulty.toUpperCase()}</small></span></div>
           <motion.section className="game-intro" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} aria-labelledby="game-title">
             <div className="intro-title"><div className="eyebrow intro-eyebrow"><span className="live-dot" /> GOBLIN ENGINEERING. ZERO OVERSIGHT.</div><h1 id="game-title">GOBLIN <span>RALLY</span><span className="title-period">.</span></h1><p>Big balls. Bad ideas. A very questionable use of physics.</p></div>
@@ -338,15 +351,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 <div className="stage-actions"><button className="stage-button" onClick={togglePause} disabled={!playing && !paused} aria-label={paused ? 'Resume game' : 'Pause game'} title="Pause / resume (P)">{paused ? <Play size={16} /> : <Pause size={16} />}</button><button className="stage-button" onClick={() => retry()} disabled={!assets} aria-label="Restart run" title="Restart (R)"><RotateCcw size={16} /></button><button className="stage-button" onClick={() => void toggleFullscreen()} aria-label={fullscreen || theater ? 'Exit fullscreen' : 'Enter fullscreen'} title="Fullscreen (F)">{fullscreen || theater ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div>
               </div>
               <AnimatePresence>
+                {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Flag size={16} /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
                 {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><span>YOUR BALL. THEIR PROBLEM.</span><p>Pull back the orange goblin. Launch the whole grid.</p><svg viewBox="0 0 180 82" fill="none" aria-hidden="true"><path d="M164 6C128 10 56 19 18 72M18 72l2-14M18 72l15-3" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 5" strokeLinecap="round" /></svg></motion.div>}
                 {snapshot.notice && playing && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
               <div className="race-progress" aria-label={`Race progress: ${Math.round(snapshot.progress * 100)} percent`}><span><Flag size={11} /> SUMMIT</span><div className="progress-track"><div className="progress-fill" style={{ width: `${snapshot.progress * 100}%` }} /><span className="progress-runner" style={{ left: `${snapshot.progress * 100}%` }} /></div><span className="finish-label">{number(TRACK_DISTANCE)} m <span className="checkered-flag" /></span></div>
               <AnimatePresence>
-                {!assets && <motion.div className="game-loading" exit={{ opacity: 0 }}><GoblinMark /><span className="eyebrow orange-text">{loadError ? 'A SMALL ENGINEERING PROBLEM' : 'ASSEMBLING A VERY BAD IDEA'}</span><h2>{loadError ? 'The goblins misplaced the art.' : 'Tightening the loose bolts.'}</h2>{loadError ? <button className="primary-button" onClick={() => setLoadingAttempt((attempt) => attempt + 1)}>TRY LOADING AGAIN <RotateCcw size={17} /></button> : <div className="loading-track"><span /></div>}</motion.div>}
+                {!assets && !resumeOnly && <motion.div className="game-loading" exit={{ opacity: 0 }}><GoblinMark /><span className="eyebrow orange-text">{loadError ? 'A SMALL ENGINEERING PROBLEM' : 'ASSEMBLING A VERY BAD IDEA'}</span><h2>{loadError ? 'The goblins misplaced the art.' : 'Tightening the loose bolts.'}</h2>{loadError ? <button className="primary-button" onClick={() => setLoadingAttempt((attempt) => attempt + 1)}>TRY LOADING AGAIN <RotateCcw size={17} /></button> : <div className="loading-track"><span /></div>}</motion.div>}
                 {paused && !modal && <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><span className="eyebrow orange-text">A MOMENT OF UNCHARACTERISTIC CAUTION</span><h2>CHAOS ON HOLD.</h2><p>Your goblin is enjoying the peace and quiet.</p><button className="primary-button" onClick={() => { engineRef.current?.togglePause(); canvasRef.current?.focus({ preventScroll: true }); }}><Play size={18} fill="currentColor" /> RESUME RACE</button><div className="pause-menu-actions"><button className="text-button" onClick={onSettings}><Settings2 size={16} /> SETTINGS</button><button className="text-button" onClick={onMainMenu}>MAIN MENU <ArrowUpRight size={16} /></button></div><span className="overlay-shortcut">OR PRESS <kbd>P</kbd></span></motion.div>}
                 {snapshot.settling && playing && <motion.div className="finish-wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Flag size={23} /><strong>You crossed the line.</strong><span>Rivals finishing: {snapshot.finishWait}s remaining</span></motion.div>}
-                {snapshot.status === 'finished' && result && <motion.div className="round-result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RoundResult result={result} session={session} onContinue={onContinue} onMenu={onMainMenu} onNewGame={onNewGame} /></motion.div>}
+                {result && (snapshot.status === 'finished' || resumeOnly) && <motion.div className="round-result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RoundResult result={result} session={session} onContinue={onContinue} onMenu={onMainMenu} onNewGame={onNewGame} /></motion.div>}
               </AnimatePresence>
             </div>
             <RaceControls
@@ -402,20 +416,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 ['aimAssist', 'A slightly sensible trajectory', 'Preview your launch arc before committing to the bit.'],
               ] as const).map(([key, label, description]) => <div className="setting-row" key={key}><div><h3>{label}</h3><p>{description}</p></div><button className={`toggle ${options[key] ? 'on' : ''}`} role="switch" aria-checked={options[key]} aria-label={label} onClick={() => setOptions((previous) => ({ ...previous, [key]: !previous[key] }))}><span /></button></div>)}<p className="settings-note">Display settings never reset a race. Your course and crew stay fixed for this event.</p></div>}
             {workshopTab === 'concept' && <div className="concept-content"><p className="modal-lead">First came the concept. Then came the questionable engineering. This original painting set the mood for every mountain, machine, and goblin in the game.</p><figure className="concept-figure"><img src="/art/goblin-rally-concept.png" alt="Original Goblin Rally concept art: a goblin-piloted iron capsule in a giant slingshot, wooden loops, explosive crates, sheep, and cheering crowds in a misty mountain arena." /><figcaption><span>01 / THE ORIGINAL BAD IDEA</span><span>ART DIRECTION & WORLD CONCEPT</span></figcaption></figure><div className="modal-bottom"><span>Painted fantasy. Built for a little chaos.</span><button className="outline-button" onClick={() => saveSource('/art/goblin-rally-concept.png', 'goblin-rally-concept.png')}>DOWNLOAD CONCEPT <ArrowDownToLine size={16} /></button></div></div>}
-            {workshopTab === 'sprites' && <div className="sprite-content">
-              <div className="sprite-toolbar">
-                <div><h3>Little sprites. Big trouble.</h3><p>Characters and camera-matched machinery. Click to save a PNG.</p></div>
-                <div className="sprite-view-toggle"><button className={!rawSprites ? 'selected' : ''} onClick={() => setRawSprites(false)}>CUTOUTS</button><button className={rawSprites ? 'selected' : ''} onClick={() => setRawSprites(true)}>GREEN SCREEN</button></div>
-              </div>
-              {rawSprites ? <img className="raw-sprite-sheet" src="/art/track-sprites.png" alt="Original six-object sprite sheet on a bright #00FF00 chroma-key background" /> : assets ?
-                <div className="sprite-grid">{WORKSHOP_SPRITES.map(({ name, label, alt }) =>
-                  <button className="sprite-download" key={name} onClick={() => download(assets[name].url, `goblin-rally-${name}.png`)}>
-                    <ArrowDownToLine size={15} /><img src={assets[name].url} alt={alt} /><span>{label}</span><small>PNG + ALPHA</small>
-                  </button>,
-                )}</div> : <p className="modal-lead">The goblins are still preparing the cutouts. They will appear here once loaded.</p>}
-              <div className="sprite-key-note"><span className="green-swatch" /><span>CHROMA KEY <strong>#00FF00</strong></span><p>Keyed sprites. PNG-textured machinery. One shared perspective.</p></div>
-            </div>}
-            {downloadError && <p className="error-message" role="alert">{downloadError}</p>}
+            {workshopTab === 'sprites' && <div className="sprite-content"><ArtGallery /></div>}
           </Modal>}
 
           {modal === 'records' && <Modal key="records" title="The Hall of Chaos" eyebrow="LEGENDS ARE MEASURED IN METERS" onClose={closeModal} className="fantasy-dialog">

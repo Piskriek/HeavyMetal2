@@ -98,8 +98,10 @@ export class ArenaEnvironment {
       const w = Math.abs(index) % 2 ? 196 : 270;
       if (x < -w - 40 || x > this.view.width + 40) continue;
       const y = 100 + Math.abs(index % 3) * 27 + (this.frame.reducedMotion ? 0 : Math.sin(this.frame.time * 0.35 + index) * 4);
+      const blimp = this.art.blimp;
       context.save(); context.globalAlpha = 0.66;
-      context.drawImage(this.art.blimp, x, y, w, w * 270 / 520); context.restore();
+      // Uses the sprite's own aspect ratio: the painted airship is not 520x270.
+      context.drawImage(blimp, x, y, w, w * blimp.height / blimp.width); context.restore();
     }
   }
 

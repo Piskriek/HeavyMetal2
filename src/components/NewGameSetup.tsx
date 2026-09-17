@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Flag, Gauge, LockKeyhole, RotateCcw, Shield, Sparkles, Trophy, Users, Weight, Zap } from 'lucide-react';
 import Modal from './Modal';
 import { CAPSULES, DEFAULT_LOADOUT, RIDERS, STAT_LABELS, capsuleById, loadoutStats, riderById } from '../game/loadouts';
-import { capsuleArt, loadoutArt, riderArt } from '../game/loadout-art';
+import RacerFigure from './RacerFigure';
+import { capsuleArt, riderArt } from '../game/loadout-art';
 import { CUP_NAME, CUP_POINTS, CUP_ROUNDS, DIFFICULTIES, type RaceSetup } from '../game/session';
 import { COURSES } from '../game/types';
 import { TRACKS } from '../game/courses';
@@ -12,6 +13,8 @@ import { coursePreview } from '../game/world-art';
 interface NewGameSetupProps {
   initial: RaceSetup;
   hasSession: boolean;
+  /** A completed event still holds its standings view and needs confirmation to replace. */
+  finishedSession: boolean;
   onStart: (setup: RaceSetup) => void;
   onClose: () => void;
 }
@@ -27,7 +30,7 @@ function radioKeys(event: KeyboardEvent<HTMLElement>) {
   items[next].click(); items[next].focus();
 }
 
-export default function NewGameSetup({ initial, hasSession, onStart, onClose }: NewGameSetupProps) {
+export default function NewGameSetup({ initial, hasSession, finishedSession, onStart, onClose }: NewGameSetupProps) {
   const [setup, setSetup] = useState<RaceSetup>(() => ({ ...initial, loadout: { ...initial.loadout } }));
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState(false);
@@ -60,7 +63,7 @@ export default function NewGameSetup({ initial, hasSession, onStart, onClose }: 
       <div ref={body} tabIndex={-1} className="setup-body">
         {confirm ? <div className="setup-confirm">
           <Flag size={40} strokeWidth={1.3} /><h3>New crew. Fresh trouble.</h3>
-          <p>This replaces the current race or cup, including its unfinished rounds. Completed race records and your settings will be kept.</p>
+          <p>{finishedSession ? 'This event is already finished, but its final standings have not been filed away yet. Starting a new event clears that results screen. Every committed round stays in the Hall of Chaos, and your settings are kept.' : 'This replaces the current race or cup, including its unfinished rounds. Completed race records and your settings will be kept.'}</p>
           <div className="fantasy-dialog-actions"><button className="fantasy-secondary" onClick={() => setConfirm(false)}><ArrowLeft size={16} />Keep choosing</button><button className="fantasy-primary" onClick={start} disabled={starting}>Start the New Event <Flag size={16} /></button></div>
         </div> : <>
           <nav className="setup-steps" aria-label="Race setup steps">{names.map((name, index) => <button key={name} className={step === index ? 'active' : index < step ? 'complete' : ''} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span>{index < step ? <Check size={12} /> : index + 1}</span>{name}{index < 2 && <ChevronRight size={13} />}</button>)}</nav>
@@ -88,7 +91,7 @@ export default function NewGameSetup({ initial, hasSession, onStart, onClose }: 
               </button>)}</div>
               <div className="loadout-showcase" aria-label={`${rider.name} riding ${capsule.name}`}>
                 <div className="showcase-circle" aria-hidden="true" />
-                <AnimatePresence mode="wait"><motion.img key={`${rider.id}-${capsule.id}`} className="selected-capsule" src={loadoutArt(setup.loadout)} alt={`${rider.name} inside the ${capsule.name} capsule`} initial={{ opacity: 0, y: 7, rotate: -3 }} animate={{ opacity: 1, y: 0, rotate: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.19 }} /></AnimatePresence>
+                <AnimatePresence mode="wait"><motion.div key={`${rider.id}-${capsule.id}`} className="selected-capsule" initial={{ opacity: 0, y: 7, rotate: -3 }} animate={{ opacity: 1, y: 0, rotate: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.19 }}><RacerFigure loadout={setup.loadout} /></motion.div></AnimatePresence>
                 <div className="showcase-shadow" aria-hidden="true" />
                 <div className="showcase-label"><span>{rider.title}</span><h3>{rider.name} <i>&</i> {capsule.name}</h3><p>{rider.quote}</p></div>
               </div>
@@ -127,7 +130,7 @@ export default function NewGameSetup({ initial, hasSession, onStart, onClose }: 
               <p className="difficulty-description">{DIFFICULTIES.find((d) => d.id === setup.difficulty)?.description} Difficulty changes decisions, not the laws of physics.</p>
               {!tournament && <label className="practice-option"><input type="checkbox" checked={setup.customPhysics} onChange={(event) => setSetup((s) => ({ ...s, customPhysics: event.target.checked }))} /><span>Custom physics practice<small>Enable the live speed and weight sliders. Recorded as practice, not a preset race.</small></span></label>}
             </section>
-            <aside className="event-summary"><img src={loadoutArt(setup.loadout)} alt={`${rider.name} in ${capsule.name}`} /><span className="mode-kicker">YOUR STARTING LINEUP</span><h3>{rider.name}</h3><p>{capsule.name} / {capsule.title}</p>
+            <aside className="event-summary"><RacerFigure loadout={setup.loadout} className="summary-racer" /><span className="mode-kicker">YOUR STARTING LINEUP</span><h3>{rider.name}</h3><p>{capsule.name} / {capsule.title}</p>
               <div className="event-summary-rule"><LockKeyhole size={17} /><span>{setup.customPhysics && !tournament ? 'Custom tuning enabled for this practice run.' : tournament ? 'Your loadout stays locked for all three rounds.' : 'Preset stats stay fixed for this race.'}</span></div>
               <div className="event-summary-rule"><Trophy size={17} /><span>{tournament ? CUP_NAME : 'One race. Four goblins. One finish.'}</span></div>
               <p className="finish-window-note">Rivals get a 10-second finish window after you. Ties in the cup break by wins, then final-round placement.</p>

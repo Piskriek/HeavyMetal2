@@ -184,21 +184,23 @@ export interface RacerLayers {
 export function racerLayers(loadout: { rider: RiderId; capsule: CapsuleId }): RacerLayers {
   const shell = capsuleCell(loadout.capsule);
   const rider = riderCell(loadout.rider);
-  const hatch = shell.hatch ?? { x: 0.66, y: 0.5, radius: 0.13, measured: false };
+  const hatch = shell.hatch ?? { x: 0.82, y: 0.62, radius: 0.09, measured: false };
   const eyeLine = rider.eyeLine ?? 0.44;
-  // The painted port is an ellipse (a circle seen at an angle), so the pilot is seated in
-  // that ellipse: 1.7x the opening's diameter in both axes, which keeps the foreshortening
-  // of the artwork and leaves the head filling the opening rather than overflowing it.
+  // The seat is the shell's ringed port, and the bust has to sit *inside* the ring: an earlier
+  // pass scaled the pilot to 3.4x the opening, so the goblin's helmet clipped over the brass
+  // and read as sitting on top of the capsule. The window is a tilted ellipse, so the square
+  // bust is scaled uniformly off the opening's smaller half-axis (scaling each axis separately
+  // squashed the face); 2.4x fills the port with the face while the alpha bbox stays within the
+  // painted opening, and the eye line lands on the window centre.
   const rx = hatch.rx ?? hatch.radius;
   const ry = hatch.ry ?? hatch.radius;
-  const width = rx * 3.4;
-  const height = ry * 3.4;
+  const size = Math.min(rx, ry) * 2.4;
   return {
     shell: artUrl(shell.image),
     pilot: artUrl(rider.pilot ?? rider.image),
     hatch,
     eyeLine,
-    pilotBox: { left: hatch.x - width / 2, top: hatch.y - eyeLine * height, width, height },
+    pilotBox: { left: hatch.x - size / 2, top: hatch.y - eyeLine * size, width: size, height: size },
     // Percentages, not angles: `ellipse()` takes percentage radii, which resolve against the
     // figure box width and height, and the figure box is the same square as the sprite.
     clip: `ellipse(${(rx * 0.99 * 100).toFixed(2)}% ${(ry * 0.99 * 100).toFixed(2)}% at ${(hatch.x * 100).toFixed(2)}% ${(hatch.y * 100).toFixed(2)}%)`,

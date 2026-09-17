@@ -220,26 +220,14 @@ function sheetMatte(file, name) {
 }
 
 /**
- * Measures the open cockpit hatch of a normalized shell: the near-black, fully opaque
- * blob in the lower-right quadrant of the sprite. Automatic, because a guessed anchor
- * would put the pilot through the hull; `tests/artifacts/hatch-probe.png` draws the
- * measurement over the art for every build so a bad measurement is visible immediately.
- */
-/**
- * Cockpit openings, read from the painted shells and pinned here.
+ * How much of the measured opening the pilot's window covers.
  *
- * They are pinned rather than auto-detected on purpose: each shell contains several dark
- * shapes (the top opening, plate shadows, the shaded hull), and a blob scan kept selecting
- * the wrong one. These numbers come from reading the artwork against the drawn guide in
- * `tests/artifacts/hatch-probe.png`; `assertHatch` then re-checks every pinned ellipse
- * against the freshly written sprite on every build, so art that moves a port fails the
- * build instead of silently moving the pilot.
+ * The measurement comes back as the bounding box of the porthole's dark interior, and a
+ * porthole is a *tilted* ellipse: an axis-aligned window inscribed in that box still has to
+ * give the painted ring a few percent of clearance, or the bust clips over the brass. 0.92
+ * keeps the window inside the ring on all three shells while staying wide enough for a face.
  */
-const MEASURED_HATCH = {
-  iron: { x: 0.8193, y: 0.6172, rx: 0.1016, ry: 0.1436 },
-  springsteel: { x: 0.8170, y: 0.6178, rx: 0.0898, ry: 0.1426 },
-  siege: { x: 0.8135, y: 0.6104, rx: 0.0957, ry: 0.1416 },
-};
+const HATCH_INSET = 0.92;
 
 /** Reads a sprite back as a small pixel grid, so measurements can be asserted in JS. */
 function sampleGrid(file, side = 128) {
@@ -262,11 +250,55 @@ function sampleGrid(file, side = 128) {
 const luma = (pixel) => 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
 
 /**
- * Verifies a pinned hatch against the sprite it belongs to: the ellipse interior must be the
+ * Measures the window a rider looks out of on a normalised shell, and verifies the fit.
+ *
+ * The seat is the ringed porthole on the shell's face - the same round port the pre-4.2 SVG
+ * capsule drew its rider in, and the only opening the artwork gives a brass ring. (The wide
+ * top hatch is the cockpit itself: a bust seated there is hidden behind its front rim.)
+ *
+ * Picking it is deterministic rather than hand-pinned: of the near-black, fully opaque blobs,
+ * the largest one whose centroid sits in the lower-right quadrant is the porthole. Every
+ * shell also contains a top opening, plate shadows and a big shaded hull region, and a naive
+ * "largest blob" scan picks those, which is how an earlier hand-pinned ellipse ended up
+ * offset and undersized - the bust then overlapped the ring, which is the defect this fixes.
+ *
+ * `HATCH_INSET` shrinks the fit inside the tilted opening; the fit is then re-checked against
+ * the sprite by sampling, so artwork that moves or unkeys the porthole fails the build.
+ */
+function measureHatch(id, file) {
+  const text = execFileSync('convert', [file, '-colorspace', 'Gray', '-threshold', '12%',
+    '-define', 'connected-components:verbose=true', '-define', 'connected-components:area-threshold=1200',
+    '-connected-components', '8', 'null:'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
+  const canvas = 512;
+  let best = null;
+  for (const line of text.split('\n').slice(1)) {
+    const match = /^\s+\d+: (\d+)x(\d+)\+(-?\d+)\+(-?\d+) ([\d.]+),([\d.]+) (\d+) graya\((\d+),(\d+)\)/.exec(line);
+    if (!match) continue;
+    const [, width, height, x, y, cx, cy, area, , alpha] = match.map(Number);
+    // Opaque only: the transparent background is also near-black, and the shell's own cast
+    // shadow is a wide flat blob rather than the taller-than-wide porthole.
+    if (alpha < 1) continue;
+    if (cx / canvas < 0.6 || cx / canvas > 0.98 || cy / canvas < 0.4 || cy / canvas > 0.85) continue;
+    if (height < width * 0.9) continue;
+    if (area < canvas * canvas * 0.004) continue;
+    if (!best || area > best.area) best = { width, height, x, y, cx, cy, area };
+  }
+  if (!best) throw new Error(`Could not find the porthole on ${id}-shell.png; re-read it and the sheet matte.`);
+  const hatch = {
+    x: best.cx / canvas,
+    y: best.cy / canvas,
+    rx: (best.width / 2 / canvas) * HATCH_INSET,
+    ry: (best.height / 2 / canvas) * HATCH_INSET,
+  };
+  return assertHatch(id, file, hatch, best);
+}
+
+/**
+ * Verifies a fitted hatch against the sprite it belongs to: the ellipse interior must be the
  * dark opening and the ring just outside it must be brighter painted metal. Throws when the
  * artwork and the measurement disagree.
  */
-function assertHatch(id, file, hatch) {
+function assertHatch(id, file, hatch, measured) {
   const grid = sampleGrid(file);
   let interior = 0;
   let interiorDark = 0;
@@ -283,33 +315,36 @@ function assertHatch(id, file, hatch) {
       interiorLuma += luma(pixel);
       if (luma(pixel) < 60 && pixel.a > 200) interiorDark += 1;
     }
-    const outer = grid.at(hatch.x + Math.cos(angle) * hatch.rx * 1.4, hatch.y + Math.sin(angle) * hatch.ry * 1.4);
-    // Only opaque samples count: the port sits near the shell's edge, so part of the ring
-    // falls on transparent background that says nothing about the artwork.
-    if (!outer || outer.a < 200) continue;
+    // Sample the painted ring outside the window. The opening is a *tilted* ellipse, so a
+    // single ring can still land inside the dark for some angles; three rings are sampled and
+    // the brightest opaque one counts. Samples on transparent background (the port sits near
+    // the shell's edge) say nothing about the artwork and are skipped.
+    let brightest = null;
+    for (const factor of [1.18, 1.35, 1.52]) {
+      const outer = grid.at(hatch.x + Math.cos(angle) * hatch.rx * (1 / HATCH_INSET) * factor,
+        hatch.y + Math.sin(angle) * hatch.ry * (1 / HATCH_INSET) * factor);
+      if (!outer || outer.a < 200) continue;
+      const value = luma(outer);
+      if (brightest === null || value > brightest) brightest = value;
+    }
+    if (brightest === null) continue;
     rim += 1;
-    rimLuma += luma(outer);
-    if (luma(outer) > 70) rimBright += 1;
+    rimLuma += brightest;
+    if (brightest > 70) rimBright += 1;
   }
   const dark = interior ? interiorDark / interior : 0;
   const bright = rim ? rimBright / rim : 0;
   const contrast = (rim ? rimLuma / rim : 0) - (interior ? interiorLuma / interior : 0);
-  if (interior < 40 || rim < 12 || dark < 0.9 || bright < 0.5 || contrast < 25) {
-    throw new Error(`Hatch measurement for ${id} no longer matches the art (${interiorDark}/${interior} dark inside, `
-      + `${rimBright}/${rim} bright outside). Re-read tests/artifacts/hatch-probe.png and update MEASURED_HATCH.`);
+  if (interior < 40 || rim < 12 || dark < 0.9 || bright < 0.45 || contrast < 25) {
+    throw new Error(`Hatch fit for ${id} no longer matches the art (${interiorDark}/${interior} dark inside, `
+      + `${rimBright}/${rim} bright ring outside). Re-read tests/artifacts/hatch-probe.png.`);
   }
-  console.log(`  capsule ${id}: hatch at ${hatch.x.toFixed(3)},${hatch.y.toFixed(3)} rx ${hatch.rx.toFixed(3)} ry ${hatch.ry.toFixed(3)} `
-    + `(verified: ${Math.round(dark * 100)}% dark opening, ${Math.round(bright * 100)}% brighter rim, contrast ${contrast.toFixed(0)})`);
+  console.log(`  capsule ${id}: port at ${hatch.x.toFixed(3)},${hatch.y.toFixed(3)} rx ${hatch.rx.toFixed(3)} ry ${hatch.ry.toFixed(3)}`
+    + `${measured ? ` (opening ${measured.width}x${measured.height})` : ''} `
+    + `(verified: ${Math.round(dark * 100)}% dark inside, ${Math.round(bright * 100)}% painted ring, contrast ${contrast.toFixed(0)})`);
   return { ...hatch, radius: Math.max(hatch.rx, hatch.ry), measured: true };
 }
-/**
- * Where the eyes sit in each trimmed rider bust, as a fraction of the cockpit pilot PNG's
- * height, used to seat the head on the hatch centre. These are measured per rider rather
- * than shared: a bust whose helmet is tall (Grub) carries its eye line much lower in the
- * crop than a bare-headed one, and a single constant pushed that face into the lower rim.
- * `tests/artifacts/eyeline-probe.png` renders every pilot against 0.30/0.40/0.50/0.60 guides
- * so the numbers can be re-checked whenever the source art changes.
- */
+
 const EYE_LINE = { rivet: 0.44, nix: 0.44, grub: 0.52, sprocket: 0.49 };
 
 /* ---------------------------------- riders ---------------------------------- */
@@ -365,7 +400,7 @@ const RIDER_CELLS = [
     // written, and `hatchOf` below reads that same file back.
     const hull = normalize(trimmed, join(out, `${id}-shell.png`), { diameter: 452, canvas: 512 });
     const sprite = join(out, `${id}-shell.png`);
-    const hatch = assertHatch(id, sprite, MEASURED_HATCH[id]);
+    const hatch = measureHatch(id, sprite);
     record(`capsule:${id}`, 'capsules', sheet, index, `${id}-shell.png`, {
       action: 'shell', anchor: 'center', pivot: { x: 0.5, y: 0.5 }, envelope: 1,
       hull: { diameter: 452, canvas: 512, scale: Number(hull.scale.toFixed(4)) },

@@ -116,30 +116,44 @@ never modified.
 - Everything else is fitted into a fixed runtime box with `object-fit`-like behaviour at
   build time, so runtime code never scales per frame.
 
-### 3.4 The hatch is measured, then asserted on every build
+### 3.4 The seat is the ringed port, fitted and asserted on every build
 
-A shell's cockpit opening is a **near-black opaque blob in the lower-right quadrant**, and it
-is fitted to an **ellipse** (the opening is a circle seen from an angle). The numbers are
-pinned in `build-art.mjs` (`MEASURED_HATCH`) rather than scanned on every run, because each
-shell also contains the top opening, plate shadows and a large shaded hull area, and a blob
-scan kept selecting the wrong one (in one run it selected the whole shell). Pinning alone
-would rot silently, so `assertHatch()` re-checks each pinned ellipse against the freshly
-written sprite on every build: at least 90% of the samples inside the ellipse must be the
-dark opening, at least half of the opaque samples just outside it must be brighter painted
-metal, and the mean luma contrast between the two has to be at least 25. Artwork that moves a
-port fails the build instead of silently moving the pilot.
+The rider sits in the shell's **ringed port** — the same round window the pre-4.2 capsule SVG
+drew its pilot in, and the only opening the artwork surrounds with brass. (The wide **top
+hatch** is the cockpit's own opening: a bust seated there disappears behind its front rim, so
+it is not the seat.)
+
+`measureHatch()` finds it deterministically on the normalised shell: of the near-black,
+fully opaque blobs it takes the **largest one whose centroid sits in the lower-right
+quadrant**. The plate shadows, the shaded hull and the top opening are excluded by that
+region test, and the transparent background by the alpha test. The blob's bounding box is
+fitted to an **ellipse** inset by `HATCH_INSET` (0.92), because the port is a *tilted*
+ellipse: an axis-aligned window inscribed in its box still needs clearance from the ring.
+
+An earlier pass pinned these numbers by hand. The pinned ellipse ended up offset and
+undersized against the artwork, so the bust clipped over the brass ring — the defect a
+screenshot review caught ("the portrait renders outside / overlapping the capsule"). The
+measurement is now taken from the sprite every build instead of carried forward.
+
+The fit is verified by `assertHatch()` on every build: at least 90% of the samples inside the
+window must be the dark opening, the brightest of three rings sampled outside it must be
+brighter painted metal for at least 45% of the angles (three rings because a tilted ellipse
+leaves some angles inside the dark), and the mean luma contrast must clear 25. Artwork that
+moves or unkeys a port fails the build instead of silently moving the pilot.
 
 The manifest stores fractions of the sprite:
 
 ```json
-"hatch": { "x": 0.8193, "y": 0.6172, "rx": 0.1016, "ry": 0.1436, "radius": 0.1436, "measured": true }
+"hatch": { "x": 0.806, "y": 0.613, "rx": 0.089, "ry": 0.127, "radius": 0.127, "measured": true }
 ```
 
 `radius` is `max(rx, ry)`, kept for callers that cannot draw an ellipse; `measured` is
 `false` when the scan failed and a conservative fallback was substituted. The pilot bust is
-then drawn at `3.4 * rx` by `3.4 * ry`, positioned so its eye line (`eyeLine`, a fraction of
-the pilot PNG's height) sits on the hatch centre, and clipped to 99% of the ellipse so the
-painted rim stays visible.
+then drawn at `2.4 * min(rx, ry)` **square** — one scale for both axes, because sizing the
+axes separately squashed the face — positioned so its eye line (`eyeLine`, a fraction of the
+pilot PNG's height) sits on the window centre, and clipped to 99% of the ellipse. 2.4x keeps
+the bust's alpha box inside the painted opening: the earlier `3.4 * rx` by `3.4 * ry` box was
+1.7x the opening in both axes, which is what pushed the helmet over the brass.
 
 `eyeLine` is **measured per rider**, because a bust with a tall helmet carries its eyes much
 lower in the 68% head crop than a bare-headed one (one shared constant pushed Grub's face
@@ -158,13 +172,13 @@ be re-read whenever the source portraits change. Horizontally the busts are cent
 hatch: their alpha centroids measure 0.47-0.52 of the crop, so no per-rider x offset is
 needed.
 
-Current measurements (512x512 shells):
+Current measurements (512x512 shells, opening = the measured interior box):
 
-| Shell | Hatch centre | rx | ry |
-| --- | --- | --- | --- |
-| Rustbucket (iron) | 0.819, 0.617 | 0.102 | 0.144 |
-| Springsteel | 0.817, 0.618 | 0.090 | 0.143 |
-| Siegebreaker (siege) | 0.814, 0.610 | 0.096 | 0.142 |
+| Shell | Port centre | rx | ry | Opening |
+| --- | --- | --- | --- | --- |
+| Rustbucket (iron) | 0.806, 0.613 | 0.089 | 0.127 | 99x141 px |
+| Springsteel | 0.804, 0.613 | 0.079 | 0.125 | 88x139 px |
+| Siegebreaker (siege) | 0.800, 0.605 | 0.082 | 0.125 | 91x139 px |
 
 `tests/artifacts/hatch-probe.png` re-draws each measured ellipse over its shell: if a
 future sheet moves the opening, the probe shows it immediately and `assertHatch()` stops the
@@ -230,11 +244,12 @@ npm run check:art                          # builds the app, then drives the dis
 node tests/art-check.mjs http://127.0.0.1:5173   # or check a running server (the preview)
 ```
 
-22 checks (see `tests/art-check.mjs`) assert that: four portrait PNGs and their pilot busts
+25 checks (see `tests/art-check.mjs`) assert that: four portrait PNGs and their pilot busts
 decode; the menu composite is one shell plus one clipped pilot; the pilot window's clip-path
-sits on the measured hatch centre (x 0.82 / y 0.61, rx 0.10 / ry 0.14) rather than the shell
-middle and the pilot image stays inside the capsule silhouette; choosing another rider and
-capsule swaps both layers; all three shells and all three course previews are the rasters
+sits on the measured port centre (x 0.81 / y 0.61) rather than the shell middle, stays square
+so the face is not stretched, keeps its alpha box inside the dark area around the port instead
+of clipping over the brass ring, and stays inside the capsule silhouette; choosing another
+rider and capsule swaps both layers; all three shells and all three course previews are the rasters
 with no inline vectors; there are no broken images on the setup screen, the grid and the
 race; HUD supply icons are the painted PNGs; the race frame contains painted metal/brass
 pixels rather than flat fills; no request fails and no page error fires while painting a

@@ -150,11 +150,83 @@ try {
   check(Boolean(geometry?.hatch), 'the pilot window exposes a measured hatch clip', geometry?.clip ?? 'none');
   if (geometry?.hatch) {
     const { x, y, rx, ry } = geometry.hatch;
-    // The painted ports measure near 0.82 / 0.61 of the shell sprite on all three capsules.
-    check(Math.abs(x - 0.817) < 0.05 && Math.abs(y - 0.615) < 0.05,
-      'the pilot window sits on the painted hatch, not on the shell middle', `x=${x.toFixed(3)} y=${y.toFixed(3)}`);
-    check(rx > 0.04 && rx < 0.18 && ry > 0.08 && ry < 0.22,
+    // The painted cockpit is the ringed porthole on the shell's face, and its fitted centre
+    // lands near 0.81 / 0.61 on all three capsules. The wide top hatch is the cockpit's own
+    // opening; a bust seated there disappears behind its front rim, so it is not the seat.
+    check(Math.abs(x - 0.812) < 0.05 && Math.abs(y - 0.612) < 0.05,
+      'the pilot window sits on the painted port, not on the top hatch', `x=${x.toFixed(3)} y=${y.toFixed(3)}`);
+    check(rx > 0.06 && rx < 0.14 && ry > 0.09 && ry < 0.18,
       'the hatch window matches the measured ellipse radii', `rx=${rx.toFixed(3)} ry=${ry.toFixed(3)}`);
+    // The bust is square: a wildly non-square pilot box is what squashed the face before.
+    const pilotBox = await page.evaluate(() => {
+      const pilot = document.querySelector('.selected-capsule .racer-pilot');
+      if (!pilot) return null;
+      const rect = pilot.getBoundingClientRect();
+      return { w: rect.width, h: rect.height };
+    });
+    check(pilotBox !== null && Math.abs(pilotBox.w - pilotBox.h) < 2,
+      'the pilot keeps the bust aspect instead of being stretched', pilotBox ? `${pilotBox.w.toFixed(1)}x${pilotBox.h.toFixed(1)}` : 'none');
+
+    // And the bust has to stay inside the painted opening: the reported defect was a pilot
+    // scaled to 3.4x the port, whose helmet clipped over the brass ring. This compares the
+    // shell's own near-black pixels around the port against the pilot PNG's alpha bounding box
+    // in sprite coordinates, so it cannot drift with CSS box behaviour. It is a loose bound -
+    // the exact fit is the ellipse clip the check above reads - but it fails loudly for the
+    // 3.4x-style overshoot that caused the defect.
+    const seat = await page.evaluate(async () => {
+      const figure = document.querySelector('.selected-capsule .racer-figure');
+      const pilot = figure?.querySelector('.racer-pilot');
+      const shell = figure?.querySelector('.racer-shell');
+      if (!figure || !pilot || !shell) return null;
+      const sample = async (image) => {
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        const paint = canvas.getContext('2d');
+        paint.drawImage(image, 0, 0);
+        return { data: paint.getImageData(0, 0, canvas.width, canvas.height), width: canvas.width, height: canvas.height };
+      };
+      const shellPixels = await sample(shell);
+      // Opening: near-black opaque pixels in the port's corner of the shell sprite.
+      let opening = { left: 1, top: 1, right: 0, bottom: 0 };
+      for (let y = 0; y < shellPixels.height; y += 1) {
+        for (let x = 0; x < shellPixels.width; x += 1) {
+          const index = (y * shellPixels.width + x) * 4;
+          const [r, g, b, a] = [shellPixels.data.data[index], shellPixels.data.data[index + 1], shellPixels.data.data[index + 2], shellPixels.data.data[index + 3]];
+          if (a < 200 || r + g + b > 80) continue;
+          if (x / shellPixels.width < 0.66 || y / shellPixels.height < 0.44) continue;
+          opening = {
+            left: Math.min(opening.left, x / shellPixels.width), top: Math.min(opening.top, y / shellPixels.height),
+            right: Math.max(opening.right, x / shellPixels.width), bottom: Math.max(opening.bottom, y / shellPixels.height),
+          };
+        }
+      }
+      const pilotPixels = await sample(pilot);
+      let head = { left: 1, top: 1, right: 0, bottom: 0 };
+      for (let y = 0; y < pilotPixels.height; y += 1) {
+        for (let x = 0; x < pilotPixels.width; x += 1) {
+          if (pilotPixels.data.data[(y * pilotPixels.width + x) * 4 + 3] < 24) continue;
+          head = {
+            left: Math.min(head.left, x / pilotPixels.width), top: Math.min(head.top, y / pilotPixels.height),
+            right: Math.max(head.right, x / pilotPixels.width), bottom: Math.max(head.bottom, y / pilotPixels.height),
+          };
+        }
+      }
+      // Where the pilot box puts that alpha box, in shell-sprite fractions.
+      const box = { left: parseFloat(pilot.style.left) / 100, top: parseFloat(pilot.style.top) / 100, size: parseFloat(pilot.style.width) / 100 };
+      const placed = {
+        left: box.left + head.left * box.size, right: box.left + head.right * box.size,
+        top: box.top + head.top * box.size, bottom: box.top + head.bottom * box.size,
+      };
+      return { opening, placed, covered: (opening.right - opening.left) * (opening.bottom - opening.top) };
+    });
+    const slack = 0.012;
+    check(Boolean(seat) && seat.placed.left >= seat.opening.left - slack && seat.placed.right <= seat.opening.right + slack
+      && seat.placed.top >= seat.opening.top - slack && seat.placed.bottom <= seat.opening.bottom + slack,
+      'the bust stays inside the dark area around the painted port, not over the brass ring',
+      seat ? `bust ${seat.placed.left.toFixed(3)},${seat.placed.top.toFixed(3)}-${seat.placed.right.toFixed(3)},${seat.placed.bottom.toFixed(3)} vs port ${seat.opening.left.toFixed(3)},${seat.opening.top.toFixed(3)}-${seat.opening.right.toFixed(3)},${seat.opening.bottom.toFixed(3)}` : 'no composite');
+    check(Boolean(seat) && (seat.opening.right - seat.opening.left) * (seat.opening.bottom - seat.opening.top) > 0.02,
+      'the measured port covers a plausible share of the shell', seat ? `${(seat.covered * 100).toFixed(1)}% of the sprite` : 'none');
   }
   check(geometry?.pilotInside === true, 'the pilot image stays inside the capsule silhouette');
   await page.locator('.selected-capsule').screenshot({ path: join(artifacts, 'art-1b-capsule-closeup.png') });

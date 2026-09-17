@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
-import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Keyboard, MousePointer2, Play, Settings2, Trophy } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Image as ImageIcon, Keyboard, MousePointer2, Play, Settings2, Trophy } from 'lucide-react';
 import MainMenu from './components/MainMenu';
 import SettingsPanel from './components/SettingsPanel';
 import Modal from './components/Modal';
@@ -9,27 +9,45 @@ import { AirSupplyGuide } from './components/AirSupplies';
 import RaceScreen from './screens/RaceScreen';
 import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, savePreference } from './game/preferences';
 import { COURSES, type RunRecord } from './game/types';
-import { SETUP_KEY, commitRound, createSession, nextRound, readSetup, recordModeLabel, roundComplete, sessionComplete, sessionConfig, type RaceSession, type RaceSetup } from './game/session';
+import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
+import { readSave, writeSave, type SaveNotice } from './game/save';
 import './menu.css';
 import './setup.css';
 
 type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | null;
 
+const WRITE_FAILED = 'Progress could not be saved on this device. Your current event keeps running in this tab.';
+
 export default function App() {
+  // Read the durable event once, before the first paint, so a reload lands on a coherent flow.
+  const hydration = useMemo(() => readSave(), []);
   const [options, setOptions] = useState(readOptions);
   const [records, setRecords] = useState(readRecords);
   const [screen, setScreen] = useState<'menu' | 'race'>('menu');
   const [panel, setPanel] = useState<Panel>(null);
-  const [session, setSession] = useState<RaceSession | null>(null);
-  const [lastSetup, setLastSetup] = useState(readSetup);
+  const [session, setSession] = useState<RaceSession | null>(hydration.session);
+  const [phase, setPhase] = useState<SessionPhase>(hydration.phase);
+  const [lastSetup, setLastSetup] = useState<RaceSetup>(() => ({ ...hydration.draft, loadout: { ...hydration.draft.loadout } }));
+  const [notices, setNotices] = useState<SaveNotice[]>(hydration.notices);
+  const [restartNote, setRestartNote] = useState<string | null>(hydration.restartNotice);
+  const [persistWarning, setPersistWarning] = useState<string | null>(hydration.storageBlocked ? hydration.notices[0]?.text ?? WRITE_FAILED : null);
   const [clearRecords, setClearRecords] = useState(false);
   const [fullscreenFallback, setFullscreenFallback] = useState(false);
   const shell = useRef<HTMLDivElement>(null);
   const config = useMemo(() => session ? sessionConfig(session) : null, [session?.id, session?.round]);
+  const recoveryNotes = useMemo(() => [...(restartNote ? [restartNote] : []), ...notices.map((notice) => notice.text)], [restartNote, notices]);
 
-  useEffect(() => savePreference(OPTIONS_KEY, options), [options]);
-  useEffect(() => savePreference(RECORDS_KEY, records), [records]);
-  useEffect(() => savePreference(SETUP_KEY, lastSetup), [lastSetup]);
+  useEffect(() => { if (!savePreference(OPTIONS_KEY, options)) setPersistWarning(WRITE_FAILED); }, [options]);
+  useEffect(() => { if (!savePreference(RECORDS_KEY, records)) setPersistWarning(WRITE_FAILED); }, [records]);
+  useEffect(() => { savePreference(SETUP_KEY, lastSetup); }, [lastSetup]);
+  // Atomic, idempotent persistence of the event phase. Identical payloads are not rewritten.
+  useEffect(() => {
+    const result = writeSave({ phase, draft: lastSetup, session });
+    setPersistWarning(result.ok ? null : (result.error ?? WRITE_FAILED));
+  }, [phase, session, lastSetup]);
+  useEffect(() => {
+    notices.forEach((notice) => notice.level === 'warning' && console.warn('[Goblin Rally] save recovery:', notice.text));
+  }, [notices]);
   useEffect(() => {
     document.documentElement.classList.toggle('high-contrast-game', options.highContrast);
     document.documentElement.classList.toggle('reduced-motion-game', options.reducedMotion);
@@ -52,17 +70,48 @@ export default function App() {
   const settings = useCallback(() => setPanel('settings'), []);
   const newGame = useCallback(() => setPanel('new-game'), []);
   const startRace = useCallback((setup: RaceSetup) => {
-    leaveRaceFullscreen(() => { setLastSetup(setup); setSession(createSession(setup)); setScreen('race'); setPanel(null); });
-  }, [leaveRaceFullscreen]);
-  const finishRound = useCallback((record: RunRecord) => {
-    setSession((current) => current ? commitRound(current, record) : current);
-  }, []);
-  const continueRace = useCallback(() => {
     leaveRaceFullscreen(() => {
-      setSession((current) => !current ? current : sessionComplete(current) ? createSession(current.setup) : nextRound(current));
-      setScreen('race'); setPanel(null);
+      setLastSetup(setup);
+      setSession(createSession(setup));
+      setPhase('grid');
+      setNotices([]);
+      setRestartNote(null);
+      setScreen('race');
+      setPanel(null);
     });
   }, [leaveRaceFullscreen]);
+  // Commits are idempotent: a duplicate round record is ignored, never scored twice.
+  const finishRound = useCallback((record: RunRecord) => {
+    if (!session) return;
+    const next = commitRound(session, record);
+    if (next === session) return;
+    setSession(next);
+    setPhase(sessionComplete(next) ? 'cup-results' : 'round-results');
+    setNotices([]);
+  }, [session]);
+  const continueRace = useCallback(() => {
+    leaveRaceFullscreen(() => {
+      if (session) {
+        const complete = sessionComplete(session);
+        const next = complete ? createSession(session.setup) : nextRound(session);
+        if (next !== session) {
+          setSession(next);
+          setPhase(next.round !== session.round ? 'grid' : sessionComplete(next) ? 'cup-results' : 'round-results');
+        }
+      }
+      setRestartNote(null);
+      setScreen('race');
+      setPanel(null);
+    });
+  }, [session, leaveRaceFullscreen]);
+  // The race screen owns the live engine; it may only move the phase between grid and racing.
+  const noteRacePhase = useCallback((next: 'grid' | 'racing') => {
+    setPhase((current) => current === 'round-results' || current === 'cup-results' ? current : next);
+    if (next === 'racing') {
+      setNotices((current) => current.length ? [] : current);
+      setRestartNote(null);
+    }
+  }, []);
   const fullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
@@ -74,19 +123,20 @@ export default function App() {
   return (
     <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
       <div ref={shell} className={`game-application ${fullscreenFallback ? 'menu-fullscreen' : ''}`}>
-        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={session?.setup.mode === 'tournament' ? sessionComplete(session) ? 'View Cup Results' : roundComplete(session) ? 'Continue Tournament' : 'Resume Tournament' : session && roundComplete(session) ? 'View Race Results' : 'Resume Race'} onNewGame={newGame} onResume={resume}
+        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onNewGame={newGame} onResume={resume}
           onSettings={settings} onGuide={() => setPanel('guide')} onRecords={() => setPanel('records')}
           onCredits={() => setPanel('credits')} onSound={() => setOptions((previous) => ({ ...previous, sound: !previous.sound }))} onFullscreen={() => void fullscreen()} />}
 
         {session && config && <div className="race-screen-host" hidden={screen !== 'race'} aria-hidden={screen !== 'race'} inert={screen !== 'race'}>
           <RaceScreen key={`${session.id}:${session.round}`} active={screen === 'race' && panel === null} options={options} setOptions={setOptions}
-            config={config} session={session} onRoundComplete={finishRound} onContinue={continueRace} onNewGame={newGame}
+            config={config} session={session} onRoundComplete={finishRound} onContinue={continueRace} onNewGame={newGame} onPhase={noteRacePhase}
+            gridNotes={recoveryNotes} storageWarning={persistWarning}
             records={records} setRecords={setRecords} onMainMenu={mainMenu} onSettings={settings} />
         </div>}
 
         <AnimatePresence>
           {panel === 'settings' && <SettingsPanel key="settings" options={options} onChange={setOptions} onClose={closePanel} />}
-          {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={!!session && !sessionComplete(session)} onStart={startRace} onClose={closePanel} />}
+          {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={Boolean(session)} finishedSession={session ? sessionComplete(session) : false} onStart={startRace} onClose={closePanel} />}
 
           {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide>
             <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the other three riders. Falling costs time, not the whole race.</p>
@@ -109,6 +159,9 @@ export default function App() {
           {panel === 'credits' && <Modal key="credits" title="The Art & the Engineering" eyebrow="ORIGINAL GOBLINS. CAREFULLY CONSIDERED CHAOS." onClose={closePanel} className="fantasy-dialog" wide>
             <figure className="menu-concept"><img src="/art/goblin-rally-concept.png" alt="Original Goblin Rally concept painting with a goblin slingshot, timber loop, sheep, and cheering crowds in a mountain arena." /><figcaption>THE ORIGINAL CONCEPT / GOBLIN RALLY</figcaption></figure>
             <p className="fantasy-lead">An original fantasy racing game. The visual direction takes cues from readable, hand-painted high fantasy; no Blizzard characters, logos, or interface assets are used.</p>
+            <div className="research-links"><h3><ImageIcon size={18} />Original art</h3>
+              <p className="artist-note">Riders, capsule shells, air supplies, blimp, landmarks and course paintings are original generated artwork made for this game. They are stored as alpha PNGs under <code>public/art/</code> with a typed manifest at <code>src/game/art-manifest.json</code>; the source sheets and the keying, despill and normalization steps are documented in <code>docs/ART_PIPELINE.md</code>. Downloads in The Workshop are the exact files the race draws.</p>
+            </div>
             <div className="research-links"><h3><BookOpen size={18} />Design references</h3>
               <a href="https://news.blizzard.com/en-us/article/23737992/shadowlands-an-inside-look-at-the-character-creation-ui-redesign" target="_blank" rel="noreferrer">Blizzard: Focus, hierarchy, and choice <ArrowUpRight size={15} /></a>
               <a href="https://80.lv/articles/matt-mcdaid-mastering-the-stylized-art" target="_blank" rel="noreferrer">Matt McDaid: Readability in stylized art <ArrowUpRight size={15} /></a>

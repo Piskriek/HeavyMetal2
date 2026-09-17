@@ -1,3 +1,4 @@
+import { artUrl, drawToCanvas, loadArtImage, placeholderCanvas, supplyCell } from './art-assets';
 import type { CourseId } from './types';
 import { FINISH, GRAVITY, RADIUS, STADIUM_START, courseY, laneZ, type Obstacle } from './scene';
 
@@ -74,25 +75,26 @@ export function hopTiming(vx: number, impulse: number) {
   return Math.max(0.1, Math.min(0.39, impulse / GRAVITY * 0.75)) * Math.max(200, vx);
 }
 
-const icons = new Map<PowerupKind, string>();
+/**
+ * Painted pickup icon: a real alpha PNG from the generated art library, sized 256x256 by
+ * the manifest. The world and the HUD use the same source, so a supply always looks the
+ * same everywhere.
+ */
 export function powerupIcon(kind: PowerupKind) {
-  if (icons.has(kind)) return icons.get(kind)!;
-  const color = POWERUPS[kind].color;
-  const symbol = kind === 'fuel' ? '<path d="m54 21-23 31h15l-5 22 25-33H51Z"/>'
-    : kind === 'shield' ? '<path d="m48 23 21 8v17q-2 19-21 27-19-8-21-27V31Z" fill="none" stroke-width="6"/><path d="m38 47 8 9 15-18" fill="none" stroke-width="5"/>'
-      : '<path d="M48 68V29m-14 15 14-15 14 15M29 69h38" fill="none" stroke-width="6"/><path d="m26 53-13-7 9 16m48-9 13-7-9 16" fill="none" stroke-width="4"/>';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><defs><radialGradient id="g"><stop stop-color="${color}" stop-opacity=".4"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient><linearGradient id="m" x2="1" y2="1"><stop stop-color="#829a83"/><stop offset=".4" stop-color="#253d31"/><stop offset="1" stop-color="#101e1b"/></linearGradient></defs><circle cx="48" cy="48" r="47" fill="url(#g)"/><path d="M48 11 81 30v36L48 85 15 66V30Z" fill="url(#m)" stroke="#12251c" stroke-width="6"/><path d="M48 13 79 31v34L48 83 17 65V31Z" fill="none" stroke="${color}" stroke-width="3"/><g fill="${color}" stroke="${color}" stroke-linejoin="round" stroke-linecap="round">${symbol}</g><path d="m27 29 18-10" stroke="#fff3cd" stroke-width="2" opacity=".7"/></svg>`;
-  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  icons.set(kind, url); return url;
+  return artUrl(supplyCell(kind).image);
 }
 
-let iconPromise: Promise<Record<PowerupKind, HTMLCanvasElement>> | null = null;
+let spritePromise: Promise<Record<PowerupKind, HTMLCanvasElement>> | null = null;
+/** Decodes and draws each pickup icon once per session; never called from a frame. */
 export function preparePowerupSprites() {
-  iconPromise ??= Promise.all((Object.keys(POWERUPS) as PowerupKind[]).map((kind) => new Promise<[PowerupKind, HTMLCanvasElement]>((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 128; canvas.getContext('2d')!.drawImage(image, 0, 0, 128, 128); resolve([kind, canvas]); };
-    image.onerror = () => reject(new Error('Could not prepare airborne pickups.'));
-    image.src = powerupIcon(kind);
-  }))).then((entries) => Object.fromEntries(entries) as Record<PowerupKind, HTMLCanvasElement>).catch((error: unknown) => { iconPromise = null; throw error; });
-  return iconPromise;
+  spritePromise ??= Promise.all((Object.keys(POWERUPS) as PowerupKind[]).map(async (kind) => {
+    const cell = supplyCell(kind);
+    try {
+      const image = await loadArtImage(cell.image);
+      return [kind, drawToCanvas(image, 128)] as [PowerupKind, HTMLCanvasElement];
+    } catch {
+      return [kind, placeholderCanvas(cell.runtime.width, cell.runtime.height, 128)] as [PowerupKind, HTMLCanvasElement];
+    }
+  })).then((entries) => Object.fromEntries(entries) as Record<PowerupKind, HTMLCanvasElement>);
+  return spritePromise;
 }

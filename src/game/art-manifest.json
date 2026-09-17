@@ -1,0 +1,610 @@
+{
+  "generatedAt": "2026-09-17",
+  "matte": {
+    "capsules": {
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "supply-fuel": {
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "supply-shield": {
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "supply-bounce": {
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "landmarks": {
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "blimp": {
+      "hex": "#FF00F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    }
+  },
+  "sheets": {
+    "riders": {
+      "file": "art/sheets/riders-source.png",
+      "width": 1536,
+      "height": 1024,
+      "columns": 5,
+      "rows": 3,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 307,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 614,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 921,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 1228,
+          "y": 0,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 0,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 307,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 614,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 921,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 1228,
+          "y": 341,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 0,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 307,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 614,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 921,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        },
+        {
+          "x": 1228,
+          "y": 682,
+          "width": 307,
+          "height": 341
+        }
+      ],
+      "alpha": "painted"
+    },
+    "capsules": {
+      "file": "art/sheets/capsules-sheet.png",
+      "width": 1792,
+      "height": 592,
+      "columns": 3,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 597,
+          "height": 592
+        },
+        {
+          "x": 597,
+          "y": 0,
+          "width": 597,
+          "height": 592
+        },
+        {
+          "x": 1194,
+          "y": 0,
+          "width": 597,
+          "height": 592
+        }
+      ]
+    },
+    "supply-fuel": {
+      "file": "art/sheets/supply-fuel.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1264,
+          "height": 843
+        }
+      ]
+    },
+    "supply-shield": {
+      "file": "art/sheets/supply-shield.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 1024
+        }
+      ]
+    },
+    "supply-bounce": {
+      "file": "art/sheets/supply-bounce.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1264,
+          "height": 843
+        }
+      ]
+    },
+    "landmarks": {
+      "file": "art/sheets/landmarks-sheet.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 2,
+      "rows": 2,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 632,
+          "height": 421
+        },
+        {
+          "x": 632,
+          "y": 0,
+          "width": 632,
+          "height": 421
+        },
+        {
+          "x": 0,
+          "y": 421,
+          "width": 632,
+          "height": 421
+        },
+        {
+          "x": 632,
+          "y": 421,
+          "width": 632,
+          "height": 421
+        }
+      ]
+    },
+    "blimp": {
+      "file": "art/sheets/blimp.png",
+      "width": 1264,
+      "height": 843,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1264,
+          "height": 843
+        }
+      ]
+    },
+    "courses": {
+      "file": "art/sheets/courses-sheet.png",
+      "width": 1792,
+      "height": 592,
+      "columns": 1,
+      "rows": 3,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1792,
+          "height": 197
+        },
+        {
+          "x": 0,
+          "y": 197,
+          "width": 1792,
+          "height": 197
+        },
+        {
+          "x": 0,
+          "y": 394,
+          "width": 1792,
+          "height": 197
+        }
+      ]
+    }
+  },
+  "cells": {
+    "rider:rivet": {
+      "sheet": "riders",
+      "sheetCell": 0,
+      "image": "art/rivet-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "note": "leather aviator cap and brass goggles",
+      "pilot": "art/rivet-pilot.png",
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
+      "eyeLine": 0.44
+    },
+    "rider:nix": {
+      "sheet": "riders",
+      "sheetCell": 8,
+      "image": "art/nix-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "note": "asymmetric hair, goggles, wide grin",
+      "pilot": "art/nix-pilot.png",
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
+      "eyeLine": 0.44
+    },
+    "rider:grub": {
+      "sheet": "riders",
+      "sheetCell": 11,
+      "image": "art/grub-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "note": "battered spiked helmet, heavy jaw",
+      "pilot": "art/grub-pilot.png",
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
+      "eyeLine": 0.52
+    },
+    "rider:sprocket": {
+      "sheet": "riders",
+      "sheetCell": 3,
+      "image": "art/sprocket-portrait.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "portrait",
+      "anchor": "center",
+      "note": "coiled-helmet tinkerer",
+      "pilot": "art/sprocket-pilot.png",
+      "pilotRuntime": {
+        "width": 256,
+        "height": 256
+      },
+      "eyeLine": 0.49
+    },
+    "capsule:iron": {
+      "sheet": "capsules",
+      "sheetCell": 0,
+      "image": "art/iron-shell.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "shell",
+      "anchor": "center",
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "envelope": 1,
+      "hull": {
+        "diameter": 452,
+        "canvas": 512,
+        "scale": 0.8496
+      },
+      "hatch": {
+        "x": 0.8056640625,
+        "y": 0.6125,
+        "rx": 0.0889453125,
+        "ry": 0.1266796875,
+        "radius": 0.1266796875,
+        "measured": true
+      }
+    },
+    "capsule:springsteel": {
+      "sheet": "capsules",
+      "sheetCell": 1,
+      "image": "art/springsteel-shell.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "shell",
+      "anchor": "center",
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "envelope": 1,
+      "hull": {
+        "diameter": 452,
+        "canvas": 512,
+        "scale": 0.8512
+      },
+      "hatch": {
+        "x": 0.803515625,
+        "y": 0.6134765625,
+        "rx": 0.07906250000000001,
+        "ry": 0.12488281250000001,
+        "radius": 0.12488281250000001,
+        "measured": true
+      }
+    },
+    "capsule:siege": {
+      "sheet": "capsules",
+      "sheetCell": 2,
+      "image": "art/siege-shell.png",
+      "runtime": {
+        "width": 512,
+        "height": 512
+      },
+      "action": "shell",
+      "anchor": "center",
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "envelope": 1,
+      "hull": {
+        "diameter": 452,
+        "canvas": 512,
+        "scale": 0.8433
+      },
+      "hatch": {
+        "x": 0.8001953125,
+        "y": 0.6046875,
+        "rx": 0.0817578125,
+        "ry": 0.12488281250000001,
+        "radius": 0.12488281250000001,
+        "measured": true
+      }
+    },
+    "supply:fuel": {
+      "sheet": "supply-fuel",
+      "sheetCell": 0,
+      "image": "art/fuel-supply.png",
+      "runtime": {
+        "width": 256,
+        "height": 256
+      },
+      "action": "icon",
+      "anchor": "center"
+    },
+    "supply:shield": {
+      "sheet": "supply-shield",
+      "sheetCell": 0,
+      "image": "art/shield-supply.png",
+      "runtime": {
+        "width": 256,
+        "height": 256
+      },
+      "action": "icon",
+      "anchor": "center"
+    },
+    "supply:bounce": {
+      "sheet": "supply-bounce",
+      "sheetCell": 0,
+      "image": "art/bounce-supply.png",
+      "runtime": {
+        "width": 256,
+        "height": 256
+      },
+      "action": "icon",
+      "anchor": "center"
+    },
+    "landmark:pines": {
+      "sheet": "landmarks",
+      "sheetCell": 0,
+      "image": "art/landmark-pines.png",
+      "runtime": {
+        "width": 295,
+        "height": 394
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "landmark:quarry": {
+      "sheet": "landmarks",
+      "sheetCell": 1,
+      "image": "art/landmark-quarry.png",
+      "runtime": {
+        "width": 456,
+        "height": 322
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "landmark:windmill": {
+      "sheet": "landmarks",
+      "sheetCell": 2,
+      "image": "art/landmark-windmill.png",
+      "runtime": {
+        "width": 316,
+        "height": 397
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "landmark:pasture": {
+      "sheet": "landmarks",
+      "sheetCell": 3,
+      "image": "art/landmark-pasture.png",
+      "runtime": {
+        "width": 512,
+        "height": 240
+      },
+      "action": "prop",
+      "anchor": "bottom",
+      "baseline": 1
+    },
+    "prop:blimp": {
+      "sheet": "blimp",
+      "sheetCell": 0,
+      "image": "art/blimp.png",
+      "runtime": {
+        "width": 900,
+        "height": 577
+      },
+      "action": "prop",
+      "anchor": "center",
+      "facing": "right"
+    },
+    "course:ridge": {
+      "sheet": "courses",
+      "sheetCell": 0,
+      "image": "art/ridge-course.png",
+      "runtime": {
+        "width": 800,
+        "height": 440
+      },
+      "action": "preview",
+      "source": {
+        "x": 0,
+        "y": 0,
+        "width": 1792,
+        "height": 197
+      }
+    },
+    "course:boomtown": {
+      "sheet": "courses",
+      "sheetCell": 1,
+      "image": "art/boomtown-course.png",
+      "runtime": {
+        "width": 800,
+        "height": 440
+      },
+      "action": "preview",
+      "source": {
+        "x": 0,
+        "y": 197,
+        "width": 1792,
+        "height": 197
+      }
+    },
+    "course:sheep": {
+      "sheet": "courses",
+      "sheetCell": 2,
+      "image": "art/sheep-course.png",
+      "runtime": {
+        "width": 800,
+        "height": 440
+      },
+      "action": "preview",
+      "source": {
+        "x": 0,
+        "y": 394,
+        "width": 1792,
+        "height": 197
+      }
+    }
+  }
+}

@@ -34,6 +34,16 @@ export interface CupStanding {
   positions: number[];
 }
 
+/**
+ * Explicit, persisted lifecycle phase for an event. Hydration never guesses the
+ * phase from a mounted React component or from `results.length` alone.
+ * `goblin-rally-session-v1` stores one of these strings.
+ */
+export type SessionPhase = 'setup' | 'grid' | 'racing' | 'round-results' | 'cup-results';
+export const SESSION_PHASES: readonly SessionPhase[] = ['setup', 'grid', 'racing', 'round-results', 'cup-results'];
+export const isSessionPhase = (value: unknown): value is SessionPhase =>
+  typeof value === 'string' && SESSION_PHASES.includes(value as SessionPhase);
+
 export const CUP_NAME = 'The Scrapdome Cup';
 export const CUP_POINTS = [9, 6, 3, 1] as const;
 export const CUP_ROUNDS: CourseId[] = ['ridge', 'boomtown', 'sheep'];
@@ -81,6 +91,31 @@ export function commitRound(session: RaceSession, record: RunRecord): RaceSessio
 
 export const sessionComplete = (session: RaceSession) => session.results.length >= session.rounds.length;
 export const roundComplete = (session: RaceSession) => session.results.some((record) => record.round === session.round);
+export const roundCommitted = (session: RaceSession, round: number) => session.results.some((record) => record.round === round);
+
+/** Stable identity for a committed result: one record per session round. */
+export const runRecordKey = (record: RunRecord) => record.sessionId !== undefined && record.round !== undefined
+  ? `${record.sessionId}:${record.round}` : record.id;
+
+/** The phase that matches practice progress inside a live round. */
+export function liveSessionPhase(session: RaceSession | null): SessionPhase {
+  if (!session) return 'setup';
+  if (sessionComplete(session)) return 'cup-results';
+  return roundComplete(session) ? 'round-results' : 'grid';
+}
+
+/** Contextual label for the main-menu resume entry, derived from the persisted phase. */
+export function resumeLabel(session: RaceSession | null, phase: SessionPhase): string {
+  if (!session) return 'Resume Race';
+  const tournament = session.setup.mode === 'tournament';
+  if (phase === 'cup-results') return tournament ? 'View Cup Results' : 'View Race Results';
+  if (phase === 'round-results') return tournament ? 'View Round Results' : 'View Race Results';
+  return tournament ? 'Continue Tournament' : 'Resume Race';
+}
+
+export function roundLabel(session: RaceSession, round: number) {
+  return session.setup.mode === 'tournament' ? `Round ${round + 1} of ${session.rounds.length}` : 'the current race';
+}
 export const recordModeLabel = (record: RunRecord) => record.mode === 'practice' ? 'Custom practice'
   : record.mode === 'tournament' ? `Cup / Round ${(record.round ?? 0) + 1}`
     : record.mode === 'quick' ? 'Quick Race' : 'Legacy run';

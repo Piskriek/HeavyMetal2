@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "node scripts/check.mjs",
+    "check:browser": "node scripts/browser-check.mjs",
+    "check:art": "node scripts/browser-check.mjs art"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -17,12 +20,15 @@
     "tailwind-merge": "3.4.0"
   },
   "devDependencies": {
+    "@sparticuz/chromium": "^153.0.0",
     "@tailwindcss/vite": "4.1.17",
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.1",
+    "playwright-core": "^1.63.0",
     "tailwindcss": "4.1.17",
+    "tsx": "^4.23.13",
     "typescript": "5.9.3",
     "vite": "7.3.2",
     "vite-plugin-singlefile": "2.3.0"

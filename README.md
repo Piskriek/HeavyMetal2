@@ -4,9 +4,13 @@ A playable, original four-lane fantasy-goblin slingshot racing game built with R
 
 ## Full-Game Expansion
 
-Sections 1-3 of the requested four-part expansion are implemented: a researched fantasy main menu, persistent settings, keyboard navigation, Quick Race/Tournament setup, selectable rider/capsule loadouts, three distinct dirt courses, blimps, and airborne supplies.
+Sections 1-3 of the requested four-part expansion are implemented, along with Parts 4.1 and 4.2 of the final section: a researched fantasy main menu, persistent settings, keyboard navigation, Quick Race/Tournament setup, selectable rider/capsule loadouts, three distinct dirt courses, blimps, airborne supplies, a versioned, validated tournament save that survives a page reload, and a painted PNG sprite library that replaced the placeholder vector art.
 
-Choose **New Game > Competition > Rider & Capsule > Race Rules**. Quick Race selects one existing track; Tournament runs all three in order. Returning to **Main Menu** retains the race and cup in memory; the contextual Resume/Continue action brings it back. Replacing an unfinished event asks for confirmation. A page reload retains settings, the last setup, and completed race records, but does not yet restore the active event.
+Choose **New Game > Competition > Rider & Capsule > Race Rules**. Quick Race selects one existing track; Tournament runs all three in order. Returning to **Main Menu** retains the race and cup; the contextual Resume/Continue action brings it back. Replacing an unfinished or unviewed event asks for confirmation.
+
+Progress is durable: settings, the last setup, the top-20 race records and the whole active event (roster, loadout, difficulty, committed round results and an explicit phase) are saved on this device. Reload the tab and the menu offers **Continue Tournament**, **View Round Results** or **View Cup Results** as appropriate. An interrupted round restarts from that round's starting grid and says so; a committed round is never re-raced for points. Saving is round-boundary recovery only — a reload does not restore live physics mid-race. If the browser denies or runs out of storage, the game says so instead of silently losing progress. The contract is documented in `docs/PERSISTENCE.md`.
+
+The riders, capsule shells, air supplies, blimp, landmarks and course previews are original painted PNGs under `public/art/`, cut from generated source sheets by `scripts/build-art.mjs`: magenta `#FF00FF` keying with per-cell matte detection, fringe-only despill, a fixed 452 px hull envelope so armour never changes the collision size, and a measured cockpit ellipse (plus a per-rider eye line, because a tall helmet sits differently in the crop) that positions the pilot bust inside each shell. `src/game/art-manifest.json` is the typed manifest, every sprite decodes before a race starts and is cached afterwards, and a broken file degrades to a visible placeholder instead of a blank. The Sprite Lab (The Workshop > Sprite Lab) lists every runtime sprite and every source sheet for download, and the pipeline contract is in `docs/ART_PIPELINE.md`.
 
 Settings are reachable before any race starts. They include graphics quality, audio enable/volume with a sound test, menu animation, contrast, reduced motion, camera view, and trajectory assistance. Restore defaults does not erase records or alter the selected course or ball tuning.
 
@@ -86,8 +90,13 @@ Choose **The Workshop > The Garage > Graphics performance** for Auto, Performanc
 - `src/components/NewGameSetup.tsx`: mode selection, live rider/capsule workbench, course/difficulty choices, and replacement confirmation.
 - `src/components/RoundResult.tsx`: basic race/cup standings and round continuation.
 - `src/game/loadouts.ts`: shared preset definitions, rating budget, and actual physics mapping.
-- `src/game/loadout-art.ts`: original rider/capsule SVGs and once-per-loadout raster sprites.
-- `src/game/session.ts`: separate event configuration, cup order/scoring, setup persistence, and idempotent round progression.
+- `src/game/loadout-art.ts`: PNG rider/capsule art and the once-per-roster baked race capsule.
+- `src/game/art-assets.ts`: typed access to `art-manifest.json`, the one-time decode cache, hatch geometry, and placeholder/failure reporting.
+- `src/components/RacerFigure.tsx`: menu-side shell + pilot composite clipped to the measured hatch ellipse.
+- `src/components/ArtGallery.tsx`: the Sprite Lab, listing and downloading the exact files the game draws.
+- `scripts/build-art.mjs`: the build-time keying, despill, normalisation and hatch-measurement pipeline (`node scripts/build-art.mjs`).
+- `src/game/session.ts`: separate event configuration, cup order/scoring, the explicit `SessionPhase` model, and idempotent round progression.
+- `src/game/save.ts`: versioned, validated, atomic and idempotent storage of the active event, with backup-slot recovery and plain-language notices.
 - `src/setup.css`: responsive fantasy workbench, selection states, and result presentation.
 - `src/game/preferences.ts`: validated preference loading and optional local persistence.
 - `src/menu.css`: forged-metal menu styling, fantasy typography, responsive dialogs, and contrast/motion overrides.
@@ -120,9 +129,12 @@ Choose **The Workshop > The Garage > Graphics performance** for Auto, Performanc
 - `docs/GAME_DESIGN.md`: researched design direction and staged full-game roadmap.
 - `docs/LOADOUT_BALANCE.md`: the 12-build matrix, exact stat formulas, and remaining empirical tests.
 - `docs/WORLD_AND_POWERUPS.md`: Section 3 course and supply rules, performance choices, and verification boundaries.
+- `docs/ART_PIPELINE.md`: Part 4.2 source sheets, matte/despill/normalisation rules, manifest schema, fallback behaviour, and art verification.
 
 ## Development
 
 Install dependencies, then use `npm run dev`. The production build is `npm run build`.
 
-No API keys or third-party game services are required. Sound is muted initially and can be enabled from the header or workshop. Settings and records remain optional when browser storage is unavailable.
+No API keys or third-party game services are required. Sound is muted initially and can be enabled from the header or workshop. Settings, records and the active event remain optional when browser storage is unavailable; the game runs either way and reports the failure.
+
+Verification: `npm run check` type-checks the app and runs the focused persistence/recovery tests; `npm run check:browser` builds the app and drives the reload-recovery flow in headless Chromium (start a cup, launch, reload mid-race, resume, restored standings, corrupt save, denied storage); `npm run check:art` builds the app and runs 25 checks that the drawn art really is the PNG library in headless Chromium (decoded sprites, the pilot seated square inside the measured port with its alpha box clear of the brass ring, layer swaps, no inline vectors, no broken images, painted pixels in the race frame, a complete Sprite Lab); the same suite can be pointed at a running server with `node tests/art-check.mjs http://127.0.0.1:5173`. Compilation, unit tests and the scripted browser runs are not a substitute for playtesting.

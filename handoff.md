@@ -2,15 +2,21 @@
 You can find the Files to the Game predecesor "Heavy Metal 1" in the "Pregame" folder, you are free to use any png assets from there to style the game, its encouraged. You can only generate 10 images per turn before your turns need to be reset, to reset them simply say "Reset please" and stop working, you will get a reply of "turns reset" and you will be able to do 10 more. 
 ## Latest User Instruction
 
-The user asked to continue to Section 4, split that final section into four smaller parts, and implement one part at a time. They then superseded immediate implementation with: create only this status report and a prompt for a fresh Codex agent, including generating PNG artwork to replace SVG art and any additional art requirements.
+The user asked to continue to Section 4, split that final section into four smaller parts, and implement one part at a time.
 
-This handoff is the only change made for that final request. No Section 4 implementation has begun. The next agent should begin Part 4.1, finish and verify it, then stop for the user's continuation. Do not silently complete all four parts in one turn.
+**Parts 4.1 (Durable Events And Recovery) and 4.2 (Original PNG Art Pass) are implemented and reported.** The next agent should wait for the user's prompt before starting Part 4.3 (Results, Cup Completion, And Progression Polish). Do not silently complete the remaining parts in one turn, and do not start 4.3 in the same turn as any 4.1/4.2 follow-up work.
+
+Part 4.1 in one line: one versioned durable document now survives reloads with an explicit phase, atomic/idempotent round commits, validated non-destructive recovery, honest storage-failure reporting and a race screen that never rebuilds an already-committed round as a live race. See `docs/PERSISTENCE.md` for the contract and `tests/session-save.test.ts` for the recovery matrix.
+
+Part 4.2 in one line: the placeholder vector riders, capsules, supplies, blimp, landmarks and course previews are replaced by 18 painted alpha PNGs cut from eight source sheets by `scripts/build-art.mjs` (per-cell magenta keying, fringe-only despill, fixed hull envelope, measured cockpit ellipses and per-rider eye lines), consumed through the typed `src/game/art-manifest.json` with decode-once caching, baked race capsules and a visible placeholder fallback. See `docs/ART_PIPELINE.md`.
+
+Part 4.2 verification, done after the art landed: `npm run check` (tsc + 18 recovery tests), `npm run check:browser` (21 reload-recovery checks), `npm run check:art` (25 headless-Chromium art checks on the built app) and the same 25 checks against the live dev server (`node tests/art-check.mjs http://127.0.0.1:5173`), plus `alpha-check.png`, `hatch-probe.png` and `eyeline-probe.png` read as images and the crew-picker/race screenshots inspected. Four real defects were found and fixed in that pass: the pilot's seat, whose hand-pinned ellipse was offset and undersized against the painted port while the bust was drawn 1.7x the opening in both axes, so the goblin clipped over the brass ring and the face was stretched (the "portrait renders outside / overlapping the capsule" screenshot report — the port is now measured from the sprite on every build and the bust is drawn square at 2.4x the opening's smaller half-axis, with checks on the port centre, the square box and the bust's alpha box); the cockpit eye line was one shared constant (0.44) that pushed Grub's face into the lower rim of the port (now per rider: Rivet 0.44, Nix 0.44, Grub 0.52, Sprocket 0.49, with `eyeline-probe.png` regenerated on every build); `pilotRuntime` was written as a tuple while the typed consumers read named fields, so the Sprite Lab showed `0x0` for every pilot; and hull normalisation rolled each shell the wrong way, wrapping pixels around the canvas, pushing the sprite off-canvas and leaking `{iron,springsteel,siege}-shell.png` into the repo root (it now writes to `public/art/` and centres with `-gravity center -extent`, and the shell sprites are regenerated from the sheet to match). Screenshots of the live menu, crew picker, starting grid, race and Sprite Lab are in `tests/artifacts/`.
 
 ## Copy-Paste Prompt For The Next Codex Agent
 
-You are taking over Goblin Rally, an existing React/TypeScript/Vite browser game. Read `handoff.md`, `docs/EXPANSION_PROGRESS.md`, `docs/GAME_DESIGN.md`, `docs/LOADOUT_BALANCE.md`, and `docs/WORLD_AND_POWERUPS.md`, then inspect the relevant implementation. Continue the existing game, not a replacement mockup.
+You are taking over Goblin Rally, an existing React/TypeScript/Vite browser game. Read `handoff.md`, `docs/EXPANSION_PROGRESS.md`, `docs/PERSISTENCE.md`, `docs/GAME_DESIGN.md`, `docs/LOADOUT_BALANCE.md`, and `docs/WORLD_AND_POWERUPS.md`, then inspect the relevant implementation. Continue the existing game, not a replacement mockup.
 
-Sections 1-3 are implemented. The user wants the final Section 4 divided into FOUR parts, completed ONE AT A TIME. Begin Part 4.1 below and stop after it is implemented, documented, and built. Wait for a prompt before Part 4.2. The final scope includes actual generated, polished PNG art to replace the current SVG character/capsule/pickup/track-preview illustrations, not merely renaming SVG files or screenshotting the same placeholder artwork. Keep semantic UI text as real HTML and retain simple vector control icons where appropriate.
+Sections 1-3 and Section 4 Parts 4.1 and 4.2 are implemented. The user wants the final Section 4 divided into FOUR parts, completed ONE AT A TIME. Part 4.3 (Results, Cup Completion, And Progression Polish) has NOT begun: await the user's prompt before starting it, and stop after it is implemented, documented and built.
 
 Preserve the current original Warcraft-inspired fantasy identity: chunky painted goblins, iron/brass machinery, muted dirt roads, readable silhouettes, and a green-iron/gold/crimson game UI. Do not use Blizzard logos, proprietary characters, or imply affiliation. Preserve the researched clarity/accessibility principles. This is a full game, not a marketing website.
 
@@ -74,11 +80,28 @@ Run the complete matrix of rider/capsule/course/difficulty tests and real playte
 - Shield ring/timer/break effect, pickup icons/counts, handbook explanations, and result counters.
 - Full-depth visibility bounds and extra off-screen tiles address the earlier right-edge scenery pop-in.
 
+### Implemented Section 4 Part 4.1
+
+- Versioned durable event save (`goblin-rally-session-v1` + backup slot) with an explicit persisted phase (`setup`, `grid`, `racing`, `round-results`, `cup-results`). Reload hydrates the menu with Continue Tournament / View Round Results / View Cup Results as appropriate.
+- Atomic and idempotent round commits; duplicate, mismatched or out-of-range records are dropped with a report, and `mergeRunRecord` replaces rather than appends per `sessionId:round`.
+- Interrupted rounds restart at that round's grid with an explicit message; an earlier unfinished round is never skipped, and later committed results are preserved without double-scoring.
+- Corrupt primary falls back to the last valid backup; unsupported future schema versions are left untouched; denied/full storage is reported in the menu and race header.
+- The race screen builds no live engine for an already-committed round, so a restored result cannot be replayed for unscored points.
+- `node scripts/check.mjs` = `tsc --noEmit` + 18 focused tests (`tests/session-save.test.ts`, TAP artifact under `tests/artifacts/`). Round-boundary recovery only: no engine snapshot, and the UI says as much.
+
+### Implemented Section 4 Part 4.2
+
+- Eight source sheets in `public/art/sheets/` (capsules, landmarks, blimp, courses, three individual supplies, and the predecessor project's portrait sheet copied to `riders-source.png`) produce 18 runtime PNGs in `public/art/`: four 512² rider portraits with four 256² pilot busts, three 512² capsule shells, three 256² supply icons, four landmarks, a 900x576 blimp and three 800x440 course previews. All alpha sprites are true RGBA.
+- `scripts/build-art.mjs` does all pixel work at build time: per-cell border matte detection (magenta `#FF00FF` preferred — the subjects are green — with `#00FF00` still supported), fringe-only despill that clamps just the matte channels so olive skin and mint springs survive, `-shave 6x6` per cell so painted dividers cannot join a subject, largest-component hull trimming, and normalisation of every shell hull to 452 px on a 512 px canvas.
+- The seat is the shell's ringed port, measured from the artwork on every build (`measureHatch()`: largest near-black opaque blob in the lower-right quadrant, fitted to an ellipse inset by 0.92) and stored with `rx`/`ry`/`radius`/`measured` — iron 0.806,0.613 rx 0.089 ry 0.127; springsteel 0.804,0.613 rx 0.079 ry 0.125; siege 0.800,0.605 rx 0.082 ry 0.125. The pilot bust is drawn **square** at `2.4 * min(rx, ry)` with its eye line on the window centre and clipped to 99% of the ellipse, in menus (`RacerFigure`), in the baked race capsule (`prepareRaceCapsules`, 192², cached per roster) and in the preload path. The earlier hand-pinned ellipse (0.82/0.61) was offset and undersized against the art and the `3.4 * rx` by `3.4 * ry` box stretched the face, so the goblin clipped over the brass ring: that was the "portrait renders outside / overlapping the capsule" screenshot defect, now covered by checks on the port centre, the square box and the bust's alpha box. The eye line is per rider (Rivet 0.44, Nix 0.44, Grub 0.52, Sprocket 0.49) and re-checkable via `eyeline-probe.png`; horizontally the busts are centred on the window.
+- The manifest records the detected key hex next to the canonical target (`#FF00F8` detected / `#FF00FF` target), so a drifting generated sheet shows up in the Sprite Lab instead of passing silently.
+- Removed the superseded first-pass sheets (`riders-sheet.png`, `supplies-sheet.png`) and stray scratch PNGs; the tree no longer carries unused art sources.
+- Remaining SVG in the app is deliberate: the logo mark and the dashed pull-back hint arrow. Semantic text is still real HTML; no UI text is baked into art.
+- `npm run check:art` builds the app and runs 25 art checks in headless Chromium (or checks a live server: `node tests/art-check.mjs http://127.0.0.1:5173`); `tests/artifacts/alpha-check.png` (checkerboard contact sheet), `hatch-probe.png` (measured ellipses drawn over the shells) and `eyeline-probe.png` (pilot eye-line guides) were inspected as images during implementation. The suite asserts geometry, not just decoding: the pilot window's clip-path, the pilot staying inside the silhouette, and both layers swapping when the rider/capsule changes.
+
 ### Not Yet Complete
 
-- Active session/cup is NOT restored after browser reload. `src/App.tsx` initializes session to `null`.
-- Full progression/cup history, polished podium presentation, and robust save-phase recovery remain unfinished.
-- Many selection and pickup illustrations are generated SVG data URLs. Regional skies/blimps/landmarks are canvas-painted placeholders. The user specifically requests a generated PNG replacement pass.
+- Polished results/podium presentation and persistent cup history (4.3), empirical balance/QA/performance (4.4).
 - No measured proof of balance, smooth FPS, keyboard accessibility, mobile usability, or full tournament correctness. These need actual tests/play sessions.
 - Do not call the game fully finished merely because features exist and compilation passes.
 
@@ -92,14 +115,20 @@ Run the complete matrix of rider/capsule/course/difficulty tests and real playte
 | `src/game/preferences.ts` | Options/record validation and local-storage writes |
 | `src/game/types.ts` | Options, RunRecord, GameSnapshot, race standings and IDs |
 | `src/game/loadouts.ts` | Rider/capsule definitions and shared stat formulas |
-| `src/game/loadout-art.ts` | CURRENT SVG rider/capsule builders and once-per-roster rasterization; primary PNG replacement point |
+| `src/game/loadout-art.ts` | PNG rider/capsule art (`riderArt`, `capsuleArt`, `loadoutArt`, `loadoutArtAlt`) and `prepareRaceCapsules`, the once-per-roster 192² baked race capsule |
+| `src/game/art-assets.ts` | Typed `art-manifest.json` access, one-time decode cache, hatch/pilot-box geometry, placeholder and failure reporting |
+| `src/game/art-manifest.json` | GENERATED sprite metadata (sheets, cell rects, runtime sizes, hull diameter, measured hatch ellipses) — regenerate with `node scripts/build-art.mjs`, never hand-edit |
+| `scripts/build-art.mjs` | Build-time-only ImageMagick pipeline: matte detection, despill, shave/trim, hull normalisation, hatch measurement, verification montages |
+| `src/components/RacerFigure.tsx` | Menu-side shell + pilot composite clipped to the measured hatch ellipse |
+| `src/components/ArtGallery.tsx` | The Sprite Lab: runtime sprites and source sheets with detected keys, sizes and downloads |
+| `docs/ART_PIPELINE.md` | Part 4.2 pipeline contract, manifest schema, fallback rules, art verification |
 | `src/game/racers.ts` | Four racer states/resources, loadout application, visited obstacles, finish order |
 | `src/game/engine.ts` | Fixed-step physics, CPU planning, lane steering, collision impulses, recovery, pickups/shields, finish window |
 | `src/game/scene.ts` | Track lengths, lane geometry, course-specific elevation tables, pickup/racer frame types |
 | `src/game/courses.ts` | Region identities, colors, elevation profiles, sectors, stadium names |
 | `src/game/track-layout.ts` | Deterministic course-specific ground obstacle placement |
-| `src/game/powerups.ts` | Supply definitions/placement, swept pickup test, SVG icons, sprite preparation |
-| `src/game/world-art.ts` | Cached canvas skies/dirt/banks/blimps/landmarks; SVG `coursePreview()` builder |
+| `src/game/powerups.ts` | Supply definitions/placement, swept pickup test, painted HUD icons drawn from the shared PNG sprite map |
+| `src/game/world-art.ts` | Cached canvas skies/dirt/banks plus `prepareWorldArt()` (blimp + landmarks decoded before racing); course previews are the painted PNG rasters |
 | `src/game/renderer.ts` | Zoomed perspective rendering, lane-aware sprites, pickups, shield effects, race sprite choices |
 | `src/game/environment.ts` | Dirt strip rendering, terrain, crowds, blimps, landmarks, gaps and stadium |
 | `src/game/projection.ts` | 0.86 world/screen projection, inverse aiming, visibleSpan overscan, culling |
@@ -120,8 +149,8 @@ Run the complete matrix of rider/capsule/course/difficulty tests and real playte
 
 ## Persistence Details And Hazards
 
-- Existing keys: `goblin-rally-options-v1`, `goblin-rally-records-v1`, `goblin-rally-setup-v2`.
-- Options and top 20 completed race records are persisted. Last setup is persisted. RaceSession is currently only React memory.
+- Keys: `goblin-rally-options-v1`, `goblin-rally-records-v1`, `goblin-rally-setup-v2` (legacy draft, still written and read as a migration source), `goblin-rally-session-v1` and `goblin-rally-session-v1-backup`.
+- Options, the top 20 records, the last setup and the whole active event are persisted. `docs/PERSISTENCE.md` is the authoritative contract; do not weaken atomicity or the duplicate-result guards.
 - `RaceSession` has `id`, `setup`, `rounds`, `round`, `roster`, and `results`; it has no explicit saved phase or schema version.
 - `commitRound()` validates record session ID, current round and course, then ignores duplicate round entries. Preserve these guards.
 - `RaceScreen` stores local result state and constructs a GameEngine in an effect. Hydrating a completed round requires preventing that fresh engine from replacing the saved results with a ready race.
@@ -225,8 +254,8 @@ For environment paintings replace the transparency clause with the composition r
 
 ## Verification Status At Handoff
 
-The last Section 3 production build passed with the provided `build_project` tool: Vite built successfully; the single-file output was approximately 619.76 kB (193.13 kB gzip). That is compilation evidence only.
+Parts 4.1 + 4.2 verification: `npm run build` succeeded at 641.46 kB / 199.46 kB gzip; `node scripts/check.mjs` passed `tsc --noEmit` plus 18 focused persistence tests; `node scripts/browser-check.mjs` passed 21 recovery checks; `node scripts/browser-check.mjs art` passed 25 art checks (the same 25 pass against the live dev server on 5173); `node scripts/build-art.mjs` rebuilt all 18 sprites from 8 sheets with every matte detected as magenta `#FF00F8` (target `#FF00FF`) and every port re-measured and verified. Screenshots, the alpha contact sheet, the hatch probe and a manifest copy are in `tests/artifacts/` (git-ignored).
 
-No browser automation, live rendered screenshot inspection, mobile-device FPS benchmark, or empirical race/loadout balance run was available in the previous tool environment. The feature descriptions above report implementation, not certified test outcomes. If the new environment provides a browser or terminal, use it and record concrete results. Run a new build after each implementation part.
+What the browser tooling does and does not prove: it runs the real app in headless Chromium and inspects decoded images, the composited pilot, the drawn race frame's pixels, and the recovery flow. It does not measure frame pacing, race balance, touch ergonomics, or accessibility conformance, and it does not represent a human playtest. Those remain 4.4 work.
 
-Only this `handoff.md` was created during the handoff request. No Section 4 features or generated replacement artwork were added in that turn.
+A Vite preview configuration (`vite.preview.config.ts`) is available for the sandbox's proxied preview host; `vite.config.ts` itself was left untouched.

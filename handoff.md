@@ -1,16 +1,33 @@
-# Goblin Rally: Project Status And Codex Handoff
-You can find the Files to the Game predecesor "Heavy Metal 1" in the "Pregame" folder, you are free to use any png assets from there to style the game, its encouraged. You can only generate 10 images per turn before your turns need to be reset, to reset them simply say "Reset please" and stop working, you will get a reply of "turns reset" and you will be able to do 10 more. 
-## Latest User Instruction
+# Goblin Rally (Heavy Metal GP 2): Project Status And Codex Handoff
 
-The user asked to continue to Section 4, split that final section into four smaller parts, and implement one part at a time.
+> [!IMPORTANT]
+> **Predecessor Assets & Image Quota Policy**:
+> - You can find all files from predecessor game "Heavy Metal 1" in the [`PreGame/`](file:///c:/MarbleGp/PreGame) folder (`PreGame/assets/`, `PreGame/src/assets/`). You are **strongly encouraged** to use existing PNG/WebP assets from there (e.g. `ball-*.webp`, `bumper-*.webp`, `spring.webp`, `strip-*.webp`, `uikit.png`, `repeatingBG.png`) to style and extend the game.
+> - **Image Generation Quota**: You can only generate **10 images per turn** before your quota needs to be reset. To reset them, simply say **"Reset please"** and stop working; the user will reply with "turns reset", and you can continue with 10 more calls.
 
-**Parts 4.1 (Durable Events And Recovery) and 4.2 (Original PNG Art Pass) are implemented and reported.** The next agent should wait for the user's prompt before starting Part 4.3 (Results, Cup Completion, And Progression Polish). Do not silently complete the remaining parts in one turn, and do not start 4.3 in the same turn as any 4.1/4.2 follow-up work.
+## Latest User Direction & Actionable Ticket Suite
 
-Part 4.1 in one line: one versioned durable document now survives reloads with an explicit phase, atomic/idempotent round commits, validated non-destructive recovery, honest storage-failure reporting and a race screen that never rebuilds an already-committed round as a live race. See `docs/PERSISTENCE.md` for the contract and `tests/session-save.test.ts` for the recovery matrix.
+The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):
 
-Part 4.2 in one line: the placeholder vector riders, capsules, supplies, blimp, landmarks and course previews are replaced by 18 painted alpha PNGs cut from eight source sheets by `scripts/build-art.mjs` (per-cell magenta keying, fringe-only despill, fixed hull envelope, measured cockpit ellipses and per-rider eye lines), consumed through the typed `src/game/art-manifest.json` with decode-once caching, baked race capsules and a visible placeholder fallback. See `docs/ART_PIPELINE.md`.
+1. [`TICKET-01`: Blizzard/Warcraft Ornate UI Frame & Border System](file:///c:/MarbleGp/docs/tickets/TICKET-01-warcraft-ornate-ui-borders.md)
+   - Redo modal & card UI with ornate metallic/carved borders using non-stretching 9-slice framing and `#00FF00` key transparency.
+2. [`TICKET-02`: UI Decluttering, Visual Gauges & Hierarchical Drill-Downs](file:///c:/MarbleGp/docs/tickets/TICKET-02-ui-declutter-gauges-drawers.md)
+   - Strip text walls, replace stats with circular/arc gauges, and hide lore/specs in collapsible info drawers.
+3. [`TICKET-03`: Customizable Controls & Loading Screen Controls Visualizer](file:///c:/MarbleGp/docs/tickets/TICKET-03-custom-controls-loading-screen.md)
+   - Add Controls remapping in Settings; display mapped controls on the loading screen before entering the grid.
+4. [`TICKET-04`: Character & Ball Selection Redesign (Full-Body Goblin + Ball Renders)](file:///c:/MarbleGp/docs/tickets/TICKET-04-character-ball-selection-full-body.md)
+   - Eliminate the "broken inside looking out" cockpit hole. Render full-body goblins standing proudly beside high-gloss standalone balls.
+5. [`TICKET-05`: Menu Overhaul with Animated Painted Fantasy Backdrops](file:///c:/MarbleGp/docs/tickets/TICKET-05-menu-animated-backgrounds.md)
+   - Big painted 1920x1080 fantasy environments for all menus with subtle embers, smoke, and lantern flicker.
+6. [`TICKET-06`: Epic Blizzard Track Backdrops, Thematic Lighting & Asset Preloading](file:///c:/MarbleGp/docs/tickets/TICKET-06-track-backgrounds-lighting-preloading.md)
+   - Hand-painted multi-layer skyboxes for all tracks, distinct lighting/mood per course, and async preloader.
+7. [`TICKET-07`: Dynamic Ball Camera Tracking, Off-Screen Indicator & Airborne Lane Ground Decal](file:///c:/MarbleGp/docs/tickets/TICKET-07-camera-pointer-ground-decal.md)
+   - Follow-ball camera mode, off-screen HUD pointer arrow, and expanding circular ground decal/shadow for airborne lane alignment.
+8. [`TICKET-08`: Multi-Section Track Expansion Part 1: Vertical Pinball Drop, Pegs & Waterfalls](file:///c:/MarbleGp/docs/tickets/TICKET-08-track-section2-vertical-pinball-drop.md)
+   - Extend downhill into Stage 2: vertical cliff drop with pinball bumpers, springs, ramps, loops, fire rings, and waterfall switchbacks.
+9. [`TICKET-09`: Multi-Section Track Expansion Part 2: Mine Tunnels, Rails & Stadium Finale](file:///c:/MarbleGp/docs/tickets/TICKET-09-track-section3-mine-tunnels-waterfall-finish.md)
+   - Stage 3 subterranean minecart rails, cave lighting, and waterfall breakthrough into the final stadium sprint.
 
-Part 4.2 verification, done after the art landed: `npm run check` (tsc + 18 recovery tests), `npm run check:browser` (21 reload-recovery checks), `npm run check:art` (25 headless-Chromium art checks on the built app) and the same 25 checks against the live dev server (`node tests/art-check.mjs http://127.0.0.1:5173`), plus `alpha-check.png`, `hatch-probe.png` and `eyeline-probe.png` read as images and the crew-picker/race screenshots inspected. Four real defects were found and fixed in that pass: the pilot's seat, whose hand-pinned ellipse was offset and undersized against the painted port while the bust was drawn 1.7x the opening in both axes, so the goblin clipped over the brass ring and the face was stretched (the "portrait renders outside / overlapping the capsule" screenshot report — the port is now measured from the sprite on every build and the bust is drawn square at 2.4x the opening's smaller half-axis, with checks on the port centre, the square box and the bust's alpha box); the cockpit eye line was one shared constant (0.44) that pushed Grub's face into the lower rim of the port (now per rider: Rivet 0.44, Nix 0.44, Grub 0.52, Sprocket 0.49, with `eyeline-probe.png` regenerated on every build); `pilotRuntime` was written as a tuple while the typed consumers read named fields, so the Sprite Lab showed `0x0` for every pilot; and hull normalisation rolled each shell the wrong way, wrapping pixels around the canvas, pushing the sprite off-canvas and leaking `{iron,springsteel,siege}-shell.png` into the repo root (it now writes to `public/art/` and centres with `-gravity center -extent`, and the shell sprites are regenerated from the sheet to match). Screenshots of the live menu, crew picker, starting grid, race and Sprite Lab are in `tests/artifacts/`.
 
 ## Copy-Paste Prompt For The Next Codex Agent
 

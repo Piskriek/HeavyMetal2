@@ -11,6 +11,8 @@ const __dirname = path.dirname(__filename);
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), viteSingleFile()],
+  // Dev server: allow the sandbox preview proxy host (e.g. 5173-<id>.e2b.app).
+  server: { allowedHosts: [".e2b.app"] },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),

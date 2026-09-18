@@ -95,7 +95,6 @@ export default function MainMenu(props: MainMenuProps) {
       <footer className="menu-footer">
         {props.storageWarning ? <p className="menu-storage-warning" role="status">{props.storageWarning}</p> : null}
         <div className="menu-input-hints"><span><kbd>Enter</kbd> Select</span><span><kbd>Tab</kbd> Navigate</span>{props.hasRace && <span><kbd>Esc</kbd> Resume</span>}</div>
-        <button onClick={props.onCredits}>The Art & the Engineering <ArrowRight size={13} /></button>
         <span className="menu-build">LOCAL PLAY <i /> BUILD 0.4.3</span>
       </footer>
     </main>

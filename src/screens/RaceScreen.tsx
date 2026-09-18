@@ -3,13 +3,12 @@ import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import {
   ArrowDownToLine, ArrowRight, ArrowUpFromLine, ArrowUpRight, Check,
   CircleHelp, Crosshair, Flag, Hammer, Home, Image as ImageIcon,
-  Maximize2, Menu, Minimize2, MousePointer2, Pause, Play, RotateCcw, Settings2,
-  ShieldCheck, Sparkles, Trophy, Volume2, VolumeX, X, Zap,
+  Maximize2, Minimize2, MousePointer2, Pause, Play, RotateCcw, Settings2,
+  ShieldCheck, Trophy, Volume2, X, Zap,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import ArtGallery from '../components/ArtGallery';
 import Brand from '../components/Brand';
-import RaceControls from '../components/RaceControls';
 import RoundResult from '../components/RoundResult';
 import AirSupplies, { AirSupplyGuide } from '../components/AirSupplies';
 import BlizzardGauge from '../components/ui/BlizzardGauge';
@@ -91,7 +90,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const [modal, setModal] = useState<ModalName>(null);
   const [workshopTab, setWorkshopTab] = useState<WorkshopTab>('garage');
   const [helpTab, setHelpTab] = useState<'basics' | 'hazards'>('basics');
-  const [mobileMenu, setMobileMenu] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [theater, setTheater] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
@@ -139,13 +137,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     const iv = window.setInterval(() => setLoadingProgress((p) => Math.min(92, p + Math.random() * 9)), 420);
     return () => clearInterval(iv);
   }, [assets, loadingAttempt, config]);
-  // Auto-dismiss shortly after ready so auto-advance still works, but user can also click
-  useEffect(() => {
-    if (!assets || loadingDismissed || resumeOnly) return;
-    if (snapshot.status !== 'ready') return;
-    const t = window.setTimeout(() => setLoadingDismissed(true), 2600);
-    return () => clearTimeout(t);
-  }, [assets, loadingDismissed, resumeOnly, snapshot.status]);
 
   const best = useMemo(() => Math.max(0, ...records.map((record) => record.distance)), [records]);
   const course = COURSES.find((item) => item.id === config.course) ?? COURSES[0];
@@ -174,7 +165,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   }, [playing]);
   useEffect(() => { if (!playing && !paused) setGearOpen(false); }, [playing, paused]);
   const gearHidden = playing && hudIdle && !gearOpen;
-  const immersed = (playing || paused) && !modal && !mobileMenu;
   const playerDistance = snapshot.racers.find((racer) => racer.id === 0)?.distance ?? snapshot.distance;
   const trackPct = (distance: number) => Math.min(100, Math.max(0, (distance / TRACK_DISTANCE) * 100));
   const toggleGear = () => {
@@ -248,7 +238,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     if (!engine) return;
     if (!active) {
       setTheater(false);
-      setMobileMenu(false);
       resumeAfterScreen.current = engine.status === 'flying';
       if (engine.status === 'flying') engine.togglePause();
       engine.inputEnabled = false;
@@ -286,7 +275,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     }
     modalRef.current = name;
     setModal(name);
-    setMobileMenu(false);
   }, []);
 
   const retry = useCallback((autoLaunch = false) => {
@@ -333,11 +321,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       if (['BUTTON', 'A'].includes(target.tagName) && ['Space', 'Enter'].includes(event.code)) return;
       // While the consolidated gear menu is open it owns Escape and the keys stay inert.
       if (gearOpen) { if (event.code === 'Escape') { event.preventDefault(); setGearOpen(false); } return; }
-      // Loading cover: any key dismisses once ready, without triggering game actions
-      if (!loadingDismissed && assets && !resumeOnly && snapshot.status === 'ready') {
-        event.preventDefault();
-        setLoadingDismissed(true);
-        canvasRef.current?.focus({ preventScroll: true });
+      // While controls popup is active, do not execute in-game key actions
+      if (!loadingDismissed && assets && !resumeOnly) {
         return;
       }
       const engine = engineRef.current;
@@ -373,13 +358,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     return () => window.removeEventListener('keydown', keydown);
   }, [retry, theater, toggleFullscreen, loadingDismissed, assets, resumeOnly, snapshot.status, gearOpen]);
 
-  const mainAction = () => {
-    if (resumeOnly || snapshot.status === 'finished') { onContinue(); return; }
-    if (ready) engineRef.current?.launch();
-    else if (paused || playing) engineRef.current?.togglePause();
-    else retry();
-    canvasRef.current?.focus({ preventScroll: true });
-  };
   const toggleSound = () => {
     setOptions((previous) => ({ ...previous, sound: !previous.sound }));
     if (playing || paused) canvasRef.current?.focus({ preventScroll: true });
@@ -388,7 +366,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     engineRef.current?.togglePause();
     canvasRef.current?.focus({ preventScroll: true });
   };
-  const showConcept = () => { setWorkshopTab('concept'); openModal('workshop'); };
   const showGarage = () => { setWorkshopTab('garage'); openModal('workshop'); };
   const saveSource = (url: string, filename: string) => {
     void downloadSourcePng(url, filename).catch(() => undefined);
@@ -396,33 +373,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   return (
     <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
-      <div className={`app race-app ${immersed ? 'race-immersed' : ''}`}>
-        <header className="site-header">
-          <div className="header-inner">
-            <button className="brand" aria-label="Return to main menu" onClick={onMainMenu}>
-              <Brand variant="compact" />
-            </button>
-            <nav className="desktop-nav" aria-label="Main navigation">
-              <button className="nav-link" onClick={onMainMenu}>MAIN MENU</button>
-              <button className={modal === 'workshop' ? 'nav-link active' : 'nav-link'} onClick={showGarage}>THE WORKSHOP</button>
-              <button className={modal === 'records' ? 'nav-link active' : 'nav-link'} onClick={() => openModal('records')}>HALL OF CHAOS</button>
-            </nav>
-            <div className="header-actions">
-              <button className="help-link" onClick={onSettings}><Settings2 size={17} /><span>Settings</span></button><span className="header-divider" />
-              <button className={`icon-button sound-button ${options.sound ? 'sound-on' : ''}`} onClick={toggleSound} aria-label={options.sound ? 'Mute sound' : 'Enable sound'} aria-pressed={options.sound} title={options.sound ? 'Sound on (M)' : 'Sound off (M)'}>{options.sound ? <Volume2 size={19} /> : <VolumeX size={19} />}</button>
-              <button className="icon-button mobile-menu-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileMenu}>{mobileMenu ? <X size={22} /> : <Menu size={22} />}</button>
-            </div>
-          </div>
-          <AnimatePresence>{mobileMenu && <motion.nav initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mobile-nav" aria-label="Mobile navigation"><button onClick={onMainMenu}>Main menu <Flag size={17} /></button><button onClick={onSettings}>Settings <Settings2 size={17} /></button><button onClick={showGarage}>The workshop <Hammer size={17} /></button><button onClick={() => openModal('records')}>Hall of chaos <Trophy size={17} /></button><button onClick={() => openModal('help')}>How to play <CircleHelp size={17} /></button></motion.nav>}</AnimatePresence>
-        </header>
+      <div className="app race-app race-immersed">
+        <header className="site-header" style={{ display: 'none' }} aria-hidden="true" />
 
         <main className="main-content">
           {storageWarning && <p className="race-storage-warning" role="status"><ShieldCheck size={15} />{storageWarning}</p>}
           {artFailures.length > 0 && <p className="race-storage-warning" role="status"><ImageIcon size={15} />{artFailures.length} painted sprite{artFailures.length === 1 ? '' : 's'} could not be loaded, so a stand-in is shown. The race is unaffected.</p>}
-          <motion.section className="game-intro" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} aria-labelledby="game-title">
-            <div className="intro-title"><div className="eyebrow intro-eyebrow"><span className="live-dot" /> GOBLIN ENGINEERING. ZERO OVERSIGHT.</div><h1 id="game-title">GOBLIN <span>RALLY</span><span className="title-period">.</span></h1><p>Big balls. Bad ideas. A very questionable use of physics.</p></div>
-            <div className="intro-aside"><div className="safety-stamp"><ShieldCheck size={28} strokeWidth={1.2} /><span>SAFETY THIRD.<br /><strong>FUN FIRST.</strong></span></div><span className="build-label">EST. 2026 <span>/</span> GOBLIN APPROVED</span></div>
-          </motion.section>
 
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
             <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
@@ -490,22 +446,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 {result && (snapshot.status === 'finished' || resumeOnly) && <motion.div className="round-result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RoundResult result={result} session={session} onContinue={onContinue} onMenu={onMainMenu} onNewGame={onNewGame} /></motion.div>}
               </AnimatePresence>
             </div>
-            <RaceControls
-              snapshot={snapshot}
-              loaded={Boolean(assets)}
-              options={raceOptions}
-              config={config}
-              bindings={bindings}
-              onTune={(key, value) => setOptions((previous) => ({ ...previous, [key]: value }))}
-              onJump={() => { engineRef.current?.jump(); canvasRef.current?.focus({ preventScroll: true }); }}
-              onBounce={() => { engineRef.current?.bounce(); canvasRef.current?.focus({ preventScroll: true }); }}
-              onBoost={() => { engineRef.current?.boost(); canvasRef.current?.focus({ preventScroll: true }); }}
-              onPrimary={mainAction}
-              onLane={(direction) => { engineRef.current?.changeLane(direction); canvasRef.current?.focus({ preventScroll: true }); }}
-            />
           </motion.div>
-          <motion.div className="track-footnote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}><p><span className="tip-label"><Sparkles size={13} /> GOBLIN WISDOM</span><span>TNT is a speed boost if you believe in yourself.</span></p><span className="footnote-right">NO BRAKES. NO REFUNDS.</span></motion.div>
-          <footer className="site-footer"><div className="footer-brand"><Hammer size={14} /><span>GOBLIN ENGINEERING CO.</span><span className="footer-dot" /><span className="footer-disclaimer">Proudly unregulated.</span></div><button onClick={showConcept}>THE ART BEHIND THE CHAOS <ArrowUpRight size={14} /></button></footer>
+          <div className="track-footnote" style={{ display: 'none' }} aria-hidden="true" />
         </main>
 
         <AnimatePresence>

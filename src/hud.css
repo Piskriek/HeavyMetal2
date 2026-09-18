@@ -134,13 +134,81 @@
 .supply-total { display: flex; flex-direction: column; align-items: center; margin-left: 2px; padding: 3px 8px; border-radius: 4px; background: #0d160fb8; color: #e6cd97; font: 600 15px 'Barlow Condensed', sans-serif; line-height: 1; text-shadow: 0 1px 3px #000; }
 .supply-total small { font: 6px 'Space Mono', monospace; letter-spacing: .7px; color: #9fb18c; margin-top: 2px; }
 
-/* ============ Immersion: hide chrome while the race is live ============ */
-.race-immersed .site-header, .race-immersed .event-race-banner, .race-immersed .track-footnote, .race-immersed .site-footer { display: none; }
-.race-immersed .main-content { max-width: none; padding: 0; }
-.race-immersed .race-storage-warning { position: absolute; z-index: 20; top: 10px; left: 50%; transform: translateX(-50%); width: min(560px, 90%); margin: 0; opacity: .94; }
-.race-immersed .game-shell { height: 100dvh; width: 100%; border: 0; border-radius: 0; background: #10190e; display: flex; flex-direction: column; }
-.race-immersed .game-stage { height: auto; min-height: 0; flex: 1; }
-.race-immersed .control-deck { flex-shrink: 0; }
+/* ============ Full-Screen Race Scene ============ */
+.race-app {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.race-app .main-content {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  max-width: none !important;
+  margin: 0;
+  padding: 0 !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.race-app .race-storage-warning {
+  position: absolute;
+  z-index: 20;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, 90%);
+  margin: 0;
+  opacity: .94;
+}
+
+.race-app .game-shell {
+  flex: 1;
+  width: 100%;
+  height: 100% !important;
+  max-width: none !important;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: #10190e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.race-app .game-stage {
+  flex: 1;
+  width: 100%;
+  height: 100% !important;
+  min-height: 0;
+  max-height: none !important;
+  position: relative;
+}
+
+.race-app .game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.race-app .site-header,
+.race-app .event-race-banner,
+.race-app .track-footnote,
+.race-app .site-footer,
+.race-app .game-intro,
+.race-app .race-controls {
+  display: none !important;
+}
 
 /* ============ Decluttered control deck ============ */
 .launch-status .status-heading h2 { font: 600 12px 'Space Mono', monospace; letter-spacing: 1.2px; text-transform: uppercase; color: #d6c79b; }

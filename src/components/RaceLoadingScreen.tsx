@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpFromLine, Flag, Keyboard, MoveUp, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpFromLine, Flag, Keyboard, MoveUp, X, Zap } from 'lucide-react';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
+import Brand from './Brand';
+import OrnateCorners from './OrnateCorners';
+
 const loadingWide = '/art/loading-wide.webp';
 const loadingTall = '/art/loading-tall.webp';
 
@@ -39,8 +42,10 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
     if (!ready) return;
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) return;
-      e.preventDefault();
-      onEnter();
+      if (['Escape', 'Enter', 'Space'].includes(e.code) || ['Escape', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault();
+        onEnter();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -50,7 +55,6 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
   const label = (action: keyof KeyBindings, fallback: string) => {
     const codes = resolved[action as keyof KeyBindings];
     if (!codes || codes.length === 0) return fallback;
-    // Join all bound keys for that action, e.g. "A / ←"
     return codes.map(formatKey).join(' / ');
   };
 
@@ -63,33 +67,54 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
     <div
       className="race-loading-screen"
       role="dialog"
-      aria-label="Loading race and controls"
+      aria-label="Race controls and protocols"
       aria-modal="true"
-      onClick={() => ready && onEnter()}
+      onClick={(e) => { if (e.target === e.currentTarget && ready) onEnter(); }}
     >
-      <picture className="race-loading-backdrop" aria-hidden="true">
-        <source media="(max-width: 640px)" srcSet={loadingTall} />
-        <img src={loadingWide} alt="" draggable={false} />
-      </picture>
-      <div className="race-loading-vignette" aria-hidden="true" />
-      <div className="race-loading-grain" aria-hidden="true" />
+      <div className="race-loading-backdrop-art" aria-hidden="true">
+        <picture className="race-loading-backdrop">
+          <source media="(max-width: 640px)" srcSet={loadingTall} />
+          <img src={loadingWide} alt="" draggable={false} />
+        </picture>
+        <div className="race-loading-vignette" />
+        <div className="race-loading-grain" />
+      </div>
 
-      <div className="race-loading-content">
+      <div className="race-loading-content modal fantasy-dialog" onClick={(e) => e.stopPropagation()}>
+        <OrnateCorners />
+
         <div className="race-loading-header">
-          <span className="eyebrow race-loading-eyebrow">
-            <Flag size={12} />
-            {ready ? 'GRID READY — ENGINES HOT' : 'ASSEMBLING A VERY BAD IDEA'}
-          </span>
-          <h2 className="race-loading-title">{ready ? 'ENTER THE GRID' : 'LOADING THE TRACK'}</h2>
-          <p className="race-loading-subtitle">
-            {ready ? 'Your bindings are locked in. Press any key or click to take your lane.' : 'Decoding capsules, scenery, and a worrying amount of dynamite…'}
-          </p>
-          <div className="race-loading-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={ready ? 100 : Math.round(progress)}>
-            <div className="race-loading-progress-track">
-              <div className="race-loading-progress-fill" style={{ width: `${ready ? 100 : Math.max(8, progress)}%` }} />
+          <div className="race-loading-header-bar">
+            <Brand variant="emblem" decorative />
+            <div className="race-loading-title-group">
+              <span className="eyebrow orange-text">
+                <Flag size={12} />
+                {ready ? 'GRID READY — ENGINES HOT' : 'ASSEMBLING A VERY BAD IDEA'}
+              </span>
+              <h2 className="race-loading-title">{ready ? 'RACE CONTROLS & PROTOCOLS' : 'LOADING THE TRACK'}</h2>
             </div>
-            <span className="race-loading-progress-label">{ready ? 'READY' : `${Math.round(progress)}% • PLEASE STAND BY`}</span>
+            {ready && (
+              <button
+                className="icon-button modal-close race-loading-close"
+                onClick={onEnter}
+                aria-label="Close controls and take grid"
+                title="Enter grid (Esc)"
+              >
+                <X size={20} />
+              </button>
+            )}
           </div>
+          <p className="race-loading-subtitle">
+            {ready ? 'Review your flight controls below. Press Enter, Space, Esc, or the launch button to take your lane.' : 'Decoding capsules, scenery, and a worrying amount of dynamite…'}
+          </p>
+          {!ready && (
+            <div className="race-loading-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}>
+              <div className="race-loading-progress-track">
+                <div className="race-loading-progress-fill" style={{ width: `${Math.max(8, progress)}%` }} />
+              </div>
+              <span className="race-loading-progress-label">{`${Math.round(progress)}% • PLEASE STAND BY`}</span>
+            </div>
+          )}
         </div>
 
         <div className="race-loading-keys" aria-label="Current controls">
@@ -187,8 +212,12 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
 
         <div className="race-loading-footer">
           {ready ? (
-            <button className="race-loading-enter" onClick={(e) => { e.stopPropagation(); onEnter(); }} autoFocus>
-              PRESS ANY KEY / CLICK TO ENTER GRID →
+            <button
+              className="forged-menu-button forged-primary race-loading-enter"
+              onClick={(e) => { e.stopPropagation(); onEnter(); }}
+              autoFocus
+            >
+              <span>ENTER THE GRID & LAUNCH →</span>
             </button>
           ) : (
             <span className="race-loading-wait">
@@ -196,52 +225,64 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
               Tightening the loose bolts…
             </span>
           )}
-          <span className="race-loading-hint">Tip: rebind keys in Settings → Controls at any time.</span>
+          <span className="race-loading-hint">Tip: rebind keys in Settings → Controls at any time. Press Esc or Enter to start.</span>
         </div>
       </div>
 
       <style>{`
         .race-loading-screen {
-          position: absolute; inset: 0; z-index: 4;
+          position: fixed; inset: 0; z-index: 1000;
           display: flex; align-items: center; justify-content: center;
-          padding: 18px; overflow: hidden;
-          cursor: ${ready ? 'pointer' : 'default'};
+          padding: 20px; overflow-y: auto;
+          background: #050a06c8; backdrop-filter: blur(8px);
+        }
+        .race-loading-backdrop-art {
+          position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
         }
         .race-loading-backdrop { position: absolute; inset: 0; }
-        .race-loading-backdrop img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.95) brightness(0.78) contrast(1.06); }
+        .race-loading-backdrop img { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85) brightness(0.5); }
         .race-loading-vignette {
           position: absolute; inset: 0;
-          background:
-            radial-gradient(ellipse 90% 70% at 50% 38%, transparent 45%, #0a0f0e 88%),
-            linear-gradient(180deg, #0a0f0e66 0%, #0a0f0e 100%);
+          background: radial-gradient(ellipse 90% 70% at 50% 38%, transparent 35%, #050908f0 85%);
         }
         .race-loading-grain {
           position: absolute; inset: 0; opacity: .18; mix-blend-mode: overlay;
           background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
         }
         .race-loading-content {
-          position: relative; z-index: 1;
-          width: min(860px, 100%); max-height: min(92vh, 820px);
-          overflow: auto; scrollbar-width: thin;
-          background: linear-gradient(180deg, #141e1acc 0%, #0f1814f2 100%);
-          border: 1px solid #6b5426; border-radius: 12px;
-          box-shadow: 0 20px 60px #00000088, inset 0 1px 0 #ffffff14;
-          backdrop-filter: blur(6px);
-          padding: 22px 22px 16px;
-          display: flex; flex-direction: column; gap: 16px;
+          position: relative; z-index: 2;
+          width: min(860px, 95vw); max-height: calc(100dvh - 40px);
+          overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+          padding: 24px 28px 20px;
+          display: flex; flex-direction: column; gap: 14px;
         }
-        .race-loading-header { text-align: center; padding: 6px 6px 0; }
+        .race-loading-header { text-align: left; padding: 2px 2px 0; }
+        .race-loading-header-bar {
+          display: flex; align-items: center; justify-content: space-between; gap: 14px;
+        }
+        .race-loading-header-bar > .brand-emblem { width: 44px; height: 44px; flex-shrink: 0; }
+        .race-loading-title-group { flex: 1; text-align: left; }
+        .race-loading-header-bar .modal-close {
+          width: 36px; height: 36px; flex-shrink: 0;
+          background: #101b14; color: #c3af7b;
+          border: 1px solid #88744088; border-radius: 3px;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer;
+        }
+        .race-loading-header-bar .modal-close:hover {
+          color: #fff0cb; border-color: #d6b771;
+        }
         .race-loading-eyebrow {
-          justify-content: center; gap: 7px; color: #f0a15b; font: 7px var(--mono); letter-spacing: 1.4px;
+          display: inline-flex; align-items: center; gap: 7px; color: #f0a15b; font: 7px var(--mono); letter-spacing: 1.4px;
         }
         .race-loading-eyebrow svg { color: #f0a15b; }
         .race-loading-title {
-          margin-top: 8px;
-          font: 800 34px/1 var(--display); letter-spacing: .8px; color: #ececdb; text-transform: uppercase;
-          text-shadow: 0 2px 12px #00000088;
+          margin-top: 4px;
+          font: 800 24px/1.2 var(--display, 'Cinzel', serif); letter-spacing: .5px; color: #ececdb; text-transform: uppercase;
+          text-shadow: 0 2px 8px #000000aa;
         }
-        .race-loading-subtitle { margin-top: 8px; font-size: 11px; line-height: 1.6; color: #aab8a0; max-width: 560px; margin-left: auto; margin-right: auto; }
-        .race-loading-progress { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; align-items: center; }
+        .race-loading-subtitle { margin-top: 6px; font-size: 11px; line-height: 1.5; color: #aab8a0; }
+        .race-loading-progress { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; align-items: center; }
         .race-loading-progress-track {
           width: min(420px, 100%); height: 7px; border-radius: 9999px; overflow: hidden;
           background: #1a2520; border: 1px solid #3a4a3a; padding: 2px;
@@ -255,19 +296,19 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
         .race-loading-progress-label { font: 6px var(--mono); letter-spacing: 1.1px; color: #8ea094; }
 
         .race-loading-keys {
-          background: #0f1814cc; border: 1px solid #2e3827; border-radius: 10px; padding: 14px;
+          background: #0f1814cc; border: 1px solid #2e3827; border-radius: 8px; padding: 12px 14px;
         }
         .race-loading-keys-header {
-          display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+          display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
           font: 7px var(--mono); letter-spacing: 1.1px; color: #f0a15b;
         }
         .race-loading-keys-header h3 { font: 700 12px var(--display); letter-spacing: .8px; color: #ececdb; margin-right: auto; }
         .race-loading-keys-header span { color: #7f8d7a; font: 7px var(--mono); }
-        .race-loading-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .race-loading-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .race-loading-key-card {
           position: relative;
           display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
-          padding: 11px 12px; border-radius: 8px;
+          padding: 10px 12px; border-radius: 6px;
           background: linear-gradient(180deg, #1a2420 0%, #121a17 100%);
           border: 1px solid #3b4a3a;
           box-shadow: inset 0 1px 0 #ffffff0a, 0 2px 8px #0000002e;
@@ -287,20 +328,20 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
         .glyph-sep { font: 700 10px var(--mono); color: #7f8d7a; }
         .glyph-alt { font: 6px var(--mono); color: #8b9a7d; letter-spacing: .3px; text-align: center; }
         .race-key-info strong { display: block; font: 600 11px/1.2 var(--display); letter-spacing: .35px; color: #ececdb; text-transform: uppercase; }
-        .race-key-info p { margin-top: 4px; font-size: 9px; line-height: 1.5; color: #9aa68d; }
+        .race-key-info p { margin-top: 3px; font-size: 9px; line-height: 1.4; color: #9aa68d; }
         .kbd-mini { display: inline-block; background: #1e2823; border: 1px solid #3a4a3a; border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; font: 700 8px var(--mono); color: #e8e8d8; }
         .race-key-icon { color: #f0a15b; opacity: .9; flex-shrink: 0; }
 
         .race-loading-diagram {
-          margin-top: 12px; padding: 10px; border-radius: 8px;
+          margin-top: 10px; padding: 8px 10px; border-radius: 6px;
           background: #0a120f; border: 1px dashed #2e3827;
-          display: flex; flex-direction: column; gap: 8px; align-items: center;
+          display: flex; flex-direction: column; gap: 6px; align-items: center;
         }
-        .diagram-keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; }
-        .diagram-row { display: flex; gap: 6px; }
+        .diagram-keyboard { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+        .diagram-row { display: flex; gap: 5px; }
         .diagram-key {
           display: inline-flex; align-items: center; justify-content: center;
-          min-width: 36px; height: 30px; padding: 0 8px; border-radius: 5px;
+          min-width: 34px; height: 28px; padding: 0 8px; border-radius: 4px;
           background: #1c2520; border: 1px solid #2e3b2e; border-bottom-width: 3px;
           font: 700 10px var(--mono); color: #7f8d7a;
         }
@@ -309,29 +350,23 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
         .diagram-caption { font: 6px var(--mono); letter-spacing: .6px; color: #7f8d7a; text-align: center; }
 
         .race-loading-tips {
-          display: flex; flex-direction: column; align-items: center; gap: 6px;
-          padding: 10px 14px; border-radius: 8px; background: #121a17; border: 1px solid #2e3827;
+          display: flex; flex-direction: column; align-items: center; gap: 5px;
+          padding: 8px 12px; border-radius: 6px; background: #121a17; border: 1px solid #2e3827;
           text-align: center;
         }
         .tip-label { font: 600 6px var(--mono); letter-spacing: 1.2px; color: #f0a15b; }
-        .tip-text { font: italic 600 11px var(--display); letter-spacing: .3px; color: #d9e2c9; line-height: 1.5; max-width: 620px; }
+        .tip-text { font: italic 600 11px var(--display); letter-spacing: .3px; color: #d9e2c9; line-height: 1.4; max-width: 620px; }
         .tip-dots { display: flex; gap: 5px; margin-top: 2px; }
         .tip-dots i { width: 5px; height: 5px; border-radius: 50%; background: #2e3827; transition: all 200ms; }
         .tip-dots i.is-active { background: #f0a15b; box-shadow: 0 0 6px #f0a15b66; }
 
-        .race-loading-footer { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 4px 0 2px; }
+        .race-loading-footer { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 4px 0 0; }
         .race-loading-enter {
-          display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-          width: 100%; min-height: 44px; padding: 0 18px; border-radius: 8px;
-          background: linear-gradient(180deg, #f0a15b 0%, #d47a2e 100%);
-          border: 1px solid #ffcc8a; color: #1a1208;
-          font: 800 12px var(--display); letter-spacing: .7px; text-transform: uppercase;
-          box-shadow: 0 6px 18px #0000003a, inset 0 1px 0 #ffffff66;
-          animation: pulse-enter 1.6s ease-in-out infinite;
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 100%; min-height: 48px; padding: 10px 24px;
+          font: 700 14px var(--fantasy, 'Cinzel', serif); letter-spacing: 1.1px;
+          cursor: pointer; text-transform: uppercase;
         }
-        .race-loading-enter:hover { filter: brightness(1.06); transform: translateY(-1px); }
-        .race-loading-enter:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-        @keyframes pulse-enter { 0%,100% { box-shadow: 0 6px 18px #0000003a, 0 0 0 0 #f0a15b00; } 50% { box-shadow: 0 6px 18px #0000003a, 0 0 0 8px #f0a15b18; } }
         .race-loading-wait {
           display: inline-flex; align-items: center; gap: 10px;
           font: 600 11px var(--display); letter-spacing: .5px; color: #aab8a0; text-transform: uppercase;
@@ -343,18 +378,18 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
           display: inline-block;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .race-loading-hint { font: 6px var(--mono); letter-spacing: .6px; color: #7f8d7a; }
+        .race-loading-hint { font: 7px var(--mono); letter-spacing: .6px; color: #7f8d7a; }
 
         @media (max-width: 740px) {
-          .race-loading-content { padding: 16px 14px 12px; gap: 12px; max-height: 94vh; }
-          .race-loading-title { font-size: 26px; }
+          .race-loading-content { padding: 16px 14px 12px; gap: 10px; max-height: 94vh; }
+          .race-loading-title { font-size: 20px; }
           .race-loading-subtitle { font-size: 10px; }
-          .race-loading-grid { grid-template-columns: 1fr; gap: 8px; }
-          .race-loading-key-card { padding: 10px; gap: 8px; }
+          .race-loading-grid { grid-template-columns: 1fr; gap: 6px; }
+          .race-loading-key-card { padding: 8px; gap: 6px; }
           .race-key-info strong { font-size: 10px; }
           .race-key-info p { font-size: 8px; }
-          .diagram-key { min-width: 32px; height: 26px; font-size: 9px; }
-          .diagram-key.wide { min-width: 96px; }
+          .diagram-key { min-width: 30px; height: 24px; font-size: 9px; }
+          .diagram-key.wide { min-width: 90px; }
           .tip-text { font-size: 10px; }
         }
       `}</style>

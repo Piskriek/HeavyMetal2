@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpFromLine, Flag, Keyboard, MoveUp, X, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpFromLine, Flag, Keyboard, X, Zap } from 'lucide-react';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
 import Brand from './Brand';
 import OrnateCorners from './OrnateCorners';
@@ -59,7 +59,6 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
   };
 
   const steerLabel = `${label('steerLeft', 'A')} / ${label('steerRight', 'D')}`;
-  const hopLabel = label('hop', 'W');
   const bounceLabel = label('bounce', 'SPACE');
   const boostLabel = label('boost', 'SHIFT');
 
@@ -135,24 +134,10 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
                 <strong>
                   <span className="kbd-mini">{steerLabel}</span> → Switch Lanes / Shoulder Rivals
                 </strong>
-                <p>Tap to change lanes. Contact at speed shoves rivals sideways. Heavy balls push harder.</p>
+                <p>Tap to change lanes. Contact shoves rivals sideways. Heavier balls push harder.</p>
               </div>
               <ArrowLeft size={16} className="race-key-icon" aria-hidden="true" />
               <ArrowRight size={16} className="race-key-icon" aria-hidden="true" />
-            </div>
-
-            <div className="race-loading-key-card">
-              <span className="race-key-glyphs" aria-hidden="true">
-                <span className="glyph-pill accent-green">{hopLabel.split(' / ')[0] || hopLabel}</span>
-                {label('hop', 'W').includes(' / ') && <small className="glyph-alt">also {hopLabel.split(' / ').slice(1).join(' / ')}</small>}
-              </span>
-              <div className="race-key-info">
-                <strong>
-                  <span className="kbd-mini">{hopLabel}</span> → Bunny Hop Ground Obstacles
-                </strong>
-                <p>Quick hop from the ground. Gaps affect specific lanes — steer or jump.</p>
-              </div>
-              <MoveUp size={18} className="race-key-icon" aria-hidden="true" />
             </div>
 
             <div className="race-loading-key-card">
@@ -161,14 +146,14 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
               </span>
               <div className="race-key-info">
                 <strong>
-                  <span className="kbd-mini">{bounceLabel}</span> → Air Bounce off Springs
+                  <span className="kbd-mini">{bounceLabel}</span> → Air Bounce off Ground & Springs
                 </strong>
-                <p>Spend one of three midair bounces. Spring pads refill a charge.</p>
+                <p>Spend one of your midair bounces. Spring pads refill charges automatically.</p>
               </div>
               <ArrowUpFromLine size={18} className="race-key-icon" aria-hidden="true" />
             </div>
 
-            <div className="race-loading-key-card">
+            <div className="race-loading-key-card race-key-card-span">
               <span className="race-key-glyphs" aria-hidden="true">
                 <span className="glyph-pill accent-amber">{boostLabel}</span>
               </span>
@@ -176,7 +161,7 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
                 <strong>
                   <span className="kbd-mini">{boostLabel}</span> → Turbo Nitro Boost
                 </strong>
-                <p>Instant speed + fresh charge. CPU goblins use the same physics.</p>
+                <p>Instant rocket speed forward. Boost pads refill fresh charges along the track.</p>
               </div>
               <Zap size={18} className="race-key-icon" aria-hidden="true" />
             </div>
@@ -186,7 +171,6 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
             <div className="diagram-keyboard">
               <div className="diagram-row">
                 <span className={`diagram-key ${resolved.steerLeft.includes('KeyQ') || resolved.steerLeft.includes('KeyA') ? 'is-active' : ''}`}>A</span>
-                <span className={`diagram-key ${resolved.hop.includes('KeyW') ? 'is-active' : ''}`}>W</span>
                 <span className={`diagram-key ${resolved.steerRight.includes('KeyD') ? 'is-active' : ''}`}>D</span>
               </div>
               <div className="diagram-row">
@@ -305,6 +289,7 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
         .race-loading-keys-header h3 { font: 700 12px var(--display); letter-spacing: .8px; color: #ececdb; margin-right: auto; }
         .race-loading-keys-header span { color: #7f8d7a; font: 7px var(--mono); }
         .race-loading-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .race-loading-key-card.race-key-card-span { grid-column: 1 / -1; }
         .race-loading-key-card {
           position: relative;
           display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;

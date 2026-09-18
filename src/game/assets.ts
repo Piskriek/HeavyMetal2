@@ -16,7 +16,11 @@ export type SpriteName =
   | 'tnt'
   | 'spring'
   | 'boost'
-  | 'ramp';
+  | 'ramp'
+  | 'blimp'
+  | 'signSheep'
+  | 'signTnt'
+  | 'signParts';
 
 export interface Sprite {
   image: HTMLImageElement;
@@ -137,11 +141,15 @@ export function loadAssets(): Promise<GameAssets> {
       ['ground', 'track-tile.png'],
       ['deck', 'deck-surface.png'],
       ['dirtArt', 'dirt-tile.png'],
+      ['blimp', 'blimp.png'],
+      ['signSheep', 'sign-sheep.png'],
+      ['signTnt', 'sign-tnt.png'],
+      ['signParts', 'sign-parts.png'],
     ];
     const result = {} as GameAssets;
     await Promise.all(files.map(async ([name, filename]) => {
       const image = await readImage(`/art/${filename}`);
-      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' ? asSprite(image) : await cutout(image);
+      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts' ? asSprite(image) : await cutout(image);
     }));
     const sheet = await readImage('/art/track-sprites.png');
     const names: SpriteName[] = ['ball', 'sheep', 'tnt', 'spring', 'boost', 'ramp'];

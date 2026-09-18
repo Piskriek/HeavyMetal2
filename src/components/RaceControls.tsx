@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpFromLine, ArrowUpRight, MoveUp, Pause, Play, RotateCcw, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpFromLine, ArrowUpRight, Pause, Play, RotateCcw, Zap } from 'lucide-react';
 import type { GameOptions, GameSnapshot } from '../game/types';
 import BallTuning, { type TuningKey } from './BallTuning';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
@@ -12,7 +12,6 @@ interface RaceControlsProps {
   config?: RaceConfig;
   bindings?: KeyBindings;
   onTune: (key: TuningKey, value: number) => void;
-  onJump: () => void;
   onBounce: () => void;
   onBoost: () => void;
   onPrimary: () => void;
@@ -24,7 +23,7 @@ interface RaceControlsProps {
  * Flavor headlines, pack-delta text, and standings strips moved out: standings
  * are pips on the mini track bar, supplies are the in-stage icon counter.
  */
-export default function RaceControls({ snapshot, loaded, options, config, bindings: propBindings, onTune, onJump, onBounce, onBoost, onPrimary, onLane }: RaceControlsProps) {
+export default function RaceControls({ snapshot, loaded, options, config, bindings: propBindings, onTune, onBounce, onBoost, onPrimary, onLane }: RaceControlsProps) {
   const [liveBindings, setLiveBindings] = useState<KeyBindings>(() => propBindings ?? loadBindings());
   useEffect(() => { if (propBindings) setLiveBindings(propBindings); }, [propBindings]);
   useEffect(() => {
@@ -37,7 +36,6 @@ export default function RaceControls({ snapshot, loaded, options, config, bindin
   const bindings = liveBindings;
   const leftLabel = (bindings.steerLeft?.[0] ? formatKey(bindings.steerLeft[0]) : 'A');
   const rightLabel = (bindings.steerRight?.[0] ? formatKey(bindings.steerRight[0]) : 'D');
-  const hopLabel = (bindings.hop?.[0] ? formatKey(bindings.hop[0]) : 'W');
   const bounceLabel = (bindings.bounce?.[0] ? formatKey(bindings.bounce[0]) : 'SPACE');
   const boostLabel = (bindings.boost?.[0] ? formatKey(bindings.boost[0]) : 'SHIFT');
   const pauseLabel = (bindings.pause?.[0] ? formatKey(bindings.pause[0]) : 'P');
@@ -82,10 +80,6 @@ export default function RaceControls({ snapshot, loaded, options, config, bindin
         </div>
       </div>
       <div className="air-controls" aria-label="Air controls">
-        <button className="ability-button jump-button" disabled={!flying || snapshot.settling || !snapshot.hopReady || inLoop || falling} onClick={onJump} title={`Bunny hop from the ground (${hopLabel}). Unlimited hops, no charges.`} aria-label={`Jump: bunny hop (${hopLabel})`}>
-          <MoveUp className="ability-icon jump-icon" size={23} strokeWidth={1.6} />
-          <span className="ability-label">Jump<span className="hop-status">{snapshot.hopReady ? 'READY' : 'ON LANDING'}</span></span><kbd>{hopLabel}</kbd>
-        </button>
         <button className="ability-button" disabled={!flying || snapshot.settling || inLoop || falling || bounces === 0} onClick={onBounce} title={inLoop ? 'Bounce unlocks after the loop' : `Bounce upward (${bounceLabel}). ${bounces} charges remaining.`} aria-label={`Bounce (${bounceLabel}). ${bounces} charges${inLoop ? '. Available after the loop' : ''}`}>
           <ArrowUpFromLine className="ability-icon bounce-icon" size={24} strokeWidth={1.6} />
           <span className="ability-label">Bounce<span className="charge-dots" aria-hidden="true">{[0, 1, 2].map((index) => <i key={index} className={index < bounces ? 'charged' : ''} />)}</span></span>

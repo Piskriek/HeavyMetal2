@@ -155,7 +155,7 @@ export default function ControlsSettings({ onBindingsChange }: ControlsSettingsP
           <span role="columnheader">Action</span>
           <span role="columnheader">Primary</span>
           <span role="columnheader">Alternate</span>
-          {ACTIONS.find((a) => a.id === 'hop')?.defaults.length === 3 && <span role="columnheader" className="tertiary-header">Extra</span>}
+          {ACTIONS.some((a) => a.defaults.length > 2) && <span role="columnheader" className="tertiary-header">Extra</span>}
         </div>
         {ACTIONS.map((action) => {
           const codes = bindings[action.id] ?? [];

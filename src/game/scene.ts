@@ -11,7 +11,7 @@ export const TRACK_DISTANCE = 15000;
 export const TRACK_LENGTH = TRACK_DISTANCE * 2;
 export const FINISH = START_X + TRACK_LENGTH;
 export const STADIUM_START = START_X + 27000;
-export const GRAVITY = 860;
+export const GRAVITY = 2400;
 export const LANE_COUNT = 4;
 export const LANE_WIDTH = 240;
 export const PLAYER_LANE = 2;
@@ -30,9 +30,13 @@ export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) {
   return { near: laneZ(last) - LANE_WIDTH / 2, far: laneZ(first) + LANE_WIDTH / 2 };
 }
 export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0.7) {
-  if (obstacle.kind === 'gap') {
+  if (obstacle.kind === 'gap' || obstacle.kind === 'sign') {
     const bounds = obstacleBounds(obstacle);
     return z > bounds.near + 5 && z < bounds.far - 5;
+  }
+  if (obstacle.kind === 'blimp') {
+    const bounds = obstacleBounds(obstacle);
+    return z > bounds.near - 40 && z < bounds.far + 40;
   }
   const halfWidth = obstacle.kind === 'ramp' || obstacle.kind === 'loop' ? 66 : obstacle.kind === 'boost' ? 45 : 37;
   return Math.abs(z - obstacleZ(obstacle)) < halfWidth + padding;
@@ -99,7 +103,7 @@ export function rampSurface(obstacle: Pick<Obstacle, 'x' | 'width' | 'height'>, 
   return courseY(x, course) - Math.pow(t, 1.6) * obstacle.height;
 }
 
-export type ObstacleKind = 'ramp' | 'loop' | 'sheep' | 'tnt' | 'spring' | 'boost' | 'gap';
+export type ObstacleKind = 'ramp' | 'loop' | 'sheep' | 'tnt' | 'spring' | 'boost' | 'gap' | 'blimp' | 'sign';
 
 export interface Obstacle {
   kind: ObstacleKind;
@@ -111,6 +115,8 @@ export interface Obstacle {
   lane?: number;
   laneSpan?: number;
   hitMask?: number;
+  altitude?: number;
+  signType?: 'sheep' | 'tnt' | 'parts';
 }
 
 export interface Particle {

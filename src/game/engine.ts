@@ -193,11 +193,7 @@ export class GameEngine {
       && (racer.grounded || this.runTime - racer.lastGroundedAt < 0.085);
   }
 
-  jump = () => {
-    if (this.status !== 'flying' || this.player.falling || this.player.loopRide) return;
-    if (this.canHop(this.player)) this.performHop(this.player);
-    else this.player.bufferedJump = this.runTime + 0.15;
-  };
+  jump = () => {};
 
   private performHop(racer: Racer) {
     racer.vy = racer.vx * this.surfaceAt(racer.x, racer.z).slope - 290 * weightImpulse(racer.weight) * racer.hopFactor;
@@ -214,7 +210,7 @@ export class GameEngine {
 
   private performBounce(racer: Racer) {
     if (!racer.bounces || racer.falling || racer.loopRide || racer.finished) return;
-    racer.bounces--; racer.vy = -590 * weightImpulse(racer.weight) * racer.hopFactor;
+    racer.bounces--; racer.vy = -760 * weightImpulse(racer.weight) * racer.hopFactor;
     racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
     racer.grounded = false; racer.lastGroundedAt = -100;
     this.emit(racer.x, racer.y + RADIUS, racer.z, 10, '#a7dec1', 160);
@@ -535,7 +531,7 @@ export class GameEngine {
       }
       for (const obstacle of this.nearby(racer.x)) {
         if (racer.visited.has(obstacle) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
-        if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep') && obstacle.hit) continue;
+        if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep' || obstacle.kind === 'blimp' || obstacle.kind === 'sign') && obstacle.hit) continue;
         if (obstacle.kind === 'loop') {
           const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
           const dy = racer.y - (this.y(racer.x) - this.y(loop.x)) - loop.y;
@@ -549,7 +545,16 @@ export class GameEngine {
           }
         } else {
           const center = obstacle.x + obstacle.width / 2; const base = this.y(center);
-          if (Math.abs(racer.x - center) < obstacle.width / 2 + RADIUS && racer.y + RADIUS > base - obstacle.height && racer.y - RADIUS < base + 10) this.hitObstacle(racer, obstacle);
+          if (obstacle.kind === 'blimp' || obstacle.kind === 'sign') {
+            const alt = obstacle.altitude ?? (obstacle.kind === 'blimp' ? 540 : 315);
+            const obsBottom = base - alt + 20;
+            const obsTop = base - alt - obstacle.height - 20;
+            if (Math.abs(racer.x - center) < obstacle.width / 2 + RADIUS && racer.y + RADIUS > obsTop && racer.y - RADIUS < obsBottom) {
+              this.hitObstacle(racer, obstacle);
+            }
+          } else {
+            if (Math.abs(racer.x - center) < obstacle.width / 2 + RADIUS && racer.y + RADIUS > base - obstacle.height && racer.y - RADIUS < base + 10) this.hitObstacle(racer, obstacle);
+          }
         }
       }
       const surface = this.surfaceAt(racer.x, racer.z); const gap = this.inGap(racer.x, racer.z);
@@ -561,7 +566,10 @@ export class GameEngine {
         if (normalSpeed > 260) {
           racer.vy = surface.slope * racer.vx - normalSpeed * restitution;
           this.emit(racer.x, surface.y, racer.z, 3, '#b8a77b', 70);
-          if (!racer.id) { this.audio.play('land'); if (normalSpeed > 500) this.shake = 1.8; }
+          if (!racer.id) {
+            this.audio.play('land');
+            if (normalSpeed > 360) this.shake = Math.min(4.5, normalSpeed / 160);
+          }
         } else { racer.grounded = true; racer.lastGroundedAt = this.runTime; racer.vy = surface.slope * racer.vx; }
       }
       racer.rotation += (racer.x - oldX) * (racer.grounded ? Math.sqrt(1 + surface.slope * surface.slope) : 1) / RADIUS;
@@ -744,6 +752,37 @@ export class GameEngine {
         this.airSheep.push({ x, y: y - 40, z, vx: racer.vx * 0.51, vy: -520, rotation: 0, life: 3.1 });
         this.emit(x, y - 35, z, 8, '#e9e1c6', 115);
         if (!racer.id) { this.snapshot.score += 125; this.counts.sheep++; this.audio.play('sheep'); this.say('BAA-D DECISIONS.'); }
+        break;
+      case 'blimp':
+        obstacle.hit = true;
+        racer.vy = Math.max(950, 1200 * impulse);
+        racer.vx = Math.max(120, racer.vx * 0.72);
+        racer.grounded = false;
+        this.emit(x, y - (obstacle.altitude ?? 540), z, 35, '#ff4400', 320);
+        this.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#ffbb00', 250);
+        this.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#333333', 180);
+        if (!racer.id) {
+          this.snapshot.score += 250;
+          this.counts.explosions++;
+          this.shake = 6.0;
+          this.audio.play('boom');
+          this.say('AIRSPACE RESTRICTED! DOWN YOU GO!');
+        }
+        break;
+      case 'sign':
+        obstacle.hit = true;
+        racer.vx = Math.max(90, racer.vx * 0.52);
+        racer.vy = Math.max(90, racer.vy + 140);
+        const signY = y - (obstacle.altitude ?? 315);
+        this.emit(x, signY, z, 24, '#8b5a2b', 210);
+        this.emit(x, signY, z, 16, '#c29a64', 170);
+        this.emit(x, signY, z, 12, '#ffffff', 130);
+        if (!racer.id) {
+          this.snapshot.score += 150;
+          this.shake = 3.2;
+          this.audio.play('land');
+          this.say('WATCH THE ROAD SIGNS! SPEED REDUCED.');
+        }
         break;
       default: break;
     }

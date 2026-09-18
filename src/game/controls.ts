@@ -6,7 +6,7 @@
 
 export const STORAGE_KEY = 'goblin-rally-keybindings-v1';
 
-export type ActionId = 'steerLeft' | 'steerRight' | 'hop' | 'bounce' | 'boost' | 'pause';
+export type ActionId = 'steerLeft' | 'steerRight' | 'bounce' | 'boost' | 'pause';
 
 export interface ActionMeta {
   id: ActionId;
@@ -28,12 +28,6 @@ export const ACTIONS: ActionMeta[] = [
     label: 'Steer Right',
     description: 'Move to the lane on the right / shoulder rivals',
     defaults: ['KeyD', 'ArrowRight'],
-  },
-  {
-    id: 'hop',
-    label: 'Hop / Jump',
-    description: 'Bunny hop over ground obstacles',
-    defaults: ['KeyW', 'KeyJ', 'ArrowUp'],
   },
   {
     id: 'bounce',

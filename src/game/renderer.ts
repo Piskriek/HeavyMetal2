@@ -382,9 +382,223 @@ export class RangeRenderer {
     context.fillRect(point.x - 22 * point.scale, point.y - (27 + sparkle) * point.scale, 2 * point.scale, 2 * point.scale);
   }
 
+  private drawSign(obstacle: Obstacle) {
+    const context = this.context;
+    const { x } = obstacle;
+    const centerX = x + obstacle.width / 2;
+    const baseY = this.y(centerX);
+    const altitude = obstacle.altitude ?? 315;
+
+    // Select sprite
+    const sprite = obstacle.signType === 'tnt' ? this.assets.signTnt
+      : obstacle.signType === 'parts' ? this.assets.signParts
+      : this.assets.signSheep;
+
+    const img = sprite.image;
+    const imgW = img.naturalWidth || sprite.width;
+    const imgH = img.naturalHeight || sprite.height;
+    const aspect = imgW / imgH;
+
+    // Maintain true aspect ratio - never stretch!
+    const height = Math.max(120, Math.min(170, obstacle.height || 145));
+    const spanZ = height * aspect;
+    const zCenter = obstacleZ(obstacle);
+    const signFarZ = zCenter + spanZ / 2;
+    const signNearZ = zCenter - spanZ / 2;
+
+    const yBottom = baseY - altitude;
+    const yTop = yBottom - height;
+
+    // Two sturdy wooden legs supporting the billboard from the ground
+    const farBase = this.p(centerX, baseY, signFarZ - 8);
+    const farTop = this.p(centerX, yBottom + 12, signFarZ - 8);
+    const nearBase = this.p(centerX, baseY, signNearZ + 8);
+    const nearTop = this.p(centerX, yBottom + 12, signNearZ + 8);
+
+    context.strokeStyle = '#382214';
+    context.lineWidth = 10 * farTop.scale;
+    context.beginPath();
+    context.moveTo(farBase.x, farBase.y);
+    context.lineTo(farTop.x, farTop.y);
+    context.stroke();
+
+    context.strokeStyle = '#28170c';
+    context.lineWidth = 12 * nearTop.scale;
+    context.beginPath();
+    context.moveTo(nearBase.x, nearBase.y);
+    context.lineTo(nearTop.x, nearTop.y);
+    context.stroke();
+
+    // Cross-struts on the tall support legs (trestle scaffolding)
+    const avgScale = (farTop.scale + nearTop.scale) / 2;
+    context.strokeStyle = '#341f11';
+    context.lineWidth = 5 * avgScale;
+    for (const frac of [0.35, 0.7, 1.0]) {
+      const braceY = baseY - altitude * frac + 10;
+      const fP = this.p(centerX, braceY, signFarZ - 8);
+      const nP = this.p(centerX, braceY, signNearZ + 8);
+      context.beginPath();
+      context.moveTo(fP.x, fP.y);
+      context.lineTo(nP.x, nP.y);
+      context.stroke();
+    }
+
+    // Ground contact shadows under the two post bases
+    this.contact(centerX, 26, '#040c07', 0.45, signFarZ - 8);
+    this.contact(centerX, 30, '#040c07', 0.5, signNearZ + 8);
+
+    if (!obstacle.hit) {
+      // Front 3D Quad facing oncoming riders in true 3D space
+      // UV: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
+      const p0 = this.p(centerX, yTop, signFarZ);
+      const p1 = this.p(centerX, yTop, signNearZ);
+      const p2 = this.p(centerX, yBottom, signNearZ);
+      const p3 = this.p(centerX, yBottom, signFarZ);
+
+      // Texture the quad with the billboard art in 3D perspective!
+      texturedQuad(context, img, { x: 0, y: 0, width: imgW, height: imgH }, [p0, p1, p2, p3]);
+    } else {
+      // 3D Shatter / break animation!
+      const age = this.frame.time - obstacle.hitAt;
+      if (age > 3.0) return;
+      const fade = Math.max(0, 1 - Math.max(0, age - 1.8) / 1.2);
+      const halfW = Math.floor(imgW / 2);
+      const zMid = (signFarZ + signNearZ) / 2;
+
+      context.save();
+      context.globalAlpha = fade;
+
+      // Piece 1: Left half (Far side) tumbling in 3D
+      const lDx = age * 180;
+      const lDz = age * 60;
+      const lDy = age * 30 + age * age * 420;
+      const lp0 = this.p(centerX + lDx, yTop + lDy, signFarZ + lDz);
+      const lp1 = this.p(centerX + lDx + age * 25, yTop + lDy - age * 20, zMid + lDz * 0.3);
+      const lp2 = this.p(centerX + lDx + age * 25, yBottom + lDy - age * 20, zMid + lDz * 0.3);
+      const lp3 = this.p(centerX + lDx, yBottom + lDy, signFarZ + lDz);
+      texturedQuad(context, img, { x: 0, y: 0, width: halfW, height: imgH }, [lp0, lp1, lp2, lp3]);
+
+      // Piece 2: Right half (Near side) tumbling in 3D
+      const rDx = age * 210;
+      const rDz = -age * 70;
+      const rDy = age * 40 + age * age * 450;
+      const rp0 = this.p(centerX + rDx - age * 25, yTop + rDy - age * 15, zMid + rDz * 0.3);
+      const rp1 = this.p(centerX + rDx, yTop + rDy, signNearZ + rDz);
+      const rp2 = this.p(centerX + rDx, yBottom + rDy, signNearZ + rDz);
+      const rp3 = this.p(centerX + rDx - age * 25, yBottom + rDy - age * 15, zMid + rDz * 0.3);
+      texturedQuad(context, img, { x: halfW, y: 0, width: halfW, height: imgH }, [rp0, rp1, rp2, rp3]);
+
+      // Wood splinter debris in 3D
+      for (let i = 0; i < 8; i++) {
+        const px = centerX + age * (130 + (i % 3) * 60);
+        const py = yBottom - 25 + (i % 2 === 0 ? -1 : 1) * 20 + (age * 15 + age * age * 340);
+        const pz = zMid + Math.sin(i * 2.1) * (180 + age * 130);
+        const p = this.p(px, py, pz);
+        context.save();
+        context.translate(p.x, p.y);
+        context.rotate(age * (i % 2 === 0 ? 6 : -6) + i);
+        context.fillStyle = i % 2 === 0 ? '#8b5a2b' : '#c29a64';
+        context.fillRect(-7 * p.scale, -3.5 * p.scale, 14 * p.scale, 7 * p.scale);
+        context.restore();
+      }
+
+      context.restore();
+
+      if (age < 0.35) {
+        const midP = this.p(centerX, (yTop + yBottom) / 2, zMid);
+        this.glow(midP.x, midP.y, 75 * midP.scale, '#ffe6b3', (1 - age / 0.35) * 0.85);
+      }
+    }
+  }
+
+  private drawBlimp(obstacle: Obstacle) {
+    const context = this.context;
+    const { x, width, height } = obstacle;
+    const centerX = x + width / 2;
+    const baseY = this.y(centerX);
+    const altitude = obstacle.altitude ?? 540;
+    const zCenter = obstacleZ(obstacle);
+
+    // Ground contact shadow under the floating blimp
+    this.contact(centerX, 80, '#040c07', 0.22, zCenter);
+
+    if (!obstacle.hit) {
+      const hover = this.frame.reducedMotion ? 0 : Math.sin(this.frame.runTime * 1.8 + centerX * 0.02) * 12;
+      const pitch = this.frame.reducedMotion ? 0 : Math.cos(this.frame.runTime * 1.4 + centerX * 0.02) * 0.03;
+      const point = this.p(centerX, baseY - altitude + hover, zCenter);
+      const drawW = width * point.scale;
+      const drawH = height * point.scale;
+
+      context.save();
+      context.translate(point.x, point.y);
+      context.rotate(pitch);
+      context.drawImage(this.assets.blimp.image, -drawW / 2, -drawH / 2, drawW, drawH);
+
+      // Warning blinking beacon light
+      const beaconOn = (this.frame.runTime * 3) % 1 > 0.45;
+      if (beaconOn) {
+        context.fillStyle = '#ff2200';
+        context.beginPath();
+        context.arc(drawW * 0.05, -drawH * 0.38, 4 * point.scale, 0, TAU);
+        context.fill();
+      }
+      context.restore();
+
+      if (beaconOn) {
+        this.glow(point.x + drawW * 0.05, point.y - drawH * 0.38, 14 * point.scale, '#ff3300', 0.5);
+      }
+    } else {
+      const age = this.frame.time - obstacle.hitAt;
+      if (age > 2.8) return;
+      const dropY = (age * 40 + age * age * 460);
+      const point = this.p(centerX + age * 80, baseY - altitude + dropY, zCenter);
+      const drawW = width * point.scale;
+      const drawH = height * point.scale;
+      const fade = Math.max(0, 1 - age / 2.6);
+
+      // Fiery explosion ball during initial blast
+      if (age < 0.65) {
+        const blastFactor = 1 - age / 0.65;
+        this.glow(point.x, point.y, (130 + age * 160) * point.scale, '#ff3300', blastFactor * 0.9);
+        this.glow(point.x, point.y, (90 + age * 120) * point.scale, '#ffaa00', blastFactor * 0.95);
+        this.glow(point.x, point.y, (50 + age * 80) * point.scale, '#ffffff', blastFactor * 0.9);
+      }
+
+      // Burning blimp plummeting
+      context.save();
+      context.globalAlpha = fade;
+      context.translate(point.x, point.y);
+      context.rotate(age * 1.5);
+      context.drawImage(this.assets.blimp.image, -drawW / 2, -drawH / 2, drawW, drawH);
+      context.fillStyle = 'rgba(20, 10, 5, 0.65)';
+      context.beginPath();
+      context.arc(0, 0, drawW * 0.4, 0, TAU);
+      context.fill();
+      context.restore();
+
+      // Trailing smoke puffs
+      for (let i = 0; i < 4; i++) {
+        const puffAge = Math.max(0, age - i * 0.12);
+        if (puffAge > 0 && puffAge < 1.2) {
+          const sx = point.x - puffAge * 65 * point.scale + Math.sin(i * 3) * 15 * point.scale;
+          const sy = point.y - puffAge * 45 * point.scale - (i * 12 * point.scale);
+          this.glow(sx, sy, (25 + puffAge * 45) * point.scale, '#222222', (1 - puffAge / 1.2) * 0.4);
+        }
+      }
+    }
+  }
+
   private drawObstacle(obstacle: Obstacle) {
     const { kind, x, width, height } = obstacle;
     if (kind === 'ramp' || kind === 'loop' || kind === 'gap') return;
+    if (kind === 'sign') {
+      this.drawSign(obstacle);
+      return;
+    }
+    if (kind === 'blimp') {
+      this.drawBlimp(obstacle);
+      return;
+    }
     if ((kind === 'tnt' || kind === 'sheep') && obstacle.hit) {
       if (kind === 'tnt') this.drawExplosion(obstacle);
       return;

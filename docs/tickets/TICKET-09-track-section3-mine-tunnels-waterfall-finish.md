@@ -1,9 +1,9 @@
-# TICKET-09: Multi-Section Track Expansion Part 2 — Mine Tunnels, Minecart Rails & Waterfall Stadium Finale
+# TICKET-09: Multi-Section Track Expansion Part 2 — Subterranean Roller Coaster Mine, Spaghetti Rails, Lava Loops & Stadium Finale
 
 - **ID**: `TICKET-09`
-- **Component**: Track Design / Subterranean Environment / Climax Race Sequence
+- **Component**: Track Design / Subterranean Environment / Multi-Tier Roller Coaster Mechanics / Climax Race Sequence
 - **Priority**: High (Phase 3 Track Expansion)
-- **Status**: Ready for Implementation
+- **Status**: Detailed & Ready for Implementation
 - **Dependencies**: `TICKET-08`
 
 ---
@@ -22,66 +22,150 @@
 
 ---
 
-## 1. Problem Statement & User Need
-Building on the Stage 2 Waterfall Cascades (`TICKET-08`), the race needs a thrilling subterranean climax before the final victory celebration. The user specifically specified the third and final stage of the grand race:
+## 1. Visual Concept & Art Reference
+
+### 1.1 Section 3 Concept Art: The Subterranean Roller Coaster Mine
+![Section 3 Roller Coaster Mine Concept Art](file:///c:/MarbleGp/docs/tickets/assets/section3-mine-rollercoaster-concept.jpg)
+
+### 1.2 Transition 3-to-Finale Concept Art: The Waterfall Breakthrough to Stadium
+![Transition 3-to-Finale Concept Art](file:///c:/MarbleGp/docs/tickets/assets/transition3-mine-to-stadium-concept.jpg)
+
+---
+
+## 2. Problem Statement & Level Design Vision
+
+Following the cliffside waterfall zigzag (`TICKET-08`), the race plunges deep into the earth for the ultimate subterranean climax before bursting into the stadium finish.
 
 The user requires:
-- **Section 3 (Mine Tunnels & Minecart Tracks)**:
-  - The waterfall cascade plunges directly into an underground goblin cavern and deep mining complex.
-  - Racers roll at blistering speeds across **iron minecart tracks and wooden railway trestles**.
-  - Dynamic mining obstacles: TNT barrels, narrow track switches, low rock arches, and swinging ore buckets.
-- **The Waterfall Spit-Out & Final Downhill**:
-  - The mine tunnel abruptly ends as the track bursts through a massive rock archway through a roaring waterfall curtain.
-  - Racers drop into daylight on one final, ultra-fast downhill sprint right into the roar of the **Scrapdome Stadium Finish Line**.
+1. **Underground Roller Coaster Minecart Tracks**:
+   - The track enters a gargantuan volcanic cavern with a labyrinthine "spaghetti" web of multi-tier wooden trestles and iron rails.
+   - Tracks split into branching routes, criss-cross each other in 3D, and feature inverted loops and banked corkscrews.
+2. **Lava, Fire & Industrial Hazards**:
+   - Bubbling molten lava rivers and fiery slag pits beneath the trestles.
+   - Flaming fire boost rings that reward daring high-altitude jumps.
+   - Swinging ore cauldrons pouring molten metal across the rails on timed intervals.
+   - Clustered TNT explosive barrels that launch careless racers sideways.
+3. **Spectacle Transitions**:
+   - **Transition 2 $\rightarrow$ 3 (The Cavern Maw)**: Plunging directly from the churning waterfall pool into darkness, transitioning instantly to glowing magma, amber lanterns, and goblin miners cheering in hanging iron cages.
+   - **Transition 3 $\rightarrow$ Finish (The Waterfall Breakthrough)**: The subterranean rails converge into an explosive rocket-boosted climb that punches right through a thundering daylight waterfall curtain into the festive, firework-filled Scrapdome Stadium victory straight.
 
 ---
 
-## 2. Technical Requirements & Specifications
+## 3. Detailed Technical Architecture & Specifications
 
-### 2.1 Stage 3 Track Segments (24,000m – 36,000m)
-1. **The Dark Tunnel Mouth (24,000m – 25,500m)**:
-   - Abrupt transition from misty waterfall daylight into deep underground cavern gloom.
-   - Screen lighting shifts dynamically: dark ambient rock walls, glowing amber goblin lanterns, and fluorescent green bioluminescent cave mushrooms.
-2. **Minecart Dual & Quad Rails (25,500m – 30,000m)**:
-   - Track surface transforms into iron rails on wooden railway sleepers (`strip-metal.webp`, `strip-hazard.webp` from `PreGame/`).
-   - Four distinct rail lanes:
-     - Riding on rails gives +15% top speed boost and high steering traction.
-     - Slipping between rails onto gravel causes slight friction and sparks.
-   - Railroad switches: Track splits into upper and lower tunnel bypasses with high-risk shortcuts.
-3. **Mining Hazards (30,000m – 32,500m)**:
-   - TNT explosive crates (`PreGame/src/assets/game/crate.webp`, `skull-box.webp`): Hitting triggers an explosion impulse launching balls sideways.
-   - Runaway minecarts rolling on rival lanes that must be dodged or hopped over.
-4. **The Waterfall Breakthrough & Final Sprint (32,500m – 36,000m)**:
-   - Track plunges down a 45° mine shoot leading toward a bright opening.
-   - **The Breakthrough**: Balls punch through a translucent cascading curtain of water (triggering screen splash droplet effects and water spray audio).
-   - Emerge back into bright stadium floodlights and fireworks over a massive final downhill ramp.
-   - The grand Scrapdome finish banner with cheering goblin crowds, checkered flags, and fireworks.
+### 3.1 Course Layout & Distance Budget (24,000m – 36,000m)
 
-### 2.2 Visual & Shader Upgrades (`src/game/environment.ts`, `renderer.ts`)
-- **Cavern Lighting**:
-  - Implement a dynamic darkness filter with radial point-light halos around each racer's ball (illuminating the iron tracks ahead).
-  - Lantern posts spaced along tunnel walls with flickering golden glow.
-- **Water Curtain Particle Effect**:
-  - Particle splash bursting outward when balls punch through the waterfall exit into the stadium.
+```
+[24,000m -------------- 28,500m] --> [28,500m ------------------ 33,000m] --> [33,000m -------------- 36,000m]
+   Zone 3.1: The Trestle Labyrinth      Zone 3.2: Lava Cavern & Loops           Zone 3.3: Breakthrough & Finale
+   - Plunge into Cavern (24,000m)       - Magma Chamber (28,500m)               - Rocket Incline (33,000m)
+   - 3-Way Rail Branch (25,200m)        - Vertical 360° Lava Loop (29,800m)     - Waterfall Curtain (34,200m)
+   - Trestle Spaghetti (26,800m)        - Swinging Ore Cauldrons (31,200m)      - Stadium Sprint (34,800m)
+   - Mineral Crates & TNT (27,900m)     - Flame Boost Rings (32,000m)           - Grand Brass Finish (36,000m)
+```
 
 ---
 
-## 3. Implementation Plan
-1. **Cavern & Mine Tunnel Assets**:
-   - Integrate mine rail textures, lanterns, and rock cavern wall sprites into `public/art/tracks/mine/`.
-2. **Engine Track Layout**:
-   - In `src/game/track-layout.ts`, implement `generateMineTunnelSection(difficulty: Difficulty)`.
-   - Add dynamic track surface properties (`surfaceType: 'dirt' | 'wet_wood' | 'rail_iron' | 'stone'`).
-3. **Lighting & Atmosphere Transitions**:
-   - In `src/game/courses.ts`, define distance-based ambient light curves ($L_{\text{sun}} \rightarrow L_{\text{cave}} \rightarrow L_{\text{stadium}}$).
-4. **Finish Line Climax**:
-   - Ensure `onFinish()` callback in `RaceScreen.tsx` triggers only after passing the stadium gate at the end of Stage 3.
+### 3.2 Section 3 Step-by-Step Level Design & Geometry
+
+#### 1. Transition 2 $\rightarrow$ 3: The Drowned Maw (24,000m – 25,200m)
+- **Geometry**: The Section 2 waterfall torrent funnels into a churning whirlpool drain that drops 80 vertical units into a deep rock tunnel.
+- **Atmospheric Shift**:
+  - Outdoor skybox fades rapidly; cavern ceiling closes overhead.
+  - Deep subterranean fog and smoke rise from below.
+  - Amber lantern posts flicker on heavy timber struts; fluorescent green cave fungi dot the stone walls.
+- **Audio Cue**: Roaring waterfall sound muffled as deep subterranean grinding, pickaxes, and bass cavern drone take over.
+
+#### 2. Zone 3.1: The Spaghetti Rail Split (25,200m – 28,500m)
+- **Rail Mechanics**: The track divides into 3 distinct branching roller coaster routes:
+  1. **Route A: The High Roller Coaster (Upper Trestle)**:
+     - High-altitude timber trestle hugging the cavern ceiling.
+     - Narrow twin rails with +20% speed bonus (`rail_speed_multiplier = 1.20`).
+     - High risk of falling off the unguarded curves directly into the lower cavern.
+  2. **Route B: The Lower Brimstone Trench (Main Floor)**:
+     - Banked stone trough running alongside the underground river.
+     - Wider, safer, and lined with speed boost pads and TNT clusters (`skull-box.webp`, `crate.webp`).
+  3. **Route C: The Minecart Siding (Secret High-Risk Shortcut)**:
+     - Hidden jump ramp at `x = 26,100` accessible via <kbd>SPACE</kbd> Air Bounce that lands on a razor-thin single-rail line cutting 300m off the lap.
+- **Dynamic Spectators**: Goblin miners in suspended iron cages, cheering and banging pickaxes against the bars.
+
+#### 3. Zone 3.2: The Magma Chamber, Loops & Fire Rings (28,500m – 33,000m)
+- **Lava Floor Hazard**:
+  - The floor drops away into a bubbling magma lake (`#ff3b00` glow with dynamic heat distortion).
+  - Touching the lava lake instantly vaporizes the ball in a cloud of black smoke, triggering an immediate checkpoint recovery onto the nearest rail.
+- **The Vertical Lava Loop (29,800m – 30,500m)**:
+  - A 360° roller coaster loop suspended directly over a molten fire pit.
+  - Requires minimum speed of $v_x > 480$ km/h to clear the apex without stalling.
+- **Flaming Boost Rings**:
+  - Blazing iron rings suspended mid-air along the roller coaster descent.
+  - Passing through grants a **Fiery Nitro Surge** (+80 km/h, rocket engine sound, flame particle exhaust).
+- **Swinging Ore Cauldrons (31,200m – 32,400m)**:
+  - 3 massive iron cauldrons swinging across the tracks like pendulums on timed cycles.
+  - Molten gold/slag spills down in a hazardous stream that must be timed or dodged by switching rails (<kbd>A</kbd>/<kbd>D</kbd>).
+
+#### 4. Transition 3 $\rightarrow$ Finish: The Waterfall Breakthrough & Stadium Finale (33,000m – 36,000m)
+- **The Rocket Incline (33,000m – 34,200m)**:
+  - All branching rails merge back into a four-lane iron track rising up a steep 30° rock shaft.
+  - Staggered boost pads accelerate all racers to maximum terminal velocity ($> 750$ km/h).
+- **The Waterfall Breakthrough (34,200m)**:
+  - The mine tunnel bursts outward through a thundering curtain of daylight water cascading over the cavern exit archway.
+  - **Screen VFX**: Explosive white-water splash particles burst outward across the camera, accompanied by sudden sunlight bloom and thunderous water crash audio.
+- **The Scrapdome Victory Straight (34,500m – 36,000m)**:
+  - Racers emerge into full daylight onto the wide, packed-dirt stadium straight.
+  - Flanked on both sides by multi-tier grandstands packed with roaring goblin fans waving banners.
+  - Fireworks and colored smoke rockets explode overhead.
+  - Monumental brass and iron **Scrapdome Finish Line Gantry** with spinning checkered gears and celebratory victory horns.
 
 ---
 
-## 4. Acceptance Criteria
-- [ ] Seamless transition from Stage 2 waterfalls into Stage 3 underground mine tunnels.
-- [ ] Riding on minecart tracks provides distinct speed and metallic roll sounds.
-- [ ] Cavern features atmospheric lighting with dynamic racer headlight cones and lantern glow.
-- [ ] Spectacular waterfall exit bursts balls into daylight for the final stadium sprint.
-- [ ] Full 3-stage circuit is fully performant, maintaining 60+ FPS throughout.
+### 3.3 Physics, Controls & Camera Specifications (`src/game/engine.ts`, `renderer.ts`)
+
+1. **Minecart Rail Lock-In Traction**:
+   - When a marble aligns with an iron rail lane ($\Delta z < 14$), snap into "Rail-Lock":
+     - Rolling resistance reduced by 60%.
+     - Metallic clatter and wheel-grind sound loops (`audio.play('rail_grind')`).
+     - Sparks emit backwards from the ball contact point (`#ffd700`, 8 particles/frame).
+2. **Roller Coaster 3D Camera Dynamic Roll**:
+   - In looping and corkscrewing sections, smoothly roll camera bank angle:
+     $$\text{roll}_{\text{cam}} = \text{clamp}(\text{trackSlope} \times 0.28, -0.4, 0.4)$$
+   - Creates a dizzying, authentic roller coaster sensation without disorienting the player.
+3. **Cavern Lighting System**:
+   - Global darkness overlay: Dark slate tint (`rgba(10, 8, 14, 0.72)`).
+   - Radial illumination halos around each racer's marble, lighting up the iron rails and wooden ties 200m ahead.
+   - Warm flickering point lights positioned at each lantern post ($r = 180$, color `#ffaa33`).
+   - Searing orange ambient uplight from molten lava pools ($y > 450$).
+
+---
+
+## 4. Implementation Steps & Work Packages
+
+### Work Package 1: Cavern Assets & Rail Sprites
+- [ ] Create or extract tileable iron rail and wooden sleeper textures (`rail-iron.png`, `trestle-wood.png`).
+- [ ] Add swinging ore cauldron sprite with animated slag spill frame loop.
+- [ ] Add flaming boost ring and glowing lantern post sprites to `public/art/track-parts/`.
+- [ ] Create stadium finish gantry and firework particle bursts for the grand finale.
+
+### Work Package 2: Spaghetti Rail Track Generator
+- [ ] In `src/game/track-layout.ts`, implement `createStage3MineSection()`:
+  - Generate the 3-way rail split (High Trestle, Lower Trench, Siding Shortcut).
+  - Place vertical 360° lava loop and timed swinging cauldrons.
+  - Place the ascending rocket chute and waterfall breakthrough portal.
+
+### Work Package 3: Lighting, Rail Physics & Audio
+- [ ] In `src/game/renderer.ts`:
+  - Implement cavern dark lighting mask with racer headlight punch-throughs.
+  - Add lava heat haze and water curtain breakthrough splash overlay.
+- [ ] In `src/game/engine.ts`:
+  - Implement rail-lock lateral attraction and speed bonus.
+  - Add lava pit hazard collision boundary.
+  - Trigger celebratory fireworks and crowd cheer upon crossing the 36,000m finish line.
+
+---
+
+## 5. Acceptance Criteria
+- [ ] Seamless transition from Stage 2 waterfall pool into Stage 3 subterranean mine tunnels.
+- [ ] Roller coaster rails feel fast, tactile, and distinct with metallic grind sounds and spark particles.
+- [ ] Multi-tier spaghetti track offers genuine strategic choice: high-speed risky trestles vs safe lower routes.
+- [ ] Lava pits, fire rings, and swinging cauldrons provide visceral, thrilling obstacles.
+- [ ] Punching through the waterfall curtain into the bright stadium finish line delivers a triumphant, cinematic climax.
+- [ ] Stable 60 FPS performance during cavern lighting and particle-heavy firework sequences.

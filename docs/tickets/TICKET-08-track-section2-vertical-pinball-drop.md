@@ -1,9 +1,9 @@
-# TICKET-08: Multi-Section Track Expansion Part 1 — Vertical Pinball Drop, Pegs, Ramps, Loops & Waterfalls
+# TICKET-08: Multi-Section Track Expansion Part 1 — Waterfall Cliff Zigzag, Protruding Rocks & Pinball Chasm
 
 - **ID**: `TICKET-08`
-- **Component**: Track Design / 3D Track Layout / Physics Engine
+- **Component**: Track Design / 3D Track Layout / Environmental Art & Physics Engine
 - **Priority**: High (Phase 3 Track Expansion)
-- **Status**: Ready for Implementation
+- **Status**: Detailed & Ready for Implementation
 - **Dependencies**: `TICKET-06`, `TICKET-07`
 
 ---
@@ -22,71 +22,141 @@
 
 ---
 
-## 1. Problem Statement & User Need
-The game currently terminates each track after a single 15 km straight downhill slope into a flat stadium finish line. This makes races feel short, repetitive, and unvaried. The user explicitly requested an ambitious multi-section track structure inspired by the original *Heavy Metal GP* (found in `PreGame/`):
+## 1. Visual Concept & Art Reference
 
-The user requires:
-- **Track Extension**: Instead of finishing after the initial downhill, the track **continues into Section 2**.
-- **The Vertical Pinball Drop**:
-  - The downhill ends at a dramatic cliff precipice leading into a **steep vertical drop**.
-  - Filled with **pinball-style bumper pegs, wooden ramps, high-speed loops, and flaming fire boost rings**.
-  - A frantic **zig-zag path cascading down alongside roaring waterfalls** (a direct 3D evolution of the classic 2D Heavy Metal GP track mechanics).
-- **Leverage Free Assets from `PreGame/`**:
-  - Use pinball bumpers (`PreGame/src/assets/game/bumper-spiked.webp`, `bumper-crown.webp`)
-  - Use bounce springs (`PreGame/src/assets/game/spring.webp`)
-  - Use skull hazard boxes and crates (`skull-box.webp`, `crate.webp`)
-  - Use surface strips (`strip-metal.webp`, `strip-lava.webp`, `strip-hazard.webp`, `strip-wood.webp`).
+### 1.1 Section 2 Concept Art: The Cliffside Waterfall Zigzag
+![Section 2 Waterfall Zigzag Concept Art](file:///c:/MarbleGp/docs/tickets/assets/section2-waterfall-zigzag-concept.jpg)
+
+### 1.2 Transition 1-to-2 Concept Art: The Scrap Fall Crest Launch
+![Transition 1-to-2 Cliff Launch Concept Art](file:///c:/MarbleGp/docs/tickets/assets/transition1-ridge-to-waterfall-concept.jpg)
 
 ---
 
-## 2. Technical Requirements & Specifications
+## 2. Problem Statement & Level Design Vision
 
-### 2.1 Multi-Section Course Architecture (`src/game/courses.ts`, `scene.ts`)
-- Restructure each course into a 3-Stage Circuit:
-  - **Stage 1 (0m – 12,000m)**: High-Speed Mountain Downhill (The current course layout).
-  - **Stage 2 (12,000m – 24,000m)**: The Vertical Pinball Chasm & Waterfall Cascades.
-  - **Stage 3 (24,000m – 36,000m)**: Subterranean Mine Tunnels & Grand Stadium Finale (Detailed in `TICKET-09`).
+Currently, the race track terminates after a single 15 km alpine downhill into a flat stadium finish. This makes races feel short, predictable, and flat. The user requires an ambitious multi-section track structure:
 
-### 2.2 Section 2 Geometry & Feature Layout
-1. **The Precipice Launch (Transition from Stage 1 to 2)**:
-   - Downhill slopes down to a massive cliff lip.
-   - Speed boost pads launch the four balls out into the open gorge over a roaring waterfall canyon.
-2. **The Pinball Pegfield (13,000m – 16,500m)**:
-   - A steep 65° plunge featuring staggered hexagonal bumper pegs:
-     - `bumper-crown.webp` (Super Bumper: awards points, triggers loud bell audio, launches ball with 1.5x impulse).
-     - `bumper-spiked.webp` (Spiked Bumper: repels ball with erratic side deflection).
-     - `spring.webp` (Spring Launchers: vertical rebound kicking ball back up or forward into speed lanes).
-   - Elastic physics collision: Matter.js restitution calculated with bouncy audio effects.
-3. **The Timber Loop & Fire Rings (16,500m – 19,500m)**:
-   - Full 360° vertical loop constructed from heavy timber slats.
-   - Fire Boost Rings (`ring-spiked.webp`, `ring-steel.webp`) floating mid-loop; passing through grants +50 km/h hyper-speed and fire particle trails.
-4. **The Waterfall Zig-Zag Cascade (19,500m – 24,000m)**:
-   - Tight switchback bends hugging a massive sheer rock wall with rushing whitewater cascades on the outer edge.
-   - Slippery wet wood planks (`strip-wood.webp`, `strip-moss.webp`) requiring careful steering.
-   - Missing guardrails on hairpins where reckless players can fall off, suffering a recovery respawn penalty.
-
-### 2.3 Physics & Collision Integrations (`src/game/engine.ts`)
-- Extend the physics engine to handle vertical drop gravity acceleration ($g = 1.6\times$ normal down the chasm).
-- Implement dynamic circular bumper collisions with recoil impulses.
-- Add trigger zones for Fire Rings that grant immediate nitro acceleration and invulnerability frames.
+1. **The Sheer Waterfall Cliff**:
+   - The gentle alpine downhill ends at a massive cliff drop-off.
+   - Section 2 descends a colossal granite cliff face alongside massive roaring waterfalls with mist, foam, and spray particles.
+2. **Natural Switchback Zigzagging**:
+   - Instead of an artificial flat board, the track descends in **natural flowing switchback zigzags** carved into the cliff face, featuring banked wooden turns, wet stone troughs, and precarious rock shelves.
+3. **Protruding Rocks & Natural Deflectors**:
+   - Jagged rocks and giant boulders stick out directly from the cliff walls and road shoulders.
+   - They act as natural bumpers, ramps, and lane splitters, ricocheting balls down the cascade.
+4. **Cliffside Goblin Spectator Scaffolding**:
+   - Rickety multi-tiered wooden scaffolding, rope bridges, and viewing balconies cling to the cliff walls on both sides of the canyon.
+   - Crowded with animated cheering goblins waving clan flags, swinging lanterns, and brandishing torches.
+5. **Seamless Transitions**:
+   - **Transition 1 $\rightarrow$ 2**: High-speed launch off the wooden lip of Scrap Fall Crest into freefall over the waterfall gorge.
+   - **Transition 2 $\rightarrow$ 3**: Plunging from the churning base of the falls into a massive cavern maw that leads directly into the underground mine tunnels of Section 3.
 
 ---
 
-## 3. Implementation Plan
-1. **Asset Migration**:
-   - Copy bumper, spring, crate, and strip assets from `PreGame/src/assets/game/` into `public/art/track-parts/`.
-2. **Update Track Layout Generator**:
-   - In `src/game/track-layout.ts`, create procedural/deterministic generation routines for the Pinball Drop and Waterfall Switchbacks.
-3. **Physics Bumper Handlers**:
-   - In `src/game/engine.ts`, register circular static bodies with high restitution for bumper pegs and springs.
-4. **Visual Waterfall Effects**:
-   - In `src/game/environment.ts`, add animated waterfall sheets with foaming water mist particles cascading behind the track.
+## 3. Detailed Technical Architecture & Specifications
+
+### 3.1 Course Layout & Distance Budget (`src/game/courses.ts`, `scene.ts`)
+Each grand circuit expands to a 3-Stage Odyssey (36,000m total):
+- **Stage 1 (0m – 12,000m)**: Alpine Ridge Downhill (Current Course Core).
+- **Stage 2 (12,000m – 24,000m)**: **The Waterfall Cliff Zigzag & Pinball Chasm (This Ticket)**.
+- **Stage 3 (24,000m – 36,000m)**: Subterranean Roller Coaster Mine & Stadium Finale (`TICKET-09`).
+
+```
+[0m -------------- 12,000m] --> [12,000m ------------------ 24,000m] --> [24,000m -------------- 36,000m]
+   Stage 1: Alpine Ridge            Stage 2: Waterfall Zigzag & Cliff        Stage 3: Subterranean Mine
+   (High-Speed Downhill)            - Scrap Fall Launch (12,000m)            - Cavern Mouth (24,000m)
+                                    - Upper Tier Switchbacks (13,500m)       - Roller Coaster Rails (26,000m)
+                                    - Mid-Cliff Rock Outcrops (17,000m)      - Lava Loops & Fire (29,000m)
+                                    - Churning Foam Run (21,000m)            - Waterfall Breakthrough (33,500m)
+                                    - Whirlpool Cavern Maw (23,800m)         - Stadium Victory Straight (36,000m)
+```
 
 ---
 
-## 4. Acceptance Criteria
-- [ ] Track length extends seamlessly from Stage 1 downhill into Stage 2 pinball drop without loading pauses.
-- [ ] Bumping into pegs, springs, and bumpers produces responsive, arcade-style pinball deflections and audio.
-- [ ] Fire rings grant visible speed surges and nitro effects.
-- [ ] Waterfall switchbacks challenge steering with wet surfaces and dramatic cliffside vertical drops.
-- [ ] AI racers intelligently navigate bumpers, take ramps, and aim for fire rings.
+### 3.2 Section 2 Step-by-Step Level Design & Geometry
+
+#### 1. Transition 1 $\rightarrow$ 2: The Scrap Fall Crest (11,800m – 12,600m)
+- **Geometry**: The Stage 1 downhill accelerates into a steep 35° wooden ramp terminating abruptly at a cliff lip at `x = 12,200`.
+- **The Leap**: Boost pads fling all 4 racers 400m through open air over the roaring gorge.
+- **Visuals**: Zeppelins float in the background; sunlight beams cut through water mist; wooden grandstands packed with screaming goblins line the cliff rim.
+- **Camera**: Dynamic camera tracks the drop, expanding vertical range and tilting slightly downward to show the massive drop below.
+
+#### 2. Upper Switchback Cascade (12,600m – 15,500m)
+- **Descent Style**: Banked wooden berms hugging the granite cliff face.
+- **Track Flow**:
+  - **Hairpin 1 (13,200m)**: 180° right-hand sweeping wooden switchback with high timber banked wall (`#4a2f1b`).
+  - **Hairpin 2 (14,400m)**: 180° left-hand switchback cutting right through a cascading whitewater veil.
+- **Protruding Rocks**:
+  - Center divider boulders force riders to choose between the **Tight Inside Line** (slick wet stone, high risk of clipping the wall) vs **Wide Banked Berm** (fast, safe, wooden slats).
+- **Spectators**: Hanging wooden balconies overhang the switchbacks with cheering goblins and banners.
+
+#### 3. The Mid-Cliff Pinball Rockfield (15,500m – 19,500m)
+- **Elevation Drop**: Steep 55° plunge down jagged granite shelves.
+- **Protruding Rock Formations**:
+  - Granite Outcrops (`kind: 'rock-bumper'`): Natural rounded stone ledges with high bounce coefficient ($e = 1.45$). Bumping into them redirects the marble without killing forward momentum.
+  - Spiked Boulders: Mineralized stone spikes that trigger a heavy impulse deflection and camera shake ($4.5$).
+- **Integrated Arcade Props** (from `PreGame/` assets):
+  - Spring Launchers (`spring.webp`): Mounted flush to rock faces to fling racers across wide gaps between switchback shelves.
+  - Flaming Fire Rings (`ring-spiked.webp`): Suspended over outer cliff drop-offs; daring players who jump off the edge through the ring receive +60 km/h hyper-speed and safe landing on the tier below.
+
+#### 4. The Wet Foam Run & Rope Bridge Crossings (19,500m – 23,800m)
+- **Surface**: Wet weathered planks and mossy slate (`surfaceType: 'wet_wood' | 'moss_rock'`).
+- **Hazard**: Missing guardrails on the canyon side. Going off the edge triggers the aerial recovery crew respawn.
+- **Hanging Rope Bridge**: A swinging suspension wooden bridge spanning a 120m chasm between two cliff spires, swaying slightly under the weight of the rolling balls.
+- **Spectator Density**: Wooden scaffolding towers 4 tiers high flank both sides with goblin drummers, flares, and horns.
+
+#### 5. Transition 2 $\rightarrow$ 3: The Whirlpool Cavern Maw (23,500m – 24,200m)
+- **Geometry**: The switchback path funnels into a deep rock channel where the waterfall's whitewater drains violently into a cavern funnel.
+- **The Plunge**: Racers drop through the roaring whirlpool mouth into total darkness, triggering the transition into the subterranean mine tunnels of Section 3.
+- **Audio/Visual Transition**: Thunderous waterfall roar transitions into deep subterranean echoes and cavern rumble. Daylight dims rapidly to pitch black before the glowing lava and lanterns of Stage 3 ignite.
+
+---
+
+### 3.3 Physics & Interaction Mechanics (`src/game/engine.ts`)
+
+1. **Cliffside Vertical Gravity Scaling**:
+   - In steep vertical cliff sections ($> 40^\circ$), adjust downward gravity:
+     $$\text{gravity}_{\text{cliff}} = \text{GRAVITY} \times 1.45$$
+   - Provides an exhilarating feeling of freefall while keeping steering responsive.
+2. **Protruding Rock Collisions**:
+   - Implement circular rock collider detection:
+     $$\vec{v}_{\text{rebound}} = \text{reflect}(\vec{v}, \vec{n}) \times e_{\text{rock}}$$
+   - Produces satisfying clattering stone impact sound effects and rock dust particles.
+3. **Wet Surface Traction**:
+   - `wet_wood` reduces lateral steering friction by 40%, demanding rhythmic steering adjustments through switchbacks.
+4. **Air Bounce Shortcuts**:
+   - Using the <kbd>SPACE</kbd> Air Bounce near a cliff switchback allows skilled players to hop over the dividing rock ridge to skip half the hairpin turn!
+
+---
+
+## 4. Implementation Steps & Work Packages
+
+### Work Package 1: Environmental Assets & Waterfall Renderer
+- [ ] Move `PreGame/src/assets/game/bumper-*.webp`, `spring.webp`, `strip-wood.webp`, and `strip-moss.webp` into `public/art/track-parts/`.
+- [ ] In `src/game/environment.ts`, build multi-layer parallax waterfall sheets:
+  - Background cliff granite wall with running water texture.
+  - Midground cascading white-water foam with animated vertical UV scroll.
+  - Foreground mist particles rising from the bottom chasm.
+- [ ] Add cliffside wooden spectator scaffolding sprites with animated crowd silhouettes and torches.
+
+### Work Package 2: Track Layout & Switchback Generator
+- [ ] In `src/game/track-layout.ts`, create `createStage2WaterfallSection()`:
+  - Generate the 4 switchback tiers between `12,000m` and `24,000m`.
+  - Place protruding rock outcrops, center divider boulders, and banked wooden turns.
+  - Place spring launchers, fire boost rings, and aerial blimps over the gorge.
+
+### Work Package 3: Physics & Collision Updates
+- [ ] In `src/game/engine.ts`:
+  - Support `rock-bumper` obstacle kind with radial bounce impulse and rock sound.
+  - Support `wet_wood` surface friction modifier in `stepRacer`.
+  - Add camera pitch adjustment for steep drops.
+
+---
+
+## 5. Acceptance Criteria
+- [ ] Track length extends seamlessly from Stage 1 downhill into Stage 2 waterfall cliff without loading pauses or hitching.
+- [ ] The waterfall cascade feels alive with rushing water, mist particles, and ambient roaring audio.
+- [ ] Natural switchbacks feel thrilling to navigate: high-speed banked turns catch the marble, while protruding rocks challenge line selection.
+- [ ] Cheering goblin spectators on wooden scaffolding give the cliff walls rich life and spectacle.
+- [ ] Transition 1 $\rightarrow$ 2 (Scrap Fall launch) and Transition 2 $\rightarrow$ 3 (Cavern Maw plunge) are dramatic, visceral, and seamless.
+- [ ] Maintains 60 FPS across both desktop and mobile viewports.

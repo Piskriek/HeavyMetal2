@@ -5,8 +5,9 @@ import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
 import {
   AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
-  RADIUS, STADIUM_START, START_X, START_Y, TRACK_DISTANCE, closestLane, courseY, courseSlope,
-  laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, weightImpulse,
+  RADIUS, STADIUM_START, START_X, START_Y, STAGE_2_START, STAGE_3_START, TRACK_DISTANCE,
+  closestLane, courseY, courseSlope, gravityScaleForSlope, laneZ, launchVelocity, loopGeometry,
+  obstacleZ, occupiesLane, rampSurface, sectorAt, surfaceTypeAt, weightImpulse,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
@@ -276,10 +277,17 @@ export class GameEngine {
   private inGap(x: number, z: number) { return this.nearby(x).some((o) => o.kind === 'gap' && x > o.x && x < o.x + o.width && occupiesLane(o, z, 0)); }
   private surfaceAt(x: number, z: number) {
     let y = this.y(x); let slope = this.slope(x); let ramp: Obstacle | null = null;
+    let surface = surfaceTypeAt(x);
     for (const o of this.nearby(x)) if (o.kind === 'ramp' && x >= o.x && x <= o.x + o.width && occupiesLane(o, z, 5)) {
       y = rampSurface(o, x, this.options.course); slope -= 1.6 * o.height / o.width * Math.pow((x - o.x) / o.width, 0.6); ramp = o;
+      surface = o.surface ?? surface;
     }
-    return { y, slope, ramp };
+    return { y, slope, ramp, surface };
+  }
+
+  private inCliffSection(x: number) { return x >= STAGE_2_START && x < STAGE_3_START; }
+  private gravityAt(x: number, slope = this.slope(x)) {
+    return GRAVITY * (this.inCliffSection(x) ? Math.max(1.45, gravityScaleForSlope(slope)) : gravityScaleForSlope(slope));
   }
 
   private coordinates(event: PointerEvent) {
@@ -353,7 +361,7 @@ export class GameEngine {
       rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
       rendered.falling = racer.falling; rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
-      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
+      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt; rendered.fireUntil = racer.fireUntil;
     }
     const player = this.player; const rendered = this.renderRacers[0];
     if (this.status === 'flying' && this.inputEnabled) {
@@ -432,7 +440,9 @@ export class GameEngine {
         if (obstacle.kind === 'gap') score -= distance < racer.vx * 0.45 ? 13 : 7;
         else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
           const proximity = 1 - clamp(distance / lookAhead, 0, 1);
-          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2 : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
+          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'fire-ring' ? 4.6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2.5
+            : obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock' ? -1.8 : obstacle.kind === 'crate' || obstacle.kind === 'skull-box' ? -1.2
+              : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
         }
       }
       for (const pickup of supplies) {
@@ -452,6 +462,13 @@ export class GameEngine {
     if (this.runTime - racer.lastLaneChange > (difficulty === 'rookie' ? 0.9 : difficulty === 'veteran' ? 0.48 : 0.66)) this.setLane(racer, bestLane);
     const soon = racer.x + racer.vx * 0.22;
     if (this.canHop(racer) && (this.inGap(soon, racer.z) || this.inGap(soon, laneZ(racer.targetLane)))) this.performHop(racer);
+    if (this.canHop(racer) && racer.bounces) {
+      for (const obstacle of seen) {
+        if (obstacle.kind !== 'fire-ring' || obstacle.lane !== racer.targetLane || obstacle.x < racer.x + 90 || obstacle.x > racer.x + racer.vx * 0.46) continue;
+        this.performBounce(racer);
+        break;
+      }
+    }
     if (this.canHop(racer)) {
       const timing = hopTiming(racer.vx, 290 * weightImpulse(racer.weight) * racer.hopFactor);
       for (const pickup of supplies) {
@@ -470,14 +487,16 @@ export class GameEngine {
   private stepRacer(racer: Racer, dt: number) {
     const oldX = racer.x;
     if (racer.falling) {
-      racer.fallingFor += dt; racer.vy += GRAVITY * dt;
+      racer.fallingFor += dt; racer.vy += this.gravityAt(racer.x) * (this.inCliffSection(racer.x) ? 1.1 : 1) * dt;
       racer.x += racer.vx * dt * 0.45; racer.y += racer.vy * dt; racer.rotation += 9 * dt;
       if (racer.fallingFor > 0.72) this.recover(racer);
       return;
     }
     if (!racer.loopRide) {
-      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling;
-      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling);
+      const steeringSurface = surfaceTypeAt(racer.x);
+      const lateralTraction = steeringSurface === 'wet_wood' ? 0.6 : steeringSurface === 'moss_rock' ? 0.72 : 1;
+      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling * lateralTraction;
+      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling) * lateralTraction;
       racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
       const previousZ = racer.z;
       racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
@@ -510,7 +529,7 @@ export class GameEngine {
       if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
       const before = this.surfaceAt(racer.x, racer.z);
       if (racer.grounded && !this.inGap(racer.x, racer.z)) {
-        const downhill = GRAVITY * before.slope / (1 + before.slope * before.slope) / 1.4;
+        const downhill = this.gravityAt(racer.x, before.slope) * before.slope / (1 + before.slope * before.slope) / 1.4;
         const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
         racer.vx = Math.max(0, racer.vx + (downhill - resistance) * dt);
         racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
@@ -526,19 +545,35 @@ export class GameEngine {
         }
       } else {
         racer.grounded = false;
-        racer.vx *= Math.exp(-0.009 * dragFactor * dt);
-        racer.vy += GRAVITY * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
+        const airDrag = this.inCliffSection(racer.x) ? 0.007 : 0.009;
+        racer.vx *= Math.exp(-airDrag * dragFactor * dt);
+        racer.vy += this.gravityAt(racer.x) * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
       }
       for (const obstacle of this.nearby(racer.x)) {
-        if (racer.visited.has(obstacle) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
+        const repeatableRock = obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock';
+        if ((!repeatableRock && racer.visited.has(obstacle)) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
         if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep' || obstacle.kind === 'blimp' || obstacle.kind === 'sign') && obstacle.hit) continue;
+        if (repeatableRock) {
+          this.hitRock(racer, obstacle);
+          continue;
+        }
+        if (obstacle.kind === 'fire-ring') {
+          const center = obstacle.x + obstacle.width / 2;
+          const ringY = this.y(center) - (obstacle.altitude ?? 130);
+          const ringRadius = obstacle.width * 0.42;
+          if (Math.abs(racer.x - center) < ringRadius + RADIUS && Math.hypot(racer.x - center, racer.y - ringY) < ringRadius + RADIUS) {
+            this.hitObstacle(racer, obstacle);
+          }
+          continue;
+        }
         if (obstacle.kind === 'loop') {
           const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
           const dy = racer.y - (this.y(racer.x) - this.y(loop.x)) - loop.y;
           if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
             const angle = (Math.atan2(dx, dy) + TAU) % TAU;
             racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
-            racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
+            const loopSpan = obstacle.section === 'stage2' ? TAU : TAU * 0.65;
+            racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: angle + loopSpan,
               speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
             if (!racer.id) { this.say('HOLD ON TO YOUR GOBLIN.'); this.audio.play('boost'); }
             break;
@@ -725,6 +760,42 @@ export class GameEngine {
     }
   }
 
+  private hitRock(racer: Racer, obstacle: Obstacle) {
+    const bit = 1 << racer.id;
+    if ((obstacle.hitMask ?? 0) & bit && this.time - obstacle.hitAt < 0.16) return;
+    const centerX = obstacle.x + obstacle.width / 2;
+    const centerZ = obstacleZ(obstacle);
+    const base = this.y(centerX);
+    const centerY = base - obstacle.height * 0.52;
+    const radius = obstacle.width * 0.43;
+    const dx = racer.x - centerX;
+    const dz = (racer.z - centerZ) * 0.72;
+    const distance = Math.hypot(dx, dz);
+    if (distance > radius + RADIUS || Math.abs(racer.y - centerY) > radius + RADIUS) return;
+    const planar = distance || 1;
+    const nx = dx / planar;
+    const nz = dz / planar;
+    const normalSpeed = racer.vx * nx + racer.vz * nz;
+    const restitution = obstacle.kind === 'rock-bumper' ? 1.45 : 0.92;
+    if (normalSpeed < 0) {
+      racer.vx -= (1 + restitution) * normalSpeed * nx;
+      racer.vz -= (1 + restitution) * normalSpeed * nz / 0.72;
+    }
+    const push = radius + RADIUS - distance + 2;
+    racer.x += nx * push; racer.z = clamp(racer.z + nz * push / 0.72, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.vx = clamp(Math.max(150, racer.vx + (obstacle.kind === 'rock-bumper' ? 70 : 25)), 0, racer.maximumSpeed);
+    racer.vz = clamp(racer.vz, -720, 720);
+    racer.grounded = false; racer.lastGroundedAt = -100;
+    obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | bit;
+    this.emit(centerX, centerY, centerZ, obstacle.kind === 'rock-bumper' ? 12 : 18, obstacle.kind === 'rock-bumper' ? '#c7b18a' : '#d7d0b4', obstacle.kind === 'rock-bumper' ? 135 : 180);
+    if (!racer.id) {
+      this.snapshot.score += obstacle.kind === 'rock-bumper' ? 90 : 45;
+      this.shake = obstacle.kind === 'spiked-rock' ? 4.5 : 2.4;
+      this.audio.play('bump');
+      this.say(obstacle.kind === 'rock-bumper' ? 'CROWN BUMPER! KEEP THE MOMENTUM.' : 'SPIKED ROCK! PICK A CLEANER LINE.');
+    }
+  }
+
   private hitObstacle(racer: Racer, obstacle: Obstacle) {
     racer.visited.add(obstacle); obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | (1 << racer.id);
     const impulse = weightImpulse(racer.weight);
@@ -741,6 +812,33 @@ export class GameEngine {
         racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
         racer.bounces = Math.min(3, racer.bounces + 1); this.emit(x, y - 24, z, 10, '#a1e1bd', 160);
         if (!racer.id) { this.snapshot.score += 100; this.audio.play('bounce'); this.say('SPRING BREAK! +1 BOUNCE'); }
+        break;
+      case 'fire-ring':
+        // +50 km/h in the HUD's 0.16 velocity-to-km/h conversion.
+        racer.vx = Math.min(racer.maximumSpeed, racer.vx + 312.5 * impulse);
+        racer.fireUntil = this.runTime + 1.35;
+        racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.72);
+        this.emit(x, y - (obstacle.altitude ?? 130), z, 22, '#ff8b3d', 240);
+        this.emit(x, y - (obstacle.altitude ?? 130), z, 10, '#ffe0a0', 155);
+        if (!racer.id) {
+          this.snapshot.score += 250;
+          this.shake = 3.2;
+          this.audio.play('boost');
+          this.say('FIRE RING! HYPER-SPEED ENGAGED.');
+        }
+        break;
+      case 'crate':
+        racer.vx = Math.min(racer.maximumSpeed, racer.vx + 45 * impulse);
+        racer.vy -= 100 * impulse; racer.grounded = false;
+        this.emit(x, y - 35, z, 8, '#c38b51', 100);
+        if (!racer.id) { this.snapshot.score += 40; this.audio.play('bump'); this.say('TIMBER IN THE FAST LINE.'); }
+        break;
+      case 'skull-box':
+        racer.vx = Math.max(130, racer.vx * 0.72);
+        racer.vy -= 155 * impulse; racer.vz += (racer.z <= z ? -1 : 1) * 180;
+        racer.grounded = false;
+        this.emit(x, y - 38, z, 13, '#c7d0ad', 125);
+        if (!racer.id) { this.snapshot.score += 80; this.shake = 2.6; this.audio.play('bump'); this.say('SKULL BOX! THE SHORTCUT BIT BACK.'); }
         break;
       case 'tnt':
         obstacle.hit = true; racer.vx += 300 * impulse; racer.vy = -450 * impulse; racer.grounded = false;

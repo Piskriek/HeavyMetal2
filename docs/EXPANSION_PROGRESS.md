@@ -73,6 +73,16 @@ Section 4 is implemented in four installments, one per user prompt.
 
 Results/cup/progression presentation and persistent cup history; then empirical balance, end-to-end QA, frame pacing and release verification. A successful build is not proof of FPS, balance or accessibility.
 
+## Phase 3 Track Expansion
+
+### TICKET-08: Waterfall Cliff Zigzag & Pinball Chasm — Implemented
+
+- `src/game/scene.ts` now exposes a 36,000 m three-stage circuit: 12,000 m Alpine Ridge, 12,000 m Waterfall Cliff, and a 12,000 m cavern/stadium approach. Course profiles are precomputed through the 72,000 world-unit finish, with cliff gravity scaling and `wet_wood` / `moss_rock` traction.
+- `createStage2WaterfallSection()` deterministically places the Scrap Fall launch, staggered crown and spiked bumper pegs, spring launchers, fire-ring hyper-speed routes, wet-run crates/skull boxes, and missing-rail recovery gaps between 11,800 m and 24,000 m. The generated objects are spatially bucketed with the rest of the course, so the extension does not create a per-frame full-track scan.
+- The physics engine reflects racers from circular rock bumpers, applies 1.45x cliff gravity, reduces steering traction on wet surfaces, awards fire-ring speed and brief invulnerability, emits rock/fire particles, and gives CPU racers a fire-ring bounce decision.
+- PreGame bumper, spring, crate, skull-box, and surface-strip assets are shipped under `public/art/track-parts/` and preloaded before the grid. The renderer uses the wood/moss strips for the active surface, procedural flame rings, cached canyon/waterfall art, bounded spray, and two-sided cliff scaffolding with spectator silhouettes.
+- The 36 km finish, progress bar, race help, course itinerary, README, and world rules now describe the expanded circuit. Section 3 remains intentionally reserved for `TICKET-09` mine-specific mechanics.
+
 ## Phase 1 Ticket Suite
 
 The ticket suite in `docs/tickets/` is implemented one issue at a time. `TICKET-01` (ornate frame system) shipped earlier; `TICKET-02` is implemented here.

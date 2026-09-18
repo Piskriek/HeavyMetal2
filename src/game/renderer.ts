@@ -3,7 +3,11 @@ import { ArenaEnvironment } from './environment';
 import { buildModelAtlas, createBoostTexture, type ModelAtlas, type ModelName } from './model-atlas';
 import { RangeCamera, edgeAnchor } from './projection';
 import { CanvasLayer, RenderBudget } from './performance';
-import { FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_WIDTH, LAUNCHER, RADIUS, closestLane, courseY, courseSlope, decalOpacity, decalRadius, laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame } from './scene';
+import {
+  FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_WIDTH, LAUNCHER, RADIUS,
+  closestLane, courseY, courseSlope, decalOpacity, decalRadius, laneZ, launchVelocity, loopGeometry,
+  obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame,
+} from './scene';
 import { RACER_DEFINITIONS, type CourseId } from './types';
 import { POWERUPS, pickupY, type AirPickup } from './powerups';
 import { polygon, texturedQuad, type Quad } from './texture';
@@ -726,9 +730,55 @@ export class RangeRenderer {
     }
   }
 
+  private drawFireRing(obstacle: Obstacle) {
+    const centerX = obstacle.x + obstacle.width / 2;
+    const point = this.p(centerX, this.y(centerX) - (obstacle.altitude ?? 130), obstacleZ(obstacle));
+    const radius = obstacle.width * 0.42 * point.scale;
+    const pulse = this.frame.reducedMotion ? 0.6 : 0.78 + Math.sin(this.frame.time * 8 + centerX * 0.01) * 0.18;
+    const context = this.context;
+    this.glow(point.x, point.y, radius * 1.8, obstacle.ring === 'steel' ? '#ff8e45' : '#ffbd55', 0.2 * pulse);
+    context.save(); context.translate(point.x, point.y); context.globalAlpha = pulse;
+    context.strokeStyle = '#24140d'; context.lineWidth = Math.max(4, radius * 0.24);
+    context.beginPath(); context.arc(0, 0, radius, 0, TAU); context.stroke();
+    context.strokeStyle = obstacle.ring === 'steel' ? '#d7d0bf' : '#f0a14e'; context.lineWidth = Math.max(2, radius * 0.13);
+    context.beginPath(); context.arc(0, 0, radius, 0, TAU); context.stroke();
+    context.strokeStyle = '#fff1b1'; context.lineWidth = Math.max(1, radius * 0.045);
+    context.beginPath(); context.arc(0, 0, radius * 0.82, -0.9, 1.2); context.stroke();
+    for (let i = 0; i < 7; i++) {
+      const angle = i * TAU / 7 + this.frame.time * 0.35;
+      const x = Math.cos(angle) * radius * 0.93;
+      const y = Math.sin(angle) * radius * 0.93;
+      context.fillStyle = i % 2 ? '#ff6335' : '#ffd27a';
+      context.beginPath(); context.moveTo(x, y); context.lineTo(x + Math.cos(angle) * 8 * point.scale, y + Math.sin(angle) * 8 * point.scale);
+      context.lineTo(x - Math.sin(angle) * 4 * point.scale, y + Math.cos(angle) * 4 * point.scale); context.closePath(); context.fill();
+    }
+    context.restore();
+  }
+
+  private drawBumper(obstacle: Obstacle) {
+    const centerX = obstacle.x + obstacle.width / 2;
+    const point = this.p(centerX, this.y(centerX), obstacleZ(obstacle));
+    const sprite = obstacle.kind === 'spiked-rock' || obstacle.variant === 'spiked' ? this.assets.bumperSpiked : this.assets.bumperCrown;
+    const drawW = obstacle.width * point.scale;
+    const drawH = Math.min(obstacle.height * 1.22, drawW * sprite.height / sprite.width);
+    this.glow(point.x, point.y - drawH * 0.42, drawW * 0.72, obstacle.kind === 'spiked-rock' ? '#ff6543' : '#ffd27a', obstacle.kind === 'spiked-rock' ? 0.09 : 0.12);
+    this.context.save(); this.context.translate(point.x, point.y);
+    this.context.rotate(Math.atan(this.slope(centerX)) * 0.22);
+    this.context.drawImage(sprite.image, -drawW * 0.5, -drawH * 0.91, drawW, drawH);
+    this.context.restore();
+  }
+
   private drawObstacle(obstacle: Obstacle) {
     const { kind, x, width, height } = obstacle;
     if (kind === 'ramp' || kind === 'loop' || kind === 'gap') return;
+    if (kind === 'fire-ring') {
+      this.drawFireRing(obstacle);
+      return;
+    }
+    if (kind === 'rock-bumper' || kind === 'spiked-rock') {
+      this.drawBumper(obstacle);
+      return;
+    }
     if (kind === 'sign') {
       this.drawSign(obstacle);
       return;
@@ -750,11 +800,12 @@ export class RangeRenderer {
       return;
     }
     const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
-    let h = Math.min(height * 1.12, width * this.assets[kind].height / this.assets[kind].width);
+    const sprite = kind === 'skull-box' ? this.assets.skullBox : kind === 'spring' ? this.assets.springPart : this.assets[kind];
+    let h = Math.min(height * 1.12, width * sprite.height / sprite.width);
     if (kind === 'spring' && this.frame.time - obstacle.hitAt < 0.4) h *= 1 - Math.sin((this.frame.time - obstacle.hitAt) / 0.4 * Math.PI) * 0.36;
     this.context.save(); this.context.translate(point.x, point.y);
     this.context.rotate(Math.atan(this.slope(x) - (this.frame.options.downrange ? 0.11 : 0)) * 0.38);
-    this.context.drawImage(this.assets[kind].image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
+    this.context.drawImage(sprite.image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
     this.context.restore();
     if (kind === 'tnt') this.glow(point.x + 7 * point.scale, point.y - h * point.scale * 0.9, 12 * point.scale, '#ffc16c', 0.3);
   }
@@ -764,6 +815,18 @@ export class RangeRenderer {
     const p = this.p(ball.x, ball.y, ball.z);
     const context = this.context;
     const ready = this.frame.snapshot.status === 'ready';
+    if (!ready && ball.fireUntil > this.frame.runTime) {
+      const age = Math.max(0, ball.fireUntil - this.frame.runTime);
+      this.glow(p.x - 27 * p.scale, p.y + 9 * p.scale, 36 * p.scale, '#ff6335', 0.16);
+      context.save(); context.translate(p.x, p.y); context.rotate(ball.rotation);
+      for (let i = 0; i < 4; i++) {
+        const flame = 15 + i * 5 + Math.sin(this.frame.time * 18 + i) * 3;
+        context.fillStyle = i % 2 ? '#ff713b' : '#ffd27a';
+        context.globalAlpha = Math.min(0.9, age * 1.4) * (1 - i * 0.12);
+        context.beginPath(); context.moveTo(-27 * p.scale - i * 4 * p.scale, 0); context.quadraticCurveTo(-42 * p.scale - i * 4 * p.scale, -flame * p.scale, -58 * p.scale - i * 5 * p.scale, 0); context.quadraticCurveTo(-42 * p.scale - i * 4 * p.scale, flame * p.scale, -27 * p.scale - i * 4 * p.scale, 0); context.fill();
+      }
+      context.restore();
+    }
     if (ball.shieldUntil > this.frame.runTime) {
       context.strokeStyle = '#8cceffd9'; context.lineWidth = 2 * p.scale;
       context.beginPath(); context.arc(p.x, p.y, 44 * p.scale, 0, TAU); context.stroke();

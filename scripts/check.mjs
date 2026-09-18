@@ -13,7 +13,7 @@ const commands = [
   ['node_modules/typescript/bin/tsc', '--noEmit'],
   ['--import', 'tsx', '--test', '--test-reporter=tap', '--test-reporter-destination=stdout',
     '--test-reporter=tap', '--test-reporter-destination=tests/artifacts/latest-test-run.tap',
-    'tests/session-save.test.ts', 'tests/camera-decal.test.ts', 'tests/ticket05-backdrop.test.ts'],
+    'tests/session-save.test.ts', 'tests/camera-decal.test.ts', 'tests/ticket05-backdrop.test.ts', 'tests/ticket08-section.test.ts'],
 ];
 
 for (const args of commands) {

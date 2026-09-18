@@ -73,6 +73,8 @@ async function downloadSourcePng(url: string, filename: string) {
 
 const HAZARDS: { sprite: SpriteName; name: string; description: string }[] = [
   { sprite: 'spring', name: 'Spring loaded', description: 'A big bounce, a little airtime, and one bounce charge back.' },
+  { sprite: 'bumperCrown', name: 'Crown bumper', description: 'A pinball-style crown peg redirects your line without killing momentum.' },
+  { sprite: 'bumperSpiked', name: 'Spiked bumper', description: 'The red rockfield peg kicks hard and rewards a clean lane choice.' },
   { sprite: 'boost', name: 'Full throttle', description: 'Hit the chevrons for instant speed and a fresh boost charge.' },
   { sprite: 'tnt', name: 'Explosive potential', description: 'Run into it. Seriously. The blast sends you further.' },
   { sprite: 'sheep', name: 'The local wildlife', description: 'Soft landings. Loud complaints. No sheep are harmed.' },
@@ -460,7 +462,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         <AnimatePresence>
           {modal === 'help' && <Modal key="help" title="A Crash Course. Literally." eyebrow="THE VERY OPTIONAL INSTRUCTION MANUAL" onClose={closeModal} className="fantasy-dialog">
             <div className="modal-tabs" role="tablist" aria-label="Instructions"><button role="tab" aria-selected={helpTab === 'basics'} className={helpTab === 'basics' ? 'selected' : ''} onClick={() => setHelpTab('basics')}>THE BASICS</button><button role="tab" aria-selected={helpTab === 'hazards'} className={helpTab === 'hazards' ? 'selected' : ''} onClick={() => setHelpTab('hazards')}>MEET THE BAD IDEAS</button></div>
-            {helpTab === 'basics' ? <div className="help-basics"><p className="modal-lead">You are racing as {riderById(config.loadout.rider).name} in the {capsuleById(config.loadout.capsule).name}. Four loaded slingshots, four lanes, and 15 km to the stadium. Your orange goblin starts in lane 3.</p>
+            {helpTab === 'basics' ? <div className="help-basics"><p className="modal-lead">You are racing as {riderById(config.loadout.rider).name} in the {capsuleById(config.loadout.capsule).name}. Four loaded slingshots, four lanes, and 36 km to the stadium. Your orange goblin starts in lane 3.</p>
               <div className="instruction-row"><span className="instruction-number">01</span><MousePointer2 size={24} /><div><h3>Pull back. Let it rip.</h3><p>Drag the glowing ball left and down, then release. Or use arrow keys to adjust power and angle, then Enter to launch.</p></div><kbd>DRAG</kbd></div>
               <div className="instruction-row"><span className="instruction-number">02</span><ArrowRight size={25} /><div><h3>Pick a lane. Borrow theirs.</h3><p>A moves left, D moves right. Touch the steering arrows on a phone. Contact shoves rivals toward adjacent lanes; heavier capsules push harder. Steering locks briefly after a bump and during loops.</p></div><kbd>A / D</kbd></div>
               <div className="instruction-row"><span className="instruction-number">03</span><ArrowUpFromLine size={25} /><div><h3>Give gravity a day off.</h3><p>Space uses one of your midair bounces. Spring pads refill charges automatically. Each racer has their own charges; sheep and TNT are first-come, first-chaos.</p></div><kbd>SPACE</kbd></div>

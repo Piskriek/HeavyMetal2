@@ -7,17 +7,55 @@ export const GROUND = 478;
 export const START_X = 190;
 export const START_Y = 325;
 export const RADIUS = 31;
-export const TRACK_DISTANCE = 15000;
-export const TRACK_LENGTH = TRACK_DISTANCE * 2;
+
+/**
+ * World X is deliberately twice the race distance.  That leaves enough room for
+ * the perspective camera to show the road, the canyon wall, and the next feature
+ * without making the physics units awkwardly large.
+ */
+export const METERS_TO_WORLD = 2;
+export const STAGE_1_DISTANCE = 12000;
+export const STAGE_2_DISTANCE = 12000;
+export const STAGE_3_DISTANCE = 12000;
+export const TRACK_DISTANCE = STAGE_1_DISTANCE + STAGE_2_DISTANCE + STAGE_3_DISTANCE;
+export const TRACK_LENGTH = TRACK_DISTANCE * METERS_TO_WORLD;
+export const STAGE_1_END = START_X + STAGE_1_DISTANCE * METERS_TO_WORLD;
+export const STAGE_2_START = STAGE_1_END;
+export const STAGE_2_END = STAGE_2_START + STAGE_2_DISTANCE * METERS_TO_WORLD;
+export const STAGE_3_START = STAGE_2_END;
+export const STADIUM_START_DISTANCE = 34500;
+export const STADIUM_START = START_X + STADIUM_START_DISTANCE * METERS_TO_WORLD;
 export const FINISH = START_X + TRACK_LENGTH;
-export const STADIUM_START = START_X + 27000;
 export const GRAVITY = 2400;
+export const CLIFF_GRAVITY_MULTIPLIER = 1.45;
+export const CLIFF_ANGLE = 40 * Math.PI / 180;
 export const LANE_COUNT = 4;
 export const LANE_WIDTH = 240;
 export const PLAYER_LANE = 2;
 export const LANE = { near: -480, far: 480 };
 export const laneZ = (lane: number) => LANE.far - LANE_WIDTH * (lane + 0.5);
 export const closestLane = (z: number) => Math.max(0, Math.min(3, Math.round((LANE.far - z) / LANE_WIDTH - 0.5)));
+
+export type TrackSection = 'stage1' | 'stage2' | 'stage3';
+export type SurfaceType = 'normal' | 'wet_wood' | 'moss_rock';
+
+export function trackSectionAt(x: number): TrackSection {
+  if (x < STAGE_2_START) return 'stage1';
+  if (x < STAGE_3_START) return 'stage2';
+  return 'stage3';
+}
+
+export function surfaceTypeAt(x: number): SurfaceType {
+  if (x < STAGE_2_START || x >= STAGE_3_START) return 'normal';
+  // The upper shelves are timber berms; the lower foam run is slick mossy slate.
+  return x < STAGE_2_START + 7800 ? 'wet_wood' : 'moss_rock';
+}
+
+/** A steep cliff face gets a controlled arcade gravity boost without changing all tracks. */
+export function gravityScaleForSlope(slope: number) {
+  return Math.abs(Math.atan(slope)) >= CLIFF_ANGLE ? CLIFF_GRAVITY_MULTIPLIER : 1;
+}
+
 export const obstacleZ = (obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) => {
   if (obstacle.lane === -1) return 0;
   const lane = obstacle.lane ?? PLAYER_LANE;
@@ -38,7 +76,10 @@ export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0
     const bounds = obstacleBounds(obstacle);
     return z > bounds.near - 40 && z < bounds.far + 40;
   }
-  const halfWidth = obstacle.kind === 'ramp' || obstacle.kind === 'loop' ? 66 : obstacle.kind === 'boost' ? 45 : 37;
+  const halfWidth = obstacle.kind === 'ramp' || obstacle.kind === 'loop' ? 66
+    : obstacle.kind === 'boost' ? 45
+      : obstacle.kind === 'fire-ring' ? 62
+        : obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock' || obstacle.kind === 'crate' || obstacle.kind === 'skull-box' ? 52 : 37;
   return Math.abs(z - obstacleZ(obstacle)) < halfWidth + padding;
 }
 export const TERRAIN = GROUND + 154;
@@ -50,7 +91,7 @@ const SAMPLE_STEP = 16;
 const elevations = {} as Record<CourseId, Float32Array>;
 for (const id of Object.keys(TRACKS) as CourseId[]) {
   const profile = TRACKS[id].profile;
-  const table = new Float32Array(Math.ceil(32000 / SAMPLE_STEP) + 1);
+  const table = new Float32Array(Math.ceil((TRACK_LENGTH + 1024) / SAMPLE_STEP) + 1);
   const slopes = profile.slice(0, -1).map((point, i) => (profile[i + 1][1] - point[1]) / (profile[i + 1][0] - point[0]));
   const tangents = profile.map((_, i) => !i || i === profile.length - 1 || !slopes[i - 1] || !slopes[i] ? 0 : 2 / (1 / slopes[i - 1] + 1 / slopes[i]));
   for (let i = 0, section = 0; i < table.length; i++) {
@@ -64,7 +105,7 @@ for (const id of Object.keys(TRACKS) as CourseId[]) {
   elevations[id] = table;
 }
 
-// A precomputed, monotone hill profile keeps collision and drawing queries cheap.
+// A precomputed, monotone-enough odyssey profile keeps collision and drawing queries cheap.
 export function courseY(x: number, course: CourseId = 'ridge') {
   const elevation = elevations[course];
   const sample = Math.max(0, Math.min(elevation.length - 1.001, (x - START_X) / SAMPLE_STEP));
@@ -86,11 +127,12 @@ export const decalRadius = (altitude: number) => RADIUS * 1.1 * (1 + Math.max(0,
 /** Opacity = clamp(0.85 - Z / Z_max x 0.45, 0.25, 0.85) — it softens as the ball climbs. */
 export const decalOpacity = (altitude: number) => Math.max(0.25, Math.min(0.85, 0.85 - Math.max(0, altitude) / AIRBORNE_CEILING * 0.45));
 
+const SECTOR_ENDS = [1400, 5400, 10000, 13600, 18600, 23000, 24000, 26400, 30000, 33600, 37200, 42000, 46800, 52000, 60000, 69000];
 export function sectorAt(x: number, course: CourseId = 'ridge') {
   const distance = x - START_X;
   const sectors = TRACKS[course].sectors;
-  const index = [1400, 5400, 10000, 13600, 18600, 23000, 27000].findIndex((end) => distance < end);
-  return sectors[index < 0 ? 7 : index];
+  const index = SECTOR_ENDS.findIndex((end) => distance < end);
+  return sectors[Math.min(index < 0 ? sectors.length - 1 : index, sectors.length - 1)];
 }
 
 export function loopGeometry(obstacle: Pick<Obstacle, 'x' | 'height'>, course: CourseId = 'ridge') {
@@ -103,7 +145,8 @@ export function rampSurface(obstacle: Pick<Obstacle, 'x' | 'width' | 'height'>, 
   return courseY(x, course) - Math.pow(t, 1.6) * obstacle.height;
 }
 
-export type ObstacleKind = 'ramp' | 'loop' | 'sheep' | 'tnt' | 'spring' | 'boost' | 'gap' | 'blimp' | 'sign';
+export type ObstacleKind = 'ramp' | 'loop' | 'sheep' | 'tnt' | 'spring' | 'boost' | 'gap' | 'blimp' | 'sign'
+  | 'rock-bumper' | 'spiked-rock' | 'fire-ring' | 'crate' | 'skull-box';
 
 export interface Obstacle {
   kind: ObstacleKind;
@@ -117,6 +160,10 @@ export interface Obstacle {
   hitMask?: number;
   altitude?: number;
   signType?: 'sheep' | 'tnt' | 'parts';
+  variant?: 'crown' | 'spiked';
+  ring?: 'spiked' | 'steel';
+  section?: TrackSection;
+  surface?: SurfaceType;
 }
 
 export interface Particle {
@@ -170,6 +217,7 @@ export interface RacerFrame {
   shieldUntil: number;
   shieldHitAt: number;
   pickupAt: number;
+  fireUntil: number;
   launchOrigin: { x: number; y: number };
 }
 

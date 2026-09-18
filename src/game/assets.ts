@@ -148,9 +148,9 @@ export function loadAssets(): Promise<GameAssets> {
       ['deck', 'deck-surface.png'],
       ['dirtArt', 'dirt-tile.png'],
       ['blimp', 'blimp.png'],
-      ['signSheep', 'sign-sheep.png'],
-      ['signTnt', 'sign-tnt.png'],
-      ['signParts', 'sign-parts.png'],
+      ['signSheep', 'sign-sheep.png?v=3'],
+      ['signTnt', 'sign-tnt.png?v=3'],
+      ['signParts', 'sign-parts.png?v=3'],
     ];
     const result = {} as GameAssets;
     await Promise.all(files.map(async ([name, filename]) => {

@@ -5,13 +5,18 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
   const obstacles: Obstacle[] = [];
   const add = (kind: ObstacleKind, x: number, width: number, height: number, lane: number, laneSpan = 1) =>
     obstacles.push({ kind, x, width, height, lane, laneSpan, hit: false, hitAt: -100, hitMask: 0 });
-  const addSign = (x: number, signType: 'sheep' | 'tnt' | 'parts', altitude = 315) =>
-    obstacles.push({ kind: 'sign', signType, x, width: 360, height: 160, lane: -1, laneSpan: 4, altitude, hit: false, hitAt: -100, hitMask: 0 });
-  const addBlimp = (x: number, altitude = 540) =>
+  const addSign = (x: number, signType: 'sheep' | 'tnt' | 'parts', altitude = 320) =>
+    obstacles.push({ kind: 'sign', signType, x, width: 360, height: 150, lane: -1, laneSpan: 4, altitude, hit: false, hitAt: -100, hitMask: 0 });
+  const addBlimp = (x: number, altitude = 545) =>
     obstacles.push({ kind: 'blimp', x, width: 230, height: 115, lane: -1, laneSpan: 4, altitude, hit: false, hitAt: -100, hitMask: 0 });
+  const addBlimpSign = (x: number, signType: 'sheep' | 'tnt' | 'parts', signAlt = 320, blimpAlt = 545) => {
+    // Blimp (width 230) centered over sign (width 360): (x + 180) - 115 = x + 65
+    addBlimp(x + 65, blimpAlt);
+    addSign(x, signType, signAlt);
+  };
 
   for (let lane = 0; lane < 4; lane++) { add('ramp', 510, 190, 76, lane); add('boost', 770, 116, 15, lane); }
-  addSign(980, course === 'sheep' ? 'sheep' : course === 'boomtown' ? 'tnt' : 'parts', 315);
+  addBlimpSign(980, course === 'sheep' ? 'sheep' : course === 'boomtown' ? 'tnt' : 'parts', 320, 545);
   add('sheep', 1160, 62, 59, course === 'sheep' ? 2 : 0);
   add('loop', 1370, 375, 322, course === 'boomtown' ? 3 : 2);
   add('spring', 1670, 82, 56, 1);
@@ -26,7 +31,7 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
     if (course === 'ridge') {
       add('boost', x + 30, 130, 15, lane);
       add('ramp', x + 325, 205, section % 2 ? 90 : 112, (lane + 1) % 4);
-      addSign(x + 620, signType, 330);
+      addBlimpSign(x + 620, signType, 330, 555);
       add('sheep', x + 860, 62, 59, (lane + 2) % 4);
       add('spring', x + 1070, 82, 56, lane);
       if (section % 2 === 0) addBlimp(x + 1320, 550);
@@ -38,7 +43,7 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
       add('boost', x + 55, 135, 15, (lane + 2) % 4);
       add('tnt', x + 295, 65, 70, lane); add('tnt', x + 430, 65, 70, (lane + 1) % 4);
       add('ramp', x + 700, 210, 125, (lane + 2) % 4);
-      addSign(x + 980, section % 2 === 0 ? 'tnt' : 'parts', 340);
+      addBlimpSign(x + 980, section % 2 === 0 ? 'tnt' : 'parts', 335, 560);
       add('gap', x + 1120, 192, 0, section % 3, 2);
       if (section % 2 === 1) addBlimp(x + 1380, 560);
       add('tnt', x + 1520, 65, 70, (lane + 3) % 4);
@@ -48,7 +53,7 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
     } else {
       add('sheep', x + 135, 66, 62, lane); add('sheep', x + 265, 62, 59, (lane + 2) % 4);
       add('ramp', x + 500, 185, 80, (lane + 1) % 4);
-      addSign(x + 720, section % 2 === 0 ? 'sheep' : 'parts', 315);
+      addBlimpSign(x + 720, section % 2 === 0 ? 'sheep' : 'parts', 320, 545);
       add('spring', x + 890, 82, 56, (lane + 3) % 4);
       add('gap', x + 1190, 132, 0, lane, 1);
       if (section % 3 === 1) addBlimp(x + 1400, 530);
@@ -59,7 +64,7 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
   }
 
   for (let lane = 0; lane < 4; lane++) { add('boost', STADIUM_START + 290, 130, 15, lane); add('boost', FINISH - 550, 135, 15, lane); }
-  addSign(STADIUM_START + 800, 'parts', 330);
+  addBlimpSign(STADIUM_START + 800, 'parts', 325, 550);
   add('ramp', STADIUM_START + 1300, 190, 70, course === 'sheep' ? 2 : 0);
   addBlimp(STADIUM_START + 1600, 560);
   add(course === 'boomtown' ? 'tnt' : 'sheep', STADIUM_START + 1970, 65, 65, 3);

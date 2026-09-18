@@ -761,6 +761,12 @@ export class GameEngine {
         this.emit(x, y - (obstacle.altitude ?? 540), z, 35, '#ff4400', 320);
         this.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#ffbb00', 250);
         this.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#333333', 180);
+        for (const o of this.nearby(x)) {
+          if (o.kind === 'sign' && !o.hit && Math.abs((o.x + o.width / 2) - x) < 90) {
+            o.hit = true;
+            o.hitAt = this.time;
+          }
+        }
         if (!racer.id) {
           this.snapshot.score += 250;
           this.counts.explosions++;

@@ -406,57 +406,171 @@ export class RangeRenderer {
     const signFarZ = zCenter + spanZ / 2;
     const signNearZ = zCenter - spanZ / 2;
 
-    const yBottom = baseY - altitude;
+    // Blimp hover bobbing in sync with overhead blimp
+    const hover = this.frame.reducedMotion ? 0 : Math.sin(this.frame.runTime * 1.8 + centerX * 0.02) * 12;
+
+    const yBottom = baseY - altitude + hover;
     const yTop = yBottom - height;
 
-    // Two sturdy wooden legs supporting the billboard from the ground
-    const farBase = this.p(centerX, baseY, signFarZ - 8);
-    const farTop = this.p(centerX, yBottom + 12, signFarZ - 8);
-    const nearBase = this.p(centerX, baseY, signNearZ + 8);
-    const nearTop = this.p(centerX, yBottom + 12, signNearZ + 8);
+    // Thickness in 3D along X axis for perceived volumetric depth
+    const thickness = 16;
+    const xFront = centerX - thickness / 2;
+    const xBack = centerX + thickness / 2;
 
-    context.strokeStyle = '#382214';
-    context.lineWidth = 10 * farTop.scale;
-    context.beginPath();
-    context.moveTo(farBase.x, farBase.y);
-    context.lineTo(farTop.x, farTop.y);
-    context.stroke();
+    // Find overhead blimp to attach ropes to
+    const blimp = this.visibleObstacles.find((o) => o.kind === 'blimp' && Math.abs((o.x + o.width / 2) - centerX) < 80);
+    const blimpAlt = blimp?.altitude ?? (altitude + height + 50);
+    const blimpX = blimp ? blimp.x + blimp.width / 2 : centerX;
+    // Gondola position at the bottom of the blimp
+    const gondolaY = baseY - blimpAlt + hover + 42;
 
-    context.strokeStyle = '#28170c';
-    context.lineWidth = 12 * nearTop.scale;
-    context.beginPath();
-    context.moveTo(nearBase.x, nearBase.y);
-    context.lineTo(nearTop.x, nearTop.y);
-    context.stroke();
+    const gondolaFar = this.p(blimpX, gondolaY, zCenter + spanZ * 0.28);
+    const gondolaNear = this.p(blimpX, gondolaY, zCenter - spanZ * 0.28);
+    const signFarEye = this.p(xFront, yTop, signFarZ - 16);
+    const signNearEye = this.p(xFront, yTop, signNearZ + 16);
 
-    // Cross-struts on the tall support legs (trestle scaffolding)
-    const avgScale = (farTop.scale + nearTop.scale) / 2;
-    context.strokeStyle = '#341f11';
-    context.lineWidth = 5 * avgScale;
-    for (const frac of [0.35, 0.7, 1.0]) {
-      const braceY = baseY - altitude * frac + 10;
-      const fP = this.p(centerX, braceY, signFarZ - 8);
-      const nP = this.p(centerX, braceY, signNearZ + 8);
-      context.beginPath();
-      context.moveTo(fP.x, fP.y);
-      context.lineTo(nP.x, nP.y);
-      context.stroke();
-    }
-
-    // Ground contact shadows under the two post bases
-    this.contact(centerX, 26, '#040c07', 0.45, signFarZ - 8);
-    this.contact(centerX, 30, '#040c07', 0.5, signNearZ + 8);
+    const avgScale = (signFarEye.scale + signNearEye.scale) / 2;
 
     if (!obstacle.hit) {
-      // Front 3D Quad facing oncoming riders in true 3D space
-      // UV: [Top-Left, Top-Right, Bottom-Right, Bottom-Left]
-      const p0 = this.p(centerX, yTop, signFarZ);
-      const p1 = this.p(centerX, yTop, signNearZ);
-      const p2 = this.p(centerX, yBottom, signNearZ);
-      const p3 = this.p(centerX, yBottom, signFarZ);
+      // 3D Slab Thickness: 8 projected corners of the billboard
+      const f0 = this.p(xFront, yTop, signFarZ);
+      const f1 = this.p(xFront, yTop, signNearZ);
+      const f2 = this.p(xFront, yBottom, signNearZ);
+      const f3 = this.p(xFront, yBottom, signFarZ);
 
-      // Texture the quad with the billboard art in 3D perspective!
-      texturedQuad(context, img, { x: 0, y: 0, width: imgW, height: imgH }, [p0, p1, p2, p3]);
+      const b0 = this.p(xBack, yTop, signFarZ);
+      const b1 = this.p(xBack, yTop, signNearZ);
+      const b2 = this.p(xBack, yBottom, signNearZ);
+      const b3 = this.p(xBack, yBottom, signFarZ);
+
+      // Back face (dark rustic wood planks)
+      polygon(context, [b0, b1, b2, b3]);
+      context.fillStyle = '#1c1007';
+      context.fill();
+      context.strokeStyle = '#2b180a';
+      context.lineWidth = 1.5 * avgScale;
+      context.stroke();
+
+      // Top thickness face (illuminated by overhead sky light)
+      polygon(context, [f0, f1, b1, b0]);
+      context.fillStyle = '#54361e';
+      context.fill();
+
+      // Front rim highlight bevel along top edge
+      context.strokeStyle = '#7d5030';
+      context.lineWidth = 1.8 * avgScale;
+      context.beginPath();
+      context.moveTo(f0.x, f0.y);
+      context.lineTo(f1.x, f1.y);
+      context.stroke();
+
+      // Back rim shadow line
+      context.strokeStyle = '#321c0d';
+      context.lineWidth = 1.2 * avgScale;
+      context.beginPath();
+      context.moveTo(b0.x, b0.y);
+      context.lineTo(b1.x, b1.y);
+      context.stroke();
+
+      // Near side thickness face (visible from camera yaw angle)
+      polygon(context, [f1, f2, b2, b1]);
+      context.fillStyle = '#352012';
+      context.fill();
+      context.strokeStyle = '#201309';
+      context.lineWidth = 1.2 * avgScale;
+      context.stroke();
+
+      // Bottom thickness face (deep underside shadow)
+      polygon(context, [f3, f2, b2, b3]);
+      context.fillStyle = '#120904';
+      context.fill();
+
+      // Front face with crisp unstretched billboard artwork
+      texturedQuad(context, img, { x: 0, y: 0, width: imgW, height: imgH }, [f0, f1, f2, f3]);
+
+      // Subtle solid wooden border around front face
+      context.strokeStyle = '#271509';
+      context.lineWidth = 2.2 * avgScale;
+      polygon(context, [f0, f1, f2, f3]);
+      context.stroke();
+
+      // Draw short twisted suspension ropes from blimp gondola down to billboard
+      context.save();
+
+      // Far rope
+      context.strokeStyle = '#180d05';
+      context.lineWidth = 4 * signFarEye.scale;
+      context.beginPath();
+      context.moveTo(gondolaFar.x, gondolaFar.y);
+      context.lineTo(signFarEye.x, signFarEye.y);
+      context.stroke();
+
+      context.strokeStyle = '#6e4722';
+      context.lineWidth = 2.4 * signFarEye.scale;
+      context.beginPath();
+      context.moveTo(gondolaFar.x, gondolaFar.y);
+      context.lineTo(signFarEye.x, signFarEye.y);
+      context.stroke();
+
+      context.strokeStyle = '#a67c48';
+      context.lineWidth = 1.2 * signFarEye.scale;
+      context.setLineDash([3 * signFarEye.scale, 3 * signFarEye.scale]);
+      context.beginPath();
+      context.moveTo(gondolaFar.x, gondolaFar.y);
+      context.lineTo(signFarEye.x, signFarEye.y);
+      context.stroke();
+      context.setLineDash([]);
+
+      // Near rope
+      context.strokeStyle = '#180d05';
+      context.lineWidth = 4.5 * signNearEye.scale;
+      context.beginPath();
+      context.moveTo(gondolaNear.x, gondolaNear.y);
+      context.lineTo(signNearEye.x, signNearEye.y);
+      context.stroke();
+
+      context.strokeStyle = '#6e4722';
+      context.lineWidth = 2.6 * signNearEye.scale;
+      context.beginPath();
+      context.moveTo(gondolaNear.x, gondolaNear.y);
+      context.lineTo(signNearEye.x, signNearEye.y);
+      context.stroke();
+
+      context.strokeStyle = '#a67c48';
+      context.lineWidth = 1.3 * signNearEye.scale;
+      context.setLineDash([3 * signNearEye.scale, 3 * signNearEye.scale]);
+      context.beginPath();
+      context.moveTo(gondolaNear.x, gondolaNear.y);
+      context.lineTo(signNearEye.x, signNearEye.y);
+      context.stroke();
+      context.setLineDash([]);
+
+      // Heavy forged iron mounting brackets and eyelets on top rim of the sign
+      for (const eye of [signFarEye, signNearEye]) {
+        // Vertical iron mounting strap bolted to the timber face
+        context.fillStyle = '#222222';
+        context.fillRect(eye.x - 3.5 * eye.scale, eye.y - 2 * eye.scale, 7 * eye.scale, 14 * eye.scale);
+        context.strokeStyle = '#444444';
+        context.lineWidth = 1 * eye.scale;
+        context.strokeRect(eye.x - 3.5 * eye.scale, eye.y - 2 * eye.scale, 7 * eye.scale, 14 * eye.scale);
+
+        // Mounting rivets
+        context.fillStyle = '#888888';
+        context.beginPath();
+        context.arc(eye.x, eye.y + 4 * eye.scale, 1.2 * eye.scale, 0, TAU);
+        context.arc(eye.x, eye.y + 9 * eye.scale, 1.2 * eye.scale, 0, TAU);
+        context.fill();
+
+        // Eyelet ring where rope enters
+        context.fillStyle = '#181818';
+        context.beginPath();
+        context.arc(eye.x, eye.y - 2 * eye.scale, 4.2 * eye.scale, 0, TAU);
+        context.fill();
+        context.strokeStyle = '#555555';
+        context.lineWidth = 1.5 * eye.scale;
+        context.stroke();
+      }
+      context.restore();
     } else {
       // 3D Shatter / break animation!
       const age = this.frame.time - obstacle.hitAt;
@@ -468,24 +582,48 @@ export class RangeRenderer {
       context.save();
       context.globalAlpha = fade;
 
+      // Draw severed rope ends dangling from blimp gondola
+      context.strokeStyle = '#754d24';
+      context.lineWidth = 2.5 * avgScale;
+      context.beginPath();
+      context.moveTo(gondolaFar.x, gondolaFar.y);
+      context.lineTo(gondolaFar.x + Math.sin(age * 12) * 5 * avgScale, gondolaFar.y + 14 * avgScale);
+      context.moveTo(gondolaNear.x, gondolaNear.y);
+      context.lineTo(gondolaNear.x - Math.sin(age * 12) * 6 * avgScale, gondolaNear.y + 16 * avgScale);
+      context.stroke();
+
       // Piece 1: Left half (Far side) tumbling in 3D
       const lDx = age * 180;
       const lDz = age * 60;
       const lDy = age * 30 + age * age * 420;
-      const lp0 = this.p(centerX + lDx, yTop + lDy, signFarZ + lDz);
-      const lp1 = this.p(centerX + lDx + age * 25, yTop + lDy - age * 20, zMid + lDz * 0.3);
-      const lp2 = this.p(centerX + lDx + age * 25, yBottom + lDy - age * 20, zMid + lDz * 0.3);
-      const lp3 = this.p(centerX + lDx, yBottom + lDy, signFarZ + lDz);
+      const lp0 = this.p(xFront + lDx, yTop + lDy, signFarZ + lDz);
+      const lp1 = this.p(xFront + lDx + age * 25, yTop + lDy - age * 20, zMid + lDz * 0.3);
+      const lp2 = this.p(xFront + lDx + age * 25, yBottom + lDy - age * 20, zMid + lDz * 0.3);
+      const lp3 = this.p(xFront + lDx, yBottom + lDy, signFarZ + lDz);
+
+      // Left piece thickness backing
+      const lb0 = this.p(xBack + lDx, yTop + lDy, signFarZ + lDz);
+      const lb1 = this.p(xBack + lDx + age * 25, yTop + lDy - age * 20, zMid + lDz * 0.3);
+      polygon(context, [lp0, lp1, lb1, lb0]);
+      context.fillStyle = '#4c301c'; context.fill();
+
       texturedQuad(context, img, { x: 0, y: 0, width: halfW, height: imgH }, [lp0, lp1, lp2, lp3]);
 
       // Piece 2: Right half (Near side) tumbling in 3D
       const rDx = age * 210;
       const rDz = -age * 70;
       const rDy = age * 40 + age * age * 450;
-      const rp0 = this.p(centerX + rDx - age * 25, yTop + rDy - age * 15, zMid + rDz * 0.3);
-      const rp1 = this.p(centerX + rDx, yTop + rDy, signNearZ + rDz);
-      const rp2 = this.p(centerX + rDx, yBottom + rDy, signNearZ + rDz);
-      const rp3 = this.p(centerX + rDx - age * 25, yBottom + rDy - age * 15, zMid + rDz * 0.3);
+      const rp0 = this.p(xFront + rDx - age * 25, yTop + rDy - age * 15, zMid + rDz * 0.3);
+      const rp1 = this.p(xFront + rDx, yTop + rDy, signNearZ + rDz);
+      const rp2 = this.p(xFront + rDx, yBottom + rDy, signNearZ + rDz);
+      const rp3 = this.p(xFront + rDx - age * 25, yBottom + rDy - age * 15, zMid + rDz * 0.3);
+
+      // Right piece thickness backing
+      const rb0 = this.p(xBack + rDx - age * 25, yTop + rDy - age * 15, zMid + rDz * 0.3);
+      const rb1 = this.p(xBack + rDx, yTop + rDy, signNearZ + rDz);
+      polygon(context, [rp0, rp1, rb1, rb0]);
+      context.fillStyle = '#4c301c'; context.fill();
+
       texturedQuad(context, img, { x: halfW, y: 0, width: halfW, height: imgH }, [rp0, rp1, rp2, rp3]);
 
       // Wood splinter debris in 3D

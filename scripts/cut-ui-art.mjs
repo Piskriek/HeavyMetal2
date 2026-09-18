@@ -206,10 +206,10 @@ for (const [source, target, box] of [
   run([target, '-channel', 'RB', '-fx', 'a < 0.96 && r > 1.12*g && b > 1.12*g ? g : u', '+channel', target]);
   log('HM2 keyed sticker', target);
 }
-run(['-size', '720x160', 'xc:none',
+run(['-size', '700x160', 'xc:none',
   // Deliberately upscale the predecessor banner; `>` would only shrink it and leave a gap.
   '(', join(root, 'PreGame/src/assets/ui/logo.webp'), '-resize', '650x115', ')', '-gravity', 'west', '-geometry', '+0+0', '-composite',
-  // The badge overlaps the banner's right iron cap, reading as one lockup rather than two marks.
+  // The badge overlaps the banner's right iron cap by 95px, reading as one tight lockup.
   '(', out('art/ui/emblem-heavy-metal-2.png'), '-resize', '145x145', ')', '-gravity', 'east', '-geometry', '+0+0', '-composite',
   out('art/ui/logo-heavymetal2.png')]);
 log('HM2 logo', out('art/ui/logo-heavymetal2.png'));

@@ -4,11 +4,24 @@ import { TRACKS, type CourseDefinition } from './courses';
 import type { CourseId } from './types';
 
 export interface CourseArt {
+  /**
+   * TICKET-06: Layer 1 — high-resolution painted panoramic skybox (2048x1024).
+   * Falls back to the procedural gradient sky if the PNG isn't decoded yet.
+   */
   sky: HTMLCanvasElement;
+  /**
+   * TICKET-06: Layer 2 — distant mountain/city silhouette parallax layer (0.15x).
+   * Painted onto a transparent canvas so it composites cleanly over the skybox.
+   */
+  farMountains: HTMLCanvasElement;
   dirt: HTMLCanvasElement;
   bank: HTMLCanvasElement;
   blimp: HTMLCanvasElement;
   landmarks: HTMLCanvasElement[];
+  /** TICKET-06: pre-decoded skybox image; null until prepareWorldArt finishes. */
+  skyboxImage: HTMLImageElement | null;
+  /** TICKET-06: sunbeam / god-ray overlay, tinted to the course's lighting profile. */
+  sunbeams: HTMLCanvasElement;
 }
 const cache = new Map<CourseId, CourseArt>();
 const canvas = (width: number, height: number) => {
@@ -79,7 +92,10 @@ function forestTree(c: CanvasRenderingContext2D, x: number, y: number, height: n
   }
 }
 
-function background(track: CourseDefinition, assets: GameAssets) {
+/**
+ * TICKET-06: Procedural fallback sky gradient + sun (painted skybox not yet decoded).
+ */
+function proceduralSky(track: CourseDefinition, assets: GameAssets) {
   const { image, context: c } = canvas(1792, 768);
   const p = track.palette;
   const sky = c.createLinearGradient(0, 0, 0, 650);
@@ -92,34 +108,130 @@ function background(track: CourseDefinition, assets: GameAssets) {
     const sun = c.createRadialGradient(1280, 140, 8, 1280, 140, 205);
     sun.addColorStop(0, '#f4ddb25e'); sun.addColorStop(1, '#f4ddb200');
     c.fillStyle = sun; c.fillRect(1060, 0, 440, 365);
-    for (let layer = 0; layer < 3; layer++) {
-      c.fillStyle = [p.distant, p.middle, p.foreground][layer];
-      if (track.biome === 'canyon') {
-        const y = 410 + layer * 109;
-        c.beginPath(); c.moveTo(-60, 800);
-        for (let x = -80, i = 0; x < 1850; x += 200, i++) {
-          const top = y - 90 - noise(i + layer * 23) * (160 - layer * 20);
-          c.lineTo(x, y); c.lineTo(x + 36, top + 35); c.lineTo(x + 65, top);
-          c.lineTo(x + 144, top + 9); c.lineTo(x + 183, y + 20);
-        }
-        c.lineTo(1860, 800); c.fill();
-        c.strokeStyle = `${p.horizon}12`; c.lineWidth = 8;
-        for (let x = 70; x < 1792; x += 200) {
-          c.beginPath(); c.moveTo(x, y - 36); c.lineTo(x + 72, y - 31); c.stroke();
-        }
-      } else {
-        const y = 370 + layer * 110;
-        c.beginPath(); c.moveTo(-20, 800); c.lineTo(-20, y);
-        for (let x = -20; x < 1800; x += 340) c.bezierCurveTo(x + 100, y - 125 - layer * 7, x + 235, y - 92, x + 340, y + 10);
-        c.lineTo(1830, 800); c.fill();
-        if (layer > 0) for (let x = 80; x < 1792; x += 230) forestTree(c, x, y - 23, 30 + noise(x) * 30, [p.distant, p.middle, p.foreground][layer]);
-      }
+  }
+  return image;
+}
+
+/**
+ * TICKET-06: Layer 2 silhouette layer — distant mountains, smelters, ruins, city skylines.
+ * Painted onto a transparent canvas so it can be scrolled at 0.15x parallax independently of
+ * the skybox. Serves as the mid-distance anchor even when the skybox PNG is present.
+ */
+function farMountainSilhouette(track: CourseDefinition) {
+  const WIDTH = 2048;
+  const HEIGHT = 512;
+  const { image, context: c } = canvas(WIDTH, HEIGHT);
+  const p = track.palette;
+
+  // Far ridge (lightest, most atmospheric)
+  c.fillStyle = p.distant;
+  c.globalAlpha = 0.55;
+  if (track.biome === 'forest') {
+    // Snow-dusted alpine spires
+    c.beginPath(); c.moveTo(-40, HEIGHT); c.lineTo(-40, 280);
+    for (let x = -40, i = 0; x < WIDTH + 80; x += 180, i++) {
+      const peak = 190 - noise(i * 1.7) * 80;
+      c.lineTo(x + 60, peak + 30);
+      c.lineTo(x + 90, peak);
+      c.lineTo(x + 130, peak + 25);
+      c.lineTo(x + 180, 260 + noise(i + 3) * 40);
+    }
+    c.lineTo(WIDTH + 80, HEIGHT); c.fill();
+    // Snow caps
+    c.fillStyle = '#e8dfc4'; c.globalAlpha = 0.6;
+    c.beginPath(); c.moveTo(-40, HEIGHT);
+    for (let x = -40, i = 0; x < WIDTH + 80; x += 180, i++) {
+      const peak = 190 - noise(i * 1.7) * 80;
+      c.lineTo(x + 70, peak + 20);
+      c.lineTo(x + 90, peak);
+      c.lineTo(x + 110, peak + 20);
+    }
+    c.lineTo(WIDTH + 80, HEIGHT); c.fill();
+  } else if (track.biome === 'canyon') {
+    // Jagged red canyon mesas + smelter silhouettes
+    c.beginPath(); c.moveTo(-40, HEIGHT); c.lineTo(-40, 300);
+    for (let x = -40, i = 0; x < WIDTH + 80; x += 220, i++) {
+      const top = 240 - noise(i + 11) * 70;
+      c.lineTo(x + 20, top + 40);
+      c.lineTo(x + 60, top);
+      c.lineTo(x + 120, top + 15);
+      // Smelter chimney
+      c.fillRect(x + 140, top - 80, 18, 95);
+      c.lineTo(x + 140, top + 15);
+      c.lineTo(x + 200, top + 30);
+    }
+    c.lineTo(WIDTH + 80, HEIGHT); c.fill();
+  } else {
+    // Craggy highland peaks with monoliths
+    c.beginPath(); c.moveTo(-40, HEIGHT); c.lineTo(-40, 260);
+    for (let x = -40, i = 0; x < WIDTH + 80; x += 260, i++) {
+      const base = 280 + noise(i) * 40;
+      c.bezierCurveTo(x + 60, base - 130 - noise(i + 5) * 50, x + 160, base - 110, x + 260, base);
+    }
+    c.lineTo(WIDTH + 80, HEIGHT); c.fill();
+    // Stone monoliths
+    c.fillStyle = p.middle; c.globalAlpha = 0.45;
+    for (let x = 200; x < WIDTH; x += 380) {
+      const h = 110 + noise(x) * 60;
+      c.fillRect(x, HEIGHT - 220 - h, 24, h);
+      c.fillRect(x + 40, HEIGHT - 220 - h + 20, 18, h - 20);
     }
   }
-  if (track.biome === 'forest') for (let i = 0; i < 20; i++) forestTree(c, i * 97 - 35, 710, 88 + noise(i + 6) * 115, p.foreground);
-  const mist = c.createLinearGradient(0, 440, 0, 768);
-  mist.addColorStop(0, `${p.haze}00`); mist.addColorStop(0.68, `${p.haze}30`); mist.addColorStop(1, `${p.foreground}9e`);
-  c.fillStyle = mist; c.fillRect(0, 440, 1792, 328);
+  c.globalAlpha = 1;
+
+  // Atmospheric haze band at the base of the far mountains
+  const mist = c.createLinearGradient(0, HEIGHT - 180, 0, HEIGHT);
+  mist.addColorStop(0, `${track.lighting.fogColor}00`);
+  mist.addColorStop(0.5, `${track.lighting.fogColor}22`);
+  mist.addColorStop(1, `${p.haze}44`);
+  c.fillStyle = mist;
+  c.fillRect(0, HEIGHT - 180, WIDTH, 180);
+
+  return image;
+}
+
+/**
+ * TICKET-06: Volumetric sunbeam / god-ray overlay. Additive.
+ */
+function sunbeamOverlay(track: CourseDefinition) {
+  const WIDTH = 1024;
+  const HEIGHT = 768;
+  const { image, context: c } = canvas(WIDTH, HEIGHT);
+  const lighting = track.lighting;
+  const intensity = lighting.sunbeamIntensity;
+  if (intensity <= 0) return image;
+
+  // Sun position varies by biome
+  const sunX = track.biome === 'canyon' ? 800 : track.biome === 'meadow' ? 240 : 650;
+  const sunY = 120;
+
+  c.save();
+  c.globalCompositeOperation = 'screen';
+  for (let i = 0; i < 14; i++) {
+    const angle = -0.9 + i * 0.13;
+    const width = 40 + noise(i + 30) * 60;
+    const grad = c.createLinearGradient(sunX, sunY, sunX + Math.cos(angle) * HEIGHT * 1.5, sunY + Math.sin(angle) * HEIGHT * 1.5);
+    grad.addColorStop(0, `${lighting.sunColor}${Math.round(intensity * 55).toString(16).padStart(2, '0')}`);
+    grad.addColorStop(0.4, `${lighting.sunColor}${Math.round(intensity * 25).toString(16).padStart(2, '0')}`);
+    grad.addColorStop(1, `${lighting.sunColor}00`);
+    c.fillStyle = grad;
+    c.beginPath();
+    c.moveTo(sunX, sunY);
+    c.lineTo(sunX + Math.cos(angle - 0.04) * HEIGHT * 1.6, sunY + Math.sin(angle - 0.04) * HEIGHT * 1.6);
+    c.lineTo(sunX + Math.cos(angle) * width, sunY + Math.sin(angle) * width);
+    c.lineTo(sunX + Math.cos(angle + 0.04) * HEIGHT * 1.6, sunY + Math.sin(angle + 0.04) * HEIGHT * 1.6);
+    c.closePath();
+    c.fill();
+  }
+  // Sun disc glow
+  const sun = c.createRadialGradient(sunX, sunY, 2, sunX, sunY, 180);
+  sun.addColorStop(0, `${lighting.sunColor}${Math.round(intensity * 180).toString(16).padStart(2, '0')}`);
+  sun.addColorStop(0.3, `${lighting.sunColor}${Math.round(intensity * 70).toString(16).padStart(2, '0')}`);
+  sun.addColorStop(1, `${lighting.sunColor}00`);
+  c.fillStyle = sun;
+  c.fillRect(sunX - 200, sunY - 200, 400, 400);
+  c.restore();
+
   return image;
 }
 
@@ -200,6 +312,8 @@ function landmark(track: CourseDefinition, variation: number) {
  * complete fallback if a PNG cannot be decoded.
  */
 const painted = new Map<string, HTMLImageElement>();
+/** TICKET-06: decoded skybox images keyed by course id. */
+const skyboxImages = new Map<CourseId, HTMLImageElement>();
 
 /** Which painted landmark each circuit uses for its two roadside variations. */
 const LANDMARK_BY_COURSE: Record<CourseId, [LandmarkId, LandmarkId]> = {
@@ -209,17 +323,38 @@ const LANDMARK_BY_COURSE: Record<CourseId, [LandmarkId, LandmarkId]> = {
 };
 
 /**
- * Decode the blimp and landmark sprites before racing; never called during a frame.
- * Any course art that was already composed with the fallback fallback is invalidated, so
- * the painted props always win once they are available.
+ * TICKET-06: Returns the list of skybox paths that must be preloaded for a given course
+ * (or all courses). Used by the asset preloader pipeline.
+ */
+export function skyboxPathsForCourse(courseId?: CourseId): string[] {
+  const ids: CourseId[] = courseId ? [courseId] : ['ridge', 'boomtown', 'sheep'];
+  return ids.map((id) => TRACKS[id].lighting.skyboxUrl);
+}
+
+/**
+ * Decode the blimp, landmark sprites, and skybox panoramas before racing; never called
+ * during a frame. Any course art that was already composed with the procedural fallback is
+ * invalidated, so the painted artwork always wins once it is available.
  */
 export async function prepareWorldArt(): Promise<boolean> {
   const paths = [blimpCell().image, ...LANDMARK_IDS.map((id) => landmarkCell(id).image)];
+  const skyPaths = skyboxPathsForCourse();
   let loaded = 0;
-  await Promise.all(paths.map(async (path) => {
-    if (painted.has(path)) { loaded += 1; return; }
-    try { painted.set(path, await loadArtImage(path)); loaded += 1; } catch { /* keep the fallback */ }
-  }));
+  await Promise.all([
+    ...paths.map(async (path) => {
+      if (painted.has(path)) { loaded += 1; return; }
+      try { painted.set(path, await loadArtImage(path)); loaded += 1; } catch { /* keep the fallback */ }
+    }),
+    ...skyPaths.map(async (path) => {
+      const courseId = (['ridge', 'boomtown', 'sheep'] as const).find((id) => TRACKS[id].lighting.skyboxUrl === path);
+      if (!courseId || skyboxImages.has(courseId)) return;
+      try {
+        const img = await loadArtImage(path);
+        skyboxImages.set(courseId, img);
+        loaded += 1;
+      } catch { /* keep the procedural fallback */ }
+    }),
+  ]);
   if (loaded) cache.clear();
   return loaded > 0;
 }
@@ -240,8 +375,17 @@ function propCanvas(id: LandmarkId, width: number, height: number) {
 export function buildCourseArt(id: CourseId, assets: GameAssets): CourseArt {
   const existing = cache.get(id); if (existing) return existing;
   const track = TRACKS[id];
-  const art = { sky: background(track, assets), dirt: dirtMaterial(track, assets), bank: bankMaterial(track),
-    blimp: blimpArt(track), landmarks: [landmark(track, 0), landmark(track, 1)] };
+  const skyboxImage = skyboxImages.get(id) ?? null;
+  const art: CourseArt = {
+    sky: proceduralSky(track, assets),
+    farMountains: farMountainSilhouette(track),
+    dirt: dirtMaterial(track, assets),
+    bank: bankMaterial(track),
+    blimp: blimpArt(track),
+    landmarks: [landmark(track, 0), landmark(track, 1)],
+    skyboxImage,
+    sunbeams: sunbeamOverlay(track),
+  };
   cache.set(id, art); return art;
 }
 

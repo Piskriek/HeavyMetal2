@@ -70,28 +70,93 @@ export class ArenaEnvironment {
     return false;
   }
 
+  /**
+   * TICKET-06: Multi-layered parallax background composite.
+   *  - Layer 1 (far sky): 2048x1024 painted skybox, scrolls at 0.05x — nearly stationary.
+   *  - Layer 2 (distant mountains / silhouettes): transparent silhouette layer, 0.15x.
+   *  - Sunbeam / god-ray overlay tinted to the course's lighting profile.
+   *  - Blimps (Layer 3 midground) are drawn in drawBlimps at ~0.2x.
+   * Horizontal tiling uses modulo repetition with no seams or pop-in.
+   */
   drawLandscape() {
     const context = this.context;
-    const image = this.art.sky;
-    const height = HEIGHT + 55;
-    const width = image.width / image.height * height;
-    const offset = this.frame.camera * (this.frame.options.parallax ? 0.08 : 0.23) + this.frame.drift * 0.2;
+    const lighting = TRACKS[this.course].lighting;
+    const parallax = this.frame.options.parallax;
+
+    // ---- Layer 1: Far Sky (painted skybox if available, else procedural gradient) ----
+    const skyImage = this.art.skyboxImage ?? this.art.sky;
+    this.drawTiledLayer(skyImage, HEIGHT + 55, this.frame.camera * (parallax ? 0.05 : 0.15) + this.frame.drift * 0.1, -35);
+
+    // ---- Atmospheric fog tint at horizon for mood ----
+    const fogGrad = context.createLinearGradient(0, HEIGHT * 0.35, 0, HEIGHT * 0.7);
+    fogGrad.addColorStop(0, `${lighting.fogColor}00`);
+    fogGrad.addColorStop(1, `${lighting.fogColor}22`);
+    context.fillStyle = fogGrad;
+    context.fillRect(0, HEIGHT * 0.35, this.view.width, HEIGHT * 0.35);
+
+    // ---- Layer 2: Distant mountains / city silhouettes (0.15x parallax) ----
+    this.drawTiledLayerTransparent(this.art.farMountains, HEIGHT + 35, this.frame.camera * (parallax ? 0.15 : 0.35) + this.frame.drift * 0.15, 100);
+
+    // ---- Sunbeam / god-ray overlay ----
+    if (lighting.sunbeamIntensity > 0) {
+      this.drawTiledLayerTransparent(this.art.sunbeams, HEIGHT + 55, this.frame.camera * (parallax ? 0.03 : 0.1), -20);
+    }
+
+    // ---- Vignette-style ambient light tint (top) ----
+    const topTint = context.createLinearGradient(0, 0, 0, 120);
+    topTint.addColorStop(0, `${lighting.ambientLight}40`);
+    topTint.addColorStop(1, `${lighting.ambientLight}00`);
+    context.fillStyle = topTint;
+    context.fillRect(0, 0, this.view.width, 120);
+
+    this.drawBlimps();
+  }
+
+  /**
+   * TICKET-06: Tile an image across the viewport with a given horizontal offset and
+   * draw height. Handles horizontal wrapping with a flip on alternating tiles to hide
+   * seams (mirrored tiling).
+   */
+  private drawTiledLayer(image: CanvasImageSource, height: number, offset: number, yOffset: number) {
+    const context = this.context;
+    const sourceW = (image as HTMLImageElement).naturalWidth ?? (image as HTMLCanvasElement).width;
+    const sourceH = (image as HTMLImageElement).naturalHeight ?? (image as HTMLCanvasElement).height;
+    const width = sourceW / sourceH * height;
     const start = Math.floor(offset / width) - 1;
     for (let i = start; i < start + Math.ceil(this.view.width / width) + 4; i++) {
       const x = i * width - offset;
       context.save();
-      if (Math.abs(i) % 2) { context.translate(x + width, 0); context.scale(-1, 1); context.drawImage(image, 0, -35, width + 1, height); }
-      else context.drawImage(image, x, -35, width + 1, height);
+      if (Math.abs(i) % 2) { context.translate(x + width, 0); context.scale(-1, 1); context.drawImage(image, 0, yOffset, width + 1, height); }
+      else context.drawImage(image, x, yOffset, width + 1, height);
       context.restore();
     }
-    this.drawBlimps();
+  }
+
+  /**
+   * TICKET-06: Same as drawTiledLayer but for transparent layers (silhouettes, sunbeams).
+   * Does not clear background beneath; relies on the source image alpha.
+   */
+  private drawTiledLayerTransparent(image: HTMLCanvasElement, height: number, offset: number, yOffset: number) {
+    const context = this.context;
+    const sourceW = image.width;
+    const sourceH = image.height;
+    const width = sourceW / sourceH * height;
+    const start = Math.floor(offset / width) - 1;
+    for (let i = start; i < start + Math.ceil(this.view.width / width) + 4; i++) {
+      const x = i * width - offset;
+      context.save();
+      if (Math.abs(i) % 2) { context.translate(x + width, 0); context.scale(-1, 1); context.drawImage(image, 0, yOffset, width + 1, height); }
+      else context.drawImage(image, x, yOffset, width + 1, height);
+      context.restore();
+    }
   }
 
   private drawBlimps() {
     const context = this.context;
     const spacing = 1450;
     const movement = this.frame.reducedMotion ? 0 : this.frame.time * 7;
-    const offset = this.frame.camera * (this.frame.options.parallax ? 0.13 : 0.2) - movement;
+    // TICKET-06: Layer 3 midground — watchtowers/blimps at 0.4x parallax.
+    const offset = this.frame.camera * (this.frame.options.parallax ? 0.4 : 0.5) - movement;
     const first = Math.floor((offset - 950) / spacing) - 1;
     for (let index = first; index < first + Math.ceil(this.view.width / spacing) + 3; index++) {
       const x = 950 + index * spacing - offset;

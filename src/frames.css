@@ -6,9 +6,9 @@
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 .brand { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
-.brand img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.brand-hero { width: min(100%, 410px); margin-inline: auto; filter: drop-shadow(0 5px 5px #000c) drop-shadow(0 0 18px #e965242f); }
-.brand-hero img { aspect-ratio: 78 / 19; }
+.brand img { display: block; width: 100%; height: auto; object-fit: contain; }
+.brand-compact img, .brand-emblem img { height: 100%; }
+.brand-hero { width: min(100%, 500px); margin-inline: auto; filter: drop-shadow(0 5px 5px #000c) drop-shadow(0 0 18px #e965242f); }
 .brand-hero small { margin-top: 8px; color: #d9bd7c; font: 700 9px var(--fantasy, 'Cinzel', serif); letter-spacing: 2.8px; text-shadow: 0 2px 4px #000; }
 .brand-compact { width: 205px; height: 50px; filter: drop-shadow(0 2px 3px #000a); }
 .brand-emblem { width: 44px; height: 44px; flex: none; filter: drop-shadow(0 2px 3px #000a); }
@@ -54,7 +54,7 @@
   isolation: isolate;
   border: 0;
   border-radius: 2px;
-  padding: 12px 32px;
+  padding: 12px 58px 12px 64px;
   background:
     linear-gradient(#d4aa5d, #5f421f) top / 100% 3px no-repeat,
     linear-gradient(#4b3218, #d1a459) bottom / 100% 3px no-repeat,
@@ -63,13 +63,22 @@
 }
 .forged-menu-button::before,
 .forged-menu-button::after {
-  content: ''; position: absolute; z-index: 2; top: 50%; width: 58px; height: 54px;
+  content: ''; position: absolute; z-index: 2; top: 50%; width: 54px; height: 50px;
   background: url('/art/ui/ornament-endcap.png') center / contain no-repeat;
   transform: translateY(-50%); pointer-events: none; opacity: .96;
 }
-.forged-menu-button::before { left: -22px; }
-.forged-menu-button::after { right: -22px; transform: translateY(-50%) scaleX(-1); }
+.forged-menu-button::before { left: -16px; }
+.forged-menu-button::after { left: auto; right: -16px; transform: translateY(-50%) scaleX(-1); }
+/* Beat the retired crimson-wash rule's higher specificity. It was the source of the
+   detached translucent red rectangle on the selected menu action. */
+.forged-menu-button.forged-primary::before {
+  inset: auto auto auto -16px; top: 50%; width: 54px; height: 50px;
+  background: url('/art/ui/ornament-endcap.png') center / contain no-repeat;
+  transform: translateY(-50%);
+}
 .forged-menu-button > * { position: relative; z-index: 3; }
+.forged-menu-button > svg:first-of-type { margin-left: 0; }
+.forged-menu-button > span:not(.button-rivet) { white-space: nowrap; }
 .forged-menu-button:hover, .forged-menu-button:focus-visible {
   border-image: none;
   background:
@@ -149,7 +158,8 @@
 .main-menu[data-motion='true'] .menu-world { animation-name: menu-world-breathe-hm2; }
 @keyframes menu-world-breathe-hm2 { from { transform: scale(1.01); } to { transform: scale(1.05); } }
 .studio-signature > .brand-emblem { width: 34px; height: 34px; }
-.game-wordmark .brand-hero { width: min(100%, 410px); }
+.menu-composition { width: min(480px, 46vw); }
+.game-wordmark .brand-hero { width: min(100%, 500px); }
 .game-wordmark p { margin-top: 4px; }
 .game-loading { background: linear-gradient(#080c0ce8, #080c0cf5), url('/art/ui/menu-heavy-metal-2.jpg') center / cover; }
 .game-loading > .brand-hero { width: min(470px, 82vw); }
@@ -158,13 +168,14 @@
 
 @media (max-height: 700px) and (min-width: 701px) {
   .menu-composition { padding-top: 66px; }
-  .game-wordmark .brand-hero { width: 330px; }
+  .game-wordmark .brand-hero { width: 400px; max-width: 100%; }
   .game-wordmark p { font-size: 12px; }
   .main-menu-actions { margin-top: 17px; gap: 8px; }
   .forged-menu-button { min-height: 51px; }
   .menu-bottom-flourish { margin-top: 12px; }
 }
 @media (max-width: 700px) {
+  .menu-composition { width: min(430px, calc(100% - 32px)); }
   .menu-world { background-position: 65% center; }
   .menu-vignette { background: linear-gradient(90deg, #050908ed 0%, #070c0bd8 65%, #080c0b86), linear-gradient(0deg, #050707ed, transparent 45%); }
   .studio-signature > .brand-emblem { width: 30px; height: 30px; }

@@ -38,7 +38,7 @@ const browser = await playwright.launch({
 let failures = 0;
 const report = (ok, message, detail = '') => { console.log(`${ok ? 'ok' : 'not ok'} - ${message}${detail ? ` :: ${detail}` : ''}`); if (!ok) failures++; };
 try {
-  for (const viewport of [{ width: 800, height: 600 }, { width: 1920, height: 1080 }, { width: 3840, height: 2160 }]) {
+  for (const viewport of [{ width: 578, height: 760 }, { width: 800, height: 600 }, { width: 1920, height: 1080 }, { width: 3840, height: 2160 }]) {
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}`, { waitUntil: 'load' });
@@ -50,9 +50,10 @@ try {
       return { borderImage: style.borderImageSource, capWidth: cap.width, background: getComputedStyle(document.querySelector('.menu-world')).backgroundSize, overflow: document.documentElement.scrollWidth > innerWidth };
     });
     report(menu.borderImage === 'none', `${viewport.width}×${viewport.height}: menu buttons do not stretch border images`, menu.borderImage);
-    report(menu.capWidth === '58px', `${viewport.width}×${viewport.height}: button end-cap stays fixed`, menu.capWidth);
+    report(menu.capWidth === '54px', `${viewport.width}×${viewport.height}: button end-cap stays fixed`, menu.capWidth);
     report(menu.background === 'cover', `${viewport.width}×${viewport.height}: menu painting preserves aspect ratio`, menu.background);
     report(!menu.overflow, `${viewport.width}×${viewport.height}: menu has no horizontal overflow`);
+    if (viewport.width === 578) { await page.waitForTimeout(900); await page.screenshot({ path: join(artifacts, 'ui-menu-578x760.png') }); }
 
     await page.getByRole('button', { name: 'New Game' }).click();
     await page.waitForSelector('.setup-dialog');

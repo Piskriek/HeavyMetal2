@@ -414,7 +414,18 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 ['downrange', 'Look down the track', 'One camera for the launcher, rails, solid grandstands, and both audience rows.'],
                 ['parallax', 'A little atmosphere', 'Gentle mountain drift. The crowds stay firmly attached to their terraces.'],
                 ['aimAssist', 'A slightly sensible trajectory', 'Preview your launch arc before committing to the bit.'],
-              ] as const).map(([key, label, description]) => <div className="setting-row" key={key}><div><h3>{label}</h3><p>{description}</p></div><button className={`toggle ${options[key] ? 'on' : ''}`} role="switch" aria-checked={options[key]} aria-label={label} onClick={() => setOptions((previous) => ({ ...previous, [key]: !previous[key] }))}><span /></button></div>)}<p className="settings-note">Display settings never reset a race. Your course and crew stay fixed for this event.</p></div>}
+              ] as const).map(([key, label, description]) => <div className="setting-row" key={key}><div><h3>{label}</h3><p>{description}</p></div><button className={`toggle ${options[key] ? 'on' : ''}`} role="switch" aria-checked={options[key]} aria-label={label} onClick={() => setOptions((previous) => ({ ...previous, [key]: !previous[key] }))}><span /></button></div>)}
+              <div className="setting-row">
+                <div><h3><label htmlFor="race-camera-mode">Ball camera</label></h3><p>Follow ball chases your capsule so it stays framed. Fixed course holds the classic wide view; an edge arrow points when the ball leaves the screen.</p></div>
+                <select id="race-camera-mode" className="graphics-select" value={options.cameraMode} onChange={(event) => {
+                  const cameraMode = event.target.value;
+                  if (cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
+                }}>
+                  <option value="follow_ball">Follow ball</option>
+                  <option value="fixed">Fixed course</option>
+                </select>
+              </div>
+              <p className="settings-note">Display settings never reset a race. Your course and crew stay fixed for this event.</p></div>}
             {workshopTab === 'concept' && <div className="concept-content"><p className="modal-lead">First came the concept. Then came the questionable engineering. This original painting set the mood for every mountain, machine, and goblin in the game.</p><figure className="concept-figure"><img src="/art/goblin-rally-concept.png" alt="Original Goblin Rally concept art: a goblin-piloted iron capsule in a giant slingshot, wooden loops, explosive crates, sheep, and cheering crowds in a misty mountain arena." /><figcaption><span>01 / THE ORIGINAL BAD IDEA</span><span>ART DIRECTION & WORLD CONCEPT</span></figcaption></figure><div className="modal-bottom"><span>Painted fantasy. Built for a little chaos.</span><button className="outline-button" onClick={() => saveSource('/art/goblin-rally-concept.png', 'goblin-rally-concept.png')}>DOWNLOAD CONCEPT <ArrowDownToLine size={16} /></button></div></div>}
             {workshopTab === 'sprites' && <div className="sprite-content"><ArtGallery /></div>}
           </Modal>}

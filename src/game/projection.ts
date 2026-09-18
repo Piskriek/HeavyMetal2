@@ -1,4 +1,4 @@
-import { GROUND, START_X } from './scene';
+import { FINISH, GROUND, START_X } from './scene';
 import type { Vec3 } from './geometry';
 
 export interface ScreenPoint {
@@ -6,6 +6,34 @@ export interface ScreenPoint {
   y: number;
   scale: number;
   depth: number;
+}
+
+/** World units of rendered track kept beyond the camera clamp at each end of the course. */
+export const CAMERA_HEADROOM = 350;
+
+/** Soft boundary clamp: the camera may never expose unrendered void past the launch pad or the stadium. */
+export const clampCameraTarget = (target: number) => Math.max(0, Math.min(FINISH - CAMERA_HEADROOM, target));
+
+/** Frame-rate independent form of `lerp(current, target, dt * rate)`. */
+export const chaseLerp = (current: number, target: number, rate: number, dt: number) =>
+  current + (target - current) * (1 - Math.exp(-rate * Math.max(0, dt)));
+
+export interface EdgeAnchor {
+  x: number;
+  y: number;
+  /** Angle from the clamped anchor back toward the real point. */
+  angle: number;
+  /** -1 when the point left the view on the left, 1 on the right, 0 when it stayed inside horizontally. */
+  side: -1 | 0 | 1;
+  /** True when the point left the view across the top edge. */
+  above: boolean;
+}
+
+/** Clamps an off-screen point to the viewport rim, keeping the direction toward the real position. */
+export function edgeAnchor(px: number, py: number, width: number, height: number, margin: number): EdgeAnchor {
+  const x = Math.max(margin, Math.min(width - margin, px));
+  const y = Math.max(margin, Math.min(height - margin, py));
+  return { x, y, angle: Math.atan2(py - y, px - x), side: px < 0 ? -1 : px > width ? 1 : 0, above: py < margin };
 }
 
 export class RangeCamera {

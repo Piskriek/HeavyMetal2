@@ -1,6 +1,7 @@
 import type { GameAssets } from './assets';
 import { GameAudio } from './audio';
 import { RangeRenderer } from './renderer';
+import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
 import {
   AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
@@ -361,10 +362,18 @@ export class GameEngine {
     const player = this.player; const rendered = this.renderRacers[0];
     if (this.status === 'flying' && this.inputEnabled) {
       const focus = player.loopRide?.obstacle.x ?? rendered.x;
-      const target = Math.min(this.renderer.view.followOffset(focus, rendered.z), FINISH - 350);
-      this.camera += (target - this.camera) * (1 - Math.exp(-7 * dt));
-      const cameraTargetY = this.y(focus + player.vx * 0.09) - GROUND;
-      this.cameraY += (cameraTargetY - this.cameraY) * (1 - Math.exp(-10 * dt));
+      const view = this.renderer.view;
+      // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
+      // keeps the ball framed; the fixed course camera pans slower with a longer look-ahead
+      // for the classic broad overview, letting the ball wander (the edge pointer covers it).
+      const follow = this.options.cameraMode === 'follow_ball';
+      const target = clampCameraTarget(view.followOffset(focus + (follow ? 0 : view.width * 0.06), rendered.z));
+      this.camera = chaseLerp(this.camera, target, follow ? 6 : 2.4, dt);
+      // Camera Y tracks the terrain, and in follow mode pans up softly on big air so the
+      // ball stays framed through hops, springs, and catapult launches.
+      const altitude = Math.max(0, this.y(rendered.x) - RADIUS - rendered.y);
+      const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
+      this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
     }
     this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
     const active = this.status === 'flying' || this.isDragging;

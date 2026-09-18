@@ -1,9 +1,9 @@
 import type { GameAssets } from './assets';
 import { ArenaEnvironment } from './environment';
 import { buildModelAtlas, createBoostTexture, type ModelAtlas, type ModelName } from './model-atlas';
-import { RangeCamera } from './projection';
+import { RangeCamera, edgeAnchor } from './projection';
 import { CanvasLayer, RenderBudget } from './performance';
-import { FINISH, GRAVITY, HEIGHT, LANE, LAUNCHER, RADIUS, courseY, courseSlope, laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame } from './scene';
+import { FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_WIDTH, LAUNCHER, RADIUS, closestLane, courseY, courseSlope, decalOpacity, decalRadius, laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame } from './scene';
 import { RACER_DEFINITIONS, type CourseId } from './types';
 import { POWERUPS, pickupY, type AirPickup } from './powerups';
 import { polygon, texturedQuad, type Quad } from './texture';
@@ -122,6 +122,7 @@ export class RangeRenderer {
     if (still) this.sceneryLayer.draw(context, this.view.width, HEIGHT, this.scale, key, (target) => this.environment.withContext(target, scenery));
     else scenery();
     this.drawGroundEffects();
+    this.renderGroundShadowAndHighlight();
     this.drawActors();
     this.drawTrajectory();
     this.environment.drawTracksideLights();
@@ -129,6 +130,7 @@ export class RangeRenderer {
     else this.environment.drawForeground();
     context.restore();
     this.drawAltitudeIndicator();
+    this.drawOffScreenIndicator();
     this.lastCamera = frame.camera; this.lastCameraY = frame.cameraY;
     const work = performance.now() - start;
     if (this.budget.sample(work, start, frame.snapshot.status === 'flying')) this.pendingResize = true;
@@ -208,6 +210,66 @@ export class RangeRenderer {
     }
     for (const pickup of this.visiblePickups) if (pickup.collectedBy === null) {
       this.contact(pickup.x, 24, POWERUPS[pickup.kind].color, 0.11, pickup.z);
+    }
+  }
+
+  /**
+   * TICKET-07: magical rune circle + softened drop shadow projected onto the track
+   * directly beneath the airborne player ball, so the landing lane is always readable.
+   */
+  private renderGroundShadowAndHighlight() {
+    const { status } = this.frame.snapshot;
+    if (status !== 'flying' && status !== 'paused') return;
+    const ball = this.frame.ball;
+    const ground = this.surface(ball.x, ball.z);
+    const altitude = ground - RADIUS - ball.y;
+    if (altitude <= 2) return;
+    const point = this.p(ball.x, ground - 0.6, ball.z);
+    if (point.x < -170 || point.x > this.view.width + 170 || point.y < -90 || point.y > HEIGHT + 60) return;
+    const radius = decalRadius(altitude);
+    const opacity = decalOpacity(altitude);
+    const gap = this.inGap(ball.x, ball.z);
+    const context = this.context;
+    // Soft ambient-occlusion shadow, squashed onto the deck; it never floats over a gap.
+    if (!gap) this.contact(ball.x, radius * 0.72, '#040c07', opacity * 0.5, ball.z, ground);
+    const color = gap ? '#ff7a52' : '#ffc16c';
+    // Rune circle drawn in the ground plane via a slope-aware basis (unit space = one radius).
+    const a = this.p(ball.x + radius, ground + this.slope(ball.x) * radius - 0.6, ball.z);
+    const b = this.p(ball.x, ground - 0.6, ball.z + radius * 0.67);
+    context.save();
+    context.translate(point.x, point.y);
+    context.transform(a.x - point.x, a.y - point.y, b.x - point.x, b.y - point.y, 0, 0);
+    context.strokeStyle = color;
+    context.lineWidth = 0.085;
+    context.beginPath(); context.arc(0, 0, 1, 0, TAU); context.stroke();
+    context.globalAlpha = opacity * 0.72;
+    context.lineWidth = 0.042;
+    context.beginPath(); context.arc(0, 0, 0.62, 0, TAU); context.stroke();
+    // Goblin gear markings: radial teeth plus two chevrons that read as "land here".
+    context.lineWidth = 0.05;
+    for (let tooth = 0; tooth < 12; tooth++) {
+      const angle = tooth * TAU / 12 + (tooth % 2 ? 0.12 : -0.12);
+      context.beginPath();
+      context.moveTo(Math.cos(angle) * 0.76, Math.sin(angle) * 0.76);
+      context.lineTo(Math.cos(angle) * 0.93, Math.sin(angle) * 0.93);
+      context.stroke();
+    }
+    context.lineWidth = 0.055;
+    for (const side of [-1, 1]) {
+      context.beginPath();
+      context.moveTo(side * 0.3, -0.2); context.lineTo(side * 0.16, 0); context.lineTo(side * 0.3, 0.2);
+      context.stroke();
+    }
+    context.restore();
+    this.glow(point.x, point.y, radius * point.scale * 1.12, gap ? '#ffae59' : '#ffe1ac', opacity * 0.13);
+    // Lane boundary illumination: light the edges of the lane band under the ball so
+    // mid-air A/D steering can line up the landing before touchdown.
+    const lane = closestLane(ball.z);
+    for (const edge of [laneZ(lane) - LANE_WIDTH / 2 + 6, laneZ(lane) + LANE_WIDTH / 2 - 6]) {
+      const strip = this.groundQuad(ball.x - 150, ball.x + 150, edge - 4, edge + 4, -2);
+      polygon(context, strip);
+      context.fillStyle = gap ? `rgba(255, 122, 82, ${opacity * 0.4})` : `rgba(255, 214, 140, ${opacity * 0.34})`;
+      context.fill();
     }
   }
 
@@ -471,6 +533,56 @@ export class RangeRenderer {
     polygon(this.context, [{ x, y: 105 }, { x: x - 5, y: 115 }, { x: x + 5, y: 115 }]);
     this.context.fillStyle = '#efc989'; this.context.fill();
     this.context.textAlign = 'center'; this.context.font = '8px "Space Mono", monospace'; this.context.fillText('STILL FLYING', x, 129); this.context.textAlign = 'left';
+  }
+
+  /**
+   * TICKET-07: ornate edge pointer shown whenever the player's ball leaves the
+   * viewport. A pulsing orange badge with the racer's portrait is clamped to the
+   * screen rim and a chevron keeps aiming at the real ball position.
+   */
+  private drawOffScreenIndicator() {
+    if (this.frame.snapshot.status !== 'flying') return;
+    const ball = this.frame.ball;
+    const p = this.p(ball.x, ball.y, ball.z);
+    const margin = 50;
+    if (p.x > -4 && p.x < this.view.width + 4 && p.y > -4 && p.y < HEIGHT + 4) return;
+    const anchor = edgeAnchor(p.x, p.y, this.view.width, HEIGHT, margin);
+    const context = this.context;
+    const color = RACER_DEFINITIONS[0].color;
+    const pulse = this.frame.reducedMotion ? 0.5 : (Math.sin(this.frame.runTime * 5.4) + 1) / 2;
+    this.glow(anchor.x, anchor.y, 54 + pulse * 14, color, 0.15 + pulse * 0.1);
+    // Badge disc with the player's miniature portrait.
+    context.save();
+    context.translate(anchor.x, anchor.y);
+    context.fillStyle = '#241505ee'; context.strokeStyle = '#f1c986'; context.lineWidth = 3;
+    context.beginPath(); context.arc(0, 0, 26, 0, TAU); context.fill(); context.stroke();
+    context.strokeStyle = `${color}aa`; context.lineWidth = 1;
+    context.beginPath(); context.arc(0, 0, 30, 0, TAU); context.stroke();
+    context.save();
+    context.beginPath(); context.arc(0, 0, 21, 0, TAU); context.clip();
+    context.drawImage(this.capsules[0], -21, -21, 42, 42);
+    context.restore();
+    context.restore();
+    // Directional chevron on the rim, aimed at the real ball position.
+    context.save();
+    context.translate(anchor.x, anchor.y);
+    context.rotate(anchor.angle);
+    polygon(context, [{ x: 29, y: -13 }, { x: 48, y: 0 }, { x: 29, y: 13 }, { x: 36, y: 0 }]);
+    context.fillStyle = color; context.fill();
+    context.strokeStyle = '#7c3f12'; context.lineWidth = 1.5; context.stroke();
+    context.restore();
+    // Distance readout (+45m past the rim) or an altitude callout for vertical exits.
+    let label = '^ AIRBORNE';
+    if (anchor.side) {
+      const edgeWorldX = this.view.unproject(anchor.side > 0 ? this.view.width - margin : margin, GROUND, ball.z).x;
+      label = `${anchor.side > 0 ? '+' : '-'}${Math.round(Math.abs(ball.x - edgeWorldX) / 2)}m`;
+    } else if (!anchor.above) label = 'AIRBORNE';
+    const textX = clamp(anchor.x - Math.cos(anchor.angle) * 48, 34, this.view.width - 34);
+    const textY = clamp(anchor.y - Math.sin(anchor.angle) * 48 + 4, 14, HEIGHT - 8);
+    context.font = '700 12px "Space Mono", monospace'; context.textAlign = 'center';
+    context.fillStyle = '#241505cc'; context.fillText(label, textX + 1, textY + 1);
+    context.fillStyle = '#ffd9a0'; context.fillText(label, textX, textY);
+    context.textAlign = 'left';
   }
 
   destroy() {

@@ -16,7 +16,7 @@ import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import { loadArtImage, riderCell } from '../game/art-assets';
-import { prepareWorldArt } from '../game/world-art';
+import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
 import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../game/session';
 import { TRACK_DISTANCE } from '../game/scene';
@@ -131,12 +131,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   }, []);
   // Reset loading cover when config changes (new round)
   useEffect(() => { setLoadingDismissed(session.results.some((r) => r.round === config.round)); setLoadingProgress(0); }, [config.round, config.course]);
-  // Drive a fake progress while assets are null so the bar feels alive
+  // TICKET-06: Real progress comes from preloadRaceAssets(); but bump to 8% while
+  // the pipeline is spinning up so the bar never looks stuck at zero. Snap to 100%
+  // once assets are fully ready.
   useEffect(() => {
     if (assets) { setLoadingProgress(100); return; }
-    setLoadingProgress(8);
-    const iv = window.setInterval(() => setLoadingProgress((p) => Math.min(92, p + Math.random() * 9)), 420);
-    return () => clearInterval(iv);
+    setLoadingProgress((p) => Math.max(p, 6));
   }, [assets, loadingAttempt, config]);
 
   const best = useMemo(() => Math.max(0, ...records.map((record) => record.distance)), [records]);
@@ -181,10 +181,13 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   useEffect(() => {
     let active = true;
     setLoadError(false);
-    // Every painted PNG is decoded before the race starts: nothing is generated per frame.
-    // The painted scenery props are decoded first: course art bakes them at build-course
-    // time, so racing must not compose the background before the artwork is available.
-    prepareWorldArt()
+    // TICKET-06: Comprehensive asset preloading pipeline.
+    // The preloader decodes every skybox, sprite, racer portrait and course texture
+    // before render, reporting real percentage progress to the loading bar. This
+    // eliminates the starting-grid pop-in that occurred previously.
+    preloadRaceAssets(config.course, config.roster, (percent) => {
+      setLoadingProgress(percent);
+    })
       .then(() => Promise.all([
         loadAssets(), prepareRaceBalls(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster),
         // The off-screen pointer badge shows the player's portrait, not the ball.

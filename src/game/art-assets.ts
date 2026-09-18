@@ -162,4 +162,46 @@ export async function prepareArtSprites(cells: ArtCell[]): Promise<{ sprites: Ma
   return { sprites, failures };
 }
 
+/**
+ * TICKET-06: Asset preloading progress callback. Receives (loaded, total) between 0..1.
+ */
+export type PreloadProgress = (loaded: number, total: number, currentAsset?: string) => void;
+
+/**
+ * TICKET-06: Decode and warm-cache a set of image URLs before the race begins.
+ * Uses HTMLImageElement.decode() for GPU-resident readiness and reports progress
+ * for the loading bar. Any single image failure is caught and reported but does
+ * not block the pipeline — the renderer always has a fallback.
+ */
+export async function preloadImages(
+  paths: string[],
+  onProgress?: PreloadProgress,
+): Promise<{ loaded: string[]; failures: string[] }> {
+  const loaded: string[] = [];
+  const failures: string[] = [];
+  let count = 0;
+  const total = paths.length;
+
+  // Load sequentially? No — that's slower. We'll run them in parallel but
+  // report progress individually so the bar advances smoothly.
+  await Promise.all(paths.map(async (path) => {
+    try {
+      const image = await loadArtImage(path);
+      // Use .decode() to ensure the bitmap is fully decoded and GPU-ready,
+      // eliminating first-frame pop-in.
+      if ('decode' in image && typeof image.decode === 'function') {
+        try { await image.decode(); } catch { /* decode is a hint; failures are non-fatal */ }
+      }
+      loaded.push(path);
+    } catch {
+      failures.push(path);
+    } finally {
+      count++;
+      onProgress?.(count, total, path);
+    }
+  }));
+
+  return { loaded, failures };
+}
+
 

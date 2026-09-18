@@ -1,5 +1,20 @@
 import type { CourseId } from './types';
 
+export interface CourseLighting {
+  /** Path to the high-resolution painted panoramic skybox (2048x1024). */
+  skyboxUrl: string;
+  /** Volumetric fog tint applied to distant terrain. */
+  fogColor: string;
+  /** Ambient light fill color — tints shadows and unlit surfaces. */
+  ambientLight: string;
+  /** Intensity of god-rays / sunbeams piercing clouds and canopy (0-1). */
+  sunbeamIntensity: number;
+  /** Color of sun light source (for rim lights and glow). */
+  sunColor: string;
+  /** Optional CSS color overlay for the track surface to reinforce theme. */
+  trackTint?: string;
+}
+
 export interface CourseDefinition {
   id: CourseId;
   biome: 'forest' | 'canyon' | 'meadow';
@@ -14,6 +29,8 @@ export interface CourseDefinition {
     dirt: string; dirtLight: string; bank: string; soil: string; shoulder: string;
     chalk: string; grass: string; accent: string; haze: string;
   };
+  /** TICKET-06: thematic lighting profile for Blizzard-style mood. */
+  lighting: CourseLighting;
 }
 
 export const TRACKS: Record<CourseId, CourseDefinition> = {
@@ -24,6 +41,14 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     profile: [[0, 0], [1400, 0], [5400, 600], [10000, 1960], [13600, 2130], [18600, 3830], [23000, 4380], [26400, 4970], [27000, 5060], [31000, 5060]],
     sectors: ['THE LAUNCH RIDGE', 'COPPERWOOD DESCENT', 'THE SCREAMING SLOPE', 'SHEPHERD\'S REST', 'DEADWEIGHT DROP', 'THE LOWER SWITCHBACK', 'STADIUM APPROACH', 'THE SCRAPDOME'],
     palette: { sky: '#234b49', horizon: '#9cbd9e', distant: '#658c76', middle: '#3e6651', foreground: '#203e31', dirt: '#8b7651', dirtLight: '#a28b61', bank: '#544732', soil: '#2f4432', shoulder: '#526343', chalk: '#d9cc9e', grass: '#657449', accent: '#d8a15e', haze: '#789878' },
+    lighting: {
+      skyboxUrl: '/art/tracks/sky_copperwood_ridge.png',
+      fogColor: '#b8a77a',
+      ambientLight: '#6b5f3f',
+      sunbeamIntensity: 0.45,
+      sunColor: '#f0c070',
+      trackTint: '#8b7651',
+    },
   },
   boomtown: {
     id: 'boomtown', biome: 'canyon', region: 'The Brass Quarries', character: 'Bursts & commitment',
@@ -32,6 +57,14 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     profile: [[0, 0], [1400, 0], [5400, 1040], [10000, 1790], [13600, 3190], [18600, 3490], [23000, 5040], [26400, 5670], [27000, 5780], [31000, 5780]],
     sectors: ['THE QUARRY GATE', 'COPPER CANYON', 'POWDERKEG STRAIGHT', 'THE BIG DROP', 'SMOKESTACK SHELF', 'DYNAMITE DESCENT', 'FURNACE APPROACH', 'THE BLAST FURNACE'],
     palette: { sky: '#655142', horizon: '#d8b884', distant: '#aa8661', middle: '#805c41', foreground: '#4a382b', dirt: '#a57c57', dirtLight: '#b99065', bank: '#72503c', soil: '#624a36', shoulder: '#84704b', chalk: '#e2cda0', grass: '#837b49', accent: '#e7aa56', haze: '#ad8861' },
+    lighting: {
+      skyboxUrl: '/art/tracks/sky_boomtown_quarry.png',
+      fogColor: '#c98855',
+      ambientLight: '#4a2e1e',
+      sunbeamIntensity: 0.55,
+      sunColor: '#ff8833',
+      trackTint: '#a57c57',
+    },
   },
   sheep: {
     id: 'sheep', biome: 'meadow', region: 'The Woolwind Downs', character: 'Hops & lane choices',
@@ -40,6 +73,14 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     profile: [[0, 0], [1400, 0], [5400, 310], [10000, 1200], [13600, 1510], [18600, 2690], [23000, 2890], [26400, 3540], [27000, 3600], [31000, 3600]],
     sectors: ['THE HILLTOP PADDOCK', 'WOOLWIND MEADOW', 'RAMBLER\'S RUN', 'THE GRAZING SHELF', 'SHEEP LEAP', 'LOWER PASTURES', 'COLISEUM APPROACH', 'THE WOOLLY COLISEUM'],
     palette: { sky: '#42656b', horizon: '#c3d6ad', distant: '#87a993', middle: '#5c8661', foreground: '#355237', dirt: '#a79b70', dirtLight: '#b9ac80', bank: '#71674b', soil: '#4a6940', shoulder: '#6c8249', chalk: '#eee0ba', grass: '#91a359', accent: '#b9ca78', haze: '#a5be99' },
+    lighting: {
+      skyboxUrl: '/art/tracks/sky_woolly_wasteland.png',
+      fogColor: '#9eb0a8',
+      ambientLight: '#5b7282',
+      sunbeamIntensity: 0.35,
+      sunColor: '#d8e8c8',
+      trackTint: '#a79b70',
+    },
   },
 };
 

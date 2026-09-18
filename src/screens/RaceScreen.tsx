@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import ArtGallery from '../components/ArtGallery';
-import GoblinMark from '../components/GoblinMark';
+import Brand from '../components/Brand';
 import RaceControls from '../components/RaceControls';
 import RoundResult from '../components/RoundResult';
 import { AirSupplyGuide } from '../components/AirSupplies';
@@ -360,7 +360,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         <header className="site-header">
           <div className="header-inner">
             <button className="brand" aria-label="Return to main menu" onClick={onMainMenu}>
-              <GoblinMark /><span className="brand-wordmark">GOBLIN<span>RALLY<span className="brand-period">.</span></span></span>
+              <Brand variant="compact" />
             </button>
             <nav className="desktop-nav" aria-label="Main navigation">
               <button className="nav-link" onClick={onMainMenu}>MAIN MENU</button>
@@ -387,7 +387,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
             <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
-              <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Four-lane Goblin Rally. Drag your orange ball to launch all four goblins. A and D change lanes and bump rivals. W to hop, Space to air bounce, Shift to boost, P to pause, R to restart.">Your browser needs HTML canvas support to play Goblin Rally.</canvas>
+              <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Four-lane Heavy Metal GP 2. Drag your orange ball to launch all four goblins. A and D change lanes and bump rivals. W to hop, Space to air bounce, Shift to boost, P to pause, R to restart.">Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
               <div className="game-hud">
                 <button className="track-selector" onClick={showGarage} title="Choose a circuit"><span className="track-eyebrow"><FlagTriangleRight size={13} /> 4 GOBLINS / 15 KM DOWNHILL <span className="circuit-number">{course.number}</span></span><span className="track-name">{course.name}<ChevronDown size={16} /></span><span className="track-sector">{snapshot.sector}</span></button>
                 <div className="telemetry" aria-label="Race statistics">
@@ -404,7 +404,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
               </AnimatePresence>
               <div className="race-progress" aria-label={`Race progress: ${Math.round(snapshot.progress * 100)} percent`}><span><Flag size={11} /> SUMMIT</span><div className="progress-track"><div className="progress-fill" style={{ width: `${snapshot.progress * 100}%` }} /><span className="progress-runner" style={{ left: `${snapshot.progress * 100}%` }} /></div><span className="finish-label">{number(TRACK_DISTANCE)} m <span className="checkered-flag" /></span></div>
               <AnimatePresence>
-                {loadError && !assets && !resumeOnly && <motion.div className="game-loading" exit={{ opacity: 0 }}><GoblinMark /><span className="eyebrow orange-text">A SMALL ENGINEERING PROBLEM</span><h2>The goblins misplaced the art.</h2><button className="primary-button" onClick={() => setLoadingAttempt((attempt) => attempt + 1)}>TRY LOADING AGAIN <RotateCcw size={17} /></button></motion.div>}
+                {loadError && !assets && !resumeOnly && (
+                  <motion.div className="game-loading" exit={{ opacity: 0 }}>
+                    <Brand variant="hero" />
+                    <span className="eyebrow orange-text">A SMALL ENGINEERING PROBLEM</span>
+                    <h2>The goblins misplaced the art.</h2>
+                    <button className="primary-button" onClick={() => setLoadingAttempt((attempt) => attempt + 1)}>
+                      TRY LOADING AGAIN <RotateCcw size={17} />
+                    </button>
+                  </motion.div>
+                )}
                 {!loadError && (!assets || (!loadingDismissed && !resumeOnly)) && (
                   <motion.div className="game-loading-cover" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} key="loading-cover">
                     <RaceLoadingScreen bindings={bindings} ready={Boolean(assets && snapshot.status === 'ready')} progress={loadingProgress} onEnter={() => { setLoadingDismissed(true); canvasRef.current?.focus({ preventScroll: true }); }} />

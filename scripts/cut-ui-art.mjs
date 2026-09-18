@@ -36,6 +36,7 @@ const preSrc = (file) => join(root, 'PreGame/public/art', file);
 const out = (file) => join(root, 'public', file);
 const preOut = (file) => join(root, 'PreGame/public/art', file);
 mkdirSync(join(root, 'public/ui'), { recursive: true });
+mkdirSync(join(root, 'public/art/ui'), { recursive: true });
 mkdirSync(join(root, 'tmp-art'), { recursive: true });
 
 let step = 0;
@@ -190,6 +191,32 @@ for (const [file, target, box, stops] of [
   run([file, '-trim', '+repage', '-resize', box, target]);
   log('cutout', target);
 }
+
+/* Heavy Metal GP 2 identity ---------------------------------------------------------
+ * Chroma-green generated stickers are keyed before resize. They remain independent
+ * overlays at runtime: the browser never scales them to match a panel or button. */
+for (const [source, target, box] of [
+  [src('menu-endcap-src.png'), out('art/ui/ornament-endcap.png'), '180x180>'],
+  [src('heavymetal2-badge-src.png'), out('art/ui/emblem-heavy-metal-2.png'), '300x300>'],
+]) {
+  run([source, '-fuzz', '15%', '-transparent', '#00ff00', '-trim', '+repage', '-resize', box, target]);
+  // Remove green and magenta contamination from anti-aliased edge pixels. Gold is
+  // untouched because it is red/yellow dominant rather than green- or RB-dominant.
+  run([target, '-channel', 'G', '-fx', 'g > 1.35*r && g > 1.35*b ? max(r,b) : g', '+channel', target]);
+  run([target, '-channel', 'RB', '-fx', 'a < 0.96 && r > 1.12*g && b > 1.12*g ? g : u', '+channel', target]);
+  log('HM2 keyed sticker', target);
+}
+run(['-size', '700x160', 'xc:none',
+  // Deliberately upscale the predecessor banner; `>` would only shrink it and leave a gap.
+  '(', join(root, 'PreGame/src/assets/ui/logo.webp'), '-resize', '650x115', ')', '-gravity', 'west', '-geometry', '+0+0', '-composite',
+  // The badge overlaps the banner's right iron cap by 95px, reading as one tight lockup.
+  '(', out('art/ui/emblem-heavy-metal-2.png'), '-resize', '145x145', ')', '-gravity', 'east', '-geometry', '+0+0', '-composite',
+  out('art/ui/logo-heavymetal2.png')]);
+log('HM2 logo', out('art/ui/logo-heavymetal2.png'));
+run([src('menu-heavy-metal-2-src.jpg'), '-resize', '1920x1080^', '-gravity', 'center', '-extent', '1920x1080', '-quality', '88', out('art/ui/menu-heavy-metal-2.jpg')]);
+log('HM2 menu painting', out('art/ui/menu-heavy-metal-2.jpg'));
+run([out('art/ui/emblem-heavy-metal-2.png'), '-resize', '220x220>', '-gravity', 'center', '-background', 'none', '-extent', '256x256', out('favicon-heavy-metal-2.png')]);
+log('HM2 favicon', out('favicon-heavy-metal-2.png'));
 
 /* 3. Favicon: rounded stone tile ----------------------------------------------------- */
 run([src('favicon-src.png'), '-resize', '256x256',

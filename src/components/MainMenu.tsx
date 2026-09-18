@@ -1,7 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, BookOpen, Flag, Maximize2, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
-import GoblinMark from './GoblinMark';
+import Brand from './Brand';
 import type { GameOptions } from '../game/types';
 
 interface MainMenuProps {
@@ -64,7 +64,7 @@ export default function MainMenu(props: MainMenuProps) {
       <div className="menu-grain" aria-hidden="true" />
       <div className="menu-embers" aria-hidden="true">{[0, 1, 2, 3, 4, 5].map((n) => <i key={n} style={{ left: `${43 + n * 8}%`, animationDelay: `${n * -2.3}s`, animationDuration: `${13 + n}s` }} />)}</div>
       <div className="menu-topline">
-        <div className="studio-signature"><GoblinMark small /><span>GOBLIN ENGINEERING CO.<small>Purveyors of exceptionally bad ideas</small></span></div>
+        <div className="studio-signature"><Brand variant="emblem" decorative /><span>HEAVY METAL WORKS<small>Purveyors of exceptionally bad ideas</small></span></div>
         <div className="menu-utilities">
           <button className="forged-icon" onClick={props.onSound} aria-label={props.options.sound ? 'Mute sound' : 'Enable sound'} title={props.options.sound ? 'Mute sound' : 'Enable sound'}>{props.options.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
           <button className="forged-icon" onClick={props.onFullscreen} aria-label="Toggle fullscreen" title="Fullscreen"><Maximize2 size={17} /></button>
@@ -73,9 +73,8 @@ export default function MainMenu(props: MainMenuProps) {
 
       <motion.div className="menu-composition" data-resume-note={Boolean(props.hasRace && props.resumeNote)} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65 }}>
         <div className="game-wordmark">
-          <div className="wordmark-flourish"><span /><GoblinMark small /><span /></div>
-          <h1 id="menu-title"><span className="wordmark-goblin">GOBLIN</span><span className="wordmark-rally">RALLY</span></h1>
-          <div className="wordmark-subtitle"><i /> THE SCRAPDOME CHAMPIONSHIP <i /></div>
+          <h1 id="menu-title" className="visually-hidden">Heavy Metal GP 2</h1>
+          <Brand variant="hero" />
           <p>Glory at the bottom. Trouble all the way down.</p>
         </div>
 

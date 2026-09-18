@@ -13,6 +13,7 @@ import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resu
 import { readSave, writeSave, type SaveNotice } from './game/save';
 import './menu.css';
 import './setup.css';
+import './frames.css';
 
 type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | null;
 
@@ -46,7 +47,7 @@ export default function App() {
     setPersistWarning(result.ok ? null : (result.error ?? WRITE_FAILED));
   }, [phase, session, lastSetup]);
   useEffect(() => {
-    notices.forEach((notice) => notice.level === 'warning' && console.warn('[Goblin Rally] save recovery:', notice.text));
+    notices.forEach((notice) => notice.level === 'warning' && console.warn('[Heavy Metal GP 2] save recovery:', notice.text));
   }, [notices]);
   useEffect(() => {
     document.documentElement.classList.toggle('high-contrast-game', options.highContrast);

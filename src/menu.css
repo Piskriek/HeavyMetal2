@@ -13,8 +13,12 @@
 .race-screen-host[hidden] { display: none !important; }
 .main-menu { position: relative; min-height: 760px; height: 100dvh; overflow: hidden; isolation: isolate; color: #e9dfc9; background: #101c19; }
 .main-menu[data-resumable='true'] { min-height: 835px; }
-.menu-world { position: absolute; z-index: -5; inset: -2%; background: url('/art/goblin-rally-concept.png') center center / cover no-repeat; transform: scaleX(-1); filter: saturate(.89) brightness(.93); }
-.menu-vignette { position: absolute; z-index: -4; inset: 0; background: linear-gradient(90deg, #08100fed 0%, #091412ed 19%, #0a1713bf 34%, #09171348 52%, #09161200 72%), linear-gradient(0deg, #070c0ce8 0%, #09161000 30%, #06101100 68%, #06100b73 100%); }
+/* TICKET-05: the menu painting, vignette, embers and parallax tilt are owned
+   by `AnimatedMenuBackground`. The legacy `.menu-world` rules are kept only
+   as a CSS hook so the ui-frame-check can still measure the backdrop size
+   without painting the old concept art over the new plane. */
+.menu-world { position: absolute; z-index: 1; inset: -16px; background-size: cover; background-repeat: no-repeat; }
+.menu-vignette { display: none; }
 .menu-grain { position: absolute; z-index: -3; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px #0307077a; }
 .menu-grain::before, .menu-grain::after { position: absolute; content: ''; width: 72px; height: 72px; pointer-events: none; opacity: .48; }
 .menu-grain::before { top: 14px; left: 14px; border-left: 1px solid #b89d65; border-top: 1px solid #b89d65; }
@@ -81,10 +85,10 @@
 .menu-build > i { width: 3px; height: 3px; background: #c3a86b; transform: rotate(45deg); }
 .menu-embers { position: absolute; pointer-events: none; inset: 0; z-index: -2; overflow: hidden; }
 .menu-embers > i { position: absolute; bottom: 3%; width: 2px; height: 3px; border-radius: 50%; background: #f3b45c; box-shadow: 0 0 5px #fbb75c88; opacity: 0; }
+/* The animated background owns the menu's ember drift and parallax tilt; the
+   legacy rule is kept as a safety net for any pre-mount frame. */
 .main-menu[data-motion='true'] .menu-embers > i { animation-name: menu-ember; animation-timing-function: linear; animation-iteration-count: infinite; }
-.main-menu[data-motion='true'] .menu-world { animation: menu-world-breathe 32s ease-in-out infinite alternate; }
 @keyframes menu-ember { 0% { opacity: 0; transform: translate3d(0, 0, 0); } 18% { opacity: .6; } 80% { opacity: .3; } 100% { opacity: 0; transform: translate3d(-70px, -430px, 0); } }
-@keyframes menu-world-breathe { from { transform: scaleX(-1) scale(1.01); } to { transform: scaleX(-1) scale(1.055); } }
 
 .fantasy-dialog { --fantasy: 'Cinzel', Georgia, serif; width: 660px; border: 2px solid #806e45; border-radius: 7px; background: linear-gradient(145deg, #222c24, #111b17 75%); box-shadow: inset 0 0 0 4px #070d0947, inset 0 0 0 5px #a68e4521, 0 28px 110px #000b; color: #e9dfc9; }
 .fantasy-dialog.modal-wide { width: 810px; }

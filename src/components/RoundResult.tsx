@@ -5,6 +5,7 @@ import { CUP_NAME, CUP_POINTS, cupStandings, resultField, sessionComplete, type 
 import { capsuleById, riderById } from '../game/loadouts';
 import Brand from './Brand';
 import OrnateCorners from './OrnateCorners';
+import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 
 interface RoundResultProps {
   result: RunRecord;
@@ -24,7 +25,9 @@ export default function RoundResult({ result, session, onContinue, onMenu, onNew
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => { container.current?.focus({ preventScroll: true }); }, [result.id]);
   return (
-    <div ref={container} tabIndex={-1} className="round-result" role="region" aria-label={tournament ? 'Tournament round results' : 'Race results'}>
+    <div ref={container} tabIndex={-1} className="round-result-wrap" data-painted-backdrop="true">
+      <AnimatedMenuBackground preset="vault" />
+      <div className="round-result" role="region" aria-label={tournament ? 'Tournament round results' : 'Race results'}>
       <OrnateCorners /><div className="round-result-heading"><Brand variant="compact" decorative /><Trophy size={35} strokeWidth={1.3} /><span>{tournament ? `${CUP_NAME.toUpperCase()} / ${complete ? 'CUP COMPLETE' : `ROUND ${session.round + 1} OF ${session.rounds.length}`}` : session.setup.customPhysics ? 'CUSTOM PHYSICS / PRACTICE RESULTS' : 'QUICK RACE / RESULTS'}</span><h2>{won ? 'A Gloriously Bad Idea.' : complete && tournament ? 'A Cup Well Contested.' : 'Another One for the Scrapbook.'}</h2><p>{tournament && complete ? `You placed ${playerCup} of 4 with ${table.find((row) => row.id === 0)?.points ?? 0} points.` : `${result.completed ? `Finished ${result.position} of 4` : 'Did not finish'} / ${result.raceTime?.toFixed(1) ?? '0'} s / ${COURSES.find((course) => course.id === result.course)?.name}`}</p></div>
       <div className="round-results-columns">
         <section><h3><Flag size={14} />{tournament ? 'This Round' : 'The Finish Line'}</h3><table className="round-table"><thead><tr><th>Place</th><th>Racer</th><th>{tournament ? 'Points' : 'Time'}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className={!row.id ? 'is-player' : ''}><td>{row.finished ? row.position : 'DNF'}</td><td><i style={{ backgroundColor: row.color }} />{row.name}{!row.id && <small>YOU</small>}</td><td>{tournament ? `+${row.finished ? CUP_POINTS[row.position - 1] ?? 0 : 0}` : row.finishTime === null ? 'DNF' : `${row.finishTime.toFixed(1)}s`}</td></tr>)}</tbody></table></section>
@@ -32,6 +35,7 @@ export default function RoundResult({ result, session, onContinue, onMenu, onNew
       </div>
       {tournament && !complete && <p className="next-round-note">Up next: <strong>{COURSES.find((course) => course.id === session.rounds[session.round + 1])?.name}</strong>. Same crew. Fresh trouble.</p>}
       <div className="round-result-actions"><button className="fantasy-link" onClick={onMenu}><Home size={15} />Main menu</button><button className="fantasy-secondary" onClick={onNewGame}>New setup</button><button className="fantasy-primary" onClick={onContinue}>{tournament && !complete ? <>Next Race <ArrowRight size={17} /></> : <>{tournament ? 'Race the Cup Again' : 'Rematch'}<RotateCcw size={16} /></>}</button></div>
+      </div>
     </div>
   );
 }

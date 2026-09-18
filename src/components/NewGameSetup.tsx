@@ -62,7 +62,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
   };
 
   return (
-    <Modal title={confirm ? 'Leave the Current Event?' : titles[step]} eyebrow="HEAVY METAL GP 2 / NEW GAME" onClose={onClose} wide className="fantasy-dialog setup-dialog">
+    <Modal title={confirm ? 'Leave the Current Event?' : titles[step]} eyebrow="HEAVY METAL GP 2 / NEW GAME" onClose={onClose} wide className="fantasy-dialog setup-dialog" backdrop={step === 1 ? 'workshop' : 'arena'}>
       <div ref={body} tabIndex={-1} className="setup-body">
         {confirm ? <div className="setup-confirm">
           <Flag size={40} strokeWidth={1.3} /><h3>New crew. Fresh trouble.</h3>

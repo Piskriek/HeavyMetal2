@@ -217,6 +217,7 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
 .game-shell:fullscreen .control-deck, .theater-mode .control-deck { flex-shrink: 0; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: #050a05c9; backdrop-filter: blur(9px); padding: 30px; display: flex; align-items: center; justify-content: center; overflow-y: auto; }
+.modal-backdrop[data-painted-backdrop='true'] { background: rgba(5, 10, 8, 0.42); backdrop-filter: blur(2px); }
 .modal { width: 680px; max-width: 100%; max-height: calc(100dvh - 60px); overflow: auto; background: #151e12; border: 1px solid #465338; border-radius: 9px; box-shadow: 0 25px 120px #0008; }
 .modal-wide { width: 830px; }
 .modal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 29px 30px 20px; }

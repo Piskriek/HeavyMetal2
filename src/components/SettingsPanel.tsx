@@ -26,7 +26,7 @@ export default function SettingsPanel({ options, onChange, onClose }: SettingsPa
   );
 
   return (
-    <Modal title="The Tinker's Settings" eyebrow="A FEW ADJUSTMENTS. NOTHING EXPLOSIVE." onClose={onClose} className="fantasy-dialog settings-dialog" wide>
+    <Modal title="The Tinker's Settings" eyebrow="A FEW ADJUSTMENTS. NOTHING EXPLOSIVE." onClose={onClose} className="fantasy-dialog settings-dialog" wide backdrop="settings">
       <div className="fantasy-tabs" role="tablist" aria-label="Settings categories" onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();

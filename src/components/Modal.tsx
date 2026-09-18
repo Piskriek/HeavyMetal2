@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import Brand from './Brand';
 import OrnateCorners from './OrnateCorners';
+import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
+import type { MenuBackdropPreset } from './ui/ambient-motion';
 
 interface ModalProps {
   children: ReactNode;
@@ -12,9 +14,11 @@ interface ModalProps {
   onClose: () => void;
   wide?: boolean;
   className?: string;
+  /** TICKET-05: paint a dedicated fantasy backdrop behind the dialog panel. */
+  backdrop?: MenuBackdropPreset | string;
 }
 
-export default function Modal({ children, title, eyebrow, onClose, wide = false, className = '' }: ModalProps) {
+export default function Modal({ children, title, eyebrow, onClose, wide = false, className = '', backdrop }: ModalProps) {
   const dialog = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -45,7 +49,8 @@ export default function Modal({ children, title, eyebrow, onClose, wide = false,
   }, [onClose]);
 
   return createPortal(
-    <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <motion.div className="modal-backdrop" data-painted-backdrop={backdrop ? 'true' : undefined} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      {backdrop && <AnimatedMenuBackground preset={backdrop} className="modal-backdrop-painted" />}
       <motion.div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`modal ${wide ? 'modal-wide' : ''} ${className}`} initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.22 }}>
         <OrnateCorners /><div className="modal-heading"><Brand variant="emblem" decorative /><div className="modal-title"><span className="eyebrow orange-text">{eyebrow}</span><h2 id={titleId}>{title}</h2></div><button className="icon-button modal-close" onClick={onClose} aria-label="Close dialog"><X size={21} /></button></div>
         <div className="modal-content">{children}</div>

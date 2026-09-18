@@ -186,15 +186,15 @@
 
 /* Main menu painting is covered/cropped by the viewport, never geometrically squashed. */
 .main-menu { min-height: 600px; background: #090e0d; }
-.menu-world {
-  inset: -2%;
-  background: url('/art/ui/menu-heavy-metal-2.jpg') 53% center / cover no-repeat;
-  transform: scale(1.01);
-  filter: saturate(.92) brightness(.88);
-}
-.menu-vignette { background: linear-gradient(90deg, #050908f7 0%, #080c0bea 22%, #090d0bc2 36%, #090d0b42 57%, transparent 75%), linear-gradient(0deg, #050707e8, transparent 34%, #06090748); }
-.main-menu[data-motion='true'] .menu-world { animation-name: menu-world-breathe-hm2; }
-@keyframes menu-world-breathe-hm2 { from { transform: scale(1.01); } to { transform: scale(1.05); } }
+/* TICKET-05: the menu painting, parallax tilt, ember drift, vignette and
+   flicker are owned by `AnimatedMenuBackground` (see
+   `src/components/ui/animated-background.css`). The legacy `.menu-world`,
+   `.menu-vignette` and `menu-world-breathe-hm2` rules were retired so the
+   inline-style backdrop plane does not get painted over or transformed by a
+   stale cascade. The `.menu-world` class is kept for the ui-frame-check
+   regression (it asserts the backdrop's backgroundSize). */
+.menu-world { /* no-op: see menu.css for the safe hook */ }
+.menu-vignette { display: none; }
 .studio-signature > .brand-emblem { width: 34px; height: 34px; }
 .menu-composition { width: min(480px, 46vw); }
 .game-wordmark .brand-hero { width: min(100%, 500px); }
@@ -214,7 +214,7 @@
 }
 @media (max-width: 700px) {
   .menu-composition { width: min(430px, calc(100% - 32px)); }
-  .menu-world { background-position: 65% center; }
-  .menu-vignette { background: linear-gradient(90deg, #050908ed 0%, #070c0bd8 65%, #080c0b86), linear-gradient(0deg, #050707ed, transparent 45%); }
+  /* The mobile-position nudge for the menu painting is now driven by the
+     AnimatedMenuBackground component (`backdrop.position`). */
   .studio-signature > .brand-emblem { width: 30px; height: 30px; }
 }

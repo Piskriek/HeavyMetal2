@@ -1,0 +1,116 @@
+/* TICKET-05 animated menu background.
+   The painted plane lives inside `.animated-menu-bg`. The component reads its
+   preset from `data-preset` and the overlay tint from a class on the wrapper
+   (`.ambient-overlay-menu`, `.ambient-overlay-dialog`, `.ambient-overlay-round-result`). */
+
+.animated-menu-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  isolation: isolate;
+  contain: strict;
+}
+
+.ambient-backdrop-plane {
+  position: absolute;
+  inset: -16px;
+  background-repeat: no-repeat;
+  background-origin: padding-box;
+  z-index: 1;
+  will-change: transform;
+}
+
+.ambient-current.ambient-flicker {
+  animation:
+    ambient-torch-flicker 2.4s ease-in-out infinite,
+    ambient-backdrop-in .42s ease-out both;
+}
+
+/* New plane fade-in (one-shot) layered with the ongoing torch flicker. */
+.ambient-current {
+  animation: ambient-backdrop-in .42s ease-out both;
+}
+
+.ambient-smoke { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .65; }
+.ambient-smoke > span {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(220, 220, 220, 0.18) 0%, rgba(200, 200, 200, 0.07) 35%, transparent 65%);
+  filter: blur(8px);
+  animation: ambient-smoke 22s ease-in-out infinite;
+  mix-blend-mode: screen;
+}
+
+.ambient-embers {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: .9;
+}
+
+.ambient-vignette { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+
+/* Overlay variants: each tint is applied via a class on the wrapper so the
+   same backdrop plane can be reused across main, dialog and round-result
+   contexts with the right scrim darkness for each. */
+.ambient-overlay-menu {
+  /* The original menu vignette lives in menu.css on `.menu-vignette`; the
+     ambient vignette here deepens the edges only slightly so the painted
+     artwork reads as a setting without crushing the composition column. */
+  --ambient-edge-tint: linear-gradient(90deg, #060e0bf2 0%, #071010d6 22%, #081110a8 36%, #0812101c 60%, transparent 78%);
+}
+.ambient-overlay-menu .ambient-vignette { background: var(--ambient-edge-tint), linear-gradient(0deg, #060c0be8 0%, transparent 32%, transparent 70%, #060c0a5a 100%); }
+
+.ambient-overlay-dialog {
+  /* The dialog itself is opaque so the scrim stays light and the painted
+     backdrop shows around the panel. The centre stays mostly clear so the
+     modal reads as a panel on top of the painting rather than a window cut
+     through a dark overlay. */
+  --ambient-edge-tint: radial-gradient(circle at 50% 50%, rgba(4, 8, 6, 0.18) 0%, rgba(4, 8, 6, 0.55) 100%);
+}
+.ambient-overlay-dialog .ambient-vignette { background: var(--ambient-edge-tint); }
+
+.ambient-overlay-round-result {
+  /* Round results sit on top of the race render, so the vignette is the
+     heaviest of the three to keep the result table readable. */
+  --ambient-edge-tint: linear-gradient(180deg, #060b09e6 0%, #07100ce0 35%, #07100cd6 65%, #060b09ea 100%);
+}
+.ambient-overlay-round-result .ambient-vignette { background: var(--ambient-edge-tint); }
+
+@keyframes ambient-torch-flicker {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  18% { filter: brightness(1.06) saturate(1.03); }
+  32% { filter: brightness(0.95) saturate(0.98); }
+  48% { filter: brightness(1.02) saturate(1.01); }
+  66% { filter: brightness(0.97) saturate(0.99); }
+  82% { filter: brightness(1.04) saturate(1.02); }
+}
+@keyframes ambient-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ambient-smoke {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .25; }
+  33% { transform: translate3d(40px, -20px, 0) scale(1.15); opacity: .55; }
+  66% { transform: translate3d(-30px, 18px, 0) scale(.9); opacity: .35; }
+}
+
+/* Reduced-motion: kill the flicker, embers and parallax even when the
+   component prop says `motionActive=true`. The wrapper's data-motion attribute
+   is the gate. */
+[data-motion='false'] .ambient-current,
+[data-motion='false'] .ambient-current.ambient-flicker { animation: none; }
+[data-motion='false'] .ambient-embers { display: none; }
+[data-motion='false'] .ambient-smoke > span { animation-play-state: paused; }
+[data-motion='false'] .ambient-backdrop-plane { transform: none !important; transition: none !important; }
+
+/* The global reduced-motion toggle (game settings) takes precedence over the
+   per-component data-motion flag. */
+.reduced-motion-game .ambient-current,
+.reduced-motion-game .ambient-current.ambient-flicker { animation: none; }
+.reduced-motion-game .ambient-embers { display: none; }
+.reduced-motion-game .ambient-backdrop-plane { transform: none !important; transition: none !important; }

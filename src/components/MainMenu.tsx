@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, BookOpen, Flag, Maximize2, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
 import Brand from './Brand';
+import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 import type { GameOptions } from '../game/types';
 
 interface MainMenuProps {
@@ -59,10 +60,8 @@ export default function MainMenu(props: MainMenuProps) {
 
   return (
     <main className="main-menu" data-motion={props.options.menuMotion && !props.options.reducedMotion} data-resumable={props.hasRace} aria-labelledby="menu-title">
-      <div className="menu-world" aria-hidden="true" />
-      <div className="menu-vignette" aria-hidden="true" />
+      <AnimatedMenuBackground preset="main" motionActive={props.options.menuMotion && !props.options.reducedMotion} />
       <div className="menu-grain" aria-hidden="true" />
-      <div className="menu-embers" aria-hidden="true">{[0, 1, 2, 3, 4, 5].map((n) => <i key={n} style={{ left: `${43 + n * 8}%`, animationDelay: `${n * -2.3}s`, animationDuration: `${13 + n}s` }} />)}</div>
       <div className="menu-topline">
         <div className="studio-signature"><Brand variant="emblem" decorative /><span>HEAVY METAL WORKS<small>Purveyors of exceptionally bad ideas</small></span></div>
         <div className="menu-utilities">

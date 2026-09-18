@@ -111,8 +111,14 @@
 .finish-wait { position: absolute; z-index: 5; left: 50%; top: 46%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 11px; color: #e1ca93; background: #102017e8; border: 1px solid #a88d565e; padding: 25px 38px; border-radius: 4px; text-align: center; min-width: 260px; }
 .finish-wait strong { font: 600 19px 'Cinzel', Georgia, serif; }
 .finish-wait span { font-size: 11px; color: #a9c194; }
-.round-result-overlay { position: absolute; inset: 0; z-index: 7; background: #101b14f5; overflow: auto; }
-.round-result { width: min(940px, 100%); min-height: 100%; margin: auto; padding: 27px 34px 24px; display: flex; flex-direction: column; justify-content: center; outline: none; }
+/* TICKET-05: the round-result overlay is now the painted vault backdrop.
+   The opaque scrim that used to sit behind the result panel is removed so
+   the AnimatedMenuBackground child can show through, with a soft inner
+   vignette to keep the result table readable. */
+.round-result-overlay { position: absolute; inset: 0; z-index: 7; background: transparent; overflow: auto; }
+.round-result-wrap { position: relative; min-height: 100%; padding: clamp(12px, 3vw, 34px); }
+.round-result-wrap > .animated-menu-bg { z-index: 0; }
+.round-result { position: relative; z-index: 1; width: min(940px, 100%); margin: auto; padding: 27px 34px 24px; display: flex; flex-direction: column; justify-content: center; outline: none; }
 .round-result-heading { text-align: center; }
 .round-result-heading > svg { display: block; margin: auto auto 9px; color: #dcba79; }
 .round-result-heading > span { font: 7px 'Space Mono', monospace; letter-spacing: 1px; color: #aaae80; }

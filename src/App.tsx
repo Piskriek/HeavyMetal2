@@ -140,7 +140,7 @@ export default function App() {
           {panel === 'settings' && <SettingsPanel key="settings" options={options} onChange={setOptions} onClose={closePanel} />}
           {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={Boolean(session)} finishedSession={session ? sessionComplete(session) : false} onStart={startRace} onClose={closePanel} />}
 
-          {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide>
+          {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop">
             <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the other three riders. Falling costs time, not the whole race.</p>
             <div className="handbook-row"><MousePointer2 size={23} /><div><h3>Launch all four goblins</h3><p>Pull your glowing ball back and release. Or adjust power and angle with the arrow keys, then press Enter.</p></div><kbd>Drag</kbd></div>
             <div className="handbook-row"><ArrowRight size={23} /><div><h3>Take the racing line. Or theirs.</h3><p>A and D change lanes. Contact shoves rivals sideways. Heavy balls push harder, but light balls jump higher.</p></div><kbd>A / D</kbd></div>
@@ -150,7 +150,7 @@ export default function App() {
             <div className="fantasy-dialog-actions"><span className="subtle-note">No brakes. No refunds. Now you know.</span><button className="fantasy-primary" onClick={closePanel}>I Feel Qualified <Check size={16} /></button></div>
           </Modal>}
 
-          {panel === 'records' && <Modal key="records" title="Hall of Chaos" eyebrow="SOME BAD IDEAS BECOME LEGENDS" onClose={closePanel} className="fantasy-dialog" wide>
+          {panel === 'records' && <Modal key="records" title="Hall of Chaos" eyebrow="SOME BAD IDEAS BECOME LEGENDS" onClose={closePanel} className="fantasy-dialog" wide backdrop="vault">
             {records.length ? <>
               <p className="fantasy-lead">Your best runs, saved on this device. No account. No witnesses required.</p>
               <div className="fantasy-records-wrap"><table className="fantasy-records"><thead><tr><th>Rank</th><th>Track</th><th>Finish</th><th>Distance</th><th>Chaos</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td>{String(index + 1).padStart(2, '0')}</td><td>{COURSES.find((track) => track.id === record.course)?.name ?? 'Rustbucket Ridge'}<small>{recordModeLabel(record)} / {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></td><td>{record.completed ? `${record.position ?? 1} / 4` : 'DNF'}</td><td>{record.distance.toLocaleString()} m</td><td>{record.score.toLocaleString()}</td></tr>)}</tbody></table></div>
@@ -158,7 +158,7 @@ export default function App() {
             </> : <div className="menu-empty-state"><Trophy size={53} strokeWidth={1.15} /><h3>A Legend in the Making</h3><p>The record book is empty.<br />The track is not going to wreck itself.</p><button className="fantasy-primary" onClick={newGame}>Make Some History <ArrowRight size={16} /></button></div>}
           </Modal>}
 
-          {panel === 'credits' && <Modal key="credits" title="The Art & the Engineering" eyebrow="ORIGINAL GOBLINS. CAREFULLY CONSIDERED CHAOS." onClose={closePanel} className="fantasy-dialog" wide>
+          {panel === 'credits' && <Modal key="credits" title="The Art & the Engineering" eyebrow="ORIGINAL GOBLINS. CAREFULLY CONSIDERED CHAOS." onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop">
             <figure className="menu-concept"><img src="/art/goblin-rally-concept.png" alt="Original Goblin Rally concept painting with a goblin slingshot, timber loop, sheep, and cheering crowds in a mountain arena." /><figcaption>THE ORIGINAL CONCEPT / GOBLIN RALLY</figcaption></figure>
             <p className="fantasy-lead">An original fantasy racing game. The visual direction takes cues from readable, hand-painted high fantasy; no Blizzard characters, logos, or interface assets are used.</p>
             <div className="research-links"><h3><ImageIcon size={18} />Original art</h3>

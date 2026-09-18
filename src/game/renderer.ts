@@ -3,7 +3,11 @@ import { ArenaEnvironment } from './environment';
 import { buildModelAtlas, createBoostTexture, type ModelAtlas, type ModelName } from './model-atlas';
 import { RangeCamera, edgeAnchor } from './projection';
 import { CanvasLayer, RenderBudget } from './performance';
-import { FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_WIDTH, LAUNCHER, RADIUS, closestLane, courseY, courseSlope, decalOpacity, decalRadius, laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame } from './scene';
+import {
+  FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_WIDTH, LAUNCHER, RADIUS,
+  closestLane, courseY, courseSlope, decalOpacity, decalRadius, laneZ, launchVelocity, loopGeometry,
+  obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame,
+} from './scene';
 import { RACER_DEFINITIONS, type CourseId } from './types';
 import { POWERUPS, pickupY, type AirPickup } from './powerups';
 import { polygon, texturedQuad, type Quad } from './texture';
@@ -94,6 +98,11 @@ export class RangeRenderer {
     this.budget.configure(this.cssWidth, this.cssHeight, frame.options.graphics);
     if (this.pendingResize || changed) this.resizeBuffer();
     this.view.configure(this.view.width, frame.camera, frame.options.downrange, frame.cameraY);
+    if (frame.waterfall) {
+      this.renderWaterfall();
+      this.lastCamera = frame.camera; this.lastCameraY = frame.cameraY;
+      return;
+    }
     if (frame.obstacles !== this.lastObstacles) { this.courseRevision++; this.lastObstacles = frame.obstacles; }
     this.environment.begin(frame, this.lowDetail);
     this.updateHint();
@@ -118,7 +127,7 @@ export class RangeRenderer {
     }
     const still = Math.abs(frame.camera - this.lastCamera) < 0.001 && Math.abs(frame.cameraY - this.lastCameraY) < 0.001;
     const key = `${this.view.revision}:${this.courseRevision}:${frame.camera.toFixed(3)}:${frame.cameraY.toFixed(3)}:${this.lowDetail}`;
-    const scenery = () => { this.environment.drawTerrain(); this.environment.drawGrandstands(); this.environment.drawTrack(); };
+    const scenery = () => { this.environment.drawTerrain(); this.environment.drawGrandstands(); this.environment.drawTrack(); this.environment.drawMineOverlay(); };
     if (still) this.sceneryLayer.draw(context, this.view.width, HEIGHT, this.scale, key, (target) => this.environment.withContext(target, scenery));
     else scenery();
     this.drawGroundEffects();
@@ -142,6 +151,171 @@ export class RangeRenderer {
       this.canvas.dataset.renderer = 'prebaked-atlas';
       this.metrics = { started: start, frames: 0, work: 0 };
     }
+  }
+
+  private renderWaterfall() {
+    const frame = this.frame;
+    const waterfall = frame.waterfall;
+    if (!waterfall) return;
+    const context = this.context;
+    context.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    context.fillStyle = '#02070a'; context.fillRect(0, 0, this.view.width, HEIGHT);
+
+    const backdrop = this.assets.waterfallHeadon?.image;
+    if (backdrop) {
+      const sourceW = backdrop.naturalWidth || this.assets.waterfallHeadon.width;
+      const sourceH = backdrop.naturalHeight || this.assets.waterfallHeadon.height;
+      const cover = Math.max(this.view.width / sourceW, HEIGHT / sourceH);
+      const drawW = sourceW * cover;
+      const drawH = sourceH * cover;
+      const sway = frame.reducedMotion ? 0 : Math.sin(frame.time * 0.32) * 8;
+      context.save(); context.globalAlpha = waterfall.phase === 'wall-impact' ? 0.82 : 1;
+      context.drawImage(backdrop, (this.view.width - drawW) / 2 + sway, (HEIGHT - drawH) / 2, drawW, drawH);
+      context.restore();
+    }
+
+    // The generated art supplies the deep cliff silhouette; these gradients push
+    // the edges toward black so the eye stays on the head-on water column.
+    const sideFade = context.createLinearGradient(0, 0, this.view.width, 0);
+    sideFade.addColorStop(0, '#010407e8'); sideFade.addColorStop(0.16, '#01040718');
+    sideFade.addColorStop(0.5, '#00000000'); sideFade.addColorStop(0.84, '#01040718'); sideFade.addColorStop(1, '#010407e8');
+    context.fillStyle = sideFade; context.fillRect(0, 0, this.view.width, HEIGHT);
+    const lowerFade = context.createLinearGradient(0, HEIGHT * 0.58, 0, HEIGHT);
+    lowerFade.addColorStop(0, '#05171a00'); lowerFade.addColorStop(1, '#020609c9');
+    context.fillStyle = lowerFade; context.fillRect(0, HEIGHT * 0.56, this.view.width, HEIGHT * 0.44);
+
+    const center = this.view.width * 0.5;
+    const top = 62;
+    const bottom = HEIGHT - 94;
+    const waterWidth = Math.min(this.view.width * 0.52, 730);
+    const waterLeft = center - waterWidth / 2;
+    const flow = frame.reducedMotion ? 0 : frame.time * 180;
+    // White-blue flow ribbons remain animated even if the source backdrop is
+    // static, making the river visibly run toward the camera.
+    context.save(); context.globalAlpha = waterfall.phase === 'wall-impact' ? 0.38 : 0.7;
+    for (let i = 0; i < (this.lowDetail ? 9 : 18); i++) {
+      const x = waterLeft + (i * 83 + Math.sin(i * 3.1) * 25) % Math.max(40, waterWidth);
+      const start = top + (i * 37) % 120;
+      const length = 160 + (i % 5) * 58;
+      context.strokeStyle = i % 3 ? '#a6eff1a8' : '#e4ffffbc';
+      context.lineWidth = (1.5 + i % 3) * (0.7 + waterfall.depth * 0.35);
+      context.beginPath();
+      context.moveTo(x + Math.sin(flow * 0.004 + i) * 8, start);
+      context.bezierCurveTo(x - 22, start + length * 0.34, x + 28, start + length * 0.68, x + Math.sin(flow * 0.006 + i) * 14, start + length);
+      context.stroke();
+    }
+    context.restore();
+
+    for (const feature of frame.waterfallFeatures) {
+      const y = top + feature.depth * (bottom - top);
+      const x = center + feature.lateral * waterWidth * 0.42;
+      const hitAge = frame.runTime - feature.hitAt;
+      this.drawWaterfallFeature(feature, x, y, waterWidth, hitAge);
+    }
+
+    if (waterfall.phase === 'wall-impact') this.drawHeadOnWall(waterfall.impact);
+    if (waterfall.phase === 'river') this.drawRiverLip(waterfall.progress);
+    if (waterfall.phase === 'bottom-impact') this.drawBottomRocks(waterfall.impact);
+
+    // Every racer gets a head-on marker during the shared drop. The player is
+    // painted last and larger, so the camera lock reads even in a crowded fall.
+    const fallingRacers = frame.racers.filter((racer) => racer.waterfallPhase !== null);
+    for (const racer of fallingRacers) {
+      const depth = racer.waterfallPhase === 'wall-impact' ? 0.02
+        : racer.waterfallPhase === 'river' ? 0.035 + racer.waterfallProgress * 0.04 : racer.waterfallDepth;
+      const x = center + racer.waterfallLateral * waterWidth * 0.42;
+      const y = top + depth * (bottom - top);
+      this.drawWaterfallBall(racer, x, y, racer.id === 0 ? 42 : 31);
+    }
+
+    const vignette = context.createRadialGradient(center, HEIGHT * 0.44, 80, center, HEIGHT * 0.45, Math.max(this.view.width, HEIGHT) * 0.7);
+    vignette.addColorStop(0, '#00000000'); vignette.addColorStop(0.72, '#00000022'); vignette.addColorStop(1, '#000000c8');
+    context.fillStyle = vignette; context.fillRect(0, 0, this.view.width, HEIGHT);
+
+    context.fillStyle = '#e8fff4'; context.font = '900 20px "Barlow Condensed", sans-serif';
+    context.textAlign = 'left'; context.fillText('WATERFALL // PINBALL DROP', 28, 38);
+    context.fillStyle = '#94e6df'; context.font = '700 11px "Space Mono", monospace';
+    const phase = waterfall.phase === 'wall-impact' ? 'ROCK WALL IMPACT' : waterfall.phase === 'river' ? 'RIVER LIP' : waterfall.phase === 'bottom-impact' ? 'BOTTOM ROCKS' : 'VERTICAL DROP';
+    context.fillText(phase, 30, HEIGHT - 33);
+    context.textAlign = 'right'; context.fillText(`${Math.round(waterfall.depth * 100)}% DESCENT  /  ${waterfall.hitCount} REBOUND${waterfall.hitCount === 1 ? '' : 'S'}`, this.view.width - 28, HEIGHT - 33);
+    context.textAlign = 'left';
+    context.fillStyle = '#bceee8'; context.font = '700 10px "Space Mono", monospace';
+    context.fillText('← A / D →  STEER THE FALL', 30, 57);
+    const barWidth = Math.min(330, this.view.width * 0.3);
+    context.fillStyle = '#031012aa'; context.fillRect(center - barWidth / 2, 24, barWidth, 5);
+    context.fillStyle = '#78e0d6'; context.fillRect(center - barWidth / 2, 24, barWidth * clamp(waterfall.depth, 0, 1), 5);
+  }
+
+  private drawWaterfallFeature(feature: SceneFrame['waterfallFeatures'][number], x: number, y: number, waterWidth: number, hitAge: number) {
+    const context = this.context;
+    const depthScale = 0.72 + feature.depth * 0.4;
+    const width = feature.width * waterWidth * depthScale;
+    const height = Math.max(18, feature.height * 210 * depthScale);
+    const hit = hitAge >= 0 && hitAge < 0.5;
+    context.save();
+    if (hit) { this.glow(x, y, width * 0.9, feature.kind === 'tube' ? '#76e5dd' : '#ffd08a', (1 - hitAge / 0.5) * 0.25); }
+    if (feature.kind === 'rock') {
+      context.translate(x, y);
+      context.fillStyle = '#101b1b'; context.strokeStyle = '#8ca49b'; context.lineWidth = 3;
+      context.beginPath(); context.moveTo(-width * 0.52, height * 0.34); context.lineTo(-width * 0.35, -height * 0.46); context.lineTo(width * 0.05, -height * 0.62); context.lineTo(width * 0.52, -height * 0.2); context.lineTo(width * 0.42, height * 0.43); context.lineTo(0, height * 0.58); context.closePath(); context.fill(); context.stroke();
+      context.fillStyle = '#6f8b80'; context.globalAlpha = 0.58; context.beginPath(); context.moveTo(-width * 0.28, -height * 0.32); context.lineTo(width * 0.02, -height * 0.48); context.lineTo(width * 0.29, -height * 0.16); context.lineTo(-width * 0.02, -height * 0.1); context.closePath(); context.fill();
+    } else if (feature.kind === 'ramp') {
+      const side = feature.lateral < 0 ? -1 : 1;
+      context.translate(x, y); context.rotate(side * 0.16);
+      context.fillStyle = '#3b2c24'; context.strokeStyle = '#e7bb78'; context.lineWidth = 3;
+      context.beginPath(); context.moveTo(-width * 0.52, height * 0.44); context.lineTo(width * 0.51, height * 0.44); context.lineTo(width * 0.28, -height * 0.52); context.lineTo(-width * 0.36, -height * 0.32); context.closePath(); context.fill(); context.stroke();
+      context.strokeStyle = '#8fe6d9'; context.lineWidth = 2; context.beginPath(); context.moveTo(-width * 0.32, height * 0.22); context.lineTo(width * 0.3, height * 0.22); context.stroke();
+    } else {
+      const side = feature.lateral < 0 ? -1 : 1;
+      context.translate(x, y); context.rotate(side * 0.28);
+      context.strokeStyle = '#d2b06d'; context.lineWidth = Math.max(10, width * 0.16); context.lineCap = 'round';
+      context.beginPath(); context.arc(0, 0, width * 0.48, Math.PI * (side < 0 ? 0.7 : 0.3), Math.PI * (side < 0 ? 1.75 : 1.3)); context.stroke();
+      context.strokeStyle = '#58b9b3'; context.lineWidth = Math.max(4, width * 0.055); context.beginPath(); context.arc(0, 0, width * 0.48, Math.PI * (side < 0 ? 0.7 : 0.3), Math.PI * (side < 0 ? 1.75 : 1.3)); context.stroke();
+    }
+    context.restore();
+  }
+
+  private drawWaterfallBall(racer: RacerFrame, x: number, y: number, radius: number) {
+    const context = this.context;
+    this.glow(x + radius * 0.25, y - radius * 0.35, radius * 1.6, racer.color, racer.id === 0 ? 0.2 : 0.1);
+    context.save(); context.translate(x, y); context.rotate(racer.rotation);
+    context.drawImage(this.balls[racer.id], -radius, -radius, radius * 2, radius * 2);
+    context.restore();
+    if (racer.id === 0) {
+      context.strokeStyle = '#ffe0a1'; context.lineWidth = 2; context.beginPath(); context.arc(x, y, radius + 7, 0, TAU); context.stroke();
+    }
+  }
+
+  private drawHeadOnWall(impact: number) {
+    const context = this.context;
+    const h = 114 + impact * 16;
+    context.save(); context.translate(this.view.width / 2, HEIGHT - 42);
+    context.fillStyle = '#121a18'; context.strokeStyle = '#b99b6b'; context.lineWidth = 4;
+    context.beginPath(); context.moveTo(-this.view.width * 0.56, 42); context.lineTo(-this.view.width * 0.5, -h * 0.66); context.lineTo(-this.view.width * 0.3, -h); context.lineTo(this.view.width * 0.32, -h * 0.94); context.lineTo(this.view.width * 0.52, -h * 0.58); context.lineTo(this.view.width * 0.56, 42); context.closePath(); context.fill(); context.stroke();
+    context.strokeStyle = '#263934'; context.lineWidth = 2;
+    for (let i = -4; i <= 4; i++) { context.beginPath(); context.moveTo(i * 82, -h * 0.6); context.lineTo(i * 62 + Math.sin(i) * 24, 24); context.stroke(); }
+    context.restore();
+  }
+
+  private drawRiverLip(progress: number) {
+    const context = this.context;
+    const y = HEIGHT * 0.7 + progress * 28;
+    context.fillStyle = '#b9f5e6a0'; context.beginPath(); context.ellipse(this.view.width / 2, y, this.view.width * 0.34, 46, 0, 0, TAU); context.fill();
+    context.strokeStyle = '#e4fff2cc'; context.lineWidth = 3; context.beginPath(); context.ellipse(this.view.width / 2, y, this.view.width * 0.34, 46, 0, 0, TAU); context.stroke();
+  }
+
+  private drawBottomRocks(impact: number) {
+    const context = this.context;
+    context.save(); context.globalAlpha = 0.72 + impact * 0.28;
+    context.fillStyle = '#172421'; context.strokeStyle = '#9eb5a0'; context.lineWidth = 3;
+    for (let i = 0; i < 7; i++) {
+      const x = (i + 0.5) * this.view.width / 7;
+      const r = 36 + (i % 3) * 17;
+      context.beginPath(); context.ellipse(x, HEIGHT - 45 - (i % 2) * 12, r, r * 0.58, (i - 3) * 0.18, 0, TAU); context.fill(); context.stroke();
+    }
+    context.restore();
   }
 
   private updateHint() {
@@ -726,9 +900,63 @@ export class RangeRenderer {
     }
   }
 
+  private drawFireRing(obstacle: Obstacle) {
+    const centerX = obstacle.x + obstacle.width / 2;
+    const point = this.p(centerX, this.y(centerX) - (obstacle.altitude ?? 130), obstacleZ(obstacle));
+    const radius = obstacle.width * 0.42 * point.scale;
+    const pulse = this.frame.reducedMotion ? 0.6 : 0.78 + Math.sin(this.frame.time * 8 + centerX * 0.01) * 0.18;
+    const context = this.context;
+    this.glow(point.x, point.y, radius * 1.8, obstacle.ring === 'steel' ? '#ff8e45' : '#ffbd55', 0.2 * pulse);
+    context.save(); context.translate(point.x, point.y); context.globalAlpha = pulse;
+    context.strokeStyle = '#24140d'; context.lineWidth = Math.max(4, radius * 0.24);
+    context.beginPath(); context.arc(0, 0, radius, 0, TAU); context.stroke();
+    context.strokeStyle = obstacle.ring === 'steel' ? '#d7d0bf' : '#f0a14e'; context.lineWidth = Math.max(2, radius * 0.13);
+    context.beginPath(); context.arc(0, 0, radius, 0, TAU); context.stroke();
+    context.strokeStyle = '#fff1b1'; context.lineWidth = Math.max(1, radius * 0.045);
+    context.beginPath(); context.arc(0, 0, radius * 0.82, -0.9, 1.2); context.stroke();
+    for (let i = 0; i < 7; i++) {
+      const angle = i * TAU / 7 + this.frame.time * 0.35;
+      const x = Math.cos(angle) * radius * 0.93;
+      const y = Math.sin(angle) * radius * 0.93;
+      context.fillStyle = i % 2 ? '#ff6335' : '#ffd27a';
+      context.beginPath(); context.moveTo(x, y); context.lineTo(x + Math.cos(angle) * 8 * point.scale, y + Math.sin(angle) * 8 * point.scale);
+      context.lineTo(x - Math.sin(angle) * 4 * point.scale, y + Math.cos(angle) * 4 * point.scale); context.closePath(); context.fill();
+    }
+    context.restore();
+  }
+
+  private drawBumper(obstacle: Obstacle) {
+    const centerX = obstacle.x + obstacle.width / 2;
+    const point = this.p(centerX, this.y(centerX), obstacleZ(obstacle));
+    const sprite = obstacle.kind === 'spiked-rock' || obstacle.variant === 'spiked' ? this.assets.bumperSpiked : this.assets.bumperCrown;
+    const drawW = obstacle.width * point.scale;
+    const drawH = Math.min(obstacle.height * 1.22, drawW * sprite.height / sprite.width);
+    this.glow(point.x, point.y - drawH * 0.42, drawW * 0.72, obstacle.kind === 'spiked-rock' ? '#ff6543' : '#ffd27a', obstacle.kind === 'spiked-rock' ? 0.09 : 0.12);
+    this.context.save(); this.context.translate(point.x, point.y);
+    this.context.rotate(Math.atan(this.slope(centerX)) * 0.22);
+    this.context.drawImage(sprite.image, -drawW * 0.5, -drawH * 0.91, drawW, drawH);
+    this.context.restore();
+  }
+
   private drawObstacle(obstacle: Obstacle) {
     const { kind, x, width, height } = obstacle;
     if (kind === 'ramp' || kind === 'loop' || kind === 'gap') return;
+    if (kind === 'fire-ring') {
+      this.drawFireRing(obstacle);
+      return;
+    }
+    if (kind === 'rock-bumper' || kind === 'spiked-rock') {
+      this.drawBumper(obstacle);
+      return;
+    }
+    if (kind === 'rock-wall') {
+      this.drawRockWall(obstacle);
+      return;
+    }
+    if (kind === 'mine-rail' || kind === 'mine-split') {
+      this.drawMineObstacle(obstacle);
+      return;
+    }
     if (kind === 'sign') {
       this.drawSign(obstacle);
       return;
@@ -750,13 +978,68 @@ export class RangeRenderer {
       return;
     }
     const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
-    let h = Math.min(height * 1.12, width * this.assets[kind].height / this.assets[kind].width);
+    const sprite = kind === 'skull-box' ? this.assets.skullBox
+      : kind === 'spring' ? this.assets.springPart
+        : kind === 'crate' ? this.assets.crate
+          : kind === 'sheep' ? this.assets.sheep
+            : this.assets.tnt;
+    let h = Math.min(height * 1.12, width * sprite.height / sprite.width);
     if (kind === 'spring' && this.frame.time - obstacle.hitAt < 0.4) h *= 1 - Math.sin((this.frame.time - obstacle.hitAt) / 0.4 * Math.PI) * 0.36;
     this.context.save(); this.context.translate(point.x, point.y);
     this.context.rotate(Math.atan(this.slope(x) - (this.frame.options.downrange ? 0.11 : 0)) * 0.38);
-    this.context.drawImage(this.assets[kind].image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
+    this.context.drawImage(sprite.image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
     this.context.restore();
     if (kind === 'tnt') this.glow(point.x + 7 * point.scale, point.y - h * point.scale * 0.9, 12 * point.scale, '#ffc16c', 0.3);
+  }
+
+  private drawRockWall(obstacle: Obstacle) {
+    const context = this.context;
+    const x = obstacle.x + obstacle.width / 2;
+    const y = this.y(x);
+    const near = this.p(x, y + 28, LANE.near - 34);
+    const far = this.p(x, y + 28, LANE.far + 34);
+    const nearTop = this.p(x, y - obstacle.height, LANE.near - 34);
+    const farTop = this.p(x, y - obstacle.height, LANE.far + 34);
+    polygon(context, [farTop, nearTop, near, far]);
+    const gradient = context.createLinearGradient(0, Math.min(nearTop.y, farTop.y), 0, Math.max(near.y, far.y));
+    gradient.addColorStop(0, obstacle.variant === 'spiked' ? '#5e3d2d' : '#3b4b45');
+    gradient.addColorStop(0.5, '#202c2a'); gradient.addColorStop(1, '#0b1212');
+    context.fillStyle = gradient; context.fill();
+    context.strokeStyle = '#aa8a5c'; context.lineWidth = Math.max(2, 4 * near.scale); context.stroke();
+    context.strokeStyle = '#6c7e72'; context.lineWidth = Math.max(1, 1.5 * near.scale);
+    for (let i = -5; i <= 5; i++) {
+      const a = this.p(x, y - obstacle.height * (0.18 + (i + 5) % 3 * 0.2), laneZ(Math.max(0, Math.min(3, i + 2))));
+      const b = this.p(x, y + 10, a.depth > 0 ? LANE.far + 15 : LANE.near - 15);
+      context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
+    }
+    const title = this.p(x, y - obstacle.height - 20, 0);
+    context.textAlign = 'center'; context.font = `900 ${Math.max(12, 20 * title.scale)}px "Barlow Condensed", sans-serif`;
+    context.fillStyle = '#f1d29a'; context.fillText('NO EXIT', title.x, title.y); context.textAlign = 'left';
+  }
+
+  private drawMineObstacle(obstacle: Obstacle) {
+    const context = this.context;
+    const x = obstacle.x;
+    const end = obstacle.x + obstacle.width;
+    const z = obstacle.kind === 'mine-rail' ? LANE.near + 62 : laneZ(1);
+    const railColor = obstacle.kind === 'mine-rail' ? '#b9a66e' : '#7cd3c4';
+    for (const offset of obstacle.kind === 'mine-rail' ? [-34, 34] : [-185, 185]) {
+      const a = this.p(x, this.y(x) - 5, z + offset);
+      const b = this.p(end, this.y(end) - 5, z + offset);
+      context.strokeStyle = '#101615'; context.lineWidth = 9 * a.scale; context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
+      context.strokeStyle = railColor; context.lineWidth = 3 * a.scale; context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
+    }
+    for (let tie = x; tie < end; tie += 86) {
+      const a = this.p(tie, this.y(tie) - 3, z - 64);
+      const b = this.p(tie, this.y(tie) - 3, z + 64);
+      context.strokeStyle = '#4b3928'; context.lineWidth = Math.max(2, 5 * a.scale); context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
+    }
+    if (obstacle.kind === 'mine-split') {
+      const branch = this.p(x + obstacle.width * 0.44, this.y(x + obstacle.width * 0.44) - 8, laneZ(3));
+      context.strokeStyle = '#8de3d3'; context.lineWidth = 4 * branch.scale;
+      context.beginPath(); context.moveTo(branch.x, branch.y); context.lineTo(branch.x - 90 * branch.scale, branch.y - 66 * branch.scale); context.stroke();
+      context.fillStyle = '#d8b56f'; context.beginPath(); context.arc(branch.x, branch.y, 8 * branch.scale, 0, TAU); context.fill();
+    }
   }
 
   private drawBall(ball: RacerFrame) {
@@ -764,6 +1047,18 @@ export class RangeRenderer {
     const p = this.p(ball.x, ball.y, ball.z);
     const context = this.context;
     const ready = this.frame.snapshot.status === 'ready';
+    if (!ready && ball.fireUntil > this.frame.runTime) {
+      const age = Math.max(0, ball.fireUntil - this.frame.runTime);
+      this.glow(p.x - 27 * p.scale, p.y + 9 * p.scale, 36 * p.scale, '#ff6335', 0.16);
+      context.save(); context.translate(p.x, p.y); context.rotate(ball.rotation);
+      for (let i = 0; i < 4; i++) {
+        const flame = 15 + i * 5 + Math.sin(this.frame.time * 18 + i) * 3;
+        context.fillStyle = i % 2 ? '#ff713b' : '#ffd27a';
+        context.globalAlpha = Math.min(0.9, age * 1.4) * (1 - i * 0.12);
+        context.beginPath(); context.moveTo(-27 * p.scale - i * 4 * p.scale, 0); context.quadraticCurveTo(-42 * p.scale - i * 4 * p.scale, -flame * p.scale, -58 * p.scale - i * 5 * p.scale, 0); context.quadraticCurveTo(-42 * p.scale - i * 4 * p.scale, flame * p.scale, -27 * p.scale - i * 4 * p.scale, 0); context.fill();
+      }
+      context.restore();
+    }
     if (ball.shieldUntil > this.frame.runTime) {
       context.strokeStyle = '#8cceffd9'; context.lineWidth = 2 * p.scale;
       context.beginPath(); context.arc(p.x, p.y, 44 * p.scale, 0, TAU); context.stroke();

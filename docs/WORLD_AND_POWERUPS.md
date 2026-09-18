@@ -10,7 +10,7 @@ The world pass keeps the readability principles from `GAME_DESIGN.md`: quiet roa
 | Boomtown Run | The Brass Quarries | Copper-red mesas, steeper alternating drops, more TNT, and committed lane choices | The Blast Furnace |
 | Woolly Wasteland | The Woolwind Downs | Open green pastures, pale dirt, shorter single-lane gaps, more sheep and spring routes | The Woolly Coliseum |
 
-All courses remain 15 km and retain a four-lane start and stadium finish. Each now has its own monotone elevation profile, sector names, obstacle placement rhythm, and pickup route. The forest/canyon/meadow choice is not just a background tint.
+All courses now run 36 km and retain a four-lane start and stadium finish. The first 12 km is the established downhill; the 12 km Section 2 waterfall cliff adds a full-width rock-wall crash, a head-on river drop, pinball rocks, ramps, tubes, and bottom-rock handoff; the final 12 km is a branching mine-tunnel network with multiple rails before the stadium finale. Each course has its own elevation profile, sector names, obstacle placement rhythm, and pickup route. The forest/canyon/meadow choice is not just a background tint.
 
 `src/game/courses.ts` contains their palettes and profiles. `src/game/scene.ts` precomputes a small elevation lookup table for each course. Queries take an explicit course ID; the engine, renderer, ground contacts, ramps, loops, pickups, and camera all use the selected table. The default profile remains available to the static machinery atlas builder.
 

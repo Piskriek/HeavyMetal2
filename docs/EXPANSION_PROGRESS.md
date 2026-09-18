@@ -73,6 +73,16 @@ Section 4 is implemented in four installments, one per user prompt.
 
 Results/cup/progression presentation and persistent cup history; then empirical balance, end-to-end QA, frame pacing and release verification. A successful build is not proof of FPS, balance or accessibility.
 
+## Phase 3 Track Expansion
+
+### TICKET-08: Waterfall Cliff Zigzag & Pinball Chasm — Implemented
+
+- `src/game/scene.ts` now exposes a 36,000 m three-stage circuit: 12,000 m Alpine Ridge, 12,000 m Waterfall Cliff, and a 12,000 m mine-tunnel/stadium approach. Course profiles are precomputed through the 72,000 world-unit finish, with cliff gravity scaling and `wet_wood` / `moss_rock` traction.
+- `createStage2WaterfallSection()` deterministically places the downhill's full-width rock wall and the waterfall pinball contract; the normalized drop layout drives staggered rocks, ramps, tubes, rebounds, and water-flow slowdowns after the wall. The generated objects are spatially bucketed with the rest of the course, so the extension does not create a per-frame full-track scan.
+- The physics engine visibly enters the wall, locks the active camera head-on during the vertical fall, redirects racers with lateral rock/tube impulses, resolves bottom-rock impact, and hands the race to `createStage3MineSection()` with multiple rails, branch splits, gaps, and cavern obstacles.
+- PreGame bumper, spring, crate, skull-box, and surface-strip assets plus the generated head-on waterfall backdrop are shipped under `public/art/track-parts/` and preloaded before the grid. The renderer uses the wood/moss strips for the active surface, procedural waterfall motion, dark cliff fade, mine arches, branch mouths, and multi-rail tunnel network.
+- The 36 km finish, progress bar, race help, course itinerary, README, and world rules now describe the expanded waterfall-to-mine circuit. `TICKET-09` can still cover later end-cavern polish without deferring this playable handoff.
+
 ## Phase 1 Ticket Suite
 
 The ticket suite in `docs/tickets/` is implemented one issue at a time. `TICKET-01` (ornate frame system) shipped earlier; `TICKET-02` is implemented here.

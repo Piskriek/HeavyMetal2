@@ -1,4 +1,4 @@
-import { laneZ, START_X, START_Y, type LoopRide, type Obstacle, type RacerFrame } from './scene';
+import { laneZ, START_X, START_Y, type LoopRide, type Obstacle, type RacerFrame, type WaterfallRide } from './scene';
 import { RACER_DEFINITIONS } from './types';
 import { DEFAULT_LOADOUT, loadoutStats, riderById, type Loadout } from './loadouts';
 import type { RaceConfig } from './session';
@@ -27,6 +27,7 @@ export interface Racer extends RacerFrame {
   lastBoostAt: number;
   lastLaneChange: number;
   loopRide: LoopRide | null;
+  waterfall: WaterfallRide | null;
   finishTime: number | null;
   distance: number;
   bounces: number;
@@ -48,11 +49,12 @@ export function createRacers(config?: RaceConfig): Racer[] {
     lane: definition.homeLane, targetLane: definition.homeLane, rotation: 0,
     falling: false, finished: false, grounded: false, bumpAt: -100,
     immuneUntil: -100, launchOrigin: { x: START_X, y: START_Y },
-    shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,
+    shieldUntil: -100, shieldHitAt: -100, pickupAt: -100, fireUntil: -100,
     lastGroundedAt: -100, lastHopAt: -100, bufferedJump: -100,
     fallingFor: 0, stoppedFor: 0, recoveryUntil: -100, steerLockedUntil: -100,
     nextDecision: 0.35 + definition.id * 0.11, lastBoostAt: -100, lastLaneChange: -100,
-    loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
+    loopRide: null, waterfall: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
+    waterfallPhase: null, waterfallProgress: 0, waterfallDepth: 0, waterfallLateral: 0, waterfallHits: 0,
     visited: new Set<Obstacle>(),
     previous: { x: START_X, y: START_Y, z: laneZ(definition.homeLane), rotation: 0 },
     };

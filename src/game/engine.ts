@@ -5,13 +5,14 @@ import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
 import {
   AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
-  RADIUS, STADIUM_START, START_X, START_Y, TRACK_DISTANCE, closestLane, courseY, courseSlope,
-  laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, weightImpulse,
-  type AirSheep, type Obstacle, type Particle, type RacerFrame,
+  RADIUS, STADIUM_START, START_X, START_Y, STAGE_2_START, STAGE_3_START, TRACK_DISTANCE,
+  WATERFALL_EXIT_X, WATERFALL_START_X, WATERFALL_WALL_X, closestLane, courseY, courseSlope, gravityScaleForSlope,
+  laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, surfaceTypeAt, weightImpulse,
+  type AirSheep, type Obstacle, type Particle, type RacerFrame, type WaterfallFeature, type WaterfallFrame,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
 import type { RaceConfig } from './session';
-import { createTrackLayout } from './track-layout';
+import { createTrackLayout, createWaterfallDropLayout } from './track-layout';
 import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from './powerups';
 
 const TAU = Math.PI * 2;
@@ -51,6 +52,8 @@ export class GameEngine {
   private renderRacers: RacerFrame[] = [];
   private readonly collisionTimes = new Float64Array(16).fill(-100);
   private obstacles: Obstacle[] = [];
+  private waterfallFeatures: WaterfallFeature[] = [];
+  private waterfallCamera: WaterfallFrame | null = null;
   private pickups: AirPickup[] = [];
   private readonly pickupBuckets = new Map<number, AirPickup[]>();
   private pickupCount = 0;
@@ -135,6 +138,8 @@ export class GameEngine {
     this.topSpeed = this.shake = 0;
     this.isDragging = false;
     this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
+    this.waterfallCamera = null;
+    this.waterfallFeatures = [];
     this.pickupCount = this.shieldBlocks = 0;
     this.snapshot.sector = sectorAt(START_X, this.options.course);
     this.collisionTimes.fill(-100);
@@ -189,7 +194,7 @@ export class GameEngine {
   };
 
   private canHop(racer: Racer) {
-    return !racer.falling && !racer.loopRide && !racer.finished && this.runTime - racer.lastHopAt >= 0.25
+    return !racer.falling && !racer.loopRide && !racer.waterfall && !racer.finished && this.runTime - racer.lastHopAt >= 0.25
       && (racer.grounded || this.runTime - racer.lastGroundedAt < 0.085);
   }
 
@@ -209,7 +214,7 @@ export class GameEngine {
   };
 
   private performBounce(racer: Racer) {
-    if (!racer.bounces || racer.falling || racer.loopRide || racer.finished) return;
+    if (!racer.bounces || racer.falling || racer.loopRide || racer.waterfall || racer.finished) return;
     racer.bounces--; racer.vy = -760 * weightImpulse(racer.weight) * racer.hopFactor;
     racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
     racer.grounded = false; racer.lastGroundedAt = -100;
@@ -220,7 +225,7 @@ export class GameEngine {
   boost = () => { if (this.status === 'flying') this.performBoost(this.player); };
 
   private performBoost(racer: Racer) {
-    if (!racer.boosts || racer.falling || racer.finished) return;
+    if (!racer.boosts || racer.falling || racer.waterfall || racer.finished) return;
     const impulse = 430 * weightImpulse(racer.weight) * racer.boostFactor;
     racer.boosts--; racer.lastBoostAt = this.runTime;
     if (racer.loopRide) racer.loopRide.speed = Math.min(racer.maximumSpeed, racer.loopRide.speed + impulse);
@@ -254,6 +259,7 @@ export class GameEngine {
 
   private makeTrack() {
     this.obstacles = createTrackLayout(this.options.course);
+    this.waterfallFeatures = createWaterfallDropLayout(this.options.course);
     this.buckets.clear(); this.pickupBuckets.clear();
     for (const obstacle of this.obstacles) {
       const left = obstacle.kind === 'loop' ? obstacle.x - obstacle.width / 2 : obstacle.x;
@@ -276,10 +282,17 @@ export class GameEngine {
   private inGap(x: number, z: number) { return this.nearby(x).some((o) => o.kind === 'gap' && x > o.x && x < o.x + o.width && occupiesLane(o, z, 0)); }
   private surfaceAt(x: number, z: number) {
     let y = this.y(x); let slope = this.slope(x); let ramp: Obstacle | null = null;
+    let surface = surfaceTypeAt(x);
     for (const o of this.nearby(x)) if (o.kind === 'ramp' && x >= o.x && x <= o.x + o.width && occupiesLane(o, z, 5)) {
       y = rampSurface(o, x, this.options.course); slope -= 1.6 * o.height / o.width * Math.pow((x - o.x) / o.width, 0.6); ramp = o;
+      surface = o.surface ?? surface;
     }
-    return { y, slope, ramp };
+    return { y, slope, ramp, surface };
+  }
+
+  private inCliffSection(x: number) { return x >= STAGE_2_START && x < STAGE_3_START; }
+  private gravityAt(x: number, slope = this.slope(x)) {
+    return GRAVITY * (this.inCliffSection(x) ? Math.max(1.45, gravityScaleForSlope(slope)) : gravityScaleForSlope(slope));
   }
 
   private coordinates(event: PointerEvent) {
@@ -353,23 +366,34 @@ export class GameEngine {
       rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
       rendered.falling = racer.falling; rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
-      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
+      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt; rendered.fireUntil = racer.fireUntil;
+      rendered.waterfallPhase = racer.waterfallPhase; rendered.waterfallProgress = racer.waterfallProgress;
+      rendered.waterfallDepth = racer.waterfallDepth; rendered.waterfallLateral = racer.waterfallLateral; rendered.waterfallHits = racer.waterfallHits;
     }
     const player = this.player; const rendered = this.renderRacers[0];
     if (this.status === 'flying' && this.inputEnabled) {
-      const focus = player.loopRide?.obstacle.x ?? rendered.x;
       const view = this.renderer.view;
-      // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
-      // keeps the ball framed; the fixed course camera pans slower with a longer look-ahead
-      // for the classic broad overview, letting the ball wander (the edge pointer covers it).
-      const follow = this.options.cameraMode === 'follow_ball';
-      const target = clampCameraTarget(view.followOffset(focus + (follow ? 0 : view.width * 0.06), rendered.z));
-      this.camera = chaseLerp(this.camera, target, follow ? 6 : 2.4, dt);
-      // Camera Y tracks the terrain, and in follow mode pans up softly on big air so the
-      // ball stays framed through hops, springs, and catapult launches.
-      const altitude = Math.max(0, this.y(rendered.x) - RADIUS - rendered.y);
-      const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
-      this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
+      if (player.waterfall) {
+        // The waterfall renderer is deliberately camera-locked and head-on. Keep
+        // the world camera parked at the lip so the handoff back to the mine rail
+        // network has no sideways snap when the bottom impact releases the racer.
+        const target = clampCameraTarget(view.followOffset(WATERFALL_START_X, 0));
+        this.camera = chaseLerp(this.camera, target, 12, dt);
+        this.cameraY = chaseLerp(this.cameraY, 0, 12, dt);
+      } else {
+        const focus = player.loopRide?.obstacle.x ?? rendered.x;
+        // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
+        // keeps the ball framed; the fixed course camera pans slower with a longer look-ahead
+        // for the classic broad overview, letting the ball wander (the edge pointer covers it).
+        const follow = this.options.cameraMode === 'follow_ball';
+        const target = clampCameraTarget(view.followOffset(focus + (follow ? 0 : view.width * 0.06), rendered.z));
+        this.camera = chaseLerp(this.camera, target, follow ? 6 : 2.4, dt);
+        // Camera Y tracks the terrain, and in follow mode pans up softly on big air so the
+        // ball stays framed through hops, springs, and catapult launches.
+        const altitude = Math.max(0, this.y(rendered.x) - RADIUS - rendered.y);
+        const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
+        this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
+      }
     }
     this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
     const active = this.status === 'flying' || this.isDragging;
@@ -385,12 +409,127 @@ export class GameEngine {
         drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
+        waterfall: this.waterfallCamera, waterfallFeatures: this.waterfallFeatures,
         snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion }, interval);
     }
     if (now - this.lastNotify > 100) this.notify(false);
     const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
     if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient)) this.schedule();
   };
+
+  private enterWaterfall(racer: Racer) {
+    if (racer.waterfall || racer.finished) return;
+    const lateral = clamp(-racer.z / (LANE.far + 70), -0.78, 0.78);
+    racer.waterfall = {
+      phase: 'wall-impact', progress: 0, depth: 0, lateral, targetLateral: lateral,
+      velocity: 0, hitCount: 0, impact: 1, startedAt: this.runTime,
+    };
+    racer.waterfallPhase = 'wall-impact'; racer.waterfallProgress = 0;
+    racer.waterfallDepth = 0; racer.waterfallLateral = lateral; racer.waterfallHits = 0;
+    racer.x = WATERFALL_WALL_X; racer.y = this.y(WATERFALL_WALL_X) - RADIUS;
+    racer.z = -lateral * (LANE.far + 70); racer.vx = 0; racer.vy = 0; racer.vz = 0;
+    racer.grounded = false; racer.loopRide = null; racer.falling = false;
+    this.emit(WATERFALL_WALL_X, racer.y - 95, racer.z, 26, '#d2b582', 230);
+    if (!racer.id) {
+      this.shake = 7;
+      this.snapshot.score += 120;
+      this.audio.play('bump');
+      this.say('THE WALL WON. TAKE THE WATERFALL.');
+    }
+  }
+
+  private hitWaterfallFeature(racer: Racer, feature: WaterfallFeature) {
+    const ride = racer.waterfall;
+    if (!ride || (feature.hitMask & (1 << racer.id)) || this.runTime - feature.hitAt < 0.08) return;
+    const lateralDistance = Math.abs(ride.lateral - feature.lateral);
+    if (lateralDistance > feature.width * 0.62 + 0.085) return;
+    feature.hitMask |= 1 << racer.id;
+    feature.hitAt = this.runTime;
+    ride.hitCount++;
+    racer.waterfallHits = ride.hitCount;
+    const side = ride.lateral >= feature.lateral ? 1 : -1;
+    const strength = feature.kind === 'rock' ? 0.26 : feature.kind === 'tube' ? 0.34 : 0.2;
+    ride.lateral = clamp(ride.lateral + side * strength, -0.84, 0.84);
+    ride.targetLateral = clamp(ride.lateral + side * (feature.kind === 'tube' ? 0.16 : 0.1), -0.84, 0.84);
+    racer.vz = side * (feature.kind === 'rock' ? 1.55 : feature.kind === 'tube' ? 2.2 : 1.15);
+    ride.velocity *= feature.kind === 'rock' ? 0.54 : feature.kind === 'tube' ? 0.43 : 0.7;
+    ride.impact = 1;
+    this.emit(racer.x, racer.y, racer.z, feature.kind === 'rock' ? 15 : 10, feature.kind === 'tube' ? '#8be7e0' : '#d9c49b', 180);
+    if (!racer.id) {
+      this.snapshot.score += feature.kind === 'rock' ? 95 : feature.kind === 'tube' ? 140 : 70;
+      this.shake = feature.kind === 'rock' ? 3.8 : 2.2;
+      this.audio.play(feature.kind === 'tube' ? 'boost' : 'bump');
+      this.say(feature.kind === 'tube' ? 'TUBE SHOT! AIM FOR THE NEXT REBOUND.' : feature.kind === 'ramp' ? 'RAMP REBOUND! KEEP IT PINNED.' : 'ROCK SPLIT! LEFT OR RIGHT.');
+    }
+  }
+
+  private leaveWaterfall(racer: Racer) {
+    const exitX = WATERFALL_EXIT_X + 100;
+    racer.x = exitX; racer.z = clamp(-racer.waterfallLateral * (LANE.far + 70), LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    const surface = this.surfaceAt(racer.x, racer.z);
+    racer.y = surface.y - RADIUS; racer.vx = Math.max(390, racer.launchSpeed / 0.16 * 0.82);
+    racer.vy = surface.slope * racer.vx; racer.vz = 0; racer.grounded = true;
+    racer.waterfall = null; racer.waterfallPhase = null; racer.waterfallProgress = 0;
+    racer.waterfallDepth = 0; racer.waterfallLateral = 0; racer.waterfallHits = 0;
+    racer.lastGroundedAt = this.runTime; racer.recoveryUntil = this.runTime + 0.35;
+    if (!racer.id) { this.say('BOTTOM ROCKS. WELCOME TO THE MINE TUNNELS.'); this.audio.play('land'); this.shake = 4; }
+  }
+
+  private stepWaterfall(racer: Racer, dt: number) {
+    const ride = racer.waterfall;
+    if (!ride) return;
+    const phaseDuration = ride.phase === 'wall-impact' ? 0.78 : ride.phase === 'river' ? 1.08 : ride.phase === 'bottom-impact' ? 0.82 : 1;
+    ride.progress += dt / phaseDuration;
+    ride.impact = Math.max(0, ride.impact - dt * (ride.phase === 'wall-impact' ? 1.8 : 2.8));
+    racer.waterfallPhase = ride.phase; racer.waterfallProgress = clamp(ride.progress, 0, 1);
+    if (ride.phase === 'wall-impact') {
+      racer.x = WATERFALL_WALL_X; racer.y = this.y(WATERFALL_WALL_X) - RADIUS;
+      if (ride.progress >= 1) { ride.phase = 'river'; ride.progress = 0; ride.velocity = 0.11; }
+    } else if (ride.phase === 'river') {
+      const t = clamp(ride.progress, 0, 1);
+      racer.x = WATERFALL_WALL_X + (WATERFALL_START_X - WATERFALL_WALL_X) * t;
+      racer.y = this.y(racer.x) - RADIUS - 28 - Math.sin(t * Math.PI) * 24;
+      ride.lateral += (ride.targetLateral - ride.lateral) * Math.min(1, dt * 3);
+      racer.z = -ride.lateral * (LANE.far + 70); racer.vz = 0;
+      if (ride.progress >= 1) { ride.phase = 'vertical-drop'; ride.progress = 0; ride.velocity = 0.135; ride.impact = 0; }
+    } else if (ride.phase === 'vertical-drop') {
+      const target = clamp(-laneZ(racer.targetLane) / (LANE.far + 70), -0.82, 0.82);
+      const lateralAcceleration = (target - ride.lateral) * 8.5 - racer.vz * 4.6;
+      racer.vz = clamp(racer.vz + lateralAcceleration * dt, -3.5, 3.5);
+      ride.lateral = clamp(ride.lateral + racer.vz * dt, -0.86, 0.86);
+      ride.targetLateral = target;
+      ride.velocity = Math.min(0.205, ride.velocity + dt * 0.006);
+      const previousDepth = ride.depth;
+      ride.depth = clamp(ride.depth + ride.velocity * dt, 0, 1);
+      ride.progress = ride.depth;
+      racer.x = WATERFALL_START_X + (WATERFALL_EXIT_X - WATERFALL_START_X) * ride.depth;
+      racer.y = GROUND + ride.depth * 720;
+      racer.z = -ride.lateral * (LANE.far + 70);
+      for (const feature of this.waterfallFeatures) {
+        if (previousDepth < feature.depth && ride.depth >= feature.depth) this.hitWaterfallFeature(racer, feature);
+      }
+      if (ride.depth >= 1) { ride.phase = 'bottom-impact'; ride.progress = 0; ride.impact = 1; }
+    } else if (ride.phase === 'bottom-impact') {
+      racer.x = WATERFALL_EXIT_X; racer.y = this.y(WATERFALL_EXIT_X) - RADIUS - Math.max(0, 1 - ride.progress) * 90;
+      racer.z = -ride.lateral * (LANE.far + 70);
+      if (ride.progress >= 1) this.leaveWaterfall(racer);
+    }
+    racer.waterfallDepth = ride.depth; racer.waterfallLateral = ride.lateral; racer.waterfallHits = ride.hitCount;
+    racer.rotation += dt * (ride.phase === 'vertical-drop' ? 16 : 7);
+    racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
+    if (racer.waterfall) {
+      racer.vx = ride.phase === 'vertical-drop' ? ride.velocity * (WATERFALL_EXIT_X - WATERFALL_START_X) : 0;
+      racer.vy = ride.phase === 'vertical-drop' ? ride.velocity * 720 : 0;
+    }
+  }
+
+  private updateWaterfallFrame() {
+    const ride = this.player.waterfall;
+    this.waterfallCamera = ride ? {
+      phase: ride.phase, progress: clamp(ride.progress, 0, 1), depth: ride.depth,
+      lateral: ride.lateral, impact: ride.impact, hitCount: ride.hitCount,
+    } : null;
+  }
 
   private stepRace(dt: number) {
     this.runTime += dt;
@@ -401,6 +540,7 @@ export class GameEngine {
     }
     this.resolveBumps();
     this.resolvePickups();
+    this.updateWaterfallFrame();
     this.refreshSnapshot();
     if (this.player.finished) {
       this.snapshot.settling = true;
@@ -414,7 +554,7 @@ export class GameEngine {
     const difficulty = this.config?.difficulty ?? 'racer';
     const reaction = difficulty === 'rookie' ? 0.43 : difficulty === 'veteran' ? 0.13 : 0.19;
     racer.nextDecision = this.runTime + reaction + racer.id * 0.023;
-    if (racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
+    if (racer.falling || racer.loopRide || racer.waterfall || racer.finished || this.runTime < racer.steerLockedUntil) return;
     const lookAhead = clamp(racer.vx * (difficulty === 'rookie' ? 0.54 : difficulty === 'veteran' ? 0.92 : 0.75), 360, 1350);
     const current = racer.targetLane;
     let bestLane = current; let bestScore = -Infinity;
@@ -432,7 +572,9 @@ export class GameEngine {
         if (obstacle.kind === 'gap') score -= distance < racer.vx * 0.45 ? 13 : 7;
         else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
           const proximity = 1 - clamp(distance / lookAhead, 0, 1);
-          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2 : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
+          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'fire-ring' ? 4.6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2.5
+            : obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock' ? -1.8 : obstacle.kind === 'crate' || obstacle.kind === 'skull-box' ? -1.2
+              : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
         }
       }
       for (const pickup of supplies) {
@@ -452,6 +594,13 @@ export class GameEngine {
     if (this.runTime - racer.lastLaneChange > (difficulty === 'rookie' ? 0.9 : difficulty === 'veteran' ? 0.48 : 0.66)) this.setLane(racer, bestLane);
     const soon = racer.x + racer.vx * 0.22;
     if (this.canHop(racer) && (this.inGap(soon, racer.z) || this.inGap(soon, laneZ(racer.targetLane)))) this.performHop(racer);
+    if (this.canHop(racer) && racer.bounces) {
+      for (const obstacle of seen) {
+        if (obstacle.kind !== 'fire-ring' || obstacle.lane !== racer.targetLane || obstacle.x < racer.x + 90 || obstacle.x > racer.x + racer.vx * 0.46) continue;
+        this.performBounce(racer);
+        break;
+      }
+    }
     if (this.canHop(racer)) {
       const timing = hopTiming(racer.vx, 290 * weightImpulse(racer.weight) * racer.hopFactor);
       for (const pickup of supplies) {
@@ -469,15 +618,21 @@ export class GameEngine {
 
   private stepRacer(racer: Racer, dt: number) {
     const oldX = racer.x;
+    if (racer.waterfall) {
+      this.stepWaterfall(racer, dt);
+      return;
+    }
     if (racer.falling) {
-      racer.fallingFor += dt; racer.vy += GRAVITY * dt;
+      racer.fallingFor += dt; racer.vy += this.gravityAt(racer.x) * (this.inCliffSection(racer.x) ? 1.1 : 1) * dt;
       racer.x += racer.vx * dt * 0.45; racer.y += racer.vy * dt; racer.rotation += 9 * dt;
       if (racer.fallingFor > 0.72) this.recover(racer);
       return;
     }
     if (!racer.loopRide) {
-      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling;
-      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling);
+      const steeringSurface = surfaceTypeAt(racer.x);
+      const lateralTraction = steeringSurface === 'wet_wood' ? 0.6 : steeringSurface === 'moss_rock' ? 0.72 : 1;
+      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling * lateralTraction;
+      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling) * lateralTraction;
       racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
       const previousZ = racer.z;
       racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
@@ -510,7 +665,7 @@ export class GameEngine {
       if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
       const before = this.surfaceAt(racer.x, racer.z);
       if (racer.grounded && !this.inGap(racer.x, racer.z)) {
-        const downhill = GRAVITY * before.slope / (1 + before.slope * before.slope) / 1.4;
+        const downhill = this.gravityAt(racer.x, before.slope) * before.slope / (1 + before.slope * before.slope) / 1.4;
         const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
         racer.vx = Math.max(0, racer.vx + (downhill - resistance) * dt);
         racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
@@ -526,19 +681,37 @@ export class GameEngine {
         }
       } else {
         racer.grounded = false;
-        racer.vx *= Math.exp(-0.009 * dragFactor * dt);
-        racer.vy += GRAVITY * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
+        const airDrag = this.inCliffSection(racer.x) ? 0.007 : 0.009;
+        racer.vx *= Math.exp(-airDrag * dragFactor * dt);
+        racer.vy += this.gravityAt(racer.x) * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
       }
       for (const obstacle of this.nearby(racer.x)) {
-        if (racer.visited.has(obstacle) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
+        const repeatableRock = obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock';
+        if ((!repeatableRock && racer.visited.has(obstacle)) || obstacle.kind === 'gap' || obstacle.kind === 'ramp'
+          || obstacle.kind === 'rock-wall' || obstacle.kind === 'mine-rail' || obstacle.kind === 'mine-split'
+          || (obstacle.section === 'stage2' && obstacle.x >= WATERFALL_WALL_X) || !occupiesLane(obstacle, racer.z)) continue;
         if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep' || obstacle.kind === 'blimp' || obstacle.kind === 'sign') && obstacle.hit) continue;
+        if (repeatableRock) {
+          this.hitRock(racer, obstacle);
+          continue;
+        }
+        if (obstacle.kind === 'fire-ring') {
+          const center = obstacle.x + obstacle.width / 2;
+          const ringY = this.y(center) - (obstacle.altitude ?? 130);
+          const ringRadius = obstacle.width * 0.42;
+          if (Math.abs(racer.x - center) < ringRadius + RADIUS && Math.hypot(racer.x - center, racer.y - ringY) < ringRadius + RADIUS) {
+            this.hitObstacle(racer, obstacle);
+          }
+          continue;
+        }
         if (obstacle.kind === 'loop') {
           const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
           const dy = racer.y - (this.y(racer.x) - this.y(loop.x)) - loop.y;
           if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
             const angle = (Math.atan2(dx, dy) + TAU) % TAU;
             racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
-            racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
+            const loopSpan = obstacle.section === 'stage2' ? TAU : TAU * 0.65;
+            racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: angle + loopSpan,
               speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
             if (!racer.id) { this.say('HOLD ON TO YOUR GOBLIN.'); this.audio.play('boost'); }
             break;
@@ -577,6 +750,10 @@ export class GameEngine {
     racer.vx = clamp(racer.vx, 0, racer.maximumSpeed);
     racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
     racer.stoppedFor = racer.vx < 40 && !racer.loopRide ? racer.stoppedFor + dt : 0;
+    if (racer.x >= WATERFALL_WALL_X && racer.x < WATERFALL_START_X && oldX < WATERFALL_START_X && !racer.falling && !racer.waterfall) {
+      this.enterWaterfall(racer);
+      return;
+    }
     if (racer.x >= FINISH && !racer.falling) {
       racer.finishTime = this.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
       racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
@@ -606,7 +783,7 @@ export class GameEngine {
   private resolveBumps() {
     for (let i = 0; i < this.racers.length - 1; i++) for (let j = i + 1; j < this.racers.length; j++) {
       const a = this.racers[i]; const b = this.racers[j];
-      if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
+      if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide || a.waterfall || b.waterfall
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
       const diameter = RADIUS * 2 + 4;
@@ -677,7 +854,7 @@ export class GameEngine {
   private resolvePickups() {
     this.pickupCandidates.clear();
     for (const racer of this.racers) {
-      if (racer.falling || racer.finished || racer.loopRide) continue;
+      if (racer.falling || racer.finished || racer.loopRide || racer.waterfall) continue;
       const first = Math.floor(Math.min(racer.previous.x, racer.x) / BUCKET);
       const last = Math.floor(Math.max(racer.previous.x, racer.x) / BUCKET);
       for (let key = first; key <= last; key++) for (const pickup of this.pickupBuckets.get(key) ?? []) {
@@ -689,7 +866,7 @@ export class GameEngine {
       let earliest = Infinity;
       const y = pickupY(pickup, this.runTime, this.reducedMotion);
       for (const racer of this.racers) {
-        if (racer.falling || racer.finished || racer.loopRide || Math.abs(racer.z - pickup.z) > 110 || Math.abs(racer.x - pickup.x) > 160) continue;
+        if (racer.falling || racer.finished || racer.loopRide || racer.waterfall || Math.abs(racer.z - pickup.z) > 110 || Math.abs(racer.x - pickup.x) > 160) continue;
         const time = pickupIntercept(racer.previous, racer, pickup, y);
         if (time !== null && time < earliest) { earliest = time; winner = racer; }
       }
@@ -725,6 +902,42 @@ export class GameEngine {
     }
   }
 
+  private hitRock(racer: Racer, obstacle: Obstacle) {
+    const bit = 1 << racer.id;
+    if ((obstacle.hitMask ?? 0) & bit && this.time - obstacle.hitAt < 0.16) return;
+    const centerX = obstacle.x + obstacle.width / 2;
+    const centerZ = obstacleZ(obstacle);
+    const base = this.y(centerX);
+    const centerY = base - obstacle.height * 0.52;
+    const radius = obstacle.width * 0.43;
+    const dx = racer.x - centerX;
+    const dz = (racer.z - centerZ) * 0.72;
+    const distance = Math.hypot(dx, dz);
+    if (distance > radius + RADIUS || Math.abs(racer.y - centerY) > radius + RADIUS) return;
+    const planar = distance || 1;
+    const nx = dx / planar;
+    const nz = dz / planar;
+    const normalSpeed = racer.vx * nx + racer.vz * nz;
+    const restitution = obstacle.kind === 'rock-bumper' ? 1.45 : 0.92;
+    if (normalSpeed < 0) {
+      racer.vx -= (1 + restitution) * normalSpeed * nx;
+      racer.vz -= (1 + restitution) * normalSpeed * nz / 0.72;
+    }
+    const push = radius + RADIUS - distance + 2;
+    racer.x += nx * push; racer.z = clamp(racer.z + nz * push / 0.72, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.vx = clamp(Math.max(150, racer.vx + (obstacle.kind === 'rock-bumper' ? 70 : 25)), 0, racer.maximumSpeed);
+    racer.vz = clamp(racer.vz, -720, 720);
+    racer.grounded = false; racer.lastGroundedAt = -100;
+    obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | bit;
+    this.emit(centerX, centerY, centerZ, obstacle.kind === 'rock-bumper' ? 12 : 18, obstacle.kind === 'rock-bumper' ? '#c7b18a' : '#d7d0b4', obstacle.kind === 'rock-bumper' ? 135 : 180);
+    if (!racer.id) {
+      this.snapshot.score += obstacle.kind === 'rock-bumper' ? 90 : 45;
+      this.shake = obstacle.kind === 'spiked-rock' ? 4.5 : 2.4;
+      this.audio.play('bump');
+      this.say(obstacle.kind === 'rock-bumper' ? 'CROWN BUMPER! KEEP THE MOMENTUM.' : 'SPIKED ROCK! PICK A CLEANER LINE.');
+    }
+  }
+
   private hitObstacle(racer: Racer, obstacle: Obstacle) {
     racer.visited.add(obstacle); obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | (1 << racer.id);
     const impulse = weightImpulse(racer.weight);
@@ -741,6 +954,33 @@ export class GameEngine {
         racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
         racer.bounces = Math.min(3, racer.bounces + 1); this.emit(x, y - 24, z, 10, '#a1e1bd', 160);
         if (!racer.id) { this.snapshot.score += 100; this.audio.play('bounce'); this.say('SPRING BREAK! +1 BOUNCE'); }
+        break;
+      case 'fire-ring':
+        // +50 km/h in the HUD's 0.16 velocity-to-km/h conversion.
+        racer.vx = Math.min(racer.maximumSpeed, racer.vx + 312.5 * impulse);
+        racer.fireUntil = this.runTime + 1.35;
+        racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.72);
+        this.emit(x, y - (obstacle.altitude ?? 130), z, 22, '#ff8b3d', 240);
+        this.emit(x, y - (obstacle.altitude ?? 130), z, 10, '#ffe0a0', 155);
+        if (!racer.id) {
+          this.snapshot.score += 250;
+          this.shake = 3.2;
+          this.audio.play('boost');
+          this.say('FIRE RING! HYPER-SPEED ENGAGED.');
+        }
+        break;
+      case 'crate':
+        racer.vx = Math.min(racer.maximumSpeed, racer.vx + 45 * impulse);
+        racer.vy -= 100 * impulse; racer.grounded = false;
+        this.emit(x, y - 35, z, 8, '#c38b51', 100);
+        if (!racer.id) { this.snapshot.score += 40; this.audio.play('bump'); this.say('TIMBER IN THE FAST LINE.'); }
+        break;
+      case 'skull-box':
+        racer.vx = Math.max(130, racer.vx * 0.72);
+        racer.vy -= 155 * impulse; racer.vz += (racer.z <= z ? -1 : 1) * 180;
+        racer.grounded = false;
+        this.emit(x, y - 38, z, 13, '#c7d0ad', 125);
+        if (!racer.id) { this.snapshot.score += 80; this.shake = 2.6; this.audio.play('bump'); this.say('SKULL BOX! THE SHORTCUT BIT BACK.'); }
         break;
       case 'tnt':
         obstacle.hit = true; racer.vx += 300 * impulse; racer.vy = -450 * impulse; racer.grounded = false;
@@ -798,7 +1038,7 @@ export class GameEngine {
     const player = this.player;
     this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / TRACK_DISTANCE;
     this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : Math.hypot(player.vx, player.vy)) * 0.16);
-    this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling;
+    this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling || !!player.waterfall;
     this.snapshot.grounded = player.grounded; this.snapshot.hopReady = this.canHop(player);
     this.snapshot.bounces = player.bounces; this.snapshot.boosts = player.boosts;
     this.snapshot.grade = Math.round(this.slope(player.x) * 100);

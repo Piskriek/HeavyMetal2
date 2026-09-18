@@ -20,7 +20,17 @@ export type SpriteName =
   | 'blimp'
   | 'signSheep'
   | 'signTnt'
-  | 'signParts';
+  | 'signParts'
+  | 'springPart'
+  | 'bumperCrown'
+  | 'bumperSpiked'
+  | 'crate'
+  | 'skullBox'
+  | 'stripWood'
+  | 'stripMoss'
+  | 'stripHazard'
+  | 'stripMetal'
+  | 'waterfallHeadon';
 
 export interface Sprite {
   image: HTMLImageElement;
@@ -151,11 +161,24 @@ export function loadAssets(): Promise<GameAssets> {
       ['signSheep', 'sign-sheep.png?v=3'],
       ['signTnt', 'sign-tnt.png?v=3'],
       ['signParts', 'sign-parts.png?v=3'],
+      ['springPart', 'track-parts/spring.webp'],
+      ['bumperCrown', 'track-parts/bumper-crown.webp'],
+      ['bumperSpiked', 'track-parts/bumper-spiked.webp'],
+      ['crate', 'track-parts/crate.webp'],
+      ['skullBox', 'track-parts/skull-box.webp'],
+      ['stripWood', 'track-parts/strip-wood.webp'],
+      ['stripMoss', 'track-parts/strip-moss.webp'],
+      ['stripHazard', 'track-parts/strip-hazard.webp'],
+      ['stripMetal', 'track-parts/strip-metal.webp'],
+      ['waterfallHeadon', 'track-parts/waterfall-headon.png'],
     ];
     const result = {} as GameAssets;
     await Promise.all(files.map(async ([name, filename]) => {
       const image = await readImage(`/art/${filename}`);
-      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts' ? asSprite(image) : await cutout(image);
+      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts'
+        || name === 'springPart' || name === 'bumperCrown' || name === 'bumperSpiked' || name === 'crate' || name === 'skullBox'
+        || name === 'stripWood' || name === 'stripMoss' || name === 'stripHazard' || name === 'stripMetal' || name === 'waterfallHeadon'
+        ? asSprite(image) : await cutout(image);
     }));
     const sheet = await readImage('/art/track-sprites.png');
     const names: SpriteName[] = ['ball', 'sheep', 'tnt', 'spring', 'boost', 'ramp'];

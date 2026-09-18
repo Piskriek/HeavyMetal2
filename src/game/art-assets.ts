@@ -166,7 +166,7 @@ export async function prepareArtSprites(cells: ArtCell[]): Promise<{ sprites: Ma
       sprites.set(cell.image, placeholderSprite(cell));
     }
   }));
-  if (failures.length) console.warn('[Goblin Rally] art placeholders in use:', failures.join(', '));
+  if (failures.length) console.warn('[Heavy Metal GP 2] art placeholders in use:', failures.join(', '));
   return { sprites, failures };
 }
 

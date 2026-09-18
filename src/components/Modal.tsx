@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import Brand from './Brand';
+import OrnateCorners from './OrnateCorners';
 
 interface ModalProps {
   children: ReactNode;
@@ -45,7 +47,7 @@ export default function Modal({ children, title, eyebrow, onClose, wide = false,
   return createPortal(
     <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <motion.div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`modal ${wide ? 'modal-wide' : ''} ${className}`} initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} transition={{ duration: 0.22 }}>
-        <div className="modal-heading"><div><span className="eyebrow orange-text">{eyebrow}</span><h2 id={titleId}>{title}</h2></div><button className="icon-button modal-close" onClick={onClose} aria-label="Close dialog"><X size={21} /></button></div>
+        <OrnateCorners /><div className="modal-heading"><Brand variant="emblem" decorative /><div className="modal-title"><span className="eyebrow orange-text">{eyebrow}</span><h2 id={titleId}>{title}</h2></div><button className="icon-button modal-close" onClick={onClose} aria-label="Close dialog"><X size={21} /></button></div>
         <div className="modal-content">{children}</div>
       </motion.div>
     </motion.div>,

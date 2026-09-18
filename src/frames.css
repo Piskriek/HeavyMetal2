@@ -1,0 +1,171 @@
+/* Heavy Metal GP 2 ornate frame system
+   =====================================
+   Edges are CSS gradients/repeating texture; they scale only by repetition. The four
+   ornaments are independent fixed-size overlays, so corners never stretch or squash. */
+
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.brand { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.brand img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.brand-hero { width: min(100%, 410px); margin-inline: auto; filter: drop-shadow(0 5px 5px #000c) drop-shadow(0 0 18px #e965242f); }
+.brand-hero img { aspect-ratio: 78 / 19; }
+.brand-hero small { margin-top: 8px; color: #d9bd7c; font: 700 9px var(--fantasy, 'Cinzel', serif); letter-spacing: 2.8px; text-shadow: 0 2px 4px #000; }
+.brand-compact { width: 205px; height: 50px; filter: drop-shadow(0 2px 3px #000a); }
+.brand-emblem { width: 44px; height: 44px; flex: none; filter: drop-shadow(0 2px 3px #000a); }
+
+/* The edge recipe is intentionally image-free. Horizontal/vertical highlights repeat
+   every few pixels instead of resampling a painted border bitmap. */
+.modal.fantasy-dialog,
+.round-result {
+  position: relative;
+  isolation: isolate;
+  border: 4px solid #33281a;
+  border-radius: 2px;
+  background:
+    linear-gradient(145deg, #18231ce8, #0d1511f2),
+    url('/ui/stone-tile.png') 0 0 / 384px 384px repeat;
+  box-shadow:
+    inset 0 0 0 2px #d6ad5c,
+    inset 0 0 0 5px #4b351b,
+    inset 0 0 0 7px #aa813e,
+    inset 0 0 42px #000b,
+    0 28px 110px #000c;
+}
+.modal.fantasy-dialog::before,
+.round-result::before {
+  content: ''; position: absolute; z-index: 4; pointer-events: none;
+  inset: 8px; border: 1px solid #e0be7570;
+  outline: 1px solid #392715; outline-offset: 3px;
+}
+.ornate-corners { position: absolute; z-index: 8; inset: 0; pointer-events: none; overflow: hidden; }
+.ornate-corner { position: absolute; display: block; width: 56px; height: 52px; background: url('/art/ui/ornament-endcap.png') center / contain no-repeat; filter: drop-shadow(0 2px 2px #000c); }
+.corner-tl { left: -13px; top: -12px; transform: rotate(-45deg); }
+.corner-tr { right: -13px; top: -12px; transform: scaleX(-1) rotate(-45deg); }
+.corner-bl { left: -13px; bottom: -12px; transform: scaleY(-1) rotate(-45deg); }
+.corner-br { right: -13px; bottom: -12px; transform: scale(-1) rotate(-45deg); }
+
+.fantasy-dialog .modal-heading { position: relative; align-items: center; padding-left: 34px; }
+.fantasy-dialog .modal-heading > .brand-emblem { width: 51px; height: 51px; margin-right: -8px; }
+.modal-title { min-width: 0; flex: 1; }
+.fantasy-dialog .modal-content { position: relative; z-index: 2; }
+
+/* Menu button: repeating steel/gold rails and fixed end-caps. No border-image. */
+.forged-menu-button {
+  isolation: isolate;
+  border: 0;
+  border-radius: 2px;
+  padding: 12px 32px;
+  background:
+    linear-gradient(#d4aa5d, #5f421f) top / 100% 3px no-repeat,
+    linear-gradient(#4b3218, #d1a459) bottom / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, #1c211d 0 2px, #242923 2px 4px, #171b18 4px 6px);
+  box-shadow: inset 0 0 0 1px #070907, inset 0 0 14px #000b, 0 5px 14px #0008;
+}
+.forged-menu-button::before,
+.forged-menu-button::after {
+  content: ''; position: absolute; z-index: 2; top: 50%; width: 58px; height: 54px;
+  background: url('/art/ui/ornament-endcap.png') center / contain no-repeat;
+  transform: translateY(-50%); pointer-events: none; opacity: .96;
+}
+.forged-menu-button::before { left: -22px; }
+.forged-menu-button::after { right: -22px; transform: translateY(-50%) scaleX(-1); }
+.forged-menu-button > * { position: relative; z-index: 3; }
+.forged-menu-button:hover, .forged-menu-button:focus-visible {
+  border-image: none;
+  background:
+    linear-gradient(#f1d18c, #80602d) top / 100% 3px no-repeat,
+    linear-gradient(#61431c, #e0ba70) bottom / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, #33352c 0 2px, #3f412f 2px 4px, #282c25 4px 6px);
+  color: #fff3cf; box-shadow: inset 0 0 18px #c3903f21, 0 0 0 1px #e5bd6c, 0 8px 22px #0009;
+}
+.forged-menu-button.forged-primary,
+.forged-menu-button.forged-primary:hover,
+.forged-menu-button.forged-primary:focus-visible {
+  background:
+    linear-gradient(#e5b96d, #71401f) top / 100% 3px no-repeat,
+    linear-gradient(#5a2a19, #d09e53) bottom / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, #662b20 0 3px, #733325 3px 6px, #542219 6px 9px);
+}
+
+/* Shared action buttons use the same repeat-safe rail, without large caps at small sizes. */
+.fantasy-primary, .fantasy-secondary {
+  border: 2px solid #8e682f;
+  border-image: none;
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, #70442b, #40231b),
+    repeating-linear-gradient(90deg, #b88c49 0 2px, #6b4d25 2px 4px);
+  box-shadow: inset 0 0 0 2px #21150c, inset 0 1px #f0cf8b76, 0 3px 10px #0008;
+}
+.fantasy-secondary { background: repeating-linear-gradient(90deg, #252c24 0 3px, #1b221d 3px 6px); }
+.fantasy-secondary::before { display: none; }
+.fantasy-primary:hover, .fantasy-secondary:hover:not(:disabled) { border-image: none; border-color: #e3bf72; background-color: #65402a; }
+.fantasy-primary:focus-visible, .fantasy-secondary:focus-visible,
+.fantasy-link:focus-visible, .rune-toggle:focus-visible, .setup-steps button:focus-visible,
+.mode-option:focus-visible, .rider-option:focus-visible, .capsule-option:focus-visible {
+  outline: 3px solid #ffe39c; outline-offset: 4px;
+}
+
+/* Ticketed setup cards: textured fills and repeated/manual edges. */
+.setup-dialog .mode-option,
+.setup-dialog .loadout-workbench,
+.setup-dialog .loadout-showcase,
+.setup-dialog .event-selection,
+.setup-dialog .rules-panel,
+.settings-page {
+  border: 2px solid #604722;
+  border-radius: 2px;
+  background:
+    linear-gradient(150deg, #202d25e8, #101914f2),
+    url('/ui/stone-tile.png') 0 0 / 260px 260px repeat;
+  box-shadow: inset 0 0 0 2px #0a0e0b, inset 0 0 0 3px #af88424d, 0 7px 18px #0005;
+}
+.setup-dialog .mode-option::before { inset: 7px; border-color: #e1bc6d4d; }
+.settings-page { margin-top: 12px; padding: 6px 20px 10px; }
+.fantasy-tabs { margin-bottom: 0; padding-inline: 14px; border: 1px solid #684d26; background: repeating-linear-gradient(90deg, #161d18 0 3px, #1d251e 3px 6px); }
+
+.round-result-overlay { padding: clamp(12px, 3vw, 34px); background: #080d0aea; }
+.round-result { width: min(940px, 100%); min-height: 0; margin: auto; padding: 35px 42px 30px; }
+.round-result-heading .brand-compact { display: block; margin: 0 auto 2px; }
+
+@media (max-width: 700px) {
+  .brand-hero { width: min(340px, 92vw); }
+  .brand-compact { width: 150px; height: 38px; }
+  .ornate-corner { width: 45px; height: 42px; }
+  .fantasy-dialog .modal-heading > .brand-emblem { width: 42px; height: 42px; }
+  .settings-page { padding-inline: 13px; }
+  .round-result { padding: 28px 22px 24px; }
+}
+
+/* Main menu painting is covered/cropped by the viewport, never geometrically squashed. */
+.main-menu { min-height: 600px; background: #090e0d; }
+.menu-world {
+  inset: -2%;
+  background: url('/art/ui/menu-heavy-metal-2.jpg') 53% center / cover no-repeat;
+  transform: scale(1.01);
+  filter: saturate(.92) brightness(.88);
+}
+.menu-vignette { background: linear-gradient(90deg, #050908f7 0%, #080c0bea 22%, #090d0bc2 36%, #090d0b42 57%, transparent 75%), linear-gradient(0deg, #050707e8, transparent 34%, #06090748); }
+.main-menu[data-motion='true'] .menu-world { animation-name: menu-world-breathe-hm2; }
+@keyframes menu-world-breathe-hm2 { from { transform: scale(1.01); } to { transform: scale(1.05); } }
+.studio-signature > .brand-emblem { width: 34px; height: 34px; }
+.game-wordmark .brand-hero { width: min(100%, 410px); }
+.game-wordmark p { margin-top: 4px; }
+.game-loading { background: linear-gradient(#080c0ce8, #080c0cf5), url('/art/ui/menu-heavy-metal-2.jpg') center / cover; }
+.game-loading > .brand-hero { width: min(470px, 82vw); }
+.game-loading .brand-hero small { font-size: 8px; }
+.race-app .topbar-brand .brand-compact { width: 180px; height: 44px; }
+
+@media (max-height: 700px) and (min-width: 701px) {
+  .menu-composition { padding-top: 66px; }
+  .game-wordmark .brand-hero { width: 330px; }
+  .game-wordmark p { font-size: 12px; }
+  .main-menu-actions { margin-top: 17px; gap: 8px; }
+  .forged-menu-button { min-height: 51px; }
+  .menu-bottom-flourish { margin-top: 12px; }
+}
+@media (max-width: 700px) {
+  .menu-world { background-position: 65% center; }
+  .menu-vignette { background: linear-gradient(90deg, #050908ed 0%, #070c0bd8 65%, #080c0b86), linear-gradient(0deg, #050707ed, transparent 45%); }
+  .studio-signature > .brand-emblem { width: 30px; height: 30px; }
+}

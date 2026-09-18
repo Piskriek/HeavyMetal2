@@ -418,7 +418,7 @@ export function readSave(storage: StorageLike | null = resolveStorage()): Hydrat
   }
 
   if (sawUnsupported) {
-    return { ...empty, source: 'unsupported', notices: [...notices, { level: 'warning', text: 'This device holds progress from a newer version of Goblin Rally. It was left untouched.' }] };
+    return { ...empty, source: 'unsupported', notices: [...notices, { level: 'warning', text: 'This device holds progress from a newer version of Heavy Metal GP 2. It was left untouched.' }] };
   }
 
   const legacyDraft = readLegacyDraft(storage);

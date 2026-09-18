@@ -119,13 +119,18 @@
     repeating-linear-gradient(90deg, #33352c 0 2px, #3f412f 2px 4px, #282c25 4px 6px);
   color: #fff3cf; box-shadow: inset 0 0 18px #c3903f21, 0 0 0 1px #e5bd6c, 0 8px 22px #0009;
 }
-.forged-menu-button.forged-primary,
+.forged-menu-button.forged-primary {
+  background:
+    linear-gradient(#ffdf80, #8a5812) top / 100% 3px no-repeat,
+    linear-gradient(#5a3406, #f3b53a) bottom / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, #7a4608 0 3px, #96590a 3px 6px, #633605 6px 9px);
+}
 .forged-menu-button.forged-primary:hover,
 .forged-menu-button.forged-primary:focus-visible {
   background:
-    linear-gradient(#e5b96d, #71401f) top / 100% 3px no-repeat,
-    linear-gradient(#5a2a19, #d09e53) bottom / 100% 3px no-repeat,
-    repeating-linear-gradient(90deg, #662b20 0 3px, #733325 3px 6px, #542219 6px 9px);
+    linear-gradient(#ffe99c, #a86c16) top / 100% 3px no-repeat,
+    linear-gradient(#744408, #ffc958) bottom / 100% 3px no-repeat,
+    repeating-linear-gradient(90deg, #915509 0 3px, #b06b0b 3px 6px, #784206 6px 9px);
 }
 
 /* Shared action buttons use the same repeat-safe rail, without large caps at small sizes. */

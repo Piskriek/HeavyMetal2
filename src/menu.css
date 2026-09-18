@@ -58,12 +58,11 @@
 .forged-menu-button:hover .menu-action-arrow, .forged-menu-button:focus-visible .menu-action-arrow { opacity: 1; transform: translateX(0); }
 .forged-menu-button:focus-visible { outline: 2px solid #f3d49b; outline-offset: 5px; }
 .forged-menu-button:active { transform: translateY(2px) !important; }
-/* The primary entry keeps the gold plate and gains a crimson wash painted inside it. */
-.forged-menu-button.forged-primary::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #7d3a2ad9 0%, #57241bd6 100%); pointer-events: none; }
-.forged-menu-button.forged-primary { color: #ffe9b6; box-shadow: 0 4px 20px #c76a3a2c, 0 4px 14px #00000066; }
-.forged-primary > svg:first-of-type { color: #ffd98f; }
-.forged-primary .menu-action-arrow { opacity: .75; transform: none; }
-.forged-menu-button.forged-primary:hover, .forged-menu-button.forged-primary:focus-visible { color: #fff3cf; box-shadow: 0 6px 26px #e08a4438, 0 4px 14px #00000066; }
+/* The primary entry keeps the gold plate and gains a rich molten gold/amber glow. */
+.forged-menu-button.forged-primary { color: #fff9e6; box-shadow: 0 4px 20px #e5930238, 0 4px 14px #00000066, inset 0 0 16px #da8a0122; }
+.forged-primary > svg:first-of-type { color: #ffe7a4; }
+.forged-primary .menu-action-arrow { color: #fff2c8; opacity: .85; transform: none; }
+.forged-menu-button.forged-primary:hover, .forged-menu-button.forged-primary:focus-visible { color: #ffffff; box-shadow: 0 6px 26px #f2af0255, 0 4px 14px #00000066, inset 0 0 20px #f2af0238; }
 .button-rivet { display: none; }
 .rivet-left { left: 8px; }
 .rivet-right { right: 8px; }

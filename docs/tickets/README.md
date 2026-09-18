@@ -6,17 +6,17 @@ Welcome to the comprehensive ticket tracker for **Heavy Metal GP 2 (Goblin Rally
 
 ## Ticket Overview & Execution Matrix
 
-| Ticket ID | Title | Priority | Area | Dependencies | Status |
-| :--- | :--- | :---: | :--- | :--- | :---: |
-| [`TICKET-01`](file:///c:/MarbleGp/docs/tickets/TICKET-01-warcraft-ornate-ui-borders.md) | Blizzard/Warcraft Ornate UI Frame & Border System | **P1** | UI / Styling / 9-Slice | None | Ready |
-| [`TICKET-02`](file:///c:/MarbleGp/docs/tickets/TICKET-02-ui-declutter-gauges-drawers.md) | UI Decluttering, Visual Gauges & Hierarchical Drill-Downs | **P1** | UI / UX / Gauges | `TICKET-01` | Ready |
-| [`TICKET-03`](file:///c:/MarbleGp/docs/tickets/TICKET-03-custom-controls-loading-screen.md) | Customizable Controls & Loading Screen Controls Visualizer | **P1** | Settings / Input / Loading | `TICKET-01` | Ready |
-| [`TICKET-04`](file:///c:/MarbleGp/docs/tickets/TICKET-04-character-ball-selection-full-body.md) | Character & Ball Selection Redesign (Full-Body Goblin + Ball Renders) | **P1** | Character Art / 2D Presentation | `TICKET-01`, `TICKET-02` | Ready |
-| [`TICKET-05`](file:///c:/MarbleGp/docs/tickets/TICKET-05-menu-animated-backgrounds.md) | Menu Overhaul with Animated Painted Fantasy Backdrops | **P2** | Environmental Art / Menus | `TICKET-01`, `TICKET-04` | Ready |
-| [`TICKET-06`](file:///c:/MarbleGp/docs/tickets/TICKET-06-track-backgrounds-lighting-preloading.md) | Epic Blizzard Track Backdrops, Thematic Lighting & Asset Preloading | **P1** | Environment / Asset Pipeline | `TICKET-05` | Ready |
-| [`TICKET-07`](file:///c:/MarbleGp/docs/tickets/TICKET-07-camera-tracking-pointer-ground-decal.md) | Dynamic Ball Camera Tracking, Off-Screen Indicator & Airborne Lane Ground Decal | **P1** | Camera / Physics / HUD Feedback | None | Ready |
-| [`TICKET-08`](file:///c:/MarbleGp/docs/tickets/TICKET-08-track-section2-vertical-pinball-drop.md) | Multi-Section Track Expansion Part 1: Vertical Pinball Drop, Pegs & Waterfalls | **P1** | Track Design / Physics / Bumpers | `TICKET-06`, `TICKET-07` | Ready |
-| [`TICKET-09`](file:///c:/MarbleGp/docs/tickets/TICKET-09-track-section3-mine-tunnels-waterfall-finish.md) | Multi-Section Track Expansion Part 2: Mine Tunnels, Rails & Stadium Finale | **P1** | Track Design / Subterranean | `TICKET-08` | Ready |
+| Ticket ID | GitHub Issue | Title | Priority | Area | Dependencies | Status |
+| :--- | :---: | :--- | :---: | :--- | :--- | :---: |
+| [`TICKET-01`](file:///c:/MarbleGp/docs/tickets/TICKET-01-warcraft-ornate-ui-borders.md) | [#3](https://github.com/Piskriek/HeavyMetal2/issues/3) | Blizzard/Warcraft Ornate UI Frame & Border System | **P1** | UI / Styling / 9-Slice | None | Ready |
+| [`TICKET-02`](file:///c:/MarbleGp/docs/tickets/TICKET-02-ui-declutter-gauges-drawers.md) | [#4](https://github.com/Piskriek/HeavyMetal2/issues/4) | UI Decluttering, Visual Gauges & Hierarchical Drill-Downs | **P1** | UI / UX / Gauges | `TICKET-01` | Ready |
+| [`TICKET-03`](file:///c:/MarbleGp/docs/tickets/TICKET-03-custom-controls-loading-screen.md) | [#5](https://github.com/Piskriek/HeavyMetal2/issues/5) | Customizable Controls & Loading Screen Controls Visualizer | **P1** | Settings / Input / Loading | `TICKET-01` | Ready |
+| [`TICKET-04`](file:///c:/MarbleGp/docs/tickets/TICKET-04-character-ball-selection-full-body.md) | [#6](https://github.com/Piskriek/HeavyMetal2/issues/6) | Character & Ball Selection Redesign (Full-Body Goblin + Ball Renders) | **P1** | Character Art / 2D Presentation | `TICKET-01`, `TICKET-02` | Ready |
+| [`TICKET-05`](file:///c:/MarbleGp/docs/tickets/TICKET-05-menu-animated-backgrounds.md) | [#7](https://github.com/Piskriek/HeavyMetal2/issues/7) | Menu Overhaul with Animated Painted Fantasy Backdrops | **P2** | Environmental Art / Menus | `TICKET-01`, `TICKET-04` | Ready |
+| [`TICKET-06`](file:///c:/MarbleGp/docs/tickets/TICKET-06-track-backgrounds-lighting-preloading.md) | [#8](https://github.com/Piskriek/HeavyMetal2/issues/8) | Epic Blizzard Track Backdrops, Thematic Lighting & Asset Preloading | **P1** | Environment / Asset Pipeline | `TICKET-05` | Ready |
+| [`TICKET-07`](file:///c:/MarbleGp/docs/tickets/TICKET-07-camera-pointer-ground-decal.md) | [#9](https://github.com/Piskriek/HeavyMetal2/issues/9) | Dynamic Ball Camera Tracking, Off-Screen Indicator & Airborne Lane Ground Decal | **P1** | Camera / Physics / HUD Feedback | None | Ready |
+| [`TICKET-08`](file:///c:/MarbleGp/docs/tickets/TICKET-08-track-section2-vertical-pinball-drop.md) | [#10](https://github.com/Piskriek/HeavyMetal2/issues/10) | Multi-Section Track Expansion Part 1: Vertical Pinball Drop, Pegs & Waterfalls | **P1** | Track Design / Physics / Bumpers | `TICKET-06`, `TICKET-07` | Ready |
+| [`TICKET-09`](file:///c:/MarbleGp/docs/tickets/TICKET-09-track-section3-mine-tunnels-waterfall-finish.md) | [#11](https://github.com/Piskriek/HeavyMetal2/issues/11) | Multi-Section Track Expansion Part 2: Mine Tunnels, Rails & Stadium Finale | **P1** | Track Design / Subterranean | `TICKET-08` | Ready |
 
 ---
 

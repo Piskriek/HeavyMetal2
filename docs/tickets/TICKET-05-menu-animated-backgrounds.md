@@ -7,6 +7,20 @@
 - **Dependencies**: `TICKET-01`, `TICKET-04`
 
 ---
+> [!IMPORTANT]
+> ### ⚠️ Codex Agent Operational Directives & Session Rules
+> 1. **Image Generation Quota (10 Per Turn)**:
+>    - You can only generate up to **10 images per turn**.
+>    - A turn reset requires user interaction: when you reach your 10-image limit, output **"[pause for turns to reset]"** and stop working so the user can reply with "Reset" to refresh your generation quota.
+> 2. **Background Testing & Parallel Execution (< 300s Limit)**:
+>    - Run tests in the background while continuing work; do not block or wait synchronously on long-running test suites.
+>    - If any test or build task takes longer than **300 seconds**, split it into multiple smaller test suites running in parallel to prevent timeouts.
+> 3. **GitHub Sandbox Token Expiry & Browser Refresh**:
+>    - The GitHub sandbox authentication token will expire if sessions run excessively long without pushing.
+>    - While local files are always preserved on disk, an expired token will reject remote pushes.
+>    - If you experience token expiration or push failures, request the user to **refresh their browser session** to generate a fresh GitHub token.
+
+---
 
 ## 1. Problem Statement & User Need
 Currently, the Main Menu features an evocative concept painting (`goblin-rally-concept.png`), but once the player clicks "New Game", "Settings", or "Rules", they are presented with a dim translucent overlay on top of the same static screen (see Screenshots 1 & 3). The secondary screens lack their own sense of place, atmosphere, and visual drama.

@@ -7,6 +7,20 @@
 - **Dependencies**: None
 
 ---
+> [!IMPORTANT]
+> ### ⚠️ Codex Agent Operational Directives & Session Rules
+> 1. **Image Generation Quota (10 Per Turn)**:
+>    - You can only generate up to **10 images per turn**.
+>    - A turn reset requires user interaction: when you reach your 10-image limit, output **"[pause for turns to reset]"** and stop working so the user can reply with "Reset" to refresh your generation quota.
+> 2. **Background Testing & Parallel Execution (< 300s Limit)**:
+>    - Run tests in the background while continuing work; do not block or wait synchronously on long-running test suites.
+>    - If any test or build task takes longer than **300 seconds**, split it into multiple smaller test suites running in parallel to prevent timeouts.
+> 3. **GitHub Sandbox Token Expiry & Browser Refresh**:
+>    - The GitHub sandbox authentication token will expire if sessions run excessively long without pushing.
+>    - While local files are always preserved on disk, an expired token will reject remote pushes.
+>    - If you experience token expiration or push failures, request the user to **refresh their browser session** to generate a fresh GitHub token.
+
+---
 
 ## 1. Problem Statement & User Need
 During fast downhill racing, aerial bounces, or heavy rival side shoves, the player's ball can quickly move far off-center or even fly completely off-screen, leaving the player disoriented. Furthermore, when jumping or launching high into the air, players cannot accurately tell which track lane they are hovering over, causing unpredictable landings on hazards or missed power-ups.

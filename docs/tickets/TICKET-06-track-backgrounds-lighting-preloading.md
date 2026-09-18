@@ -7,6 +7,20 @@
 - **Dependencies**: `TICKET-05`
 
 ---
+> [!IMPORTANT]
+> ### ⚠️ Codex Agent Operational Directives & Session Rules
+> 1. **Image Generation Quota (10 Per Turn)**:
+>    - You can only generate up to **10 images per turn**.
+>    - A turn reset requires user interaction: when you reach your 10-image limit, output **"[pause for turns to reset]"** and stop working so the user can reply with "Reset" to refresh your generation quota.
+> 2. **Background Testing & Parallel Execution (< 300s Limit)**:
+>    - Run tests in the background while continuing work; do not block or wait synchronously on long-running test suites.
+>    - If any test or build task takes longer than **300 seconds**, split it into multiple smaller test suites running in parallel to prevent timeouts.
+> 3. **GitHub Sandbox Token Expiry & Browser Refresh**:
+>    - The GitHub sandbox authentication token will expire if sessions run excessively long without pushing.
+>    - While local files are always preserved on disk, an expired token will reject remote pushes.
+>    - If you experience token expiration or push failures, request the user to **refresh their browser session** to generate a fresh GitHub token.
+
+---
 
 ## 1. Problem Statement & User Need
 In the live race screenshots (Screenshots 4 & 5), tracks like Boomtown Run and Woolly Wasteland display barren, flat procedural sky gradients with repetitive tan mesa cutouts. Furthermore, assets occasionally pop in during the initial seconds of a race, and the tracks lack distinctive atmospheric mood, dramatic lighting, and environmental identity.

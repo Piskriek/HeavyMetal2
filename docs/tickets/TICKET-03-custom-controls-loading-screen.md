@@ -7,6 +7,20 @@
 - **Dependencies**: `TICKET-01`
 
 ---
+> [!IMPORTANT]
+> ### ⚠️ Codex Agent Operational Directives & Session Rules
+> 1. **Image Generation Quota (10 Per Turn)**:
+>    - You can only generate up to **10 images per turn**.
+>    - A turn reset requires user interaction: when you reach your 10-image limit, output **"[pause for turns to reset]"** and stop working so the user can reply with "Reset" to refresh your generation quota.
+> 2. **Background Testing & Parallel Execution (< 300s Limit)**:
+>    - Run tests in the background while continuing work; do not block or wait synchronously on long-running test suites.
+>    - If any test or build task takes longer than **300 seconds**, split it into multiple smaller test suites running in parallel to prevent timeouts.
+> 3. **GitHub Sandbox Token Expiry & Browser Refresh**:
+>    - The GitHub sandbox authentication token will expire if sessions run excessively long without pushing.
+>    - While local files are always preserved on disk, an expired token will reject remote pushes.
+>    - If you experience token expiration or push failures, request the user to **refresh their browser session** to generate a fresh GitHub token.
+
+---
 
 ## 1. Problem Statement & User Need
 Players currently have hard-coded key bindings (A/D for steering, W/J for hops, Space for bounce, Shift for boost). There is no way in the Settings panel to view or customize these keys, which limits accessibility, ergonomics, and support for alternative layouts (such as arrow keys, ESDF, or gamepad controllers). Furthermore, new players enter the starting grid without a dedicated controls introduction during track loading.

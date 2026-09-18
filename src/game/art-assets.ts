@@ -3,8 +3,8 @@
  *
  * `src/game/art-manifest.json` is produced by `scripts/build-art.mjs`: it records each
  * cell's source sheet, its frame rectangle, the runtime PNG it was written to, the
- * normalized hull geometry for capsule shells and the measured hatch circle whose centre
- * the pilot insert is seated on.
+ * normalized hull geometry for the racing balls and the full-body stances the selection
+ * stage stands on.
  *
  * Rules this module keeps:
  *  - Art is loaded and decoded before a race starts, never inside a physics tick.
@@ -17,29 +17,19 @@ import type { CapsuleId, RiderId } from './loadouts';
 import type { PowerupKind } from './powerups';
 import type { CourseId } from './types';
 
-export interface ArtHatch {
-  x: number;
-  y: number;
-  /** Half-height of the measured opening; the fallback when no ellipse was measured. */
-  radius: number;
-  /** Half-width and half-height of the measured opening, as sprite fractions. */
-  rx?: number;
-  ry?: number;
-  measured: boolean;
-}
-
 export interface ArtCell {
   sheet: string;
   sheetCell: number;
   image: string;
   runtime: { width: number; height: number };
-  action: 'portrait' | 'shell' | 'icon' | 'prop' | 'preview';
+  action: 'portrait' | 'ball' | 'icon' | 'prop' | 'preview';
   anchor?: 'center' | 'bottom';
-  hatch?: ArtHatch;
   hull?: { diameter: number; canvas: number; scale: number };
   pilot?: string;
   pilotRuntime?: { width: number; height: number };
-  eyeLine?: number;
+  /** TICKET-04: the heroic full-body render that stands on the selection stage. */
+  fullbody?: string;
+  fullbodyRuntime?: { width: number; height: number };
   pivot?: { x: number; y: number };
   facing?: 'right';
   baseline?: number;
@@ -62,6 +52,8 @@ export const artUrl = (path: string) => `${import.meta.env.BASE_URL}${path.repla
 
 export const riderCell = (id: RiderId): ArtCell => ART_CELLS[`rider:${id}`];
 export const capsuleCell = (id: CapsuleId): ArtCell => ART_CELLS[`capsule:${id}`];
+/** TICKET-04: public URL of a rider's full-body render (falls back to the portrait). */
+export const riderFullBody = (id: RiderId): string => artUrl(riderCell(id).fullbody ?? riderCell(id).image);
 export const supplyCell = (kind: PowerupKind): ArtCell => ART_CELLS[`supply:${kind}`];
 export const courseCell = (id: CourseId): ArtCell => ART_CELLS[`course:${id}`];
 export const blimpCell = (): ArtCell => ART_CELLS['prop:blimp'];
@@ -69,7 +61,7 @@ export const LANDMARK_IDS = ['pines', 'quarry', 'windmill', 'pasture'] as const;
 export type LandmarkId = typeof LANDMARK_IDS[number];
 export const landmarkCell = (id: LandmarkId): ArtCell => ART_CELLS[`landmark:${id}`];
 
-/** Every cell that has to be decoded before a race: shells, pilots and supply icons. */
+/** Every cell that has to be decoded before a race: balls, portraits, pilots and supply icons. */
 export function raceArtPaths(roster: { rider: RiderId; capsule: CapsuleId }[]): string[] {
   const paths = new Set<string>();
   for (const loadout of roster) {
@@ -170,39 +162,4 @@ export async function prepareArtSprites(cells: ArtCell[]): Promise<{ sprites: Ma
   return { sprites, failures };
 }
 
-/** CSS-only layered description of a rider inside a capsule, for HTML previews. */
-export interface RacerLayers {
-  shell: string;
-  pilot: string;
-  hatch: ArtHatch;
-  eyeLine: number;
-  /** Pilot box as fractions of the capsule sprite box. */
-  pilotBox: { left: number; top: number; width: number; height: number };
-  clip: string;
-}
 
-export function racerLayers(loadout: { rider: RiderId; capsule: CapsuleId }): RacerLayers {
-  const shell = capsuleCell(loadout.capsule);
-  const rider = riderCell(loadout.rider);
-  const hatch = shell.hatch ?? { x: 0.82, y: 0.62, radius: 0.09, measured: false };
-  const eyeLine = rider.eyeLine ?? 0.44;
-  // The seat is the shell's ringed port, and the bust has to sit *inside* the ring: an earlier
-  // pass scaled the pilot to 3.4x the opening, so the goblin's helmet clipped over the brass
-  // and read as sitting on top of the capsule. The window is a tilted ellipse, so the square
-  // bust is scaled uniformly off the opening's smaller half-axis (scaling each axis separately
-  // squashed the face); 2.4x fills the port with the face while the alpha bbox stays within the
-  // painted opening, and the eye line lands on the window centre.
-  const rx = hatch.rx ?? hatch.radius;
-  const ry = hatch.ry ?? hatch.radius;
-  const size = Math.min(rx, ry) * 2.4;
-  return {
-    shell: artUrl(shell.image),
-    pilot: artUrl(rider.pilot ?? rider.image),
-    hatch,
-    eyeLine,
-    pilotBox: { left: hatch.x - size / 2, top: hatch.y - eyeLine * size, width: size, height: size },
-    // Percentages, not angles: `ellipse()` takes percentage radii, which resolve against the
-    // figure box width and height, and the figure box is the same square as the sprite.
-    clip: `ellipse(${(rx * 0.99 * 100).toFixed(2)}% ${(ry * 0.99 * 100).toFixed(2)}% at ${(hatch.x * 100).toFixed(2)}% ${(hatch.y * 100).toFixed(2)}%)`,
-  };
-}

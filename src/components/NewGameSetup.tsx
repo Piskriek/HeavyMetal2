@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Flag, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
 import Modal from './Modal';
 import BlizzardGauge from './ui/BlizzardGauge';
 import Drawer from './ui/Drawer';
 import { CAPSULES, DEFAULT_LOADOUT, RIDERS, STAT_LABELS, capsuleById, loadoutStats, riderById } from '../game/loadouts';
-import RacerFigure from './RacerFigure';
+import CharacterShowcase from './CharacterShowcase';
 import { capsuleArt, riderArt } from '../game/loadout-art';
 import { CUP_NAME, CUP_POINTS, CUP_ROUNDS, DIFFICULTIES, type RaceSetup } from '../game/session';
 import { COURSES } from '../game/types';
@@ -88,21 +87,23 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
           </div>}
 
           {step === 1 && <div className="loadout-builder">
-            <section className="loadout-workbench" aria-label="Rider and capsule selection">
-              <div className="choice-heading"><span>01 / PICK YOUR RIDER</span><span>{RIDERS.length} equally questionable candidates</span></div>
-              <div className="rider-options" role="radiogroup" aria-label="Select rider" onKeyDown={radioKeys}>{RIDERS.map((candidate) => <button key={candidate.id} className={`rider-option ${candidate.id === setup.loadout.rider ? 'selected' : ''}`} role="radio" aria-checked={candidate.id === setup.loadout.rider} tabIndex={candidate.id === setup.loadout.rider ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, loadout: { ...s.loadout, rider: candidate.id } }))}>
-                <img src={riderArt(candidate.id)} alt={`${candidate.name}, ${candidate.title}`} /><span>{candidate.name}</span>{candidate.id === setup.loadout.rider && <Check size={12} />}
-              </button>)}</div>
-              <div className="loadout-showcase" aria-label={`${rider.name} riding ${capsule.name}`}>
-                <div className="showcase-circle" aria-hidden="true" />
-                <AnimatePresence mode="wait"><motion.div key={`${rider.id}-${capsule.id}`} className="selected-capsule" initial={{ opacity: 0, y: 7, rotate: -3 }} animate={{ opacity: 1, y: 0, rotate: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.19 }}><RacerFigure loadout={setup.loadout} /></motion.div></AnimatePresence>
-                <div className="showcase-shadow" aria-hidden="true" />
+            <section className="loadout-workbench" aria-label="Rider and ball selection">
+              <div className="workbench-left">
+                <div className="choice-heading"><span>01 / PICK YOUR RIDER</span><span>{RIDERS.length} equally questionable candidates</span></div>
+                <div className="rider-deck" role="radiogroup" aria-label="Select rider" onKeyDown={radioKeys}>{RIDERS.map((candidate) => <button key={candidate.id} className={`rider-card ${candidate.id === setup.loadout.rider ? 'selected' : ''}`} role="radio" aria-checked={candidate.id === setup.loadout.rider} tabIndex={candidate.id === setup.loadout.rider ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, loadout: { ...s.loadout, rider: candidate.id } }))}>
+                  <img src={riderArt(candidate.id)} alt="" /><span className="rider-card-text"><strong>{candidate.name}</strong><small>{candidate.title}</small></span>{candidate.id === setup.loadout.rider && <Check size={13} />}
+                </button>)}</div>
+              </div>
+              <div className="loadout-stage" aria-label={`${rider.name} standing beside the ${capsule.name} ball`}>
+                <CharacterShowcase loadout={setup.loadout} />
                 <div className="showcase-label"><span>{rider.title}</span><h3>{rider.name} <i>&</i> {capsule.name}</h3><p>{rider.quote}</p></div>
               </div>
-              <div className="choice-heading"><span>02 / PICK YOUR CAPSULE</span><button onClick={() => setSetup((s) => ({ ...s, loadout: { ...DEFAULT_LOADOUT } }))}><RotateCcw size={11} />All-rounder</button></div>
-              <div className="capsule-options" role="radiogroup" aria-label="Select capsule" onKeyDown={radioKeys}>{CAPSULES.map((candidate) => <button key={candidate.id} className={`capsule-option ${candidate.id === setup.loadout.capsule ? 'selected' : ''}`} role="radio" aria-checked={candidate.id === setup.loadout.capsule} tabIndex={candidate.id === setup.loadout.capsule ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, loadout: { ...s.loadout, capsule: candidate.id } }))}>
-                <img src={capsuleArt(candidate.id)} alt="" /><span>{candidate.name}<small>{candidate.title}</small></span>{candidate.id === setup.loadout.capsule && <Check size={12} />}
-              </button>)}</div>
+              <div className="workbench-balls">
+                <div className="choice-heading"><span>02 / PICK YOUR BALL</span><button onClick={() => setSetup((s) => ({ ...s, loadout: { ...DEFAULT_LOADOUT } }))}><RotateCcw size={11} />All-rounder</button></div>
+                <div className="ball-deck" role="radiogroup" aria-label="Select ball" onKeyDown={radioKeys}>{CAPSULES.map((candidate) => <button key={candidate.id} className={`ball-card ${candidate.id === setup.loadout.capsule ? 'selected' : ''}`} role="radio" aria-checked={candidate.id === setup.loadout.capsule} tabIndex={candidate.id === setup.loadout.capsule ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, loadout: { ...s.loadout, capsule: candidate.id } }))}>
+                  <span className="ball-card-well"><img src={capsuleArt(candidate.id)} alt="" /></span><span className="ball-card-text">{candidate.name}<small>{candidate.title}</small></span>{candidate.id === setup.loadout.capsule && <Check size={12} />}
+                </button>)}</div>
+              </div>
             </section>
             <aside className="loadout-spec" aria-label="Combined loadout statistics">
               <div className="spec-heading"><span>THE COMBINED BUILD</span>
@@ -181,7 +182,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
               <p className="difficulty-description">{DIFFICULTIES.find((d) => d.id === setup.difficulty)?.description} Difficulty changes decisions, not the laws of physics.</p>
               {!tournament && <label className="practice-option"><input type="checkbox" checked={setup.customPhysics} onChange={(event) => setSetup((s) => ({ ...s, customPhysics: event.target.checked }))} /><span>Custom physics practice<small>Enable the live speed and weight sliders. Recorded as practice, not a preset race.</small></span></label>}
             </section>
-            <aside className="event-summary"><RacerFigure loadout={setup.loadout} className="summary-racer" /><span className="mode-kicker">YOUR STARTING LINEUP</span><h3>{rider.name}</h3><p>{capsule.name} / {capsule.title}</p>
+            <aside className="event-summary"><CharacterShowcase loadout={setup.loadout} variant="summary" decorative /><span className="mode-kicker">YOUR STARTING LINEUP</span><h3>{rider.name}</h3><p>{capsule.name} / {capsule.title}</p>
               <div className="event-summary-rule"><LockKeyhole size={17} /><span>{setup.customPhysics && !tournament ? 'Custom tuning enabled for this practice run.' : tournament ? 'Your loadout stays locked for all three rounds.' : 'Preset stats stay fixed for this race.'}</span></div>
               <div className="event-summary-rule"><Trophy size={17} /><span>{tournament ? CUP_NAME : 'One race. Four goblins. One finish.'}</span></div>
               <p className="finish-window-note">Rivals get a 10-second finish window after you. Ties in the cup break by wins, then final-round placement.</p>

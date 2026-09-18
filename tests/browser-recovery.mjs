@@ -127,8 +127,18 @@ try {
     report(started?.session?.roster?.length === 4, 'the persisted event keeps a four-racer roster');
     await page.screenshot({ path: join(artifacts, 'browser-1-grid.png') });
 
-    // Launch the race and confirm the live phase is persisted.
-    await page.keyboard.press('Enter');
+    // Launch the race and confirm the live phase is persisted. The loading cover owns
+    // Enter until dismissed, and a keypress can also land in the render gap after the
+    // status flip, so dismiss the cover and retry the launch until the race flies.
+    if (await page.locator('.race-loading-screen').count()) await page.keyboard.press('Enter');
+    await page.waitForFunction(() => !document.querySelector('.race-loading-screen'), null, { timeout: 15000 });
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await page.keyboard.press('Enter');
+      try {
+        await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 1200 });
+        break;
+      } catch { /* landed in a gap; retry */ }
+    }
     await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 15000 });
     await page.waitForTimeout(1400);
     const racing = await page.evaluate(() => JSON.parse(localStorage.getItem('goblin-rally-session-v1') ?? 'null'));

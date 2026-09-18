@@ -1,8 +1,62 @@
 {
-  "generatedAt": "2026-09-17",
+  "generatedAt": "2026-09-18",
   "matte": {
-    "capsules": {
-      "hex": "#FF00F8",
+    "rider-rivet-full": {
+      "hex": "#F030F0",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "rider-nix-full": {
+      "hex": "#F830F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "rider-grub-full": {
+      "hex": "#FF10F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "rider-sprocket-full": {
+      "hex": "#F820F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "ball-iron": {
+      "hex": "#F800F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "ball-springsteel": {
+      "hex": "#F800F8",
+      "detected": "magenta",
+      "canonical": "#FF00FF",
+      "despill": [
+        "R",
+        "B"
+      ]
+    },
+    "ball-siege": {
+      "hex": "#F800F8",
       "detected": "magenta",
       "canonical": "#FF00FF",
       "despill": [
@@ -157,30 +211,108 @@
       ],
       "alpha": "painted"
     },
-    "capsules": {
-      "file": "art/sheets/capsules-sheet.png",
-      "width": 1792,
-      "height": 592,
-      "columns": 3,
+    "rider-rivet-full": {
+      "file": "art/sheets/riders-fullbody/rivet-full-src.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 1,
       "rows": 1,
       "cells": [
         {
           "x": 0,
           "y": 0,
-          "width": 597,
-          "height": 592
-        },
+          "width": 1024,
+          "height": 1024
+        }
+      ]
+    },
+    "rider-nix-full": {
+      "file": "art/sheets/riders-fullbody/nix-full-src.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
         {
-          "x": 597,
+          "x": 0,
           "y": 0,
-          "width": 597,
-          "height": 592
-        },
+          "width": 1024,
+          "height": 1024
+        }
+      ]
+    },
+    "rider-grub-full": {
+      "file": "art/sheets/riders-fullbody/grub-full-src.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
         {
-          "x": 1194,
+          "x": 0,
           "y": 0,
-          "width": 597,
-          "height": 592
+          "width": 1024,
+          "height": 1024
+        }
+      ]
+    },
+    "rider-sprocket-full": {
+      "file": "art/sheets/riders-fullbody/sprocket-full-src.png",
+      "width": 1024,
+      "height": 1024,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 1024
+        }
+      ]
+    },
+    "ball-iron": {
+      "file": "art/sheets/balls/iron-ball-src.png",
+      "width": 1254,
+      "height": 1254,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1254,
+          "height": 1254
+        }
+      ]
+    },
+    "ball-springsteel": {
+      "file": "art/sheets/balls/springsteel-ball-src.png",
+      "width": 1254,
+      "height": 1254,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1254,
+          "height": 1254
+        }
+      ]
+    },
+    "ball-siege": {
+      "file": "art/sheets/balls/siege-ball-src.png",
+      "width": 1254,
+      "height": 1254,
+      "columns": 1,
+      "rows": 1,
+      "cells": [
+        {
+          "x": 0,
+          "y": 0,
+          "width": 1254,
+          "height": 1254
         }
       ]
     },
@@ -322,7 +454,11 @@
         "width": 256,
         "height": 256
       },
-      "eyeLine": 0.44
+      "fullbody": "art/riders/fullbody/rivet_full.png",
+      "fullbodyRuntime": {
+        "width": 512,
+        "height": 768
+      }
     },
     "rider:nix": {
       "sheet": "riders",
@@ -340,7 +476,11 @@
         "width": 256,
         "height": 256
       },
-      "eyeLine": 0.44
+      "fullbody": "art/riders/fullbody/nix_full.png",
+      "fullbodyRuntime": {
+        "width": 512,
+        "height": 768
+      }
     },
     "rider:grub": {
       "sheet": "riders",
@@ -358,7 +498,11 @@
         "width": 256,
         "height": 256
       },
-      "eyeLine": 0.52
+      "fullbody": "art/riders/fullbody/grub_full.png",
+      "fullbodyRuntime": {
+        "width": 512,
+        "height": 768
+      }
     },
     "rider:sprocket": {
       "sheet": "riders",
@@ -376,17 +520,21 @@
         "width": 256,
         "height": 256
       },
-      "eyeLine": 0.49
+      "fullbody": "art/riders/fullbody/sprocket_full.png",
+      "fullbodyRuntime": {
+        "width": 512,
+        "height": 768
+      }
     },
     "capsule:iron": {
-      "sheet": "capsules",
+      "sheet": "ball-iron",
       "sheetCell": 0,
-      "image": "art/iron-shell.png",
+      "image": "art/balls/iron-ball.png",
       "runtime": {
         "width": 512,
         "height": 512
       },
-      "action": "shell",
+      "action": "ball",
       "anchor": "center",
       "pivot": {
         "x": 0.5,
@@ -396,26 +544,18 @@
       "hull": {
         "diameter": 452,
         "canvas": 512,
-        "scale": 0.8496
-      },
-      "hatch": {
-        "x": 0.8056640625,
-        "y": 0.6125,
-        "rx": 0.0889453125,
-        "ry": 0.1266796875,
-        "radius": 0.1266796875,
-        "measured": true
+        "scale": 0.3798
       }
     },
     "capsule:springsteel": {
-      "sheet": "capsules",
-      "sheetCell": 1,
-      "image": "art/springsteel-shell.png",
+      "sheet": "ball-springsteel",
+      "sheetCell": 0,
+      "image": "art/balls/springsteel-ball.png",
       "runtime": {
         "width": 512,
         "height": 512
       },
-      "action": "shell",
+      "action": "ball",
       "anchor": "center",
       "pivot": {
         "x": 0.5,
@@ -425,26 +565,18 @@
       "hull": {
         "diameter": 452,
         "canvas": 512,
-        "scale": 0.8512
-      },
-      "hatch": {
-        "x": 0.803515625,
-        "y": 0.6134765625,
-        "rx": 0.07906250000000001,
-        "ry": 0.12488281250000001,
-        "radius": 0.12488281250000001,
-        "measured": true
+        "scale": 0.4029
       }
     },
     "capsule:siege": {
-      "sheet": "capsules",
-      "sheetCell": 2,
-      "image": "art/siege-shell.png",
+      "sheet": "ball-siege",
+      "sheetCell": 0,
+      "image": "art/balls/siege-ball.png",
       "runtime": {
         "width": 512,
         "height": 512
       },
-      "action": "shell",
+      "action": "ball",
       "anchor": "center",
       "pivot": {
         "x": 0.5,
@@ -454,15 +586,7 @@
       "hull": {
         "diameter": 452,
         "canvas": 512,
-        "scale": 0.8433
-      },
-      "hatch": {
-        "x": 0.8001953125,
-        "y": 0.6046875,
-        "rx": 0.0817578125,
-        "ry": 0.12488281250000001,
-        "radius": 0.12488281250000001,
-        "measured": true
+        "scale": 0.3795
       }
     },
     "supply:fuel": {

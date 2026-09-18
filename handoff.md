@@ -276,3 +276,26 @@ Parts 4.1 + 4.2 verification: `npm run build` succeeded at 641.46 kB / 199.46 kB
 What the browser tooling does and does not prove: it runs the real app in headless Chromium and inspects decoded images, the composited pilot, the drawn race frame's pixels, and the recovery flow. It does not measure frame pacing, race balance, touch ergonomics, or accessibility conformance, and it does not represent a human playtest. Those remain 4.4 work.
 
 A Vite preview configuration (`vite.preview.config.ts`) is available for the sandbox's proxied preview host; `vite.config.ts` itself was left untouched.
+## TICKET-04 Session (arena/01a0b559-heavymetal2)
+
+TICKET-04 (character & ball selection redesign) is implemented on this branch. The cockpit
+composite (`RacerFigure`, `racerLayers`, `measureHatch()` / `assertHatch()`, the three
+`*-shell.png` sprites and `capsules-sheet.png`) is retired. New generated art: four
+full-body goblin renders (`public/art/sheets/riders-fullbody/*-full-src.png` ->
+`public/art/riders/fullbody/<id>_full.png`, 512x768) and three standalone ball renders
+(`public/art/sheets/balls/*-ball-src.png` -> `public/art/balls/<id>-ball.png`, 512x512,
+hull-normalised to the retired shells' 452px diameter). `build-art.mjs` gained
+`defringeWhite()` (flood-fills off-white side bars with the matte before keying) and
+`fitStance()` (feet on the bottom edge of the portrait box); `loadout-art.ts` now exposes
+`prepareRaceBalls()` (ball + team rim, no pilot insert) and `riderFullBody()`; the
+selection screen uses the new `CharacterShowcase` component (full-body rider beside the
+ball on a lit pedestal, crossfade per figure, reflection and reduced-motion-aware gleam);
+the off-screen pointer badge draws the player's pilot portrait (`assets.playerBadge`).
+
+Verification on this branch: `npm run check` (tsc + 24 unit tests) green; `npm run build`
+green; `tests/art-check.mjs` 20/20; `tests/ticket02-visual.mjs` 24/24;
+`tests/ticket07-visual.mjs` green; `tests/ui-frame-check.mjs` green. Screenshots reviewed
+as images (`tests/artifacts/art-1-loadout.png`, `art-4-race.png`). The art-check and
+ticket07 suites were also de-flaked while here: the loading cover owns Enter until
+dismissed (there is no auto-dismiss), the race screen has no header nav (workshop and main
+menu live in the gear menu), and launches retry until the status flips.

@@ -28,8 +28,9 @@ interface Entry {
 
 /**
  * The sprite lab lists exactly the PNGs the game draws, with the manifest data that places
- * them (hatch circles, hull diameter, baselines). Downloads are the runtime files themselves,
- * so what a visitor saves is what the race uses. Source sheets stay available separately.
+ * them (hull diameters, full-body stances, baselines). Downloads are the runtime files
+ * themselves, so what a visitor saves is what the race uses. Source sheets stay available
+ * separately.
  */
 export default function ArtGallery() {
   const [view, setView] = useState<'runtime' | 'sheets'>('runtime');
@@ -46,17 +47,25 @@ export default function ArtGallery() {
     const pilotEntries: Entry[] = RIDERS.map((rider) => {
       const cell = riderCell(rider.id);
       return {
-        key: `pilot-${rider.id}`, label: `${rider.name} cockpit pilot`, detail: 'Seated in the measured hatch',
+        key: `pilot-${rider.id}`, label: `${rider.name} badge portrait`, detail: 'HUD badge & off-screen pointer',
         src: artUrl(cell.pilot ?? cell.image), file: `${rider.id}-pilot.png`,
-        meta: `${cell.pilotRuntime?.width ?? 0}x${cell.pilotRuntime?.height ?? 0} / eye line ${(cell.eyeLine ?? 0.44).toFixed(2)}`,
+        meta: `${cell.pilotRuntime?.width ?? 0}x${cell.pilotRuntime?.height ?? 0} / head crop`,
       };
     });
-    const shellEntries: Entry[] = CAPSULES.map((capsule) => {
+    const fullbodyEntries: Entry[] = RIDERS.map((rider) => {
+      const cell = riderCell(rider.id);
+      return {
+        key: `fullbody-${rider.id}`, label: `${rider.name} full body`, detail: `${rider.title} / selection stage figure`,
+        src: artUrl(cell.fullbody ?? cell.image), file: `${rider.id}_full.png`,
+        meta: `${cell.fullbodyRuntime?.width ?? 0}x${cell.fullbodyRuntime?.height ?? 0} / stands on the bottom edge`,
+      };
+    });
+    const ballEntries: Entry[] = CAPSULES.map((capsule) => {
       const cell = capsuleCell(capsule.id);
       return {
-        key: `shell-${capsule.id}`, label: `${capsule.name} shell`, detail: `${capsule.title} / open hatch`,
-        src: artUrl(cell.image), file: `${capsule.id}-shell.png`,
-        meta: `hull ${cell.hull?.diameter ?? 452}px of ${cell.hull?.canvas ?? 512} / hatch ${(cell.hatch?.x ?? 0).toFixed(2)},${(cell.hatch?.y ?? 0).toFixed(2)} r${(cell.hatch?.radius ?? 0).toFixed(2)}`,
+        key: `ball-${capsule.id}`, label: `${capsule.name} ball`, detail: `${capsule.title} / standalone render`,
+        src: artUrl(cell.image), file: `${capsule.id}-ball.png`,
+        meta: `hull ${cell.hull?.diameter ?? 452}px of ${cell.hull?.canvas ?? 512}`,
       };
     });
     const supplyEntries: Entry[] = (Object.keys(POWERUPS) as PowerupKind[]).map((kind) => {
@@ -80,8 +89,9 @@ export default function ArtGallery() {
     }));
     return [
       { name: 'Riders', entries: riderEntries },
-      { name: 'Cockpit pilots', entries: pilotEntries },
-      { name: 'Capsule shells', entries: shellEntries },
+      { name: 'Full-body riders', entries: fullbodyEntries },
+      { name: 'Badge portraits', entries: pilotEntries },
+      { name: 'Racing balls', entries: ballEntries },
       { name: 'Air supplies', entries: supplyEntries },
       { name: 'World props', entries: propEntries },
       { name: 'Course art', entries: courseEntries },
@@ -143,7 +153,7 @@ export default function ArtGallery() {
           </div>
           <p className="sprite-key-note"><Ruler size={14} />
             <span>PLACED BY MANIFEST</span>
-            <p>Hatch circles, hull diameter, eye lines and ground baselines are measured from the artwork and stored in <code>src/game/art-manifest.json</code>, so nothing in the game guesses where a pilot sits.</p>
+            <p>Hull diameters, full-body stances and ground baselines are measured from the artwork and stored in <code>src/game/art-manifest.json</code>, so nothing in the game guesses where a racer stands or how big a ball rolls.</p>
           </p>
         </div>
       )}

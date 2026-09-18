@@ -1,25 +1,34 @@
 import { useId } from 'react';
-import { Check, PackageOpen } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { POWERUPS, powerupIcon, type PowerupKind } from '../game/powerups';
 import type { GameSnapshot } from '../game/types';
 
-export default function AirSupplies({ snapshot }: { snapshot: GameSnapshot }) {
+/**
+ * TICKET-02: compact in-stage supply counter. Three glyph chips with charge
+ * badges replace the wide annotated bar; full explanations live in the guide.
+ */
+export default function AirSupplies({ snapshot, className = '' }: { snapshot: GameSnapshot; className?: string }) {
   const recent = snapshot.raceTime < snapshot.pickupNoticeUntil;
+  const shieldActive = snapshot.shieldSeconds > 0;
+  const items: { kind: PowerupKind; count: string; live?: boolean }[] = [
+    { kind: 'bounce', count: `${snapshot.bounces}` },
+    { kind: 'fuel', count: `${snapshot.boosts}` },
+    { kind: 'shield', count: shieldActive ? `${snapshot.shieldSeconds.toFixed(0)}s` : '—', live: shieldActive },
+  ];
   return (
-    <div className="air-supplies" aria-label="Airborne powerups">
-      <span className="air-supplies-title"><PackageOpen size={13} />AIR SUPPLIES</span>
-      <div className="air-supplies-items">
-        {(Object.keys(POWERUPS) as PowerupKind[]).map((kind) => {
-          const definition = POWERUPS[kind];
-          const active = kind === 'shield' && snapshot.shieldSeconds > 0;
-          return <div key={kind} className={`air-supply-item ${active ? 'active' : ''} ${recent && snapshot.lastPickup === kind ? 'just-collected' : ''}`} title={definition.description}>
-            <img src={powerupIcon(kind)} alt="" /><span>{kind === 'fuel' ? 'Rocket Fuel' : kind === 'shield' ? 'Skyward Shield' : 'Air Spring'}<small>{active ? `${snapshot.shieldSeconds.toFixed(1)}s / one hit` : definition.label}</small></span>
-            {active && <div className="shield-duration" role="meter" aria-label="Shield time remaining" aria-valuemin={0} aria-valuemax={6} aria-valuenow={snapshot.shieldSeconds}><span style={{ height: `${snapshot.shieldSeconds / 6 * 100}%` }} /></div>}
-            {recent && snapshot.lastPickup === kind && <Check className="pickup-check" size={12} />}
-          </div>;
-        })}
-      </div>
-      <span className="pickup-count">{snapshot.pickups}<small>collected</small></span>
+    <div className={`hud-supplies ${className}`} aria-label="Airborne supplies">
+      {items.map(({ kind, count, live }) => {
+        const definition = POWERUPS[kind];
+        const justCollected = recent && snapshot.lastPickup === kind;
+        return (
+          <div key={kind} className={`supply-chip ${live ? 'active shield-live' : ''} ${justCollected ? 'just-collected' : ''}`} title={`${definition.name}: ${definition.description}`}>
+            <img src={powerupIcon(kind)} alt={definition.name} />
+            <span className="supply-count" aria-label={`${definition.name}: ${count}`}>{count}</span>
+            {justCollected && <Check className="pickup-check" size={12} />}
+          </div>
+        );
+      })}
+      <span className="supply-total" title="Airborne supplies collected this race">{snapshot.pickups}<small>PICKED&nbsp;UP</small></span>
     </div>
   );
 }

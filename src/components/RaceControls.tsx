@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpFromLine, ArrowUpRight, LockKeyhole, MoveUp, Pause, Play, RotateCcw, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpFromLine, ArrowUpRight, MoveUp, Pause, Play, RotateCcw, Zap } from 'lucide-react';
 import type { GameOptions, GameSnapshot } from '../game/types';
 import BallTuning, { type TuningKey } from './BallTuning';
-import RaceStandings from './RaceStandings';
-import AirSupplies from './AirSupplies';
-import { capsuleById, loadoutStats, riderById } from '../game/loadouts';
-import type { RaceConfig } from '../game/session';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
+import type { RaceConfig } from '../game/session';
 
 interface RaceControlsProps {
   snapshot: GameSnapshot;
@@ -22,6 +19,11 @@ interface RaceControlsProps {
   onLane: (direction: number) => void;
 }
 
+/**
+ * TICKET-02: the control deck keeps only tactile inputs and live numbers.
+ * Flavor headlines, pack-delta text, and standings strips moved out: standings
+ * are pips on the mini track bar, supplies are the in-stage icon counter.
+ */
 export default function RaceControls({ snapshot, loaded, options, config, bindings: propBindings, onTune, onJump, onBounce, onBoost, onPrimary, onLane }: RaceControlsProps) {
   const [liveBindings, setLiveBindings] = useState<KeyBindings>(() => propBindings ?? loadBindings());
   useEffect(() => { if (propBindings) setLiveBindings(propBindings); }, [propBindings]);
@@ -44,30 +46,22 @@ export default function RaceControls({ snapshot, loaded, options, config, bindin
   const flying = status === 'flying';
   const paused = status === 'paused';
   const finished = status === 'finished';
-  const headline = snapshot.settling ? 'Your finish is locked in.' : falling && flying ? 'Pit crew! A little help here.'
-    : inLoop && flying ? 'Hold on to your goblin.'
-    : flying ? 'Looking gloriously irresponsible.'
-      : paused ? 'Even chaos needs a breather.'
-        : finished ? 'That deserves another go.' : 'Four goblins. One very bad idea.';
-  const description = snapshot.settling ? 'The remaining racers have a short window to finish.' : falling && flying ? 'Recovery costs time, not the race. Get back after them.'
-    : inLoop && flying ? 'Let the loop do its thing. Save a bounce for the landing.'
-    : flying ? `${snapshot.grade}% downhill. ${leftLabel} / ${rightLabel} to switch lanes and shoulder the competition.`
-      : paused ? 'Your goblin will wait. Probably.'
-        : ready ? 'Pull back your orange ball. All four launch together.'
-          : finished ? 'New ball. Same goblin. Still no plan.' : 'One goblin. One metal ball. Absolutely no plan.';
+  // Short functional status only — no commentary during active gameplay.
+  const statusWord = snapshot.settling ? 'Finish locked' : falling && flying ? 'Recovering'
+    : inLoop && flying ? 'In the loop'
+      : flying ? 'Live'
+        : paused ? 'Paused'
+          : finished ? 'Finished' : 'On the grid';
+  const statusAlert = Boolean(flying && (falling || inLoop));
   const label = ready || status === 'loading' ? 'LAUNCH THE RACE' : paused ? 'KEEP IT ROLLING' : flying ? 'PAUSE THE CHAOS' : config?.mode === 'tournament' ? config.round < config.totalRounds - 1 ? 'NEXT RACE' : 'RACE THE CUP AGAIN' : 'REMATCH';
   const canSteer = flying && !snapshot.settling && !inLoop && !falling && !snapshot.laneLocked;
-  const stats = config ? loadoutStats(config.loadout) : null;
 
   return (
     <div className="race-controls">
-    <RaceStandings racers={snapshot.racers} ready={ready || status === 'loading'} />
-    <AirSupplies snapshot={snapshot} />
-    {config && !config.customPhysics ? <div className="race-loadout-bar"><LockKeyhole size={15} /><strong>{riderById(config.loadout.rider).name}<span> + </span>{capsuleById(config.loadout.capsule).name}</strong><span>{stats?.launchSpeed} km/h launch</span><span>{stats?.weight} kg</span><small>{config.mode === 'tournament' ? 'CREW LOCKED FOR THE CUP' : 'FIXED RACE LOADOUT'}</small></div> : <BallTuning options={options} onChange={onTune} flying={flying || paused} />}
+    {config?.customPhysics ? <BallTuning options={options} onChange={onTune} flying={flying || paused} /> : null}
     <div className="control-deck">
       <div className="launch-status">
-        <div className="status-heading"><span className={`status-light ${flying ? 'is-live' : ''}`} /><h2>{headline}</h2></div>
-        <p>{description}</p>
+        <div className="status-heading"><span className={`status-light ${flying ? 'is-live' : ''}`} /><h2 className={statusAlert ? 'alert' : ''} role="status" aria-live="polite">{statusWord}</h2></div>
         <div className="steering-controls" role="group" aria-label="Lane steering">
           <button className="steer-key" onClick={() => onLane(-1)} disabled={!canSteer || snapshot.targetLane === 0} aria-label={`Change to the lane on the left (${leftLabel})`} title={`Left lane (${leftLabel})`}><ArrowLeft size={13} /><kbd>{leftLabel}</kbd></button>
           <div className="lane-indicator" aria-label={`Lane ${snapshot.lane + 1} of 4. Target lane ${snapshot.targetLane + 1}`}>
@@ -107,7 +101,7 @@ export default function RaceControls({ snapshot, loaded, options, config, bindin
         <button className="primary-button launch-button" onClick={onPrimary} disabled={!loaded}>
           {label}{flying ? <Pause size={18} /> : paused ? <Play size={18} /> : finished ? <RotateCcw size={18} /> : <ArrowUpRight size={22} />}
         </button>
-        <span>{ready ? <>OR PRESS <kbd>ENTER</kbd></> : flying || paused ? <>PAUSE / RESUME <kbd>{pauseLabel}</kbd></> : 'QUESTIONABLE FUN. UNLIMITED ATTEMPTS.'}</span>
+        <span>{ready ? <>OR PRESS <kbd>ENTER</kbd></> : flying || paused ? <>PAUSE / RESUME <kbd>{pauseLabel}</kbd></> : 'UNLIMITED ATTEMPTS'}</span>
       </div>
     </div>
     </div>

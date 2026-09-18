@@ -3,7 +3,7 @@
 - **ID**: `TICKET-02`
 - **Component**: UI / UX / Information Architecture
 - **Priority**: High (Phase 1 Foundation)
-- **Status**: Ready for Implementation
+- **Status**: Implemented (branch `arena/01a0b433-heavymetal2`; see `docs/EXPANSION_PROGRESS.md` → TICKET-02)
 - **Dependencies**: `TICKET-01`
 
 ---

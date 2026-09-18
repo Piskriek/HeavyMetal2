@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Check, ChevronRight, Flag, Gauge, LockKeyhole, RotateCcw, Shield, Sparkles, Trophy, Users, Weight, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Flag, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
 import Modal from './Modal';
+import BlizzardGauge from './ui/BlizzardGauge';
+import Drawer from './ui/Drawer';
 import { CAPSULES, DEFAULT_LOADOUT, RIDERS, STAT_LABELS, capsuleById, loadoutStats, riderById } from '../game/loadouts';
 import RacerFigure from './RacerFigure';
 import { capsuleArt, riderArt } from '../game/loadout-art';
@@ -35,6 +37,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const startGuard = useRef(false);
   const body = useRef<HTMLDivElement>(null);
   const rider = riderById(setup.loadout.rider);
@@ -45,6 +48,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
   const names = ['Competition', 'Rider & Capsule', 'Race Rules'];
 
   useEffect(() => {
+    setDetailsOpen(false);
     if (!step && !confirm) return;
     body.current?.focus({ preventScroll: true });
     body.current?.closest('.modal')?.scrollTo({ top: 0, behavior: 'instant' });
@@ -101,16 +105,63 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
               </button>)}</div>
             </section>
             <aside className="loadout-spec" aria-label="Combined loadout statistics">
-              <div className="spec-heading"><span>THE COMBINED BUILD</span><Shield size={18} /></div>
-              <h3>{stats.ratings.handling >= 8 ? 'Quick on its feet.' : stats.ratings.stability >= 8 ? 'Hard to move. Harder to ignore.' : stats.ratings.boost >= 8 ? 'Made for the red button.' : 'A little of everything.'}</h3>
-              <p className="spec-description">{rider.description}</p>
-              <div className="loadout-ratings">{STAT_LABELS.map(({ id, label, explanation }) => <div className="rating-row" key={id} title={explanation}>
-                <div><span>{label}</span><strong>{stats.ratings[id]}<small> / 10</small></strong></div><div className="rating-track" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={10} aria-valuenow={stats.ratings[id]}><span style={{ width: `${stats.ratings[id] * 10}%` }} /></div>
-              </div>)}</div>
-              <div className="budget-note"><Check size={13} />{stats.budget}-point budget. Different strengths, not upgrades.</div>
-              <dl className="physical-stats"><div><dt><Gauge size={14} />Launch speed</dt><dd>{stats.launchSpeed} <small>km/h</small></dd></div><div><dt><Weight size={14} />Race weight</dt><dd>{stats.weight} <small>kg</small></dd></div><div><dt><Zap size={14} />Boost impulse</dt><dd>+{stats.boostKmh} <small>km/h</small></dd></div></dl>
-              <div className="loadout-tradeoffs"><p><strong>Good at</strong>{capsule.strength}</p><p><strong>The catch</strong>{capsule.weakness}</p></div>
-              <details className="stat-explanation"><summary>What do these stats change?</summary>{STAT_LABELS.map((stat) => <p key={stat.id}><strong>{stat.label}:</strong> {stat.explanation}</p>)}<p>Weight also changes hop height and resistance to bumps. All combinations use the same total budget; final balance will be checked through playtesting.</p></details>
+              <div className="spec-heading"><span>THE COMBINED BUILD</span>
+                <button className="spec-info-button" onClick={() => setDetailsOpen(true)} aria-haspopup="dialog" aria-expanded={detailsOpen} title="Open stat breakdown, lore and physics details"><Info size={13} />TUNING DETAILS</button>
+              </div>
+              <h3>{stats.ratings.handling >= 8 ? 'Quick on its feet.' : stats.ratings.stability >= 8 ? 'Hard to move.' : stats.ratings.boost >= 8 ? 'Made for the red button.' : 'A little of everything.'}</h3>
+              <div className="spec-gauges" role="group" aria-label="Loadout ratings from zero to ten">
+                {STAT_LABELS.map(({ id, label, explanation }) => <BlizzardGauge key={id} variant="arc" label={label} value={stats.ratings[id]} max={10} title={`${label}: ${explanation}`} />)}
+              </div>
+              <div className="budget-chip"><Check size={13} />{stats.budget}-point budget · different strengths, not upgrades</div>
+              <Drawer open={detailsOpen} title="Tuning Details" caption={`${rider.name} + ${capsule.name} / full spec`} onClose={() => setDetailsOpen(false)}>
+                <section className="drawer-section">
+                  <h4><Scale size={13} />STAT BALANCE</h4>
+                  {STAT_LABELS.map(({ id, label }) => {
+                    const offset = (value: number) => value === 0 ? '±0' : value > 0 ? `+${value}` : `−${Math.abs(value)}`;
+                    return (
+                      <div className="balance-row" key={id}>
+                        <span className="balance-label">{label}</span>
+                        <div className="balance-mid">
+                          <span className="balance-chips">6 base <i>→</i> <span className={rider.offsets[id] >= 0 ? 'positive' : 'negative'}>{offset(rider.offsets[id])} rider</span> <i>→</i> <span className={capsule.offsets[id] >= 0 ? 'positive' : 'negative'}>{offset(capsule.offsets[id])} capsule</span></span>
+                          <BlizzardGauge variant="meter" value={stats.ratings[id]} max={10} label={label} />
+                        </div>
+                        <strong className="balance-total">{stats.ratings[id]}</strong>
+                      </div>
+                    );
+                  })}
+                </section>
+                <section className="drawer-section">
+                  <h4><ScrollText size={13} />THE CREW</h4>
+                  <div className="drawer-lore">
+                    <div><div className="lore-name">{rider.name} · {rider.title}</div><blockquote>{rider.quote}</blockquote><p>{rider.description}</p></div>
+                    <div><div className="lore-name">{capsule.name} · {capsule.title}</div><p>{capsule.description}</p></div>
+                  </div>
+                </section>
+                <section className="drawer-section">
+                  <h4><BookOpen size={13} />TRADE-OFFS</h4>
+                  <div className="tradeoff-row"><strong>Good at</strong>{capsule.strength}</div>
+                  <div className="tradeoff-row"><strong>The catch</strong>{capsule.weakness}</div>
+                  <div className="tradeoff-row"><strong>Rider edge</strong>{rider.strength}</div>
+                  <div className="tradeoff-row"><strong>Rider risk</strong>{rider.weakness}</div>
+                </section>
+                <section className="drawer-section">
+                  <h4><FlaskConical size={13} />PHYSICS MATH</h4>
+                  <dl className="formula-list">
+                    <div><dt>Launch speed<small>160 + (Launch − 6) × 4</small></dt><dd>{stats.launchSpeed} km/h</dd></div>
+                    <div><dt>Top speed<small>(2100 + (Launch − 6) × 35) × 0.16</small></dt><dd>{Math.round(stats.maximumSpeed * 0.16)} km/h</dd></div>
+                    <div><dt>Race weight<small>120 + (Stability − 6) × 14</small></dt><dd>{stats.weight} kg</dd></div>
+                    <div><dt>Boost impulse<small>430 × √(120 ÷ weight) × boost × 0.16</small></dt><dd>+{stats.boostKmh} km/h</dd></div>
+                    <div><dt>Hop height<small>lighter balls hop higher</small></dt><dd>~{stats.hopMeters} m</dd></div>
+                    <div><dt>Steering response<small>1 + (Handling − 6) × 0.08</small></dt><dd>×{stats.handling.toFixed(2)}</dd></div>
+                    <div><dt>Bump recovery<small>1 − (Stability − 6) × 0.045</small></dt><dd>×{stats.bumpRecovery.toFixed(2)}</dd></div>
+                  </dl>
+                </section>
+                <section className="drawer-section stat-glossary">
+                  <h4><Info size={13} />WHAT EACH STAT DRIVES</h4>
+                  {STAT_LABELS.map((stat) => <p key={stat.id}><strong>{stat.label}:</strong> {stat.explanation}</p>)}
+                  <p>Weight also changes hop height and resistance to bumps. Every combination spends the same {stats.budget}-point budget.</p>
+                </section>
+              </Drawer>
             </aside>
           </div>}
 

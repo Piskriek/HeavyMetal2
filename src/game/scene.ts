@@ -73,6 +73,15 @@ export const terrainY = (x: number, course: CourseId = 'ridge') => courseY(x, co
 export const launchVelocity = (power: number, speed: number) => speed / 0.16 * (0.45 + power * 0.55);
 export const weightImpulse = (weight: number) => Math.max(0.68, Math.min(1.45, Math.sqrt(120 / weight)));
 
+// TICKET-07: airborne ground-decal equations. Altitude is normalised against a
+// ceiling sized for the tallest spring launches; the raw ratio drives both curves
+// so extreme air keeps growing the circle while the opacity floor holds the mark visible.
+export const AIRBORNE_CEILING = 340;
+/** Radius = R_base x (1 + Z / Z_max x 1.8) — the rune circle grows with altitude. */
+export const decalRadius = (altitude: number) => RADIUS * 1.1 * (1 + Math.max(0, altitude) / AIRBORNE_CEILING * 1.8);
+/** Opacity = clamp(0.85 - Z / Z_max x 0.45, 0.25, 0.85) — it softens as the ball climbs. */
+export const decalOpacity = (altitude: number) => Math.max(0.25, Math.min(0.85, 0.85 - Math.max(0, altitude) / AIRBORNE_CEILING * 0.45));
+
 export function sectorAt(x: number, course: CourseId = 'ridge') {
   const distance = x - START_X;
   const sectors = TRACKS[course].sectors;

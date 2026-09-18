@@ -44,6 +44,7 @@ export default function SettingsPanel({ options, onChange, onClose }: SettingsPa
           {toggle('menuMotion', 'Living menu', 'Slow background movement and a few drifting embers.')}
           {toggle('parallax', 'Background parallax', 'Give the mountains depth as the race moves downhill.')}
           <div className="fantasy-setting-row"><div><h3><label htmlFor="menu-camera">Race camera</label></h3><p>Choose the view that is most comfortable for you.</p></div><select id="menu-camera" value={options.downrange ? 'range' : 'side'} onChange={(event) => change('downrange', event.target.value === 'range')}><option value="range">Down-range</option><option value="side">Side view</option></select></div>
+          <div className="fantasy-setting-row"><div><h3><label htmlFor="menu-ball-camera">Ball tracking</label></h3><p>Follow ball chases your capsule so it never leaves the screen. Fixed course holds the classic wide view, with an edge arrow when the ball exits.</p></div><select id="menu-ball-camera" value={options.cameraMode} onChange={(event) => change('cameraMode', event.target.value as GameOptions['cameraMode'])}><option value="follow_ball">Follow ball</option><option value="fixed">Fixed course</option></select></div>
           <p className="settings-footnote">Changes apply immediately. Graphics settings never reset your race.</p>
         </>}
         {tab === 'audio' && <>

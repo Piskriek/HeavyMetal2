@@ -2,7 +2,7 @@
 /**
  * Converts the generated source sheets in `public/art/sheets/` into the runtime
  * sprites in `public/art/` and writes `src/game/art-manifest.json` (frame rectangles,
- * runtime sizes, normalized hull geometry, hatch circles) that the typed manifest reads.
+ * runtime sizes, normalized hull geometry, full-body stances) that the typed manifest reads.
  *
  * All pixel work happens here, at build time, with ImageMagick. The browser only decodes
  * finished PNGs; it never keys, crops or converts art at runtime.
@@ -13,9 +13,16 @@
  *    goblins are green; #00FF00 is still supported.
  *  - Despill: the fringe is clamped to the matte-free channels only, so olive skin, mint
  *    springs and teal metal keep their colour instead of turning grey.
- *  - Capsule normalisation: every shell is scaled to one common hull diameter and
- *    re-centred, so armour never changes the collision envelope and the pilot insert
- *    lands in the same place in all three shells.
+ *  - Ball normalisation: every standalone ball is scaled to one common hull diameter and
+ *    re-centred, so armour and spikes never change the collision envelope and the race
+ *    draws all three balls at the same scale.
+ *  - Full-body riders stand on the bottom edge of a 512x768 portrait box (TICKET-04).
+ *  - Defringe: single-subject renders sometimes come back with off-white side bars around
+ *    the matte; the connected near-white border is flood-filled with the matte first, so
+ *    one key removes the whole background while interior highlights survive.
+ *
+ * The TICKET-04 redesign retired the cockpit composite: there is no hatch measurement,
+ * no `measureHatch()` / `assertHatch()` and no pilot-inside-shell clipping anywhere.
  *
  * Usage: node scripts/build-art.mjs
  */
@@ -194,6 +201,36 @@ function fit(trimmed, target, box) {
   magick([trimmed, '-resize', `${box}x${box}>`, '-background', 'none', '-gravity', 'center', '-extent', `${box}x${box}`, '-strip', target]);
 }
 
+/**
+ * Fits a standing figure inside a portrait box with its feet on the bottom edge, keeping
+ * the whole silhouette (wrenches and mauls are never clipped). The selection stage aligns
+ * figures by the bottom of this box, so every rider stands on the same ground line.
+ */
+function fitStance(trimmed, target, { width, height }) {
+  magick([trimmed, '-resize', `${width}x${height}>`, '-background', 'none', '-gravity', 'south', '-extent', `${width}x${height}`, '-strip', target]);
+}
+
+/**
+ * Some single-subject renders come back with off-white side bars instead of the matte.
+ * Flood-filling the connected near-white border regions with the matte lets the single
+ * magenta key remove the whole background afterwards. The fill reaches the white/matte
+ * blend column (22% fuzz) but never the matte itself (~33% away), and interior highlights
+ * are not connected to the border, so they survive.
+ */
+function defringeWhite(file, matteHex) {
+  const corner = rgbOf(execFileSync('convert', [file, '-format', '%[pixel:p{1,1}]', 'info:'], { encoding: 'utf8' }));
+  const nearWhite = corner.length === 3 && corner.every((channel) => channel > 235)
+    && Math.max(...corner) - Math.min(...corner) < 14;
+  if (!nearWhite) return file;
+  const [width, height] = size(file);
+  const fixed = temp('defringe');
+  magick([file, '-fuzz', '22%', '-fill', matteHex,
+    '-draw', 'color 0,0 floodfill', '-draw', `color ${width - 1},0 floodfill`,
+    '-draw', `color 0,${height - 1} floodfill`, '-draw', `color ${width - 1},${height - 1} floodfill`,
+    fixed]);
+  return fixed;
+}
+
 function grid(file, columns, rows) {
   const [width, height] = size(file);
   const cellWidth = Math.floor(width / columns);
@@ -218,134 +255,6 @@ function sheetMatte(file, name) {
   console.log(`  ${name}: ${matte.name} matte ${matte.hex} (target ${CANONICAL[matte.name]}), despill ${matte.clamp.join('/')}`);
   return matte;
 }
-
-/**
- * How much of the measured opening the pilot's window covers.
- *
- * The measurement comes back as the bounding box of the porthole's dark interior, and a
- * porthole is a *tilted* ellipse: an axis-aligned window inscribed in that box still has to
- * give the painted ring a few percent of clearance, or the bust clips over the brass. 0.92
- * keeps the window inside the ring on all three shells while staying wide enough for a face.
- */
-const HATCH_INSET = 0.92;
-
-/** Reads a sprite back as a small pixel grid, so measurements can be asserted in JS. */
-function sampleGrid(file, side = 128) {
-  const target = temp('sample');
-  magick([file, '-depth', '8', '-resize', `${side}x${side}!`, target]);
-  const text = execFileSync('convert', [target, 'txt:-'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
-  const pixels = new Array(side * side).fill(null);
-  for (const line of text.split('\n')) {
-    const match = line.match(/^(\d+),(\d+): \((\d+),(\d+),(\d+)(?:,(\d+))?\)/);
-    if (!match) continue;
-    const [, x, y, r, g, b, a] = match;
-    pixels[Number(y) * side + Number(x)] = { r: +r, g: +g, b: +b, a: a === undefined ? 255 : +a };
-  }
-  return {
-    side,
-    at: (fx, fy) => pixels[Math.round(fy * (side - 1)) * side + Math.round(fx * (side - 1))] ?? null,
-  };
-}
-
-const luma = (pixel) => 0.2126 * pixel.r + 0.7152 * pixel.g + 0.0722 * pixel.b;
-
-/**
- * Measures the window a rider looks out of on a normalised shell, and verifies the fit.
- *
- * The seat is the ringed porthole on the shell's face - the same round port the pre-4.2 SVG
- * capsule drew its rider in, and the only opening the artwork gives a brass ring. (The wide
- * top hatch is the cockpit itself: a bust seated there is hidden behind its front rim.)
- *
- * Picking it is deterministic rather than hand-pinned: of the near-black, fully opaque blobs,
- * the largest one whose centroid sits in the lower-right quadrant is the porthole. Every
- * shell also contains a top opening, plate shadows and a big shaded hull region, and a naive
- * "largest blob" scan picks those, which is how an earlier hand-pinned ellipse ended up
- * offset and undersized - the bust then overlapped the ring, which is the defect this fixes.
- *
- * `HATCH_INSET` shrinks the fit inside the tilted opening; the fit is then re-checked against
- * the sprite by sampling, so artwork that moves or unkeys the porthole fails the build.
- */
-function measureHatch(id, file) {
-  const text = execFileSync('convert', [file, '-colorspace', 'Gray', '-threshold', '12%',
-    '-define', 'connected-components:verbose=true', '-define', 'connected-components:area-threshold=1200',
-    '-connected-components', '8', 'null:'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
-  const canvas = 512;
-  let best = null;
-  for (const line of text.split('\n').slice(1)) {
-    const match = /^\s+\d+: (\d+)x(\d+)\+(-?\d+)\+(-?\d+) ([\d.]+),([\d.]+) (\d+) graya\((\d+),(\d+)\)/.exec(line);
-    if (!match) continue;
-    const [, width, height, x, y, cx, cy, area, , alpha] = match.map(Number);
-    // Opaque only: the transparent background is also near-black, and the shell's own cast
-    // shadow is a wide flat blob rather than the taller-than-wide porthole.
-    if (alpha < 1) continue;
-    if (cx / canvas < 0.6 || cx / canvas > 0.98 || cy / canvas < 0.4 || cy / canvas > 0.85) continue;
-    if (height < width * 0.9) continue;
-    if (area < canvas * canvas * 0.004) continue;
-    if (!best || area > best.area) best = { width, height, x, y, cx, cy, area };
-  }
-  if (!best) throw new Error(`Could not find the porthole on ${id}-shell.png; re-read it and the sheet matte.`);
-  const hatch = {
-    x: best.cx / canvas,
-    y: best.cy / canvas,
-    rx: (best.width / 2 / canvas) * HATCH_INSET,
-    ry: (best.height / 2 / canvas) * HATCH_INSET,
-  };
-  return assertHatch(id, file, hatch, best);
-}
-
-/**
- * Verifies a fitted hatch against the sprite it belongs to: the ellipse interior must be the
- * dark opening and the ring just outside it must be brighter painted metal. Throws when the
- * artwork and the measurement disagree.
- */
-function assertHatch(id, file, hatch, measured) {
-  const grid = sampleGrid(file);
-  let interior = 0;
-  let interiorDark = 0;
-  let interiorLuma = 0;
-  let rim = 0;
-  let rimBright = 0;
-  let rimLuma = 0;
-  for (let step = 0; step < 32; step += 1) {
-    const angle = (step / 32) * Math.PI * 2;
-    for (const factor of [0.3, 0.6]) {
-      const pixel = grid.at(hatch.x + Math.cos(angle) * hatch.rx * factor, hatch.y + Math.sin(angle) * hatch.ry * factor);
-      if (!pixel) continue;
-      interior += 1;
-      interiorLuma += luma(pixel);
-      if (luma(pixel) < 60 && pixel.a > 200) interiorDark += 1;
-    }
-    // Sample the painted ring outside the window. The opening is a *tilted* ellipse, so a
-    // single ring can still land inside the dark for some angles; three rings are sampled and
-    // the brightest opaque one counts. Samples on transparent background (the port sits near
-    // the shell's edge) say nothing about the artwork and are skipped.
-    let brightest = null;
-    for (const factor of [1.18, 1.35, 1.52]) {
-      const outer = grid.at(hatch.x + Math.cos(angle) * hatch.rx * (1 / HATCH_INSET) * factor,
-        hatch.y + Math.sin(angle) * hatch.ry * (1 / HATCH_INSET) * factor);
-      if (!outer || outer.a < 200) continue;
-      const value = luma(outer);
-      if (brightest === null || value > brightest) brightest = value;
-    }
-    if (brightest === null) continue;
-    rim += 1;
-    rimLuma += brightest;
-    if (brightest > 70) rimBright += 1;
-  }
-  const dark = interior ? interiorDark / interior : 0;
-  const bright = rim ? rimBright / rim : 0;
-  const contrast = (rim ? rimLuma / rim : 0) - (interior ? interiorLuma / interior : 0);
-  if (interior < 40 || rim < 12 || dark < 0.9 || bright < 0.45 || contrast < 25) {
-    throw new Error(`Hatch fit for ${id} no longer matches the art (${interiorDark}/${interior} dark inside, `
-      + `${rimBright}/${rim} bright ring outside). Re-read tests/artifacts/hatch-probe.png.`);
-  }
-  console.log(`  capsule ${id}: port at ${hatch.x.toFixed(3)},${hatch.y.toFixed(3)} rx ${hatch.rx.toFixed(3)} ry ${hatch.ry.toFixed(3)}`
-    + `${measured ? ` (opening ${measured.width}x${measured.height})` : ''} `
-    + `(verified: ${Math.round(dark * 100)}% dark inside, ${Math.round(bright * 100)}% painted ring, contrast ${contrast.toFixed(0)})`);
-  return { ...hatch, radius: Math.max(hatch.rx, hatch.ry), measured: true };
-}
-
-const EYE_LINE = { rivet: 0.44, nix: 0.44, grub: 0.52, sprocket: 0.49 };
 
 /* ---------------------------------- riders ---------------------------------- */
 
@@ -375,39 +284,65 @@ const RIDER_CELLS = [
     const trimmed = temp(`rider-trim-${rider.id}`);
     magick([crop, '-trim', '+repage', trimmed]);
     fit(trimmed, join(out, `${rider.id}-portrait.png`), 512);
-    // The cockpit insert is the head, so the face fills the hatch opening.
+    // The head crop is the HUD badge and off-screen pointer portrait (TICKET-04).
     const [width, height] = size(trimmed);
     const head = temp(`rider-head-${rider.id}`);
     magick([trimmed, '-crop', `${width}x${Math.round(height * 0.68)}+0+0`, '+repage', head]);
     fit(head, join(out, `${rider.id}-pilot.png`), 256);
     record(`rider:${rider.id}`, 'riders', sheet, rider.cell, `${rider.id}-portrait.png`, {
       action: 'portrait', anchor: 'center', note: rider.note, pilot: `art/${rider.id}-pilot.png`,
-      pilotRuntime: runtimeSize(join(out, `${rider.id}-pilot.png`)), eyeLine: EYE_LINE[rider.id],
+      pilotRuntime: runtimeSize(join(out, `${rider.id}-pilot.png`)),
     });
   }
 }
 
-/* --------------------------------- capsules --------------------------------- */
+/* ------------------------------ full-body riders ----------------------------- */
 
-{
-  const file = join(sheets, 'capsules-sheet.png');
-  const sheet = grid(file, 3, 1);
-  const matte = sheetMatte(file, 'capsules');
-  manifest.sheets.capsules = sheet;
-  ['iron', 'springsteel', 'siege'].forEach((id, index) => {
-    const trimmed = extract(file, sheet.cells[index], matte);
-    // Publish first, then measure: the path handed to `normalize` is where the sprite is
-    // written, and `hatchOf` below reads that same file back.
-    const hull = normalize(trimmed, join(out, `${id}-shell.png`), { diameter: 452, canvas: 512 });
-    const sprite = join(out, `${id}-shell.png`);
-    const hatch = measureHatch(id, sprite);
-    record(`capsule:${id}`, 'capsules', sheet, index, `${id}-shell.png`, {
-      action: 'shell', anchor: 'center', pivot: { x: 0.5, y: 0.5 }, envelope: 1,
-      hull: { diameter: 452, canvas: 512, scale: Number(hull.scale.toFixed(4)) },
-      hatch,
-    });
+// TICKET-04: heroic full-body renders, keyed on magenta, standing on the bottom edge of a
+// 512x768 portrait box. Sources may carry off-white side bars, so they are defringed
+// before keying. The extra runtime files are merged onto the rider cells.
+['rivet', 'nix', 'grub', 'sprocket'].forEach((id) => {
+  const file = join(sheets, `riders-fullbody/${id}-full-src.png`);
+  const matte = matteOf(file);
+  const name = `rider-${id}-full`;
+  manifest.matte[name] = { hex: matte.hex, detected: matte.name, canonical: CANONICAL[matte.name], despill: matte.clamp };
+  const [width, height] = size(file);
+  const sheet = { file: `art/sheets/riders-fullbody/${id}-full-src.png`, width, height, columns: 1, rows: 1, cells: [{ x: 0, y: 0, width, height }] };
+  manifest.sheets[name] = sheet;
+  console.log(`  ${name}: ${matte.name} matte ${matte.hex} (target ${CANONICAL[matte.name]}), despill ${matte.clamp.join('/')}`);
+  const source = defringeWhite(file, matte.hex);
+  const target = join(out, `riders/fullbody/${id}_full.png`);
+  mkdirSync(join(out, 'riders/fullbody'), { recursive: true });
+  fitStance(extract(source, sheet.cells[0], matte), target, { width: 512, height: 768 });
+  Object.assign(manifest.cells[`rider:${id}`], {
+    fullbody: `art/riders/fullbody/${id}_full.png`,
+    fullbodyRuntime: runtimeSize(target),
   });
-}
+});
+
+/* ---------------------------------- balls ----------------------------------- */
+
+// TICKET-04: balls are disentangled from the rider art entirely - standalone high-detail
+// renders, hull-normalised to the same 452px diameter on a 512px canvas that the retired
+// capsule shells used, so the race's draw scale and collision envelope carry over
+// unchanged. The capsule cell's runtime sprite is the ball itself.
+['iron', 'springsteel', 'siege'].forEach((id) => {
+  const file = join(sheets, `balls/${id}-ball-src.png`);
+  const matte = matteOf(file);
+  const name = `ball-${id}`;
+  manifest.matte[name] = { hex: matte.hex, detected: matte.name, canonical: CANONICAL[matte.name], despill: matte.clamp };
+  const [width, height] = size(file);
+  const sheet = { file: `art/sheets/balls/${id}-ball-src.png`, width, height, columns: 1, rows: 1, cells: [{ x: 0, y: 0, width, height }] };
+  manifest.sheets[name] = sheet;
+  console.log(`  ${name}: ${matte.name} matte ${matte.hex} (target ${CANONICAL[matte.name]}), despill ${matte.clamp.join('/')}`);
+  const source = defringeWhite(file, matte.hex);
+  mkdirSync(join(out, 'balls'), { recursive: true });
+  const hull = normalize(extract(source, sheet.cells[0], matte), join(out, `balls/${id}-ball.png`), { diameter: 452, canvas: 512 });
+  record(`capsule:${id}`, name, sheet, 0, `balls/${id}-ball.png`, {
+    action: 'ball', anchor: 'center', pivot: { x: 0.5, y: 0.5 }, envelope: 1,
+    hull: { diameter: 452, canvas: 512, scale: Number(hull.scale.toFixed(4)) },
+  });
+});
 
 /* --------------------------------- supplies --------------------------------- */
 
@@ -475,8 +410,10 @@ console.log(`Built ${Object.keys(manifest.cells).length} sprites from ${Object.k
 /* ------------------------- verification contact sheets ---------------------- */
 
 const verify = ['rivet-portrait.png', 'nix-portrait.png', 'grub-portrait.png', 'sprocket-portrait.png',
-  'iron-shell.png', 'springsteel-shell.png', 'siege-shell.png', 'fuel-supply.png', 'shield-supply.png',
-  'bounce-supply.png', 'blimp.png', 'landmark-pines.png', 'landmark-quarry.png', 'landmark-windmill.png', 'landmark-pasture.png'];
+  'riders/fullbody/rivet_full.png', 'riders/fullbody/nix_full.png', 'riders/fullbody/grub_full.png',
+  'riders/fullbody/sprocket_full.png', 'balls/iron-ball.png', 'balls/springsteel-ball.png', 'balls/siege-ball.png',
+  'fuel-supply.png', 'shield-supply.png', 'bounce-supply.png', 'blimp.png', 'landmark-pines.png',
+  'landmark-quarry.png', 'landmark-windmill.png', 'landmark-pasture.png'];
 
 const tiles = verify.map((name, index) => {
   const tile = join(work, `tile-${index}.png`);
@@ -485,35 +422,5 @@ const tiles = verify.map((name, index) => {
   return tile;
 });
 execFileSync('montage', ['-background', '#171b14', '-tile', '4x', '-geometry', '+8+8', ...tiles, join(root, 'tests/artifacts/alpha-check.png')]);
-
-const probes = ['iron', 'springsteel', 'siege'].map((id, index) => {
-  const target = join(work, `hatch-${index}.png`);
-  const hatch = manifest.cells[`capsule:${id}`].hatch;
-  const cx = Math.round(hatch.x * 512);
-  const cy = Math.round(hatch.y * 512);
-  const rx = Math.round((hatch.rx ?? hatch.radius) * 512);
-  const ry = Math.round((hatch.ry ?? hatch.radius) * 512);
-  magick([join(out, `${id}-shell.png`), '-fill', 'none', '-stroke', 'magenta', '-strokewidth', '3',
-    '-draw', `ellipse ${cx},${cy} ${rx},${ry} 0,360`, target]);
-  return target;
-});
-execFileSync('montage', ['-background', '#22262c', '-tile', '3x', '-geometry', '+6+6', ...probes, join(root, 'tests/artifacts/hatch-probe.png')]);
-
-/**
- * The eye-line contact sheet: every cockpit pilot at 3x with the guide rows the manifest
- * `eyeLine` values were read from (0.30 / 0.40 / 0.50 / 0.60 of the pilot PNG's height).
- * Re-render it whenever the source portraits change and re-read the numbers.
- */
-const guides = [['0.30', 0.30, 'orange'], ['0.40', 0.40, 'yellow'], ['0.50', 0.50, 'cyan'], ['0.60', 0.60, 'red']];
-const eyelines = ['rivet', 'nix', 'grub', 'sprocket'].map((id, index) => {
-  const target = join(work, `eyeline-${index}.png`);
-  const args = [join(out, `${id}-pilot.png`), '-resize', '300%'];
-  for (const [, fraction, colour] of guides) args.push('-stroke', colour, '-strokewidth', '2', '-draw', `line 0,${Math.round(fraction * 768)} 768,${Math.round(fraction * 768)}`);
-  args.push(target);
-  magick(args);
-  return target;
-});
-execFileSync('montage', ['-background', '#22302a', '-tile', '4x', '-geometry', '+6+6', ...eyelines, join(root, 'tests/artifacts/eyeline-probe.png')]);
-console.log(`Eye lines: ${Object.entries(EYE_LINE).map(([id, value]) => `${id} ${value}`).join(', ')} (guides at 0.30/0.40/0.50/0.60 of tests/artifacts/eyeline-probe.png)`);
 
 rmSync(work, { recursive: true, force: true });

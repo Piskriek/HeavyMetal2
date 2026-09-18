@@ -77,6 +77,19 @@ const loftyLaunch = async (page) => {
   for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft'); // 0.8 -> 0.6 power
 };
 
+// Enter can land in a render/effect re-subscription gap after a status change, or be
+// consumed by the loading cover; retry until the race actually launches.
+const launchWithEnter = async (page) => {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await page.keyboard.press('Enter');
+    try {
+      await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 1200 });
+      return;
+    } catch { /* landed in a gap; try again */ }
+  }
+  await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 15000 });
+};
+
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 950 } });
   const page = await context.newPage();
@@ -100,12 +113,16 @@ try {
   await page.getByRole('button', { name: /To the Starting Line/ }).click();
   await page.waitForSelector('.game-stage', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-ready'), null, { timeout: 20000 });
+  // The loading cover owns Enter until dismissed (there is no auto-dismiss); dismiss it
+  // explicitly before driving the engine from the canvas.
+  if (await page.locator('.race-loading-screen').count()) await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('.race-loading-screen'), null, { timeout: 15000 });
+  await page.locator('canvas.game-canvas').focus();
 
   // Follow-ball mode (the default): a max launch catapults the ball off the top.
   await loftyLaunch(page);
   await shot(page, '1-ready-follow');
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 15000 });
+  await launchWithEnter(page);
   await page.waitForTimeout(450);
   await shot(page, '2-follow-airborne');
   // An air bounce over open track puts the ball high with a clean view of the decal.
@@ -116,19 +133,25 @@ try {
   await shot(page, '3-follow-decend');
   await page.waitForTimeout(2500);
 
-  // Switch to the fixed course camera mid-race and repeat the catapult launch.
-  await page.getByRole('button', { name: /THE WORKSHOP/i }).click();
+  // Switch to the fixed course camera mid-race and repeat the catapult launch. The race
+  // screen has no header nav; the workshop lives in the gear menu.
+  await page.mouse.move(720, 480); // wake the auto-hidden gear button
+  await page.getByRole('button', { name: 'Race menu' }).click();
+  await page.getByRole('menuitem', { name: /The workshop/i }).click();
   await page.waitForSelector('#race-camera-mode', { timeout: 10000 });
   const modeValue = await page.locator('#race-camera-mode').inputValue();
   report(modeValue === 'follow_ball', 'in-race select exposes follow_ball as the default', modeValue);
   await page.locator('#race-camera-mode').selectOption('fixed');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
+  // Focus returns to the modal's trigger button when it closes; an Enter there would
+  // re-click the button instead of launching. Drive the engine from the canvas.
+  await page.locator('canvas.game-canvas').focus();
   await page.keyboard.press('KeyR');
   await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-ready'), null, { timeout: 15000 });
+  await page.waitForTimeout(400);
   await loftyLaunch(page);
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 15000 });
+  await launchWithEnter(page);
   await page.waitForTimeout(450);
   await shot(page, '4-fixed-airborne');
   await page.keyboard.press('Space');

@@ -111,147 +111,52 @@ try {
   await page.getByRole('button', { name: 'New Game', exact: true }).click();
   await page.getByRole('radio', { name: /Tournament/ }).click();
   await page.getByRole('button', { name: /Choose Your Crew/ }).click();
-  await page.waitForSelector('.rider-options img', { timeout: 15000 });
+  await page.waitForSelector('.rider-deck img', { timeout: 15000 });
   await page.waitForTimeout(600);
   const riders = await page.evaluate(() => {
-    const images = [...document.querySelectorAll('.rider-options img')];
+    const images = [...document.querySelectorAll('.rider-deck img')];
     return images.map((image) => ({ src: image.getAttribute('src'), width: image.naturalWidth }));
   });
   check(riders.length === 4, 'four painted rider portraits are offered', String(riders.length));
   check(riders.every((image) => image.width > 0), 'every rider portrait decodes', JSON.stringify(riders.map((r) => r.width)));
-  check(await page.locator('.racer-figure .racer-shell').count() === 1, 'the showcase composites shell + pilot');
-  check(await page.locator('.racer-pilot-window').count() === 1, 'the pilot is clipped to the measured hatch');
-  await page.screenshot({ path: join(artifacts, 'art-1-loadout.png') });
-
-  const shellWidth = await page.evaluate(() => document.querySelector('.racer-shell')?.naturalWidth ?? 0);
-  const pilotWidth = await page.evaluate(() => document.querySelector('.racer-pilot')?.naturalWidth ?? 0);
-  check(shellWidth > 0 && pilotWidth > 0, 'shell and pilot PNGs are decoded', `${shellWidth}x${pilotWidth}`);
-
-  // Geometry, not just presence: the pilot has to sit ON the measured hatch opening rather
-  // than floating over the shell, which is the defect that made the capsule picker wrong.
-  const geometry = await page.evaluate(() => {
-    const figure = document.querySelector('.selected-capsule .racer-figure');
-    const shell = figure?.querySelector('.racer-shell');
-    const window_ = figure?.querySelector('.racer-pilot-window');
-    const pilot = figure?.querySelector('.racer-pilot');
-    if (!figure || !shell || !window_ || !pilot) return null;
-    const shellRect = shell.getBoundingClientRect();
-    const pilotRect = pilot.getBoundingClientRect();
-    const clip = getComputedStyle(window_).clipPath;
-    const numbers = (clip.match(/[\d.]+/g) ?? []).map(Number);
+  // TICKET-04: the broken cockpit-hole composite is retired - no goblin head in a hatch.
+  check(await page.locator('.racer-pilot-window').count() === 0, 'the cockpit hatch composite is retired');
+  check(await page.locator('.character-showcase .showcase-rider').count() >= 1, 'the stage shows a full-body rider');
+  check(await page.locator('.character-showcase .showcase-ball').count() >= 1, 'the stage shows a standalone ball');
+  const figures = await page.evaluate(() => {
+    const rider = document.querySelector('.showcase-rider');
+    const ball = document.querySelector('.showcase-ball');
     return {
-      clip,
-      hatch: numbers.length >= 4
-        ? { rx: numbers[0] / 100, ry: numbers[1] / 100, x: numbers[2] / 100, y: numbers[3] / 100 } : null,
-      pilotInside: pilotRect.left >= shellRect.left - 1 && pilotRect.right <= shellRect.right + 1
-        && pilotRect.top >= shellRect.top - 1 && pilotRect.bottom <= shellRect.bottom + 1,
+      rider: rider ? { w: rider.naturalWidth, h: rider.naturalHeight } : null,
+      ball: ball ? { w: ball.naturalWidth, h: ball.naturalHeight } : null,
     };
   });
-  check(Boolean(geometry?.hatch), 'the pilot window exposes a measured hatch clip', geometry?.clip ?? 'none');
-  if (geometry?.hatch) {
-    const { x, y, rx, ry } = geometry.hatch;
-    // The painted cockpit is the ringed porthole on the shell's face, and its fitted centre
-    // lands near 0.81 / 0.61 on all three capsules. The wide top hatch is the cockpit's own
-    // opening; a bust seated there disappears behind its front rim, so it is not the seat.
-    check(Math.abs(x - 0.812) < 0.05 && Math.abs(y - 0.612) < 0.05,
-      'the pilot window sits on the painted port, not on the top hatch', `x=${x.toFixed(3)} y=${y.toFixed(3)}`);
-    check(rx > 0.06 && rx < 0.14 && ry > 0.09 && ry < 0.18,
-      'the hatch window matches the measured ellipse radii', `rx=${rx.toFixed(3)} ry=${ry.toFixed(3)}`);
-    // The bust is square: a wildly non-square pilot box is what squashed the face before.
-    const pilotBox = await page.evaluate(() => {
-      const pilot = document.querySelector('.selected-capsule .racer-pilot');
-      if (!pilot) return null;
-      const rect = pilot.getBoundingClientRect();
-      return { w: rect.width, h: rect.height };
-    });
-    check(pilotBox !== null && Math.abs(pilotBox.w - pilotBox.h) < 2,
-      'the pilot keeps the bust aspect instead of being stretched', pilotBox ? `${pilotBox.w.toFixed(1)}x${pilotBox.h.toFixed(1)}` : 'none');
+  check(Boolean(figures.rider) && figures.rider.h > figures.rider.w, 'the rider render is a full-body portrait figure', JSON.stringify(figures.rider));
+  check(Boolean(figures.ball) && figures.ball.w > 0 && Math.abs(figures.ball.w - figures.ball.h) <= 2, 'the ball render is a clean square sprite', JSON.stringify(figures.ball));
+  await page.screenshot({ path: join(artifacts, 'art-1-loadout.png') });
+  await page.locator('.loadout-stage').screenshot({ path: join(artifacts, 'art-1b-capsule-closeup.png') });
 
-    // And the bust has to stay inside the painted opening: the reported defect was a pilot
-    // scaled to 3.4x the port, whose helmet clipped over the brass ring. This compares the
-    // shell's own near-black pixels around the port against the pilot PNG's alpha bounding box
-    // in sprite coordinates, so it cannot drift with CSS box behaviour. It is a loose bound -
-    // the exact fit is the ellipse clip the check above reads - but it fails loudly for the
-    // 3.4x-style overshoot that caused the defect.
-    const seat = await page.evaluate(async () => {
-      const figure = document.querySelector('.selected-capsule .racer-figure');
-      const pilot = figure?.querySelector('.racer-pilot');
-      const shell = figure?.querySelector('.racer-shell');
-      if (!figure || !pilot || !shell) return null;
-      const sample = async (image) => {
-        await image.decode();
-        const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
-        const paint = canvas.getContext('2d');
-        paint.drawImage(image, 0, 0);
-        return { data: paint.getImageData(0, 0, canvas.width, canvas.height), width: canvas.width, height: canvas.height };
-      };
-      const shellPixels = await sample(shell);
-      // Opening: near-black opaque pixels in the port's corner of the shell sprite.
-      let opening = { left: 1, top: 1, right: 0, bottom: 0 };
-      for (let y = 0; y < shellPixels.height; y += 1) {
-        for (let x = 0; x < shellPixels.width; x += 1) {
-          const index = (y * shellPixels.width + x) * 4;
-          const [r, g, b, a] = [shellPixels.data.data[index], shellPixels.data.data[index + 1], shellPixels.data.data[index + 2], shellPixels.data.data[index + 3]];
-          if (a < 200 || r + g + b > 80) continue;
-          if (x / shellPixels.width < 0.66 || y / shellPixels.height < 0.44) continue;
-          opening = {
-            left: Math.min(opening.left, x / shellPixels.width), top: Math.min(opening.top, y / shellPixels.height),
-            right: Math.max(opening.right, x / shellPixels.width), bottom: Math.max(opening.bottom, y / shellPixels.height),
-          };
-        }
-      }
-      const pilotPixels = await sample(pilot);
-      let head = { left: 1, top: 1, right: 0, bottom: 0 };
-      for (let y = 0; y < pilotPixels.height; y += 1) {
-        for (let x = 0; x < pilotPixels.width; x += 1) {
-          if (pilotPixels.data.data[(y * pilotPixels.width + x) * 4 + 3] < 24) continue;
-          head = {
-            left: Math.min(head.left, x / pilotPixels.width), top: Math.min(head.top, y / pilotPixels.height),
-            right: Math.max(head.right, x / pilotPixels.width), bottom: Math.max(head.bottom, y / pilotPixels.height),
-          };
-        }
-      }
-      // Where the pilot box puts that alpha box, in shell-sprite fractions.
-      const box = { left: parseFloat(pilot.style.left) / 100, top: parseFloat(pilot.style.top) / 100, size: parseFloat(pilot.style.width) / 100 };
-      const placed = {
-        left: box.left + head.left * box.size, right: box.left + head.right * box.size,
-        top: box.top + head.top * box.size, bottom: box.top + head.bottom * box.size,
-      };
-      return { opening, placed, covered: (opening.right - opening.left) * (opening.bottom - opening.top) };
-    });
-    const slack = 0.012;
-    check(Boolean(seat) && seat.placed.left >= seat.opening.left - slack && seat.placed.right <= seat.opening.right + slack
-      && seat.placed.top >= seat.opening.top - slack && seat.placed.bottom <= seat.opening.bottom + slack,
-      'the bust stays inside the dark area around the painted port, not over the brass ring',
-      seat ? `bust ${seat.placed.left.toFixed(3)},${seat.placed.top.toFixed(3)}-${seat.placed.right.toFixed(3)},${seat.placed.bottom.toFixed(3)} vs port ${seat.opening.left.toFixed(3)},${seat.opening.top.toFixed(3)}-${seat.opening.right.toFixed(3)},${seat.opening.bottom.toFixed(3)}` : 'no composite');
-    check(Boolean(seat) && (seat.opening.right - seat.opening.left) * (seat.opening.bottom - seat.opening.top) > 0.02,
-      'the measured port covers a plausible share of the shell', seat ? `${(seat.covered * 100).toFixed(1)}% of the sprite` : 'none');
-  }
-  check(geometry?.pilotInside === true, 'the pilot image stays inside the capsule silhouette');
-  await page.locator('.selected-capsule').screenshot({ path: join(artifacts, 'art-1b-capsule-closeup.png') });
-
-  // Swapping rider and capsule has to swap both painted layers.
-  await page.locator('.rider-option').nth(2).click();
-  await page.locator('.capsule-option').nth(1).click();
+  // Swapping rider and ball has to swap both painted figures.
+  await page.locator('.rider-card').nth(2).click();
+  await page.locator('.ball-card').nth(1).click();
   await page.waitForTimeout(800);
   const swapped = await page.evaluate(() => {
-    const shell = document.querySelector('.selected-capsule .racer-shell');
-    const pilot = document.querySelector('.selected-capsule .racer-pilot');
+    const rider = document.querySelector('.showcase-rider');
+    const ball = document.querySelector('.showcase-ball');
     return {
-      shell: (shell?.getAttribute('src') ?? '').split('/').pop(), pilot: (pilot?.getAttribute('src') ?? '').split('/').pop(),
-      ready: Boolean(shell && shell.naturalWidth > 0 && pilot && pilot.naturalWidth > 0),
+      rider: (rider?.getAttribute('src') ?? '').split('/').pop(), ball: (ball?.getAttribute('src') ?? '').split('/').pop(),
+      ready: Boolean(rider && rider.naturalWidth > 0 && ball && ball.naturalWidth > 0),
     };
   });
-  check(swapped.shell === 'springsteel-shell.png' && swapped.pilot === 'grub-pilot.png' && swapped.ready,
-    'choosing another rider and capsule swaps both painted layers', JSON.stringify(swapped));
-  await page.locator('.rider-option').nth(0).click();
-  await page.locator('.capsule-option').nth(0).click();
+  check(swapped.rider === 'grub_full.png' && swapped.ball === 'springsteel-ball.png' && swapped.ready,
+    'choosing another rider and ball swaps both painted figures', JSON.stringify(swapped));
+  await page.locator('.rider-card').nth(0).click();
+  await page.locator('.ball-card').nth(0).click();
   await page.waitForTimeout(500);
 
-  // Capsule picker: all three painted shells.
-  const capsules = await page.evaluate(() => [...document.querySelectorAll('.capsule-options img')].map((image) => image.naturalWidth));
-  check(capsules.length === 3 && capsules.every((width) => width > 0), 'all three capsule shells decode', JSON.stringify(capsules));
+  // Ball picker: all three standalone renders.
+  const balls = await page.evaluate(() => [...document.querySelectorAll('.ball-deck img')].map((image) => image.naturalWidth));
+  check(balls.length === 3 && balls.every((width) => width > 0), 'all three standalone ball renders decode', JSON.stringify(balls));
 
   // Course art in the itinerary step.
   await page.getByRole('button', { name: /Set the Race/ }).click();
@@ -269,16 +174,25 @@ try {
   await page.waitForSelector('.game-stage', { timeout: 20000 });
   await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-ready'), null, { timeout: 30000 });
   await page.waitForTimeout(1200);
-  const hudIcons = await page.evaluate(() => [...document.querySelectorAll('.air-supplies img')].map((image) => image.naturalWidth));
+  const hudIcons = await page.evaluate(() => [...document.querySelectorAll('.hud-supplies img')].map((image) => image.naturalWidth));
   check(hudIcons.length >= 3 && hudIcons.every((width) => width > 0), 'HUD supply icons are the painted PNGs', JSON.stringify(hudIcons));
   await page.screenshot({ path: join(artifacts, 'art-3-grid.png') });
 
-  await page.keyboard.press('Enter');
+  // The loading cover owns Enter until dismissed (there is no auto-dismiss); dismiss it
+  // explicitly, then launch. Enter can also land in a render gap after the status flip,
+  // so the launch is retried until the race actually flies.
+  if (await page.locator('.race-loading-screen').count()) await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('.race-loading-screen'), null, { timeout: 15000 });
+  for (let attempt = 0; attempt < 6; attempt++) {
+    await page.keyboard.press('Enter');
+    try {
+      await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 1200 });
+      break;
+    } catch { /* landed in a gap; retry */ }
+  }
   await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-flying'), null, { timeout: 15000 });
   await page.waitForTimeout(2200);
   await page.screenshot({ path: join(artifacts, 'art-4-race.png') });
-  await page.keyboard.press('KeyP');
-  await page.waitForTimeout(400);
 
   // The canvas frame must actually contain the painted capsules: sample the drawn pixels.
   const painted = await page.evaluate(() => {
@@ -301,8 +215,17 @@ try {
   check(errors.length === 0 && failed.length === 0, 'no failed requests or page errors while painting the race',
     [...errors, ...failed].slice(0, 4).join(' | '));
 
-  // The workshop sprite lab must offer the art that is actually used in the game.
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'THE WORKSHOP' }).click();
+  // Back to the grid: immersion hides the site header while racing or paused, and the
+  // workshop is opened from the header navigation.
+  await page.keyboard.press('KeyR');
+  await page.waitForFunction(() => document.querySelector('.game-stage')?.className.includes('status-ready'), null, { timeout: 30000 });
+  await page.waitForTimeout(400);
+
+  // The workshop sprite lab must offer the art that is actually used in the game. The
+  // race screen has no header nav; the workshop lives in the gear menu.
+  await page.mouse.move(720, 480);
+  await page.getByRole('button', { name: 'Race menu' }).click();
+  await page.getByRole('menuitem', { name: /The workshop/i }).click();
   await page.getByRole('tab', { name: /SPRITE LAB/ }).click();
   await page.waitForSelector('.art-tile img', { timeout: 15000 });
   await page.waitForTimeout(800);
@@ -332,7 +255,9 @@ try {
 
   await page.getByRole('button', { name: /Close dialog/ }).click();
   await page.waitForTimeout(300);
-  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'MAIN MENU' }).click();
+  await page.mouse.move(720, 480);
+  await page.getByRole('button', { name: 'Race menu' }).click();
+  await page.getByRole('menuitem', { name: /Main menu/i }).click();
   await page.waitForSelector('main.main-menu', { timeout: 15000 });
   await context.close();
 } finally {

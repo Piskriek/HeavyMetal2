@@ -25,7 +25,7 @@ export class RangeRenderer {
   private readonly commands: DrawItem[] = [];
   private readonly visibleObstacles: Obstacle[] = [];
   private readonly visiblePickups: AirPickup[] = [];
-  private readonly capsules: CanvasImageSource[];
+  private readonly balls: CanvasImageSource[];
   private cssWidth = 1440;
   private cssHeight = HEIGHT;
   private scale = 1;
@@ -45,8 +45,8 @@ export class RangeRenderer {
     this.context = context;
     this.models = buildModelAtlas(assets);
     this.environment = new ArenaEnvironment(context, this.view, assets, course);
-    this.capsules = RACER_DEFINITIONS.map((racer) => {
-      if (assets.raceCapsules?.[racer.id]) return assets.raceCapsules[racer.id];
+    this.balls = RACER_DEFINITIONS.map((racer) => {
+      if (assets.raceBalls?.[racer.id]) return assets.raceBalls[racer.id];
       const image = document.createElement('canvas'); image.width = image.height = 160;
       const paint = image.getContext('2d')!;
       paint.drawImage(assets.ball.image, 5, 5, 150, 150);
@@ -429,7 +429,7 @@ export class RangeRenderer {
     if (this.frame.runTime < ball.immuneUntil) context.globalAlpha = 0.65;
     // Rotate the actual capsule, not just a highlight drawn over an upright sprite.
     context.rotate(ready ? 0 : ball.rotation);
-    context.drawImage(this.capsules[ball.id], -38 * p.scale, -38 * p.scale, 76 * p.scale, 76 * p.scale);
+    context.drawImage(this.balls[ball.id], -38 * p.scale, -38 * p.scale, 76 * p.scale, 76 * p.scale);
     context.restore();
     this.glow(p.x + 13 * p.scale, p.y - 19 * p.scale, 10 * p.scale, '#ffe1ac', 0.07);
     const bump = this.frame.runTime - ball.bumpAt;
@@ -560,7 +560,8 @@ export class RangeRenderer {
     context.beginPath(); context.arc(0, 0, 30, 0, TAU); context.stroke();
     context.save();
     context.beginPath(); context.arc(0, 0, 21, 0, TAU); context.clip();
-    context.drawImage(this.capsules[0], -21, -21, 42, 42);
+    // TICKET-04: the badge shows the rider's portrait; the ball rolls on its own.
+    context.drawImage(this.assets.playerBadge ?? this.balls[0], -21, -21, 42, 42);
     context.restore();
     context.restore();
     // Directional chevron on the rim, aimed at the real ball position.

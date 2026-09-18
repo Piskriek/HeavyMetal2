@@ -26,7 +26,13 @@ export interface Sprite {
   shadow?: HTMLCanvasElement;
 }
 
-export type GameAssets = Record<SpriteName, Sprite> & { raceCapsules?: HTMLCanvasElement[]; pickupSprites?: Record<PowerupKind, HTMLCanvasElement> };
+export type GameAssets = Record<SpriteName, Sprite> & {
+  /** TICKET-04: one baked standalone-ball sprite (ball + team rim) per roster slot. */
+  raceBalls?: HTMLCanvasElement[];
+  pickupSprites?: Record<PowerupKind, HTMLCanvasElement>;
+  /** The player's head-crop portrait, drawn in the off-screen pointer badge. */
+  playerBadge?: CanvasImageSource;
+};
 
 const readImage = (url: string): Promise<HTMLImageElement> =>
   new Promise((resolve, reject) => {

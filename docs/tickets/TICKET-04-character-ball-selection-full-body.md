@@ -3,7 +3,7 @@
 - **ID**: `TICKET-04`
 - **Component**: UI / 2D Art / Character Rendering
 - **Priority**: High (Phase 1 Art & Presentation)
-- **Status**: Ready for Implementation
+- **Status**: Implemented (arena/01a0b559-heavymetal2)
 - **Dependencies**: `TICKET-01`, `TICKET-02`
 
 ---
@@ -78,7 +78,21 @@ The user requires:
 ---
 
 ## 4. Acceptance Criteria
-- [ ] No goblin head peeking out of a tiny hole in the ball on the selection screen.
-- [ ] Rider displays as a full-body painted fantasy goblin standing beside their chosen ball.
-- [ ] Selecting different combinations updates the character and ball visuals instantly with smooth transitions.
-- [ ] High-detail ball textures showcase clean metallic/magical details without distortion.
+- [x] No goblin head peeking out of a tiny hole in the ball on the selection screen.
+- [x] Rider displays as a full-body painted fantasy goblin standing beside their chosen ball.
+- [x] Selecting different combinations updates the character and ball visuals instantly with smooth transitions.
+- [x] High-detail ball textures showcase clean metallic/magical details without distortion.
+
+---
+
+## Implementation Notes (arena/01a0b559-heavymetal2)
+
+- Implemented as documented in `docs/ART_PIPELINE.md` §3.4 and `docs/EXPANSION_PROGRESS.md`.
+- The `PreGame/src/assets/game/ball-*.webp` sources are 75x76 px and would blur when upscaled
+  to the showcase size, so the standalone balls were regenerated as high-detail 512x512 alpha
+  PNGs in the same visual language (riveted Rustbucket, coiled Springsteel, spiked
+  Siegebreaker). Bonus unlockable skins (lava/galaxy/red/green) are deferred: no unlock
+  system exists in this codebase yet.
+- Verified with `npm run check` (typecheck + 24 unit tests), `npm run build`, and the
+  headless-Chromium suites (`tests/art-check.mjs` 20/20, `ticket02-visual.mjs` 24/24,
+  `ticket07-visual.mjs`, `ui-frame-check.mjs`), with screenshots reviewed as images.

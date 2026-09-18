@@ -14,7 +14,8 @@ import AirSupplies, { AirSupplyGuide } from '../components/AirSupplies';
 import BlizzardGauge from '../components/ui/BlizzardGauge';
 import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
-import { prepareRaceCapsules, prepareRosterArt } from '../game/loadout-art';
+import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
+import { loadArtImage, riderCell } from '../game/art-assets';
 import { prepareWorldArt } from '../game/world-art';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
 import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../game/session';
@@ -184,11 +185,15 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     // The painted scenery props are decoded first: course art bakes them at build-course
     // time, so racing must not compose the background before the artwork is available.
     prepareWorldArt()
-      .then(() => Promise.all([loadAssets(), prepareRaceCapsules(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster)]))
-      .then(([loaded, raceCapsules, pickupSprites, art]) => {
+      .then(() => Promise.all([
+        loadAssets(), prepareRaceBalls(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster),
+        // The off-screen pointer badge shows the player's portrait, not the ball.
+        loadArtImage(riderCell(config.loadout.rider).pilot ?? riderCell(config.loadout.rider).image).catch(() => null),
+      ]))
+      .then(([loaded, raceBalls, pickupSprites, art, playerBadge]) => {
         if (!active) return;
         setArtFailures(art.failures);
-        setAssets({ ...loaded, raceCapsules, pickupSprites });
+        setAssets({ ...loaded, raceBalls, pickupSprites, playerBadge: playerBadge ?? undefined });
       }).catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
   }, [loadingAttempt, config]);

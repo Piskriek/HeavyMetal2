@@ -206,11 +206,11 @@ for (const [source, target, box] of [
   run([target, '-channel', 'RB', '-fx', 'a < 0.96 && r > 1.12*g && b > 1.12*g ? g : u', '+channel', target]);
   log('HM2 keyed sticker', target);
 }
-run(['-size', '700x160', 'xc:none',
-  // Deliberately upscale the predecessor banner; `>` would only shrink it and leave a gap.
-  '(', join(root, 'PreGame/src/assets/ui/logo.webp'), '-resize', '650x115', ')', '-gravity', 'west', '-geometry', '+0+0', '-composite',
-  // The badge overlaps the banner's right iron cap by 95px, reading as one tight lockup.
-  '(', out('art/ui/emblem-heavy-metal-2.png'), '-resize', '145x145', ')', '-gravity', 'east', '-geometry', '+0+0', '-composite',
+run(['-size', '664x145', 'xc:none',
+  // Scale predecessor banner to height 110px.
+  '(', join(root, 'PreGame/src/assets/ui/logo.webp'), '-resize', '621x110', ')', '-geometry', '+0+17', '-composite',
+  // The badge sits snugly against the 'GP' letters with no dead space, reading as one tight lockup.
+  '(', out('art/ui/emblem-heavy-metal-2.png'), '-resize', '135x135', ')', '-geometry', '+529+5', '-composite',
   out('art/ui/logo-heavymetal2.png')]);
 log('HM2 logo', out('art/ui/logo-heavymetal2.png'));
 run([src('menu-heavy-metal-2-src.jpg'), '-resize', '1920x1080^', '-gravity', 'center', '-extent', '1920x1080', '-quality', '88', out('art/ui/menu-heavy-metal-2.jpg')]);

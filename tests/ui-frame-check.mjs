@@ -24,16 +24,27 @@ const server = createServer(async (request, response) => {
 });
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 await mkdir(artifacts, { recursive: true });
-const libraryDir = await mkdtemp(join(tmpdir(), 'hm2-ui-libs-'));
-const archive = await readFile(join(root, 'node_modules/@sparticuz/chromium/bin/al2023.tar.br'));
-const extraction = spawnSync('tar', ['-xf', '-', '-C', libraryDir], { input: brotliDecompressSync(archive) });
-if (extraction.status !== 0) throw new Error('Could not extract browser libraries.');
-chromium.setGraphicsMode = false;
-const browser = await playwright.launch({
-  args: [...chromium.args.filter((arg) => !['--single-process', '--in-process-gpu'].includes(arg)), '--disable-gpu'],
-  executablePath: await chromium.executablePath(), headless: true,
-  env: { ...process.env, LD_LIBRARY_PATH: `${libraryDir}/lib:${libraryDir}/al2023/lib:${process.env.LD_LIBRARY_PATH ?? ''}`, FONTCONFIG_PATH: join(tmpdir(), 'fonts') },
-});
+let browser;
+let libraryDir = null;
+if (process.platform === 'win32') {
+  const chromePath = existsSync('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')
+    ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    : existsSync('C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe')
+    ? 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+    : undefined;
+  browser = await playwright.launch({ executablePath: chromePath, headless: true });
+} else {
+  libraryDir = await mkdtemp(join(tmpdir(), 'hm2-ui-libs-'));
+  const archive = await readFile(join(root, 'node_modules/@sparticuz/chromium/bin/al2023.tar.br'));
+  const extraction = spawnSync('tar', ['-xf', '-', '-C', libraryDir], { input: brotliDecompressSync(archive) });
+  if (extraction.status !== 0) throw new Error('Could not extract browser libraries.');
+  chromium.setGraphicsMode = false;
+  browser = await playwright.launch({
+    args: [...chromium.args.filter((arg) => !['--single-process', '--in-process-gpu'].includes(arg)), '--disable-gpu'],
+    executablePath: await chromium.executablePath(), headless: true,
+    env: { ...process.env, LD_LIBRARY_PATH: `${libraryDir}/lib:${libraryDir}/al2023/lib:${process.env.LD_LIBRARY_PATH ?? ''}`, FONTCONFIG_PATH: join(tmpdir(), 'fonts') },
+  });
+}
 
 let failures = 0;
 const report = (ok, message, detail = '') => { console.log(`${ok ? 'ok' : 'not ok'} - ${message}${detail ? ` :: ${detail}` : ''}`); if (!ok) failures++; };
@@ -69,6 +80,8 @@ try {
     await context.close();
   }
 } finally {
-  await browser.close(); server.close(); await rm(libraryDir, { recursive: true, force: true });
+  if (browser) await browser.close();
+  server.close();
+  if (libraryDir) await rm(libraryDir, { recursive: true, force: true });
 }
 if (failures) process.exit(1);

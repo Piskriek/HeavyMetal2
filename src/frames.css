@@ -31,23 +31,55 @@
     inset 0 0 42px #000b,
     0 28px 110px #000c;
 }
+.modal.fantasy-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 64px);
+  overflow: visible !important;
+  margin: auto;
+}
 .modal.fantasy-dialog::before,
 .round-result::before {
   content: ''; position: absolute; z-index: 4; pointer-events: none;
   inset: 8px; border: 1px solid #e0be7570;
   outline: 1px solid #392715; outline-offset: 3px;
 }
-.ornate-corners { position: absolute; z-index: 8; inset: 0; pointer-events: none; overflow: hidden; }
+.ornate-corners { position: absolute; z-index: 8; inset: 0; pointer-events: none; overflow: visible !important; }
 .ornate-corner { position: absolute; display: block; width: 56px; height: 52px; background: url('/art/ui/ornament-endcap.png') center / contain no-repeat; filter: drop-shadow(0 2px 2px #000c); }
 .corner-tl { left: -13px; top: -12px; transform: rotate(-45deg); }
 .corner-tr { right: -13px; top: -12px; transform: scaleX(-1) rotate(-45deg); }
 .corner-bl { left: -13px; bottom: -12px; transform: scaleY(-1) rotate(-45deg); }
 .corner-br { right: -13px; bottom: -12px; transform: scale(-1) rotate(-45deg); }
 
-.fantasy-dialog .modal-heading { position: relative; align-items: center; padding-left: 34px; }
+.fantasy-dialog .modal-heading { position: relative; align-items: center; padding-left: 34px; flex-shrink: 0; }
 .fantasy-dialog .modal-heading > .brand-emblem { width: 51px; height: 51px; margin-right: -8px; }
 .modal-title { min-width: 0; flex: 1; }
-.fantasy-dialog .modal-content { position: relative; z-index: 2; }
+.fantasy-dialog .modal-content {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #684d26 #0d151180;
+}
+.fantasy-dialog .modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+.fantasy-dialog .modal-content::-webkit-scrollbar-track {
+  background: #0d151180;
+  border-radius: 4px;
+}
+.fantasy-dialog .modal-content::-webkit-scrollbar-thumb {
+  background: #684d26;
+  border-radius: 4px;
+  border: 1px solid #a8813e;
+}
+.fantasy-dialog .modal-content::-webkit-scrollbar-thumb:hover {
+  background: #9a7433;
+}
 
 /* Menu button: repeating steel/gold rails and fixed end-caps. No border-image. */
 .forged-menu-button {
@@ -144,6 +176,7 @@
   .fantasy-dialog .modal-heading > .brand-emblem { width: 42px; height: 42px; }
   .settings-page { padding-inline: 13px; }
   .round-result { padding: 28px 22px 24px; }
+  .modal.fantasy-dialog { max-height: calc(100dvh - 24px); }
 }
 
 /* Main menu painting is covered/cropped by the viewport, never geometrically squashed. */

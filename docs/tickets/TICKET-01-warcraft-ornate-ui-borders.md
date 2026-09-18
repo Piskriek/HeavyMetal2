@@ -45,6 +45,22 @@ The user requires:
 3. `src/components/SettingsPanel.tsx`: Forged iron/brass framed settings drawer with ornate tab bar.
 4. `src/components/RoundResult.tsx`: Grand victory/defeat scoreboard frame with ornamental crest.
 
+### 2.4 HeavyMetalGP2 Brand Logo & Iconography (PreGame Throwback)
+- **Predecessor Reference**:
+  - In `PreGame/src/assets/ui/logo.webp` and `PreGame/src/components/Brand.tsx`, the original *Heavy Metal GP* used a bold, hand-painted metallic fantasy logo with heavy iron plates, brass rivets, and beveling.
+- **HeavyMetalGP2 Evolution**:
+  - Replace the temporary "GOBLIN RALLY" text wordmark and SVG `GoblinMark` with the official **HeavyMetalGP2** painted logo.
+  - Logo Design Requirements:
+    - Bold, chunky fantasy lettering in weathered dark iron and burnished gold/brass.
+    - A prominent, stylized numeral **"2"** (or Roman numeral **"II"**) with glowing forge/spark accents.
+    - Rendered as an alpha-transparent PNG (`public/art/ui/logo-heavymetal2.png`) with clean contours (no matte fringing or distortion).
+- **Component & Layout Integration**:
+  - Create `src/components/Brand.tsx` (re-engineered from `PreGame/src/components/Brand.tsx`) supporting `variant="hero" | "compact" | "emblem"`.
+  - **Main Menu (`MainMenu.tsx`)**: Hero logo centered prominently above menu options.
+  - **In-Race Topbar (`RaceScreen.tsx`)**: Compact 34px-height logo replacing `brand-wordmark`.
+  - **Modal Headers & Loading Screen**: Branded emblem banner.
+  - Update `index.html` title to **"Heavy Metal GP 2"** and update favicon.
+
 ---
 
 ## 3. Implementation Plan
@@ -53,8 +69,10 @@ The user requires:
    - Implement either 9-slice CSS (`border-image`) or a `<BlizzardFrame variant="brass|iron|gold">` React wrapper.
 2. **Asset Pipeline Integration**:
    - Add slice coordinates for UI frames to `scripts/build-art.mjs` (or extract individual corner/edge PNGs into `public/art/ui/`).
+   - Integrate `public/art/ui/logo-heavymetal2.png` into asset manifest.
    - Ensure `#00FF00` key transparency filter handles anti-aliased edge despill.
 3. **Component Refactoring**:
+   - Create `src/components/Brand.tsx` and replace `GoblinMark` / `GOBLIN RALLY` in `MainMenu.tsx`, `RaceScreen.tsx`, and `Modal.tsx`.
    - Replace flat border CSS in `Modal.tsx`, `NewGameSetup.tsx`, and `SettingsPanel.tsx` with the new Blizzard frame styling.
 
 ---
@@ -62,5 +80,8 @@ The user requires:
 ## 4. Acceptance Criteria
 - [ ] No border texture stretching or distortion at any modal aspect ratio (tested from 800x600 to 4K).
 - [ ] Modals display ornate metallic/carved fantasy borders with distinctive corner brackets and embossed headers.
-- [ ] Transparency around ornate corners is clean with zero green/magenta matte fringing.
+- [ ] "GOBLIN RALLY" text is replaced everywhere by the new **HeavyMetalGP2** logo, styled after the original `PreGame/src/assets/ui/logo.webp`.
+- [ ] The HeavyMetalGP2 logo scales cleanly in both hero mode (Main Menu) and compact mode (Race HUD) without pixelation or stretching.
+- [ ] Transparency around ornate corners and logo is clean with zero green/magenta matte fringing.
 - [ ] Keyboard navigation and accessibility focus rings remain distinct and visible around ornate interactive elements.
+

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Eye, Monitor, RotateCcw, Volume2 } from 'lucide-react';
+import { Check, Eye, Keyboard, Monitor, RotateCcw, Volume2 } from 'lucide-react';
 import Modal from './Modal';
+import ControlsSettings from './ControlsSettings';
 import { GameAudio } from '../game/audio';
 import { defaultOptions } from '../game/preferences';
 import type { GameOptions } from '../game/types';
@@ -12,7 +13,7 @@ interface SettingsPanelProps {
 }
 
 export default function SettingsPanel({ options, onChange, onClose }: SettingsPanelProps) {
-  const [tab, setTab] = useState<'display' | 'audio' | 'comfort'>('display');
+  const [tab, setTab] = useState<'display' | 'audio' | 'comfort' | 'controls'>('display');
   const [message, setMessage] = useState('');
   const testAudio = useRef<GameAudio | null>(null);
   useEffect(() => () => testAudio.current?.destroy(), []);
@@ -29,12 +30,12 @@ export default function SettingsPanel({ options, onChange, onClose }: SettingsPa
       <div className="fantasy-tabs" role="tablist" aria-label="Settings categories" onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        const tabs = ['display', 'audio', 'comfort'] as const;
+        const tabs = ['display', 'audio', 'comfort', 'controls'] as const;
         const next = (tabs.indexOf(tab) + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
         setTab(tabs[next]);
         event.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
       }}>
-        {([{ id: 'display', label: 'Display', icon: Monitor }, { id: 'audio', label: 'Sound', icon: Volume2 }, { id: 'comfort', label: 'Accessibility', icon: Eye }] as const).map(({ id, label, icon: Icon }) =>
+        {([{ id: 'display', label: 'Display', icon: Monitor }, { id: 'audio', label: 'Sound', icon: Volume2 }, { id: 'comfort', label: 'Accessibility', icon: Eye }, { id: 'controls', label: 'Controls', icon: Keyboard }] as const).map(({ id, label, icon: Icon }) =>
           <button key={id} role="tab" aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} className={tab === id ? 'selected' : ''} onClick={() => setTab(id)}><Icon size={16} />{label}</button>)}
       </div>
       <div className="settings-page" role="tabpanel">
@@ -58,6 +59,7 @@ export default function SettingsPanel({ options, onChange, onClose }: SettingsPa
           {toggle('aimAssist', 'Show launch trajectory', 'Preview the arc before releasing your capsule.')}
           <p className="settings-footnote">Your system's reduced-motion preference is also respected. All menus support keyboard navigation.</p>
         </>}
+        {tab === 'controls' && <ControlsSettings />}
       </div>
       <div className="fantasy-dialog-actions">
         <button className="fantasy-link" onClick={() => { const defaults = defaultOptions(); onChange({ ...options, sound: defaults.sound, masterVolume: defaults.masterVolume, graphics: defaults.graphics, screenShake: defaults.screenShake, menuMotion: defaults.menuMotion, reducedMotion: defaults.reducedMotion, highContrast: defaults.highContrast, parallax: defaults.parallax, downrange: defaults.downrange, aimAssist: defaults.aimAssist }); setMessage('Display, sound, and accessibility defaults restored. Race records were kept.'); }}><RotateCcw size={14} />Restore defaults</button>

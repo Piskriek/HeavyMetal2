@@ -3,7 +3,7 @@
 - **ID**: `TICKET-05`
 - **Component**: UI / Environmental Art / Animation
 - **Priority**: Medium (Phase 2 Presentation)
-- **Status**: Ready for Implementation
+- **Status**: Merged ([PR #17](https://github.com/Piskriek/HeavyMetal2/pull/17))
 - **Dependencies**: `TICKET-01`, `TICKET-04`
 
 ---

@@ -13,7 +13,8 @@ Welcome to the comprehensive ticket tracker for **Heavy Metal GP 2 (Goblin Rally
 | [`TICKET-03`](file:///c:/MarbleGp/docs/tickets/TICKET-03-custom-controls-loading-screen.md) | [#5](https://github.com/Piskriek/HeavyMetal2/issues/5) | Customizable Controls & Loading Screen Controls Visualizer | **P1** | Settings / Input / Loading | `TICKET-01` | **Merged** ([PR #12](https://github.com/Piskriek/HeavyMetal2/pull/12)) |
 | [`TICKET-04`](file:///c:/MarbleGp/docs/tickets/TICKET-04-character-ball-selection-full-body.md) | [#6](https://github.com/Piskriek/HeavyMetal2/issues/6) | Character & Ball Selection Redesign (Full-Body Goblin + Ball Renders) | **P1** | Character Art / 2D Presentation | `TICKET-01`, `TICKET-02` | **Merged** ([PR #16](https://github.com/Piskriek/HeavyMetal2/pull/16)) |
 | [`TICKET-05`](file:///c:/MarbleGp/docs/tickets/TICKET-05-menu-animated-backgrounds.md) | [#7](https://github.com/Piskriek/HeavyMetal2/issues/7) | Menu Overhaul with Animated Painted Fantasy Backdrops | **P2** | Environmental Art / Menus | `TICKET-01`, `TICKET-04` | **Merged** ([PR #17](https://github.com/Piskriek/HeavyMetal2/pull/17)) |
-| [`TICKET-06`](file:///c:/MarbleGp/docs/tickets/TICKET-06-track-backgrounds-lighting-preloading.md) | [#8](https://github.com/Piskriek/HeavyMetal2/issues/8) | Epic Blizzard Track Backdrops, Thematic Lighting & Asset Preloading | **P1** | Environment / Asset Pipeline | `TICKET-05` | Ready |
+| [`TICKET-06`](file:///c:/MarbleGp/docs/tickets/TICKET-06-track-backgrounds-lighting-preloading.md) | [#8](https://github.com/Piskriek/HeavyMetal2/issues/8) | Epic Blizzard Track Backdrops, Thematic Lighting & Asset Preloading | **P1** | Environment / Asset Pipeline | `TICKET-05` | **In Progress** |
+| [`TICKET-06.2`](file:///c:/MarbleGp/docs/tickets/TICKET-06.2-midground-environmental-depth-layers.md) | — | Midground Environmental Depth Layers (Treetops, Props & Crowd Separation) | **P1** | Environment / Multi-Plane Parallax | `TICKET-06` | **Detailed & Ready** (Concept Art Attached) |
 | [`TICKET-07`](file:///c:/MarbleGp/docs/tickets/TICKET-07-camera-pointer-ground-decal.md) | [#9](https://github.com/Piskriek/HeavyMetal2/issues/9) | Dynamic Ball Camera Tracking, Off-Screen Indicator & Airborne Lane Ground Decal | **P1** | Camera / Physics / HUD Feedback | None | **Merged** ([PR #13](https://github.com/Piskriek/HeavyMetal2/pull/13)) |
 | [`TICKET-08`](file:///c:/MarbleGp/docs/tickets/TICKET-08-track-section2-vertical-pinball-drop.md) | [#10](https://github.com/Piskriek/HeavyMetal2/issues/10) | Multi-Section Track Expansion Part 1: Waterfall Cliff Zigzag, Protruding Rocks & Spectator Scaffolding | **P1** | Track Design / 3D Layout / Physics | `TICKET-06`, `TICKET-07` | **Detailed & Ready** (Concept Art Attached) |
 | [`TICKET-09`](file:///c:/MarbleGp/docs/tickets/TICKET-09-track-section3-mine-tunnels-waterfall-finish.md) | [#11](https://github.com/Piskriek/HeavyMetal2/issues/11) | Multi-Section Track Expansion Part 2: Subterranean Roller Coaster Mine, Spaghetti Rails, Lava Loops & Stadium Finale | **P1** | Track Design / Subterranean / Climax | `TICKET-08` | **Detailed & Ready** (Concept Art Attached) |
@@ -28,10 +29,11 @@ Welcome to the comprehensive ticket tracker for **Heavy Metal GP 2 (Goblin Rally
 3. **`TICKET-03`**: Controls customization tab & loading screen visualizer. (Merged in PR #12)
 4. **`TICKET-04`**: Full-body hero goblin renders standing beside standalone glossy balls. (Merged in PR #16)
 
-### Phase 2: Atmosphere, Camera & Quality of Life (Tickets 05, 06, 07)
+### Phase 2: Atmosphere, Camera & Environmental Depth (Tickets 05, 06, 06.2, 07)
 5. **`TICKET-05`**: High-res painted menu backgrounds with subtle embers/smoke/lantern flicker. (Merged in PR #17)
-6. **Implement `TICKET-06`**: Composite multi-layer painted track skyboxes, configure per-course lighting, and build async asset preloader.
-7. **`TICKET-07`**: Dynamic ball camera tracking, off-screen indicator arrows, and airborne lane ground decal. (Merged in PR #13)
+6. **`TICKET-06`**: Composite multi-layer painted track skyboxes, configure per-course lighting, and build async asset preloader. (In Progress)
+7. **`TICKET-06.2`**: Populate the midground between crowd and backdrop with map-appropriate PNG treetops, chimneys, windmills, and props. (Detailed & Ready)
+8. **`TICKET-07`**: Dynamic ball camera tracking, off-screen indicator arrows, and airborne lane ground decal. (Merged in PR #13)
 
 ### Phase 3: The Grand Track Expansion (Tickets 08, 09)
 8. **Implement `TICKET-08`**: Build Section 2 (the Sheer Cliff Waterfall Zigzag with protruding rock outcrops, goblin spectator scaffolding, banked switchbacks, and Scrap Fall Crest launch).

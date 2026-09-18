@@ -127,6 +127,38 @@ Each grand circuit expands to a 3-Stage Odyssey (36,000m total):
 4. **Air Bounce Shortcuts**:
    - Using the <kbd>SPACE</kbd> Air Bounce near a cliff switchback allows skilled players to hop over the dividing rock ridge to skip half the hairpin turn!
 
+### 3.4 The 5-Tier Environmental Depth Stack for Section 2 (Waterfall Cliff)
+
+To ensure the world feels expansive, believable, and cohesive, every asset in Section 2 must be assigned to and rendered within its designated depth plane:
+
+```
+[CAMERA]
+   │
+   ├── 0. FOREGROUND (Parallax: 1.20x - 1.35x)
+   │      Water spray mist droplets on screen, overhanging moss clumps, jutting rock stalactites passing close-up
+   │
+   ├── 1. ACTIVE TRACK & RACERS (Parallax: 1.00x - Primary Game Plane)
+   │      Banked wooden switchbacks, wet mossy slate, protruding rock bumpers, spring launchers, fire rings
+   │
+   ├── 2. RACE WALL, BARRIERS & SPECTATOR SCAFFOLDING (Parallax: 0.94x - 0.98x)
+   │      Timber crash barriers, multi-tiered cliff scaffolding, cheering goblins with banners, horns, and torches
+   │
+   ├── 3. MIDGROUND: BEHIND RACE WALL & SCAFFOLDING (Parallax: 0.38x - 0.48x)
+   │      Cliffside pine/fir trees clinging to rock cracks, secondary water chutes, wooden aqueducts, rock buttresses
+   │
+   ├── 4. DISTANT CANYON LANDSCAPE (Parallax: 0.15x - 0.22x)
+   │      Opposite canyon cliff wall, gargantuan primary waterfall plunge, deep mist chasm floor
+   │
+   └── 5. SKYBOX & HORIZON (Parallax: 0.00x - 0.05x)
+          Sunbeams piercing storm clouds, misty alpine peaks, high-altitude floating zeppelins
+```
+
+#### How Section 2 Layers Relate & Harmonize:
+- **Foreground to Track**: Water spray and foreground rock edges frame the player's view, heightening speed and vertigo.
+- **Track to Race Wall**: Banked wooden berms transition directly into timber crash railings and spectator platforms, ensuring players clearly perceive track boundaries.
+- **Race Wall to Midground**: Behind the cheering crowds, the cliff face is richly populated with hardy alpine conifers, rocky spires, and wooden aqueducts, avoiding any blank wallpaper look.
+- **Midground to Far Canyon**: As the terrain drops away, the midground trees and water chutes fade softly into the deep canyon mist and towering waterfall background.
+
 ---
 
 ## 4. Implementation Steps & Work Packages

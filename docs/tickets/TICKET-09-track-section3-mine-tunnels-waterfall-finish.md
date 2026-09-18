@@ -135,6 +135,38 @@ The user requires:
    - Warm flickering point lights positioned at each lantern post ($r = 180$, color `#ffaa33`).
    - Searing orange ambient uplight from molten lava pools ($y > 450$).
 
+### 3.4 The 5-Tier Environmental Depth Stack for Section 3 (Subterranean Mine)
+
+In the subterranean mine, atmospheric depth transforms from open-air skies to an enclosed, multi-tier industrial cavern:
+
+```
+[CAMERA]
+   │
+   ├── 0. FOREGROUND (Parallax: 1.25x - 1.40x)
+   │      Hanging iron chains, ceiling stalactites, swinging ore buckets crossing close-up, heat haze waves
+   │
+   ├── 1. ACTIVE TRACK & RACERS (Parallax: 1.00x - Primary Game Plane)
+   │      Active iron minecart rails, wooden railway ties, 360° lava loop, flaming boost rings, TNT crates
+   │
+   ├── 2. RACE WALL, BARRIERS & MINER SPECTATORS (Parallax: 0.92x - 0.98x)
+   │      Timber track guard curbs, hanging iron cages packed with cheering goblin miners, lantern posts
+   │
+   ├── 3. MIDGROUND: BEHIND RACE WALL (Parallax: 0.35x - 0.48x)
+   │      Spaghetti web of secondary trestles, criss-crossing minecart tracks, basalt pillars, molten slag chutes
+   │
+   ├── 4. DISTANT CAVERN LANDSCAPE (Parallax: 0.12x - 0.20x)
+   │      Distant volcanic rock domes, glowing subterranean magma ocean, steam geysers, smelting chimneys
+   │
+   └── 5. CAVERN HORIZON & SMOKE DOME (Parallax: 0.00x - 0.05x)
+          Dark cavern vault ceiling, drifting brimstone smoke, distant volcanic glow gradients
+```
+
+#### How Section 3 Layers Relate & Harmonize:
+- **Foreground to Track**: Swinging ore buckets and stalactites frame the camera, creating claustrophobic speed and underground peril.
+- **Track to Race Wall**: The active rail line is bounded by timber curbs and miner platforms, giving clear visual cues where rails end and drops begin.
+- **Race Wall to Midground**: Directly behind the rails, the cavern is packed with an intricate spaghetti web of secondary abandoned trestles, molten waterfalls, and basalt columns, completely eliminating empty flat cave walls.
+- **Midground to Cavern Dome**: The multi-tiered trestles fade naturally into the warm glowing orange fog of the distant magma sea.
+
 ---
 
 ## 4. Implementation Steps & Work Packages

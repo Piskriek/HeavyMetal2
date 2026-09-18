@@ -14,6 +14,7 @@ import { readSave, writeSave, type SaveNotice } from './game/save';
 import './menu.css';
 import './setup.css';
 import './frames.css';
+import './hud.css';
 
 type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | null;
 

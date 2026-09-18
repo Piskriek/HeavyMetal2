@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import {
-  ArrowDownToLine, ArrowRight, ArrowUpFromLine, ArrowUpRight, Check, ChevronDown,
-  CircleHelp, Crosshair, Flag, FlagTriangleRight, Gauge, Hammer, Image as ImageIcon,
+  ArrowDownToLine, ArrowRight, ArrowUpFromLine, ArrowUpRight, Check,
+  CircleHelp, Crosshair, Flag, Hammer, Home, Image as ImageIcon,
   Maximize2, Menu, Minimize2, MousePointer2, Pause, Play, RotateCcw, Settings2,
   ShieldCheck, Sparkles, Trophy, Volume2, VolumeX, X, Zap,
 } from 'lucide-react';
@@ -11,7 +11,9 @@ import ArtGallery from '../components/ArtGallery';
 import Brand from '../components/Brand';
 import RaceControls from '../components/RaceControls';
 import RoundResult from '../components/RoundResult';
-import { AirSupplyGuide } from '../components/AirSupplies';
+import AirSupplies, { AirSupplyGuide } from '../components/AirSupplies';
+import BlizzardGauge from '../components/ui/BlizzardGauge';
+import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceCapsules, prepareRosterArt } from '../game/loadout-art';
 import { prepareWorldArt } from '../game/world-art';
@@ -20,7 +22,6 @@ import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../g
 import { TRACK_DISTANCE } from '../game/scene';
 import { loadAssets, type GameAssets, type SpriteName } from '../game/assets';
 import { preparePowerupSprites } from '../game/powerups';
-import { TRACKS } from '../game/courses';
 import { GameEngine } from '../game/engine';
 import { COURSES, INITIAL_SNAPSHOT, type GameOptions, type RunRecord } from '../game/types';
 import RaceLoadingScreen from '../components/RaceLoadingScreen';
@@ -97,6 +98,9 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const [bindings, setBindings] = useState<KeyBindings>(() => loadBindings());
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingDismissed, setLoadingDismissed] = useState(() => session.results.some((record) => record.round === config.round));
+  // TICKET-02: the consolidated gear menu and its auto-hide-while-racing behavior.
+  const [gearOpen, setGearOpen] = useState(false);
+  const [hudIdle, setHudIdle] = useState(false);
   const bindingsRef = useRef<KeyBindings>(bindings);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -148,6 +152,40 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const playing = snapshot.status === 'flying';
   const ready = snapshot.status === 'ready';
   const paused = snapshot.status === 'paused';
+  // The gear button is the single always-available race menu; it fades away
+  // during active play and returns on any pointer or key activity.
+  useEffect(() => {
+    if (!playing) { setHudIdle(false); return; }
+    let timer = window.setTimeout(() => setHudIdle(true), 2400);
+    const wake = () => {
+      setHudIdle(false);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setHudIdle(true), 2400);
+    };
+    window.addEventListener('pointermove', wake, { passive: true });
+    window.addEventListener('pointerdown', wake, { passive: true });
+    window.addEventListener('keydown', wake);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointermove', wake);
+      window.removeEventListener('pointerdown', wake);
+      window.removeEventListener('keydown', wake);
+    };
+  }, [playing]);
+  useEffect(() => { if (!playing && !paused) setGearOpen(false); }, [playing, paused]);
+  const gearHidden = playing && hudIdle && !gearOpen;
+  const immersed = (playing || paused) && !modal && !mobileMenu;
+  const playerDistance = snapshot.racers.find((racer) => racer.id === 0)?.distance ?? snapshot.distance;
+  const trackPct = (distance: number) => Math.min(100, Math.max(0, (distance / TRACK_DISTANCE) * 100));
+  const toggleGear = () => {
+    setGearOpen((open) => {
+      const next = !open;
+      // Browsing the menu never costs the race: pause automatically mid-flight.
+      if (next && engineRef.current?.status === 'flying') engineRef.current.togglePause();
+      return next;
+    });
+  };
+  const gearAction = (action: () => void) => () => { setGearOpen(false); action(); };
 
   useEffect(() => {
     let active = true;
@@ -293,6 +331,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       const target = event.target as HTMLElement;
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
       if (['BUTTON', 'A'].includes(target.tagName) && ['Space', 'Enter'].includes(event.code)) return;
+      // While the consolidated gear menu is open it owns Escape and the keys stay inert.
+      if (gearOpen) { if (event.code === 'Escape') { event.preventDefault(); setGearOpen(false); } return; }
       // Loading cover: any key dismisses once ready, without triggering game actions
       if (!loadingDismissed && assets && !resumeOnly && snapshot.status === 'ready') {
         event.preventDefault();
@@ -331,7 +371,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [retry, theater, toggleFullscreen, loadingDismissed, assets, resumeOnly, snapshot.status]);
+  }, [retry, theater, toggleFullscreen, loadingDismissed, assets, resumeOnly, snapshot.status, gearOpen]);
 
   const mainAction = () => {
     if (resumeOnly || snapshot.status === 'finished') { onContinue(); return; }
@@ -356,7 +396,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   return (
     <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
-      <div className="app race-app">
+      <div className={`app race-app ${immersed ? 'race-immersed' : ''}`}>
         <header className="site-header">
           <div className="header-inner">
             <button className="brand" aria-label="Return to main menu" onClick={onMainMenu}>
@@ -379,7 +419,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         <main className="main-content">
           {storageWarning && <p className="race-storage-warning" role="status"><ShieldCheck size={15} />{storageWarning}</p>}
           {artFailures.length > 0 && <p className="race-storage-warning" role="status"><ImageIcon size={15} />{artFailures.length} painted sprite{artFailures.length === 1 ? '' : 's'} could not be loaded, so a stand-in is shown. The race is unaffected.</p>}
-          <div className="event-race-banner"><span>{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${CUP_NAME.toUpperCase()} / ROUND ${config.round + 1} OF ${config.totalRounds}` : 'QUICK RACE'}<small className="race-biome">{TRACKS[config.course].region}</small></span><span>{riderById(config.loadout.rider).name} + {capsuleById(config.loadout.capsule).name}<small>{config.difficulty.toUpperCase()}</small></span></div>
           <motion.section className="game-intro" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} aria-labelledby="game-title">
             <div className="intro-title"><div className="eyebrow intro-eyebrow"><span className="live-dot" /> GOBLIN ENGINEERING. ZERO OVERSIGHT.</div><h1 id="game-title">GOBLIN <span>RALLY</span><span className="title-period">.</span></h1><p>Big balls. Bad ideas. A very questionable use of physics.</p></div>
             <div className="intro-aside"><div className="safety-stamp"><ShieldCheck size={28} strokeWidth={1.2} /><span>SAFETY THIRD.<br /><strong>FUN FIRST.</strong></span></div><span className="build-label">EST. 2026 <span>/</span> GOBLIN APPROVED</span></div>
@@ -388,21 +427,48 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
             <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
               <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Four-lane Heavy Metal GP 2. Drag your orange ball to launch all four goblins. A and D change lanes and bump rivals. W to hop, Space to air bounce, Shift to boost, P to pause, R to restart.">Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
-              <div className="game-hud">
-                <button className="track-selector" onClick={showGarage} title="Choose a circuit"><span className="track-eyebrow"><FlagTriangleRight size={13} /> 4 GOBLINS / 15 KM DOWNHILL <span className="circuit-number">{course.number}</span></span><span className="track-name">{course.name}<ChevronDown size={16} /></span><span className="track-sector">{snapshot.sector}</span></button>
-                <div className="telemetry" aria-label="Race statistics">
-                  <div className="distance-stat"><span className="hud-label">DISTANCE</span><div><strong>{snapshot.distance ? number(snapshot.distance) : '000'}</strong><span>m</span></div></div>
-                  <div className="speed-stat"><span className="hud-label"><Gauge size={12} /> SPEED</span><div><strong>{snapshot.speed}</strong><span>km/h</span></div></div>
-                  <div className="position-stat"><span className="hud-label"><Trophy size={11} /> POSITION</span><div><strong>{snapshot.position}</strong><span>/ 4</span></div></div>
+              <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
+                <div className={`hud-gear ${gearHidden ? 'gear-hidden' : ''}`}>
+                  <button className="gear-button" onClick={toggleGear} aria-haspopup="menu" aria-expanded={gearOpen} aria-label="Race menu" title="Race menu"><Settings2 size={17} /></button>
+                  <AnimatePresence>
+                    {gearOpen && <motion.div key="gear-scrim" className="gear-scrim" onClick={() => setGearOpen(false)} aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />}
+                    {gearOpen && (
+                      <motion.div key="gear-menu" className="gear-menu" role="menu" aria-label="Race menu" initial={{ opacity: 0, y: -7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: 0.16 }}>
+                        <span className="gear-menu-event">{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${CUP_NAME.toUpperCase()} · R${config.round + 1}/${config.totalRounds}` : 'QUICK RACE'}<small>{course.name} · {config.difficulty}</small></span>
+                        {(playing || paused) && <button role="menuitem" onClick={gearAction(togglePause)}>{paused ? <Play size={15} /> : <Pause size={15} />}{paused ? 'Resume race' : 'Pause race'}</button>}
+                        <button role="menuitem" onClick={gearAction(() => retry())} disabled={!assets}><RotateCcw size={15} />Restart round</button>
+                        <button role="menuitem" onClick={gearAction(toggleSound)}><Volume2 size={15} />{options.sound ? 'Sound: on' : 'Sound: off'}</button>
+                        <button role="menuitem" onClick={gearAction(showGarage)}><Hammer size={15} />The workshop</button>
+                        <button role="menuitem" onClick={gearAction(() => openModal('records'))}><Trophy size={15} />Hall of chaos</button>
+                        <button role="menuitem" onClick={gearAction(() => openModal('help'))}><CircleHelp size={15} />How to play</button>
+                        <button role="menuitem" onClick={gearAction(onSettings)}><Settings2 size={15} />Settings</button>
+                        <button role="menuitem" className="danger" onClick={gearAction(onMainMenu)}><Home size={15} />Main menu</button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-                <div className="stage-actions"><button className="stage-button" onClick={togglePause} disabled={!playing && !paused} aria-label={paused ? 'Resume game' : 'Pause game'} title="Pause / resume (P)">{paused ? <Play size={16} /> : <Pause size={16} />}</button><button className="stage-button" onClick={() => retry()} disabled={!assets} aria-label="Restart run" title="Restart (R)"><RotateCcw size={16} /></button><button className="stage-button" onClick={() => void toggleFullscreen()} aria-label={fullscreen || theater ? 'Exit fullscreen' : 'Enter fullscreen'} title="Fullscreen (F)">{fullscreen || theater ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div>
+                <div className="hud-right">
+                  <div className="stage-actions"><button className="stage-button" onClick={togglePause} disabled={!playing && !paused} aria-label={paused ? 'Resume game' : 'Pause game'} title="Pause / resume (P)">{paused ? <Play size={16} /> : <Pause size={16} />}</button><button className="stage-button" onClick={() => retry()} disabled={!assets} aria-label="Restart run" title="Restart (R)"><RotateCcw size={16} /></button><button className="stage-button" onClick={() => void toggleFullscreen()} aria-label={fullscreen || theater ? 'Exit fullscreen' : 'Enter fullscreen'} title="Fullscreen (F)">{fullscreen || theater ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button></div>
+                  <div className="hud-telemetry">
+                    <PositionMedallion position={snapshot.position} />
+                    <BlizzardGauge variant="dial" value={snapshot.speed} max={360} unit="km/h" label="SPEED" title={`Speed: ${snapshot.speed} km/h`} />
+                  </div>
+                </div>
               </div>
               <AnimatePresence>
                 {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Flag size={16} /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
-                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><span>YOUR BALL. THEIR PROBLEM.</span><p>Pull back the orange goblin. Launch the whole grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
+                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
                 {snapshot.notice && playing && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
-              <div className="race-progress" aria-label={`Race progress: ${Math.round(snapshot.progress * 100)} percent`}><span><Flag size={11} /> SUMMIT</span><div className="progress-track"><div className="progress-fill" style={{ width: `${snapshot.progress * 100}%` }} /><span className="progress-runner" style={{ left: `${snapshot.progress * 100}%` }} /></div><span className="finish-label">{number(TRACK_DISTANCE)} m <span className="checkered-flag" /></span></div>
+              <AirSupplies snapshot={snapshot} />
+              <div className="mini-trackbar" aria-label={`Race progress: ${Math.round(trackPct(playerDistance))} percent`}>
+                <span className="trackbar-sector">{snapshot.sector}</span>
+                <div className="trackbar-rail">
+                  <div className="trackbar-fill" style={{ width: `${trackPct(playerDistance)}%` }} />
+                  {snapshot.racers.map((racer) => <span key={racer.id} className={`trackbar-pip ${racer.id === 0 ? 'player' : ''}`} style={{ left: `${trackPct(racer.distance)}%`, backgroundColor: racer.color }} title={racer.id === 0 ? 'You' : racer.name} aria-hidden="true" />)}
+                </div>
+                <span className="trackbar-remaining">{number(Math.max(0, TRACK_DISTANCE - playerDistance))} m <span className="checkered-flag" /></span>
+              </div>
               <AnimatePresence>
                 {loadError && !assets && !resumeOnly && (
                   <motion.div className="game-loading" exit={{ opacity: 0 }}>

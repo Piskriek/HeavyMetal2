@@ -1,0 +1,175 @@
+/* TICKET-02: visual gauges, drill-down drawers, and the decluttered race HUD.
+   Everything here favors glyphs, meters, and medallions over paragraph text. */
+
+/* ============ Blizzard gauges ============ */
+.blizzard-gauge { position: relative; display: flex; flex-direction: column; align-items: center; gap: 7px; margin: 0; }
+.blizzard-gauge > svg { display: block; overflow: visible; filter: drop-shadow(0 3px 5px #0007); }
+.gauge-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.gauge-bezel { fill: none; stroke: #6d5327; stroke-width: 2.6; }
+.gauge-face { stroke: #caa55c55; stroke-width: 1; }
+.gauge-track { fill: none; stroke: #060d09; stroke-width: 7; stroke-linecap: round; opacity: .9; }
+.gauge-value-arc { fill: none; stroke-width: 7; stroke-linecap: round; filter: drop-shadow(0 0 4px #f2a34166); transition: stroke-dashoffset .55s cubic-bezier(.22, .9, .3, 1); }
+.gauge-tick { stroke: #4e5c3d; stroke-width: 1.4; }
+.gauge-tick.lit { stroke: #d9b26e; }
+.gauge-needle { transform-origin: 60px 60px; transform-box: view-box; transition: transform .55s cubic-bezier(.22, .9, .3, 1); }
+.gauge-needle-glint { stroke: #ffe9b0; stroke-width: 1; opacity: .55; stroke-linecap: round; }
+.gauge-cap { fill: #1a2417; stroke: #b58f4d; stroke-width: 1.6; }
+.gauge-value-text { font: 600 15px 'Space Mono', monospace; fill: #f3d69b; }
+.gauge-value-max { font-size: 9px; fill: #8ba07a; }
+.gauge-caption { font: 8px 'Space Mono', monospace; letter-spacing: .9px; text-transform: uppercase; color: #c8b583; text-align: center; }
+.high-contrast-game .gauge-caption { color: #efe3c0; }
+
+/* Speedometer dial */
+.blizzard-dial .gauge-track { stroke-width: 9; }
+.blizzard-dial .gauge-value-arc { stroke-width: 9; }
+.dial-redline { fill: none; stroke: #a33d2a; stroke-width: 9; stroke-linecap: round; opacity: .55; }
+.dial-tick { stroke: #57654a; stroke-width: 1.6; }
+.dial-tick.major { stroke: #c3ad7c; stroke-width: 2.4; }
+.dial-tick.redline { stroke: #d2694a; }
+.dial-number { font: 600 11px 'Barlow Condensed', sans-serif; fill: #a9b396; }
+.dial-needle { transform-origin: 100px 100px; transition: transform 140ms linear; }
+.dial-readout { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); display: flex; align-items: baseline; gap: 4px; padding: 3px 9px; border: 1px solid #b28c4d6e; border-radius: 3px; background: #0a120dd9; box-shadow: inset 0 0 8px #000a, 0 1px 4px #0008; }
+.dial-readout strong { font: 600 19px 'Barlow Condensed', sans-serif; color: #ffd694; font-variant-numeric: tabular-nums; text-shadow: 0 0 9px #f0a15b55; }
+.dial-readout small { font: 8px 'Space Mono', monospace; color: #a3a68b; }
+.dial-caption { margin-top: 2px; color: #b8a878; }
+
+/* Horizontal engraved meter */
+.blizzard-meter { min-width: 0; flex: 1; }
+.blizzard-meter-track { position: relative; height: 7px; border: 1px solid #6b5631; border-radius: 2px; background: #070d09; box-shadow: inset 0 1px 3px #000c; overflow: hidden; }
+.blizzard-meter-track::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), #1c241755 calc(10% - 1px), #1c241755 10%); pointer-events: none; }
+.blizzard-meter-fill { display: block; height: 100%; background: linear-gradient(90deg, #8a3d16, #e07a2b 45%, #f2b34c 80%, #ffe49a); box-shadow: 0 0 7px #f2a34155; transition: width .45s cubic-bezier(.22, .9, .3, 1); }
+
+/* ============ Position medallion ============ */
+.position-medallion { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; border: 2px solid; box-shadow: inset 0 2px 3px #ffffff38, inset 0 -4px 7px #00000090, 0 4px 12px #000b; text-shadow: 0 1px 2px #0009; flex-shrink: 0; }
+.position-medallion::before { content: ''; position: absolute; inset: 4px; border: 1px dashed #00000045; border-radius: 50%; pointer-events: none; }
+.medallion-rank { display: flex; align-items: baseline; font: 700 27px/1 'Cinzel', Georgia, serif; }
+.medallion-rank small { font-size: 12px; margin-left: 1px; }
+.medallion-caption { font: 6px 'Space Mono', monospace; letter-spacing: 1.4px; opacity: .85; margin-top: 2px; }
+.tier-gold { background: radial-gradient(circle at 32% 26%, #ffedb0, #e3b24c 52%, #7d5514); border-color: #ffe19a; color: #3f2c06; box-shadow: inset 0 2px 3px #ffffff70, inset 0 -4px 7px #00000080, 0 0 16px #f3c96b55, 0 4px 12px #000b; }
+.tier-silver { background: radial-gradient(circle at 32% 26%, #f4f8fb, #b9c3cc 52%, #5d6a74); border-color: #e2e9ef; color: #232c33; }
+.tier-bronze { background: radial-gradient(circle at 32% 26%, #f2c39a, #c07f4a 52%, #5f371b); border-color: #e8b183; color: #371d0a; }
+.tier-iron { background: radial-gradient(circle at 32% 26%, #b9beb4, #7c847a 52%, #39413a); border-color: #aab2a6; color: #161c17; }
+.high-contrast-game .position-medallion { border-width: 3px; }
+
+/* ============ Setup spec panel with gauges ============ */
+.spec-gauges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 10px; margin: 6px 0 14px; }
+.spec-info-button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid #8d6b33; border-radius: 2px; background: linear-gradient(180deg, #3a2d17, #241b0e); color: #ecd29c; font: 8px 'Space Mono', monospace; letter-spacing: .8px; box-shadow: inset 0 1px #f0cf8b3d, 0 2px 5px #0006; }
+.spec-info-button:hover { border-color: #e3bf72; color: #ffe9b8; background: linear-gradient(180deg, #4d3b1e, #2c2111); }
+.budget-chip { display: flex; gap: 8px; align-items: center; justify-content: center; padding: 8px 10px; border: 1px solid #6b5631; border-radius: 2px; background: #10190f; color: #b7c5a2; font-size: 9px; letter-spacing: .5px; }
+.budget-chip svg { color: #d8b471; flex-shrink: 0; }
+
+/* ============ Tuning drill-down drawer ============
+   Anchored to the (already positioned) .fantasy-dialog .modal-content box. */
+.drawer-scrim { position: absolute; inset: 0; z-index: 5; background: #060a07b0; }
+.tuning-drawer { position: absolute; z-index: 6; top: 0; right: 0; bottom: 0; width: min(430px, 96%); display: flex; flex-direction: column; border-left: 2px solid #b28c4d; background: linear-gradient(160deg, #1b261ce8, #0d1511f7), url('/ui/stone-tile.png') 0 0 / 260px repeat; box-shadow: -18px 0 40px #000a; }
+.drawer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 16px 18px 12px; border-bottom: 1px solid #7a5f3152; }
+.drawer-titles .eyebrow { font-size: 6px; letter-spacing: 1.3px; }
+.drawer-titles h3 { font: 600 19px 'Cinzel', Georgia, serif; color: #ecd8ab; margin-top: 4px; }
+.drawer-close { border: 1px solid #6b5631; flex-shrink: 0; }
+.drawer-body { flex: 1; min-height: 0; overflow-y: auto; padding: 15px 18px 22px; overscroll-behavior: contain; }
+.drawer-section { margin-bottom: 21px; }
+.drawer-section > h4 { display: flex; align-items: center; gap: 8px; font: 8px 'Space Mono', monospace; letter-spacing: 1px; color: #c8ad74; margin-bottom: 11px; }
+.drawer-section > h4 svg { color: #d8b471; }
+.balance-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 8px 0 10px; border-bottom: 1px solid #42502e2e; }
+.balance-label { font-size: 10px; color: #d3dcbe; }
+.balance-mid { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.balance-chips { display: flex; gap: 4px; align-items: center; font: 8px 'Space Mono', monospace; color: #93a682; white-space: nowrap; }
+.balance-chips i { font-style: normal; color: #6d7f5e; }
+.balance-chips .positive { color: #cfe0a4; }
+.balance-chips .negative { color: #dd9a76; }
+.balance-total { font: 600 14px 'Space Mono', monospace; color: #f0d59f; }
+.drawer-lore { display: flex; flex-direction: column; gap: 12px; }
+.drawer-lore blockquote { margin: 0; font: italic 12px Georgia, serif; color: #b6c3a2; }
+.drawer-lore p { font-size: 11px; line-height: 1.75; color: #b3c2a3; }
+.lore-name { font: 600 12px 'Cinzel', Georgia, serif; color: #e0cb99; margin-bottom: 3px; }
+.tradeoff-row { display: flex; gap: 10px; padding: 6px 0; font-size: 10px; line-height: 1.6; color: #b3c2a3; }
+.tradeoff-row strong { flex-shrink: 0; min-width: 74px; font-weight: 500; color: #d8c89b; }
+.formula-list { display: flex; flex-direction: column; gap: 9px; }
+.formula-list > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid #42502e2e; }
+.formula-list dt { font-size: 10px; color: #b3c2a3; }
+.formula-list dd { margin: 0; font: 11px 'Space Mono', monospace; color: #eed7a1; text-align: right; }
+.formula-list small { display: block; font: 8px 'Space Mono', monospace; color: #8ea37c; margin-top: 3px; }
+.stat-glossary p { font-size: 10px; line-height: 1.7; color: #aebf9d; margin: 0 0 9px; }
+.stat-glossary strong { color: #d8c89b; font-weight: 500; }
+
+/* ============ Race HUD: gear menu, telemetry cluster ============ */
+.game-hud { transition: opacity 200ms; }
+/* An open gear menu floats above the pause overlay so the consolidated
+   navigation is never buried under "chaos on hold". */
+.game-hud.hud-menu-open { z-index: 6; }
+.hud-gear { position: relative; pointer-events: auto; }
+.gear-button { display: inline-flex; align-items: center; justify-content: center; width: 37px; height: 37px; padding: 0; border: 1px solid #b28c4d75; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #3c4936, #131d13 68%); color: #ecd29c; box-shadow: inset 0 1px #f0cf8b30, 0 3px 9px #000a; transition: opacity 400ms, transform 200ms, color 160ms, border-color 160ms; }
+.gear-button:hover, .gear-button[aria-expanded='true'] { color: #ffe9b8; border-color: #e3bf72; transform: rotate(24deg); }
+.hud-gear.gear-hidden { opacity: 0; pointer-events: none; }
+.hud-gear.gear-hidden .gear-button { transform: translateY(-5px); }
+.gear-scrim { position: fixed; inset: 0; z-index: 8; }
+.gear-menu { position: absolute; z-index: 9; top: 44px; left: 0; min-width: 218px; padding: 6px; border: 1px solid #a8874a; border-radius: 3px; background: linear-gradient(160deg, #202c1ef2, #10180ff7); box-shadow: inset 0 0 0 1px #0a0e0b, inset 0 0 0 2px #b28c4d3d, 0 14px 34px #000c; }
+.gear-menu-event { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px 9px; border-bottom: 1px solid #6e5a313b; margin-bottom: 5px; font: 8px 'Space Mono', monospace; letter-spacing: .7px; color: #cbb98a; }
+.gear-menu-event small { color: #93a67f; }
+.gear-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 9px; border-radius: 2px; background: transparent; color: #cfd8bc; font-size: 11px; text-align: left; }
+.gear-menu button svg { color: #c9a86a; flex-shrink: 0; }
+.gear-menu button:hover { background: #d8a45c1c; color: #ffe9b8; }
+.gear-menu button.danger:hover { background: #a33d2a26; }
+
+.hud-right { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; }
+.hud-right .stage-actions { pointer-events: auto; }
+.hud-telemetry { display: flex; align-items: flex-end; gap: 12px; }
+
+/* ============ Mini track bar ============ */
+.mini-trackbar { position: absolute; left: 26px; right: 26px; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 14px; pointer-events: none; }
+.mini-trackbar > span { flex-shrink: 0; display: flex; align-items: center; gap: 8px; color: #a9b397; font: 7px var(--mono); letter-spacing: 1px; text-shadow: 0 1px 6px #04120ad9; }
+.trackbar-rail { position: relative; flex: 1; height: 3px; border-radius: 2px; background: #c1cf9c26; box-shadow: 0 1px 4px #0009; }
+.trackbar-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; background: linear-gradient(90deg, #b2551f, #f0a15b); opacity: .66; transition: width 120ms linear; }
+.trackbar-pip { position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; border: 1px solid #00000088; box-shadow: 0 1px 3px #000a; transition: left 120ms linear; }
+.trackbar-pip.player { width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid #ffedc4; box-shadow: 0 0 8px #f0a15bcc, 0 1px 3px #000c; z-index: 1; }
+
+/* ============ Compact air supplies (in-stage corner) ============ */
+.hud-supplies { position: absolute; left: 22px; bottom: 36px; z-index: 3; display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+.supply-chip { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid #8f985340; border-radius: 5px; background: #0d160fd9; box-shadow: inset 0 1px #f0cf8b17, 0 3px 8px #000a; opacity: .82; transition: opacity 150ms, border-color 150ms; }
+.supply-chip > img { width: 26px; height: 26px; }
+.supply-chip.active, .supply-chip.just-collected { opacity: 1; border-color: #d8b471; box-shadow: inset 0 1px #f0cf8b40, 0 0 10px #d8b47144, 0 3px 8px #000a; }
+.supply-count { position: absolute; right: -5px; bottom: -6px; min-width: 17px; padding: 1px 4px; border: 1px solid #b28c4d; border-radius: 8px; background: #1a1408; color: #ffd694; font: 600 9px 'Barlow Condensed', sans-serif; text-align: center; font-variant-numeric: tabular-nums; }
+.supply-chip.shield-live .supply-count { border-color: #8cceff; color: #bfe4ff; }
+.pickup-check { position: absolute; top: -5px; right: -5px; color: #ffd694; filter: drop-shadow(0 1px 2px #000); }
+.supply-total { display: flex; flex-direction: column; align-items: center; margin-left: 2px; padding: 3px 8px; border-radius: 4px; background: #0d160fb8; color: #e6cd97; font: 600 15px 'Barlow Condensed', sans-serif; line-height: 1; text-shadow: 0 1px 3px #000; }
+.supply-total small { font: 6px 'Space Mono', monospace; letter-spacing: .7px; color: #9fb18c; margin-top: 2px; }
+
+/* ============ Immersion: hide chrome while the race is live ============ */
+.race-immersed .site-header, .race-immersed .event-race-banner, .race-immersed .track-footnote, .race-immersed .site-footer { display: none; }
+.race-immersed .main-content { max-width: none; padding: 0; }
+.race-immersed .race-storage-warning { position: absolute; z-index: 20; top: 10px; left: 50%; transform: translateX(-50%); width: min(560px, 90%); margin: 0; opacity: .94; }
+.race-immersed .game-shell { height: 100dvh; width: 100%; border: 0; border-radius: 0; background: #10190e; display: flex; flex-direction: column; }
+.race-immersed .game-stage { height: auto; min-height: 0; flex: 1; }
+.race-immersed .control-deck { flex-shrink: 0; }
+
+/* ============ Decluttered control deck ============ */
+.launch-status .status-heading h2 { font: 600 12px 'Space Mono', monospace; letter-spacing: 1.2px; text-transform: uppercase; color: #d6c79b; }
+.launch-status .status-heading h2.alert { color: #eb9b6d; }
+
+/* ============ Responsive tuning ============ */
+@media (max-width: 900px) {
+  .mini-trackbar { left: 18px; right: 18px; }
+  .hud-supplies { left: 14px; bottom: 34px; }
+  .position-medallion { width: 52px; height: 52px; }
+  .medallion-rank { font-size: 21px; }
+  .medallion-rank small { font-size: 10px; }
+}
+@media (max-width: 600px) {
+  .spec-gauges { gap: 12px 4px; }
+  .spec-gauges .blizzard-gauge > svg { width: 92px; height: 92px; }
+  .blizzard-dial > svg { width: 104px; height: 104px; }
+  .dial-readout { bottom: 22px; padding: 2px 6px; }
+  .dial-readout strong { font-size: 15px; }
+  .position-medallion { width: 44px; height: 44px; border-width: 2px; }
+  .medallion-rank { font-size: 17px; }
+  .medallion-caption { display: none; }
+  .hud-right { gap: 6px; }
+  .hud-supplies { bottom: 30px; gap: 5px; }
+  .supply-chip { width: 32px; height: 32px; }
+  .supply-chip > img { width: 21px; height: 21px; }
+  .supply-total { font-size: 12px; padding: 2px 5px; }
+  .mini-trackbar { left: 12px; right: 12px; bottom: 10px; gap: 8px; }
+  .mini-trackbar .trackbar-sector { display: none; }
+  .tuning-drawer { width: 100%; border-left: 0; }
+  .gear-menu { min-width: 194px; }
+}

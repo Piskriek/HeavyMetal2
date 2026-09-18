@@ -87,28 +87,7 @@ h1, h2, h3, p, figure { margin: 0; }
 .game-canvas:focus-visible { outline: 2px solid #f0a15b77; outline-offset: -3px; }
 .status-ready .game-canvas { cursor: grab; }
 .status-ready .game-canvas:active { cursor: grabbing; }
-.game-hud { position: absolute; z-index: 2; top: 27px; left: 28px; right: 28px; display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; pointer-events: none; text-shadow: 0 2px 8px #07170ee6; }
-.track-selector { display: block; padding: 0; text-align: left; background: transparent; pointer-events: auto; }
-.track-eyebrow { display: flex; align-items: center; gap: 7px; color: #bac4a8; font: 7px var(--mono); letter-spacing: 1.2px; }
-.track-eyebrow > svg { color: var(--orange); }
-.circuit-number { font-size: 8px; color: var(--orange); border-left: 1px solid #6a725077; padding-left: 8px; margin-left: 2px; }
-.track-name { display: flex; align-items: center; gap: 11px; margin-top: 9px; color: #eeebd2; font: 700 24px/1 var(--display); text-transform: uppercase; letter-spacing: .7px; }
-.track-name > svg { color: #b3bca1; }
-.track-sector { display: block; margin-top: 9px; color: #b5c2a1; font: 6px var(--mono); letter-spacing: 1.2px; }
-.track-selector:hover .track-name { color: var(--orange); }
-.telemetry { display: flex; align-items: flex-start; gap: 35px; margin-left: auto; margin-right: 34px; }
-.hud-label { display: flex; align-items: center; gap: 5px; font: 7px/1.4 var(--mono); color: #a7b398; letter-spacing: 1.1px; white-space: nowrap; }
-.telemetry > div > div { display: flex; align-items: baseline; margin-top: 7px; gap: 5px; }
-.telemetry strong { font: 600 27px/1 var(--display); letter-spacing: .4px; font-variant-numeric: tabular-nums; }
-.telemetry > div > div > span { color: #a9b396; font: 9px var(--mono); }
-.telemetry .distance-stat { min-width: 85px; }
-.telemetry .distance-stat strong { font-size: 43px; line-height: .82; font-weight: 600; }
-.speed-stat { min-width: 63px; }
-.best-stat strong { color: #e6b56e; }
-.best-stat .hud-label { color: #bca375; }
-.position-stat { min-width: 52px; }
-.position-stat strong { color: #edb777; }
-.position-stat .hud-label { color: #c6ad7d; }
+.game-hud { position: absolute; z-index: 2; top: 22px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; pointer-events: none; text-shadow: 0 2px 8px #07170ee6; }
 .stage-actions { display: flex; gap: 7px; pointer-events: auto; }
 .stage-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; background: #101b136b; border: 1px solid #87966d4a; border-radius: 5px; color: #d3d6bd; }
 .stage-button:disabled { opacity: .45; }
@@ -131,22 +110,7 @@ h1, h2, h3, p, figure { margin: 0; }
   .grid-recovery p { font-size: 9px; line-height: 1.6; }
 }
 .game-notice { position: absolute; z-index: 2; top: 116px; left: 24px; right: 24px; text-align: center; pointer-events: none; font: italic 700 25px/1.2 var(--display); letter-spacing: .7px; color: #ffcf8a; text-shadow: 0 2px 3px #1c2c16, 0 0 17px #122410; }
-.race-progress { position: absolute; left: 28px; right: 28px; bottom: 18px; z-index: 3; display: flex; align-items: center; gap: 18px; pointer-events: none; }
-.race-progress > span { display: flex; align-items: center; gap: 7px; flex-shrink: 0; color: #8b967d; font: 7px var(--mono); letter-spacing: 1px; }
-.progress-track { position: relative; height: 2px; flex: 1; background: #c1cf9c22; }
-.progress-fill { height: 100%; background: #d89d5b; transition: width 100ms linear; }
-.progress-runner { position: absolute; width: 5px; height: 5px; top: -1.5px; transform: rotate(45deg); background: #e9ad63; transition: left 100ms linear; }
-.race-progress .finish-label { gap: 12px; color: #a9b397; }
 .race-controls { flex-shrink: 0; }
-.race-standings { display: flex; align-items: center; gap: 26px; padding: 10px 28px; border-top: 1px solid #36442b; background: #10190f; }
-.standings-caption { flex-shrink: 0; color: #8ea078; font: 6px var(--mono); letter-spacing: 1px; }
-.race-standings ol { display: grid; grid-template-columns: repeat(4, 1fr); flex: 1; gap: 22px; list-style: none; margin: 0; padding: 0; }
-.race-standings li { display: flex; align-items: center; gap: 7px; min-width: 0; font: 8px var(--mono); }
-.race-standings li > i { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
-.race-standings strong { font-size: 8px; letter-spacing: .5px; font-weight: 400; }
-.standing-position { color: #6c8260; font-size: 9px; }
-.standing-detail { margin-left: auto; color: #748b65; font-size: 6px; white-space: nowrap; }
-.player-standing .standing-position, .player-standing .standing-detail { color: #c9a56e; }
 .ball-tuning { display: grid; grid-template-columns: .7fr 1fr 1fr; gap: 30px; padding: 17px 28px 14px; border-top: 1px solid #39452d; background: #131c11; align-items: center; }
 .tuning-title { font: 8px var(--mono); letter-spacing: 1px; color: #c7aa77; }
 .tuning-title > span { display: block; margin-top: 7px; font-size: 6px; color: #748667; letter-spacing: .7px; }
@@ -389,15 +353,11 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
 }
 
 @media (max-width: 1150px) {
-  .race-standings { padding-left: 22px; padding-right: 22px; gap: 18px; }
-  .race-standings ol { gap: 16px; }
-  .standings-caption { font-size: 5px; }
   .ball-tuning { gap: 23px; grid-template-columns: .65fr 1fr 1fr; padding: 16px 22px 13px; }
   .header-inner, .main-content { padding-left: 30px; padding-right: 30px; }
   .desktop-nav { gap: 23px; }
   .nav-link { font-size: 9px; letter-spacing: 1px; }
   .header-actions { gap: 13px; }
-  .telemetry { gap: 25px; margin-right: 15px; }
   .control-deck { padding: 21px 22px; gap: 22px; }
   .status-heading h2 { font-size: 12px; }
   .launch-status > p { font-size: 9px; }
@@ -410,8 +370,6 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
 }
 
 @media (max-width: 900px) {
-  .standings-caption { display: none; }
-  .race-standings ol { gap: 20px; }
   .ball-tuning { grid-template-columns: 1fr 1fr; gap: 20px; }
   .tuning-title { display: none; }
   .header-inner { height: 70px; display: flex; justify-content: space-between; padding-left: 24px; padding-right: 24px; }
@@ -423,9 +381,6 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
   .main-content { padding: 25px 24px 0; }
   .intro-title h1 { font-size: 56px; }
   .game-hud { left: 22px; right: 22px; top: 23px; gap: 20px; }
-  .telemetry { gap: 26px; margin-right: 0; }
-  .best-stat { display: none; }
-  .track-name { font-size: 22px; }
   .control-deck { flex-wrap: wrap; gap: 17px 24px; }
   .launch-status { min-width: 300px; }
   .status-heading h2 { font-size: 14px; }
@@ -441,12 +396,6 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
 }
 
 @media (max-width: 600px) {
-  .race-standings { padding: 10px 15px; }
-  .race-standings ol { gap: 12px; }
-  .race-standings li { gap: 4px; flex-wrap: wrap; }
-  .race-standings strong { font-size: 6px; letter-spacing: .25px; }
-  .standing-position { font-size: 7px; }
-  .standing-detail { flex-basis: 100%; margin: 0 0 0 14px; font-size: 5px; }
   .steering-controls { margin-top: 9px; gap: 8px; }
   .steer-key { min-width: 45px; height: 36px; }
   .lane-indicator { grid-template-columns: repeat(4, 23px); }
@@ -478,29 +427,14 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
   .game-shell { border-radius: 6px; }
   .game-stage { height: 390px; }
   .game-hud { top: 18px; left: 17px; right: 17px; }
-  .track-selector { max-width: calc(100% - 101px); }
-  .track-eyebrow { font-size: 5px; gap: 5px; letter-spacing: .65px; white-space: nowrap; }
-  .track-eyebrow > svg { width: 11px; }
-  .circuit-number { font-size: 6px; margin-left: 0; padding-left: 5px; }
-  .track-name { font-size: 20px; gap: 6px; letter-spacing: .3px; }
-  .track-name > svg { width: 12px; flex-shrink: 0; }
   .stage-actions { gap: 5px; }
   .stage-button { width: 29px; height: 29px; }
   .stage-button > svg { width: 14px; }
-  .telemetry { position: absolute; left: 0; top: 70px; gap: 26px; }
-  .telemetry .distance-stat { min-width: 68px; }
-  .telemetry .distance-stat strong { font-size: 35px; }
-  .telemetry strong { font-size: 24px; }
-  .hud-label { font-size: 6px; }
-  .telemetry > div > div > span { font-size: 7px; }
   .aim-hint { left: calc(var(--launch-x, 25%) + 54px); top: calc(var(--launch-y, 54.8%) - 116px); max-width: 150px; }
   .aim-hint > span { font-size: 20px; letter-spacing: .5px; }
   .aim-hint > p { font-size: 9px; line-height: 1.6; max-width: 145px; margin-top: 5px; }
   .aim-hint > svg { width: 140px; height: 64px; margin-left: -70px; }
   .game-notice { top: 139px; font-size: 20px; left: 15px; right: 15px; }
-  .race-progress { left: 17px; right: 17px; bottom: 16px; gap: 12px; }
-  .race-progress > span { font-size: 6px; gap: 5px; }
-  .race-progress .finish-label { gap: 9px; }
   .control-deck { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px; }
   .launch-status { grid-column: 1 / -1; min-width: 0; }
   .status-heading h2 { font-size: 12px; }
@@ -605,7 +539,6 @@ kbd { font: 7px/1.3 var(--mono); color: #9ba88a; letter-spacing: .5px; border: 1
 }
 
 @media (max-height: 570px) and (min-width: 601px) {
-  .game-shell:fullscreen .race-standings, .theater-mode .race-standings { padding-top: 6px; padding-bottom: 6px; }
   .game-shell:fullscreen .steering-controls, .theater-mode .steering-controls { margin-top: 5px; }
   .game-shell:fullscreen .ball-tuning, .theater-mode .ball-tuning { padding-top: 7px; padding-bottom: 6px; }
   .game-shell:fullscreen .tuning-hint, .theater-mode .tuning-hint { display: none; }

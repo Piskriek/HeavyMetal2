@@ -44,6 +44,16 @@ export const ASSETS = {
   'lantern-post':          { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
   'ore-cart':              { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
   'tnt-crate':             { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'mine-rails-c':          { w: 512,  h: 512,  g: 'center', probes: [[4, 4, 0]] },
+  'mine-gate-c':           { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'lava-sheet-c':          { w: 512,  h: 512,  g: 'center', probes: [], seamless: true },
+  'cauldron-molten-c':     { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'stadium-gantry-c':      { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'waterfall-curtain':     { w: 512,  h: 1024, g: 'north',  probes: [[4, 4, 0]] },
+  'rail-switch':           { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'ore-bucket':            { w: 512,  h: 512,  g: 'north',  probes: [[4, 508, 0]] },
+  'rock-tunnel-frame-c':   { w: 1024, h: 1024, g: 'center', probes: [[512, 512, 0], [2, 2, 1]] },
+  'goblin-bleacher-e':     { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
 };
 
 const run = (cmd) => execSync(cmd, { stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();

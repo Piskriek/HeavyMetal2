@@ -101,6 +101,53 @@ The ticket suite in `docs/tickets/` is implemented one issue at a time. `TICKET-
 - Five Section-3 track-part assets were generated into `public/art/track-parts/` per the ticket's asset generation manifest (issue #11 comment): `mine-rails.png` (512x512 alpha, vertically tileable iron-rail/wooden-sleeper segment), `mine-gate.png` (1024x512 alpha rock-archway cavern mouth with lantern posts, skull warning signs and iron chains), `lava-sheet.png` (512x512 seamless molten lava tile with basalt crust and fire veins), `cauldron-molten.png` (512x512 alpha swinging cast-iron smelting cauldron pouring molten slag), and `stadium-gantry.png` (1024x512 alpha brass-and-iron Scrapdome finish gantry with gears, checkered victory flags and victory horns).
 - Pipeline: painted in the established hand-painted goblin-mine style matching `public/art/concepts/section3-mine-rollercoaster-concept.jpg`; sprites keyed on flat magenta `#FF00FF` (the repo keying convention from `docs/ART_PIPELINE.md`) with ImageMagick, trimmed and aspect-fit onto the exact manifest canvases; the lava sheet was made seamless with a half-roll pyramid-mask blend; tileability verified with 2x2 and 2x1 tile montages inspected as images, and alpha verified with corner probes plus contrasting-backdrop flatten checks. Integration into the track renderer belongs to the TICKET-09 implementation work packages.
 
+### TICKET-09 Extended Asset Sets — Generated
+
+On top of the five manifest assets, three generation batches extended
+`public/art/track-parts/` into a full Section-3 kit (35 sprites). All new art was
+painted on flat magenta, processed by `scripts/process-track-parts.mjs` (key →
+fringe-only despill → trim → aspect-fit onto the exact runtime canvas, plus per-asset
+transparent/opaque pixel probes that fail the run when wrong), and verified with
+green-backdrop contact sheets and tile montages inspected as images.
+
+**Rock/wall cutouts that frame track sections as tunnels or walls** (composited
+corridor mock verified):
+- `rock-tunnel-frame-a/b/c.png` 1024x1024 alpha — full-slab rock walls with a clean
+  keyhole tunnel opening punched through (a/b brown rock with timber shoring, c dark
+  rock veined with blue-green crystals); layer over a section to frame it as a tunnel mouth.
+- `rock-ceiling-cutout.png` 1024x512 alpha — top-anchored stalactite ceiling strip.
+- `rock-floor-ledge.png` 1024x512 alpha — bottom-anchored rocky floor strip.
+- `rock-wall-left.png` / `rock-wall-right.png` 512x1024 alpha — edge-anchored cavern
+  wall panels for framing a corridor from the sides.
+- `rock-boulder-a/b.png` 512x512 alpha — standalone boulder clusters to place under
+  platforms or along track edges.
+
+**Platforms that sit on rocks with cheering goblins** (five variations):
+- `goblin-bleacher-a/b.png` 1024x512 — boulder-base platforms with wooden bleachers,
+  flag-waving crowds, drums, horns and torches.
+- `goblin-bleacher-c.png` 512x512 — small rock perch, three goblins with a checkered flag.
+- `goblin-bleacher-d.png` 512x512 — drum podium with skull banner.
+- `goblin-bleacher-e.png` 1024x512 — broad two-row terrace carved into a cavern wall.
+
+**Variant sets B and C of the five manifest assets** (multiple sets as requested):
+- `mine-rails-b/c.png` 512x512 alpha, vertically tileable (rope-lashed weathered
+  sleepers / blackened ember-cracked rails); vertical 2-tile montages verified.
+- `mine-gate-b/c.png` 1024x512 alpha (low wide mushroom-lit mouth / crystal cavern mouth).
+- `lava-sheet-b/c.png` 512x512 seamless (golden-veined / spectral emerald slag), made
+  seamless with the half-roll cosine-mask blend; 2x2 montages verified seam-free.
+- `cauldron-molten-b/c.png` 512x512 alpha (chain-hung pouring / boiling tripod cauldron).
+- `stadium-gantry-b/c.png` 1024x512 alpha (stone towers with goblin walkway / night
+  floodlights and fireworks).
+
+**Section-3 hazards and dressing:** `rail-switch.png` (forking rails with lever),
+`ore-cart.png`, `ore-bucket.png` (chain-hung swinging bucket), `tnt-crate.png`,
+`lantern-post.png`, and `waterfall-curtain.png` 512x1024 alpha (translucent cascade
+for the breakthrough moment).
+
+Renderer integration of all track-parts remains part of the TICKET-09 implementation
+work packages; this deliverable is the asset library plus the reproducible processing
+script.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

@@ -34,6 +34,16 @@ export const ASSETS = {
   'rock-boulder-b':        { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
   'goblin-bleacher-a':     { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
   'goblin-bleacher-b':     { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'goblin-bleacher-c':     { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'goblin-bleacher-d':     { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'mine-rails-b':          { w: 512,  h: 512,  g: 'center', probes: [[4, 4, 0]] },
+  'mine-gate-b':           { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'lava-sheet-b':          { w: 512,  h: 512,  g: 'center', probes: [], seamless: true },
+  'cauldron-molten-b':     { w: 512,  h: 512,  g: 'center', probes: [[4, 4, 0]] },
+  'stadium-gantry-b':      { w: 1024, h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'lantern-post':          { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'ore-cart':              { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
+  'tnt-crate':             { w: 512,  h: 512,  g: 'south',  probes: [[4, 4, 0]] },
 };
 
 const run = (cmd) => execSync(cmd, { stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();
@@ -46,6 +56,24 @@ function keyAndTrim(src, keyed) {
       `-channel B -fx "(((min(r,b)-g)>0.25)&&(a>0))?min(b,max(g,r)):b" ` +
       `+channel -trim +repage "${keyed}"`
   );
+}
+
+// Half-roll + cosine-mask crossfade: near the edges the half-rolled copy shows,
+// so opposite edges carry matching content and the tile wraps in both axes
+// (same technique the original lava-sheet was made seamless with).
+function makeSeamless(src, out, w, h) {
+  const base = `${PROC}/seamless-base.png`;
+  const shift = `${PROC}/seamless-shift.png`;
+  const mask = `${PROC}/seamless-mask.png`;
+  const layered = `${PROC}/seamless-layered.png`;
+  run(`convert "${src}" -resize ${w}x${h}! -alpha off "${base}"`);
+  run(`convert "${base}" -roll +${w / 2}+${h / 2} "${shift}"`);
+  run(
+    `convert -size ${w}x${h} xc: -channel R ` +
+      `-fx "(0.5-0.5*cos(2*pi*i/w))*(0.5-0.5*cos(2*pi*j/h))" +channel "${mask}"`
+  );
+  run(`convert "${base}" "${mask}" -compose copy_opacity -composite "${layered}"`);
+  run(`convert "${shift}" "${layered}" -compose over -composite "${out}"`);
 }
 
 function fit(keyed, out, { w, h, g }) {
@@ -81,7 +109,8 @@ for (const name of names) {
   }
   const keyed = `${PROC}/${name}-keyed.png`;
   const out = `${OUT}/${name}.png`;
-  keyAndTrim(src, keyed);
+  if (spec.seamless) makeSeamless(src, keyed, spec.w, spec.h);
+  else keyAndTrim(src, keyed);
   fit(keyed, out, spec);
   const dims = run(`identify -format "%wx%h" "${out}"`);
   const meanAlpha = Number(run(`convert "${out}" -channel A -separate -format "%[fx:mean]" info:`));

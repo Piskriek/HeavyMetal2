@@ -20,7 +20,10 @@ export type SpriteName =
   | 'blimp'
   | 'signSheep'
   | 'signTnt'
-  | 'signParts';
+  | 'signParts'
+  | 'treeWallPines'
+  | 'treeWallBoomtown'
+  | 'treeWallSheep';
 
 export interface Sprite {
   image: HTMLImageElement;
@@ -174,11 +177,14 @@ export function loadAssets(): Promise<GameAssets> {
       ['signSheep', 'sign-sheep.png?v=3'],
       ['signTnt', 'sign-tnt.png?v=3'],
       ['signParts', 'sign-parts.png?v=3'],
+      ['treeWallPines', 'treewall-pines.png'],
+      ['treeWallBoomtown', 'treewall-boomtown.png'],
+      ['treeWallSheep', 'treewall-sheep.png'],
     ];
     const result = {} as GameAssets;
     await Promise.all(files.map(async ([name, filename]) => {
       const image = await readImage(`/art/${filename}`);
-      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts' ? asSprite(image) : await cutout(image);
+      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts' || name === 'treeWallPines' || name === 'treeWallBoomtown' || name === 'treeWallSheep' ? asSprite(image) : await cutout(image);
     }));
     const sheet = await readImage('/art/track-sprites.png');
     const names: SpriteName[] = ['ball', 'sheep', 'tnt', 'spring', 'boost', 'ramp'];

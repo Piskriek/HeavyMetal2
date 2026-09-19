@@ -129,9 +129,6 @@ export class ArenaEnvironment {
     context.fillStyle = fogGrad;
     context.fillRect(0, HEIGHT * 0.35, this.view.width, HEIGHT * 0.35);
 
-    // ---- Layer 2: Distant mountains / city silhouettes (0.15x parallax) ----
-    this.drawTiledLayerTransparent(this.art.farMountains, HEIGHT + 35, this.frame.camera * (parallax ? 0.15 : 0.35) + this.frame.drift * 0.15, 100);
-
     // ---- Sunbeam / god-ray overlay ----
     if (lighting.sunbeamIntensity > 0) {
       this.drawTiledLayerTransparent(this.art.sunbeams, HEIGHT + 55, this.frame.camera * (parallax ? 0.03 : 0.1), -20);
@@ -270,12 +267,18 @@ export class ArenaEnvironment {
   drawTerrain() {
     const range = this.view.visibleSpan(LANE.near - 850, LANE.far + 1500, 250);
     const step = 256;
+    const understory = this.course === 'boomtown' ? '#18120d' : this.course === 'sheep' ? '#1f2b15' : '#111c14';
     for (let x = Math.floor(range.start / step) * step; x < range.end; x += step) {
       const stadium = x >= STADIUM_START;
       // TICKET-08: the gorge has no floor. The chasm painted in drawLandscape shows
-      // through instead, which is what makes the leap off the lip read as freefall.
+      // through instead, which is what makes the leap off the lip read as freefall —
+      // including the TICKET-06.2 undergrowth mulch, which would otherwise float.
       if (x + step <= this.gorgeStart || x >= this.gorgeEnd) {
         this.fill(this.quad(x, x + step, LANE.near - 850, LANE.far + 1500, 153), stadium ? this.palette.grass : this.palette.soil);
+        // Rich shaded undergrowth mulch directly beneath the midground tree wall
+        if (!stadium) {
+          this.fill(this.quad(x, x + step, LANE.far + 340, LANE.far + 820, 153), understory);
+        }
       }
       this.fill(this.quad(x, x + step, LANE.far + 6, LANE.far + 380, 153), this.palette.shoulder);
     }
@@ -312,6 +315,7 @@ export class ArenaEnvironment {
     const z = LANE.far + 240;
     const range = this.view.visibleSpan(z - 25, z + 30, 330);
     this.drawStadium();
+    this.drawTreeWall();
     this.drawLandmarks();
     const step = 256;
     const crest = this.cliffStart;
@@ -372,6 +376,67 @@ export class ArenaEnvironment {
       context.globalAlpha = fade * 0.35;
       context.fillStyle = '#ffd9a0';
       context.beginPath(); context.ellipse(base.x, base.y, 2.4 * base.scale, 5 * base.scale, 0, 0, TAU); context.fill();
+      context.restore();
+    }
+  }
+
+  /**
+   * TICKET-06.2: Midground Environmental Depth Layer — Dense Wall of Trees & Theme Scenery.
+   * Eliminates the bare ground void behind the spectator crowd and racetrack wall by rendering
+   * two overlapping 3D depth tiers anchored to track elevation with height/flip variations.
+   */
+  private drawTreeWall() {
+    const context = this.context;
+    const sprite = this.course === 'boomtown'
+      ? this.assets.treeWallBoomtown
+      : this.course === 'sheep'
+        ? this.assets.treeWallSheep
+        : this.assets.treeWallPines;
+
+    if (!sprite || !sprite.image) return;
+
+    // Two depth tiers for true 3D parallax depth and full coverage behind crowd:
+    // Tier 1: Deeper midground backdrop (z = LANE.far + 580)
+    // Tier 2: Midground wall directly behind grandstand (z = LANE.far + 390)
+    const tiers = [
+      { z: LANE.far + 580, step: 240, baseHeight: 530, alpha: 0.82, offset: 120 },
+      { z: LANE.far + 390, step: 175, baseHeight: 470, alpha: 0.98, offset: 0 },
+    ];
+
+    for (const tier of tiers) {
+      const z = tier.z;
+      const range = this.view.visibleSpan(z, z, 350);
+      const start = Math.floor((range.start - tier.offset) / tier.step) * tier.step + tier.offset;
+      const end = Math.min(range.end + tier.step, STADIUM_START + 600);
+      if (start >= end) continue;
+
+      context.save();
+      context.globalAlpha = tier.alpha;
+
+      for (let x = start; x < end; x += tier.step) {
+        // Deterministic pseudo-random variation based on world position
+        const seed = Math.sin(x * 0.013 + tier.z * 0.007) * 43758.5453;
+        const rand = seed - Math.floor(seed);
+        const flip = Math.abs(Math.floor(x / tier.step)) % 2 === 1;
+        const scaleMod = 0.88 + rand * 0.26; // 0.88x to 1.14x scale
+        const height = tier.baseHeight * scaleMod;
+        const width = height * (sprite.width / sprite.height);
+
+        // Ground anchor: rises and falls naturally with track elevation
+        const baseY = this.y(x) + 130 + Math.sin(x * 0.004) * 12;
+        const point = this.p(x, baseY, z);
+
+        const screenW = width * point.scale;
+        const screenH = height * point.scale;
+
+        if (point.x + screenW / 2 < -60 || point.x - screenW / 2 > this.view.width + 60) continue;
+
+        context.save();
+        context.translate(point.x, point.y);
+        if (flip) context.scale(-1, 1);
+        context.drawImage(sprite.image, -screenW / 2, -screenH, screenW, screenH);
+        context.restore();
+      }
       context.restore();
     }
   }

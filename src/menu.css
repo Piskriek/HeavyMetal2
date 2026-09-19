@@ -49,14 +49,14 @@
 .menu-composition[data-resume-note='true'] .main-menu-actions { margin-top: 18px; }
 .menu-composition[data-resume-note='true'] .menu-bottom-flourish { margin: 15px auto 8px; }
 .menu-composition[data-resume-note='true'] .game-wordmark p { margin-top: 10px; }
-.menu-resume-note > svg { color: #d8ab68; flex-shrink: 0; margin-top: 1px; }
+.menu-resume-note > svg, .menu-resume-note > img, .menu-resume-flag-img { width: 15px; height: 15px; object-fit: contain; flex-shrink: 0; margin-top: 1px; }
 .menu-storage-warning { position: absolute; left: 0; right: 0; bottom: calc(100% + 12px); margin: 0; text-align: center; color: #e2b183; font: 9px/1.5 var(--mono); letter-spacing: .6px; }
 .high-contrast-game .menu-resume-note, .high-contrast-game .menu-storage-warning { color: #f0e8d2; }
 .main-menu-actions { margin: 31px auto 0; display: flex; flex-direction: column; gap: 11px; width: 88%; }
 .forged-menu-button { position: relative; display: flex; align-items: center; gap: 18px; width: 100%; min-height: 58px; padding: 10px 24px 10px 27px; border: 13px solid transparent; border-image: url('/ui/button-gold.png') 52 86 80 86 fill / 13px 20px 12px 20px stretch; color: #f0e2ba; background: transparent; box-shadow: 0 4px 14px #00000066; text-align: left; text-shadow: 0 1px 2px #000000b0; }
 .forged-menu-button::after { content: ''; position: absolute; left: 14%; right: 14%; top: 9px; height: 1px; background: linear-gradient(90deg, transparent, #e8d69896, transparent); opacity: .7; pointer-events: none; }
 .forged-menu-button > span:not(.button-rivet) { flex: 1; font: 600 15px var(--fantasy); letter-spacing: 1px; }
-.forged-menu-button > svg:first-of-type { color: #e8cd8d; width: 20px; flex-shrink: 0; filter: drop-shadow(0 1px 1px #0009); }
+.forged-menu-button > svg:first-of-type, .forged-menu-button > .menu-flag-icon { color: #e8cd8d; width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 1px 1px #0009); }
 .forged-menu-button .menu-action-arrow { color: #f0d89a; opacity: 0; transform: translateX(-4px); transition: opacity .18s, transform .18s; }
 .forged-menu-button:hover, .forged-menu-button:focus-visible { border-image: url('/ui/button-gold-hover.png') 52 86 80 86 fill / 13px 20px 12px 20px stretch; color: #fff3cf; box-shadow: 0 6px 20px #d9a94e30, 0 4px 14px #00000066; }
 .forged-menu-button:hover .menu-action-arrow, .forged-menu-button:focus-visible .menu-action-arrow { opacity: 1; transform: translateX(0); }

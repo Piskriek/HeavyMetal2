@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Flag, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
 import Modal from './Modal';
 import BlizzardGauge from './ui/BlizzardGauge';
 import Drawer from './ui/Drawer';
@@ -65,9 +65,9 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
     <Modal title={confirm ? 'Leave the Current Event?' : titles[step]} eyebrow="HEAVY METAL GP 2 / NEW GAME" onClose={onClose} wide className="fantasy-dialog setup-dialog" backdrop={step === 1 ? 'workshop' : 'arena'}>
       <div ref={body} tabIndex={-1} className="setup-body">
         {confirm ? <div className="setup-confirm">
-          <Flag size={40} strokeWidth={1.3} /><h3>New crew. Fresh trouble.</h3>
+          <img src="/art/flag-checkered.png" alt="" className="setup-confirm-flag-img" aria-hidden="true" /><h3>New crew. Fresh trouble.</h3>
           <p>{finishedSession ? 'This event is already finished, but its final standings have not been filed away yet. Starting a new event clears that results screen. Every committed round stays in the Hall of Chaos, and your settings are kept.' : 'This replaces the current race or cup, including its unfinished rounds. Completed race records and your settings will be kept.'}</p>
-          <div className="fantasy-dialog-actions"><button className="fantasy-secondary" onClick={() => setConfirm(false)}><ArrowLeft size={16} />Keep choosing</button><button className="fantasy-primary" onClick={start} disabled={starting}>Start the New Event <Flag size={16} /></button></div>
+          <div className="fantasy-dialog-actions"><button className="fantasy-secondary" onClick={() => setConfirm(false)}><ArrowLeft size={16} />Keep choosing</button><button className="fantasy-primary" onClick={start} disabled={starting}>Start the New Event <img src="/art/flag-checkered.png" alt="" className="button-flag-img" aria-hidden="true" /></button></div>
         </div> : <>
           <nav className="setup-steps" aria-label="Race setup steps">{names.map((name, index) => <button key={name} className={step === index ? 'active' : index < step ? 'complete' : ''} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span>{index < step ? <Check size={12} /> : index + 1}</span>{name}{index < 2 && <ChevronRight size={13} />}</button>)}</nav>
 
@@ -75,7 +75,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
             <p className="fantasy-lead">A quick shot at glory, or three races to prove it wasn't an accident.</p>
             <div className="mode-options" role="radiogroup" aria-label="Race mode" onKeyDown={radioKeys}>
               <button className={`mode-option ${!tournament ? 'selected' : ''}`} role="radio" aria-checked={!tournament} tabIndex={!tournament ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, mode: 'quick' }))}>
-                <div className="mode-icon"><Flag size={47} strokeWidth={1.15} /></div><span className="mode-kicker">ONE RACE. ALL THE CHAOS.</span><h3>Quick Race</h3><p>Choose a track, build your capsule, and challenge three rivals.</p>
+                <div className="mode-icon"><img src="/art/flag-checkered.png" alt="" className="mode-flag-img" aria-hidden="true" /></div><span className="mode-kicker">ONE RACE. ALL THE CHAOS.</span><h3>Quick Race</h3><p>Choose a track, build your capsule, and challenge three rivals.</p>
                 <div className="mode-facts"><span>1 track</span><span>4 racers</span><span>Your rules</span></div><span className="selection-mark">{!tournament && <Check size={15} />}</span>
               </button>
               <button className={`mode-option ${tournament ? 'selected' : ''}`} role="radio" aria-checked={tournament} tabIndex={tournament ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, mode: 'tournament', customPhysics: false }))}>
@@ -168,7 +168,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
 
           {step === 2 && <div className="setup-final">
             <section className="event-selection">
-              <div className="choice-heading"><span>{tournament ? 'THE SCRAPDOME CUP / RACE ORDER' : 'CHOOSE YOUR TRACK'}</span><Flag size={15} /></div>
+              <div className="choice-heading"><span>{tournament ? 'THE SCRAPDOME CUP / RACE ORDER' : 'CHOOSE YOUR TRACK'}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
               {tournament ? <div className="cup-itinerary">{CUP_ROUNDS.map((id, index) => {
                 const track = COURSES.find((c) => c.id === id)!;
                 return <div className="itinerary-stop" key={id}><img className="course-thumbnail" src={coursePreview(id)} alt={`${TRACKS[id].region} scenery`} /><span>{String(index + 1).padStart(2, '0')}</span><div><h3>{track.name}</h3><p>{TRACKS[id].region} / {TRACKS[id].character}</p></div><small>15 km</small></div>;

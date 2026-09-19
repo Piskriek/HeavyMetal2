@@ -458,7 +458,6 @@ export class ArenaEnvironment {
     for (let x = 16; x < 1400; x += 228) {
       context.fillStyle = '#283a2a'; context.fillRect(x, 36, 15, 440);
       context.fillStyle = '#b99962'; context.fillRect(x + 1, 30, 3, 435);
-      context.fillStyle = this.palette.accent; context.beginPath(); context.moveTo(x + 3, 10); context.lineTo(x + 76, 25); context.lineTo(x + 3, 46); context.fill();
     }
     context.fillStyle = '#14231b'; context.fillRect(441, 2, 518, 56);
     context.strokeStyle = '#b39055'; context.lineWidth = 3; context.strokeRect(441, 2, 518, 56);

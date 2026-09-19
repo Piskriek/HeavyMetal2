@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Flag, Maximize2, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, Maximize2, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
 import Brand from './Brand';
 import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 import type { GameOptions } from '../game/types';
@@ -50,9 +50,11 @@ export default function MainMenu(props: MainMenuProps) {
     return () => window.removeEventListener('keydown', keydown);
   }, [props.hasRace, props.onResume]);
 
+  const FlagIcon = () => <img src="/art/flag-checkered.png" alt="" className="menu-flag-icon" aria-hidden="true" />;
+
   const entries = [
     ...(props.hasRace ? [{ label: props.resumeLabel ?? 'Resume Race', sub: 'Your goblin is waiting.', icon: Play, action: props.onResume, primary: true }] : []),
-    { label: 'New Game', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A fresh start. The same bad judgment.', icon: Flag, action: props.onNewGame, primary: !props.hasRace },
+    { label: 'New Game', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A fresh start. The same bad judgment.', icon: FlagIcon, action: props.onNewGame, primary: !props.hasRace },
     { label: 'Settings', sub: 'A little fine-tuning never hurt.', icon: Settings, action: props.onSettings, primary: false },
     { label: 'How to Play', sub: 'The very optional instruction manual.', icon: BookOpen, action: props.onGuide, primary: false },
     { label: 'Hall of Chaos', sub: 'Some things deserve to be remembered.', icon: Trophy, action: props.onRecords, primary: false },
@@ -77,7 +79,7 @@ export default function MainMenu(props: MainMenuProps) {
           <p>Glory at the bottom. Trouble all the way down.</p>
         </div>
 
-        {props.hasRace && props.resumeNote && <p className="menu-resume-note" role="status"><Flag size={13} />{props.resumeNote}</p>}
+        {props.hasRace && props.resumeNote && <p className="menu-resume-note" role="status"><img src="/art/flag-checkered.png" alt="" className="menu-resume-flag-img" aria-hidden="true" />{props.resumeNote}</p>}
         <nav ref={navigation} className="main-menu-actions" aria-label="Main menu" onKeyDown={moveFocus}>
           {entries.map(({ label, icon: Icon, action, primary }, index) => (
             <motion.button key={label} className={`forged-menu-button ${primary ? 'forged-primary' : ''}`} onClick={action}

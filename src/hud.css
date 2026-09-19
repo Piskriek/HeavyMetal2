@@ -122,6 +122,7 @@
 .trackbar-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; background: linear-gradient(90deg, #b2551f, #f0a15b); opacity: .66; transition: width 120ms linear; }
 .trackbar-pip { position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; border: 1px solid #00000088; box-shadow: 0 1px 3px #000a; transition: left 120ms linear; }
 .trackbar-pip.player { width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 2px solid #ffedc4; box-shadow: 0 0 8px #f0a15bcc, 0 1px 3px #000c; z-index: 1; }
+.trackbar-flag-img { width: 14px; height: 14px; object-fit: contain; vertical-align: -2px; margin-left: 4px; filter: drop-shadow(0 1px 2px #000a); }
 
 /* ============ Compact air supplies (in-stage corner) ============ */
 .hud-supplies { position: absolute; left: 22px; bottom: 36px; z-index: 3; display: flex; align-items: center; gap: 8px; pointer-events: auto; }

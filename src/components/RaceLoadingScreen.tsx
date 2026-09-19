@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpFromLine, Flag, Keyboard, X, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpFromLine, Keyboard, X, Zap } from 'lucide-react';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
 import Brand from './Brand';
 import OrnateCorners from './OrnateCorners';
@@ -87,7 +87,7 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
             <Brand variant="emblem" decorative />
             <div className="race-loading-title-group">
               <span className="eyebrow orange-text">
-                <Flag size={12} />
+                <img src="/art/flag-checkered.png" alt="" className="loading-flag-img" aria-hidden="true" />
                 {ready ? 'GRID READY — ENGINES HOT' : 'ASSEMBLING A VERY BAD IDEA'}
               </span>
               <h2 className="race-loading-title">{ready ? 'RACE CONTROLS & PROTOCOLS' : 'LOADING THE TRACK'}</h2>
@@ -230,8 +230,8 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
           background: radial-gradient(ellipse 90% 70% at 50% 38%, transparent 35%, #050908f0 85%);
         }
         .race-loading-grain {
-          position: absolute; inset: 0; opacity: .18; mix-blend-mode: overlay;
-          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
+          position: absolute; inset: 0; opacity: .12; pointer-events: none;
+          background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
         }
         .race-loading-content {
           position: relative; z-index: 2;

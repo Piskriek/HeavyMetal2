@@ -83,7 +83,44 @@ export class ArenaEnvironment {
     const lighting = TRACKS[this.course].lighting;
     const parallax = this.frame.options.parallax;
 
-    // ---- Layer 1: Far Sky (painted skybox if available, else procedural gradient) ----
+    // ---- Section 3: Subterranean Cavern Atmosphere (48000..68400) ----
+    if (this.frame.camera >= 48000 && this.frame.camera < 68400) {
+      // Dark cavern vault ceiling with warm volcanic glow from below
+      const cavernGrad = context.createLinearGradient(0, 0, 0, HEIGHT);
+      cavernGrad.addColorStop(0, '#0a080e');
+      cavernGrad.addColorStop(0.5, '#16101c');
+      cavernGrad.addColorStop(1, '#2c1208');
+      context.fillStyle = cavernGrad;
+      context.fillRect(0, 0, this.view.width, HEIGHT);
+
+      // Searing magma uplight glow
+      const lavaGlow = context.createLinearGradient(0, HEIGHT * 0.6, 0, HEIGHT);
+      lavaGlow.addColorStop(0, '#ff3b0000');
+      lavaGlow.addColorStop(1, '#ff440055');
+      context.fillStyle = lavaGlow;
+      context.fillRect(0, HEIGHT * 0.6, this.view.width, HEIGHT * 0.4);
+      return;
+    }
+
+    // ---- Section 2: Waterfall Canyon Chasm Atmosphere (24000..48000) ----
+    if (this.frame.camera >= 24000 && this.frame.camera < 48000) {
+      const canyonGrad = context.createLinearGradient(0, 0, 0, HEIGHT);
+      canyonGrad.addColorStop(0, '#102028');
+      canyonGrad.addColorStop(0.6, '#183844');
+      canyonGrad.addColorStop(1, '#2c5364');
+      context.fillStyle = canyonGrad;
+      context.fillRect(0, 0, this.view.width, HEIGHT);
+
+      // Frothing waterfall mist rising from below
+      const mistGrad = context.createLinearGradient(0, HEIGHT * 0.55, 0, HEIGHT);
+      mistGrad.addColorStop(0, '#8ec5fc00');
+      mistGrad.addColorStop(1, '#e0c3fc44');
+      context.fillStyle = mistGrad;
+      context.fillRect(0, HEIGHT * 0.55, this.view.width, HEIGHT * 0.45);
+      return;
+    }
+
+    // ---- Section 1 & Stadium: Alpine Open Sky ----
     const skyImage = this.art.skyboxImage ?? this.art.sky;
     this.drawTiledLayer(skyImage, HEIGHT + 55, this.frame.camera * (parallax ? 0.05 : 0.15) + this.frame.drift * 0.1, -35);
 
@@ -149,10 +186,10 @@ export class ArenaEnvironment {
   }
 
   private drawBlimps() {
+    if (this.frame.camera >= 24000 && this.frame.camera <= 68400) return;
     const context = this.context;
     const spacing = 1450;
     const movement = this.frame.reducedMotion ? 0 : this.frame.time * 7;
-    // TICKET-06: Layer 3 midground — watchtowers/blimps at 0.4x parallax.
     const offset = this.frame.camera * (this.frame.options.parallax ? 0.4 : 0.5) - movement;
     const first = Math.floor((offset - 950) / spacing) - 1;
     for (let index = first; index < first + Math.ceil(this.view.width / spacing) + 3; index++) {
@@ -162,7 +199,6 @@ export class ArenaEnvironment {
       const y = 100 + Math.abs(index % 3) * 27 + (this.frame.reducedMotion ? 0 : Math.sin(this.frame.time * 0.35 + index) * 4);
       const blimp = this.art.blimp;
       context.save(); context.globalAlpha = 0.66;
-      // Uses the sprite's own aspect ratio: the painted airship is not 520x270.
       context.drawImage(blimp, x, y, w, w * blimp.height / blimp.width); context.restore();
     }
   }
@@ -217,8 +253,14 @@ export class ArenaEnvironment {
     this.drawLavaChamber();
     this.drawTreeWall();
     this.drawLandmarks();
+    this.drawLipTransitionCutouts();
+    this.drawWaterfallCliffStage();
+    this.drawCavernMawStage();
+    this.drawMineCoasterStage();
+    this.drawBreakthroughStage();
     const step = 256;
     for (let x = Math.floor(range.start / step) * step; x < range.end; x += step) {
+      if (x >= 24000 && x <= 68400) continue; // Section 2 & 3 have bespoke cliff & mine spectator sets
       const y = this.y(x);
       const ny = this.y(x + step);
       this.fill([this.p(x, y + 67, z), this.p(x + step, ny + 67, z), this.p(x + step, ny + 155, z), this.p(x, y + 155, z)], '#2a301d');
@@ -227,8 +269,166 @@ export class ArenaEnvironment {
       const a = this.p(x + 16, y + 146, z - 1); const b = this.p(x + step - 12, ny + 72, z - 1);
       context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
     }
-    this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86);
+    this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86, 0, 24000);
+    this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86, STADIUM_START, FINISH + 2000);
     this.drawFence(LANE.far + 65, 142, 114);
+  }
+
+  private drawLipTransitionCutouts() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const cam = this.view.offset;
+    if (cam < 22500 || cam > 27000) return;
+
+    const context = this.context;
+    if (parts.rockArchWide) {
+      const p = this.p(24100, this.y(24100), 0);
+      const w = 1100 * p.scale;
+      const h = 750 * p.scale;
+      context.drawImage(parts.rockArchWide.image, p.x - w / 2, p.y - h * 0.96, w, h);
+    }
+    if (parts.rockBoulderA) {
+      const p = this.p(24350, this.y(24350) + 20, LANE.far + 80);
+      const w = 480 * p.scale;
+      const h = 420 * p.scale;
+      context.drawImage(parts.rockBoulderA.image, p.x - w / 2, p.y - h * 0.95, w, h);
+    }
+    if (parts.rockBoulderB) {
+      const p = this.p(24500, this.y(24500) + 30, LANE.near - 80);
+      const w = 460 * p.scale;
+      const h = 400 * p.scale;
+      context.drawImage(parts.rockBoulderB.image, p.x - w / 2, p.y - h * 0.95, w, h);
+    }
+    if (parts.rockTunnelFrameA) {
+      const p = this.p(25200, this.y(25200), 0);
+      const w = 1050 * p.scale;
+      const h = 800 * p.scale;
+      context.drawImage(parts.rockTunnelFrameA.image, p.x - w / 2, p.y - h * 0.98, w, h);
+    }
+  }
+
+  private drawWaterfallCliffStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const range = this.view.visibleSpan(LANE.near - 350, LANE.far + 350, 400);
+    const start = Math.max(24800, range.start);
+    const end = Math.min(48200, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const step = 950;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const y = this.y(x);
+      const idx = Math.abs(Math.floor(x / step));
+
+      if (parts.cliffScaffolding) {
+        const pLeft = this.p(x, y - 40, LANE.far + 140);
+        const sw = 360 * pLeft.scale;
+        const sh = 420 * pLeft.scale;
+        context.drawImage(parts.cliffScaffolding.image, pLeft.x - sw / 2, pLeft.y - sh * 0.95, sw, sh);
+
+        const bleacher = idx % 2 === 0 ? parts.goblinBleacherA : parts.goblinBleacherB;
+        if (bleacher) {
+          const bw = 240 * pLeft.scale;
+          const bh = 150 * pLeft.scale;
+          context.drawImage(bleacher.image, pLeft.x - bw / 2, pLeft.y - sh * 0.65, bw, bh);
+        }
+      }
+
+      if (parts.rockPlatformSpire) {
+        const pRight = this.p(x + 450, this.y(x + 450) - 20, LANE.near - 140);
+        const sw = 340 * pRight.scale;
+        const sh = 460 * pRight.scale;
+        context.drawImage(parts.rockPlatformSpire.image, pRight.x - sw / 2, pRight.y - sh * 0.95, sw, sh);
+
+        const bleacherRight = idx % 2 === 0 ? parts.goblinBleacherC : parts.goblinBleacherD;
+        if (bleacherRight) {
+          const bw = 220 * pRight.scale;
+          const bh = 140 * pRight.scale;
+          context.drawImage(bleacherRight.image, pRight.x - bw / 2, pRight.y - sh * 0.55, bw, bh);
+        }
+      }
+    }
+  }
+
+  private drawCavernMawStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const cam = this.view.offset;
+    if (cam < 46500 || cam > 51500) return;
+
+    const context = this.context;
+    if (parts.tunnelMouthStone) {
+      const p = this.p(48200, this.y(48200), 0);
+      const w = 1200 * p.scale;
+      const h = 850 * p.scale;
+      context.drawImage(parts.tunnelMouthStone.image, p.x - w / 2, p.y - h * 0.98, w, h);
+    }
+    if (parts.rockCeilingCutout) {
+      const p = this.p(48600, this.y(48600) - 280, 0);
+      const w = 980 * p.scale;
+      const h = 420 * p.scale;
+      context.drawImage(parts.rockCeilingCutout.image, p.x - w / 2, p.y, w, h);
+    }
+  }
+
+  private drawMineCoasterStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const range = this.view.visibleSpan(LANE.near - 300, LANE.far + 300, 350);
+    const start = Math.max(50500, range.start);
+    const end = Math.min(68000, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const step = 1100;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const y = this.y(x);
+      const idx = Math.abs(Math.floor(x / step));
+
+      if (parts.wallTimberBraced) {
+        const pWall = this.p(x, y - 60, LANE.far + 180);
+        const w = 450 * pWall.scale;
+        const h = 380 * pWall.scale;
+        context.drawImage(parts.wallTimberBraced.image, pWall.x - w / 2, pWall.y - h * 0.95, w, h);
+      }
+
+      if (parts.oreBucket && idx % 2 === 1) {
+        const pBucket = this.p(x + 300, y - 320, 0);
+        const bw = 160 * pBucket.scale;
+        const bh = 180 * pBucket.scale;
+        context.drawImage(parts.oreBucket.image, pBucket.x - bw / 2, pBucket.y - bh / 2, bw, bh);
+      }
+
+      const bleacher = idx % 2 === 0 ? parts.goblinBleacherE : parts.goblinBleacherC;
+      if (bleacher) {
+        const pBleach = this.p(x + 550, y - 50, LANE.near - 150);
+        const bw = 240 * pBleach.scale;
+        const bh = 150 * pBleach.scale;
+        context.drawImage(bleacher.image, pBleach.x - bw / 2, pBleach.y - bh * 0.85, bw, bh);
+      }
+    }
+  }
+
+  private drawBreakthroughStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const cam = this.view.offset;
+    if (cam < 67000 || cam > 72000) return;
+
+    const context = this.context;
+    if (parts.waterfallCurtain) {
+      const p = this.p(68400, this.y(68400), 0);
+      const w = 1150 * p.scale;
+      const h = 820 * p.scale;
+      context.drawImage(parts.waterfallCurtain.image, p.x - w / 2, p.y - h * 0.98, w, h);
+    }
+    if (parts.stadiumGantry) {
+      const p1 = this.p(69200, this.y(69200), 0);
+      const w1 = 980 * p1.scale;
+      const h1 = 580 * p1.scale;
+      context.drawImage(parts.stadiumGantry.image, p1.x - w1 / 2, p1.y - h1 * 0.98, w1, h1);
+    }
   }
 
   private drawWaterfallRiver() {
@@ -299,6 +499,7 @@ export class ArenaEnvironment {
    * TICKET-06.2: Midground Environmental Depth Layer — Dense Wall of Trees & Theme Scenery.
    * Eliminates the bare ground void behind the spectator crowd and racetrack wall by rendering
    * two overlapping 3D depth tiers anchored to track elevation with height/flip variations.
+   * Section 1 only (0..24000m).
    */
   private drawTreeWall() {
     const context = this.context;
@@ -310,9 +511,6 @@ export class ArenaEnvironment {
 
     if (!sprite || !sprite.image) return;
 
-    // Two depth tiers for true 3D parallax depth and full coverage behind crowd:
-    // Tier 1: Deeper midground backdrop (z = LANE.far + 580)
-    // Tier 2: Midground wall directly behind grandstand (z = LANE.far + 390)
     const tiers = [
       { z: LANE.far + 580, step: 240, baseHeight: 530, alpha: 0.82, offset: 120 },
       { z: LANE.far + 390, step: 175, baseHeight: 470, alpha: 0.98, offset: 0 },
@@ -322,22 +520,20 @@ export class ArenaEnvironment {
       const z = tier.z;
       const range = this.view.visibleSpan(z, z, 350);
       const start = Math.floor((range.start - tier.offset) / tier.step) * tier.step + tier.offset;
-      const end = Math.min(range.end + tier.step, STADIUM_START + 600);
+      const end = Math.min(range.end + tier.step, 24000);
       if (start >= end) continue;
 
       context.save();
       context.globalAlpha = tier.alpha;
 
       for (let x = start; x < end; x += tier.step) {
-        // Deterministic pseudo-random variation based on world position
         const seed = Math.sin(x * 0.013 + tier.z * 0.007) * 43758.5453;
         const rand = seed - Math.floor(seed);
         const flip = Math.abs(Math.floor(x / tier.step)) % 2 === 1;
-        const scaleMod = 0.88 + rand * 0.26; // 0.88x to 1.14x scale
+        const scaleMod = 0.88 + rand * 0.26;
         const height = tier.baseHeight * scaleMod;
         const width = height * (sprite.width / sprite.height);
 
-        // Ground anchor: rises and falls naturally with track elevation
         const baseY = this.y(x) + 130 + Math.sin(x * 0.004) * 12;
         const point = this.p(x, baseY, z);
 

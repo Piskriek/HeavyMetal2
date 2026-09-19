@@ -476,8 +476,9 @@ export class GameEngine {
       return;
     }
     if (!racer.loopRide) {
-      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling;
-      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling);
+      const isWet = racer.x >= 24000 && racer.x <= 48000;
+      const response = (this.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling;
+      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
       racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
       const previousZ = racer.z;
       racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
@@ -485,6 +486,7 @@ export class GameEngine {
       racer.lane = closestLane(racer.z);
     }
     const dragFactor = 120 / racer.weight;
+    const stageGravity = (racer.x >= 24000 && racer.x <= 48000 ? GRAVITY * 1.45 : GRAVITY);
     if (racer.loopRide) {
       const ride = racer.loopRide; const loop = loopGeometry(ride.obstacle, this.options.course);
       racer.z += (obstacleZ(ride.obstacle) - racer.z) * Math.min(1, dt * 16); racer.vz = 0;
@@ -510,7 +512,7 @@ export class GameEngine {
       if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
       const before = this.surfaceAt(racer.x, racer.z);
       if (racer.grounded && !this.inGap(racer.x, racer.z)) {
-        const downhill = GRAVITY * before.slope / (1 + before.slope * before.slope) / 1.4;
+        const downhill = stageGravity * before.slope / (1 + before.slope * before.slope) / 1.4;
         const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
         racer.vx = Math.max(0, racer.vx + (downhill - resistance) * dt);
         racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
@@ -527,7 +529,7 @@ export class GameEngine {
       } else {
         racer.grounded = false;
         racer.vx *= Math.exp(-0.009 * dragFactor * dt);
-        racer.vy += GRAVITY * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
+        racer.vy += stageGravity * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
       }
       for (const obstacle of this.nearby(racer.x)) {
         if (racer.visited.has(obstacle) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
@@ -581,6 +583,12 @@ export class GameEngine {
       racer.finishTime = this.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
       racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
       if (racer.id) racer.y = this.y(racer.x) - RADIUS;
+    } else if (racer.x >= 48000 && racer.x <= 68400 && racer.y > this.y(racer.x) + 260) {
+      // Lava lake plunge in Section 3: instant black-smoke vaporization and checkpoint recovery
+      this.emit(racer.x, racer.y, racer.z, 30, '#111111', 260);
+      this.emit(racer.x, racer.y, racer.z, 20, '#ff4400', 220);
+      if (!racer.id) { this.say('LAVA VAPORIZATION! RESCUED ONTO RAILS.'); this.shake = 5; }
+      this.recover(racer);
     } else if (racer.y > this.y(racer.x) + 360 || racer.stoppedFor > 3) this.recover(racer);
   }
 

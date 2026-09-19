@@ -36,6 +36,16 @@ export function edgeAnchor(px: number, py: number, width: number, height: number
   return { x, y, angle: Math.atan2(py - y, px - x), side: px < 0 ? -1 : px > width ? 1 : 0, above: py < margin };
 }
 
+export interface CameraStageState {
+  stage: 'alpine' | 'lip_swing' | 'waterfall_cliff' | 'cavern_maw' | 'mine_coaster' | 'stadium';
+  yaw: number;
+  swingProgress: number; // 0 to 1 during 90° swing
+  verticalBias: number;  // 1 when fully head-on/vertical in Section 2
+  originX: number;
+  originY: number;
+  elevation: number;
+}
+
 export class RangeCamera {
   width = 1440;
   offset = 0;
@@ -43,33 +53,104 @@ export class RangeCamera {
   readonly zoom = 0.86;
   private focal = 2880;
   private originX = 209;
-  private readonly originY = 447;
-  private readonly elevation = 0.32;
+  private originY = 447;
+  private elevation = 0.32;
+  private yaw = 20 * Math.PI / 180;
   private sine = Math.sin(20 * Math.PI / 180);
   private cosine = Math.cos(20 * Math.PI / 180);
-  private downrange = true;
   private cameraX = START_X - 2880 * Math.sin(20 * Math.PI / 180);
   private cameraY = GROUND - 2880 * 0.32;
   private cameraZ = -2880 * Math.cos(20 * Math.PI / 180);
+  private swingProgress = 0;
+  private verticalBias = 0;
+  private currentStage: CameraStageState['stage'] = 'alpine';
   revision = 0;
 
+  get stageState(): CameraStageState {
+    return {
+      stage: this.currentStage,
+      yaw: this.yaw,
+      swingProgress: this.swingProgress,
+      verticalBias: this.verticalBias,
+      originX: this.originX,
+      originY: this.originY,
+      elevation: this.elevation,
+    };
+  }
+
   configure(width: number, offset: number, downrange = true, heightOffset = this.heightOffset) {
-    if (width !== this.width || downrange !== this.downrange || this.revision === 0) {
-      this.width = width;
-      this.downrange = downrange;
-      this.focal = Math.max(2400, width * 2);
-      this.originX = Math.max(143, Math.min(250, width * 0.155));
-      const yaw = downrange ? 20 * Math.PI / 180 : 0;
-      this.sine = Math.sin(yaw);
-      this.cosine = Math.cos(yaw);
-      this.cameraY = GROUND - this.focal * this.elevation;
-      this.cameraZ = -this.focal * this.cosine;
-      this.revision++;
-    }
+    this.width = width;
     this.offset = offset;
     this.heightOffset = heightOffset;
+    this.focal = Math.max(2400, width * 2);
+
+    // Compute stage-aware camera angles for theatrical stage production:
+    // Section 1 (Alpine Downhill 0..24000): 20° side-follow view
+    // Transition 1->2 (Canyon Lip 24000..25600): camera smoothly swings 90° right
+    // Section 2 (Waterfall Cliff 25600..48000): head-on vertical drop stage, marbles drop down screen
+    // Transition 2->3 (Cavern Maw 48000..50000): plunge into darkness, swings to 24° coaster angle
+    // Section 3 (Mine Coaster 50000..68400): subterranean spaghetti coaster with dynamic banking
+    // Stadium Climax (68400+): breakthrough daylight finish
+    if (offset < 24000) {
+      this.currentStage = 'alpine';
+      this.swingProgress = 0;
+      this.verticalBias = 0;
+      this.yaw = downrange ? 20 * Math.PI / 180 : 0;
+      this.originX = Math.max(143, Math.min(250, width * 0.155));
+      this.originY = 447;
+      this.elevation = 0.32;
+    } else if (offset < 25600) {
+      this.currentStage = 'lip_swing';
+      const t = (offset - 24000) / 1600;
+      const ease = t * t * (3 - 2 * t);
+      this.swingProgress = ease;
+      this.verticalBias = ease;
+      this.yaw = (20 + 70 * ease) * Math.PI / 180;
+      this.originX = width * 0.155 * (1 - ease) + (width * 0.5) * ease;
+      this.originY = 447 * (1 - ease) + 260 * ease;
+      this.elevation = 0.32 * (1 - ease) + 0.70 * ease;
+    } else if (offset < 48000) {
+      this.currentStage = 'waterfall_cliff';
+      this.swingProgress = 1;
+      this.verticalBias = 1;
+      this.yaw = 90 * Math.PI / 180;
+      this.originX = width * 0.5;
+      this.originY = 260;
+      this.elevation = 0.70;
+    } else if (offset < 50000) {
+      this.currentStage = 'cavern_maw';
+      const t = (offset - 48000) / 2000;
+      const ease = t * t * (3 - 2 * t);
+      this.swingProgress = 1 - ease;
+      this.verticalBias = 1 - ease;
+      this.yaw = (90 - 66 * ease) * Math.PI / 180;
+      this.originX = (width * 0.5) * (1 - ease) + (width * 0.20) * ease;
+      this.originY = 260 * (1 - ease) + 420 * ease;
+      this.elevation = 0.70 * (1 - ease) + 0.32 * ease;
+    } else if (offset < 68400) {
+      this.currentStage = 'mine_coaster';
+      this.swingProgress = 0;
+      this.verticalBias = 0;
+      this.yaw = 24 * Math.PI / 180;
+      this.originX = width * 0.20;
+      this.originY = 420;
+      this.elevation = 0.32;
+    } else {
+      this.currentStage = 'stadium';
+      this.swingProgress = 0;
+      this.verticalBias = 0;
+      this.yaw = 20 * Math.PI / 180;
+      this.originX = width * 0.155;
+      this.originY = 447;
+      this.elevation = 0.32;
+    }
+
+    this.sine = Math.sin(this.yaw);
+    this.cosine = Math.cos(this.yaw);
     this.cameraY = GROUND + heightOffset - this.focal * this.elevation;
     this.cameraX = offset + START_X - this.focal * this.sine;
+    this.cameraZ = -this.focal * this.cosine;
+    this.revision++;
   }
 
   // Physics stays in its original plane; only rendering gains range and lateral depth.
@@ -92,10 +173,11 @@ export class RangeCamera {
 
   unproject(screenX: number, screenY: number, lateral = 0, parallax = 1) {
     const u = (screenX - this.originX) / this.zoom;
-    const denominator = this.focal * this.cosine - u * this.sine;
-    const range = (u * (this.focal + lateral * this.cosine) + this.focal * lateral * this.sine) / Math.max(1, denominator);
+    const rawDenom = this.focal * this.cosine - u * this.sine;
+    const denominator = Math.abs(rawDenom) < 1 ? (rawDenom < 0 ? -1 : 1) : rawDenom;
+    const range = (u * (this.focal + lateral * this.cosine) + this.focal * lateral * this.sine) / denominator;
     const depth = range * this.sine + lateral * this.cosine;
-    const scale = this.zoom * this.focal / (this.focal + depth);
+    const scale = this.zoom * this.focal / Math.max(this.focal * 0.2, this.focal + depth);
     return {
       x: this.offset * parallax + START_X + range,
       y: GROUND + this.heightOffset + (screenY - this.originY) / scale + depth * this.elevation,
@@ -103,6 +185,12 @@ export class RangeCamera {
   }
 
   visibleRange(lateral = 0, padding = 160, parallax = 1) {
+    if (this.currentStage === 'waterfall_cliff') {
+      return {
+        start: this.offset - 500,
+        end: this.offset + 2500,
+      };
+    }
     return {
       start: this.unproject(-padding, GROUND, lateral, parallax).x,
       end: this.unproject(this.width + padding, GROUND, lateral, parallax).x,
@@ -110,21 +198,45 @@ export class RangeCamera {
   }
 
   visibleSpan(near: number, far: number, padding = 220) {
-    // Far scenery projects left of the track center. Cover both lateral extremes
-    // and a complete tile beyond the viewport so a new right edge never pops in.
+    if (this.currentStage === 'waterfall_cliff') {
+      return {
+        start: Math.max(0, this.offset - 600),
+        end: this.offset + 2600,
+      };
+    }
     const a = this.visibleRange(near, padding);
     const b = this.visibleRange(far, padding);
     return { start: Math.min(a.start, b.start) - 256, end: Math.max(a.end, b.end) + 512 };
   }
 
   followOffset(x: number, z = 0) {
+    if (x >= 25600 && x <= 48000) {
+      return Math.max(0, x - 180);
+    }
+    if (x >= 24000 && x < 25600) {
+      const t = (x - 24000) / 1600;
+      const ease = t * t * (3 - 2 * t);
+      const focusX = Math.max(this.originX, this.width * 0.3);
+      const relative = this.unproject(focusX, GROUND, z).x - this.offset;
+      const side = Math.max(0, x - relative);
+      const vert = Math.max(0, x - 180);
+      return side * (1 - ease) + vert * ease;
+    }
+    if (x >= 48000 && x < 50000) {
+      const t = (x - 48000) / 2000;
+      const ease = t * t * (3 - 2 * t);
+      const focusX = Math.max(this.originX, this.width * 0.3);
+      const relative = this.unproject(focusX, GROUND, z).x - this.offset;
+      const side = Math.max(0, x - relative);
+      const vert = Math.max(0, x - 180);
+      return vert * (1 - ease) + side * ease;
+    }
     const focusX = Math.max(this.originX, this.width * 0.3);
     const relative = this.unproject(focusX, GROUND, z).x - this.offset;
     return Math.max(0, x - relative);
   }
 
   facing(point: Vec3, normal: Vec3) {
-    // Cull against the camera behind the launch axis, not a hard-coded screen side.
     const dx = this.cameraX - point.x;
     const dy = this.cameraY - point.y;
     const dz = this.cameraZ - point.z;

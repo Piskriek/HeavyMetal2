@@ -275,8 +275,10 @@ export class ArenaEnvironment {
       // including the TICKET-06.2 undergrowth mulch, which would otherwise float.
       if (x + step <= this.gorgeStart || x >= this.gorgeEnd) {
         this.fill(this.quad(x, x + step, LANE.near - 850, LANE.far + 1500, 153), stadium ? this.palette.grass : this.palette.soil);
-        // Rich shaded undergrowth mulch directly beneath the midground tree wall
-        if (!stadium) {
+        // Rich shaded undergrowth mulch directly beneath the midground tree wall. It stops
+        // at the crest with the tree wall: Section 2 has no meadow there, so the strip would
+        // otherwise paint a bare quad across the gorge.
+        if (!stadium && x + step <= this.cliffStart) {
           this.fill(this.quad(x, x + step, LANE.far + 340, LANE.far + 820, 153), understory);
         }
       }
@@ -407,7 +409,10 @@ export class ArenaEnvironment {
       const z = tier.z;
       const range = this.view.visibleSpan(z, z, 350);
       const start = Math.floor((range.start - tier.offset) / tier.step) * tier.step + tier.offset;
-      const end = Math.min(range.end + tier.step, STADIUM_START + 600);
+      // TICKET-08: this is Stage 1 meadow scenery. Past the crest the deck becomes a cliff
+      // face with its own midground (drawCliffWall), and the tree wall would be floating in
+      // the gorge, so it stops with the crowd.
+      const end = Math.min(range.end + tier.step, STADIUM_START + 600, this.cliffStart - 120);
       if (start >= end) continue;
 
       context.save();

@@ -88,8 +88,8 @@ export class RangeCamera {
     // Section 1 (Alpine Downhill 0..24000): 20° side-follow view
     // Transition 1->2 (Canyon Lip 24000..25600): camera smoothly swings 90° right
     // Section 2 (Waterfall Cliff 25600..48000): head-on vertical drop stage, marbles drop down screen
-    // Transition 2->3 (Cavern Maw 48000..50000): plunge into darkness, swings to 24° coaster angle
-    // Section 3 (Mine Coaster 50000..68400): subterranean spaghetti coaster with dynamic banking
+    // Transition 2->3 (Cavern Maw 48000..50400): plunge into darkness, swings to 22° coaster angle
+    // Section 3 (Mine Coaster 50400..68400): subterranean spaghetti coaster over lava
     // Stadium Climax (68400+): breakthrough daylight finish
     if (offset < 24000) {
       this.currentStage = 'alpine';
@@ -107,7 +107,7 @@ export class RangeCamera {
       this.verticalBias = ease;
       this.yaw = (20 + 70 * ease) * Math.PI / 180;
       this.originX = width * 0.155 * (1 - ease) + (width * 0.5) * ease;
-      this.originY = 447 * (1 - ease) + 260 * ease;
+      this.originY = 447 * (1 - ease) + 320 * ease;
       this.elevation = 0.32 * (1 - ease) + 0.70 * ease;
     } else if (offset < 48000) {
       this.currentStage = 'waterfall_cliff';
@@ -115,25 +115,25 @@ export class RangeCamera {
       this.verticalBias = 1;
       this.yaw = 90 * Math.PI / 180;
       this.originX = width * 0.5;
-      this.originY = 260;
+      this.originY = 320;
       this.elevation = 0.70;
-    } else if (offset < 50000) {
+    } else if (offset < 50400) {
       this.currentStage = 'cavern_maw';
-      const t = (offset - 48000) / 2000;
+      const t = (offset - 48000) / 2400;
       const ease = t * t * (3 - 2 * t);
       this.swingProgress = 1 - ease;
       this.verticalBias = 1 - ease;
-      this.yaw = (90 - 66 * ease) * Math.PI / 180;
+      this.yaw = (90 - 68 * ease) * Math.PI / 180;
       this.originX = (width * 0.5) * (1 - ease) + (width * 0.20) * ease;
-      this.originY = 260 * (1 - ease) + 420 * ease;
+      this.originY = 320 * (1 - ease) + 430 * ease;
       this.elevation = 0.70 * (1 - ease) + 0.32 * ease;
     } else if (offset < 68400) {
       this.currentStage = 'mine_coaster';
       this.swingProgress = 0;
       this.verticalBias = 0;
-      this.yaw = 24 * Math.PI / 180;
+      this.yaw = 22 * Math.PI / 180;
       this.originX = width * 0.20;
-      this.originY = 420;
+      this.originY = 430;
       this.elevation = 0.32;
     } else {
       this.currentStage = 'stadium';
@@ -159,19 +159,51 @@ export class RangeCamera {
   }
 
   projectInto(x: number, y: number, lateral: number, target: ScreenPoint, parallax = 1) {
-    const range = x - this.offset * parallax - START_X;
-    const depth = range * this.sine + lateral * this.cosine;
-    const scale = this.zoom * this.focal / Math.max(this.focal * 0.2, this.focal + depth);
-    target.x = this.originX + (range * this.cosine - lateral * this.sine) * scale;
-    target.y = this.originY + (y - GROUND - this.heightOffset - depth * this.elevation) * scale;
-    target.scale = scale;
-    target.depth = depth;
+    // 1. Standard Horizontal Side-Follow Projection (Section 1, Section 3, Stadium)
+    const rangeH = x - this.offset * parallax - START_X;
+    const depthH = rangeH * this.sine + lateral * this.cosine;
+    const scaleH = this.zoom * this.focal / Math.max(this.focal * 0.2, this.focal + depthH);
+    const hX = this.originX + (rangeH * this.cosine - lateral * this.sine) * scaleH;
+    const hY = this.originY + (y - GROUND - this.heightOffset - depthH * this.elevation) * scaleH;
+
+    // 2. Head-On Vertical Drop Projection (Section 2: Waterfall Cliff)
+    // Camera looks directly at cliff face: lateral (z) maps across screen horizontally,
+    // and track distance x (falling down cliff) maps DOWNWARDS vertically!
+    const vScale = 0.88;
+    const vX = this.originX + lateral * 1.7 * vScale;
+    const vY = this.originY + (x - this.offset) * 0.55;
+    const vDepth = x - this.offset;
+
+    if (this.verticalBias <= 0) {
+      target.x = hX;
+      target.y = hY;
+      target.scale = scaleH;
+      target.depth = depthH;
+    } else if (this.verticalBias >= 1) {
+      target.x = vX;
+      target.y = vY;
+      target.scale = vScale;
+      target.depth = vDepth;
+    } else {
+      const b = this.verticalBias;
+      target.x = hX * (1 - b) + vX * b;
+      target.y = hY * (1 - b) + vY * b;
+      target.scale = scaleH * (1 - b) + vScale * b;
+      target.depth = depthH * (1 - b) + vDepth * b;
+    }
+
     return target;
   }
 
   depthAt(x: number, z: number) { return (x - this.offset - START_X) * this.sine + z * this.cosine; }
 
   unproject(screenX: number, screenY: number, lateral = 0, parallax = 1) {
+    if (this.verticalBias > 0.5) {
+      return {
+        x: this.offset + (screenY - this.originY) / 0.55,
+        y: GROUND + this.heightOffset,
+      };
+    }
     const u = (screenX - this.originX) / this.zoom;
     const rawDenom = this.focal * this.cosine - u * this.sine;
     const denominator = Math.abs(rawDenom) < 1 ? (rawDenom < 0 ? -1 : 1) : rawDenom;
@@ -185,10 +217,10 @@ export class RangeCamera {
   }
 
   visibleRange(lateral = 0, padding = 160, parallax = 1) {
-    if (this.currentStage === 'waterfall_cliff') {
+    if (this.verticalBias > 0.5) {
       return {
-        start: this.offset - 500,
-        end: this.offset + 2500,
+        start: Math.max(0, this.offset - 800),
+        end: this.offset + 1600,
       };
     }
     return {
@@ -198,10 +230,10 @@ export class RangeCamera {
   }
 
   visibleSpan(near: number, far: number, padding = 220) {
-    if (this.currentStage === 'waterfall_cliff') {
+    if (this.verticalBias > 0.5) {
       return {
-        start: Math.max(0, this.offset - 600),
-        end: this.offset + 2600,
+        start: Math.max(0, this.offset - 800),
+        end: this.offset + 1600,
       };
     }
     const a = this.visibleRange(near, padding);
@@ -211,7 +243,7 @@ export class RangeCamera {
 
   followOffset(x: number, z = 0) {
     if (x >= 25600 && x <= 48000) {
-      return Math.max(0, x - 180);
+      return x;
     }
     if (x >= 24000 && x < 25600) {
       const t = (x - 24000) / 1600;
@@ -219,17 +251,15 @@ export class RangeCamera {
       const focusX = Math.max(this.originX, this.width * 0.3);
       const relative = this.unproject(focusX, GROUND, z).x - this.offset;
       const side = Math.max(0, x - relative);
-      const vert = Math.max(0, x - 180);
-      return side * (1 - ease) + vert * ease;
+      return side * (1 - ease) + x * ease;
     }
-    if (x >= 48000 && x < 50000) {
-      const t = (x - 48000) / 2000;
+    if (x >= 48000 && x < 50400) {
+      const t = (x - 48000) / 2400;
       const ease = t * t * (3 - 2 * t);
       const focusX = Math.max(this.originX, this.width * 0.3);
       const relative = this.unproject(focusX, GROUND, z).x - this.offset;
       const side = Math.max(0, x - relative);
-      const vert = Math.max(0, x - 180);
-      return vert * (1 - ease) + side * ease;
+      return x * (1 - ease) + side * ease;
     }
     const focusX = Math.max(this.originX, this.width * 0.3);
     const relative = this.unproject(focusX, GROUND, z).x - this.offset;

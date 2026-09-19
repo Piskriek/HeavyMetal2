@@ -856,11 +856,46 @@ export class RangeRenderer {
       return;
     }
     if (kind === 'lava_loop') {
-      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
-      this.context.save(); this.context.translate(point.x, point.y);
+      const z = obstacleZ(obstacle);
+      const point = this.p(x + width / 2, this.y(x + width / 2), z);
+      // 1. Draw heavy timber trestle support framework under the loop down to the lava!
+      const pBaseL = this.p(x + width * 0.15, this.y(x + width * 0.15) + 260, z);
+      const pBaseR = this.p(x + width * 0.85, this.y(x + width * 0.85) + 260, z);
+      this.context.fillStyle = '#24140a';
+      // Timber truss legs down to lava
+      this.context.beginPath();
+      this.context.moveTo(point.x - width * point.scale * 0.45, point.y);
+      this.context.lineTo(pBaseL.x, pBaseL.y);
+      this.context.lineTo(pBaseL.x + 20 * point.scale, pBaseL.y);
+      this.context.lineTo(point.x - width * point.scale * 0.35, point.y);
+      this.context.fill();
+
+      this.context.beginPath();
+      this.context.moveTo(point.x + width * point.scale * 0.45, point.y);
+      this.context.lineTo(pBaseR.x, pBaseR.y);
+      this.context.lineTo(pBaseR.x - 20 * point.scale, pBaseR.y);
+      this.context.lineTo(point.x + width * point.scale * 0.35, point.y);
+      this.context.fill();
+
+      // Cross struts on the trestle base
+      this.context.strokeStyle = '#351e0e';
+      this.context.lineWidth = 4 * point.scale;
+      this.context.beginPath();
+      this.context.moveTo(point.x - width * point.scale * 0.4, point.y);
+      this.context.lineTo(pBaseR.x, pBaseR.y);
+      this.context.moveTo(point.x + width * point.scale * 0.4, point.y);
+      this.context.lineTo(pBaseL.x, pBaseL.y);
+      this.context.stroke();
+
+      // 2. The 360° Roller Coaster Loop
+      this.context.save();
+      this.context.translate(point.x, point.y);
       this.context.drawImage(this.assets.loop.image, -width * point.scale / 2, -height * point.scale * 0.95, width * point.scale, height * point.scale);
       this.context.restore();
-      this.glow(point.x, point.y - 40 * point.scale, 60 * point.scale, '#ff4400', 0.3);
+
+      // 3. Searing lava rim glow and heat sparks
+      this.glow(point.x, point.y - height * point.scale * 0.5, 90 * point.scale, '#ff4400', 0.45);
+      this.glow(point.x, point.y - height * point.scale * 0.8, 50 * point.scale, '#ffaa00', 0.3);
       return;
     }
     const sprite = (this.assets as Record<string, any>)[kind];

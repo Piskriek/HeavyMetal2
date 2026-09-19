@@ -146,6 +146,35 @@ export class GameEngine {
     this.notify(); this.invalidate();
   };
 
+  teleport = (targetX: number) => {
+    const spacing = 45;
+    for (let i = 0; i < this.racers.length; i++) {
+      const racer = this.racers[i];
+      racer.x = targetX + (i - 1.5) * spacing;
+      racer.targetLane = racer.homeLane ?? (i % 4);
+      racer.lane = racer.targetLane;
+      racer.z = laneZ(racer.lane);
+      racer.vz = 0;
+      racer.y = this.surfaceAt(racer.x, racer.z).y - RADIUS;
+      racer.vx = 480;
+      racer.vy = this.slope(racer.x) * racer.vx;
+      racer.grounded = true;
+      racer.falling = false;
+      racer.finished = false;
+      racer.loopRide = null;
+      racer.distance = clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE);
+      Object.assign(racer.previous, { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation });
+    }
+    this.camera = targetX - 220;
+    this.cameraY = this.y(targetX) - GROUND;
+    this.snapshot.status = 'flying';
+    this.snapshot.sector = sectorAt(targetX, this.options.course);
+    this.renderer.view.configure(this.renderer.view.width, this.camera, this.options.downrange, this.cameraY);
+    this.lastFrame = this.accumulator = 0;
+    this.invalidate();
+    this.notify();
+  };
+
   launch = () => {
     if (this.status !== 'ready') return;
     for (const racer of this.racers) {

@@ -194,7 +194,8 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
     }
 
     // 360° Lava Loops
-    if (j % 3 === 1) {
+    if (j % 2 === 1) {
+      add('lava_loop', x + 1300, 380, 330, (lane + 1) % 4);
       add('lava_loop', x + 1300, 380, 330, (lane + 3) % 4);
     } else {
       add('ramp', x + 1250, 210, 110, lane);

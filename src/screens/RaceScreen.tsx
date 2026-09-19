@@ -23,6 +23,7 @@ import { TRACK_DISTANCE } from '../game/scene';
 import { loadAssets, type GameAssets, type SpriteName } from '../game/assets';
 import { preparePowerupSprites } from '../game/powerups';
 import { GameEngine } from '../game/engine';
+import { GameDebugController } from '../game/debug';
 import { COURSES, INITIAL_SNAPSHOT, type GameOptions, type RunRecord } from '../game/types';
 import RaceLoadingScreen from '../components/RaceLoadingScreen';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
@@ -211,6 +212,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     if (resumeOnly || !assets || !canvasRef.current || !stageRef.current) return;
     const engine = new GameEngine(canvasRef.current, assets, optionsRef.current, setSnapshot, handleFinish, config);
     engineRef.current = engine;
+    const debug = new GameDebugController(engine);
     engine.inputEnabled = activeRef.current && !modalRef.current;
     engine.setVisible(activeRef.current);
     const resize = () => {
@@ -225,6 +227,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     return () => {
       observer.disconnect();
       visibilityObserver.disconnect();
+      debug.destroy();
       engine.destroy();
       engineRef.current = null;
     };

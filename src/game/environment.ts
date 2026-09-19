@@ -208,6 +208,8 @@ export class ArenaEnvironment {
     const step = 256;
     const understory = this.course === 'boomtown' ? '#18120d' : this.course === 'sheep' ? '#1f2b15' : '#111c14';
     for (let x = Math.floor(range.start / step) * step; x < range.end; x += step) {
+      // In Section 2 (Waterfall Cliff) and Section 3 (Cavern Mine / Lava), NO flat soil or grass terrain!
+      if (x >= 24000 && x < 68400) continue;
       const stadium = x >= STADIUM_START;
       this.fill(this.quad(x, x + step, LANE.near - 850, LANE.far + 1500, 153), stadium ? this.palette.grass : this.palette.soil);
       // Rich shaded undergrowth mulch directly beneath the midground tree wall
@@ -282,27 +284,27 @@ export class ArenaEnvironment {
 
     const context = this.context;
     if (parts.rockArchWide) {
-      const p = this.p(24100, this.y(24100), 0);
-      const w = 1100 * p.scale;
-      const h = 750 * p.scale;
-      context.drawImage(parts.rockArchWide.image, p.x - w / 2, p.y - h * 0.96, w, h);
+      const p = this.p(24050, this.y(24050) - 20, 0);
+      const w = 1250 * p.scale;
+      const h = 850 * p.scale;
+      context.drawImage(parts.rockArchWide.image, p.x - w / 2, p.y - h * 0.95, w, h);
     }
     if (parts.rockBoulderA) {
-      const p = this.p(24350, this.y(24350) + 20, LANE.far + 80);
-      const w = 480 * p.scale;
-      const h = 420 * p.scale;
+      const p = this.p(24250, this.y(24250) + 40, LANE.far + 80);
+      const w = 540 * p.scale;
+      const h = 460 * p.scale;
       context.drawImage(parts.rockBoulderA.image, p.x - w / 2, p.y - h * 0.95, w, h);
     }
     if (parts.rockBoulderB) {
-      const p = this.p(24500, this.y(24500) + 30, LANE.near - 80);
-      const w = 460 * p.scale;
-      const h = 400 * p.scale;
+      const p = this.p(24400, this.y(24400) + 40, LANE.near - 80);
+      const w = 520 * p.scale;
+      const h = 440 * p.scale;
       context.drawImage(parts.rockBoulderB.image, p.x - w / 2, p.y - h * 0.95, w, h);
     }
     if (parts.rockTunnelFrameA) {
-      const p = this.p(25200, this.y(25200), 0);
-      const w = 1050 * p.scale;
-      const h = 800 * p.scale;
+      const p = this.p(25000, this.y(25000), 0);
+      const w = 1100 * p.scale;
+      const h = 850 * p.scale;
       context.drawImage(parts.rockTunnelFrameA.image, p.x - w / 2, p.y - h * 0.98, w, h);
     }
   }
@@ -365,10 +367,8 @@ export class ArenaEnvironment {
       context.drawImage(parts.tunnelMouthStone.image, p.x - w / 2, p.y - h * 0.98, w, h);
     }
     if (parts.rockCeilingCutout) {
-      const p = this.p(48600, this.y(48600) - 280, 0);
-      const w = 980 * p.scale;
-      const h = 420 * p.scale;
-      context.drawImage(parts.rockCeilingCutout.image, p.x - w / 2, p.y, w, h);
+      // Stalactite cavern ceiling hangs from the TOP of the screen!
+      context.drawImage(parts.rockCeilingCutout.image, 0, 0, this.view.width, 240);
     }
   }
 
@@ -434,14 +434,13 @@ export class ArenaEnvironment {
   private drawWaterfallRiver() {
     const sheet = this.assets.trackParts?.waterfallSheet;
     if (!sheet) return;
-    const z = LANE.far + 420;
-    const range = this.view.visibleSpan(z, z, 400);
+    const range = this.view.visibleSpan(-600, 600, 400);
     const start = Math.max(23600, range.start);
     const end = Math.min(48500, range.end);
     if (start >= end) return;
 
     const context = this.context;
-    const scrollY = (this.frame.time * 750) % 1024;
+    const scrollY = (this.frame.time * 850) % 1024;
     const splashA = this.assets.trackParts?.waterfallSplash;
     const splashB = this.assets.trackParts?.waterfallSplashB;
     const splash = Math.floor(this.frame.time * 9) % 2 === 0 ? splashA : splashB;
@@ -451,19 +450,39 @@ export class ArenaEnvironment {
       const right = x + step;
       const y = this.y(x);
       const ny = this.y(right);
-      const height = 650;
+      
+      // In Section 2 (Waterfall Cliff):
+      // The towering waterfall sheet forms the vertical backdrop behind the chutes across z in [-580, 580]
       const quad: Quad = [
-        this.p(x, y - height, z),
-        this.p(right, ny - height, z),
-        this.p(right, ny + 90, z),
-        this.p(x, y + 90, z),
+        this.p(x, y - 60, -580),
+        this.p(right, ny - 60, -580),
+        this.p(right, ny - 60, 580),
+        this.p(x, y - 60, 580),
       ];
       texturedQuad(context, sheet.image, { x: 0, y: scrollY, width: 512, height: 1024 }, quad);
 
-      if (splash) {
-        const point = this.p(x + step / 2, y + 40, z - 40);
-        const sw = 280 * point.scale;
-        const sh = 280 * point.scale;
+      // Wet slate rock walls framing the outer cliff edges (beyond z = ±460)
+      if (this.assets.trackParts?.wallSlateWet) {
+        const leftWall: Quad = [
+          this.p(x, y, -640),
+          this.p(right, ny, -640),
+          this.p(right, ny, -460),
+          this.p(x, y, -460),
+        ];
+        const rightWall: Quad = [
+          this.p(x, y, 460),
+          this.p(right, ny, 460),
+          this.p(right, ny, 640),
+          this.p(x, y, 640),
+        ];
+        texturedQuad(context, this.assets.trackParts.wallSlateWet.image, { x: 0, y: 0, width: 512, height: 512 }, leftWall);
+        texturedQuad(context, this.assets.trackParts.wallSlateWet.image, { x: 0, y: 0, width: 512, height: 512 }, rightWall);
+      }
+
+      if (splash && x % 1024 === 0) {
+        const point = this.p(x + step / 2, y + 40, 0);
+        const sw = 320 * point.scale;
+        const sh = 320 * point.scale;
         context.drawImage(splash.image, point.x - sw / 2, point.y - sh * 0.85, sw, sh);
       }
     }
@@ -475,23 +494,25 @@ export class ArenaEnvironment {
     const lavaC = this.assets.trackParts?.lavaSheetC;
     const lava = Math.floor(this.frame.time * 2) % 3 === 0 ? lavaA : Math.floor(this.frame.time * 2) % 3 === 1 ? lavaB : lavaC;
     if (!lava) return;
-    const z = LANE.near - 80;
-    const range = this.view.visibleSpan(z, z, 350);
-    const start = Math.max(53000, range.start);
-    const end = Math.min(67000, range.end);
+    const range = this.view.visibleSpan(LANE.near - 800, LANE.far + 800, 450);
+    const start = Math.max(48000, range.start);
+    const end = Math.min(68400, range.end);
     if (start >= end) return;
     const step = 512;
+    const scrollX = (this.frame.time * 60) % 512;
     for (let x = Math.floor(start / step) * step; x < end; x += step) {
       const right = x + step;
-      const y = this.y(x) + 320;
-      const ny = this.y(right) + 320;
+      // Raise lava lake elevation to y + 140 so magma is brilliantly visible beneath the trestles
+      const y = this.y(x) + 140;
+      const ny = this.y(right) + 140;
       const quad: Quad = [
-        this.p(x, y, LANE.far + 300),
-        this.p(right, ny, LANE.far + 300),
-        this.p(right, ny + 200, LANE.near - 300),
-        this.p(x, y + 200, LANE.near - 300),
+        this.p(x, y, LANE.far + 900),
+        this.p(right, ny, LANE.far + 900),
+        this.p(right, ny, LANE.near - 900),
+        this.p(x, y, LANE.near - 900),
       ];
-      texturedQuad(this.context, lava.image, { x: 0, y: 0, width: 512, height: 512 }, quad);
+      texturedQuad(this.context, lava.image, { x: scrollX, y: 0, width: 512, height: 512 }, quad);
+      this.fill(quad, '#ff44002e');
     }
   }
 
@@ -557,6 +578,7 @@ export class ArenaEnvironment {
     const range = this.view.visibleSpan(z, z, 230);
     const step = this.course === 'sheep' ? 1800 : 1170;
     for (let x = Math.floor(range.start / step) * step; x < Math.min(range.end, STADIUM_START - 300); x += step) {
+      if (x >= 24000) continue; // Landmarks belong only to Section 1 alpine grasslands!
       const point = this.p(x + 270, this.terrain(x + 270), z);
       const image = this.art.landmarks[Math.abs(Math.round(x / step)) % 2];
       const height = (this.course === 'sheep' ? 230 : 250) * point.scale;
@@ -590,27 +612,147 @@ export class ArenaEnvironment {
       const front: Quad = [this.p(x, y, LANE.near), this.p(right, ny, LANE.near), this.p(right, ny + 154, LANE.near), this.p(x, y + 154, LANE.near)];
       const middle = (x + right) / 2;
       const crop = { x: mod(x, 512), y: 0, width: right - x, height: 128 };
-      if (!this.inGap(middle)) texturedQuad(this.context, this.wall, crop, front);
       const hasGap = gaps.some((gap) => middle > gap.x && middle < gap.x + gap.width);
-      if (!hasGap) {
-        texturedQuad(this.context, this.deck, { ...crop, height: 512 }, top);
-        if (middle >= 24000 && middle <= 48000) {
-          this.context.save();
-          this.context.globalAlpha = 0.32;
-          this.fill(top, '#4ec5e8');
-          this.context.restore();
+
+      if (middle >= 48000 && middle < 68400) {
+        // SECTION 3: 4 INDIVIDUAL SEPARATED ROLLER-COASTER RAILS OVER BUBBLING LAVA
+        // NO continuous road deck or front wall!
+        const railsImg = this.assets.trackParts?.mineRails?.image;
+        for (let lane = 0; lane < LANE_COUNT; lane++) {
+          const lz = laneZ(lane);
+          const railHalf = 32;
+          // Lane 0 is elevated high trestle (-65), Lane 1 (-10), Lane 2 (+35), Lane 3 (+75)
+          const laneYOffset = lane === 0 ? -65 : lane === 1 ? -10 : lane === 2 ? 35 : 75;
+          const yL = y + laneYOffset;
+          const nyL = ny + laneYOffset;
+
+          // 1. Trestle timber bents (pairs of vertical posts at lz - 24 and lz + 24) plunging down into lava
+          const trestle1: Quad = [
+            this.p(x, yL, lz - 24),
+            this.p(right, nyL, lz - 24),
+            this.p(right, nyL + 280, lz - 24),
+            this.p(x, yL + 280, lz - 24),
+          ];
+          const trestle2: Quad = [
+            this.p(x, yL, lz + 24),
+            this.p(right, nyL, lz + 24),
+            this.p(right, nyL + 280, lz + 24),
+            this.p(x, yL + 280, lz + 24),
+          ];
+          this.fill(trestle1, '#23150b');
+          this.fill(trestle2, '#1c1008');
+
+          // Diagonal 'X' cross-brace struts on trestles
+          const pTopL = this.p(x, yL + 40, lz - 24);
+          const pBotR = this.p(right, nyL + 240, lz - 24);
+          const pTopR = this.p(right, nyL + 40, lz - 24);
+          const pBotL = this.p(x, yL + 240, lz - 24);
+          this.context.strokeStyle = '#2d1b0e';
+          this.context.lineWidth = 4 * pTopL.scale;
+          this.context.beginPath();
+          this.context.moveTo(pTopL.x, pTopL.y); this.context.lineTo(pBotR.x, pBotR.y);
+          this.context.moveTo(pTopR.x, pTopR.y); this.context.lineTo(pBotL.x, pBotL.y);
+          this.context.stroke();
+
+          // 2. Wooden railway ties / sleepers
+          const sleeperQuad: Quad = [
+            this.p(x, yL, lz + railHalf),
+            this.p(right, nyL, lz + railHalf),
+            this.p(right, nyL, lz - railHalf),
+            this.p(x, yL, lz - railHalf),
+          ];
+          this.fill(sleeperQuad, '#3d2615');
+
+          // 3. Twin iron/steel rails with metallic sheen
+          if (railsImg) {
+            texturedQuad(this.context, railsImg, { x: 0, y: 0, width: 512, height: 512 }, sleeperQuad);
+          } else {
+            const rail1: Quad = [
+              this.p(x, yL - 4, lz - railHalf + 6),
+              this.p(right, nyL - 4, lz - railHalf + 6),
+              this.p(right, nyL - 4, lz - railHalf + 14),
+              this.p(x, yL - 4, lz - railHalf + 14),
+            ];
+            const rail2: Quad = [
+              this.p(x, yL - 4, lz + railHalf - 14),
+              this.p(right, nyL - 4, lz + railHalf - 14),
+              this.p(right, nyL - 4, lz + railHalf - 6),
+              this.p(x, yL - 4, lz + railHalf - 6),
+            ];
+            this.fill(rail1, '#8c9aa6');
+            this.fill(rail2, '#8c9aa6');
+          }
         }
-      }
-      else {
-        let lane = 0;
-        while (lane < LANE_COUNT) {
-          if (this.inGap(middle, laneZ(lane))) { lane++; continue; }
-          const first = lane;
-          while (lane + 1 < LANE_COUNT && !this.inGap(middle, laneZ(lane + 1))) lane++;
-          const near = laneZ(lane) - LANE_WIDTH / 2;
-          const far = laneZ(first) + LANE_WIDTH / 2;
-          texturedQuad(this.context, this.deck, { ...crop, y: first * 128, height: (lane - first + 1) * 128 }, this.quad(x, right, near, far));
-          lane++;
+      } else if (middle >= 24000 && middle < 48000) {
+        // SECTION 2: WOODEN FLUME / CHUTE DOWN THE WATERFALL CLIFF
+        // Chute bed: dark wet timber planks
+        const flumeQuad = this.quad(x, right, -180, 180);
+        this.fill(flumeQuad, '#16221c');
+
+        // Wooden cross-ribs / plank joints every 64m
+        for (let ribX = Math.floor(x / 64) * 64; ribX < right; ribX += 64) {
+          if (ribX >= x) {
+            const ribQuad = this.quad(ribX, ribX + 12, -180, 180);
+            this.fill(ribQuad, '#28362e');
+          }
+        }
+
+        // Rushing water overlay (translucent cyan)
+        this.context.save();
+        this.context.globalAlpha = 0.40;
+        this.fill(flumeQuad, '#38bdf8');
+        this.context.restore();
+
+        // White foam rapids streaks
+        const foamQuad = this.quad(x, right, -165, 165);
+        this.context.save();
+        this.context.globalAlpha = 0.22;
+        this.fill(foamQuad, '#ffffff');
+        this.context.restore();
+
+        // Timber guide rails along outer edges (z = -180 and z = 180)
+        const leftGuide: Quad = [
+          this.p(x, y - 24, -180),
+          this.p(right, ny - 24, -180),
+          this.p(right, ny + 20, -180),
+          this.p(x, y + 20, -180),
+        ];
+        const rightGuide: Quad = [
+          this.p(x, y - 24, 180),
+          this.p(right, ny - 24, 180),
+          this.p(right, ny + 20, 180),
+          this.p(x, y + 20, 180),
+        ];
+        this.fill(leftGuide, '#3d2b1c');
+        this.fill(rightGuide, '#2e2015');
+
+        // Lane divider lines
+        for (const dz of [-90, 0, 90]) {
+          const p1 = this.p(x, y - 2, dz);
+          const p2 = this.p(right, ny - 2, dz);
+          this.context.strokeStyle = '#67e8f988';
+          this.context.lineWidth = 2 * p1.scale;
+          this.context.beginPath();
+          this.context.moveTo(p1.x, p1.y);
+          this.context.lineTo(p2.x, p2.y);
+          this.context.stroke();
+        }
+      } else {
+        // Section 1 & Stadium: standard dirt/grass track with front wall
+        if (!this.inGap(middle)) texturedQuad(this.context, this.wall, crop, front);
+        if (!hasGap) {
+          texturedQuad(this.context, this.deck, { ...crop, height: 512 }, top);
+        } else {
+          let lane = 0;
+          while (lane < LANE_COUNT) {
+            if (this.inGap(middle, laneZ(lane))) { lane++; continue; }
+            const first = lane;
+            while (lane + 1 < LANE_COUNT && !this.inGap(middle, laneZ(lane + 1))) lane++;
+            const near = laneZ(lane) - LANE_WIDTH / 2;
+            const far = laneZ(first) + LANE_WIDTH / 2;
+            texturedQuad(this.context, this.deck, { ...crop, y: first * 128, height: (lane - first + 1) * 128 }, this.quad(x, right, near, far));
+            lane++;
+          }
         }
       }
     }
@@ -677,6 +819,7 @@ export class ArenaEnvironment {
     const range = this.view.visibleSpan(z, z, 230);
     const context = this.context;
     for (let x = Math.floor(range.start / 256) * 256; x < range.end; x += 256) {
+      if (x >= 24000 && x < STADIUM_START) continue;
       const bottom = this.p(x, this.y(x) + base, z);
       const top = this.p(x, this.y(x) + base - height, z);
       const next = this.p(x + 256, this.y(x + 256) + base - height + 5, z);
@@ -702,6 +845,7 @@ export class ArenaEnvironment {
     const z = LANE.near - 62;
     const range = this.view.visibleSpan(z, z, 150);
     for (let x = Math.floor((range.start - 430) / 1250) * 1250 + 430; x < range.end; x += 1250) {
+      if (x >= 24000 && x < STADIUM_START) continue;
       const tip = this.p(x, this.y(x) - 27, z);
       const base = this.p(x, this.terrain(x), z);
       this.context.strokeStyle = '#1b2b1f'; this.context.lineWidth = 5 * tip.scale;
@@ -756,7 +900,8 @@ export class ArenaEnvironment {
 
   drawForeground() {
     this.drawFence(LANE.near - 55, 154, 87);
-    this.crowdStrip(this.assets.crowd, LANE.near - 172, 196, 320, 0.96);
+    this.crowdStrip(this.assets.crowd, LANE.near - 172, 196, 320, 0.96, 0, 24000);
+    this.crowdStrip(this.assets.crowd, LANE.near - 172, 196, 320, 0.96, STADIUM_START, FINISH + 2000);
     if (!this.lowDetail) this.crowdStrip(this.assets.crowd, LANE.near - 310, 245, 360, 0.94, STADIUM_START - 420, FINISH + 1000);
     const context = this.context;
     const fade = context.createLinearGradient(0, HEIGHT * 0.79, 0, HEIGHT);

@@ -82,6 +82,11 @@ export default function App() {
       setPanel(null);
     });
   }, [leaveRaceFullscreen]);
+
+  useEffect(() => {
+    (window as any).__startRace = (setup?: RaceSetup) => startRace(setup ?? lastSetup);
+    return () => { delete (window as any).__startRace; };
+  }, [startRace, lastSetup]);
   // Commits are idempotent: a duplicate round record is ignored, never scored twice.
   const finishRound = useCallback((record: RunRecord) => {
     if (!session) return;

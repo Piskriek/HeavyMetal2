@@ -13,7 +13,7 @@
  * same ImageMagick 6 requirement. Idempotent: already-keyed sources are
  * detected and only despilled again.
  *
- * Outputs (exact manifest names/sizes):
+ * Outputs (manifest names/sizes, plus the follow-up wall/tunnel/platform kit):
  *  - `waterfall-sheet.png`        512x1024 opaque tile, seamless vertically
  *                                 (roll + soft crossfade so the water still
  *                                 reads as flowing downward)
@@ -21,6 +21,18 @@
  *  - `rock-deflector.png`         512x512 transparent sprite
  *  - `bridge-wooden-broken.png`   512x256 transparent sprite
  *  - `cliff-scaffolding.png`      512x512 transparent sprite
+ *  - `wall-granite-strata.png`    512x1024 transparent wall column
+ *  - `wall-slate-wet.png`         512x1024 transparent wall column
+ *  - `wall-timber-braced.png`     512x1024 transparent wall column
+ *  - `tunnel-mouth-stone.png`     512x512 transparent arch portal (opaque
+ *                                 dark opening baked in)
+ *  - `tunnel-mouth-timber.png`    512x512 transparent mine entrance
+ *  - `rock-arch-wide.png`         1024x384 transparent natural arch (open
+ *                                 area under the span is real transparency)
+ *  - `rock-platform-deck.png`     512x512 transparent goblin viewing deck
+ *  - `rock-platform-spire.png`    512x1024 transparent two-tier spire decks
+ *  - `rock-platform-springboard.png` 512x512 transparent springboard ledge
+ *  - `rock-platform-drums.png`    512x512 transparent drum-ring boulder
  *
  * Usage: node scripts/process-track-parts.mjs
  * Requires ImageMagick 6 on PATH, exactly like the sprite pipeline.
@@ -43,14 +55,16 @@ const run = (args) => execFileSync('convert', args, { stdio: ['ignore', 'pipe', 
 const size = (file) => execFileSync('identify', ['-format', '%wx%h', file], { encoding: 'utf8' }).trim();
 const rgbOf = (text) => (text.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
 
-/** Matte detection: most frequent quantised border colour with a GREEN
- *  signature (same thresholds as the runtime cutout() matte in
- *  src/game/assets.ts). Returns null when the border is already transparent
- *  (idempotent re-runs) or when there is no chroma border (opaque tiles). */
+/** Matte detection: most frequent quantised border colour with a MAGENTA
+ *  signature (cut-ui-art.mjs rules) or a GREEN signature (runtime cutout()
+ *  rules in src/game/assets.ts). Sources are generated on whichever chroma
+ *  backdrop is safest for the subject (magenta under green goblins). Returns
+ *  null when the border is already transparent (idempotent re-runs) or when
+ *  there is no chroma border (opaque tiles). */
 function matteOf(file) {
   const [width, height] = size(file).split('x').map(Number);
   const strips = [`1x${height}+0+0`, `1x${height}+${width - 1}+0`, `${width}x1+0+0`, `${width}x1+0+${height - 1}`];
-  const counts = new Map();
+  const counts = { magenta: new Map(), green: new Map() };
   for (const strip of strips) {
     const text = execFileSync('convert', [file, '-crop', strip, '+repage', 'txt:-'], { encoding: 'utf8', maxBuffer: 1 << 26 });
     for (const line of text.split('\n')) {
@@ -58,21 +72,25 @@ function matteOf(file) {
       if (at < 0) continue;
       const [r, g, b] = rgbOf(line.slice(at + 1));
       if (![r, g, b].every(Number.isFinite)) continue;
-      if (!(g > 150 && r < 130 && b < 140 && g > Math.max(r, b) * 1.65)) continue;
+      let kind = null;
+      if (r > 150 && b > 150 && g < 110) kind = 'magenta';
+      else if (g > 150 && r < 130 && b < 140 && g > Math.max(r, b) * 1.65) kind = 'green';
+      if (!kind) continue;
       const key = [r, g, b].map((v) => Math.round(v / 8) * 8).join(',');
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      counts[kind].set(key, (counts[kind].get(key) ?? 0) + 1);
     }
   }
-  if (!counts.size) return null;
-  const [r, g, b] = [...counts.entries()].sort((a, c) => c[1] - a[1])[0][0].split(',').map(Number);
-  return `#${[r, g, b].map((v) => Math.min(255, v).toString(16).padStart(2, '0')).join('')}`;
+  const kind = counts.magenta.size >= counts.green.size ? 'magenta' : 'green';
+  if (!counts[kind].size) return null;
+  const [r, g, b] = [...counts[kind].entries()].sort((a, c) => c[1] - a[1])[0][0].split(',').map(Number);
+  return { kind, hex: `#${[r, g, b].map((v) => Math.min(255, v).toString(16).padStart(2, '0')).join('')}` };
 }
 
-/** cut-ui-art.mjs's despill(), verbatim strategy adapted to a green matte:
- *  clamp the matte's own channel (G) to the strongest remaining channel
- *  (Lighten of R and B), only on the anti-aliased fringe — the fully opaque
- *  interior (goblin greens, moss, spray whites) is protected. */
-function despill(file) {
+/** cut-ui-art.mjs's despill(), verbatim strategy for the detected matte kind:
+ *  clamp the matte's OWN channels (R and B for magenta, G for green) to the
+ *  strongest remaining channel, only on the anti-aliased fringe — the fully
+ *  opaque interior (goblin greens, moss, spray whites) is protected. */
+function despill(file, kind) {
   const channels = {};
   for (const name of ['R', 'G', 'B']) {
     const target = temp(`chan${name}`);
@@ -85,7 +103,10 @@ function despill(file) {
   run([alpha, '-threshold', '96%', interior]);
 
   const output = {};
-  for (const [name, others] of [['G', ['R', 'B']]]) {
+  const clamps = kind === 'magenta'
+    ? [['R', ['G', 'B']], ['B', ['G', 'R']]]
+    : [['G', ['R', 'B']]];
+  for (const [name, others] of clamps) {
     const ceiling = temp('ceiling');
     run([channels[others[0]], channels[others[1]], '-compose', 'Lighten', '-composite', ceiling]);
     const clamped = temp('clamped');
@@ -97,22 +118,43 @@ function despill(file) {
     output[name] = merged;
   }
   const rgb = temp('rgb');
-  run([channels.R, output.G, channels.B, '-combine', '-alpha', 'off', rgb]);
+  run([output.R ?? channels.R, output.G ?? channels.G, output.B ?? channels.B, '-combine', '-alpha', 'off', rgb]);
   const result = temp('despilled');
   run([rgb, alpha, '-alpha', 'off', '-compose', 'CopyOpacity', '-composite', result]);
   run([result, file]);
   return file;
 }
 
-/** Fuzz-key the border matte when present, then always despill the fringe. */
+/** Fuzz-key the border matte when present, then always despill the fringe.
+ *  GREEN-matte sources (no green-skinned subjects) use the original blanket
+ *  two-pass fuzz key: it also eats chroma-adjacent painter's glow (lantern
+ *  halos) and enclosed pockets like the under-arch opening. MAGENTA-matte
+ *  sources (green goblins aboard) key by FLOOD FILL from border seeds so warm
+ *  bunting/skin anywhere near the frame can never be holed; a final tight
+ *  global pass catches enclosed pockets at a fuzz low enough to never match
+ *  subject colours. */
 function keyOut(file) {
-  const hex = matteOf(file);
-  if (hex) {
-    run([file, '-fuzz', '18%', '-transparent', hex, file]);
-    run([file, '-fuzz', '34%', '-transparent', hex, file]);
+  const matte = matteOf(file);
+  if (matte) {
+    if (matte.kind === 'green') {
+      run([file, '-fuzz', '18%', '-transparent', matte.hex, file]);
+      run([file, '-fuzz', '34%', '-transparent', matte.hex, file]);
+    } else {
+      const [width, height] = size(file).split('x').map(Number);
+      const seeds = [
+        [0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1],
+        [Math.floor(width / 2), 0], [0, Math.floor(height / 2)],
+        [width - 1, Math.floor(height / 2)], [Math.floor(width / 2), height - 1],
+      ];
+      const draws = seeds.flatMap(([x, y]) => ['-draw', `matte ${x},${y} floodfill`]);
+      for (const fuzz of ['20%', '35%']) {
+        run([file, '-alpha', 'set', '-fuzz', fuzz, ...draws, file]);
+      }
+      run([file, '-fuzz', '12%', '-transparent', matte.hex, file]);
+    }
+    despill(file, matte.kind);
   }
-  despill(file);
-  return Boolean(hex);
+  return Boolean(matte);
 }
 
 /** Fit the keyed content inside a WxH transparent canvas (manifest size):
@@ -163,10 +205,23 @@ log('waterfall sheet (tile)', sheetTarget);
 
 /* 2-5. Keyed sprites ---------------------------------------------------------------- */
 const sprites = [
+  // Manifest batch (issue #10 comment 5740271262)
   ['waterfall-splash-src.png', 'waterfall-splash.png', 512, 512],
   ['rock-deflector-src.png', 'rock-deflector.png', 512, 512],
   ['bridge-wooden-broken-src.png', 'bridge-wooden-broken.png', 512, 256],
   ['cliff-scaffolding-src.png', 'cliff-scaffolding.png', 512, 512],
+  // Wall / rock cutout kit: canyon-wall columns and tunnel & arch framers
+  ['wall-granite-strata-src.png', 'wall-granite-strata.png', 512, 1024],
+  ['wall-slate-wet-src.png', 'wall-slate-wet.png', 512, 1024],
+  ['wall-timber-braced-src.png', 'wall-timber-braced.png', 512, 1024],
+  ['tunnel-mouth-stone-src.png', 'tunnel-mouth-stone.png', 512, 512],
+  ['tunnel-mouth-timber-src.png', 'tunnel-mouth-timber.png', 512, 512],
+  ['rock-arch-wide-src.png', 'rock-arch-wide.png', 1024, 384],
+  // Goblin rock platforms (cheering-crowd variants)
+  ['rock-platform-deck-src.png', 'rock-platform-deck.png', 512, 512],
+  ['rock-platform-spire-src.png', 'rock-platform-spire.png', 512, 1024],
+  ['rock-platform-springboard-src.png', 'rock-platform-springboard.png', 512, 512],
+  ['rock-platform-drums-src.png', 'rock-platform-drums.png', 512, 512],
 ];
 for (const [sourceName, outName, width, height] of sprites) {
   const working = temp('work');

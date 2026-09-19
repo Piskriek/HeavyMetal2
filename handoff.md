@@ -299,3 +299,35 @@ as images (`tests/artifacts/art-1-loadout.png`, `art-4-race.png`). The art-check
 ticket07 suites were also de-flaked while here: the loading cover owns Enter until
 dismissed (there is no auto-dismiss), the race screen has no header nav (workshop and main
 menu live in the gear menu), and launches retry until the status flips.
+
+## TICKET-08 Session (arena/01a0b617-heavymetal2)
+
+TICKET-08 (Section 2: waterfall cliff zigzag and pinball chasm, 12,000-24,000 m) is
+implemented on this branch. `src/game/track-geometry.ts` was split out of `scene.ts` as a
+leaf module (world frame and lane primitives) because `stage-two.ts` importing them from
+`scene.ts` formed an import cycle that crashed module loading; `scene.ts` re-exports it so
+existing imports are unchanged. `src/game/stage-two.ts` owns the metre-to-world conversion,
+the deterministic per-course prop layout, the surface zones and the physics tuning;
+`src/game/stage-two-art.ts` bakes the Section 2 sheets once per course; `environment.ts`
+layers the five-tier depth stack (foreground spray, deck and racers, barriers and
+scaffolding, midground chutes, distant canyon, skybox). The elevation profile is
+`SHAPE_LEGS`: `[metres, slope]` legs at or under 0.6 slope, joined to Stage 1 with C1
+continuity and with a shelf after each chute, because a spline through the earlier knot list
+overshot transitions by ~40% and stretched the deck art past its 0.9-ish projection limit.
+Art reuses predecessor webps (`public/art/track-parts/`: bumper-crown, bumper-spiked,
+spring, skull-box, crate, three rings, four surface strips) decoded before the race by the
+preloader. New physics: cliff gravity scale, surface-grip steering, banked-berm pull,
+swept-circle radial bumper reflection, fire rings with nitro and invulnerability frames,
+slope-driven camera pitch, and AI valuation for pegs, rocks, rings, crates and skulls. The
+HUD names the deck under the ball (DIRT / WET TIMBER / MOSSY SLATE / RIVETED STEEL / LAVA
+SLAG) and hides the chip on mobile. Stage 3 (`TICKET-09`, 24,000-36,000 m) is still just a
+ticket: the finish inside the Drowned Maw is provisional and the stadium stands down past
+the crest.
+
+Verification on this branch: `npm run check` (tsc + 53 tests, including 21 Section 2
+contracts in `tests/section-two.test.ts`) green; `npm run build` green at 740.48 kB / 228.85
+kB gzip; `node scripts/browser-check.mjs section2` (17 checks, new) drives a real
+headless-Chromium race from the grid into the maw and captures `tests/artifacts/section2-*.png`
+plus `section-two-visual.tap`, all of which were reviewed as images. Not verified: the
+ticket's 60 FPS target on real desktop or mobile hardware - the scripted run only proves the
+renderer keeps producing frames on the sandbox's software rasteriser.

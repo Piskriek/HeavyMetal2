@@ -9,9 +9,13 @@ import {
   laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, weightImpulse,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
 } from './scene';
-import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
+import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type SurfaceLabel } from './types';
 import type { RaceConfig } from './session';
 import { createTrackLayout } from './track-layout';
+import {
+  BANK_PULL, PEG_BOUNCE, RING, ROCK_BOUNCE, SURFACE_LABEL, bumperRebound, cameraPitch, gravityAt,
+  surfaceGripAt, surfaceKindAt, throughRing, type TrackSurface,
+} from './stage-two';
 import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from './powerups';
 
 const TAU = Math.PI * 2;
@@ -39,6 +43,7 @@ export class GameEngine {
   private runTime = 0;
   private camera = 0;
   private cameraY = 0;
+  private cameraTilt = 0;
   private pointerDrift = 0;
   private drift = 0;
   private shake = 0;
@@ -88,6 +93,22 @@ export class GameEngine {
   private get player() { return this.racers[0]; }
   private y(x: number) { return courseY(x, this.options.course); }
   private slope(x: number) { return courseSlope(x, this.options.course); }
+  /** TICKET-08: lateral grip of the deck under this x (wet timber is 40% slipperier). */
+  private grip(x: number) { return surfaceGripAt(x, this.options.course); }
+  private surfaceKind(x: number): TrackSurface { return surfaceKindAt(x, this.options.course); }
+  /**
+   * The banked shelf currently under `x`, if any. A switchback zone carries no collider;
+   * it applies a lateral pull toward its safe lane so the berm sweeps the field across
+   * the cliff face exactly like the classic Heavy Metal switchbacks.
+   */
+  private bankAt(x: number) {
+    for (const obstacle of this.nearby(x)) {
+      if (obstacle.kind !== 'switchback' || x < obstacle.x || x > obstacle.x + obstacle.width) continue;
+      const ramp = Math.min(1, (x - obstacle.x) / 140) * Math.min(1, (obstacle.x + obstacle.width - x) / 140);
+      if (ramp > 0) return { obstacle, strength: BANK_PULL * ramp };
+    }
+    return null;
+  }
   private get customPhysics() { return !this.config || this.config.customPhysics; }
   get status(): GameStatus { return this.snapshot.status; }
   get inputEnabled() { return this.controlsEnabled; }
@@ -95,7 +116,7 @@ export class GameEngine {
 
   resize(width: number, height: number) {
     this.renderer.resize(width, height);
-    this.renderer.view.configure(this.renderer.view.width, this.camera, this.options.downrange, this.cameraY);
+    this.renderer.view.configure(this.renderer.view.width, this.camera, this.options.downrange, this.cameraY, this.cameraTilt);
     this.invalidate();
   }
 
@@ -130,7 +151,7 @@ export class GameEngine {
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
-    this.camera = this.cameraY = this.runTime = 0;
+    this.camera = this.cameraY = this.cameraTilt = this.runTime = 0;
     this.accumulator = this.lastFrame = this.lastRender = 0;
     this.topSpeed = this.shake = 0;
     this.isDragging = false;
@@ -354,6 +375,7 @@ export class GameEngine {
       rendered.falling = racer.falling; rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
+      rendered.ringAt = racer.ringAt;
     }
     const player = this.player; const rendered = this.renderRacers[0];
     if (this.status === 'flying' && this.inputEnabled) {
@@ -370,6 +392,9 @@ export class GameEngine {
       const altitude = Math.max(0, this.y(rendered.x) - RADIUS - rendered.y);
       const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
       this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
+      // TICKET-08: the camera tilts down into the chute once the grade passes 40°, and
+      // unwinds smoothly on the ledge out of it.
+      this.cameraTilt = chaseLerp(this.cameraTilt, cameraPitch(this.slope(focus)), 3.2, dt);
     }
     this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
     const active = this.status === 'flying' || this.isDragging;
@@ -381,7 +406,7 @@ export class GameEngine {
         this.trailSample = now; this.trail.push({ x: rendered.x, y: rendered.y, z: rendered.z });
         if (this.trail.length > 9) this.trail.shift();
       }
-      this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
+      this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY, cameraPitch: this.cameraTilt,
         drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
@@ -430,9 +455,28 @@ export class GameEngine {
         const distance = obstacle.x - racer.x;
         if (distance < -obstacle.width || distance > lookAhead || !occupiesLane(obstacle, laneZ(lane), 0)) continue;
         if (obstacle.kind === 'gap') score -= distance < racer.vx * 0.45 ? 13 : 7;
-        else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
+        else if (obstacle.kind === 'switchback') {
+          // TICKET-08: a banked berm sweeps the field toward its safe lane, so a CPU
+          // lines up on that side of the shelf instead of fighting the pull.
           const proximity = 1 - clamp(distance / lookAhead, 0, 1);
-          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2 : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
+          const safe = obstacle.lane ?? PLAYER_LANE;
+          const span = obstacle.laneSpan ?? 1;
+          score += (lane >= safe && lane < safe + span ? 4.5 : -3) * proximity;
+        } else if (obstacle.kind === 'crate' || obstacle.kind === 'skull') {
+          const proximity = 1 - clamp(distance / lookAhead, 0, 1);
+          if (!obstacle.hit) score += (obstacle.kind === 'skull' ? -6 : -2.4) * proximity;
+        } else if (obstacle.kind === 'peg' || obstacle.kind === 'rock') {
+          // Pegs are lane-lottery: crown bumpers are worth clipping, spikes and boulders
+          // are not, and a heavier capsule can afford a shove through the field.
+          const proximity = 1 - clamp(distance / lookAhead, 0, 1);
+          const bump = racer.visited.has(obstacle) ? 0
+            : obstacle.kind === 'rock' ? -4.4
+            : obstacle.pegType === 'crown' ? 2.2 : -3.6;
+          score += bump * proximity * (racer.weight > 130 ? 0.55 : 1);
+        } else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
+          const proximity = 1 - clamp(distance / lookAhead, 0, 1);
+          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2
+            : obstacle.kind === 'ring' ? 5.5 : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
         }
       }
       for (const pickup of supplies) {
@@ -460,6 +504,15 @@ export class GameEngine {
           this.performHop(racer); break;
         }
       }
+      // TICKET-08: a raised fire ring needs a hop to thread it; a rolling hoop does not.
+      for (const obstacle of seen) {
+        if (obstacle.kind !== 'ring' || racer.visited.has(obstacle)) continue;
+        const distance = obstacle.x + obstacle.width / 2 - racer.x;
+        if (distance < timing - 70 || distance > timing + 70) continue;
+        if (Math.abs(racer.z - laneZ(obstacle.lane ?? PLAYER_LANE)) > 40) continue;
+        if ((obstacle.altitude ?? RING.altitude) < RING.airAltitude - 10) continue;
+        this.performHop(racer); break;
+      }
     }
     if (!racer.grounded && racer.bounces && this.inGap(racer.x + racer.vx * 0.1, racer.z)
       && racer.y > this.y(racer.x) - 105 && racer.vy > 90) this.performBounce(racer);
@@ -470,15 +523,21 @@ export class GameEngine {
   private stepRacer(racer: Racer, dt: number) {
     const oldX = racer.x;
     if (racer.falling) {
-      racer.fallingFor += dt; racer.vy += GRAVITY * dt;
+      racer.fallingFor += dt; racer.vy += gravityAt(this.slope(racer.x)) * dt;
       racer.x += racer.vx * dt * 0.45; racer.y += racer.vy * dt; racer.rotation += 9 * dt;
       if (racer.fallingFor > 0.72) this.recover(racer);
       return;
     }
     if (!racer.loopRide) {
-      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling;
+      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling * this.grip(racer.x);
       const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling);
       racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
+      // TICKET-08: a banked switchback shelf sweeps a grounded ball toward its safe lane.
+      const bank = racer.grounded ? this.bankAt(racer.x) : null;
+      if (bank) {
+        const safe = laneZ(bank.obstacle.lane ?? PLAYER_LANE);
+        racer.vz += Math.sign(safe - racer.z) * bank.strength * dt;
+      }
       const previousZ = racer.z;
       racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
       if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
@@ -510,7 +569,7 @@ export class GameEngine {
       if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
       const before = this.surfaceAt(racer.x, racer.z);
       if (racer.grounded && !this.inGap(racer.x, racer.z)) {
-        const downhill = GRAVITY * before.slope / (1 + before.slope * before.slope) / 1.4;
+        const downhill = gravityAt(before.slope) * before.slope / (1 + before.slope * before.slope) / 1.4;
         const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
         racer.vx = Math.max(0, racer.vx + (downhill - resistance) * dt);
         racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
@@ -530,7 +589,11 @@ export class GameEngine {
         racer.vy += GRAVITY * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
       }
       for (const obstacle of this.nearby(racer.x)) {
-        if (racer.visited.has(obstacle) || obstacle.kind === 'gap' || obstacle.kind === 'ramp' || !occupiesLane(obstacle, racer.z)) continue;
+        if (obstacle.kind === 'gap' || obstacle.kind === 'ramp' || obstacle.kind === 'switchback') continue;
+        // TICKET-08: pegs, rocks and rings are swept circles rather than lane boxes.
+        if (obstacle.kind === 'peg' || obstacle.kind === 'rock') { this.resolvePropContact(racer, obstacle); continue; }
+        if (obstacle.kind === 'ring') { this.resolveRing(racer, obstacle); continue; }
+        if (racer.visited.has(obstacle) || !occupiesLane(obstacle, racer.z)) continue;
         if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep' || obstacle.kind === 'blimp' || obstacle.kind === 'sign') && obstacle.hit) continue;
         if (obstacle.kind === 'loop') {
           const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
@@ -582,6 +645,103 @@ export class GameEngine {
       racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
       if (racer.id) racer.y = this.y(racer.x) - RADIUS;
     } else if (racer.y > this.y(racer.x) + 360 || racer.stoppedFor > 3) this.recover(racer);
+  }
+
+  /**
+   * TICKET-08 pinball contact. Pegs, rock outcrops and boulders are solid circles on the
+   * deck; the test is a swept circle in the (x, z) plane so a 2,000-unit/s ball can never
+   * tunnel through a bumper. The rebound reflects the planar velocity about the contact
+   * normal with the prop's own restitution, and a ball high enough to clear the prop's
+   * crown simply flies over it.
+   */
+  private resolvePropContact(racer: Racer, obstacle: Obstacle) {
+    const radius = obstacle.radius ?? 40;
+    const centreX = obstacle.x + obstacle.width / 2;
+    const centreZ = obstacleZ(obstacle);
+    const deck = this.y(centreX);
+    if (racer.y + RADIUS < deck - obstacle.height * 0.95) return;
+    const dx = racer.x - racer.previous.x; const dz = racer.z - racer.previous.z;
+    const fx = racer.previous.x - centreX; const fz = racer.previous.z - centreZ;
+    const reach = radius + RADIUS;
+    const a = dx * dx + dz * dz;
+    const b = 2 * (fx * dx + fz * dz);
+    const c = fx * fx + fz * fz - reach * reach;
+    let contact = c <= 0;
+    if (!contact && a > 1e-6) {
+      const discriminant = b * b - 4 * a * c;
+      if (discriminant >= 0) {
+        const time = (-b - Math.sqrt(discriminant)) / (2 * a);
+        contact = time >= 0 && time <= 1;
+      }
+    }
+    if (!contact) return;
+    let nx = racer.x - centreX; let nz = racer.z - centreZ;
+    const length = Math.hypot(nx, nz) || 1;
+    nx /= length; nz /= length;
+    const penetration = reach - length;
+    if (penetration > 0) {
+      racer.x += nx * penetration;
+      racer.z = clamp(racer.z + nz * penetration, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    }
+    const crown = obstacle.pegType === 'crown' && obstacle.kind === 'peg';
+    const restitution = obstacle.kind === 'rock' ? ROCK_BOUNCE : crown ? PEG_BOUNCE.crown : PEG_BOUNCE.spiked;
+    const rebound = bumperRebound({ vx: racer.vx, vz: racer.vz }, { x: nx, z: nz }, restitution);
+    racer.vx = clamp(rebound.vx + 35, 0, racer.maximumSpeed);
+    racer.vz = clamp(rebound.vz, -680, 680);
+    // Spiked bumpers add an erratic lateral deflection (deterministic, so replays match).
+    if (obstacle.kind === 'peg' && !crown) {
+      racer.vz = clamp(racer.vz + (randomAt(racer.id, this.runTime) - 0.5) * 280 * weightImpulse(racer.weight), -700, 700);
+    }
+    if (racer.grounded) racer.vy = this.slope(racer.x) * racer.vx;
+    const mask = 1 << racer.id;
+    const first = !((obstacle.hitMask ?? 0) & mask);
+    const fresh = this.time - obstacle.hitAt > 0.16;
+    obstacle.hitAt = this.time;
+    if (first) obstacle.hitMask = (obstacle.hitMask ?? 0) | mask;
+    if (crown) {
+      this.emit(centreX, deck - obstacle.height, centreZ, 9, '#ffd479', 150);
+      if (!racer.id) {
+        if (first) { this.snapshot.score += 150; this.shake = Math.max(this.shake, 2.6); this.say('SUPER BUMPER! +150'); }
+        if (fresh) this.audio.play('bell');
+      }
+    } else if (obstacle.kind === 'rock') {
+      this.emit(centreX, deck - RADIUS, centreZ, 7, '#8d8a76', 95);
+      if (!racer.id) {
+        if (fresh) this.audio.play('land');
+        if (fresh) { this.shake = Math.max(this.shake, 2.2); this.say('GRANITE. GRANITE WINS.'); }
+      }
+    } else {
+      this.emit(centreX, deck - obstacle.height, centreZ, 8, '#cfe3ff', 130);
+      if (!racer.id) {
+        if (first) { this.snapshot.score += 60; this.say('SPIKED BUMPER. HOLD ON.'); }
+        if (fresh) { this.audio.play('bump'); this.shake = Math.max(this.shake, 3.2); }
+      }
+    }
+  }
+
+  /**
+   * TICKET-08 fire ring: a trigger volume floating over the deck (or over a drop-off, for
+   * the daring line). Passing through grants hyper-speed, a free boost charge and a short
+   * window where rival shoves bounce off, then the ring's flame dies for that racer.
+   */
+  private resolveRing(racer: Racer, obstacle: Obstacle) {
+    if (racer.visited.has(obstacle)) return;
+    const centreX = obstacle.x + obstacle.width / 2;
+    if (!throughRing(obstacle, racer.x, racer.y, racer.z, this.y(centreX))) return;
+    racer.visited.add(obstacle);
+    const impulse = RING.boost * weightImpulse(racer.weight) * racer.boostFactor;
+    racer.vx = Math.min(racer.maximumSpeed + 150, racer.vx + impulse);
+    racer.boosts = Math.min(2, racer.boosts + 1);
+    racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + RING.immune);
+    racer.ringAt = this.runTime;
+    if (racer.grounded) racer.vy = this.slope(racer.x) * racer.vx;
+    this.emit(centreX, racer.y, racer.z, 18, obstacle.ringType === 'steel' ? '#9fd8ff' : '#ff9a3c', 190);
+    if (!racer.id) {
+      this.snapshot.score += 250;
+      this.shake = Math.max(this.shake, 3.4);
+      this.audio.play('boost');
+      this.say('FIRE RING! +250 AND A FREE NITRO.');
+    }
   }
 
   private recover(racer: Racer) {
@@ -775,6 +935,22 @@ export class GameEngine {
           this.say('AIRSPACE RESTRICTED! DOWN YOU GO!');
         }
         break;
+      case 'crate':
+        // TICKET-08: goblin supply crates splinter and cost the ball momentum.
+        obstacle.hit = true;
+        racer.vx = Math.max(140, racer.vx * 0.58); racer.vy = -300 * impulse; racer.grounded = false;
+        this.emit(x, y - 34, z, 22, '#c29a64', 200);
+        this.emit(x, y - 34, z, 12, '#8b5a2b', 150);
+        if (!racer.id) { this.snapshot.score += 80; this.shake = 3.4; this.audio.play('land'); this.say('SUPPLIES! MINUS SOME SPEED.'); }
+        break;
+      case 'skull':
+        // TICKET-08: the skull box is a hazard, not a prize. It slams the ball down.
+        obstacle.hit = true;
+        racer.vx = Math.max(110, racer.vx * 0.46); racer.vy = Math.max(120, racer.vy + 250); racer.grounded = false;
+        this.emit(x, y - 40, z, 20, '#d8d2bd', 190);
+        this.emit(x, y - 40, z, 10, '#6f6a58', 140);
+        if (!racer.id) { this.snapshot.score = Math.max(0, this.snapshot.score - 50); this.shake = 5.2; this.audio.play('boom'); this.say('SKULL BOX. DENTED PRIDE.'); }
+        break;
       case 'sign':
         obstacle.hit = true;
         racer.vx = Math.max(90, racer.vx * 0.52);
@@ -802,6 +978,10 @@ export class GameEngine {
     this.snapshot.grounded = player.grounded; this.snapshot.hopReady = this.canHop(player);
     this.snapshot.bounces = player.bounces; this.snapshot.boosts = player.boosts;
     this.snapshot.grade = Math.round(this.slope(player.x) * 100);
+    // Title-cased for the HUD: "MOSSY SLATE" reads as a warning, "DIRT" as home turf.
+    // TICKET-08 §3.5: the surface chip tracks the deck under the ball every frame, not
+    // only on event-driven refreshes — otherwise the maw's final slag zone never shows.
+    const nextSurface = SURFACE_LABEL[this.surfaceKind(player.x)] as SurfaceLabel;
     this.snapshot.lane = closestLane(player.z); this.snapshot.targetLane = player.targetLane;
     this.snapshot.laneLocked = this.runTime < player.steerLockedUntil;
     this.snapshot.bumps = this.counts.bumps; this.snapshot.raceTime = Math.floor(this.runTime * 10) / 10;
@@ -810,7 +990,7 @@ export class GameEngine {
     this.snapshot.position = position;
     const sector = sectorAt(START_X + player.distance * 2, this.options.course);
     if (sector !== this.snapshot.sector && player.x >= STADIUM_START) { this.say('FINAL STRAIGHT. NO MORE MANNERS.'); this.audio.play('finish'); }
-    this.snapshot.sector = sector; this.topSpeed = Math.max(this.topSpeed, this.snapshot.speed);
+    this.snapshot.sector = sector; this.snapshot.surface = nextSurface; this.topSpeed = Math.max(this.topSpeed, this.snapshot.speed);
     this.snapshot.pickups = this.pickupCount;
     this.snapshot.shieldSeconds = Math.max(0, Math.ceil((player.shieldUntil - this.runTime) * 10) / 10);
   }

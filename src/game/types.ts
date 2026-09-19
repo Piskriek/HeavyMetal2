@@ -72,8 +72,13 @@ export interface RunRecord {
   shieldsUsed?: number;
 }
 
+/** TICKET-08: the deck surface the player is currently on, shown in the HUD. */
+export type SurfaceLabel = 'DIRT' | 'WET TIMBER' | 'MOSSY SLATE' | 'RIVETED STEEL' | 'LAVA SLAG';
+
 export interface GameSnapshot {
   status: GameStatus;
+  /** TICKET-08: Section 2 surfaces change the grip, so the HUD names them. */
+  surface: SurfaceLabel;
   distance: number;
   speed: number;
   power: number;
@@ -106,6 +111,7 @@ export interface GameSnapshot {
 
 export const INITIAL_SNAPSHOT: GameSnapshot = {
   status: 'loading',
+  surface: 'DIRT',
   distance: 0,
   speed: 0,
   power: 0.8,

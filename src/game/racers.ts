@@ -48,7 +48,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
     lane: definition.homeLane, targetLane: definition.homeLane, rotation: 0,
     falling: false, finished: false, grounded: false, bumpAt: -100,
     immuneUntil: -100, launchOrigin: { x: START_X, y: START_Y },
-    shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,
+    shieldUntil: -100, shieldHitAt: -100, pickupAt: -100, ringAt: -100,
     lastGroundedAt: -100, lastHopAt: -100, bufferedJump: -100,
     fallingFor: 0, stoppedFor: 0, recoveryUntil: -100, steerLockedUntil: -100,
     nextDecision: 0.35 + definition.id * 0.11, lastBoostAt: -100, lastLaneChange: -100,

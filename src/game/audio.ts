@@ -1,4 +1,6 @@
-export type SoundName = 'launch' | 'hop' | 'bounce' | 'bump' | 'boost' | 'boom' | 'sheep' | 'loop' | 'finish' | 'land' | 'pickup' | 'shield';
+export type SoundName = 'launch' | 'hop' | 'bounce' | 'bump' | 'boost' | 'boom' | 'sheep' | 'loop' | 'finish' | 'land' | 'pickup' | 'shield'
+  /** TICKET-08: the super bumper's bell and the pinball ricochet. */
+  | 'bell' | 'ping';
 
 export class GameAudio {
   private context: AudioContext | null = null;
@@ -60,6 +62,8 @@ export class GameAudio {
       land: [100, 38, 0.1, 'sine'],
       pickup: [520, 1060, 0.2, 'triangle'],
       shield: [850, 220, 0.25, 'sine'],
+      bell: [1180, 640, 0.5, 'triangle'],
+      ping: [1560, 300, 0.18, 'square'],
     };
     const [start, end, duration, type] = notes[name];
     const oscillator = context.createOscillator();

@@ -1,5 +1,6 @@
 import type { CourseId } from './types';
 import { FINISH, STADIUM_START, type Obstacle, type ObstacleKind } from './scene';
+import { SECTION_TWO, createSectionTwoLayout, mx } from './stage-two';
 
 export function createTrackLayout(course: CourseId): Obstacle[] {
   const obstacles: Obstacle[] = [];
@@ -23,8 +24,12 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
   addBlimp(1850, 540);
   if (course === 'boomtown') add('tnt', 1210, 65, 70, 1);
 
+  // TICKET-08: Stage 1's obstacle rhythm stops at the Scrap Fall Crest; from there the
+  // waterfall cliff owns the layout. The alpine section keeps the exact same spacing and
+  // section count it had before the circuit was extended.
+  const stageOneEnd = mx(SECTION_TWO.crest);
   const step = course === 'boomtown' ? 2420 : course === 'sheep' ? 2160 : 2300;
-  for (let x = 2400, section = 0; x < STADIUM_START - 2400; x += step, section++) {
+  for (let x = 2400, section = 0; x < Math.min(STADIUM_START - 2400, stageOneEnd - 1800); x += step, section++) {
     const lane = (section * (course === 'sheep' ? 3 : 1)) % 4;
     const signType: 'sheep' | 'tnt' | 'parts' = section % 3 === 0 ? 'sheep' : section % 3 === 1 ? 'tnt' : 'parts';
 
@@ -63,10 +68,16 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
     }
   }
 
-  for (let lane = 0; lane < 4; lane++) { add('boost', STADIUM_START + 290, 130, 15, lane); add('boost', FINISH - 550, 135, 15, lane); }
-  addBlimpSign(STADIUM_START + 800, 'parts', 325, 550);
-  add('ramp', STADIUM_START + 1300, 190, 70, course === 'sheep' ? 2 : 0);
-  addBlimp(STADIUM_START + 1600, 560);
-  add(course === 'boomtown' ? 'tnt' : 'sheep', STADIUM_START + 1970, 65, 65, 3);
+  // Section 2: the crest run-out, the gorge leap, the switchbacks, the pinball rockfield,
+  // the wet foam run and the Drowned Maw. `stage-two.ts` owns every number below.
+  for (const obstacle of createSectionTwoLayout(course)) obstacles.push(obstacle);
+
+  // The provisional finish inside the cavern maw gets a proper run-in: boost pads, a
+  // ramp and a final piece of scenery, all of it past Section 2's landing funnel.
+  for (let lane = 0; lane < 4; lane++) { add('boost', STADIUM_START + 420, 130, 15, lane); add('boost', FINISH - 620, 135, 15, lane); }
+  add('ramp', STADIUM_START + 900, 190, 70, course === 'sheep' ? 2 : 0);
+  addBlimp(STADIUM_START + 1780, 560);
+  addBlimpSign(STADIUM_START + 1180, 'parts', 325, 550);
+  add(course === 'boomtown' ? 'tnt' : 'sheep', STADIUM_START + 2180, 65, 65, 3);
   return obstacles.sort((a, b) => a.x - b.x);
 }

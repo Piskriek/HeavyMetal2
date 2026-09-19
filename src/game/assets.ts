@@ -30,7 +30,30 @@ export interface Sprite {
   shadow?: HTMLCanvasElement;
 }
 
+/**
+ * TICKET-08: the predecessor game's painted track parts, copied from
+ * `PreGame/src/assets/` into `public/art/track-parts/`. They are loaded as plain
+ * images (their alpha is already clean) and cached by `stage-two-art.ts`.
+ */
+export interface TrackPartAssets {
+  bumperCrown: HTMLImageElement;
+  bumperSpiked: HTMLImageElement;
+  spring: HTMLImageElement;
+  crate: HTMLImageElement;
+  skull: HTMLImageElement;
+  ringSpiked: HTMLImageElement;
+  ringSteel: HTMLImageElement;
+  ringCrown: HTMLImageElement;
+  stripWood: HTMLImageElement;
+  stripMoss: HTMLImageElement;
+  stripMetal: HTMLImageElement;
+  stripHazard: HTMLImageElement;
+}
+
 export type GameAssets = Record<SpriteName, Sprite> & {
+  /** TICKET-08 Section 2 props and surface strips. */
+  trackParts: TrackPartAssets;
+  trackPartFailures?: string[];
   /** TICKET-04: one baked standalone-ball sprite (ball + team rim) per roster slot. */
   raceBalls?: HTMLCanvasElement[];
   pickupSprites?: Record<PowerupKind, HTMLCanvasElement>;
@@ -169,6 +192,30 @@ export function loadAssets(): Promise<GameAssets> {
         height,
       });
     }));
+    // TICKET-08: the reference pack's pinball props and surface strips. A missing file
+    // degrades to a blank 1x1 image rather than failing the whole race load.
+    const parts: [keyof TrackPartAssets, string][] = [
+      ['bumperCrown', 'bumper-crown.webp'], ['bumperSpiked', 'bumper-spiked.webp'],
+      ['spring', 'spring.webp'], ['crate', 'crate.webp'], ['skull', 'skull-box.webp'],
+      ['ringSpiked', 'ring-spiked.webp'], ['ringSteel', 'ring-steel.webp'], ['ringCrown', 'ring-crown.webp'],
+      ['stripWood', 'strip-wood.webp'], ['stripMoss', 'strip-moss.webp'],
+      ['stripMetal', 'strip-metal.webp'], ['stripHazard', 'strip-hazard.webp'],
+    ];
+    const trackParts = {} as TrackPartAssets;
+    const failures: string[] = [];
+    await Promise.all(parts.map(async ([name, filename]) => {
+      const url = `/art/track-parts/${filename}`;
+      try { trackParts[name] = await readImage(url); }
+      catch {
+        failures.push(url);
+        const blank = document.createElement('canvas');
+        blank.width = blank.height = 2;
+        trackParts[name] = blank as unknown as HTMLImageElement;
+      }
+    }));
+    result.trackParts = trackParts;
+    result.trackPartFailures = failures;
+
     const previews = createAssemblyPreviews(result);
     await Promise.all((Object.keys(previews) as (keyof typeof previews)[]).map(async (name) => {
       result[name] = asSprite(await readImage(previews[name]));

@@ -44,7 +44,8 @@ export class RangeCamera {
   private focal = 2880;
   private originX = 209;
   private readonly originY = 447;
-  private readonly elevation = 0.32;
+  private elevation = 0.32;
+  private readonly baseElevation = 0.32;
   private sine = Math.sin(20 * Math.PI / 180);
   private cosine = Math.cos(20 * Math.PI / 180);
   private downrange = true;
@@ -52,8 +53,18 @@ export class RangeCamera {
   private cameraY = GROUND - 2880 * 0.32;
   private cameraZ = -2880 * Math.cos(20 * Math.PI / 180);
   revision = 0;
+  /** Current steep-descent tilt, 0 for Stage 1's alpine grades. */
+  pitch = 0;
 
-  configure(width: number, offset: number, downrange = true, heightOffset = this.heightOffset) {
+  /**
+   * TICKET-08: `pitch` tilts the camera down into a steep Section 2 chute (see
+   * `cameraPitch` in stage-two.ts). It rides on the projection's elevation term, so the
+   * whole world — deck, scenery, actors — tilts together and inverse pointer projection
+   * stays exact.
+   */
+  configure(width: number, offset: number, downrange = true, heightOffset = this.heightOffset, pitch = this.pitch) {
+    this.pitch = Math.max(0, pitch);
+    this.elevation = this.baseElevation + this.pitch;
     if (width !== this.width || downrange !== this.downrange || this.revision === 0) {
       this.width = width;
       this.downrange = downrange;

@@ -118,6 +118,10 @@
 /* ============ Mini track bar ============ */
 .mini-trackbar { position: absolute; left: 26px; right: 26px; bottom: 14px; z-index: 3; display: flex; align-items: center; gap: 14px; pointer-events: none; }
 .mini-trackbar > span { flex-shrink: 0; display: flex; align-items: center; gap: 8px; color: #a9b397; font: 7px var(--mono); letter-spacing: 1px; text-shadow: 0 1px 6px #04120ad9; }
+.mini-trackbar .trackbar-surface { flex-shrink: 0; padding: 2px 7px; border: 1px solid #6f5626; border-radius: 3px; background: #14231bcc; color: #e7c98b; font: 7px var(--mono); letter-spacing: 1.1px; }
+.mini-trackbar .trackbar-surface.surface-wet, .mini-trackbar .trackbar-surface.surface-mossy { border-color: #4e7c58; color: #b6e0c0; }
+.mini-trackbar .trackbar-surface.surface-riveted { border-color: #5d7c8c; color: #bcdcea; }
+.mini-trackbar .trackbar-surface.surface-lava { border-color: #a3441f; color: #ffb98a; }
 .trackbar-rail { position: relative; flex: 1; height: 3px; border-radius: 2px; background: #c1cf9c26; box-shadow: 0 1px 4px #0009; }
 .trackbar-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; background: linear-gradient(90deg, #b2551f, #f0a15b); opacity: .66; transition: width 120ms linear; }
 .trackbar-pip { position: absolute; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; border: 1px solid #00000088; box-shadow: 0 1px 3px #000a; transition: left 120ms linear; }
@@ -238,6 +242,7 @@
   .supply-total { font-size: 12px; padding: 2px 5px; }
   .mini-trackbar { left: 12px; right: 12px; bottom: 10px; gap: 8px; }
   .mini-trackbar .trackbar-sector { display: none; }
+  .mini-trackbar .trackbar-surface { display: none; }
   .tuning-drawer { width: 100%; border-left: 0; }
   .gear-menu { min-width: 194px; }
 }

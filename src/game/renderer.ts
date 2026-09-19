@@ -5,6 +5,8 @@ import { RangeCamera, edgeAnchor } from './projection';
 import { CanvasLayer, RenderBudget } from './performance';
 import { FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_WIDTH, LAUNCHER, RADIUS, closestLane, courseY, courseSlope, decalOpacity, decalRadius, laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, type Obstacle, type RacerFrame, type SceneFrame } from './scene';
 import { RACER_DEFINITIONS, type CourseId } from './types';
+import { RING } from './stage-two';
+import { buildStageTwoArt, type StageTwoArt } from './stage-two-art';
 import { POWERUPS, pickupY, type AirPickup } from './powerups';
 import { polygon, texturedQuad, type Quad } from './texture';
 
@@ -22,6 +24,8 @@ export class RangeRenderer {
   private readonly sceneryLayer = new CanvasLayer();
   private readonly foregroundLayer = new CanvasLayer();
   private readonly glows = new Map<string, HTMLCanvasElement>();
+  /** TICKET-08: cached Section 2 props, rocks and sheets (built once per course). */
+  private stageTwo: StageTwoArt;
   private readonly commands: DrawItem[] = [];
   private readonly visibleObstacles: Obstacle[] = [];
   private readonly visiblePickups: AirPickup[] = [];
@@ -32,6 +36,7 @@ export class RangeRenderer {
   private lastCamera = Infinity;
   private lastCameraY = Infinity;
   private courseRevision = 0;
+  private artCourse: CourseId;
   private lastObstacles: Obstacle[] | null = null;
   private pendingResize = false;
   private frame!: SceneFrame;
@@ -40,10 +45,12 @@ export class RangeRenderer {
   private metrics = { started: 0, frames: 0, work: 0 };
 
   constructor(private readonly canvas: HTMLCanvasElement, private readonly assets: GameAssets, course: CourseId = 'ridge') {
+    this.artCourse = course;
     const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
     if (!context) throw new Error('Your browser does not support canvas.');
     this.context = context;
     this.models = buildModelAtlas(assets);
+    this.stageTwo = buildStageTwoArt(assets, course);
     this.environment = new ArenaEnvironment(context, this.view, assets, course);
     this.balls = RACER_DEFINITIONS.map((racer) => {
       if (assets.raceBalls?.[racer.id]) return assets.raceBalls[racer.id];
@@ -93,8 +100,9 @@ export class RangeRenderer {
     this.frame = frame;
     this.budget.configure(this.cssWidth, this.cssHeight, frame.options.graphics);
     if (this.pendingResize || changed) this.resizeBuffer();
-    this.view.configure(this.view.width, frame.camera, frame.options.downrange, frame.cameraY);
+    this.view.configure(this.view.width, frame.camera, frame.options.downrange, frame.cameraY, frame.cameraPitch);
     if (frame.obstacles !== this.lastObstacles) { this.courseRevision++; this.lastObstacles = frame.obstacles; }
+    if (frame.options.course !== this.artCourse) { this.artCourse = frame.options.course; this.stageTwo = buildStageTwoArt(this.assets, this.artCourse); }
     this.environment.begin(frame, this.lowDetail);
     this.updateHint();
     const range = this.view.visibleSpan(LANE.near - 100, LANE.far + 100, 320);
@@ -117,7 +125,7 @@ export class RangeRenderer {
       context.translate(Math.sin(frame.time * 91) * frame.shake * 0.24, Math.cos(frame.time * 73) * frame.shake * 0.2);
     }
     const still = Math.abs(frame.camera - this.lastCamera) < 0.001 && Math.abs(frame.cameraY - this.lastCameraY) < 0.001;
-    const key = `${this.view.revision}:${this.courseRevision}:${frame.camera.toFixed(3)}:${frame.cameraY.toFixed(3)}:${this.lowDetail}`;
+    const key = `${this.view.revision}:${this.courseRevision}:${frame.camera.toFixed(3)}:${frame.cameraY.toFixed(3)}:${frame.cameraPitch.toFixed(3)}:${this.lowDetail}`;
     const scenery = () => { this.environment.drawTerrain(); this.environment.drawGrandstands(); this.environment.drawTrack(); };
     if (still) this.sceneryLayer.draw(context, this.view.width, HEIGHT, this.scale, key, (target) => this.environment.withContext(target, scenery));
     else scenery();
@@ -290,7 +298,7 @@ export class RangeRenderer {
   private drawActors() {
     this.commands.length = 0;
     for (const obstacle of this.visibleObstacles) {
-      if (obstacle.kind === 'gap') continue;
+      if (obstacle.kind === 'gap' || obstacle.kind === 'switchback') continue;
       const z = obstacleZ(obstacle);
       if (obstacle.kind === 'loop') this.queueModel('loop', obstacle.x, obstacle.height / 322, obstacle.height / 322, z);
       else if (obstacle.kind === 'ramp') this.queueModel('ramp', obstacle.x + obstacle.width / 2, obstacle.width / 190, obstacle.height / 113, z);
@@ -728,7 +736,13 @@ export class RangeRenderer {
 
   private drawObstacle(obstacle: Obstacle) {
     const { kind, x, width, height } = obstacle;
-    if (kind === 'ramp' || kind === 'loop' || kind === 'gap') return;
+    if (kind === 'ramp' || kind === 'loop' || kind === 'gap' || kind === 'switchback') return;
+    // TICKET-08 props are painted reference-pack sprites and procedural granite, not the
+    // Stage 1 atlas entries, so they are routed away before the generic sprite path.
+    if (kind === 'peg') { this.drawPeg(obstacle); return; }
+    if (kind === 'rock') { this.drawRock(obstacle); return; }
+    if (kind === 'ring') { this.drawRing(obstacle); return; }
+    if (kind === 'crate' || kind === 'skull') { this.drawBreakable(obstacle); return; }
     if (kind === 'sign') {
       this.drawSign(obstacle);
       return;
@@ -757,6 +771,154 @@ export class RangeRenderer {
     this.context.drawImage(this.assets[kind].image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
     this.context.restore();
     if (kind === 'tnt') this.glow(point.x + 7 * point.scale, point.y - h * point.scale * 0.9, 12 * point.scale, '#ffc16c', 0.3);
+  }
+
+  /**
+   * TICKET-08 super/spiked bumper: a painted pinball peg bolted to the deck. A contact
+   * squashes the dome for a fifth of a second and, for the crown bumper, rings a bell of
+   * light over it. The collision radius is the peg's own, never the sprite's width.
+   */
+  private drawPeg(obstacle: Obstacle) {
+    const centre = obstacle.x + obstacle.width / 2;
+    const z = obstacleZ(obstacle);
+    const deck = this.y(centre);
+    const point = this.p(centre, deck, z);
+    if (point.x < -160 || point.x > this.view.width + 160) return;
+    const context = this.context;
+    const crown = obstacle.pegType === 'crown';
+    const radius = obstacle.radius ?? 40;
+    const age = this.frame.time - obstacle.hitAt;
+    const squash = age >= 0 && age < 0.22 ? Math.sin(age / 0.22 * Math.PI) : 0;
+    const width = radius * 2.5 * (1 + squash * 0.14);
+    const height = radius * 2.2 * (1 - squash * 0.18);
+    const image = crown ? this.stageTwo.props.crown : this.stageTwo.props.spiked;
+    context.save();
+    context.translate(point.x, point.y);
+    context.rotate(Math.atan(this.slope(centre) - (this.frame.options.downrange ? 0.11 : 0)) * 0.3);
+    context.drawImage(image, -width * point.scale / 2, -height * point.scale, width * point.scale, height * point.scale);
+    context.restore();
+    if (crown) this.glow(point.x, point.y - height * point.scale * 0.72, width * point.scale * (0.5 + squash * 0.6), '#ffd479', 0.1 + squash * 0.4);
+    if (age >= 0 && age < 0.22) {
+      // Impact ring, shared by every peg the ball clatters into.
+      context.strokeStyle = crown ? `rgba(255, 212, 121, ${(1 - age / 0.22) * 0.6})` : `rgba(207, 227, 255, ${(1 - age / 0.22) * 0.55})`;
+      context.lineWidth = 1.6 * point.scale;
+      context.beginPath(); context.arc(point.x, point.y - radius * point.scale, (radius + age * 210) * point.scale, 0, TAU); context.stroke();
+    }
+  }
+
+  /** TICKET-08 protruding rock: a mossy granite outcrop rising out of the deck. */
+  private drawRock(obstacle: Obstacle) {
+    const centre = obstacle.x + obstacle.width / 2;
+    const z = obstacleZ(obstacle);
+    const deck = this.y(centre);
+    const point = this.p(centre, deck, z);
+    if (point.x < -200 || point.x > this.view.width + 200) return;
+    const radius = obstacle.radius ?? 86;
+    const index = radius <= 62 ? 0 : radius <= 86 ? 1 : 2;
+    const image = this.stageTwo.rocks[index];
+    const size = radius * 2.9;
+    this.context.save();
+    this.context.globalAlpha = 0.28;
+    this.context.fillStyle = '#040c07';
+    this.context.beginPath();
+    this.context.ellipse(point.x, point.y + 3 * point.scale, radius * 0.92 * point.scale, radius * 0.3 * point.scale, 0, 0, TAU);
+    this.context.fill();
+    this.context.globalAlpha = 1;
+    this.context.drawImage(image, point.x - size * point.scale / 2, point.y - size * point.scale * 0.97, size * point.scale, size * point.scale);
+    this.context.restore();
+  }
+
+  /**
+   * TICKET-08 fire ring: a painted hoop hanging over the deck (or over the drop for the
+   * daring outer line). Live flames mean a ring the player has already claimed burns out
+   * to cold steel instead of staying lit forever.
+   */
+  private drawRing(obstacle: Obstacle) {
+    const centre = obstacle.x + obstacle.width / 2;
+    const z = obstacleZ(obstacle);
+    const deck = this.y(centre);
+    const y = deck - (obstacle.altitude ?? RING.altitude);
+    const point = this.p(centre, y, z);
+    if (point.x < -220 || point.x > this.view.width + 220) return;
+    const context = this.context;
+    const radius = obstacle.radius ?? RING.radius;
+    const steel = obstacle.ringType === 'steel';
+    const used = ((obstacle.hitMask ?? 0) & 1) !== 0;
+    const size = radius * 2.7;
+    const spin = this.frame.reducedMotion ? 0 : Math.sin(this.frame.runTime * 1.7 + centre * 0.01) * 0.05;
+    const pulse = this.frame.reducedMotion ? 0 : 1 + Math.sin(this.frame.runTime * 4.2 + centre * 0.02) * 0.03;
+    context.save();
+    context.translate(point.x, point.y);
+    context.rotate(spin);
+    if (!used) {
+      // Flame inside the hoop: the part the ball flies through.
+      const fire = this.radial(steel ? '#9fd8ff' : '#ff9a3c');
+      context.globalAlpha = 0.34 * pulse;
+      context.drawImage(fire, -size * point.scale * 0.62, -size * point.scale * 0.62, size * point.scale * 1.24, size * point.scale * 1.24);
+      context.globalAlpha = 0.3;
+      context.drawImage(fire, -size * point.scale * 0.4, -size * point.scale * 0.4, size * point.scale * 0.8, size * point.scale * 0.8);
+      context.globalAlpha = 1;
+    }
+    const image = steel || used ? this.stageTwo.props.ringSteel : this.stageTwo.props.ringSpiked;
+    context.globalAlpha = used ? 0.62 : 1;
+    context.drawImage(image, -size * point.scale / 2 * pulse, -size * point.scale / 2 * pulse, size * point.scale * pulse, size * point.scale * pulse);
+    context.globalAlpha = 1;
+    context.restore();
+    if (!used) {
+      this.glow(point.x, point.y, size * point.scale * 0.8, steel ? '#9fd8ff' : '#ff9a3c', 0.16);
+      // Embers falling out of the hoop.
+      if (!this.frame.reducedMotion) for (let i = 0; i < 3; i++) {
+        const drop = ((this.frame.time * 0.8 + i * 0.33) % 1);
+        const drift = Math.sin(this.frame.time * 2 + i * 2.1 + centre * 0.01) * 14;
+        context.fillStyle = `rgba(255, ${150 + i * 30}, 80, ${(1 - drop) * 0.5})`;
+        context.fillRect(point.x + drift * point.scale, point.y + (radius * 0.5 + drop * 120) * point.scale, 2.2 * point.scale, 3.4 * point.scale);
+      }
+    }
+  }
+
+  /**
+   * TICKET-08 breakables: goblin supply crates splinter and skull boxes crack open. Both
+   * are shared objects, so once any racer hits one it stays broken for the field.
+   */
+  private drawBreakable(obstacle: Obstacle) {
+    const centre = obstacle.x + obstacle.width / 2;
+    const z = obstacleZ(obstacle);
+    const deck = this.y(centre);
+    const point = this.p(centre, deck, z);
+    if (point.x < -180 || point.x > this.view.width + 180) return;
+    const context = this.context;
+    const crate = obstacle.kind === 'crate';
+    const width = obstacle.width * 1.15;
+    const height = obstacle.height * 1.15;
+    if (!obstacle.hit) {
+      const image = crate ? this.stageTwo.props.crate : this.stageTwo.props.skull;
+      context.save();
+      context.translate(point.x, point.y);
+      context.rotate(Math.atan(this.slope(centre) - (this.frame.options.downrange ? 0.11 : 0)) * 0.3);
+      context.drawImage(image, -width * point.scale / 2, -height * point.scale, width * point.scale, height * point.scale);
+      context.restore();
+      if (!crate) this.glow(point.x, point.y - height * point.scale * 0.5, width * point.scale * 0.5, '#d8d2bd', 0.07);
+      return;
+    }
+    const age = this.frame.time - obstacle.hitAt;
+    if (age > 1.5) return;
+    const fade = Math.max(0, 1 - age / 1.5);
+    context.save();
+    context.globalAlpha = fade;
+    for (let i = 0; i < 9; i++) {
+      const angle = i / 9 * TAU + centre * 0.01;
+      const travel = age * (120 + (i % 3) * 90);
+      const x = point.x + Math.cos(angle) * travel * point.scale;
+      const y = point.y - (60 + Math.sin(angle) * travel * 0.7) * point.scale + age * age * 420 * point.scale * 0.35;
+      context.save();
+      context.translate(x, y);
+      context.rotate(age * (i % 2 ? 7 : -7) + i);
+      context.fillStyle = crate ? (i % 2 ? '#8b5a2b' : '#c29a64') : (i % 2 ? '#d8d2bd' : '#6f6a58');
+      context.fillRect(-7 * point.scale, -3 * point.scale, 14 * point.scale, 6 * point.scale);
+      context.restore();
+    }
+    if (age < 0.3) this.glow(point.x, point.y - 40 * point.scale, 90 * point.scale, crate ? '#ffd0a0' : '#e8e4d0', (1 - age / 0.3) * 0.5);
+    context.restore();
   }
 
   private drawBall(ball: RacerFrame) {
@@ -819,6 +981,19 @@ export class RangeRenderer {
   }
 
   private drawTrail() {
+    // TICKET-08: a fire-ring pass leaves a short flame trail, so the speed surge is visible.
+    const ringAge = this.frame.runTime - (this.frame.racers[0]?.ringAt ?? -100);
+    if (ringAge >= 0 && ringAge < 1.1 && this.frame.racers[0]) {
+      const ball = this.frame.ball;
+      const context = this.context;
+      for (let i = 1; i <= 5; i++) {
+        const back = i * 26;
+        const p = this.p(ball.x - back, ball.y + i * 3, ball.z);
+        const alpha = (1 - ringAge / 1.1) * (1 - i / 6) * 0.6;
+        this.glow(p.x, p.y, (34 - i * 4) * p.scale, i % 2 ? '#ff9a3c' : '#ffd479', alpha);
+      }
+      context.globalAlpha = 1;
+    }
     if (this.frame.snapshot.status !== 'flying' || this.frame.reducedMotion || this.frame.loopRide || this.frame.snapshot.falling) return;
     const context = this.context;
     context.save(); context.lineCap = 'round';

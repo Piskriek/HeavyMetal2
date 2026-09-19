@@ -430,6 +430,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   <div className="trackbar-fill" style={{ width: `${trackPct(playerDistance)}%` }} />
                   {snapshot.racers.map((racer) => <span key={racer.id} className={`trackbar-pip ${racer.id === 0 ? 'player' : ''}`} style={{ left: `${trackPct(racer.distance)}%`, backgroundColor: racer.color }} title={racer.id === 0 ? 'You' : racer.name} aria-hidden="true" />)}
                 </div>
+                {snapshot.surface !== 'DIRT' && <span className={`trackbar-surface surface-${snapshot.surface.split(' ')[0].toLowerCase()}`} title="Section 2 surfaces change how the ball steers">{snapshot.surface}</span>}
                 <span className="trackbar-remaining">{number(Math.max(0, TRACK_DISTANCE - playerDistance))} m <span className="checkered-flag" /></span>
               </div>
               <AnimatePresence>

@@ -76,6 +76,12 @@ export function collectRaceAssetPaths(courseId: CourseId, roster: RosterSlot[]):
     'sign-tnt.png?v=3',
     'sign-parts.png?v=3',
     'aim-arrow.png',
+    // TICKET-08: the Section 2 pinball props and surface strips.
+    'track-parts/bumper-crown.webp', 'track-parts/bumper-spiked.webp', 'track-parts/spring.webp',
+    'track-parts/crate.webp', 'track-parts/skull-box.webp',
+    'track-parts/ring-spiked.webp', 'track-parts/ring-steel.webp', 'track-parts/ring-crown.webp',
+    'track-parts/strip-wood.webp', 'track-parts/strip-moss.webp',
+    'track-parts/strip-metal.webp', 'track-parts/strip-hazard.webp',
     'landmark-pines.png',
     'landmark-quarry.png',
     'landmark-windmill.png',

@@ -1,21 +1,81 @@
 import type { CourseId } from './types';
-import { FINISH, STADIUM_START, type Obstacle, type ObstacleKind } from './scene';
+import {
+  FINISH,
+  STADIUM_START,
+  SECTION_LIP_START,
+  SECTION_2_START,
+  SECTION_2_END,
+  SECTION_3_START,
+  SECTION_3_END,
+  type Obstacle,
+  type ObstacleKind,
+} from './scene';
 
 export function createTrackLayout(course: CourseId): Obstacle[] {
   const obstacles: Obstacle[] = [];
-  const add = (kind: ObstacleKind, x: number, width: number, height: number, lane: number, laneSpan = 1) =>
-    obstacles.push({ kind, x, width, height, lane, laneSpan, hit: false, hitAt: -100, hitMask: 0 });
+  const add = (
+    kind: ObstacleKind,
+    x: number,
+    width: number,
+    height: number,
+    lane: number,
+    laneSpan = 1,
+    extra: Partial<Obstacle> = {}
+  ) =>
+    obstacles.push({
+      kind,
+      x,
+      width,
+      height,
+      lane,
+      laneSpan,
+      hit: false,
+      hitAt: -100,
+      hitMask: 0,
+      ...extra,
+    });
+
   const addSign = (x: number, signType: 'sheep' | 'tnt' | 'parts', altitude = 320) =>
-    obstacles.push({ kind: 'sign', signType, x, width: 360, height: 150, lane: -1, laneSpan: 4, altitude, hit: false, hitAt: -100, hitMask: 0 });
+    obstacles.push({
+      kind: 'sign',
+      signType,
+      x,
+      width: 360,
+      height: 150,
+      lane: -1,
+      laneSpan: 4,
+      altitude,
+      hit: false,
+      hitAt: -100,
+      hitMask: 0,
+    });
+
   const addBlimp = (x: number, altitude = 545) =>
-    obstacles.push({ kind: 'blimp', x, width: 230, height: 115, lane: -1, laneSpan: 4, altitude, hit: false, hitAt: -100, hitMask: 0 });
+    obstacles.push({
+      kind: 'blimp',
+      x,
+      width: 230,
+      height: 115,
+      lane: -1,
+      laneSpan: 4,
+      altitude,
+      hit: false,
+      hitAt: -100,
+      hitMask: 0,
+    });
+
   const addBlimpSign = (x: number, signType: 'sheep' | 'tnt' | 'parts', signAlt = 320, blimpAlt = 545) => {
-    // Blimp (width 230) centered over sign (width 360): (x + 180) - 115 = x + 65
     addBlimp(x + 65, blimpAlt);
     addSign(x, signType, signAlt);
   };
 
-  for (let lane = 0; lane < 4; lane++) { add('ramp', 510, 190, 76, lane); add('boost', 770, 116, 15, lane); }
+  // =========================================================================
+  // SECTION 1: THE ALPINE DOWNHILL (0m – 12,000m / x: 0 to 24,000)
+  // =========================================================================
+  for (let lane = 0; lane < 4; lane++) {
+    add('ramp', 510, 190, 76, lane);
+    add('boost', 770, 116, 15, lane);
+  }
   addBlimpSign(980, course === 'sheep' ? 'sheep' : course === 'boomtown' ? 'tnt' : 'parts', 320, 545);
   add('sheep', 1160, 62, 59, course === 'sheep' ? 2 : 0);
   add('loop', 1370, 375, 322, course === 'boomtown' ? 3 : 2);
@@ -23,8 +83,8 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
   addBlimp(1850, 540);
   if (course === 'boomtown') add('tnt', 1210, 65, 70, 1);
 
-  const step = course === 'boomtown' ? 2420 : course === 'sheep' ? 2160 : 2300;
-  for (let x = 2400, section = 0; x < STADIUM_START - 2400; x += step, section++) {
+  const step1 = course === 'boomtown' ? 2420 : course === 'sheep' ? 2160 : 2300;
+  for (let x = 2400, section = 0; x < SECTION_LIP_START - 1800; x += step1, section++) {
     const lane = (section * (course === 'sheep' ? 3 : 1)) % 4;
     const signType: 'sheep' | 'tnt' | 'parts' = section % 3 === 0 ? 'sheep' : section % 3 === 1 ? 'tnt' : 'parts';
 
@@ -41,7 +101,8 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
       if (section % 2 === 0) add('tnt', x + 710, 65, 70, (lane + 3) % 4);
     } else if (course === 'boomtown') {
       add('boost', x + 55, 135, 15, (lane + 2) % 4);
-      add('tnt', x + 295, 65, 70, lane); add('tnt', x + 430, 65, 70, (lane + 1) % 4);
+      add('tnt', x + 295, 65, 70, lane);
+      add('tnt', x + 430, 65, 70, (lane + 1) % 4);
       add('ramp', x + 700, 210, 125, (lane + 2) % 4);
       addBlimpSign(x + 980, section % 2 === 0 ? 'tnt' : 'parts', 335, 560);
       add('gap', x + 1120, 192, 0, section % 3, 2);
@@ -51,7 +112,8 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
       if (section % 3 === 1) add('loop', x + 2120, 355, 300, (lane + 1) % 4);
       else add('boost', x + 2110, 130, 15, (lane + 3) % 4);
     } else {
-      add('sheep', x + 135, 66, 62, lane); add('sheep', x + 265, 62, 59, (lane + 2) % 4);
+      add('sheep', x + 135, 66, 62, lane);
+      add('sheep', x + 265, 62, 59, (lane + 2) % 4);
       add('ramp', x + 500, 185, 80, (lane + 1) % 4);
       addBlimpSign(x + 720, section % 2 === 0 ? 'sheep' : 'parts', 320, 545);
       add('spring', x + 890, 82, 56, (lane + 3) % 4);
@@ -63,10 +125,103 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
     }
   }
 
-  for (let lane = 0; lane < 4; lane++) { add('boost', STADIUM_START + 290, 130, 15, lane); add('boost', FINISH - 550, 135, 15, lane); }
-  addBlimpSign(STADIUM_START + 800, 'parts', 325, 550);
-  add('ramp', STADIUM_START + 1300, 190, 70, course === 'sheep' ? 2 : 0);
-  addBlimp(STADIUM_START + 1600, 560);
-  add(course === 'boomtown' ? 'tnt' : 'sheep', STADIUM_START + 1970, 65, 65, 3);
+  // =========================================================================
+  // TRANSITION 1 -> 2: THE CANYON LIP TURN (x: 24,000 to 25,600)
+  // =========================================================================
+  addSign(SECTION_LIP_START - 200, 'parts', 320);
+  for (let lane = 0; lane < 4; lane++) {
+    add('boost', SECTION_LIP_START + 200, 140, 15, lane);
+  }
+  // Rushing river impact spray where waterfall meets the track
+  add('waterfall_splash', SECTION_LIP_START + 450, 480, 160, -1, 4);
+  // Rock deflectors guiding into the 90° right turn
+  add('water_rock', SECTION_LIP_START + 700, 110, 110, 0, 1, { deflectPower: 1.4 });
+  add('water_rock', SECTION_LIP_START + 950, 110, 110, 3, 1, { deflectPower: 1.4 });
+  // Canyon lip launch ramps over the abyss
+  for (let lane = 0; lane < 4; lane++) {
+    add('ramp', SECTION_LIP_START + 1200, 220, 110, lane);
+  }
+
+  // =========================================================================
+  // SECTION 2: WATERFALL CLIFF ZIGZAG & PINBALL CHASM (x: 25,600 to 48,000)
+  // =========================================================================
+  const step2 = 2800;
+  for (let x = SECTION_2_START + 400, i = 0; x < SECTION_2_END - 2000; x += step2, i++) {
+    const lane = (i * 2) % 4;
+    // Rock deflectors in alternating lanes
+    add('water_rock', x + 200, 120, 120, lane, 1, { deflectPower: 1.35 });
+    add('water_rock', x + 650, 110, 110, (lane + 2) % 4, 1, { deflectPower: 1.35 });
+
+    // Breakable wooden bridges over chasm drops
+    if (i % 2 === 0) {
+      add('break_bridge', x + 1050, 320, 40, -1, 4, { health: 1, broken: false });
+      add('waterfall_splash', x + 1150, 360, 140, -1, 4);
+    } else {
+      add('gap', x + 1050, 200, 0, (lane + 1) % 4, 2);
+      add('spring', x + 850, 85, 58, (lane + 1) % 4);
+    }
+
+    // Pinball spinners & boost pads
+    add('pinball_spinner', x + 1600, 90, 90, (lane + 3) % 4, 1, { spinAngle: 0 });
+    add('boost', x + 1950, 130, 15, lane);
+    add('waterfall_splash', x + 2300, 320, 120, (lane + 2) % 4, 2);
+  }
+
+  // =========================================================================
+  // TRANSITION 2 -> 3: SPLASHDOWN POOL & CAVERN MAW (x: 48,000 to 50,400)
+  // =========================================================================
+  add('waterfall_splash', SECTION_3_START + 200, 520, 180, -1, 4);
+  add('waterfall_splash', SECTION_3_START + 500, 520, 180, -1, 4);
+  // 3D Carnival rock gate archway entering the subterranean mine
+  add('rock_gate', SECTION_3_START + 1100, 480, 320, -1, 4, { variant: 'mine-gate' });
+  add('rock_gate', SECTION_3_START + 1800, 480, 320, -1, 4, { variant: 'mine-gate-b' });
+
+  // =========================================================================
+  // SECTION 3: SUBTERRANEAN ROLLER COASTER MINE (x: 50,400 to 68,400)
+  // =========================================================================
+  const step3 = 3000;
+  for (let x = SECTION_3_START + 2400, j = 0; x < SECTION_3_END - 2000; x += step3, j++) {
+    const lane = j % 4;
+    // Minecart rails & switches
+    add('roller_rails', x + 100, 300, 30, lane, 1);
+    add('cave_torch', x + 250, 60, 120, -1, 4);
+
+    // Swinging molten cauldrons
+    if (j % 2 === 0) {
+      add('cauldron', x + 700, 140, 140, (lane + 1) % 4, 2);
+    } else {
+      add('tnt', x + 650, 70, 75, (lane + 2) % 4);
+    }
+
+    // 360° Lava Loops
+    if (j % 3 === 1) {
+      add('lava_loop', x + 1300, 380, 330, (lane + 3) % 4);
+    } else {
+      add('ramp', x + 1250, 210, 110, lane);
+      add('boost', x + 1550, 130, 15, lane);
+    }
+
+    // Tunnel frames framing the ride
+    add('rock_gate', x + 2100, 460, 300, -1, 4, { variant: j % 2 ? 'rock-tunnel-frame-a' : 'rock-tunnel-frame-b' });
+    add('boost', x + 2600, 130, 15, (lane + 2) % 4);
+  }
+
+  // =========================================================================
+  // TRANSITION 3 -> FINISH: WATERFALL BREAKTHROUGH & STADIUM (x: 68,400 to 72,000)
+  // =========================================================================
+  // Rocket incline boost into waterfall curtain
+  for (let lane = 0; lane < 4; lane++) {
+    add('boost', SECTION_3_END + 200, 140, 15, lane);
+  }
+  // Breakthrough waterfall curtain
+  add('waterfall_splash', SECTION_3_END + 700, 520, 220, -1, 4, { variant: 'waterfall-curtain' });
+  for (let lane = 0; lane < 4; lane++) {
+    add('ramp', SECTION_3_END + 1100, 200, 80, lane);
+    add('boost', STADIUM_START + 1200, 130, 15, lane);
+    add('boost', FINISH - 600, 140, 15, lane);
+  }
+  // Grand finish line gantry
+  add('rock_gate', FINISH - 100, 520, 340, -1, 4, { variant: 'stadium-gantry' });
+
   return obstacles.sort((a, b) => a.x - b.x);
-}
+}

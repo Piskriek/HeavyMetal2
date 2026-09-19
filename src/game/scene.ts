@@ -7,10 +7,17 @@ export const GROUND = 478;
 export const START_X = 190;
 export const START_Y = 325;
 export const RADIUS = 31;
-export const TRACK_DISTANCE = 15000;
+export const TRACK_DISTANCE = 36000;
 export const TRACK_LENGTH = TRACK_DISTANCE * 2;
 export const FINISH = START_X + TRACK_LENGTH;
-export const STADIUM_START = START_X + 27000;
+export const STADIUM_START = START_X + 68400;
+export const SECTION_LIP_START = START_X + 24000;
+export const SECTION_LIP_END = START_X + 25600;
+export const SECTION_2_START = START_X + 25600;
+export const SECTION_2_END = START_X + 48000;
+export const SECTION_3_START = START_X + 48000;
+export const SECTION_3_END = START_X + 68400;
+export const SECTION_BREAKTHROUGH = START_X + 68400;
 export const GRAVITY = 2400;
 export const LANE_COUNT = 4;
 export const LANE_WIDTH = 240;
@@ -30,7 +37,13 @@ export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) {
   return { near: laneZ(last) - LANE_WIDTH / 2, far: laneZ(first) + LANE_WIDTH / 2 };
 }
 export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0.7) {
-  if (obstacle.kind === 'gap' || obstacle.kind === 'sign') {
+  if (
+    obstacle.kind === 'gap' ||
+    obstacle.kind === 'sign' ||
+    obstacle.kind === 'rock_gate' ||
+    obstacle.kind === 'break_bridge' ||
+    obstacle.kind === 'waterfall_splash'
+  ) {
     const bounds = obstacleBounds(obstacle);
     return z > bounds.near + 5 && z < bounds.far - 5;
   }
@@ -38,7 +51,14 @@ export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0
     const bounds = obstacleBounds(obstacle);
     return z > bounds.near - 40 && z < bounds.far + 40;
   }
-  const halfWidth = obstacle.kind === 'ramp' || obstacle.kind === 'loop' ? 66 : obstacle.kind === 'boost' ? 45 : 37;
+  const halfWidth =
+    obstacle.kind === 'ramp' || obstacle.kind === 'loop' || obstacle.kind === 'lava_loop'
+      ? 66
+      : obstacle.kind === 'boost'
+      ? 45
+      : obstacle.kind === 'water_rock'
+      ? 55
+      : 37;
   return Math.abs(z - obstacleZ(obstacle)) < halfWidth + padding;
 }
 export const TERRAIN = GROUND + 154;
@@ -50,7 +70,7 @@ const SAMPLE_STEP = 16;
 const elevations = {} as Record<CourseId, Float32Array>;
 for (const id of Object.keys(TRACKS) as CourseId[]) {
   const profile = TRACKS[id].profile;
-  const table = new Float32Array(Math.ceil(32000 / SAMPLE_STEP) + 1);
+  const table = new Float32Array(Math.ceil(78000 / SAMPLE_STEP) + 1);
   const slopes = profile.slice(0, -1).map((point, i) => (profile[i + 1][1] - point[1]) / (profile[i + 1][0] - point[0]));
   const tangents = profile.map((_, i) => !i || i === profile.length - 1 || !slopes[i - 1] || !slopes[i] ? 0 : 2 / (1 / slopes[i - 1] + 1 / slopes[i]));
   for (let i = 0, section = 0; i < table.length; i++) {
@@ -89,8 +109,9 @@ export const decalOpacity = (altitude: number) => Math.max(0.25, Math.min(0.85, 
 export function sectorAt(x: number, course: CourseId = 'ridge') {
   const distance = x - START_X;
   const sectors = TRACKS[course].sectors;
-  const index = [1400, 5400, 10000, 13600, 18600, 23000, 27000].findIndex((end) => distance < end);
-  return sectors[index < 0 ? 7 : index];
+  const thresholds = [4000, 12000, 20000, 25000, 32000, 42000, 48000, 52000, 59000, 65000, 70000];
+  const index = thresholds.findIndex((end) => distance < end);
+  return sectors[index < 0 ? sectors.length - 1 : index];
 }
 
 export function loopGeometry(obstacle: Pick<Obstacle, 'x' | 'height'>, course: CourseId = 'ridge') {
@@ -103,7 +124,27 @@ export function rampSurface(obstacle: Pick<Obstacle, 'x' | 'width' | 'height'>, 
   return courseY(x, course) - Math.pow(t, 1.6) * obstacle.height;
 }
 
-export type ObstacleKind = 'ramp' | 'loop' | 'sheep' | 'tnt' | 'spring' | 'boost' | 'gap' | 'blimp' | 'sign';
+export type ObstacleKind =
+  | 'ramp'
+  | 'loop'
+  | 'sheep'
+  | 'tnt'
+  | 'spring'
+  | 'boost'
+  | 'gap'
+  | 'blimp'
+  | 'sign'
+  | 'water_rock'
+  | 'break_bridge'
+  | 'lane_tube'
+  | 'pinball_spinner'
+  | 'rock_gate'
+  | 'cave_torch'
+  | 'stalactite'
+  | 'waterfall_splash'
+  | 'roller_rails'
+  | 'cauldron'
+  | 'lava_loop';
 
 export interface Obstacle {
   kind: ObstacleKind;
@@ -117,6 +158,11 @@ export interface Obstacle {
   hitMask?: number;
   altitude?: number;
   signType?: 'sheep' | 'tnt' | 'parts';
+  broken?: boolean;
+  health?: number;
+  variant?: string;
+  spinAngle?: number;
+  deflectPower?: number;
 }
 
 export interface Particle {

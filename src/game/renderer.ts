@@ -749,12 +749,128 @@ export class RangeRenderer {
       this.context.restore();
       return;
     }
+    if (kind === 'water_rock') {
+      const rock = this.assets.trackParts?.rockDeflector ?? this.assets.trackParts?.rockBoulderA;
+      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
+      if (rock) {
+        this.context.save(); this.context.translate(point.x, point.y);
+        this.context.drawImage(rock.image, -width * point.scale / 2, -height * point.scale * 0.95, width * point.scale, height * point.scale);
+        this.context.restore();
+      }
+      return;
+    }
+    if (kind === 'break_bridge') {
+      const bridge = this.assets.trackParts?.bridgeWoodenBroken;
+      const point = this.p(x + width / 2, this.y(x + width / 2), 0);
+      if (bridge) {
+        this.context.save(); this.context.translate(point.x, point.y);
+        if (obstacle.broken) {
+          this.context.globalAlpha = 0.6;
+          this.context.rotate(0.12);
+        }
+        this.context.drawImage(bridge.image, -width * point.scale / 2, -height * point.scale, width * point.scale, height * point.scale);
+        this.context.restore();
+      }
+      return;
+    }
+    if (kind === 'waterfall_splash') {
+      const isCurtain = obstacle.variant === 'waterfall-curtain';
+      const img = isCurtain
+        ? this.assets.trackParts?.waterfallCurtain?.image
+        : Math.floor(this.frame.time * 8) % 2 === 0
+        ? this.assets.trackParts?.waterfallSplash?.image
+        : this.assets.trackParts?.waterfallSplashB?.image;
+      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
+      if (img) {
+        this.context.save(); this.context.translate(point.x, point.y);
+        this.context.drawImage(img, -width * point.scale / 2, -height * point.scale * 0.9, width * point.scale, height * point.scale);
+        this.context.restore();
+      }
+      return;
+    }
+    if (kind === 'cauldron') {
+      const cycle = Math.floor(this.frame.time * 4) % 3;
+      const img = cycle === 0
+        ? this.assets.trackParts?.cauldronMolten?.image
+        : cycle === 1
+        ? this.assets.trackParts?.cauldronMoltenB?.image
+        : this.assets.trackParts?.cauldronMoltenC?.image;
+      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
+      if (img) {
+        this.context.save(); this.context.translate(point.x, point.y);
+        this.context.drawImage(img, -width * point.scale / 2, -height * point.scale * 0.95, width * point.scale, height * point.scale);
+        this.context.restore();
+        this.glow(point.x, point.y - height * point.scale * 0.5, 30 * point.scale, '#ff6600', 0.35);
+      }
+      return;
+    }
+    if (kind === 'rock_gate') {
+      const v = obstacle.variant;
+      const img = v === 'stadium-gantry'
+        ? this.assets.trackParts?.stadiumGantry?.image
+        : v === 'rock-tunnel-frame-b'
+        ? this.assets.trackParts?.rockTunnelFrameB?.image
+        : v === 'rock-tunnel-frame-a'
+        ? this.assets.trackParts?.rockTunnelFrameA?.image
+        : v === 'mine-gate-b'
+        ? this.assets.trackParts?.mineGateB?.image
+        : this.assets.trackParts?.mineGate?.image;
+      const point = this.p(x + width / 2, this.y(x + width / 2), 0);
+      if (img) {
+        this.context.save(); this.context.translate(point.x, point.y);
+        this.context.drawImage(img, -width * point.scale / 2, -height * point.scale * 0.98, width * point.scale, height * point.scale);
+        this.context.restore();
+      }
+      return;
+    }
+    if (kind === 'cave_torch') {
+      const post = this.assets.trackParts?.lanternPost;
+      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
+      if (post) {
+        this.context.save(); this.context.translate(point.x, point.y);
+        this.context.drawImage(post.image, -width * point.scale / 2, -height * point.scale * 0.95, width * point.scale, height * point.scale);
+        this.context.restore();
+        this.glow(point.x, point.y - height * point.scale * 0.7, 45 * point.scale, '#ffaa33', 0.28);
+      }
+      return;
+    }
+    if (kind === 'roller_rails') {
+      const rail = this.assets.trackParts?.mineRails;
+      const z = obstacleZ(obstacle);
+      const quad = this.groundQuad(x, x + width, z - 30, z + 30, -3);
+      if (rail) {
+        texturedQuad(this.context, rail.image, { x: 0, y: 0, width: 512, height: 512 }, quad);
+      }
+      return;
+    }
+    if (kind === 'pinball_spinner') {
+      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
+      this.context.save(); this.context.translate(point.x, point.y - height * point.scale * 0.5);
+      this.context.rotate(this.frame.time * 8);
+      this.context.fillStyle = '#b5843a';
+      for (let arm = 0; arm < 4; arm++) {
+        this.context.rotate(Math.PI / 2);
+        this.context.fillRect(-4 * point.scale, 0, 8 * point.scale, width * point.scale * 0.45);
+      }
+      this.context.restore();
+      return;
+    }
+    if (kind === 'lava_loop') {
+      const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
+      this.context.save(); this.context.translate(point.x, point.y);
+      this.context.drawImage(this.assets.loop.image, -width * point.scale / 2, -height * point.scale * 0.95, width * point.scale, height * point.scale);
+      this.context.restore();
+      this.glow(point.x, point.y - 40 * point.scale, 60 * point.scale, '#ff4400', 0.3);
+      return;
+    }
+    const sprite = (this.assets as Record<string, any>)[kind];
+    if (!sprite?.image) return;
     const point = this.p(x + width / 2, this.y(x + width / 2), obstacleZ(obstacle));
-    let h = Math.min(height * 1.12, width * this.assets[kind].height / this.assets[kind].width);
+    let h = Math.min(height * 1.12, width * sprite.height / sprite.width);
     if (kind === 'spring' && this.frame.time - obstacle.hitAt < 0.4) h *= 1 - Math.sin((this.frame.time - obstacle.hitAt) / 0.4 * Math.PI) * 0.36;
     this.context.save(); this.context.translate(point.x, point.y);
     this.context.rotate(Math.atan(this.slope(x) - (this.frame.options.downrange ? 0.11 : 0)) * 0.38);
-    this.context.drawImage(this.assets[kind].image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
+    this.context.drawImage(sprite.image, -width * point.scale / 2, -h * point.scale * 0.95, width * point.scale, h * point.scale);
     this.context.restore();
     if (kind === 'tnt') this.glow(point.x + 7 * point.scale, point.y - h * point.scale * 0.9, 12 * point.scale, '#ffc16c', 0.3);
   }

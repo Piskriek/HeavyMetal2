@@ -790,6 +790,65 @@ export class GameEngine {
           this.say('WATCH THE ROAD SIGNS! SPEED REDUCED.');
         }
         break;
+      case 'water_rock':
+        const dz = racer.z - obstacleZ(obstacle);
+        racer.vz = (dz >= 0 ? 1 : -1) * 380 * (obstacle.deflectPower ?? 1.35);
+        racer.vx = Math.max(160, racer.vx * 0.82);
+        racer.vy = -180;
+        racer.grounded = false;
+        this.emit(x, y, z, 14, '#6ebad8', 180);
+        this.emit(x, y, z, 8, '#b8a77b', 120);
+        if (!racer.id) {
+          this.snapshot.score += 80;
+          this.shake = 3.5;
+          this.audio.play('bump');
+          this.say('ROCK DEFLECTION! HOLD YOUR LINE!');
+        }
+        break;
+      case 'break_bridge':
+        if (racer.vx > 450) {
+          obstacle.broken = true;
+          this.emit(x, y, z, 20, '#8b5a2b', 180);
+          if (!racer.id) {
+            this.snapshot.score += 90;
+            this.shake = 2.5;
+            this.audio.play('land');
+            this.say('BRIDGE BROKEN! CHASM AHEAD!');
+          }
+        }
+        break;
+      case 'pinball_spinner':
+        racer.vz = (Math.random() > 0.5 ? 1 : -1) * 440;
+        racer.vx += 120;
+        if (!racer.id) {
+          this.snapshot.score += 110;
+          this.shake = 3.0;
+          this.audio.play('bounce');
+          this.say('PINBALL KICK!');
+        }
+        break;
+      case 'cauldron':
+        racer.vx += 250 * impulse;
+        racer.vy = -140;
+        racer.grounded = false;
+        this.emit(x, y, z, 22, '#ff6600', 220);
+        if (!racer.id) {
+          this.snapshot.score += 130;
+          this.shake = 4.0;
+          this.audio.play('boom');
+          this.say('MOLTEN SLAG BOOST! FEEL THE HEAT!');
+        }
+        break;
+      case 'roller_rails':
+        racer.vx += 90;
+        this.emit(x, y, z, 6, '#ffd700', 90);
+        break;
+      case 'waterfall_splash':
+        this.emit(x, y, z, 16, '#c6f1ff', 140);
+        if (!racer.id && this.time - obstacle.hitAt < 0.2) {
+          this.say('THROUGH THE SPRAY!');
+        }
+        break;
       default: break;
     }
   }

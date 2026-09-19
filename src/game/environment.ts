@@ -213,6 +213,8 @@ export class ArenaEnvironment {
     const z = LANE.far + 240;
     const range = this.view.visibleSpan(z - 25, z + 30, 330);
     this.drawStadium();
+    this.drawWaterfallRiver();
+    this.drawLavaChamber();
     this.drawTreeWall();
     this.drawLandmarks();
     const step = 256;
@@ -227,6 +229,70 @@ export class ArenaEnvironment {
     }
     this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86);
     this.drawFence(LANE.far + 65, 142, 114);
+  }
+
+  private drawWaterfallRiver() {
+    const sheet = this.assets.trackParts?.waterfallSheet;
+    if (!sheet) return;
+    const z = LANE.far + 420;
+    const range = this.view.visibleSpan(z, z, 400);
+    const start = Math.max(23600, range.start);
+    const end = Math.min(48500, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const scrollY = (this.frame.time * 750) % 1024;
+    const splashA = this.assets.trackParts?.waterfallSplash;
+    const splashB = this.assets.trackParts?.waterfallSplashB;
+    const splash = Math.floor(this.frame.time * 9) % 2 === 0 ? splashA : splashB;
+
+    const step = 512;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const right = x + step;
+      const y = this.y(x);
+      const ny = this.y(right);
+      const height = 650;
+      const quad: Quad = [
+        this.p(x, y - height, z),
+        this.p(right, ny - height, z),
+        this.p(right, ny + 90, z),
+        this.p(x, y + 90, z),
+      ];
+      texturedQuad(context, sheet.image, { x: 0, y: scrollY, width: 512, height: 1024 }, quad);
+
+      if (splash) {
+        const point = this.p(x + step / 2, y + 40, z - 40);
+        const sw = 280 * point.scale;
+        const sh = 280 * point.scale;
+        context.drawImage(splash.image, point.x - sw / 2, point.y - sh * 0.85, sw, sh);
+      }
+    }
+  }
+
+  private drawLavaChamber() {
+    const lavaA = this.assets.trackParts?.lavaSheet;
+    const lavaB = this.assets.trackParts?.lavaSheetB;
+    const lavaC = this.assets.trackParts?.lavaSheetC;
+    const lava = Math.floor(this.frame.time * 2) % 3 === 0 ? lavaA : Math.floor(this.frame.time * 2) % 3 === 1 ? lavaB : lavaC;
+    if (!lava) return;
+    const z = LANE.near - 80;
+    const range = this.view.visibleSpan(z, z, 350);
+    const start = Math.max(53000, range.start);
+    const end = Math.min(67000, range.end);
+    if (start >= end) return;
+    const step = 512;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const right = x + step;
+      const y = this.y(x) + 320;
+      const ny = this.y(right) + 320;
+      const quad: Quad = [
+        this.p(x, y, LANE.far + 300),
+        this.p(right, ny, LANE.far + 300),
+        this.p(right, ny + 200, LANE.near - 300),
+        this.p(x, y + 200, LANE.near - 300),
+      ];
+      texturedQuad(this.context, lava.image, { x: 0, y: 0, width: 512, height: 512 }, quad);
+    }
   }
 
   /**
@@ -330,7 +396,15 @@ export class ArenaEnvironment {
       const crop = { x: mod(x, 512), y: 0, width: right - x, height: 128 };
       if (!this.inGap(middle)) texturedQuad(this.context, this.wall, crop, front);
       const hasGap = gaps.some((gap) => middle > gap.x && middle < gap.x + gap.width);
-      if (!hasGap) texturedQuad(this.context, this.deck, { ...crop, height: 512 }, top);
+      if (!hasGap) {
+        texturedQuad(this.context, this.deck, { ...crop, height: 512 }, top);
+        if (middle >= 24000 && middle <= 48000) {
+          this.context.save();
+          this.context.globalAlpha = 0.32;
+          this.fill(top, '#4ec5e8');
+          this.context.restore();
+        }
+      }
       else {
         let lane = 0;
         while (lane < LANE_COUNT) {

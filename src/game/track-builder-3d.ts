@@ -32,6 +32,7 @@ export interface PlacedProp {
   scale: number;
   alignToTrack: boolean;
   trackDist?: number;
+  cameraFacing?: boolean;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
@@ -117,6 +118,7 @@ export class TrackBuilder3D {
     alignToTrack: true,
     snapToCenterline: false,
     gridSnap: 0,
+    cameraFacingDefault: true,
   };
 
   private readonly textureLoader = new THREE.TextureLoader();
@@ -311,8 +313,15 @@ export class TrackBuilder3D {
 
     for (const hit of intersects) {
       const obj = hit.object;
-      // Skip sky, markers, gizmos, ghosts, sprites
-      if (obj.name === 'Sky' || obj.name === 'Ghost' || (obj as any).isSprite || obj.name === 'DebugMarkers') continue;
+      // Skip sky, markers, gizmos, ghosts, sprites, and placed props
+      if (
+        obj.name === 'Sky' ||
+        obj.name === 'Ghost' ||
+        obj.name === 'GhostMesh' ||
+        (obj as any).isSprite ||
+        obj.name === 'DebugMarkers' ||
+        obj.name?.startsWith('PlacedProp_')
+      ) continue;
 
       // Find closest track sample
       let closestSample: TrackSample | undefined;
@@ -374,9 +383,33 @@ export class TrackBuilder3D {
 
     if (def.isRamp) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
-      if (!this.ghostMesh) {
+      if (!this.ghostMesh || (this.ghostMesh as any)._isRampMesh !== true) {
+        if (this.ghostMesh) this.scene.remove(this.ghostMesh);
         const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.5, wireframe: true });
         this.ghostMesh = wedgeMesh(def.defaultWidth, 1100, def.defaultHeight, ghostMat);
+        this.ghostMesh.name = 'GhostMesh';
+        (this.ghostMesh as any)._isRampMesh = true;
+        this.scene.add(this.ghostMesh);
+      }
+      this.ghostMesh.visible = true;
+    } else if (this.snapping.cameraFacingDefault === false) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      const tex = this.getTexture(def.url);
+      if (!this.ghostMesh || (this.ghostMesh as any)._forType !== def.type || (this.ghostMesh as any)._isRampMesh === true) {
+        if (this.ghostMesh) this.scene.remove(this.ghostMesh);
+        const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
+        if (def.alignBottom !== false) {
+          geom.translate(0, def.defaultHeight / 2, 0);
+        }
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 0.55,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
+        this.ghostMesh = new THREE.Mesh(geom, mat);
+        (this.ghostMesh as any)._forType = def.type;
         this.ghostMesh.name = 'GhostMesh';
         this.scene.add(this.ghostMesh);
       }
@@ -427,6 +460,7 @@ export class TrackBuilder3D {
       scale: 1,
       alignToTrack: this.snapping.alignToTrack,
       trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
+      cameraFacing: def.isRamp ? false : this.snapping.cameraFacingDefault,
     };
 
     this.placedProps.push(prop);
@@ -508,17 +542,30 @@ export class TrackBuilder3D {
     const prop = this.placedProps.find((p) => p.id === id);
     if (!prop) return;
 
+    const oldCameraFacing = prop.cameraFacing !== false;
     Object.assign(prop, updates);
-    const obj = this.propObjects.get(id);
-    if (obj) {
-      obj.position.set(prop.x, prop.y, prop.z);
-      obj.rotation.y = prop.rotY;
-      const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
-      if (def) {
-        if (def.isRamp) {
-          obj.scale.set(prop.scale, prop.scale, prop.scale);
-        } else {
-          obj.scale.set(def.defaultWidth * prop.scale, def.defaultHeight * prop.scale, 1);
+    const newCameraFacing = prop.cameraFacing !== false;
+
+    // If cameraFacing changed, recreate the 3D object
+    if (oldCameraFacing !== newCameraFacing) {
+      const oldObj = this.propObjects.get(id);
+      if (oldObj) {
+        this.scene.remove(oldObj);
+        this.propObjects.delete(id);
+      }
+      this.createPropSprite(prop);
+    } else {
+      const obj = this.propObjects.get(id);
+      if (obj) {
+        obj.position.set(prop.x, prop.y, prop.z);
+        obj.rotation.y = prop.rotY;
+        const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+        if (def) {
+          if (def.isRamp || prop.cameraFacing === false) {
+            obj.scale.set(prop.scale, prop.scale, prop.scale);
+          } else {
+            obj.scale.set(def.defaultWidth * prop.scale, def.defaultHeight * prop.scale, 1);
+          }
         }
       }
     }
@@ -590,7 +637,29 @@ export class TrackBuilder3D {
       mesh.position.set(prop.x, prop.y, prop.z);
       mesh.rotation.y = prop.rotY;
       obj = mesh;
+    } else if (prop.cameraFacing === false) {
+      // Fixed 3D World Orientation (Double-sided plane mesh)
+      const tex = this.getTexture(def.url);
+      const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
+      if (def.alignBottom !== false) {
+        geom.translate(0, def.defaultHeight / 2, 0);
+      }
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: true,
+        alphaTest: 0.05,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.name = `PlacedProp_${prop.id}`;
+      mesh.userData = { propId: prop.id, isMeshProp: true };
+      mesh.position.set(prop.x, prop.y, prop.z);
+      mesh.rotation.y = prop.rotY;
+      mesh.scale.set(prop.scale, prop.scale, prop.scale);
+      obj = mesh;
     } else {
+      // Camera Facing (Billboard Sprite)
       const tex = this.getTexture(def.url);
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
       const sprite = new THREE.Sprite(mat);

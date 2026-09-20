@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
-  Layers, Eye, MousePointer
+  Layers, Eye, MousePointer, Camera
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -45,6 +45,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [selectedProp, setSelectedProp] = useState<PlacedProp | null>(builder.getSelectedProp());
   const [alignToTrack, setAlignToTrack] = useState(builder.snapping.alignToTrack);
   const [snapToCenterline, setSnapToCenterline] = useState(builder.snapping.snapToCenterline);
+  const [cameraFacingDefault, setCameraFacingDefault] = useState(builder.snapping.cameraFacingDefault);
   const [showPropsDrawer, setShowPropsDrawer] = useState(false);
   const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly, Right-Drag to look, Click props to select');
 
@@ -403,6 +404,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             />
             Snap Centerline
           </label>
+
+          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed PNG decorations rotate to always face the camera. When disabled, they are placed with a fixed 3D world orientation.">
+            <input
+              type="checkbox"
+              checked={cameraFacingDefault}
+              onChange={(e) => {
+                setCameraFacingDefault(e.target.checked);
+                builder.snapping.cameraFacingDefault = e.target.checked;
+                showToast(e.target.checked ? 'Default: Camera Facing (Billboard)' : 'Default: Fixed 3D World Orientation');
+              }}
+              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
+            />
+            Camera Facing
+          </label>
         </div>
 
         {/* Action Buttons */}
@@ -530,7 +545,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         />
                       )}
                       <div className="flex flex-col min-w-0">
-                        <span className="font-semibold truncate text-[11px]">{p.name}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold truncate text-[11px]">{p.name}</span>
+                          {def?.isRamp ? (
+                            <span className="text-[9px] px-1 py-0.2 bg-amber-900/60 text-amber-300 rounded font-mono">RAMP</span>
+                          ) : p.cameraFacing === false ? (
+                            <span className="text-[9px] px-1 py-0.2 bg-purple-950/60 text-purple-300 rounded font-mono">3D</span>
+                          ) : (
+                            <span className="text-[9px] px-1 py-0.2 bg-blue-950/60 text-blue-300 rounded font-mono">BB</span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-zinc-400 truncate">
                           X:{p.x} Y:{p.y} Z:{p.z}
                         </span>
@@ -726,6 +750,34 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               className="accent-amber-500"
             />
           </div>
+
+          {/* Camera Facing Toggle (for PNG decorations) */}
+          {(() => {
+            const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
+            if (def?.isRamp) return null;
+            const isFacing = selectedProp.cameraFacing !== false;
+            return (
+              <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+                <span className="text-zinc-400">Camera Facing:</span>
+                <button
+                  onClick={() => {
+                    const next = !isFacing;
+                    builder.updatePropTransform(selectedProp.id, { cameraFacing: next });
+                    showToast(next ? 'Set to Camera Facing (Billboard)' : 'Set to Fixed 3D World Orientation');
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                    isFacing
+                      ? 'bg-amber-600/90 hover:bg-amber-500 text-zinc-950 border-amber-400'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+                  }`}
+                  title="Toggle whether this decoration rotates to face the camera (billboard) or stays fixed in 3D world space"
+                >
+                  <Camera size={13} />
+                  <span>{isFacing ? 'ON (Billboard)' : 'OFF (Fixed 3D)'}</span>
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Actions */}
           <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">

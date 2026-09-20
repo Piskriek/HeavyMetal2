@@ -6,8 +6,10 @@
  *  - Generated on the project's standard magenta (#FF00FF) chroma key backdrop.
  *  - Stored in `public/art/props/` (raw magenta key transparency) and
  *    `public/art/props/alpha/` (keyed true alpha transparency).
- *  - Combined sprite sheet stored in `public/art/sheets/props-sheet.png` (all 20)
- *    and `public/art/sheets/props-sheet-b.png` (Batch 2: props 11-20).
+ *  - Combined sprite sheets stored in:
+ *    - `public/art/sheets/props-sheet.png` (all 30 variations, 5x6)
+ *    - `public/art/sheets/props-sheet-b.png` (Batch 2: props 11-20, 5x2)
+ *    - `public/art/sheets/props-sheet-c.png` (Batch 3: props 21-30, 5x2)
  *
  * Keying & despill:
  *  - Detects magenta matte (#FF00FF signature: high R and B, low G).
@@ -23,7 +25,9 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const propsDir = join(root, 'public/art/props');
 const alphaDir = join(root, 'public/art/props/alpha');
+const sheetsDir = join(root, 'public/art/sheets');
 mkdirSync(alphaDir, { recursive: true });
+mkdirSync(sheetsDir, { recursive: true });
 
 export const PROP_VARIATIONS = [
   // --- Batch 1 (Props 01 - 10) ---
@@ -128,6 +132,57 @@ export const PROP_VARIATIONS = [
     original: 'public/art/track-parts/rock-platform-springboard.png',
     concept: 'Goblin springboard catapult ledge on craggy stone outcrop with torch brazier, checkered flag, and cheering goblin spectators',
   },
+  // --- Batch 3 (Props 21 - 30) ---
+  {
+    file: 'prop-21-quarry-excavation-crane.png',
+    original: 'public/art/landmark-quarry.png',
+    concept: 'Heavy timber A-frame goblin quarry crane with steam boiler, brass gears, and suspended iron claw gripping sandstone boulder',
+  },
+  {
+    file: 'prop-22-armored-sheep-pen.png',
+    original: 'public/art/landmark-pasture.png',
+    concept: 'Armored goblin racing sheep in wooden paddock pen with barbed wire, glowing mushroom feed trough, and horned skull gatepost',
+  },
+  {
+    file: 'prop-23-hazard-sign-sheep.png',
+    original: 'public/art/sign-sheep.png',
+    concept: 'Rustic timber roadside caution signpost with painted yellow warning diamond depicting explosive racing sheep, wooden arrow, and lantern',
+  },
+  {
+    file: 'prop-24-hazard-sign-explosives.png',
+    original: 'public/art/sign-tnt.png',
+    concept: 'Roadside hazard signpost with stenciled BOOM-TOWN TNT, red dynamite bundle, sparking fuse, and skull warning plate',
+  },
+  {
+    file: 'prop-25-timber-coaster-loop.png',
+    original: 'public/art/timber-loop.png',
+    concept: 'Vertical timber roller coaster loop-de-loop with heavy notched pine beams, iron tie brackets, hanging amber lanterns, and guide rails',
+  },
+  {
+    file: 'prop-26-granite-tunnel-portal.png',
+    original: 'public/art/track-parts/tunnel-mouth-stone.png',
+    concept: 'Heavy chiseled granite mountain tunnel entrance archway with reinforced timber lintels, beast skull trophy keystone, and burning iron sconces',
+  },
+  {
+    file: 'prop-27-rock-spire-lookout.png',
+    original: 'public/art/track-parts/rock-platform-spire.png',
+    concept: 'Towering jagged rock needle pinnacle with goblin lookout crow\'s nest, hanging brass gong, rope ladder, and fluttering pennant',
+  },
+  {
+    file: 'prop-28-cavern-waterwheel-cascade.png',
+    original: 'public/art/track-parts/waterfall-curtain.png',
+    concept: 'Roaring alpine waterfall tumbling over stepped slate rocks with heavy mossy wooden goblin waterwheel, brass scoops, and splash trough',
+  },
+  {
+    file: 'prop-29-spiked-boulder-barricade.png',
+    original: 'public/art/track-parts/rock-boulder-a.png',
+    concept: 'Cluster of rugged sandstone boulders fortified with sharpened wooden palisade spikes, chains, glowing green mushrooms, goblin shield, and war horn',
+  },
+  {
+    file: 'prop-30-goblin-slingshot-downrange.png',
+    original: 'public/art/slingshot-downrange.png',
+    concept: 'Heavy mechanical track slingshot catapult launcher with steam boiler, brass gear winch, and timber forks viewed downrange',
+  },
 ];
 
 console.log(`Processing and verifying ${PROP_VARIATIONS.length} prop variations...\n`);
@@ -164,7 +219,7 @@ for (const prop of PROP_VARIATIONS) {
   const alphaPixel = execFileSync('convert', [alphaPath, '-format', '%[pixel:p{10,10}]', 'info:'], { encoding: 'utf8' }).trim();
   const dims = execFileSync('identify', ['-format', '%wx%h', rawPath], { encoding: 'utf8' }).trim();
 
-  console.log(`✓ ${prop.file.padEnd(42)} ${dims.padEnd(10)} magenta=${pixel.padEnd(20)} alpha=${alphaPixel}`);
+  console.log(`✓ ${prop.file.padEnd(44)} ${dims.padEnd(11)} magenta=${pixel.padEnd(20)} alpha=${alphaPixel}`);
 }
 
 console.log(`\nAll ${PROP_VARIATIONS.length} prop variations verified successfully.`);

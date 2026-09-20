@@ -187,6 +187,26 @@ Generated an additional 10 variations of trackside and decoration props (Props 1
 - Composite 5x2 sprite sheet for Batch 2 generated in `public/art/sheets/props-sheet-b.png`.
 - Full composite 5x4 sprite sheet of all 20 variations generated in `public/art/sheets/props-sheet.png`.
 
+### Decoration Prop Variations (Batch 3 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of trackside and decoration props (Props 21 to 30) based on the original props (`landmark-quarry`, `landmark-pasture`, `sign-sheep`, `sign-tnt`, `timber-loop`, `tunnel-mouth-stone`, `rock-platform-spire`, `waterfall-curtain`, `rock-boulder-a`, and `slingshot-downrange`):
+
+21. `public/art/props/prop-21-quarry-excavation-crane.png` (1224x864) — Heavy timber A-frame goblin quarry crane with steam boiler, brass gears, pulleys, and suspended iron claw gripping a chiseled sandstone boulder.
+22. `public/art/props/prop-22-armored-sheep-pen.png` (1502x704) — Armored goblin racing ram in a weathered wooden paddock pen with barbed wire, glowing mushroom feed trough, and horned skull gatepost.
+23. `public/art/props/prop-23-hazard-sign-sheep.png` (768x1024) — Rustic timber roadside caution signpost on cobblestone base with painted yellow warning diamond depicting explosive racing sheep, wooden arrow, and lantern.
+24. `public/art/props/prop-24-hazard-sign-explosives.png` (1024x1024) — Roadside hazard signpost on cobblestone base with stenciled "BOOM-TOWN TNT", red dynamite bundle, sparking fuse, and hanging skull warning plate.
+25. `public/art/props/prop-25-timber-coaster-loop.png` (1024x1024) — Spiral vertical timber roller coaster loop-de-loop with heavy notched pine beams, iron tie brackets, hanging amber lanterns, and guide rails.
+26. `public/art/props/prop-26-granite-tunnel-portal.png` (1024x1024) — Heavy chiseled granite mountain tunnel entrance archway with reinforced timber lintels, beast skull trophy keystone, and burning iron sconces.
+27. `public/art/props/prop-27-rock-spire-lookout.png` (720x1440) — Towering jagged rock needle pinnacle with goblin lookout crow's nest, hanging brass gong, rope ladder, and fluttering pennant.
+28. `public/art/props/prop-28-cavern-waterwheel-cascade.png` (720x1440) — Roaring alpine waterfall tumbling over stepped slate rocks with a heavy mossy wooden goblin waterwheel, brass scoops, and splash trough.
+29. `public/art/props/prop-29-spiked-boulder-barricade.png` (1024x1024) — Cluster of rugged sandstone boulders fortified with sharpened wooden palisade spikes, chains, glowing green mushrooms, goblin shield, and war horn.
+30. `public/art/props/prop-30-goblin-slingshot-downrange.png` (1024x1536) — Mechanical track slingshot catapult launcher with steam boiler, brass gear winch, and heavy timber forks viewed downrange.
+
+- All 30 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet for Batch 3 generated in `public/art/sheets/props-sheet-c.png`.
+- Full composite 5x6 sprite sheet of all 30 variations generated in `public/art/sheets/props-sheet.png`.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

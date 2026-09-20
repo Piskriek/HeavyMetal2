@@ -148,6 +148,65 @@ Renderer integration of all track-parts remains part of the TICKET-09 implementa
 work packages; this deliverable is the asset library plus the reproducible processing
 script.
 
+### Decoration Prop Variations (Batch 1 — 10 Variations with Magenta Key Transparency)
+
+Generated 10 variations of roadside and track decoration props based on the original props (`lantern-post`, `ore-cart`, `tnt-crate`, `ore-bucket`, `rail-switch`, `rock-deflector`, `cauldron-molten`, `landmark-windmill`, `landmark-pines`, and `blimp`):
+
+1. `public/art/props/prop-01-lantern-post-triple.png` (1024x1024) — Triple-lantern timber watchpost with chains, skull emblem, and cobblestone base.
+2. `public/art/props/prop-02-ore-cart-spilling.png` (1024x1024) — Tilted minecart spilling glowing magma rocks, gold ore, and embers on rails.
+3. `public/art/props/prop-03-tnt-powder-kegs.png` (1024x1024) — Gunpowder keg pyramid with dynamite bundles, skull TNT stencils, and sizzling fuse.
+4. `public/art/props/prop-04-smelting-crucible.png` (1024x1024) — Spiked iron smelting bucket with goblin gear crest and dripping molten gold.
+5. `public/art/props/prop-05-rail-turntable-switch.png` (1024x1024) — Railway switch tracks with dual-lever control box and signal lantern.
+6. `public/art/props/prop-06-crystal-rock-deflector.png` (1024x1024) — Rugged granite boulder deflector embedded with glowing amber crystal clusters.
+7. `public/art/props/prop-07-tripod-cauldron-molten.png` (1024x1024) — A-frame tripod smelting cauldron pouring molten metal onto glowing coals.
+8. `public/art/props/prop-08-goblin-windmill-gears.png` (912x1146) — Wooden windmill with patched sails, exposed brass cogs, and smoking chimney.
+9. `public/art/props/prop-09-pine-lookout-outcrop.png` (896x1197) — Mountain pine cluster with wooden goblin scout platform, hanging lantern, and ladder.
+10. `public/art/props/prop-10-scout-blimp-zeppelin.png` (1264x843) — Goblin scout airship with brass ribs, spinning propellers, and hanging gondola.
+
+- All 10 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet on magenta key background generated in `public/art/sheets/props-sheet.png`.
+
+### Decoration Prop Variations (Batch 2 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of trackside and decoration props (Props 11 to 20) based on the original props (`bridge-wooden-broken`, `cliff-scaffolding`, `mine-gate`, `stadium-gantry`, `goblin-bleacher`, `rock-arch-wide`, `rock-platform-drums`, `slingshot`, `grandstand`, and `rock-platform-springboard`):
+
+11. `public/art/props/prop-11-broken-rope-bridge.png` (1408x768) — Broken wooden suspension rope bridge with snapped planks, fraying thick hemp ropes, and bolted timber anchor posts.
+12. `public/art/props/prop-12-goblin-scaffold-tower.png` (768x1376) — Rickety multi-level goblin timber watchtower with thatched roof, ladder, iron brackets, red skull flag, and lantern.
+13. `public/art/props/prop-13-cavern-mine-gate.png` (1408x768) — Heavy cavern mine entrance archway with jagged stone frame, timber beams, burning iron torches, and skull keystone.
+14. `public/art/props/prop-14-scrapdome-finish-gantry.png` (1408x768) — Racetrack finish line gantry arch with riveted iron trusses, brass cogs, checkered flag banner, and brass horns.
+15. `public/art/props/prop-15-goblin-spectator-terrace.png` (1408x768) — Tiered wooden bleacher terrace on mossy stone outcrop with spiked railings, skull banner, and flaming brazier.
+16. `public/art/props/prop-16-molten-rock-natural-arch.png` (1408x768) — Jagged basalt rock arch bridge with glowing orange lava fissures and dripping molten slag stalactites.
+17. `public/art/props/prop-17-goblin-war-drums.png` (1408x768) — Giant goblin war drum with stretched hide skin, spiked bronze rims, iron brackets, skull charms, and mallets.
+18. `public/art/props/prop-18-goblin-slingshot-launcher.png` (1408x768) — Heavy mechanical track slingshot catapult launcher with torsion winch, brass cog gear, and spiked anchor sled.
+19. `public/art/props/prop-19-racetrack-grandstand.png` (1408x768) — Covered wooden racetrack grandstand with tiered bench seating, corrugated rusty tin roof, and festive goblin pennant bunting.
+20. `public/art/props/prop-20-goblin-springboard-platform.png` (1024x1024) — Goblin springboard catapult ledge on craggy stone outcrop with torch brazier, checkered flag, and cheering goblin spectators.
+
+- All 20 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet for Batch 2 generated in `public/art/sheets/props-sheet-b.png`.
+- Full composite 5x4 sprite sheet of all 20 variations generated in `public/art/sheets/props-sheet.png`.
+
+### Decoration Prop Variations (Batch 3 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of trackside and decoration props (Props 21 to 30) based on the original props (`landmark-quarry`, `landmark-pasture`, `sign-sheep`, `sign-tnt`, `timber-loop`, `tunnel-mouth-stone`, `rock-platform-spire`, `waterfall-curtain`, `rock-boulder-a`, and `slingshot-downrange`):
+
+21. `public/art/props/prop-21-quarry-excavation-crane.png` (1224x864) — Heavy timber A-frame goblin quarry crane with steam boiler, brass gears, pulleys, and suspended iron claw gripping a chiseled sandstone boulder.
+22. `public/art/props/prop-22-armored-sheep-pen.png` (1502x704) — Armored goblin racing ram in a weathered wooden paddock pen with barbed wire, glowing mushroom feed trough, and horned skull gatepost.
+23. `public/art/props/prop-23-hazard-sign-sheep.png` (768x1024) — Rustic timber roadside caution signpost on cobblestone base with painted yellow warning diamond depicting explosive racing sheep, wooden arrow, and lantern.
+24. `public/art/props/prop-24-hazard-sign-explosives.png` (1024x1024) — Roadside hazard signpost on cobblestone base with stenciled "BOOM-TOWN TNT", red dynamite bundle, sparking fuse, and hanging skull warning plate.
+25. `public/art/props/prop-25-timber-coaster-loop.png` (1024x1024) — Spiral vertical timber roller coaster loop-de-loop with heavy notched pine beams, iron tie brackets, hanging amber lanterns, and guide rails.
+26. `public/art/props/prop-26-granite-tunnel-portal.png` (1024x1024) — Heavy chiseled granite mountain tunnel entrance archway with reinforced timber lintels, beast skull trophy keystone, and burning iron sconces.
+27. `public/art/props/prop-27-rock-spire-lookout.png` (720x1440) — Towering jagged rock needle pinnacle with goblin lookout crow's nest, hanging brass gong, rope ladder, and fluttering pennant.
+28. `public/art/props/prop-28-cavern-waterwheel-cascade.png` (720x1440) — Roaring alpine waterfall tumbling over stepped slate rocks with a heavy mossy wooden goblin waterwheel, brass scoops, and splash trough.
+29. `public/art/props/prop-29-spiked-boulder-barricade.png` (1024x1024) — Cluster of rugged sandstone boulders fortified with sharpened wooden palisade spikes, chains, glowing green mushrooms, goblin shield, and war horn.
+30. `public/art/props/prop-30-goblin-slingshot-downrange.png` (1024x1536) — Mechanical track slingshot catapult launcher with steam boiler, brass gear winch, and heavy timber forks viewed downrange.
+
+- All 30 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet for Batch 3 generated in `public/art/sheets/props-sheet-c.png`.
+- Full composite 5x6 sprite sheet of all 30 variations generated in `public/art/sheets/props-sheet.png`.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

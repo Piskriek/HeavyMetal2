@@ -167,6 +167,26 @@ Generated 10 variations of roadside and track decoration props based on the orig
 - Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
 - Composite 5x2 sprite sheet on magenta key background generated in `public/art/sheets/props-sheet.png`.
 
+### Decoration Prop Variations (Batch 2 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of trackside and decoration props (Props 11 to 20) based on the original props (`bridge-wooden-broken`, `cliff-scaffolding`, `mine-gate`, `stadium-gantry`, `goblin-bleacher`, `rock-arch-wide`, `rock-platform-drums`, `slingshot`, `grandstand`, and `rock-platform-springboard`):
+
+11. `public/art/props/prop-11-broken-rope-bridge.png` (1408x768) — Broken wooden suspension rope bridge with snapped planks, fraying thick hemp ropes, and bolted timber anchor posts.
+12. `public/art/props/prop-12-goblin-scaffold-tower.png` (768x1376) — Rickety multi-level goblin timber watchtower with thatched roof, ladder, iron brackets, red skull flag, and lantern.
+13. `public/art/props/prop-13-cavern-mine-gate.png` (1408x768) — Heavy cavern mine entrance archway with jagged stone frame, timber beams, burning iron torches, and skull keystone.
+14. `public/art/props/prop-14-scrapdome-finish-gantry.png` (1408x768) — Racetrack finish line gantry arch with riveted iron trusses, brass cogs, checkered flag banner, and brass horns.
+15. `public/art/props/prop-15-goblin-spectator-terrace.png` (1408x768) — Tiered wooden bleacher terrace on mossy stone outcrop with spiked railings, skull banner, and flaming brazier.
+16. `public/art/props/prop-16-molten-rock-natural-arch.png` (1408x768) — Jagged basalt rock arch bridge with glowing orange lava fissures and dripping molten slag stalactites.
+17. `public/art/props/prop-17-goblin-war-drums.png` (1408x768) — Giant goblin war drum with stretched hide skin, spiked bronze rims, iron brackets, skull charms, and mallets.
+18. `public/art/props/prop-18-goblin-slingshot-launcher.png` (1408x768) — Heavy mechanical track slingshot catapult launcher with torsion winch, brass cog gear, and spiked anchor sled.
+19. `public/art/props/prop-19-racetrack-grandstand.png` (1408x768) — Covered wooden racetrack grandstand with tiered bench seating, corrugated rusty tin roof, and festive goblin pennant bunting.
+20. `public/art/props/prop-20-goblin-springboard-platform.png` (1024x1024) — Goblin springboard catapult ledge on craggy stone outcrop with torch brazier, checkered flag, and cheering goblin spectators.
+
+- All 20 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet for Batch 2 generated in `public/art/sheets/props-sheet-b.png`.
+- Full composite 5x4 sprite sheet of all 20 variations generated in `public/art/sheets/props-sheet.png`.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

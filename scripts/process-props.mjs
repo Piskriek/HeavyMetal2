@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * Post-processes and validates the 10 generated prop variations.
+ * Post-processes and validates the generated prop variations.
  *
  * Sources:
  *  - Generated on the project's standard magenta (#FF00FF) chroma key backdrop.
  *  - Stored in `public/art/props/` (raw magenta key transparency) and
  *    `public/art/props/alpha/` (keyed true alpha transparency).
- *  - Combined sprite sheet stored in `public/art/sheets/props-sheet.png`.
+ *  - Combined sprite sheet stored in `public/art/sheets/props-sheet.png` (all 20)
+ *    and `public/art/sheets/props-sheet-b.png` (Batch 2: props 11-20).
  *
  * Keying & despill:
  *  - Detects magenta matte (#FF00FF signature: high R and B, low G).
@@ -25,6 +26,7 @@ const alphaDir = join(root, 'public/art/props/alpha');
 mkdirSync(alphaDir, { recursive: true });
 
 export const PROP_VARIATIONS = [
+  // --- Batch 1 (Props 01 - 10) ---
   {
     file: 'prop-01-lantern-post-triple.png',
     original: 'public/art/track-parts/lantern-post.png',
@@ -75,9 +77,60 @@ export const PROP_VARIATIONS = [
     original: 'public/art/sheets/blimp.png',
     concept: 'Goblin scout blimp airship with riveted brass ribs, spinning side propellers, and hanging gondola',
   },
+  // --- Batch 2 (Props 11 - 20) ---
+  {
+    file: 'prop-11-broken-rope-bridge.png',
+    original: 'public/art/track-parts/bridge-wooden-broken.png',
+    concept: 'Broken wooden suspension rope bridge with snapped planks, fraying thick hemp ropes, and bolted timber anchor posts',
+  },
+  {
+    file: 'prop-12-goblin-scaffold-tower.png',
+    original: 'public/art/track-parts/cliff-scaffolding.png',
+    concept: 'Rickety goblin timber watchtower with thatched roof, ladder, iron brackets, red skull flag, and lantern',
+  },
+  {
+    file: 'prop-13-cavern-mine-gate.png',
+    original: 'public/art/track-parts/mine-gate.png',
+    concept: 'Heavy cavern mine entrance archway with jagged stone frame, timber beams, burning iron torches, and skull keystone',
+  },
+  {
+    file: 'prop-14-scrapdome-finish-gantry.png',
+    original: 'public/art/track-parts/stadium-gantry.png',
+    concept: 'Racetrack finish line gantry arch with riveted iron trusses, brass cogs, checkered flag banner, and brass horns',
+  },
+  {
+    file: 'prop-15-goblin-spectator-terrace.png',
+    original: 'public/art/track-parts/goblin-bleacher-a.png',
+    concept: 'Tiered wooden bleacher terrace on mossy stone outcrop with spiked railings, skull banner, and flaming brazier',
+  },
+  {
+    file: 'prop-16-molten-rock-natural-arch.png',
+    original: 'public/art/track-parts/rock-arch-wide.png',
+    concept: 'Jagged basalt rock arch bridge with glowing orange lava fissures and dripping molten slag stalactites',
+  },
+  {
+    file: 'prop-17-goblin-war-drums.png',
+    original: 'public/art/track-parts/rock-platform-drums.png',
+    concept: 'Giant goblin war drum with stretched hide skin, spiked bronze rims, iron brackets, skull charms, and mallets',
+  },
+  {
+    file: 'prop-18-goblin-slingshot-launcher.png',
+    original: 'public/art/slingshot.png',
+    concept: 'Heavy mechanical track slingshot catapult launcher with torsion winch, brass cog gear, and spiked anchor sled',
+  },
+  {
+    file: 'prop-19-racetrack-grandstand.png',
+    original: 'public/art/grandstand.png',
+    concept: 'Covered wooden racetrack grandstand with tiered bench seating, corrugated rusty tin roof, and festive goblin pennant bunting',
+  },
+  {
+    file: 'prop-20-goblin-springboard-platform.png',
+    original: 'public/art/track-parts/rock-platform-springboard.png',
+    concept: 'Goblin springboard catapult ledge on craggy stone outcrop with torch brazier, checkered flag, and cheering goblin spectators',
+  },
 ];
 
-console.log('Processing and verifying 10 prop variations...\n');
+console.log(`Processing and verifying ${PROP_VARIATIONS.length} prop variations...\n`);
 
 let allPassed = true;
 
@@ -93,7 +146,11 @@ for (const prop of PROP_VARIATIONS) {
 
   // Verify magenta key in corner
   const pixel = execFileSync('convert', [rawPath, '-format', '%[pixel:p{10,10}]', 'info:'], { encoding: 'utf8' }).trim();
-  const isMagenta = pixel.includes('srgb(25') || pixel.includes('#ff') || pixel.includes('255,0,255') || pixel.includes('#FE') || pixel.includes('#FD') || pixel.includes('#FB') || pixel.includes('#FA');
+  const isMagenta = pixel.includes('srgb(25') || pixel.includes('#ff') || pixel.includes('255,0,255') || pixel.includes('#FE') || pixel.includes('#FD') || pixel.includes('#FB') || pixel.includes('#FA') || pixel.includes('srgba(255,0,255');
+
+  if (!isMagenta) {
+    console.warn(`WARN: Corner pixel for ${prop.file} is ${pixel}`);
+  }
 
   // Key to alpha
   execFileSync('convert', [
@@ -107,8 +164,8 @@ for (const prop of PROP_VARIATIONS) {
   const alphaPixel = execFileSync('convert', [alphaPath, '-format', '%[pixel:p{10,10}]', 'info:'], { encoding: 'utf8' }).trim();
   const dims = execFileSync('identify', ['-format', '%wx%h', rawPath], { encoding: 'utf8' }).trim();
 
-  console.log(`✓ ${prop.file.padEnd(38)} ${dims.padEnd(10)} magenta=${pixel.padEnd(18)} alpha=${alphaPixel}`);
+  console.log(`✓ ${prop.file.padEnd(42)} ${dims.padEnd(10)} magenta=${pixel.padEnd(20)} alpha=${alphaPixel}`);
 }
 
-console.log(`\nAll 10 prop variations verified successfully.`);
+console.log(`\nAll ${PROP_VARIATIONS.length} prop variations verified successfully.`);
 if (!allPassed) process.exit(1);

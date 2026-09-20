@@ -94,14 +94,14 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'crowd_banner', name: 'Cheering Crowd Banner', category: 'stadium', url: '/art/foreground-crowd.png', defaultWidth: 1500, defaultHeight: 500 },
   { type: 'checkered_flag', name: 'Checkered Flag', category: 'stadium', url: '/art/flag-checkered.png', defaultWidth: 380, defaultHeight: 380 },
 
-  // --- ROAD DECALS ---
-  { type: 'decal_tire_skid', name: 'Tire Skid Marks', category: 'decals', url: '/art/decals/decal-tire-skid.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
-  { type: 'decal_oil_spill', name: 'Oil Spill Puddle', category: 'decals', url: '/art/decals/decal-oil-spill.png', defaultWidth: 440, defaultHeight: 440, isDecal: true },
-  { type: 'decal_cracks', name: 'Asphalt Fissures & Cracks', category: 'decals', url: '/art/decals/decal-cracks.png', defaultWidth: 460, defaultHeight: 460, isDecal: true },
-  { type: 'decal_pothole', name: 'Broken Pothole Crater', category: 'decals', url: '/art/decals/decal-pothole.png', defaultWidth: 400, defaultHeight: 400, isDecal: true },
-  { type: 'decal_hazard_stripes', name: 'Caution Hazard Stripes', category: 'decals', url: '/art/decals/decal-hazard-stripes.png', defaultWidth: 620, defaultHeight: 310, isDecal: true },
-  { type: 'decal_speed_arrow', name: 'Directional Speed Chevron', category: 'decals', url: '/art/decals/decal-speed-arrow.png', defaultWidth: 380, defaultHeight: 380, isDecal: true },
-  { type: 'decal_drain_grate', name: 'Iron Drainage Grate', category: 'decals', url: '/art/decals/decal-drain-grate.png', defaultWidth: 360, defaultHeight: 360, isDecal: true },
+  // --- ROAD DECALS (WARCRAFT RTS DIRT ROAD STYLE) ---
+  { type: 'decal_wc_grass_patch', name: 'Lush Grass Patch', category: 'decals', url: '/art/decals/decal-wc-grass-patch.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
+  { type: 'decal_wc_grass_seam', name: 'Grass Fringe & Seam Blender', category: 'decals', url: '/art/decals/decal-wc-grass-seam.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
+  { type: 'decal_wc_rocky_dirt', name: 'Rocky Dirt Cutout', category: 'decals', url: '/art/decals/decal-wc-rocky-dirt.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
+  { type: 'decal_wc_mud_puddle', name: 'Muddy Dirt Puddle', category: 'decals', url: '/art/decals/decal-wc-mud-puddle.png', defaultWidth: 480, defaultHeight: 480, isDecal: true },
+  { type: 'decal_wc_flagstone', name: 'Mossy Flagstone Pavers', category: 'decals', url: '/art/decals/decal-wc-flagstone.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
+  { type: 'decal_wc_gravel', name: 'Gravel & River Stones', category: 'decals', url: '/art/decals/decal-wc-gravel.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
+  { type: 'decal_wc_cart_ruts', name: 'Wagon Cart Dirt Ruts', category: 'decals', url: '/art/decals/decal-wc-cart-ruts.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
 ];
 
 export class TrackBuilder3D {

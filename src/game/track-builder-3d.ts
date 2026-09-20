@@ -127,6 +127,31 @@ export class TrackBuilder3D {
   private readonly mouseNdc = new THREE.Vector2();
 
   private listeners: (() => void)[] = [];
+  private currentSkyId = 'ridge';
+  private onSkyboxChangeCb?: (skyId: string) => void;
+
+  onSkyboxChange(cb: (skyId: string) => void) {
+    this.onSkyboxChangeCb = cb;
+  }
+
+  setInitialSky(skyId: string) {
+    this.currentSkyId = skyId;
+  }
+
+  getSkybox(): string {
+    return this.currentSkyId;
+  }
+
+  setSkybox(skyId: string) {
+    this.currentSkyId = skyId;
+    try {
+      localStorage.setItem('hm2-3d-track-sky', skyId);
+    } catch {
+      // Storage unavailable
+    }
+    this.onSkyboxChangeCb?.(skyId);
+    this.notify();
+  }
 
   constructor(
     private readonly scene: THREE.Scene,

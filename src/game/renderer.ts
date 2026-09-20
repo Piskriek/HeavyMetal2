@@ -13,8 +13,8 @@ export class RangeRenderer {
   readonly view = new RangeCamera();
   private readonly renderer3d: Renderer3D;
 
-  constructor(canvas: HTMLCanvasElement, assets: GameAssets, _course: CourseId = 'ridge') {
-    this.renderer3d = new Renderer3D(canvas, assets);
+  constructor(canvas: HTMLCanvasElement, assets: GameAssets, course: CourseId = 'ridge') {
+    this.renderer3d = new Renderer3D(canvas, assets, course);
   }
 
   resize(width: number, height: number) {

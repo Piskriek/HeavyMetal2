@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
-  Layers, Eye, MousePointer, Camera
+  Layers, Eye, MousePointer, Camera, Sun, ChevronDown
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -11,6 +11,7 @@ import {
   type PropCategory,
   type PlacedProp
 } from '../game/track-builder-3d';
+import { SKY_PRESETS } from '../game/renderer-3d';
 
 interface TrackBuilderUIProps {
   builder: TrackBuilder3D;
@@ -47,6 +48,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [snapToCenterline, setSnapToCenterline] = useState(builder.snapping.snapToCenterline);
   const [cameraFacingDefault, setCameraFacingDefault] = useState(builder.snapping.cameraFacingDefault);
   const [showPropsDrawer, setShowPropsDrawer] = useState(false);
+  const [currentSky, setCurrentSky] = useState<string>(builder.getSkybox());
+  const [showSkyMenu, setShowSkyMenu] = useState(false);
   const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly, Right-Drag to look, Click props to select');
 
   const keysRef = useRef(new Set<string>());
@@ -66,6 +69,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     const update = () => {
       setSelectedProp(builder.getSelectedProp());
       setActivePropType(builder.getActivePropType());
+      setCurrentSky(builder.getSkybox());
       onRequestRender?.();
     };
     builder.onChange(update);
@@ -363,6 +367,55 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Skybox / Atmosphere Environment Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSkyMenu(!showSkyMenu)}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/50 font-medium cursor-pointer"
+              title="Choose Skydome Environment & Atmosphere"
+            >
+              <Sun size={13} />
+              <span>Sky: {SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Ridge'}</span>
+              <ChevronDown size={11} />
+            </button>
+
+            {showSkyMenu && (
+              <div className="absolute top-8 left-0 z-50 w-64 bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl p-2 flex flex-col gap-1 backdrop-blur-md">
+                <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider">
+                  Skydome Atmosphere
+                </span>
+                {Object.values(SKY_PRESETS).map((p) => {
+                  const isActive = currentSky === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        builder.setSkybox(p.id);
+                        setCurrentSky(p.id);
+                        setShowSkyMenu(false);
+                        showToast(`Atmosphere: ${p.name}`);
+                      }}
+                      className={`flex items-center gap-2.5 px-2 py-1.5 rounded text-xs text-left transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-amber-950/70 border border-amber-500/80 text-amber-200 font-bold'
+                          : 'hover:bg-zinc-900 text-zinc-300 border border-transparent'
+                      }`}
+                    >
+                      <div
+                        className="w-8 h-8 rounded border border-zinc-700 overflow-hidden shrink-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${p.url})` }}
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate font-medium">{p.name}</span>
+                        <span className="text-[9px] text-zinc-500 capitalize">{p.id} biome</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Placed Props Drawer Toggle */}

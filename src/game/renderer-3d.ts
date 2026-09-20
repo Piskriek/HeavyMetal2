@@ -1161,38 +1161,126 @@ function buildStadium(track: TrackData, M: Materials, scene: THREE.Scene) {
 /* -----------------------------------------------------------------------------
    6. WORLD (Sky & Distant Mountains)
    -------------------------------------------------------------------------- */
+export interface SkyPreset {
+  id: string;
+  name: string;
+  url: string;
+  fogColor: number;
+  ambientColor: number;
+  sunColor: number;
+  sunIntensity: number;
+  zenithColor: number;
+}
+
+export const SKY_PRESETS: Record<string, SkyPreset> = {
+  ridge: {
+    id: 'ridge',
+    name: 'Alpine Mountain Vista',
+    url: '/art/tracks/sky_copperwood_ridge.png',
+    fogColor: 0xb8a77a,
+    ambientColor: 0x6b5f3f,
+    sunColor: 0xf0c070,
+    sunIntensity: 2.4,
+    zenithColor: 0x244c66,
+  },
+  boomtown: {
+    id: 'boomtown',
+    name: 'Canyon Sunset Furnace',
+    url: '/art/tracks/sky_boomtown_quarry.png',
+    fogColor: 0xc98855,
+    ambientColor: 0x4a2e1e,
+    sunColor: 0xff8833,
+    sunIntensity: 2.6,
+    zenithColor: 0x5a3020,
+  },
+  sheep: {
+    id: 'sheep',
+    name: 'Stormy Downland Vista',
+    url: '/art/tracks/sky_woolly_wasteland.png',
+    fogColor: 0x9eb0a8,
+    ambientColor: 0x5b7282,
+    sunColor: 0xd8e8c8,
+    sunIntensity: 2.1,
+    zenithColor: 0x304a52,
+  },
+  vista: {
+    id: 'vista',
+    name: 'Scrapdome Golden Sunset',
+    url: '/art/menu-vista.png',
+    fogColor: 0xb07040,
+    ambientColor: 0x503025,
+    sunColor: 0xffa050,
+    sunIntensity: 2.5,
+    zenithColor: 0x382848,
+  },
+};
+
 const SKY = {
   topDay: new THREE.Color(0x4f7fb4), goldDay: new THREE.Color(0xe9c98c),
   fogDay: new THREE.Color(0xb8a77a), fogCave: new THREE.Color(0x160a06),
   ambientDay: new THREE.Color(0x6b5f3f), ambientCave: new THREE.Color(0x3a1c0c),
 };
 
-function buildSky() {
+function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
+  const tex = loader.load(preset.url);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+
   const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
     uniforms: {
-      topColor: { value: SKY.topDay.clone() },
-      goldColor: { value: SKY.goldDay.clone() },
-      horizonColor: { value: SKY.fogDay.clone() },
+      skyMap: { value: tex },
+      hasTexture: { value: 1.0 },
+      horizonColor: { value: new THREE.Color(preset.fogColor) },
+      zenithColor: { value: new THREE.Color(preset.zenithColor) },
     },
     vertexShader: `
+      varying vec2 vUv;
       varying vec3 vDir;
       void main() {
+        vUv = uv;
         vDir = normalize((modelMatrix * vec4(position, 1.0)).xyz - cameraPosition);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
+      }
+    `,
     fragmentShader: `
-      uniform vec3 topColor; uniform vec3 goldColor; uniform vec3 horizonColor; varying vec3 vDir;
+      uniform sampler2D skyMap;
+      uniform float hasTexture;
+      uniform vec3 horizonColor;
+      uniform vec3 zenithColor;
+      varying vec2 vUv;
+      varying vec3 vDir;
+
       void main() {
+        // Map uvY so the painting spans from just below the horizon up to the zenith
+        float uvY = clamp((vUv.y - 0.32) / 0.68, 0.0, 1.0);
+        vec2 uv = vec2(1.0 - vUv.x, uvY);
+        vec4 tex = texture2D(skyMap, uv);
+
         float h = vDir.y;
-        vec3 c = mix(horizonColor, goldColor, smoothstep(0.0, 0.10, h));
-        c = mix(c, topColor, pow(smoothstep(0.06, 0.75, h), 0.7));
-        c = mix(horizonColor * 0.85, c, smoothstep(-0.30, 0.0, h));
-        gl_FragColor = vec4(c, 1.0);
-      }`,
+        // Fade smoothly into horizon/fog color below horizon
+        float groundBlend = smoothstep(-0.25, 0.03, h);
+        float zenithBlend = smoothstep(0.40, 0.95, h);
+
+        vec3 color = mix(horizonColor, tex.rgb, groundBlend);
+        color = mix(color, zenithColor, zenithBlend * 0.22);
+
+        if (hasTexture < 0.5) {
+          color = mix(horizonColor, zenithColor, smoothstep(-0.1, 0.7, h));
+        }
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(110000, 24, 12), mat);
+
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(120000, 64, 32), mat);
   sky.name = 'Sky';
+  sky.renderOrder = -1000;
   return sky;
 }
 
@@ -1306,9 +1394,10 @@ export class Renderer3D {
   private readonly D_END: number;
   private readonly enterD: number;
   private readonly exitD: number;
+  private currentSkyPreset: SkyPreset;
   private destroyed = false;
 
-  constructor(canvas: HTMLCanvasElement, assets: GameAssets) {
+  constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -1320,21 +1409,26 @@ export class Renderer3D {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
 
+    const storedSky = typeof localStorage !== 'undefined' ? localStorage.getItem('hm2-3d-track-sky') : null;
+    const skyKey = (storedSky && SKY_PRESETS[storedSky]) ? storedSky : (SKY_PRESETS[initialSky] ? initialSky : 'ridge');
+    this.currentSkyPreset = SKY_PRESETS[skyKey] ?? SKY_PRESETS.ridge;
+
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(SKY.fogDay.clone(), 6000, 48000);
+    this.scene.fog = new THREE.Fog(new THREE.Color(this.currentSkyPreset.fogColor), 6000, 48000);
 
     const aspect = (canvas.clientWidth || 1440) / (canvas.clientHeight || 620);
     this.camera = new THREE.PerspectiveCamera(62, aspect, 30, 200000);
 
     // Lights
-    this.sun = new THREE.DirectionalLight(0xf0c070, 2.4);
+    this.sun = new THREE.DirectionalLight(this.currentSkyPreset.sunColor, this.currentSkyPreset.sunIntensity);
     this.sun.position.set(6000, 10000, -4000);
-    this.ambient = new THREE.AmbientLight(SKY.ambientDay.clone(), 1.6);
+    this.ambient = new THREE.AmbientLight(this.currentSkyPreset.ambientColor, 1.6);
     this.lavaGlow = new THREE.HemisphereLight(0x1a0c06, 0xff5a1a, 0);
     this.scene.add(this.sun, this.ambient, this.lavaGlow);
 
-    // Sky
-    this.sky = buildSky();
+    // Sky Dome
+    const textureLoader = new THREE.TextureLoader();
+    this.sky = buildSky(this.currentSkyPreset, textureLoader);
     this.scene.add(this.sky);
 
     // Build materials & Track
@@ -1359,11 +1453,39 @@ export class Renderer3D {
 
     // 3D Track Builder (handles placed props, free-fly, and surface snapping)
     this.trackBuilder = new TrackBuilder3D(this.scene, this.camera, this.track, this.materials);
+    this.trackBuilder.setInitialSky(skyKey);
+    this.trackBuilder.onSkyboxChange((newSky) => this.setSkybox(newSky));
 
     // Racers
     this.racers3D = createRacerMeshes(this.scene, assets);
 
     this.placeCamera(this.D_START, 0.1);
+  }
+
+  setSkybox(skyId: string) {
+    const preset = SKY_PRESETS[skyId];
+    if (!preset) return;
+    this.currentSkyPreset = preset;
+
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load(preset.url);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+
+    const mat = this.sky.material as THREE.ShaderMaterial;
+    if (mat && mat.uniforms) {
+      if (mat.uniforms.skyMap) mat.uniforms.skyMap.value = tex;
+      if (mat.uniforms.horizonColor) mat.uniforms.horizonColor.value.setHex(preset.fogColor);
+      if (mat.uniforms.zenithColor) mat.uniforms.zenithColor.value.setHex(preset.zenithColor);
+      if (mat.uniforms.hasTexture) mat.uniforms.hasTexture.value = 1.0;
+    }
+
+    this.sun.color.setHex(preset.sunColor);
+    this.sun.intensity = preset.sunIntensity;
+    this.ambient.color.setHex(preset.ambientColor);
+    (this.scene.fog as THREE.Fog).color.setHex(preset.fogColor);
   }
 
   resize(width: number, height: number) {
@@ -1392,18 +1514,20 @@ export class Renderer3D {
 
   private updateAtmosphere(d: number) {
     const under = smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d));
-    (this.scene.fog as THREE.Fog).color.copy(SKY.fogDay).lerp(SKY.fogCave, under);
+    const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
+    const dayAmbient = new THREE.Color(this.currentSkyPreset.ambientColor);
+    (this.scene.fog as THREE.Fog).color.copy(dayFog).lerp(SKY.fogCave, under);
     (this.scene.fog as THREE.Fog).near = lerp(6000, 1500, under);
     (this.scene.fog as THREE.Fog).far = lerp(48000, 17000, under);
-    this.ambient.color.copy(SKY.ambientDay).lerp(SKY.ambientCave, under);
+    this.ambient.color.copy(dayAmbient).lerp(SKY.ambientCave, under);
     this.ambient.intensity = lerp(1.6, 1.1, under);
-    this.sun.intensity = lerp(2.4, 0.15, under);
-    this.lavaGlow.intensity = under * 1.6;
+    this.sun.intensity = lerp(this.currentSkyPreset.sunIntensity, 0.15, under);
+    this.lavaGlow.intensity = under * 2.8;
 
     const skyMat = this.sky.material as THREE.ShaderMaterial;
-    skyMat.uniforms.topColor.value.copy(SKY.topDay).lerp(SKY.fogCave, under);
-    skyMat.uniforms.goldColor.value.copy(SKY.goldDay).lerp(SKY.fogCave, under);
-    skyMat.uniforms.horizonColor.value.copy(SKY.fogDay).lerp(SKY.fogCave, under);
+    if (skyMat && skyMat.uniforms?.horizonColor) {
+      skyMat.uniforms.horizonColor.value.copy(dayFog).lerp(SKY.fogCave, under);
+    }
   }
 
   render(frame: SceneFrame, intervalMs = 16.67) {
@@ -1454,6 +1578,7 @@ export class Renderer3D {
       this.updateAtmosphere(playerDist);
     }
     this.sky.position.copy(this.camera.position);
+    this.sky.rotation.y += dt * 0.0012;
 
     // 3. Texture scrolls
     const raw = frame.time;

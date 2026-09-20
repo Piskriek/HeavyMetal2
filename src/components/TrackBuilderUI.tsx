@@ -38,6 +38,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [alignToTrack, setAlignToTrack] = useState(builder.snapping.alignToTrack);
   const [snapToCenterline, setSnapToCenterline] = useState(builder.snapping.snapToCenterline);
   const [cameraFacingDefault, setCameraFacingDefault] = useState(builder.snapping.cameraFacingDefault);
+  const [decalDefault, setDecalDefault] = useState(builder.snapping.decalDefault ?? false);
   const [showPropsDrawer, setShowPropsDrawer] = useState(false);
   const [currentSky, setCurrentSky] = useState<string>(builder.getSkybox());
   const [showSkyMenu, setShowSkyMenu] = useState(false);
@@ -484,6 +485,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             />
             Camera Facing
           </label>
+
+          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed items are treated as flat decals on the track/ground surface.">
+            <input
+              type="checkbox"
+              checked={decalDefault}
+              onChange={(e) => {
+                setDecalDefault(e.target.checked);
+                builder.snapping.decalDefault = e.target.checked;
+                showToast(e.target.checked ? 'Default: Decal (Flat on Track/Ground)' : 'Default: Upright Decoration');
+              }}
+              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
+            />
+            Decal (Flat)
+          </label>
         </div>
 
         {/* Action Buttons */}
@@ -615,6 +630,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                           <span className="font-semibold truncate text-[11px]">{p.name}</span>
                           {def?.isRamp ? (
                             <span className="text-[9px] px-1 py-0.2 bg-amber-900/60 text-amber-300 rounded font-mono">RAMP</span>
+                          ) : (p.isDecal !== undefined ? p.isDecal : def?.isDecal) ? (
+                            <span className="text-[9px] px-1 py-0.2 bg-emerald-950/60 text-emerald-300 rounded font-mono">DECAL</span>
                           ) : p.cameraFacing === false ? (
                             <span className="text-[9px] px-1 py-0.2 bg-purple-950/60 text-purple-300 rounded font-mono">3D</span>
                           ) : (
@@ -877,10 +894,43 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
           </div>
 
-          {/* Camera Facing Toggle (for PNG decorations) */}
+          {/* Decal Mode (Flat) Checkbox / Toggle */}
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
-            if (def?.isRamp || def?.isDecal) return null;
+            if (def?.isRamp) return null;
+            const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
+            return (
+              <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+                <span className="text-zinc-400">Decal Mode (Flat):</span>
+                <button
+                  onClick={() => {
+                    const next = !isDecal;
+                    builder.updatePropTransform(selectedProp.id, {
+                      isDecal: next,
+                      cameraFacing: next ? false : selectedProp.cameraFacing,
+                    });
+                    showToast(next ? 'Set as Decal (Flat on Track/Ground)' : 'Set as Upright Decoration');
+                    onRequestRender?.();
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                    isDecal
+                      ? 'bg-emerald-600/90 hover:bg-emerald-500 text-zinc-950 border-emerald-400'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+                  }`}
+                  title="Toggle whether this item lies flat on the road/ground as a decal, or stands upright"
+                >
+                  <Layers size={13} />
+                  <span>{isDecal ? 'Decal (Flat on Ground)' : 'Upright Decoration'}</span>
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* Camera Facing Toggle (for PNG decorations that are NOT decals) */}
+          {(() => {
+            const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
+            const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
+            if (def?.isRamp || isDecal) return null;
             const isFacing = selectedProp.cameraFacing !== false;
             return (
               <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
@@ -890,6 +940,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     const next = !isFacing;
                     builder.updatePropTransform(selectedProp.id, { cameraFacing: next });
                     showToast(next ? 'Set to Camera Facing (Billboard)' : 'Set to Fixed 3D World Orientation');
+                    onRequestRender?.();
                   }}
                   className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
                     isFacing

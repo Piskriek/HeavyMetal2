@@ -36,6 +36,7 @@ export interface PlacedProp {
   trackDist?: number;
   cameraFacing?: boolean;
   flipX?: boolean;
+  isDecal?: boolean;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
@@ -114,7 +115,7 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'prop_45_cheer_platform', name: 'Goblin Cheer Platform', category: 'stadium', url: '/art/props/alpha/prop-45-goblin-cheer-platform-horn.png', defaultWidth: 1100, defaultHeight: 600 },
   { type: 'prop_50_flag_pole_row', name: 'Pennant Flag Pole Row', category: 'stadium', url: '/art/props/alpha/prop-50-pennant-flag-pole-row.png', defaultWidth: 1200, defaultHeight: 650 },
 
-  // --- ROAD DECALS (WARCRAFT RTS DIRT ROAD STYLE) ---
+  // --- ROAD DECALS (WARCRAFT RTS DIRT ROAD & TRACK DECALS) ---
   { type: 'decal_wc_grass_patch', name: 'Lush Grass Patch', category: 'decals', url: '/art/decals/decal-wc-grass-patch.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
   { type: 'decal_wc_grass_seam', name: 'Grass Fringe & Seam Blender', category: 'decals', url: '/art/decals/decal-wc-grass-seam.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
   { type: 'decal_wc_rocky_dirt', name: 'Rocky Dirt Cutout', category: 'decals', url: '/art/decals/decal-wc-rocky-dirt.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
@@ -122,6 +123,14 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'decal_wc_flagstone', name: 'Mossy Flagstone Pavers', category: 'decals', url: '/art/decals/decal-wc-flagstone.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
   { type: 'decal_wc_gravel', name: 'Gravel & River Stones', category: 'decals', url: '/art/decals/decal-wc-gravel.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
   { type: 'decal_wc_cart_ruts', name: 'Wagon Cart Dirt Ruts', category: 'decals', url: '/art/decals/decal-wc-cart-ruts.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
+  { type: 'decal_grass_fringe', name: 'Grass Fringe Border', category: 'decals', url: '/art/decals/grass-fringe.png', defaultWidth: 600, defaultHeight: 300, isDecal: true },
+  { type: 'decal_tire_skid', name: 'Tire Skid Marks', category: 'decals', url: '/art/decals/decal-tire-skid.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
+  { type: 'decal_oil_spill', name: 'Oil Spill Puddle', category: 'decals', url: '/art/decals/decal-oil-spill.png', defaultWidth: 440, defaultHeight: 440, isDecal: true },
+  { type: 'decal_cracks', name: 'Asphalt Fissures & Cracks', category: 'decals', url: '/art/decals/decal-cracks.png', defaultWidth: 460, defaultHeight: 460, isDecal: true },
+  { type: 'decal_pothole', name: 'Broken Pothole Crater', category: 'decals', url: '/art/decals/decal-pothole.png', defaultWidth: 400, defaultHeight: 400, isDecal: true },
+  { type: 'decal_hazard_stripes', name: 'Caution Hazard Stripes', category: 'decals', url: '/art/decals/decal-hazard-stripes.png', defaultWidth: 620, defaultHeight: 310, isDecal: true },
+  { type: 'decal_speed_arrow', name: 'Directional Speed Chevron', category: 'decals', url: '/art/decals/decal-speed-arrow.png', defaultWidth: 380, defaultHeight: 380, isDecal: true },
+  { type: 'decal_drain_grate', name: 'Iron Drainage Grate', category: 'decals', url: '/art/decals/decal-drain-grate.png', defaultWidth: 360, defaultHeight: 360, isDecal: true },
 ];
 
 export class TrackBuilder3D {
@@ -152,6 +161,7 @@ export class TrackBuilder3D {
     snapToCenterline: false,
     gridSnap: 0,
     cameraFacingDefault: true,
+    decalDefault: false,
   };
 
   private readonly textureLoader = new THREE.TextureLoader();
@@ -446,7 +456,9 @@ export class TrackBuilder3D {
     const def = PROP_DEFINITIONS.find((p) => p.type === this.activePropType);
     if (!def) return;
 
-    if (def.isDecal) {
+    const isDecal = def.isDecal || this.snapping.decalDefault;
+
+    if (isDecal) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
       const tex = this.getTexture(def.url);
       if (!this.ghostMesh || (this.ghostMesh as any)._forType !== def.type || (this.ghostMesh as any)._isDecalMesh !== true) {
@@ -534,6 +546,8 @@ export class TrackBuilder3D {
       rotY = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
     }
 
+    const isDecal = def.isDecal || this.snapping.decalDefault;
+
     const prop: PlacedProp = {
       id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       type: def.type,
@@ -546,8 +560,9 @@ export class TrackBuilder3D {
       scale: 1,
       alignToTrack: this.snapping.alignToTrack,
       trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
-      cameraFacing: (def.isRamp || def.isDecal) ? false : this.snapping.cameraFacingDefault,
+      cameraFacing: (def.isRamp || isDecal) ? false : this.snapping.cameraFacingDefault,
       flipX: false,
+      isDecal,
     };
 
     this.placedProps.push(prop);
@@ -629,12 +644,17 @@ export class TrackBuilder3D {
     const prop = this.placedProps.find((p) => p.id === id);
     if (!prop) return;
 
+    const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
     const oldCameraFacing = prop.cameraFacing !== false;
-    Object.assign(prop, updates);
-    const newCameraFacing = prop.cameraFacing !== false;
+    const oldIsDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
 
-    // If cameraFacing changed, recreate the 3D object
-    if (oldCameraFacing !== newCameraFacing) {
+    Object.assign(prop, updates);
+
+    const newCameraFacing = prop.cameraFacing !== false;
+    const newIsDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
+
+    // If cameraFacing or isDecal changed, recreate the 3D object
+    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal) {
       const oldObj = this.propObjects.get(id);
       if (oldObj) {
         this.scene.remove(oldObj);
@@ -645,10 +665,9 @@ export class TrackBuilder3D {
       const obj = this.propObjects.get(id);
       if (obj) {
         obj.position.set(prop.x, prop.y, prop.z);
-        const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
         const flip = prop.flipX ? -1 : 1;
         if (def) {
-          if (def.isDecal || (obj as any).userData?.isDecal) {
+          if (newIsDecal || (obj as any).userData?.isDecal) {
             obj.position.y = prop.y + 2;
             obj.rotation.x = -Math.PI / 2;
             obj.rotation.z = -(prop.rotY + (prop.rotZ ?? 0));
@@ -710,7 +729,8 @@ export class TrackBuilder3D {
     // Position in-place rotation handle above the prop
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
     const h = (def?.defaultHeight ?? 500) * prop.scale;
-    const handleY = prop.y + (def?.isDecal ? 40 : h + 70);
+    const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
+    const handleY = prop.y + (isDecal ? 40 : h + 70);
 
     if (!this.rotationHandle) {
       this.rotationHandle = new THREE.Group();
@@ -783,6 +803,7 @@ export class TrackBuilder3D {
 
     let obj: THREE.Object3D;
     const flip = prop.flipX ? -1 : 1;
+    const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def.isDecal ?? false);
 
     if (def.isRamp) {
       // Create 3D wedge ramp mesh
@@ -800,7 +821,7 @@ export class TrackBuilder3D {
       mesh.rotation.y = prop.rotY;
       mesh.rotation.z = prop.rotZ ?? 0;
       obj = mesh;
-    } else if (def.isDecal) {
+    } else if (isDecal) {
       // Flat surface decal (lies flat on track/ground)
       const tex = this.getTexture(def.url);
       const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);

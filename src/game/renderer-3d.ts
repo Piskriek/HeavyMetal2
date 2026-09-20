@@ -832,22 +832,7 @@ function buildAlpine(track: TrackData, M: Materials, scene: THREE.Scene, terrain
 
   // Ramps are now independent props in TrackBuilder3D with full collision and positioning!
 
-  for (let d = track.stageStart.alpine + 600; d < track.stageEnd.alpine - 400; d += 300) {
-    const s = sampleAt(d);
-    if (s.inLoop || Math.abs(d - distOf('alpineLoop')) < 1400) continue;
-    for (const side of [-1, 1]) {
-      if (rand() < 0.3) continue;
-      const lateral = side > 0 ? randRange(1300, 3600) : randRange(1300, 7000);
-      const x = s.pos.x + s.right.x * side * lateral, z = s.pos.z + s.right.z * side * lateral;
-      const groundY = terrain(x, z);
-      if (groundY > s.pos.y + 900 || groundY < s.pos.y - 2600) continue;
-      const height = randRange(900, 1500);
-      const trunk = grounded(new THREE.Mesh(new THREE.CylinderGeometry(55, 95, height, 6, 1), M.bark), 'PineTrunk');
-      trunk.position.set(x, groundY - 120 + height / 2, z);
-      trunk.rotation.y = rand() * Math.PI;
-      scene.add(trunk);
-    }
-  }
+  // Pine tree trunks removed per user request (cylindrical wood posts on either side of the track)
 
   for (let i = 0; i < 46; i++) {
     const s = sampleAt(randRange(track.stageStart.alpine + 300, track.stageEnd.alpine - 300));

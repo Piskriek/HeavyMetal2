@@ -148,6 +148,25 @@ Renderer integration of all track-parts remains part of the TICKET-09 implementa
 work packages; this deliverable is the asset library plus the reproducible processing
 script.
 
+### Decoration Prop Variations (Batch 1 — 10 Variations with Magenta Key Transparency)
+
+Generated 10 variations of roadside and track decoration props based on the original props (`lantern-post`, `ore-cart`, `tnt-crate`, `ore-bucket`, `rail-switch`, `rock-deflector`, `cauldron-molten`, `landmark-windmill`, `landmark-pines`, and `blimp`):
+
+1. `public/art/props/prop-01-lantern-post-triple.png` (1024x1024) — Triple-lantern timber watchpost with chains, skull emblem, and cobblestone base.
+2. `public/art/props/prop-02-ore-cart-spilling.png` (1024x1024) — Tilted minecart spilling glowing magma rocks, gold ore, and embers on rails.
+3. `public/art/props/prop-03-tnt-powder-kegs.png` (1024x1024) — Gunpowder keg pyramid with dynamite bundles, skull TNT stencils, and sizzling fuse.
+4. `public/art/props/prop-04-smelting-crucible.png` (1024x1024) — Spiked iron smelting bucket with goblin gear crest and dripping molten gold.
+5. `public/art/props/prop-05-rail-turntable-switch.png` (1024x1024) — Railway switch tracks with dual-lever control box and signal lantern.
+6. `public/art/props/prop-06-crystal-rock-deflector.png` (1024x1024) — Rugged granite boulder deflector embedded with glowing amber crystal clusters.
+7. `public/art/props/prop-07-tripod-cauldron-molten.png` (1024x1024) — A-frame tripod smelting cauldron pouring molten metal onto glowing coals.
+8. `public/art/props/prop-08-goblin-windmill-gears.png` (912x1146) — Wooden windmill with patched sails, exposed brass cogs, and smoking chimney.
+9. `public/art/props/prop-09-pine-lookout-outcrop.png` (896x1197) — Mountain pine cluster with wooden goblin scout platform, hanging lantern, and ladder.
+10. `public/art/props/prop-10-scout-blimp-zeppelin.png` (1264x843) — Goblin scout airship with brass ribs, spinning propellers, and hanging gondola.
+
+- All 10 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet on magenta key background generated in `public/art/sheets/props-sheet.png`.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

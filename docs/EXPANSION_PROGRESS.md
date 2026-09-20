@@ -207,6 +207,28 @@ Generated an additional 10 variations of trackside and decoration props (Props 2
 - Composite 5x2 sprite sheet for Batch 3 generated in `public/art/sheets/props-sheet-c.png`.
 - Full composite 5x6 sprite sheet of all 30 variations generated in `public/art/sheets/props-sheet.png`.
 
+### Decoration Prop Variations (Batch 4 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of seam-hiding dressing and trackside structures (Props 31 to 40) based on the original props (`grass-fringe`, `rock-floor-ledge`, `rock-boulder-b`, `wall-timber-braced`, `wall-granite-strata`, `stadium-gantry` ironwork, `goblin-bleacher-a` timberwork, and `tunnel-mouth-timber`):
+
+31. `public/art/props/prop-31-grass-seam-fringe-wide.png` (1584x672) — Wide dense grass fringe seam patch with tall blades, clover tufts, wildflowers, dirt clumps, and pebbles.
+32. `public/art/props/prop-32-mossy-embankment-skirt.png` (1584x672) — Mossy dirt embankment skirt wedge with grass lip, hanging moss sheets, exposed roots, and embedded stones.
+33. `public/art/props/prop-33-rubble-gravel-seam-strip.png` (1584x672) — Loose rubble and gravel seam strip with crushed granite chunks, cracked slabs, dirt clumps, and pebbles.
+34. `public/art/props/prop-34-timber-crib-retaining-wall.png` (1376x768) — Timber crib retaining wall of stacked notched logs with iron spikes, corner brackets, moss, and dirt footing.
+35. `public/art/props/prop-35-granite-strata-seam-wall.png` (1376x768) — Layered granite strata seam wall with chiseled bands, iron pitons, hanging moss, ferns, and rubble footing.
+36. `public/art/props/prop-36-glowcap-mushroom-thicket.png` (1376x768) — Glowing green-capped mushroom thicket cluster with mossy fallen logs, drifting spores, and ferns.
+37. `public/art/props/prop-37-fern-bramble-undergrowth.png` (1376x768) — Dense fern and bramble undergrowth patch with curled fronds, thorny vines, red berries, and leaf litter.
+38. `public/art/props/prop-38-scrap-iron-barricade.png` (1376x768) — Scrap-iron junk barricade of leaning riveted plates, brass gears, chains, timber posts, and warning lantern.
+39. `public/art/props/prop-39-goblin-pit-canopy-tent.png` (1408x768) — Goblin pit-crew canopy tent with patched canvas awning, timber poles, tool crates, tire stack, and pennant bunting.
+40. `public/art/props/prop-40-timber-arch-gate-lanterns.png` (1408x768) — Heavy timber arch gate with crossed beams, iron brackets, hanging amber lanterns, and carved skull totem.
+
+- All 40 variations stored with pure magenta `#FF00FF` chroma key background in `public/art/props/` (the script flood-normalises the connected backdrop; Batch 1 raws were standardised from shaded to pure magenta).
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`, now with fringe unmix-despill: each boundary pixel's magenta excess `e = min(R-G, B-G)` becomes coverage `c = 1-e`, colour `(R-e,G,B-e)/c` and alpha `c`, dissolving anti-aliased fringe and baked pink rim-light into smooth neutral edges while leaving interiors bit-identical. All 40 alphas were re-processed; opaque magenta-ish remnants now measure 0–0.14% per sprite (residuals are interior paint such as glow-mushroom neon, verified on remnant maps).
+- `scripts/process-props.mjs` now also rebuilds the sprite sheets automatically and documents the 7-step batch protocol in its header for the next agent.
+- Composite 5x2 sprite sheet for Batch 4 generated in `public/art/sheets/props-sheet-d.png`.
+- Full composite 5x8 sprite sheet of all 40 variations generated in `public/art/sheets/props-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`): seam-hiding foliage (31, 32, 33, 36, 37), trackside walls/structures (34, 38, 40), cavern rockwork (35), stadium pit tent (39).
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

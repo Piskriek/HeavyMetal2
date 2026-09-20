@@ -229,6 +229,28 @@ Generated an additional 10 variations of seam-hiding dressing and trackside stru
 - Full composite 5x8 sprite sheet of all 40 variations generated in `public/art/sheets/props-sheet.png`.
 - All 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`): seam-hiding foliage (31, 32, 33, 36, 37), trackside walls/structures (34, 38, 40), cavern rockwork (35), stadium pit tent (39).
 
+### Decoration Prop Variations (Batch 5 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of cavern and stunt dressing (Props 41 to 50) based on the original props (`lava-sheet`, `waterfall-splash-b`, `mine-rails-b`, `ore-bucket`, `goblin-bleacher-b`, `rock-wall-left`, `rock-wall-right`, `rock-ceiling-cutout`, `tnt-crate`, and `flag-checkered`):
+
+41. `public/art/props/prop-41-molten-slag-channel.png` (1376x768) — Molten slag runnel channel with glowing lava stream, black basalt crust banks, embers, and smoke wisps.
+42. `public/art/props/prop-42-waterfall-plunge-basin.png` (1408x768) — Waterfall plunge basin with foaming splash pool, falling curtain, mist, and wet mossy boulders.
+43. `public/art/props/prop-43-mine-rail-buffer-junction.png` (1376x768) — Mine rail junction with forking rails, red timber buffer stop, lever, lantern, and gravel bed.
+44. `public/art/props/prop-44-chain-hoist-gantry.png` (1408x768) — Timber A-frame chain hoist gantry with iron brackets, hanging chains, hook block, ore bucket, and brass pulley.
+45. `public/art/props/prop-45-goblin-cheer-platform-horn.png` (1376x768) — Goblin cheer platform with railing, giant brass war horn, pennant bunting, torch, and skull decoration.
+46. `public/art/props/prop-46-cavern-wall-curtain-left.png` (768x1376) — Tall cavern rock wall curtain slab with green crystal clusters, hanging moss, ferns, and iron lantern.
+47. `public/art/props/prop-47-cavern-wall-curtain-right.png` (848x1264) — Tall layered slate wall curtain slab with waterfall seep, amber crystal veins, mushrooms, and piton rope.
+48. `public/art/props/prop-48-stalactite-ceiling-cluster.png` (1376x768) — Stalactite cave ceiling cluster with limestone spikes, green crystals, and hanging lanterns on chains.
+49. `public/art/props/prop-49-blast-crater-scorched.png` (1376x768) — Scorched TNT blast crater bowl with blackened marks, cracked rim, debris, smoke wisps, and ember cracks.
+50. `public/art/props/prop-50-pennant-flag-pole-row.png` (1376x768) — Checkered racing flag pole row with three tattered flags, skull finials, rope ties, brass bells, and cobblestone footings.
+
+- All 50 variations stored with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/` (flood-normalise + fuzz-key + unmix-despill). Batch 5 remnants measure 0–0.05% per sprite; residuals verified as interior paint (torch flame, smoke shading) on remnant maps.
+- Defect fix: the prop-42 generator render carried a magenta mist blob (~24% off-key, too big for the boundary ring); it was seed flood-filled to pure magenta in the raw (1.85% of pixels, rock untouched) and re-processed — blob eliminated (0.63% → 0.004%), mist now dissolves softly. Future agents: catch these on the remnant-map inspection step and seed-fill the raw the same way.
+- Composite 5x2 sprite sheet for Batch 5 generated in `public/art/sheets/props-sheet-e.png`.
+- Full composite 5x10 sprite sheet of all 50 variations generated in `public/art/sheets/props-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`): cavern/mine rockwork and rails (41, 43, 44, 46, 47, 48), trackside water/crater dressing (42, 49), stadium cheer platform and flag poles (45, 50).
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

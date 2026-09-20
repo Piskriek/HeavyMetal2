@@ -7,10 +7,11 @@
  *  - Stored in `public/art/props/` (raw magenta key transparency) and
  *    `public/art/props/alpha/` (keyed true alpha transparency).
  *  - Combined sprite sheets stored in:
- *    - `public/art/sheets/props-sheet.png` (all 40 variations, 5x8)
+ *    - `public/art/sheets/props-sheet.png` (all 50 variations, 5x10)
  *    - `public/art/sheets/props-sheet-b.png` (Batch 2: props 11-20, 5x2)
  *    - `public/art/sheets/props-sheet-c.png` (Batch 3: props 21-30, 5x2)
  *    - `public/art/sheets/props-sheet-d.png` (Batch 4: props 31-40, 5x2)
+ *    - `public/art/sheets/props-sheet-e.png` (Batch 5: props 41-50, 5x2)
  *
  * Keying & despill:
  *  - Detects magenta matte (#FF00FF signature: high R and B, low G).
@@ -257,6 +258,57 @@ export const PROP_VARIATIONS = [
     file: 'prop-40-timber-arch-gate-lanterns.png',
     original: 'public/art/track-parts/tunnel-mouth-timber.png',
     concept: 'Heavy timber arch gate with crossed beams, iron brackets, hanging amber lanterns, and skull totem',
+  },
+  // --- Batch 5 (Props 41 - 50): cavern depths + stunt dressing ---
+  {
+    file: 'prop-41-molten-slag-channel.png',
+    original: 'public/art/track-parts/lava-sheet.png',
+    concept: 'Molten slag runnel channel with glowing lava stream, black basalt crust banks, embers, and smoke wisps',
+  },
+  {
+    file: 'prop-42-waterfall-plunge-basin.png',
+    original: 'public/art/track-parts/waterfall-splash-b.png',
+    concept: 'Waterfall plunge basin with foaming splash pool, falling curtain, mist, and wet mossy boulders',
+  },
+  {
+    file: 'prop-43-mine-rail-buffer-junction.png',
+    original: 'public/art/track-parts/mine-rails-b.png',
+    concept: 'Mine rail junction with forking rails, red timber buffer stop, lever, lantern, and gravel bed',
+  },
+  {
+    file: 'prop-44-chain-hoist-gantry.png',
+    original: 'public/art/track-parts/ore-bucket.png',
+    concept: 'Timber A-frame chain hoist gantry with iron brackets, hanging chains, hook block, ore bucket, and brass pulley',
+  },
+  {
+    file: 'prop-45-goblin-cheer-platform-horn.png',
+    original: 'public/art/track-parts/goblin-bleacher-b.png',
+    concept: 'Goblin cheer platform with railing, giant brass war horn, pennant bunting, torch, and skull decoration',
+  },
+  {
+    file: 'prop-46-cavern-wall-curtain-left.png',
+    original: 'public/art/track-parts/rock-wall-left.png',
+    concept: 'Tall cavern rock wall curtain slab with green crystal clusters, hanging moss, ferns, and iron lantern',
+  },
+  {
+    file: 'prop-47-cavern-wall-curtain-right.png',
+    original: 'public/art/track-parts/rock-wall-right.png',
+    concept: 'Tall layered slate wall curtain slab with waterfall seep, amber crystal veins, mushrooms, and piton rope',
+  },
+  {
+    file: 'prop-48-stalactite-ceiling-cluster.png',
+    original: 'public/art/track-parts/rock-ceiling-cutout.png',
+    concept: 'Stalactite cave ceiling cluster with limestone spikes, green crystals, and hanging lanterns on chains',
+  },
+  {
+    file: 'prop-49-blast-crater-scorched.png',
+    original: 'public/art/track-parts/tnt-crate.png',
+    concept: 'Scorched TNT blast crater bowl with blackened marks, cracked rim, debris, smoke wisps, and ember cracks',
+  },
+  {
+    file: 'prop-50-pennant-flag-pole-row.png',
+    original: 'public/art/flag-checkered.png',
+    concept: 'Checkered racing flag pole row with three tattered flags, skull finials, rope ties, brass bells, and cobblestone footings',
   },
 ];
 

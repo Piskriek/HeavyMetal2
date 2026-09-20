@@ -26,6 +26,7 @@ import { GameEngine } from '../game/engine';
 import { GameDebugController } from '../game/debug';
 import { COURSES, INITIAL_SNAPSHOT, type GameOptions, type RunRecord } from '../game/types';
 import RaceLoadingScreen from '../components/RaceLoadingScreen';
+import TrackBuilderUI from '../components/TrackBuilderUI';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
 
 type ModalName = 'help' | 'workshop' | 'records' | null;
@@ -98,6 +99,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const [bindings, setBindings] = useState<KeyBindings>(() => loadBindings());
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingDismissed, setLoadingDismissed] = useState(() => session.results.some((record) => record.round === config.round));
+  const [buildMode, setBuildMode] = useState(false);
   // TICKET-02: the consolidated gear menu and its auto-hide-while-racing behavior.
   const [gearOpen, setGearOpen] = useState(false);
   const [hudIdle, setHudIdle] = useState(false);
@@ -130,6 +132,21 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       window.removeEventListener('storage', handler);
     };
   }, []);
+  useEffect(() => {
+    const handleToggle = (e: any) => {
+      setBuildMode(e.detail.active);
+    };
+    window.addEventListener('toggle-3d-build-mode' as any, handleToggle);
+    return () => window.removeEventListener('toggle-3d-build-mode' as any, handleToggle);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('sync-3d-build-mode', { detail: { active: buildMode } }));
+    if (engineRef.current) {
+      engineRef.current.setBuildPaused(buildMode);
+    }
+  }, [buildMode]);
+
   // Reset loading cover when config changes (new round)
   useEffect(() => { setLoadingDismissed(session.results.some((r) => r.round === config.round)); setLoadingProgress(0); }, [config.round, config.course]);
   // TICKET-06: Real progress comes from preloadRaceAssets(); but bump to 8% while
@@ -393,6 +410,14 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
             <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
               <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Four-lane Heavy Metal GP 2. Drag your orange ball to launch all four goblins. A and D change lanes and bump rivals. Space to air bounce, Shift to boost, P to pause, R to restart.">Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
+              {buildMode && engineRef.current && canvasRef.current && (
+                <TrackBuilderUI
+                  builder={engineRef.current.trackBuilder}
+                  canvas={canvasRef.current}
+                  onClose={() => setBuildMode(false)}
+                  onRequestRender={() => engineRef.current?.requestRender()}
+                />
+              )}
               <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
                 <div className={`hud-gear ${gearHidden ? 'gear-hidden' : ''}`}>
                   <button className="gear-button" onClick={toggleGear} aria-haspopup="menu" aria-expanded={gearOpen} aria-label="Race menu" title="Race menu"><Settings2 size={17} /></button>
@@ -401,6 +426,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     {gearOpen && (
                       <motion.div key="gear-menu" className="gear-menu" role="menu" aria-label="Race menu" initial={{ opacity: 0, y: -7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: 0.16 }}>
                         <span className="gear-menu-event">{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${CUP_NAME.toUpperCase()} · R${config.round + 1}/${config.totalRounds}` : 'QUICK RACE'}<small>{course.name} · {config.difficulty}</small></span>
+                        <button role="menuitem" onClick={gearAction(() => setBuildMode((prev) => !prev))}><Hammer size={15} />{buildMode ? 'Exit 3D builder' : '3D Track builder (B)'}</button>
                         {(playing || paused) && <button role="menuitem" onClick={gearAction(togglePause)}>{paused ? <Play size={15} /> : <Pause size={15} />}{paused ? 'Resume race' : 'Pause race'}</button>}
                         <button role="menuitem" onClick={gearAction(() => retry())} disabled={!assets}><RotateCcw size={15} />Restart round</button>
                         <button role="menuitem" onClick={gearAction(toggleSound)}><Volume2 size={15} />{options.sound ? 'Sound: on' : 'Sound: off'}</button>

@@ -2,6 +2,7 @@ import type { GameAssets } from './assets';
 import { LANDMARK_IDS, artUrl, blimpCell, courseCell, loadArtImage, landmarkCell, type LandmarkId } from './art-assets';
 import { TRACKS, type CourseDefinition } from './courses';
 import type { CourseId } from './types';
+import { TRACK_TEXTURES, type TrackTexKey } from './track-3d-data';
 
 export interface CourseArt {
   /**
@@ -315,6 +316,23 @@ const painted = new Map<string, HTMLImageElement>();
 /** TICKET-06: decoded skybox images keyed by course id. */
 const skyboxImages = new Map<CourseId, HTMLImageElement>();
 
+/** Blizzard-style track textures from Arena AI (loaded in prepareWorldArt). */
+const trackTexCache = new Map<TrackTexKey, HTMLImageElement>();
+
+/**
+ * Returns the loaded Blizzard track textures for use by the 3D geometry builder.
+ * Keys: 'dirt', 'cliff', 'grass', 'lava', 'caverock', 'cobble', 'wood', 'iron', 'bark', 'water'.
+ * Returns null for any texture that hasn't been loaded yet.
+ */
+export function getTrackTextures(): Record<TrackTexKey, { image: CanvasImageSource; width: number; height: number }> | null {
+  if (trackTexCache.size < 10) return null;
+  const result = {} as Record<TrackTexKey, { image: CanvasImageSource; width: number; height: number }>;
+  for (const [key, img] of trackTexCache) {
+    result[key] = { image: img, width: img.naturalWidth || 1024, height: img.naturalHeight || 1024 };
+  }
+  return result;
+}
+
 /** Which painted landmark each circuit uses for its two roadside variations. */
 const LANDMARK_BY_COURSE: Record<CourseId, [LandmarkId, LandmarkId]> = {
   ridge: ['pines', 'windmill'],
@@ -339,6 +357,7 @@ export function skyboxPathsForCourse(courseId?: CourseId): string[] {
 export async function prepareWorldArt(): Promise<boolean> {
   const paths = [blimpCell().image, ...LANDMARK_IDS.map((id) => landmarkCell(id).image)];
   const skyPaths = skyboxPathsForCourse();
+  const trackTexPaths = Object.entries(TRACK_TEXTURES) as [TrackTexKey, string][];
   let loaded = 0;
   await Promise.all([
     ...paths.map(async (path) => {
@@ -353,6 +372,17 @@ export async function prepareWorldArt(): Promise<boolean> {
         skyboxImages.set(courseId, img);
         loaded += 1;
       } catch { /* keep the procedural fallback */ }
+    }),
+    // Load the 10 Blizzard-style track textures from Arena AI
+    ...trackTexPaths.map(async ([key, path]) => {
+      if (trackTexCache.has(key)) return;
+      try {
+        const img = await loadArtImage(path);
+        trackTexCache.set(key, img);
+        loaded += 1;
+      } catch {
+        console.warn(`[world-art] Could not load track texture: ${key} (${path})`);
+      }
     }),
   ]);
   if (loaded) cache.clear();

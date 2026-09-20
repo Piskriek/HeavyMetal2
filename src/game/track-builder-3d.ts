@@ -1,0 +1,683 @@
+/* =============================================================================
+   HEAVY METAL GP 2 — FULL 3D TRACK BUILDER
+   Complete 3D world editor: free-fly camera, raycast surface snapping onto
+   track & terrain, categorized prop palette, 3D manipulation, undo/redo,
+   and JSON persistence.
+   ============================================================================= */
+import * as THREE from 'three';
+import { wedgeMesh, type TrackData, type TrackSample } from './renderer-3d';
+
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium';
+
+export interface PropDefinition {
+  type: string;
+  name: string;
+  category: PropCategory;
+  url: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  defaultAltitude?: number;
+  alignBottom?: boolean;
+  isRamp?: boolean;
+}
+
+export interface PlacedProp {
+  id: string;
+  type: string;
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+  rotY: number;
+  scale: number;
+  alignToTrack: boolean;
+  trackDist?: number;
+}
+
+export const PROP_DEFINITIONS: PropDefinition[] = [
+  // --- FOLIAGE & NATURE ---
+  { type: 'pines_cluster', name: 'Pine Forest Wall', category: 'foliage', url: '/art/treewall-pines.png', defaultWidth: 1400, defaultHeight: 950 },
+  { type: 'pine_landmark', name: 'Pine Outcrop', category: 'foliage', url: '/art/landmark-pines.png', defaultWidth: 800, defaultHeight: 1000 },
+  { type: 'boulder_a', name: 'Granite Boulder A', category: 'foliage', url: '/art/track-parts/rock-boulder-a.png', defaultWidth: 420, defaultHeight: 360 },
+  { type: 'boulder_b', name: 'Granite Boulder B', category: 'foliage', url: '/art/track-parts/rock-boulder-b.png', defaultWidth: 360, defaultHeight: 310 },
+  { type: 'pasture', name: 'Green Pasture', category: 'foliage', url: '/art/landmark-pasture.png', defaultWidth: 800, defaultHeight: 500 },
+  { type: 'windmill', name: 'Windmill', category: 'foliage', url: '/art/landmark-windmill.png', defaultWidth: 600, defaultHeight: 850 },
+
+  // --- TRACKSIDE & STUNTS ---
+  { type: 'timber_ramp', name: 'Timber Stunt Ramp', category: 'trackside', url: '/art/track-parts/bridge-wooden-broken.png', defaultWidth: 960, defaultHeight: 260, isRamp: true },
+  { type: 'rock_springboard', name: 'Rock Springboard Ramp', category: 'trackside', url: '/art/track-parts/rock-platform-springboard.png', defaultWidth: 800, defaultHeight: 280, isRamp: true },
+  { type: 'lantern_post', name: 'Iron Lantern Post', category: 'trackside', url: '/art/track-parts/lantern-post.png', defaultWidth: 180, defaultHeight: 440 },
+  { type: 'sign_sheep', name: 'Sign: Beware Sheep', category: 'trackside', url: '/art/sign-sheep.png', defaultWidth: 240, defaultHeight: 340 },
+  { type: 'sign_tnt', name: 'Sign: High Explosive', category: 'trackside', url: '/art/sign-tnt.png', defaultWidth: 240, defaultHeight: 340 },
+  { type: 'cliff_scaffold', name: 'Cliff Scaffolding', category: 'trackside', url: '/art/track-parts/cliff-scaffolding.png', defaultWidth: 650, defaultHeight: 750 },
+  { type: 'broken_bridge', name: 'Broken Timber Plank', category: 'trackside', url: '/art/track-parts/bridge-wooden-broken.png', defaultWidth: 850, defaultHeight: 380 },
+  { type: 'springboard', name: 'Rock Springboard', category: 'trackside', url: '/art/track-parts/rock-platform-springboard.png', defaultWidth: 550, defaultHeight: 400 },
+  { type: 'waterfall_curtain', name: 'Waterfall Curtain', category: 'trackside', url: '/art/track-parts/waterfall-curtain.png', defaultWidth: 900, defaultHeight: 1400 },
+  { type: 'waterfall_splash', name: 'Waterfall Spray', category: 'trackside', url: '/art/track-parts/waterfall-splash.png', defaultWidth: 650, defaultHeight: 450 },
+
+  // --- CAVERN & MINE ---
+  { type: 'tunnel_mouth', name: 'Stone Maw Tunnel', category: 'cavern_mine', url: '/art/track-parts/tunnel-mouth-stone.png', defaultWidth: 1800, defaultHeight: 1400 },
+  { type: 'tunnel_frame', name: 'Rock Tunnel Frame', category: 'cavern_mine', url: '/art/track-parts/rock-tunnel-frame-a.png', defaultWidth: 1600, defaultHeight: 1200 },
+  { type: 'mine_gate', name: 'Mine Gate A', category: 'cavern_mine', url: '/art/track-parts/mine-gate.png', defaultWidth: 1400, defaultHeight: 1100 },
+  { type: 'mine_gate_b', name: 'Mine Gate B', category: 'cavern_mine', url: '/art/track-parts/mine-gate-b.png', defaultWidth: 1400, defaultHeight: 1100 },
+  { type: 'ore_cart', name: 'Ore Cart', category: 'cavern_mine', url: '/art/track-parts/ore-cart.png', defaultWidth: 420, defaultHeight: 320 },
+  { type: 'molten_cauldron', name: 'Molten Cauldron', category: 'cavern_mine', url: '/art/track-parts/cauldron-molten.png', defaultWidth: 460, defaultHeight: 520 },
+  { type: 'tnt_crate', name: 'TNT Crate', category: 'cavern_mine', url: '/art/track-parts/tnt-crate.png', defaultWidth: 260, defaultHeight: 260 },
+  { type: 'mine_rails', name: 'Mine Rail Siding', category: 'cavern_mine', url: '/art/track-parts/mine-rails.png', defaultWidth: 700, defaultHeight: 300 },
+
+  // --- STADIUM & SPECTATORS ---
+  { type: 'stadium_gantry', name: 'Finish Line Gantry', category: 'stadium', url: '/art/track-parts/stadium-gantry.png', defaultWidth: 1500, defaultHeight: 1000 },
+  { type: 'bleacher_a', name: 'Goblin Bleacher A', category: 'stadium', url: '/art/track-parts/goblin-bleacher-a.png', defaultWidth: 1100, defaultHeight: 850 },
+  { type: 'bleacher_b', name: 'Goblin Bleacher B', category: 'stadium', url: '/art/track-parts/goblin-bleacher-b.png', defaultWidth: 1100, defaultHeight: 850 },
+  { type: 'bleacher_c', name: 'Goblin Bleacher C', category: 'stadium', url: '/art/track-parts/goblin-bleacher-c.png', defaultWidth: 1100, defaultHeight: 850 },
+  { type: 'bleacher_d', name: 'Goblin Bleacher D', category: 'stadium', url: '/art/track-parts/goblin-bleacher-d.png', defaultWidth: 1100, defaultHeight: 850 },
+  { type: 'crowd_banner', name: 'Cheering Crowd Banner', category: 'stadium', url: '/art/foreground-crowd.png', defaultWidth: 1500, defaultHeight: 500 },
+  { type: 'checkered_flag', name: 'Checkered Flag', category: 'stadium', url: '/art/flag-checkered.png', defaultWidth: 380, defaultHeight: 380 },
+];
+
+export class TrackBuilder3D {
+  private placedProps: PlacedProp[] = [];
+  private propObjects = new Map<string, THREE.Object3D>();
+  private selectedPropId: string | null = null;
+  private activePropType: string | null = null;
+  private ghostSprite: THREE.Sprite | null = null;
+  private ghostMesh: THREE.Mesh | null = null;
+  private selectionBox: THREE.BoxHelper | null = null;
+
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
+
+  readonly freeFly = {
+    active: false,
+    x: 0,
+    y: 18200,
+    z: -1200,
+    yaw: 0,
+    pitch: -0.1,
+    speed: 1200,
+  };
+
+  snapping = {
+    alignToTrack: true,
+    snapToCenterline: false,
+    gridSnap: 0,
+  };
+
+  private readonly textureLoader = new THREE.TextureLoader();
+  private readonly textureCache = new Map<string, THREE.Texture>();
+  private readonly raycaster = new THREE.Raycaster();
+  private readonly mouseNdc = new THREE.Vector2();
+
+  private listeners: (() => void)[] = [];
+
+  constructor(
+    private readonly scene: THREE.Scene,
+    private readonly camera: THREE.PerspectiveCamera,
+    private readonly track: TrackData,
+    private readonly materials?: any,
+  ) {
+    this.loadFromStorage();
+  }
+
+  onChange(cb: () => void) {
+    this.listeners.push(cb);
+  }
+
+  private notify() {
+    this.listeners.forEach((cb) => cb());
+  }
+
+  getProps(): readonly PlacedProp[] {
+    return this.placedProps;
+  }
+
+  getSelectedProp(): PlacedProp | null {
+    if (!this.selectedPropId) return null;
+    return this.placedProps.find((p) => p.id === this.selectedPropId) ?? null;
+  }
+
+  getActivePropType(): string | null {
+    return this.activePropType;
+  }
+
+  setActivePropType(type: string | null) {
+    this.activePropType = type;
+    this.updateGhostSprite();
+    this.notify();
+  }
+
+  selectProp(id: string | null) {
+    this.selectedPropId = id;
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  // --- FREE FLY CAMERA UPDATE ---
+  updateFlyCamera(dt: number, keys: Set<string>) {
+    if (!this.freeFly.active) return;
+
+    const speed = this.freeFly.speed * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 3.0 : 1.0);
+    const move = new THREE.Vector3();
+
+    // Horizontal direction vectors from yaw
+    const forward = new THREE.Vector3(Math.sin(this.freeFly.yaw), 0, Math.cos(this.freeFly.yaw));
+    const right = new THREE.Vector3(-Math.cos(this.freeFly.yaw), 0, Math.sin(this.freeFly.yaw));
+
+    if (keys.has('KeyW')) move.add(forward);
+    if (keys.has('KeyS')) move.sub(forward);
+    if (keys.has('KeyD')) move.add(right);
+    if (keys.has('KeyA')) move.sub(right);
+    if (keys.has('Space')) move.y += 1;
+    if (keys.has('KeyQ') || keys.has('ControlLeft')) move.y -= 1;
+
+    if (move.lengthSq() > 0) {
+      move.normalize().multiplyScalar(speed * dt);
+      this.freeFly.x += move.x;
+      this.freeFly.y += move.y;
+      this.freeFly.z += move.z;
+    }
+
+    // Apply to Three.js camera
+    this.camera.position.set(this.freeFly.x, this.freeFly.y, this.freeFly.z);
+    const lookDir = new THREE.Vector3(
+      Math.sin(this.freeFly.yaw) * Math.cos(this.freeFly.pitch),
+      Math.sin(this.freeFly.pitch),
+      Math.cos(this.freeFly.yaw) * Math.cos(this.freeFly.pitch),
+    );
+    this.camera.lookAt(this.camera.position.clone().add(lookDir));
+  }
+
+  rotateCamera(deltaX: number, deltaY: number) {
+    if (!this.freeFly.active) return;
+    this.freeFly.yaw -= deltaX * 0.003;
+    this.freeFly.pitch = Math.max(-1.45, Math.min(1.45, this.freeFly.pitch - deltaY * 0.003));
+
+    const lookDir = new THREE.Vector3(
+      Math.sin(this.freeFly.yaw) * Math.cos(this.freeFly.pitch),
+      Math.sin(this.freeFly.pitch),
+      Math.cos(this.freeFly.yaw) * Math.cos(this.freeFly.pitch),
+    );
+    this.camera.lookAt(this.camera.position.clone().add(lookDir));
+  }
+
+  jumpToStage(stageName: string) {
+    const s = this.track.samples.find((sample) => sample.stage === stageName);
+    if (s) {
+      this.freeFly.x = s.pos.x - s.tangent.x * 600;
+      this.freeFly.y = s.pos.y + 450;
+      this.freeFly.z = s.pos.z - s.tangent.z * 600;
+      this.freeFly.yaw = Math.atan2(s.tangent.x, s.tangent.z);
+      this.freeFly.pitch = -0.15;
+    }
+  }
+
+  // --- RAYCASTING & SURFACE SNAPPING ---
+  // --- RAYCASTING & SURFACE SNAPPING ---
+  raycastProp(clientX: number, clientY: number, canvas: HTMLCanvasElement): PlacedProp | null {
+    if (this.placedProps.length === 0) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const objects = Array.from(this.propObjects.values());
+    const hits = this.raycaster.intersectObjects(objects, true);
+
+    if (hits.length > 0) {
+      let hitObj: THREE.Object3D | null = hits[0].object;
+      while (hitObj && !hitObj.userData?.propId) {
+        hitObj = hitObj.parent;
+      }
+      if (hitObj?.userData?.propId) {
+        const found = this.placedProps.find((p) => p.id === hitObj!.userData.propId);
+        if (found) return found;
+      }
+    }
+
+    // Screen-space proximity fallback:
+    let bestProp: PlacedProp | null = null;
+    let bestDistanceSq = Infinity;
+
+    for (const prop of this.placedProps) {
+      const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+      if (!def) continue;
+
+      const w = def.defaultWidth * prop.scale;
+      const h = def.defaultHeight * prop.scale;
+
+      const centerY = def.alignBottom !== false ? prop.y + h / 2 : prop.y;
+      const worldPos = new THREE.Vector3(prop.x, centerY, prop.z);
+
+      // Check if in front of camera
+      const cameraDir = this.camera.getWorldDirection(new THREE.Vector3());
+      const toProp = worldPos.clone().sub(this.camera.position);
+      if (cameraDir.dot(toProp) <= 0) continue;
+
+      const ndc = worldPos.clone().project(this.camera);
+      if (ndc.z > 1 || ndc.z < -1) continue;
+
+      const screenX = ((ndc.x + 1) / 2) * rect.width + rect.left;
+      const screenY = ((-ndc.y + 1) / 2) * rect.height + rect.top;
+
+      const dist = toProp.length();
+      const vFovRad = (this.camera.fov * Math.PI) / 180;
+      const screenH = (h / (2 * Math.tan(vFovRad / 2) * Math.max(10, dist))) * rect.height;
+      const screenW = (w / (2 * Math.tan(vFovRad / 2) * Math.max(10, dist))) * rect.height;
+
+      const halfW = Math.max(30, screenW / 2);
+      const halfH = Math.max(30, screenH / 2);
+
+      if (
+        clientX >= screenX - halfW - 20 &&
+        clientX <= screenX + halfW + 20 &&
+        clientY >= screenY - halfH - 20 &&
+        clientY <= screenY + halfH + 20
+      ) {
+        const d2 = (clientX - screenX) ** 2 + (clientY - screenY) ** 2;
+        if (d2 < bestDistanceSq) {
+          bestDistanceSq = d2;
+          bestProp = prop;
+        }
+      }
+    }
+
+    return bestProp;
+  }
+
+  raycastSurface(clientX: number, clientY: number, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+    for (const hit of intersects) {
+      const obj = hit.object;
+      // Skip sky, markers, gizmos, ghosts, sprites
+      if (obj.name === 'Sky' || obj.name === 'Ghost' || (obj as any).isSprite || obj.name === 'DebugMarkers') continue;
+
+      // Find closest track sample
+      let closestSample: TrackSample | undefined;
+      let minD = Infinity;
+      for (let i = 0; i < this.track.samples.length; i += 4) {
+        const s = this.track.samples[i];
+        const dist = s.pos.distanceTo(hit.point);
+        if (dist < minD) {
+          minD = dist;
+          closestSample = s;
+        }
+      }
+
+      return {
+        point: hit.point,
+        normal: hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 1, 0),
+        sample: minD < 1800 ? closestSample : undefined,
+      };
+    }
+
+    return null;
+  }
+
+  // --- GHOST PREVIEW ---
+  updateGhostPosition(clientX: number, clientY: number, canvas: HTMLCanvasElement) {
+    if (!this.activePropType) return;
+
+    const hit = this.raycastSurface(clientX, clientY, canvas);
+    if (!hit) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      if (this.ghostMesh) this.ghostMesh.visible = false;
+      return;
+    }
+
+    let pos = hit.point.clone();
+    if (this.snapping.snapToCenterline && hit.sample) {
+      pos.copy(hit.sample.pos);
+    }
+
+    if (this.ghostMesh && this.ghostMesh.visible) {
+      this.ghostMesh.position.copy(pos);
+      if (this.snapping.alignToTrack && hit.sample) {
+        this.ghostMesh.rotation.y = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
+      }
+    } else if (this.ghostSprite && this.ghostSprite.visible) {
+      this.ghostSprite.position.copy(pos);
+    }
+  }
+
+  private updateGhostSprite() {
+    if (!this.activePropType) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      if (this.ghostMesh) this.ghostMesh.visible = false;
+      return;
+    }
+
+    const def = PROP_DEFINITIONS.find((p) => p.type === this.activePropType);
+    if (!def) return;
+
+    if (def.isRamp) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      if (!this.ghostMesh) {
+        const ghostMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.5, wireframe: true });
+        this.ghostMesh = wedgeMesh(def.defaultWidth, 1100, def.defaultHeight, ghostMat);
+        this.ghostMesh.name = 'GhostMesh';
+        this.scene.add(this.ghostMesh);
+      }
+      this.ghostMesh.visible = true;
+    } else {
+      if (this.ghostMesh) this.ghostMesh.visible = false;
+      const tex = this.getTexture(def.url);
+      if (!this.ghostSprite) {
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.55, depthWrite: false });
+        this.ghostSprite = new THREE.Sprite(mat);
+        this.ghostSprite.name = 'Ghost';
+        this.scene.add(this.ghostSprite);
+      } else {
+        this.ghostSprite.material.map = tex;
+        this.ghostSprite.material.needsUpdate = true;
+      }
+      this.ghostSprite.center.set(0.5, def.alignBottom !== false ? 0 : 0.5);
+      this.ghostSprite.scale.set(def.defaultWidth, def.defaultHeight, 1);
+      this.ghostSprite.visible = true;
+    }
+  }
+
+  // --- PROP CREATION, MANIPULATION & SELECTION ---
+  placeActiveProp(clientX: number, clientY: number, canvas: HTMLCanvasElement): PlacedProp | null {
+    if (!this.activePropType) return null;
+    const def = PROP_DEFINITIONS.find((p) => p.type === this.activePropType);
+    if (!def) return null;
+
+    const hit = this.raycastSurface(clientX, clientY, canvas);
+    if (!hit) return null;
+
+    this.pushUndo();
+
+    let pos = hit.point.clone();
+    let rotY = 0;
+    if (this.snapping.alignToTrack && hit.sample) {
+      rotY = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
+    }
+
+    const prop: PlacedProp = {
+      id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: def.type,
+      name: def.name,
+      x: Math.round(pos.x),
+      y: Math.round(pos.y),
+      z: Math.round(pos.z),
+      rotY,
+      scale: 1,
+      alignToTrack: this.snapping.alignToTrack,
+      trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
+    };
+
+    this.placedProps.push(prop);
+    this.createPropSprite(prop);
+    this.selectProp(prop.id);
+    this.saveToStorage();
+    this.notify();
+    return prop;
+  }
+
+  duplicateSelected(): PlacedProp | null {
+    const selected = this.getSelectedProp();
+    if (!selected) return null;
+
+    this.pushUndo();
+    const dup: PlacedProp = {
+      ...selected,
+      id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      x: selected.x + 120,
+      z: selected.z + 120,
+    };
+
+    this.placedProps.push(dup);
+    this.createPropSprite(dup);
+    this.selectProp(dup.id);
+    this.saveToStorage();
+    this.notify();
+    return dup;
+  }
+
+  deleteSelected() {
+    if (!this.selectedPropId) return;
+    this.deleteProp(this.selectedPropId);
+  }
+
+  deleteProp(id: string) {
+    this.pushUndo();
+
+    const idx = this.placedProps.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      const prop = this.placedProps[idx];
+      const obj = this.propObjects.get(prop.id);
+      if (obj) {
+        this.scene.remove(obj);
+        this.propObjects.delete(prop.id);
+      }
+      this.placedProps.splice(idx, 1);
+    }
+
+    if (this.selectedPropId === id) {
+      this.selectProp(null);
+    }
+    this.saveToStorage();
+    this.notify();
+  }
+
+  focusProp(id: string) {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop) return;
+
+    this.selectProp(id);
+
+    const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+    const h = (def?.defaultHeight ?? 600) * prop.scale;
+
+    const viewDist = Math.max(900, h * 1.5);
+    this.freeFly.x = prop.x;
+    this.freeFly.y = prop.y + h * 0.5 + 200;
+    this.freeFly.z = prop.z - viewDist;
+    this.freeFly.yaw = 0;
+    this.freeFly.pitch = -0.15;
+
+    this.camera.position.set(this.freeFly.x, this.freeFly.y, this.freeFly.z);
+    this.camera.lookAt(prop.x, prop.y + h * 0.4, prop.z);
+    this.notify();
+  }
+
+  updatePropTransform(id: string, updates: Partial<PlacedProp>) {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop) return;
+
+    Object.assign(prop, updates);
+    const obj = this.propObjects.get(id);
+    if (obj) {
+      obj.position.set(prop.x, prop.y, prop.z);
+      obj.rotation.y = prop.rotY;
+      const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+      if (def) {
+        if (def.isRamp) {
+          obj.scale.set(prop.scale, prop.scale, prop.scale);
+        } else {
+          obj.scale.set(def.defaultWidth * prop.scale, def.defaultHeight * prop.scale, 1);
+        }
+      }
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  getPlacedRamps(): readonly PlacedProp[] {
+    return this.placedProps.filter((p) => {
+      const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
+      return def?.isRamp || p.type === 'timber_ramp' || p.type === 'rock_springboard' || p.type === 'springboard';
+    });
+  }
+
+  // --- SELECTION BOX HIGHLIGHT ---
+  private updateSelectionBox() {
+    const prop = this.getSelectedProp();
+    if (!prop || !this.freeFly.active) {
+      if (this.selectionBox) this.selectionBox.visible = false;
+      return;
+    }
+
+    const obj = this.propObjects.get(prop.id);
+    if (!obj) return;
+
+    if (!this.selectionBox) {
+      this.selectionBox = new THREE.BoxHelper(obj, 0xffdd00);
+      (this.selectionBox.material as THREE.LineBasicMaterial).depthTest = false;
+      (this.selectionBox.material as THREE.LineBasicMaterial).transparent = true;
+      (this.selectionBox.material as THREE.LineBasicMaterial).opacity = 0.95;
+      this.selectionBox.renderOrder = 9999;
+      this.scene.add(this.selectionBox);
+    } else {
+      this.selectionBox.setFromObject(obj);
+      this.selectionBox.visible = true;
+    }
+  }
+
+  // --- SPRITE & MESH CREATION & TEXTURE CACHE ---
+  private getTexture(url: string): THREE.Texture {
+    let tex = this.textureCache.get(url);
+    if (!tex) {
+      tex = this.textureLoader.load(url);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.textureCache.set(url, tex);
+    }
+    return tex;
+  }
+
+  private createPropSprite(prop: PlacedProp): THREE.Object3D {
+    const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+    if (!def) return new THREE.Object3D();
+
+    let obj: THREE.Object3D;
+
+    if (def.isRamp) {
+      // Create 3D wedge ramp mesh
+      const w = (def.defaultWidth || 960) * prop.scale;
+      const len = 1100 * prop.scale;
+      const h = (def.defaultHeight || 260) * prop.scale;
+      const mat = this.materials?.wood ?? new THREE.MeshStandardMaterial({
+        color: 0x9b6b3b,
+        roughness: 0.7,
+      });
+      const mesh = wedgeMesh(w, len, h, mat);
+      mesh.name = `PlacedProp_${prop.id}`;
+      mesh.userData = { propId: prop.id, isRamp: true };
+      mesh.position.set(prop.x, prop.y, prop.z);
+      mesh.rotation.y = prop.rotY;
+      obj = mesh;
+    } else {
+      const tex = this.getTexture(def.url);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const sprite = new THREE.Sprite(mat);
+      sprite.name = `PlacedProp_${prop.id}`;
+      sprite.userData = { propId: prop.id };
+      sprite.position.set(prop.x, prop.y, prop.z);
+      sprite.center.set(0.5, def.alignBottom !== false ? 0 : 0.5);
+      sprite.scale.set(def.defaultWidth * prop.scale, def.defaultHeight * prop.scale, 1);
+      obj = sprite;
+    }
+
+    this.scene.add(obj);
+    this.propObjects.set(prop.id, obj);
+    return obj;
+  }
+
+  // --- UNDO / REDO ---
+  private pushUndo() {
+    this.undoStack.push(JSON.stringify(this.placedProps));
+    if (this.undoStack.length > 30) this.undoStack.shift();
+    this.redoStack.length = 0;
+  }
+
+  undo() {
+    if (!this.undoStack.length) return;
+    this.redoStack.push(JSON.stringify(this.placedProps));
+    const state = JSON.parse(this.undoStack.pop()!);
+    this.restorePropsState(state);
+    this.notify();
+  }
+
+  redo() {
+    if (!this.redoStack.length) return;
+    this.undoStack.push(JSON.stringify(this.placedProps));
+    const state = JSON.parse(this.redoStack.pop()!);
+    this.restorePropsState(state);
+    this.notify();
+  }
+
+  private restorePropsState(props: PlacedProp[]) {
+    // Remove current objects
+    this.propObjects.forEach((s) => this.scene.remove(s));
+    this.propObjects.clear();
+
+    this.placedProps = props;
+    this.placedProps.forEach((p) => this.createPropSprite(p));
+    this.selectProp(null);
+    this.saveToStorage();
+  }
+
+  // --- PERSISTENCE ---
+  private saveToStorage() {
+    try {
+      localStorage.setItem('hm2-3d-track-props', JSON.stringify(this.placedProps));
+    } catch {
+      // Storage full or unavailable
+    }
+  }
+
+  private loadFromStorage() {
+    try {
+      const raw = localStorage.getItem('hm2-3d-track-props');
+      if (raw) {
+        const props: PlacedProp[] = JSON.parse(raw);
+        if (Array.isArray(props)) {
+          this.placedProps = props;
+          this.placedProps.forEach((p) => this.createPropSprite(p));
+        }
+      }
+    } catch {
+      // Invalid JSON
+    }
+  }
+
+  exportJson(): string {
+    return JSON.stringify(this.placedProps, null, 2);
+  }
+
+  importJson(jsonStr: string) {
+    try {
+      const props: PlacedProp[] = JSON.parse(jsonStr);
+      if (Array.isArray(props)) {
+        this.pushUndo();
+        this.restorePropsState(props);
+        this.notify();
+      }
+    } catch (e) {
+      console.error('Failed to import track props JSON:', e);
+    }
+  }
+
+  clearAll() {
+    this.pushUndo();
+    this.restorePropsState([]);
+    this.notify();
+  }
+
+  destroy() {
+    if (this.ghostSprite) this.scene.remove(this.ghostSprite);
+    if (this.ghostMesh) this.scene.remove(this.ghostMesh);
+    if (this.selectionBox) this.scene.remove(this.selectionBox);
+    this.propObjects.forEach((s) => this.scene.remove(s));
+    this.propObjects.clear();
+    this.listeners.length = 0;
+  }
+}

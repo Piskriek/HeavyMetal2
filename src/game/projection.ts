@@ -1,4 +1,4 @@
-import { FINISH, GROUND, START_X } from './scene';
+import { FINISH, GROUND, START_X, START_Y } from './scene';
 import type { Vec3 } from './geometry';
 
 export interface ScreenPoint {
@@ -46,11 +46,32 @@ export interface CameraStageState {
   elevation: number;
 }
 
+export interface FreeFlyCamera {
+  active: boolean;
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
+  pitch: number;
+  speed: number;
+}
+
 export class RangeCamera {
   width = 1440;
   offset = 0;
   heightOffset = 0;
   readonly zoom = 0.86;
+  cameraMode: 'third_person' | 'follow_ball' | 'fixed' = 'third_person';
+  ballPos = { x: START_X, y: START_Y, z: 0 };
+  freeFly: FreeFlyCamera = {
+    active: false,
+    x: 2000,
+    y: 350,
+    z: 0,
+    yaw: 0,
+    pitch: 0.18,
+    speed: 700,
+  };
   private focal = 2880;
   private originX = 209;
   private originY = 447;
@@ -78,14 +99,23 @@ export class RangeCamera {
     };
   }
 
-  configure(width: number, offset: number, downrange = true, heightOffset = this.heightOffset) {
+  configure(
+    width: number,
+    offset: number,
+    downrange = true,
+    heightOffset = this.heightOffset,
+    cameraMode: 'third_person' | 'follow_ball' | 'fixed' = this.cameraMode,
+    ballPos: { x: number; y: number; z: number } = this.ballPos
+  ) {
     this.width = width;
     this.offset = offset;
     this.heightOffset = heightOffset;
+    this.cameraMode = cameraMode;
+    this.ballPos = ballPos;
     this.focal = Math.max(2400, width * 2);
 
     // Compute stage-aware camera angles for theatrical stage production:
-    // Section 1 (Alpine Downhill 0..24000): 20° side-follow view
+    // Section 1 (Alpine Downhill 0..24000): 20° side-follow view or third-person chase
     // Transition 1->2 (Canyon Lip 24000..25600): camera smoothly swings 90° right
     // Section 2 (Waterfall Cliff 25600..48000): head-on vertical drop stage, marbles drop down screen
     // Transition 2->3 (Cavern Maw 48000..50400): plunge into darkness, swings to 22° coaster angle
@@ -159,18 +189,58 @@ export class RangeCamera {
   }
 
   projectInto(x: number, y: number, lateral: number, target: ScreenPoint, parallax = 1) {
+    // 0. Free-Fly Camera in Map Building Debug Mode
+    if (this.freeFly.active) {
+      const dx = x - this.freeFly.x;
+      const dy = y - this.freeFly.y;
+      const dz = lateral - this.freeFly.z;
+      const cosY = Math.cos(this.freeFly.yaw);
+      const sinY = Math.sin(this.freeFly.yaw);
+      const cosP = Math.cos(this.freeFly.pitch);
+      const sinP = Math.sin(this.freeFly.pitch);
+
+      // Rotate around Y axis (yaw)
+      const rx = dx * cosY - dz * sinY;
+      const rz = dx * sinY + dz * cosY;
+
+      // Rotate around X axis (pitch)
+      const ry = dy * cosP - rz * sinP;
+      const depth = dy * sinP + rz * cosP;
+
+      if (depth <= 5) {
+        target.x = -9999; target.y = -9999; target.scale = 0; target.depth = -1;
+        return target;
+      }
+      const scale = (this.focal * 0.55) / depth;
+      target.x = this.width / 2 + rx * scale;
+      target.y = this.originY + ry * scale;
+      target.scale = scale;
+      target.depth = depth;
+      return target;
+    }
+
     // 1. Standard Horizontal Side-Follow Projection (Section 1, Section 3, Stadium)
     const rangeH = x - this.offset * parallax - START_X;
     const depthH = rangeH * this.sine + lateral * this.cosine;
     const scaleH = this.zoom * this.focal / Math.max(this.focal * 0.2, this.focal + depthH);
-    const hX = this.originX + (rangeH * this.cosine - lateral * this.sine) * scaleH;
-    const hY = this.originY + (y - GROUND - this.heightOffset - depthH * this.elevation) * scaleH;
+    let hX = this.originX + (rangeH * this.cosine - lateral * this.sine) * scaleH;
+    let hY = this.originY + (y - GROUND - this.heightOffset - depthH * this.elevation) * scaleH;
+
+    // In third-person mode, center the player and chase forward
+    if (this.cameraMode === 'third_person' && this.verticalBias <= 0) {
+      const tpDepth = (x - (this.ballPos.x - 360));
+      const tpScale = this.zoom * this.focal / Math.max(this.focal * 0.15, this.focal + tpDepth);
+      const tpX = this.width * 0.5 + (lateral - this.ballPos.z) * 1.35 * tpScale + (x - this.ballPos.x) * 0.28 * tpScale;
+      const tpY = this.originY + 60 + (y - GROUND - this.heightOffset - tpDepth * 0.22) * tpScale;
+      hX = tpX;
+      hY = tpY;
+    }
 
     // 2. Head-On Vertical Drop Projection (Section 2: Waterfall Cliff)
-    // Camera looks directly at cliff face: lateral (z) maps across screen horizontally,
-    // and track distance x (falling down cliff) maps DOWNWARDS vertically!
+    // Camera looks directly at cliff face: lateral (z in [-480, 480]) maps comfortably across
+    // the central 60% of screen (864px), and track distance x maps DOWNWARDS vertically!
     const vScale = 0.88;
-    const vX = this.originX + lateral * 1.7 * vScale;
+    const vX = this.originX + lateral * 0.90;
     const vY = this.originY + (x - this.offset) * 0.55;
     const vDepth = x - this.offset;
 

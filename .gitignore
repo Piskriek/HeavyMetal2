@@ -4,4 +4,5 @@ tests/artifacts/
 *.local
 *.zip
 scratch/
-*.exe
+*.exe
+3DTrack/

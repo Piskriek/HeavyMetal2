@@ -63,12 +63,17 @@ async function run() {
       }
     }, stage.x);
 
-    // Wait 500ms for camera and render to settle
-    await page.waitForTimeout(600);
+    // Wait 400ms for camera and render to settle (t0)
+    await page.waitForTimeout(400);
+    const outPathT0 = path.join(ARTIFACT_DIR, `${stage.name}_t0.png`);
+    await page.screenshot({ path: outPathT0 });
+    console.log(`Saved screenshot: ${outPathT0}`);
 
-    const outPath = path.join(ARTIFACT_DIR, `${stage.name}.png`);
-    await page.screenshot({ path: outPath });
-    console.log(`Saved screenshot: ${outPath}`);
+    // Wait 200ms for active game time (t200ms)
+    await page.waitForTimeout(200);
+    const outPathT200 = path.join(ARTIFACT_DIR, `${stage.name}_t200ms.png`);
+    await page.screenshot({ path: outPathT200 });
+    console.log(`Saved screenshot: ${outPathT200}`);
   }
 
   await browser.close();

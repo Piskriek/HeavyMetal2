@@ -210,6 +210,8 @@ export interface RacerFrame {
   vy: number;
   rotation: number;
   falling: boolean;
+  grounded?: boolean;
+  distance?: number;
   finished: boolean;
   bumpAt: number;
   immuneUntil: number;

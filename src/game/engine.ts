@@ -92,6 +92,32 @@ export class GameEngine {
   get status(): GameStatus { return this.snapshot.status; }
   get inputEnabled() { return this.controlsEnabled; }
   set inputEnabled(value: boolean) { this.controlsEnabled = value; this.lastFrame = 0; this.invalidate(); }
+  get view() { return this.renderer.view; }
+  get trackRenderer() { return this.renderer; }
+  get trackBuilder() { return this.renderer.trackBuilder; }
+  getTrackY(x: number) { return this.y(x); }
+  get trackObstacles(): Obstacle[] { return this.obstacles; }
+  private pausedForBuild = false;
+  get isBuildPaused() { return this.pausedForBuild; }
+  setBuildPaused(paused: boolean) {
+    this.pausedForBuild = paused;
+    this.accumulator = this.lastFrame = 0;
+    this.invalidate();
+  }
+  setTrackObstacles(newObstacles: Obstacle[]) {
+    this.obstacles = newObstacles;
+    this.buckets.clear();
+    for (const obstacle of this.obstacles) {
+      const left = obstacle.kind === 'loop' ? obstacle.x - obstacle.width / 2 : obstacle.x;
+      const right = obstacle.kind === 'loop' ? obstacle.x + obstacle.width / 2 : obstacle.x + obstacle.width;
+      for (let key = Math.floor((left - RADIUS * 2) / BUCKET); key <= Math.floor((right + RADIUS * 2) / BUCKET); key++) {
+        const bucket = this.buckets.get(key);
+        if (bucket) bucket.push(obstacle); else this.buckets.set(key, [obstacle]);
+      }
+    }
+    this.invalidate();
+  }
+  requestRender() { this.invalidate(); }
 
   resize(width: number, height: number) {
     this.renderer.resize(width, height);
@@ -359,9 +385,9 @@ export class GameEngine {
     this.lastFrame = now;
     if (this.status !== 'paused' && this.inputEnabled) {
       this.time += dt; this.shake *= Math.exp(-9 * dt);
-      if (this.status === 'flying') {
+      if (this.status === 'flying' && !this.pausedForBuild) {
         this.accumulator = Math.min(0.1, this.accumulator + dt);
-        while (this.accumulator >= STEP && this.status === 'flying') {
+        while (this.accumulator >= STEP && this.status === 'flying' && !this.pausedForBuild) {
           for (const racer of this.racers) {
             racer.previous.x = racer.x; racer.previous.y = racer.y;
             racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
@@ -380,12 +406,13 @@ export class GameEngine {
       rendered.z = racer.previous.z + (racer.z - racer.previous.z) * alpha;
       rendered.rotation = racer.previous.rotation + (racer.rotation - racer.previous.rotation) * alpha;
       rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
-      rendered.falling = racer.falling; rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
+      rendered.falling = racer.falling; rendered.grounded = racer.grounded; rendered.distance = racer.distance;
+      rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
     }
     const player = this.player; const rendered = this.renderRacers[0];
-    if (this.status === 'flying' && this.inputEnabled) {
+    if (this.status === 'flying' && this.inputEnabled && !this.pausedForBuild) {
       const focus = player.loopRide?.obstacle.x ?? rendered.x;
       const view = this.renderer.view;
       // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
@@ -401,12 +428,12 @@ export class GameEngine {
       this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
     }
     this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
-    const active = this.status === 'flying' || this.isDragging;
+    const active = (this.status === 'flying' && !this.pausedForBuild) || this.isDragging;
     const due = active || this.needsRender || !this.lastRender || now - this.lastRender >= 1000 / 30 - 0.5;
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
       this.lastRender = now; this.needsRender = false;
-      if (this.status === 'flying' && now - this.trailSample > 16) {
+      if (this.status === 'flying' && !this.pausedForBuild && now - this.trailSample > 16) {
         this.trailSample = now; this.trail.push({ x: rendered.x, y: rendered.y, z: rendered.z });
         if (this.trail.length > 9) this.trail.shift();
       }
@@ -418,7 +445,7 @@ export class GameEngine {
     }
     if (now - this.lastNotify > 100) this.notify(false);
     const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
-    if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient)) this.schedule();
+    if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
   };
 
   private stepRace(dt: number) {

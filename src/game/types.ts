@@ -6,7 +6,7 @@ export type GameStatus = 'loading' | 'ready' | 'flying' | 'paused' | 'finished';
 export type CourseId = 'ridge' | 'boomtown' | 'sheep';
 export type GraphicsMode = 'auto' | 'performance' | 'quality';
 /** TICKET-07: chase the player's ball, or hold the classic broad course view. */
-export type CameraMode = 'follow_ball' | 'fixed';
+export type CameraMode = 'third_person' | 'follow_ball' | 'fixed';
 
 export const RACER_DEFINITIONS = [
   { id: 0, name: 'YOU', color: '#f0a15b', homeLane: 2, weight: 120, pace: 1 },
@@ -148,7 +148,7 @@ export const DEFAULT_OPTIONS: GameOptions = {
   downrange: true,
   parallax: true,
   aimAssist: true,
-  cameraMode: 'follow_ball',
+  cameraMode: 'third_person',
   course: 'ridge',
   graphics: 'auto',
   launchSpeed: 160,

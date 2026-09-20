@@ -28,7 +28,7 @@ export function readOptions(): GameOptions {
     }
     if (COURSES.some((course) => course.id === saved.course)) options.course = saved.course!;
     if (saved.graphics === 'auto' || saved.graphics === 'performance' || saved.graphics === 'quality') options.graphics = saved.graphics;
-    if (saved.cameraMode === 'follow_ball' || saved.cameraMode === 'fixed') options.cameraMode = saved.cameraMode;
+    if (saved.cameraMode === 'third_person' || saved.cameraMode === 'follow_ball' || saved.cameraMode === 'fixed') options.cameraMode = saved.cameraMode;
     for (const [key, min, max] of [['launchSpeed', 80, 240], ['ballWeight', 40, 240], ['masterVolume', 0, 100]] as const) {
       if (typeof saved[key] === 'number' && Number.isFinite(saved[key])) options[key] = Math.max(min, Math.min(max, saved[key]!));
     }

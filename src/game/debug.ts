@@ -20,11 +20,18 @@ export const DEBUG_SECTIONS: DebugSection[] = [
 export class GameDebugController {
   private panel: HTMLDivElement | null = null;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private isBuildMode = false;
+  private syncHandler: ((e: any) => void) | null = null;
 
   constructor(private engine: GameEngine) {
     this.attachWindowApi();
     this.attachKeyboard();
     this.createDebugPanel();
+    this.attachSyncListener();
+  }
+
+  get inBuildMode() {
+    return this.isBuildMode;
   }
 
   teleport(targetX: number) {
@@ -41,11 +48,26 @@ export class GameDebugController {
     return canvas ? canvas.toDataURL('image/png') : '';
   }
 
+  toggleBuildMode = (forceState?: boolean) => {
+    this.isBuildMode = forceState !== undefined ? forceState : !this.isBuildMode;
+    this.updateDebugButtonState();
+    window.dispatchEvent(new CustomEvent('toggle-3d-build-mode', { detail: { active: this.isBuildMode } }));
+  };
+
+  private attachSyncListener() {
+    this.syncHandler = (e: CustomEvent<{ active: boolean }>) => {
+      this.isBuildMode = e.detail.active;
+      this.updateDebugButtonState();
+    };
+    window.addEventListener('sync-3d-build-mode' as any, this.syncHandler);
+  }
+
   private attachWindowApi() {
     (window as any).__gameDebug = {
       teleport: (x: number) => this.teleport(x),
       teleportSection: (id: string) => this.teleportSection(id),
       captureCanvas: () => this.captureCanvas(),
+      toggleBuildMode: (forceState?: boolean) => this.toggleBuildMode(forceState),
       sections: DEBUG_SECTIONS,
     };
     (window as any).__gameEngine = this.engine;
@@ -53,26 +75,36 @@ export class GameDebugController {
 
   private attachKeyboard() {
     this.keyHandler = (e: KeyboardEvent) => {
-      // Don't intercept if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const sec = DEBUG_SECTIONS.find((s) => s.key === e.key);
-      if (sec) {
-        e.preventDefault();
-        this.teleport(sec.x);
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
         return;
       }
 
-      if (e.key === 'p' || e.key === 'P') {
+      // Toggle Build Mode on 'B'
+      if (e.key === 'b' || e.key === 'B') {
         e.preventDefault();
-        this.engine.togglePause();
+        this.toggleBuildMode();
+        return;
+      }
+
+      if (!this.isBuildMode) {
+        const sec = DEBUG_SECTIONS.find((s) => s.key === e.key);
+        if (sec) {
+          e.preventDefault();
+          this.teleport(sec.x);
+          return;
+        }
+
+        if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          this.engine.togglePause();
+        }
       }
     };
+
     window.addEventListener('keydown', this.keyHandler);
   }
 
   private createDebugPanel() {
-    // Check if panel already exists
     if (document.getElementById('hm2-debug-panel')) return;
 
     const panel = document.createElement('div');
@@ -85,8 +117,8 @@ export class GameDebugController {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      background: rgba(14, 10, 8, 0.88);
-      border: 1px solid rgba(255, 170, 51, 0.4);
+      background: rgba(14, 10, 8, 0.92);
+      border: 1px solid rgba(255, 170, 51, 0.5);
       border-radius: 8px;
       padding: 6px 10px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.6);
@@ -94,6 +126,29 @@ export class GameDebugController {
       font-size: 11px;
       color: #ffaa33;
     `;
+
+    // 3D Track Builder Toggle Button
+    const buildBtn = document.createElement('button');
+    buildBtn.id = 'hm2-build-mode-btn';
+    buildBtn.innerText = '🛠 [B] 3D BUILDER: OFF';
+    buildBtn.style.cssText = `
+      background: #3a2210;
+      color: #ffaa33;
+      border: 1px solid #ffaa33;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: bold;
+      transition: all 0.15s;
+    `;
+    buildBtn.onclick = () => this.toggleBuildMode();
+    panel.appendChild(buildBtn);
+
+    const divider = document.createElement('span');
+    divider.style.cssText = 'border-left: 1px solid rgba(255,170,51,0.3); margin: 0 4px;';
+    panel.appendChild(divider);
 
     const label = document.createElement('span');
     label.innerText = 'STAGE JUMP:';
@@ -124,9 +179,39 @@ export class GameDebugController {
     this.panel = panel;
   }
 
+  private updateDebugButtonState() {
+    if (this.panel) {
+      this.panel.style.display = this.isBuildMode ? 'none' : 'flex';
+    }
+    const btn = document.getElementById('hm2-build-mode-btn');
+    if (!btn) return;
+    if (this.isBuildMode) {
+      btn.innerText = '🛠 [B] 3D BUILDER: ON';
+      btn.style.background = '#00aa55';
+      btn.style.color = '#ffffff';
+      btn.style.borderColor = '#00ff88';
+      btn.style.boxShadow = '0 0 10px rgba(0,255,136,0.6)';
+    } else {
+      btn.innerText = '🛠 [B] 3D BUILDER: OFF';
+      btn.style.background = '#3a2210';
+      btn.style.color = '#ffaa33';
+      btn.style.borderColor = '#ffaa33';
+      btn.style.boxShadow = 'none';
+    }
+  }
+
   destroy() {
-    if (this.keyHandler) window.removeEventListener('keydown', this.keyHandler);
-    if (this.panel) this.panel.remove();
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+    }
+    if (this.syncHandler) {
+      window.removeEventListener('sync-3d-build-mode' as any, this.syncHandler);
+    }
+    if (this.panel) {
+      this.panel.remove();
+      this.panel = null;
+    }
     delete (window as any).__gameDebug;
+    delete (window as any).__gameEngine;
   }
 }

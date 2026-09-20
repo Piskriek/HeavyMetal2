@@ -12,8 +12,8 @@ import { CAMERA_HEADROOM, RangeCamera, chaseLerp, clampCameraTarget, edgeAnchor 
 const WIDTH = 1440;
 const HEIGHT = 620;
 
-test('follow ball is the default camera mode', () => {
-  assert.equal(DEFAULT_OPTIONS.cameraMode, 'follow_ball');
+test('third person is the default camera mode', () => {
+  assert.equal(DEFAULT_OPTIONS.cameraMode, 'third_person');
 });
 
 test('ball chase smoothing is the frame-rate independent lerp(camX, ballX, dt * 6)', () => {
@@ -28,18 +28,27 @@ test('camera target is soft-clamped inside the rendered track', () => {
   assert.equal(clampCameraTarget(-500), 0, 'never behind the launch pad');
   assert.equal(clampCameraTarget(FINISH), FINISH - CAMERA_HEADROOM, 'never past the stadium');
   const view = new RangeCamera();
-  view.configure(WIDTH, 0, true, 0);
-  view.configure(WIDTH, clampCameraTarget(view.followOffset(FINISH + 4000, 0)), true, 0);
+  view.configure(WIDTH, 0, true, 0, 'follow_ball');
+  view.configure(WIDTH, clampCameraTarget(view.followOffset(FINISH + 4000, 0)), true, 0, 'follow_ball');
   assert.ok(view.project(FINISH, GROUND, 0).x <= WIDTH, 'finish line stays on screen at the clamp');
 });
 
 test('follow offset frames the ball inside the central 60% band', () => {
   const view = new RangeCamera();
-  view.configure(WIDTH, 0, true, 0);
+  view.configure(WIDTH, 0, true, 0, 'follow_ball');
   for (const x of [900, 4000, 12000, 28000]) {
-    view.configure(WIDTH, clampCameraTarget(view.followOffset(x, 0)), true, 0);
+    view.configure(WIDTH, clampCameraTarget(view.followOffset(x, 0)), true, 0, 'follow_ball');
     const point = view.project(x, GROUND, 0);
     assert.ok(point.x > WIDTH * 0.2 && point.x < WIDTH * 0.8, `ball at ${x} projects to ${point.x}`);
+  }
+});
+
+test('third person mode frames the ball centrally', () => {
+  const view = new RangeCamera();
+  for (const x of [900, 4000, 12000]) {
+    view.configure(WIDTH, x - 200, true, 0, 'third_person', { x, y: GROUND, z: 0 });
+    const point = view.project(x, GROUND, 0);
+    assert.ok(point.x > WIDTH * 0.4 && point.x < WIDTH * 0.6, `ball at ${x} in third person projects to ${point.x}`);
   }
 });
 

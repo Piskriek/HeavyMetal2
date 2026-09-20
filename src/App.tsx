@@ -7,6 +7,7 @@ import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
 import { AirSupplyGuide } from './components/AirSupplies';
 import RaceScreen from './screens/RaceScreen';
+import MapEditorScreen from './screens/MapEditorScreen';
 import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, savePreference } from './game/preferences';
 import { COURSES, type RunRecord } from './game/types';
 import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
@@ -25,7 +26,7 @@ export default function App() {
   const hydration = useMemo(() => readSave(), []);
   const [options, setOptions] = useState(readOptions);
   const [records, setRecords] = useState(readRecords);
-  const [screen, setScreen] = useState<'menu' | 'race'>('menu');
+  const [screen, setScreen] = useState<'menu' | 'race' | 'editor'>('menu');
   const [panel, setPanel] = useState<Panel>(null);
   const [session, setSession] = useState<RaceSession | null>(hydration.session);
   const [phase, setPhase] = useState<SessionPhase>(hydration.phase);
@@ -71,6 +72,7 @@ export default function App() {
   }, []);
   const settings = useCallback(() => setPanel('settings'), []);
   const newGame = useCallback(() => setPanel('new-game'), []);
+  const mapEditor = useCallback(() => { setPanel(null); setScreen('editor'); }, []);
   const startRace = useCallback((setup: RaceSetup) => {
     leaveRaceFullscreen(() => {
       setLastSetup(setup);
@@ -130,9 +132,16 @@ export default function App() {
   return (
     <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
       <div ref={shell} className={`game-application ${fullscreenFallback ? 'menu-fullscreen' : ''}`}>
-        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onNewGame={newGame} onResume={resume}
+        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onNewGame={newGame} onResume={resume} onMapEditor={mapEditor}
           onSettings={settings} onGuide={() => setPanel('guide')} onRecords={() => setPanel('records')}
           onCredits={() => setPanel('credits')} onSound={() => setOptions((previous) => ({ ...previous, sound: !previous.sound }))} onFullscreen={() => void fullscreen()} />}
+
+        {screen === 'editor' && (
+          <MapEditorScreen
+            options={options}
+            onMainMenu={mainMenu}
+          />
+        )}
 
         {session && config && <div className="race-screen-host" hidden={screen !== 'race'} aria-hidden={screen !== 'race'} inert={screen !== 'race'}>
           <RaceScreen key={`${session.id}:${session.round}`} active={screen === 'race' && panel === null} options={options} setOptions={setOptions}

@@ -272,6 +272,28 @@ Generated 10 loose full-body goblin decoration cutouts (5 cheering fans, 5 worki
 - New `goblins` category added to `PropCategory` with a "Goblins & Crew" palette tab in the Track Builder; all 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`).
 - Next agent: follow the 7-step batch protocol in the `process-goblins.mjs` header (goblins 11–20 → `goblins-sheet-b.png`, etc.), then commit to this branch and update the open goblins PR — never open a second PR.
 
+### Loose Goblin Cutouts (Batch 2 — 10 New Roles & Group Cutouts with Magenta Key Transparency)
+
+Generated 10 more goblin decoration cutouts (5 new single roles, 5 duo/trio groups) in the same painted identity:
+
+11. `public/art/goblins/goblin-11-lantern-warden.png` (848x1264) — Hooded night warden holding a tall lantern pole with a glowing amber lamp, signaling.
+12. `public/art/goblins/goblin-12-ball-loader.png` (848x1264) — Track worker straining to push and roll a giant riveted iron racing ball.
+13. `public/art/goblins/goblin-13-bell-ringer.png` (768x1376) — Cheering goblin ringing a big brass handbell overhead, horned helmet.
+14. `public/art/goblins/goblin-14-scarf-fan.png` (848x1264) — Superfan cheering with a checkered racing scarf stretched wide overhead.
+15. `public/art/goblins/goblin-15-track-sweeper.png` (848x1264) — Track sweeper with a big straw broom, bandana, goggles, oil can at belt.
+16. `public/art/goblins/goblin-16-rope-heave-trio.png` (1376x768) — Three goblins heaving a thick hemp slingshot rope together in unison.
+17. `public/art/goblins/goblin-17-shoulder-ride-duo.png` (768x1376) — Cheering duo: goblin kid riding on a big goblin's shoulders, arms triumphantly high.
+18. `public/art/goblins/goblin-18-firework-crew.png` (1408x768) — Two celebrating goblins, one waving a fizzing sparkler, the other laughing with covered ears.
+19. `public/art/goblins/goblin-19-tire-carry-duo.png` (1376x768) — Two pit mechanics carrying a big spiked iron racing tire together between them.
+20. `public/art/goblins/goblin-20-victory-huddle.png` (1408x768) — Three goblins in a victory huddle, middle one thrusting a golden gear trophy cup high.
+
+- Near-magenta backdrops flood-normalised to pure `#FF00FF`; keyed via `scripts/process-goblins.mjs` into `public/art/goblins/alpha/`.
+- Defect fix: the goblin-11 render carried a magenta glow disc around the lamp (~1.73% opaque-pink, too big for the boundary ring); it was seed flood-filled to pure magenta in the raw (3.79% of pixels over two passes — outer halo, then the inner transition ring — lamp glass verified still amber) and re-processed — remnant eliminated (1.73% → 0.0045%), glow now dissolves softly. Same procedure as the Batch 5 prop-42 fix.
+- Remaining Batch 2 remnants: 0–0.0045% except goblin-18 at 0.118% (sparkler flash core, verified interior glow paint on the remnant map, within the 0.14% props precedent).
+- Composite 5x2 sprite sheet for Batch 2 generated in `public/art/sheets/goblins-sheet-b.png`; full 5x4 sheet of all 20 in `public/art/sheets/goblins-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` under `goblins` (singles at 560px height, landscape groups at 600px height).
+- Next agent: goblins 21–30 → `goblins-sheet-c.png`, then commit to this branch and update the open goblins PR — never open a second PR.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

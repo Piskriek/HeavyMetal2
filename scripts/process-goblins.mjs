@@ -10,6 +10,7 @@
  *    - `public/art/sheets/goblins-sheet.png` (all goblins, 5xN)
  *    - `public/art/sheets/goblins-sheet-a.png` (Batch 1: goblins 01-10, 5x2)
  *    - `public/art/sheets/goblins-sheet-b.png` (Batch 2: goblins 11-20, 5x2)
+ *    - `public/art/sheets/goblins-sheet-b.png` (Batch 2: goblins 11-20, 5x2)
  *    - ... one letter per batch of 10.
  *
  * Keying & despill (identical to `scripts/process-props.mjs`):
@@ -106,6 +107,57 @@ export const GOBLIN_VARIATIONS = [
   {
     file: 'goblin-10-tankard-celebrant.png',
     concept: 'Celebrating goblin raising a foaming iron tankard high, other fist pumping',
+    role: 'cheering',
+  },
+  // --- Batch 2 (Goblins 11 - 20): new crew roles + group cutouts ---
+  {
+    file: 'goblin-11-lantern-warden.png',
+    concept: 'Hooded night warden goblin holding a tall lantern pole with glowing amber lamp, signaling',
+    role: 'working',
+  },
+  {
+    file: 'goblin-12-ball-loader.png',
+    concept: 'Track worker goblin straining to push and roll a giant riveted iron racing ball',
+    role: 'working',
+  },
+  {
+    file: 'goblin-13-bell-ringer.png',
+    concept: 'Cheering goblin ringing a big brass handbell overhead, shouting, horned helmet',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-14-scarf-fan.png',
+    concept: 'Superfan goblin cheering with a checkered racing scarf stretched wide overhead',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-15-track-sweeper.png',
+    concept: 'Track sweeper goblin with big straw broom, bandana, goggles, oil can at belt',
+    role: 'working',
+  },
+  {
+    file: 'goblin-16-rope-heave-trio.png',
+    concept: 'Three goblins heaving a thick hemp slingshot rope together in unison',
+    role: 'working',
+  },
+  {
+    file: 'goblin-17-shoulder-ride-duo.png',
+    concept: 'Cheering duo: small goblin kid riding on a big goblin shoulders, arms triumphantly high',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-18-firework-crew.png',
+    concept: 'Two celebrating goblins, one waving a fizzing sparkler, the other laughing with covered ears',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-19-tire-carry-duo.png',
+    concept: 'Two pit mechanics carrying a big spiked iron racing tire together between them',
+    role: 'working',
+  },
+  {
+    file: 'goblin-20-victory-huddle.png',
+    concept: 'Three goblins in a victory huddle, middle one thrusting a golden gear trophy cup high',
     role: 'cheering',
   },
 ];

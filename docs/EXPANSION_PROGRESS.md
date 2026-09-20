@@ -251,6 +251,27 @@ Generated an additional 10 variations of cavern and stunt dressing (Props 41 to 
 - Full composite 5x10 sprite sheet of all 50 variations generated in `public/art/sheets/props-sheet.png`.
 - All 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`): cavern/mine rockwork and rails (41, 43, 44, 46, 47, 48), trackside water/crater dressing (42, 49), stadium cheer platform and flag poles (45, 50).
 
+### Loose Goblin Cutouts (Batch 1 — 10 Working & Cheering Goblins with Magenta Key Transparency)
+
+Generated 10 loose full-body goblin decoration cutouts (5 cheering fans, 5 working crew) in the game's painted identity (olive skin, weathered charcoal iron, warm brass, teal shadows):
+
+1. `public/art/goblins/goblin-01-flag-waver.png` (848x1264) — Cheering goblin waving a large checkered racing flag overhead, shouting with joy.
+2. `public/art/goblins/goblin-02-war-drummer.png` (768x1376) — Goblin drummer mid-beat with two mallets over a spiked war drum strapped at the waist.
+3. `public/art/goblins/goblin-03-pit-mechanic.png` (848x1264) — Pit-crew mechanic goblin with an oversized brass wrench on the shoulder, oil-stained apron, goggles.
+4. `public/art/goblins/goblin-04-torchbearer.png` (848x1264) — Cheering goblin thrusting a flaming iron torch high, other fist pumped.
+5. `public/art/goblins/goblin-05-ore-miner.png` (768x1376) — Miner goblin with pickaxe over shoulder, lantern helmet, ore sack and rope at belt.
+6. `public/art/goblins/goblin-06-horn-blower.png` (768x1376) — Goblin blowing a giant curved brass war horn with skull engraving, cheeks puffed.
+7. `public/art/goblins/goblin-07-tnt-handler.png` (848x1264) — Grinning goblin hugging a wooden crate of sparking red dynamite with skull stencil.
+8. `public/art/goblins/goblin-08-track-marshal.png` (768x1376) — Track marshal goblin with crossed yellow signal flags, striped vest, brass whistle.
+9. `public/art/goblins/goblin-09-blacksmith.png` (848x1264) — Burly blacksmith goblin resting a huge forging hammer on one shoulder, leather apron.
+10. `public/art/goblins/goblin-10-tankard-celebrant.png` (768x1376) — Celebrating goblin raising a foaming iron tankard high, other fist pumping.
+
+- All 10 generated with near-magenta chroma key backgrounds in `public/art/goblins/`, flood-normalised to pure `#FF00FF` by the script.
+- Processed into true alpha-channel sprites via the new `scripts/process-goblins.mjs` in `public/art/goblins/alpha/` (flood-normalise + fuzz-key + unmix-despill, same protocol as `process-props.mjs`). Remnants measure 0–0.027% per sprite; residuals verified as interior glow paint (torch flame, fuse spark) on remnant maps and 2x checkerboard edge crops.
+- Composite 5x2 sprite sheet for Batch 1 generated in `public/art/sheets/goblins-sheet-a.png`; full composite sheet in `public/art/sheets/goblins-sheet.png`.
+- New `goblins` category added to `PropCategory` with a "Goblins & Crew" palette tab in the Track Builder; all 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`).
+- Next agent: follow the 7-step batch protocol in the `process-goblins.mjs` header (goblins 11–20 → `goblins-sheet-b.png`, etc.), then commit to this branch and update the open goblins PR — never open a second PR.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

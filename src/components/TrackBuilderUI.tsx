@@ -28,16 +28,7 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'trackside', label: 'Trackside & Stunts', icon: <Compass size={16} /> },
   { id: 'cavern_mine', label: 'Cavern & Mine', icon: <Mountain size={16} /> },
   { id: 'stadium', label: 'Stadium & Crowds', icon: <Flag size={16} /> },
-];
-
-const STAGES = [
-  { id: 'alpine', name: '1: Alpine Downhill' },
-  { id: 'canyon', name: '2: Canyon Lip' },
-  { id: 'zigzag', name: '3: Waterfall Zigzag' },
-  { id: 'cavern', name: '4: Cavern Maw' },
-  { id: 'mine', name: '5: Mine & Lava' },
-  { id: 'breakthrough', name: '6: Breakthrough' },
-  { id: 'stadium', name: '7: Stadium Finish' },
+  { id: 'decals', label: 'Road Decals', icon: <Layers size={16} /> },
 ];
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
@@ -55,6 +46,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const keysRef = useRef(new Set<string>());
   const isRightMouseDown = useRef(false);
   const isDraggingSelected = useRef(false);
+  const isRotatingSelected = useRef(false);
   const lastPointerPos = useRef({ x: 0, y: 0 });
   const animFrameRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
@@ -114,12 +106,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             onRequestRender?.();
           }
         } else {
+          // Check if clicking in-place rotation handle
+          if (builder.getSelectedProp() && builder.raycastRotateHandle(e.clientX, e.clientY, canvas)) {
+            isRotatingSelected.current = true;
+            lastPointerPos.current = { x: e.clientX, y: e.clientY };
+            showToast('Rotate / Tilt In-Place: Drag left/right');
+            return;
+          }
+
           // Select mode: check if clicking on an existing placed prop
           const hitProp = builder.raycastProp(e.clientX, e.clientY, canvas);
           if (hitProp) {
             builder.selectProp(hitProp.id);
             isDraggingSelected.current = true;
-            showToast(`Selected ${hitProp.name} [Drag to move, Arrow keys to nudge, Del to delete]`);
+            showToast(`Selected ${hitProp.name} [Drag to move, [ / ] to tilt, X to flip, Del to delete]`);
             onRequestRender?.();
           } else {
             // Clicked empty area: deselect
@@ -139,6 +139,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         lastPointerPos.current = { x: e.clientX, y: e.clientY };
         builder.rotateCamera(dx, dy);
         onRequestRender?.();
+      }
+
+      // Rotating/tilting selected prop in-place
+      if (isRotatingSelected.current && !isRightMouseDown.current) {
+        const dx = e.clientX - lastPointerPos.current.x;
+        lastPointerPos.current = { x: e.clientX, y: e.clientY };
+        builder.tiltSelectedProp((dx * Math.PI) / 180);
+        onRequestRender?.();
+        return;
       }
 
       // Dragging selected prop across surface
@@ -164,8 +173,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         onRequestRender?.();
       } else {
         // Hover check in select mode
-        const hit = builder.raycastProp(e.clientX, e.clientY, canvas);
-        canvas.style.cursor = hit ? 'pointer' : 'default';
+        const hitHandle = builder.getSelectedProp() && builder.raycastRotateHandle(e.clientX, e.clientY, canvas);
+        const hit = hitHandle || builder.raycastProp(e.clientX, e.clientY, canvas);
+        canvas.style.cursor = hitHandle ? 'grab' : (hit ? 'pointer' : 'default');
       }
     };
 
@@ -179,6 +189,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         }
       } else if (e.button === 0) {
         isDraggingSelected.current = false;
+        isRotatingSelected.current = false;
       }
     };
 
@@ -219,6 +230,24 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             x: selected.x + dx,
             z: selected.z + dz,
           });
+          onRequestRender?.();
+        }
+      } else if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+        const selected = builder.getSelectedProp();
+        if (selected) {
+          e.preventDefault();
+          const stepDeg = e.shiftKey ? 10 : 2;
+          const delta = (stepDeg * Math.PI) / 180 * (e.code === 'BracketLeft' ? -1 : 1);
+          builder.tiltSelectedProp(delta);
+          showToast(`Tilt: ${Math.round(((selected.rotZ ?? 0) * 180) / Math.PI)}°`);
+          onRequestRender?.();
+        }
+      } else if (e.code === 'KeyX' && !e.ctrlKey && !e.metaKey) {
+        const selected = builder.getSelectedProp();
+        if (selected) {
+          e.preventDefault();
+          builder.flipSelectedProp();
+          showToast(`Prop ${selected.flipX ? 'Mirrored (Flipped)' : 'Normal'}`);
           onRequestRender?.();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
@@ -352,22 +381,6 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               </select>
             </div>
           )}
-
-          {/* Stage Jump Selector */}
-          <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-700/60 rounded px-2 py-1 text-xs">
-            <span className="text-zinc-400 font-medium">Stage:</span>
-            <select
-              className="bg-transparent text-amber-300 focus:outline-none cursor-pointer"
-              onChange={(e) => builder.jumpToStage(e.target.value)}
-              defaultValue="alpine"
-            >
-              {STAGES.map((s) => (
-                <option key={s.id} value={s.id} className="bg-zinc-900 text-amber-200">
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* Skybox / Atmosphere Environment Selector */}
           <div className="relative">
@@ -788,7 +801,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           {/* Rotation Y */}
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex justify-between text-zinc-400">
-              <span>Rotation Y:</span>
+              <span>Rotation Y (Yaw):</span>
               <span className="text-amber-300 font-mono">{Math.round((selectedProp.rotY * 180) / Math.PI)}°</span>
             </div>
             <input
@@ -804,10 +817,70 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             />
           </div>
 
+          {/* Tilt / In-Place Rotation */}
+          <div className="flex flex-col gap-1.5 bg-zinc-900/60 p-2 rounded-md border border-zinc-800/80 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="text-zinc-400 font-medium">Tilt / In-Place Rotation:</span>
+              <span className="text-amber-300 font-mono font-bold">
+                {Math.round(((selectedProp.rotZ ?? 0) * 180) / Math.PI)}°
+              </span>
+            </div>
+            <input
+              type="range"
+              min="-90"
+              max="90"
+              value={Math.round(((selectedProp.rotZ ?? 0) * 180) / Math.PI)}
+              onChange={(e) => {
+                const deg = parseFloat(e.target.value);
+                builder.updatePropTransform(selectedProp.id, { rotZ: (deg * Math.PI) / 180 });
+                onRequestRender?.();
+              }}
+              className="w-full accent-amber-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
+            />
+            <div className="grid grid-cols-5 gap-1 pt-0.5">
+              {[-15, -5, 0, 5, 15].map((deg) => (
+                <button
+                  key={deg}
+                  onClick={() => {
+                    const currentDeg = Math.round(((selectedProp.rotZ ?? 0) * 180) / Math.PI);
+                    const newDeg = deg === 0 ? 0 : Math.max(-90, Math.min(90, currentDeg + deg));
+                    builder.updatePropTransform(selectedProp.id, { rotZ: (newDeg * Math.PI) / 180 });
+                    onRequestRender?.();
+                  }}
+                  className="px-1 py-0.5 text-[10px] bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700/50 cursor-pointer text-center"
+                >
+                  {deg === 0 ? '0° Flat' : (deg > 0 ? `+${deg}°` : `${deg}°`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Flip / Mirror Button */}
+          <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+            <span className="text-zinc-400">Flip / Mirror PNG:</span>
+            <button
+              onClick={() => {
+                const next = !selectedProp.flipX;
+                builder.updatePropTransform(selectedProp.id, { flipX: next });
+                showToast(next ? 'Flipped Horizontally (Mirrored)' : 'Restored Normal Orientation');
+                onRequestRender?.();
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                selectedProp.flipX
+                  ? 'bg-amber-600/90 hover:bg-amber-500 text-zinc-950 border-amber-400'
+                  : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+              }`}
+              title="Flip / Mirror the PNG horizontally [Key: X]"
+            >
+              <RotateCw size={13} />
+              <span>{selectedProp.flipX ? 'Mirrored (Flipped)' : 'Normal'}</span>
+            </button>
+          </div>
+
           {/* Camera Facing Toggle (for PNG decorations) */}
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
-            if (def?.isRamp) return null;
+            if (def?.isRamp || def?.isDecal) return null;
             const isFacing = selectedProp.cameraFacing !== false;
             return (
               <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">

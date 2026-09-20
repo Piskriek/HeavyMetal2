@@ -56,7 +56,7 @@ function grounded<T extends THREE.Object3D>(obj: T, name: string): T {
 /* -----------------------------------------------------------------------------
    1. TEXTURES & MATERIALS
    -------------------------------------------------------------------------- */
-type TexKey = 'dirt' | 'cliff' | 'cave' | 'lava' | 'wood' | 'grass' | 'cobble' | 'iron' | 'bark' | 'water';
+type TexKey = 'dirt' | 'cliff' | 'cave' | 'lava' | 'wood' | 'grass' | 'cobble' | 'iron' | 'bark' | 'water' | 'grassFringe';
 const TEXTURE_FILES: Record<TexKey, string> = {
   dirt: '/textures/dirt.png',
   cliff: '/textures/cliff.png',
@@ -68,6 +68,7 @@ const TEXTURE_FILES: Record<TexKey, string> = {
   iron: '/textures/iron.png',
   bark: '/textures/bark.png',
   water: '/textures/water.png',
+  grassFringe: '/textures/grass-fringe.png',
 };
 
 function loadTextures(manager: THREE.LoadingManager) {
@@ -75,7 +76,12 @@ function loadTextures(manager: THREE.LoadingManager) {
   const out = {} as Record<TexKey, THREE.Texture>;
   (Object.keys(TEXTURE_FILES) as TexKey[]).forEach((key) => {
     const t = loader.load(TEXTURE_FILES[key]);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    if (key === 'grassFringe') {
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.ClampToEdgeWrapping;
+    } else {
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    }
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     out[key] = t;
@@ -83,17 +89,78 @@ function loadTextures(manager: THREE.LoadingManager) {
   return out;
 }
 
+function makeSeamlessMaterial(texture: THREE.Texture, extra: THREE.MeshStandardMaterialParameters = {}) {
+  const mat = new THREE.MeshStandardMaterial({
+    map: texture,
+    roughness: 0.95,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    ...extra,
+  });
+
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <uv_pars_vertex>',
+      `#include <uv_pars_vertex>
+      varying vec3 vWorldPosSeamless;`
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <worldpos_vertex>',
+      `#include <worldpos_vertex>
+      vWorldPosSeamless = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <uv_pars_fragment>',
+      `#include <uv_pars_fragment>
+      varying vec3 vWorldPosSeamless;`
+    );
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#ifdef USE_MAP
+        vec4 col1 = texture2D(map, vMapUv);
+
+        // Secondary unaligned sample rotated 30 deg at 0.38x scale to break repetition
+        mat2 rotMat = mat2(0.866, -0.5, 0.5, 0.866);
+        vec2 uv2 = rotMat * (vMapUv * 0.38) + vec2(0.27, 0.63);
+        vec4 col2 = texture2D(map, uv2);
+
+        // Smooth noise-like transition
+        float blend = smoothstep(0.25, 0.75, sin(vMapUv.x * 3.1 + vMapUv.y * 2.3) * 0.5 + 0.5);
+        vec4 blended = mix(col1, col2, blend * 0.42);
+
+        // Subtle organic tone modulation based on world coordinates
+        float worldNoise = sin(vWorldPosSeamless.x * 0.0011) * cos(vWorldPosSeamless.z * 0.0014);
+        vec3 toneVariation = mix(vec3(0.93, 0.94, 0.91), vec3(1.05, 1.03, 0.98), worldNoise * 0.5 + 0.5);
+
+        diffuseColor *= blended * vec4(toneVariation, 1.0);
+      #endif`
+    );
+  };
+
+  return mat;
+}
+
 function buildMaterials(T: Record<TexKey, THREE.Texture>) {
   const std = (map: THREE.Texture, extra: THREE.MeshStandardMaterialParameters = {}) =>
     new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0, side: THREE.DoubleSide, ...extra });
 
   return {
-    dirt: std(T.dirt),
+    dirt: makeSeamlessMaterial(T.dirt),
     cliff: std(T.cliff),
     cave: std(T.cave),
     wood: std(T.wood),
-    grass: std(T.grass),
-    cobble: std(T.cobble),
+    grass: makeSeamlessMaterial(T.grass),
+    cobble: makeSeamlessMaterial(T.cobble),
+    grassFringe: new THREE.MeshStandardMaterial({
+      map: T.grassFringe,
+      transparent: true,
+      alphaTest: 0.08,
+      roughness: 0.92,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+    }),
     iron: std(T.iron, { metalness: 0.35, roughness: 0.7 }),
     bark: std(T.bark),
     boulder: std(T.cliff, { flatShading: true }),
@@ -700,11 +767,16 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
       runStart = i;
     }
   }
-  const linedStage = (s: TrackSample) => !s.onBridge && (s.stage === 'alpine' || s.stage === 'canyon' || s.stage === 'zigzag' || s.stage === 'stadium');
-  for (const side of [-0.5, 0, 0.5]) {
-    rangesWhere(samples, linedStage).forEach(([a, b]) =>
-      scene.add(sweepProfile(samples, a, b, [P(side, -7, 4), P(side, 7, 4)], M.chalk, { stride: 2 })));
-  }
+
+  // Natural grass fringe along the road shoulders: breaks up hard geometric edges
+  const grassFringeStage = (s: TrackSample) => !s.onBridge && !s.inLoop && (s.stage === 'alpine' || s.stage === 'canyon' || s.stage === 'zigzag');
+  const FRINGE_L = [P(-1, -120, -6), P(-1, 25, 2)];
+  const FRINGE_R = [P(1, -25, 2), P(1, 120, -6)];
+
+  rangesWhere(samples, grassFringeStage).forEach(([a, b]) => {
+    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 400, stride: 2 }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 400, stride: 2 }));
+  });
 }
 
 function makeAlpineTerrain(track: TrackData) {

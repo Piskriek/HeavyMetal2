@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { wedgeMesh, type TrackData, type TrackSample } from './renderer-3d';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals';
 
 export interface PropDefinition {
   type: string;
@@ -19,6 +19,7 @@ export interface PropDefinition {
   defaultAltitude?: number;
   alignBottom?: boolean;
   isRamp?: boolean;
+  isDecal?: boolean;
 }
 
 export interface PlacedProp {
@@ -29,10 +30,12 @@ export interface PlacedProp {
   y: number;
   z: number;
   rotY: number;
+  rotZ?: number;
   scale: number;
   alignToTrack: boolean;
   trackDist?: number;
   cameraFacing?: boolean;
+  flipX?: boolean;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
@@ -90,6 +93,15 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'bleacher_b', name: 'Goblin Bleacher B', category: 'stadium', url: '/art/track-parts/goblin-bleacher-b.png', defaultWidth: 1100, defaultHeight: 850 },
   { type: 'crowd_banner', name: 'Cheering Crowd Banner', category: 'stadium', url: '/art/foreground-crowd.png', defaultWidth: 1500, defaultHeight: 500 },
   { type: 'checkered_flag', name: 'Checkered Flag', category: 'stadium', url: '/art/flag-checkered.png', defaultWidth: 380, defaultHeight: 380 },
+
+  // --- ROAD DECALS ---
+  { type: 'decal_tire_skid', name: 'Tire Skid Marks', category: 'decals', url: '/art/decals/decal-tire-skid.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
+  { type: 'decal_oil_spill', name: 'Oil Spill Puddle', category: 'decals', url: '/art/decals/decal-oil-spill.png', defaultWidth: 440, defaultHeight: 440, isDecal: true },
+  { type: 'decal_cracks', name: 'Asphalt Fissures & Cracks', category: 'decals', url: '/art/decals/decal-cracks.png', defaultWidth: 460, defaultHeight: 460, isDecal: true },
+  { type: 'decal_pothole', name: 'Broken Pothole Crater', category: 'decals', url: '/art/decals/decal-pothole.png', defaultWidth: 400, defaultHeight: 400, isDecal: true },
+  { type: 'decal_hazard_stripes', name: 'Caution Hazard Stripes', category: 'decals', url: '/art/decals/decal-hazard-stripes.png', defaultWidth: 620, defaultHeight: 310, isDecal: true },
+  { type: 'decal_speed_arrow', name: 'Directional Speed Chevron', category: 'decals', url: '/art/decals/decal-speed-arrow.png', defaultWidth: 380, defaultHeight: 380, isDecal: true },
+  { type: 'decal_drain_grate', name: 'Iron Drainage Grate', category: 'decals', url: '/art/decals/decal-drain-grate.png', defaultWidth: 360, defaultHeight: 360, isDecal: true },
 ];
 
 export class TrackBuilder3D {
@@ -100,6 +112,7 @@ export class TrackBuilder3D {
   private ghostSprite: THREE.Sprite | null = null;
   private ghostMesh: THREE.Mesh | null = null;
   private selectionBox: THREE.BoxHelper | null = null;
+  private rotationHandle: THREE.Group | null = null;
 
   private undoStack: string[] = [];
   private redoStack: string[] = [];
@@ -388,7 +401,14 @@ export class TrackBuilder3D {
 
     if (this.ghostMesh && this.ghostMesh.visible) {
       this.ghostMesh.position.copy(pos);
-      if (this.snapping.alignToTrack && hit.sample) {
+      if ((this.ghostMesh as any)._isDecalMesh) {
+        this.ghostMesh.position.y += 2;
+        this.ghostMesh.rotation.x = -Math.PI / 2;
+        if (this.snapping.alignToTrack && hit.sample) {
+          const rotY = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
+          this.ghostMesh.rotation.z = -rotY;
+        }
+      } else if (this.snapping.alignToTrack && hit.sample) {
         this.ghostMesh.rotation.y = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
       }
     } else if (this.ghostSprite && this.ghostSprite.visible) {
@@ -406,7 +426,27 @@ export class TrackBuilder3D {
     const def = PROP_DEFINITIONS.find((p) => p.type === this.activePropType);
     if (!def) return;
 
-    if (def.isRamp) {
+    if (def.isDecal) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      const tex = this.getTexture(def.url);
+      if (!this.ghostMesh || (this.ghostMesh as any)._forType !== def.type || (this.ghostMesh as any)._isDecalMesh !== true) {
+        if (this.ghostMesh) this.scene.remove(this.ghostMesh);
+        const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 0.65,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
+        this.ghostMesh = new THREE.Mesh(geom, mat);
+        (this.ghostMesh as any)._forType = def.type;
+        (this.ghostMesh as any)._isDecalMesh = true;
+        this.ghostMesh.name = 'GhostDecalMesh';
+        this.scene.add(this.ghostMesh);
+      }
+      this.ghostMesh.visible = true;
+    } else if (def.isRamp) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
       if (!this.ghostMesh || (this.ghostMesh as any)._isRampMesh !== true) {
         if (this.ghostMesh) this.scene.remove(this.ghostMesh);
@@ -482,10 +522,12 @@ export class TrackBuilder3D {
       y: Math.round(pos.y),
       z: Math.round(pos.z),
       rotY,
+      rotZ: 0,
       scale: 1,
       alignToTrack: this.snapping.alignToTrack,
       trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
-      cameraFacing: def.isRamp ? false : this.snapping.cameraFacingDefault,
+      cameraFacing: (def.isRamp || def.isDecal) ? false : this.snapping.cameraFacingDefault,
+      flipX: false,
     };
 
     this.placedProps.push(prop);
@@ -583,13 +625,28 @@ export class TrackBuilder3D {
       const obj = this.propObjects.get(id);
       if (obj) {
         obj.position.set(prop.x, prop.y, prop.z);
-        obj.rotation.y = prop.rotY;
         const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+        const flip = prop.flipX ? -1 : 1;
         if (def) {
-          if (def.isRamp || prop.cameraFacing === false) {
-            obj.scale.set(prop.scale, prop.scale, prop.scale);
+          if (def.isDecal || (obj as any).userData?.isDecal) {
+            obj.position.y = prop.y + 2;
+            obj.rotation.x = -Math.PI / 2;
+            obj.rotation.z = -(prop.rotY + (prop.rotZ ?? 0));
+            obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
+          } else if (def.isRamp) {
+            obj.rotation.y = prop.rotY;
+            obj.rotation.z = prop.rotZ ?? 0;
+            obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
+          } else if (prop.cameraFacing === false) {
+            obj.rotation.y = prop.rotY;
+            obj.rotation.z = prop.rotZ ?? 0;
+            obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
           } else {
-            obj.scale.set(def.defaultWidth * prop.scale, def.defaultHeight * prop.scale, 1);
+            // Sprite
+            if (obj instanceof THREE.Sprite) {
+              obj.material.rotation = prop.rotZ ?? 0;
+              obj.scale.set(def.defaultWidth * prop.scale * flip, def.defaultHeight * prop.scale, 1);
+            }
           }
         }
       }
@@ -606,11 +663,12 @@ export class TrackBuilder3D {
     });
   }
 
-  // --- SELECTION BOX HIGHLIGHT ---
+  // --- SELECTION BOX HIGHLIGHT & ROTATION HANDLE ---
   private updateSelectionBox() {
     const prop = this.getSelectedProp();
     if (!prop || !this.freeFly.active) {
       if (this.selectionBox) this.selectionBox.visible = false;
+      if (this.rotationHandle) this.rotationHandle.visible = false;
       return;
     }
 
@@ -628,6 +686,64 @@ export class TrackBuilder3D {
       this.selectionBox.setFromObject(obj);
       this.selectionBox.visible = true;
     }
+
+    // Position in-place rotation handle above the prop
+    const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+    const h = (def?.defaultHeight ?? 500) * prop.scale;
+    const handleY = prop.y + (def?.isDecal ? 40 : h + 70);
+
+    if (!this.rotationHandle) {
+      this.rotationHandle = new THREE.Group();
+      this.rotationHandle.name = 'RotationHandleGroup';
+
+      // Stem line
+      const stemGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 45, 0),
+      ]);
+      const stemMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, depthTest: false });
+      const stem = new THREE.Line(stemGeo, stemMat);
+      stem.renderOrder = 10000;
+      this.rotationHandle.add(stem);
+
+      // Rotation ring / torus
+      const ringGeo = new THREE.TorusGeometry(32, 6, 8, 24);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.y = 45;
+      ring.renderOrder = 10000;
+      ring.userData = { isRotationHandle: true };
+      this.rotationHandle.add(ring);
+
+      this.scene.add(this.rotationHandle);
+    }
+
+    this.rotationHandle.position.set(prop.x, handleY, prop.z);
+    this.rotationHandle.visible = true;
+  }
+
+  raycastRotateHandle(clientX: number, clientY: number, canvas: HTMLCanvasElement): boolean {
+    if (!this.rotationHandle || !this.rotationHandle.visible) return false;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.mouseNdc.set(x, y);
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const hits = this.raycaster.intersectObjects(this.rotationHandle.children, true);
+    return hits.length > 0;
+  }
+
+  tiltSelectedProp(deltaRadians: number) {
+    const prop = this.getSelectedProp();
+    if (!prop) return;
+    const current = prop.rotZ ?? 0;
+    this.updatePropTransform(prop.id, { rotZ: current + deltaRadians });
+  }
+
+  flipSelectedProp() {
+    const prop = this.getSelectedProp();
+    if (!prop) return;
+    this.updatePropTransform(prop.id, { flipX: !prop.flipX });
   }
 
   // --- SPRITE & MESH CREATION & TEXTURE CACHE ---
@@ -646,10 +762,11 @@ export class TrackBuilder3D {
     if (!def) return new THREE.Object3D();
 
     let obj: THREE.Object3D;
+    const flip = prop.flipX ? -1 : 1;
 
     if (def.isRamp) {
       // Create 3D wedge ramp mesh
-      const w = (def.defaultWidth || 960) * prop.scale;
+      const w = (def.defaultWidth || 960) * prop.scale * flip;
       const len = 1100 * prop.scale;
       const h = (def.defaultHeight || 260) * prop.scale;
       const mat = this.materials?.wood ?? new THREE.MeshStandardMaterial({
@@ -661,6 +778,28 @@ export class TrackBuilder3D {
       mesh.userData = { propId: prop.id, isRamp: true };
       mesh.position.set(prop.x, prop.y, prop.z);
       mesh.rotation.y = prop.rotY;
+      mesh.rotation.z = prop.rotZ ?? 0;
+      obj = mesh;
+    } else if (def.isDecal) {
+      // Flat surface decal (lies flat on track/ground)
+      const tex = this.getTexture(def.url);
+      const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -3,
+        polygonOffsetUnits: -3,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.name = `PlacedProp_${prop.id}`;
+      mesh.userData = { propId: prop.id, isDecal: true };
+      mesh.position.set(prop.x, prop.y + 2, prop.z);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = -(prop.rotY + (prop.rotZ ?? 0));
+      mesh.scale.set(prop.scale * flip, prop.scale, prop.scale);
       obj = mesh;
     } else if (prop.cameraFacing === false) {
       // Fixed 3D World Orientation (Double-sided plane mesh)
@@ -681,18 +820,24 @@ export class TrackBuilder3D {
       mesh.userData = { propId: prop.id, isMeshProp: true };
       mesh.position.set(prop.x, prop.y, prop.z);
       mesh.rotation.y = prop.rotY;
-      mesh.scale.set(prop.scale, prop.scale, prop.scale);
+      mesh.rotation.z = prop.rotZ ?? 0;
+      mesh.scale.set(prop.scale * flip, prop.scale, prop.scale);
       obj = mesh;
     } else {
       // Camera Facing (Billboard Sprite)
       const tex = this.getTexture(def.url);
-      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthWrite: false,
+        rotation: prop.rotZ ?? 0,
+      });
       const sprite = new THREE.Sprite(mat);
       sprite.name = `PlacedProp_${prop.id}`;
       sprite.userData = { propId: prop.id };
       sprite.position.set(prop.x, prop.y, prop.z);
       sprite.center.set(0.5, def.alignBottom !== false ? 0 : 0.5);
-      sprite.scale.set(def.defaultWidth * prop.scale, def.defaultHeight * prop.scale, 1);
+      sprite.scale.set(def.defaultWidth * prop.scale * flip, def.defaultHeight * prop.scale, 1);
       obj = sprite;
     }
 
@@ -786,6 +931,7 @@ export class TrackBuilder3D {
     if (this.ghostSprite) this.scene.remove(this.ghostSprite);
     if (this.ghostMesh) this.scene.remove(this.ghostMesh);
     if (this.selectionBox) this.scene.remove(this.selectionBox);
+    if (this.rotationHandle) this.scene.remove(this.rotationHandle);
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
     this.listeners.length = 0;

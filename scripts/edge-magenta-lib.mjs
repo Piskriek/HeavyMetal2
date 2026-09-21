@@ -286,6 +286,7 @@ export function auditPixels(w, h, data) {
   let hardBoundary = 0; // fully opaque pixel with an interior transparent 4-neighbour
   let softBoundary = 0; // semi-transparent pixel with an interior transparent 4-neighbour
   let transpBleed = 0; // transparent pixel near the silhouette still carrying matte RGB
+  let fringeTaint = 0; // transparent pixel next to visible art whose RGB is not the bled edge colour
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
@@ -332,8 +333,40 @@ export function auditPixels(w, h, data) {
       if (near) transpBleed++;
     }
   }
+  // Transparent pixels adjacent to visible art must carry the bled edge colour
+  // (the mean of their filled 3x3 neighbourhood, as fix pass 7 writes it). A
+  // stale colour — matte magenta, canvas clear black, anything — resurfaces as
+  // a tinted halo when a non-premultiplied scaler interpolates across the edge.
+  // Tolerance 16: the fixer's fixed point is within ~4 of this mean, while a
+  // stale clear colour is off by 100+.
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] !== 0) continue;
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      let nr = 0, ng = 0, nb = 0, nfill = 0, hasVisible = false;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const j = (ny * w + nx) * 4;
+          const a = data[j + 3];
+          if (a === 0) continue;
+          if (a >= 16) hasVisible = true;
+          nr += data[j]; ng += data[j + 1]; nb += data[j + 2]; nfill++;
+        }
+      }
+      if (!hasVisible || nfill === 0) continue;
+      if (Math.max(
+        Math.abs(r - Math.round(nr / nfill)),
+        Math.abs(g - Math.round(ng / nfill)),
+        Math.abs(b - Math.round(nb / nfill)),
+      ) > 16) fringeTaint++;
+    }
+  }
   return {
-    opaque, semi, holes, spillSemi, spillEdge, edgeRing, hardBoundary, softBoundary, transpBleed,
+    opaque, semi, holes, spillSemi, spillEdge, edgeRing, hardBoundary, softBoundary, transpBleed, fringeTaint,
     hasAlpha: semi > 0 || opaque < w * h,
   };
 }

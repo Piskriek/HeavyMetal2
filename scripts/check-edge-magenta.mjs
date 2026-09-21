@@ -65,6 +65,8 @@ function main() {
         report.failures.push({ file: rel, reason: `magenta spill on alpha fringe: ${audit.spillSemi + audit.spillEdge}px` });
       if (audit.transpBleed > 0)
         report.failures.push({ file: rel, reason: `matte RGB stored in transparent fringe (bleeds under scaling): ${audit.transpBleed}px` });
+      if (audit.fringeTaint > 0)
+        report.failures.push({ file: rel, reason: `stale colour in transparent fringe — not the bled edge colour (halo under non-premultiplied scaling): ${audit.fringeTaint}px` });
       if (row.hardEdge > HARD_EDGE_MAX)
         report.failures.push({ file: rel, reason: `hard aliased edge (${(row.hardEdge * 100).toFixed(0)}% of boundary is un-feathered 255-vs-0 steps)` });
     }
@@ -81,7 +83,7 @@ function main() {
   const bad = report.runtime.filter((r) => flaggedRuntime.has(r.file));
   if (bad.length === 0) console.log('  none — every runtime sprite is clean.');
   for (const r of bad) {
-    console.log(`  ${r.file.padEnd(62)} holes=${String(r.holes).padStart(6)} spill=${String(r.spillSemi + r.spillEdge).padStart(6)} hardEdge=${r.hardEdge}`);
+    console.log(`  ${r.file.padEnd(62)} holes=${String(r.holes).padStart(6)} spill=${String(r.spillSemi + r.spillEdge).padStart(6)} tb=${String(r.transpBleed).padStart(6)} taint=${String(r.fringeTaint).padStart(6)} hardEdge=${r.hardEdge}`);
   }
 
   console.log('\nSource sheets holding matte (expected, not failed):');

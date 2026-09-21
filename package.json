@@ -14,7 +14,8 @@
     "check:art": "node scripts/browser-check.mjs art",
     "check:ui": "npm run build && node tests/ui-frame-check.mjs",
     "art:textures": "node scripts/generate-stylized-track-textures.mjs",
-    "check:textures": "node scripts/generate-stylized-track-textures.mjs --check"
+    "check:textures": "node scripts/generate-stylized-track-textures.mjs --check",
+    "balance:art": "node scripts/balance-asset-color.mjs"
   },
   "dependencies": {
     "clsx": "2.1.1",

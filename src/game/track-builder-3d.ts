@@ -477,7 +477,9 @@ export class TrackBuilder3D {
     if (keys.has('KeyD')) move.add(right);
     if (keys.has('KeyA')) move.sub(right);
     if (keys.has('Space')) move.y += 1;
-    if (keys.has('KeyQ') || keys.has('ControlLeft')) move.y -= 1;
+    if ((keys.has('KeyZ') || keys.has('KeyQ')) && !keys.has('ControlLeft') && !keys.has('ControlRight') && !keys.has('MetaLeft') && !keys.has('MetaRight')) {
+      move.y -= 1;
+    }
 
     if (move.lengthSq() > 0) {
       move.normalize().multiplyScalar(speed * dt);

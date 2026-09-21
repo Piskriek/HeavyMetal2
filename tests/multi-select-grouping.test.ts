@@ -255,4 +255,27 @@ test('Multi-select and Grouping Core Functionality', async (t) => {
     assert.equal(cycle('x'), 'z');
     assert.equal(cycle('z'), 'y');
   });
+
+  await t.test('Fly camera uses Z (and Q) for downward movement and ignores Ctrl', () => {
+    const builder = createTestBuilder();
+    builder.freeFly.active = true;
+    builder.freeFly.y = 1000;
+
+    // Pressing ControlLeft should NOT move camera downward
+    builder.updateFlyCamera(0.1, new Set(['ControlLeft']));
+    assert.equal(builder.freeFly.y, 1000, 'ControlLeft should not move camera downward');
+
+    // Pressing Ctrl+Z (Undo) should NOT move camera downward
+    builder.updateFlyCamera(0.1, new Set(['ControlLeft', 'KeyZ']));
+    assert.equal(builder.freeFly.y, 1000, 'Ctrl+Z should not move camera downward');
+
+    // Pressing KeyZ alone SHOULD move camera downward
+    builder.updateFlyCamera(0.1, new Set(['KeyZ']));
+    assert.ok(builder.freeFly.y < 1000, 'KeyZ should move camera downward');
+
+    // Pressing Space SHOULD move camera upward
+    const prevY = builder.freeFly.y;
+    builder.updateFlyCamera(0.1, new Set(['Space']));
+    assert.ok(builder.freeFly.y > prevY, 'Space should move camera upward');
+  });
 });

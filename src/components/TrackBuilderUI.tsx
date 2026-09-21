@@ -47,7 +47,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [showPropsDrawer, setShowPropsDrawer] = useState(false);
   const [currentSky, setCurrentSky] = useState<string>(builder.getSkybox());
   const [showSkyMenu, setShowSkyMenu] = useState(false);
-  const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly, Right-Drag to look, Click props to select');
+  const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly (Space: up, Z: down), Right-Drag to look, Click props to select');
 
   const keysRef = useRef(new Set<string>());
   const isRightMouseDown = useRef(false);

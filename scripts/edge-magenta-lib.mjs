@@ -15,8 +15,202 @@
  * scripts/build-art.mjs already documents.
  */
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { inflateSync, deflateSync, crc32 } from 'node:zlib';
+
+function paeth(a, b, c) {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  if (pb <= pc) return b;
+  return c;
+}
+
+function decodePngNode(file) {
+  const buf = readFileSync(file);
+  if (buf.length < 8 || buf.toString('ascii', 1, 4) !== 'PNG') {
+    throw new Error('Not a PNG');
+  }
+  let pos = 8;
+  let w = 0, h = 0, bitDepth = 0, colorType = 0, interlace = 0;
+  const idatParts = [];
+  let palette = null;
+  let trns = null;
+
+  while (pos < buf.length) {
+    const len = buf.readUInt32BE(pos);
+    const type = buf.toString('ascii', pos + 4, pos + 8);
+    const data = buf.subarray(pos + 8, pos + 8 + len);
+    pos += 12 + len;
+
+    if (type === 'IHDR') {
+      w = data.readUInt32BE(0);
+      h = data.readUInt32BE(4);
+      bitDepth = data.readUInt8(8);
+      colorType = data.readUInt8(9);
+      interlace = data.readUInt8(12);
+    } else if (type === 'PLTE') {
+      palette = data;
+    } else if (type === 'tRNS') {
+      trns = data;
+    } else if (type === 'IDAT') {
+      idatParts.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+  }
+
+  if (interlace !== 0) throw new Error('Interlaced PNG not supported');
+  if (bitDepth !== 8 && bitDepth !== 16) throw new Error(`Unsupported bit depth: ${bitDepth}`);
+
+  const raw = inflateSync(Buffer.concat(idatParts));
+  const out = Buffer.alloc(w * h * 4);
+
+  let channels = 4;
+  if (colorType === 6) channels = 4;
+  else if (colorType === 2) channels = 3;
+  else if (colorType === 0) channels = 1;
+  else if (colorType === 4) channels = 2;
+  else if (colorType === 3) channels = 1;
+  else throw new Error(`Unsupported color type: ${colorType}`);
+
+  const bytesPerSample = bitDepth === 16 ? 2 : 1;
+  const bpp = channels * bytesPerSample;
+
+  let rawPos = 0;
+  const prevLine = Buffer.alloc(w * bpp);
+  const currLine = Buffer.alloc(w * bpp);
+
+  for (let y = 0; y < h; y++) {
+    const filter = raw[rawPos++];
+    for (let x = 0; x < w * bpp; x++) {
+      const val = raw[rawPos++];
+      const left = x >= bpp ? currLine[x - bpp] : 0;
+      const up = prevLine[x];
+      const upLeft = x >= bpp ? prevLine[x - bpp] : 0;
+
+      let unfiltered = 0;
+      if (filter === 0) unfiltered = val;
+      else if (filter === 1) unfiltered = (val + left) & 0xff;
+      else if (filter === 2) unfiltered = (val + up) & 0xff;
+      else if (filter === 3) unfiltered = (val + Math.floor((left + up) / 2)) & 0xff;
+      else if (filter === 4) unfiltered = (val + paeth(left, up, upLeft)) & 0xff;
+      else throw new Error(`Unknown filter: ${filter}`);
+
+      currLine[x] = unfiltered;
+    }
+
+    const outRowStart = y * w * 4;
+    if (bitDepth === 8) {
+      if (colorType === 6) {
+        currLine.copy(out, outRowStart, 0, w * 4);
+      } else if (colorType === 2) {
+        for (let x = 0; x < w; x++) {
+          const di = outRowStart + x * 4;
+          const si = x * 3;
+          out[di] = currLine[si];
+          out[di + 1] = currLine[si + 1];
+          out[di + 2] = currLine[si + 2];
+          out[di + 3] = 255;
+        }
+      } else if (colorType === 3) {
+        for (let x = 0; x < w; x++) {
+          const di = outRowStart + x * 4;
+          const idx = currLine[x];
+          out[di] = palette[idx * 3];
+          out[di + 1] = palette[idx * 3 + 1];
+          out[di + 2] = palette[idx * 3 + 2];
+          out[di + 3] = trns && idx < trns.length ? trns[idx] : 255;
+        }
+      } else if (colorType === 0) {
+        for (let x = 0; x < w; x++) {
+          const di = outRowStart + x * 4;
+          const g = currLine[x];
+          out[di] = g;
+          out[di + 1] = g;
+          out[di + 2] = g;
+          out[di + 3] = 255;
+        }
+      } else if (colorType === 4) {
+        for (let x = 0; x < w; x++) {
+          const di = outRowStart + x * 4;
+          const g = currLine[x * 2];
+          const a = currLine[x * 2 + 1];
+          out[di] = g;
+          out[di + 1] = g;
+          out[di + 2] = g;
+          out[di + 3] = a;
+        }
+      }
+    } else {
+      if (colorType === 6) {
+        for (let x = 0; x < w; x++) {
+          const di = outRowStart + x * 4;
+          const si = x * 8;
+          out[di] = currLine[si];
+          out[di + 1] = currLine[si + 2];
+          out[di + 2] = currLine[si + 4];
+          out[di + 3] = currLine[si + 6];
+        }
+      } else if (colorType === 2) {
+        for (let x = 0; x < w; x++) {
+          const di = outRowStart + x * 4;
+          const si = x * 6;
+          out[di] = currLine[si];
+          out[di + 1] = currLine[si + 2];
+          out[di + 2] = currLine[si + 4];
+          out[di + 3] = 255;
+        }
+      }
+    }
+
+    currLine.copy(prevLine);
+  }
+
+  return { w, h, data: out };
+}
+
+function makeChunk(type, data) {
+  const len = data.length;
+  const chunk = Buffer.alloc(12 + len);
+  chunk.writeUInt32BE(len, 0);
+  chunk.write(type, 4, 4, 'ascii');
+  data.copy(chunk, 8);
+  const typeAndData = chunk.subarray(4, 8 + len);
+  const crc = crc32(typeAndData);
+  chunk.writeUInt32BE(crc >>> 0, 8 + len);
+  return chunk;
+}
+
+function encodePngNode(w, h, data) {
+  const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.writeUInt8(8, 8);
+  ihdr.writeUInt8(6, 9);
+  ihdr.writeUInt8(0, 10);
+  ihdr.writeUInt8(0, 11);
+  ihdr.writeUInt8(0, 12);
+
+  const ihdrChunk = makeChunk('IHDR', ihdr);
+
+  const rawScanlines = Buffer.alloc(h * (1 + w * 4));
+  for (let y = 0; y < h; y++) {
+    const rawPos = y * (1 + w * 4);
+    rawScanlines[rawPos] = 0;
+    data.copy(rawScanlines, rawPos + 1, y * w * 4, (y + 1) * w * 4);
+  }
+
+  const compressed = deflateSync(rawScanlines);
+  const idatChunk = makeChunk('IDAT', compressed);
+  const iendChunk = makeChunk('IEND', Buffer.alloc(0));
+
+  return Buffer.concat([sig, ihdrChunk, idatChunk, iendChunk]);
+}
 
 export function isMagentaHole(r, g, b, a) {
   return a > 0 && r > 150 && b > 150 && Math.min(r - g, b - g) >= 120 && Math.abs(r - b) <= 45;
@@ -26,23 +220,32 @@ export function isMagentaSpill(r, g, b, a) {
   return a > 0 && r > 140 && b > 140 && Math.min(r - g, b - g) >= 90 && Math.abs(r - b) <= 45;
 }
 
-/** Raw RGBA (8-bit) decode of one PNG via ImageMagick. */
+/** Raw RGBA (8-bit) decode of one PNG via pure Node (with ImageMagick fallback). */
 export function decodePng(file) {
-  const info = spawnSync('identify', ['-format', '%w %h', file], { encoding: 'utf8' });
-  if (info.status !== 0) throw new Error(`identify failed for ${file}: ${info.stderr}`);
-  const [w, h] = info.stdout.trim().split(/\s+/).map(Number);
-  const raw = spawnSync('convert', [file, '-depth', '8', 'RGBA:-'], { maxBuffer: 1 << 30 });
-  if (raw.status !== 0) throw new Error(`decode failed for ${file}: ${raw.stderr}`);
-  return { w, h, data: raw.stdout };
+  try {
+    return decodePngNode(file);
+  } catch (nodeErr) {
+    const info = spawnSync('identify', ['-format', '%w %h', file], { encoding: 'utf8' });
+    if (info.status !== 0) throw new Error(`decode failed for ${file}: ${nodeErr.message}`);
+    const [w, h] = info.stdout.trim().split(/\s+/).map(Number);
+    const raw = spawnSync('convert', [file, '-depth', '8', 'RGBA:-'], { maxBuffer: 1 << 30 });
+    if (raw.status !== 0) throw new Error(`decode failed for ${file}: ${raw.stderr}`);
+    return { w, h, data: raw.stdout };
+  }
 }
 
-/** Encode an RGBA buffer back to the same PNG path via ImageMagick. */
+/** Encode an RGBA buffer back to the same PNG path via pure Node (with ImageMagick fallback). */
 export function encodePng(file, w, h, data) {
-  const res = spawnSync('convert', ['-size', `${w}x${h}`, '-depth', '8', 'RGBA:-', file], {
-    input: data,
-    maxBuffer: 1 << 30,
-  });
-  if (res.status !== 0) throw new Error(`encode failed for ${file}: ${res.stderr}`);
+  try {
+    const encoded = encodePngNode(w, h, data);
+    writeFileSync(file, encoded);
+  } catch {
+    const res = spawnSync('convert', ['-size', `${w}x${h}`, '-depth', '8', 'RGBA:-', file], {
+      input: data,
+      maxBuffer: 1 << 30,
+    });
+    if (res.status !== 0) throw new Error(`encode failed for ${file}: ${res.stderr}`);
+  }
 }
 
 export function walkPngs(dir) {
@@ -67,6 +270,7 @@ export function classify(rel) {
   if (r.startsWith('PreGame/')) return 'legacy';
   if (r.includes('/art/sheets/')) return 'source';
   if (/\/art\/props\/prop-/.test(r) && !r.includes('/props/alpha/')) return 'source';
+  if (/\/art\/goblins\/goblin-/.test(r) && !r.includes('/goblins/alpha/')) return 'source';
   return 'runtime';
 }
 
@@ -151,8 +355,9 @@ export function relOf(root, file) {
 
 /** Raw matte-backed scan a keyed runtime sprite was cut from, if any. */
 export function rawCounterpart(rel) {
-  if (!rel.startsWith('public/art/props/alpha/')) return null;
-  return rel.replace('public/art/props/alpha/', 'public/art/props/');
+  if (rel.startsWith('public/art/props/alpha/')) return rel.replace('public/art/props/alpha/', 'public/art/props/');
+  if (rel.startsWith('public/art/goblins/alpha/')) return rel.replace('public/art/goblins/alpha/', 'public/art/goblins/');
+  return null;
 }
 
 const isSaturatedMatte = (r, g, b) => r > 120 && b > 100 && g < 0.45 * r && g < 0.45 * b;

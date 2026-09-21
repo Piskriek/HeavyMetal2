@@ -854,30 +854,18 @@ function archMesh(center: THREE.Vector3, axis: THREE.Vector3, radius: number, tu
 }
 
 function smoothBoulderGeometry(radius: number, detail = 1): THREE.BufferGeometry {
-  const base = new THREE.DodecahedronGeometry(radius, detail);
-  const pos = base.attributes.position;
+  const geo = new THREE.DodecahedronGeometry(radius, detail);
+  const pos = geo.attributes.position;
   const count = pos.count;
-  const precision = 1000;
-  const map = new Map<string, number>();
-  const indices: number[] = [];
-  const uniquePositions: number[] = [];
-
+  const normArray = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const key = `${Math.round(x * precision)},${Math.round(y * precision)},${Math.round(z * precision)}`;
-    let idx = map.get(key);
-    if (idx === undefined) {
-      idx = map.size;
-      map.set(key, idx);
-      uniquePositions.push(x, y, z);
-    }
-    indices.push(idx);
+    const len = Math.hypot(x, y, z) || 1;
+    normArray[i * 3] = x / len;
+    normArray[i * 3 + 1] = y / len;
+    normArray[i * 3 + 2] = z / len;
   }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(uniquePositions, 3));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
+  geo.setAttribute('normal', new THREE.BufferAttribute(normArray, 3));
   return geo;
 }
 
@@ -923,16 +911,6 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
       runStart = i;
     }
   }
-
-  // Natural grass fringe along the road shoulders: breaks up hard geometric edges
-  const grassFringeStage = (s: TrackSample) => !s.onBridge && !s.inLoop && (s.stage === 'alpine' || s.stage === 'canyon' || s.stage === 'zigzag');
-  const FRINGE_L = [P(-1, -120, -6), P(-1, 25, 2)];
-  const FRINGE_R = [P(1, 120, -6), P(1, -25, 2)];
-
-  rangesWhere(samples, grassFringeStage).forEach(([a, b]) => {
-    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 550, stride: 2, uvMode: 'fringe' }));
-    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 550, stride: 2, uvMode: 'fringe' }));
-  });
 }
 
 function makeAlpineTerrain(track: TrackData) {
@@ -976,18 +954,7 @@ function buildAlpine(track: TrackData, M: Materials, scene: THREE.Scene, terrain
     scene.add(sweepProfile(samples, a, b, mirror(SHOULDER_L), M.dirt, { texScale: 600, stride: 2 }));
   });
 
-  const gate = sampleAt(distOf('launchEdge'));
-  for (const side of [-1, 1]) {
-    const pillar = grounded(boxMesh(260, 1700, 260, M.cobble, 500), 'StartPillar');
-    pillar.applyMatrix4(frameMatrix(gate, side * (gate.halfWidth + 260), 600));
-    scene.add(pillar);
-  }
-  const header = boxMesh(gate.halfWidth * 2 + 780, 220, 260, M.wood, 500);
-  header.applyMatrix4(frameMatrix(gate, 0, 1400));
-  scene.add(header);
-
-  // Ramps are now independent props in TrackBuilder3D with full collision and positioning!
-
+  // Start archway and ramps are managed as customizable builder props/decals
   // Pine tree trunks removed per user request (cylindrical wood posts on either side of the track)
 
   for (let i = 0; i < 46; i++) {

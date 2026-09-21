@@ -263,3 +263,40 @@ backing plate are all painted PNGs, and the only remaining `<svg>` elements are 
 PreGame minimap's live data overlay (course geometry, racer dots, camera window) and the
 standard `lucide-react` icon set, which are data, not art.
 
+## 8. Skybox / skydome panoramas (TICKET-06)
+
+The painted panoramas in `public/art/tracks/sky_*.png` are mapped onto the race
+skydome (`buildSky()` in `src/game/renderer-3d.ts`) and double as the far parallax
+layer of the 2D renderer (`src/game/world-art.ts`). The dome shader stretches the
+painting from just below the horizon up to the zenith, so any landscape painted
+above the bottom of the image towers into the sky during a race. The composition
+standard for every skybox is therefore:
+
+- **Sky dominates**: clouds, light shafts, smoke columns, airships and atmosphere
+  fill the top ~85% of the frame.
+- **Landscape is a silhouette strip only**: treetops / ridge crests / smelter
+  silhouettes form a single narrow line of foliage or skyline inside the bottom
+  ~15% of the image. No valleys, roads, foreground terrain or sprawling vistas.
+- **Format**: 2048x1024 PNG, left and right edges painted to blend seamlessly
+  (the texture wraps 360 degrees around the dome with `RepeatWrapping`).
+- **Lighting values are sampled from the art**: each `SKY_PRESETS` entry derives
+  `fogColor` from the horizon band, `zenithColor` from the top band and
+  `ambientColor` from a darkened mid-sky average, so dome fog and lighting always
+  match the painting.
+
+Ten variations ship with the game, grouped by course biome; the three canonical
+files are the ones referenced by `TRACKS[...].lighting.skyboxUrl`, the rest are
+selectable in the Track Builder's Skydome Atmosphere menu:
+
+| File | Preset id | Biome / mood |
+| --- | --- | --- |
+| `sky_copperwood_ridge.png` | `ridge` | golden-hour sunburst over a pine treetop line |
+| `sky_copperwood_misty_dawn.png` | `copperwood_dawn` | cool fog banks at first light |
+| `sky_copperwood_autumn_dusk.png` | `copperwood_dusk` | copper sunset over silhouetted canopy |
+| `sky_copperwood_frost_morning.png` | `copperwood_frost` | crisp frosty blue morning, snow spires |
+| `sky_boomtown_quarry.png` | `boomtown` | crimson forge dusk, smoke columns from smelter silhouettes |
+| `sky_boomtown_ember_storm.png` | `boomtown_embers` | churning ember storm lit from below |
+| `sky_boomtown_night_furnace.png` | `boomtown_night` | night sky, furnace glow underlighting cloud |
+| `sky_woolly_wasteland.png` | `sheep` | slate-emerald highland storm, sunbeams, wool zeppelins |
+| `sky_woolly_sunbeam_break.png` | `woolly_sunbeams` | storm breaking into golden-green light shafts |
+| `sky_woolly_dusk_zeppelins.png` | `woolly_dusk` | violet dusk with silhouetted zeppelins |

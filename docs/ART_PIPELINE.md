@@ -300,3 +300,46 @@ selectable in the Track Builder's Skydome Atmosphere menu:
 | `sky_woolly_wasteland.png` | `sheep` | slate-emerald highland storm, sunbeams, wool zeppelins |
 | `sky_woolly_sunbeam_break.png` | `woolly_sunbeams` | storm breaking into golden-green light shafts |
 | `sky_woolly_dusk_zeppelins.png` | `woolly_dusk` | violet dusk with silhouetted zeppelins |
+
+## 9. Edge & magenta-bleed audit (`npm run check:edges`)
+
+`scripts/check-edge-magenta.mjs` audits **every PNG in the project** (Node +
+ImageMagick only, no browser) and exits non-zero when a runtime sprite breaks
+the contract. `scripts/fix-edge-magenta.mjs` repairs violations; run the
+checker after it to confirm zero failures. Both share the pixel tests in
+`scripts/edge-magenta-lib.mjs`.
+
+File classes:
+
+- **source** (`public/art/sheets/**`, raw `public/art/props/prop-*.png`):
+  matte-backed scans the pipeline reads. Magenta is expected and only counted.
+- **legacy** (`PreGame/**`): archived predecessor art, reported but never
+  failed or rewritten.
+- **runtime** (everything else the game draws): must pass all four gates.
+
+Runtime gates:
+
+1. **No matte holes** — zero opaque/semi pixels near `#FF00FF`
+   (`r,b>150`, `min(r-g,b-g)>=120`, `|r-b|<=45`). The symmetry test keeps
+   painted purples (glowcap mushrooms, violet UI) safe: they are blue-shifted.
+2. **No fringe spill** — zero semi or boundary pixels with
+   `min(r-g,b-g)>=90` and symmetric channels, and zero opaque *shaded-matte*
+   fringe (`dom>=60`, symmetric) hugging transparency.
+3. **No stored-matte bleed** — transparent pixels within 2px of the silhouette
+   must not carry matte RGB; scalers that interpolate non-premultiplied
+   channels would otherwise resurface pink speckle. The fixer bleeds edge
+   colour into the transparent fringe (alpha stays 0).
+4. **Clean edges** — at most half of the silhouette boundary may be hard
+   255-vs-0 steps; the fixer feathers offenders with one premultiplied 3x3
+   alpha blur.
+5. **Raw-scan proof (props)** — for `public/art/props/alpha/*` the raw scan's
+   background (saturated-matte components touching the sheet border, or >=80%
+   saturated pockets) is ground truth: any opaque matte-tinted pixel inside it
+   is leftover backdrop and fails the audit.
+
+The repair passes, in order: key residual holes and raw-proven backdrop;
+despill opaque boundary fringe toward green+40; soften rims around freshly
+keyed holes; unmix matte out of semi fringe (`C = t*A + (1-t)*M` solved for
+the art colour `A`); feather hard silhouettes; bleed edge colour into the
+transparent fringe. Every pass is idempotent and leaves asymmetric painted
+purples/violets untouched.

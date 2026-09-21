@@ -5,7 +5,7 @@
    and JSON persistence.
    ============================================================================= */
 import * as THREE from 'three';
-import { wedgeMesh, type TrackData, type TrackSample } from './renderer-3d';
+import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 
 export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals';
 
@@ -20,6 +20,8 @@ export interface PropDefinition {
   alignBottom?: boolean;
   isRamp?: boolean;
   isDecal?: boolean;
+  is3DModel?: boolean;
+  isSlingshot?: boolean;
 }
 
 export interface PlacedProp {
@@ -58,6 +60,7 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'prop_37_fern_undergrowth', name: 'Fern Bramble Undergrowth', category: 'foliage', url: '/art/props/alpha/prop-37-fern-bramble-undergrowth.png', defaultWidth: 900, defaultHeight: 500 },
 
   // --- TRACKSIDE & STUNTS ---
+  { type: 'slingshot_3d_launcher', name: 'Starting Grid Slingshot (3D)', category: 'trackside', url: '/art/props/alpha/prop-18-goblin-slingshot-launcher.png', defaultWidth: 320, defaultHeight: 420, is3DModel: true, isSlingshot: true },
   { type: 'timber_ramp', name: 'Timber Stunt Ramp', category: 'trackside', url: '/art/track-parts/bridge-wooden-broken.png', defaultWidth: 960, defaultHeight: 260, isRamp: true },
   { type: 'rock_springboard', name: 'Rock Springboard Ramp', category: 'trackside', url: '/art/track-parts/rock-platform-springboard.png', defaultWidth: 800, defaultHeight: 280, isRamp: true },
   { type: 'prop_01_lantern_post', name: 'Triple Lantern Post', category: 'trackside', url: '/art/props/alpha/prop-01-lantern-post-triple.png', defaultWidth: 360, defaultHeight: 480 },
@@ -139,7 +142,7 @@ export class TrackBuilder3D {
   private selectedPropId: string | null = null;
   private activePropType: string | null = null;
   private ghostSprite: THREE.Sprite | null = null;
-  private ghostMesh: THREE.Mesh | null = null;
+  private ghostMesh: THREE.Object3D | null = null;
   private selectionBox: THREE.BoxHelper | null = null;
   private rotationHandle: THREE.Group | null = null;
 
@@ -489,6 +492,30 @@ export class TrackBuilder3D {
         this.scene.add(this.ghostMesh);
       }
       this.ghostMesh.visible = true;
+    } else if (def.isSlingshot || def.is3DModel) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      if (!this.ghostMesh || (this.ghostMesh as any)._forType !== def.type) {
+        if (this.ghostMesh) this.scene.remove(this.ghostMesh);
+        const ghostModel = createSlingshotMesh(1, this.materials);
+        ghostModel.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.material = new THREE.MeshBasicMaterial({
+              color: 0xffaa00,
+              wireframe: true,
+              transparent: true,
+              opacity: 0.45,
+            });
+          }
+        });
+        ghostModel.name = 'GhostSlingshotMesh';
+        (ghostModel as any)._forType = def.type;
+        (ghostModel as any)._is3DModel = true;
+        this.ghostMesh = ghostModel;
+        this.scene.add(ghostModel);
+      }
+      if (this.ghostMesh) {
+        this.ghostMesh.visible = true;
+      }
     } else if (this.snapping.cameraFacingDefault === false) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
       const tex = this.getTexture(def.url);
@@ -560,7 +587,7 @@ export class TrackBuilder3D {
       scale: 1,
       alignToTrack: this.snapping.alignToTrack,
       trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
-      cameraFacing: (def.isRamp || isDecal) ? false : this.snapping.cameraFacingDefault,
+      cameraFacing: (def.isRamp || def.isSlingshot || def.is3DModel || isDecal) ? false : this.snapping.cameraFacingDefault,
       flipX: false,
       isDecal,
     };
@@ -676,6 +703,10 @@ export class TrackBuilder3D {
             obj.rotation.y = prop.rotY;
             obj.rotation.z = prop.rotZ ?? 0;
             obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
+          } else if (def.isSlingshot || def.is3DModel) {
+            obj.rotation.y = prop.rotY;
+            obj.rotation.z = prop.rotZ ?? 0;
+            obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
           } else if (prop.cameraFacing === false) {
             obj.rotation.y = prop.rotY;
             obj.rotation.z = prop.rotZ ?? 0;
@@ -730,7 +761,7 @@ export class TrackBuilder3D {
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
     const h = (def?.defaultHeight ?? 500) * prop.scale;
     const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
-    const handleY = prop.y + (isDecal ? 40 : h + 70);
+    const handleY = prop.y + (isDecal ? 40 : (def?.isSlingshot ? 440 * prop.scale : h + 70));
 
     if (!this.rotationHandle) {
       this.rotationHandle = new THREE.Group();
@@ -821,6 +852,16 @@ export class TrackBuilder3D {
       mesh.rotation.y = prop.rotY;
       mesh.rotation.z = prop.rotZ ?? 0;
       obj = mesh;
+    } else if (def.isSlingshot || def.is3DModel) {
+      // Create 3D Slingshot Model
+      const model = createSlingshotMesh(prop.scale, this.materials);
+      model.name = `PlacedProp_${prop.id}`;
+      model.userData = { propId: prop.id, is3DModel: true, isSlingshot: true };
+      model.position.set(prop.x, prop.y, prop.z);
+      model.rotation.y = prop.rotY;
+      model.rotation.z = prop.rotZ ?? 0;
+      model.scale.set(prop.scale * flip, prop.scale, prop.scale);
+      obj = model;
     } else if (isDecal) {
       // Flat surface decal (lies flat on track/ground)
       const tex = this.getTexture(def.url);

@@ -630,6 +630,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                           <span className="font-semibold truncate text-[11px]">{p.name}</span>
                           {def?.isRamp ? (
                             <span className="text-[9px] px-1 py-0.2 bg-amber-900/60 text-amber-300 rounded font-mono">RAMP</span>
+                          ) : def?.isSlingshot || def?.is3DModel ? (
+                            <span className="text-[9px] px-1 py-0.2 bg-orange-950/60 text-orange-300 rounded font-mono">3D</span>
                           ) : (p.isDecal !== undefined ? p.isDecal : def?.isDecal) ? (
                             <span className="text-[9px] px-1 py-0.2 bg-emerald-950/60 text-emerald-300 rounded font-mono">DECAL</span>
                           ) : p.cameraFacing === false ? (
@@ -897,7 +899,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           {/* Decal Mode (Flat) Checkbox / Toggle */}
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
-            if (def?.isRamp) return null;
+            if (def?.isRamp || def?.isSlingshot || def?.is3DModel) return null;
             const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
             return (
               <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
@@ -926,11 +928,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             );
           })()}
 
-          {/* Camera Facing Toggle (for PNG decorations that are NOT decals) */}
+          {/* Camera Facing Toggle (for PNG decorations that are NOT decals or 3D models) */}
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
             const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
-            if (def?.isRamp || isDecal) return null;
+            if (def?.isRamp || def?.isSlingshot || def?.is3DModel || isDecal) return null;
             const isFacing = selectedProp.cameraFacing !== false;
             return (
               <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">

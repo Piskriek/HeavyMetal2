@@ -156,10 +156,13 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
     grassFringe: new THREE.MeshStandardMaterial({
       map: T.grassFringe,
       transparent: true,
-      alphaTest: 0.08,
+      alphaTest: 0.12,
       roughness: 0.92,
       side: THREE.DoubleSide,
-      depthWrite: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     }),
     iron: std(T.iron, { metalness: 0.35, roughness: 0.7 }),
     bark: std(T.bark),
@@ -443,7 +446,7 @@ const profileAt = (src: ProfileSource, s: TrackSample) => (typeof src === 'funct
 
 function sweepProfile(
   samples: TrackSample[], i0: number, i1: number, profile: ProfileSource, material: THREE.Material,
-  opts: { texScale?: number; stride?: number } = {},
+  opts: { texScale?: number; stride?: number; uvMode?: 'standard' | 'fringe' } = {},
 ) {
   const texScale = opts.texScale ?? 480;
   const stride = opts.stride ?? 1;
@@ -469,7 +472,12 @@ function sweepProfile(
       }
       v.copy(s.pos).addScaledVector(s.right, x).addScaledVector(s.up, p.height);
       positions.push(v.x, v.y, v.z);
-      uvs.push(uAcc / texScale, s.dist / texScale);
+      if (opts.uvMode === 'fringe') {
+        const vCoord = cols > 1 ? c / (cols - 1) : 0;
+        uvs.push(s.dist / texScale, vCoord);
+      } else {
+        uvs.push(uAcc / texScale, s.dist / texScale);
+      }
     }
   });
   for (let r = 0; r < rows.length - 1; r++) {
@@ -718,6 +726,149 @@ export function wedgeMesh(width: number, length: number, height: number, materia
   return new THREE.Mesh(geo, material);
 }
 
+export function createSlingshotMesh(scale = 1, materials?: any): THREE.Group {
+  const g = new THREE.Group();
+  g.name = 'Slingshot3DModel';
+
+  const woodMat = materials?.wood ?? new THREE.MeshStandardMaterial({
+    color: 0x8b5a2b,
+    roughness: 0.78,
+  });
+  const ironMat = materials?.iron ?? new THREE.MeshStandardMaterial({
+    color: 0x2e3236,
+    metalness: 0.65,
+    roughness: 0.45,
+  });
+  const brassMat = new THREE.MeshStandardMaterial({
+    color: 0xd4a034,
+    metalness: 0.8,
+    roughness: 0.35,
+  });
+  const bandMat = new THREE.MeshStandardMaterial({
+    color: 0xd45d1e,
+    roughness: 0.65,
+    side: THREE.DoubleSide,
+  });
+  const pouchMat = new THREE.MeshStandardMaterial({
+    color: 0x823b14,
+    roughness: 0.75,
+    side: THREE.DoubleSide,
+  });
+
+  const addBox = (w: number, h: number, d: number, mat: THREE.Material, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => {
+    const geom = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(x, y, z);
+    if (rx || ry || rz) mesh.rotation.set(rx, ry, rz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    g.add(mesh);
+    return mesh;
+  };
+
+  const addCyl = (rt: number, rb: number, h: number, seg: number, mat: THREE.Material, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => {
+    const geom = new THREE.CylinderGeometry(rt, rb, h, seg);
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(x, y, z);
+    if (rx || ry || rz) mesh.rotation.set(rx, ry, rz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    g.add(mesh);
+    return mesh;
+  };
+
+  // 1. BASE PLATFORM (Heavy timber deck with iron brackets)
+  addBox(290, 22, 330, woodMat, 0, 11, -20);
+  addBox(32, 34, 350, woodMat, -115, 17, -20);
+  addBox(32, 34, 350, woodMat, 115, 17, -20);
+  addBox(260, 28, 30, woodMat, 0, 24, 80);
+  addBox(260, 28, 30, woodMat, 0, 24, -120);
+
+  // 4 Corner iron brackets & bollard posts
+  const corners = [
+    [-115, 17, -180],
+    [115, 17, -180],
+    [-115, 17, 140],
+    [115, 17, 140],
+  ];
+  for (const [cx, cy, cz] of corners) {
+    addBox(42, 38, 42, ironMat, cx, cy, cz);
+    addCyl(15, 17, 75, 8, woodMat, cx, cy + 45, cz);
+    addCyl(18, 18, 12, 8, ironMat, cx, cy + 70, cz);
+    addCyl(0, 14, 18, 4, ironMat, cx, cy + 85, cz, 0, Math.PI / 4, 0);
+  }
+
+  // 2. CENTRAL Y-FORK TRUNK
+  addCyl(30, 36, 120, 8, woodMat, 0, 82, 35);
+  addCyl(38, 38, 18, 8, ironMat, 0, 50, 35);
+  addCyl(35, 35, 20, 8, ironMat, 0, 115, 35);
+  addBox(42, 42, 10, ironMat, 0, 115, 68, 0, 0, Math.PI / 4);
+  addCyl(12, 12, 14, 8, brassMat, 0, 115, 72, Math.PI / 2, 0, 0);
+
+  // 3. LEFT & RIGHT Y-FORK PRONGS
+  // Left fork arm
+  addCyl(24, 28, 140, 8, woodMat, -35, 190, 32, -0.04, 0, 0.48);
+  addCyl(21, 24, 135, 8, woodMat, -90, 305, 25, -0.07, 0, 0.38);
+  addCyl(28, 28, 18, 8, ironMat, -48, 215, 31, -0.04, 0, 0.48);
+  addCyl(26, 26, 24, 8, ironMat, -112, 350, 21, -0.07, 0, 0.38);
+  addCyl(12, 12, 16, 8, brassMat, -125, 350, 21, 0, 0, Math.PI / 2);
+
+  // Right fork arm
+  addCyl(24, 28, 140, 8, woodMat, 35, 190, 32, -0.04, 0, -0.48);
+  addCyl(21, 24, 135, 8, woodMat, 90, 305, 25, -0.07, 0, -0.38);
+  addCyl(28, 28, 18, 8, ironMat, 48, 215, 31, -0.04, 0, -0.48);
+  addCyl(26, 26, 24, 8, ironMat, 112, 350, 21, -0.07, 0, -0.38);
+  addCyl(12, 12, 16, 8, brassMat, 125, 350, 21, 0, 0, Math.PI / 2);
+
+  // 4. DIAGONAL REAR TIMBER BRACES
+  addCyl(14, 16, 210, 6, woodMat, -70, 95, -55, 0.82, 0, -0.32);
+  addCyl(14, 16, 210, 6, woodMat, 70, 95, -55, 0.82, 0, 0.32);
+
+  // 5. MECHANICAL WINCH & BRASS COGS
+  addCyl(24, 24, 110, 12, woodMat, 0, 52, -50, 0, 0, Math.PI / 2);
+  addCyl(26, 26, 70, 12, bandMat, 0, 52, -50, 0, 0, Math.PI / 2);
+  addBox(18, 55, 38, ironMat, -60, 48, -50);
+  addBox(18, 55, 38, ironMat, 60, 48, -50);
+  addCyl(38, 38, 10, 12, brassMat, 72, 52, -50, 0, 0, Math.PI / 2);
+  addCyl(10, 10, 16, 8, ironMat, 75, 52, -50, 0, 0, Math.PI / 2);
+  addBox(6, 32, 8, ironMat, 80, 70, -45, 0.3, 0, -0.2);
+
+  // Boiler smokestack pipe
+  addCyl(11, 14, 45, 8, ironMat, -88, 45, -50);
+  addCyl(13, 11, 30, 8, ironMat, -88, 75, -56, -0.4, 0, 0);
+  addCyl(15, 11, 12, 8, brassMat, -88, 88, -63, -0.4, 0, 0);
+
+  // 6. ELASTIC LAUNCH BANDS & LEATHER CRADLE POUCH
+  const pouchGeom = new THREE.CylinderGeometry(38, 32, 45, 12, 1, true, -Math.PI / 2, Math.PI);
+  const pouchMesh = new THREE.Mesh(pouchGeom, pouchMat);
+  pouchMesh.position.set(0, 165, -120);
+  pouchMesh.rotation.set(0.35, 0, Math.PI / 2);
+  g.add(pouchMesh);
+
+  addBox(65, 34, 12, pouchMat, 0, 165, -135, 0.35, 0, 0);
+  addCyl(8, 8, 8, 8, brassMat, -34, 168, -132, 0, 0, Math.PI / 2);
+  addCyl(8, 8, 8, 8, brassMat, 34, 168, -132, 0, 0, Math.PI / 2);
+
+  const leftBandVec = new THREE.Vector3(86, -182, -153);
+  const leftBandLen = leftBandVec.length();
+  const leftBand = addCyl(6, 6, leftBandLen, 8, bandMat, -77, 259, -55);
+  leftBand.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), leftBandVec.clone().normalize());
+
+  const rightBandVec = new THREE.Vector3(-86, -182, -153);
+  const rightBandLen = rightBandVec.length();
+  const rightBand = addCyl(6, 6, rightBandLen, 8, bandMat, 77, 259, -55);
+  rightBand.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), rightBandVec.clone().normalize());
+
+  addBox(6, 65, 14, bandMat, -132, 305, 21, 0, 0, 0.15);
+  addBox(6, 55, 12, bandMat, 132, 310, 21, 0, 0, -0.15);
+
+  if (scale !== 1) {
+    g.scale.set(scale, scale, scale);
+  }
+
+  return g;
+}
+
 function archMesh(center: THREE.Vector3, axis: THREE.Vector3, radius: number, tube: number, material: THREE.Material) {
   const geo = new THREE.TorusGeometry(radius, tube, 6, 16, Math.PI);
   const mesh = new THREE.Mesh(geo, material);
@@ -771,11 +922,11 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
   // Natural grass fringe along the road shoulders: breaks up hard geometric edges
   const grassFringeStage = (s: TrackSample) => !s.onBridge && !s.inLoop && (s.stage === 'alpine' || s.stage === 'canyon' || s.stage === 'zigzag');
   const FRINGE_L = [P(-1, -120, -6), P(-1, 25, 2)];
-  const FRINGE_R = [P(1, -25, 2), P(1, 120, -6)];
+  const FRINGE_R = [P(1, 120, -6), P(1, -25, 2)];
 
   rangesWhere(samples, grassFringeStage).forEach(([a, b]) => {
-    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 400, stride: 2 }));
-    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 400, stride: 2 }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 550, stride: 2, uvMode: 'fringe' }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 550, stride: 2, uvMode: 'fringe' }));
   });
 }
 

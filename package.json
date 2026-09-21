@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check.mjs",
+    "check:edges": "node scripts/check-edge-magenta.mjs",
+    "fix:edges": "node scripts/fix-edge-magenta.mjs",
     "check:browser": "node scripts/browser-check.mjs",
     "check:art": "node scripts/browser-check.mjs art",
     "check:ui": "npm run build && node tests/ui-frame-check.mjs"

@@ -315,7 +315,7 @@ File classes:
   matte-backed scans the pipeline reads. Magenta is expected and only counted.
 - **legacy** (`PreGame/**`): archived predecessor art, reported but never
   failed or rewritten.
-- **runtime** (everything else the game draws): must pass all four gates.
+- **runtime** (everything else the game draws): must pass all gates below.
 
 Runtime gates:
 
@@ -329,10 +329,18 @@ Runtime gates:
    must not carry matte RGB; scalers that interpolate non-premultiplied
    channels would otherwise resurface pink speckle. The fixer bleeds edge
    colour into the transparent fringe (alpha stays 0).
-4. **Clean edges** — at most half of the silhouette boundary may be hard
+4. **No stale-colour fringe** — any transparent pixel next to visible art
+   (alpha >= 16 within one ring) must carry the bled edge colour, i.e. be
+   within 16/channel of the mean of its filled 3x3 neighbourhood — exactly
+   what the fixer's bleed pass writes. Catches generator leftovers the matte
+   test cannot: a canvas `clearRect` black (the Warcraft grass-fringe strips
+   shipped with `(0,0,0,0)` fringes) tints dark when a non-premultiplied
+   scaler interpolates across the edge.
+5. **Clean edges** — at most half of the silhouette boundary may be hard
    255-vs-0 steps; the fixer feathers offenders with one premultiplied 3x3
    alpha blur.
-5. **Raw-scan proof (props)** — for `public/art/props/alpha/*` the raw scan's
+6. **Raw-scan proof (props and goblins)** — for `public/art/props/alpha/*`
+   the raw scan's
    background (saturated-matte components touching the sheet border, or >=80%
    saturated pockets) is ground truth: any opaque matte-tinted pixel inside it
    is leftover backdrop and fails the audit.

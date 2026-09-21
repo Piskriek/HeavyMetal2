@@ -294,6 +294,27 @@ Generated 10 more goblin decoration cutouts (5 new single roles, 5 duo/trio grou
 - All 10 registered in `PROP_DEFINITIONS` under `goblins` (singles at 560px height, landscape groups at 600px height).
 - Next agent: goblins 21–30 → `goblins-sheet-c.png`, then commit to this branch and update the open goblins PR — never open a second PR.
 
+### Loose Goblin Cutouts (Batch 3 — 10 Stands & Big Cheering Crowds with Magenta Key Transparency)
+
+Generated 10 more goblin decoration cutouts (7 crowd stands, 3 pure cheering mobs) in the same painted identity:
+
+21. `public/art/goblins/goblin-21-grandstand-roar.png` (1376x768) — Covered timber grandstand packed with fans, checkered flags, skull banner, bunting, drums.
+22. `public/art/goblins/goblin-22-drum-podium-mob.png` (1376x768) — Round war-drum podium ringed by eight dancing goblins with mallets and torch braziers.
+23. `public/art/goblins/goblin-23-flag-terrace.png` (1376x768) — Timber spectator terrace with spiked railings crowded with flag-waving fans and braziers.
+24. `public/art/goblins/goblin-24-torch-crowd.png` (1376x768) — Dense night crowd of twelve cheering fans thrusting flaming torches high.
+25. `public/art/goblins/goblin-25-horn-riser.png` (1376x768) — Two-tier scaffold riser with three war-horn blowers and three drummers, hanging lantern.
+26. `public/art/goblins/goblin-26-mosh-pit.png` (1376x768) — Rowdy circle of nine jumping fans, one crowd-surfing aloft, flying tankards and scarves.
+27. `public/art/goblins/goblin-27-fence-fans.png` (1376x768) — Trackside barrier fence crowded with eleven fans leaning over, blank banner, pennants.
+28. `public/art/goblins/goblin-28-cheer-tower.png` (848x1264) — Tall two-level timber cheer tower with ten fans, drummer and horn on top deck, skull flag.
+29. `public/art/goblins/goblin-29-victory-stage.png` (1376x768) — Champion victory stage with three racers on a podium, trophy cup, confetti, drummers, crowd.
+30. `public/art/goblins/goblin-30-fan-aisle.png` (1376x768) — Two facing rows of cheering fans forming a victory aisle with flags, tankards, torch posts.
+
+- Near-magenta backdrops flood-normalised to pure `#FF00FF`; keyed via `scripts/process-goblins.mjs` into `public/art/goblins/alpha/`. No defects: all 10 renders passed inspection first try (complete structures, blank banners, no ground planes, no text).
+- Batch 3 remnants: 0.0007–0.0217% (interior paint only), verified on remnant metrics + 1.5x checkerboard edge crops (torch flames, grandstand railings/flags) + grey contact sheet — no halos or blocks.
+- Composite 5x2 sprite sheet for Batch 3 generated in `public/art/sheets/goblins-sheet-c.png`; full 5x6 sheet of all 30 in `public/art/sheets/goblins-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` under `goblins` (stands at 700px height, pure crowds at 600px, tower portrait at 650px).
+- Next agent: goblins 31–40 → `goblins-sheet-d.png`, then commit to this branch and update the open goblins PR — never open a second PR.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

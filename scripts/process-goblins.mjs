@@ -10,7 +10,7 @@
  *    - `public/art/sheets/goblins-sheet.png` (all goblins, 5xN)
  *    - `public/art/sheets/goblins-sheet-a.png` (Batch 1: goblins 01-10, 5x2)
  *    - `public/art/sheets/goblins-sheet-b.png` (Batch 2: goblins 11-20, 5x2)
- *    - `public/art/sheets/goblins-sheet-b.png` (Batch 2: goblins 11-20, 5x2)
+ *    - `public/art/sheets/goblins-sheet-c.png` (Batch 3: goblins 21-30, 5x2)
  *    - ... one letter per batch of 10.
  *
  * Keying & despill (identical to `scripts/process-props.mjs`):
@@ -158,6 +158,57 @@ export const GOBLIN_VARIATIONS = [
   {
     file: 'goblin-20-victory-huddle.png',
     concept: 'Three goblins in a victory huddle, middle one thrusting a golden gear trophy cup high',
+    role: 'cheering',
+  },
+  // --- Batch 3 (Goblins 21 - 30): stands & big cheering crowds ---
+  {
+    file: 'goblin-21-grandstand-roar.png',
+    concept: 'Covered timber grandstand packed with cheering fans, checkered flags, skull banner, bunting, drums',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-22-drum-podium-mob.png',
+    concept: 'Round war-drum podium ringed by eight dancing goblins with mallets and torch braziers',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-23-flag-terrace.png',
+    concept: 'Timber spectator terrace with spiked railings crowded with flag-waving fans and braziers',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-24-torch-crowd.png',
+    concept: 'Dense night crowd of twelve cheering fans thrusting flaming torches high',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-25-horn-riser.png',
+    concept: 'Two-tier scaffold riser with three war-horn blowers and three drummers, hanging lantern',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-26-mosh-pit.png',
+    concept: 'Rowdy circle of nine jumping fans, one crowd-surfing aloft, flying tankards and scarves',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-27-fence-fans.png',
+    concept: 'Trackside barrier fence crowded with eleven fans leaning over, blank banner, pennants',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-28-cheer-tower.png',
+    concept: 'Tall two-level timber cheer tower with ten fans, drummer and horn on top deck, skull flag',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-29-victory-stage.png',
+    concept: 'Champion victory stage with three racers on a podium, trophy cup, confetti, drummers, crowd',
+    role: 'cheering',
+  },
+  {
+    file: 'goblin-30-fan-aisle.png',
+    concept: 'Two facing rows of cheering fans forming a victory aisle with flags, tankards, torch posts',
     role: 'cheering',
   },
 ];

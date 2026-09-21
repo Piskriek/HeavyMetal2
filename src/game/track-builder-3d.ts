@@ -39,6 +39,7 @@ export interface PlacedProp {
   cameraFacing?: boolean;
   flipX?: boolean;
   isDecal?: boolean;
+  groupId?: string;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
@@ -171,11 +172,11 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
 export class TrackBuilder3D {
   private placedProps: PlacedProp[] = [];
   private propObjects = new Map<string, THREE.Object3D>();
-  private selectedPropId: string | null = null;
+  private selectedPropIds: Set<string> = new Set();
   private activePropType: string | null = null;
   private ghostSprite: THREE.Sprite | null = null;
   private ghostMesh: THREE.Object3D | null = null;
-  private selectionBox: THREE.BoxHelper | null = null;
+  private selectionBoxes = new Map<string, THREE.BoxHelper>();
   private rotationHandle: THREE.Group | null = null;
 
   private undoStack: string[] = [];
@@ -248,13 +249,31 @@ export class TrackBuilder3D {
     this.listeners.forEach((cb) => cb());
   }
 
+  get selectedPropId(): string | null {
+    if (this.selectedPropIds.size === 0) return null;
+    return Array.from(this.selectedPropIds)[0];
+  }
+
   getProps(): readonly PlacedProp[] {
     return this.placedProps;
   }
 
   getSelectedProp(): PlacedProp | null {
-    if (!this.selectedPropId) return null;
-    return this.placedProps.find((p) => p.id === this.selectedPropId) ?? null;
+    if (this.selectedPropIds.size === 0) return null;
+    const firstId = Array.from(this.selectedPropIds)[0];
+    return this.placedProps.find((p) => p.id === firstId) ?? null;
+  }
+
+  getSelectedProps(): PlacedProp[] {
+    return this.placedProps.filter((p) => this.selectedPropIds.has(p.id));
+  }
+
+  getSelectedPropIds(): string[] {
+    return Array.from(this.selectedPropIds);
+  }
+
+  isPropSelected(id: string): boolean {
+    return this.selectedPropIds.has(id);
   }
 
   getActivePropType(): string | null {
@@ -267,9 +286,178 @@ export class TrackBuilder3D {
     this.notify();
   }
 
-  selectProp(id: string | null) {
-    this.selectedPropId = id;
+  selectProp(id: string | null, multi = false) {
+    if (!id) {
+      this.selectedPropIds.clear();
+    } else {
+      const prop = this.placedProps.find((p) => p.id === id);
+      if (!prop) {
+        this.selectedPropIds.clear();
+      } else if (multi) {
+        if (this.selectedPropIds.has(id)) {
+          if (prop.groupId) {
+            this.placedProps.filter((p) => p.groupId === prop.groupId).forEach((p) => this.selectedPropIds.delete(p.id));
+          } else {
+            this.selectedPropIds.delete(id);
+          }
+        } else {
+          if (prop.groupId) {
+            this.placedProps.filter((p) => p.groupId === prop.groupId).forEach((p) => this.selectedPropIds.add(p.id));
+          } else {
+            this.selectedPropIds.add(id);
+          }
+        }
+      } else {
+        this.selectedPropIds.clear();
+        if (prop.groupId) {
+          this.placedProps.filter((p) => p.groupId === prop.groupId).forEach((p) => this.selectedPropIds.add(p.id));
+        } else {
+          this.selectedPropIds.add(id);
+        }
+      }
+    }
     this.updateSelectionBox();
+    this.notify();
+  }
+
+  selectMultipleProps(ids: string[]) {
+    this.selectedPropIds = new Set(ids);
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  groupSelected(): string | null {
+    const selected = this.getSelectedProps();
+    if (selected.length < 2) return null;
+    this.pushUndo();
+    const groupId = `group_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    for (const prop of selected) {
+      prop.groupId = groupId;
+    }
+    this.saveToStorage();
+    this.notify();
+    return groupId;
+  }
+
+  ungroupSelected(): boolean {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return false;
+    this.pushUndo();
+    for (const prop of selected) {
+      delete prop.groupId;
+    }
+    this.saveToStorage();
+    this.notify();
+    return true;
+  }
+
+  isSelectionGrouped(): boolean {
+    const selected = this.getSelectedProps();
+    if (selected.length < 2) return false;
+    const firstGroup = selected[0].groupId;
+    return Boolean(firstGroup && selected.every((p) => p.groupId === firstGroup));
+  }
+
+  getGroupCentroid(): { x: number; y: number; z: number } {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return { x: 0, y: 0, z: 0 };
+    let sx = 0, sy = 0, sz = 0;
+    for (const p of selected) {
+      sx += p.x;
+      sy += p.y;
+      sz += p.z;
+    }
+    const n = selected.length;
+    return {
+      x: Math.round(sx / n),
+      y: Math.round(sy / n),
+      z: Math.round(sz / n),
+    };
+  }
+
+  moveSelectedProps(dx: number, dy: number, dz: number) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0 || (dx === 0 && dy === 0 && dz === 0)) return;
+    for (const prop of selected) {
+      this.updatePropTransform(prop.id, {
+        x: prop.x + dx,
+        y: prop.y + dy,
+        z: prop.z + dz,
+      }, false);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  rotateSelectedProps(deltaAngle: number) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    const centroid = this.getGroupCentroid();
+    const cos = Math.cos(deltaAngle);
+    const sin = Math.sin(deltaAngle);
+
+    for (const prop of selected) {
+      const ox = prop.x - centroid.x;
+      const oz = prop.z - centroid.z;
+      const nx = ox * cos - oz * sin;
+      const nz = ox * sin + oz * cos;
+      this.updatePropTransform(prop.id, {
+        x: Math.round(centroid.x + nx),
+        z: Math.round(centroid.z + nz),
+        rotY: prop.rotY + deltaAngle,
+      }, false);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  scaleSelectedProps(multiplier: number) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0 || multiplier <= 0) return;
+    const centroid = this.getGroupCentroid();
+    for (const prop of selected) {
+      const newScale = Math.max(0.1, Math.min(6.0, prop.scale * multiplier));
+      const ox = prop.x - centroid.x;
+      const oz = prop.z - centroid.z;
+      const nx = ox * multiplier;
+      const nz = oz * multiplier;
+      this.updatePropTransform(prop.id, {
+        x: Math.round(centroid.x + nx),
+        z: Math.round(centroid.z + nz),
+        scale: Math.round(newScale * 100) / 100,
+      }, false);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  tiltSelectedProps(deltaRadians: number) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    for (const prop of selected) {
+      this.updatePropTransform(prop.id, { rotZ: (prop.rotZ ?? 0) + deltaRadians }, false);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  flipSelectedProps() {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    const centroid = this.getGroupCentroid();
+    for (const prop of selected) {
+      const ox = prop.x - centroid.x;
+      this.updatePropTransform(prop.id, {
+        x: Math.round(centroid.x - ox),
+        flipX: !prop.flipX,
+      }, false);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
     this.notify();
   }
 
@@ -632,29 +820,60 @@ export class TrackBuilder3D {
     return prop;
   }
 
-  duplicateSelected(): PlacedProp | null {
-    const selected = this.getSelectedProp();
-    if (!selected) return null;
+  duplicateSelected(): PlacedProp[] {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return [];
 
     this.pushUndo();
-    const dup: PlacedProp = {
-      ...selected,
-      id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      x: selected.x + 120,
-      z: selected.z + 120,
-    };
+    const newGroupId = selected.length > 1 ? `group_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` : undefined;
+    const duplicated: PlacedProp[] = [];
+    const newIds: string[] = [];
 
-    this.placedProps.push(dup);
-    this.createPropSprite(dup);
-    this.selectProp(dup.id);
+    for (const prop of selected) {
+      const newId = `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const dup: PlacedProp = {
+        ...prop,
+        id: newId,
+        x: prop.x + 120,
+        z: prop.z + 120,
+        groupId: newGroupId || (prop.groupId ? `group_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` : undefined),
+      };
+      this.placedProps.push(dup);
+      this.createPropSprite(dup);
+      duplicated.push(dup);
+      newIds.push(newId);
+    }
+
+    this.selectMultipleProps(newIds);
     this.saveToStorage();
     this.notify();
-    return dup;
+    return duplicated;
   }
 
   deleteSelected() {
-    if (!this.selectedPropId) return;
-    this.deleteProp(this.selectedPropId);
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      const idx = this.placedProps.findIndex((p) => p.id === prop.id);
+      if (idx >= 0) {
+        const obj = this.propObjects.get(prop.id);
+        if (obj) {
+          this.scene.remove(obj);
+          this.propObjects.delete(prop.id);
+        }
+        const box = this.selectionBoxes.get(prop.id);
+        if (box) {
+          this.scene.remove(box);
+          this.selectionBoxes.delete(prop.id);
+        }
+        this.placedProps.splice(idx, 1);
+      }
+    }
+    this.selectedPropIds.clear();
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
   }
 
   deleteProp(id: string) {
@@ -668,12 +887,16 @@ export class TrackBuilder3D {
         this.scene.remove(obj);
         this.propObjects.delete(prop.id);
       }
+      const box = this.selectionBoxes.get(prop.id);
+      if (box) {
+        this.scene.remove(box);
+        this.selectionBoxes.delete(prop.id);
+      }
       this.placedProps.splice(idx, 1);
     }
 
-    if (this.selectedPropId === id) {
-      this.selectProp(null);
-    }
+    this.selectedPropIds.delete(id);
+    this.updateSelectionBox();
     this.saveToStorage();
     this.notify();
   }
@@ -699,7 +922,7 @@ export class TrackBuilder3D {
     this.notify();
   }
 
-  updatePropTransform(id: string, updates: Partial<PlacedProp>) {
+  updatePropTransform(id: string, updates: Partial<PlacedProp>, autoSync = true) {
     const prop = this.placedProps.find((p) => p.id === id);
     if (!prop) return;
 
@@ -753,9 +976,11 @@ export class TrackBuilder3D {
         }
       }
     }
-    this.updateSelectionBox();
-    this.saveToStorage();
-    this.notify();
+    if (autoSync) {
+      this.updateSelectionBox();
+      this.saveToStorage();
+      this.notify();
+    }
   }
 
   getPlacedRamps(): readonly PlacedProp[] {
@@ -767,33 +992,55 @@ export class TrackBuilder3D {
 
   // --- SELECTION BOX HIGHLIGHT & ROTATION HANDLE ---
   private updateSelectionBox() {
-    const prop = this.getSelectedProp();
-    if (!prop || !this.freeFly.active) {
-      if (this.selectionBox) this.selectionBox.visible = false;
+    const selected = this.getSelectedProps();
+    if (selected.length === 0 || !this.freeFly.active) {
+      this.selectionBoxes.forEach((box) => { box.visible = false; });
       if (this.rotationHandle) this.rotationHandle.visible = false;
       return;
     }
 
-    const obj = this.propObjects.get(prop.id);
-    if (!obj) return;
+    const currentSelectedIds = new Set(selected.map((p) => p.id));
 
-    if (!this.selectionBox) {
-      this.selectionBox = new THREE.BoxHelper(obj, 0xffdd00);
-      (this.selectionBox.material as THREE.LineBasicMaterial).depthTest = false;
-      (this.selectionBox.material as THREE.LineBasicMaterial).transparent = true;
-      (this.selectionBox.material as THREE.LineBasicMaterial).opacity = 0.95;
-      this.selectionBox.renderOrder = 9999;
-      this.scene.add(this.selectionBox);
-    } else {
-      this.selectionBox.setFromObject(obj);
-      this.selectionBox.visible = true;
+    // Hide boxes for unselected props
+    for (const [id, box] of this.selectionBoxes.entries()) {
+      if (!currentSelectedIds.has(id)) {
+        box.visible = false;
+      }
     }
 
-    // Position in-place rotation handle above the prop
-    const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
-    const h = (def?.defaultHeight ?? 500) * prop.scale;
-    const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
-    const handleY = prop.y + (isDecal ? 40 : (def?.isSlingshot ? 440 * prop.scale : h + 70));
+    const isGroup = selected.length > 1;
+    const boxColor = isGroup ? 0x38bdf8 : 0xffdd00;
+
+    // Create or update box helpers for each selected prop
+    for (const prop of selected) {
+      const obj = this.propObjects.get(prop.id);
+      if (!obj) continue;
+      let box = this.selectionBoxes.get(prop.id);
+      if (!box) {
+        box = new THREE.BoxHelper(obj, boxColor);
+        (box.material as THREE.LineBasicMaterial).depthTest = false;
+        (box.material as THREE.LineBasicMaterial).transparent = true;
+        (box.material as THREE.LineBasicMaterial).opacity = 0.95;
+        box.renderOrder = 9999;
+        this.scene.add(box);
+        this.selectionBoxes.set(prop.id, box);
+      } else {
+        box.setFromObject(obj);
+        (box.material as THREE.LineBasicMaterial).color.setHex(boxColor);
+        box.visible = true;
+      }
+    }
+
+    // Centroid of selected group
+    const centroid = this.getGroupCentroid();
+    let maxHandleY = centroid.y + 120;
+    for (const prop of selected) {
+      const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+      const h = (def?.defaultHeight ?? 500) * prop.scale;
+      const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
+      const hy = prop.y + (isDecal ? 50 : (def?.isSlingshot ? 440 * prop.scale : h + 70));
+      if (hy > maxHandleY) maxHandleY = hy;
+    }
 
     if (!this.rotationHandle) {
       this.rotationHandle = new THREE.Group();
@@ -810,7 +1057,7 @@ export class TrackBuilder3D {
       this.rotationHandle.add(stem);
 
       // Rotation ring / torus
-      const ringGeo = new THREE.TorusGeometry(32, 6, 8, 24);
+      const ringGeo = new THREE.TorusGeometry(36, 6, 8, 24);
       const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.position.y = 45;
@@ -821,7 +1068,7 @@ export class TrackBuilder3D {
       this.scene.add(this.rotationHandle);
     }
 
-    this.rotationHandle.position.set(prop.x, handleY, prop.z);
+    this.rotationHandle.position.set(centroid.x, maxHandleY, centroid.z);
     this.rotationHandle.visible = true;
   }
 
@@ -837,16 +1084,11 @@ export class TrackBuilder3D {
   }
 
   tiltSelectedProp(deltaRadians: number) {
-    const prop = this.getSelectedProp();
-    if (!prop) return;
-    const current = prop.rotZ ?? 0;
-    this.updatePropTransform(prop.id, { rotZ: current + deltaRadians });
+    this.tiltSelectedProps(deltaRadians);
   }
 
   flipSelectedProp() {
-    const prop = this.getSelectedProp();
-    if (!prop) return;
-    this.updatePropTransform(prop.id, { flipX: !prop.flipX });
+    this.flipSelectedProps();
   }
 
   // --- SPRITE & MESH CREATION & TEXTURE CACHE ---
@@ -987,6 +1229,8 @@ export class TrackBuilder3D {
     // Remove current objects
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
+    this.selectionBoxes.forEach((box) => this.scene.remove(box));
+    this.selectionBoxes.clear();
 
     this.placedProps = props;
     this.placedProps.forEach((p) => this.createPropSprite(p));
@@ -1044,7 +1288,8 @@ export class TrackBuilder3D {
   destroy() {
     if (this.ghostSprite) this.scene.remove(this.ghostSprite);
     if (this.ghostMesh) this.scene.remove(this.ghostMesh);
-    if (this.selectionBox) this.scene.remove(this.selectionBox);
+    this.selectionBoxes.forEach((box) => this.scene.remove(box));
+    this.selectionBoxes.clear();
     if (this.rotationHandle) this.scene.remove(this.rotationHandle);
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();

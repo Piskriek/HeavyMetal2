@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
-  Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users
+  Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
+  Move
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -36,6 +37,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [category, setCategory] = useState<PropCategory>('foliage');
   const [activePropType, setActivePropType] = useState<string | null>(builder.getActivePropType());
   const [selectedProp, setSelectedProp] = useState<PlacedProp | null>(builder.getSelectedProp());
+  const [selectedProps, setSelectedProps] = useState<PlacedProp[]>(builder.getSelectedProps());
+  const [clickMoveEnabled, setClickMoveEnabled] = useState(false);
+  const [nudgeAxis, setNudgeAxis] = useState<'y' | 'x' | 'z'>('y');
   const [alignToTrack, setAlignToTrack] = useState(builder.snapping.alignToTrack);
   const [snapToCenterline, setSnapToCenterline] = useState(builder.snapping.snapToCenterline);
   const [cameraFacingDefault, setCameraFacingDefault] = useState(builder.snapping.cameraFacingDefault);
@@ -49,6 +53,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const isRightMouseDown = useRef(false);
   const isDraggingSelected = useRef(false);
   const isRotatingSelected = useRef(false);
+  const lastDragSurfacePoint = useRef<{ x: number; y: number; z: number } | null>(null);
+  const clickMoveEnabledRef = useRef(false);
+  clickMoveEnabledRef.current = clickMoveEnabled;
+  const nudgeAxisRef = useRef<'y' | 'x' | 'z'>('y');
+  nudgeAxisRef.current = nudgeAxis;
   const lastPointerPos = useRef({ x: 0, y: 0 });
   const animFrameRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
@@ -62,6 +71,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   useEffect(() => {
     const update = () => {
       setSelectedProp(builder.getSelectedProp());
+      setSelectedProps(builder.getSelectedProps());
       setActivePropType(builder.getActivePropType());
       setCurrentSky(builder.getSkybox());
       onRequestRender?.();
@@ -109,25 +119,41 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           }
         } else {
           // Check if clicking in-place rotation handle
-          if (builder.getSelectedProp() && builder.raycastRotateHandle(e.clientX, e.clientY, canvas)) {
+          if (builder.getSelectedProps().length > 0 && builder.raycastRotateHandle(e.clientX, e.clientY, canvas)) {
             isRotatingSelected.current = true;
             lastPointerPos.current = { x: e.clientX, y: e.clientY };
-            showToast('Rotate / Tilt In-Place: Drag left/right');
+            showToast('Orbit / Rotate In-Place: Drag left/right');
             return;
           }
 
           // Select mode: check if clicking on an existing placed prop
           const hitProp = builder.raycastProp(e.clientX, e.clientY, canvas);
+          const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
           if (hitProp) {
-            builder.selectProp(hitProp.id);
-            isDraggingSelected.current = true;
-            showToast(`Selected ${hitProp.name} [Drag to move, [ / ] to tilt, X to flip, Del to delete]`);
+            builder.selectProp(hitProp.id, isMulti);
+            const currentSelected = builder.getSelectedProps();
+            if (clickMoveEnabledRef.current) {
+              isDraggingSelected.current = true;
+              const hit = builder.raycastSurface(e.clientX, e.clientY, canvas);
+              lastDragSurfacePoint.current = hit ? { ...hit.point } : null;
+            } else {
+              isDraggingSelected.current = false;
+              lastDragSurfacePoint.current = null;
+            }
+
+            if (currentSelected.length > 1) {
+              showToast(`Selected ${currentSelected.length} items (${builder.isSelectionGrouped() ? 'Grouped' : 'Multi-select'}) [Ctrl+G: Group, Ctrl+D: Dup, Del: Delete]`);
+            } else {
+              showToast(`Selected ${hitProp.name} [Numpad/Arrows: move on ${nudgeAxisRef.current.toUpperCase()}, 5: cycle axis, M: click-move]`);
+            }
             onRequestRender?.();
           } else {
-            // Clicked empty area: deselect
-            if (builder.getSelectedProp()) {
-              builder.selectProp(null);
-              onRequestRender?.();
+            // Clicked empty area: deselect unless holding multi modifier
+            if (!isMulti) {
+              if (builder.getSelectedProps().length > 0) {
+                builder.selectProp(null);
+                onRequestRender?.();
+              }
             }
           }
         }
@@ -143,27 +169,33 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         onRequestRender?.();
       }
 
-      // Rotating/tilting selected prop in-place
+      // Rotating/tilting selected prop in-place around centroid
       if (isRotatingSelected.current && !isRightMouseDown.current) {
         const dx = e.clientX - lastPointerPos.current.x;
         lastPointerPos.current = { x: e.clientX, y: e.clientY };
-        builder.tiltSelectedProp((dx * Math.PI) / 180);
+        builder.rotateSelectedProps((dx * Math.PI) / 180);
         onRequestRender?.();
         return;
       }
 
-      // Dragging selected prop across surface
-      if (isDraggingSelected.current && !isRightMouseDown.current) {
-        const selected = builder.getSelectedProp();
-        if (selected) {
+      // Dragging selected prop across surface (ONLY when clickMoveEnabled is ON!)
+      if (isDraggingSelected.current && clickMoveEnabledRef.current && !isRightMouseDown.current) {
+        const selected = builder.getSelectedProps();
+        if (selected.length > 0) {
           const hit = builder.raycastSurface(e.clientX, e.clientY, canvas);
           if (hit) {
-            builder.updatePropTransform(selected.id, {
-              x: Math.round(hit.point.x),
-              z: Math.round(hit.point.z),
-              y: Math.round(hit.point.y),
-            });
-            onRequestRender?.();
+            if (lastDragSurfacePoint.current) {
+              const dx = Math.round(hit.point.x - lastDragSurfacePoint.current.x);
+              const dy = Math.round(hit.point.y - lastDragSurfacePoint.current.y);
+              const dz = Math.round(hit.point.z - lastDragSurfacePoint.current.z);
+              if (dx !== 0 || dy !== 0 || dz !== 0) {
+                builder.moveSelectedProps(dx, dy, dz);
+                lastDragSurfacePoint.current = { ...hit.point };
+                onRequestRender?.();
+              }
+            } else {
+              lastDragSurfacePoint.current = { ...hit.point };
+            }
             return;
           }
         }
@@ -175,7 +207,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         onRequestRender?.();
       } else {
         // Hover check in select mode
-        const hitHandle = builder.getSelectedProp() && builder.raycastRotateHandle(e.clientX, e.clientY, canvas);
+        const hitHandle = builder.getSelectedProps().length > 0 && builder.raycastRotateHandle(e.clientX, e.clientY, canvas);
         const hit = hitHandle || builder.raycastProp(e.clientX, e.clientY, canvas);
         canvas.style.cursor = hitHandle ? 'grab' : (hit ? 'pointer' : 'default');
       }
@@ -191,6 +223,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         }
       } else if (e.button === 0) {
         isDraggingSelected.current = false;
+        lastDragSurfacePoint.current = null;
         isRotatingSelected.current = false;
       }
     };
@@ -216,50 +249,118 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       keysRef.current.add(e.code);
 
       // Keyboard shortcuts
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) {
-        const selected = builder.getSelectedProp();
-        if (selected) {
+      // 1. Cycle active axis with Numpad 5 or Digit 5
+      if ((e.code === 'Numpad5' || e.code === 'Digit5') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const current = nudgeAxisRef.current;
+        const nextAxis: 'y' | 'x' | 'z' = current === 'y' ? 'x' : current === 'x' ? 'z' : 'y';
+        setNudgeAxis(nextAxis);
+        showToast(`Nudge Axis: ${nextAxis.toUpperCase()} [Numpad/Arrows to move, 5 to cycle]`);
+        return;
+      }
+
+      // 2. Toggle Click Move with KeyM
+      if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setClickMoveEnabled((prev) => {
+          const next = !prev;
+          showToast(next ? 'Click Move: ON (Click & drag to move)' : 'Click Move: OFF (Clicking selects only)');
+          return next;
+        });
+        return;
+      }
+
+      // 3. Group / Ungroup with Ctrl+G / Ctrl+Shift+G
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyG') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const success = builder.ungroupSelected();
+          if (success) {
+            showToast('Ungrouped selection');
+            onRequestRender?.();
+          }
+        } else {
+          const gid = builder.groupSelected();
+          if (gid) {
+            showToast(`Grouped ${builder.getSelectedProps().length} decorations [Ctrl+Shift+G to ungroup]`);
+            onRequestRender?.();
+          } else {
+            showToast('Select 2 or more decorations to group');
+          }
+        }
+        return;
+      }
+
+      // 4. Directional movement along active axis via Arrow or Numpad keys
+      const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code);
+      const isNumpad = ['Numpad8', 'Numpad2', 'Numpad4', 'Numpad6'].includes(e.code);
+      if (isArrow || isNumpad) {
+        const selected = builder.getSelectedProps();
+        if (selected.length > 0) {
           e.preventDefault();
           const step = e.shiftKey ? 100 : 25;
           let dx = 0;
+          let dy = 0;
           let dz = 0;
-          if (e.code === 'ArrowLeft') dx = -step;
-          if (e.code === 'ArrowRight') dx = step;
-          if (e.code === 'ArrowUp') dz = step;
-          if (e.code === 'ArrowDown') dz = -step;
+          const axis = nudgeAxisRef.current;
 
-          builder.updatePropTransform(selected.id, {
-            x: selected.x + dx,
-            z: selected.z + dz,
-          });
+          if (axis === 'y') {
+            // Y axis: Up/Right raises, Down/Left lowers
+            if (e.code === 'ArrowUp' || e.code === 'Numpad8') dy = step;
+            else if (e.code === 'ArrowDown' || e.code === 'Numpad2') dy = -step;
+            else if (e.code === 'ArrowRight' || e.code === 'Numpad6') dy = step;
+            else if (e.code === 'ArrowLeft' || e.code === 'Numpad4') dy = -step;
+          } else if (axis === 'x') {
+            // X axis: Right/Up moves +X, Left/Down moves -X
+            if (e.code === 'ArrowRight' || e.code === 'Numpad6') dx = step;
+            else if (e.code === 'ArrowLeft' || e.code === 'Numpad4') dx = -step;
+            else if (e.code === 'ArrowUp' || e.code === 'Numpad8') dx = step;
+            else if (e.code === 'ArrowDown' || e.code === 'Numpad2') dx = -step;
+          } else if (axis === 'z') {
+            // Z axis: Up/Right moves +Z (forward along track), Down/Left moves -Z (backward)
+            if (e.code === 'ArrowUp' || e.code === 'Numpad8') dz = step;
+            else if (e.code === 'ArrowDown' || e.code === 'Numpad2') dz = -step;
+            else if (e.code === 'ArrowRight' || e.code === 'Numpad6') dz = step;
+            else if (e.code === 'ArrowLeft' || e.code === 'Numpad4') dz = -step;
+          }
+
+          builder.moveSelectedProps(dx, dy, dz);
           onRequestRender?.();
+          return;
         }
       } else if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
-        const selected = builder.getSelectedProp();
-        if (selected) {
+        const selected = builder.getSelectedProps();
+        if (selected.length > 0) {
           e.preventDefault();
           const stepDeg = e.shiftKey ? 10 : 2;
           const delta = (stepDeg * Math.PI) / 180 * (e.code === 'BracketLeft' ? -1 : 1);
-          builder.tiltSelectedProp(delta);
-          showToast(`Tilt: ${Math.round(((selected.rotZ ?? 0) * 180) / Math.PI)}°`);
+          builder.tiltSelectedProps(delta);
+          showToast(`Tilt adjusted for ${selected.length} item(s)`);
           onRequestRender?.();
         }
       } else if (e.code === 'KeyX' && !e.ctrlKey && !e.metaKey) {
-        const selected = builder.getSelectedProp();
-        if (selected) {
+        const selected = builder.getSelectedProps();
+        if (selected.length > 0) {
           e.preventDefault();
-          builder.flipSelectedProp();
-          showToast(`Prop ${selected.flipX ? 'Mirrored (Flipped)' : 'Normal'}`);
+          builder.flipSelectedProps();
+          showToast(`Flipped/mirrored ${selected.length} item(s)`);
           onRequestRender?.();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
         e.preventDefault();
-        const dup = builder.duplicateSelected();
-        if (dup) showToast(`Duplicated ${dup.name}`);
+        const dups = builder.duplicateSelected();
+        if (dups.length > 0) {
+          showToast(`Duplicated ${dups.length} item(s) as group`);
+          onRequestRender?.();
+        }
       } else if (e.code === 'Delete' || e.code === 'Backspace') {
         e.preventDefault();
-        builder.deleteSelected();
-        showToast('Deleted prop');
+        const count = builder.getSelectedProps().length;
+        if (count > 0) {
+          builder.deleteSelected();
+          showToast(`Deleted ${count} item(s)`);
+          onRequestRender?.();
+        }
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
         e.preventDefault();
         builder.undo();
@@ -269,11 +370,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         builder.redo();
         showToast('Redo');
       } else if (e.code === 'KeyF') {
-        const selected = builder.getSelectedProp();
-        if (selected) {
+        const selected = builder.getSelectedProps();
+        if (selected.length > 0) {
           e.preventDefault();
-          builder.focusProp(selected.id);
-          showToast(`Focused camera on ${selected.name}`);
+          builder.focusProp(selected[0].id);
+          showToast(`Focused camera on ${selected[0].name}`);
         }
       } else if (e.code === 'KeyV') {
         e.preventDefault();
@@ -284,7 +385,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         if (builder.getActivePropType()) {
           builder.setActivePropType(null);
           showToast('Select Tool Active');
-        } else if (builder.getSelectedProp()) {
+        } else if (builder.getSelectedProps().length > 0) {
           builder.selectProp(null);
         } else {
           onClose();
@@ -602,20 +703,23 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             ) : (
               placedProps.map((p) => {
                 const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
-                const isSelected = selectedProp?.id === p.id;
+                const isSelected = builder.isPropSelected(p.id);
                 return (
                   <div
                     key={p.id}
                     className={`flex items-center justify-between p-2 rounded-md border text-xs transition-colors ${
                       isSelected
-                        ? 'bg-amber-950/50 border-amber-500/80 text-amber-200'
+                        ? p.groupId
+                          ? 'bg-cyan-950/50 border-cyan-500/80 text-cyan-200'
+                          : 'bg-amber-950/50 border-amber-500/80 text-amber-200'
                         : 'bg-zinc-900/70 border-zinc-800 hover:border-zinc-700 text-zinc-300'
                     }`}
                   >
                     <div
                       className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
-                      onClick={() => {
-                        builder.selectProp(p.id);
+                      onClick={(e) => {
+                        const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                        builder.selectProp(p.id, isMulti);
                         showToast(`Selected ${p.name}`);
                       }}
                     >
@@ -629,6 +733,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1">
                           <span className="font-semibold truncate text-[11px]">{p.name}</span>
+                          {p.groupId && (
+                            <span className="text-[9px] px-1 py-0.2 bg-cyan-950/80 text-cyan-300 rounded font-mono border border-cyan-700/50">GRP</span>
+                          )}
                           {def?.isRamp ? (
                             <span className="text-[9px] px-1 py-0.2 bg-amber-900/60 text-amber-300 rounded font-mono">RAMP</span>
                           ) : def?.isSlingshot || def?.is3DModel ? (
@@ -677,20 +784,279 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         </div>
       )}
 
-      {/* Selected Prop Inspector (Floating Right) */}
-      {selectedProp && (
+      {/* Selected Prop(s) Inspector (Floating Right) */}
+      {selectedProps.length > 1 ? (
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-xs text-cyan-400">
+                  {builder.isSelectionGrouped() ? 'Group' : 'Multi-Selection'}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
+                  {selectedProps.length} Items
+                </span>
+              </div>
+              <span className="text-[10px] text-zinc-400">
+                Centroid: ({builder.getGroupCentroid().x}, {builder.getGroupCentroid().y}, {builder.getGroupCentroid().z})
+              </span>
+            </div>
+            <button
+              onClick={() => builder.selectProp(null)}
+              className="text-zinc-400 hover:text-cyan-200 text-xs p-1 cursor-pointer"
+              title="Deselect All [Esc]"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* Group / Ungroup Bar */}
+          <div className="flex items-center gap-2">
+            {builder.isSelectionGrouped() ? (
+              <button
+                onClick={() => {
+                  builder.ungroupSelected();
+                  showToast('Ungrouped selection');
+                  onRequestRender?.();
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1 text-xs rounded font-bold bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-600 transition-colors cursor-pointer"
+                title="Ungroup into individual items [Ctrl+Shift+G]"
+              >
+                <Users size={13} />
+                <span>Ungroup [Ctrl+Shift+G]</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  builder.groupSelected();
+                  showToast(`Grouped ${selectedProps.length} items [Ctrl+Shift+G to ungroup]`);
+                  onRequestRender?.();
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1 text-xs rounded font-bold bg-cyan-600 hover:bg-cyan-500 text-zinc-950 shadow-md shadow-cyan-900/40 transition-colors cursor-pointer"
+                title="Group items into a single unit [Ctrl+G]"
+              >
+                <Users size={13} />
+                <span>Group Selected [Ctrl+G]</span>
+              </button>
+            )}
+          </div>
+
+          {/* Active Nudge Axis Indicator & Quick Nudge */}
+          <div className="flex flex-col gap-1 text-xs bg-zinc-900/70 p-2 rounded-md border border-zinc-800">
+            <div className="flex justify-between items-center text-zinc-400">
+              <div className="flex items-center gap-1">
+                <span>Nudge Active Axis:</span>
+                <span className="font-mono font-bold text-amber-400 bg-zinc-800 px-1.5 py-0.5 rounded border border-amber-500/40">
+                  {nudgeAxis.toUpperCase()}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  const next: 'y' | 'x' | 'z' = nudgeAxis === 'y' ? 'x' : nudgeAxis === 'x' ? 'z' : 'y';
+                  setNudgeAxis(next);
+                  showToast(`Nudge Axis: ${next.toUpperCase()} [Press 5 to cycle]`);
+                }}
+                className="text-[10px] text-amber-300 hover:text-amber-200 underline cursor-pointer"
+              >
+                Cycle [5]
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-1 pt-1">
+              {[-100, -25, +25, +100].map((step) => (
+                <button
+                  key={step}
+                  onClick={() => {
+                    const dx = nudgeAxis === 'x' ? step : 0;
+                    const dy = nudgeAxis === 'y' ? step : 0;
+                    const dz = nudgeAxis === 'z' ? step : 0;
+                    builder.moveSelectedProps(dx, dy, dz);
+                    onRequestRender?.();
+                  }}
+                  className="px-1 py-0.5 text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 cursor-pointer text-center font-mono"
+                >
+                  {step > 0 ? `+${step}` : step}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group Scale (Centroid-relative) */}
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="text-zinc-400 font-medium">Scale Group (from Centroid):</span>
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { label: '-25%', mult: 0.75 },
+                { label: '-10%', mult: 0.9 },
+                { label: '+10%', mult: 1.1 },
+                { label: '+25%', mult: 1.25 }
+              ].map((btn) => (
+                <button
+                  key={btn.label}
+                  onClick={() => {
+                    builder.scaleSelectedProps(btn.mult);
+                    onRequestRender?.();
+                  }}
+                  className="px-1 py-1 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700 cursor-pointer text-center font-mono"
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group Orbit Rotation (Yaw around Centroid) */}
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid):</span>
+            <div className="grid grid-cols-5 gap-1">
+              {[-45, -15, 15, 45, 180].map((deg) => (
+                <button
+                  key={deg}
+                  onClick={() => {
+                    builder.rotateSelectedProps((deg * Math.PI) / 180);
+                    onRequestRender?.();
+                  }}
+                  className="px-1 py-0.5 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700 cursor-pointer text-center font-mono"
+                >
+                  {deg > 0 ? `+${deg}°` : `${deg}°`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group Tilt / In-Place Rotation */}
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="text-zinc-400 font-medium">Tilt All [ [ / ] ]:</span>
+            <div className="grid grid-cols-5 gap-1">
+              {[-15, -5, 0, 5, 15].map((deg) => (
+                <button
+                  key={deg}
+                  onClick={() => {
+                    if (deg === 0) {
+                      for (const p of selectedProps) {
+                        builder.updatePropTransform(p.id, { rotZ: 0 });
+                      }
+                    } else {
+                      builder.tiltSelectedProps((deg * Math.PI) / 180);
+                    }
+                    onRequestRender?.();
+                  }}
+                  className="px-1 py-0.5 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700 cursor-pointer text-center font-mono"
+                >
+                  {deg === 0 ? '0° Flat' : deg > 0 ? `+${deg}°` : `${deg}°`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group Flip / Mirror Button */}
+          <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+            <span className="text-zinc-400">Flip / Mirror All:</span>
+            <button
+              onClick={() => {
+                builder.flipSelectedProps();
+                showToast('Flipped/mirrored selection');
+                onRequestRender?.();
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-600 cursor-pointer"
+              title="Flip / Mirror all items horizontally [Key: X]"
+            >
+              <RotateCw size={13} />
+              <span>Mirror Selection [X]</span>
+            </button>
+          </div>
+
+          {/* Group Actions */}
+          <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">
+            <button
+              onClick={() => {
+                if (selectedProps.length > 0) {
+                  builder.focusProp(selectedProps[0].id);
+                  showToast('Focused camera on group');
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
+              title="Focus Camera [F]"
+            >
+              <Eye size={13} /> Focus [F]
+            </button>
+            <button
+              onClick={() => {
+                const dups = builder.duplicateSelected();
+                showToast(`Duplicated ${dups.length} items as group`);
+                onRequestRender?.();
+              }}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
+              title="Duplicate Group [Ctrl+D]"
+            >
+              <Copy size={13} /> Duplicate [Ctrl+D]
+            </button>
+            <button
+              onClick={() => {
+                const count = builder.getSelectedProps().length;
+                builder.deleteSelected();
+                showToast(`Deleted ${count} items`);
+                onRequestRender?.();
+              }}
+              className="flex items-center justify-center px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded font-bold shadow-lg shadow-red-600/30 cursor-pointer"
+              title="Delete Group [Del / Backspace]"
+            >
+              <Trash2 size={14} /> DELETE
+            </button>
+          </div>
+        </div>
+      ) : selectedProp ? (
         <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-72 bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
             <div className="flex flex-col min-w-0">
-              <span className="font-bold text-xs text-amber-400 truncate">{selectedProp.name}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-xs text-amber-400 truncate">{selectedProp.name}</span>
+                {selectedProp.groupId && (
+                  <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
+                    GROUPED
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] text-zinc-400">Position: ({selectedProp.x}, {selectedProp.y}, {selectedProp.z})</span>
             </div>
             <button
               onClick={() => builder.selectProp(null)}
-              className="text-zinc-400 hover:text-amber-200 text-xs p-1"
+              className="text-zinc-400 hover:text-amber-200 text-xs p-1 cursor-pointer"
               title="Deselect [Esc]"
             >
               <X size={14} />
+            </button>
+          </div>
+
+          {/* Group info & Ungroup button if part of group */}
+          {selectedProp.groupId && (
+            <div className="flex items-center justify-between bg-cyan-950/40 border border-cyan-700/50 px-2 py-1 rounded text-xs">
+              <span className="text-cyan-300 font-medium">Part of Group</span>
+              <button
+                onClick={() => {
+                  builder.ungroupSelected();
+                  showToast('Ungrouped selection');
+                  onRequestRender?.();
+                }}
+                className="px-2 py-0.5 text-[10px] bg-zinc-800 hover:bg-zinc-700 text-cyan-200 rounded border border-zinc-600 cursor-pointer"
+                title="Ungroup [Ctrl+Shift+G]"
+              >
+                Ungroup [Ctrl+Shift+G]
+              </button>
+            </div>
+          )}
+
+          {/* Active Nudge Axis Indicator */}
+          <div className="flex items-center justify-between text-xs bg-zinc-900/60 px-2 py-1 rounded border border-zinc-800/80">
+            <span className="text-zinc-400">Nudge Axis: <b className="text-amber-400 font-mono">{nudgeAxis.toUpperCase()}</b></span>
+            <button
+              onClick={() => {
+                const next: 'y' | 'x' | 'z' = nudgeAxis === 'y' ? 'x' : nudgeAxis === 'x' ? 'z' : 'y';
+                setNudgeAxis(next);
+                showToast(`Nudge Axis: ${next.toUpperCase()} [Press 5 to cycle]`);
+              }}
+              className="text-[10px] text-amber-300 hover:text-amber-200 underline cursor-pointer"
+            >
+              Cycle [5]
             </button>
           </div>
 
@@ -990,7 +1356,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Bottom Prop Palette */}
       <div className="pointer-events-auto bg-zinc-950/90 border-t border-amber-500/40 backdrop-blur-md flex flex-col">
@@ -1012,6 +1378,64 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <MousePointer size={14} />
               SELECT TOOL [V]
             </button>
+
+            {/* Click Move Toggle Button */}
+            <button
+              onClick={() => {
+                setClickMoveEnabled((prev) => {
+                  const next = !prev;
+                  showToast(next ? 'Click Move: ON (Click & drag to move)' : 'Click Move: OFF (Clicking selects only)');
+                  return next;
+                });
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-t font-bold transition-all border-t border-x cursor-pointer ${
+                clickMoveEnabled
+                  ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
+                  : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border-zinc-700/50'
+              }`}
+              title="Toggle click-move mode [M] (Default: OFF, clicking only selects)"
+            >
+              <Move size={13} />
+              <span>CLICK MOVE: {clickMoveEnabled ? 'ON' : 'OFF'} [M]</span>
+            </button>
+
+            {/* Active Axis Cycle Button */}
+            <button
+              onClick={() => {
+                const nextAxis: 'y' | 'x' | 'z' = nudgeAxis === 'y' ? 'x' : nudgeAxis === 'x' ? 'z' : 'y';
+                setNudgeAxis(nextAxis);
+                showToast(`Nudge Axis: ${nextAxis.toUpperCase()} [Numpad/Arrows to move, 5 to cycle]`);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-t font-bold bg-zinc-900/80 text-amber-300 hover:text-amber-200 border-t border-x border-zinc-700/50 transition-all cursor-pointer"
+              title="Active movement axis for Arrow/Numpad keys. Press 5 on Numpad or click to cycle: Y -> X -> Z -> Y"
+            >
+              <span className="text-zinc-400">AXIS:</span>
+              <span className="font-mono bg-zinc-800 px-1.5 py-0.5 rounded text-amber-400 border border-amber-500/40">
+                {nudgeAxis.toUpperCase()}
+              </span>
+              <span className="text-[10px] text-zinc-500">[5]</span>
+            </button>
+
+            {/* If multi-selected, show group pill in dock */}
+            {selectedProps.length > 1 && (
+              <button
+                onClick={() => {
+                  if (builder.isSelectionGrouped()) {
+                    builder.ungroupSelected();
+                    showToast('Ungrouped selection');
+                  } else {
+                    builder.groupSelected();
+                    showToast(`Grouped ${selectedProps.length} items`);
+                  }
+                  onRequestRender?.();
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-t font-bold bg-cyan-950 text-cyan-300 border-t border-x border-cyan-700/60 transition-all cursor-pointer hover:bg-cyan-900/60"
+                title="Group/Ungroup selected decorations [Ctrl+G / Ctrl+Shift+G]"
+              >
+                <Users size={13} />
+                <span>{builder.isSelectionGrouped() ? `Group (${selectedProps.length})` : `Selected (${selectedProps.length})`}</span>
+              </button>
+            )}
 
             {CATEGORIES.map((cat) => (
               <button

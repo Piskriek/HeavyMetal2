@@ -89,17 +89,68 @@ function loadTextures(manager: THREE.LoadingManager) {
   return out;
 }
 
-function makeSeamlessMaterial(texture: THREE.Texture, extra: THREE.MeshStandardMaterialParameters = {}) {
+function makeSeamlessMaterial(
+  texture: THREE.Texture,
+  extra: THREE.MeshStandardMaterialParameters = {},
+  { breakUpRoadRepeat = false }: { breakUpRoadRepeat?: boolean } = {},
+) {
   // The tiles are painted to repeat on their own. Sampling one clear image keeps
-  // their large value groups legible at race speed; the old three-way stochastic
-  // blend added visual static and obscured the intentional brush shapes.
-  return new THREE.MeshStandardMaterial({
+  // their large value groups legible at race speed. Dirt gets one deliberately
+  // restrained alternate sample: it prevents a single tile motif marching down
+  // the road without returning to the old noisy multi-tap material treatment.
+  const material = new THREE.MeshStandardMaterial({
     map: texture,
     roughness: 0.95,
     metalness: 0,
     side: THREE.DoubleSide,
     ...extra,
   });
+  if (!breakUpRoadRepeat) return material;
+
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <uv_pars_vertex>',
+      `#include <uv_pars_vertex>
+      varying vec3 vRoadWorldPos;`,
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <worldpos_vertex>',
+      `#include <worldpos_vertex>
+      vRoadWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <uv_pars_fragment>',
+      `#include <uv_pars_fragment>
+      varying vec3 vRoadWorldPos;
+
+      float roadHash(vec2 point) {
+        return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+      float roadPatch(vec2 point) {
+        vec2 cell = floor(point);
+        vec2 local = fract(point);
+        local = local * local * (3.0 - 2.0 * local);
+        return mix(
+          mix(roadHash(cell), roadHash(cell + vec2(1.0, 0.0)), local.x),
+          mix(roadHash(cell + vec2(0.0, 1.0)), roadHash(cell + vec2(1.0, 1.0)), local.x),
+          local.y
+        );
+      }`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#ifdef USE_MAP
+        vec4 primaryDirt = texture2D(map, vMapUv);
+        // The rotated, offset sample is only a low-strength partner. It preserves
+        // the low-contrast brushwork while changing the motif over broad road patches.
+        vec2 alternateUv = vec2(-vMapUv.y, vMapUv.x) + vec2(0.371, 0.619);
+        vec4 alternateDirt = texture2D(map, alternateUv);
+        float broadPatch = smoothstep(0.26, 0.74, roadPatch(vRoadWorldPos.xz * 0.00034));
+        diffuseColor *= mix(primaryDirt, alternateDirt, broadPatch * 0.42);
+      #endif`,
+    );
+  };
+  return material;
 }
 
 function buildMaterials(T: Record<TexKey, THREE.Texture>) {
@@ -107,7 +158,7 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
     new THREE.MeshStandardMaterial({ map, roughness: 0.95, metalness: 0, side: THREE.DoubleSide, ...extra });
 
   return {
-    dirt: makeSeamlessMaterial(T.dirt),
+    dirt: makeSeamlessMaterial(T.dirt, {}, { breakUpRoadRepeat: true }),
     cliff: makeSeamlessMaterial(T.cliff),
     cave: makeSeamlessMaterial(T.cave),
     wood: std(T.wood),

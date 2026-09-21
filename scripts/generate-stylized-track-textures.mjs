@@ -36,6 +36,8 @@ const EDGE_FEATHER = 18;
 // a pure black crevice or a near-white highlight that would break the course's
 // visual hierarchy at speed.
 const MATERIAL_GRADES = {
+  // Dirt is deliberately the quietest surface: a road should support the racers,
+  // not project a tile-shaped motif down the course.
   dirt:     { contrast: 0.65, saturation: 0.45, tint: [142, 108, 71], tintMix: 0.56, shadow: 0.12, light: 0.07 },
   grass:    { contrast: 0.63, saturation: 0.78, tint: [101, 119, 70], tintMix: 0.09, shadow: 0.13, light: 0.07 },
   cliff:    { contrast: 0.59, saturation: 0.58, tint: [116, 111, 93], tintMix: 0.10, shadow: 0.15, light: 0.07 },

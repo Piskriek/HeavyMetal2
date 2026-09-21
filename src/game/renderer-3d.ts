@@ -166,11 +166,12 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
     cobble: makeSeamlessMaterial(T.cobble),
     grassFringe: new THREE.MeshStandardMaterial({
       map: T.grassFringe,
-      transparent: true,
-      alphaTest: 0.055,
+      // The replacement fringe is an opaque two-material surface rather than a
+      // floating alpha card, so it cleanly hides the seam below it.
+      transparent: false,
       roughness: 0.92,
       side: THREE.DoubleSide,
-      depthWrite: false,
+      depthWrite: true,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,

@@ -151,10 +151,9 @@ async function rasterize(page, sourceUrl, grade) {
 }
 
 /**
- * A soft, shared transition band keeps the grass from ending in a bright, busy
- * line against dirt and stone. It reuses the already colour-graded grass paint
- * through a low-alpha brush mask rather than drawing a second, unrelated blade
- * texture.
+ * Builds an opaque grass-to-road transition strip for the raised dirt-track
+ * shoulders. It composes the same graded grass and dirt materials that meet at
+ * the road edge, with only a restrained grass-over-road growth pass on top.
  */
 async function buildGrassFringe(page, grassUrl, dirtUrl) {
   return page.evaluate(async ({ grassUrl, dirtUrl }) => {

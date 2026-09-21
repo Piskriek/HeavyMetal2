@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
-  Layers, Eye, MousePointer, Camera, Sun, ChevronDown
+  Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -29,6 +29,7 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'cavern_mine', label: 'Cavern & Mine', icon: <Mountain size={16} /> },
   { id: 'stadium', label: 'Stadium & Crowds', icon: <Flag size={16} /> },
   { id: 'decals', label: 'Road Decals', icon: <Layers size={16} /> },
+  { id: 'goblins', label: 'Goblins & Crew', icon: <Users size={16} /> },
 ];
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {

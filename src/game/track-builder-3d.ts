@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins';
 
 export interface PropDefinition {
   type: string;
@@ -134,6 +134,38 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'decal_hazard_stripes', name: 'Caution Hazard Stripes', category: 'decals', url: '/art/decals/decal-hazard-stripes.png', defaultWidth: 620, defaultHeight: 310, isDecal: true },
   { type: 'decal_speed_arrow', name: 'Directional Speed Chevron', category: 'decals', url: '/art/decals/decal-speed-arrow.png', defaultWidth: 380, defaultHeight: 380, isDecal: true },
   { type: 'decal_drain_grate', name: 'Iron Drainage Grate', category: 'decals', url: '/art/decals/decal-drain-grate.png', defaultWidth: 360, defaultHeight: 360, isDecal: true },
+
+  // --- LOOSE GOBLINS (WORKING CREW & CHEERING FANS, BATCH 1: 01-10) ---
+  { type: 'goblin_01_flag_waver', name: 'Flag-Waving Fan', category: 'goblins', url: '/art/goblins/alpha/goblin-01-flag-waver.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_02_war_drummer', name: 'War Drummer', category: 'goblins', url: '/art/goblins/alpha/goblin-02-war-drummer.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_03_pit_mechanic', name: 'Pit Mechanic', category: 'goblins', url: '/art/goblins/alpha/goblin-03-pit-mechanic.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_04_torchbearer', name: 'Torchbearer Fan', category: 'goblins', url: '/art/goblins/alpha/goblin-04-torchbearer.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_05_ore_miner', name: 'Ore Miner', category: 'goblins', url: '/art/goblins/alpha/goblin-05-ore-miner.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_06_horn_blower', name: 'War Horn Blower', category: 'goblins', url: '/art/goblins/alpha/goblin-06-horn-blower.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_07_tnt_handler', name: 'TNT Handler', category: 'goblins', url: '/art/goblins/alpha/goblin-07-tnt-handler.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_08_track_marshal', name: 'Track Marshal', category: 'goblins', url: '/art/goblins/alpha/goblin-08-track-marshal.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_09_blacksmith', name: 'Blacksmith', category: 'goblins', url: '/art/goblins/alpha/goblin-09-blacksmith.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_10_tankard_celebrant', name: 'Tankard Celebrant', category: 'goblins', url: '/art/goblins/alpha/goblin-10-tankard-celebrant.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_11_lantern_warden', name: 'Lantern Warden', category: 'goblins', url: '/art/goblins/alpha/goblin-11-lantern-warden.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_12_ball_loader', name: 'Ball Loader', category: 'goblins', url: '/art/goblins/alpha/goblin-12-ball-loader.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_13_bell_ringer', name: 'Bell Ringer', category: 'goblins', url: '/art/goblins/alpha/goblin-13-bell-ringer.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_14_scarf_fan', name: 'Scarf Fan', category: 'goblins', url: '/art/goblins/alpha/goblin-14-scarf-fan.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_15_track_sweeper', name: 'Track Sweeper', category: 'goblins', url: '/art/goblins/alpha/goblin-15-track-sweeper.png', defaultWidth: 375, defaultHeight: 560 },
+  { type: 'goblin_16_rope_heave_trio', name: 'Rope-Heave Trio', category: 'goblins', url: '/art/goblins/alpha/goblin-16-rope-heave-trio.png', defaultWidth: 1075, defaultHeight: 600 },
+  { type: 'goblin_17_shoulder_ride_duo', name: 'Shoulder-Ride Duo', category: 'goblins', url: '/art/goblins/alpha/goblin-17-shoulder-ride-duo.png', defaultWidth: 312, defaultHeight: 560 },
+  { type: 'goblin_18_firework_crew', name: 'Firework Crew', category: 'goblins', url: '/art/goblins/alpha/goblin-18-firework-crew.png', defaultWidth: 1100, defaultHeight: 600 },
+  { type: 'goblin_19_tire_carry_duo', name: 'Tire-Carry Duo', category: 'goblins', url: '/art/goblins/alpha/goblin-19-tire-carry-duo.png', defaultWidth: 1075, defaultHeight: 600 },
+  { type: 'goblin_20_victory_huddle', name: 'Victory Huddle', category: 'goblins', url: '/art/goblins/alpha/goblin-20-victory-huddle.png', defaultWidth: 1100, defaultHeight: 600 },
+  { type: 'goblin_21_grandstand_roar', name: 'Grandstand Roar', category: 'goblins', url: '/art/goblins/alpha/goblin-21-grandstand-roar.png', defaultWidth: 1254, defaultHeight: 700 },
+  { type: 'goblin_22_drum_podium_mob', name: 'Drum Podium Mob', category: 'goblins', url: '/art/goblins/alpha/goblin-22-drum-podium-mob.png', defaultWidth: 1254, defaultHeight: 700 },
+  { type: 'goblin_23_flag_terrace', name: 'Flag Terrace', category: 'goblins', url: '/art/goblins/alpha/goblin-23-flag-terrace.png', defaultWidth: 1254, defaultHeight: 700 },
+  { type: 'goblin_24_torch_crowd', name: 'Torch Crowd', category: 'goblins', url: '/art/goblins/alpha/goblin-24-torch-crowd.png', defaultWidth: 1075, defaultHeight: 600 },
+  { type: 'goblin_25_horn_riser', name: 'Horn Riser Band', category: 'goblins', url: '/art/goblins/alpha/goblin-25-horn-riser.png', defaultWidth: 1254, defaultHeight: 700 },
+  { type: 'goblin_26_mosh_pit', name: 'Mosh Pit', category: 'goblins', url: '/art/goblins/alpha/goblin-26-mosh-pit.png', defaultWidth: 1075, defaultHeight: 600 },
+  { type: 'goblin_27_fence_fans', name: 'Fence Fans', category: 'goblins', url: '/art/goblins/alpha/goblin-27-fence-fans.png', defaultWidth: 1254, defaultHeight: 700 },
+  { type: 'goblin_28_cheer_tower', name: 'Cheer Tower', category: 'goblins', url: '/art/goblins/alpha/goblin-28-cheer-tower.png', defaultWidth: 436, defaultHeight: 650 },
+  { type: 'goblin_29_victory_stage', name: 'Victory Stage', category: 'goblins', url: '/art/goblins/alpha/goblin-29-victory-stage.png', defaultWidth: 1254, defaultHeight: 700 },
+  { type: 'goblin_30_fan_aisle', name: 'Fan Aisle', category: 'goblins', url: '/art/goblins/alpha/goblin-30-fan-aisle.png', defaultWidth: 1075, defaultHeight: 600 },
 ];
 
 export class TrackBuilder3D {

@@ -874,7 +874,11 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
   let runStart = 0;
   for (let i = 1; i <= samples.length; i++) {
     if (i === samples.length || surfaceKey(samples[i]) !== surfaceKey(samples[runStart])) {
-      scene.add(sweepProfile(samples, runStart, Math.min(i, samples.length - 1), SURFACE, M[surfaceKey(samples[runStart])]));
+      const key = surfaceKey(samples[runStart]);
+      // The dirt road uses a deliberately broad UV scale: it reads as soft,
+      // irregular earth instead of a series of texture-sized road stripes.
+      scene.add(sweepProfile(samples, runStart, Math.min(i, samples.length - 1), SURFACE, M[key],
+        key === 'dirt' ? { texScale: 1500 } : undefined));
       runStart = i;
     }
   }
@@ -927,8 +931,8 @@ function buildAlpine(track: TrackData, M: Materials, scene: THREE.Scene, terrain
 
   const deepInLoop = (d: number) => track.loops.some((l) => d > l.start + 350 && d < l.end - 350);
   rangesWhere(samples, (s) => s.stage === 'alpine' && !deepInLoop(s.dist) && s.dist < alpineEndD - 400).forEach(([a, b]) => {
-    scene.add(sweepProfile(samples, a, b, SHOULDER_L, M.dirt, { texScale: 600, stride: 2 }));
-    scene.add(sweepProfile(samples, a, b, mirror(SHOULDER_L), M.dirt, { texScale: 600, stride: 2 }));
+    scene.add(sweepProfile(samples, a, b, SHOULDER_L, M.dirt, { texScale: 1500, stride: 2 }));
+    scene.add(sweepProfile(samples, a, b, mirror(SHOULDER_L), M.dirt, { texScale: 1500, stride: 2 }));
   });
 
   const gate = sampleAt(distOf('launchEdge'));

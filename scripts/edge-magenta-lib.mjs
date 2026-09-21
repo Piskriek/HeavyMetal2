@@ -315,22 +315,16 @@ export function auditPixels(w, h, data) {
       }
     }
   }
-  // Transparent pixels that still store matte RGB bleed pink when a renderer
-  // or image scaler interpolates non-premultiplied channels.
+  // Transparent pixels that still store matte RGB bleed pink when downscaled
+  // or when a renderer/scaler interpolates or mipmaps channels at a distance.
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       if (data[i + 3] !== 0) continue;
       const r = data[i], g = data[i + 1], b = data[i + 2];
-      if (!(r > 150 && b > 150 && Math.min(r - g, b - g) >= 120 && Math.abs(r - b) <= 45)) continue;
-      let near = false;
-      for (let dy = -2; dy <= 2 && !near; dy++) {
-        for (let dx = -2; dx <= 2 && !near; dx++) {
-          const nx = x + dx, ny = y + dy;
-          if (nx >= 0 && ny >= 0 && nx < w && ny < h && data[(ny * w + nx) * 4 + 3] > 0) near = true;
-        }
+      if (r > 150 && b > 150 && Math.min(r - g, b - g) >= 120 && Math.abs(r - b) <= 45) {
+        transpBleed++;
       }
-      if (near) transpBleed++;
     }
   }
   // Transparent pixels adjacent to visible art must carry the bled edge colour

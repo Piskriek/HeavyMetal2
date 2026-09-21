@@ -88,6 +88,8 @@ function fixFile(file, rel, rootDir) {
         Math.min(r - g, b - g) >= 40 && Math.abs(r - b) <= 60;
       if (isMagentaHole(r, g, b, a) || rawBg) {
         data[i + 3] = 0;
+        data[i] = Math.min(r, g);
+        data[i + 2] = Math.min(b, g);
         removed[p] = 1;
         keyed++;
       }
@@ -189,7 +191,24 @@ function fixFile(file, rel, rootDir) {
     feathered = 1;
   }
 
-  // Pass 7: bleed edge colour into the transparent fringe so non-premultiplied
+  // Pass 7: Total transparent background despill.
+  // Neutralize ALL residual matte RGB across the entire transparent area so
+  // distance downscaling/mipmapping in WebGL never averages magenta into distant texels.
+  let neutralized = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3] !== 0) continue;
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      if (r > 130 && b > 130 && Math.min(r - g, b - g) >= 40 && Math.abs(r - b) <= 60) {
+        data[i] = Math.min(r, g);
+        data[i + 2] = Math.min(b, g);
+        neutralized++;
+      }
+    }
+  }
+
+  // Pass 8: bleed edge colour into the transparent fringe so non-premultiplied
   // scalers (browser image smoothing, IM resize) can never resurface the old
   // matte RGB as pink speckle. Alpha stays 0.
   let bled = 0;
@@ -225,10 +244,10 @@ function fixFile(file, rel, rootDir) {
     filled = next;
   }
 
-  const changed = keyed + despilled + rimmed + feathered + bled > 0;
+  const changed = keyed + despilled + rimmed + feathered + bled + neutralized > 0;
   if (changed && !DRY) encodePng(file, w, h, data);
   const after = changed ? auditPixels(w, h, data) : before;
-  return { rel, changed, keyed, despilled, rimmed, feathered, bled, before, after };
+  return { rel, changed, keyed, despilled, rimmed, feathered, bled, neutralized, before, after };
 }
 
 function main() {
@@ -243,7 +262,7 @@ function main() {
     console.log(
       `${DRY ? '[dry]' : '✓'} ${rel.padEnd(62)} keyed=${String(res.keyed).padStart(5)}` +
       ` despill=${String(res.despilled).padStart(5)} rim=${String(res.rimmed).padStart(4)}` +
-      ` bled=${String(res.bled).padStart(6)}${res.feathered ? ' feathered' : ''}  semi ${res.before.semi}->${res.after.semi}`
+      ` bled=${String(res.bled).padStart(6)} neut=${String(res.neutralized).padStart(6)}${res.feathered ? ' feathered' : ''}  semi ${res.before.semi}->${res.after.semi}`
     );
   }
   console.log(`\n${DRY ? 'Would touch' : 'Touched'} ${touched} runtime sprites.`);

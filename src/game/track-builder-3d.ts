@@ -927,7 +927,7 @@ export class TrackBuilder3D {
         transparent: true,
         side: THREE.DoubleSide,
         depthWrite: true,
-        alphaTest: 0.05,
+        alphaTest: 0.2,
       });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;

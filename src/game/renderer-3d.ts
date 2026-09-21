@@ -90,112 +90,16 @@ function loadTextures(manager: THREE.LoadingManager) {
 }
 
 function makeSeamlessMaterial(texture: THREE.Texture, extra: THREE.MeshStandardMaterialParameters = {}) {
-  const mat = new THREE.MeshStandardMaterial({
+  // The stylized tiles are pre-sealed for seamless RepeatWrapping and carry
+  // deliberate large brush/value shapes — sample them directly so the painterly
+  // detail shows cleanly instead of being re-noised by a multi-tap shader blend.
+  return new THREE.MeshStandardMaterial({
     map: texture,
     roughness: 0.95,
     metalness: 0,
     side: THREE.DoubleSide,
     ...extra,
   });
-
-  mat.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <uv_pars_vertex>',
-      `#include <uv_pars_vertex>
-      varying vec3 vWorldPosSeamless;`
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <worldpos_vertex>',
-      `#include <worldpos_vertex>
-      vWorldPosSeamless = (modelMatrix * vec4(transformed, 1.0)).xyz;`
-    );
-
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <uv_pars_fragment>',
-      `#include <uv_pars_fragment>
-      varying vec3 vWorldPosSeamless;
-
-      float hash21Seamless(vec2 p) {
-        p = fract(p * vec2(234.34, 435.345));
-        p += dot(p, p + 34.23);
-        return fract(p.x * p.y);
-      }
-
-      float noise2DSeamless(vec2 p) {
-        vec2 i = floor(p);
-        vec2 f = fract(p);
-        vec2 u = f * f * (3.0 - 2.0 * f);
-        return mix(
-          mix(hash21Seamless(i + vec2(0.0, 0.0)), hash21Seamless(i + vec2(1.0, 0.0)), u.x),
-          mix(hash21Seamless(i + vec2(0.0, 1.0)), hash21Seamless(i + vec2(1.0, 1.0)), u.x),
-          u.y
-        );
-      }
-
-      float fbmSeamless(vec2 p) {
-        return noise2DSeamless(p) * 0.62 + noise2DSeamless(p * 2.08 + vec2(1.7, 3.2)) * 0.38;
-      }`
-    );
-
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <map_fragment>',
-      `#ifdef USE_MAP
-        // 1. Organic domain warping: subtly perturb UVs using world coordinates to break grid alignment
-        vec2 warp = vec2(
-          fbmSeamless(vWorldPosSeamless.xz * 0.0007),
-          fbmSeamless(vWorldPosSeamless.zx * 0.0007 + 3.7)
-        ) - 0.5;
-        vec2 baseUv = vMapUv + warp * 0.12;
-
-        // 2. Incommensurate golden-ratio multi-tap sampling
-        // Tap A: base coordinate
-        vec4 colA = texture2D(map, baseUv);
-
-        // Tap B: scale 1.381966 (golden ratio derivative), rotated by 41.7 deg
-        mat2 rotB = mat2(0.746, -0.665, 0.665, 0.746);
-        vec2 uvB = rotB * (baseUv * 1.381966) + vec2(0.3819, 0.6180);
-        vec4 colB = texture2D(map, uvB);
-
-        // Tap C: scale 0.7236, rotated by 83.2 deg
-        mat2 rotC = mat2(0.118, -0.993, 0.993, 0.118);
-        vec2 uvC = rotC * (baseUv * 0.7236) + vec2(0.7182, 0.2818);
-        vec4 colC = texture2D(map, uvC);
-
-        // 3. Continuous 2D noise blend weights (no periodic sine stripes)
-        float nAB = fbmSeamless(baseUv * 0.85 + vec2(0.4, 0.9));
-        float nC = fbmSeamless(baseUv * 0.42 + vec2(5.1, 2.7));
-
-        // 4. Height / Luminance-aware contrast preservation:
-        // Sharp rocks, grass blades, and soil clods overlay each other cleanly
-        float lumA = dot(colA.rgb, vec3(0.299, 0.587, 0.114));
-        float lumB = dot(colB.rgb, vec3(0.299, 0.587, 0.114));
-        float lumC = dot(colC.rgb, vec3(0.299, 0.587, 0.114));
-
-        float hDiffAB = (lumA + (1.0 - nAB)) - (lumB + nAB);
-        float blendAB = clamp(hDiffAB * 2.5 + 0.5, 0.0, 1.0);
-        vec4 colAB = mix(colB, colA, blendAB);
-        float lumAB = mix(lumB, lumA, blendAB);
-
-        float hDiffC = (lumAB + (1.0 - nC * 0.45)) - (lumC + nC * 0.45);
-        float blendC = clamp(hDiffC * 2.5 + 0.5, 0.0, 1.0);
-        vec4 blended = mix(colC, colAB, blendC);
-
-        // 5. Macro-scale world-space organic tone modulation:
-        // Varies sun exposure, mineral richness, and soil moisture across hundreds of meters
-        float macroL = fbmSeamless(vWorldPosSeamless.xz * 0.00018);
-        float macroH = fbmSeamless(vWorldPosSeamless.zx * 0.00028 + 2.4);
-
-        vec3 warmTone = vec3(1.05, 1.03, 0.96);
-        vec3 coolTone = vec3(0.94, 0.96, 0.98);
-        vec3 toneMod = mix(coolTone, warmTone, macroH);
-        toneMod *= (0.92 + 0.16 * macroL);
-
-        diffuseColor *= blended * vec4(toneMod, 1.0);
-      #endif`
-    );
-  };
-
-  return mat;
 }
 
 function buildMaterials(T: Record<TexKey, THREE.Texture>) {

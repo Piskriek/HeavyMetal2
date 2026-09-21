@@ -167,7 +167,7 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
     grassFringe: new THREE.MeshStandardMaterial({
       map: T.grassFringe,
       transparent: true,
-      alphaTest: 0.12,
+      alphaTest: 0.055,
       roughness: 0.92,
       side: THREE.DoubleSide,
       depthWrite: false,
@@ -936,12 +936,14 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
 
   // Natural grass fringe along the road shoulders: breaks up hard geometric edges
   const grassFringeStage = (s: TrackSample) => !s.onBridge && !s.inLoop && (s.stage === 'alpine' || s.stage === 'canyon' || s.stage === 'zigzag');
-  const FRINGE_L = [P(-1, -120, -6), P(-1, 25, 2)];
-  const FRINGE_R = [P(1, 120, -6), P(1, -25, 2)];
+  // A broad, translucent paint bridge is more natural than a thin row of grass
+  // blades. It overlaps both the verge and a small amount of road surface.
+  const FRINGE_L = [P(-1, -210, -7), P(-1, 35, 3)];
+  const FRINGE_R = [P(1, 210, -7), P(1, -35, 3)];
 
   rangesWhere(samples, grassFringeStage).forEach(([a, b]) => {
-    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 550, stride: 2, uvMode: 'fringe' }));
-    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 550, stride: 2, uvMode: 'fringe' }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 900, stride: 2, uvMode: 'fringe' }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 900, stride: 2, uvMode: 'fringe' }));
   });
 }
 

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "art:textures": "node scripts/generate-stylized-track-textures.mjs",
     "check": "node scripts/check.mjs",
     "check:edges": "node scripts/check-edge-magenta.mjs",
     "fix:edges": "node scripts/fix-edge-magenta.mjs",

@@ -935,15 +935,15 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
   }
 
   // Natural grass fringe along the road shoulders: breaks up hard geometric edges
-  const grassFringeStage = (s: TrackSample) => !s.onBridge && !s.inLoop && (s.stage === 'alpine' || s.stage === 'canyon' || s.stage === 'zigzag');
-  // A broad, translucent paint bridge is more natural than a thin row of grass
-  // blades. It overlaps both the verge and a small amount of road surface.
-  const FRINGE_L = [P(-1, -210, -7), P(-1, 35, 3)];
-  const FRINGE_R = [P(1, 210, -7), P(1, -35, 3)];
+  const grassFringeStage = (s: TrackSample) => !s.onBridge && !s.inLoop && s.stage === 'alpine';
+  // The outer half of this strip sits on the grass-covered drop, while its inner
+  // half overlaps the dirt road. Its texture is authored in that same order.
+  const FRINGE_L = [P(-1, -175, -9), P(-1, 70, 4)];
+  const FRINGE_R = [P(1, 175, -9), P(1, -70, 4)];
 
   rangesWhere(samples, grassFringeStage).forEach(([a, b]) => {
-    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 900, stride: 2, uvMode: 'fringe' }));
-    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 900, stride: 2, uvMode: 'fringe' }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_L, M.grassFringe, { texScale: 1100, stride: 2, uvMode: 'fringe' }));
+    scene.add(sweepProfile(samples, a, b, FRINGE_R, M.grassFringe, { texScale: 1100, stride: 2, uvMode: 'fringe' }));
   });
 }
 
@@ -984,8 +984,10 @@ function buildAlpine(track: TrackData, M: Materials, scene: THREE.Scene, terrain
 
   const deepInLoop = (d: number) => track.loops.some((l) => d > l.start + 350 && d < l.end - 350);
   rangesWhere(samples, (s) => s.stage === 'alpine' && !deepInLoop(s.dist) && s.dist < alpineEndD - 400).forEach(([a, b]) => {
-    scene.add(sweepProfile(samples, a, b, SHOULDER_L, M.dirt, { texScale: 1500, stride: 2 }));
-    scene.add(sweepProfile(samples, a, b, mirror(SHOULDER_L), M.dirt, { texScale: 1500, stride: 2 }));
+    // The tapering faces of the raised road mound are grass-covered terrain,
+    // not more road. The road/grass fringe above bridges this slope cleanly.
+    scene.add(sweepProfile(samples, a, b, SHOULDER_L, M.grass, { texScale: 1500, stride: 2 }));
+    scene.add(sweepProfile(samples, a, b, mirror(SHOULDER_L), M.grass, { texScale: 1500, stride: 2 }));
   });
 
   const gate = sampleAt(distOf('launchEdge'));

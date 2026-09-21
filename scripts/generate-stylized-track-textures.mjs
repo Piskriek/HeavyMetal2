@@ -167,77 +167,99 @@ async function buildGrassFringe(page, grassUrl, dirtUrl) {
     const [grass, dirt] = await Promise.all([load(grassUrl), load(dirtUrl)]);
     const W = 1024;
     const H = 256;
-    const mask = document.createElement('canvas');
-    mask.width = W;
-    mask.height = H;
-    const m = mask.getContext('2d');
-    const output = document.createElement('canvas');
-    output.width = W;
-    output.height = H;
-    const context = output.getContext('2d');
-    if (!m || !context) throw new Error('Could not create a fringe canvas context.');
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not create a fringe canvas context.');
 
-    // A deterministic, low-density set of broad brush dabs makes a soft verge
-    // silhouette. Unlike individual blades, it reads as terrain paint at speed.
-    let state = 0x7e57c0de;
-    const random = () => { state = Math.imul(state ^ (state >>> 15), 1 | state); state ^= state + Math.imul(state ^ (state >>> 7), 61 | state); return ((state ^ (state >>> 14)) >>> 0) / 4294967296; };
-    const paintDab = (x) => {
-      const width = 54 + random() * 112;
-      const base = 232 + random() * 28;
-      const height = 68 + random() * 100;
-      const lean = -32 + random() * 64;
-      m.save();
-      m.globalAlpha = 0.20 + random() * 0.22;
-      m.fillStyle = '#ffffff';
-      m.filter = 'blur(2.4px)';
-      m.beginPath();
-      m.moveTo(x - width * 0.5, base);
-      m.bezierCurveTo(x - width * 0.34, base - height * 0.16, x + lean - width * 0.2, base - height * 0.78, x + lean, base - height);
-      m.bezierCurveTo(x + lean + width * 0.22, base - height * 0.70, x + width * 0.42, base - height * 0.12, x + width * 0.5, base);
-      m.closePath();
-      m.fill();
-      m.restore();
+    const paintAcross = (target, image) => {
+      target.drawImage(image, 0, 0, 512, 512, 0, 0, 512, H);
+      target.drawImage(image, 0, 0, 512, 512, 512, 0, 512, H);
     };
 
-    // Always run the same dabs across the image edge and its two neighbours so
-    // RepeatWrapping gives the roadside one continuous painted rhythm.
-    for (let index = 0; index < 38; index++) {
-      const x = random() * W;
-      paintDab(x - W);
-      paintDab(x);
-      paintDab(x + W);
-    }
-    const root = m.createLinearGradient(0, 82, 0, H);
-    root.addColorStop(0, 'rgba(255,255,255,0)');
-    root.addColorStop(0.30, 'rgba(255,255,255,0.07)');
-    root.addColorStop(0.66, 'rgba(255,255,255,0.48)');
-    root.addColorStop(1, 'rgba(255,255,255,0.84)');
-    m.fillStyle = root;
-    m.fillRect(0, 70, W, H - 70);
+    // Vertical direction is deliberate: v=0 is the outer grass slope and v=1
+    // is the road. The strip therefore has real grass on one side and the same
+    // subdued dirt material on the other, rather than a separate green decal.
+    paintAcross(context, grass);
+    const roadHalf = document.createElement('canvas');
+    roadHalf.width = W;
+    roadHalf.height = H;
+    const road = roadHalf.getContext('2d');
+    if (!road) throw new Error('Could not create a road fringe canvas context.');
+    paintAcross(road, dirt);
+    const roadMask = road.createLinearGradient(0, 88, 0, H);
+    roadMask.addColorStop(0, 'rgba(255,255,255,0)');
+    roadMask.addColorStop(0.34, 'rgba(255,255,255,0)');
+    roadMask.addColorStop(0.58, 'rgba(255,255,255,0.30)');
+    roadMask.addColorStop(0.83, 'rgba(255,255,255,0.86)');
+    roadMask.addColorStop(1, 'rgba(255,255,255,1)');
+    road.globalCompositeOperation = 'destination-in';
+    road.fillStyle = roadMask;
+    road.fillRect(0, 0, W, H);
+    road.globalCompositeOperation = 'source-over';
+    context.drawImage(roadHalf, 0, 0);
 
-    // Start with the same muted grass paint used by the terrain. Warm it toward
-    // the road at the inner edge using the graded dirt texture; this is the
-    // colour bridge that makes the fringe belong to both neighbouring materials.
-    context.drawImage(grass, 0, 0, 512, 512, 0, 0, 512, H);
-    context.drawImage(grass, 0, 0, 512, 512, 512, 0, 512, H);
-    const roadGlaze = context.createLinearGradient(0, 116, 0, H);
-    roadGlaze.addColorStop(0, 'rgba(0,0,0,0)');
-    roadGlaze.addColorStop(0.56, 'rgba(0,0,0,0)');
-    roadGlaze.addColorStop(1, 'rgba(150,112,73,0.38)');
-    context.fillStyle = roadGlaze;
-    context.fillRect(0, 0, W, H);
-    context.globalCompositeOperation = 'source-atop';
-    context.globalAlpha = 0.18;
-    context.drawImage(dirt, 0, 0, 512, 512, 0, 0, 512, H);
-    context.drawImage(dirt, 0, 0, 512, 512, 512, 0, 512, H);
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = 'destination-in';
-    context.drawImage(mask, 0, 0);
-    context.globalCompositeOperation = 'source-over';
+    // A few large, irregular grass clumps grow from the verge onto the road.
+    // Their colour is sampled from the terrain grass itself, so the transition
+    // remains clean, low contrast, and tied to the surrounding slope.
+    const clumpMask = document.createElement('canvas');
+    clumpMask.width = W;
+    clumpMask.height = H;
+    const m = clumpMask.getContext('2d');
+    if (!m) throw new Error('Could not create a fringe mask canvas context.');
+    let state = 0x5f3759df;
+    const random = () => { state = Math.imul(state ^ (state >>> 15), 1 | state); state ^= state + Math.imul(state ^ (state >>> 7), 61 | state); return ((state ^ (state >>> 14)) >>> 0) / 4294967296; };
+    const paintClump = (x) => {
+      const base = 174 + random() * 20;
+      const width = 34 + random() * 62;
+      const height = 42 + random() * 64;
+      const lean = -18 + random() * 36;
+      m.save();
+      m.globalAlpha = 0.42 + random() * 0.18;
+      m.fillStyle = '#ffffff';
+      m.filter = 'blur(2px)';
+      m.beginPath();
+      m.moveTo(x - width * 0.55, base + 23);
+      m.bezierCurveTo(x - width * 0.32, base - height * 0.04, x + lean - width * 0.18, base - height, x + lean, base - height - 8);
+      m.bezierCurveTo(x + lean + width * 0.26, base - height * 0.58, x + width * 0.45, base + 4, x + width * 0.58, base + 23);
+      m.closePath();
+      m.fill();
+      // Two broad leaf/blade strokes make the grass visibly grow across dirt
+      // without becoming a busy hairline fringe.
+      m.globalAlpha = 0.36 + random() * 0.16;
+      m.lineCap = 'round';
+      m.lineWidth = 5 + random() * 6;
+      for (const spread of [-0.42, 0.34]) {
+        m.beginPath();
+        m.moveTo(x + spread * width * 0.28, base + 18);
+        m.quadraticCurveTo(x + lean * 0.5 + spread * width * 0.55, base - height * 0.18, x + lean + spread * width * 0.45, base - height * 0.74);
+        m.stroke();
+      }
+      m.restore();
+    };
+    for (let index = 0; index < 34; index++) {
+      const x = random() * W;
+      paintClump(x - W);
+      paintClump(x);
+      paintClump(x + W);
+    }
+
+    const overgrowth = document.createElement('canvas');
+    overgrowth.width = W;
+    overgrowth.height = H;
+    const growth = overgrowth.getContext('2d');
+    if (!growth) throw new Error('Could not create a grass overgrowth canvas context.');
+    paintAcross(growth, grass);
+    growth.globalCompositeOperation = 'destination-in';
+    growth.drawImage(clumpMask, 0, 0);
+    growth.globalCompositeOperation = 'source-over';
+    context.drawImage(overgrowth, 0, 0);
 
     const pixels = context.getImageData(0, 0, W, H);
     const d = pixels.data;
-    // Seal the horizontal repeat after every layer has been painted.
+    // The horizontal repeat is exact, so this transition can run the complete
+    // length of either shoulder without producing a seam.
     for (let y = 0; y < H; y++) for (let x = 0; x < 24; x++) {
       const left = (y * W + x) * 4;
       const right = (y * W + (W - 1 - x)) * 4;
@@ -247,7 +269,7 @@ async function buildGrassFringe(page, grassUrl, dirtUrl) {
       }
     }
     context.putImageData(pixels, 0, 0);
-    return output.toDataURL('image/png');
+    return canvas.toDataURL('image/png');
   }, { grassUrl, dirtUrl });
 }
 

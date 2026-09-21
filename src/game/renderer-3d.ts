@@ -128,8 +128,8 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
     }),
     iron: std(T.iron, { metalness: 0.35, roughness: 0.7 }),
     bark: std(T.bark),
-    boulder: std(T.cliff, { flatShading: true }),
-    caveRock: std(T.cave, { flatShading: true }),
+    boulder: makeSeamlessMaterial(T.cliff),
+    caveRock: makeSeamlessMaterial(T.cave),
     lava: new THREE.MeshStandardMaterial({
       map: T.lava, emissive: 0xffa040, emissiveMap: T.lava, emissiveIntensity: 1.6, roughness: 1,
     }),
@@ -503,6 +503,11 @@ function buildHeightfield(
   const H: number[] = [];
   const positions: number[] = [];
   const uvs: number[] = [];
+  const normals: number[] = [];
+  const cellX = (x1 - x0) / nx, cellZ = (z1 - z0) / nz;
+  const epsX = Math.max(1, cellX * 0.5);
+  const epsZ = Math.max(1, cellZ * 0.5);
+
   for (let iz = 0; iz <= nz; iz++) {
     for (let ix = 0; ix <= nx; ix++) {
       const x = lerp(x0, x1, ix / nx), z = lerp(z0, z1, iz / nz);
@@ -510,9 +515,17 @@ function buildHeightfield(
       H.push(y);
       positions.push(x, y, z);
       uvs.push(x / texScale, z / texScale);
+
+      // Continuous analytical normal via central differences to eliminate triangulation creasing
+      const dhx = heightAt(x + epsX, z) - heightAt(x - epsX, z);
+      const dhz = heightAt(x, z + epsZ) - heightAt(x, z - epsZ);
+      const nxVal = -dhx * epsZ;
+      const nyVal = 2 * epsX * epsZ;
+      const nzVal = -dhz * epsX;
+      const len = Math.hypot(nxVal, nyVal, nzVal) || 1;
+      normals.push(nxVal / len, nyVal / len, nzVal / len);
     }
   }
-  const cellX = (x1 - x0) / nx, cellZ = (z1 - z0) / nz;
   const grassIdx: number[] = [];
   const rockIdx: number[] = [];
   for (let iz = 0; iz < nz; iz++) {
@@ -527,10 +540,10 @@ function buildHeightfield(
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geo.setIndex([...grassIdx, ...rockIdx]);
   geo.addGroup(0, grassIdx.length, 0);
   geo.addGroup(grassIdx.length, rockIdx.length, 1);
-  geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, [grassMat, rockMat]);
   mesh.name = 'Terrain';
   group.add(mesh);
@@ -840,8 +853,38 @@ function archMesh(center: THREE.Vector3, axis: THREE.Vector3, radius: number, tu
   return mesh;
 }
 
-function rockCone(x: number, baseY: number, z: number, radius: number, height: number, material: THREE.Material, segments = 7) {
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, segments, 1), material);
+function smoothBoulderGeometry(radius: number, detail = 1): THREE.BufferGeometry {
+  const base = new THREE.DodecahedronGeometry(radius, detail);
+  const pos = base.attributes.position;
+  const count = pos.count;
+  const precision = 1000;
+  const map = new Map<string, number>();
+  const indices: number[] = [];
+  const uniquePositions: number[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const key = `${Math.round(x * precision)},${Math.round(y * precision)},${Math.round(z * precision)}`;
+    let idx = map.get(key);
+    if (idx === undefined) {
+      idx = map.size;
+      map.set(key, idx);
+      uniquePositions.push(x, y, z);
+    }
+    indices.push(idx);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(uniquePositions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function rockCone(x: number, baseY: number, z: number, radius: number, height: number, material: THREE.Material, segments = 20) {
+  const geo = new THREE.ConeGeometry(radius, height, Math.max(16, segments), 1);
+  geo.computeVertexNormals();
+  const cone = new THREE.Mesh(geo, material);
   cone.position.set(x, baseY + height / 2, z);
   cone.rotation.y = rand() * Math.PI;
   return cone;
@@ -954,7 +997,7 @@ function buildAlpine(track: TrackData, M: Materials, scene: THREE.Scene, terrain
     const lateral = side > 0 ? randRange(1400, 6000) : randRange(1400, 8500);
     const x = s.pos.x + s.right.x * side * lateral, z = s.pos.z + s.right.z * side * lateral;
     const r = randRange(160, 480);
-    const rock = grounded(new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), M.boulder), 'Boulder');
+    const rock = grounded(new THREE.Mesh(smoothBoulderGeometry(r, 1), M.boulder), 'Boulder');
     rock.position.set(x, terrain(x, z) + r * 0.35, z);
     rock.rotation.set(rand() * 3, rand() * 3, rand() * 3);
     scene.add(rock);
@@ -1054,14 +1097,14 @@ function buildCliffs(track: TrackData, M: Materials, scene: THREE.Scene, terrain
     const ledge = inward < 0 ? ledgeL(s) : ledgeR(s);
     const c = s.pos.clone().addScaledVector(s.right, inward * (s.halfWidth + ledge * 0.55));
     const radius = clamp(ledge * 0.42, 120, 420);
-    scene.add(grounded(rockCone(c.x, s.pos.y - 600, c.z, radius, 1500, M.boulder), 'HairpinPinnacle'));
+    scene.add(grounded(rockCone(c.x, s.pos.y - 600, c.z, radius, 1500, M.boulder, 20), 'HairpinPinnacle'));
   }
 
   const boulderD = distOf('boulders');
   [[-900, -260], [-200, 240], [700, 40], [1600, -300]].forEach(([dd, lat]) => {
     const s = sampleAt(boulderD + dd);
     const r = randRange(200, 330);
-    const rock = grounded(new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), M.boulder), 'TrackBoulder');
+    const rock = grounded(new THREE.Mesh(smoothBoulderGeometry(r, 1), M.boulder), 'TrackBoulder');
     rock.position.copy(s.pos).addScaledVector(s.right, lat).addScaledVector(s.up, r * 0.45);
     rock.rotation.set(rand() * 3, rand() * 3, rand() * 3);
     scene.add(rock);
@@ -1107,7 +1150,7 @@ function buildCavern(track: TrackData, M: Materials, scene: THREE.Scene) {
   scene.add(groundPatch(CAVE.xMin, CAVE.xMax, CAVE.zMin, CAVE.zMax, CAVE.topY, M.cliff, 2600));
 
   [[-18000, 36000, 2600], [-27000, 31000, 3600], [-36000, 39000, 3200], [-44000, 33000, 2200], [-22000, 42000, 2800], [-40000, 28500, 2400]]
-    .forEach(([x, z, h]) => scene.add(grounded(rockCone(x, CAVE.topY - 40, z, h * 1.4, h, M.boulder), 'MountainPeak')));
+    .forEach(([x, z, h]) => scene.add(grounded(rockCone(x, CAVE.topY - 40, z, h * 1.4, h, M.boulder, 24), 'MountainPeak')));
 
   scene.add(axisWallWithHole('x', CAVE.xMax - 200, CAVE.zMin, CAVE.zMax, CAVE.floorY, CAVE.ceilY, enterHole, -1, M.cave));
   scene.add(axisWallWithHole('x', CAVE.xMin + 200, CAVE.zMin, CAVE.zMax, CAVE.floorY, CAVE.ceilY, exitHole, 1, M.cave));
@@ -1145,7 +1188,9 @@ function buildCavern(track: TrackData, M: Materials, scene: THREE.Scene) {
 
   for (let i = 0; i < 90; i++) {
     const h = randRange(400, 1400);
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(randRange(90, 240), h, 5, 1), M.caveRock);
+    const geo = new THREE.ConeGeometry(randRange(90, 240), h, 16, 1);
+    geo.computeVertexNormals();
+    const cone = new THREE.Mesh(geo, M.caveRock);
     cone.position.set(randRange(CAVE.xMin + 800, CAVE.xMax - 800), CAVE.ceilY - h / 2 + 10, randRange(CAVE.zMin + 800, CAVE.zMax - 800));
     cone.rotation.x = Math.PI;
     scene.add(cone);
@@ -1218,7 +1263,9 @@ function buildMine(track: TrackData, M: Materials, scene: THREE.Scene) {
   const columns = [[-16500, 30000], [-22000, 41500], [-28500, 29500], [-33000, 41000], [-39500, 30500], [-44500, 40500], [-20000, 33500], [-36000, 40000]];
   columns.forEach(([x, z]) => {
     if (!clearOfTrack(x, z, 2600)) return;
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(randRange(600, 900), randRange(1100, 1500), CAVE.ceilY - LAVA_Y + 400, 7, 1), M.caveRock);
+    const colGeo = new THREE.CylinderGeometry(randRange(600, 900), randRange(1100, 1500), CAVE.ceilY - LAVA_Y + 400, 18, 1);
+    colGeo.computeVertexNormals();
+    const col = new THREE.Mesh(colGeo, M.caveRock);
     col.position.set(x, (CAVE.ceilY + LAVA_Y) / 2, z);
     scene.add(col);
   });
@@ -1226,14 +1273,14 @@ function buildMine(track: TrackData, M: Materials, scene: THREE.Scene) {
   for (let i = 0; i < 70; i++) {
     const x = randRange(CAVE.xMin + 1200, CAVE.xMax - 1200), z = randRange(CAVE.zMin + 1200, CAVE.zMax - 1200);
     if (!clearOfTrack(x, z, 1500)) continue;
-    scene.add(grounded(rockCone(x, LAVA_Y - 200, z, randRange(250, 650), randRange(900, 3200), M.caveRock, 5), 'Stalagmite'));
+    scene.add(grounded(rockCone(x, LAVA_Y - 200, z, randRange(250, 650), randRange(900, 3200), M.caveRock, 18), 'Stalagmite'));
   }
 
   for (let i = 0; i < 44; i++) {
     const x = randRange(CAVE.xMin + 1500, CAVE.xMax - 1500);
     const z = rand() < 0.5 ? CAVE.zMin + randRange(300, 1400) : CAVE.zMax - randRange(300, 1400);
     const r = randRange(700, 1600);
-    const rock = grounded(new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), M.caveRock), 'WallBoulder');
+    const rock = grounded(new THREE.Mesh(smoothBoulderGeometry(r, 1), M.caveRock), 'WallBoulder');
     rock.position.set(x, LAVA_Y - 100 + r * randRange(0.1, 0.55), z);
     rock.rotation.set(rand() * 3, rand() * 3, rand() * 3);
     scene.add(rock);
@@ -1535,7 +1582,7 @@ function buildWorld(M: Materials, scene: THREE.Scene) {
     [-30000, 68000, 14000, 13000], [-62000, 60000, 16000, 15000], [-80000, 35000, 15000, 17000], [-75000, 5000, 14000, 14000],
     [-50000, -15000, 16000, 15000], [-25000, -25000, 14000, 12000], [12000, 82000, 13000, 11000], [-88000, 50000, 12000, 11000],
   ];
-  peaks.forEach(([x, z, r, h]) => scene.add(grounded(rockCone(x, VALLEY_Y - 300, z, r, h, M.boulder, 7), 'DistantPeak')));
+  peaks.forEach(([x, z, r, h]) => scene.add(grounded(rockCone(x, VALLEY_Y - 300, z, r, h, M.boulder, 24), 'DistantPeak')));
 }
 
 /* -----------------------------------------------------------------------------

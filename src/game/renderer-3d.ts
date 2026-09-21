@@ -126,16 +126,18 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,
     }),
-    iron: std(T.iron, { metalness: 0.35, roughness: 0.7 }),
+    // Keep the supporting materials matte so the low-contrast albedo stays quiet
+    // under the track's directional light instead of producing sharp specular hits.
+    iron: std(T.iron, { metalness: 0.12, roughness: 0.88 }),
     bark: std(T.bark),
     boulder: std(T.cliff, { flatShading: true }),
     caveRock: std(T.cave, { flatShading: true }),
     lava: new THREE.MeshStandardMaterial({
-      map: T.lava, emissive: 0x9b4f2d, emissiveMap: T.lava, emissiveIntensity: 0.68, roughness: 1,
+      map: T.lava, emissive: 0x70422e, emissiveMap: T.lava, emissiveIntensity: 0.24, roughness: 1,
     }),
     water: new THREE.MeshStandardMaterial({
-      map: T.water, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false,
-      emissive: 0x3a7a8a, emissiveIntensity: 0.35, roughness: 0.4,
+      map: T.water, transparent: true, opacity: 0.64, side: THREE.DoubleSide, depthWrite: false,
+      emissive: 0x315b62, emissiveIntensity: 0.18, roughness: 0.82,
     }),
     chalk: new THREE.MeshStandardMaterial({
       color: 0xf4ecd8, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,

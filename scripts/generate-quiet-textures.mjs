@@ -4,12 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { encodePng } from './edge-magenta-lib.mjs';
 
 /**
- * The first-pass 3D materials were painted with very sharp value changes and
- * then layered again in the renderer. That made the repeated surfaces louder
- * than the scenery around them. These small, deliberately quiet tiles use a
- * Warcraft-inspired hand-painted palette: broad brush-shaped value changes,
- * softened edges, and a narrow luminance range. Every field is periodic, so
- * the generated PNGs remain safe to repeat in world space.
+ * Generate the repeat materials used by the Three.js track.
+ *
+ * Research note: the useful lesson from Warcraft environment references is not
+ * "add more surface detail". The hand-painted look is carried by a restrained
+ * palette, broad value masses, readable silhouettes and a few deliberate
+ * material cues. These tiles therefore use one very low-frequency tonal field,
+ * soft seams only where a material needs them, and no grain, speckle or sharp
+ * highlight marks. They are intentionally quieter than a realistic texture so
+ * the models, terrain shape and racers remain the focal points.
+ *
+ * Every field is periodic, so the generated PNGs are safe to repeat in world
+ * space. Keep this script as the source of truth for public/textures/*.png.
  */
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -20,7 +26,7 @@ const H = 512;
 
 const clamp = (value, min = 0, max = 1) => Math.max(min, Math.min(max, value));
 const lerp = (a, b, t) => a + (b - a) * t;
-const smooth = (a, b, value) => {
+const smoothstep = (a, b, value) => {
   const t = clamp((value - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
@@ -33,7 +39,7 @@ function hash2(x, y, seed = 1) {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Smooth, tile-periodic value noise. The cell count is an integer period. */
+/** Smooth tile-periodic value noise. `cells` stays deliberately low. */
 function valueNoise(u, v, cells, seed) {
   const x = u * cells;
   const y = v * cells;
@@ -51,8 +57,9 @@ function valueNoise(u, v, cells, seed) {
   );
 }
 
-function quietNoise(u, v, seed) {
-  return valueNoise(u, v, 4, seed) * 0.68 + valueNoise(u, v, 8, seed + 17) * 0.22 + valueNoise(u, v, 16, seed + 31) * 0.1;
+/** One broad wash plus a tiny secondary wash; never high-frequency noise. */
+function quietField(u, v, seed) {
+  return valueNoise(u, v, 3, seed) * 0.84 + valueNoise(u, v, 5, seed + 19) * 0.16;
 }
 
 function color(hex) {
@@ -69,8 +76,8 @@ function mixColor(a, b, amount) {
   ];
 }
 
-function overlay(base, tint, amount) {
-  return mixColor(base, tint, clamp(amount));
+function tint(base, target, amount) {
+  return mixColor(base, target, clamp(amount));
 }
 
 function pixelIndex(width, x, y) {
@@ -86,72 +93,60 @@ function put(data, width, x, y, rgb, alpha = 255) {
   data[i + 3] = alpha;
 }
 
-function blend(data, width, x, y, rgb, amount) {
-  if (x < 0 || y < 0 || x >= width || y >= data.length / (width * 4)) return;
-  const i = pixelIndex(width, x, y);
-  const a = clamp(amount);
-  data[i] = Math.round(lerp(data[i], rgb[0], a));
-  data[i + 1] = Math.round(lerp(data[i + 1], rgb[1], a));
-  data[i + 2] = Math.round(lerp(data[i + 2], rgb[2], a));
+function renderTexture(painter, width, height) {
+  const data = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const [r, g, b, a = 255] = painter(x / width, y / height, x, y);
+      put(data, width, x, y, [r, g, b], a);
+    }
+  }
+  return data;
 }
 
-function rotatedPatch(u, v, patch) {
-  let dx = wrapDistance(u - patch.x);
-  let dy = wrapDistance(v - patch.y);
-  const c = Math.cos(patch.angle ?? 0);
-  const s = Math.sin(patch.angle ?? 0);
-  const rx = (dx * c + dy * s) / patch.rx;
-  const ry = (-dx * s + dy * c) / patch.ry;
-  const distance = Math.sqrt(rx * rx + ry * ry);
-  return smooth(1.12, 0.22, distance);
+function writeTexture(filePath, painter, width, height) {
+  encodePng(filePath, width, height, renderTexture(painter, width, height));
 }
 
-function paintPatches(u, v, base, patches) {
+function makeTexture(name, painter, width = W, height = H) {
+  writeTexture(join(OUT, `${name}.png`), painter, width, height);
+  console.log(`  wrote ${name}.png (${width}x${height})`);
+}
+
+function softPatches(u, v, base, patches) {
   let output = base;
   for (const patch of patches) {
-    const field = rotatedPatch(u, v, patch);
-    output = overlay(output, patch.color, field * patch.alpha);
+    let dx = wrapDistance(u - patch.x);
+    let dy = wrapDistance(v - patch.y);
+    const c = Math.cos(patch.angle ?? 0);
+    const s = Math.sin(patch.angle ?? 0);
+    const rx = (dx * c + dy * s) / patch.rx;
+    const ry = (-dx * s + dy * c) / patch.ry;
+    const distance = Math.sqrt(rx * rx + ry * ry);
+    // Very soft brush-shaped edges: no stamped blobs or hard decals.
+    const field = smoothstep(1.15, 0.18, distance);
+    output = tint(output, patch.color, field * patch.amount);
   }
   return output;
 }
 
-function makeTexture(name, painter, width = W, height = H) {
-  const data = Buffer.alloc(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const u = x / width;
-      const v = y / height;
-      const [r, g, b, a = 255] = painter(u, v, x, y);
-      put(data, width, x, y, [r, g, b], a);
-    }
-  }
-  encodePng(join(OUT, `${name}.png`), width, height, data);
-  console.log(`  wrote ${name}.png (${width}x${height})`);
-}
-
-function paintQuietDirt(u, v) {
-  const n = quietNoise(u, v, 11);
-  let base = mixColor(color('#766443'), color('#9a8557'), 0.28 + n * 0.5);
-  base = paintPatches(u, v, base, [
-    { x: 0.14, y: 0.28, rx: 0.24, ry: 0.18, angle: -0.3, color: color('#a38e5d'), alpha: 0.16 },
-    { x: 0.62, y: 0.22, rx: 0.28, ry: 0.16, angle: 0.4, color: color('#66543c'), alpha: 0.13 },
-    { x: 0.82, y: 0.74, rx: 0.3, ry: 0.2, angle: -0.2, color: color('#ae9661'), alpha: 0.12 },
-    { x: 0.34, y: 0.78, rx: 0.26, ry: 0.18, angle: 0.2, color: color('#6d5a3d'), alpha: 0.1 },
+function paintDirt(u, v) {
+  const n = quietField(u, v, 11);
+  let base = mixColor(color('#80704f'), color('#927e55'), 0.33 + n * 0.2);
+  base = softPatches(u, v, base, [
+    { x: 0.18, y: 0.27, rx: 0.36, ry: 0.24, angle: -0.25, color: color('#9b875a'), amount: 0.045 },
+    { x: 0.74, y: 0.72, rx: 0.42, ry: 0.28, angle: 0.18, color: color('#735f45'), amount: 0.035 },
   ]);
   return [...base, 255];
 }
 
-function paintQuietGrass(u, v) {
-  const n = quietNoise(u, v, 23);
-  let base = mixColor(color('#435a31'), color('#6f8248'), 0.25 + n * 0.55);
-  base = paintPatches(u, v, base, [
-    { x: 0.12, y: 0.18, rx: 0.22, ry: 0.3, angle: 0.15, color: color('#7e8d4d'), alpha: 0.15 },
-    { x: 0.48, y: 0.62, rx: 0.32, ry: 0.2, angle: -0.45, color: color('#384e2b'), alpha: 0.15 },
-    { x: 0.82, y: 0.34, rx: 0.23, ry: 0.26, angle: 0.6, color: color('#819151'), alpha: 0.12 },
+function paintGrass(u, v) {
+  const n = quietField(u, v, 23);
+  let base = mixColor(color('#536b39'), color('#687b46'), 0.38 + n * 0.2);
+  base = softPatches(u, v, base, [
+    { x: 0.18, y: 0.2, rx: 0.42, ry: 0.36, angle: 0.15, color: color('#70804a'), amount: 0.05 },
+    { x: 0.68, y: 0.72, rx: 0.48, ry: 0.3, angle: -0.2, color: color('#486033'), amount: 0.04 },
   ]);
-  // Wide, soft brush sweeps stand in for blades without turning the ground into confetti.
-  const sweep = 0.5 + 0.5 * Math.sin(TAU * (u * 2.0 + v * 3.0) + valueNoise(u, v, 4, 77) * 0.7);
-  base = overlay(base, color('#8a9854'), (sweep ** 5) * 0.08);
   return [...base, 255];
 }
 
@@ -167,8 +162,8 @@ function nearestCells(u, v, cellsX, cellsY, seed) {
     for (let ox = -1; ox <= 1; ox++) {
       const cellX = mod(ix + ox, cellsX);
       const cellY = mod(iy + oy, cellsY);
-      let centerX = cellX + 0.5 + (hash2(cellX, cellY, seed) - 0.5) * 0.34;
-      let centerY = cellY + 0.5 + (hash2(cellX, cellY, seed + 3) - 0.5) * 0.34;
+      let centerX = cellX + 0.5 + (hash2(cellX, cellY, seed) - 0.5) * 0.22;
+      let centerY = cellY + 0.5 + (hash2(cellX, cellY, seed + 3) - 0.5) * 0.22;
       while (centerX - px > cellsX / 2) centerX -= cellsX;
       while (px - centerX > cellsX / 2) centerX += cellsX;
       while (centerY - py > cellsY / 2) centerY -= cellsY;
@@ -183,99 +178,117 @@ function nearestCells(u, v, cellsX, cellsY, seed) {
       }
     }
   }
-  return { first, second, gap: second.distance - first.distance };
+  return { first, gap: second.distance - first.distance };
 }
 
-function paintQuietCobble(u, v) {
-  const cells = nearestCells(u, v, 6, 6, 43);
-  const n = quietNoise(u, v, 51);
-  const stoneTone = hash2(cells.first.id, 9, 61) * 0.7 + n * 0.3;
-  let base = mixColor(color('#626957'), color('#858671'), 0.26 + stoneTone * 0.34);
-  const seam = 1 - smooth(0.018, 0.11, cells.gap);
-  base = overlay(base, color('#46483d'), seam * 0.42);
-  base = overlay(base, color('#a49f7a'), smooth(0.1, 0.28, cells.gap) * 0.06);
+/** Shared quiet stone treatment: large shapes, barely-there soft seams. */
+function paintStone(u, v, options) {
+  const cells = nearestCells(u, v, options.cellsX, options.cellsY, options.seed);
+  const n = quietField(u, v, options.seed + 17);
+  const stoneTone = hash2(cells.first.id, 9, options.seed + 29) * 0.35 + n * 0.65;
+  let base = mixColor(color(options.dark), color(options.light), 0.46 + stoneTone * 0.1);
+  const seam = 1 - smoothstep(options.seamStart, options.seamEnd, cells.gap);
+  base = tint(base, color(options.seamColor), seam * options.seamAmount);
   return [...base, 255];
 }
 
-function paintQuietCliff(u, v) {
-  const cells = nearestCells(u, v, 4, 5, 71);
-  const n = quietNoise(u, v, 81);
-  const rockTone = hash2(cells.first.id, 5, 91) * 0.7 + n * 0.3;
-  let base = mixColor(color('#4b4d49'), color('#777064'), 0.24 + rockTone * 0.33);
-  const seam = 1 - smooth(0.012, 0.1, cells.gap);
-  base = overlay(base, color('#343936'), seam * 0.34);
-  base = overlay(base, color('#958671'), smooth(0.1, 0.26, cells.gap) * 0.08);
-  return [...base, 255];
+function paintCobble(u, v) {
+  return paintStone(u, v, {
+    cellsX: 4,
+    cellsY: 3,
+    seed: 43,
+    dark: '#6a6d5e',
+    light: '#858575',
+    seamColor: '#56594e',
+    seamStart: 0.02,
+    seamEnd: 0.18,
+    seamAmount: 0.16,
+  });
 }
 
-function paintQuietCave(u, v) {
-  const cells = nearestCells(u, v, 5, 5, 101);
-  const n = quietNoise(u, v, 111);
-  const rockTone = hash2(cells.first.id, 3, 121) * 0.7 + n * 0.3;
-  let base = mixColor(color('#34383a'), color('#5d514b'), 0.22 + rockTone * 0.34);
-  const seam = 1 - smooth(0.016, 0.105, cells.gap);
-  base = overlay(base, color('#242b2d'), seam * 0.32);
-  base = overlay(base, color('#765b4a'), smooth(0.1, 0.27, cells.gap) * 0.07);
-  return [...base, 255];
+function paintCliff(u, v) {
+  return paintStone(u, v, {
+    cellsX: 3,
+    cellsY: 3,
+    seed: 71,
+    dark: '#555952',
+    light: '#706b5d',
+    seamColor: '#444943',
+    seamStart: 0.02,
+    seamEnd: 0.18,
+    seamAmount: 0.14,
+  });
 }
 
-function paintQuietWood(u, v) {
-  const boards = 5;
+function paintCave(u, v) {
+  return paintStone(u, v, {
+    cellsX: 3,
+    cellsY: 3,
+    seed: 101,
+    dark: '#3f4646',
+    light: '#574f49',
+    seamColor: '#303837',
+    seamStart: 0.02,
+    seamEnd: 0.18,
+    seamAmount: 0.13,
+  });
+}
+
+function paintWood(u, v) {
+  const boards = 4;
   const boardFloat = u * boards;
   const board = Math.floor(boardFloat);
   const edgeDistance = Math.min(boardFloat - board, 1 - (boardFloat - board));
-  const seam = 1 - smooth(0.035, 0.12, edgeDistance);
-  const phase = hash2(board, 3, 141) * TAU;
-  const grain = 0.5 + 0.5 * Math.sin(TAU * (v * 2.2 + Math.sin(TAU * v * 1.1 + phase) * 0.06) + phase);
-  const n = quietNoise(u, v, 151);
-  let base = mixColor(color('#6f4e34'), color('#a2774a'), 0.24 + n * 0.36 + grain * 0.08);
-  base = overlay(base, color('#382b23'), seam * 0.38);
-  base = overlay(base, color('#b28a59'), (1 - seam) * (0.5 + 0.5 * Math.sin(TAU * v * 2 + phase)) * 0.045);
+  const seam = 1 - smoothstep(0.035, 0.16, edgeDistance);
+  const n = quietField(u, v, 141);
+  const phase = hash2(board, 3, 151) * TAU;
+  // A broad, almost imperceptible grain wash keeps it painted rather than flat.
+  const grain = 0.5 + 0.5 * Math.sin(TAU * (v * 1.5) + phase);
+  let base = mixColor(color('#75563b'), color('#916d49'), 0.38 + n * 0.16 + grain * 0.018);
+  base = tint(base, color('#4e3d2f'), seam * 0.16);
   return [...base, 255];
 }
 
-function paintQuietIron(u, v) {
-  const panelX = u * 4;
-  const panelY = v * 3;
-  const seamX = 1 - smooth(0.025, 0.09, Math.min(panelX % 1, 1 - (panelX % 1)));
-  const seamY = 1 - smooth(0.025, 0.09, Math.min(panelY % 1, 1 - (panelY % 1)));
-  const n = quietNoise(u, v, 171);
-  let base = mixColor(color('#4b5957'), color('#778078'), 0.25 + n * 0.34);
-  const rustWash = 0.5 + 0.5 * Math.sin(TAU * (u * 2 - v * 1.5));
-  base = overlay(base, color('#7e5a43'), rustWash * 0.1);
-  base = overlay(base, color('#293533'), Math.max(seamX, seamY) * 0.4);
+function paintIron(u, v) {
+  const panelX = u * 3;
+  const panelY = v * 2;
+  const edgeX = Math.min(panelX % 1, 1 - (panelX % 1));
+  const edgeY = Math.min(panelY % 1, 1 - (panelY % 1));
+  const seam = Math.max(1 - smoothstep(0.035, 0.16, edgeX), 1 - smoothstep(0.035, 0.16, edgeY));
+  const n = quietField(u, v, 171);
+  let base = mixColor(color('#596560'), color('#707a72'), 0.42 + n * 0.14);
+  const warmWash = 0.5 + 0.5 * Math.sin(TAU * (u * 1.5 - v * 0.75));
+  base = tint(base, color('#705744'), warmWash * 0.035);
+  base = tint(base, color('#3d4946'), seam * 0.13);
   return [...base, 255];
 }
 
-function paintQuietBark(u, v) {
-  const n = quietNoise(u, v, 191);
-  const bands = 0.5 + 0.5 * Math.sin(TAU * (u * 5 + valueNoise(u, v, 4, 193) * 0.35));
-  let base = mixColor(color('#4e3d32'), color('#765a40'), 0.25 + n * 0.3 + bands * 0.1);
-  base = paintPatches(u, v, base, [
-    { x: 0.22, y: 0.33, rx: 0.12, ry: 0.34, angle: 0.08, color: color('#876846'), alpha: 0.1 },
-    { x: 0.76, y: 0.7, rx: 0.13, ry: 0.32, angle: -0.1, color: color('#382e29'), alpha: 0.1 },
+function paintBark(u, v) {
+  const n = quietField(u, v, 191);
+  let base = mixColor(color('#584638'), color('#6b533d'), 0.42 + n * 0.13);
+  base = softPatches(u, v, base, [
+    { x: 0.24, y: 0.34, rx: 0.2, ry: 0.5, angle: 0.06, color: color('#755b42'), amount: 0.045 },
+    { x: 0.78, y: 0.72, rx: 0.2, ry: 0.5, angle: -0.08, color: color('#493a32'), amount: 0.04 },
   ]);
   return [...base, 255];
 }
 
-function paintQuietLava(u, v) {
-  const cells = nearestCells(u, v, 5, 5, 211);
-  const n = quietNoise(u, v, 221);
-  const rockTone = hash2(cells.first.id, 4, 231) * 0.6 + n * 0.4;
-  let base = mixColor(color('#353a3b'), color('#554b45'), 0.22 + rockTone * 0.3);
-  const seam = 1 - smooth(0.015, 0.105, cells.gap);
-  base = overlay(base, color('#9a4d2e'), seam * 0.78);
-  base = overlay(base, color('#c06b32'), seam * smooth(0.02, 0.08, cells.gap) * 0.22);
+function paintLava(u, v) {
+  const cells = nearestCells(u, v, 4, 4, 211);
+  const n = quietField(u, v, 221);
+  let base = mixColor(color('#404443'), color('#54483f'), 0.38 + n * 0.12);
+  const seam = 1 - smoothstep(0.025, 0.18, cells.gap);
+  base = tint(base, color('#87452f'), seam * 0.28);
+  base = tint(base, color('#a45b34'), seam * 0.06);
   return [...base, 255];
 }
 
-function paintQuietWater(u, v) {
-  const flowNoise = valueNoise(u, v, 4, 241) * 0.16 + valueNoise(u, v, 8, 242) * 0.05;
-  const band = 0.5 + 0.5 * Math.sin(TAU * (u * 3 + v * 4 + flowNoise));
-  let base = mixColor(color('#2f6068'), color('#5e8585'), 0.23 + band * 0.33);
-  const softFoam = Math.max(0, Math.sin(TAU * (u * 3 + v * 4 + 0.12))) ** 10;
-  base = overlay(base, color('#9ab5a5'), softFoam * 0.16);
-  base = overlay(base, color('#274e59'), valueNoise(u, v, 4, 245) * 0.09);
+function paintWater(u, v) {
+  const flow = quietField(u * 0.9 + 0.03, v * 0.9, 241);
+  const band = 0.5 + 0.5 * Math.sin(TAU * (u * 2 + v * 2.5 + flow * 0.15));
+  let base = mixColor(color('#3f696d'), color('#5b7e7b'), 0.42 + band * 0.07);
+  base = tint(base, color('#83a095'), Math.max(0, band - 0.82) * 0.1);
+  base = tint(base, color('#315a63'), quietField(u, v, 245) * 0.035);
   return [...base, 255];
 }
 
@@ -309,14 +322,14 @@ function makeGrassFringe() {
   const width = 1024;
   const height = 256;
   const data = Buffer.alloc(width * height * 4);
-  const root = color('#4f6732');
+  const root = color('#526837');
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const rootAmount = smooth(0.62, 0.9, y / height);
+      const rootAmount = smoothstep(0.58, 0.9, y / height);
       if (rootAmount > 0) {
-        const n = valueNoise(x / width, y / height, 8, 301);
-        const rgb = mixColor(root, color('#718044'), n * 0.2);
-        put(data, width, x, y, rgb, Math.round(rootAmount * 230));
+        const n = quietField(x / width, y / height, 301);
+        const rgb = mixColor(root, color('#627645'), n * 0.12);
+        put(data, width, x, y, rgb, Math.round(rootAmount * 185));
       }
     }
   }
@@ -326,29 +339,22 @@ function makeGrassFringe() {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  const bladeColors = [color('#5e7637'), color('#718548'), color('#7c8c4c'), color('#4b6232')];
-  for (let i = 0; i < 66; i++) {
+  const bladeColors = [color('#5a7040'), color('#617748'), color('#4d6338')];
+  // Sparse, broad tufts: the fringe is an edge cue, not a field of confetti.
+  for (let i = 0; i < 28; i++) {
     const x = random() * width;
-    const baseY = 198 + random() * 44;
-    const length = 50 + random() * 54;
-    const lean = (random() - 0.5) * 65;
-    const halfWidth = 4.5 + random() * 4.5;
+    const baseY = 202 + random() * 36;
+    const length = 42 + random() * 38;
+    const lean = (random() - 0.5) * 48;
+    const halfWidth = 6 + random() * 5;
     const rgb = bladeColors[i % bladeColors.length];
-    const alpha = 175 + Math.round(random() * 42);
-    // Draw copies at both horizontal edges so the fringe is actually seamless.
+    const alpha = 118 + Math.round(random() * 28);
     for (const shift of [-width, 0, width]) {
       paintTriangle(data, width, height, [
         { x: x + shift - halfWidth, y: baseY },
         { x: x + shift + halfWidth, y: baseY },
         { x: x + shift + lean, y: baseY - length },
       ], rgb, alpha);
-      if (i % 3 === 0) {
-        paintTriangle(data, width, height, [
-          { x: x + shift, y: baseY },
-          { x: x + shift + halfWidth * 0.45, y: baseY },
-          { x: x + shift + lean * 0.72, y: baseY - length * 0.9 },
-        ], color('#a0aa62'), 72);
-      }
     }
   }
 
@@ -357,16 +363,30 @@ function makeGrassFringe() {
 }
 
 mkdirSync(OUT, { recursive: true });
-console.log('Generating quiet, low-contrast Warcraft-inspired repeat textures...');
-makeTexture('dirt', paintQuietDirt);
-makeTexture('grass', paintQuietGrass);
-makeTexture('cobble', paintQuietCobble);
-makeTexture('cliff', paintQuietCliff);
-makeTexture('caverock', paintQuietCave);
-makeTexture('wood', paintQuietWood);
-makeTexture('iron', paintQuietIron);
-makeTexture('bark', paintQuietBark);
-makeTexture('lava', paintQuietLava);
-makeTexture('water', paintQuietWater);
+const TRACK_OUT = join(ROOT, 'public/art/tracks');
+mkdirSync(TRACK_OUT, { recursive: true });
+console.log('Generating restrained, low-contrast Warcraft-inspired repeat textures...');
+
+const texturePainters = {
+  dirt: paintDirt,
+  grass: paintGrass,
+  cobble: paintCobble,
+  cliff: paintCliff,
+  caverock: paintCave,
+  wood: paintWood,
+  iron: paintIron,
+  bark: paintBark,
+  lava: paintLava,
+  water: paintWater,
+};
+
+for (const [name, painter] of Object.entries(texturePainters)) {
+  makeTexture(name, painter);
+  // Keep the legacy preloaded aliases quiet too. Some older 2D tooling still
+  // requests art/tracks/tex-*.png even though the live 3D renderer uses /textures.
+  const [aliasWidth, aliasHeight] = name === 'wood' ? [1200, 1600] : [1408, 1408];
+  writeTexture(join(TRACK_OUT, `tex-${name}.png`), painter, aliasWidth, aliasHeight);
+}
+
 makeGrassFringe();
 console.log('Done. The renderer can use these directly with RepeatWrapping.');

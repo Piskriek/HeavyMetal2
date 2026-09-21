@@ -140,48 +140,19 @@ function makeSeamlessMaterial(texture: THREE.Texture, extra: THREE.MeshStandardM
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <map_fragment>',
       `#ifdef USE_MAP
-        // 1. Organic domain warping: subtly perturb UVs using world coordinates to break grid alignment
+        // Gentle organic domain warp: breaks grid alignment so tile repeats never
+        // read as a lattice, without adding noise on top of the painted textures.
         vec2 warp = vec2(
           fbmSeamless(vWorldPosSeamless.xz * 0.0007),
           fbmSeamless(vWorldPosSeamless.zx * 0.0007 + 3.7)
         ) - 0.5;
-        vec2 baseUv = vMapUv + warp * 0.12;
+        vec2 baseUv = vMapUv + warp * 0.08;
 
-        // 2. Incommensurate golden-ratio multi-tap sampling
-        // Tap A: base coordinate
-        vec4 colA = texture2D(map, baseUv);
+        // Single tap: the hand-painted tile shows through untouched.
+        vec4 texelColor = texture2D(map, baseUv);
 
-        // Tap B: scale 1.381966 (golden ratio derivative), rotated by 41.7 deg
-        mat2 rotB = mat2(0.746, -0.665, 0.665, 0.746);
-        vec2 uvB = rotB * (baseUv * 1.381966) + vec2(0.3819, 0.6180);
-        vec4 colB = texture2D(map, uvB);
-
-        // Tap C: scale 0.7236, rotated by 83.2 deg
-        mat2 rotC = mat2(0.118, -0.993, 0.993, 0.118);
-        vec2 uvC = rotC * (baseUv * 0.7236) + vec2(0.7182, 0.2818);
-        vec4 colC = texture2D(map, uvC);
-
-        // 3. Continuous 2D noise blend weights (no periodic sine stripes)
-        float nAB = fbmSeamless(baseUv * 0.85 + vec2(0.4, 0.9));
-        float nC = fbmSeamless(baseUv * 0.42 + vec2(5.1, 2.7));
-
-        // 4. Height / Luminance-aware contrast preservation:
-        // Sharp rocks, grass blades, and soil clods overlay each other cleanly
-        float lumA = dot(colA.rgb, vec3(0.299, 0.587, 0.114));
-        float lumB = dot(colB.rgb, vec3(0.299, 0.587, 0.114));
-        float lumC = dot(colC.rgb, vec3(0.299, 0.587, 0.114));
-
-        float hDiffAB = (lumA + (1.0 - nAB)) - (lumB + nAB);
-        float blendAB = clamp(hDiffAB * 2.5 + 0.5, 0.0, 1.0);
-        vec4 colAB = mix(colB, colA, blendAB);
-        float lumAB = mix(lumB, lumA, blendAB);
-
-        float hDiffC = (lumAB + (1.0 - nC * 0.45)) - (lumC + nC * 0.45);
-        float blendC = clamp(hDiffC * 2.5 + 0.5, 0.0, 1.0);
-        vec4 blended = mix(colC, colAB, blendC);
-
-        // 5. Macro-scale world-space organic tone modulation:
-        // Varies sun exposure, mineral richness, and soil moisture across hundreds of meters
+        // Macro-scale world-space tone modulation: varies sun exposure and soil
+        // moisture across hundreds of meters so long runs never look tiled.
         float macroL = fbmSeamless(vWorldPosSeamless.xz * 0.00018);
         float macroH = fbmSeamless(vWorldPosSeamless.zx * 0.00028 + 2.4);
 
@@ -190,7 +161,7 @@ function makeSeamlessMaterial(texture: THREE.Texture, extra: THREE.MeshStandardM
         vec3 toneMod = mix(coolTone, warmTone, macroH);
         toneMod *= (0.92 + 0.16 * macroL);
 
-        diffuseColor *= blended * vec4(toneMod, 1.0);
+        diffuseColor *= texelColor * vec4(toneMod, 1.0);
       #endif`
     );
   };

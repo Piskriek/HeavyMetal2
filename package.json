@@ -12,7 +12,9 @@
     "fix:edges": "node scripts/fix-edge-magenta.mjs",
     "check:browser": "node scripts/browser-check.mjs",
     "check:art": "node scripts/browser-check.mjs art",
-    "check:ui": "npm run build && node tests/ui-frame-check.mjs"
+    "check:ui": "npm run build && node tests/ui-frame-check.mjs",
+    "art:textures": "node scripts/generate-stylized-track-textures.mjs",
+    "check:textures": "node scripts/generate-stylized-track-textures.mjs --check"
   },
   "dependencies": {
     "clsx": "2.1.1",

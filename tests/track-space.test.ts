@@ -39,6 +39,7 @@ import {
   rampHeightAt,
   rampNormalAt,
   splinePointAt,
+  splineTangentAt,
   surfaceNormalAt,
   validateFrameList,
   worldFromCanonical,
@@ -111,6 +112,40 @@ test('renderer agreement: compiled samples match THREE.CatmullRomCurve3 within 1
   const raw = curve.getPoint(0.42);
   const rp = catmullRomPointAt(map.centerline.points, 0.42);
   assert.ok(dist({ x: raw.x, y: raw.y, z: raw.z }, rp) < 1e-9);
+});
+
+test('renderer agreement: frame basis (transported up, banking, right) matches the legacy build', () => {
+  // replicate the legacy renderer buildTrack basis pipeline in three.js terms
+  const WORLD_UP3 = new THREE.Vector3(0, 1, 0);
+  const clamp3 = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+  const transportUp = new THREE.Vector3(0, 1, 0);
+  const prevTan = new THREE.Vector3(0, 0, 1);
+  let bank = 0;
+  const count = map.samples.length - 1;
+  let maxUp = 0, maxRight = 0, maxTurn = 0;
+  for (let i = 0; i <= count; i++) {
+    const u = i / count;
+    const tangent = splineTangentAt(map.spline, u);
+    const t3 = new THREE.Vector3(tangent.x, tangent.y, tangent.z);
+    transportUp.addScaledVector(t3, -transportUp.dot(t3)).normalize();
+    const gravityUp = WORLD_UP3.clone().addScaledVector(t3, -t3.y);
+    if (gravityUp.lengthSq() > 0.04) {
+      gravityUp.normalize();
+      transportUp.lerp(gravityUp, 0.12 * clamp3(transportUp.y, 0, 1)).normalize();
+    }
+    const turn = i === 0 ? 0 : new THREE.Vector3().crossVectors(prevTan, t3).dot(transportUp);
+    bank = bank + (clamp3(-turn * 7, -0.35, 0.35) - bank) * 0.15;
+    const up = transportUp.clone().applyAxisAngle(t3, bank).normalize();
+    const right = new THREE.Vector3().crossVectors(t3, up).normalize();
+    prevTan.copy(t3);
+    const s = map.samples[i];
+    maxUp = Math.max(maxUp, Math.hypot(up.x - s.up.x, up.y - s.up.y, up.z - s.up.z));
+    maxRight = Math.max(maxRight, Math.hypot(right.x - s.right.x, right.y - s.right.y, right.z - s.right.z));
+    maxTurn = Math.max(maxTurn, Math.abs(turn / 50 - s.turnRate));
+  }
+  assert.ok(maxUp < 1e-9, `up drift ${maxUp}`);
+  assert.ok(maxRight < 1e-9, `right drift ${maxRight}`);
+  assert.ok(maxTurn < 1e-9, `turnRate drift ${maxTurn}`);
 });
 
 test('map structure: frozen, sane invariants, validated at build', () => {

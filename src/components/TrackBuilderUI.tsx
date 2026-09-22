@@ -80,10 +80,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const animFrameRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, stickyMs = 3500) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), stickyMs);
   };
+  const shownPlacementErrorRef = useRef<string | null>(null);
 
   // Sync builder changes
   useEffect(() => {
@@ -95,6 +96,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       setCameraFacingDefault(builder.snapping.cameraFacingDefault);
       setDecalDefault(builder.snapping.decalDefault ?? false);
       setDecalLightingDefault(builder.snapping.decalLightingDefault ?? true);
+      // T03: unsupported gameplay-prop placements fail visibly, not silently
+      const placementError = builder.getPlacementError();
+      if (placementError && placementError !== shownPlacementErrorRef.current) {
+        shownPlacementErrorRef.current = placementError;
+        showToast(placementError, 6000);
+        builder.clearPlacementError();
+      }
+      if (!placementError) shownPlacementErrorRef.current = null;
       onRequestRender?.();
     };
     builder.onChange(update);

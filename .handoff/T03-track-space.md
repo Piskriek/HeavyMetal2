@@ -22,10 +22,10 @@ Branch: `arena/01a0ca15-heavymetal2`. Base: `f9ca189` (main). Baseline `npm run 
 - `npm run build`: exit 0.
 - Browser suite `tests/browser-recovery.mjs`: **fails identically on the base commit and this branch** in this sandbox — race stage renders, assets reach 100%, WebGL available with `--enable-unsafe-swiftshader`, but stage class is stuck at `status-loading` with zero pageerrors (unbuilt WebGL at default flags makes it fail earlier). Pre-existing environment limitation, unrelated to T03; the renderer could not be smoke-tested in-browser here. tsc confirmed clean throughout the refactor.
 
-## Remaining / blockers
+## Status: pushed & PR open
 
-- **GitHub auth expired mid-session**: `GH_TOKEN`/`GITHUB_TOKEN` in env now return "Bad credentials"; pushes fail (`could not read Username … terminal prompts disabled`). 4 local commits on `arena/01a0ca15-heavymetal2` are ready to push; then open the draft PR against issue #36 (use `gh api repos/Piskriek/HeavyMetal2/issues/36` — `gh issue view` errors with a "Projects (classic)" GraphQL failure). **Reconnect GitHub in Arena to unblock.**
-- Draft PR body is drafted in `.handoff/T03-pr-body.md`.
+- All 5 commits are on `origin/arena/01a0ca15-heavymetal2` (`9fce31d` builder validation/docs + `92f5eae` handoff on top of `ed6766b`). Note: the sandbox re-cloned the repo when the GitHub token was refreshed; history was reconstructed by resetting the local branch to the remote tip and re-committing the surviving working-tree delta — final tree verified identical to the pre-loss state (81/81 green).
+- Draft PR open: https://github.com/Piskriek/HeavyMetal2/pull/49 (body updated to final). `gh` subcommands hit a "Projects (classic)" GraphQL bug on this repo — use `gh api repos/Piskriek/HeavyMetal2/{pulls,issues}/N` instead.
 - Non-goals documented in `docs/TRACK_SPACE.md`: grounded-state engine-elevation ≡ RADIUS quirk preserved (zero visual drift); `track-geometry-3d.ts` legacy module intentionally not unified (dead except shared types); ramp past-crest ballistics are physics-owned.
 
 ## Verification recipe to re-run

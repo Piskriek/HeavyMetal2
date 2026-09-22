@@ -1,5 +1,9 @@
 # T00 — Baseline Verification Log
 
+> Historical document recovered from the earlier workspace export. It is not
+> current verification. See [T02_RECOVERY.md](T02_RECOVERY.md) for this recovery,
+> missing snapshot payloads, test results, and outstanding limitations.
+
 Every command below was executed in this checkout on 2026-09-22 (Node v22.22.3, npm
 10.9.8, Linux sandbox) after `npm ci`. Raw logs were kept during the run; the summaries
 and exit codes are quoted verbatim.

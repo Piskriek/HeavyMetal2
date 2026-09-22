@@ -1,121 +1,73 @@
-# T02 — Dynamic Roster And Scale-Safe Runtime Plumbing
+# T02 — dynamic roster and scale-safe runtime plumbing
 
-Status: implemented on this branch. Issue: [#35](https://github.com/Piskriek/HeavyMetal2/issues/35).
-Builds directly on the frozen T01 contracts (`src/game/contracts/`, `docs/CONTRACTS.md`).
+**Status: recovered implementation; draft, not full acceptance of #35.**
+See [T02_RECOVERY.md](T02_RECOVERY.md) for export provenance, current verification,
+and gaps discovered during recovery. This document replaces the exported agent's
+claims of bit-identical gameplay and completed qualifying enforcement.
 
-The game now supports explicit fields of **4 / 20 / 50 / 100** participants while the
-four-racer path stays bit-identical to the legacy build: same lanes, pace, decision
-ramp, launch fan, finish bonus, cup points and names. No unrelated pace or balance
-change ships with this ticket.
+## Recovered implementation
 
-## Roster and identity
+- `roster.ts` builds fields of **4 / 20 / 50 / 100**, with dense IDs `0..N-1`.
+  Player ID is `0`. `createRacers` preserves the four-racer lane/loadout/name,
+  pace, launch-offset and decision-time formulas covered by the tests.
+- Larger grids use rows of four, 90 units apart, numbered CPU names and bounded
+  pace variation. Physics stays at 120 Hz; larger fields use bounded AI staggering.
+- Obstacle hits use `Set<RacerId>` instead of racer-ID bit shifts. Collision pair
+  keys are `minId * 2^20 + maxId` (safe for the generated IDs, not a universal
+  arbitrary-ID encoding). Cooldowns expire after 0.38 s and are pruned every 0.5 s.
+- Gameplay pinball randomness uses a seeded resettable generator; particle and
+  record-ID randomness use a separate cosmetic stream. Legacy AI's `randomAt`
+  remains a pure function of ID and simulation time.
+- `Renderer3D.setRacerCount` grows/shrinks the mesh pool. Each slot owns its material;
+  canvas-keyed textures have reference counts and are disposed on last release.
+  Shared sphere/shadow/shield resources are retained for reuse, disposed on teardown.
+  Loadout/rim canvas baking is deduplicated.
+- The trackbar selects at most 12 pips; results select at most 24 rows, retaining the
+  player. Labels disclose display limits and distinguish old partial saves.
+- Legacy cup points remain `[9, 6, 3, 1]`; above four, positions 1–9 earn 9–1 points,
+  with remaining positions and DNFs earning zero. The setup displays the right rule.
 
-- `src/game/roster.ts` (pure, DOM-free) owns roster construction and every former
-  four-racer formula.
-- `buildRoster(fieldSize, playerLoadout)` returns dense IDs `0..N-1`; the local player
-  is always `PLAYER_ID = 0`, independent of array order.
-- The engine keeps a `createRacerRegistry()` lookup (T01 identity contract) and resolves
-  the player through `registry.indexOf(PLAYER_ID)` — never `racers[0]` as an identity
-  assumption. Every legacy `if (!racer.id)` guard became `racer.isPlayer`.
-- Four-racer fields reproduce `RACER_DEFINITIONS` exactly (lanes `[2, 0, 1, 3]`, colors,
-  names, `opponentLoadouts()` mapping, pace `1`). Larger fields cycle the twelve
-  rider/capsule combinations, name CPUs `RIDER NN` for unique HUD rows, and take a
-  bounded ±2.5% deterministic pace spread.
-- Large fields stack the starting grid in rows behind the launch line
-  (`GRID_ROW_SPACING = 90`; four racers per row, one lane each) so lane-mates never
-  spawn inside each other. The legacy grid sits on the line, unchanged.
+## Persistence correction made during recovery
 
-## Scale-safe runtime state
+`RESULT_SUMMARY_POLICY = { version: 1, keepTop: 12 }` keeps the top 12 plus the
+player and stamps `opponentsSummary: { policy, totalField, kept }`.
 
-| Legacy assumption | Replacement | File |
-| :-- | :-- | :-- |
-| `hitMask \|= 1 << racerId` (wraps at 32) | `recordObstacleHit()` → `obstacle.hitBy: Set<RacerId>` | `roster.ts`, `scene.ts`, `engine.ts` |
-| `Float64Array(16)` pair cache, `i * 4 + j` | `Map` keyed by `pairKey(idA, idB) = min·2²⁰ + max` | `roster.ts`, `engine.ts` |
-| Pair cache lives forever | Entries expire after the 0.38 s cooldown; pruned every 0.5 s of run time; cleared on reset | `engine.ts` |
-| Fixed 4-mesh racer pool | `Renderer3D.setRacerCount(n)` grows on demand, disposes materials on shrink, shares canvas-keyed textures, disposes everything in `destroy()` | `renderer-3d.ts`, `renderer.ts` |
-| `createRacers()` maps 4 definitions | Field-size aware builder with registry validation | `racers.ts` |
-| `(4 - position) * 500` finish bonus | `finishPositionBonus()` — same four values, scales to N | `roster.ts`, `engine.ts` |
-| Cup table indexed by place | `roundPointsFor()`: frozen `[9, 6, 3, 1]` at four; `max(0, 10 - place)` (top nine score 9..1) above; DNF always 0 | `session.ts` |
-| `lastPlace: 5` tiebreak | `fieldSize + 1` | `session.ts` |
-| Trackbar draws every racer | `trackbarRacers()` bounded to 12 pips (player + leaders + nearest rivals) | `roster.ts`, `RaceScreen.tsx` |
-| Results render every row | `resultRows()` bounded to 24 rows with an explicit "Showing X of N — every place kept" note | `roster.ts`, `RoundResult.tsx` |
+This policy is now **archive-only** (`recordsForStorage` for Hall of Chaos).
+Authoritative event saves keep **every row**: cup ties, previous placements, and
+zero-point racers cannot be reconstructed from a top-12 summary. Tests save and
+reload every round at 4/20/50/100 racers and compare complete cup standings.
 
-## RNG streams
+Recognized older summaries are still readable, with an explicit partial-standings
+warning; final cup rank/winner claims are suppressed for those sessions. Missing
+rows cannot be invented. Invalid/unknown markers are rejected even on full lists.
+Unmarked short lists are rejected as before. Normal storage-quota error handling
+remains in place; no silent fallback truncation is introduced.
 
-`src/game/rng.ts` provides two separated mulberry32 streams:
+## Qualifying and adapter limitations
 
-- **Gameplay** — seeded from the session seed (`session.seed`, persisted in the save);
-  draws the pinball-spinner kick inside a fixed step. `engine.reset(seed?)` reseeds it
-  explicitly, so the same seed replays the same race (the `SimulationAdapter` path uses
-  exactly this: `runHeadless({ config }) → adapter.reset(config.seed)`).
-- **Cosmetic** — seeded from the clock; particles and record-ID suffixes only. No
-  simulation code reads it, so it can never desync a replay.
-- The legacy `randomAt(id, time)` shove check in `driveCPU` stays a pure function of
-  identity and run time — deterministic and alias-free by construction.
+The setup exposes all four field sizes. **Qualifying heats are not implemented or
+required by the live launch path.** `qualifyingForField` and the separate frozen
+config validator express the rule but are not integrated as a runtime gate. The UI
+now explicitly labels larger fields experimental and discloses this limitation.
 
-## AI staggering and tick rate
+`stepOnce`, `applyCommands`, `observe`, and `createEngineAdapter` were recovered.
+They do not make `GameEngine` DOM-free: construction still needs browser rendering.
+Review also found that `stepOnce` lacks the frame loop's status/pause guards and
+command gating is computed once per batch; some command types are no-ops. These
+require further integration/testing before relying on the seam for replay.
 
-The physics tick is untouched: `FIXED_STEP = 1/120`, `TICK_RATE = 120`
-(asserted in `tests/roster-scale.test.ts`). Decision timing scales instead:
+The engine caches the player's dense index after registry construction. Generated
+rosters are stable, but arbitrary in-place array reordering has not been validated.
+Formula tests are not proof of bit-identical whole-engine replay or 100-racer pace.
 
-- Four racers keep the exact legacy ramp `0.35 + id * 0.11` initial and
-  `reaction + id * 0.023` per decision.
-- Larger fields hash identity into fixed windows: initial ≤ 0.9 s, per-decision
-  stagger < 0.3 s, player always 0. A 100-racer field never waits on racer 99.
-- Bump processing stays correct at 100 racers (4,950 pairs) with the pruned cooldown
-  map replacing the aliased 16-slot table.
+## Current verification
 
-## Field size UI and qualifying
-
-- Step 3 of setup offers **4 / 20 / 50 / 100 racers** (`FIELD_SIZES` from the config
-  contract). The selection persists through `RaceSetup.fieldSize` → session → save.
-- Above four, the UI states the contract rule: *qualifying is required*; hydration
-  repairs any stored "disabled" flag (`normalizeRaceConfig` from T01 rejects a
-  large field without qualifying). The qualifying **heat flow itself** belongs to
-  T04/T06 as scheduled in `docs/CONTRACTS.md` — this ticket records, enforces and
-  surfaces the requirement, and does not fake a qualifying session.
-- `RaceSetup` gained `fieldSize`; `RaceSession`/`RaceConfig` gained `seed`
-  (from `createSession`). Legacy saved setups hydrate as `fieldSize: 4`.
-
-## Persisted results: explicit versioned summary policy
-
-localStorage cannot hold 3 × 100-row standings forever, so truncation is explicit:
-
-- `RESULT_SUMMARY_POLICY = { version: 1, keepTop: 12 }` (`save.ts`).
-- `summarizeRecord()` keeps the top 12 **plus the player's row** and stamps
-  `opponentsSummary: { policy, totalField, kept }`. It is idempotent and never
-  touches four-racer records.
-- `writeSave()` and the Hall of Chaos writer (`recordsForStorage`) summarise the
-  *storage copy* only; in-memory sessions keep every row.
-- Hydration accepts a short list **only** with a recognised marker that matches the
-  field size; an unmarked short list is rejected as silent truncation (the round
-  reports as dropped and must be raced again — honest, never silently degraded).
-  Unknown policy versions are also rejected rather than guessed at.
-- The full standings still round-trip for any field whose list fits the policy.
-
-## Headless stepping seam (T01's first task for T02)
-
-```ts
-engine.stepOnce(commands)   // one fixed step: validate → dedupe → apply → step
-engine.applyCommands(cmds)  // validateCommand + dedupeCommands against the heat gate
-engine.observe()            // { distance, speed, position, runTime }
-createEngineAdapter(engine) // SimulationAdapter for runHeadless / HeatController
-engine.reset(seed?)         // explicit RNG reset for same-seed replay
-```
-
-The `frame()` accumulator loop now calls `stepOnce()`; visual behaviour is unchanged.
-
-## Verification
-
-- `npx tsc --noEmit` — clean.
-- `node scripts/check.mjs` — **145/145** tests (39 contract, 23 safeguard, 25 new
-  `tests/roster-scale.test.ts` acceptance checks, plus the existing suites).
-- `npm run build` — green, 1,458.52 kB / 402.38 kB gzip.
-- `node tests/ui-frame-check.mjs` — green (frame/overflow checks).
-- Acceptance mapping: unique IDs + stable player at 4/20/50/100 ✅ · no aliasing at
-  32/33/64/100 (pair-key uniqueness over all 4,950 pairs; Set ledger proves racer 33
-  cannot light racer 1, unlike `1 << 33`) ✅ · mesh/texture disposal implemented via
-  the owned pool (WebGL disposal cannot execute in this environment — the bundled
-  Chromium exposes no WebGL context, as recorded by the T00 baseline) ✅ · legacy
-  compatibility pinned by formula tests, 145/145 green without pace/balance edits ✅ ·
-  HUD bounded (12 pips / 24 rows with explicit counts) ✅.
+- `npm run check`: app type-check plus **151/151 tests**, no failures/skips.
+- `npm run build`: successful (1,459.22 kB HTML, 402.69 kB gzip).
+- `node tests/ui-frame-check.mjs`: **40/40 checks**, at 578×760, 800×600,
+  1920×1080 and 3840×2160, including the 100-racer selector and warning.
+- `tests/racer-pool.test.ts`: production pool methods, real Three.js disposal
+  events for 20/50/100 → 4 → original size → teardown, without creating WebGL.
+  This verifies resource ownership calls, not GPU-driver behavior.
+- No live 100-racer WebGL race, complete legacy replay comparison, or performance
+  benchmark was run. Keep #35 open pending its remaining acceptance work.

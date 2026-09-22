@@ -4,6 +4,9 @@
 
 Recovered the exported source from `temp/temp.zip` on `arena/01a0ca08-heavymetal2`.
 See `docs/T02_RECOVERY.md` for provenance, current verification, and remaining gaps.
+Pushed recovery: draft PR #48 (follow-up to #47). Verification: 151/151 tests,
+production build, 40/40 browser UI checks. Texture shrink and cup-save regressions
+are fixed. Qualifying/replay integration remains incomplete; keep #35 open.
 The exported agent transcript is not evidence that all acceptance criteria are met.
 
 > [!IMPORTANT]

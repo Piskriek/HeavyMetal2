@@ -1,5 +1,9 @@
 # T02 — Dynamic roster and scale-safe runtime plumbing (working plan)
 
+> Historical document recovered from the earlier workspace export. It is not
+> current verification. See [T02_RECOVERY.md](T02_RECOVERY.md) for this recovery,
+> missing snapshot payloads, test results, and outstanding limitations.
+
 Issue: https://github.com/Piskriek/HeavyMetal2/issues/35 — depends on T01 contracts (PR #46,
 `src/game/contracts/`, `docs/CONTRACTS.md`). This branch is based on `pr/46`.
 

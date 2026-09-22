@@ -31,6 +31,7 @@ import {
 } from '../src/game/session';
 import {
   RESULT_SUMMARY_POLICY, SUMMARY_POLICY_VERSION, sanitizeRecord, sanitizeResults, summarizeRecord,
+  readSave, writeSave, SAVE_KEY, type StorageLike,
 } from '../src/game/save';
 import { FIXED_STEP, TICK_RATE } from '../src/game/contracts/timing';
 import { createRacerRegistry } from '../src/game/contracts/identity';
@@ -372,4 +373,58 @@ test('session: cup standings scale to 20 racers with bounded points and places',
     assert.ok(row.points >= 0 && row.points <= 9, `points bounded: ${row.points}`);
     assert.ok(row.lastPlace <= 21, 'DNF placeholder scales with the field');
   }
+});
+
+
+test('storage: large-field cup standings survive all round-boundary reloads', () => {
+  for (const fieldSize of FIELDS) {
+    const values = new Map<string, string>();
+    const storage: StorageLike = {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => { values.set(key, value); },
+      removeItem: (key) => { values.delete(key); },
+    };
+    const base = createSession(setup({ mode: 'tournament', fieldSize }));
+    for (let round = 0; round < base.rounds.length; round++) {
+      const opponents = standingsOf(fieldSize).map((entry) => ({
+        ...entry, position: ((entry.id + round * 7) % fieldSize) + 1,
+      }));
+      base.results.push({ ...recordOf(fieldSize), opponents, sessionId: base.id,
+        round, course: base.rounds[round] });
+      base.round = round;
+      const phase = round === base.rounds.length - 1 ? 'cup-results' : 'round-results';
+      const written = writeSave({ phase, draft: base.setup, session: base }, storage);
+      assert.equal(written.ok, true);
+      const stored = JSON.parse(values.get(SAVE_KEY)!);
+      assert.equal(stored.session.results[round].opponents.length, fieldSize);
+      const restored = readSave(storage);
+      assert.ok(restored.session);
+      assert.equal(restored.phase, phase);
+      assert.deepEqual(cupStandings(restored.session!), cupStandings(base));
+      const repeat = writeSave({ phase, draft: base.setup, session: base }, storage);
+      assert.equal(repeat.skipped, true, 'complete storage stays idempotent');
+    }
+  }
+});
+
+test('summary: invalid markers on full lists are rejected, not erased', () => {
+  const full = recordOf(100);
+  const invalid = { ...full, opponentsSummary: { policy: 999, kept: 100, totalField: 100 } };
+  assert.equal(sanitizeRecord(invalid, 'session-1', ['ridge'], 100), null);
+});
+
+
+test('storage: older summarized sessions surface a partial-standings warning', () => {
+  const base = createSession(setup({ mode: 'tournament', fieldSize: 100 }));
+  base.results = [summarizeRecord({ ...recordOf(100), sessionId: base.id })];
+  const values = new Map<string, string>();
+  const storage: StorageLike = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, value); },
+    removeItem: (key) => { values.delete(key); },
+  };
+  writeSave({ phase: 'round-results', draft: base.setup, session: base }, storage);
+  const restored = readSave(storage);
+  assert.equal(restored.session?.results.length, 1, 'do not invent rows or replay a committed round');
+  assert.ok(restored.notices.some((notice) => notice.level === 'warning' && notice.text.includes('standings for this event are partial')));
 });

@@ -233,6 +233,7 @@ function sanitizeSummaryMarker(raw: unknown, fieldSize: number): OpponentsSummar
 function sanitizeOpponents(raw: unknown, fieldSize: number, rawMarker: unknown): RacerStanding[] | null {
   if (!Array.isArray(raw)) return null;
   const summary = sanitizeSummaryMarker(rawMarker, fieldSize);
+  if (rawMarker !== undefined && !summary) return null;
   if (raw.length > fieldSize) return null;
   if (summary) {
     if (raw.length !== summary.kept) return null;
@@ -390,6 +391,9 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   const { results, dropped, duplicates } = sanitizeResults(raw.results, raw.id, rounds, setup.fieldSize);
   if (dropped) notices.push({ level: 'warning', text: `${dropped} saved round result${dropped === 1 ? '' : 's'} could not be validated and ${dropped === 1 ? 'was' : 'were'} set aside. That round must be raced again.` });
   if (duplicates) notices.push({ level: 'warning', text: `${duplicates} duplicate round result${duplicates === 1 ? '' : 's'} were ignored so no points are awarded twice.` });
+  if (results.some((record) => record.opponentsSummary)) {
+    notices.push({ level: 'warning', text: 'This older save contains summarized results. Missing racer rows cannot be recovered; standings for this event are partial.' });
+  }
 
   const rawRound = isInt(raw.round) ? raw.round : 0;
   let round = clampInt(rawRound, 0, rounds.length - 1);
@@ -548,11 +552,10 @@ export function writeSave(input: { phase: SessionPhase; draft: RaceSetup; sessio
   const phase: SessionPhase = input.session ? (input.phase === 'setup' ? 'grid' : input.phase) : 'setup';
   if (!storage) return { ok: false, document: null, skipped: false, error: DENIED_ERROR };
 
-  // The stored copy is summarised under the explicit versioned policy; the caller's
-  // in-memory session keeps every row.
-  const storedSession = input.session
-    ? { ...input.session, results: input.session.results.map(summarizeRecord) }
-    : input.session;
+  // An active/resumable event needs every placing, including zero-point ties and
+  // prior-round histories. Summary v1 is only for the Hall of Chaos archive, never
+  // the authoritative session used to reconstruct cup standings after a reload.
+  const storedSession = input.session;
   const signature = payloadOf({ phase, draft: input.draft, session: storedSession });
   let existingRaw: string | null = null;
   try { existingRaw = storage.getItem(SAVE_KEY); } catch { existingRaw = null; }

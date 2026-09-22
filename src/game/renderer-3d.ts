@@ -1576,6 +1576,7 @@ import { TrackBuilder3D } from './track-builder-3d';
    9. RACER 3D MESHES & OBSTACLES
    -------------------------------------------------------------------------- */
 interface Racer3DMesh {
+  canvas: HTMLCanvasElement | null;
   group: THREE.Group;
   sphere: THREE.Mesh;
   shadow: THREE.Mesh;
@@ -1619,7 +1620,7 @@ export class Renderer3D {
   private racers3D: Racer3DMesh[] = [];
   private racerResources: RacerMeshResources | null = null;
   /** Canvas-keyed texture cache so identical loadout/rim combos share one GPU texture. */
-  private readonly racerTextures = new Map<HTMLCanvasElement, THREE.CanvasTexture>();
+  private readonly racerTextures = new Map<HTMLCanvasElement, { texture: THREE.CanvasTexture; refs: number }>();
   private storedAssets: GameAssets;
   private readonly camUp = new THREE.Vector3(0, 1, 0);
   readonly trackBuilder: TrackBuilder3D;
@@ -1767,11 +1768,11 @@ export class Renderer3D {
   /**
    * T02: sizes the mesh pool to the field. Growing creates meshes on demand; shrinking
    * removes groups from the scene and disposes their materials. Textures are shared
-   * per canvas and released only with the whole pool (or on destroy), so a count change
-   * never leaks GPU resources and never rebuilds textures it already owns.
+   * per canvas and released when the last referencing slot is removed. Retained slots
+   * keep their shared textures and geometry across a count change.
    */
   setRacerCount(count: number) {
-    if (this.destroyed || count < 0) return;
+    if (this.destroyed || !Number.isFinite(count) || count < 0) return;
     this.ensureRacerMeshes(Math.floor(count));
   }
 
@@ -1798,11 +1799,11 @@ export class Renderer3D {
     const canvas = this.storedAssets.raceBalls?.[index] as HTMLCanvasElement | undefined;
     if (canvas) {
       const cached = this.racerTextures.get(canvas);
-      if (cached) texture = cached;
+      if (cached) { texture = cached.texture; cached.refs++; }
       else {
         texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
-        this.racerTextures.set(canvas, texture);
+        this.racerTextures.set(canvas, { texture, refs: 1 });
       }
     }
     const material = new THREE.MeshStandardMaterial({
@@ -1825,7 +1826,7 @@ export class Renderer3D {
     group.add(shield);
 
     this.scene.add(group);
-    return { group, sphere, shadow, shield };
+    return { group, sphere, shadow, shield, canvas: canvas ?? null };
   }
 
   /** Removes the newest mesh from the scene and disposes its per-mesh material. */
@@ -1836,17 +1837,18 @@ export class Renderer3D {
     // Shadow/shield materials are shared resources — only this mesh's own material
     // (and its participation in the canvas texture cache) belongs to the slot.
     (mesh.sphere.material as THREE.Material).dispose();
+    if (mesh.canvas) {
+      const cached = this.racerTextures.get(mesh.canvas);
+      if (cached && --cached.refs === 0) {
+        cached.texture.dispose();
+        this.racerTextures.delete(mesh.canvas);
+      }
+    }
   }
 
   /** Full teardown: every racer material, cached canvas texture and shared geometry. */
   private disposeRacerPool() {
-    for (const mesh of this.racers3D) {
-      this.scene.remove(mesh.group);
-      (mesh.sphere.material as THREE.Material).dispose();
-    }
-    this.racers3D = [];
-    for (const texture of this.racerTextures.values()) texture.dispose();
-    this.racerTextures.clear();
+    while (this.racers3D.length) this.releaseRacerMesh();
     this.racerResources?.sphereGeo.dispose();
     this.racerResources?.shadowGeo.dispose();
     this.racerResources?.shadowMat.dispose();

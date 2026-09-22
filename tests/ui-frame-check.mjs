@@ -77,6 +77,15 @@ try {
     const expected = viewport.width <= 700 ? [45, 42] : [56, 52];
     report(frame.corner[0] === expected[0] && frame.corner[1] === expected[1], `${viewport.width}×${viewport.height}: ornate corners stay fixed`, frame.corner.join('×'));
     if (viewport.width !== 1920) await page.screenshot({ path: join(artifacts, `ui-frame-${viewport.width}x${viewport.height}.png`) });
+    // T02 recovery: reach the new field-size control without requiring WebGL.
+    await page.getByRole('button', { name: 'Choose Your Crew' }).click();
+    await page.getByRole('button', { name: 'Set the Race' }).click();
+    const fields = page.getByRole('radiogroup', { name: 'Field size', exact: true });
+    report(await fields.getByRole('radio').count() === 4, `${viewport.width}×${viewport.height}: all four field sizes are exposed`);
+    await fields.getByRole('radio', { name: '100 racers', exact: true }).click();
+    report(await fields.getByRole('radio', { name: '100 racers', exact: true }).getAttribute('aria-checked') === 'true', `${viewport.width}×${viewport.height}: 100-racer selection works`);
+    report(await page.getByText(/qualifying heats are not implemented yet/).isVisible(), `${viewport.width}×${viewport.height}: experimental qualifying limitation is visible`);
+    report(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${viewport.width}×${viewport.height}: large-field setup has no horizontal overflow`);
     await context.close();
   }
 } finally {

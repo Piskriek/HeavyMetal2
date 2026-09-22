@@ -1,5 +1,9 @@
 # T00 — Repository Baseline Inventory And Protected-Data Record
 
+> Historical document recovered from the earlier workspace export. It is not
+> current verification. See [T02_RECOVERY.md](T02_RECOVERY.md) for this recovery,
+> missing snapshot payloads, test results, and outstanding limitations.
+
 Status: **complete for the parts that can be observed in this checkout.**
 Owner: safety/tooling agent. Ticket: [#33](https://github.com/Piskriek/HeavyMetal2/issues/33).
 

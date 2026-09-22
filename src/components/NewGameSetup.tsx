@@ -173,7 +173,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
               {tournament ? <div className="cup-itinerary">{CUP_ROUNDS.map((id, index) => {
                 const track = COURSES.find((c) => c.id === id)!;
                 return <div className="itinerary-stop" key={id}><img className="course-thumbnail" src={coursePreview(id)} alt={`${TRACKS[id].region} scenery`} /><span>{String(index + 1).padStart(2, '0')}</span><div><h3>{track.name}</h3><p>{TRACKS[id].region} / {TRACKS[id].character}</p></div><small>15 km</small></div>;
-              })}<div className="cup-scoring"><Trophy size={18} /><div><strong>Every finish matters.</strong><p>1st: {CUP_POINTS[0]} pts / 2nd: {CUP_POINTS[1]} / 3rd: {CUP_POINTS[2]} / 4th: {CUP_POINTS[3]}. DNF: 0.</p></div></div></div> :
+              })}<div className="cup-scoring"><Trophy size={18} /><div><strong>Every finish matters.</strong><p>{setup.fieldSize === 4 ? `1st: ${CUP_POINTS[0]} pts / 2nd: ${CUP_POINTS[1]} / 3rd: ${CUP_POINTS[2]} / 4th: ${CUP_POINTS[3]}. DNF: 0.` : '1st–9th: 9–1 pts. Remaining places and DNF: 0.'}</p></div></div></div> :
                 <div className="new-race-courses" role="radiogroup" aria-label="Choose a track" onKeyDown={radioKeys}>{COURSES.map((track) => <button key={track.id} className={`new-race-course ${setup.course === track.id ? 'selected' : ''}`} role="radio" aria-checked={setup.course === track.id} tabIndex={setup.course === track.id ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, course: track.id }))}>
                   <img className="course-thumbnail" src={coursePreview(track.id)} alt={`${TRACKS[track.id].region} scenery`} /><span><strong>{track.name}</strong><small>{TRACKS[track.id].region} / {TRACKS[track.id].character}</small></span><span className="course-check">{setup.course === track.id && <Check size={17} />}</span>
                 </button>)}</div>}
@@ -181,7 +181,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
               <div className="choice-heading difficulty-heading"><span>FIELD SIZE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="Field size" onKeyDown={radioKeys}>{FIELD_SIZES.map((size) => <button role="radio" aria-checked={setup.fieldSize === size} tabIndex={setup.fieldSize === size ? 0 : -1} className={setup.fieldSize === size ? 'selected' : ''} key={size} onClick={() => setSetup((s) => ({ ...s, fieldSize: size as FieldSize }))}>{size} racers</button>)}</div>
               <p className="difficulty-description">{setup.fieldSize > QUALIFYING_REQUIRED_ABOVE
-                ? `A ${setup.fieldSize}-racer field requires qualifying — grids above four participants never skip it.`
+                ? `Experimental ${setup.fieldSize}-racer field. Qualifying is required by the event rules, but qualifying heats are not implemented yet.`
                 : 'The classic four-lane grid. No qualifying required.'}</p>
               <div className="choice-heading difficulty-heading"><span>CPU CHALLENGE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="CPU difficulty" onKeyDown={radioKeys}>{DIFFICULTIES.map((level) => <button role="radio" aria-checked={setup.difficulty === level.id} tabIndex={setup.difficulty === level.id ? 0 : -1} className={setup.difficulty === level.id ? 'selected' : ''} key={level.id} onClick={() => setSetup((s) => ({ ...s, difficulty: level.id }))}>{level.name}</button>)}</div>

@@ -62,7 +62,7 @@ export const DEFAULT_SETUP: RaceSetup = { mode: 'quick', course: 'ridge', loadou
 /**
  * T02: qualifying is a contract rule, not a preference — required above four
  * participants, disabled at four. The heat flow that runs it lands with T04/T06;
- * until then the requirement is recorded and enforced on the config.
+ * this helper describes the rule but does not enforce a live heat gate.
  */
 export function qualifyingForField(fieldSize: number): { enabled: boolean; required: boolean } {
   const required = fieldSize > QUALIFYING_REQUIRED_ABOVE;

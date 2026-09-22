@@ -5,6 +5,14 @@
 > - You can find all files from predecessor game "Heavy Metal 1" in the [`PreGame/`](file:///c:/MarbleGp/PreGame) folder (`PreGame/assets/`, `PreGame/src/assets/`). You are **strongly encouraged** to use existing PNG/WebP assets from there (e.g. `ball-*.webp`, `bumper-*.webp`, `spring.webp`, `strip-*.webp`, `uikit.png`, `repeatingBG.png`) to style and extend the game.
 > - **Image Generation Quota**: You can only generate **10 images per turn** before your quota needs to be reset. To reset them, simply say **"Reset please"** and stop working; the user will reply with "turns reset", and you can continue with 10 more calls.
 
+## Active Ticket Handoff — T02 (#35)
+
+Recovered from the previous agent's workspace dump (`temp/temp.zip`) onto `arena/01a0c9fa-heavymetal2`. That agent implemented T02 locally on top of PR #46 and could not push. GitHub `main` was later re-uploaded as `f4c2dcb` and no longer shares history with `arena/01a0c8b7-heavymetal2`, so this branch carries the recovered T02 delta **and** the T01 contracts it compiles against. Do not treat PR #46 as mergeable into current `main`.
+
+Implemented: fields of 4/20/50/100, stable player id 0 via `RacerRegistry`, scale-safe hit ledger and pair-cooldown cache, separated gameplay/cosmetic RNG with explicit `reset(seed)`, bounded AI stagger at 120 Hz, dynamic racer mesh pool with disposal, field-size UI with qualifying required above four (heat flow itself is still T04/T06), and versioned result summaries (`RESULT_SUMMARY_POLICY` v1, unmarked truncation rejected). Four-racer formulas stay pinned. Details: `docs/T02_ROSTER_AND_SCALE.md`.
+
+Next agent: do not reopen pace/balance. Qualifying heats, release reservations, and live 100-racer WebGL disposal are out of scope here (no WebGL in the bundled Chromium). `node scripts/check.mjs` is the acceptance suite.
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

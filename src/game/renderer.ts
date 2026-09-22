@@ -35,6 +35,11 @@ export class RangeRenderer {
     return this.renderer3d.trackBuilder;
   }
 
+  /** T02: resize the racer mesh pool when the field size changes. */
+  setRacerCount(count: number) {
+    this.renderer3d.setRacerCount(count);
+  }
+
   get renderer3D() {
     return this.renderer3d;
   }

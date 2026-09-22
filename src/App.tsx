@@ -8,7 +8,7 @@ import NewGameSetup from './components/NewGameSetup';
 import { AirSupplyGuide } from './components/AirSupplies';
 import RaceScreen from './screens/RaceScreen';
 import MapEditorScreen from './screens/MapEditorScreen';
-import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, savePreference } from './game/preferences';
+import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, recordsForStorage, savePreference } from './game/preferences';
 import { COURSES, type RunRecord } from './game/types';
 import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
 import { readSave, writeSave, type SaveNotice } from './game/save';
@@ -41,7 +41,8 @@ export default function App() {
   const recoveryNotes = useMemo(() => [...(restartNote ? [restartNote] : []), ...notices.map((notice) => notice.text)], [restartNote, notices]);
 
   useEffect(() => { if (!savePreference(OPTIONS_KEY, options)) setPersistWarning(WRITE_FAILED); }, [options]);
-  useEffect(() => { if (!savePreference(RECORDS_KEY, records)) setPersistWarning(WRITE_FAILED); }, [records]);
+  // T02: stored under the explicit summary policy; the in-memory list keeps every row.
+  useEffect(() => { if (!savePreference(RECORDS_KEY, recordsForStorage(records))) setPersistWarning(WRITE_FAILED); }, [records]);
   useEffect(() => { savePreference(SETUP_KEY, lastSetup); }, [lastSetup]);
   // Atomic, idempotent persistence of the event phase. Identical payloads are not rewritten.
   useEffect(() => {
@@ -155,8 +156,8 @@ export default function App() {
           {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={Boolean(session)} finishedSession={session ? sessionComplete(session) : false} onStart={startRace} onClose={closePanel} />}
 
           {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop">
-            <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the other three riders. Falling costs time, not the whole race.</p>
-            <div className="handbook-row"><MousePointer2 size={23} /><div><h3>Launch all four goblins</h3><p>Pull your glowing ball back and release. Or adjust power and angle with the arrow keys, then press Enter.</p></div><kbd>Drag</kbd></div>
+            <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the rival riders. Falling costs time, not the whole race.</p>
+            <div className="handbook-row"><MousePointer2 size={23} /><div><h3>Launch the whole grid</h3><p>Pull your glowing ball back and release. Or adjust power and angle with the arrow keys, then press Enter.</p></div><kbd>Drag</kbd></div>
             <div className="handbook-row"><ArrowRight size={23} /><div><h3>Take the racing line. Or theirs.</h3><p>A and D change lanes. Contact shoves rivals sideways. Heavy balls push harder, but light balls jump higher.</p></div><kbd>A / D</kbd></div>
             <div className="handbook-row"><Play size={22} /><div><h3>A little hop, a lot of trouble</h3><p>W or J bunny-hops from the ground. Space spends an air-bounce charge. Shift boosts; chevron pads refill a charge.</p></div><kbd>W / Space / Shift</kbd></div>
             <div className="handbook-row"><Settings2 size={23} /><div><h3>Keep the chaos under control</h3><p>P pauses. R restarts the current unfinished race. M toggles sound. Presets are fixed during competition; Quick Race custom practice enables the tuning sliders.</p></div><Keyboard size={25} /></div>
@@ -167,7 +168,7 @@ export default function App() {
           {panel === 'records' && <Modal key="records" title="Hall of Chaos" eyebrow="SOME BAD IDEAS BECOME LEGENDS" onClose={closePanel} className="fantasy-dialog" wide backdrop="vault">
             {records.length ? <>
               <p className="fantasy-lead">Your best runs, saved on this device. No account. No witnesses required.</p>
-              <div className="fantasy-records-wrap"><table className="fantasy-records"><thead><tr><th>Rank</th><th>Track</th><th>Finish</th><th>Distance</th><th>Chaos</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td>{String(index + 1).padStart(2, '0')}</td><td>{COURSES.find((track) => track.id === record.course)?.name ?? 'Rustbucket Ridge'}<small>{recordModeLabel(record)} / {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></td><td>{record.completed ? `${record.position ?? 1} / 4` : 'DNF'}</td><td>{record.distance.toLocaleString()} m</td><td>{record.score.toLocaleString()}</td></tr>)}</tbody></table></div>
+              <div className="fantasy-records-wrap"><table className="fantasy-records"><thead><tr><th>Rank</th><th>Track</th><th>Finish</th><th>Distance</th><th>Chaos</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td>{String(index + 1).padStart(2, '0')}</td><td>{COURSES.find((track) => track.id === record.course)?.name ?? 'Rustbucket Ridge'}<small>{recordModeLabel(record)} / {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></td><td>{record.completed ? `${record.position ?? 1} / ${record.fieldSize ?? 4}` : 'DNF'}</td><td>{record.distance.toLocaleString()} m</td><td>{record.score.toLocaleString()}</td></tr>)}</tbody></table></div>
               <div className="fantasy-dialog-actions"><button className="fantasy-link" onClick={() => { if (clearRecords) { setRecords([]); setClearRecords(false); } else setClearRecords(true); }}>{clearRecords ? 'Confirm: clear local records' : 'Clear local records'}</button>{clearRecords && <button className="fantasy-link" onClick={() => setClearRecords(false)}>Cancel</button>}<button className="fantasy-primary" onClick={closePanel}>Back <ArrowLeft size={15} /></button></div>
             </> : <div className="menu-empty-state"><Trophy size={53} strokeWidth={1.15} /><h3>A Legend in the Making</h3><p>The record book is empty.<br />The track is not going to wreck itself.</p><button className="fantasy-primary" onClick={newGame}>Make Some History <ArrowRight size={16} /></button></div>}
           </Modal>}

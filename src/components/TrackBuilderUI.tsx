@@ -3,14 +3,16 @@ import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
   Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
-  Move
+  Move, Database, History, Save, RefreshCw, CheckCircle2,
+  HardDrive, Clock, ShieldCheck
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
   TrackBuilder3D,
   PROP_DEFINITIONS,
   type PropCategory,
-  type PlacedProp
+  type PlacedProp,
+  type DecalSide
 } from '../game/track-builder-3d';
 import { SKY_PRESETS } from '../game/renderer-3d';
 
@@ -46,13 +48,29 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [decalDefault, setDecalDefault] = useState(builder.snapping.decalDefault ?? false);
   const [showPropsDrawer, setShowPropsDrawer] = useState(false);
   const [currentSky, setCurrentSky] = useState<string>(builder.getSkybox());
+  const [decalLightingDefault, setDecalLightingDefault] = useState<boolean>(builder.snapping.decalLightingDefault ?? true);
+  const [selectedStageFilter, setSelectedStageFilter] = useState<'all' | 'alpine' | 'canyon' | 'cavern' | 'stadium'>('all');
   const [showSkyMenu, setShowSkyMenu] = useState(false);
+  const [showBackupsModal, setShowBackupsModal] = useState(false);
+  const [backupInfo, setBackupInfo] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; timestamp: number; count: number }>({
+    status: 'idle',
+    timestamp: 0,
+    count: builder.getProps().length,
+  });
+  const [backupsList, setBackupsList] = useState<{ latest: any; history: any[]; localHistory: any[] }>({
+    latest: null,
+    history: [],
+    localHistory: [],
+  });
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly (Space: up, Z: down), Right-Drag to look, Click props to select');
 
   const keysRef = useRef(new Set<string>());
   const isRightMouseDown = useRef(false);
   const isDraggingSelected = useRef(false);
   const isRotatingSelected = useRef(false);
+  const isDraggingDecalSide = useRef(false);
+  const activeDecalSide = useRef<DecalSide | null>(null);
   const lastDragSurfacePoint = useRef<{ x: number; y: number; z: number } | null>(null);
   const clickMoveEnabledRef = useRef(false);
   clickMoveEnabledRef.current = clickMoveEnabled;
@@ -74,6 +92,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       setSelectedProps(builder.getSelectedProps());
       setActivePropType(builder.getActivePropType());
       setCurrentSky(builder.getSkybox());
+      setCameraFacingDefault(builder.snapping.cameraFacingDefault);
+      setDecalDefault(builder.snapping.decalDefault ?? false);
+      setDecalLightingDefault(builder.snapping.decalLightingDefault ?? true);
       onRequestRender?.();
     };
     builder.onChange(update);
@@ -82,6 +103,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       builder.freeFly.active = false;
     };
   }, [builder, onRequestRender]);
+
+  // Sync course and backup status
+  useEffect(() => {
+    if (course) {
+      builder.setCourse(course);
+    }
+    const unsub = builder.onBackupStatus((info) => {
+      setBackupInfo(info);
+    });
+    return () => unsub();
+  }, [builder, course]);
 
   // Animation frame loop for smooth fly camera
   useEffect(() => {
@@ -118,8 +150,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             onRequestRender?.();
           }
         } else {
+          // Check if clicking decal side handle (yellow manipulation box on decal edges)
+          const hitDecalSide = builder.getSelectedProps().length === 1 && builder.raycastDecalSideHandle(e.clientX, e.clientY, canvas);
+          if (hitDecalSide) {
+            builder.pushUndo();
+            isDraggingDecalSide.current = true;
+            activeDecalSide.current = hitDecalSide.side;
+            lastPointerPos.current = { x: e.clientX, y: e.clientY };
+            showToast(`Manipulating ${hitDecalSide.side.toUpperCase()} decal edge [Drag up/down to tilt/slope]`);
+            return;
+          }
+
           // Check if clicking in-place rotation handle
           if (builder.getSelectedProps().length > 0 && builder.raycastRotateHandle(e.clientX, e.clientY, canvas)) {
+            builder.pushUndo();
             isRotatingSelected.current = true;
             lastPointerPos.current = { x: e.clientX, y: e.clientY };
             showToast('Orbit / Rotate In-Place: Drag left/right');
@@ -169,6 +213,19 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         onRequestRender?.();
       }
 
+      // Dragging decal side handle (raising/lowering front, back, left, right edge)
+      if (isDraggingDecalSide.current && activeDecalSide.current && !isRightMouseDown.current) {
+        const dy = e.clientY - lastPointerPos.current.y;
+        lastPointerPos.current = { x: e.clientX, y: e.clientY };
+        const selected = builder.getSelectedProp();
+        if (selected && dy !== 0) {
+          const deltaElevation = -dy * 1.5;
+          builder.nudgeDecalSide(selected.id, activeDecalSide.current, deltaElevation, false, false);
+          onRequestRender?.();
+        }
+        return;
+      }
+
       // Rotating/tilting selected prop in-place around centroid
       if (isRotatingSelected.current && !isRightMouseDown.current) {
         const dx = e.clientX - lastPointerPos.current.x;
@@ -207,9 +264,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         onRequestRender?.();
       } else {
         // Hover check in select mode
+        const hitDecalSide = builder.getSelectedProps().length === 1 && builder.raycastDecalSideHandle(e.clientX, e.clientY, canvas);
         const hitHandle = builder.getSelectedProps().length > 0 && builder.raycastRotateHandle(e.clientX, e.clientY, canvas);
-        const hit = hitHandle || builder.raycastProp(e.clientX, e.clientY, canvas);
-        canvas.style.cursor = hitHandle ? 'grab' : (hit ? 'pointer' : 'default');
+        const hitProp = builder.raycastProp(e.clientX, e.clientY, canvas);
+        if (hitDecalSide) {
+          canvas.style.cursor = 'ns-resize';
+        } else if (hitHandle) {
+          canvas.style.cursor = 'grab';
+        } else if (hitProp) {
+          canvas.style.cursor = 'pointer';
+        } else {
+          canvas.style.cursor = 'default';
+        }
       }
     };
 
@@ -222,6 +288,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (isDraggingDecalSide.current) {
+          isDraggingDecalSide.current = false;
+          activeDecalSide.current = null;
+          builder.saveToStorage();
+          onRequestRender?.();
+        }
         isDraggingSelected.current = false;
         lastDragSurfacePoint.current = null;
         isRotatingSelected.current = false;
@@ -338,6 +410,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast(`Tilt adjusted for ${selected.length} item(s)`);
           onRequestRender?.();
         }
+      } else if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) {
+        const selected = builder.getSelectedProps();
+        if (selected.length > 0) {
+          e.preventDefault();
+          const stepDeg = e.shiftKey ? -15 : 15;
+          builder.pushUndo();
+          builder.rotateSelectedProps((stepDeg * Math.PI) / 180);
+          showToast(`Rotated ${selected.length} item(s) (${stepDeg > 0 ? `+${stepDeg}` : stepDeg}°) [Key: R]`);
+          onRequestRender?.();
+        }
       } else if (e.code === 'KeyX' && !e.ctrlKey && !e.metaKey) {
         const selected = builder.getSelectedProps();
         if (selected.length > 0) {
@@ -448,6 +530,74 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     input.click();
   };
 
+  const refreshBackupsList = async () => {
+    setIsLoadingBackups(true);
+    try {
+      const data = await builder.fetchBackups();
+      setBackupsList(data);
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showBackupsModal) {
+      refreshBackupsList();
+    }
+  }, [showBackupsModal]);
+
+  const handleSaveDiskBackup = async () => {
+    const res = await builder.backupToFile(true);
+    if (res) {
+      showToast(`Saved backup file to disk! (${res.count} props)`);
+      refreshBackupsList();
+    } else {
+      showToast('Disk backup saved.');
+      refreshBackupsList();
+    }
+  };
+
+  const handleRestoreStarterDecorations = async () => {
+    if (confirm('Restore the 14 starter track decorations? This will replace your current placed props.')) {
+      await builder.restoreDefaultPreset();
+      showToast('Restored 14 starter track decorations!');
+      setShowBackupsModal(false);
+    }
+  };
+
+  const handleRestoreFile = async (filename: string) => {
+    if (confirm(`Restore backup file "${filename}"?`)) {
+      const ok = await builder.restoreBackupFile(filename);
+      if (ok) {
+        showToast(`Restored backup ${filename}!`);
+        setShowBackupsModal(false);
+      } else {
+        showToast('Failed to restore backup file.');
+      }
+    }
+  };
+
+  const handleRestoreLocalSnapshot = (props: PlacedProp[]) => {
+    if (confirm(`Restore browser snapshot with ${props.length} props?`)) {
+      builder.pushUndo();
+      builder.importJson(JSON.stringify(props));
+      showToast(`Restored ${props.length} props from browser backup!`);
+      setShowBackupsModal(false);
+    }
+  };
+
+  const handleDownloadSpecificBackup = (data: any, name: string) => {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${name}!`);
+  };
+
   const filteredProps = PROP_DEFINITIONS.filter((p) => p.category === category);
   const placedProps = builder.getProps();
 
@@ -512,6 +662,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         setCurrentSky(p.id);
                         setShowSkyMenu(false);
                         showToast(`Atmosphere: ${p.name}`);
+                        onRequestRender?.();
                       }}
                       className={`flex items-center gap-2.5 px-2 py-1.5 rounded text-xs text-left transition-colors cursor-pointer ${
                         isActive
@@ -574,14 +725,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             Snap Centerline
           </label>
 
-          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed PNG decorations rotate to always face the camera. When disabled, they are placed with a fixed 3D world orientation.">
+          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed PNG decorations rotate to always face the camera. When disabled, they are placed with a fixed 3D world orientation facing the camera angle.">
             <input
               type="checkbox"
               checked={cameraFacingDefault}
               onChange={(e) => {
                 setCameraFacingDefault(e.target.checked);
-                builder.snapping.cameraFacingDefault = e.target.checked;
-                showToast(e.target.checked ? 'Default: Camera Facing (Billboard)' : 'Default: Fixed 3D World Orientation');
+                builder.setCameraFacingDefault(e.target.checked);
+                showToast(e.target.checked ? 'Mode: Camera Facing (Billboard) [Active for future placements]' : 'Mode: Fixed 3D World Orientation [Active for future placements]');
               }}
               className="rounded border-zinc-700 text-amber-500 focus:ring-0"
             />
@@ -594,12 +745,26 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               checked={decalDefault}
               onChange={(e) => {
                 setDecalDefault(e.target.checked);
-                builder.snapping.decalDefault = e.target.checked;
+                builder.setDecalDefault(e.target.checked);
                 showToast(e.target.checked ? 'Default: Decal (Flat on Track/Ground)' : 'Default: Upright Decoration');
               }}
               className="rounded border-zinc-700 text-amber-500 focus:ring-0"
             />
             Decal (Flat)
+          </label>
+
+          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed decals receive colored sky/sun/ambient lighting to match the track.">
+            <input
+              type="checkbox"
+              checked={decalLightingDefault}
+              onChange={(e) => {
+                setDecalLightingDefault(e.target.checked);
+                builder.setDecalLightingDefault(e.target.checked);
+                showToast(e.target.checked ? 'Default: Decals Receive Lighting (Match Track)' : 'Default: Decals Unlit (Raw Brightness)');
+              }}
+              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
+            />
+            Decal Lighting
           </label>
         </div>
 
@@ -633,6 +798,33 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           >
             <Upload size={14} /> Import
           </button>
+          <button
+            onClick={() => setShowBackupsModal(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-300 rounded border border-amber-600/70 font-semibold transition-colors shadow-sm cursor-pointer"
+            title="Manage disk backups, historical versions, and restore default decorations"
+          >
+            <Database size={13} /> Backups
+          </button>
+          <div
+            onClick={() => setShowBackupsModal(true)}
+            className="hidden md:flex items-center gap-1.5 px-2 py-1 text-[11px] bg-zinc-900/90 hover:bg-zinc-850 rounded border border-zinc-700/60 text-zinc-300 cursor-pointer transition-colors"
+            title="Periodic disk auto-backup status (click to view backups)"
+          >
+            {backupInfo.status === 'saving' ? (
+              <span className="flex items-center gap-1 text-amber-400 font-medium">
+                <RefreshCw size={11} className="animate-spin" /> Saving...
+              </span>
+            ) : backupInfo.timestamp > 0 ? (
+              <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                <CheckCircle2 size={11} />
+                <span className="text-[10px]">Saved {new Date(backupInfo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-zinc-400 text-[10px]">
+                <HardDrive size={11} /> Auto-Backup Active
+              </span>
+            )}
+          </div>
           <button
             onClick={() => {
               if (confirm('Clear all placed props?')) {
@@ -691,6 +883,54 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               >
                 <X size={14} />
               </button>
+            </div>
+          </div>
+
+          {/* Batch Decal Lighting per Section Controls */}
+          <div className="bg-zinc-900/90 border-b border-zinc-800 px-3 py-2 flex flex-col gap-1.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-[11px] text-amber-300 flex items-center gap-1">
+                <Sun size={12} className="text-amber-400" />
+                <span>DECAL LIGHTING:</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const count = builder.setAllDecalsLighting(true, selectedStageFilter);
+                    showToast(`Enabled lighting for ${count} decals in ${selectedStageFilter === 'all' ? 'all sections' : selectedStageFilter}`);
+                    onRequestRender?.();
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded border border-amber-500/40 cursor-pointer"
+                  title="Turn lighting ON for decals in this section (matches track lighting)"
+                >
+                  ALL ON
+                </button>
+                <button
+                  onClick={() => {
+                    const count = builder.setAllDecalsLighting(false, selectedStageFilter);
+                    showToast(`Disabled lighting for ${count} decals in ${selectedStageFilter === 'all' ? 'all sections' : selectedStageFilter}`);
+                    onRequestRender?.();
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 cursor-pointer"
+                  title="Turn lighting OFF for decals in this section (raw unlit texture)"
+                >
+                  ALL OFF
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-zinc-400">Section:</span>
+              <select
+                value={selectedStageFilter}
+                onChange={(e) => setSelectedStageFilter(e.target.value as any)}
+                className="flex-1 bg-zinc-950 text-amber-200 border border-zinc-700/60 rounded px-1.5 py-0.5 text-[10px] cursor-pointer"
+              >
+                <option value="all">Entire Track (All Decals)</option>
+                <option value="alpine">Section 1: Alpine Downhill</option>
+                <option value="canyon">Section 2: Canyon & Waterfall</option>
+                <option value="cavern">Section 3: Cavern & Mine</option>
+                <option value="stadium">Section 4: Stadium Finish</option>
+              </select>
             </div>
           </div>
 
@@ -786,8 +1026,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
       {/* Selected Prop(s) Inspector (Floating Right) */}
       {selectedProps.length > 1 ? (
-        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
+          <div className="sticky -top-3.5 -mx-3.5 px-3.5 pt-1 pb-2 bg-zinc-950/95 backdrop-blur-md z-10 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-xs text-cyan-400">
@@ -839,6 +1079,43 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <span>Group Selected [Ctrl+G]</span>
               </button>
             )}
+          </div>
+
+          {/* Batch Atmosphere Lighting Bar */}
+          <div className="bg-zinc-900/80 rounded-md p-2 border border-zinc-800 flex flex-col gap-1.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                <Sun size={13} className="text-amber-400" />
+                <span>Atmosphere Lighting:</span>
+              </span>
+              <span className="text-[10px] text-zinc-400">
+                {selectedProps.filter((p) => p.lit !== false).length}/{selectedProps.length} Lit
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  builder.setSelectedPropsLighting(true);
+                  showToast(`Atmosphere lighting enabled for ${selectedProps.length} items`);
+                  onRequestRender?.();
+                }}
+                className="flex-1 py-1 px-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-bold rounded border border-amber-500/40 cursor-pointer flex items-center justify-center gap-1"
+                title="Enable atmosphere lighting for all selected items (matches track lighting)"
+              >
+                <Sun size={11} /> All ON (Lit)
+              </button>
+              <button
+                onClick={() => {
+                  builder.setSelectedPropsLighting(false);
+                  showToast(`Atmosphere lighting disabled for ${selectedProps.length} items`);
+                  onRequestRender?.();
+                }}
+                className="flex-1 py-1 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold rounded border border-zinc-700 cursor-pointer flex items-center justify-center gap-1"
+                title="Disable atmosphere lighting for all selected items (raw unlit)"
+              >
+                All OFF (Unlit)
+              </button>
+            </div>
           </div>
 
           {/* Active Nudge Axis Indicator & Quick Nudge */}
@@ -906,16 +1183,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
           {/* Group Orbit Rotation (Yaw around Centroid) */}
           <div className="flex flex-col gap-1 text-xs">
-            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid):</span>
-            <div className="grid grid-cols-5 gap-1">
-              {[-45, -15, 15, 45, 180].map((deg) => (
+            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid) [Key: R]:</span>
+            <div className="grid grid-cols-7 gap-1">
+              {[-90, -45, -15, 15, 45, 90, 180].map((deg) => (
                 <button
                   key={deg}
                   onClick={() => {
+                    builder.pushUndo();
                     builder.rotateSelectedProps((deg * Math.PI) / 180);
                     onRequestRender?.();
                   }}
-                  className="px-1 py-0.5 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700 cursor-pointer text-center font-mono"
+                  className="px-1 py-0.5 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700 cursor-pointer text-center font-mono font-bold"
                 >
                   {deg > 0 ? `+${deg}°` : `${deg}°`}
                 </button>
@@ -965,6 +1243,32 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
           </div>
 
+          {/* Group Camera Facing Toggle */}
+          <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+            <span className="text-zinc-400">Camera Facing:</span>
+            <button
+              onClick={() => {
+                const anyNotFacing = selectedProps.some((p) => p.cameraFacing === false);
+                const next = anyNotFacing;
+                builder.pushUndo();
+                for (const p of selectedProps) {
+                  const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
+                  if (def?.isRamp || def?.isSlingshot || def?.is3DModel || p.isDecal) continue;
+                  builder.updatePropTransform(p.id, { cameraFacing: next }, false);
+                }
+                builder.setCameraFacingDefault(next);
+                setCameraFacingDefault(next);
+                showToast(next ? 'Switched group to Camera Facing (Billboard) [Active for future placements]' : 'Switched group to Fixed 3D World Orientation [Active for future placements]');
+                onRequestRender?.();
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-600 cursor-pointer"
+              title="Toggle whether selected decorations rotate to face the camera (billboard) or stay fixed in 3D world space. Also switches placement mode for all future decorations."
+            >
+              <Camera size={13} />
+              <span>Toggle Billboard Mode</span>
+            </button>
+          </div>
+
           {/* Group Actions */}
           <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">
             <button
@@ -1005,8 +1309,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           </div>
         </div>
       ) : selectedProp ? (
-        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-72 bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
-          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
+          <div className="sticky -top-3.5 -mx-3.5 px-3.5 pt-1 pb-2 bg-zinc-950/95 backdrop-blur-md z-10 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-xs text-amber-400 truncate">{selectedProp.name}</span>
@@ -1187,7 +1491,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           {/* Rotation Y */}
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex justify-between text-zinc-400">
-              <span>Rotation Y (Yaw):</span>
+              <span>Rotation Y (Yaw) [Key: R]:</span>
               <span className="text-amber-300 font-mono">{Math.round((selectedProp.rotY * 180) / Math.PI)}°</span>
             </div>
             <input
@@ -1201,6 +1505,25 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               }
               className="accent-amber-500"
             />
+            <div className="grid grid-cols-6 gap-1 pt-0.5">
+              {[-90, -45, -15, 15, 45, 90].map((deg) => (
+                <button
+                  key={deg}
+                  onClick={() => {
+                    builder.pushUndo();
+                    const deltaRad = (deg * Math.PI) / 180;
+                    builder.updatePropTransform(selectedProp.id, {
+                      rotY: (selectedProp.rotY ?? 0) + deltaRad,
+                    });
+                    onRequestRender?.();
+                  }}
+                  className="px-1 py-0.5 text-[10px] bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700/50 cursor-pointer text-center font-mono font-bold"
+                  title={`Rotate ${deg > 0 ? `+${deg}` : deg}°`}
+                >
+                  {deg > 0 ? `+${deg}°` : `${deg}°`}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tilt / In-Place Rotation */}
@@ -1269,29 +1592,288 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             if (def?.isRamp || def?.isSlingshot || def?.is3DModel) return null;
             const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
             return (
-              <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
-                <span className="text-zinc-400">Decal Mode (Flat):</span>
-                <button
-                  onClick={() => {
-                    const next = !isDecal;
-                    builder.updatePropTransform(selectedProp.id, {
-                      isDecal: next,
-                      cameraFacing: next ? false : selectedProp.cameraFacing,
-                    });
-                    showToast(next ? 'Set as Decal (Flat on Track/Ground)' : 'Set as Upright Decoration');
-                    onRequestRender?.();
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
-                    isDecal
-                      ? 'bg-emerald-600/90 hover:bg-emerald-500 text-zinc-950 border-emerald-400'
-                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
-                  }`}
-                  title="Toggle whether this item lies flat on the road/ground as a decal, or stands upright"
-                >
-                  <Layers size={13} />
-                  <span>{isDecal ? 'Decal (Flat on Ground)' : 'Upright Decoration'}</span>
-                </button>
-              </div>
+              <>
+                <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+                  <span className="text-zinc-400">Decal Mode (Flat):</span>
+                  <button
+                    onClick={() => {
+                      const next = !isDecal;
+                      builder.updatePropTransform(selectedProp.id, {
+                        isDecal: next,
+                        cameraFacing: next ? false : selectedProp.cameraFacing,
+                      });
+                      showToast(next ? 'Set as Decal (Flat on Track/Ground)' : 'Set as Upright Decoration');
+                      onRequestRender?.();
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                      isDecal
+                        ? 'bg-emerald-600/90 hover:bg-emerald-500 text-zinc-950 border-emerald-400'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+                    }`}
+                    title="Toggle whether this item lies flat on the road/ground as a decal, or stands upright"
+                  >
+                    <Layers size={13} />
+                    <span>{isDecal ? 'Decal (Flat on Ground)' : 'Upright Decoration'}</span>
+                  </button>
+                </div>
+
+                {/* Atmosphere Lighting Toggle for Decal */}
+                <div className="flex items-center justify-between pt-1.5 pb-1 text-xs border-t border-zinc-800/60">
+                  <div className="flex flex-col">
+                    <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                      <Sun size={13} className={selectedProp.lit !== false ? "text-amber-400" : "text-zinc-500"} />
+                      <span>Atmosphere Lighting:</span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500">
+                      {selectedProp.lit !== false ? 'Matches sky sun, ambient & fog' : 'Raw unlit texture (original bright)'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const nextLit = selectedProp.lit === false;
+                      builder.updatePropTransform(selectedProp.id, { lit: nextLit });
+                      showToast(nextLit ? 'Decal lighting: ON (Matches track lighting)' : 'Decal lighting: OFF (Raw unlit texture)');
+                      onRequestRender?.();
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                      selectedProp.lit !== false
+                        ? 'bg-amber-600/90 hover:bg-amber-500 text-zinc-950 border-amber-400 shadow-sm'
+                        : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border-zinc-700'
+                    }`}
+                    title="Toggle whether this decal receives colored lighting and fog from the current sky atmosphere (matching the dirt track), or renders unlit at original brightness"
+                  >
+                    <Sun size={12} />
+                    <span>{selectedProp.lit !== false ? 'ON (Lit)' : 'OFF (Unlit)'}</span>
+                  </button>
+                </div>
+
+                {isDecal && (
+                  <div className="pt-2 pb-1 border-t border-zinc-800/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                        <Compass size={13} /> Terrain Slope Alignment
+                      </span>
+                      {(() => {
+                        const angles = builder.getDecalAngles(selectedProp);
+                        return (
+                          <span className="text-[10px] font-mono text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800">
+                            Pitch: {angles.pitchDeg}° | Roll: {angles.rollDeg}°
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Primary Alignment Action Button */}
+                    <button
+                      onClick={() => {
+                        const res = builder.alignDecalToTerrain(selectedProp.id);
+                        if (res && res.hit) {
+                          showToast(`Decal aligned parallel to terrain (Pitch: ${res.pitchDeg.toFixed(1)}°, Roll: ${res.rollDeg.toFixed(1)}°)`);
+                          onRequestRender?.();
+                        } else {
+                          showToast('Could not find terrain/track directly beneath decal');
+                        }
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-zinc-950 font-bold text-xs rounded shadow-md border border-amber-300/80 transition-all cursor-pointer"
+                      title="Raycasts straight down and aligns decal perfectly parallel with the track/terrain slope beneath it"
+                    >
+                      <Compass size={14} />
+                      <span>Align Decal Parallel to Terrain</span>
+                    </button>
+
+                    {/* Dedicated Decal Surface Heading & Spin */}
+                    <div className="bg-zinc-900/90 rounded border border-emerald-500/40 p-2 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                          <RotateCw size={13} />
+                          <span>Decal Surface Spin (In-Place)</span>
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-amber-300 bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">
+                          {Math.round(((selectedProp.rotY ?? 0) * 180) / Math.PI)}°
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 leading-tight">
+                        Spins decal flat on the surface without detaching from slope [Key: R]:
+                      </p>
+                      <input
+                        type="range"
+                        min={-Math.PI}
+                        max={Math.PI}
+                        step="0.02"
+                        value={selectedProp.rotY ?? 0}
+                        onChange={(e) => {
+                          builder.updatePropTransform(selectedProp.id, { rotY: parseFloat(e.target.value) });
+                          onRequestRender?.();
+                        }}
+                        className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-zinc-800 rounded-lg appearance-none"
+                      />
+                      <div className="grid grid-cols-7 gap-1 pt-0.5">
+                        {[-90, -45, -15, 15, 45, 90, 180].map((deg) => (
+                          <button
+                            key={deg}
+                            onClick={() => {
+                              builder.pushUndo();
+                              const deltaRad = (deg * Math.PI) / 180;
+                              builder.updatePropTransform(selectedProp.id, {
+                                rotY: (selectedProp.rotY ?? 0) + deltaRad,
+                              });
+                              onRequestRender?.();
+                            }}
+                            className="px-1 py-1 text-[10px] bg-zinc-800/80 hover:bg-emerald-900/60 hover:text-emerald-300 text-zinc-200 rounded border border-zinc-700/60 cursor-pointer text-center font-mono font-bold"
+                            title={`Turn ${deg > 0 ? `+${deg}` : deg}°`}
+                          >
+                            {deg > 0 ? `+${deg}°` : `${deg}°`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Decal Side Yellow Box Manipulators */}
+                    <div className="bg-zinc-900/90 rounded border border-yellow-500/40 p-2 text-xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 font-bold text-yellow-400">
+                          <span className="inline-block w-3 h-3 bg-yellow-400 border border-black rounded-sm shadow-sm" />
+                          <span>Decal Edge Elevators</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            builder.resetDecalFlat(selectedProp.id);
+                            showToast('Decal reset flat (0° pitch & roll)');
+                            onRequestRender?.();
+                          }}
+                          className="text-[10px] text-zinc-400 hover:text-amber-300 px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 hover:border-amber-400/50 cursor-pointer"
+                          title="Reset to completely flat horizontal"
+                        >
+                          Reset Flat
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-zinc-400 leading-tight">
+                        Drag the <strong className="text-yellow-300">yellow boxes</strong> on the decal edges in 3D, or use the elevator buttons below:
+                      </p>
+
+                      {/* Grid of 4 sides */}
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {/* Front Edge */}
+                        <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800/80 flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-yellow-300">
+                            <span>▲ Front (Downhill)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'front', -10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold rounded border border-zinc-700 cursor-pointer"
+                              title="Lower front edge by 10 units"
+                            >
+                              ▼ -10
+                            </button>
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'front', 10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-[10px] font-bold rounded border border-yellow-500/40 cursor-pointer"
+                              title="Raise front edge by 10 units"
+                            >
+                              ▲ +10
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Back Edge */}
+                        <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800/80 flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-yellow-300">
+                            <span>▼ Back (Uphill)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'back', -10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold rounded border border-zinc-700 cursor-pointer"
+                              title="Lower back edge by 10 units"
+                            >
+                              ▼ -10
+                            </button>
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'back', 10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-[10px] font-bold rounded border border-yellow-500/40 cursor-pointer"
+                              title="Raise back edge by 10 units"
+                            >
+                              ▲ +10
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Left Edge */}
+                        <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800/80 flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-yellow-300">
+                            <span>◄ Left (Bank L)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'left', -10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold rounded border border-zinc-700 cursor-pointer"
+                              title="Lower left edge by 10 units"
+                            >
+                              ▼ -10
+                            </button>
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'left', 10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-[10px] font-bold rounded border border-yellow-500/40 cursor-pointer"
+                              title="Raise left edge by 10 units"
+                            >
+                              ▲ +10
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Right Edge */}
+                        <div className="bg-zinc-950/70 p-1.5 rounded border border-zinc-800/80 flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-yellow-300">
+                            <span>► Right (Bank R)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'right', -10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold rounded border border-zinc-700 cursor-pointer"
+                              title="Lower right edge by 10 units"
+                            >
+                              ▼ -10
+                            </button>
+                            <button
+                              onClick={() => {
+                                builder.nudgeDecalSide(selectedProp.id, 'right', 10, true, true);
+                                onRequestRender?.();
+                              }}
+                              className="flex-1 py-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-[10px] font-bold rounded border border-yellow-500/40 cursor-pointer"
+                              title="Raise right edge by 10 units"
+                            >
+                              ▲ +10
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             );
           })()}
 
@@ -1307,8 +1889,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <button
                   onClick={() => {
                     const next = !isFacing;
+                    builder.pushUndo();
                     builder.updatePropTransform(selectedProp.id, { cameraFacing: next });
-                    showToast(next ? 'Set to Camera Facing (Billboard)' : 'Set to Fixed 3D World Orientation');
+                    builder.setCameraFacingDefault(next);
+                    setCameraFacingDefault(next);
+                    showToast(next ? 'Mode: Camera Facing (Billboard) [Active for future placements]' : 'Mode: Fixed 3D World Orientation [Active for future placements]');
                     onRequestRender?.();
                   }}
                   className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
@@ -1316,7 +1901,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       ? 'bg-amber-600/90 hover:bg-amber-500 text-zinc-950 border-amber-400'
                       : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
                   }`}
-                  title="Toggle whether this decoration rotates to face the camera (billboard) or stays fixed in 3D world space"
+                  title="Toggle whether this decoration rotates to face the camera (billboard) or stays fixed in 3D world space. Switches mode so all subsequent placements behave as such until pressed again."
                 >
                   <Camera size={13} />
                   <span>{isFacing ? 'ON (Billboard)' : 'OFF (Fixed 3D)'}</span>
@@ -1484,6 +2069,239 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           })}
         </div>
       </div>
+
+      {/* Backups & Restore Modal */}
+      {showBackupsModal && (
+        <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl max-h-[85vh] bg-zinc-950 border border-amber-500/60 rounded-xl shadow-2xl flex flex-col overflow-hidden text-amber-100">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 bg-zinc-900/90 border-b border-amber-500/40">
+              <div className="flex items-center gap-2">
+                <Database className="text-amber-400" size={18} />
+                <h3 className="font-bold text-sm text-amber-300 tracking-wide uppercase">
+                  Track Props & Decorations Backups
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowBackupsModal(false)}
+                className="p-1.5 text-zinc-400 hover:text-amber-300 hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                title="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs scrollbar-thin">
+              {/* Status Banner */}
+              <div className="bg-zinc-900/80 border border-zinc-800 rounded-lg p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-amber-400">Current Scene:</span>
+                    <span className="bg-amber-950/80 text-amber-300 border border-amber-600/50 px-2 py-0.5 rounded font-mono font-bold">
+                      {placedProps.length} props placed
+                    </span>
+                    <span className="text-zinc-400 font-mono text-[11px] capitalize">
+                      Track: {course ?? 'ridge'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                    <Clock size={12} className="text-amber-500" />
+                    <span>Auto-backup creates periodic files in <code className="text-amber-300 font-mono">backups/props/</code> every 30s.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleSaveDiskBackup}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-zinc-950 font-bold rounded shadow transition-colors cursor-pointer"
+                    title="Force immediate backup to disk file"
+                  >
+                    <Save size={13} />
+                    <span>Save Backup Now</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  onClick={handleRestoreStarterDecorations}
+                  className="flex items-center justify-center gap-1.5 p-2.5 bg-zinc-900 hover:bg-zinc-850 text-emerald-300 border border-emerald-700/50 rounded-lg font-medium transition-colors cursor-pointer"
+                  title="Restore slingshot launcher, lanterns, flags, archway, decals & pine walls"
+                >
+                  <RefreshCw size={13} />
+                  <span>Restore Starter Preset</span>
+                </button>
+
+                <button
+                  onClick={handleExport}
+                  className="flex items-center justify-center gap-1.5 p-2.5 bg-zinc-900 hover:bg-zinc-850 text-amber-300 border border-zinc-700/60 rounded-lg font-medium transition-colors cursor-pointer"
+                  title="Download current layout as JSON"
+                >
+                  <Download size={13} />
+                  <span>Download Current JSON</span>
+                </button>
+
+                <button
+                  onClick={handleImport}
+                  className="flex items-center justify-center gap-1.5 p-2.5 bg-zinc-900 hover:bg-zinc-850 text-amber-300 border border-zinc-700/60 rounded-lg font-medium transition-colors cursor-pointer"
+                  title="Upload and load a JSON file from disk"
+                >
+                  <Upload size={13} />
+                  <span>Upload & Restore File</span>
+                </button>
+              </div>
+
+              {/* Disk Backups Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-400 text-xs flex items-center gap-1.5">
+                    <HardDrive size={14} /> Disk Backups (backups/props/)
+                  </span>
+                  <button
+                    onClick={refreshBackupsList}
+                    disabled={isLoadingBackups}
+                    className="text-[11px] text-zinc-400 hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={10} className={isLoadingBackups ? 'animate-spin' : ''} /> Refresh
+                  </button>
+                </div>
+
+                {/* Latest Disk Backup Card */}
+                {backupsList.latest ? (
+                  <div className="bg-zinc-900/90 border border-amber-600/40 rounded-lg p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="p-2 bg-amber-950/80 border border-amber-500/50 rounded-md text-amber-400 shrink-0">
+                        <HardDrive size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-amber-200 truncate">track-props-latest.json</span>
+                          <span className="bg-amber-950/80 text-amber-300 text-[10px] px-1.5 py-0.2 rounded border border-amber-600/40">
+                            Latest Disk Baseline
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-zinc-400 flex items-center gap-2 mt-0.5">
+                          <span>{backupsList.latest.props?.length ?? backupsList.latest.count ?? 0} props</span>
+                          <span>•</span>
+                          <span>{backupsList.latest.timestamp ? new Date(backupsList.latest.timestamp).toLocaleString() : 'Recent'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => {
+                          if (backupsList.latest?.props) {
+                            handleRestoreLocalSnapshot(backupsList.latest.props);
+                          } else {
+                            handleRestoreFile('track-props-latest.json');
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 rounded text-xs font-semibold cursor-pointer transition-colors"
+                      >
+                        Restore
+                      </button>
+                      <button
+                        onClick={() => handleDownloadSpecificBackup(backupsList.latest, 'track-props-latest.json')}
+                        className="p-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-600 cursor-pointer transition-colors"
+                        title="Download track-props-latest.json"
+                      >
+                        <Download size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* History Snapshots */}
+                {backupsList.history && backupsList.history.length > 0 ? (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {backupsList.history.map((h: any) => (
+                      <div
+                        key={h.filename}
+                        className="bg-zinc-900/60 hover:bg-zinc-900/90 border border-zinc-800 hover:border-zinc-700 rounded-lg p-2.5 flex items-center justify-between gap-2 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <History size={13} className="text-zinc-500 shrink-0" />
+                          <div className="min-w-0">
+                            <span className="font-mono text-[11px] text-zinc-300 truncate block">
+                              {h.filename}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">
+                              {h.count} props • {h.timestamp ? new Date(h.timestamp).toLocaleString() : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleRestoreFile(h.filename)}
+                            className="px-2 py-0.5 bg-zinc-800 hover:bg-emerald-950 hover:text-emerald-300 hover:border-emerald-600/50 text-zinc-300 border border-zinc-700 rounded text-[11px] cursor-pointer transition-colors"
+                          >
+                            Restore
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-zinc-500 text-[11px] italic py-1">
+                    No historical disk backup files yet. Changes are automatically saved every 30s.
+                  </div>
+                )}
+              </div>
+
+              {/* Local Storage Backups Section */}
+              {backupsList.localHistory && backupsList.localHistory.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-zinc-800/80">
+                  <span className="font-bold text-zinc-400 text-xs flex items-center gap-1.5">
+                    <Database size={13} /> In-Browser Local Storage Snapshots
+                  </span>
+                  <div className="space-y-1.5">
+                    {backupsList.localHistory.map((lh: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-2.5 flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ShieldCheck size={13} className="text-emerald-500 shrink-0" />
+                          <div>
+                            <span className="font-medium text-[11px] text-zinc-300 block">{lh.title}</span>
+                            <span className="text-[10px] text-zinc-500">
+                              {lh.count} props • {lh.timestamp ? new Date(lh.timestamp).toLocaleString() : 'Recently'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleRestoreLocalSnapshot(lh.props)}
+                          className="px-2 py-0.5 bg-zinc-800 hover:bg-emerald-950 hover:text-emerald-300 hover:border-emerald-600/50 text-zinc-300 border border-zinc-700 rounded text-[11px] cursor-pointer transition-colors"
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between px-5 py-3 bg-zinc-900/90 border-t border-zinc-800">
+              <span className="text-[11px] text-zinc-400">
+                Backups safeguard against browser cache clears or accidental resets.
+              </span>
+              <button
+                onClick={() => setShowBackupsModal(false)}
+                className="px-3.5 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded border border-zinc-700 cursor-pointer font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

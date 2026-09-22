@@ -144,7 +144,7 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
     mist: new THREE.MeshStandardMaterial({ color: 0xdfeef2, transparent: true, opacity: 0.18, depthWrite: false }),
   };
 }
-type Materials = ReturnType<typeof buildMaterials>;
+export type Materials = ReturnType<typeof buildMaterials>;
 
 /* -----------------------------------------------------------------------------
    2. TRACK CENTERLINE
@@ -1551,6 +1551,8 @@ function buildWorld(M: Materials, scene: THREE.Scene) {
   ];
   peaks.forEach(([x, z, r, h]) => scene.add(grounded(rockCone(x, VALLEY_Y - 300, z, r, h, M.boulder, 24), 'DistantPeak')));
 }
+
+
 
 /* -----------------------------------------------------------------------------
    7. CAMERA RIG

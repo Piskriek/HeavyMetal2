@@ -24,6 +24,8 @@ export interface PropDefinition {
   isSlingshot?: boolean;
 }
 
+export type DecalSide = 'front' | 'back' | 'left' | 'right';
+
 export interface PlacedProp {
   id: string;
   type: string;
@@ -33,6 +35,8 @@ export interface PlacedProp {
   z: number;
   rotY: number;
   rotZ?: number;
+  rotX?: number;
+  quaternion?: [number, number, number, number];
   scale: number;
   alignToTrack: boolean;
   trackDist?: number;
@@ -40,6 +44,7 @@ export interface PlacedProp {
   flipX?: boolean;
   isDecal?: boolean;
   groupId?: string;
+  lit?: boolean;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
@@ -126,22 +131,37 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'prop_45_cheer_platform', name: 'Goblin Cheer Platform', category: 'stadium', url: '/art/props/alpha/prop-45-goblin-cheer-platform-horn.png', defaultWidth: 1100, defaultHeight: 600 },
   { type: 'prop_50_flag_pole_row', name: 'Pennant Flag Pole Row', category: 'stadium', url: '/art/props/alpha/prop-50-pennant-flag-pole-row.png', defaultWidth: 1200, defaultHeight: 650 },
 
-  // --- ROAD DECALS (WARCRAFT RTS DIRT ROAD & TRACK DECALS) ---
-  { type: 'decal_wc_grass_patch', name: 'Lush Grass Patch (Bandaid)', category: 'decals', url: '/art/decals/decal-wc-grass-patch.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
-  { type: 'decal_wc_grass_seam', name: 'Grass-to-Dirt Seam (Bandaid)', category: 'decals', url: '/art/decals/decal-wc-grass-seam.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
-  { type: 'decal_wc_rocky_dirt', name: 'Dirt & Grass Rim (Bandaid)', category: 'decals', url: '/art/decals/decal-wc-rocky-dirt.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
-  { type: 'decal_wc_mud_puddle', name: 'Muddy Dirt Puddle (Bandaid)', category: 'decals', url: '/art/decals/decal-wc-mud-puddle.png', defaultWidth: 480, defaultHeight: 480, isDecal: true },
+  // --- ROAD & TERRAIN DECALS (BLIZZARD DIRT, STONE, & MODULAR BREAKUP PANELS) ---
+  // Blizzard Hand-Painted Dirt & Stone
+  { type: 'decal_blizzard_dirt_patch', name: 'Blizzard Compacted Dirt', category: 'decals', url: '/art/decals/decal-blizzard-dirt-patch.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
+  { type: 'decal_blizzard_stone_slab', name: 'Blizzard Cobble & Flagstone', category: 'decals', url: '/art/decals/decal-blizzard-stone-slab.png', defaultWidth: 560, defaultHeight: 560, isDecal: true },
+  { type: 'decal_blizzard_rock_crag', name: 'Blizzard Slate Bedrock Crag', category: 'decals', url: '/art/decals/decal-blizzard-rock-crag.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
+  { type: 'decal_blizzard_gravel_earth', name: 'Blizzard Earth & Gravel Crater', category: 'decals', url: '/art/decals/decal-blizzard-gravel-earth.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
+
+  // Modular Breakup Panels: Steel & Wood
+  { type: 'decal_panel_scrap_steel', name: 'Goblin Scrap Steel Plating', category: 'decals', url: '/art/decals/decal-panel-scrap-steel.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
+  { type: 'decal_panel_wood_planks', name: 'Rough Timber Deck Planks', category: 'decals', url: '/art/decals/decal-panel-wood-planks.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
+  { type: 'decal_panel_reinforced_wood', name: 'Reinforced Iron-Wood Panel', category: 'decals', url: '/art/decals/decal-panel-reinforced-wood.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
+  { type: 'decal_panel_iron_grate', name: 'Goblin Heavy Cast Grate', category: 'decals', url: '/art/decals/decal-panel-iron-grate.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
+
+  // Warcraft RTS Dirt & Grass Seams
+  { type: 'decal_wc_grass_patch', name: 'Lush Grass Patch', category: 'decals', url: '/art/decals/decal-wc-grass-patch.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
+  { type: 'decal_wc_grass_seam', name: 'Grass-to-Dirt Seam', category: 'decals', url: '/art/decals/decal-wc-grass-seam.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
+  { type: 'decal_wc_rocky_dirt', name: 'Dirt & Grass Rim', category: 'decals', url: '/art/decals/decal-wc-rocky-dirt.png', defaultWidth: 550, defaultHeight: 550, isDecal: true },
+  { type: 'decal_wc_mud_puddle', name: 'Muddy Dirt Puddle', category: 'decals', url: '/art/decals/decal-wc-mud-puddle.png', defaultWidth: 480, defaultHeight: 480, isDecal: true },
   { type: 'decal_wc_flagstone', name: 'Mossy Flagstone Pavers', category: 'decals', url: '/art/decals/decal-wc-flagstone.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
-  { type: 'decal_wc_gravel', name: 'Gravel & Stones (Bandaid)', category: 'decals', url: '/art/decals/decal-wc-gravel.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
-  { type: 'decal_wc_cart_ruts', name: 'Wagon Cart Dirt Ruts (Bandaid)', category: 'decals', url: '/art/decals/decal-wc-cart-ruts.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
+  { type: 'decal_wc_gravel', name: 'Gravel & River Stones', category: 'decals', url: '/art/decals/decal-wc-gravel.png', defaultWidth: 500, defaultHeight: 500, isDecal: true },
+  { type: 'decal_wc_cart_ruts', name: 'Wagon Cart Dirt Ruts', category: 'decals', url: '/art/decals/decal-wc-cart-ruts.png', defaultWidth: 580, defaultHeight: 580, isDecal: true },
   { type: 'decal_grass_fringe', name: 'Grass Fringe Border Strip', category: 'decals', url: '/art/decals/grass-fringe.png', defaultWidth: 600, defaultHeight: 300, isDecal: true },
-  { type: 'decal_tire_skid', name: 'Tire Skid Marks', category: 'decals', url: '/art/decals/decal-tire-skid.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
-  { type: 'decal_oil_spill', name: 'Oil Spill Puddle', category: 'decals', url: '/art/decals/decal-oil-spill.png', defaultWidth: 440, defaultHeight: 440, isDecal: true },
-  { type: 'decal_cracks', name: 'Asphalt Fissures & Cracks', category: 'decals', url: '/art/decals/decal-cracks.png', defaultWidth: 460, defaultHeight: 460, isDecal: true },
-  { type: 'decal_pothole', name: 'Broken Pothole Crater', category: 'decals', url: '/art/decals/decal-pothole.png', defaultWidth: 400, defaultHeight: 400, isDecal: true },
-  { type: 'decal_hazard_stripes', name: 'Caution Hazard Stripes', category: 'decals', url: '/art/decals/decal-hazard-stripes.png', defaultWidth: 620, defaultHeight: 310, isDecal: true },
+
+  // Legacy mappings updated to Blizzard theme
+  { type: 'decal_tire_skid', name: 'Timber Planks (Legacy Skid)', category: 'decals', url: '/art/decals/decal-panel-wood-planks.png', defaultWidth: 520, defaultHeight: 520, isDecal: true },
+  { type: 'decal_oil_spill', name: 'Dirt Patch (Legacy Oil)', category: 'decals', url: '/art/decals/decal-blizzard-dirt-patch.png', defaultWidth: 440, defaultHeight: 440, isDecal: true },
+  { type: 'decal_cracks', name: 'Rock Crag (Legacy Cracks)', category: 'decals', url: '/art/decals/decal-blizzard-rock-crag.png', defaultWidth: 460, defaultHeight: 460, isDecal: true },
+  { type: 'decal_pothole', name: 'Gravel Crater (Legacy Pothole)', category: 'decals', url: '/art/decals/decal-blizzard-gravel-earth.png', defaultWidth: 400, defaultHeight: 400, isDecal: true },
+  { type: 'decal_hazard_stripes', name: 'Scrap Steel (Legacy Hazard)', category: 'decals', url: '/art/decals/decal-panel-scrap-steel.png', defaultWidth: 620, defaultHeight: 310, isDecal: true },
   { type: 'decal_speed_arrow', name: 'Directional Speed Chevron', category: 'decals', url: '/art/decals/decal-speed-arrow.png', defaultWidth: 380, defaultHeight: 380, isDecal: true },
-  { type: 'decal_drain_grate', name: 'Iron Drainage Grate', category: 'decals', url: '/art/decals/decal-drain-grate.png', defaultWidth: 360, defaultHeight: 360, isDecal: true },
+  { type: 'decal_drain_grate', name: 'Iron Grate (Legacy Drain)', category: 'decals', url: '/art/decals/decal-panel-iron-grate.png', defaultWidth: 360, defaultHeight: 360, isDecal: true },
   { type: 'decal_arch_start', name: 'Start Archway (Decal)', category: 'decals', url: '/art/props/alpha/prop-51-goblin-start-archway.png', defaultWidth: 1400, defaultHeight: 1200, isDecal: true },
   { type: 'decal_arch_banner', name: 'Archway Banner (Decal)', category: 'decals', url: '/art/props/alpha/prop-55-arch-banner-flags.png', defaultWidth: 1000, defaultHeight: 380, isDecal: true },
 
@@ -178,6 +198,168 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'goblin_30_fan_aisle', name: 'Fan Aisle', category: 'goblins', url: '/art/goblins/alpha/goblin-30-fan-aisle.png', defaultWidth: 1075, defaultHeight: 600 },
 ];
 
+export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
+  {
+    id: 'prop_start_slingshot',
+    type: 'slingshot_3d_launcher',
+    name: 'Starting Grid Slingshot (3D)',
+    x: 0,
+    y: 18000,
+    z: -2500,
+    rotY: 0,
+    scale: 1.2,
+    alignToTrack: true,
+  },
+  {
+    id: 'prop_start_lantern_left',
+    type: 'prop_01_lantern_post',
+    name: 'Triple Lantern Post',
+    x: -620,
+    y: 18000,
+    z: -2100,
+    rotY: 0.3,
+    scale: 1.1,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_start_lantern_right',
+    type: 'prop_01_lantern_post',
+    name: 'Triple Lantern Post',
+    x: 620,
+    y: 18000,
+    z: -2100,
+    rotY: -0.3,
+    scale: 1.1,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_start_goblin_left',
+    type: 'goblin_01_flag_waver',
+    name: 'Flag-Waving Fan',
+    x: -720,
+    y: 18000,
+    z: -1950,
+    rotY: 0.4,
+    scale: 1.0,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_start_goblin_right',
+    type: 'goblin_02_war_drummer',
+    name: 'War Drummer Goblin',
+    x: 720,
+    y: 18000,
+    z: -1950,
+    rotY: -0.4,
+    scale: 1.0,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_start_flags_left',
+    type: 'prop_50_flag_pole_row',
+    name: 'Pennant Flag Pole Row',
+    x: -700,
+    y: 18000,
+    z: -1650,
+    rotY: 0,
+    scale: 1.0,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_start_flags_right',
+    type: 'prop_50_flag_pole_row',
+    name: 'Pennant Flag Pole Row',
+    x: 700,
+    y: 18000,
+    z: -1650,
+    rotY: 0,
+    scale: 1.0,
+    flipX: true,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_start_archway',
+    type: 'prop_51_goblin_start_archway',
+    name: 'Grand Goblin Start Archway',
+    x: 0,
+    y: 18000,
+    z: -1400,
+    rotY: 0,
+    scale: 1.0,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_decal_skid_1',
+    type: 'decal_tire_skid',
+    name: 'Rough Timber Deck Planks',
+    x: 0,
+    y: 18002,
+    z: -1900,
+    rotY: 0,
+    scale: 1.2,
+    isDecal: true,
+    alignToTrack: true,
+  },
+  {
+    id: 'prop_decal_skid_2',
+    type: 'decal_tire_skid',
+    name: 'Rough Timber Deck Planks',
+    x: 0,
+    y: 18002,
+    z: -700,
+    rotY: 0,
+    scale: 1.1,
+    isDecal: true,
+    alignToTrack: true,
+  },
+  {
+    id: 'prop_decal_grass_bandaid_left',
+    type: 'decal_wc_grass_patch',
+    name: 'Lush Grass Patch (Bandaid)',
+    x: -480,
+    y: 18002,
+    z: -1100,
+    rotY: 0.2,
+    scale: 1.0,
+    isDecal: true,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_decal_grass_bandaid_right',
+    type: 'decal_wc_grass_patch',
+    name: 'Lush Grass Patch (Bandaid)',
+    x: 480,
+    y: 18002,
+    z: -1100,
+    rotY: -0.2,
+    scale: 1.0,
+    isDecal: true,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_pine_wall_left',
+    type: 'pines_cluster',
+    name: 'Pine Forest Wall',
+    x: -1600,
+    y: 18100,
+    z: -1400,
+    rotY: 0.2,
+    scale: 1.3,
+    alignToTrack: false,
+  },
+  {
+    id: 'prop_pine_wall_right',
+    type: 'pines_cluster',
+    name: 'Pine Forest Wall',
+    x: 1700,
+    y: 18100,
+    z: -1400,
+    rotY: -0.2,
+    scale: 1.3,
+    alignToTrack: false,
+  },
+];
+
 export class TrackBuilder3D {
   private placedProps: PlacedProp[] = [];
   private propObjects = new Map<string, THREE.Object3D>();
@@ -207,12 +389,23 @@ export class TrackBuilder3D {
     gridSnap: 0,
     cameraFacingDefault: true,
     decalDefault: false,
+    decalLightingDefault: true,
   };
 
   private readonly textureLoader = new THREE.TextureLoader();
   private readonly textureCache = new Map<string, THREE.Texture>();
   private readonly raycaster = new THREE.Raycaster();
   private readonly mouseNdc = new THREE.Vector2();
+
+  private decalSideHandlesGroup: THREE.Group | null = null;
+  private readonly decalSideBoxes = new Map<DecalSide, THREE.Mesh>();
+
+  private backupIntervalTimer: any = null;
+  private backupDebounceTimer: any = null;
+  private lastBackupTimestamp = 0;
+  private backupStatus: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
+  private backupStatusListeners: ((info: { status: 'idle' | 'saving' | 'saved' | 'error'; timestamp: number; count: number }) => void)[] = [];
+  private courseId = 'ridge';
 
   private listeners: (() => void)[] = [];
   private currentSkyId = 'ridge';
@@ -241,13 +434,111 @@ export class TrackBuilder3D {
     this.notify();
   }
 
+  setCourse(courseId: string) {
+    this.courseId = courseId;
+  }
+
+  getCourse(): string {
+    return this.courseId;
+  }
+
+  onBackupStatus(cb: (info: { status: 'idle' | 'saving' | 'saved' | 'error'; timestamp: number; count: number }) => void) {
+    this.backupStatusListeners.push(cb);
+    cb({
+      status: this.backupStatus,
+      timestamp: this.lastBackupTimestamp,
+      count: this.placedProps.length,
+    });
+    return () => {
+      this.backupStatusListeners = this.backupStatusListeners.filter((l) => l !== cb);
+    };
+  }
+
+  private notifyBackupStatus(status: 'idle' | 'saving' | 'saved' | 'error') {
+    this.backupStatus = status;
+    const info = {
+      status,
+      timestamp: this.lastBackupTimestamp,
+      count: this.placedProps.length,
+    };
+    this.backupStatusListeners.forEach((cb) => {
+      try { cb(info); } catch {}
+    });
+  }
+
+  startPeriodicBackupTimer(intervalMs = 30000) {
+    if (this.backupIntervalTimer) {
+      clearInterval(this.backupIntervalTimer);
+    }
+    this.backupIntervalTimer = setInterval(() => {
+      if (this.placedProps.length > 0) {
+        this.backupToFile(false);
+      }
+    }, intervalMs);
+    if (this.backupIntervalTimer && typeof (this.backupIntervalTimer as any).unref === 'function') {
+      (this.backupIntervalTimer as any).unref();
+    }
+  }
+
   constructor(
     private readonly scene: THREE.Scene,
     private readonly camera: THREE.PerspectiveCamera,
     private readonly track: TrackData,
     private readonly materials?: any,
   ) {
+    this.initDecalSideHandles();
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const savedFacing = localStorage.getItem('hm2-builder-camera-facing-default');
+        if (savedFacing !== null) {
+          this.snapping.cameraFacingDefault = savedFacing === 'true';
+        }
+        const savedDecal = localStorage.getItem('hm2-builder-decal-default');
+        if (savedDecal !== null) {
+          this.snapping.decalDefault = savedDecal === 'true';
+        }
+        const savedLighting = localStorage.getItem('hm2-builder-decal-lighting-default');
+        if (savedLighting !== null) {
+          this.snapping.decalLightingDefault = savedLighting === 'true';
+        }
+      } catch {}
+    }
     this.loadFromStorage();
+    if (typeof window !== 'undefined') {
+      this.startPeriodicBackupTimer(30000);
+    }
+  }
+
+  setCameraFacingDefault(facing: boolean) {
+    this.snapping.cameraFacingDefault = facing;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('hm2-builder-camera-facing-default', String(facing));
+      } catch {}
+    }
+    this.updateGhostSprite();
+    this.notify();
+  }
+
+  setDecalDefault(isDecal: boolean) {
+    this.snapping.decalDefault = isDecal;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('hm2-builder-decal-default', String(isDecal));
+      } catch {}
+    }
+    this.updateGhostSprite();
+    this.notify();
+  }
+
+  setDecalLightingDefault(enabled: boolean) {
+    this.snapping.decalLightingDefault = enabled;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('hm2-builder-decal-lighting-default', String(enabled));
+      } catch {}
+    }
+    this.notify();
   }
 
   onChange(cb: () => void) {
@@ -403,17 +694,15 @@ export class TrackBuilder3D {
     const selected = this.getSelectedProps();
     if (selected.length === 0) return;
     const centroid = this.getGroupCentroid();
-    const cos = Math.cos(deltaAngle);
-    const sin = Math.sin(deltaAngle);
+    const qOrbit = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaAngle);
 
     for (const prop of selected) {
-      const ox = prop.x - centroid.x;
-      const oz = prop.z - centroid.z;
-      const nx = ox * cos - oz * sin;
-      const nz = ox * sin + oz * cos;
+      const offset = new THREE.Vector3(prop.x - centroid.x, 0, prop.z - centroid.z);
+      offset.applyQuaternion(qOrbit);
+
       this.updatePropTransform(prop.id, {
-        x: Math.round(centroid.x + nx),
-        z: Math.round(centroid.z + nz),
+        x: Math.round(centroid.x + offset.x),
+        z: Math.round(centroid.z + offset.z),
         rotY: prop.rotY + deltaAngle,
       }, false);
     }
@@ -468,6 +757,62 @@ export class TrackBuilder3D {
     this.updateSelectionBox();
     this.saveToStorage();
     this.notify();
+  }
+
+  setSelectedPropsLighting(lit: boolean) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      this.updatePropTransform(prop.id, { lit }, false);
+    }
+    this.saveToStorage();
+    this.notify();
+  }
+
+  getPropTrackSection(prop: PlacedProp): 'alpine' | 'canyon' | 'cavern' | 'stadium' {
+    if (this.track?.samples && this.track.samples.length > 0) {
+      let minDist = Infinity;
+      let stage = 'alpine';
+      const step = Math.max(1, Math.floor(this.track.samples.length / 500));
+      for (let i = 0; i < this.track.samples.length; i += step) {
+        const s = this.track.samples[i];
+        const dx = s.pos.x - prop.x;
+        const dy = s.pos.y - prop.y;
+        const dz = s.pos.z - prop.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < minDist) {
+          minDist = d2;
+          stage = s.stage;
+        }
+      }
+      if (stage === 'alpine') return 'alpine';
+      if (stage === 'canyon' || stage === 'zigzag') return 'canyon';
+      if (stage === 'cavern' || stage === 'mine') return 'cavern';
+      if (stage === 'breakthrough' || stage === 'stadium') return 'stadium';
+      return 'alpine';
+    }
+    if (prop.x < 25600) return 'alpine';
+    if (prop.x < 48000) return 'canyon';
+    if (prop.x < 68400) return 'cavern';
+    return 'stadium';
+  }
+
+  setAllDecalsLighting(lit: boolean, filterSection: 'all' | 'alpine' | 'canyon' | 'cavern' | 'stadium' = 'all'): number {
+    this.pushUndo();
+    let count = 0;
+    for (const prop of this.placedProps) {
+      if (!this.isPropDecal(prop)) continue;
+      if (filterSection !== 'all') {
+        const sec = this.getPropTrackSection(prop);
+        if (sec !== filterSection) continue;
+      }
+      this.updatePropTransform(prop.id, { lit }, false);
+      count++;
+    }
+    this.saveToStorage();
+    this.notify();
+    return count;
   }
 
   // --- FREE FLY CAMERA UPDATE ---
@@ -615,14 +960,20 @@ export class TrackBuilder3D {
 
     for (const hit of intersects) {
       const obj = hit.object;
-      // Skip sky, markers, gizmos, ghosts, sprites, and placed props
+      // Skip sky, markers, gizmos, ghosts, sprites, placed props, and handles
       if (
         obj.name === 'Sky' ||
         obj.name === 'Ghost' ||
         obj.name === 'GhostMesh' ||
+        obj.name === 'GhostDecalMesh' ||
+        obj.name === 'GhostSlingshotMesh' ||
         (obj as any).isSprite ||
         obj.name === 'DebugMarkers' ||
-        obj.name?.startsWith('PlacedProp_')
+        obj.name?.startsWith('PlacedProp_') ||
+        obj.name?.startsWith('DecalSide') ||
+        obj.name?.startsWith('DecalHandle') ||
+        obj.name === 'RotationHandleGroup' ||
+        obj.name === 'DecalSideHandlesGroup'
       ) continue;
 
       // Find closest track sample
@@ -639,7 +990,7 @@ export class TrackBuilder3D {
 
       return {
         point: hit.point,
-        normal: hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : new THREE.Vector3(0, 1, 0),
+        normal: hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0),
         sample: minD < 1800 ? closestSample : undefined,
       };
     }
@@ -667,13 +1018,40 @@ export class TrackBuilder3D {
       this.ghostMesh.position.copy(pos);
       if ((this.ghostMesh as any)._isDecalMesh) {
         this.ghostMesh.position.y += 2;
-        this.ghostMesh.rotation.x = -Math.PI / 2;
+        let rotY: number;
         if (this.snapping.alignToTrack && hit.sample) {
-          const rotY = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
-          this.ghostMesh.rotation.z = -rotY;
+          rotY = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
+        } else {
+          let dx = this.camera.position.x - pos.x;
+          let dz = this.camera.position.z - pos.z;
+          if (Math.hypot(dx, dz) < 1e-2) {
+            dx = -Math.sin(this.freeFly.yaw);
+            dz = -Math.cos(this.freeFly.yaw);
+          }
+          rotY = Math.atan2(dx, dz);
+        }
+        if (hit.normal) {
+          const F_horiz = new THREE.Vector3(Math.sin(-rotY), 0, Math.cos(-rotY)).normalize();
+          const F_surface = F_horiz.clone().sub(hit.normal.clone().multiplyScalar(F_horiz.dot(hit.normal))).normalize();
+          const R_surface = new THREE.Vector3().crossVectors(F_surface, hit.normal).normalize();
+          const mBasis = new THREE.Matrix4().makeBasis(R_surface, F_surface, hit.normal);
+          this.ghostMesh.quaternion.setFromRotationMatrix(mBasis);
+        } else {
+          this.ghostMesh.rotation.order = 'YXZ';
+          this.ghostMesh.rotation.x = -Math.PI / 2;
+          this.ghostMesh.rotation.y = -rotY;
+          this.ghostMesh.rotation.z = 0;
         }
       } else if (this.snapping.alignToTrack && hit.sample) {
         this.ghostMesh.rotation.y = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
+      } else {
+        let dx = this.camera.position.x - pos.x;
+        let dz = this.camera.position.z - pos.z;
+        if (Math.hypot(dx, dz) < 1e-2) {
+          dx = -Math.sin(this.freeFly.yaw);
+          dz = -Math.cos(this.freeFly.yaw);
+        }
+        this.ghostMesh.rotation.y = Math.atan2(dx, dz);
       }
     } else if (this.ghostSprite && this.ghostSprite.visible) {
       this.ghostSprite.position.copy(pos);
@@ -802,9 +1180,33 @@ export class TrackBuilder3D {
     let rotY = 0;
     if (this.snapping.alignToTrack && hit.sample) {
       rotY = Math.atan2(hit.sample.tangent.x, hit.sample.tangent.z);
+    } else {
+      let dx = this.camera.position.x - pos.x;
+      let dz = this.camera.position.z - pos.z;
+      if (Math.hypot(dx, dz) < 1e-2) {
+        dx = -Math.sin(this.freeFly.yaw);
+        dz = -Math.cos(this.freeFly.yaw);
+      }
+      rotY = Math.atan2(dx, dz);
     }
 
-    const isDecal = def.isDecal || this.snapping.decalDefault;
+    const isPhysical3D = Boolean(def.isRamp || def.isSlingshot || def.is3DModel);
+    const isDecal = isPhysical3D ? false : Boolean(def.isDecal || this.snapping.decalDefault);
+
+    let quaternion: [number, number, number, number] | undefined;
+    let rotX = 0;
+    let rotZ = 0;
+
+    if (isDecal && hit.normal) {
+      const F_horiz = new THREE.Vector3(Math.sin(-rotY), 0, Math.cos(-rotY)).normalize();
+      const F_surface = F_horiz.clone().sub(hit.normal.clone().multiplyScalar(F_horiz.dot(hit.normal))).normalize();
+      const R_surface = new THREE.Vector3().crossVectors(F_surface, hit.normal).normalize();
+      const mBasis = new THREE.Matrix4().makeBasis(R_surface, F_surface, hit.normal);
+      const q = new THREE.Quaternion().setFromRotationMatrix(mBasis);
+      quaternion = [q.x, q.y, q.z, q.w];
+      rotX = Math.asin(F_surface.y);
+      rotZ = Math.asin(R_surface.y);
+    }
 
     const prop: PlacedProp = {
       id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -814,13 +1216,16 @@ export class TrackBuilder3D {
       y: Math.round(pos.y),
       z: Math.round(pos.z),
       rotY,
-      rotZ: 0,
+      rotX,
+      rotZ,
+      quaternion,
       scale: 1,
       alignToTrack: this.snapping.alignToTrack,
       trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
-      cameraFacing: (def.isRamp || def.isSlingshot || def.is3DModel || isDecal) ? false : this.snapping.cameraFacingDefault,
+      cameraFacing: (isPhysical3D || isDecal) ? false : this.snapping.cameraFacingDefault,
       flipX: false,
-      isDecal,
+      isDecal: isPhysical3D ? false : isDecal,
+      lit: isDecal ? this.snapping.decalLightingDefault : undefined,
     };
 
     this.placedProps.push(prop);
@@ -938,16 +1343,84 @@ export class TrackBuilder3D {
     if (!prop) return;
 
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+    const isPhysical3D = Boolean(def?.isRamp || def?.isSlingshot || def?.is3DModel);
     const oldCameraFacing = prop.cameraFacing !== false;
-    const oldIsDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
+    const oldIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));
+    const oldLit = prop.lit !== false;
+
+    const willBeDecal = isPhysical3D ? false : (updates.isDecal !== undefined ? updates.isDecal : oldIsDecal);
+
+    // Decal rotation handling:
+    // When rotY is updated on a decal without an explicit quaternion update,
+    // spin the decal in-place around its local surface normal (0, 0, 1) by deltaYaw,
+    // and recalculate rotX (pitch) and rotZ (roll) so all transform parameters remain in sync.
+    if (willBeDecal && updates.rotY !== undefined && updates.quaternion === undefined) {
+      let deltaYaw = updates.rotY - (prop.rotY ?? 0);
+      while (deltaYaw > Math.PI) deltaYaw -= 2 * Math.PI;
+      while (deltaYaw < -Math.PI) deltaYaw += 2 * Math.PI;
+
+      if (Math.abs(deltaYaw) > 0.0001) {
+        let q: THREE.Quaternion;
+        if (prop.quaternion) {
+          q = new THREE.Quaternion(...prop.quaternion);
+        } else {
+          const qFlat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+          const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -(prop.rotY ?? 0));
+          const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), prop.rotX ?? 0);
+          const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotZ ?? 0);
+          q = qFlat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
+        }
+
+        const qSpin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), deltaYaw);
+        q.multiply(qSpin).normalize();
+        updates.quaternion = [q.x, q.y, q.z, q.w];
+
+        const F = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+        const R = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+        updates.rotX = Math.asin(Math.max(-1, Math.min(1, F.y)));
+        updates.rotZ = Math.asin(Math.max(-1, Math.min(1, R.y)));
+      }
+    } else if (willBeDecal && updates.rotZ !== undefined && updates.rotY === undefined && updates.quaternion === undefined && prop.quaternion) {
+      // If rotZ is adjusted on a decal without rotY, apply roll tilt around decal local Y
+      const deltaRoll = updates.rotZ - (prop.rotZ ?? 0);
+      if (Math.abs(deltaRoll) > 0.0001) {
+        const q = new THREE.Quaternion(...prop.quaternion);
+        const qTilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), deltaRoll);
+        q.multiply(qTilt).normalize();
+        updates.quaternion = [q.x, q.y, q.z, q.w];
+      }
+    }
+
+    if (updates.rotY !== undefined) {
+      let normalizedRotY = updates.rotY;
+      while (normalizedRotY > Math.PI) normalizedRotY -= 2 * Math.PI;
+      while (normalizedRotY < -Math.PI) normalizedRotY += 2 * Math.PI;
+      updates.rotY = normalizedRotY;
+    }
+
+    // When switching from billboard (cameraFacing: true) to fixed 3D (cameraFacing: false),
+    // orient the prop to face the current camera angle so it doesn't snap to an arbitrary heading
+    if (updates.cameraFacing === false && oldCameraFacing === true && updates.rotY === undefined && !oldIsDecal) {
+      let dx = this.camera.position.x - prop.x;
+      let dz = this.camera.position.z - prop.z;
+      if (Math.hypot(dx, dz) < 1e-2) {
+        dx = -Math.sin(this.freeFly.yaw);
+        dz = -Math.cos(this.freeFly.yaw);
+      }
+      updates.rotY = Math.atan2(dx, dz);
+    }
 
     Object.assign(prop, updates);
+    if (isPhysical3D) {
+      prop.isDecal = false;
+    }
 
     const newCameraFacing = prop.cameraFacing !== false;
-    const newIsDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
+    const newIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));
+    const newLit = prop.lit !== false;
 
-    // If cameraFacing or isDecal changed, recreate the 3D object
-    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal) {
+    // If cameraFacing, isDecal, or lit changed, recreate the 3D object
+    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal || (updates.lit !== undefined && oldLit !== newLit)) {
       const oldObj = this.propObjects.get(id);
       if (oldObj) {
         this.scene.remove(oldObj);
@@ -960,12 +1433,7 @@ export class TrackBuilder3D {
         obj.position.set(prop.x, prop.y, prop.z);
         const flip = prop.flipX ? -1 : 1;
         if (def) {
-          if (newIsDecal || (obj as any).userData?.isDecal) {
-            obj.position.y = prop.y + 2;
-            obj.rotation.x = -Math.PI / 2;
-            obj.rotation.z = -(prop.rotY + (prop.rotZ ?? 0));
-            obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
-          } else if (def.isRamp) {
+          if (def.isRamp) {
             obj.rotation.y = prop.rotY;
             obj.rotation.z = prop.rotZ ?? 0;
             obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
@@ -973,6 +1441,8 @@ export class TrackBuilder3D {
             obj.rotation.y = prop.rotY;
             obj.rotation.z = prop.rotZ ?? 0;
             obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
+          } else if (newIsDecal || (obj as any).userData?.isDecal) {
+            this.applyDecalTransform(obj, prop, def);
           } else if (prop.cameraFacing === false) {
             obj.rotation.y = prop.rotY;
             obj.rotation.z = prop.rotZ ?? 0;
@@ -994,6 +1464,68 @@ export class TrackBuilder3D {
     }
   }
 
+  isPropDecal(prop: PlacedProp): boolean {
+    const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+    if (def?.isRamp || def?.isSlingshot || def?.is3DModel) return false;
+    if (prop.isDecal !== undefined) return prop.isDecal;
+    return def?.isDecal ?? false;
+  }
+
+  private applyDecalTransform(obj: THREE.Object3D, prop: PlacedProp, _def?: PropDefinition) {
+    const flip = prop.flipX ? -1 : 1;
+    obj.position.set(prop.x, prop.y + 2, prop.z);
+    obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
+
+    if (prop.quaternion) {
+      obj.quaternion.set(prop.quaternion[0], prop.quaternion[1], prop.quaternion[2], prop.quaternion[3]);
+    } else {
+      const qFlat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -prop.rotY);
+      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), prop.rotX ?? 0);
+      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotZ ?? 0);
+      obj.quaternion.copy(qFlat).multiply(qYaw).multiply(qPitch).multiply(qRoll);
+    }
+  }
+
+  private initDecalSideHandles() {
+    this.decalSideHandlesGroup = new THREE.Group();
+    this.decalSideHandlesGroup.name = 'DecalSideHandlesGroup';
+    this.decalSideHandlesGroup.visible = false;
+
+    const boxGeo = new THREE.BoxGeometry(34, 34, 34);
+    const boxMat = new THREE.MeshStandardMaterial({
+      color: 0xffea00,
+      emissive: 0x665500,
+      roughness: 0.35,
+      metalness: 0.1,
+      depthTest: false,
+    });
+
+    const sides: DecalSide[] = ['front', 'back', 'left', 'right'];
+    for (const side of sides) {
+      const handleGroup = new THREE.Group();
+      handleGroup.name = `DecalHandle_${side}`;
+
+      const mesh = new THREE.Mesh(boxGeo, boxMat.clone());
+      mesh.name = `DecalSideBox_${side}`;
+      mesh.userData = { isDecalSideHandle: true, side };
+      mesh.renderOrder = 10002;
+
+      // High-contrast black outline
+      const edges = new THREE.EdgesGeometry(boxGeo);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2, depthTest: false });
+      const wireframe = new THREE.LineSegments(edges, lineMat);
+      wireframe.renderOrder = 10003;
+      mesh.add(wireframe);
+
+      handleGroup.add(mesh);
+      this.decalSideHandlesGroup.add(handleGroup);
+      this.decalSideBoxes.set(side, mesh);
+    }
+
+    this.scene.add(this.decalSideHandlesGroup);
+  }
+
   getPlacedRamps(): readonly PlacedProp[] {
     return this.placedProps.filter((p) => {
       const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
@@ -1007,6 +1539,7 @@ export class TrackBuilder3D {
     if (selected.length === 0 || !this.freeFly.active) {
       this.selectionBoxes.forEach((box) => { box.visible = false; });
       if (this.rotationHandle) this.rotationHandle.visible = false;
+      if (this.decalSideHandlesGroup) this.decalSideHandlesGroup.visible = false;
       return;
     }
 
@@ -1044,12 +1577,13 @@ export class TrackBuilder3D {
 
     // Centroid of selected group
     const centroid = this.getGroupCentroid();
-    let maxHandleY = centroid.y + 120;
+    const allDecals = selected.every((p) => this.isPropDecal(p));
+    let maxHandleY = allDecals ? centroid.y + 35 : centroid.y + 120;
     for (const prop of selected) {
       const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
       const h = (def?.defaultHeight ?? 500) * prop.scale;
-      const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false);
-      const hy = prop.y + (isDecal ? 50 : (def?.isSlingshot ? 440 * prop.scale : h + 70));
+      const isDecal = this.isPropDecal(prop);
+      const hy = prop.y + (isDecal ? 35 : (def?.isSlingshot ? 440 * prop.scale : h + 70));
       if (hy > maxHandleY) maxHandleY = hy;
     }
 
@@ -1067,11 +1601,12 @@ export class TrackBuilder3D {
       stem.renderOrder = 10000;
       this.rotationHandle.add(stem);
 
-      // Rotation ring / torus
-      const ringGeo = new THREE.TorusGeometry(36, 6, 8, 24);
+      // Rotation ring / torus - oriented horizontally (Math.PI / 2) for smooth top-down/isometric dragging
+      const ringGeo = new THREE.TorusGeometry(40, 7, 10, 32);
       const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false });
       const ring = new THREE.Mesh(ringGeo, ringMat);
       ring.position.y = 45;
+      ring.rotation.x = Math.PI / 2;
       ring.renderOrder = 10000;
       ring.userData = { isRotationHandle: true };
       this.rotationHandle.add(ring);
@@ -1081,6 +1616,45 @@ export class TrackBuilder3D {
 
     this.rotationHandle.position.set(centroid.x, maxHandleY, centroid.z);
     this.rotationHandle.visible = true;
+
+    // Decal side handles (4 yellow manipulation boxes on Front, Back, Left, Right edges)
+    const isSingleDecal = selected.length === 1 && this.isPropDecal(selected[0]);
+    if (isSingleDecal && this.decalSideHandlesGroup) {
+      const prop = selected[0];
+      const obj = this.propObjects.get(prop.id);
+      const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+      if (obj && def) {
+        this.decalSideHandlesGroup.position.copy(obj.position);
+        this.decalSideHandlesGroup.quaternion.copy(obj.quaternion);
+
+        const w = (def.defaultWidth || 500) * prop.scale;
+        const h = (def.defaultHeight || 500) * prop.scale;
+        const hw = w / 2;
+        const hh = h / 2;
+
+        const frontHandle = this.decalSideHandlesGroup.getObjectByName('DecalHandle_front');
+        if (frontHandle) frontHandle.position.set(0, hh, 14);
+
+        const backHandle = this.decalSideHandlesGroup.getObjectByName('DecalHandle_back');
+        if (backHandle) backHandle.position.set(0, -hh, 14);
+
+        const leftHandle = this.decalSideHandlesGroup.getObjectByName('DecalHandle_left');
+        if (leftHandle) leftHandle.position.set(-hw, 0, 14);
+
+        const rightHandle = this.decalSideHandlesGroup.getObjectByName('DecalHandle_right');
+        if (rightHandle) rightHandle.position.set(hw, 0, 14);
+
+        this.decalSideBoxes.forEach((box) => {
+          box.userData.propId = prop.id;
+        });
+
+        this.decalSideHandlesGroup.visible = true;
+      } else {
+        this.decalSideHandlesGroup.visible = false;
+      }
+    } else if (this.decalSideHandlesGroup) {
+      this.decalSideHandlesGroup.visible = false;
+    }
   }
 
   raycastRotateHandle(clientX: number, clientY: number, canvas: HTMLCanvasElement): boolean {
@@ -1092,6 +1666,242 @@ export class TrackBuilder3D {
     this.raycaster.setFromCamera(this.mouseNdc, this.camera);
     const hits = this.raycaster.intersectObjects(this.rotationHandle.children, true);
     return hits.length > 0;
+  }
+
+  raycastDecalSideHandle(clientX: number, clientY: number, canvas: HTMLCanvasElement): { side: DecalSide; prop: PlacedProp } | null {
+    if (!this.decalSideHandlesGroup || !this.decalSideHandlesGroup.visible) return null;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    this.mouseNdc.set(x, y);
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const hits = this.raycaster.intersectObjects(this.decalSideHandlesGroup.children, true);
+    if (hits.length > 0) {
+      let obj: THREE.Object3D | null = hits[0].object;
+      while (obj && !obj.userData?.isDecalSideHandle) {
+        obj = obj.parent;
+      }
+      if (obj?.userData?.isDecalSideHandle) {
+        const prop = this.placedProps.find((p) => p.id === obj!.userData.propId);
+        if (prop) {
+          return { side: obj.userData.side as DecalSide, prop };
+        }
+      }
+    }
+    return null;
+  }
+
+  alignDecalToTerrain(propId?: string): { hit: boolean; pitchDeg: number; rollDeg: number } | null {
+    const id = propId ?? this.selectedPropIds.values().next().value;
+    if (!id) return null;
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop || !this.isPropDecal(prop)) return null;
+
+    this.pushUndo();
+
+    // Raycast down from above the decal
+    const rayOrigin = new THREE.Vector3(prop.x, prop.y + 1500, prop.z);
+    this.raycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
+    let hits = this.raycaster.intersectObjects(this.scene.children, true);
+
+    let validHit: THREE.Intersection | null = null;
+    for (const h of hits) {
+      const o = h.object;
+      if (
+        o.name === 'Sky' ||
+        o.name === 'Ghost' ||
+        o.name === 'GhostMesh' ||
+        o.name === 'GhostDecalMesh' ||
+        (o as any).isSprite ||
+        o.name === 'DebugMarkers' ||
+        o.name?.startsWith('PlacedProp_') ||
+        o.name?.startsWith('DecalSide') ||
+        o.name?.startsWith('DecalHandle') ||
+        o.name === 'RotationHandleGroup' ||
+        o.name === 'DecalSideHandlesGroup'
+      ) continue;
+      validHit = h;
+      break;
+    }
+
+    if (!validHit) {
+      this.raycaster.set(new THREE.Vector3(prop.x, 25000, prop.z), new THREE.Vector3(0, -1, 0));
+      hits = this.raycaster.intersectObjects(this.scene.children, true);
+      for (const h of hits) {
+        const o = h.object;
+        if (
+          o.name === 'Sky' ||
+          o.name === 'Ghost' ||
+          o.name === 'GhostMesh' ||
+          o.name === 'GhostDecalMesh' ||
+          (o as any).isSprite ||
+          o.name === 'DebugMarkers' ||
+          o.name?.startsWith('PlacedProp_') ||
+          o.name?.startsWith('DecalSide') ||
+          o.name?.startsWith('DecalHandle') ||
+          o.name === 'RotationHandleGroup' ||
+          o.name === 'DecalSideHandlesGroup'
+        ) continue;
+        validHit = h;
+        break;
+      }
+    }
+
+    if (!validHit || !validHit.face) return { hit: false, pitchDeg: 0, rollDeg: 0 };
+
+    const normal = validHit.face.normal.clone().transformDirection(validHit.object.matrixWorld).normalize();
+    const yaw = prop.rotY ?? 0;
+    const F_horiz = new THREE.Vector3(Math.sin(-yaw), 0, Math.cos(-yaw)).normalize();
+    const F_surface = F_horiz.clone().sub(normal.clone().multiplyScalar(F_horiz.dot(normal))).normalize();
+    const R_surface = new THREE.Vector3().crossVectors(F_surface, normal).normalize();
+    const mBasis = new THREE.Matrix4().makeBasis(R_surface, F_surface, normal);
+    const q = new THREE.Quaternion().setFromRotationMatrix(mBasis);
+
+    const pitch = Math.asin(F_surface.y);
+    const roll = Math.asin(R_surface.y);
+
+    prop.x = Math.round(validHit.point.x);
+    prop.y = Math.round(validHit.point.y + 2);
+    prop.z = Math.round(validHit.point.z);
+    prop.rotX = pitch;
+    prop.rotZ = roll;
+    prop.quaternion = [q.x, q.y, q.z, q.w];
+
+    this.updatePropTransform(prop.id, {
+      x: prop.x,
+      y: prop.y,
+      z: prop.z,
+      rotX: prop.rotX,
+      rotZ: prop.rotZ,
+      quaternion: prop.quaternion,
+    }, true);
+
+    return {
+      hit: true,
+      pitchDeg: (pitch * 180) / Math.PI,
+      rollDeg: (roll * 180) / Math.PI,
+    };
+  }
+
+  nudgeDecalSide(propId: string, side: DecalSide, deltaElevation: number, pushUndo = false, autoSave = true) {
+    const prop = this.placedProps.find((p) => p.id === propId);
+    if (!prop || !this.isPropDecal(prop) || deltaElevation === 0) return;
+
+    if (pushUndo) {
+      this.pushUndo();
+    }
+
+    const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+    const W = (def?.defaultWidth || 500) * prop.scale;
+    const H = (def?.defaultHeight || 500) * prop.scale;
+    const hw = W / 2;
+    const hh = H / 2;
+
+    let q: THREE.Quaternion;
+    if (prop.quaternion) {
+      q = new THREE.Quaternion(...prop.quaternion);
+    } else {
+      const qFlat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -prop.rotY);
+      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), prop.rotX ?? 0);
+      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotZ ?? 0);
+      q = qFlat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
+    }
+
+    let pos = new THREE.Vector3(prop.x, prop.y, prop.z);
+    const R_world = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+    const F_world = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    const N_world = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+
+    let axis: THREE.Vector3;
+    let dTheta: number;
+
+    if (side === 'front') {
+      axis = R_world;
+      dTheta = deltaElevation / (2 * hh);
+    } else if (side === 'back') {
+      axis = R_world;
+      dTheta = -deltaElevation / (2 * hh);
+    } else if (side === 'left') {
+      axis = F_world;
+      dTheta = deltaElevation / (2 * hw);
+    } else {
+      // right
+      axis = F_world;
+      dTheta = -deltaElevation / (2 * hw);
+    }
+
+    const qDelta = new THREE.Quaternion().setFromAxisAngle(axis, dTheta);
+    q = qDelta.multiply(q);
+    pos.addScaledVector(N_world, deltaElevation / 2);
+
+    const pitch = Math.asin(new THREE.Vector3(0, 1, 0).applyQuaternion(q).y);
+    const roll = Math.asin(new THREE.Vector3(1, 0, 0).applyQuaternion(q).y);
+
+    prop.x = Math.round(pos.x);
+    prop.y = Math.round(pos.y);
+    prop.z = Math.round(pos.z);
+    prop.rotX = pitch;
+    prop.rotZ = roll;
+    prop.quaternion = [q.x, q.y, q.z, q.w];
+
+    this.updatePropTransform(prop.id, {
+      x: prop.x,
+      y: prop.y,
+      z: prop.z,
+      rotX: prop.rotX,
+      rotZ: prop.rotZ,
+      quaternion: prop.quaternion,
+    }, autoSave);
+  }
+
+  resetDecalFlat(propId?: string) {
+    const id = propId ?? this.selectedPropIds.values().next().value;
+    if (!id) return;
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop || !this.isPropDecal(prop)) return;
+
+    this.pushUndo();
+    prop.rotX = 0;
+    prop.rotZ = 0;
+    delete prop.quaternion;
+
+    this.updatePropTransform(prop.id, {
+      rotX: 0,
+      rotZ: 0,
+      quaternion: undefined,
+    }, true);
+  }
+
+  getDecalAngles(prop: PlacedProp): { pitchDeg: number; rollDeg: number } {
+    if (prop.quaternion) {
+      const q = new THREE.Quaternion(...prop.quaternion);
+      const F = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+      const R = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+      return {
+        pitchDeg: Math.round((Math.asin(F.y) * 180) / Math.PI),
+        rollDeg: Math.round((Math.asin(R.y) * 180) / Math.PI),
+      };
+    }
+    return {
+      pitchDeg: Math.round(((prop.rotX ?? 0) * 180) / Math.PI),
+      rollDeg: Math.round(((prop.rotZ ?? 0) * 180) / Math.PI),
+    };
+  }
+
+  rotateDecal(propId?: string, deltaRadians = Math.PI / 12, pushUndo = true) {
+    const id = propId ?? this.selectedPropIds.values().next().value;
+    if (!id) return;
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop || !this.isPropDecal(prop) || deltaRadians === 0) return;
+
+    if (pushUndo) {
+      this.pushUndo();
+    }
+
+    this.updatePropTransform(prop.id, {
+      rotY: (prop.rotY ?? 0) + deltaRadians,
+    }, true);
   }
 
   tiltSelectedProp(deltaRadians: number) {
@@ -1106,8 +1916,12 @@ export class TrackBuilder3D {
   private getTexture(url: string): THREE.Texture {
     let tex = this.textureCache.get(url);
     if (!tex) {
-      tex = this.textureLoader.load(url);
-      tex.colorSpace = THREE.SRGBColorSpace;
+      if (typeof document === 'undefined') {
+        tex = new THREE.Texture();
+      } else {
+        tex = this.textureLoader.load(url);
+        tex.colorSpace = THREE.SRGBColorSpace;
+      }
       this.textureCache.set(url, tex);
     }
     return tex;
@@ -1122,10 +1936,10 @@ export class TrackBuilder3D {
     const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def.isDecal ?? false);
 
     if (def.isRamp) {
-      // Create 3D wedge ramp mesh
-      const w = (def.defaultWidth || 960) * prop.scale * flip;
-      const len = 1100 * prop.scale;
-      const h = (def.defaultHeight || 260) * prop.scale;
+      // Create 3D wedge ramp mesh using base dimensions (scale 1.0)
+      const w = def.defaultWidth || 960;
+      const len = 1100;
+      const h = def.defaultHeight || 260;
       const mat = this.materials?.wood ?? new THREE.MeshStandardMaterial({
         color: 0x9b6b3b,
         roughness: 0.7,
@@ -1136,6 +1950,7 @@ export class TrackBuilder3D {
       mesh.position.set(prop.x, prop.y, prop.z);
       mesh.rotation.y = prop.rotY;
       mesh.rotation.z = prop.rotZ ?? 0;
+      mesh.scale.set(prop.scale * flip, prop.scale, prop.scale);
       obj = mesh;
     } else if (def.isSlingshot || def.is3DModel) {
       // Create 3D Slingshot Model
@@ -1151,22 +1966,32 @@ export class TrackBuilder3D {
       // Flat surface decal (lies flat on track/ground)
       const tex = this.getTexture(def.url);
       const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
-      const mat = new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -3,
-        polygonOffsetUnits: -3,
-      });
+      const isLit = prop.lit !== false;
+      const mat = isLit
+        ? new THREE.MeshStandardMaterial({
+            map: tex,
+            transparent: true,
+            roughness: 0.95,
+            metalness: 0.0,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -3,
+            polygonOffsetUnits: -3,
+          })
+        : new THREE.MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -3,
+            polygonOffsetUnits: -3,
+          });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;
       mesh.userData = { propId: prop.id, isDecal: true };
-      mesh.position.set(prop.x, prop.y + 2, prop.z);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.rotation.z = -(prop.rotY + (prop.rotZ ?? 0));
-      mesh.scale.set(prop.scale * flip, prop.scale, prop.scale);
+      this.applyDecalTransform(mesh, prop, def);
       obj = mesh;
     } else if (prop.cameraFacing === false) {
       // Fixed 3D World Orientation (Double-sided plane mesh)
@@ -1175,13 +2000,24 @@ export class TrackBuilder3D {
       if (def.alignBottom !== false) {
         geom.translate(0, def.defaultHeight / 2, 0);
       }
-      const mat = new THREE.MeshBasicMaterial({
-        map: tex,
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthWrite: true,
-        alphaTest: 0.2,
-      });
+      const isLit = prop.lit !== false;
+      const mat = isLit
+        ? new THREE.MeshStandardMaterial({
+            map: tex,
+            transparent: true,
+            roughness: 0.95,
+            metalness: 0.0,
+            side: THREE.DoubleSide,
+            depthWrite: true,
+            alphaTest: 0.2,
+          })
+        : new THREE.MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: THREE.DoubleSide,
+            depthWrite: true,
+            alphaTest: 0.2,
+          });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;
       mesh.userData = { propId: prop.id, isMeshProp: true };
@@ -1214,7 +2050,7 @@ export class TrackBuilder3D {
   }
 
   // --- UNDO / REDO ---
-  private pushUndo() {
+  pushUndo() {
     this.undoStack.push(JSON.stringify(this.placedProps));
     if (this.undoStack.length > 30) this.undoStack.shift();
     this.redoStack.length = 0;
@@ -1249,28 +2085,229 @@ export class TrackBuilder3D {
     this.saveToStorage();
   }
 
-  // --- PERSISTENCE ---
-  private saveToStorage() {
+  // --- PERSISTENCE & PERIODIC DISK BACKUP ---
+  saveToStorage() {
     try {
       localStorage.setItem('hm2-3d-track-props', JSON.stringify(this.placedProps));
+      if (this.placedProps.length > 0) {
+        const backupEntry = {
+          course: this.courseId,
+          timestamp: Date.now(),
+          count: this.placedProps.length,
+          props: this.placedProps,
+        };
+        localStorage.setItem('hm2-3d-track-props-backup-latest', JSON.stringify(backupEntry));
+
+        // Rolling local backup history (up to 5 in localStorage)
+        try {
+          const rawHist = localStorage.getItem('hm2-3d-track-props-backup-history');
+          const hist = rawHist ? JSON.parse(rawHist) : [];
+          if (Array.isArray(hist)) {
+            hist.unshift({
+              course: this.courseId,
+              timestamp: Date.now(),
+              count: this.placedProps.length,
+              props: this.placedProps,
+            });
+            localStorage.setItem('hm2-3d-track-props-backup-history', JSON.stringify(hist.slice(0, 5)));
+          }
+        } catch {}
+      }
     } catch {
       // Storage full or unavailable
+    }
+
+    // Schedule debounced disk backup (e.g. 2.5 seconds after user edit)
+    if (this.backupDebounceTimer) {
+      clearTimeout(this.backupDebounceTimer);
+    }
+    if (typeof window !== 'undefined') {
+      this.backupDebounceTimer = setTimeout(() => {
+        this.backupToFile(false);
+      }, 2500);
+      if (this.backupDebounceTimer && typeof (this.backupDebounceTimer as any).unref === 'function') {
+        (this.backupDebounceTimer as any).unref();
+      }
     }
   }
 
   private loadFromStorage() {
+    let loaded = false;
     try {
       const raw = localStorage.getItem('hm2-3d-track-props');
       if (raw) {
         const props: PlacedProp[] = JSON.parse(raw);
-        if (Array.isArray(props)) {
+        if (Array.isArray(props) && props.length > 0) {
           this.placedProps = props;
           this.placedProps.forEach((p) => this.createPropSprite(p));
+          loaded = true;
         }
       }
     } catch {
       // Invalid JSON
     }
+
+    // If empty or missing, try browser local backup
+    if (!loaded) {
+      try {
+        const rawBackup = localStorage.getItem('hm2-3d-track-props-backup-latest');
+        if (rawBackup) {
+          const parsed = JSON.parse(rawBackup);
+          const props: PlacedProp[] = Array.isArray(parsed) ? parsed : parsed.props;
+          if (Array.isArray(props) && props.length > 0) {
+            this.placedProps = props;
+            this.placedProps.forEach((p) => this.createPropSprite(p));
+            loaded = true;
+          }
+        }
+      } catch {}
+    }
+
+    // If still no props, bootstrap immediately with default track decorations
+    if (!loaded) {
+      this.placedProps = JSON.parse(JSON.stringify(DEFAULT_TRACK_PROPS));
+      this.placedProps.forEach((p) => this.createPropSprite(p));
+      this.saveToStorage();
+      loaded = true;
+    }
+
+    // Sync latest from disk in background
+    this.syncLatestFromDisk();
+  }
+
+  private async syncLatestFromDisk() {
+    if (typeof fetch === 'undefined') return;
+    try {
+      const res = await fetch('/api/backup-props');
+      if (!res.ok) return;
+      const data = await res.json();
+      const diskProps = data?.latest?.props;
+      if (Array.isArray(diskProps) && diskProps.length > 0) {
+        // If scene currently only has default starter items, check if disk has custom items
+        if (this.placedProps.length === 0 || this.placedProps.length === DEFAULT_TRACK_PROPS.length) {
+          this.restorePropsState(diskProps);
+          this.notify();
+        }
+      }
+    } catch {
+      // Offline / standalone preview
+    }
+  }
+
+  async backupToFile(force = false): Promise<{ success: boolean; count: number; timestamp: number } | null> {
+    if (typeof fetch === 'undefined') return null;
+    const now = Date.now();
+    if (!force && this.lastBackupTimestamp && now - this.lastBackupTimestamp < 15000) {
+      return null;
+    }
+
+    this.notifyBackupStatus('saving');
+    try {
+      const payload = {
+        course: this.courseId,
+        timestamp: now,
+        props: this.placedProps,
+      };
+
+      const res = await fetch('/api/backup-props', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        this.lastBackupTimestamp = now;
+        this.notifyBackupStatus('saved');
+        return { success: true, count: this.placedProps.length, timestamp: now };
+      } else {
+        this.notifyBackupStatus('error');
+        return null;
+      }
+    } catch {
+      this.notifyBackupStatus('idle');
+      return null;
+    }
+  }
+
+  async fetchBackups(): Promise<{ latest: any; history: any[]; localHistory: any[] }> {
+    let latest = null;
+    let history: any[] = [];
+    const localHistory: any[] = [];
+
+    if (typeof fetch !== 'undefined') {
+      try {
+        const res = await fetch('/api/backup-props');
+        if (res.ok) {
+          const data = await res.json();
+          latest = data.latest ?? null;
+          history = data.history ?? [];
+        }
+      } catch {}
+    }
+
+    try {
+      const rawLatest = localStorage.getItem('hm2-3d-track-props-backup-latest');
+      if (rawLatest) {
+        const parsed = JSON.parse(rawLatest);
+        localHistory.push({
+          source: 'localStorage',
+          title: 'Browser Auto-Save (Latest)',
+          count: parsed.count || parsed.props?.length || 0,
+          timestamp: parsed.timestamp || 0,
+          props: parsed.props || parsed,
+        });
+      }
+      const rawHist = localStorage.getItem('hm2-3d-track-props-backup-history');
+      if (rawHist) {
+        const list = JSON.parse(rawHist);
+        if (Array.isArray(list)) {
+          list.forEach((item, idx) => {
+            localHistory.push({
+              source: 'localStorage',
+              title: `Browser History #${idx + 1}`,
+              count: item.count || item.props?.length || 0,
+              timestamp: item.timestamp || 0,
+              props: item.props || item,
+            });
+          });
+        }
+      }
+    } catch {}
+
+    return { latest, history, localHistory };
+  }
+
+  async restoreBackupFile(filename: string): Promise<boolean> {
+    if (typeof fetch === 'undefined') return false;
+    try {
+      const res = await fetch('/api/restore-backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const props = Array.isArray(data) ? data : data.props;
+        if (Array.isArray(props)) {
+          this.pushUndo();
+          this.restorePropsState(props);
+          this.notify();
+          await this.backupToFile(true);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore backup file:', e);
+    }
+    return false;
+  }
+
+  async restoreDefaultPreset(): Promise<boolean> {
+    this.pushUndo();
+    this.restorePropsState(JSON.parse(JSON.stringify(DEFAULT_TRACK_PROPS)));
+    this.notify();
+    await this.backupToFile(true);
+    return true;
   }
 
   exportJson(): string {
@@ -1284,6 +2321,7 @@ export class TrackBuilder3D {
         this.pushUndo();
         this.restorePropsState(props);
         this.notify();
+        this.backupToFile(true);
       }
     } catch (e) {
       console.error('Failed to import track props JSON:', e);
@@ -1297,6 +2335,8 @@ export class TrackBuilder3D {
   }
 
   destroy() {
+    if (this.backupIntervalTimer) clearInterval(this.backupIntervalTimer);
+    if (this.backupDebounceTimer) clearTimeout(this.backupDebounceTimer);
     if (this.ghostSprite) this.scene.remove(this.ghostSprite);
     if (this.ghostMesh) this.scene.remove(this.ghostMesh);
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
@@ -1305,5 +2345,6 @@ export class TrackBuilder3D {
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
     this.listeners.length = 0;
+    this.backupStatusListeners.length = 0;
   }
 }

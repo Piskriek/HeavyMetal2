@@ -12,10 +12,13 @@ import {
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
 import type { RaceConfig } from './session';
 import { createTrackLayout } from './track-layout';
+// T01: the fixed step is owned by the frozen timing contract, so the renderer loop and any
+// headless stepper can never drift apart. Behaviour is identical (1 / 120 s).
+import { FIXED_STEP } from './contracts/timing';
 import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from './powerups';
 
 const TAU = Math.PI * 2;
-const STEP = 1 / 120;
+const STEP = FIXED_STEP;
 const BUCKET = 512;
 const EMPTY: Obstacle[] = [];
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));

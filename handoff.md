@@ -340,3 +340,43 @@ mirrors — the primary is `backups/props/track-props-latest.json`, sha256
 `0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5`, 94,867 bytes, 237 props.
 T12's "protected bytes verified against a real baseline" stays blocked until the user
 authorises a source or points `--source`/`--recovery` at the real file.
+
+## T01 Session (arena/01a0c8b7-heavymetal2, draft PR #46)
+
+Ticket [#34](https://github.com/Piskriek/HeavyMetal2/issues/34) — frozen shared contracts and
+integration ownership. New pure module tree `src/game/contracts/` (14 modules + barrel,
+`CONTRACTS_VERSION = 1`), documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md) with a
+decision table downstream tickets must not re-litigate:
+
+- `identity.ts` stable racer IDs + dense-index lookup (no bit tricks; 100 racers supported),
+  `config.ts` `normalizeRaceConfig` (an old config loads as four racers with qualifying
+  disabled; hostile input is repaired, never padded), `timing.ts` `FIXED_STEP`/`FixedStepClock`,
+  `effects.ts` (`fuel | shield | bounce` only; mystery is a resolver that resolves once and
+  can never be stored as an effect; same-tick claims arbitrated by crossing fraction then
+  racer ID), `events.ts` typed event log, `qualifying.ts` (valid entries always rank before
+  every fallback class; swept gate validation; staging bounded at 2.5 s for 4/20/50/100),
+  `heat.ts` (`staging → qualifying? → release → racing → settling → results → staging`, all
+  other transitions refused with `E_PHASE_TRANSITION`), `props.ts` (immutable registry,
+  unknown fields preserved, scale can never be applied twice), `release.ts` (corridor
+  validation + idempotent reservation ledger), `dents.ts` (3 slots, aggregate cap, exactly-once
+  50% repair), `render.ts` (deep-frozen read-only frames), `commands.ts` (typed commands with a
+  gate; identical repeats collapse), `stepping.ts` (headless `SimulationAdapter`, `runHeadless`,
+  `HeatController`).
+- `tests/contracts.test.ts`: 39 checks covering the ticket's five acceptance criteria.
+- `src/game/engine.ts` has exactly one change: `const STEP = 1 / 120` → `FIXED_STEP` imported
+  from the timing contract. Behaviour identical, value single-sourced, and it is the only
+  non-contract source file this ticket touches (T02 takes the next engine edit).
+
+Verification: `npm run check` green (tsc clean, **117/117 tests**), `npm run build` green
+(`dist/index.html` 1,444.65 kB / 397.97 kB gzip), `tests/ui-frame-check.mjs` 24/24,
+`tests/ticket05-visual.mjs` 29/29. Note: running two Chromium suites in parallel in this
+sandbox can fail with `spawn ETXTBSY`; run them serially.
+
+T00 follow-up in this session: the user authorised the decoration backup ("The decorations
+json file is backed up, use a _tmp version for now if you need"). `npm run protect:baseline`
+now has a certified snapshot at `baseline/snapshots/track-props-latest-2026-09-22T13-38-44-625Z/`
+(read-back verified, 2 recovery copies matched byte-for-byte), `inventory` reports
+`AUTHORISED BASELINE: …` from that manifest instead of assuming, and the new
+`protect-baseline.mjs tmp-copy` command writes a verified disposable copy (`scratch/*.tmp.json`,
+git-ignored) while refusing every destination outside `scratch/` and `tests/artifacts/`.
+Remaining caveat recorded in `docs/BASELINE_INVENTORY.md`: both verified copies share one disk.

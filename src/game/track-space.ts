@@ -1030,9 +1030,15 @@ export function worldVelocityFromEngine(
   };
 }
 
-/** Local engine-course slope dy/dx extracted like courseSlope() but inline-safe. */
+/**
+ * Local engine-course slope dy/dx. The engine ground is a precomputed table
+ * lerped piecewise-linearly every 16 x-units (see scene.ts), so a ±4 stencil
+ * reads the exact local table slope without the ±24 cross-cell averaging the
+ * legacy courseSlope() uses for its own collision cycle. At table knots the
+ * slope is a subgradient between the two linear pieces (documented kink).
+ */
 function engineSlopeApprox(engineX: number): number {
-  return (courseY(engineX + 24, 'ridge') - courseY(engineX - 24, 'ridge')) / 48;
+  return (courseY(engineX + 4, 'ridge') - courseY(engineX - 4, 'ridge')) / 8;
 }
 
 /**
@@ -1079,6 +1085,15 @@ export function engineFromWorld(
     if (d2 < bestLocal) { bestLocal = d2; refined = a.dist + tt * (bFrame.dist - a.dist); }
   }
   s = refined;
+  // Newton polish: slide along the interpolated centerline until the residual
+  // is perpendicular to the tangent (converges past the chord-projection bias
+  // the coarse step leaves on tight hairpins)
+  for (let it = 0; it < 4; it++) {
+    const f = map.frameAt(s);
+    const along = vdot(vsub(world, f.pos), f.tangent);
+    if (Math.abs(along) < 1e-3) break;
+    s = clampN(s + clampN(along, -TRACK_SAMPLE_SPACING / 2, TRACK_SAMPLE_SPACING / 2), 0, map.length);
+  }
 
   const frame = map.frameAt(s);
   const rel = vsub(world, frame.pos);

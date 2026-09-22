@@ -64,6 +64,12 @@ export const POLICY = {
   },
   recoveryDirs: ['backups/props/user_safety_backup', 'backups/props/history'],
   defaultOutDir: 'baseline/snapshots',
+  /**
+   * Directories a throw-away working copy may be written to. `scratch/` and
+   * `tests/artifacts/` are git-ignored, so a tmp copy can never enter a commit or overwrite
+   * protected data. Anything else (especially `backups/props/**`) is refused.
+   */
+  tmpCopyDirs: ['scratch', 'tests/artifacts'],
 };
 
 /** Typed failure so callers and tests can branch on a stable code. */
@@ -478,6 +484,71 @@ export function createSnapshot(options = {}) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Authorised throw-away working copy
+// ---------------------------------------------------------------------------
+
+/**
+ * Writes a byte-identical *temporary* copy of the protected file so experiments and tests
+ * can work against its real shape without ever touching the baseline. The copy is verified
+ * against the source hash after writing, and the destination is restricted to a git-ignored
+ * tmp directory.
+ */
+export function createTemporaryCopy(options = {}) {
+  const root = options.root ?? repoRoot();
+  const sourceRel = options.source ?? POLICY.knownBaseline[0].path;
+  const source = resolveSafe(root, sourceRel, {
+    allowSymlinks: Boolean(options.allowSymlinkSource),
+    allowExternal: Boolean(options.allowExternalSource),
+    label: '--source',
+  });
+  if (!source.exists) {
+    throw new BaselineError('E_SOURCE_MISSING', `Protected source "${source.rel}" does not exist; there is nothing to copy.`, { source: source.rel });
+  }
+  if (source.kind === 'directory') {
+    throw new BaselineError('E_SOURCE_KIND', `Protected source "${source.rel}" is a directory.`);
+  }
+
+  const destRel = assertRelativeSafe(
+    options.dest ?? `${POLICY.tmpCopyDirs[0]}/${path.basename(source.rel).replace(/\.json$/i, '')}.tmp.json`,
+    { label: '--dest' },
+  );
+  const destAbs = path.resolve(root, destRel);
+  assertInside(root, destAbs, { label: '--dest' });
+  assertNotProtected(root, destAbs, { label: '--dest' });
+  const inTmpArea = POLICY.tmpCopyDirs.some((dir) => destRel === dir || destRel.startsWith(`${dir}/`));
+  if (!inTmpArea) {
+    throw new BaselineError(
+      'E_TMP_DEST',
+      `--dest must stay inside a git-ignored tmp area (${POLICY.tmpCopyDirs.join(', ')}), got "${destRel}".`,
+      { dest: destRel, allowed: POLICY.tmpCopyDirs },
+    );
+  }
+
+  const bytes = fs.readFileSync(source.abs);
+  const sourceHash = hashBytes(bytes);
+  const observation = observeDecorationSet(bytes, { label: source.rel });
+  const result = {
+    root,
+    source: { path: source.rel, sha256: sourceHash.sha256, bytes: sourceHash.bytes },
+    dest: destRel,
+    observation,
+  };
+  if (options.dryRun) return { ok: true, dryRun: true, ...result };
+
+  fs.mkdirSync(path.dirname(destAbs), { recursive: true });
+  fs.writeFileSync(destAbs, bytes);
+  const readBack = hashBytes(fs.readFileSync(destAbs));
+  const matches = readBack.sha256 === sourceHash.sha256 && readBack.bytes === sourceHash.bytes;
+  return {
+    ok: matches,
+    dryRun: false,
+    ...result,
+    tmp: { path: destRel, sha256: readBack.sha256, bytes: readBack.bytes, matchesSource: matches },
+    warnings: matches ? [] : ['The temporary copy does not match the protected source bytes.'],
+  };
+}
+
 export function findLatestSnapshot(root = repoRoot(), outDirRel = POLICY.defaultOutDir) {
   const outDirAbs = path.resolve(root, outDirRel);
   let entries = [];
@@ -602,6 +673,53 @@ export function verifySnapshot(snapshotRelDir, options = {}) {
 // Inventory
 // ---------------------------------------------------------------------------
 
+/**
+ * Newest snapshot under `baseline/snapshots/` whose manifest records these exact primary
+ * bytes. That is the evidence that a baseline was authorised and captured, rather than
+ * merely observed.
+ */
+export function findAuthorisedSnapshot(root = repoRoot(), sourcePath = POLICY.knownBaseline[0].path, sourceHash = null) {
+  const outDirAbs = path.resolve(root, POLICY.defaultOutDir);
+  let entries = [];
+  try {
+    entries = fs.readdirSync(outDirAbs, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const matches = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const manifestPath = path.join(outDirAbs, entry.name, 'manifest.json');
+    let manifest;
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    } catch {
+      continue;
+    }
+    if (manifest?.schema !== MANIFEST_SCHEMA) continue;
+    if (manifest.source?.path !== sourcePath) continue;
+    if (sourceHash && manifest.source?.sha256 !== sourceHash) continue;
+    let mtimeMs = 0;
+    try {
+      mtimeMs = fs.statSync(path.join(outDirAbs, entry.name)).mtimeMs;
+    } catch {
+      mtimeMs = 0;
+    }
+    matches.push({
+      directory: toRelative(root, path.join(outDirAbs, entry.name)),
+      createdAt: manifest.created_at ?? null,
+      sha256: manifest.source.sha256,
+      bytes: manifest.source.bytes,
+      readBackMatches: manifest.snapshot?.matches_source === true,
+      verifiedRecovery: (manifest.recovery?.checks ?? []).filter((check) => check.status === 'match').length,
+      recoveryPaths: (manifest.recovery?.checks ?? []).filter((check) => check.status === 'match').map((check) => check.path),
+      mtimeMs,
+    });
+  }
+  if (!matches.length) return null;
+  return matches.sort((a, b) => b.mtimeMs - a.mtimeMs)[0];
+}
+
 export function inspectKnown(root = repoRoot()) {
   const entries = [];
   for (const known of POLICY.knownBaseline) {
@@ -648,6 +766,7 @@ export function inspectKnown(root = repoRoot()) {
   const matchedRecovery = primary?.sha256
     ? recoveryCandidates.filter((candidate) => candidate.sha256 === primary.sha256).map((candidate) => candidate.path)
     : [];
+  const authorisedSnapshot = findAuthorisedSnapshot(root, POLICY.knownBaseline[0].path, primary?.sha256 ?? null);
 
   return {
     root,
@@ -663,9 +782,11 @@ export function inspectKnown(root = repoRoot()) {
       independentMedium: false,
     },
     provenance: {
-      authoritative: false,
-      reason:
-        'No user-authorised manifest or independent medium is available in this checkout: the live working copy lives in the browser profile (localStorage) and the on-disk copies have no signed provenance. Hashes below describe bytes that exist here; they do not certify that these are the user\'s original authored bytes.',
+      authoritative: Boolean(authorisedSnapshot),
+      authorisedSnapshot,
+      reason: authorisedSnapshot
+        ? `The user authorised this decoration backup on 2026-09-22 and a snapshot of these exact bytes exists at ${authorisedSnapshot.directory} (read-back verified, ${authorisedSnapshot.verifiedRecovery} recovery copy/copies matched byte-for-byte). Byte equality is proven here; the copies share one disk, so a second medium is still the only protection against losing this machine.`
+        : 'No authorised snapshot of these bytes exists under baseline/snapshots yet: run `npm run protect:baseline -- --recovery <copy>` after the user authorises a source. Hashes below describe bytes that exist in this checkout only.',
     },
   };
 }
@@ -706,8 +827,15 @@ function printInventory(report) {
     reportLine('  no byte-identical copy of the primary was found.');
   }
   reportLine('');
-  reportLine('BLOCKER: authoritative provenance is NOT established.');
-  reportLine(`  ${report.provenance.reason}`);
+  if (report.provenance.authoritative) {
+    const authorised = report.provenance.authorisedSnapshot;
+    reportLine(`AUTHORISED BASELINE: ${authorised.directory}`);
+    reportLine(`  captured ${authorised.createdAt ?? 'unknown time'} · read-back ${authorised.readBackMatches ? 'verified' : 'NOT verified'} · recovery copies matched ${authorised.verifiedRecovery}`);
+    reportLine(`  ${report.provenance.reason}`);
+  } else {
+    reportLine('BLOCKER: no authorised snapshot of these bytes has been captured yet.');
+    reportLine(`  ${report.provenance.reason}`);
+  }
 }
 
 function printSnapshot(result) {
@@ -743,13 +871,14 @@ const USAGE = `Usage: node scripts/protect-baseline.mjs <command> [options]
 Commands
   inventory   Report which protected locations exist, their hashes and observations. Read-only.
   snapshot    Create an exclusive timestamped snapshot + manifest of the protected file.
+  tmp-copy    Write a verified throw-away copy into a git-ignored tmp area (never protected).
   verify      Re-hash a snapshot (and its recovery copy) against the recorded manifest.
 
 Common options
   --root <dir>              Repository root to operate on (defaults to this repo).
   --json                    Print machine-readable JSON instead of prose.
 
-snapshot options
+snapshot / tmp-copy options
   --source <path>           Protected file, repo-relative (default: ${POLICY.knownBaseline[0].path}).
   --out <dir>               Snapshot parent directory (default: ${POLICY.defaultOutDir}).
   --label <name>            Snapshot name prefix (default: source file name).
@@ -759,6 +888,9 @@ snapshot options
   --strict                  Fail when no recovery copy verifies.
   --allow-symlink-source    Permit a source that traverses a symlink (target must stay inside the root).
   --allow-external-source   Permit a source outside the repo root (still no write to it).
+
+tmp-copy options
+  --dest <path>             Destination inside ${POLICY.tmpCopyDirs.join(' or ')} (default: ${POLICY.tmpCopyDirs[0]}/<name>.tmp.json).
 
 verify options
   --snapshot <dir>          Snapshot directory (default: newest under ${POLICY.defaultOutDir}).
@@ -781,6 +913,7 @@ async function main(argv) {
         root: { type: 'string' },
         json: { type: 'boolean', default: false },
         source: { type: 'string' },
+        dest: { type: 'string' },
         out: { type: 'string' },
         label: { type: 'string' },
         recovery: { type: 'string', multiple: true },
@@ -825,6 +958,29 @@ async function main(argv) {
       });
       if (parsed.values.json) reportLine(JSON.stringify(result, null, 2));
       else printSnapshot(result);
+      return result.ok ? 0 : 1;
+    }
+
+    if (command === 'tmp-copy') {
+      const result = createTemporaryCopy({
+        root,
+        source: parsed.values.source,
+        dest: parsed.values.dest,
+        dryRun: parsed.values['dry-run'],
+        allowSymlinkSource: parsed.values['allow-symlink-source'],
+        allowExternalSource: parsed.values['allow-external-source'],
+      });
+      if (parsed.values.json) reportLine(JSON.stringify(result, null, 2));
+      else if (result.dryRun) {
+        reportLine(`DRY RUN — would copy ${result.source.path} (${result.source.sha256}, ${result.source.bytes} bytes) to ${result.dest}`);
+      } else {
+        reportLine(`${result.ok ? 'OK' : 'FAILED'} — temporary working copy`);
+        reportLine(`  source ${result.source.path} sha256 ${result.source.sha256} (${result.source.bytes} bytes)`);
+        reportLine(`  tmp    ${result.tmp.path} sha256 ${result.tmp.sha256} (${result.tmp.bytes} bytes)`);
+        reportLine(`  bytes  ${result.tmp.matchesSource ? 'byte-for-byte match' : 'MISMATCH'}`);
+        reportLine(`  observation ${result.observation.count} props (advisory; the tmp copy is disposable)`);
+        for (const warning of result.warnings) reportLine(`  WARNING ${warning}`);
+      }
       return result.ok ? 0 : 1;
     }
 

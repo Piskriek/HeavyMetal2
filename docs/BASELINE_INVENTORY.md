@@ -80,7 +80,10 @@ only. Any future ticket that adds a writer must not target the protected path (T
 Track Builder produces. Its authoritative copy lives in the user's browser
 (`localStorage['hm2-3d-track-props']`) and is mirrored to disk by the dev server.
 
-`npm run inventory:baseline` (read-only) reported on 2026-09-22:
+`npm run inventory:baseline` (read-only) reported on 2026-09-22. It prints
+`AUTHORISED BASELINE: <snapshot dir>` when a verified snapshot of these exact bytes exists
+and `BLOCKER: no authorised snapshot …` when it does not — the status is derived from a
+manifest, never assumed:
 
 | Role | Path | Status | sha256 | Bytes | Observed props |
 | :--- | :--- | :--- | :--- | ---: | ---: |
@@ -98,36 +101,50 @@ A third, older copy differs deliberately:
 `user_safety_backup/track-props-latest-safeguard.json` — sha256 `6707d9a88d0a9fb450729c6ec559d55d07d86d433807ecf9e3b1e3331610852f`,
 77,979 bytes, 199 props, `updatedAt 2026-09-22T05:02:37.173Z`.
 
-### Blocker (explicit, per acceptance criteria)
+### Resolution: the user authorised the backup on 2026-09-22
 
-> **BLOCKER: authoritative provenance is NOT established.**
-> No user-authorised manifest and no independent medium exist in this checkout. The live
-> working copy is browser `localStorage` and therefore not visible here; every on-disk
-> copy sits on the same disk inside the same Git checkout and carries no signature
-> proving it is the user's original authored bytes. `.gitignore:8` references `3DTrack/`,
-> which is absent from this checkout — the only other hint that a real-data source
-> existed outside the repository.
+The user confirmed the decoration JSON is backed up and authorised a throw-away copy for
+experiments: *"The decorations json file is backed up, use a _tmp version for now if you
+need"*. That resolves the availability blocker. The first certified snapshot was taken
+from that authorised source:
 
-Consequences, stated plainly:
+| Snapshot | Value |
+| :--- | :--- |
+| Directory | `baseline/snapshots/track-props-latest-2026-09-22T13-38-44-625Z/` |
+| Source bytes | `backups/props/track-props-latest.json`, sha256 `0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5`, 94,867 bytes |
+| Read-back | byte-for-byte match against the source |
+| Recovery copy 1 | `backups/props/user_safety_backup/track-props-237-props-safeguard.json` → match |
+| Recovery copy 2 | `backups/props/history/props-ridge-1790060522733.json` → match |
+| Observation | 237 props, 237 unique IDs, 0 duplicates, 45 distinct prop types, course `ridge` |
 
-- The hashes above are **observed bytes**, obtained from this checkout. They are not a
-  certified "real protected hash"; T12's "Protected bytes verified unchanged against a
-  real baseline" therefore remains **blocked**.
-- `protect-baseline.mjs` can hash, snapshot and re-verify whatever is present, so the
-  moment the user authorises a source (or points `--source`/`--recovery` at the real
-  file), the same commands produce a real baseline record. Nothing is synthesised in the
-  meantime.
-- Props in the observed set carry IDs such as `prop_1790020259486_aj8o`. Per the ticket,
-  the count (237) and the ID list are **observations only**; the manifest marks them
-  `advisory: true` with the note "never hard-code them as runtime constants".
+Reproduce or extend it at any time with:
+
+```bash
+npm run protect:baseline -- --recovery backups/props/user_safety_backup/track-props-237-props-safeguard.json
+npm run verify:baseline
+```
+
+### Remaining limitations (explicit)
+
+- **Single medium.** Both verified copies live on the same disk inside the same checkout.
+  Byte-equality is proven; independence is not. A copy on a second medium remains the
+  user's call and is the only thing that would survive losing this machine.
+- **Disposable copies only.** `tmp-copy` writes to `scratch/` or `tests/artifacts/` (both
+  git-ignored) and refuses every other destination, including `backups/props/**`. A tmp
+  copy is never a baseline and never enters a commit.
+- The hashes above describe the authorised copies. The count (237) and the ID list are
+  **observations**: the manifest marks them `advisory: true` — "never hard-code them as
+  runtime constants" — and the decoration set legitimately changes as the user edits it.
 
 ### Usage
 
 ```bash
-npm run inventory:baseline                 # read-only status + blocker
+npm run inventory:baseline                 # read-only status
 npm run protect:baseline                   # exclusive timestamped snapshot + manifest
 npm run protect:baseline -- --recovery backups/props/user_safety_backup/track-props-237-props-safeguard.json
 npm run verify:baseline                    # re-hash newest snapshot, source and recovery copy
+node scripts/protect-baseline.mjs tmp-copy # verified disposable copy at scratch/track-props-latest.tmp.json
+node scripts/protect-baseline.mjs tmp-copy --dest scratch/mine.tmp.json
 ```
 
 Snapshots land in `baseline/snapshots/` (new directory) — never inside `backups/props/`.

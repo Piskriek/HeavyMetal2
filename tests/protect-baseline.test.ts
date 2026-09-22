@@ -20,6 +20,8 @@ import { fileURLToPath } from 'node:url';
 import {
   BaselineError,
   POLICY,
+  createTemporaryCopy,
+  findAuthorisedSnapshot,
   assertNotProtected,
   assertRelativeSafe,
   createSnapshot,
@@ -329,17 +331,22 @@ test('verify: an unknown manifest schema is refused', () => {
 // Suite 5 — CLI behaviour on the real repository (read-only checks)
 // ---------------------------------------------------------------------------
 
-test('cli: inventory is read-only and reports the blocked provenance', () => {
+test('cli: inventory is read-only and reports authorisation honestly', () => {
   const protectedPath = join(repoRoot(), POLICY.knownBaseline[0].path);
   const before = readFileSync(protectedPath);
   const run = runCli(['inventory']);
   assert.equal(run.status, 0, run.stdout + run.stderr);
-  assert.match(run.stdout, /BLOCKER: authoritative provenance is NOT established/);
   assert.match(run.stdout, /hm2-3d-track-props/);
+  // Either an authorised snapshot exists, or the missing baseline is stated plainly.
+  assert.match(run.stdout, /AUTHORISED BASELINE: |BLOCKER: no authorised snapshot/);
   assert.equal(readFileSync(protectedPath).equals(before), true, 'inventory must not touch the protected bytes');
 });
 
 test('cli: usage errors exit 2, blocked requests exit 1, and neither writes', () => {
+  const tmpDest = runCli(['tmp-copy', '--dest', 'backups/props/nope.json']);
+  assert.equal(tmpDest.status, 1);
+  assert.match(tmpDest.stdout, /E_PROTECTED_WRITE/);
+
   const unknownOption = runCli(['snapshot', '--nope']);
   assert.equal(unknownOption.status, 2, unknownOption.stdout + unknownOption.stderr);
   const unknownCommand = runCli(['frobnicate']);
@@ -382,9 +389,71 @@ test('cli: the real protected file is unchanged by a full snapshot round-trip', 
   }
 });
 
+test('tmp-copy: writes a verified disposable copy inside a git-ignored area only', () => {
+  const { root, bytes } = fixtureRoot();
+  try {
+    const result = createTemporaryCopy({ root });
+    assert.equal(result.ok, true);
+    assert.equal(result.dest, 'scratch/track-props-latest.tmp.json');
+    assert.equal(readFileSync(join(root, result.dest)).equals(bytes), true, 'the tmp copy is byte-identical');
+    assert.equal(result.tmp.matchesSource, true);
+    assert.equal(result.observation.advisory, true);
+
+    const dry = createTemporaryCopy({ root, dest: 'scratch/other.tmp.json', dryRun: true });
+    assert.equal(dry.dryRun, true);
+    assert.equal(existsSync(join(root, 'scratch/other.tmp.json')), false);
+
+    assert.throws(() => createTemporaryCopy({ root, dest: 'backups/props/copy.json' }), { code: 'E_PROTECTED_WRITE' });
+    assert.throws(() => createTemporaryCopy({ root, dest: 'src/game/real-props.json' }), { code: 'E_TMP_DEST' });
+    assert.throws(() => createTemporaryCopy({ root, dest: '../outside.tmp.json' }), { code: 'E_PATH_ESCAPE' });
+    assert.throws(() => createTemporaryCopy({ root, source: 'backups/props/missing.json' }), { code: 'E_SOURCE_MISSING' });
+    assert.throws(() => createTemporaryCopy({ root, source: 'backups' }), { code: 'E_SOURCE_KIND' });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('tmp-copy: the real repository copy is byte-identical and leaves the baseline alone', () => {
+  const protectedPath = join(repoRoot(), POLICY.knownBaseline[0].path);
+  if (!existsSync(protectedPath)) return; // nothing to copy in this checkout
+  const before = readFileSync(protectedPath);
+  const result = runCli(['tmp-copy']);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /byte-for-byte match/);
+  assert.match(result.stdout, /scratch\/track-props-latest\.tmp\.json/);
+  assert.equal(readFileSync(protectedPath).equals(before), true, 'the protected bytes must be untouched');
+  const copyPath = join(repoRoot(), 'scratch/track-props-latest.tmp.json');
+  assert.equal(readFileSync(copyPath).equals(before), true, 'the tmp copy must be byte-identical');
+  rmSync(copyPath, { force: true });
+});
+
+test('authorisation: a snapshot only counts when its manifest matches these exact bytes', () => {
+  const { root } = fixtureRoot();
+  try {
+    const protectedPath = join(root, POLICY.knownBaseline[0].path);
+    assert.equal(findAuthorisedSnapshot(root, POLICY.knownBaseline[0].path), null, 'no snapshot yet means no authorisation');
+
+    const created = createSnapshot({ root, now: '2026-01-02T03:04:05.678Z' });
+    const authorised = findAuthorisedSnapshot(root, POLICY.knownBaseline[0].path);
+    assert.ok(authorised);
+    assert.equal(authorised.directory, created.snapshot.directory);
+    assert.equal(authorised.readBackMatches, true);
+    assert.equal(authorised.verifiedRecovery, 1);
+
+    // A different hash is a different baseline: the snapshot must not vouch for it.
+    writeFileSync(protectedPath, JSON.stringify({ course: 'ridge', props: [{ id: 'prop_changed' }] }));
+    assert.equal(findAuthorisedSnapshot(root, POLICY.knownBaseline[0].path, hashBytes(readFileSync(protectedPath)).sha256), null);
+    assert.equal(findAuthorisedSnapshot(root, POLICY.knownBaseline[0].path)?.directory, created.snapshot.directory,
+      'without an expected hash the recorded snapshot is still reported');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('inventory: the real repository reports the observed copies without inventing provenance', () => {
   const report = inspectKnown(repoRoot());
-  assert.equal(report.provenance.authoritative, false);
+  assert.equal(report.provenance.authoritative, report.provenance.authorisedSnapshot !== null,
+    'authorisation must be derived from an actual verified snapshot, never assumed');
   assert.equal(report.recovery.independentMedium, false);
   assert.equal(report.known.length, POLICY.knownBaseline.length);
   const primary = report.known.find((entry) => entry.id === 'decoration-baseline');

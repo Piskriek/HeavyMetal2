@@ -20,6 +20,7 @@ import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
 import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../game/session';
 import { TRACK_DISTANCE } from '../game/scene';
+import { PLAYER_ID, trackbarRacers } from '../game/roster';
 import { loadAssets, type GameAssets, type SpriteName } from '../game/assets';
 import { preparePowerupSprites } from '../game/powerups';
 import { GameEngine } from '../game/engine';
@@ -184,7 +185,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   }, [playing]);
   useEffect(() => { if (!playing && !paused) setGearOpen(false); }, [playing, paused]);
   const gearHidden = playing && hudIdle && !gearOpen;
-  const playerDistance = snapshot.racers.find((racer) => racer.id === 0)?.distance ?? snapshot.distance;
+  // T02: the player is a stable ID, never "whatever happens to be index 0".
+  const playerDistance = snapshot.racers.find((racer) => racer.id === PLAYER_ID)?.distance ?? snapshot.distance;
+  // T02: the trackbar budget is bounded at every field size (player + leaders + nearest rivals).
+  const trackbarPips = useMemo(() => trackbarRacers(snapshot.racers, PLAYER_ID), [snapshot.racers]);
   const trackPct = (distance: number) => Math.min(100, Math.max(0, (distance / TRACK_DISTANCE) * 100));
   const toggleGear = () => {
     setGearOpen((open) => {
@@ -409,7 +413,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
             <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
-              <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Four-lane Heavy Metal GP 2. Drag your orange ball to launch all four goblins. A and D change lanes and bump rivals. Space to air bounce, Shift to boost, P to pause, R to restart.">Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
+              <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label={`Four-lane Heavy Metal GP 2. Drag your orange ball to launch the ${config.fieldSize} goblins. A and D change lanes and bump rivals. Space to air bounce, Shift to boost, P to pause, R to restart.`}>Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
               {buildMode && engineRef.current && canvasRef.current && (
                 <TrackBuilderUI
                   builder={engineRef.current.trackBuilder}
@@ -457,7 +461,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 <span className="trackbar-sector">{snapshot.sector}</span>
                 <div className="trackbar-rail">
                   <div className="trackbar-fill" style={{ width: `${trackPct(playerDistance)}%` }} />
-                  {snapshot.racers.map((racer) => <span key={racer.id} className={`trackbar-pip ${racer.id === 0 ? 'player' : ''}`} style={{ left: `${trackPct(racer.distance)}%`, backgroundColor: racer.color }} title={racer.id === 0 ? 'You' : racer.name} aria-hidden="true" />)}
+                  {trackbarPips.map((racer) => <span key={racer.id} className={`trackbar-pip ${racer.id === PLAYER_ID ? 'player' : ''}`} style={{ left: `${trackPct(racer.distance)}%`, backgroundColor: racer.color }} title={racer.id === PLAYER_ID ? 'You' : racer.name} aria-hidden="true" />)}
                 </div>
                 <span className="trackbar-remaining">{number(Math.max(0, TRACK_DISTANCE - playerDistance))} m <img src="/art/flag-checkered.png" alt="" className="trackbar-flag-img" aria-hidden="true" /></span>
               </div>
@@ -489,7 +493,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         <AnimatePresence>
           {modal === 'help' && <Modal key="help" title="A Crash Course. Literally." eyebrow="THE VERY OPTIONAL INSTRUCTION MANUAL" onClose={closeModal} className="fantasy-dialog">
             <div className="modal-tabs" role="tablist" aria-label="Instructions"><button role="tab" aria-selected={helpTab === 'basics'} className={helpTab === 'basics' ? 'selected' : ''} onClick={() => setHelpTab('basics')}>THE BASICS</button><button role="tab" aria-selected={helpTab === 'hazards'} className={helpTab === 'hazards' ? 'selected' : ''} onClick={() => setHelpTab('hazards')}>MEET THE BAD IDEAS</button></div>
-            {helpTab === 'basics' ? <div className="help-basics"><p className="modal-lead">You are racing as {riderById(config.loadout.rider).name} in the {capsuleById(config.loadout.capsule).name}. Four loaded slingshots, four lanes, and 15 km to the stadium. Your orange goblin starts in lane 3.</p>
+            {helpTab === 'basics' ? <div className="help-basics"><p className="modal-lead">You are racing as {riderById(config.loadout.rider).name} in the {capsuleById(config.loadout.capsule).name}. Four lanes, {config.fieldSize} loaded goblins, and 15 km to the stadium. Your orange goblin starts in lane 3.</p>
               <div className="instruction-row"><span className="instruction-number">01</span><MousePointer2 size={24} /><div><h3>Pull back. Let it rip.</h3><p>Drag the glowing ball left and down, then release. Or use arrow keys to adjust power and angle, then Enter to launch.</p></div><kbd>DRAG</kbd></div>
               <div className="instruction-row"><span className="instruction-number">02</span><ArrowRight size={25} /><div><h3>Pick a lane. Borrow theirs.</h3><p>A moves left, D moves right. Touch the steering arrows on a phone. Contact shoves rivals toward adjacent lanes; heavier capsules push harder. Steering locks briefly after a bump and during loops.</p></div><kbd>A / D</kbd></div>
               <div className="instruction-row"><span className="instruction-number">03</span><ArrowUpFromLine size={25} /><div><h3>Give gravity a day off.</h3><p>Space uses one of your midair bounces. Spring pads refill charges automatically. Each racer has their own charges; sheep and TNT are first-come, first-chaos.</p></div><kbd>SPACE</kbd></div>

@@ -31,7 +31,6 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
       laneSpan,
       hit: false,
       hitAt: -100,
-      hitMask: 0,
       ...extra,
     });
 
@@ -47,7 +46,6 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
       altitude,
       hit: false,
       hitAt: -100,
-      hitMask: 0,
     });
 
   const addBlimp = (x: number, altitude = 545) =>
@@ -61,7 +59,6 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
       altitude,
       hit: false,
       hitAt: -100,
-      hitMask: 0,
     });
 
   const addBlimpSign = (x: number, signType: 'sheep' | 'tnt' | 'parts', signAlt = 320, blimpAlt = 545) => {

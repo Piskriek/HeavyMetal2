@@ -1,5 +1,11 @@
 # Goblin Rally (Heavy Metal GP 2): Project Status And Codex Handoff
 
+## T02 recovery — 2026-09-22
+
+Recovered the exported source from `temp/temp.zip` on `arena/01a0ca08-heavymetal2`.
+See `docs/T02_RECOVERY.md` for provenance, current verification, and remaining gaps.
+The exported agent transcript is not evidence that all acceptance criteria are met.
+
 > [!IMPORTANT]
 > **Predecessor Assets & Image Quota Policy**:
 > - You can find all files from predecessor game "Heavy Metal 1" in the [`PreGame/`](file:///c:/MarbleGp/PreGame) folder (`PreGame/assets/`, `PreGame/src/assets/`). You are **strongly encouraged** to use existing PNG/WebP assets from there (e.g. `ball-*.webp`, `bumper-*.webp`, `spring.webp`, `strip-*.webp`, `uikit.png`, `repeatingBG.png`) to style and extend the game.

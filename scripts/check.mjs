@@ -14,7 +14,9 @@ const commands = [
   ['--import', 'tsx', '--test', '--test-reporter=tap', '--test-reporter-destination=stdout',
     '--test-reporter=tap', '--test-reporter-destination=tests/artifacts/latest-test-run.tap',
     'tests/session-save.test.ts', 'tests/camera-decal.test.ts', 'tests/ticket05-backdrop.test.ts',
-    'tests/multi-select-grouping.test.ts', 'tests/track-props-backup.test.ts'],
+    'tests/multi-select-grouping.test.ts', 'tests/track-props-backup.test.ts',
+    'tests/protect-baseline.test.ts', 'tests/contracts.test.ts',
+    'tests/roster-scale.test.ts'],
 ];
 
 for (const args of commands) {

@@ -5,4 +5,8 @@ tests/artifacts/
 *.zip
 scratch/
 *.exe
-3DTrack/
+3DTrack/
+# T00 safeguard: the certified baseline manifest is evidence and is committed;
+# the copied decoration payload next to it is protected data and stays out of Git.
+baseline/snapshots/*/*
+!baseline/snapshots/*/manifest.json

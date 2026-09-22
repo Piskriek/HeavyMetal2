@@ -44,20 +44,16 @@ export function prepareRosterArt(roster: Loadout[]) {
 }
 
 const raceSprites = new Map<string, Promise<HTMLCanvasElement[]>>();
+/** T02: bake once per (loadout, rim colour) so a 100-slot roster shares ≤48 canvases. */
+const raceBallCells = new Map<string, Promise<HTMLCanvasElement>>();
 
-/**
- * Bakes one racing sprite per roster slot: the standalone painted ball with the racer's
- * colour as a thin rim ring, open at the top so it reads as a rim light.
- *
- * The sprite is deliberately limited to 192x192 (the size the renderer draws at), is
- * keyed by the roster, and is never rebuilt during a frame.
- */
-export function prepareRaceBalls(roster: Loadout[]): Promise<HTMLCanvasElement[]> {
-  const key = roster.map((item) => `${item.rider}/${item.capsule}`).join('|');
-  const cached = raceSprites.get(key);
+const RIM_COLORS = ['#f0a15b', '#87d7ba', '#b7a0e8', '#e4cc77'];
+
+function bakeRaceBall(loadout: Loadout, rimColor: string): Promise<HTMLCanvasElement> {
+  const cellKey = `${loadout.rider}/${loadout.capsule}/${rimColor}`;
+  const cached = raceBallCells.get(cellKey);
   if (cached) return cached;
-  const colors = ['#f0a15b', '#87d7ba', '#b7a0e8', '#e4cc77'];
-  const promise = Promise.all(roster.map(async (loadout, index) => {
+  const promise = (async () => {
     const ball = await loadArtImage(capsuleCell(loadout.capsule).image);
     const size = 192;
     const canvas = document.createElement('canvas');
@@ -67,13 +63,33 @@ export function prepareRaceBalls(roster: Loadout[]): Promise<HTMLCanvasElement[]
     paint.drawImage(ball, 0, 0, size, size);
     // Team colour stays readable without recolouring the painted metalwork. The hull is
     // normalised to 452 of the 512 canvas, so a 0.455 radius ring hugs the painted ball.
-    paint.strokeStyle = colors[index % colors.length];
+    paint.strokeStyle = rimColor;
     paint.lineWidth = Math.max(3, size * 0.026);
     paint.beginPath();
     paint.arc(size / 2, size / 2, size * 0.455, 0.16 * Math.PI, 1.84 * Math.PI);
     paint.stroke();
     return canvas;
-  }));
+  })();
+  raceBallCells.set(cellKey, promise);
+  if (raceBallCells.size > 64) raceBallCells.delete(raceBallCells.keys().next().value!);
+  void promise.catch(() => raceBallCells.delete(cellKey));
+  return promise;
+}
+
+/**
+ * Bakes racing sprites for a roster slot each: the standalone painted ball with the
+ * slot's rim colour. Slots that share a (loadout, rim colour) pair receive the *same*
+ * canvas instance, so the renderer shares one GPU texture per pair — at 100 racers the
+ * pool stays bounded and disposal stays predictable.
+ *
+ * The sprite is limited to 192x192 (the size the renderer draws at), is keyed by the
+ * roster, and is never rebuilt during a frame.
+ */
+export function prepareRaceBalls(roster: Loadout[]): Promise<HTMLCanvasElement[]> {
+  const key = roster.map((item, index) => `${item.rider}/${item.capsule}/${RIM_COLORS[index % RIM_COLORS.length]}`).join('|');
+  const cached = raceSprites.get(key);
+  if (cached) return cached;
+  const promise = Promise.all(roster.map((loadout, index) => bakeRaceBall(loadout, RIM_COLORS[index % RIM_COLORS.length])));
   raceSprites.set(key, promise);
   if (raceSprites.size > 6) raceSprites.delete(raceSprites.keys().next().value!);
   void promise.catch(() => raceSprites.delete(key));

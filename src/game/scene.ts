@@ -155,7 +155,12 @@ export interface Obstacle {
   hitAt: number;
   lane?: number;
   laneSpan?: number;
-  hitMask?: number;
+  /**
+   * T02: racer IDs that already triggered this obstacle. Replaces the old
+   * `hitMask` bitmask (`1 << racerId`), which wrapped at racer 32 and aliased
+   * every ID beyond it. See `roster.ts → recordObstacleHit`.
+   */
+  hitBy?: Set<number>;
   altitude?: number;
   signType?: 'sheep' | 'tnt' | 'parts';
   broken?: boolean;

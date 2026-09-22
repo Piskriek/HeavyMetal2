@@ -179,7 +179,8 @@ test('recovery: the legacy setup key migrates into the durable draft', () => {
   const legacy = JSON.stringify({ mode: 'quick', course: 'boomtown', loadout: { rider: 'grub', capsule: 'siege' }, difficulty: 'veteran', customPhysics: true });
   const hydration = readSave(new FakeStorage({ 'goblin-rally-setup-v2': legacy }));
   assert.equal(hydration.source, 'legacy');
-  assert.deepEqual(hydration.draft, { mode: 'quick', course: 'boomtown', loadout: { rider: 'grub', capsule: 'siege' }, difficulty: 'veteran', customPhysics: true });
+  // T02: legacy setups migrate as four-racer fields — the explicit default, never omitted.
+  assert.deepEqual(hydration.draft, { mode: 'quick', course: 'boomtown', loadout: { rider: 'grub', capsule: 'siege' }, difficulty: 'veteran', customPhysics: true, fieldSize: 4 });
 });
 
 test('write: identical payloads are not rewritten and revisions stay monotonic', () => {

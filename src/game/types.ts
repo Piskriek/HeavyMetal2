@@ -70,6 +70,24 @@ export interface RunRecord {
   difficulty?: Difficulty;
   pickups?: number;
   shieldsUsed?: number;
+  /** T02: how many racers started this round; legacy records default to 4. */
+  fieldSize?: number;
+  /**
+   * T02: present only when `opponents` was reduced for storage under the explicit
+   * summary policy (save.ts). A short `opponents` list without this marker is invalid
+   * and is rejected — standings are never silently discarded.
+   */
+  opponentsSummary?: OpponentsSummary;
+}
+
+/** Versioned truncation marker for persisted results (see docs/T02_ROSTER_AND_SCALE.md). */
+export interface OpponentsSummary {
+  /** Summary policy version that produced the truncated list. */
+  policy: number;
+  /** Full field size the round was raced with. */
+  totalField: number;
+  /** How many rows were kept (always includes the local player). */
+  kept: number;
 }
 
 export interface GameSnapshot {

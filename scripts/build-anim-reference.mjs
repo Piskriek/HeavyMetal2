@@ -44,6 +44,7 @@ const SOURCE_ART = {
   'anim-17-arch-gate-lanterns': 'props/alpha/prop-40-timber-arch-gate-lanterns.png',
   'anim-18-torch-sconce': 'props/alpha/prop-56-arch-torch-sconce.png',
   'anim-19-waterfall-splash': 'track-parts/waterfall-splash.png',
+  'anim-20-waterfall-splash-b': 'track-parts/waterfall-splash-b.png',
 };
 
 const outDir = join(root, 'art-src/animated');

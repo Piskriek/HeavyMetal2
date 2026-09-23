@@ -403,6 +403,39 @@ Rebuilt sheets (frame size, aspect matches the still art exactly):
 
 Frame Δ is RMSE between consecutive frames; the replaced band frames sat at ≈0.015.
 
+**anim 11–20 rebuilt** (the same ten sheets that shipped as band frames):
+
+| sheet | frame | min frame Δ | remnant | source |
+|---|---|---|---|---|
+| anim-11 tnt fuse spark | 348x520 | 0.196 | 0.083% | 4x2 |
+| anim-12 drum podium braziers | 634x354 | 0.146 | 0.163% | 2x2 |
+| anim-13 horn riser lantern | 504x282 | 0.109 | 0.061% | 2x2 |
+| anim-14 fan aisle torches | 530x296 | 0.139 | 0.004% | 4x2 |
+| anim-15 triple lantern post | 454x454 | 0.105 | 0.024% | 2x2 |
+| anim-16 molten rock arch | 600x328 | 0.125 | 0.000% | 2x2 |
+| anim-17 arch gate lanterns | 476x260 | 0.156 | 0.032% | 2x2 |
+| anim-18 torch sconce | 454x454 | 0.130 | 0.214% | 2x2 |
+| anim-19 waterfall splash | 500x500 | 0.165 | 0.000% | 2x2 |
+| anim-20 waterfall splash b | 446x446 | 0.155 | 0.004% | 2x2 |
+
+All 20 sheets were additionally checked **pairwise** (all six frame pairs, not just
+consecutive ones) so a duplicated pair cannot hide behind a healthy consecutive
+delta — every sheet's minimum pair is 0.079–0.242.
+
+`anim-14` and `anim-06` come back from the model as a **4x2** grid (eight panels)
+rather than 2x2. The pipeline's `pickCuts()` detects the four evenly spaced
+columns and salvages them; both were confirmed to hold four *distinct* frames
+rather than a repeated pair, so neither needs regenerating. `anim-14` does trip
+the `LAYOUT` gate in `scripts/analyze-animated-sheets.mjs` (96.6% clean cut) —
+that gate assumes a 2x2 layout and reads the centre cut, which on a genuine 4x2
+lands inside a panel, so the flag is expected there. Judge a 4x2 sheet on the
+pairwise check and the shipped sheet instead.
+
+`anim-19`'s alpha/content gap (0.082) is its bright foam reading as near-white,
+not an opaque backdrop — its raw sheet is 65% magenta with the whites belonging
+to the splash itself. Same check that caught the old `anim-05` white-studio
+background.
+
 ### Still ↔ Animated Linking + Per-Prop Animation Controls
 
 Animated sheets are no longer a separate island: every sheet is wired to the still
@@ -429,7 +462,7 @@ decoration it was cut from.
 - Tests: `tests/animated-props.test.ts` grew 15 → 29 checks (twin links, aspect parity,
   frame skipping, speed, persistence, batch controls). `npm run check` 449/449 green;
   `npm run build` green.
-- Next agent: anim 11–20 → run `scripts/build-anim-reference.mjs`, generate the ten
+- **All 20 sheets now carry real motion.** No batch remains open.
   sheets into `art-src/animated/`, then `scripts/analyze-animated-sheets.mjs --all`
   (regenerate any `STATIC`/`LAYOUT` rows) and `scripts/process-generated-animated.mjs`.
 

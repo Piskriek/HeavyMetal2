@@ -50,6 +50,16 @@ const SOURCE_ART = {
   'anim-08-waterwheel-cascade': 'props/alpha/prop-28-cavern-waterwheel-cascade.png',
   'anim-09-plunge-basin': 'props/alpha/prop-42-waterfall-plunge-basin.png',
   'anim-10-waterfall-curtain': 'track-parts/waterfall-curtain.png',
+  'anim-11-tnt-fuse-spark': 'goblins/alpha/goblin-07-tnt-handler.png',
+  'anim-12-drum-podium-braziers': 'goblins/alpha/goblin-22-drum-podium-mob.png',
+  'anim-13-horn-riser-lantern': 'goblins/alpha/goblin-25-horn-riser.png',
+  'anim-14-fan-aisle-torches': 'goblins/alpha/goblin-30-fan-aisle.png',
+  'anim-15-triple-lantern-post': 'props/alpha/prop-01-lantern-post-triple.png',
+  'anim-16-molten-rock-arch': 'props/alpha/prop-16-molten-rock-natural-arch.png',
+  'anim-17-arch-gate-lanterns': 'props/alpha/prop-40-timber-arch-gate-lanterns.png',
+  'anim-18-torch-sconce': 'props/alpha/prop-56-arch-torch-sconce.png',
+  'anim-19-waterfall-splash': 'track-parts/waterfall-splash.png',
+  'anim-20-waterfall-splash-b': 'track-parts/waterfall-splash-b.png',
 };
 
 /** Generated sheet -> shipped sheet name (anim-01..10 in this batch). */
@@ -64,6 +74,16 @@ const SHEETS = [
   'anim-08-waterwheel-cascade',
   'anim-09-plunge-basin',
   'anim-10-waterfall-curtain',
+  'anim-11-tnt-fuse-spark',
+  'anim-12-drum-podium-braziers',
+  'anim-13-horn-riser-lantern',
+  'anim-14-fan-aisle-torches',
+  'anim-15-triple-lantern-post',
+  'anim-16-molten-rock-arch',
+  'anim-17-arch-gate-lanterns',
+  'anim-18-torch-sconce',
+  'anim-19-waterfall-splash',
+  'anim-20-waterfall-splash-b',
 ];
 
 const magick = (args) => execFileSync('convert', args, { encoding: 'utf8' });

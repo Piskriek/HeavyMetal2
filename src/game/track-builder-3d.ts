@@ -411,6 +411,8 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_26_track_marshal', name: 'Track Marshal (Animated)', category: 'animated', url: '/art/animated/alpha/anim-26-track-marshal.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
   { type: 'anim_27_blacksmith', name: 'Blacksmith (Animated)', category: 'animated', url: '/art/animated/alpha/anim-27-blacksmith.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
   { type: 'anim_28_tankard_celebrant', name: 'Tankard Celebrant (Animated)', category: 'animated', url: '/art/animated/alpha/anim-28-tankard-celebrant.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_29_ball_loader', name: 'Ball Loader (Animated)', category: 'animated', url: '/art/animated/alpha/anim-29-ball-loader.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_30_bell_ringer', name: 'Bell Ringer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-30-bell-ringer.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
 ];
 
 /**
@@ -450,6 +452,8 @@ export const ANIMATED_SOURCE_ART: Record<string, string> = {
   anim_26_track_marshal: '/art/goblins/alpha/goblin-08-track-marshal.png',
   anim_27_blacksmith: '/art/goblins/alpha/goblin-09-blacksmith.png',
   anim_28_tankard_celebrant: '/art/goblins/alpha/goblin-10-tankard-celebrant.png',
+  anim_29_ball_loader: '/art/goblins/alpha/goblin-12-ball-loader.png',
+  anim_30_bell_ringer: '/art/goblins/alpha/goblin-13-bell-ringer.png',
 };
 
 /**

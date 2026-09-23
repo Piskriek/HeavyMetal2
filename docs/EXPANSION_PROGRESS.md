@@ -530,28 +530,37 @@ same way the fire/water sheets are:
 | anim-22 war drummer | goblin-02-war-drummer | 272x488 | 9 | 0.137 | 0.001% |
 | anim-23 pit mechanic | goblin-03-pit-mechanic | 510x760 | 8 | 0.340 | 0.019% |
 | anim-24 ore miner | goblin-05-ore-miner | 510x914 | 6 | 0.414 | 0.002% |
-| anim-25 horn blower | goblin-06-horn-blower | 450x806 | 6 | 0.260 | 0.010% |
+| anim-25 horn blower | goblin-06-horn-blower | 340x608 | 6 | 0.224 | 0.020% |
 | anim-26 track marshal | goblin-08-track-marshal | 426x764 | 8 | 0.500 | 0.001% |
 | anim-27 blacksmith | goblin-09-blacksmith | 500x744 | 9 | 0.339 | 0.024% |
 | anim-28 tankard celebrant | goblin-10-tankard-celebrant | 298x532 | 6 | 0.334 | 0.000% |
+| anim-29 ball loader | goblin-12-ball-loader | 408x608 | 7 | 0.475 | 0.087% |
+| anim-30 bell ringer | goblin-13-bell-ringer | 486x870 | 7 | 0.340 | 0.004% |
+
+The prompts carry the same two constraints that fixed the fire/water sheets:
+the body must stay put and the same size in every panel, and the animated
+element must keep a consistent size across panels.
+
+**All ten goblins now pass both gates.** Full results across all 30 sheets:
+`maxShift` is 0.0px on 24 of 30 (the six exceptions have zero overlap gain, so
+they are correlator noise rather than misregistration), and `fillSpread` is
+1.04-1.51x everywhere.
+
+`anim-25-horn-blower` took three attempts. The sound rings are exactly the kind
+of element a model scales freely: the first sheet came back at `fillSpread`
+1.67x, the second at 1.95x (worse), and the third - after rewriting the prompt to
+lead with "trace the goblin once and reuse that tracing in all four panels" -
+landed at 1.34x. **The lesson for future prompts: state the size constraint as
+reusing one tracing, not as "keep the same size", which the model reads as
+advice.**
 
 The prompts carry the same two constraints that fixed the fire/water sheets: the
 body must stay put and the same size in every panel, and the animated element
 must keep a consistent size across panels. Seven of the eight come back at
 `maxShift` 0.0–2.2px and `fillSpread` 1.10–1.29x.
 
-**Known, not yet fixed:** `anim-25-horn-blower` has `fillSpread` 1.67x — the
-sound rings vary in extent between panels, so the blast visibly swells. It is
-otherwise clean (registered to 0.0px, element Δ 0.260, remnant 0.010%), and the
-pipeline gates pass it, but it trips the onion-skin size gate and should be
-regenerated.
-
-**Still to animate:** `anim-29-ball-loader` and `anim-30-bell-ringer` are
-registered in `SHEETS` and their reference templates exist, but the sheets were
-not generated this turn (image-generation budget ran out), so they are
-deliberately **not** registered in `PROP_DEFINITIONS` — the registry test derives
-its expected count from the sheets actually on disk, so adding the defs without
-the art would fail. After them: goblin-14…goblin-30 minus the eight already done.
+**Still to animate:** goblin-14, 15, 16, 17, 19, 20, 21, 23, 26, 27, 28, 29 —
+twelve more characters. After those: explosion sprites and general-play sprites.
 
 The registry test no longer hardcodes a sheet count (`exactly 20 animated
 decorations` and `19 of the 20 sheets have a still counterpart`); it now derives

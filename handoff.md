@@ -172,6 +172,57 @@ for the full design and evidence map.
 - The staging lifecycle connects to the heat phase machine via `transitionHeat(state, { type: 'release' })`
   when the countdown reaches zero.
 
+## T07 — Scalable Collision Candidates and Robust Contact Events (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#40](https://github.com/Piskriek/HeavyMetal2/issues/40) replaces the legacy O(N²) pairwise
+collision loop with a scalable broad-phase/narrow-phase system. Read [`docs/COLLISION.md`](docs/COLLISION.md)
+for the full design and evidence map.
+
+**What landed**
+
+- `src/game/collision/spatial-hash.ts` — swept spatial hash with anisotropic cells (wider in x,
+  narrower in z). Racers are inserted into their cell plus swept-forward cells based on velocity.
+  Candidate pairs are generated from same-cell and adjacent-cell racers, deduplicated, and sorted
+  by distance for deterministic processing.
+- `src/game/collision/contacts.ts` — narrow-phase contact detection and resolution. Fixed 3-pass
+  iteration budget for stable stacking. Deterministic coincident-center normal (z-axis fallback).
+  Shield absorbs impulse but NOT penetration (prevents tunneling). Returns `CollisionEvent[]` for
+  audio/particles, separated from physics.
+- `src/game/collision/cooldowns.ts` — per-pair cooldown tracking with bounded cache (max 1000
+  entries, automatic cleanup). Prevents repeated collision responses within 0.38s.
+- `src/game/collision/types.ts` — shared type definitions.
+- 17 new checks in `tests/collision.test.ts` covering broad-phase accuracy, dense packs, coincident
+  centers, high speeds, NaN prevention, cache bounds, cooldown behavior, and full pipeline integration.
+
+**Verification**
+
+```
+npm run check → tsc(src) + tsc(tests) + 261 tests, 0 fail
+  (136 pre-existing + 65 release + 43 staging + 17 collision)
+npm run build → green, 1,454.55 kB / 402.24 kB gzip
+```
+
+**Acceptance criteria → tests**
+
+| # | Criterion | Test |
+|---|-----------|------|
+| 1 | Candidate set matches brute-force | `collision: matches brute-force on random scene` |
+| 2 | Dense packs, coincident centers, high speeds | `collision: handles dense pack`, `coincident centers`, `high relative speeds` |
+| 3 | No NaNs or unbounded cache growth | `collision: does not produce NaN values`, `prevents unbounded cache growth` |
+| 4 | Ongoing contact impulses not suppressed for 0.38s | `collision: prevents repeated responses within 0.38s` |
+| 5 | Report N, candidates, contacts, occupancy, timing | `collision: reports statistics correctly` |
+
+**Notes for whoever integrates next**
+
+- The collision module is pure and headless. Wire it into `engine.ts` by replacing the legacy
+  `resolveBumps()` loop with the spatial hash pipeline.
+- The broad phase reduces candidates from O(N²) to O(N·k) where k is average cell occupancy.
+  For 100 racers, this is a significant speedup.
+- Shield behavior is explicit: absorbs impulse, allows penetration correction, does not disable
+  non-penetration or create one-sided free momentum.
+- Not yet wired into the engine — the legacy `resolveBumps()` is still in use. Integration is
+  the next step.
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

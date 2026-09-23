@@ -2,7 +2,7 @@ import type { Loadout } from './loadouts';
 import type { Difficulty, RaceMode } from './session';
 import type { PowerupKind } from './powerups';
 
-export type GameStatus = 'loading' | 'ready' | 'flying' | 'paused' | 'finished';
+export type GameStatus = 'loading' | 'ready' | 'flying' | 'paused' | 'finished' | 'checkpoint' | 'countdown';
 export type CourseId = 'ridge' | 'boomtown' | 'sheep';
 export type GraphicsMode = 'auto' | 'performance' | 'quality';
 /** TICKET-07: chase the player's ball, or hold the classic broad course view. */
@@ -120,6 +120,21 @@ export interface GameSnapshot {
   shieldSeconds: number;
   lastPickup: PowerupKind | null;
   pickupNoticeUntil: number;
+  /** Checkpoint data when status is 'checkpoint' or 'countdown' */
+  checkpointStandings?: CheckpointStanding[];
+  countdownNumber?: number;
+}
+
+export interface CheckpointStanding {
+  id: number;
+  name: string;
+  color: string;
+  position: number;
+  distance: number;
+  raceTime: number;
+  speed: number;
+  loadout?: Loadout;
+  isPlayer: boolean;
 }
 
 export const INITIAL_SNAPSHOT: GameSnapshot = {
@@ -152,6 +167,8 @@ export const INITIAL_SNAPSHOT: GameSnapshot = {
   shieldSeconds: 0,
   lastPickup: null,
   pickupNoticeUntil: 0,
+  checkpointStandings: undefined,
+  countdownNumber: undefined,
 };
 
 export const COURSES: { id: CourseId; name: string; subtitle: string; number: string }[] = [
@@ -166,7 +183,7 @@ export const DEFAULT_OPTIONS: GameOptions = {
   downrange: true,
   parallax: true,
   aimAssist: true,
-  cameraMode: 'third_person',
+  cameraMode: 'follow_ball',
   course: 'ridge',
   graphics: 'auto',
   launchSpeed: 160,

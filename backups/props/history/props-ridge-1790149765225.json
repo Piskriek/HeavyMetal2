@@ -1,8 +1,8 @@
 {
   "course": "ridge",
-  "timestamp": 1790060522733,
-  "count": 237,
-  "updatedAt": "2026-09-22T07:02:02.733Z",
+  "timestamp": 1790149765225,
+  "count": 339,
+  "updatedAt": "2026-09-23T07:49:25.225Z",
   "props": [
     {
       "id": "prop_1790020259486_aj8o",
@@ -19,7 +19,8 @@
       "trackDist": 2000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020298107_1712",
@@ -53,7 +54,8 @@
       "trackDist": 2000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020488380_v4rf",
@@ -70,7 +72,8 @@
       "trackDist": 2000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020552141_q8au",
@@ -87,7 +90,8 @@
       "trackDist": 1600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020603178_xnbu",
@@ -104,7 +108,8 @@
       "trackDist": 1600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": false
     },
     {
       "id": "prop_1790020693672_21mt",
@@ -121,7 +126,8 @@
       "trackDist": 1600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020775016_tn71",
@@ -138,7 +144,8 @@
       "trackDist": 1800,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020806420_c4q8",
@@ -155,7 +162,8 @@
       "trackDist": 1800,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020852193_ixmc",
@@ -172,7 +180,8 @@
       "trackDist": 1800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790020950460_h9lw",
@@ -189,7 +198,8 @@
       "trackDist": 1600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021310349_kdlk",
@@ -206,7 +216,8 @@
       "trackDist": 1800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021436853_jf0b",
@@ -223,7 +234,8 @@
       "trackDist": 3400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021494230_u7uz",
@@ -240,7 +252,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021595083_kc0f",
@@ -257,7 +270,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021648146_chcb",
@@ -274,7 +288,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021737729_yw3s",
@@ -291,7 +306,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790021751012_o1hb",
@@ -308,7 +324,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022425545_lkhf",
@@ -325,7 +342,8 @@
       "trackDist": 1000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022429560_02cw",
@@ -342,7 +360,8 @@
       "trackDist": 0,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022431787_ism5",
@@ -359,7 +378,8 @@
       "trackDist": 0,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022433652_jufp",
@@ -376,7 +396,8 @@
       "trackDist": 0,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022435667_uj8n",
@@ -393,7 +414,8 @@
       "trackDist": 0,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022436910_ec6t",
@@ -410,7 +432,8 @@
       "trackDist": 400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022438095_q9vq",
@@ -427,7 +450,8 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022439219_hjjf",
@@ -444,7 +468,8 @@
       "trackDist": 2600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022440501_ct0r",
@@ -461,7 +486,8 @@
       "trackDist": 4200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022441434_uceu",
@@ -478,7 +504,8 @@
       "trackDist": 5400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022442167_8v1h",
@@ -495,7 +522,8 @@
       "trackDist": 6800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022442844_2ow3",
@@ -512,7 +540,8 @@
       "trackDist": 7400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022443565_gyyu",
@@ -529,7 +558,8 @@
       "trackDist": 8200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022444133_dvn7",
@@ -546,7 +576,8 @@
       "trackDist": 8600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022444998_raqf",
@@ -563,24 +594,26 @@
       "trackDist": 9800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022445663_uspn",
       "type": "pines_cluster",
       "name": "Pine Forest Wall",
-      "x": 2208,
-      "y": 16239,
-      "z": 8402,
-      "rotY": -0.3830063232903611,
+      "x": 1798,
+      "y": 16389,
+      "z": 8132,
+      "rotY": 0.008407346410207,
       "rotX": 0,
-      "rotZ": 0,
+      "rotZ": -0.06981317007977318,
       "scale": 1,
       "alignToTrack": true,
       "trackDist": 10800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022456254_rdvk",
@@ -589,7 +622,7 @@
       "x": 2939,
       "y": 16591,
       "z": 6749,
-      "rotY": -0.19498169308040292,
+      "rotY": 0.258407346410207,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
@@ -597,41 +630,44 @@
       "trackDist": 9400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022462778_iff7",
       "type": "pines_cluster",
       "name": "Pine Forest Wall",
-      "x": 2763,
+      "x": 2443,
       "y": 16166,
-      "z": 8178,
-      "rotY": -0.3665284625299264,
+      "z": 8348,
+      "rotY": -2.39159265358979,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
       "alignToTrack": true,
       "trackDist": 10600,
-      "cameraFacing": true,
+      "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022463662_sx5i",
       "type": "pines_cluster",
       "name": "Pine Forest Wall",
       "x": 1707,
-      "y": 16094,
+      "y": 16134,
       "z": 9320,
-      "rotY": -0.5846329591018162,
+      "rotY": -0.241592653589793,
       "rotX": 0,
-      "rotZ": 0,
+      "rotZ": -0.12217304763960307,
       "scale": 1,
       "alignToTrack": true,
       "trackDist": 11800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022464531_wjuq",
@@ -640,7 +676,7 @@
       "x": 838,
       "y": 15883,
       "z": 10272,
-      "rotY": -0.6521104032316503,
+      "rotY": 0.158407346410207,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
@@ -648,7 +684,8 @@
       "trackDist": 13000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022465534_s469",
@@ -657,7 +694,7 @@
       "x": 157,
       "y": 15661,
       "z": 11333,
-      "rotY": -0.32284539229382847,
+      "rotY": 0.658407346410207,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
@@ -665,7 +702,8 @@
       "trackDist": 14599,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022466463_z0w6",
@@ -674,15 +712,16 @@
       "x": -8,
       "y": 15544,
       "z": 12448,
-      "rotY": -0.16055401812051628,
+      "rotY": -2.226684583481423,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
       "alignToTrack": true,
       "trackDist": 15799,
-      "cameraFacing": true,
+      "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022467250_1d1a",
@@ -750,7 +789,8 @@
       "trackDist": 16199,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022471407_n7n6",
@@ -759,7 +799,7 @@
       "x": -2076,
       "y": 15745,
       "z": 11355,
-      "rotY": -0.22634867295102687,
+      "rotY": -0.691592653589793,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
@@ -767,7 +807,8 @@
       "trackDist": 15199,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": true
     },
     {
       "id": "prop_1790022472219_shb7",
@@ -784,7 +825,8 @@
       "trackDist": 14200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022472953_rkvf",
@@ -801,7 +843,8 @@
       "trackDist": 13200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022473804_qalm",
@@ -818,7 +861,8 @@
       "trackDist": 12000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022474762_r0hv",
@@ -835,7 +879,8 @@
       "trackDist": 10400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022475684_rbrs",
@@ -852,7 +897,8 @@
       "trackDist": 9000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022476556_8rxf",
@@ -869,7 +915,8 @@
       "trackDist": 7600,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022477422_bde3",
@@ -886,7 +933,8 @@
       "trackDist": 6600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022478442_de41",
@@ -903,7 +951,8 @@
       "trackDist": 5400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022479253_9o2s",
@@ -920,7 +969,8 @@
       "trackDist": 4600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022480261_v37b",
@@ -937,7 +987,8 @@
       "trackDist": 3400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022481871_rydb",
@@ -954,7 +1005,8 @@
       "trackDist": 2800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022482744_i5jv",
@@ -1189,16 +1241,17 @@
       "type": "pines_cluster",
       "name": "Pine Forest Wall",
       "x": 3375,
-      "y": 16191,
+      "y": 15651,
       "z": 8457,
-      "rotY": 0,
+      "rotY": -2.0925603178729144,
       "rotX": 0,
       "rotZ": 0,
-      "scale": 1.85,
+      "scale": 2.1,
       "alignToTrack": true,
-      "cameraFacing": true,
+      "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022496443_9x70",
@@ -1287,14 +1340,15 @@
       "x": 1146,
       "y": 14923,
       "z": 15828,
-      "rotY": 0,
+      "rotY": 0.041218099619119895,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1,
       "alignToTrack": true,
-      "cameraFacing": true,
+      "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022501129_kmyf",
@@ -1311,7 +1365,8 @@
       "trackDist": 26399,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022501603_zo6l",
@@ -1462,16 +1517,17 @@
       "type": "pines_cluster",
       "name": "Pine Forest Wall",
       "x": -1303,
-      "y": 17396,
+      "y": 17016,
       "z": 5285,
-      "rotY": -0.391592653589793,
+      "rotY": -0.991592653589793,
       "rotX": 0,
       "rotZ": -0.05235987755982988,
-      "scale": 2.05,
+      "scale": 1.85,
       "alignToTrack": true,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022507886_7ivi",
@@ -1552,7 +1608,8 @@
       "trackDist": 4000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790022510155_zedz",
@@ -1628,7 +1685,7 @@
       "rotY": 0,
       "rotX": 0,
       "rotZ": 0,
-      "scale": 2.3,
+      "scale": 1.7,
       "alignToTrack": true,
       "cameraFacing": true,
       "flipX": false,
@@ -2065,7 +2122,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023099794_xci9",
@@ -2082,7 +2140,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023099794_1o5w",
@@ -2099,7 +2158,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023257680_gzr4",
@@ -2116,7 +2176,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023257680_z2ho",
@@ -2133,7 +2194,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023300733_0jhu",
@@ -2150,7 +2212,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023300733_xcf4",
@@ -2167,7 +2230,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023300734_uq70",
@@ -2184,7 +2248,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023423042_hx9o",
@@ -2218,7 +2283,8 @@
       "trackDist": 800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023524909_lgfk",
@@ -2235,7 +2301,8 @@
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023665499_14vl",
@@ -2252,13 +2319,14 @@
       "trackDist": 0,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790023752594_6y15",
       "type": "prop_31_grass_seam_fringe",
       "name": "Grass Seam Fringe",
-      "x": -480,
+      "x": -520,
       "y": 17910,
       "z": -937,
       "rotY": -1.54159265358979,
@@ -2275,13 +2343,14 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790024121515_5a0g",
       "type": "prop_31_grass_seam_fringe",
       "name": "Grass Seam Fringe",
-      "x": -480,
+      "x": -470,
       "y": 17910,
       "z": -1537,
       "rotY": -1.54159265358979,
@@ -2298,7 +2367,8 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790024761531_m4u2",
@@ -2321,7 +2391,8 @@
       "trackDist": 600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790025018043_phgi",
@@ -2329,7 +2400,7 @@
       "name": "Goblin Pit Canopy Tent",
       "x": 38,
       "y": 17920,
-      "z": -2205,
+      "z": -2325,
       "rotY": 0,
       "rotX": 0,
       "rotZ": 0,
@@ -2338,7 +2409,8 @@
       "trackDist": 200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790025041513_vo8l",
@@ -2355,16 +2427,17 @@
       "trackDist": 400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790025155544_wtqi",
       "type": "prop_22_armored_sheep_pen",
       "name": "Armored Sheep Pen",
-      "x": -292,
+      "x": -312,
       "y": 17982,
-      "z": -1908,
-      "rotY": 0.658407346410207,
+      "z": -2028,
+      "rotY": 0.258407346410207,
       "rotX": 0,
       "rotZ": -0.06981317007977318,
       "scale": 0.35,
@@ -2372,7 +2445,8 @@
       "trackDist": 400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790025226545_nhwg",
@@ -2389,7 +2463,8 @@
       "trackDist": 200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790025293404_2j45",
@@ -2406,7 +2481,8 @@
       "trackDist": 0,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790025308408_5rdh",
@@ -2423,7 +2499,8 @@
       "trackDist": 200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790025560783_qyj5",
@@ -2440,7 +2517,8 @@
       "trackDist": 2400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790045071094_594h",
@@ -2457,41 +2535,8 @@
       "trackDist": 3000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
-    },
-    {
-      "id": "prop_1790045343367_fcmp",
-      "type": "prop_33_rubble_seam_strip",
-      "name": "Rubble Gravel Seam Strip",
-      "x": -513,
-      "y": 17790,
-      "z": -1317,
-      "rotY": 1.55840734641021,
-      "rotX": 0,
-      "rotZ": 0,
-      "scale": 0.8,
-      "alignToTrack": true,
-      "trackDist": 2000,
-      "cameraFacing": false,
-      "flipX": true,
-      "isDecal": false
-    },
-    {
-      "id": "prop_1790045397441_2no4",
-      "type": "prop_33_rubble_seam_strip",
-      "name": "Rubble Gravel Seam Strip",
-      "x": 487,
-      "y": 17820,
-      "z": -1327,
-      "rotY": 1.55840734641021,
-      "rotX": 0,
-      "rotZ": 0,
-      "scale": 0.65,
-      "alignToTrack": true,
-      "trackDist": 2000,
-      "cameraFacing": false,
-      "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790045413286_15qk",
@@ -2514,7 +2559,8 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790045430333_7l97",
@@ -2537,7 +2583,8 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790045672160_2b1f",
@@ -2549,12 +2596,13 @@
       "rotY": 1.45840734641021,
       "rotX": 0,
       "rotZ": 0,
-      "scale": 0.6,
+      "scale": 0.75,
       "alignToTrack": true,
       "trackDist": 1000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790048894760_h8hn",
@@ -2588,7 +2636,8 @@
       "trackDist": 3600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790048928154_8n7o",
@@ -2605,7 +2654,8 @@
       "trackDist": 4400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049031944_flu4",
@@ -2622,7 +2672,8 @@
       "trackDist": 5400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049089374_58j2",
@@ -2639,7 +2690,8 @@
       "trackDist": 4800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049150354_wao3",
@@ -2656,7 +2708,8 @@
       "trackDist": 4200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049190374_9499",
@@ -2673,7 +2726,8 @@
       "trackDist": 5000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049488908_6mpu",
@@ -2690,7 +2744,8 @@
       "trackDist": 2800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049561693_qbp0",
@@ -2707,7 +2762,8 @@
       "trackDist": 6800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049592887_e0vd",
@@ -2724,7 +2780,8 @@
       "trackDist": 10000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049644152_rjp6",
@@ -2741,7 +2798,8 @@
       "trackDist": 10000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049731515_nbg9",
@@ -2758,7 +2816,8 @@
       "trackDist": 9800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049839859_6uhs",
@@ -2775,7 +2834,8 @@
       "trackDist": 8800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049870779_72no",
@@ -2792,7 +2852,8 @@
       "trackDist": 7800,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790049933275_xtxt",
@@ -2809,13 +2870,14 @@
       "trackDist": 7600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050023883_tt9b",
       "type": "goblin_21_grandstand_roar",
       "name": "Grandstand Roar",
-      "x": 929,
+      "x": 1009,
       "y": 16873,
       "z": 5566,
       "rotY": -1.04159265358979,
@@ -2826,7 +2888,8 @@
       "trackDist": 8200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050100359_va88",
@@ -2843,7 +2906,8 @@
       "trackDist": 4400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050179364_62ru",
@@ -2852,7 +2916,7 @@
       "x": -462,
       "y": 17973,
       "z": -503,
-      "rotY": -0.541592653589793,
+      "rotY": -0.691592653589793,
       "rotX": 0,
       "rotZ": 0,
       "scale": 0.6,
@@ -2860,7 +2924,8 @@
       "trackDist": 2200,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050255071_7k2e",
@@ -2877,7 +2942,8 @@
       "trackDist": 4800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050397629_7h7c",
@@ -2894,7 +2960,8 @@
       "trackDist": 1800,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050596223_txm6",
@@ -2911,7 +2978,8 @@
       "trackDist": 5400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050663716_3lmk",
@@ -2928,7 +2996,8 @@
       "trackDist": 8000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050761830_qpfo",
@@ -2945,7 +3014,8 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050790575_7sp2",
@@ -2962,24 +3032,26 @@
       "trackDist": 1400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050839492_nnee",
       "type": "prop_19_racetrack_grandstand",
       "name": "Racetrack Grandstand",
       "x": 128,
-      "y": 16252,
+      "y": 16302,
       "z": 7742,
       "rotY": 1.15840734641021,
       "rotX": 0,
-      "rotZ": 0.20943951023931953,
+      "rotZ": 0.08726646259971647,
       "scale": 0.7,
       "alignToTrack": true,
       "trackDist": 11000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790050891773_lfv9",
@@ -3002,8 +3074,8 @@
       "id": "prop_1790050926470_jpgs",
       "type": "pasture",
       "name": "Green Pasture",
-      "x": 639,
-      "y": 16510,
+      "x": 239,
+      "y": 16535,
       "z": 6945,
       "rotY": -0.2979121648139365,
       "rotX": 0,
@@ -3013,7 +3085,8 @@
       "trackDist": 10000,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051006640_k54d",
@@ -3030,13 +3103,14 @@
       "trackDist": 11200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051033928_a5s9",
       "type": "boulder_a",
       "name": "Granite Boulder A",
-      "x": 430,
+      "x": 180,
       "y": 16467,
       "z": 7031,
       "rotY": -0.791592653589793,
@@ -3047,7 +3121,8 @@
       "trackDist": 12400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051069965_wrda",
@@ -3064,7 +3139,8 @@
       "trackDist": 8400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051118732_4e01",
@@ -3081,14 +3157,15 @@
       "trackDist": 4800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051187267_huck",
       "type": "goblin_10_tankard_celebrant",
       "name": "Tankard Celebrant",
       "x": 305,
-      "y": 16298,
+      "y": 16373,
       "z": 8043,
       "rotY": -0.941592653589793,
       "rotX": 0,
@@ -3098,14 +3175,15 @@
       "trackDist": 11400,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051224774_m1qk",
       "type": "goblin_14_scarf_fan",
       "name": "Scarf Fan",
       "x": 274,
-      "y": 16334,
+      "y": 16374,
       "z": 7907,
       "rotY": -0.941592653589793,
       "rotX": 0,
@@ -3115,7 +3193,8 @@
       "trackDist": 11000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790051296497_9pjz",
@@ -3132,7 +3211,8 @@
       "trackDist": 10600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790052062331_kdut",
@@ -3155,53 +3235,32 @@
       "trackDist": 600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
-    },
-    {
-      "id": "prop_1790052076982_y8el",
-      "type": "decal_wc_rocky_dirt",
-      "name": "Dirt & Grass Rim (Bandaid)",
-      "x": 204,
-      "y": 17931,
-      "z": 654,
-      "rotY": 0.058407346410207,
-      "rotX": -0.10744585597847339,
-      "rotZ": 0.07125729704604776,
-      "quaternion": [
-        0.02671613648293333,
-        0.6676899594723328,
-        0.743576403134721,
-        0.023885116128937425
-      ],
-      "scale": 1.75,
-      "alignToTrack": true,
-      "trackDist": 600,
-      "cameraFacing": false,
-      "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790052161343_d0l0",
       "type": "decal_wc_rocky_dirt",
       "name": "Dirt & Grass Rim (Bandaid)",
-      "x": -9,
+      "x": 221,
       "y": 17793,
-      "z": 1667,
+      "z": 1664,
       "rotY": 0.17849588681972978,
-      "rotX": -0.1265146378921809,
-      "rotZ": 0.08567514825553785,
+      "rotX": -0.11828091765296621,
+      "rotZ": 0.08567514825553824,
       "quaternion": [
-        -0.03811409418902514,
-        0.6547829004900979,
-        0.7494237925340939,
-        0.09039163807423288
+        -0.037740249311156146,
+        0.657874105196674,
+        0.7467116774914458,
+        0.09054836272139206
       ],
-      "scale": 1.5,
+      "scale": 1.15,
       "alignToTrack": true,
       "trackDist": 4000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790052451615_xl87",
@@ -3224,7 +3283,8 @@
       "trackDist": 2200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790052824956_wflo",
@@ -3241,53 +3301,56 @@
       "trackDist": 2800,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790052985991_bi4h",
       "type": "decal_wc_rocky_dirt",
       "name": "Dirt & Grass Rim (Bandaid)",
       "x": -142,
-      "y": 17865,
-      "z": 1133,
-      "rotY": 0.15300311301784675,
-      "rotX": -0.11525323792422713,
-      "rotZ": 0.06367020962625324,
+      "y": 17871,
+      "z": 1134,
+      "rotY": -2.14159265358979,
+      "rotX": 0.1372676903571662,
+      "rotZ": 0.05878038895012322,
       "quaternion": [
-        -0.03593324853326045,
-        0.661021707303424,
-        0.7457934879188963,
-        0.0745062245807784
+        -0.6109223382101242,
+        0.23516479742622506,
+        0.24156859578221815,
+        0.7163211767490645
       ],
-      "scale": 1,
+      "scale": 1.35,
       "alignToTrack": true,
       "trackDist": 3600,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790053006707_u3ve",
       "type": "decal_wc_rocky_dirt",
       "name": "Dirt & Grass Rim (Bandaid)",
       "x": 337,
-      "y": 17658,
+      "y": 17663,
       "z": 2380,
       "rotY": 0.23337034904265774,
-      "rotX": -0.14178533019031303,
-      "rotZ": 0.09854095323308815,
+      "rotX": -0.13473651948067072,
+      "rotZ": 0.09854095323308824,
       "quaternion": [
-        -0.05590952401789206,
-        0.6453926618043757,
-        0.7533455396019043,
-        0.11319423649228198
+        -0.05550824904241306,
+        0.6480568988060753,
+        0.7510548887124519,
+        0.11339155320932581
       ],
       "scale": 2.1,
       "alignToTrack": true,
       "trackDist": 4800,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790053137086_y1ce",
@@ -3310,38 +3373,16 @@
       "trackDist": 6200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
-    },
-    {
-      "id": "prop_1790053156964_h9al",
-      "type": "decal_wc_rocky_dirt",
-      "name": "Dirt & Grass Rim (Bandaid)",
-      "x": 1315,
-      "y": 17272,
-      "z": 4287,
-      "rotY": 0.4918683493173431,
-      "rotX": -0.0897620077141767,
-      "rotZ": 0.16250875580092597,
-      "quaternion": [
-        -0.1271638895310126,
-        0.6368725497919536,
-        0.7270832854584338,
-        0.22264904340196548
-      ],
-      "scale": 1.45,
-      "alignToTrack": true,
-      "trackDist": 7000,
-      "cameraFacing": false,
-      "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790053199541_aeiy",
       "type": "decal_wc_cart_ruts",
       "name": "Wagon Cart Dirt Ruts (Bandaid)",
-      "x": 1583,
-      "y": 17066,
-      "z": 5371,
+      "x": 1733,
+      "y": 17096,
+      "z": 5251,
       "rotY": 0.18108628389511655,
       "rotX": -0.18544006188211312,
       "rotZ": 0.004226394427521159,
@@ -3356,7 +3397,8 @@
       "trackDist": 8200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790053235067_7rof",
@@ -3379,76 +3421,56 @@
       "trackDist": 9000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
-    },
-    {
-      "id": "prop_1790053392905_99i2",
-      "type": "decal_wc_cart_ruts",
-      "name": "Wagon Cart Dirt Ruts (Bandaid)",
-      "x": 1491,
-      "y": 16702,
-      "z": 7033,
-      "rotY": -0.26785353553444075,
-      "rotX": -0.15189825741109264,
-      "rotZ": -0.15612315783334424,
-      "quaternion": [
-        0.050394119212723895,
-        0.6350796817948441,
-        0.7570454641662192,
-        -0.14497032698276258
-      ],
-      "scale": 1.5,
-      "alignToTrack": true,
-      "trackDist": 9800,
-      "cameraFacing": false,
-      "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790053458503_qyct",
       "type": "decal_wc_rocky_dirt",
       "name": "Dirt & Grass Rim (Bandaid)",
-      "x": 1003,
-      "y": 16450,
-      "z": 8233,
+      "x": 1251,
+      "y": 16515,
+      "z": 7931,
       "rotY": -0.43014380365557636,
-      "rotX": -0.08457379505194769,
-      "rotZ": -0.1397901578898817,
+      "rotX": -0.11912421567436017,
+      "rotZ": -0.15437613365727434,
       "quaternion": [
-        0.1097535086029622,
-        0.6483501830272574,
-        0.7281419310799341,
-        -0.1934051077946037
+        0.10767665330602873,
+        0.6341244601358806,
+        0.740153413798293,
+        -0.19612453042116346
       ],
       "scale": 1.35,
       "alignToTrack": true,
       "trackDist": 11200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790054641603_220w",
       "type": "decal_wc_cart_ruts",
       "name": "Wagon Cart Dirt Ruts (Bandaid)",
-      "x": 601,
-      "y": 16312,
-      "z": 8939,
+      "x": 591,
+      "y": 16345,
+      "z": 8619,
       "rotY": -0.6150663921833982,
-      "rotX": -0.0034860528422161483,
-      "rotZ": -0.17318527878023768,
+      "rotX": -0.010297621909868793,
+      "rotZ": -0.17318527878023762,
       "quaternion": [
-        0.15546006227953468,
-        0.6516653700768515,
-        0.6910681528813059,
-        -0.27127333549735655
+        0.15639706106532228,
+        0.6492721056969543,
+        0.6933171563202671,
+        -0.27073421063092123
       ],
       "scale": 1.7,
       "alignToTrack": true,
       "trackDist": 12000,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790054722889_p9d9",
@@ -3471,7 +3493,8 @@
       "trackDist": 14200,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790054945777_rvtx",
@@ -3494,47 +3517,25 @@
       "id": "prop_1790055008557_ntz2",
       "type": "decal_wc_cart_ruts",
       "name": "Wagon Cart Dirt Ruts (Bandaid)",
-      "x": -988,
-      "y": 15725,
-      "z": 11870,
+      "x": -1128,
+      "y": 15835,
+      "z": 11384,
       "rotY": -0.20165231227153882,
-      "rotX": -0.21132961815573087,
-      "rotZ": -0.04429798005817802,
+      "rotX": -0.21547606377512749,
+      "rotZ": -0.048343299578976325,
       "quaternion": [
-        0.06442234433609392,
-        0.6234244995362422,
-        0.7750676247780013,
-        -0.08038552076844296
+        0.06296763176093673,
+        0.6216485504651683,
+        0.7764929690210687,
+        -0.08152806949644396
       ],
       "scale": 1.7,
       "alignToTrack": true,
       "trackDist": 15399,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
-    },
-    {
-      "id": "prop_1790055029769_ra8j",
-      "type": "decal_wc_rocky_dirt",
-      "name": "Dirt & Grass Rim (Bandaid)",
-      "x": -1240,
-      "y": 15389,
-      "z": 13536,
-      "rotY": 0.008068261199620815,
-      "rotX": -0.20401631653930863,
-      "rotZ": 0.020620474946737327,
-      "quaternion": [
-        0.000804061743656801,
-        0.6312988436224829,
-        0.7754362264051389,
-        0.01264050252895485
-      ],
-      "scale": 2.4,
-      "alignToTrack": true,
-      "trackDist": 17199,
-      "cameraFacing": false,
-      "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790055068396_hfsh",
@@ -3543,15 +3544,16 @@
       "x": -1278,
       "y": 15880,
       "z": 9765,
-      "rotY": -0.5855105069975147,
+      "rotY": 1.7759875126759734,
       "rotX": 0,
       "rotZ": 0,
       "scale": 1.5,
       "alignToTrack": true,
       "trackDist": 13600,
-      "cameraFacing": true,
+      "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": true
     },
     {
       "id": "prop_1790055086330_vtoq",
@@ -3568,7 +3570,8 @@
       "trackDist": 12800,
       "cameraFacing": false,
       "flipX": true,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790057458517_w1p5",
@@ -3585,7 +3588,8 @@
       "trackDist": 12400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790057489925_u8l0",
@@ -3882,15 +3886,16 @@
       "x": -1965,
       "y": 15780,
       "z": 10703,
-      "rotY": -1.59159265358979,
+      "rotY": -1.04159265358979,
       "rotX": 0,
       "rotZ": -0.22689280275926285,
-      "scale": 1,
+      "scale": 0.9,
       "alignToTrack": true,
       "trackDist": 14599,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "lit": false
     },
     {
       "id": "prop_1790057828696_p7gr",
@@ -3946,14 +3951,15 @@
       "trackDist": 4400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790059298577_lm0y",
       "type": "timber_ramp",
       "name": "Timber Stunt Ramp",
       "x": 361,
-      "y": 17761,
+      "y": 17686,
       "z": 1777,
       "rotY": 0.358407346410207,
       "rotX": 0,
@@ -3963,30 +3969,33 @@
       "trackDist": 4400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": false
+      "isDecal": false,
+      "groupId": "group_1790075275147_rzbn"
     },
     {
       "id": "prop_1790059406926_jmji",
       "type": "decal_panel_reinforced_wood",
       "name": "Reinforced Iron-Wood Panel",
-      "x": 410,
-      "y": 17801,
-      "z": 1942,
+      "x": 480,
+      "y": 17765,
+      "z": 2087,
       "rotY": -0.291592653589793,
-      "rotX": 0.23756837698178063,
-      "rotZ": 0.11510176126592106,
+      "rotX": 0.2375683769817857,
+      "rotZ": -0.007445787592932139,
       "quaternion": [
-        0.13659585112856917,
-        0.781648455707224,
-        0.6030518836198436,
-        -0.08182720090246415
+        0.09832585233782819,
+        0.7749392489650685,
+        0.6104605045742245,
+        -0.13091661288954962
       ],
-      "scale": 0.45,
+      "scale": 1,
       "alignToTrack": true,
       "trackDist": 4400,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": false,
+      "groupId": "group_1790075275147_rzbn"
     },
     {
       "id": "prop_1790059721337_gv2j",
@@ -4009,7 +4018,8 @@
       "trackDist": 17999,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
     },
     {
       "id": "prop_1790059832027_j0we",
@@ -4032,7 +4042,8 @@
       "trackDist": 18799,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": false
     },
     {
       "id": "prop_1790060024463_6hg6",
@@ -4055,7 +4066,8 @@
       "trackDist": 19599,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": false
     },
     {
       "id": "prop_1790060139940_uc3d",
@@ -4078,7 +4090,8 @@
       "trackDist": 20199,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": false
     },
     {
       "id": "prop_1790060291163_bqtu",
@@ -4101,7 +4114,8 @@
       "trackDist": 21199,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": false
     },
     {
       "id": "prop_1790060373194_bow4",
@@ -4124,7 +4138,2385 @@
       "trackDist": 22399,
       "cameraFacing": false,
       "flipX": false,
-      "isDecal": true
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790075355298_7kg2",
+      "type": "prop_26_granite_tunnel_portal",
+      "name": "Granite Tunnel Portal",
+      "x": -1183,
+      "y": 15268,
+      "z": 13283,
+      "rotY": 3.0609204170332536,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 16999,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075499432_524k",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1652,
+      "y": 17622,
+      "z": 15939,
+      "rotY": -2.988370829854672,
+      "rotX": 0.618714994629119,
+      "rotZ": -0.2882013048305801,
+      "quaternion": [
+        -0.09475856253514352,
+        0.8790834100304252,
+        -0.44835966964553764,
+        0.13117461519247156
+      ],
+      "scale": 2,
+      "alignToTrack": true,
+      "trackDist": 22399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075545370_2ys3",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -1733,
+      "y": 17888,
+      "z": 15217,
+      "rotY": -0.091592653589793,
+      "rotX": 0.009169158023558086,
+      "rotZ": 0.34377608648874874,
+      "quaternion": [
+        0.698731481607536,
+        0.15711672125001483,
+        0.08479269920650236,
+        0.6927473209442664
+      ],
+      "scale": 1.95,
+      "alignToTrack": true,
+      "trackDist": 23199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075616927_j6v8",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1868,
+      "y": 17629,
+      "z": 14507,
+      "rotY": -0.391592653589793,
+      "rotX": 0.5876600746704873,
+      "rotZ": 0.2825477063818672,
+      "quaternion": [
+        -0.4703127599830971,
+        -0.22391940507617572,
+        -0.03997907675735678,
+        -0.852682638060049
+      ],
+      "scale": 1.85,
+      "alignToTrack": true,
+      "trackDist": 23999,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075672525_ohoe",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -1954,
+      "y": 16991,
+      "z": 13941,
+      "rotY": -0.791592653589793,
+      "rotX": 1.1991525468157616,
+      "rotZ": 0.0801371507478683,
+      "quaternion": [
+        0.18455555723893619,
+        0.26086552802447854,
+        -0.008568036466539983,
+        0.947531008110996
+      ],
+      "scale": 1.9,
+      "alignToTrack": true,
+      "trackDist": 25199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075714491_bml5",
+      "type": "decal_panel_scrap_steel",
+      "name": "Goblin Scrap Steel Plating",
+      "x": -2080,
+      "y": 16202,
+      "z": 13960,
+      "rotY": -0.141592653589793,
+      "rotX": -1.31560483164961,
+      "rotZ": 0.10728179949623244,
+      "quaternion": [
+        0.19976463275133735,
+        0.123744328103866,
+        0.9715459734821733,
+        0.02966233595694421
+      ],
+      "scale": 1.9,
+      "alignToTrack": true,
+      "trackDist": 25799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075904859_f2yh",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -2203,
+      "y": 15588,
+      "z": 14306,
+      "rotY": -0.341592653589793,
+      "rotX": -0.855897796620269,
+      "rotZ": 0.09809540095005603,
+      "quaternion": [
+        0.00991690678917748,
+        0.34649299080436124,
+        0.9367398445215257,
+        0.04860787970041857
+      ],
+      "scale": 1.75,
+      "alignToTrack": true,
+      "trackDist": 26599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075922043_7laj",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -2291,
+      "y": 15262,
+      "z": 14809,
+      "rotY": -0.391592653589793,
+      "rotX": -0.23574706668375142,
+      "rotZ": 0.04021173900085345,
+      "quaternion": [
+        -0.017790133785934588,
+        0.6177760523593395,
+        0.7851549133173136,
+        0.03959826214458748
+      ],
+      "scale": 1.95,
+      "alignToTrack": true,
+      "trackDist": 27199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790075980834_1ngv",
+      "type": "decal_blizzard_dirt_patch",
+      "name": "Blizzard Compacted Dirt",
+      "x": -2300,
+      "y": 15081,
+      "z": 15710,
+      "rotY": 0.708407346410207,
+      "rotX": -0.14152044529940017,
+      "rotZ": -0.0854713277417373,
+      "quaternion": [
+        0.25226870923105915,
+        0.5965389733777048,
+        0.7119583972087611,
+        -0.27132451460990636
+      ],
+      "scale": 3,
+      "alignToTrack": true,
+      "trackDist": 28199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076158541_wtcy",
+      "type": "pines_cluster",
+      "name": "Pine Forest Wall",
+      "x": -6727,
+      "y": 16261,
+      "z": 17107,
+      "rotY": 1.7430149807405655,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 3,
+      "alignToTrack": true,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false
+    },
+    {
+      "id": "prop_1790076180820_4bto",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1933,
+      "y": 14802,
+      "z": 15855,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076228683_8ydl",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1938,
+      "y": 14802,
+      "z": 16350,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076270053_2amc",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1968,
+      "y": 14802,
+      "z": 16895,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076315692_c0in",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2838,
+      "y": 14802,
+      "z": 15750,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076315692_f6i2"
+    },
+    {
+      "id": "prop_1790076315692_tsqd",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2843,
+      "y": 14802,
+      "z": 16245,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076315692_f6i2"
+    },
+    {
+      "id": "prop_1790076315693_4s5x",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2873,
+      "y": 14802,
+      "z": 16790,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076315692_f6i2"
+    },
+    {
+      "id": "prop_1790076401392_qdu1",
+      "type": "prop_53_arch_lintel_timber",
+      "name": "Archway Timber Crossbeam",
+      "x": -2378,
+      "y": 15944,
+      "z": 15707,
+      "rotY": 0.008407346410207,
+      "rotX": 7.771561172376096e-16,
+      "rotZ": -0.006016058080336626,
+      "quaternion": [
+        -0.7070883934319498,
+        -0.0008454478954746482,
+        -0.00509939935911628,
+        0.7071062757590658
+      ],
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 28599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076459549_v6td",
+      "type": "prop_53_arch_lintel_timber",
+      "name": "Archway Timber Crossbeam",
+      "x": -2383,
+      "y": 15944,
+      "z": 15902,
+      "rotY": 0.008407346410207,
+      "rotX": 7.771561172376096e-16,
+      "rotZ": -0.006016058080336626,
+      "quaternion": [
+        -0.7070883934319498,
+        -0.0008454478954746482,
+        -0.00509939935911628,
+        0.7071062757590658
+      ],
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 28599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076471418_v1t4",
+      "type": "prop_53_arch_lintel_timber",
+      "name": "Archway Timber Crossbeam",
+      "x": -2388,
+      "y": 15944,
+      "z": 16222,
+      "rotY": 0.008407346410207,
+      "rotX": 7.771561172376096e-16,
+      "rotZ": -0.006016058080336626,
+      "quaternion": [
+        -0.7070883934319498,
+        -0.0008454478954746482,
+        -0.00509939935911628,
+        0.7071062757590658
+      ],
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 28599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076474984_h1l9",
+      "type": "prop_53_arch_lintel_timber",
+      "name": "Archway Timber Crossbeam",
+      "x": -2393,
+      "y": 15944,
+      "z": 16417,
+      "rotY": 0.008407346410207,
+      "rotX": 7.771561172376096e-16,
+      "rotZ": -0.006016058080336626,
+      "quaternion": [
+        -0.7070883934319498,
+        -0.0008454478954746482,
+        -0.00509939935911628,
+        0.7071062757590658
+      ],
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 28599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076476742_qhkx",
+      "type": "prop_53_arch_lintel_timber",
+      "name": "Archway Timber Crossbeam",
+      "x": -2398,
+      "y": 15944,
+      "z": 16762,
+      "rotY": 0.008407346410207,
+      "rotX": 7.771561172376096e-16,
+      "rotZ": -0.006016058080336626,
+      "quaternion": [
+        -0.7070883934319498,
+        -0.0008454478954746482,
+        -0.00509939935911628,
+        0.7071062757590658
+      ],
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 28599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076541909_d8om",
+      "type": "prop_53_arch_lintel_timber",
+      "name": "Archway Timber Crossbeam",
+      "x": -2403,
+      "y": 15944,
+      "z": 16982,
+      "rotY": 0.008407346410207,
+      "rotX": 7.771561172376096e-16,
+      "rotZ": -0.006016058080336626,
+      "quaternion": [
+        -0.7070883934319498,
+        -0.0008454478954746482,
+        -0.00509939935911628,
+        0.7071062757590658
+      ],
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 28599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076570671_a8jo",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -2377,
+      "y": 15705,
+      "z": 16922,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076624539_wgim",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -2382,
+      "y": 15705,
+      "z": 16667,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076648141_sp32",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -2387,
+      "y": 15705,
+      "z": 16387,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076654557_9qc2",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -2417,
+      "y": 15705,
+      "z": 16157,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076698579_7737",
+      "type": "prop_57_arch_crest_spikes",
+      "name": "Archway Spiked Crest Trophy",
+      "x": -2397,
+      "y": 15627,
+      "z": 16990,
+      "rotY": 0.21987074574948076,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 2.1,
+      "alignToTrack": true,
+      "trackDist": 29599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790076750526_peb6",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2993,
+      "y": 14802,
+      "z": 15795,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076750526_32b0"
+    },
+    {
+      "id": "prop_1790076750526_uh4c",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2998,
+      "y": 14802,
+      "z": 16290,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076750526_32b0"
+    },
+    {
+      "id": "prop_1790076750526_y10s",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -3028,
+      "y": 14802,
+      "z": 16835,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076750526_32b0"
+    },
+    {
+      "id": "prop_1790076774104_z9g4",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1723,
+      "y": 14802,
+      "z": 15865,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076774104_5i1h"
+    },
+    {
+      "id": "prop_1790076774104_zug4",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1728,
+      "y": 14802,
+      "z": 16360,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076774104_5i1h"
+    },
+    {
+      "id": "prop_1790076774104_7djj",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1758,
+      "y": 14802,
+      "z": 16905,
+      "rotY": 1.50840734641021,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076774104_5i1h"
+    },
+    {
+      "id": "prop_1790076805308_j141",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2949,
+      "y": 14824,
+      "z": 16936,
+      "rotY": 0.19787868225426028,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076951463_yy4f"
+    },
+    {
+      "id": "prop_1790076849249_pk0j",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1878,
+      "y": 14831,
+      "z": 16953,
+      "rotY": 0.21987074574948076,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076951463_yy4f"
+    },
+    {
+      "id": "prop_1790076953371_l29t",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2929,
+      "y": 14824,
+      "z": 16381,
+      "rotY": 0.19787868225426028,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076953371_w6yg"
+    },
+    {
+      "id": "prop_1790076953372_lse1",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1858,
+      "y": 14831,
+      "z": 16398,
+      "rotY": 0.21987074574948076,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076953371_w6yg"
+    },
+    {
+      "id": "prop_1790076966515_7nck",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -2934,
+      "y": 14824,
+      "z": 15901,
+      "rotY": 0.19787868225426028,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076966515_bllh"
+    },
+    {
+      "id": "prop_1790076966515_adwk",
+      "type": "prop_52_arch_pillar_stone",
+      "name": "Archway Stone Pillar",
+      "x": -1863,
+      "y": 14831,
+      "z": 15918,
+      "rotY": 0.21987074574948076,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false,
+      "groupId": "group_1790076966515_bllh"
+    },
+    {
+      "id": "prop_1790077037133_67qz",
+      "type": "decal_tire_skid",
+      "name": "Timber Planks (Legacy Skid)",
+      "x": -2361,
+      "y": 14915,
+      "z": 16737,
+      "rotY": 0.458407346410207,
+      "rotX": -0.1615791820445454,
+      "rotZ": 0.0673489959962643,
+      "quaternion": [
+        0.045100589147670844,
+        0.6477093903134218,
+        0.7605290568505662,
+        0.005834058993203564
+      ],
+      "scale": 2.25,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077081385_7aek",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -2347,
+      "y": 15705,
+      "z": 15627,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077110069_x5w1",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -2352,
+      "y": 15705,
+      "z": 15872,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077192446_lpe7",
+      "type": "goblin_21_grandstand_roar",
+      "name": "Grandstand Roar",
+      "x": -3615,
+      "y": 14952,
+      "z": 16737,
+      "rotY": 0.19787868225426028,
+      "rotX": 0,
+      "rotZ": -0.08726646259971647,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077257756_299c",
+      "type": "goblin_30_fan_aisle",
+      "name": "Fan Aisle",
+      "x": -2428,
+      "y": 14879,
+      "z": 16227,
+      "rotY": 0.058407346410207,
+      "rotX": 0,
+      "rotZ": -0.13962634015954636,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 28799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077332244_l1i2",
+      "type": "decal_tire_skid",
+      "name": "Timber Planks (Legacy Skid)",
+      "x": -1224,
+      "y": 15405,
+      "z": 13535,
+      "rotY": -0.141592653589793,
+      "rotX": -0.20718420869894905,
+      "rotZ": 0.08690997577526231,
+      "quaternion": [
+        -0.03289712701138706,
+        0.6247804974015689,
+        0.7757385849004754,
+        0.08244244657731123
+      ],
+      "scale": 1.9,
+      "alignToTrack": true,
+      "trackDist": 17199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077380107_bcxn",
+      "type": "decal_hazard_stripes",
+      "name": "Scrap Steel (Legacy Hazard)",
+      "x": -1219,
+      "y": 15314,
+      "z": 13963,
+      "rotY": 0.03882784723623401,
+      "rotX": -0.17067194347182818,
+      "rotZ": 0.03843936737206713,
+      "quaternion": [
+        -0.0024663892027381954,
+        0.643690821420352,
+        0.76479814393153,
+        0.02720004379370548
+      ],
+      "scale": 1.8,
+      "alignToTrack": true,
+      "trackDist": 17599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077430032_w8g0",
+      "type": "decal_hazard_stripes",
+      "name": "Scrap Steel (Legacy Hazard)",
+      "x": -1604,
+      "y": 16535,
+      "z": 13483,
+      "rotY": -1.64159265358979,
+      "rotX": 0.0031360857826308298,
+      "rotZ": -1.5108974005110167,
+      "quaternion": [
+        -0.5229076277759056,
+        0.5520576898860948,
+        -0.47434119839283495,
+        0.44362185175964464
+      ],
+      "scale": 2.35,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077584440_qwet",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1655,
+      "y": 15689,
+      "z": 13928,
+      "rotY": -0.044457495021650875,
+      "rotX": 0,
+      "rotZ": 1.5707963267948966,
+      "quaternion": [
+        0.5000000000000001,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "scale": 2.2,
+      "alignToTrack": true,
+      "trackDist": 16999,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077606764_tkaa",
+      "type": "decal_hazard_stripes",
+      "name": "Scrap Steel (Legacy Hazard)",
+      "x": -1541,
+      "y": 17584,
+      "z": 13828,
+      "rotY": -0.901592653589793,
+      "rotX": 0.7318493095862825,
+      "rotZ": -0.8288343277322294,
+      "quaternion": [
+        -0.3509581722203366,
+        0.7173234254594112,
+        -0.2066520876356232,
+        0.5653055627842143
+      ],
+      "scale": 2.35,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077642562_zljz",
+      "type": "decal_hazard_stripes",
+      "name": "Scrap Steel (Legacy Hazard)",
+      "x": -1401,
+      "y": 18276,
+      "z": 14730,
+      "rotY": -0.181592653589793,
+      "rotX": 0.723459543917971,
+      "rotZ": -0.13500575186783362,
+      "quaternion": [
+        -0.31002142458401183,
+        0.712395439730315,
+        0.2699924135758947,
+        0.5687561431420467
+      ],
+      "scale": 2.35,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077741582_t8be",
+      "type": "decal_hazard_stripes",
+      "name": "Scrap Steel (Legacy Hazard)",
+      "x": -1266,
+      "y": 18031,
+      "z": 15881,
+      "rotY": 0.598407346410207,
+      "rotX": 0.4764017897702943,
+      "rotZ": 0.6827832055231415,
+      "quaternion": [
+        -0.04434438829396981,
+        0.547499945154331,
+        0.5184026193902228,
+        0.655390043784764
+      ],
+      "scale": 2.35,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077831217_vbfg",
+      "type": "decal_hazard_stripes",
+      "name": "Scrap Steel (Legacy Hazard)",
+      "x": -1068,
+      "y": 17270,
+      "z": 16584,
+      "rotY": 1.21840734641021,
+      "rotX": 0.1313689538218444,
+      "rotZ": 1.0122001542214654,
+      "quaternion": [
+        0.20885266869076038,
+        0.5732794926387703,
+        0.6252078463963752,
+        0.4866686089167753
+      ],
+      "scale": 2.35,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077901215_qttd",
+      "type": "decal_panel_scrap_steel",
+      "name": "Goblin Scrap Steel Plating",
+      "x": -861,
+      "y": 16276,
+      "z": 16603,
+      "rotY": 0.358407346410207,
+      "rotX": 1.258737968219408,
+      "rotZ": -0.305329497867049,
+      "quaternion": [
+        -0.1454119631968576,
+        0.834253452683321,
+        0.05480460332622567,
+        -0.5290302383601978
+      ],
+      "scale": 2,
+      "alignToTrack": true,
+      "trackDist": 20199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077969124_x4xp",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1697,
+      "y": 15077,
+      "z": 16632,
+      "rotY": 0.1724474049236198,
+      "rotX": 0,
+      "rotZ": 1.5707963267948966,
+      "quaternion": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ],
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 29199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077969178_7iua",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1297,
+      "y": 15077,
+      "z": 16632,
+      "rotY": 0.1724474049236198,
+      "rotX": 0,
+      "rotZ": 1.5707963267948966,
+      "quaternion": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ],
+      "scale": 2.15,
+      "alignToTrack": true,
+      "trackDist": 29199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790077991264_3j2r",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1277,
+      "y": 16257,
+      "z": 16702,
+      "rotY": 0.1724474049236198,
+      "rotX": 0,
+      "rotZ": 1.5707963267948966,
+      "quaternion": [
+        0,
+        0,
+        0.7071067811865475,
+        0.7071067811865476
+      ],
+      "scale": 2.15,
+      "alignToTrack": true,
+      "trackDist": 29199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078038377_twft",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -1332,
+      "y": 17370,
+      "z": 16548,
+      "rotY": 0.1724474049236198,
+      "rotX": 3.582203977892107e-15,
+      "rotZ": 1.3258448201320188,
+      "quaternion": [
+        -0.08638708497574456,
+        0.08638708497574506,
+        0.7018099967579485,
+        0.7018099967579486
+      ],
+      "scale": 2.15,
+      "alignToTrack": true,
+      "trackDist": 29199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078119960_ohrb",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -1930,
+      "y": 17994,
+      "z": 15648,
+      "rotY": -1.44159265358979,
+      "rotX": 0.7435187133302865,
+      "rotZ": 0.33396096876561215,
+      "quaternion": [
+        0.3720945642811482,
+        0.6875178899483569,
+        -0.15200177520013666,
+        0.6047811559311256
+      ],
+      "scale": 1.95,
+      "alignToTrack": true,
+      "trackDist": 22799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078190672_54nj",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -2000,
+      "y": 17460,
+      "z": 16225,
+      "rotY": -0.841592653589793,
+      "rotX": 0.3828569603047186,
+      "rotZ": 1.0007137574036487,
+      "quaternion": [
+        0.5438320310994668,
+        0.6486915525132445,
+        0.1321388168993591,
+        0.5157376510558659
+      ],
+      "scale": 1.95,
+      "alignToTrack": true,
+      "trackDist": 22799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078242804_6922",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -2095,
+      "y": 16535,
+      "z": 16463,
+      "rotY": -0.291592653589793,
+      "rotX": -0.02453792694595042,
+      "rotZ": 1.392525541154011,
+      "quaternion": [
+        0.5811419851222078,
+        0.48662059133872215,
+        0.4177819113217042,
+        0.5009317995353816
+      ],
+      "scale": 1.95,
+      "alignToTrack": true,
+      "trackDist": 22799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078311723_6toi",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -1915,
+      "y": 18099,
+      "z": 14779,
+      "rotY": -2.34159265358979,
+      "rotX": 0.6736502068184683,
+      "rotZ": -0.4175063085382594,
+      "quaternion": [
+        0.03000606726070626,
+        0.7361168231079877,
+        -0.4326409117212252,
+        0.5196667202832783
+      ],
+      "scale": 1.95,
+      "alignToTrack": true,
+      "trackDist": 22799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078413223_a2z9",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -1953,
+      "y": 17429,
+      "z": 14147,
+      "rotY": -0.591592653589793,
+      "rotX": 0.8539519975559613,
+      "rotZ": 0.19827625817116618,
+      "quaternion": [
+        -0.35054181321480693,
+        -0.24647899094434852,
+        -0.013380790218236304,
+        -0.9034320664356933
+      ],
+      "scale": 2.55,
+      "alignToTrack": true,
+      "trackDist": 24399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078437525_0zmi",
+      "type": "decal_panel_wood_planks",
+      "name": "Rough Timber Deck Planks",
+      "x": -2012,
+      "y": 16551,
+      "z": 13763,
+      "rotY": -1.9555741862839378,
+      "rotX": 0.005190249190875783,
+      "rotZ": -1.5376278780211698,
+      "quaternion": [
+        -0.17758989595693978,
+        0.20089072962939486,
+        -0.6825442959325724,
+        0.6798808922839953
+      ],
+      "scale": 1.8,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078456912_06c9",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -2018,
+      "y": 15629,
+      "z": 13802,
+      "rotY": -1.9555741862839378,
+      "rotX": 0.008050332187079071,
+      "rotZ": -1.520186974382647,
+      "quaternion": [
+        -0.17233263707901764,
+        0.2078889095448538,
+        -0.682844301126377,
+        0.6788279044830678
+      ],
+      "scale": 2.2,
+      "alignToTrack": true,
+      "trackDist": 25399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078490250_218h",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -1177,
+      "y": 15630,
+      "z": 13647,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078516255_novc",
+      "type": "prop_54_arch_curve_timber",
+      "name": "Archway Curved Header",
+      "x": -1182,
+      "y": 15630,
+      "z": 13992,
+      "rotY": -0.041592653589793,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.9,
+      "alignToTrack": true,
+      "trackDist": 29399,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790078549090_he7i",
+      "type": "decal_panel_reinforced_wood",
+      "name": "Reinforced Iron-Wood Panel",
+      "x": -610,
+      "y": 15689,
+      "z": 14048,
+      "rotY": -0.044457495021650875,
+      "rotX": 0,
+      "rotZ": 1.5707963267948966,
+      "quaternion": [
+        0.5000000000000001,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "scale": 2.2,
+      "alignToTrack": true,
+      "trackDist": 16999,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790088851864_405m",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 1020,
+      "y": 17244,
+      "z": 4603,
+      "rotY": 3.10840734641021,
+      "rotX": 0.028063659382460988,
+      "rotZ": -0.21778248601004066,
+      "quaternion": [
+        0.5649680858265422,
+        0.28449007922139247,
+        0.40838838630976804,
+        -0.6580998273433871
+      ],
+      "scale": 2.45,
+      "alignToTrack": true,
+      "trackDist": 7000,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790088955426_geya",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 1101,
+      "y": 17446,
+      "z": 3186,
+      "rotY": 0.4362243169551391,
+      "rotX": 0.0675497610235771,
+      "rotZ": 0.31012457869108734,
+      "quaternion": [
+        -0.032883909978245,
+        0.6839970149729966,
+        0.6820333186305594,
+        0.2567046634760627
+      ],
+      "scale": 1.5,
+      "alignToTrack": true,
+      "trackDist": 6000,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089014194_hkyt",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 1176,
+      "y": 17405,
+      "z": 3377,
+      "rotY": 1.55840734641021,
+      "rotX": -0.16259309947009576,
+      "rotZ": 0.05393946056289244,
+      "quaternion": [
+        0.2506664330687867,
+        0.6220578531421445,
+        0.7197952227249008,
+        -0.17917925108439983
+      ],
+      "scale": 1.55,
+      "alignToTrack": true,
+      "trackDist": 6200,
+      "cameraFacing": false,
+      "flipX": true,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790089088091_hxvl",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 227,
+      "y": 17555,
+      "z": 3137,
+      "rotY": 0.33465394602292786,
+      "rotX": -0.08259506315906176,
+      "rotZ": 0.10035957460266715,
+      "quaternion": [
+        -0.08742729549727962,
+        0.6610118889565673,
+        0.7304841276058189,
+        0.14769119803178704
+      ],
+      "scale": 1.8,
+      "alignToTrack": true,
+      "trackDist": 5600,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": false
+    },
+    {
+      "id": "prop_1790089126333_wpun",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 128,
+      "y": 17741,
+      "z": 1949,
+      "rotY": -2.44159265358979,
+      "rotX": 0.1581539955728276,
+      "rotZ": -0.011293176922679402,
+      "quaternion": [
+        -0.6429973931891516,
+        0.11217492482874349,
+        0.08835495019287647,
+        0.7524390615644819
+      ],
+      "scale": 2,
+      "alignToTrack": true,
+      "trackDist": 4400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089223261_2b5k",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 517,
+      "y": 17879,
+      "z": 863,
+      "rotY": 0.139903138817082,
+      "rotX": -0.08047203010834639,
+      "rotZ": 0.10480935198396443,
+      "quaternion": [
+        -0.014577593905997981,
+        0.6728014661486875,
+        0.7348333800862465,
+        0.08453155869324788
+      ],
+      "scale": 2.7,
+      "alignToTrack": true,
+      "trackDist": 3400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089288994_w9re",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 898,
+      "y": 17733,
+      "z": 1507,
+      "rotY": 0.708407346410207,
+      "rotX": -0.19825877640465495,
+      "rotZ": 0.12347962604778102,
+      "quaternion": [
+        0.17016914595984856,
+        0.6307483587994214,
+        0.7546679531306937,
+        -0.0606238414542276
+      ],
+      "scale": 1.45,
+      "alignToTrack": true,
+      "trackDist": 4000,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089371307_vxy7",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 366,
+      "y": 18003,
+      "z": -1330,
+      "rotY": 0,
+      "rotX": -0.004140783302817907,
+      "rotZ": 0,
+      "quaternion": [
+        0,
+        0.7056412787423261,
+        0.7085692526033676,
+        0
+      ],
+      "scale": 2.3,
+      "alignToTrack": true,
+      "trackDist": 1000,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089404758_asrv",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": -402,
+      "y": 18004,
+      "z": -991,
+      "rotY": -3.14159265358979,
+      "rotX": 0.04624295656304329,
+      "rotZ": 0.008354454771800078,
+      "quaternion": [
+        -0.6905614470275536,
+        -0.002474240213436587,
+        0.003413100353444984,
+        0.7232614442651797
+      ],
+      "scale": 2,
+      "alignToTrack": true,
+      "trackDist": 1400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089488176_e32x",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1602,
+      "y": 17262,
+      "z": 3988,
+      "rotY": 1.45840734641021,
+      "rotX": -0.14386542414233902,
+      "rotZ": 0.28468750584067687,
+      "quaternion": [
+        0.27393381593408483,
+        0.6522054822923731,
+        0.7047305145994921,
+        -0.05425103821955311
+      ],
+      "scale": 1.5,
+      "alignToTrack": true,
+      "trackDist": 6800,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089540988_u9b1",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 1472,
+      "y": 17313,
+      "z": 3542,
+      "rotY": 0.4888877050897252,
+      "rotX": 0.13111471000795974,
+      "rotZ": 0.3877372982512393,
+      "quaternion": [
+        -0.014413047999621688,
+        0.6886485106583511,
+        0.6591074124442009,
+        0.30188228115691873
+      ],
+      "scale": 1.3,
+      "alignToTrack": true,
+      "trackDist": 6400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089658406_uye4",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1004,
+      "y": 17575,
+      "z": 2550,
+      "rotY": 0.808407346410207,
+      "rotX": -0.1577066607381833,
+      "rotZ": 0.16104761024345418,
+      "quaternion": [
+        0.14763406359954864,
+        0.648872033195585,
+        0.7461441245096024,
+        -0.020933543931040296
+      ],
+      "scale": 1.35,
+      "alignToTrack": true,
+      "trackDist": 5400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089722062_u6un",
+      "type": "decal_wc_mud_puddle",
+      "name": "Muddy Dirt Puddle",
+      "x": 205,
+      "y": 17509,
+      "z": 3573,
+      "rotY": 1.15840734641021,
+      "rotX": -0.15891508382863295,
+      "rotZ": 0.07230846250905965,
+      "quaternion": [
+        0.1645849957092084,
+        0.6419640078592261,
+        0.7429907847989845,
+        -0.09358784912855182
+      ],
+      "scale": 1.5,
+      "alignToTrack": true,
+      "trackDist": 5800,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089845977_loww",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1862,
+      "y": 17183,
+      "z": 4539,
+      "rotY": 1.00840734641021,
+      "rotX": -0.05687708230229339,
+      "rotZ": 0.2507981280828905,
+      "quaternion": [
+        0.13719422925582508,
+        0.6854228700560595,
+        0.7138634000736734,
+        0.042098440568134804
+      ],
+      "scale": 1.35,
+      "alignToTrack": true,
+      "trackDist": 7400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089930619_jw9o",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 1978,
+      "y": 16913,
+      "z": 6234,
+      "rotY": 2.00840734641021,
+      "rotX": 0.1370079295266155,
+      "rotZ": -0.16037518574338372,
+      "quaternion": [
+        0.5460391964406573,
+        0.3128156852734258,
+        0.36544677691071625,
+        -0.6858835150686574
+      ],
+      "scale": 1.65,
+      "alignToTrack": true,
+      "trackDist": 8800,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790089962525_wndm",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1847,
+      "y": 17032,
+      "z": 5641,
+      "rotY": 0.308407346410207,
+      "rotX": -0.20074792296857533,
+      "rotZ": -0.13453612643848706,
+      "quaternion": [
+        0.014263271092905962,
+        0.6250352785149376,
+        0.7742723705711669,
+        -0.09813131956511306
+      ],
+      "scale": 1.55,
+      "alignToTrack": true,
+      "trackDist": 8400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090063278_zjjx",
+      "type": "decal_wc_gravel",
+      "name": "Gravel & River Stones",
+      "x": 618,
+      "y": 17338,
+      "z": 4314,
+      "rotY": 0.5006161589311382,
+      "rotX": -0.10100561974957181,
+      "rotZ": 0.19509951185038088,
+      "quaternion": [
+        -0.11985833294373151,
+        0.6279098334748939,
+        0.7321550115536574,
+        0.23518558651912425
+      ],
+      "scale": 1.45,
+      "alignToTrack": true,
+      "trackDist": 6800,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090079936_94gk",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1026,
+      "y": 17124,
+      "z": 5124,
+      "rotY": -1.94159265358979,
+      "rotX": 0.24793542057693932,
+      "rotZ": 0.13446235721862262,
+      "quaternion": [
+        -0.5827593259594199,
+        0.14348218603905402,
+        0.19413925319942832,
+        0.7759602958038155
+      ],
+      "scale": 1.7,
+      "alignToTrack": true,
+      "trackDist": 7800,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090151472_sgqz",
+      "type": "decal_wc_rocky_dirt",
+      "name": "Dirt & Grass Rim",
+      "x": 1169,
+      "y": 16926,
+      "z": 5776,
+      "rotY": 0.012565261694023633,
+      "rotX": -0.23051612699460086,
+      "rotZ": -0.09964912878378591,
+      "quaternion": [
+        -0.035829623376290184,
+        0.6201000232319427,
+        0.7829152268398442,
+        -0.03515603587967274
+      ],
+      "scale": 1.35,
+      "alignToTrack": true,
+      "trackDist": 8600,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090365096_jeph",
+      "type": "decal_wc_gravel",
+      "name": "Gravel & River Stones",
+      "x": 1091,
+      "y": 16774,
+      "z": 6425,
+      "rotY": -0.19498169308040292,
+      "rotX": -0.1688754810531736,
+      "rotZ": -0.14207105803704934,
+      "quaternion": [
+        0.028741748899380755,
+        0.6343284802206972,
+        0.7636824462195467,
+        -0.11657792409901035
+      ],
+      "scale": 2.55,
+      "alignToTrack": true,
+      "trackDist": 9400,
+      "cameraFacing": false,
+      "flipX": true,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090401445_0nbp",
+      "type": "decal_wc_mud_puddle",
+      "name": "Muddy Dirt Puddle",
+      "x": 881,
+      "y": 16653,
+      "z": 6971,
+      "rotY": -1.24159265358979,
+      "rotX": -0.19901351437997006,
+      "rotZ": 0.011080622906535465,
+      "quaternion": [
+        -0.21873954105783885,
+        0.6054717622081965,
+        0.7422965846121969,
+        0.18588367012563234
+      ],
+      "scale": 3,
+      "alignToTrack": true,
+      "trackDist": 10200,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090478032_jxmc",
+      "type": "decal_wc_gravel",
+      "name": "Gravel & River Stones",
+      "x": 328,
+      "y": 16437,
+      "z": 7704,
+      "rotY": -1.69159265358979,
+      "rotX": -0.22581494639767985,
+      "rotZ": 0.012145226445427367,
+      "quaternion": [
+        -0.3353226583098864,
+        0.5594329377024548,
+        0.706759549829774,
+        0.2740154042421869
+      ],
+      "scale": 3,
+      "alignToTrack": true,
+      "trackDist": 11000,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090579794_und1",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 14,
+      "y": 16239,
+      "z": 8719,
+      "rotY": 1.20840734641021,
+      "rotX": 0.13677334360276733,
+      "rotZ": 0.17071429119647963,
+      "quaternion": [
+        0.6371648556114716,
+        0.3070165964517119,
+        0.16077093417410124,
+        -0.6884144558342771
+      ],
+      "scale": 1.55,
+      "alignToTrack": true,
+      "trackDist": 12200,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090614061_sdl0",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1594,
+      "y": 16680,
+      "z": 7193,
+      "rotY": -0.991592653589793,
+      "rotX": -0.20259123326178186,
+      "rotZ": -0.04297134039008182,
+      "quaternion": [
+        -0.14362910332987727,
+        0.6255684900784819,
+        0.7615607669255328,
+        0.08977718628568586
+      ],
+      "scale": 1.7,
+      "alignToTrack": true,
+      "trackDist": 10200,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090714161_yeck",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": 707,
+      "y": 16447,
+      "z": 8087,
+      "rotY": -0.3830063232903611,
+      "rotX": -0.11403498844858705,
+      "rotZ": -0.14001312881025374,
+      "quaternion": [
+        0.09542490086883582,
+        0.6416950791437125,
+        0.7401270749878205,
+        -0.1770125039845781
+      ],
+      "scale": 1.7,
+      "alignToTrack": true,
+      "trackDist": 10800,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790090906169_dbuo",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 593,
+      "y": 16273,
+      "z": 9312,
+      "rotY": -1.79159265358979,
+      "rotX": -0.16794046152741607,
+      "rotZ": -0.04832343775138417,
+      "quaternion": [
+        -0.2005936612617825,
+        0.6302188424230025,
+        0.737114817402822,
+        0.13873766497173107
+      ],
+      "scale": 1.65,
+      "alignToTrack": true,
+      "trackDist": 12400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790091146373_01um",
+      "type": "goblin_17_shoulder_ride_duo",
+      "name": "Shoulder-Ride Duo",
+      "x": 326,
+      "y": 16379,
+      "z": 7681,
+      "rotY": 2.063469002423839,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.5,
+      "alignToTrack": true,
+      "trackDist": 11000,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790091227912_6csz",
+      "type": "prop_03_tnt_powder_kegs",
+      "name": "TNT Powder Kegs",
+      "x": -195,
+      "y": 16154,
+      "z": 8868,
+      "rotY": -1.19159265358979,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 12400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790091279702_e5ly",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 1045,
+      "y": 16414,
+      "z": 8630,
+      "rotY": -1.89159265358979,
+      "rotX": -0.1554369820043291,
+      "rotZ": -0.03953997535248027,
+      "quaternion": [
+        -0.23341901806540274,
+        0.6261365191480472,
+        0.723133096949481,
+        0.1747774169931672
+      ],
+      "scale": 1.9,
+      "alignToTrack": true,
+      "trackDist": 12400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790091431199_rglw",
+      "type": "decal_blizzard_stone_slab",
+      "name": "Blizzard Cobble & Flagstone",
+      "x": -1173,
+      "y": 15500,
+      "z": 12957,
+      "rotY": -0.241592653589793,
+      "rotX": -0.2089900512567953,
+      "rotZ": -0.001389790853195431,
+      "quaternion": [
+        -0.009521808234012616,
+        0.6294580787141695,
+        0.7769461702533244,
+        0.006819885491219469
+      ],
+      "scale": 1.65,
+      "alignToTrack": true,
+      "trackDist": 16599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790091528518_rise",
+      "type": "goblin_08_track_marshal",
+      "name": "Track Marshal",
+      "x": -774,
+      "y": 15461,
+      "z": 13163,
+      "rotY": -0.1076668177710536,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.8,
+      "alignToTrack": true,
+      "trackDist": 16599,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790091548948_6wan",
+      "type": "goblin_01_flag_waver",
+      "name": "Flag-Waving Fan",
+      "x": -1541,
+      "y": 15462,
+      "z": 13039,
+      "rotY": -0.1076668177710536,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.8,
+      "alignToTrack": true,
+      "trackDist": 16599,
+      "cameraFacing": false,
+      "flipX": true,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790091718607_ecj1",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": -554,
+      "y": 15624,
+      "z": 12401,
+      "rotY": -0.491592653589793,
+      "rotX": -0.1979699003615897,
+      "rotZ": 0.07072229919284394,
+      "quaternion": [
+        -0.0626075618446628,
+        0.626347842048281,
+        0.7709863411137323,
+        0.09668886066857954
+      ],
+      "scale": 1.4,
+      "alignToTrack": true,
+      "trackDist": 16199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790091790023_3ozh",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": -663,
+      "y": 15828,
+      "z": 11452,
+      "rotY": 2.70840734641021,
+      "rotX": 0.22770926255431742,
+      "rotZ": -0.06579004214357025,
+      "quaternion": [
+        0.617574504490104,
+        0.04257505020537169,
+        0.07568668821413436,
+        -0.7817036661875063
+      ],
+      "scale": 1.75,
+      "alignToTrack": true,
+      "trackDist": 16199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790092057481_6ivc",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": -546,
+      "y": 16088,
+      "z": 9994,
+      "rotY": -2.74159265358979,
+      "rotX": -0.06348367924846937,
+      "rotZ": 0.09164419893041365,
+      "quaternion": [
+        -0.4746286960538499,
+        0.4764707865495891,
+        0.5535775681217429,
+        0.4911772251636476
+      ],
+      "scale": 2.1,
+      "alignToTrack": true,
+      "trackDist": 13400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790092134802_p6l6",
+      "type": "prop_29_spiked_barricade",
+      "name": "Spiked Boulder Barricade",
+      "x": 200,
+      "y": 16063,
+      "z": 10344,
+      "rotY": -0.6162584559168895,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 0.85,
+      "alignToTrack": true,
+      "trackDist": 13400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790092168247_igkt",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": 6,
+      "y": 15945,
+      "z": 10941,
+      "rotY": -0.691592653589793,
+      "rotX": -0.21876473841968358,
+      "rotZ": 0.19319699347352046,
+      "quaternion": [
+        -0.09621914248654995,
+        0.5936040858516377,
+        0.7741148886002434,
+        0.197793339439994
+      ],
+      "scale": 1.65,
+      "alignToTrack": true,
+      "trackDist": 16199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790092245193_2avg",
+      "type": "decal_wc_grass_patch",
+      "name": "Lush Grass Patch",
+      "x": -46,
+      "y": 16197,
+      "z": 9335,
+      "rotY": -0.491592653589793,
+      "rotX": 0.012329991682326623,
+      "rotZ": -0.1201499083212372,
+      "quaternion": [
+        0.21369332831025573,
+        0.6469407356183807,
+        0.6694552425686972,
+        -0.2960279112356323
+      ],
+      "scale": 2.1,
+      "alignToTrack": true,
+      "trackDist": 13400,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
+    },
+    {
+      "id": "prop_1790092390756_lkl4",
+      "type": "prop_35_granite_strata_wall",
+      "name": "Granite Strata Seam Wall",
+      "x": -295,
+      "y": 15253,
+      "z": 13191,
+      "rotY": -3.09159265358979,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 16799,
+      "cameraFacing": false,
+      "flipX": true,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790092559317_irn8",
+      "type": "prop_35_granite_strata_wall",
+      "name": "Granite Strata Seam Wall",
+      "x": -2085,
+      "y": 15253,
+      "z": 13211,
+      "rotY": -3.09159265358979,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 16799,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": false,
+      "lit": false
+    },
+    {
+      "id": "prop_1790092609729_u3is",
+      "type": "decal_wc_grass_seam",
+      "name": "Grass-to-Dirt Seam",
+      "x": -1424,
+      "y": 15653,
+      "z": 12213,
+      "rotY": -3.14159265358979,
+      "rotX": 0.20824617542454696,
+      "rotZ": 0.056203907801443624,
+      "quaternion": [
+        -0.6214727854330713,
+        0.08156133112943854,
+        0.10197761632181293,
+        0.7724764669553189
+      ],
+      "scale": 1.4,
+      "alignToTrack": true,
+      "trackDist": 16199,
+      "cameraFacing": false,
+      "flipX": false,
+      "isDecal": true,
+      "lit": true
     }
   ]
 }

@@ -4,7 +4,7 @@ import {
   Trash2, Copy, Download, Upload, Compass, Play, X,
   Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
   Move, Database, History, Save, RefreshCw, CheckCircle2,
-  HardDrive, Clock, ShieldCheck
+  HardDrive, Clock, ShieldCheck, Zap
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -33,6 +33,8 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'stadium', label: 'Stadium & Crowds', icon: <Flag size={16} /> },
   { id: 'decals', label: 'Road Decals', icon: <Layers size={16} /> },
   { id: 'goblins', label: 'Goblins & Crew', icon: <Users size={16} /> },
+  { id: 'powerup', label: 'Powerups', icon: <Zap size={16} /> },
+  { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} /> },
 ];
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {

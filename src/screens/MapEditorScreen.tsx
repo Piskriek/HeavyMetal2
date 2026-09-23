@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw } from 'lucide-react';
 import { GameEngine } from '../game/engine';
 import { loadAssets, type GameAssets } from '../game/assets';
@@ -8,8 +8,9 @@ import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import { preparePowerupSprites } from '../game/powerups';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { DEFAULT_SETUP, createSession, sessionConfig, type RaceConfig } from '../game/session';
-import type { CourseId, GameOptions, RunRecord } from '../game/types';
+import { INITIAL_SNAPSHOT, type CourseId, type GameOptions, type GameSnapshot, type RunRecord } from '../game/types';
 import TrackBuilderUI from '../components/TrackBuilderUI';
+import CheckpointOverlay from '../components/CheckpointOverlay';
 
 interface MapEditorScreenProps {
   options: GameOptions;
@@ -22,6 +23,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
   const [engine, setEngine] = useState<GameEngine | null>(null);
+  const [snapshot, setSnapshot] = useState<GameSnapshot>(INITIAL_SNAPSHOT);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -59,6 +61,12 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     return () => { active = false; };
   }, [course, roster, config]);
 
+  // Remove any lingering debug panel from a previous RaceScreen session
+  useEffect(() => {
+    const stalePanel = document.getElementById('hm2-debug-panel');
+    if (stalePanel) stalePanel.remove();
+  }, []);
+
   // Create GameEngine
   useEffect(() => {
     if (!assets || !canvasRef.current || !stageRef.current) return;
@@ -67,13 +75,17 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     const createdEngine = new GameEngine(
       canvasRef.current,
       assets,
-      { ...options, course },
-      () => {},
+      { ...options, course, cameraMode: 'follow_ball' },
+      (snap) => setSnapshot({ ...snap }),
       handleFinish,
       config,
     );
     engineRef.current = createdEngine;
     setEngine(createdEngine);
+
+    // Solo test mode: only the player marble
+    createdEngine.setSoloMode(true);
+    createdEngine.reset(); // Re-create racers with solo mode active
 
     // Start in builder mode: paused race, free-fly active
     createdEngine.setBuildPaused(true);
@@ -103,6 +115,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       engineRef.current.setBuildPaused(false);
       engineRef.current.trackBuilder.freeFly.active = false;
       engineRef.current.inputEnabled = true;
+      engineRef.current.reset(); // Reset to 'ready' state so user can launch
       canvasRef.current?.focus({ preventScroll: true });
     }
   };
@@ -116,10 +129,13 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     }
   };
 
-  // Keyboard shortcut: B toggles test mode in editor
+  // Keyboard shortcut: B toggles test mode in editor, WASD for lane changes
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+      const eng = engineRef.current;
+      if (!eng) return;
+
       if (e.key === 'b' || e.key === 'B') {
         e.preventDefault();
         if (isTesting) {
@@ -127,17 +143,31 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         } else {
           startTesting();
         }
+        return;
+      }
+
+      // WASD lane changes during testing
+      if (isTesting && eng.status === 'flying') {
+        if (e.key === 'w' || e.key === 'W' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          eng.changeLane(-1);
+        } else if (e.key === 's' || e.key === 'S' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          eng.changeLane(1);
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isTesting]);
 
+  const isCheckpoint = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black select-none">
       {/* 3D Canvas Stage */}
-      <div ref={stageRef} className="absolute inset-0 w-full h-full">
-        <canvas ref={canvasRef} className="w-full h-full block focus:outline-none" tabIndex={0} />
+      <div ref={stageRef} className="absolute inset-0 w-full h-full pointer-events-none">
+        <canvas ref={canvasRef} className="w-full h-full block focus:outline-none pointer-events-auto" tabIndex={0} />
       </div>
 
       {/* Loading Cover */}
@@ -167,7 +197,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       )}
 
       {/* Testing HUD overlay when test racing */}
-      {assets && isTesting && (
+      {assets && isTesting && !isCheckpoint && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -175,7 +205,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         >
           <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
             <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            TEST DRIVE ACTIVE
+            TEST DRIVE ACTIVE (Solo)
           </div>
 
           <span className="text-zinc-500">|</span>
@@ -197,6 +227,18 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
           </button>
         </motion.div>
       )}
+
+      {/* Checkpoint overlay during test runs */}
+      <AnimatePresence>
+        {isTesting && isCheckpoint && snapshot.checkpointStandings && (
+          <CheckpointOverlay
+            standings={snapshot.checkpointStandings}
+            countdownNumber={snapshot.countdownNumber}
+            status={snapshot.status as 'checkpoint' | 'countdown'}
+            onReadyUp={() => engineRef.current?.readyUp()}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

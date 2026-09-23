@@ -164,6 +164,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin()],
   // Dev server: allow the sandbox preview proxy host (e.g. 5173-<id>.e2b.app).
   server: {
+    host: '0.0.0.0',
     allowedHosts: [".e2b.app"],
     watch: {
       ignored: ["**/backups/**", "**/.git/**", "**/dist/**"],

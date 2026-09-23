@@ -12,8 +12,8 @@ import { CAMERA_HEADROOM, RangeCamera, chaseLerp, clampCameraTarget, edgeAnchor 
 const WIDTH = 1440;
 const HEIGHT = 620;
 
-test('third person is the default camera mode', () => {
-  assert.equal(DEFAULT_OPTIONS.cameraMode, 'third_person');
+test('follow ball is the default camera mode', () => {
+  assert.equal(DEFAULT_OPTIONS.cameraMode, 'follow_ball');
 });
 
 test('ball chase smoothing is the frame-rate independent lerp(camX, ballX, dt * 6)', () => {

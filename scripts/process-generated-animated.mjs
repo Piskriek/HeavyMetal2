@@ -128,6 +128,16 @@ const SHEETS = [
   'anim-40-fence-fans',
   'anim-41-cheer-tower',
   'anim-42-victory-stage',
+  'anim-43-explosion-fire',
+  'anim-44-spark-burst',
+  'anim-45-smoke-puff',
+  'anim-46-gore-burst',
+  'anim-47-gore-green-burst',
+  'anim-48-ground-impact',
+  'anim-49-dust-puff',
+  'anim-50-firework-red',
+  'anim-51-firework-blue',
+  'anim-52-firework-green',
 ];
 
 const magick = (args) => execFileSync('convert', args, { encoding: 'utf8' });

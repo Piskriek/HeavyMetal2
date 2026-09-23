@@ -425,6 +425,16 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_40_fence_fans', name: 'Fence Fans (Animated)', category: 'animated', url: '/art/animated/alpha/anim-40-fence-fans.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
   { type: 'anim_41_cheer_tower', name: 'Cheer Tower (Animated)', category: 'animated', url: '/art/animated/alpha/anim-41-cheer-tower.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
   { type: 'anim_42_victory_stage', name: 'Victory Stage (Animated)', category: 'animated', url: '/art/animated/alpha/anim-42-victory-stage.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_43_explosion_fire', name: 'Fire Explosion', category: 'animated', url: '/art/animated/alpha/anim-43-explosion-fire.png', defaultWidth: 480, defaultHeight: 480, isAnimated: true, animCols: 2, animRows: 2, animFps: 16 },
+  { type: 'anim_44_spark_burst', name: 'Spark Burst', category: 'animated', url: '/art/animated/alpha/anim-44-spark-burst.png', defaultWidth: 420, defaultHeight: 420, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_45_smoke_puff', name: 'Smoke Puff', category: 'animated', url: '/art/animated/alpha/anim-45-smoke-puff.png', defaultWidth: 440, defaultHeight: 440, isAnimated: true, animCols: 2, animRows: 2, animFps: 10 },
+  { type: 'anim_46_gore_burst', name: 'Gore Burst', category: 'animated', url: '/art/animated/alpha/anim-46-gore-burst.png', defaultWidth: 400, defaultHeight: 400, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_47_gore_green_burst', name: 'Green Gore Burst', category: 'animated', url: '/art/animated/alpha/anim-47-gore-green-burst.png', defaultWidth: 400, defaultHeight: 400, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_48_ground_impact', name: 'Ground Impact', category: 'animated', url: '/art/animated/alpha/anim-48-ground-impact.png', defaultWidth: 480, defaultHeight: 300, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_49_dust_puff', name: 'Dust Puff', category: 'animated', url: '/art/animated/alpha/anim-49-dust-puff.png', defaultWidth: 460, defaultHeight: 360, isAnimated: true, animCols: 2, animRows: 2, animFps: 10 },
+  { type: 'anim_50_firework_red', name: 'Red Firework', category: 'animated', url: '/art/animated/alpha/anim-50-firework-red.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_51_firework_blue', name: 'Blue Firework', category: 'animated', url: '/art/animated/alpha/anim-51-firework-blue.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_52_firework_green', name: 'Green Firework', category: 'animated', url: '/art/animated/alpha/anim-52-firework-green.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
 ];
 
 /**

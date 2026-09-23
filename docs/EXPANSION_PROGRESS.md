@@ -603,6 +603,62 @@ twins. Two more sheets were added to finish it:
 sprites, which are a separate requirement and may need a different sheet
 structure than the 4-frame 2x2 pattern.
 
+## Update 4 — ten effect sheets (anim-43 to anim-52)
+
+Ten effects, same 4-frame 2x2 structure, registered in the `animated` build-menu
+category. They have no still counterpart, so they follow the `anim_20`
+precedent: a prop definition with no `stillType` and no entry in
+`ANIMATED_SOURCE_ART`. Because there is no still art to pad to, the pipeline
+skips aspect padding for them and they keep their own freeform shape.
+
+| sheet | frame | fps | min elem Δ | remnant | centroid drift |
+|---|---|---|---|---|---|
+| anim-43 explosion fire | 486x476 | 16 | 0.492 | 0.009% | 9.5px |
+| anim-44 spark burst | 450x450 | 14 | 0.404 | 0.287% | 11.8px |
+| anim-45 smoke puff | 464x442 | 10 | 0.179 | 1.008% | 6.9px |
+| anim-46 gore burst | 468x456 | 14 | 0.506 | 0.015% | 21.7px |
+| anim-47 gore green burst | 726x388 | 14 | 0.527 | 0.009% | **70.5px** |
+| anim-48 ground impact | 504x504 | 14 | **0.059** | 0.945% | 8.2px |
+| anim-49 dust puff | 500x456 | 10 | 0.364 | 1.123% | **93.5px** |
+| anim-50 firework red | 450x450 | 14 | 0.396 | 0.031% | 7.7px |
+| anim-51 firework blue | 454x454 | 14 | **0.032** | 0.019% | 1.9px |
+| anim-52 firework green | 454x454 | 14 | **0.098** | 0.441% | 1.0px |
+
+### The size-consistency gate does not apply to effects
+
+This is the important finding. `onion-skin-check.mjs` flags `fillSpread` above
+1.6x as a size pop, and it flags anim-43 (11.4x), anim-44 (80x), anim-46 (5.5x),
+anim-47 (10.6x), anim-49 (3.4x) and anim-50 (12x). **Those are false alarms.**
+An explosion that does not grow is not an explosion - the growth *is* the
+animation. The gate was written for sheets with a static subject (a goblin, a
+lantern) where the body must hold still and only a sub-element moves. Effects
+have no static subject, so measuring the subject's size across frames measures
+the animation itself.
+
+Judging effects needs different gates, and the raw numbers show which:
+
+- **centroid drift** - the burst must stay anchored to one point. This is the
+  effect equivalent of "the body must not slide". anim-47 (70.5px) and anim-49
+  (93.5px) genuinely fail it: the gore and the dust slide across the panel
+  between frames. anim-43, 50, 51 and 52 are all under 10px.
+- **element delta** - the four frames must actually differ. anim-51 (0.032) and
+  anim-52 (0.098) are near-static: the model drew essentially the same burst
+  four times, which is not an animation at all. anim-48 (0.059) barely animates
+  too, and also carries 0.945% remnant.
+- **remnant / corner transparency** - anim-45 (1.008%) and anim-48 (0.945%) have
+  magenta haze in the keyed background.
+
+The corner failure on anim-44 was self-inflicted: the effect reference templates
+were drawn with faint guide crosshairs to anchor size, and the model reproduced
+the crosshair as subject matter, leaving dark pixels reaching the panel edge.
+**The guides have been removed** and the templates rebuilt as plain empty
+magenta panels, so the prompt carries the size constraint alone.
+
+**Three sheets are clean and trustworthy: anim-43 (fire explosion), anim-46 (red
+gore) and anim-50 (red firework).** Seven need a regeneration pass, with prompts
+prepared. The pipeline and the build-menu registration are all in place and the
+tree is green.
+
 The registry test no longer hardcodes a sheet count (`exactly 20 animated
 decorations` and `19 of the 20 sheets have a still counterpart`); it now derives
 both from the sheets on disk and from `ANIMATED_SOURCE_ART`, so a new batch

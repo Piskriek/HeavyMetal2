@@ -67,6 +67,16 @@ const SOURCE_ART = {
   'anim-40-fence-fans': 'goblins/alpha/goblin-27-fence-fans.png',
   'anim-41-cheer-tower': 'goblins/alpha/goblin-28-cheer-tower.png',
   'anim-42-victory-stage': 'goblins/alpha/goblin-29-victory-stage.png',
+  'anim-43-explosion-fire': null,
+  'anim-44-spark-burst': null,
+  'anim-45-smoke-puff': null,
+  'anim-46-gore-burst': null,
+  'anim-47-gore-green-burst': null,
+  'anim-48-ground-impact': null,
+  'anim-49-dust-puff': null,
+  'anim-50-firework-red': null,
+  'anim-51-firework-blue': null,
+  'anim-52-firework-green': null,
 };
 
 const outDir = join(root, 'art-src/animated');
@@ -83,18 +93,28 @@ const positions = [[offA, offA], [offB, offA], [offA, offB], [offB, offB]];
 try {
   let built = 0;
   for (const [name, rel] of Object.entries(SOURCE_ART)) {
-    const src = join(root, 'public/art', rel);
-    if (!existsSync(src)) {
+    const src = rel === null ? null : join(root, 'public/art', rel);
+    if (src !== null && !existsSync(src)) {
       console.warn(`skip ${name}: missing ${rel}`);
       continue;
     }
     const panelPath = join(tmp, 'panel.png');
-    magick([
-      '-size', `${panel}x${panel}`, `xc:${MAGENTA}`,
-      '(', src, '-background', MAGENTA, '-alpha', 'remove', '-alpha', 'off',
-      '-resize', `${inner}x${inner}`, ')',
-      '-gravity', 'center', '-composite', panelPath,
-    ]);
+    if (src === null) {
+      // Effect sheets have no still art to anchor size and position, so the
+      // template is just an empty magenta panel. Guide marks were tried first
+      // and abandoned: the model reproduced the crosshair as subject matter,
+      // which left dark pixels reaching the panel edge and failed the corner
+      // transparency check on anim-44. An empty panel lets the prompt carry
+      // the size constraint on its own, which is what actually works.
+      magick(['-size', `${panel}x${panel}`, `xc:${MAGENTA}`, panelPath]);
+    } else {
+      magick([
+        '-size', `${panel}x${panel}`, `xc:${MAGENTA}`,
+        '(', src, '-background', MAGENTA, '-alpha', 'remove', '-alpha', 'off',
+        '-resize', `${inner}x${inner}`, ')',
+        '-gravity', 'center', '-composite', panelPath,
+      ]);
+    }
     const out = join(outDir, `${name}-reference.png`);
     const args = ['-size', `${SHEET}x${SHEET}`, `xc:${MAGENTA}`];
     for (const [x, y] of positions) {

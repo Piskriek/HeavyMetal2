@@ -27,6 +27,7 @@ interface TrackBuilderUIProps {
 }
 
 const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] = [
+  { id: 'animated', label: 'Animated', icon: <Play size={16} /> },
   { id: 'foliage', label: 'Foliage & Nature', icon: <TreePine size={16} /> },
   { id: 'trackside', label: 'Trackside & Stunts', icon: <Compass size={16} /> },
   { id: 'cavern_mine', label: 'Cavern & Mine', icon: <Mountain size={16} /> },
@@ -611,6 +612,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
   const filteredProps = PROP_DEFINITIONS.filter((p) => p.category === category);
   const placedProps = builder.getProps();
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = (now: number) => { builder.updateAnimatedProps(now); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [builder]);
 
   return (
     <div className="track-builder-root pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
@@ -1341,6 +1349,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <X size={14} />
             </button>
           </div>
+
+          {PROP_DEFINITIONS.find((d) => d.type === selectedProp.type)?.animatedUrl && (
+            <div className="rounded border border-fuchsia-700/60 bg-fuchsia-950/30 p-2 text-xs space-y-2">
+              <label className="flex items-center justify-between text-fuchsia-200"><span>Animated</span><input type="checkbox" checked={selectedProp.animated === true} onChange={(e) => builder.setAnimationSettings(selectedProp.id, { animated: e.target.checked })} /></label>
+              <div className="flex items-center justify-between"><span>Speed</span><div className="flex gap-1"><button className="px-2 bg-zinc-800 rounded" onClick={() => builder.setAnimationSettings(selectedProp.id, { animationSpeed: Math.max(.25, (selectedProp.animationSpeed ?? 1) - .25) })}>−</button><b>{(selectedProp.animationSpeed ?? 1).toFixed(2)}x</b><button className="px-2 bg-zinc-800 rounded" onClick={() => builder.setAnimationSettings(selectedProp.id, { animationSpeed: Math.min(4, (selectedProp.animationSpeed ?? 1) + .25) })}>+</button></div></div>
+              <div className="grid grid-cols-4 gap-1">{[0,1,2,3].map((i) => <label key={i} className="text-center"><input type="checkbox" checked={(selectedProp.animationFrames ?? [true,true,true,true])[i]} onChange={(e) => { const f = [...(selectedProp.animationFrames ?? [true,true,true,true])] as [boolean,boolean,boolean,boolean]; f[i] = e.target.checked; builder.setAnimationSettings(selectedProp.id, { animationFrames: f }); }} /><span className="block text-[9px]">F{i+1}</span></label>)}</div>
+            </div>
+          )}
 
           {/* Group info & Ungroup button if part of group */}
           {selectedProp.groupId && (

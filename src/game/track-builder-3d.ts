@@ -15,7 +15,7 @@ import {
   importProps as importTrackStorage,
 } from './track-storage';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier';
+export type PropCategory = 'animated' | 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier';
 
 export interface PropDefinition {
   type: string;
@@ -33,6 +33,8 @@ export interface PropDefinition {
   isSlingshot?: boolean;
   isPowerup?: boolean; // T08: powerup category
   isBarrier?: boolean; // T08: barrier category
+  animatedUrl?: string;
+  frameCount?: number;
 }
 
 export type DecalSide = 'front' | 'back' | 'left' | 'right';
@@ -64,12 +66,17 @@ export interface PlacedProp {
   groupId?: string;
   lit?: boolean;
   visible?: boolean; // T08: visibility toggle (H key)
-  authoringNotes?: string; // T08: optional authoring metadata
+  authoringNotes?: string;
+  animated?: boolean;
+  animationSpeed?: number;
+  animationFrames?: [boolean, boolean, boolean, boolean]; // T08: optional authoring metadata
   // Allow unknown fields for forward compatibility
   [key: string]: unknown;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
+  // Animated variants stay linked to their still source through `stillType`.
+  { type: 'prop_04_smelting_crucible_animated', name: 'Smelting Crucible (Animated)', category: 'animated', url: '/art/props/alpha/prop-04-smelting-crucible.png', animatedUrl: '/art/animated/prop-04-smelting-crucible-4frame.png', frameCount: 4, defaultWidth: 460, defaultHeight: 500 },
   // --- FOLIAGE & NATURE ---
   { type: 'prop_09_pine_lookout', name: 'Pine Lookout Outcrop', category: 'foliage', url: '/art/props/alpha/prop-09-pine-lookout-outcrop.png', defaultWidth: 800, defaultHeight: 1080 },
   { type: 'prop_08_windmill_gears', name: 'Goblin Windmill & Gears', category: 'foliage', url: '/art/props/alpha/prop-08-goblin-windmill-gears.png', defaultWidth: 720, defaultHeight: 920 },
@@ -124,7 +131,7 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'prop_26_granite_tunnel_portal', name: 'Granite Tunnel Portal', category: 'cavern_mine', url: '/art/props/alpha/prop-26-granite-tunnel-portal.png', defaultWidth: 1300, defaultHeight: 1300 },
   { type: 'prop_02_ore_cart_spilling', name: 'Spilling Lava Ore Cart', category: 'cavern_mine', url: '/art/props/alpha/prop-02-ore-cart-spilling.png', defaultWidth: 500, defaultHeight: 400 },
   { type: 'prop_03_tnt_powder_kegs', name: 'TNT Powder Kegs', category: 'cavern_mine', url: '/art/props/alpha/prop-03-tnt-powder-kegs.png', defaultWidth: 420, defaultHeight: 420 },
-  { type: 'prop_04_smelting_crucible', name: 'Smelting Crucible', category: 'cavern_mine', url: '/art/props/alpha/prop-04-smelting-crucible.png', defaultWidth: 460, defaultHeight: 500 },
+  { type: 'prop_04_smelting_crucible', name: 'Smelting Crucible', category: 'cavern_mine', url: '/art/props/alpha/prop-04-smelting-crucible.png', animatedUrl: '/art/animated/prop-04-smelting-crucible-4frame.png', frameCount: 4, defaultWidth: 460, defaultHeight: 500 },
   { type: 'prop_05_rail_turntable', name: 'Rail Turntable Switch', category: 'cavern_mine', url: '/art/props/alpha/prop-05-rail-turntable-switch.png', defaultWidth: 600, defaultHeight: 400 },
   { type: 'prop_06_crystal_deflector', name: 'Crystal Rock Deflector', category: 'cavern_mine', url: '/art/props/alpha/prop-06-crystal-rock-deflector.png', defaultWidth: 480, defaultHeight: 420 },
   { type: 'prop_07_tripod_cauldron', name: 'Tripod Molten Cauldron', category: 'cavern_mine', url: '/art/props/alpha/prop-07-tripod-cauldron-molten.png', defaultWidth: 480, defaultHeight: 520 },
@@ -2135,6 +2142,30 @@ export class TrackBuilder3D {
     return tex;
   }
 
+  /** Update frame selection for animated props. Called by the builder UI clock. */
+  updateAnimatedProps(now = performance.now()) {
+    for (const prop of this.placedProps) {
+      if (!prop.animated) continue;
+      const obj = this.propObjects.get(prop.id);
+      const material = obj instanceof THREE.Sprite ? obj.material : null;
+      if (!(material instanceof THREE.SpriteMaterial)) continue;
+      const enabled = prop.animationFrames ?? [true, true, true, true];
+      const frames = enabled.map((on, i) => on ? i : -1).filter((i) => i >= 0);
+      if (!frames.length) continue;
+      const speed = Math.max(0.1, prop.animationSpeed ?? 1);
+      const frame = frames[Math.floor(now / (220 / speed)) % frames.length];
+      const texture = material.map;
+      if (texture) { texture.repeat.set(0.5, 0.5); texture.offset.set((frame % 2) * 0.5, frame < 2 ? 0.5 : 0); texture.needsUpdate = true; }
+    }
+  }
+
+  setAnimationSettings(id: string, updates: Pick<PlacedProp, 'animated' | 'animationSpeed' | 'animationFrames'>) {
+    const prop = this.placedProps.find((p) => p.id === id); if (!prop) return;
+    Object.assign(prop, updates); this.saveToStorage();
+    const obj = this.propObjects.get(id); if (obj) { this.scene.remove(obj); this.propObjects.delete(id); this.createPropSprite(prop); }
+    this.notify();
+  }
+
   private createPropSprite(prop: PlacedProp): THREE.Object3D {
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
     if (!def) return new THREE.Object3D();
@@ -2236,7 +2267,8 @@ export class TrackBuilder3D {
       obj = mesh;
     } else {
       // Camera Facing (Billboard Sprite)
-      const tex = this.getTexture(def.url);
+      const tex = this.getTexture(prop.animated && def.animatedUrl ? def.animatedUrl : def.url);
+      if (prop.animated && def.animatedUrl) { tex.wrapS = THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping; tex.repeat.set(0.5, 0.5); tex.offset.set(0, 0.5); }
       const mat = new THREE.SpriteMaterial({
         map: tex,
         transparent: true,

@@ -131,6 +131,47 @@ All ten criteria from #38 are covered:
 - Not verified: browser/WebGL integration (same blocker as T00/T04), UI wiring (T06's scope),
   and `syntheticField` stands in for T02's roster above four racers.
 
+## T06 — Staging Presentation, Ready UI, and Input Lifecycle (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#39](https://github.com/Piskriek/HeavyMetal2/issues/39) adds the presentation layer
+between qualifying (T04) and the race release (T05). Read [`docs/STAGING.md`](docs/STAGING.md)
+for the full design and evidence map.
+
+**What landed**
+
+- `src/game/staging/lifecycle.ts` — pure state machine: `qualifying → results → staging →
+  countdown → released`, with `paused` and `retry` branches. Transitions are refusal-first.
+  Countdown is derived from simulation ticks (3 s = 360 ticks at 120 Hz), so the countdown
+  label and the official clock always agree.
+- `src/game/staging/presentation.ts` — orbit bands, leaderboard, and highlights derived from
+  the qualifying results and frozen grid. Leaderboard bounded at 100 rows. Orbit bands grouped
+  by wave when the field exceeds 20. No mutation of authoritative data.
+- `src/components/StagingOverlay.tsx` — React overlay with keyboard focus (`tabIndex`, `role`,
+  `aria-modal`), reduced-motion support (static staging, instant countdown), aria-live countdown
+  label, and the full leaderboard toggle.
+- 43 new checks across two suites (lifecycle 24, presentation 19). `npm run check` = tsc over
+  `src`, tsc over `tests`, **244 tests** (201 pre-existing + 43 new). `npm run build` green at
+  1,454.55 kB / 402.24 kB gzip.
+
+**Acceptance criteria → tests**
+
+| # | Criterion | Test |
+|---|-----------|------|
+| 1 | No frozen bots during retry | `staging-lifecycle: phase changes but CPU still steps` |
+| 2 | No duplicated ball/shadow at release | Architecture: overlay fades on `released` |
+| 3 | Countdown and official clock agree | `staging-lifecycle: derived from ticks, not wall time` |
+| 4 | No catch-up burst after pause | `staging-lifecycle: tick is frozen during pause` |
+| 5 | Keyboard focus and reduced-motion | `staging-lifecycle: respects reducedMotion` + overlay aria |
+| 6 | Leaderboard bounded at 100 rows | `staging-presentation: bounded at MAX_LEADERBOARD_ROWS` |
+
+**Notes for whoever integrates next**
+
+- The overlay is a standalone React component. Wire it into `RaceScreen.tsx` by passing the
+  staging state, qualifying entries, grid, and human racer ID. The overlay never mutates state.
+- CSS classes (`staging-overlay`, `orbit-band`, `countdown-number`, etc.) need matching styles.
+- The staging lifecycle connects to the heat phase machine via `transitionHeat(state, { type: 'release' })`
+  when the countdown reaches zero.
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

@@ -13,14 +13,54 @@
  *   starting grid and is explicitly announced as a restart; committed rounds are
  *   never re-raced for new points.
  */
-import { COURSES, RACER_DEFINITIONS, type CourseId, type RacerStanding, type RunRecord } from './types';
+import { COURSES, RACER_DEFINITIONS, type CourseId, type OpponentsSummary, type RacerStanding, type RunRecord } from './types';
 import {
   CUP_ROUNDS, DEFAULT_SETUP, isSessionPhase,
   type Difficulty, type RaceMode, type RaceSession, type RaceSetup, type SessionPhase,
 } from './session';
-import { DEFAULT_LOADOUT, isCapsule, isRider, opponentLoadouts, type CapsuleId, type Loadout, type RiderId } from './loadouts';
+import { DEFAULT_LOADOUT, isCapsule, isRider, type CapsuleId, type Loadout, type RiderId } from './loadouts';
+// T02: field sizes, seeds and the summary policy for persisted standings.
+import { DEFAULT_SEED, isFieldSize } from './contracts/config';
+import { PLAYER_ID, buildRosterLoadouts, rosterColor } from './roster';
 
 export const SAVE_VERSION = 1;
+
+/* -------------------------------------------------------------------------- */
+/* T02 — explicit versioned summary policy                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Truncation only ever happens here, under an explicit, versioned policy: large
+ * fields persist their top finishers plus the local player's row, stamped with
+ * `opponentsSummary`. A persisted record whose standings are shorter than the field
+ * *without* a recognisable marker is rejected by the sanitizer — standings are never
+ * silently discarded, and hydration never guesses what a partial list means.
+ */
+export const SUMMARY_POLICY_VERSION = 1;
+export const RESULT_SUMMARY_POLICY = { version: SUMMARY_POLICY_VERSION, keepTop: 12 } as const;
+
+/** Idempotent: an already-summarised record is returned untouched. */
+export function summarizeRecord(record: RunRecord): RunRecord {
+  const opponents = record.opponents;
+  if (!opponents || record.opponentsSummary || opponents.length <= RESULT_SUMMARY_POLICY.keepTop + 1) return record;
+  const player = opponents.find((entry) => entry.id === PLAYER_ID);
+  // Defensive: never produce a summary our own sanitizer would reject (player row
+  // required). If the player is somehow absent, persist the full list instead.
+  if (!player) return record;
+  const sorted = [...opponents].sort((a, b) => a.position - b.position);
+  const rows = sorted.slice(0, RESULT_SUMMARY_POLICY.keepTop);
+  if (!rows.some((entry) => entry.id === PLAYER_ID)) rows.push(player);
+  rows.sort((a, b) => a.position - b.position);
+  return {
+    ...record,
+    opponents: rows.map((entry) => ({ ...entry })),
+    opponentsSummary: {
+      policy: SUMMARY_POLICY_VERSION,
+      totalField: record.fieldSize ?? opponents.length,
+      kept: rows.length,
+    },
+  };
+}
 export const SAVE_KEY = 'goblin-rally-session-v1';
 export const SAVE_BACKUP_KEY = 'goblin-rally-session-v1-backup';
 
@@ -78,7 +118,6 @@ const isInt = (value: unknown): value is number => isFiniteNumber(value) && Numb
 const clampInt = (value: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(value)));
 const COURSE_IDS = COURSES.map((course) => course.id);
 const DIFFICULTIES: readonly Difficulty[] = ['rookie', 'racer', 'veteran'];
-const STANDING_IDS: readonly number[] = RACER_DEFINITIONS.map((racer) => racer.id);
 const isCourse = (value: unknown): value is CourseId => COURSE_IDS.includes(value as CourseId);
 
 export function resolveStorage(): StorageLike | null {
@@ -116,6 +155,7 @@ export function sanitizeSetup(raw: unknown, fallbackCourse: CourseId): RaceSetup
     loadout: { rider, capsule },
     difficulty,
     customPhysics: mode === 'quick' && raw.customPhysics === true,
+    fieldSize: isFieldSize(raw.fieldSize) ? raw.fieldSize : 4,
   };
 }
 
@@ -128,21 +168,29 @@ export function sanitizeRounds(raw: unknown): CourseId[] | null {
 
 /** The roster is fully derived data; keep the player first and the CPUs deterministic. */
 export function sanitizeRoster(raw: unknown, setup: RaceSetup): { roster: Loadout[]; repaired: boolean } {
-  const derived = opponentLoadouts(setup.loadout);
+  const fieldSize = setup.fieldSize ?? 4;
+  const derived = buildRosterLoadouts(fieldSize, setup.loadout);
   const valid = (value: unknown): value is Loadout => isPlainObject(value) && isRider(value.rider) && isCapsule(value.capsule);
   if (!Array.isArray(raw) || raw.length !== derived.length || !raw.every(valid)) return { roster: derived, repaired: true };
-  const riders = raw.map((loadout) => loadout.rider);
-  if (new Set(riders).size !== riders.length || riders[0] !== setup.loadout.rider
-    || raw.some((loadout, index) => loadout.capsule !== derived[index].capsule)) return { roster: derived, repaired: true };
+  if (fieldSize <= 4) {
+    // Legacy strictness at four racers: unique riders, player first, signature capsules.
+    const riders = raw.map((loadout) => loadout.rider);
+    if (new Set(riders).size !== riders.length || riders[0] !== setup.loadout.rider
+      || raw.some((loadout, index) => loadout.capsule !== derived[index].capsule)) return { roster: derived, repaired: true };
+  } else if (raw[0].rider !== setup.loadout.rider || raw[0].capsule !== setup.loadout.capsule) {
+    // Large fields cycle rider/capsule combinations, so only the player slot is pinned.
+    return { roster: derived, repaired: true };
+  }
   return { roster: raw.map((loadout) => ({ rider: loadout.rider, capsule: loadout.capsule })), repaired: false };
 }
 
-function sanitizeStanding(raw: unknown): RacerStanding | null {
+function sanitizeStanding(raw: unknown, fieldSize: number): RacerStanding | null {
   if (!isPlainObject(raw)) return null;
   const id = raw.id;
-  if (!isInt(id) || !STANDING_IDS.includes(id)) return null;
-  const definition = RACER_DEFINITIONS[id];
-  if (!isInt(raw.position) || raw.position < 1 || raw.position > 4) return null;
+  if (!isInt(id) || id < 0 || id >= fieldSize) return null;
+  const fallbackName = RACER_DEFINITIONS[id]?.name ?? `RACER ${id}`;
+  const fallbackColor = rosterColor(id);
+  if (!isInt(raw.position) || raw.position < 1 || raw.position > fieldSize) return null;
   if (!isFiniteNumber(raw.distance) || !isInt(raw.lane) || raw.lane < 0 || raw.lane > 3) return null;
   if (typeof raw.finished !== 'boolean' || typeof raw.recovering !== 'boolean') return null;
   if (raw.finishTime !== null && !isFiniteNumber(raw.finishTime)) return null;
@@ -153,8 +201,8 @@ function sanitizeStanding(raw: unknown): RacerStanding | null {
   };
   return {
     id,
-    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.slice(0, 24) : definition.name,
-    color: typeof raw.color === 'string' && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : definition.color,
+    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.slice(0, 24) : fallbackName,
+    color: typeof raw.color === 'string' && /^#[0-9a-f]{6}$/i.test(raw.color) ? raw.color : fallbackColor,
     position: raw.position,
     distance: raw.distance,
     lane: raw.lane,
@@ -165,19 +213,56 @@ function sanitizeStanding(raw: unknown): RacerStanding | null {
   };
 }
 
-function sanitizeOpponents(raw: unknown): RacerStanding[] | null {
-  if (!Array.isArray(raw) || raw.length !== STANDING_IDS.length) return null;
-  const standings = raw.map(sanitizeStanding);
+function sanitizeSummaryMarker(raw: unknown, fieldSize: number): OpponentsSummary | null {
+  if (!isPlainObject(raw)) return null;
+  // An unknown policy version is not interpretable — refuse rather than guess.
+  if (raw.policy !== SUMMARY_POLICY_VERSION) return null;
+  if (!isInt(raw.totalField) || raw.totalField !== fieldSize) return null;
+  if (!isInt(raw.kept) || raw.kept < 2 || raw.kept > fieldSize) return null;
+  return { policy: SUMMARY_POLICY_VERSION, totalField: fieldSize, kept: raw.kept };
+}
+
+/**
+ * Validates a persisted standings list.
+ *
+ * A full list must be dense and complete: IDs 0..fieldSize-1 and a permutation of
+ * places 1..fieldSize. A shorter list is only accepted when `rawMarker` is a
+ * recognised summary policy marker that matches the field size — an unmarked short
+ * list is silent truncation and is rejected.
+ */
+function sanitizeOpponents(raw: unknown, fieldSize: number, rawMarker: unknown): RacerStanding[] | null {
+  if (!Array.isArray(raw)) return null;
+  const summary = sanitizeSummaryMarker(rawMarker, fieldSize);
+  if (rawMarker !== undefined && !summary) return null;
+  if (raw.length > fieldSize) return null;
+  if (summary) {
+    if (raw.length !== summary.kept) return null;
+  } else if (raw.length !== fieldSize) {
+    return null;
+  }
+  const standings = raw.map((entry) => sanitizeStanding(entry, fieldSize));
   if (standings.some((standing) => standing === null)) return null;
   const list = standings as RacerStanding[];
-  const ids = list.map((standing) => standing.id).sort((a, b) => a - b);
-  const positions = list.map((standing) => standing.position).sort((a, b) => a - b);
-  if (ids.join() !== STANDING_IDS.join() || positions.join() !== '1,2,3,4') return null;
+  const ids = list.map((standing) => standing.id);
+  const positions = list.map((standing) => standing.position);
+  if (new Set(ids).size !== ids.length) return null;
+  if (summary) {
+    // Marked summary: the local player's row is mandatory and places stay in range.
+    if (!list.some((standing) => standing.id === PLAYER_ID)) return null;
+    if (new Set(positions).size !== positions.length) return null;
+    if (positions.some((position) => position < 1 || position > fieldSize)) return null;
+  } else {
+    // Full list: dense IDs and a complete permutation of places 1..fieldSize.
+    const sortedIds = [...ids].sort((a, b) => a - b);
+    const sortedPositions = [...positions].sort((a, b) => a - b);
+    if (sortedIds.some((id, index) => id !== index)) return null;
+    if (sortedPositions.some((position, index) => position !== index + 1)) return null;
+  }
   return list.map((standing) => ({ ...standing })).sort((a, b) => a.position - b.position);
 }
 
 /** One committed round. Anything structurally impossible is rejected, never invented. */
-export function sanitizeRecord(raw: unknown, sessionId: string, rounds: CourseId[]): RunRecord | null {
+export function sanitizeRecord(raw: unknown, sessionId: string, rounds: CourseId[], fieldSize: number): RunRecord | null {
   if (!isPlainObject(raw)) return null;
   if (typeof raw.sessionId !== 'string' || raw.sessionId !== sessionId) return null;
   if (!isInt(raw.round) || raw.round < 0 || raw.round >= rounds.length) return null;
@@ -186,9 +271,9 @@ export function sanitizeRecord(raw: unknown, sessionId: string, rounds: CourseId
   if (typeof raw.date !== 'string' || Number.isNaN(Date.parse(raw.date))) return null;
   if (typeof raw.completed !== 'boolean') return null;
   if (!isFiniteNumber(raw.distance) || !isFiniteNumber(raw.score) || !isFiniteNumber(raw.topSpeed)) return null;
-  const opponents = sanitizeOpponents(raw.opponents);
+  const opponents = sanitizeOpponents(raw.opponents, fieldSize, raw.opponentsSummary);
   if (!opponents) return null;
-  const player = opponents.find((standing) => standing.id === 0)!;
+  const player = opponents.find((standing) => standing.id === PLAYER_ID)!;
   const counter = (value: unknown) => isFiniteNumber(value) && value >= 0 ? Math.round(value) : 0;
   const optionalNumber = (value: unknown) => isFiniteNumber(value) ? value : undefined;
   const mode = raw.mode === 'practice' || raw.mode === 'quick' || raw.mode === 'tournament' ? raw.mode : undefined;
@@ -221,17 +306,19 @@ export function sanitizeRecord(raw: unknown, sessionId: string, rounds: CourseId
     difficulty,
     pickups: counter(raw.pickups),
     shieldsUsed: counter(raw.shieldsUsed),
+    fieldSize,
+    opponentsSummary: raw.opponentsSummary !== undefined ? sanitizeSummaryMarker(raw.opponentsSummary, fieldSize) ?? undefined : undefined,
   };
 }
 
-export function sanitizeResults(raw: unknown, sessionId: string, rounds: CourseId[]): { results: RunRecord[]; dropped: number; duplicates: number } {
+export function sanitizeResults(raw: unknown, sessionId: string, rounds: CourseId[], fieldSize: number): { results: RunRecord[]; dropped: number; duplicates: number } {
   if (!Array.isArray(raw)) return { results: [], dropped: 0, duplicates: 0 };
   const seen = new Set<number>();
   const results: RunRecord[] = [];
   let dropped = 0;
   let duplicates = 0;
   for (const entry of raw) {
-    const record = sanitizeRecord(entry, sessionId, rounds);
+    const record = sanitizeRecord(entry, sessionId, rounds, fieldSize);
     if (!record) { dropped++; continue; }
     if (seen.has(record.round!)) { duplicates++; continue; }
     seen.add(record.round!);
@@ -300,9 +387,13 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   const { roster, repaired: rosterRepaired } = sanitizeRoster(raw.roster, setup);
   if (rosterRepaired) notices.push({ level: 'info', text: 'The rival lineup was rebuilt from the fixed event roster.' });
 
-  const { results, dropped, duplicates } = sanitizeResults(raw.results, raw.id, rounds);
+  const seed = Number.isSafeInteger(raw.seed) ? raw.seed as number : DEFAULT_SEED;
+  const { results, dropped, duplicates } = sanitizeResults(raw.results, raw.id, rounds, setup.fieldSize);
   if (dropped) notices.push({ level: 'warning', text: `${dropped} saved round result${dropped === 1 ? '' : 's'} could not be validated and ${dropped === 1 ? 'was' : 'were'} set aside. That round must be raced again.` });
   if (duplicates) notices.push({ level: 'warning', text: `${duplicates} duplicate round result${duplicates === 1 ? '' : 's'} were ignored so no points are awarded twice.` });
+  if (results.some((record) => record.opponentsSummary)) {
+    notices.push({ level: 'warning', text: 'This older save contains summarized results. Missing racer rows cannot be recovered; standings for this event are partial.' });
+  }
 
   const rawRound = isInt(raw.round) ? raw.round : 0;
   let round = clampInt(rawRound, 0, rounds.length - 1);
@@ -341,7 +432,7 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   }
 
   return {
-    session: { id: raw.id, setup, rounds, round, roster, results },
+    session: { id: raw.id, setup, rounds, round, roster, results, seed },
     phase,
     restartedRound,
     restartNotice,
@@ -461,7 +552,11 @@ export function writeSave(input: { phase: SessionPhase; draft: RaceSetup; sessio
   const phase: SessionPhase = input.session ? (input.phase === 'setup' ? 'grid' : input.phase) : 'setup';
   if (!storage) return { ok: false, document: null, skipped: false, error: DENIED_ERROR };
 
-  const signature = payloadOf({ phase, draft: input.draft, session: input.session });
+  // An active/resumable event needs every placing, including zero-point ties and
+  // prior-round histories. Summary v1 is only for the Hall of Chaos archive, never
+  // the authoritative session used to reconstruct cup standings after a reload.
+  const storedSession = input.session;
+  const signature = payloadOf({ phase, draft: input.draft, session: storedSession });
   let existingRaw: string | null = null;
   try { existingRaw = storage.getItem(SAVE_KEY); } catch { existingRaw = null; }
   if (existingRaw) {
@@ -477,7 +572,7 @@ export function writeSave(input: { phase: SessionPhase; draft: RaceSetup; sessio
   }
 
   const revision = Math.max(lastRevision, 0) + 1;
-  const document = buildSaveDocument(phase, input.draft, input.session, revision);
+  const document = buildSaveDocument(phase, input.draft, storedSession, revision);
   if (existingRaw) {
     try {
       const parsed: unknown = JSON.parse(existingRaw);

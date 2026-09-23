@@ -1576,58 +1576,32 @@ import { TrackBuilder3D } from './track-builder-3d';
    9. RACER 3D MESHES & OBSTACLES
    -------------------------------------------------------------------------- */
 interface Racer3DMesh {
+  canvas: HTMLCanvasElement | null;
   group: THREE.Group;
   sphere: THREE.Mesh;
   shadow: THREE.Mesh;
   shield: THREE.Mesh;
 }
 
-function createRacerMeshes(scene: THREE.Scene, assets: GameAssets): Racer3DMesh[] {
-  const out: Racer3DMesh[] = [];
-  const sphereGeo = new THREE.SphereGeometry(RADIUS, 24, 16);
-  const shadowGeo = new THREE.PlaneGeometry(RADIUS * 2.2, RADIUS * 2.2);
-  const shadowMat = new THREE.MeshBasicMaterial({
-    color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false,
-  });
-  const shieldGeo = new THREE.SphereGeometry(RADIUS * 1.35, 16, 12);
-  const shieldMat = new THREE.MeshBasicMaterial({
-    color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true,
-  });
+/**
+ * T02: every racer mesh owns its material (and, for textured slots, participates in a
+ * canvas-keyed texture cache). The geometry and shadow/shield resources are shared.
+ */
+interface RacerMeshResources {
+  sphereGeo: THREE.SphereGeometry;
+  shadowGeo: THREE.PlaneGeometry;
+  shadowMat: THREE.MeshBasicMaterial;
+  shieldGeo: THREE.SphereGeometry;
+  shieldMat: THREE.MeshBasicMaterial;
+}
 
-  const colors = [0xff7700, 0x33cc66, 0x3399ff, 0xcc33ff];
+/** Legacy fallback colours for slots 0–3; larger fields get a deterministic hue. */
+const LEGACY_RACER_COLORS = [0xff7700, 0x33cc66, 0x3399ff, 0xcc33ff];
 
-  for (let i = 0; i < 4; i++) {
-    const group = new THREE.Group();
-    group.name = `Racer_${i}`;
-
-    let mat: THREE.Material;
-    if (assets.raceBalls?.[i]) {
-      const canvas = assets.raceBalls[i] as HTMLCanvasElement;
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.3, metalness: 0.2 });
-    } else {
-      mat = new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.3, metalness: 0.2 });
-    }
-
-    const sphere = new THREE.Mesh(sphereGeo, mat);
-    sphere.castShadow = true;
-    group.add(sphere);
-
-    const shadow = new THREE.Mesh(shadowGeo, shadowMat);
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = -RADIUS + 2;
-    group.add(shadow);
-
-    const shield = new THREE.Mesh(shieldGeo, shieldMat);
-    shield.visible = false;
-    group.add(shield);
-
-    scene.add(group);
-    out.push({ group, sphere, shadow, shield });
-  }
-
-  return out;
+function fallbackRacerColor(index: number): number {
+  if (index < LEGACY_RACER_COLORS.length) return LEGACY_RACER_COLORS[index];
+  const hue = (index * 0.61803398875) % 1;
+  return new THREE.Color().setHSL(hue, 0.55, 0.55).getHex();
 }
 
 /* -----------------------------------------------------------------------------
@@ -1643,7 +1617,11 @@ export class Renderer3D {
   private readonly sun: THREE.DirectionalLight;
   private readonly ambient: THREE.AmbientLight;
   private readonly lavaGlow: THREE.HemisphereLight;
-  private readonly racers3D: Racer3DMesh[];
+  private racers3D: Racer3DMesh[] = [];
+  private racerResources: RacerMeshResources | null = null;
+  /** Canvas-keyed texture cache so identical loadout/rim combos share one GPU texture. */
+  private readonly racerTextures = new Map<HTMLCanvasElement, { texture: THREE.CanvasTexture; refs: number }>();
+  private storedAssets: GameAssets;
   private readonly camUp = new THREE.Vector3(0, 1, 0);
   readonly trackBuilder: TrackBuilder3D;
   private readonly D_START = 1100;
@@ -1654,6 +1632,7 @@ export class Renderer3D {
   private destroyed = false;
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
+    this.storedAssets = assets;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -1713,7 +1692,7 @@ export class Renderer3D {
     this.trackBuilder.onSkyboxChange((newSky) => this.setSkybox(newSky));
 
     // Racers
-    this.racers3D = createRacerMeshes(this.scene, assets);
+    this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
 
     this.placeCamera(this.D_START, 0.1);
   }
@@ -1784,6 +1763,98 @@ export class Renderer3D {
     if (skyMat && skyMat.uniforms?.horizonColor) {
       skyMat.uniforms.horizonColor.value.copy(dayFog).lerp(SKY.fogCave, under);
     }
+  }
+
+  /**
+   * T02: sizes the mesh pool to the field. Growing creates meshes on demand; shrinking
+   * removes groups from the scene and disposes their materials. Textures are shared
+   * per canvas and released when the last referencing slot is removed. Retained slots
+   * keep their shared textures and geometry across a count change.
+   */
+  setRacerCount(count: number) {
+    if (this.destroyed || !Number.isFinite(count) || count < 0) return;
+    this.ensureRacerMeshes(Math.floor(count));
+  }
+
+  private ensureRacerMeshes(count: number) {
+    if (!this.racerResources) {
+      this.racerResources = {
+        sphereGeo: new THREE.SphereGeometry(RADIUS, 24, 16),
+        shadowGeo: new THREE.PlaneGeometry(RADIUS * 2.2, RADIUS * 2.2),
+        shadowMat: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
+        shieldGeo: new THREE.SphereGeometry(RADIUS * 1.35, 16, 12),
+        shieldMat: new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true }),
+      };
+    }
+    const shared = this.racerResources;
+    while (this.racers3D.length < count) this.racers3D.push(this.buildRacerMesh(this.racers3D.length, shared));
+    while (this.racers3D.length > count) this.releaseRacerMesh();
+  }
+
+  private buildRacerMesh(index: number, shared: RacerMeshResources): Racer3DMesh {
+    const group = new THREE.Group();
+    group.name = `Racer_${index}`;
+
+    let texture: THREE.CanvasTexture | null = null;
+    const canvas = this.storedAssets.raceBalls?.[index] as HTMLCanvasElement | undefined;
+    if (canvas) {
+      const cached = this.racerTextures.get(canvas);
+      if (cached) { texture = cached.texture; cached.refs++; }
+      else {
+        texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.racerTextures.set(canvas, { texture, refs: 1 });
+      }
+    }
+    const material = new THREE.MeshStandardMaterial({
+      map: texture ?? undefined,
+      color: texture ? 0xffffff : fallbackRacerColor(index),
+      roughness: 0.3, metalness: 0.2,
+    });
+
+    const sphere = new THREE.Mesh(shared.sphereGeo, material);
+    sphere.castShadow = true;
+    group.add(sphere);
+
+    const shadow = new THREE.Mesh(shared.shadowGeo, shared.shadowMat);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = -RADIUS + 2;
+    group.add(shadow);
+
+    const shield = new THREE.Mesh(shared.shieldGeo, shared.shieldMat);
+    shield.visible = false;
+    group.add(shield);
+
+    this.scene.add(group);
+    return { group, sphere, shadow, shield, canvas: canvas ?? null };
+  }
+
+  /** Removes the newest mesh from the scene and disposes its per-mesh material. */
+  private releaseRacerMesh() {
+    const mesh = this.racers3D.pop();
+    if (!mesh) return;
+    this.scene.remove(mesh.group);
+    // Shadow/shield materials are shared resources — only this mesh's own material
+    // (and its participation in the canvas texture cache) belongs to the slot.
+    (mesh.sphere.material as THREE.Material).dispose();
+    if (mesh.canvas) {
+      const cached = this.racerTextures.get(mesh.canvas);
+      if (cached && --cached.refs === 0) {
+        cached.texture.dispose();
+        this.racerTextures.delete(mesh.canvas);
+      }
+    }
+  }
+
+  /** Full teardown: every racer material, cached canvas texture and shared geometry. */
+  private disposeRacerPool() {
+    while (this.racers3D.length) this.releaseRacerMesh();
+    this.racerResources?.sphereGeo.dispose();
+    this.racerResources?.shadowGeo.dispose();
+    this.racerResources?.shadowMat.dispose();
+    this.racerResources?.shieldGeo.dispose();
+    this.racerResources?.shieldMat.dispose();
+    this.racerResources = null;
   }
 
   render(frame: SceneFrame, intervalMs = 16.67) {
@@ -1891,6 +1962,7 @@ export class Renderer3D {
 
   destroy() {
     this.destroyed = true;
+    this.disposeRacerPool();
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

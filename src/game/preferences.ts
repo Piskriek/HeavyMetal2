@@ -1,5 +1,6 @@
 import { COURSES, DEFAULT_OPTIONS, type GameOptions, type RunRecord } from './types';
 import { runRecordKey } from './session';
+import { summarizeRecord } from './save';
 
 export const OPTIONS_KEY = 'goblin-rally-options-v1';
 export const RECORDS_KEY = 'goblin-rally-records-v1';
@@ -61,6 +62,14 @@ export function mergeRunRecord(records: RunRecord[], record: RunRecord): RunReco
   const key = runRecordKey(record);
   return [record, ...records.filter((item) => runRecordKey(item) !== key)]
     .sort((a, b) => b.distance - a.distance || b.score - a.score).slice(0, MAX_RECORDS);
+}
+
+/**
+ * T02: storage copy of the Hall of Chaos. Applies the explicit versioned summary
+ * policy so 100-racer records stay bounded on disk; in-memory records keep every row.
+ */
+export function recordsForStorage(records: RunRecord[]): RunRecord[] {
+  return records.map(summarizeRecord);
 }
 
 /** Returns false when the browser denied the write, so the UI can say so honestly. */

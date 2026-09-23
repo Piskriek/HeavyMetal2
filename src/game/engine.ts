@@ -15,6 +15,16 @@ import { createTrackLayout } from './track-layout';
 // T01: the fixed step is owned by the frozen timing contract, so the renderer loop and any
 // headless stepper can never drift apart. Behaviour is identical (1 / 120 s).
 import { FIXED_STEP } from './contracts/timing';
+import { DEFAULT_SEED } from './contracts/config';
+import { createRacerRegistry, type RacerRegistry } from './contracts/identity';
+import type { HeatPhase } from './contracts/heat';
+import { dedupeCommands, validateCommand, type GameCommand } from './contracts/commands';
+import type { SimulationAdapter } from './contracts/stepping';
+// T02: dynamic roster plumbing — stable identity, scalable state, separated RNG streams.
+import {
+  PLAYER_ID, cpuDecisionStagger, finishPositionBonus, launchAngleOffset, pairKey, recordObstacleHit,
+} from './roster';
+import { cosmeticSeed, createRng } from './rng';
 import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from './powerups';
 
 const TAU = Math.PI * 2;
@@ -52,7 +62,24 @@ export class GameEngine {
   private counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
   private racers = createRacers();
   private renderRacers: RacerFrame[] = [];
-  private readonly collisionTimes = new Float64Array(16).fill(-100);
+  /** T02: the local player is racer ID 0 — stable at every field size, never "index 0". */
+  private readonly playerId = PLAYER_ID;
+  private playerIndex = 0;
+  private registry: RacerRegistry = createRacerRegistry([PLAYER_ID]);
+  /** Stable identity lookup, independent of array order. */
+  private isPlayer(racer: Racer) { return racer.id === this.playerId; }
+  /**
+   * T02: bump cooldowns keyed by `pairKey(idA, idB)` — the legacy `Float64Array(16)`
+   * with `i * 4 + j` aliased for any field above four. Entries expire (bounded
+   * lifetime) and the map is pruned, so the cache cannot grow without limit.
+   */
+  private readonly bumpCooldowns = new Map<number, number>();
+  private nextCooldownPrune = 0;
+  private static readonly BUMP_COOLDOWN = 0.38;
+  /** T02: gameplay randomness — seeded, resettable, deterministic per seed. */
+  private readonly gameplay = createRng(DEFAULT_SEED);
+  /** T02: cosmetic randomness — particles and record ids only; never read by physics. */
+  private readonly cosmetic = createRng(cosmeticSeed());
   private obstacles: Obstacle[] = [];
   private pickups: AirPickup[] = [];
   private readonly pickupBuckets = new Map<number, AirPickup[]>();
@@ -88,7 +115,9 @@ export class GameEngine {
     document.addEventListener('visibilitychange', this.visibilityChanged);
   }
 
-  private get player() { return this.racers[0]; }
+  private get player() { return this.racers[this.playerIndex] ?? this.racers[0]; }
+  /** The gameplay RNG seed; `reset()` restores this stream for same-seed replay. */
+  get seed(): number { return Number.isSafeInteger(this.config?.seed) ? this.config!.seed! : DEFAULT_SEED; }
   private y(x: number) { return courseY(x, this.options.course); }
   private slope(x: number) { return courseSlope(x, this.options.course); }
   private get customPhysics() { return !this.config || this.config.customPhysics; }
@@ -153,9 +182,19 @@ export class GameEngine {
     this.invalidate();
   }
 
-  reset = () => {
+  reset = (seed?: number) => {
     this.snapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
     this.racers = createRacers(this.config);
+    // T02: identity is a registry lookup, not an array position. The player is
+    // resolved by stable ID, and the dense index is recomputed from the ID list.
+    this.registry = createRacerRegistry(this.racers.map((racer) => racer.id));
+    this.playerIndex = Math.max(0, this.registry.indexOf(this.playerId));
+    // Explicit RNG reset: the same seed always replays the same race. The cosmetic
+    // stream is deliberately re-randomised — it must never affect simulation state.
+    this.gameplay.reset(seed ?? this.seed);
+    this.cosmetic.reset(cosmeticSeed());
+    this.bumpCooldowns.clear();
+    this.nextCooldownPrune = 0;
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
@@ -166,20 +205,22 @@ export class GameEngine {
     this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
     this.pickupCount = this.shieldBlocks = 0;
     this.snapshot.sector = sectorAt(START_X, this.options.course);
-    this.collisionTimes.fill(-100);
     this.particles.length = this.airSheep.length = this.trail.length = 0;
     this.canvas.style.cursor = '';
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
     this.makeTrack();
+    // The 3D mesh pool must match the field size; it disposes what it no longer needs.
+    this.renderer.setRacerCount(this.racers.length);
     this.standingsKey = '';
     this.notify(); this.invalidate();
   };
 
   teleport = (targetX: number) => {
     const spacing = 45;
+    const center = (this.racers.length - 1) / 2;
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i];
-      racer.x = targetX + (i - 1.5) * spacing;
+      racer.x = targetX + (i - center) * spacing;
       racer.targetLane = racer.homeLane ?? (i % 4);
       racer.lane = racer.targetLane;
       racer.z = laneZ(racer.lane);
@@ -208,7 +249,9 @@ export class GameEngine {
     if (this.status !== 'ready') return;
     for (const racer of this.racers) {
       const velocity = launchVelocity(this.snapshot.power, racer.launchSpeed);
-      const angle = clamp(this.snapshot.angle + (racer.id ? (racer.id - 2) * 1.2 : 0), 12, 68) * Math.PI / 180;
+      // T02: legacy four keep the exact (id - 2) * 1.2 fan; larger fields fold the
+      // identity into the same bounded envelope (roster.launchAngleOffset).
+      const angle = clamp(this.snapshot.angle + launchAngleOffset(racer.id, this.racers.length), 12, 68) * Math.PI / 180;
       racer.launchOrigin = { x: racer.x, y: racer.y };
       racer.vx = Math.cos(angle) * velocity * racer.pace;
       racer.vy = -Math.sin(angle) * velocity * racer.pace;
@@ -220,7 +263,7 @@ export class GameEngine {
     this.isDragging = false;
     this.canvas.style.cursor = '';
     this.audio.play('launch');
-    this.say('FOUR GOBLINS. ZERO RIGHT OF WAY.'); this.notify();
+    this.say(this.racers.length === 4 ? 'FOUR GOBLINS. ZERO RIGHT OF WAY.' : `${this.racers.length} GOBLINS. ZERO RIGHT OF WAY.`); this.notify();
   };
 
   changeLane = (direction: number) => {
@@ -258,7 +301,7 @@ export class GameEngine {
     racer.grounded = false; racer.lastHopAt = this.runTime;
     racer.lastGroundedAt = racer.bufferedJump = -100;
     this.emit(racer.x, racer.y + RADIUS, racer.z, 5, '#dbc294', 85);
-    if (!racer.id) { this.snapshot.hopReady = false; this.audio.play('hop'); this.notify(); }
+    if (racer.isPlayer) { this.snapshot.hopReady = false; this.audio.play('hop'); this.notify(); }
   }
 
   bounce = () => {
@@ -272,7 +315,7 @@ export class GameEngine {
     racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
     racer.grounded = false; racer.lastGroundedAt = -100;
     this.emit(racer.x, racer.y + RADIUS, racer.z, 10, '#a7dec1', 160);
-    if (!racer.id) { this.audio.play('bounce'); this.say('GRAVITY IS A SUGGESTION.'); this.refreshSnapshot(); this.notify(); }
+    if (racer.isPlayer) { this.audio.play('bounce'); this.say('GRAVITY IS A SUGGESTION.'); this.refreshSnapshot(); this.notify(); }
   }
 
   boost = () => { if (this.status === 'flying') this.performBoost(this.player); };
@@ -285,7 +328,7 @@ export class GameEngine {
     racer.vx = Math.min(racer.maximumSpeed, racer.vx + impulse);
     if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
     this.emit(racer.x - RADIUS, racer.y, racer.z, 12, racer.color, 210);
-    if (!racer.id) { this.audio.play('boost'); this.say('MORE SPEED. LESS THINKING.'); this.shake = 2; this.refreshSnapshot(); this.notify(); }
+    if (racer.isPlayer) { this.audio.play('boost'); this.say('MORE SPEED. LESS THINKING.'); this.shake = 2; this.refreshSnapshot(); this.notify(); }
   }
 
   togglePause = () => {
@@ -391,11 +434,7 @@ export class GameEngine {
       if (this.status === 'flying' && !this.pausedForBuild) {
         this.accumulator = Math.min(0.1, this.accumulator + dt);
         while (this.accumulator >= STEP && this.status === 'flying' && !this.pausedForBuild) {
-          for (const racer of this.racers) {
-            racer.previous.x = racer.x; racer.previous.y = racer.y;
-            racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
-          }
-          this.stepRace(STEP); this.accumulator -= STEP;
+          this.stepOnce(); this.accumulator -= STEP;
         }
       }
       this.updateParticles(dt);
@@ -451,11 +490,81 @@ export class GameEngine {
     if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
   };
 
+  /** Current heat phase, derived from the explicit game status (never guessed). */
+  private heatPhase(): HeatPhase {
+    switch (this.snapshot.status) {
+      case 'ready': return 'staging';
+      case 'flying': return 'racing';
+      case 'paused': return 'racing';
+      case 'finished': return this.snapshot.settling ? 'settling' : 'results';
+      default: return 'staging';
+    }
+  }
+
+  /**
+   * T02 seam: applies validated, deduplicated commands instead of mutating simulation
+   * state from the UI. Identical repeats collapse; refusals change nothing.
+   */
+  applyCommands = (commands: readonly GameCommand[]) => {
+    if (!commands.length) return;
+    const gate = {
+      status: this.snapshot.status, phase: this.heatPhase(),
+      inputEnabled: this.controlsEnabled, racerId: this.playerId,
+    };
+    for (const command of dedupeCommands(commands)) {
+      if (!validateCommand(command, gate).ok) continue;
+      switch (command.type) {
+        case 'aim': this.setAim(command.power, command.angle); break;
+        case 'steer': this.changeLane(command.direction); break;
+        case 'hop': if (this.canHop(this.player)) this.performHop(this.player); break;
+        case 'bounce': this.bounce(); break;
+        case 'boost': this.boost(); break;
+        case 'launch': this.launch(); break;
+        case 'toggle-pause': this.togglePause(); break;
+        case 'restart': this.reset(); break;
+        case 'teleport': this.teleport(command.x); break;
+        case 'set-option': case 'reserve': case 'release-reservation': case 'noop': break;
+        default: break;
+      }
+    }
+  };
+
+  /** Absolute aim setter used by the command path (the drag path stays on adjustAim). */
+  private setAim(power: number, angle: number) {
+    if (this.status !== 'ready') return;
+    this.snapshot.power = clamp(power, 0.18, 1);
+    this.snapshot.angle = clamp(angle, 12, 68);
+    const radians = this.snapshot.angle * Math.PI / 180;
+    this.player.x = AIM_ANCHOR.x - Math.cos(radians) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
+    this.player.y = AIM_ANCHOR.y + Math.sin(radians) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
+    this.notify();
+  }
+
+  /**
+   * T02 seam: exactly one fixed step, extracted from the frame loop so the frozen
+   * `SimulationAdapter` contract can drive the engine headlessly. The visual loop
+   * calls this too — behaviour is unchanged, only the ownership of the step is.
+   */
+  stepOnce = (commands: readonly GameCommand[] = []) => {
+    this.applyCommands(commands);
+    for (const racer of this.racers) {
+      racer.previous.x = racer.x; racer.previous.y = racer.y;
+      racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
+    }
+    this.stepRace(STEP);
+  };
+
+  /** Observation record for replay comparisons through the headless seam. */
+  observe = (): Readonly<Record<string, number>> => Object.freeze({
+    distance: this.snapshot.distance, speed: this.snapshot.speed,
+    position: this.snapshot.position, runTime: this.runTime,
+  });
+
   private stepRace(dt: number) {
     this.runTime += dt;
     for (const racer of this.racers) {
       if (racer.finished) continue;
-      if (racer.id && this.runTime >= racer.nextDecision) this.driveCPU(racer);
+      if (!racer.isPlayer && this.runTime >= racer.nextDecision) this.driveCPU(racer);
       this.stepRacer(racer, dt);
     }
     this.resolveBumps();
@@ -472,7 +581,9 @@ export class GameEngine {
   private driveCPU(racer: Racer) {
     const difficulty = this.config?.difficulty ?? 'racer';
     const reaction = difficulty === 'rookie' ? 0.43 : difficulty === 'veteran' ? 0.13 : 0.19;
-    racer.nextDecision = this.runTime + reaction + racer.id * 0.023;
+    // T02: stagger decisions without touching the 120 Hz tick rate. Legacy fields keep
+    // the exact id * 0.023 ramp; large fields hash identity into a bounded window.
+    racer.nextDecision = this.runTime + reaction + cpuDecisionStagger(racer.id, this.racers.length);
     if (racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
     const lookAhead = clamp(racer.vx * (difficulty === 'rookie' ? 0.54 : difficulty === 'veteran' ? 0.92 : 0.75), 360, 1350);
     const current = racer.targetLane;
@@ -565,7 +676,7 @@ export class GameEngine {
         racer.x = loop.x + 3; racer.y = loop.y + loop.ballRadius + this.y(racer.x) - this.y(loop.x);
         racer.vx = Math.min(racer.maximumSpeed, ride.speed * 1.08); racer.vy = this.slope(racer.x) * racer.vx;
         racer.loopRide = null; racer.grounded = false;
-        if (!racer.id) { this.snapshot.score += 350; this.counts.loops++; this.say('A WELL-ROUNDED BAD IDEA.'); this.audio.play('loop'); }
+        if (racer.isPlayer) { this.snapshot.score += 350; this.counts.loops++; this.say('A WELL-ROUNDED BAD IDEA.'); this.audio.play('loop'); }
       }
     } else {
       if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
@@ -582,7 +693,7 @@ export class GameEngine {
           if (surface.ramp && !racer.visited.has(surface.ramp) && (racer.x - surface.ramp.x) / surface.ramp.width > 0.94) {
             racer.vy -= 155 * weightImpulse(racer.weight); racer.y -= 2; racer.grounded = false;
             racer.visited.add(surface.ramp);
-            if (!racer.id) { this.snapshot.score += 75; this.audio.play('launch'); }
+            if (racer.isPlayer) { this.snapshot.score += 75; this.audio.play('launch'); }
           }
         }
       } else {
@@ -601,7 +712,7 @@ export class GameEngine {
             racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
             racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
               speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
-            if (!racer.id) { this.say('HOLD ON TO YOUR GOBLIN.'); this.audio.play('boost'); }
+            if (racer.isPlayer) { this.say('HOLD ON TO YOUR GOBLIN.'); this.audio.play('boost'); }
             break;
           }
         } else {
@@ -627,7 +738,7 @@ export class GameEngine {
         if (normalSpeed > 260) {
           racer.vy = surface.slope * racer.vx - normalSpeed * restitution;
           this.emit(racer.x, surface.y, racer.z, 3, '#b8a77b', 70);
-          if (!racer.id) {
+          if (racer.isPlayer) {
             this.audio.play('land');
             if (normalSpeed > 360) this.shake = Math.min(4.5, normalSpeed / 160);
           }
@@ -641,12 +752,12 @@ export class GameEngine {
     if (racer.x >= FINISH && !racer.falling) {
       racer.finishTime = this.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
       racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
-      if (racer.id) racer.y = this.y(racer.x) - RADIUS;
+      if (!racer.isPlayer) racer.y = this.y(racer.x) - RADIUS;
     } else if (racer.x >= 48000 && racer.x <= 68400 && racer.y > this.y(racer.x) + 260) {
       // Lava lake plunge in Section 3: instant black-smoke vaporization and checkpoint recovery
       this.emit(racer.x, racer.y, racer.z, 30, '#111111', 260);
       this.emit(racer.x, racer.y, racer.z, 20, '#ff4400', 220);
-      if (!racer.id) { this.say('LAVA VAPORIZATION! RESCUED ONTO RAILS.'); this.shake = 5; }
+      if (racer.isPlayer) { this.say('LAVA VAPORIZATION! RESCUED ONTO RAILS.'); this.shake = 5; }
       this.recover(racer);
     } else if (racer.y > this.y(racer.x) + 360 || racer.stoppedFor > 3) this.recover(racer);
   }
@@ -667,10 +778,19 @@ export class GameEngine {
     racer.boosts = Math.max(1, racer.boosts);
     racer.shieldUntil = -100;
     Object.assign(racer.previous, { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation });
-    if (!racer.id) { this.snapshot.score = Math.max(0, this.snapshot.score - 100); this.trail.length = 0; this.say('PIT CREW TO THE RESCUE. KEEP RACING.'); }
+    if (racer.isPlayer) { this.snapshot.score = Math.max(0, this.snapshot.score - 100); this.trail.length = 0; this.say('PIT CREW TO THE RESCUE. KEEP RACING.'); }
+  }
+
+  private pruneBumpCooldowns() {
+    if (this.runTime < this.nextCooldownPrune) return;
+    this.nextCooldownPrune = this.runTime + 0.5;
+    for (const [pair, time] of this.bumpCooldowns) {
+      if (this.runTime - time >= GameEngine.BUMP_COOLDOWN) this.bumpCooldowns.delete(pair);
+    }
   }
 
   private resolveBumps() {
+    this.pruneBumpCooldowns();
     for (let i = 0; i < this.racers.length - 1; i++) for (let j = i + 1; j < this.racers.length; j++) {
       const a = this.racers[i]; const b = this.racers[j];
       if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
@@ -687,9 +807,9 @@ export class GameEngine {
       a.z -= nz * penetration * b.weight / sum; b.z += nz * penetration * a.weight / sum;
       a.z = clamp(a.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
       b.z = clamp(b.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-      const pair = i * 4 + j;
-      if (this.runTime - this.collisionTimes[pair] < 0.38) continue;
-      this.collisionTimes[pair] = this.runTime;
+      const pair = pairKey(a.id, b.id);
+      if (this.runTime - (this.bumpCooldowns.get(pair) ?? -100) < GameEngine.BUMP_COOLDOWN) continue;
+      this.bumpCooldowns.set(pair, this.runTime);
       const shieldA = this.absorbShield(a);
       const shieldB = this.absorbShield(b);
       const relative = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
@@ -708,15 +828,15 @@ export class GameEngine {
       if (!shieldB) this.shove(b, side, kick * Math.min(1.65, a.weight / b.weight));
       const x = (a.x + b.x) / 2; const z = (a.z + b.z) / 2;
       this.emit(x, (a.y + b.y) / 2, z, 10, '#ffe0a0', 140);
-      if (!a.id || !b.id) {
-        if ((!a.id && shieldA) || (!b.id && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
-        else if ((!a.id && shieldB) || (!b.id && shieldA)) {
+      if (a.isPlayer || b.isPlayer) {
+        if ((a.isPlayer && shieldA) || (b.isPlayer && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
+        else if ((a.isPlayer && shieldB) || (b.isPlayer && shieldA)) {
           this.audio.play('shield'); this.shake = 2;
-          this.say(`${a.id ? a.name : b.name}'S SHIELD HELD. FIND ANOTHER LINE.`);
+          this.say(`${b.isPlayer ? a.name : b.name}'S SHIELD HELD. FIND ANOTHER LINE.`);
         }
         else {
           this.counts.bumps++; this.snapshot.score += 50; this.shake = 4;
-          this.audio.play('bump'); this.say(`MAKE ROOM! ${a.id ? a.name : b.name} GOT A NUDGE.`);
+          this.audio.play('bump'); this.say(`MAKE ROOM! ${b.isPlayer ? a.name : b.name} GOT A NUDGE.`);
         }
       }
     }
@@ -737,7 +857,7 @@ export class GameEngine {
     racer.shieldHitAt = this.runTime;
     racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.3);
     this.emit(racer.x, racer.y, racer.z, 9, POWERUPS.shield.color, 155);
-    if (!racer.id) this.shieldBlocks++;
+    if (racer.isPlayer) this.shieldBlocks++;
     return true;
   }
 
@@ -784,7 +904,7 @@ export class GameEngine {
       notice = full ? 'AIR BOUNCES FULL. +75 CHAOS.' : 'AIR SPRING! +1 AIR BOUNCE';
     }
     this.emit(pickup.x, pickup.y, pickup.z, 13, POWERUPS[pickup.kind].color, 120);
-    if (!racer.id) {
+    if (racer.isPlayer) {
       this.pickupCount++; this.snapshot.score += 75;
       this.snapshot.lastPickup = pickup.kind;
       this.snapshot.pickupNoticeUntil = this.runTime + 2.5;
@@ -793,7 +913,7 @@ export class GameEngine {
   }
 
   private hitObstacle(racer: Racer, obstacle: Obstacle) {
-    racer.visited.add(obstacle); obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | (1 << racer.id);
+    racer.visited.add(obstacle); obstacle.hitAt = this.time; recordObstacleHit(obstacle, racer.id);
     const impulse = weightImpulse(racer.weight);
     const x = obstacle.x + obstacle.width / 2; const y = this.y(x); const z = obstacleZ(obstacle);
     if (obstacle.kind !== 'boost') racer.lastGroundedAt = -100;
@@ -802,23 +922,23 @@ export class GameEngine {
         racer.vx += 400 * impulse * racer.boostFactor;
         if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
         racer.boosts = Math.min(2, racer.boosts + 1); this.emit(x, y - 6, z, 8, '#ffbd6a', 135);
-        if (!racer.id) { this.snapshot.score += 100; this.audio.play('boost'); this.say('THROTTLE REFILLED. TRY NOT TO SHARE.'); }
+        if (racer.isPlayer) { this.snapshot.score += 100; this.audio.play('boost'); this.say('THROTTLE REFILLED. TRY NOT TO SHARE.'); }
         break;
       case 'spring':
         racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
         racer.bounces = Math.min(3, racer.bounces + 1); this.emit(x, y - 24, z, 10, '#a1e1bd', 160);
-        if (!racer.id) { this.snapshot.score += 100; this.audio.play('bounce'); this.say('SPRING BREAK! +1 BOUNCE'); }
+        if (racer.isPlayer) { this.snapshot.score += 100; this.audio.play('bounce'); this.say('SPRING BREAK! +1 BOUNCE'); }
         break;
       case 'tnt':
         obstacle.hit = true; racer.vx += 300 * impulse; racer.vy = -450 * impulse; racer.grounded = false;
         this.emit(x, y - 30, z, 25, '#ffb25e', 245);
-        if (!racer.id) { this.snapshot.score += 200; this.counts.explosions++; this.shake = 9; this.audio.play('boom'); this.say('THAT WAS PROBABLY LOAD-BEARING.'); }
+        if (racer.isPlayer) { this.snapshot.score += 200; this.counts.explosions++; this.shake = 9; this.audio.play('boom'); this.say('THAT WAS PROBABLY LOAD-BEARING.'); }
         break;
       case 'sheep':
         obstacle.hit = true; racer.vx += 75 * impulse; racer.vy = -290 * impulse; racer.grounded = false;
         this.airSheep.push({ x, y: y - 40, z, vx: racer.vx * 0.51, vy: -520, rotation: 0, life: 3.1 });
         this.emit(x, y - 35, z, 8, '#e9e1c6', 115);
-        if (!racer.id) { this.snapshot.score += 125; this.counts.sheep++; this.audio.play('sheep'); this.say('BAA-D DECISIONS.'); }
+        if (racer.isPlayer) { this.snapshot.score += 125; this.counts.sheep++; this.audio.play('sheep'); this.say('BAA-D DECISIONS.'); }
         break;
       case 'blimp':
         obstacle.hit = true;
@@ -834,7 +954,7 @@ export class GameEngine {
             o.hitAt = this.time;
           }
         }
-        if (!racer.id) {
+        if (racer.isPlayer) {
           this.snapshot.score += 250;
           this.counts.explosions++;
           this.shake = 6.0;
@@ -850,7 +970,7 @@ export class GameEngine {
         this.emit(x, signY, z, 24, '#8b5a2b', 210);
         this.emit(x, signY, z, 16, '#c29a64', 170);
         this.emit(x, signY, z, 12, '#ffffff', 130);
-        if (!racer.id) {
+        if (racer.isPlayer) {
           this.snapshot.score += 150;
           this.shake = 3.2;
           this.audio.play('land');
@@ -865,7 +985,7 @@ export class GameEngine {
         racer.grounded = false;
         this.emit(x, y, z, 14, '#6ebad8', 180);
         this.emit(x, y, z, 8, '#b8a77b', 120);
-        if (!racer.id) {
+        if (racer.isPlayer) {
           this.snapshot.score += 80;
           this.shake = 3.5;
           this.audio.play('bump');
@@ -876,7 +996,7 @@ export class GameEngine {
         if (racer.vx > 450) {
           obstacle.broken = true;
           this.emit(x, y, z, 20, '#8b5a2b', 180);
-          if (!racer.id) {
+          if (racer.isPlayer) {
             this.snapshot.score += 90;
             this.shake = 2.5;
             this.audio.play('land');
@@ -885,9 +1005,9 @@ export class GameEngine {
         }
         break;
       case 'pinball_spinner':
-        racer.vz = (Math.random() > 0.5 ? 1 : -1) * 440;
+        racer.vz = (this.gameplay.next() > 0.5 ? 1 : -1) * 440;
         racer.vx += 120;
-        if (!racer.id) {
+        if (racer.isPlayer) {
           this.snapshot.score += 110;
           this.shake = 3.0;
           this.audio.play('bounce');
@@ -899,7 +1019,7 @@ export class GameEngine {
         racer.vy = -140;
         racer.grounded = false;
         this.emit(x, y, z, 22, '#ff6600', 220);
-        if (!racer.id) {
+        if (racer.isPlayer) {
           this.snapshot.score += 130;
           this.shake = 4.0;
           this.audio.play('boom');
@@ -912,7 +1032,7 @@ export class GameEngine {
         break;
       case 'waterfall_splash':
         this.emit(x, y, z, 16, '#c6f1ff', 140);
-        if (!racer.id && this.time - obstacle.hitAt < 0.2) {
+        if (racer.isPlayer && this.time - obstacle.hitAt < 0.2) {
           this.say('THROUGH THE SPRAY!');
         }
         break;
@@ -932,7 +1052,7 @@ export class GameEngine {
     this.snapshot.laneLocked = this.runTime < player.steerLockedUntil;
     this.snapshot.bumps = this.counts.bumps; this.snapshot.raceTime = Math.floor(this.runTime * 10) / 10;
     let position = 1;
-    for (const racer of this.racers) if (racer.id && raceOrder(racer, player) < 0) position++;
+    for (const racer of this.racers) if (!this.isPlayer(racer) && raceOrder(racer, player) < 0) position++;
     this.snapshot.position = position;
     const sector = sectorAt(START_X + player.distance * 2, this.options.course);
     if (sector !== this.snapshot.sector && player.x >= STADIUM_START) { this.say('FINAL STRAIGHT. NO MORE MANNERS.'); this.audio.play('finish'); }
@@ -956,19 +1076,19 @@ export class GameEngine {
     this.snapshot.settling = false; this.snapshot.finishWait = 0;
     if (completed) {
       this.snapshot.distance = TRACK_DISTANCE; this.snapshot.progress = 1;
-      this.snapshot.score += 3000 + (4 - this.snapshot.position) * 500;
+      this.snapshot.score += 3000 + finishPositionBonus(this.snapshot.position, this.racers.length);
       this.emit(this.player.x, this.y(FINISH) - 140, this.player.z, 42, this.player.color, 250);
     }
     this.audio.play('finish');
     const { sheep, explosions, loops, bumps } = this.counts;
-    this.onFinish({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, distance: this.snapshot.distance, topSpeed: this.topSpeed,
+    this.onFinish({ id: `${Date.now()}-${this.cosmetic.nextInt(60466176).toString(36).padStart(5, '0')}`, distance: this.snapshot.distance, topSpeed: this.topSpeed,
       score: this.snapshot.score + this.snapshot.distance, sheep, explosions, loops, bumps,
       course: this.options.course, date: new Date().toISOString(), completed, trackLength: TRACK_DISTANCE,
       weight: this.options.ballWeight, launchSpeed: this.options.launchSpeed, position: this.snapshot.position,
       raceTime: this.player.finishTime ?? this.runTime, opponents: this.standings(),
       sessionId: this.config?.sessionId, mode: this.config?.customPhysics ? 'practice' : this.config?.mode,
       round: this.config?.round, loadout: this.config?.loadout, difficulty: this.config?.difficulty,
-      pickups: this.pickupCount, shieldsUsed: this.shieldBlocks });
+      pickups: this.pickupCount, shieldsUsed: this.shieldBlocks, fieldSize: this.racers.length });
     this.notify();
   }
 
@@ -977,8 +1097,8 @@ export class GameEngine {
     if (Math.abs(x - this.player.x) > this.renderer.view.width + 650) return;
     if (this.renderer.lowDetail) count = Math.ceil(count * 0.65);
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * TAU; const v = speed * (0.2 + Math.random() * 0.8); const life = 0.35 + Math.random() * 0.6;
-      this.particles.push({ x, y, z, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 50, life, maxLife: life, size: 2 + Math.random() * 4, color });
+      const angle = this.cosmetic.next() * TAU; const v = speed * (0.2 + this.cosmetic.next() * 0.8); const life = 0.35 + this.cosmetic.next() * 0.6;
+      this.particles.push({ x, y, z, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 50, life, maxLife: life, size: 2 + this.cosmetic.next() * 4, color });
     }
     if (this.particles.length > 160) this.particles.splice(0, this.particles.length - 160);
   }
@@ -1013,5 +1133,21 @@ export class GameEngine {
     this.canvas.removeEventListener('pointerdown', this.pointerDown); this.canvas.removeEventListener('pointermove', this.pointerMove);
     this.canvas.removeEventListener('pointerup', this.pointerUp); this.canvas.removeEventListener('pointercancel', this.pointerCancel); this.canvas.removeEventListener('pointerleave', this.pointerLeave);
     this.renderer.destroy(); this.audio.destroy(); this.buckets.clear(); this.pickupBuckets.clear(); this.pickupCandidates.clear();
+    this.bumpCooldowns.clear(); this.registry = createRacerRegistry([this.playerId]);
   }
+}
+
+/**
+ * T02: the frozen `SimulationAdapter` bound to the real engine. `runHeadless` and
+ * `HeatController` can now drive actual physics — `reset` restores the seeded
+ * gameplay stream, `tick` runs exactly one fixed step with its commands.
+ */
+export function createEngineAdapter(engine: GameEngine): SimulationAdapter {
+  return {
+    id: 'game-engine',
+    get seed() { return engine.seed; },
+    reset: (seed?: number) => { engine.reset(seed); },
+    tick: (_index: number, _step: number, commands: readonly GameCommand[]) => { engine.stepOnce(commands); },
+    observe: () => engine.observe(),
+  };
 }

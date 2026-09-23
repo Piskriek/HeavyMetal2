@@ -1,0 +1,190 @@
+/* Heavy metal GP: every screen fits the viewport. The page never scrolls. */
+html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
+body { min-width: 0; }
+.mobile-only { display: none !important; }
+
+/* ---------- shared fit shell ---------- */
+.fit-shell { height: 100dvh; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.fit-shell .app-header { height: 60px; padding: 0 24px; gap: 28px; }
+.fit-main { min-height: 0; display: grid; gap: 14px; padding: 14px 24px; width: 100%; max-width: 1600px; margin: 0 auto; }
+.fit-pane { min-height: 0; min-width: 0; overflow: hidden auto; scrollbar-width: thin; border: 1px solid var(--line); border-radius: 8px; background: #11161d; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.fit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 10px 24px; border-top: 1px solid var(--line); background: #0f141a; }
+.fit-actions > p { margin: 0 auto 0 0; color: var(--muted); font-size: 11px; }
+.fit-actions .mode-switch { margin: 0 auto 0 0; }
+.fit-actions .launch-button { width: auto; min-width: 220px; margin: 0; }
+.pane-tabs { display: none; grid-auto-flow: column; grid-auto-columns: 1fr; border-top: 1px solid var(--line); background: #0c1016; padding-bottom: env(safe-area-inset-bottom); }
+.pane-tabs button { border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; padding: 12px 0; border-top: 2px solid transparent; }
+.pane-tabs button.selected { color: #fff; border-top-color: var(--accent); }
+
+
+/* ---------- garage ---------- */
+.garage-fit { grid-template-columns: minmax(0, 1.25fr) minmax(300px, 380px) minmax(260px, 340px); }
+.garage-fit .circuit-panel { padding: 14px 16px; }
+.garage-fit .circuit-title-row { padding: 4px 0; }
+.garage-fit .circuit-title-row h2 { font-size: 28px; }
+.garage-fit .circuit-canvas-wrap { min-height: 0; flex: 1 1 auto; }
+.garage-fit .tuning-panel { border-left: 1px solid var(--line); gap: 8px; }
+.garage-fit .paint-selector { padding: 0; }
+.garage-fit .stat-control input[type=range] { margin-block: 8px 6px; }
+.garage-fit .stat-control p { margin: 0; }
+.garage-fit .tradeoff-note { margin: 0; }
+.garage-fit .paddock-loadout { margin: 0; padding: 8px 0 0; border-bottom: 0; border-top: 1px solid var(--line); flex-wrap: wrap; gap: 8px; }
+
+.driver-identity { display: flex; align-items: center; gap: 10px; }
+.driver-identity > div { flex: 1; min-width: 0; }
+.driver-identity h2 { font-family: var(--display); font-size: 25px; font-weight: 650; line-height: 1.1; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.driver-portrait { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 3px solid; background: #1d2632; flex-shrink: 0; }
+
+.driver-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.driver-grid li { display: flex; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 6px; background: #161d26; border-left: 3px solid var(--team); }
+.driver-grid li.is-player { background: #2a1512; }
+.driver-grid img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: #0c1016; flex-shrink: 0; }
+.driver-grid div { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.driver-grid strong { font-family: var(--display); font-size: 16px; font-weight: 650; letter-spacing: .3px; }
+.driver-grid small, .driver-grid span { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.driver-grid li.is-player small { color: var(--accent); }
+.driver-grid span { font-size: 9px; color: #677380; }
+
+/* ---------- championship ---------- */
+.champ-fit { grid-template-columns: minmax(0, 1.2fr) minmax(300px, 380px) minmax(0, 1fr); }
+.champ-fit .event-pane { order: 1; }
+.champ-fit .standings-column { order: 2; }
+.champ-fit .results-pane { order: 3; }
+.champ-fit .next-event, .champ-fit .gp-scoreboard, .champ-fit .season-calendar { margin: 0; padding: 0; border: 0; background: none; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.champ-fit .next-event { flex: 1; }
+.champ-fit .next-event .circuit-canvas-wrap { min-height: 180px; flex: 1 1 auto; }
+.champ-fit .next-gp-title h2 { font-size: 26px; margin: 0; }
+.champ-fit .next-gp-title p { margin: 4px 0 0; }
+.champ-fit .champion-banner { margin: 0; padding: 14px; gap: 14px; }
+.champ-fit .paddock-loadout { margin: 0; padding: 8px 0 0; border-bottom: 0; border-top: 1px solid var(--line); flex-wrap: wrap; gap: 8px; }
+.champ-fit .your-standing { margin-top: 6px; }
+.champ-fit .champ-table td, .champ-fit .champ-table th { padding-block: 5px; }
+.setup-readout { margin-right: auto; }
+.setup-readout p { margin: 2px 0 0; font-family: var(--mono); font-size: 12px; }
+.setup-readout b { color: var(--accent); }
+.mini-portrait { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 2px solid; flex-shrink: 0; background: #0c1016; }
+
+/* ---------- speech bubbles ---------- */
+.banter { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.banter-line { display: flex; align-items: flex-end; gap: 10px; max-width: 520px; animation: bubble-in .35s cubic-bezier(.2, 1.4, .4, 1) both; }
+.banter-line.banter-player { flex-direction: row-reverse; align-self: flex-end; }
+.banter-portrait { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid var(--speaker); background: #0c1016; flex-shrink: 0; box-shadow: 0 6px 18px #0008; }
+.banter-bubble { position: relative; background: #fbf6e8; color: #1b1510; padding: 8px 13px 9px; border-radius: 14px; box-shadow: 0 6px 20px #0007; margin-bottom: 18px; }
+.banter-bubble::after { content: ''; position: absolute; bottom: 10px; left: -8px; border: 8px solid transparent; border-right-color: #fbf6e8; border-left: 0; }
+.banter-player .banter-bubble { background: var(--accent); }
+.banter-player .banter-bubble::after { left: auto; right: -8px; border-right: 0; border-left: 8px solid var(--accent); }
+.mood-angry .banter-bubble { transform: rotate(-1.5deg); }
+.mood-surprised .banter-bubble { transform: rotate(1.5deg); }
+.banter-bubble b { display: block; font-family: var(--display); font-size: 13px; letter-spacing: .8px; text-transform: uppercase; color: #8a2b16; }
+.banter-player .banter-bubble b { color: #fff3dc; }
+.banter-bubble p { margin: 1px 0 0; font-size: 15px; font-weight: 600; line-height: 1.25; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(12px) scale(.85); } }
+
+.results-banter { flex-direction: row; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
+.results-banter .banter-line, .results-banter .banter-line.banter-player { flex-direction: row; align-self: auto; max-width: 340px; }
+.results-banter .banter-portrait { width: 44px; height: 44px; border-width: 2px; }
+.results-banter .banter-bubble { margin-bottom: 8px; padding: 5px 10px 6px; }
+.results-banter .banter-player .banter-bubble::after { left: -8px; right: auto; border-left: 0; border-right: 8px solid var(--accent); }
+.results-banter .banter-bubble p { font-size: 12px; }
+.results-banter .banter-bubble b { font-size: 11px; }
+.result-portrait { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid; background: #0c1016; flex-shrink: 0; }
+
+/* ---------- loading screen ---------- */
+.loading-screen { position: fixed; inset: 0; z-index: 100; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; background: #0c0f13; color: #fff; }
+.loading-bg { position: absolute; inset: 0; }
+.loading-bg img { width: 100%; height: 100%; object-fit: cover; animation: loading-zoom 14s ease-out both; }
+@keyframes loading-zoom { from { transform: scale(1.08); } }
+.loading-shade { position: absolute; inset: 0; background: linear-gradient(180deg, #000a 0%, #0000 22%, #0000 50%, #000d 100%); }
+.loading-top, .loading-banter, .loading-bottom { position: relative; }
+.loading-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 24px; }
+.loading-top .eyebrow { color: #fff; text-shadow: 0 1px 4px #000; }
+.loading-banter { grid-row: 2; align-self: center; justify-self: center; width: min(640px, calc(100% - 32px)); }
+.loading-bottom { grid-row: 3; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 24px calc(22px + env(safe-area-inset-bottom)); text-align: center; }
+.loading-bottom h1 { font-family: var(--display); font-style: italic; font-weight: 800; font-size: clamp(30px, 5vw, 56px); line-height: 1; margin: 0; text-shadow: 0 3px 14px #000; }
+.loading-bar { width: min(420px, 80vw); height: 6px; border-radius: 9px; background: #ffffff30; overflow: hidden; }
+.loading-bar span { display: block; height: 100%; background: var(--accent); animation: loading-fill linear both; }
+@keyframes loading-fill { from { width: 0; } to { width: 100%; } }
+.loading-cta { width: auto; min-width: 240px; animation: bubble-in .3s ease-out both; }
+.loading-tip { margin: 0; font-size: 11px; letter-spacing: 1px; color: #e6e6e6; text-shadow: 0 1px 4px #000; }
+
+/* ---------- race + results on small screens ---------- */
+.results-panel { overflow: hidden; }
+.results-table-wrap { min-height: 0; }
+
+/* ---------- tablet ---------- */
+@media (max-width: 1180px) {
+  .garage-fit { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); }
+  .garage-fit .grid-panel { display: none; }
+  .garage-page[data-pane='grid'] .garage-fit .grid-panel { display: flex; }
+  .garage-page[data-pane='grid'] .garage-fit .circuit-panel { display: none; }
+  .champ-fit { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+  .champ-fit .results-pane { display: none; }
+  .championship-page[data-pane='results'] .champ-fit .results-pane { display: flex; }
+  .championship-page[data-pane='results'] .champ-fit .event-pane { display: none; }
+  .pane-tabs { display: grid; }
+  .fit-shell { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 760px) {
+  .mobile-only { display: inline-flex !important; }
+  .fit-shell .app-header { height: 52px; padding: 0 12px; gap: 10px; }
+  .fit-shell .main-nav { display: none; }
+  .fit-shell .lab-link { display: none; }
+  .fit-shell .header-tools { margin-left: auto; gap: 8px; }
+  .fit-main { grid-template-columns: minmax(0, 1fr) !important; padding: 8px 10px; }
+  .fit-pane { display: none !important; padding: 12px; }
+  .garage-page[data-pane='circuit'] [data-pane-id='circuit'],
+  .garage-page[data-pane='driver'] [data-pane-id='driver'],
+  .garage-page[data-pane='grid'] [data-pane-id='grid'],
+  .championship-page[data-pane='event'] [data-pane-id='event'],
+  .championship-page[data-pane='standings'] [data-pane-id='standings'],
+  .championship-page[data-pane='results'] [data-pane-id='results'] { display: flex !important; }
+  .garage-fit .tuning-panel { border-left: 1px solid var(--line); }
+  .fit-actions { padding: 8px 10px; gap: 8px; flex-wrap: nowrap; }
+  .fit-actions > p, .setup-readout { display: none; }
+  .fit-actions .mode-switch { flex: 1; }
+  .fit-actions .mode-switch button { padding-inline: 6px; font-size: 11px; white-space: nowrap; }
+  .fit-actions .mode-switch button svg { display: none; }
+  .fit-actions .launch-button { min-width: 0; flex: 1; padding-inline: 12px; font-size: 13px; }
+  .fit-actions .button-secondary { padding-inline: 10px; }
+  .champ-fit .standing-driver small, .champ-fit .your-standing p { display: none; }
+  .champ-fit .your-standing { margin-top: 0; padding-block: 8px; }
+  .garage-fit .stat-control p { font-size: 10px; }
+  .driver-grid { gap: 4px; }
+  .driver-grid li { padding: 2px 8px 2px 3px; }
+  .driver-grid img { width: 38px; height: 38px; }
+  .driver-grid span { display: none; }
+  .driver-grid strong { font-size: 15px; }
+  .garage-fit .circuit-selector { grid-template-columns: repeat(3, 1fr); }
+  .driver-portrait { width: 72px; height: 72px; }
+  .banter-portrait { width: 56px; height: 56px; }
+  .banter-bubble p { font-size: 13px; }
+  .loading-top { padding: 12px; }
+  .loading-top .eyebrow { display: none; }
+  .results-banter .banter-line:nth-child(n+3) { display: none; }
+}
+@media (max-width: 760px) and (max-height: 700px) {
+  .garage-fit .stat-control p, .garage-fit .tradeoff-note { display: none; }
+}
+@media (orientation: portrait) { .loading-top .brand { visibility: hidden; } }
+@media (max-width: 760px) {
+  .results-banter { margin-top: 6px; gap: 4px; }
+  .results-banter .banter-portrait { width: 34px; height: 34px; }
+  .results-banter .banter-bubble { margin-bottom: 4px; padding: 4px 9px; }
+  .results-banter .banter-bubble p { font-size: 11px; }
+  .results-banter .banter-bubble b { font-size: 10px; }
+  .results-header .results-title { font-size: 28px; }
+}
+@media (max-height: 820px) {
+  .champ-fit .standing-driver small, .champ-fit .your-standing p { display: none; }
+  .champ-fit .champ-table td, .champ-fit .champ-table th { padding-block: 3px; }
+  .champ-fit .your-standing { margin-top: 0; padding-block: 6px; }
+}
+
+/* ---------- race zoom ---------- */
+.race-canvas { touch-action: none; }
+.zoom-controls { position: absolute; left: 16px; bottom: 22px; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; background: #0d1722ec; border: 1px solid #344758; border-radius: 6px; }
+.zoom-controls .icon-button { width: 32px; height: 32px; }
+.zoom-level { border: 0; background: none; color: #c9d6e2; font-family: var(--mono); font-size: 10px; padding: 2px 0; }
+@media (min-width: 980px) { .zoom-controls { left: 232px; } }

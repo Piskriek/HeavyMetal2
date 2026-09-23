@@ -1,0 +1,215 @@
+import * as storage from './storage';
+import { GrandPrix, HeatResult, MarbleInfo, POINTS, FASTEST_BONUS, HEATS_PER_GP, TEAMS, Team, TrackProfile, CIRCUIT_LENGTH_MULTIPLIER } from './types';
+import { W } from './track';
+
+const themes = {
+  classic: { bg1: '#0b0f14', bg2: '#101820', track: '#141e28', pipe: '#354657', pipeEdge: '#62778c' },
+  street: { bg1: '#140f1e', bg2: '#22162e', track: '#1c1530', pipe: '#5b4b7a', pipeEdge: '#2a1f3d' },
+  silver: { bg1: '#0f1416', bg2: '#1a2226', track: '#151d21', pipe: '#52606d', pipeEdge: '#1f2a30' },
+  forest: { bg1: '#07140f', bg2: '#0d2418', track: '#0b1e14', pipe: '#2f6b4f', pipeEdge: '#123324' },
+  sakura: { bg1: '#1a0f16', bg2: '#2a1522', track: '#22131d', pipe: '#7a4b5e', pipeEdge: '#3a1f2d' },
+  night: { bg1: '#05070f', bg2: '#0c1226', track: '#0a1022', pipe: '#3a4f8a', pipeEdge: '#182349' },
+};
+
+const P = (segments: number, weights: Record<string, number>, theme: keyof typeof themes): TrackProfile => ({ segments: segments * CIRCUIT_LENGTH_MULTIPLIER, weights, theme: themes[theme] });
+
+export const CALENDAR: GrandPrix[] = [
+  { id: 0, name: 'Marblehurst Grand Prix', short: 'MARBLEHURST', location: 'Marblehurst Park', flag: '🇬🇧', desc: 'The season opener. A balanced circuit with a bit of everything.', profile: P(10, {}, 'classic') },
+  { id: 1, name: 'Monte Pipo Street Circuit', short: 'MONTE PIPO', location: 'Monte Pipo Harbour', flag: '🇲🇨', desc: 'Tight chicanes and funnels. Overtaking is hard — bring an item.', profile: P(11, { Chicane: 3, Funnel: 2.5, 'Zigzag Pipes': 1.5, 'Ice Slide': 0.2, Splitter: 0.3 }, 'street') },
+  { id: 2, name: 'Silverpeg Grand Prix', short: 'SILVERPEG', location: 'Silverpeg Circuit', flag: '🎯', desc: 'A Peggle paradise. Peg fields and pop-boards everywhere.', profile: P(11, { 'Peggle Board': 3.5, 'Peg Field': 2.5, Chicane: 0.4 }, 'silver') },
+  { id: 3, name: 'Spa-Francoroll', short: 'SPA', location: 'Ardennes Chutes', flag: '🇧🇪', desc: 'The fastest track of the year. Ice slides and boost pads.', profile: P(12, { 'Ice Slide': 3, 'Zigzag Pipes': 2, Splitter: 1.5, 'Peg Field': 0.3 }, 'forest') },
+  { id: 4, name: 'Suzuka Spiral', short: 'SUZUKA', location: 'Suzuka Spiral', flag: '🇯🇵', desc: 'Spinners and splitters. Technical and chaotic.', profile: P(11, { Spinners: 3, Splitter: 2.5, Funnel: 1.5 }, 'sakura') },
+  { id: 5, name: 'Yas Marble Finale', short: 'YAS MARBLE', location: 'Yas Marble Island', flag: '🏁', desc: 'The night-race finale. The longest track — every feature, every trick.', profile: P(14, { 'Crack Wall Shortcut': 1.6, 'Bounce Ramp': 1.6, 'Peggle Board': 1.5 }, 'night') },
+];
+
+export const QUICK_PROFILE: TrackProfile = P(11, {}, 'classic');
+
+export interface SeasonState {
+  seed: number;
+  roster: MarbleInfo[];
+  round: number; // current GP index
+  heat: number; // current heat index inside the GP
+  results: HeatResult[][][]; // [round][heat] -> results
+  fastest: (number | null)[]; // marble id awarded fastest-heat bonus per round
+  complete: boolean;
+}
+
+export function gpSeed(seasonSeed: number, round: number): number {
+  return (seasonSeed ^ (0x51ed270b + round * 0x9e3779b9)) >>> 0;
+}
+
+export function newSeason(roster: MarbleInfo[]): SeasonState {
+  return {
+    seed: Math.floor(Math.random() * 0xffffffff),
+    roster,
+    round: 0,
+    heat: 0,
+    results: CALENDAR.map(() => []),
+    fastest: CALENDAR.map(() => null),
+    complete: false,
+  };
+}
+
+export interface Standing {
+  id: number;
+  points: number;
+  wins: number;
+  podiums: number;
+  heatsWon: number;
+  fastest: number;
+  best: number;
+  last: number | null;
+}
+
+export function pointsFor(rank: number): number {
+  return POINTS[rank - 1] ?? 0;
+}
+
+export function computeStandings(s: SeasonState): Standing[] {
+  const map = new Map<number, Standing>();
+  for (const m of s.roster) map.set(m.id, { id: m.id, points: 0, wins: 0, podiums: 0, heatsWon: 0, fastest: 0, best: 99, last: null });
+  s.results.forEach((gp, r) => {
+    const gpPoints = new Map<number, number>();
+    gp.forEach((heat) => {
+      for (const hr of heat) {
+        const st = map.get(hr.id)!;
+        const p = hr.time === null ? 0 : pointsFor(hr.rank);
+        st.points += p;
+        gpPoints.set(hr.id, (gpPoints.get(hr.id) ?? 0) + p);
+        if (hr.rank === 1 && hr.time !== null) st.heatsWon++;
+        st.last = hr.rank;
+      }
+    });
+    if (gp.length === HEATS_PER_GP) {
+      const fid = s.fastest[r];
+      if (fid !== null && map.has(fid)) {
+        map.get(fid)!.points += FASTEST_BONUS;
+        map.get(fid)!.fastest++;
+        gpPoints.set(fid, (gpPoints.get(fid) ?? 0) + FASTEST_BONUS);
+      }
+      const gpOrder = gpRanking(gp, s.fastest[r]);
+      gpOrder.forEach((id, i) => {
+        const st = map.get(id)!;
+        if ((gpPoints.get(id) ?? 0) === 0) return;
+        if (i === 0) st.wins++;
+        if (i < 3) st.podiums++;
+        st.best = Math.min(st.best, i + 1);
+      });
+    }
+  });
+  return [...map.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || b.podiums - a.podiums || a.best - b.best || a.id - b.id);
+}
+
+/** Ranking of a GP (marble ids) by GP points, tie-break by best heat finish. */
+export function gpRanking(gp: HeatResult[][], fastestId: number | null): number[] {
+  const pts = new Map<number, number>();
+  const best = new Map<number, number>();
+  for (const heat of gp)
+    for (const hr of heat) {
+      pts.set(hr.id, (pts.get(hr.id) ?? 0) + (hr.time === null ? 0 : pointsFor(hr.rank)));
+      best.set(hr.id, Math.min(best.get(hr.id) ?? 99, hr.rank));
+    }
+  if (fastestId !== null && pts.has(fastestId)) pts.set(fastestId, pts.get(fastestId)! + FASTEST_BONUS);
+  return [...pts.keys()].sort((a, b) => pts.get(b)! - pts.get(a)! || best.get(a)! - best.get(b)! || a - b);
+}
+
+export function gpPointsTable(gp: HeatResult[][], fastestId: number | null): Map<number, number> {
+  const pts = new Map<number, number>();
+  for (const heat of gp) for (const hr of heat) pts.set(hr.id, (pts.get(hr.id) ?? 0) + (hr.time === null ? 0 : pointsFor(hr.rank)));
+  if (fastestId !== null && pts.has(fastestId)) pts.set(fastestId, pts.get(fastestId)! + FASTEST_BONUS);
+  return pts;
+}
+
+export interface TeamStanding {
+  team: Team;
+  points: number;
+}
+
+export function computeTeamStandings(st: Standing[]): TeamStanding[] {
+  return TEAMS.map((team) => ({ team, points: team.members.reduce((s, id) => s + (st.find((x) => x.id === id)?.points ?? 0), 0) })).sort((a, b) => b.points - a.points);
+}
+
+/** Record a heat. Returns the updated season state (immutable). */
+export function recordHeat(s: SeasonState, results: HeatResult[]): SeasonState {
+  if (s.complete) return s;
+  const ids = new Set(results.map((r) => r.id));
+  const ranks = new Set(results.map((r) => r.rank));
+  if (results.length !== s.roster.length || ids.size !== s.roster.length || ranks.size !== s.roster.length
+    || results.some((r) => !s.roster.some((m) => m.id === r.id) || !Number.isInteger(r.rank) || r.rank < 1 || r.rank > results.length
+      || (r.time !== null && (!Number.isFinite(r.time) || r.time < 0)))) {
+    throw new Error('Invalid heat classification. Every marble needs one unique finishing position.');
+  }
+  const next: SeasonState = { ...s, results: s.results.map((r) => r.map((h) => [...h])), fastest: [...s.fastest] };
+  next.results[s.round].push(results);
+  if (next.results[s.round].length >= HEATS_PER_GP) {
+    // fastest heat time of the GP earns a bonus point
+    let bestT = Infinity;
+    let bestId: number | null = null;
+    for (const heat of next.results[s.round]) for (const hr of heat) if (hr.time !== null && hr.time < bestT) (bestT = hr.time), (bestId = hr.id);
+    next.fastest[s.round] = bestId;
+    if (s.round + 1 >= CALENDAR.length) {
+      next.complete = true;
+      next.heat = HEATS_PER_GP;
+    } else {
+      next.round = s.round + 1;
+      next.heat = 0;
+    }
+  } else {
+    next.heat = s.heat + 1;
+  }
+  return next;
+}
+
+/** Starting grid: marble ids in slot order (P1 first). Heat 1 uses championship order; later heats use previous heat finish order. */
+export function gridOrder(s: SeasonState): number[] {
+  const gp = s.results[s.round] ?? [];
+  if (gp.length > 0) {
+    const prev = gp[gp.length - 1];
+    return [...prev].sort((a, b) => a.rank - b.rank).map((r) => r.id);
+  }
+  const st = computeStandings(s);
+  if (st.every((x) => x.points === 0)) {
+    // opening round: shuffle deterministically by seed
+    const ids = s.roster.map((m) => m.id);
+    let a = s.seed >>> 0;
+    for (let i = ids.length - 1; i > 0; i--) {
+      a = (a * 1664525 + 1013904223) >>> 0;
+      const j = a % (i + 1);
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    return ids;
+  }
+  return st.map((x) => x.id);
+}
+
+/** Convert a grid order (P1..P10) into x positions on the start line: pole in the centre, alternating outward. */
+export function gridSlots(order: number[]): { id: number; x: number; slot: number }[] {
+  const n = order.length;
+  if (n === 0) return [];
+  if (n === 1) return [{ id: order[0], x: W / 2, slot: 1 }];
+  const spacing = (W - 120) / (n - 1);
+  const xs = Array.from({ length: n }, (_, i) => 60 + i * spacing);
+  const byCenter = [...xs].sort((a, b) => Math.abs(a - W / 2) - Math.abs(b - W / 2));
+  return order.map((id, i) => ({ id, x: byCenter[i], slot: i + 1 }));
+}
+
+const KEY = 'mrr-season-v1';
+export function saveSeason(s: SeasonState | null) {
+  try {
+    if (s) storage.setItem(KEY, JSON.stringify(s));
+    else storage.removeItem(KEY);
+  } catch {
+    /* ignore */
+  }
+}
+export function loadSeason(): SeasonState | null {
+  try {
+    const raw = storage.getItem(KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as SeasonState;
+    if (!s.roster || !s.results) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}

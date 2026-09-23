@@ -156,10 +156,11 @@ export interface Obstacle {
   lane?: number;
   laneSpan?: number;
   /**
-   * T02: racer IDs that already triggered this obstacle. Replaces the old
-   * `hitMask` bitmask (`1 << racerId`), which wrapped at racer 32 and aliased
-   * every ID beyond it. See `roster.ts → recordObstacleHit`.
+   * Legacy four-racer bitmask (`1 << racerId`). It wraps past racer 30, so it is only written
+   * inside its safe range and nothing reads it for gameplay; `hitBy` is the scalable ledger.
    */
+  hitMask?: number;
+  /** Every racer ID that has touched this obstacle. A Set, so 100 participants cannot alias. */
   hitBy?: Set<number>;
   altitude?: number;
   signType?: 'sheep' | 'tnt' | 'parts';

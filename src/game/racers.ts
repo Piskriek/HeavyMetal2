@@ -1,7 +1,6 @@
 import { laneZ, START_X, START_Y, type LoopRide, type Obstacle, type RacerFrame } from './scene';
 import { RACER_DEFINITIONS } from './types';
-import { loadoutStats, riderById } from './loadouts';
-import { PLAYER_ID, buildRoster, clampFieldSize, hash01 } from './roster';
+import { DEFAULT_LOADOUT, loadoutStats, riderById, type Loadout } from './loadouts';
 import type { RaceConfig } from './session';
 
 export interface Racer extends RacerFrame {
@@ -9,7 +8,7 @@ export interface Racer extends RacerFrame {
   targetLane: number;
   weight: number;
   pace: number;
-  loadout: import('./loadouts').Loadout;
+  loadout: Loadout;
   launchSpeed: number;
   handling: number;
   boostFactor: number;
@@ -22,6 +21,8 @@ export interface Racer extends RacerFrame {
   bufferedJump: number;
   fallingFor: number;
   stoppedFor: number;
+  /** Recoveries spent in the current attempt/race. Reset with the racer, never inferred. */
+  recoveries: number;
   recoveryUntil: number;
   steerLockedUntil: number;
   nextDecision: number;
@@ -32,64 +33,30 @@ export interface Racer extends RacerFrame {
   distance: number;
   bounces: number;
   boosts: number;
-  /** T02: true for the local player. Identity is `id` (always PLAYER_ID for the player). */
-  isPlayer: boolean;
   visited: Set<Obstacle>;
   previous: { x: number; y: number; z: number; rotation: number };
 }
 
-/** Spacing between starting-grid rows when more than four racers share the four lanes. */
-export const GRID_ROW_SPACING = 90;
-
-/**
- * Builds the field for a race.
- *
- * - Without a config, or with a four-racer config, this reproduces the legacy field
- *   exactly: the original definitions, lanes [2, 0, 1, 3], legacy stagger schedule.
- * - Larger fields (20/50/100) come from `buildRoster`: dense stable IDs, the player at
- *   `PLAYER_ID`, bounded deterministic pace spread, and a starting grid stacked in rows
- *   behind the launch line so lane-mates never spawn inside each other.
- */
 export function createRacers(config?: RaceConfig): Racer[] {
-  const fieldSize = clampFieldSize(config?.fieldSize ?? 4);
-  const roster = buildRoster(fieldSize, config?.roster?.[0] ?? { rider: 'rivet', capsule: 'iron' });
-  return roster.map((entry) => {
-    const definition = RACER_DEFINITIONS[entry.id];
-    const legacy = fieldSize <= 4 && !!definition;
-    const loadout = legacy ? config?.roster?.[entry.id] ?? entry.loadout : entry.loadout;
+  return RACER_DEFINITIONS.map((definition) => {
+    const loadout = config?.roster[definition.id] ?? DEFAULT_LOADOUT;
     const stats = loadoutStats(loadout);
-    const row = Math.floor(entry.id / 4);
-    const startX = fieldSize > 4 ? START_X - row * GRID_ROW_SPACING : START_X;
     return {
-      ...entry, x: startX, y: START_Y, z: laneZ(entry.homeLane), vx: 0, vy: 0, vz: 0,
-      // Legacy parity: the four-racer field always raced at pace 1 with loadout weight,
-      // exactly as before T02 — no pace/balance drift is allowed by the acceptance list.
-      weight: stats.weight,
-      // Legacy parity: with a config, the original engine renamed every four-racer
-      // slot to its loadout's rider name (roster[1] is NIX, not the definition's
-      // GRUB). Large fields keep numbered names so 100 rows stay distinguishable.
-      name: config
-        ? (legacy || entry.isPlayer)
-          ? riderById(loadout.rider).name.toUpperCase()
-          : entry.name
-        : entry.name,
-      loadout, pace: legacy ? 1 : entry.pace,
-      launchSpeed: stats.launchSpeed, handling: stats.handling, boostFactor: stats.boostFactor,
-      hopFactor: stats.hopFactor, bumpRecovery: stats.bumpRecovery, maximumSpeed: stats.maximumSpeed,
-      lane: entry.homeLane, targetLane: entry.homeLane, rotation: 0,
-      falling: false, finished: false, grounded: false, bumpAt: -100,
-      immuneUntil: -100, launchOrigin: { x: startX, y: START_Y },
-      shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,
-      lastGroundedAt: -100, lastHopAt: -100, bufferedJump: -100,
-      fallingFor: 0, stoppedFor: 0, recoveryUntil: -100, steerLockedUntil: -100,
-      // Legacy four keep the exact 0.35 + id * 0.11 ramp; big fields fold the identity
-      // hash into a bounded 0.55 s window instead of an 11-second wait at racer 99.
-      nextDecision: legacy ? 0.35 + entry.id * 0.11 : 0.35 + hash01(entry.id) * 0.55,
-      lastBoostAt: -100, lastLaneChange: -100,
-      loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
-      isPlayer: entry.id === PLAYER_ID,
-      visited: new Set<Obstacle>(),
-      previous: { x: startX, y: START_Y, z: laneZ(entry.homeLane), rotation: 0 },
+    ...definition, x: START_X, y: START_Y, z: laneZ(definition.homeLane), vx: 0, vy: 0, vz: 0,
+    name: config ? riderById(loadout.rider).name.toUpperCase() : definition.name,
+    loadout, weight: stats.weight, pace: 1,
+    launchSpeed: stats.launchSpeed, handling: stats.handling, boostFactor: stats.boostFactor,
+    hopFactor: stats.hopFactor, bumpRecovery: stats.bumpRecovery, maximumSpeed: stats.maximumSpeed,
+    lane: definition.homeLane, targetLane: definition.homeLane, rotation: 0,
+    falling: false, finished: false, grounded: false, bumpAt: -100,
+    immuneUntil: -100, launchOrigin: { x: START_X, y: START_Y },
+    shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,
+    lastGroundedAt: -100, lastHopAt: -100, bufferedJump: -100,
+    fallingFor: 0, stoppedFor: 0, recoveries: 0, recoveryUntil: -100, steerLockedUntil: -100,
+    nextDecision: 0.35 + definition.id * 0.11, lastBoostAt: -100, lastLaneChange: -100,
+    loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
+    visited: new Set<Obstacle>(),
+    previous: { x: START_X, y: START_Y, z: laneZ(definition.homeLane), rotation: 0 },
     };
   });
 }

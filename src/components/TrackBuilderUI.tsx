@@ -4,7 +4,7 @@ import {
   Trash2, Copy, Download, Upload, Compass, Play, X,
   Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
   Move, Database, History, Save, RefreshCw, CheckCircle2,
-  HardDrive, Clock, ShieldCheck, Zap
+  HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -35,6 +35,7 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'goblins', label: 'Goblins & Crew', icon: <Users size={16} /> },
   { id: 'powerup', label: 'Powerups', icon: <Zap size={16} /> },
   { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} /> },
+  { id: 'animated', label: 'Animated', icon: <Clapperboard size={16} /> },
 ];
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
@@ -113,6 +114,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     return () => {
       builder.freeFly.active = false;
     };
+  }, [builder, onRequestRender]);
+
+  // Animated decorations preview: advance sheet frames while anything is playing.
+  // Gated on hasPlayingAnimations() so idle scenes render nothing extra.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (builder.hasPlayingAnimations()) {
+        builder.updateAnimations(performance.now() / 1000);
+        onRequestRender?.();
+      }
+    }, 120);
+    return () => clearInterval(timer);
   }, [builder, onRequestRender]);
 
   // Sync course and backup status
@@ -1280,6 +1293,52 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
           </div>
 
+          {/* Group Animate Toggle (only when animated decorations are selected) */}
+          {(() => {
+            const animatedSelected = selectedProps.filter((p) =>
+              PROP_DEFINITIONS.find((d) => d.type === p.type)?.isAnimated,
+            );
+            if (animatedSelected.length === 0) return null;
+            const playingCount = animatedSelected.filter((p) => p.animate !== false).length;
+            return (
+              <div className="bg-zinc-900/80 rounded-md p-2 border border-zinc-800 flex flex-col gap-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                    <Clapperboard size={13} className="text-fuchsia-400" />
+                    <span>Animation:</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-400">
+                    {playingCount}/{animatedSelected.length} Playing
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      builder.setSelectedPropsAnimate(true);
+                      showToast(`Animation enabled for ${animatedSelected.length} items`);
+                      onRequestRender?.();
+                    }}
+                    className="flex-1 py-1 px-2 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 text-[11px] font-bold rounded border border-fuchsia-500/40 cursor-pointer flex items-center justify-center gap-1"
+                    title="Play animation on all selected animated decorations"
+                  >
+                    <Clapperboard size={11} /> All PLAY
+                  </button>
+                  <button
+                    onClick={() => {
+                      builder.setSelectedPropsAnimate(false);
+                      showToast(`Animation paused for ${animatedSelected.length} items (frame 1)`);
+                      onRequestRender?.();
+                    }}
+                    className="flex-1 py-1 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold rounded border border-zinc-700 cursor-pointer flex items-center justify-center gap-1"
+                    title="Pause animation on all selected animated decorations (frame 1)"
+                  >
+                    <Pause size={11} /> All PAUSE
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Group Actions */}
           <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">
             <button
@@ -1921,6 +1980,45 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             );
           })()}
 
+          {/* Animate Toggle (for 4-frame Animated decorations) */}
+          {(() => {
+            const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
+            if (!def?.isAnimated) return null;
+            const isPlaying = selectedProp.animate !== false;
+            return (
+              <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
+                <div className="flex flex-col">
+                  <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                    {isPlaying
+                      ? <Clapperboard size={13} className="text-fuchsia-400" />
+                      : <Pause size={13} className="text-zinc-500" />}
+                    <span>Animate:</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-500">
+                    {isPlaying ? `Cycling 4 frames @ ${def.animFps ?? 6}fps` : 'Frozen on frame 1'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    const next = !isPlaying;
+                    builder.updatePropTransform(selectedProp.id, { animate: next });
+                    showToast(next ? 'Animation: ON (cycling 4 frames)' : 'Animation: OFF (frozen on frame 1)');
+                    onRequestRender?.();
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                    isPlaying
+                      ? 'bg-fuchsia-600/90 hover:bg-fuchsia-500 text-zinc-950 border-fuchsia-400'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+                  }`}
+                  title="Toggle 4-frame animation playback for this decoration (pauses on frame 1)"
+                >
+                  {isPlaying ? <Clapperboard size={13} /> : <Pause size={13} />}
+                  <span>{isPlaying ? 'ON (Playing)' : 'OFF (Frame 1)'}</span>
+                </button>
+              </div>
+            );
+          })()}
+
           {/* Actions */}
           <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/80">
             <button
@@ -2058,12 +2156,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <button
                 key={p.type}
                 onClick={() => selectPropType(p.type)}
-                className={`group flex flex-col items-center p-2 rounded-lg border transition-all shrink-0 w-28 bg-zinc-900/90 hover:bg-zinc-850 ${
+                className={`group relative flex flex-col items-center p-2 rounded-lg border transition-all shrink-0 w-28 bg-zinc-900/90 hover:bg-zinc-850 ${
                   isSelected
                     ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-lg shadow-amber-950/50'
                     : 'border-zinc-800 hover:border-zinc-600'
                 }`}
               >
+                {p.isAnimated && (
+                  <span
+                    className="absolute top-1 right-1 flex items-center gap-0.5 text-[8px] px-1 py-px rounded font-mono font-bold bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-700/60"
+                    title="4-frame animated sheet: shows one frame at a time in 3D"
+                  >
+                    <Clapperboard size={9} /> 4-FRAME
+                  </span>
+                )}
                 <div className="w-16 h-16 flex items-center justify-center overflow-hidden mb-1.5">
                   <img
                     src={p.url}

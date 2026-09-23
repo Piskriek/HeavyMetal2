@@ -315,6 +315,29 @@ Generated 10 more goblin decoration cutouts (7 crowd stands, 3 pure cheering mob
 - All 10 registered in `PROP_DEFINITIONS` under `goblins` (stands at 700px height, pure crowds at 600px, tower portrait at 650px).
 - Next agent: goblins 31–40 → `goblins-sheet-d.png`, then commit to this branch and update the open goblins PR — never open a second PR.
 
+### Animated Decorations (Batch 1 — 10 Fire & Water 4-Frame Sheets with Magenta Key Transparency)
+
+Built 10 animated decoration twins from the shipped alpha cutouts: each source keeps its body pixel-static while its fire/water element cycles 4 frames on a 2x2 sheet (TL=f0, TR=f1, BL=f2, BR=f3 — one horizontal + one vertical centre cut yields the frames). Frames derive travelling brightness bands through an element mask (fire: R>150, R>=G, R-B>38; spark adds a pink-burst branch; water: B>150, G>110, B>=R plus a foam-white branch), rising for fire and falling for water, with a per-frame flicker lift:
+
+1. `public/art/animated/anim-01-torchbearer-flame.png` (1032x1536, frame 516x768) — Torchbearer flame licks upward @ 7fps.
+2. `public/art/animated/anim-02-firework-sparkler.png` (1536x840, frame 768x420) — Sparkler burst strobes @ 9fps.
+3. `public/art/animated/anim-03-torch-crowd.png` (1536x860, frame 768x430) — Torch-crowd flames ripple @ 7fps.
+4. `public/art/animated/anim-04-lantern-warden.png` (1032x1536, frame 516x768) — Lantern lamp breathes @ 6fps.
+5. `public/art/animated/anim-05-smelting-crucible.png` (1536x1536, frame 768x768) — Crucible slag surface roils @ 6fps.
+6. `public/art/animated/anim-06-molten-cauldron.png` (1536x1536, frame 768x768) — Cauldron pour shimmers @ 6fps.
+7. `public/art/animated/anim-07-slag-channel.png` (1536x860, frame 768x430) — Slag-channel lava pulses @ 5fps.
+8. `public/art/animated/anim-08-waterwheel-cascade.png` (768x1536, frame 384x768) — Cascade rushes, foam churns @ 5fps.
+9. `public/art/animated/anim-09-plunge-basin.png` (1536x840, frame 768x420) — Plunge spray churns @ 5fps.
+10. `public/art/animated/anim-10-waterfall-curtain.png` (768x1536, frame 384x768) — Falls sheet ripples down @ 5fps.
+
+- Frames are flattened onto pure `#FF00FF`, sheeted 2x2, then keyed via `scripts/process-animated.mjs` (flood-normalise, 20% fuzz key, 6px unmix-despill ring — identical to `scripts/process-goblins.mjs`) into `public/art/animated/alpha/`. Review contact sheet: `public/art/animated/animated-contact-sheet.png`.
+- Remnants 0.000–0.068% (anim-02's 0.068% is the pink sparkler-burst paint itself, verified interior glow — same precedent as goblin-18's 0.118%). Frame deltas verified numerically (RMSE 0.017–0.040 between frames in element zones, ~0.002 on bodies) and the contact sheet inspected as an image: no halos, no black bands, flames/lava/water vibrant.
+- Runtime: `PropDefinition.isAnimated` + `animCols/Rows/Fps`, `PlacedProp.animate` (default true), per-prop cloned textures showing one quadrant (`repeat` 1/cols × 1/rows, row-major UVs), `TrackBuilder3D.updateAnimations()` driven by the race loop (`Renderer3D.render`, frozen on frame 0 under reduced motion) and a gated 120ms editor preview tick. Twins desync via id-hash phase.
+- Build menu: new `Animated` category tab (Clapperboard icon), `4-FRAME` badge on palette cards (cards preview the full sheet), `Animate` toggle in the single-select attribute window (ON/Playing vs OFF/Frame 1) plus an All PLAY/All PAUSE batch row for multi-select.
+- All 10 registered in `PROP_DEFINITIONS` under `animated`, mirroring their source twins' world sizes.
+- Tests: `tests/animated-props.test.ts` (15 checks: frame math, UVs, registry, sheet files + even dims, headless playback/freeze/batch/static paths), registered in `scripts/check.mjs`. `npm run check` 435/435 green; `npm run build` green.
+- Next agent: anim 11–20 → append to `ANIMATED_VARIATIONS`, run the script, register under `animated`, then commit to this branch and update the open animated-decorations PR — never open a second PR.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

@@ -15,7 +15,7 @@ import {
   importProps as importTrackStorage,
 } from './track-storage';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated';
 
 export interface PropDefinition {
   type: string;
@@ -33,9 +33,55 @@ export interface PropDefinition {
   isSlingshot?: boolean;
   isPowerup?: boolean; // T08: powerup category
   isBarrier?: boolean; // T08: barrier category
+  isAnimated?: boolean; // Animated category: url is a multi-frame sheet, one frame shown at a time
+  animCols?: number; // sheet columns (default 2)
+  animRows?: number; // sheet rows (default 2)
+  animFps?: number; // playback speed (default 6)
 }
 
 export type DecalSide = 'front' | 'back' | 'left' | 'right';
+
+/** Grid + speed resolved from a definition (2x2 @ 6fps unless overridden). */
+export interface AnimGrid {
+  cols: number;
+  rows: number;
+  fps: number;
+}
+
+export function animGridFor(def: PropDefinition): AnimGrid {
+  const cols = def.animCols !== undefined && def.animCols > 0 ? Math.floor(def.animCols) : 2;
+  const rows = def.animRows !== undefined && def.animRows > 0 ? Math.floor(def.animRows) : 2;
+  const fps = def.animFps !== undefined && def.animFps > 0 ? def.animFps : 6;
+  return { cols, rows, fps };
+}
+
+/** Which frame of a `total`-frame loop is showing at `timeSec` (phase desyncs twins). */
+export function animFrameAt(timeSec: number, fps: number, total: number, phase = 0): number {
+  if (!(total > 1) || !(fps > 0)) return 0;
+  const t = timeSec * fps + phase;
+  return ((Math.floor(t) % total) + total) % total;
+}
+
+/**
+ * UV origin of a frame in a row-major sheet (frame 0 = top-left).
+ * THREE flipY puts v=1 at the image top, so row 0 sits at v = 1 - 1/rows.
+ */
+export function animFrameUV(frame: number, cols: number, rows: number): { u: number; v: number } {
+  const c = Math.max(1, Math.floor(cols));
+  const r = Math.max(1, Math.floor(rows));
+  const f = ((Math.floor(frame) % (c * r)) + c * r) % (c * r);
+  const col = f % c;
+  const row = Math.floor(f / c);
+  return { u: col / c, v: 1 - (row + 1) / r };
+}
+
+/** Stable 0..total-1 phase from a prop id so twin torches flicker out of sync. */
+export function animPhaseFor(propId: string, total: number): number {
+  if (!(total > 1)) return 0;
+  let hash = 0;
+  for (let i = 0; i < propId.length; i += 1) hash = (hash * 31 + propId.charCodeAt(i)) | 0;
+  return Math.abs(hash) % total;
+}
 
 /**
  * T08: Extended PlacedProp with optional authoring fields.
@@ -64,6 +110,7 @@ export interface PlacedProp {
   groupId?: string;
   lit?: boolean;
   visible?: boolean; // T08: visibility toggle (H key)
+  animate?: boolean; // Animated category: frame playback on/off (default true)
   authoringNotes?: string; // T08: optional authoring metadata
   // Allow unknown fields for forward compatibility
   [key: string]: unknown;
@@ -232,6 +279,18 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'barrier_fire_pit', name: 'Fire Pit Trap', category: 'barrier', url: '/art/props/alpha/prop-41-molten-slag-channel.png', defaultWidth: 600, defaultHeight: 400, defaultDepth: 600, isBarrier: true },
   { type: 'barrier_rock_slide', name: 'Rock Slide Zone', category: 'barrier', url: '/art/props/alpha/prop-35-granite-strata-seam-wall.png', defaultWidth: 1200, defaultHeight: 800, defaultDepth: 300, isBarrier: true },
   { type: 'barrier_mine_field', name: 'Mine Field', category: 'barrier', url: '/art/props/alpha/prop-02-ore-cart-spilling.png', defaultWidth: 500, defaultHeight: 300, defaultDepth: 500, isBarrier: true },
+
+  // --- ANIMATED (4-frame 2x2 sheets; built by scripts/process-animated.mjs) ---
+  { type: 'anim_01_torchbearer_flame', name: 'Torchbearer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-01-torchbearer-flame.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_02_firework_sparkler', name: 'Firework Sparkler (Animated)', category: 'animated', url: '/art/animated/alpha/anim-02-firework-sparkler.png', defaultWidth: 1100, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_03_torch_crowd', name: 'Torch Crowd (Animated)', category: 'animated', url: '/art/animated/alpha/anim-03-torch-crowd.png', defaultWidth: 1075, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_04_lantern_warden', name: 'Lantern Warden (Animated)', category: 'animated', url: '/art/animated/alpha/anim-04-lantern-warden.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_05_smelting_crucible', name: 'Smelting Crucible (Animated)', category: 'animated', url: '/art/animated/alpha/anim-05-smelting-crucible.png', defaultWidth: 460, defaultHeight: 500, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_06_molten_cauldron', name: 'Molten Cauldron (Animated)', category: 'animated', url: '/art/animated/alpha/anim-06-molten-cauldron.png', defaultWidth: 480, defaultHeight: 520, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_07_slag_channel', name: 'Slag Channel (Animated)', category: 'animated', url: '/art/animated/alpha/anim-07-slag-channel.png', defaultWidth: 1100, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_08_waterwheel_cascade', name: 'Waterwheel Cascade (Animated)', category: 'animated', url: '/art/animated/alpha/anim-08-waterwheel-cascade.png', defaultWidth: 700, defaultHeight: 1400, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_09_plunge_basin', name: 'Plunge Basin (Animated)', category: 'animated', url: '/art/animated/alpha/anim-09-plunge-basin.png', defaultWidth: 1100, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_10_waterfall_curtain', name: 'Waterfall Curtain (Animated)', category: 'animated', url: '/art/animated/alpha/anim-10-waterfall-curtain.png', defaultWidth: 900, defaultHeight: 1400, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
 ];
 
 export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
@@ -835,6 +894,18 @@ export class TrackBuilder3D {
     this.notify();
   }
 
+  /** Batch the animate flag across the current selection (static props ignore it). */
+  setSelectedPropsAnimate(animate: boolean) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      this.updatePropTransform(prop.id, { animate }, false);
+    }
+    this.saveToStorage();
+    this.notify();
+  }
+
   // --- T08: VISIBILITY TOGGLE (H KEY) ---
   /** T08: Toggle visibility on selected props. Hidden props retain selection identity but are excluded from fresh raycasts. */
   toggleVisibility(): void {
@@ -1417,6 +1488,7 @@ export class TrackBuilder3D {
       flipX: false,
       isDecal: isPhysical3D ? false : isDecal,
       lit: isDecal ? this.snapping.decalLightingDefault : undefined,
+      animate: def.isAnimated ? true : undefined,
     };
 
     this.placedProps.push(prop);
@@ -1469,6 +1541,7 @@ export class TrackBuilder3D {
           this.scene.remove(obj);
           this.propObjects.delete(prop.id);
         }
+        this.disposeAnimTexture(prop.id);
         const box = this.selectionBoxes.get(prop.id);
         if (box) {
           this.scene.remove(box);
@@ -1494,6 +1567,7 @@ export class TrackBuilder3D {
         this.scene.remove(obj);
         this.propObjects.delete(prop.id);
       }
+      this.disposeAnimTexture(prop.id);
       const box = this.selectionBoxes.get(prop.id);
       if (box) {
         this.scene.remove(box);
@@ -2135,6 +2209,77 @@ export class TrackBuilder3D {
     return tex;
   }
 
+  /**
+   * Animated decorations get one cloned texture per placed prop (keyed by
+   * prop id) showing a single sheet quadrant; static props share the cached
+   * texture. Clones are reused across sprite recreations (undo/redo, decal
+   * toggles) and disposed when the prop is deleted.
+   */
+  private readonly animTextureCache = new Map<string, THREE.Texture>();
+
+  private getPropTexture(def: PropDefinition, prop: PlacedProp): THREE.Texture {
+    if (!def.isAnimated) return this.getTexture(def.url);
+    let tex = this.animTextureCache.get(prop.id);
+    if (!tex) {
+      const base = this.getTexture(def.url);
+      tex = base.clone();
+      const { cols, rows } = animGridFor(def);
+      tex.repeat.set(1 / cols, 1 / rows);
+      const uv = animFrameUV(0, cols, rows);
+      tex.offset.set(uv.u, uv.v);
+      tex.needsUpdate = true;
+      this.animTextureCache.set(prop.id, tex);
+    }
+    return tex;
+  }
+
+  private disposeAnimTexture(propId: string) {
+    const tex = this.animTextureCache.get(propId);
+    if (tex) {
+      tex.dispose();
+      this.animTextureCache.delete(propId);
+    }
+  }
+
+  /**
+   * Advance every placed animated decoration to its current sheet frame.
+   * Called once per rendered frame (race loop) and from the editor preview
+   * tick; props with animate === false (or reduced motion) rest on frame 0.
+   * Late texture loads are picked up: a clone made before the base image
+   * arrived adopts it here instead of staying blank.
+   */
+  updateAnimations(timeSec: number, reducedMotion = false) {
+    if (this.animTextureCache.size === 0) return;
+    for (const [propId, tex] of this.animTextureCache) {
+      const obj = this.propObjects.get(propId);
+      const anim = (obj?.userData as { anim?: AnimGrid & { phase: number } } | undefined)?.anim;
+      if (!obj || !anim) continue;
+      const prop = this.placedProps.find((p) => p.id === propId);
+      const def = prop ? PROP_DEFINITIONS.find((d) => d.type === prop.type) : undefined;
+      if (def) {
+        const base = this.getTexture(def.url);
+        if (!tex.image && base.image) {
+          tex.image = base.image;
+          tex.needsUpdate = true;
+        }
+      }
+      const total = anim.cols * anim.rows;
+      const playing = !reducedMotion && prop?.animate !== false;
+      const frame = playing ? animFrameAt(timeSec, anim.fps, total, anim.phase) : 0;
+      const uv = animFrameUV(frame, anim.cols, anim.rows);
+      if (tex.offset.x !== uv.u || tex.offset.y !== uv.v) tex.offset.set(uv.u, uv.v);
+    }
+  }
+
+  /** True when at least one placed animated prop is playing (gates editor preview renders). */
+  hasPlayingAnimations(): boolean {
+    return this.placedProps.some((p) => {
+      if (p.animate === false) return false;
+      const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
+      return def?.isAnimated === true;
+    });
+  }
+
   private createPropSprite(prop: PlacedProp): THREE.Object3D {
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
     if (!def) return new THREE.Object3D();
@@ -2142,6 +2287,8 @@ export class TrackBuilder3D {
     let obj: THREE.Object3D;
     const flip = prop.flipX ? -1 : 1;
     const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def.isDecal ?? false);
+    const animGrid = animGridFor(def);
+    const animState = def.isAnimated ? { ...animGrid, phase: animPhaseFor(prop.id, animGrid.cols * animGrid.rows) } : undefined;
 
     if (def.isRamp) {
       // Create 3D wedge ramp mesh using base dimensions (scale 1.0)
@@ -2172,7 +2319,7 @@ export class TrackBuilder3D {
       obj = model;
     } else if (isDecal) {
       // Flat surface decal (lies flat on track/ground)
-      const tex = this.getTexture(def.url);
+      const tex = this.getPropTexture(def, prop);
       const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
       const isLit = prop.lit !== false;
       const mat = isLit
@@ -2198,12 +2345,12 @@ export class TrackBuilder3D {
           });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;
-      mesh.userData = { propId: prop.id, isDecal: true };
+      mesh.userData = { propId: prop.id, isDecal: true, ...(animState ? { anim: animState } : {}) };
       this.applyDecalTransform(mesh, prop, def);
       obj = mesh;
     } else if (prop.cameraFacing === false) {
       // Fixed 3D World Orientation (Double-sided plane mesh)
-      const tex = this.getTexture(def.url);
+      const tex = this.getPropTexture(def, prop);
       const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
       if (def.alignBottom !== false) {
         geom.translate(0, def.defaultHeight / 2, 0);
@@ -2228,7 +2375,7 @@ export class TrackBuilder3D {
           });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;
-      mesh.userData = { propId: prop.id, isMeshProp: true };
+      mesh.userData = { propId: prop.id, isMeshProp: true, ...(animState ? { anim: animState } : {}) };
       mesh.position.set(prop.x, prop.y, prop.z);
       mesh.rotation.y = prop.rotY;
       mesh.rotation.z = prop.rotZ ?? 0;
@@ -2236,7 +2383,7 @@ export class TrackBuilder3D {
       obj = mesh;
     } else {
       // Camera Facing (Billboard Sprite)
-      const tex = this.getTexture(def.url);
+      const tex = this.getPropTexture(def, prop);
       const mat = new THREE.SpriteMaterial({
         map: tex,
         transparent: true,
@@ -2245,7 +2392,7 @@ export class TrackBuilder3D {
       });
       const sprite = new THREE.Sprite(mat);
       sprite.name = `PlacedProp_${prop.id}`;
-      sprite.userData = { propId: prop.id };
+      sprite.userData = { propId: prop.id, ...(animState ? { anim: animState } : {}) };
       sprite.position.set(prop.x, prop.y, prop.z);
       sprite.center.set(0.5, def.alignBottom !== false ? 0 : 0.5);
       sprite.scale.set(def.defaultWidth * prop.scale * flip, def.defaultHeight * prop.scale, 1);
@@ -2289,6 +2436,12 @@ export class TrackBuilder3D {
     // Remove current objects
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
+    // Prune animated textures for props the restored state no longer holds
+    // (surviving ids keep their cached texture: no re-upload on undo/redo).
+    const live = new Set(props.map((p) => p.id));
+    for (const id of [...this.animTextureCache.keys()]) {
+      if (!live.has(id)) this.disposeAnimTexture(id);
+    }
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
     this.selectionBoxes.clear();
 
@@ -2625,6 +2778,7 @@ export class TrackBuilder3D {
     if (this.rotationHandle) this.scene.remove(this.rotationHandle);
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
+    for (const id of [...this.animTextureCache.keys()]) this.disposeAnimTexture(id);
     this.listeners.length = 0;
     this.backupStatusListeners.length = 0;
   }

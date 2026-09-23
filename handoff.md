@@ -53,6 +53,26 @@ explains which files are verbatim copies of the open T01/T02 PRs and why.
   size is unchanged (1,446.39 kB / 398.95 kB gzip) and the trace is only allocated for callers that ask
   for it, but that is not a measurement.
 
+**Publication state — one thing left, and it is not code**
+
+The sandbox was reset partway through the ticket: the working tree survived, but the local git objects did
+not, while `67e664d` (the sim seam) had already been pushed. The remaining work was therefore re-committed
+on top of the pushed head, so the pre-reset hashes `3f88b1f` / `c955e57` / `92d0fe2` are superseded by
+`63d6b5b` / `8aed260` / `3e6e68e`. Nothing was re-derived by hand; after the reset `npm run check` was
+re-run from a clean `npm ci` and reproduces exactly (113/113, `check:parity-fixture` ok, `npm run build`
+green at the same size, `npm run qualifying -- --repeat` reporting `replay: IDENTICAL` for the 4/20/100
+heats and for boomtown with `--mystery`). PR #50's body carries the criterion-by-criterion evidence and
+the four not-verified items; it is still a **draft**.
+
+The six acceptance boxes on #37 are done and cited, but this session's GitHub token cannot tick them: it
+can push and patch pull requests, yet `gh issue edit` / `gh issue comment` return `403 Resource not
+accessible by integration` (no `issues: write` on the installation). Owner-side, when convenient:
+
+```
+gh issue edit 37 --repo Piskriek/HeavyMetal2   # tick the six boxes
+gh pr ready 50 --repo Piskriek/HeavyMetal2     # or leave draft until #46/#48 merge order is settled
+```
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

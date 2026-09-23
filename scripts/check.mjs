@@ -23,7 +23,8 @@ const commands = [
     'tests/multi-select-grouping.test.ts', 'tests/track-props-backup.test.ts', 'tests/track-space.test.ts',
     'tests/track-builder-validation.test.ts',
     'tests/physics-parity.test.ts', 'tests/qualifying-gate.test.ts', 'tests/qualifying-attempt.test.ts',
-    'tests/qualifying-session.test.ts'],
+    'tests/qualifying-session.test.ts',
+    'tests/release-grid.test.ts', 'tests/release-scheduler.test.ts', 'tests/release-go-clock.test.ts'],
 ];
 
 for (const args of commands) {

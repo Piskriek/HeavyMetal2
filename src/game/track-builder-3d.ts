@@ -6,6 +6,7 @@
    ============================================================================= */
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
+import { classifyPlacedRamp, getTrackSpace } from './track-space';
 
 export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins';
 
@@ -362,6 +363,8 @@ export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
 
 export class TrackBuilder3D {
   private placedProps: PlacedProp[] = [];
+  /** T03: last visible rejection of an unsupported gameplay-prop placement. */
+  private placementErrorState: string | null = null;
   private propObjects = new Map<string, THREE.Object3D>();
   private selectedPropIds: Set<string> = new Set();
   private activePropType: string | null = null;
@@ -556,6 +559,33 @@ export class TrackBuilder3D {
 
   getProps(): readonly PlacedProp[] {
     return this.placedProps;
+  }
+
+  /** T03: surface the last physical-placement rejection to the UI (read by TrackBuilderUI). */
+  getPlacementError(): string | null {
+    return this.placementErrorState;
+  }
+  clearPlacementError(): void {
+    if (this.placementErrorState !== null) {
+      this.placementErrorState = null;
+      this.notify();
+    }
+  }
+  /**
+   * T03 required decision: builder ramps are gameplay props. A ramp only gets
+   * elevation when the shared track-space adapter can compile it into a
+   * physical surface; otherwise the placement/resize/move is rejected here
+   * (visible message) instead of leaving a render-only elevation physics
+   * cannot reproduce.
+   */
+  private validateRampSupport(type: string, vals: { id?: string; x: number; y: number; z: number; scale: number; trackDist?: number }): string | null {
+    const def = PROP_DEFINITIONS.find((d) => d.type === type);
+    if (!def?.isRamp) return null;
+    const verdict = classifyPlacedRamp(getTrackSpace(), {
+      id: vals.id, x: vals.x, y: vals.y, z: vals.z, scale: vals.scale, trackDist: vals.trackDist,
+    });
+    if (verdict.supported) return null;
+    return `Ramp not physical here — ${verdict.detail ?? verdict.reason ?? 'unsupported transform'}`;
   }
 
   getSelectedProp(): PlacedProp | null {
@@ -1174,6 +1204,16 @@ export class TrackBuilder3D {
     const hit = this.raycastSurface(clientX, clientY, canvas);
     if (!hit) return null;
 
+    // T03: gameplay props in unsupported regions must not be placed.
+    const rampRejection = this.validateRampSupport(def.type, {
+      x: hit.point.x, y: hit.point.y, z: hit.point.z, scale: 1, trackDist: hit.sample?.dist,
+    });
+    if (rampRejection) {
+      this.placementErrorState = rampRejection;
+      this.notify();
+      return null;
+    }
+
     this.pushUndo();
 
     let pos = hit.point.clone();
@@ -1343,6 +1383,23 @@ export class TrackBuilder3D {
     if (!prop) return;
 
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
+
+    // T03: keep ramps inside the physically representable region — reject
+    // (and revert) transforms that would orphan their elevation.
+    if (def?.isRamp) {
+      const touchesGeometry = ['x', 'y', 'z', 'scale', 'trackDist'].some((k) => updates[k as keyof PlacedProp] !== undefined);
+      if (touchesGeometry) {
+        const candidate = { ...prop, ...updates };
+        const rampRejection = this.validateRampSupport(prop.type, {
+          id: prop.id, x: candidate.x, y: candidate.y, z: candidate.z, scale: candidate.scale, trackDist: candidate.trackDist,
+        });
+        if (rampRejection) {
+          this.placementErrorState = rampRejection;
+          this.notify();
+          return;
+        }
+      }
+    }
     const isPhysical3D = Boolean(def?.isRamp || def?.isSlingshot || def?.is3DModel);
     const oldCameraFacing = prop.cameraFacing !== false;
     const oldIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));

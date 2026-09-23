@@ -6,13 +6,19 @@
 import * as THREE from 'three';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
-import { RADIUS, TRACK_DISTANCE, LANE_WIDTH, courseY } from './scene';
+import { RADIUS } from './scene';
+import {
+  compileRampSurfaces,
+  engineDistanceFromX,
+  getTrackSpace,
+  placementFromEngine,
+  type PhysicalRampSurface,
+  type TrackSpaceMap,
+} from './track-space';
 
 /* -----------------------------------------------------------------------------
    0. CONFIG & CONSTANTS
    -------------------------------------------------------------------------- */
-const TRACK_HALF_WIDTH = LANE_WIDTH * 2; // 480 → 960 wide
-const SAMPLE_SPACING = 50;
 
 const LAVA_Y = -7200;
 const VALLEY_Y = -3500;
@@ -147,7 +153,11 @@ function buildMaterials(T: Record<TexKey, THREE.Texture>) {
 export type Materials = ReturnType<typeof buildMaterials>;
 
 /* -----------------------------------------------------------------------------
-   2. TRACK CENTERLINE
+   2. TRACK CENTERLINE — OWNED BY src/game/track-space.ts (T03)
+   The immutable centerline data, Catmull-Rom evaluation, frame sampling and
+   half-width profile now live in the headless track-space adapter. This
+   renderer consumes the same compiled map so physics and rendering share one
+   mapping implementation instead of two parallel ones.
    -------------------------------------------------------------------------- */
 type Stage = 'alpine' | 'canyon' | 'zigzag' | 'cavern' | 'mine' | 'breakthrough' | 'stadium';
 
@@ -157,126 +167,7 @@ interface LoopDef {
   right: THREE.Vector3;
   radius: number;
   shift: number;
-  fromIdx: number;
-  toIdx: number;
   stage: Stage;
-}
-
-const waypoints: THREE.Vector3[] = [];
-const waypointStage: Stage[] = [];
-const labelIndex: Record<string, number> = {};
-const loopDefs: LoopDef[] = [];
-
-function wp(x: number, y: number, z: number, stage: Stage, label?: string) {
-  if (label) labelIndex[label] = waypoints.length;
-  waypoints.push(new THREE.Vector3(x, y, z));
-  waypointStage.push(stage);
-}
-
-function loop(stage: Stage, entry: THREE.Vector3, forward: THREE.Vector3, radius: number, shift: number, label: string) {
-  const fwd = forward.clone().normalize();
-  const right = new THREE.Vector3().crossVectors(fwd, WORLD_UP).normalize();
-  const fromIdx = waypoints.length;
-  const SEGMENTS = 12;
-  for (let k = 0; k <= SEGMENTS; k++) {
-    const a = (k / SEGMENTS) * Math.PI * 2;
-    const p = entry.clone()
-      .addScaledVector(fwd, Math.sin(a) * radius)
-      .addScaledVector(WORLD_UP, (1 - Math.cos(a)) * radius)
-      .addScaledVector(right, (k / SEGMENTS) * shift);
-    wp(p.x, p.y, p.z, stage, k === 0 ? label : undefined);
-  }
-  loopDefs.push({ entry: entry.clone(), forward: fwd, right, radius, shift, fromIdx, toIdx: waypoints.length - 1, stage });
-}
-
-function defineCenterline() {
-  if (waypoints.length > 0) return; // already defined
-
-  // 1. ALPINE DOWNHILL
-  wp(0, 18000, -2400, 'alpine', 'start');
-  wp(0, 18000, -1000, 'alpine', 'startRamp');
-  wp(0, 17950, 400, 'alpine', 'launchEdge');
-  wp(500, 17550, 3000, 'alpine');
-  wp(1600, 17000, 5600, 'alpine', 'ramp1');
-  wp(1000, 16450, 8200, 'alpine');
-  wp(-700, 15950, 10800, 'alpine');
-  wp(-1200, 15450, 13200, 'alpine');
-  wp(-1200, 15250, 14200, 'alpine');
-  loop('alpine', new THREE.Vector3(-1200, 15150, 15200), new THREE.Vector3(0, 0, 1), 1400, 1100, 'alpineLoop');
-  wp(-2300, 14950, 16400, 'alpine');
-  wp(-1800, 14650, 18400, 'alpine', 'ramp2');
-  wp(-800, 14250, 20600, 'alpine');
-  wp(-200, 13850, 22800, 'alpine');
-  wp(-300, 13650, 24300, 'alpine', 'alpineEnd');
-
-  // 2. CANYON LIP
-  wp(-700, 13500, 25300, 'canyon', 'canyonStart');
-  wp(-1500, 13350, 26100, 'canyon', 'canyonApex');
-  wp(-2500, 13250, 26500, 'canyon');
-  wp(-3600, 13150, 26600, 'canyon');
-
-  // 3. WATERFALL CLIFF ZIGZAG
-  wp(-6100, 11850, 26650, 'zigzag', 'zigzagStart');
-  wp(-8600, 10550, 26700, 'zigzag');
-  wp(-10000, 10250, 27300, 'zigzag');
-  wp(-10500, 10000, 27900, 'zigzag', 'hairpin1');
-  wp(-10000, 9750, 28500, 'zigzag');
-  wp(-8600, 9450, 29100, 'zigzag', 'bridge1a');
-  wp(-6100, 8150, 29200, 'zigzag', 'bridge1b');
-  wp(-3600, 6850, 29200, 'zigzag');
-  wp(-2200, 6550, 29800, 'zigzag');
-  wp(-1700, 6300, 30400, 'zigzag', 'hairpin2');
-  wp(-2200, 6050, 31000, 'zigzag');
-  wp(-3600, 5750, 31700, 'zigzag');
-  wp(-6100, 4450, 31800, 'zigzag', 'boulders');
-  wp(-8600, 3150, 31800, 'zigzag');
-  wp(-10000, 2850, 32400, 'zigzag');
-  wp(-10500, 2600, 33000, 'zigzag', 'hairpin3');
-  wp(-10000, 2350, 33600, 'zigzag');
-  wp(-8600, 2050, 34300, 'zigzag', 'bridge2a');
-  wp(-6100, 750, 34400, 'zigzag', 'bridge2b');
-  wp(-3600, -550, 34400, 'zigzag');
-  wp(-2200, -850, 35000, 'zigzag');
-  wp(-1700, -1100, 35600, 'zigzag', 'hairpin4');
-  wp(-2200, -1350, 36200, 'zigzag');
-  wp(-3600, -1650, 36900, 'zigzag');
-  wp(-6100, -2200, 37000, 'zigzag');
-
-  // 4. CAVERN ENTRANCE
-  wp(-8500, -2700, 37000, 'cavern', 'cavernStart');
-  wp(-10500, -3000, 37000, 'cavern');
-  wp(-12500, -3300, 37000, 'cavern', 'caveEnter');
-  wp(-14500, -3600, 37050, 'cavern');
-
-  // 5. MINE ROLLER COASTER
-  wp(-17000, -4200, 37300, 'mine', 'mineStart');
-  wp(-19500, -3300, 37800, 'mine');
-  wp(-21500, -4700, 37400, 'mine');
-  wp(-23300, -4400, 36900, 'mine');
-  loop('mine', new THREE.Vector3(-24700, -4500, 36800), new THREE.Vector3(-1, 0, 0), 1600, 1100, 'lavaLoop1');
-  wp(-26500, -4700, 35500, 'mine');
-  wp(-29000, -3700, 35700, 'mine');
-  wp(-31500, -5300, 36200, 'mine');
-  wp(-34000, -4800, 36600, 'mine');
-  wp(-35700, -5000, 36700, 'mine');
-  loop('mine', new THREE.Vector3(-37100, -5100, 36700), new THREE.Vector3(-1, 0, 0), 1500, 1100, 'lavaLoop2');
-  wp(-39000, -5500, 35500, 'mine');
-  wp(-41000, -5900, 35600, 'mine');
-  wp(-43000, -5600, 35400, 'mine');
-
-  // 6. WATERFALL BREAKTHROUGH
-  wp(-44300, -5100, 35200, 'breakthrough', 'breakStart');
-  wp(-45300, -3700, 35100, 'breakthrough');
-  wp(-46200, -2200, 35000, 'breakthrough');
-  wp(-47000, -600, 35000, 'breakthrough');
-  wp(-47500, -150, 35000, 'breakthrough', 'caveExit');
-
-  // 7. STADIUM FINISH
-  wp(-48300, -80, 35000, 'stadium', 'stadiumStart');
-  wp(-49500, 0, 35000, 'stadium');
-  wp(-51500, 0, 35000, 'stadium', 'grandstand');
-  wp(-53200, 0, 35000, 'stadium', 'finish');
-  wp(-54300, 0, 35000, 'stadium', 'end');
 }
 
 /* -----------------------------------------------------------------------------
@@ -296,7 +187,6 @@ export interface TrackSample {
 }
 
 export interface TrackData {
-  curve: THREE.CatmullRomCurve3;
   length: number;
   samples: TrackSample[];
   distOf: (label: string) => number;
@@ -307,81 +197,39 @@ export interface TrackData {
   sampleAt: (dist: number) => TrackSample;
 }
 
-function buildTrack(): TrackData {
-  defineCenterline();
-  const curve = new THREE.CatmullRomCurve3(waypoints, false, 'centripetal');
-  curve.arcLengthDivisions = 6000;
-  const lengths = curve.getLengths(6000);
-  const length = lengths[lengths.length - 1];
-
-  const distAtWaypoint = (i: number) => {
-    const t = i / (waypoints.length - 1);
-    const f = t * 6000;
-    const k = Math.min(5999, Math.floor(f));
-    return lerp(lengths[k], lengths[k + 1], f - k);
+function buildTrack(space: TrackSpaceMap): TrackData {
+  const v3 = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
+  // Identical numbers to the hand-rolled loop this replaces: the adapter is
+  // verified bit-faithful against THREE.CatmullRomCurve3 (tests/track-space).
+  const samples: TrackSample[] = space.samples.map((s) => ({
+    pos: v3(s.pos),
+    tangent: v3(s.tangent),
+    up: v3(s.up),
+    right: v3(s.right),
+    dist: s.dist,
+    stage: s.stage,
+    halfWidth: s.halfWidth,
+    turnRate: s.turnRate,
+    inLoop: s.inLoop,
+    onBridge: s.onBridge,
+  }));
+  const loops = space.loops.map((l) => ({
+    start: l.start,
+    end: l.end,
+    def: { entry: v3(l.entry), forward: v3(l.forward), right: v3(l.right), radius: l.radius, shift: l.shift, stage: l.stage },
+  }));
+  const stageStart = { ...space.stageStart } as Record<Stage, number>;
+  const stageEnd = { ...space.stageEnd } as Record<Stage, number>;
+  const count = space.samples.length - 1;
+  const sampleAt = (dist: number) => samples[clamp(Math.round(dist * space.samplesPerArc), 0, count)];
+  return {
+    length: space.length,
+    samples,
+    distOf: (label: string) => space.distOf(label),
+    stageStart, stageEnd, loops,
+    bridges: space.bridges.map((b) => ({ start: b.start, end: b.end })),
+    sampleAt,
   };
-  const distOf = (label: string) => distAtWaypoint(labelIndex[label]);
-
-  const stageStart = {} as Record<Stage, number>;
-  const stageEnd = {} as Record<Stage, number>;
-  waypointStage.forEach((s, i) => {
-    if (stageStart[s] === undefined) stageStart[s] = distAtWaypoint(i);
-    stageEnd[s] = i + 1 < waypoints.length ? distAtWaypoint(i + 1) : length;
-  });
-
-  const loops = loopDefs.map((def) => ({ start: distAtWaypoint(def.fromIdx), end: distAtWaypoint(def.toIdx), def }));
-  const bridges = [
-    { start: distOf('bridge1a'), end: distOf('bridge1b') },
-    { start: distOf('bridge2a'), end: distOf('bridge2b') },
-  ];
-
-  const halfWidthAt = (d: number) => {
-    let hw = TRACK_HALF_WIDTH;
-    hw = lerp(hw, 400, bump(d, stageStart.canyon, stageEnd.canyon, 700));
-    bridges.forEach((b) => (hw = lerp(hw, 420, bump(d, b.start, b.end, 300))));
-    hw = lerp(hw, 660, smoothstep(stageStart.stadium - 300, stageStart.stadium + 1200, d));
-    return hw;
-  };
-
-  const count = Math.ceil(length / SAMPLE_SPACING);
-  const samples: TrackSample[] = [];
-  const transportUp = new THREE.Vector3(0, 1, 0);
-  const prevTangent = new THREE.Vector3(0, 0, 1);
-  let bank = 0;
-  const BANK_GAIN = 7;
-
-  for (let i = 0; i <= count; i++) {
-    const u = i / count;
-    const dist = u * length;
-    const pos = curve.getPointAt(u);
-    const tangent = curve.getTangentAt(u).normalize();
-
-    transportUp.addScaledVector(tangent, -transportUp.dot(tangent)).normalize();
-    const gravityUp = WORLD_UP.clone().addScaledVector(tangent, -tangent.y);
-    if (gravityUp.lengthSq() > 0.04) {
-      gravityUp.normalize();
-      transportUp.lerp(gravityUp, 0.12 * clamp(transportUp.y, 0, 1)).normalize();
-    }
-    const turn = i === 0 ? 0 : new THREE.Vector3().crossVectors(prevTangent, tangent).dot(transportUp);
-    bank = lerp(bank, clamp(-turn * BANK_GAIN, -0.35, 0.35), 0.15);
-    const up = transportUp.clone().applyAxisAngle(tangent, bank).normalize();
-    const right = new THREE.Vector3().crossVectors(tangent, up).normalize();
-    prevTangent.copy(tangent);
-
-    let stage: Stage = 'stadium';
-    for (const s of Object.keys(stageStart) as Stage[]) if (dist >= stageStart[s] && dist < stageEnd[s]) stage = s;
-
-    samples.push({
-      pos, tangent, up, right, dist, stage,
-      halfWidth: halfWidthAt(dist),
-      turnRate: turn / SAMPLE_SPACING,
-      inLoop: loops.some((l) => dist >= l.start - 60 && dist <= l.end + 60),
-      onBridge: bridges.some((b) => dist >= b.start && dist <= b.end),
-    });
-  }
-
-  const sampleAt = (dist: number) => samples[clamp(Math.round(dist / length * count), 0, count)];
-  return { curve, length, samples, distOf, stageStart, stageEnd, loops, bridges, sampleAt };
 }
 
 function trackYAtX(samples: TrackSample[], x: number, pred: (s: TrackSample) => boolean) {
@@ -1637,6 +1485,8 @@ export class Renderer3D {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
+  /** Headless shared track-space map — the single source of the mapping (T03). */
+  readonly space: TrackSpaceMap;
   private readonly track: TrackData;
   private readonly materials: Materials;
   private readonly sky: THREE.Mesh;
@@ -1646,8 +1496,9 @@ export class Renderer3D {
   private readonly racers3D: Racer3DMesh[];
   private readonly camUp = new THREE.Vector3(0, 1, 0);
   readonly trackBuilder: TrackBuilder3D;
+  private rampCacheKey = '';
+  private rampSurfaces: readonly PhysicalRampSurface[] = [];
   private readonly D_START = 1100;
-  private readonly D_END: number;
   private readonly enterD: number;
   private readonly exitD: number;
   private currentSkyPreset: SkyPreset;
@@ -1692,8 +1543,8 @@ export class Renderer3D {
     const textures = loadTextures(manager);
     this.materials = buildMaterials(textures);
 
-    this.track = buildTrack();
-    this.D_END = this.track.distOf('finish') + 350;
+    this.space = getTrackSpace();
+    this.track = buildTrack(this.space);
     this.enterD = this.track.distOf('caveEnter');
     this.exitD = this.track.distOf('caveExit');
 
@@ -1751,10 +1602,35 @@ export class Renderer3D {
     this.renderer.setSize(width, height, false);
   }
 
-  /** Maps linear race distance (0..TRACK_DISTANCE) to 3D track spline distance */
+  /**
+   * Maps linear race distance (0..TRACK_DISTANCE) to 3D track spline distance.
+   * Delegates to the shared track-space map (legacy constants D_START/D_END).
+   */
   trackDistFromDistance(dist: number) {
-    const p = clamp(dist / TRACK_DISTANCE, 0, 1);
-    return lerp(this.D_START, this.D_END, p);
+    return this.space.trackDistFromEngineDistance(dist);
+  }
+
+  /**
+   * Physical ramp surfaces compiled from the builder's placed ramp props.
+   * Recompiles only when the ramp set changes; unsupported placements are
+   * rejected loudly (once per change) and contribute NO elevation, so the
+   * renderer can never disagree with physics about ramp support (T03).
+   */
+  private activeRampSurfaces(): readonly PhysicalRampSurface[] {
+    const ramps = this.trackBuilder.getPlacedRamps();
+    const key = ramps.map((r) => `${r.id}:${r.x}:${r.y}:${r.z}:${r.scale}:${r.trackDist ?? ''}`).join('|');
+    if (key !== this.rampCacheKey) {
+      this.rampCacheKey = key;
+      const compiled = compileRampSurfaces(
+        this.space,
+        ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: r.scale, trackDist: r.trackDist })),
+      );
+      this.rampSurfaces = compiled.surfaces;
+      for (const rej of compiled.rejected) {
+        console.warn(`[track-space] placed ramp is not physical: ${rej.detail ?? rej.reason}`);
+      }
+    }
+    return this.rampSurfaces;
   }
 
   private placeCamera(d: number, dt: number) {
@@ -1791,32 +1667,23 @@ export class Renderer3D {
     const dt = intervalMs / 1000;
 
     // 1. Update racers along the 3D spline
-    const playerDistance = (frame.ball as any).distance ?? clamp((frame.ball.x - 190) / 2, 0, TRACK_DISTANCE);
+    const playerDistance = (frame.ball as any).distance ?? engineDistanceFromX((frame.ball as any).x ?? 190);
     const playerDist = this.trackDistFromDistance(playerDistance);
 
+    const rampSurfaces = this.activeRampSurfaces();
     for (let i = 0; i < frame.racers.length; i++) {
       const racer = frame.racers[i];
       const mesh = this.racers3D[i];
       if (!mesh) continue;
 
-      const dist = racer.distance ?? clamp((racer.x - 190) / 2, 0, TRACK_DISTANCE);
-      const d = this.trackDistFromDistance(dist);
-      const sample = this.track.sampleAt(d);
-
-      // Lateral offset across the 4 lanes (-480..+480)
-      const lateral = (racer.z / 480) * (sample.halfWidth - RADIUS * 1.2);
-      
-      // Altitude above surface: follows ramp elevation and airborne physics
-      const engineElev = Math.max(0, courseY(racer.x, 'ridge') - racer.y);
-      const airborneElev = racer.grounded ? 0 : Math.max(0, 478 - RADIUS - racer.y);
-      const ramp3DElev = this.get3DRampElevation(d, lateral);
-      const altitude = Math.max(engineElev, airborneElev, ramp3DElev);
-
-      const pos = sample.pos.clone()
-        .addScaledVector(sample.right, lateral)
-        .addScaledVector(sample.up, RADIUS + altitude);
-
-      mesh.group.position.copy(pos);
+      // Shared placement (T03): identical lateral/altitude composition that
+      // headless physics consumes — one implementation, no parallel math.
+      const placement = placementFromEngine(
+        this.space,
+        { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded },
+        rampSurfaces,
+      );
+      mesh.group.position.set(placement.world.x, placement.world.y, placement.world.z);
 
       // Sphere rolling rotation along track tangent
       mesh.sphere.rotation.x += (racer.vx * dt) / RADIUS;
@@ -1846,47 +1713,6 @@ export class Renderer3D {
 
     // 4. Render 3D WebGL scene
     this.renderer.render(this.scene, this.camera);
-  }
-
-  /**
-   * Calculates dynamic 3D ramp elevation and launch trajectory for any placed ramp props.
-   */
-  private get3DRampElevation(d: number, lateral: number): number {
-    const ramps = this.trackBuilder.getPlacedRamps();
-    if (ramps.length === 0) return 0;
-
-    let maxElev = 0;
-    for (const ramp of ramps) {
-      const rampDist = ramp.trackDist ?? this.track.samples.reduce((closest, s) => {
-        const d2 = (s.pos.x - ramp.x) ** 2 + (s.pos.z - ramp.z) ** 2;
-        return d2 < closest.d2 ? { dist: s.dist, d2 } : closest;
-      }, { dist: 0, d2: Infinity }).dist;
-
-      const rampLength = 1100 * ramp.scale;
-      const rampHeight = 260 * ramp.scale;
-      const rampHalfWidth = (960 / 2) * ramp.scale;
-
-      // Check lateral overlap with ramp
-      const sample = this.track.sampleAt(rampDist);
-      const rampLateral = (ramp.x - sample.pos.x) * sample.right.x + (ramp.z - sample.pos.z) * sample.right.z;
-      if (Math.abs(lateral - rampLateral) > rampHalfWidth + RADIUS) continue;
-
-      // Check longitudinal position along the ramp
-      const delta = d - (rampDist - rampLength);
-      if (delta >= 0 && delta <= rampLength) {
-        // Riding UP the ramp incline: smooth curved rise
-        const progress = delta / rampLength;
-        const h = rampHeight * Math.pow(progress, 1.4);
-        if (h > maxElev) maxElev = h;
-      } else if (delta > rampLength && delta < rampLength + 750) {
-        // Airborne jump arc launching off the ramp crest!
-        const launchProgress = (delta - rampLength) / 750;
-        const arc = rampHeight * (1 - launchProgress) + 180 * Math.sin(launchProgress * Math.PI);
-        if (arc > maxElev) maxElev = arc;
-      }
-    }
-
-    return maxElev;
   }
 
   destroy() {

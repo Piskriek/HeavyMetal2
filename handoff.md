@@ -299,3 +299,84 @@ as images (`tests/artifacts/art-1-loadout.png`, `art-4-race.png`). The art-check
 ticket07 suites were also de-flaked while here: the loading cover owns Enter until
 dismissed (there is no auto-dismiss), the race screen has no header nav (workshop and main
 menu live in the gear menu), and launches retry until the status flips.
+
+## T00 Session (arena/01a0c8b7-heavymetal2, draft PR #46)
+
+Ticket [#33](https://github.com/Piskriek/HeavyMetal2/issues/33) — repository baseline and
+protected-data safeguards. Tooling only: no `src/**` or `public/**` byte changed.
+
+Added:
+
+- `scripts/protect-baseline.mjs` — read-only safeguard for the user-authored decoration
+  baseline. `inventory` (status + blocker), `snapshot` (exclusive timestamped snapshot +
+  manifest of the original bytes, read-back comparison, recovery-copy verification) and
+  `verify` (re-hash snapshot, live source and recovery copies). Refuses path escapes,
+  absolute paths, NUL bytes, symlinked components and any write inside `backups/props/**`;
+  never overwrites, never restores automatically; records counts/IDs as `advisory: true`
+  observations. Exit codes: 0 ok, 1 blocked/failed (`E_*` code), 2 usage.
+- `tests/protect-baseline.test.ts` — 20 fixture-only checks (path safety, observations,
+  exclusivity, tamper detection, CLI codes); registered in `scripts/check.mjs`.
+- `package.json` — `inventory:baseline`, `protect:baseline`, `verify:baseline`.
+- `docs/BASELINE_INVENTORY.md` — engine/renderer/builder/script/test/lockfile/storage
+  inventory, the protected-data record and the explicit missing-data blocker.
+- `docs/BASELINE_VERIFICATION.md` — the actual baseline commands, results and exit codes.
+
+Baseline in this sandbox: `npm ci` 0; `npm run check` 0 (tsc clean, 78 tests pass);
+`npm run build` 0 (`dist/index.html` 1,444.64 kB / 397.96 kB gzip); `tests/ui-frame-check.mjs`
+24/24; `tests/ticket05-visual.mjs` 29/29. Existing failures, distinguished from regressions:
+`check:edges` exits 1 with 13 stale-fringe findings on decals, `check:textures` exits 1
+(`public/textures/grass-fringe.png` is 512×256, expected 1024×256), and the four
+race-entering browser suites (`browser-recovery`, `art-check`, `ticket02-visual`,
+`ticket07-visual`) time out because this sandbox's bundled Chromium cannot create a WebGL
+context — probed across nine launch configurations; the race screen needs
+`THREE.WebGLRenderer` (`src/game/renderer-3d.ts:1657`). Re-run those suites where WebGL
+exists.
+
+Blocked, not solved: the authoritative decoration baseline cannot be certified from inside
+this checkout. The live copy is browser `localStorage['hm2-3d-track-props']`; every disk
+copy lives in the same working tree with no signed provenance (`.gitignore:8` references an
+absent `3DTrack/`). The hashes in `docs/BASELINE_INVENTORY.md` are observations of tracked
+mirrors — the primary is `backups/props/track-props-latest.json`, sha256
+`0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5`, 94,867 bytes, 237 props.
+T12's "protected bytes verified against a real baseline" stays blocked until the user
+authorises a source or points `--source`/`--recovery` at the real file.
+
+## T01 Session (arena/01a0c8b7-heavymetal2, draft PR #46)
+
+Ticket [#34](https://github.com/Piskriek/HeavyMetal2/issues/34) — frozen shared contracts and
+integration ownership. New pure module tree `src/game/contracts/` (14 modules + barrel,
+`CONTRACTS_VERSION = 1`), documented in [`docs/CONTRACTS.md`](docs/CONTRACTS.md) with a
+decision table downstream tickets must not re-litigate:
+
+- `identity.ts` stable racer IDs + dense-index lookup (no bit tricks; 100 racers supported),
+  `config.ts` `normalizeRaceConfig` (an old config loads as four racers with qualifying
+  disabled; hostile input is repaired, never padded), `timing.ts` `FIXED_STEP`/`FixedStepClock`,
+  `effects.ts` (`fuel | shield | bounce` only; mystery is a resolver that resolves once and
+  can never be stored as an effect; same-tick claims arbitrated by crossing fraction then
+  racer ID), `events.ts` typed event log, `qualifying.ts` (valid entries always rank before
+  every fallback class; swept gate validation; staging bounded at 2.5 s for 4/20/50/100),
+  `heat.ts` (`staging → qualifying? → release → racing → settling → results → staging`, all
+  other transitions refused with `E_PHASE_TRANSITION`), `props.ts` (immutable registry,
+  unknown fields preserved, scale can never be applied twice), `release.ts` (corridor
+  validation + idempotent reservation ledger), `dents.ts` (3 slots, aggregate cap, exactly-once
+  50% repair), `render.ts` (deep-frozen read-only frames), `commands.ts` (typed commands with a
+  gate; identical repeats collapse), `stepping.ts` (headless `SimulationAdapter`, `runHeadless`,
+  `HeatController`).
+- `tests/contracts.test.ts`: 39 checks covering the ticket's five acceptance criteria.
+- `src/game/engine.ts` has exactly one change: `const STEP = 1 / 120` → `FIXED_STEP` imported
+  from the timing contract. Behaviour identical, value single-sourced, and it is the only
+  non-contract source file this ticket touches (T02 takes the next engine edit).
+
+Verification: `npm run check` green (tsc clean, **117/117 tests**), `npm run build` green
+(`dist/index.html` 1,444.65 kB / 397.97 kB gzip), `tests/ui-frame-check.mjs` 24/24,
+`tests/ticket05-visual.mjs` 29/29. Note: running two Chromium suites in parallel in this
+sandbox can fail with `spawn ETXTBSY`; run them serially.
+
+T00 follow-up in this session: the user authorised the decoration backup ("The decorations
+json file is backed up, use a _tmp version for now if you need"). `npm run protect:baseline`
+now has a certified snapshot at `baseline/snapshots/track-props-latest-2026-09-22T13-38-44-625Z/`
+(read-back verified, 2 recovery copies matched byte-for-byte), `inventory` reports
+`AUTHORISED BASELINE: …` from that manifest instead of assuming, and the new
+`protect-baseline.mjs tmp-copy` command writes a verified disposable copy (`scratch/*.tmp.json`,
+git-ignored) while refusing every destination outside `scratch/` and `tests/artifacts/`.
+Remaining caveat recorded in `docs/BASELINE_INVENTORY.md`: both verified copies share one disk.

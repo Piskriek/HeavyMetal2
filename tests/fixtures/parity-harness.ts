@@ -39,6 +39,7 @@ export interface ParityPair {
 function raceConfig(course: CourseId, loadout: Loadout, difficulty: RaceConfig['difficulty']): RaceConfig {
   return {
     mode: 'quick', course, loadout, difficulty, customPhysics: false,
+    fieldSize: 4, seed: 0x12345678,
     sessionId: 'parity-harness', round: 0, totalRounds: 1,
     roster: [
       loadout,

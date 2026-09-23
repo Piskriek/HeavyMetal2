@@ -5,7 +5,7 @@ import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
 import {
   AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
-  TRACK_DISTANCE, closestLane, courseY, courseSlope, laneZ, launchVelocity, sectorAt,
+  TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
@@ -74,6 +74,16 @@ export class GameEngine {
   private snapshot: GameSnapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
   private lastSnapshot: GameSnapshot | null = null;
   private standingsKey = '';
+
+  // Checkpoint system: freeze at first loop entrance
+  private checkpointTriggered = false;
+  private checkpointX = 17000; // After Granite Tunnel Portal (trackDist ~16999)
+  private frozenVelocities: { vx: number; vy: number; vz: number }[] = [];
+  private countdownTimer = 0;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Solo test mode: only the player marble
+  private soloMode = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -191,7 +201,15 @@ export class GameEngine {
 
   reset = () => {
     this.snapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
+    this.checkpointTriggered = false;
+    this.frozenVelocities = [];
+    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
     this.racers = createRacers(this.config);
+    // Solo mode: keep only the player, remove all AI racers
+    if (this.soloMode) {
+      const player = this.racers.find(r => r.isPlayer) ?? this.racers[0];
+      this.racers = [player];
+    }
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
@@ -209,35 +227,6 @@ export class GameEngine {
     this.makeTrack();
     this.standingsKey = '';
     this.notify(); this.invalidate();
-  };
-
-  teleport = (targetX: number) => {
-    const spacing = 45;
-    for (let i = 0; i < this.racers.length; i++) {
-      const racer = this.racers[i];
-      racer.x = targetX + (i - 1.5) * spacing;
-      racer.targetLane = racer.homeLane ?? (i % 4);
-      racer.lane = racer.targetLane;
-      racer.z = laneZ(racer.lane);
-      racer.vz = 0;
-      racer.y = this.surfaceAt(racer.x, racer.z).y - RADIUS;
-      racer.vx = 480;
-      racer.vy = this.slope(racer.x) * racer.vx;
-      racer.grounded = true;
-      racer.falling = false;
-      racer.finished = false;
-      racer.loopRide = null;
-      racer.distance = clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE);
-      Object.assign(racer.previous, { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation });
-    }
-    this.camera = targetX - 220;
-    this.cameraY = this.y(targetX) - GROUND;
-    this.snapshot.status = 'flying';
-    this.snapshot.sector = sectorAt(targetX, this.options.course);
-    this.renderer.view.configure(this.renderer.view.width, this.camera, this.options.downrange, this.cameraY);
-    this.lastFrame = this.accumulator = 0;
-    this.invalidate();
-    this.notify();
   };
 
   launch = () => {
@@ -262,7 +251,8 @@ export class GameEngine {
   changeLane = (direction: number) => {
     const racer = this.player;
     if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
-    this.setLane(racer, racer.targetLane + Math.sign(direction));
+    // Invert direction: A (left) should decrease lane number, D (right) should increase
+    this.setLane(racer, racer.targetLane - Math.sign(direction));
     this.refreshSnapshot(); this.notify();
   };
 
@@ -298,6 +288,148 @@ export class GameEngine {
     else if (this.status === 'paused') this.snapshot.status = 'flying';
     this.accumulator = this.lastFrame = 0; this.notify();
   };
+
+  setSoloMode(solo: boolean) {
+    this.soloMode = solo;
+  }
+
+  get isSoloMode() { return this.soloMode; }
+
+  /** Trigger checkpoint: freeze all racers and show standings */
+  private triggerCheckpoint() {
+    if (this.checkpointTriggered) return;
+    this.checkpointTriggered = true;
+    this.snapshot.status = 'checkpoint';
+
+    // If in solo mode, restore the full field of racers at the checkpoint
+    if (this.soloMode && this.racers.length === 1) {
+      const player = this.racers[0];
+      const allRacers = createRacers(this.config);
+      
+      // Position AI racers near the checkpoint based on their "simulated" progress
+      // Player is at the checkpoint, AI racers are staggered behind
+      for (let i = 0; i < allRacers.length; i++) {
+        const racer = allRacers[i];
+        if (racer.isPlayer) {
+          // Keep player at current position
+          racer.x = player.x;
+          racer.y = player.y;
+          racer.z = player.z;
+          racer.vx = player.vx;
+          racer.vy = player.vy;
+          racer.vz = player.vz;
+          racer.lane = player.lane;
+          racer.targetLane = player.targetLane;
+          racer.distance = player.distance;
+        } else {
+          // AI racers staggered behind the player
+          const offset = (i + 1) * 50; // 50 units apart
+          racer.x = player.x - offset;
+          racer.y = player.y;
+          racer.z = player.z;
+          racer.vx = player.vx * 0.9; // Slightly slower
+          racer.vy = 0;
+          racer.vz = 0;
+          racer.lane = i % 4; // Distribute across lanes
+          racer.targetLane = racer.lane;
+          racer.distance = racer.x - START_X;
+        }
+      }
+      
+      this.racers = allRacers;
+      this.renderRacers = allRacers.map(r => ({ ...r }));
+      this.renderer.setRacerCount(allRacers.length);
+    }
+
+    // Save all velocities for staggered release
+    this.frozenVelocities = this.racers.map(r => ({
+      vx: r.vx, vy: r.vy, vz: r.vz
+    }));
+
+    // Freeze all racers
+    for (const racer of this.racers) {
+      racer.vx = 0;
+      racer.vy = 0;
+      racer.vz = 0;
+    }
+
+    // Build checkpoint standings (sorted by distance)
+    const standings = [...this.racers]
+      .sort((a, b) => b.x - a.x)
+      .map((racer, index) => ({
+        id: racer.id,
+        name: racer.name,
+        color: racer.color,
+        position: index + 1,
+        distance: Math.round((racer.x - START_X) / 2),
+        raceTime: Math.round(this.runTime * 10) / 10,
+        speed: Math.round(Math.hypot(this.frozenVelocities[racer.id].vx, this.frozenVelocities[racer.id].vy) * 0.16),
+        loadout: { ...racer.loadout },
+        isPlayer: racer.isPlayer,
+      }));
+
+    this.snapshot.checkpointStandings = standings;
+    this.accumulator = 0;
+    this.notify();
+  }
+
+  /** Called by UI when player clicks "Ready Up" */
+  readyUp() {
+    if (this.snapshot.status !== 'checkpoint') return;
+    this.snapshot.status = 'countdown';
+    this.countdownTimer = 3;
+    this.snapshot.countdownNumber = 3;
+    this.notify();
+
+    // Start countdown interval
+    this.countdownInterval = setInterval(() => {
+      this.countdownTimer--;
+      if (this.countdownTimer > 0) {
+        this.snapshot.countdownNumber = this.countdownTimer;
+        this.notify();
+      } else {
+        // Release racers in staggered order
+        if (this.countdownInterval) clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+        this.snapshot.countdownNumber = 0;
+        this.releaseFromCheckpoint();
+      }
+    }, 1000);
+  }
+
+  /** Release all racers from checkpoint with staggered timing and proper spacing */
+  private releaseFromCheckpoint() {
+    // Sort by position (1st place first, then 2nd, etc.)
+    const sorted = [...this.racers].sort((a, b) => b.x - a.x);
+    
+    // Position racers with proper spacing to avoid overlap
+    const spacing = RADIUS * 3; // 3x radius spacing between balls
+    sorted.forEach((racer, index) => {
+      // Stagger X positions so they don't overlap
+      if (index > 0) {
+        racer.x = sorted[0].x - (index * spacing);
+        racer.distance = racer.x - START_X;
+      }
+    });
+    
+    // Restore velocities in order with staggered timing
+    sorted.forEach((racer, index) => {
+      const saved = this.frozenVelocities[racer.id];
+      setTimeout(() => {
+        racer.vx = saved.vx;
+        racer.vy = saved.vy;
+        racer.vz = saved.vz;
+      }, index * 300); // 300ms stagger between each racer
+    });
+
+    this.snapshot.status = 'flying';
+    this.snapshot.checkpointStandings = undefined;
+    this.snapshot.countdownNumber = undefined;
+    this.frozenVelocities = [];
+    this.lastFrame = 0;
+    this.accumulator = 0;
+    this.notify();
+  }
   setVisible(visible: boolean) {
     this.visible = visible;
     if (!visible) {
@@ -432,11 +564,20 @@ export class GameEngine {
     }
     if (now - this.lastNotify > 100) this.notify(false);
     const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
-    if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
+    const checkpointActive = this.status === 'checkpoint' || this.status === 'countdown';
+    if (this.needsRender || checkpointActive || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
   };
 
   private stepRace(dt: number) {
     this.runTime += dt;
+
+    // Checkpoint detection: trigger when PLAYER reaches the checkpoint
+    // Freeze all balls immediately, then show the overlay
+    if (!this.checkpointTriggered && this.player.x >= this.checkpointX) {
+      this.triggerCheckpoint();
+      return;
+    }
+
     for (const racer of this.racers) {
       if (racer.finished) continue;
       // A race lets the CPU see the whole field and rubber-band against the player; an isolated
@@ -489,10 +630,35 @@ export class GameEngine {
       if (!side) side = 1;
       const closing = Math.min(380, Math.abs(a.vx - b.vx) + Math.abs(a.vz - b.vz));
       const kick = 270 + closing * 0.22;
-      if (!shieldA) this.shove(a, -side, kick * Math.min(1.65, b.weight / a.weight));
-      if (!shieldB) this.shove(b, side, kick * Math.min(1.65, a.weight / b.weight));
+      
+      // Heavy impacts cause more dramatic lane changes
+      const isHeavyImpact = closing > 200 || Math.abs(a.vx - b.vx) > 150;
+      const kickMultiplier = isHeavyImpact ? 2.5 : 1;
+      
+      if (!shieldA) this.shove(a, -side, kick * kickMultiplier * Math.min(1.65, b.weight / a.weight));
+      if (!shieldB) this.shove(b, side, kick * kickMultiplier * Math.min(1.65, a.weight / b.weight));
+      
       const x = (a.x + b.x) / 2; const z = (a.z + b.z) / 2;
-      this.emit(x, (a.y + b.y) / 2, z, 10, '#ffe0a0', 140);
+      const y = (a.y + b.y) / 2;
+      
+      // More dramatic particle effects for collisions
+      const particleCount = isHeavyImpact ? 25 : 12;
+      const particleSpeed = isHeavyImpact ? 280 : 140;
+      const particleColor = isHeavyImpact ? '#ffaa00' : '#ffe0a0';
+      
+      this.emit(x, y, z, particleCount, particleColor, particleSpeed);
+      
+      // Add sparks for heavy impacts
+      if (isHeavyImpact) {
+        this.emit(x, y, z, 8, '#ffff00', 350); // Bright yellow sparks
+        this.emit(x, y, z, 5, '#ff6600', 200); // Orange fire
+        
+        // Screen shake and audio for heavy impacts
+        if (!a.id || !b.id) { // Only if player is involved
+          this.shake = Math.min(15, closing * 0.05);
+          this.audio.play('bump');
+        }
+      }
       if (!a.id || !b.id) {
         if ((!a.id && shieldA) || (!b.id && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
         else if ((!a.id && shieldB) || (!b.id && shieldA)) {
@@ -615,6 +781,7 @@ export class GameEngine {
   }
   destroy() {
     this.destroyed = true; cancelAnimationFrame(this.frameId);
+    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
     document.removeEventListener('visibilitychange', this.visibilityChanged);
     this.canvas.removeEventListener('pointerdown', this.pointerDown); this.canvas.removeEventListener('pointermove', this.pointerMove);
     this.canvas.removeEventListener('pointerup', this.pointerUp); this.canvas.removeEventListener('pointercancel', this.pointerCancel); this.canvas.removeEventListener('pointerleave', this.pointerLeave);

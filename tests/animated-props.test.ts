@@ -17,10 +17,19 @@ import * as THREE from 'three';
 import {
   TrackBuilder3D,
   PROP_DEFINITIONS,
+  ANIMATED_SOURCE_ART,
+  ANIM_SPEED_MAX,
+  ANIM_SPEED_MIN,
+  ANIM_SPEED_STEP,
   animGridFor,
   animFrameAt,
   animFrameUV,
   animPhaseFor,
+  animEnabledFrames,
+  animSpeedFor,
+  animatedTwinDef,
+  normalizeAnimFrames,
+  propHasAnimatedOption,
   type PlacedProp,
   type PropDefinition,
 } from '../src/game/track-builder-3d';
@@ -221,6 +230,277 @@ test('Animated: headless builder playback', async (t) => {
     assert.equal(builder.hasPlayingAnimations(), false);
     builder.updateAnimations(99.99);
     assert.equal(builder.hasPlayingAnimations(), false);
+    builder.destroy();
+  });
+});
+
+test('Animated: still <-> animated twins', async (t) => {
+  await t.test('every sheet links back to the still art it was cut from', () => {
+    const byType = new Map(PROP_DEFINITIONS.map((d) => [d.type, d]));
+    let linked = 0;
+    for (const [animType, srcUrl] of Object.entries(ANIMATED_SOURCE_ART)) {
+      const animDef = byType.get(animType);
+      assert.ok(animDef, `animated def exists: ${animType}`);
+      assert.equal(animDef?.isAnimated, true);
+      // the recorded source art is really used by an animated + a still def
+      assert.ok(
+        PROP_DEFINITIONS.some((d) => d.type === animType && d.url.startsWith('/art/animated/alpha/')),
+        `${animType} is a sheet`,
+      );
+      assert.ok(
+        PROP_DEFINITIONS.some((d) => d.url === srcUrl && !d.isAnimated),
+        `a still decoration uses ${srcUrl}`,
+      );
+      const stillDef = PROP_DEFINITIONS.find((d) => d.type === animDef?.stillType);
+      assert.ok(stillDef, `${animType} -> stillType resolves`);
+      assert.equal(stillDef?.url, srcUrl, `${animType} twin shares the source art`);
+      assert.equal(stillDef?.animatedTwin, animType, `${stillDef?.type} -> animatedTwin is reciprocal`);
+      linked += 1;
+    }
+    assert.equal(linked, 19, '19 of the 20 sheets have a still counterpart');
+  });
+
+  await t.test('anim_20 has no still counterpart and stays unlinked', () => {
+    const def = PROP_DEFINITIONS.find((d) => d.type === 'anim_20_waterfall_splash_b');
+    assert.ok(def);
+    assert.equal(def?.stillType, undefined);
+    assert.equal(ANIMATED_SOURCE_ART['anim_20_waterfall_splash_b'], undefined);
+  });
+
+  await t.test('twin pairs share an aspect ratio (swap never distorts)', () => {
+    for (const def of PROP_DEFINITIONS) {
+      const twin = animatedTwinDef(def);
+      if (!twin) continue;
+      const still = pngDims(join(here, '../public', def.url));
+      const sheet = pngDims(join(alphaDir, twin.url.split('/').pop() as string));
+      const stillAr = still.w / still.h;
+      const frameAr = (sheet.w / 2) / (sheet.h / 2);
+      assert.ok(
+        Math.abs(stillAr - frameAr) < 0.02,
+        `${def.type} aspect ${stillAr.toFixed(3)} matches ${twin.type} frame ${frameAr.toFixed(3)}`,
+      );
+    }
+  });
+
+  await t.test('art reuse by powerups/barriers does not hijack the link', () => {
+    for (const def of PROP_DEFINITIONS) {
+      if (!def.isPowerup && !def.isBarrier) continue;
+      assert.equal(
+        def.animatedTwin,
+        undefined,
+        `${def.type} reuses prop art but must not claim an animated twin`,
+      );
+    }
+    assert.notEqual(
+      PROP_DEFINITIONS.find((d) => d.type === 'prop_04_smelting_crucible')?.animatedTwin,
+      undefined,
+      'the canonical still prop keeps the twin',
+    );
+  });
+
+  await t.test('frame skipping and speed are pure functions of the settings', () => {
+    // unchecked frames are skipped, the loop runs over the enabled subset
+    assert.equal(animFrameAt(0, 6, 4, 0, [true, false, true, false]), 0);
+    assert.equal(animFrameAt(1 / 6 + 1e-6, 6, 4, 0, [true, false, true, false]), 2);
+    assert.equal(animFrameAt(2 / 6 + 1e-6, 6, 4, 0, [true, false, true, false]), 0);
+    // frames can be dropped from the middle and the end
+    assert.equal(animFrameAt(1 / 6 + 1e-6, 6, 4, 0, [true, true, false, true]), 1);
+    assert.equal(animFrameAt(2 / 6 + 1e-6, 6, 4, 0, [true, true, false, true]), 3);
+    assert.equal(animFrameAt(3 / 6 + 1e-6, 6, 4, 0, [true, true, false, true]), 0);
+    // nothing enabled falls back to frame 0 rather than disappearing
+    assert.equal(animFrameAt(5, 6, 4, 0, [false, false, false, false]), 0);
+    // missing entries count as enabled
+    assert.equal(animFrameAt(1 / 6 + 1e-6, 6, 4, 0, [true, true]), 1);
+    // speed is applied by the caller as an fps multiplier
+    assert.equal(animFrameAt(0.25, 6 * 2, 4), animFrameAt(0.5, 6, 4));
+    // helpers
+    assert.deepEqual(animEnabledFrames({ animFrames: [true, false, true, false] }, 4), [0, 2]);
+    assert.deepEqual(animEnabledFrames(undefined, 4), [0, 1, 2, 3]);
+    // entries missing from a short array count as enabled
+    assert.deepEqual(animEnabledFrames({ animFrames: [false, false] }, 4), [2, 3]);
+    assert.deepEqual(animEnabledFrames({ animFrames: [false, false, false, false] }, 4), [0]);
+    assert.equal(animSpeedFor(undefined), 1);
+    assert.equal(animSpeedFor({ animSpeed: 99 }), ANIM_SPEED_MAX);
+    assert.equal(animSpeedFor({ animSpeed: -5 }), ANIM_SPEED_MIN);
+    assert.deepEqual(normalizeAnimFrames([true, false], 4), [true, false, true, true]);
+  });
+});
+
+test('Animated: attribute-window controls', async (t) => {
+  const stillType = 'prop_04_smelting_crucible';
+  const stillUrl = '/art/props/alpha/prop-04-smelting-crucible.png';
+  const twinType = 'anim_05_smelting_crucible';
+  const twinUrl = '/art/animated/alpha/anim-05-smelting-crucible.png';
+
+  function placeStill(builder: TrackBuilder3D, id: string): PlacedProp {
+    const prop = makeProp({ id, type: stillType, name: 'Smelting Crucible' });
+    builder.importJson(JSON.stringify([prop]));
+    return prop;
+  }
+
+  await t.test('a still prop renders its own art until Animated is switched on', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = placeStill(builder, 'swap_1');
+    assert.equal(propHasAnimatedOption(prop), true);
+
+    let map = spriteMap(scene, prop.id);
+    assert.equal(map.name, stillUrl);
+    assert.deepEqual([map.repeat.x, map.repeat.y], [1, 1], 'still art uses the whole texture');
+    assert.equal(builder.hasPlayingAnimations(), false);
+
+    builder.setPropAnimation(prop.id, { animated: true });
+    map = spriteMap(scene, prop.id);
+    assert.equal(map.name, twinUrl, 'sprite swapped to the animated sheet');
+    assert.deepEqual([map.repeat.x, map.repeat.y], [0.5, 0.5], 'sheet shows one quadrant');
+    assert.equal(builder.hasPlayingAnimations(), true);
+    assert.equal(builder.getProps().find((p) => p.id === prop.id)?.animated, true);
+
+    builder.setPropAnimation(prop.id, { animated: false });
+    map = spriteMap(scene, prop.id);
+    assert.equal(map.name, stillUrl, 'and back to the still art');
+    assert.deepEqual([map.repeat.x, map.repeat.y], [1, 1]);
+    builder.destroy();
+  });
+
+  await t.test('props without a twin ignore the animated flag', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = makeProp({ id: 'swap_2', type: 'boulder_a', name: 'Boulder' });
+    builder.importJson(JSON.stringify([prop]));
+    assert.equal(propHasAnimatedOption(prop), false);
+    builder.setPropAnimation(prop.id, { animated: true });
+    const map = spriteMap(scene, prop.id);
+    assert.equal(map.name, '/art/track-parts/rock-boulder-a.png');
+    assert.deepEqual([map.repeat.x, map.repeat.y], [1, 1]);
+    assert.equal(builder.getProps().find((p) => p.id === prop.id)?.animated, undefined);
+    builder.destroy();
+  });
+
+  await t.test('the +/- speed control scales playback', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = placeStill(builder, 'speed_1');
+    builder.setPropAnimation(prop.id, { animated: true });
+    const map = spriteMap(scene, prop.id);
+
+    builder.setPropAnimation(prop.id, { animSpeed: 1 });
+    builder.updateAnimations(0.5);
+    const atHalfSecond = [map.offset.x, map.offset.y];
+
+    builder.setPropAnimation(prop.id, { animSpeed: 2 });
+    builder.updateAnimations(0.25);
+    assert.deepEqual([map.offset.x, map.offset.y], atHalfSecond, '2x reaches the same frame in half the time');
+
+    assert.equal(builder.getProps().find((p) => p.id === prop.id)?.animSpeed, 2);
+    builder.setPropAnimation(prop.id, { animSpeed: 100 });
+    assert.equal(animSpeedFor(builder.getProps().find((p) => p.id === prop.id)), ANIM_SPEED_MAX, 'clamped to the slider range');
+    builder.destroy();
+  });
+
+  await t.test('unchecked frames are skipped by the loop', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = placeStill(builder, 'frames_1');
+    builder.setPropAnimation(prop.id, { animated: true, animFrames: [true, false, true, false] });
+    const map = spriteMap(scene, prop.id);
+
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i += 1) {
+      builder.updateAnimations(i * 0.05);
+      seen.add(`${map.offset.x},${map.offset.y}`);
+    }
+    const allowed = [0, 2]
+      .map((f) => animFrameUV(f, 2, 2))
+      .map((uv) => `${uv.u},${uv.v}`)
+      .sort();
+    assert.deepEqual([...seen].sort(), allowed, 'only the checked frames are ever shown');
+
+    // a single enabled frame holds still instead of cycling
+    builder.setPropAnimation(prop.id, { animFrames: [false, true, false, false] });
+    builder.updateAnimations(3.7);
+    const held = animFrameUV(1, 2, 2);
+    assert.deepEqual([map.offset.x, map.offset.y], [held.u, held.v]);
+    assert.equal(builder.hasPlayingAnimations(), false, 'one frame left = nothing to play');
+
+    builder.destroy();
+  });
+
+  await t.test('settings survive a save/load round trip', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = placeStill(builder, 'persist_1');
+    builder.setPropAnimation(prop.id, { animated: true, animSpeed: 1.5, animFrames: [true, true, false, true] });
+    const saved = JSON.parse(JSON.stringify(builder.getProps()));
+    builder.destroy();
+
+    const { scene: scene2, builder: builder2 } = makeBuilder();
+    builder2.importJson(JSON.stringify(saved));
+    const restored = builder2.getProps().find((p) => p.id === 'persist_1') as PlacedProp;
+    assert.equal(restored.animated, true);
+    assert.equal(restored.animSpeed, 1.5);
+    assert.deepEqual(restored.animFrames, [true, true, false, true]);
+    const map = spriteMap(scene2, 'persist_1');
+    assert.equal(map.name, twinUrl, 'restored prop keeps the animated sheet');
+    builder2.updateAnimations(0);
+    assert.deepEqual([map.repeat.x, map.repeat.y], [0.5, 0.5]);
+    builder2.destroy();
+  });
+
+  await t.test('batch controls apply across the selection', () => {
+    const { scene, builder } = makeBuilder();
+    builder.importJson(JSON.stringify([
+      makeProp({ id: 'batch_1', type: stillType, name: 'A' }),
+      makeProp({ id: 'batch_2', type: stillType, name: 'B' }),
+      makeProp({ id: 'batch_3', type: 'boulder_a', name: 'C' }),
+    ]));
+    builder.selectMultipleProps(['batch_1', 'batch_2', 'batch_3']);
+
+    builder.setSelectedPropsAnimated(true);
+    assert.equal(spriteMap(scene, 'batch_1').name, twinUrl);
+    assert.equal(spriteMap(scene, 'batch_2').name, twinUrl);
+    assert.equal(spriteMap(scene, 'batch_3').name, '/art/track-parts/rock-boulder-a.png', 'twinless prop untouched');
+
+    builder.nudgeSelectedAnimSpeed(ANIM_SPEED_STEP);
+    for (const id of ['batch_1', 'batch_2']) {
+      assert.equal(animSpeedFor(builder.getProps().find((p) => p.id === id)), 1 + ANIM_SPEED_STEP);
+    }
+
+    builder.setSelectedPropsAnimation({ animFrames: [true, true, true, false] });
+    for (const id of ['batch_1', 'batch_2']) {
+      assert.deepEqual(builder.getProps().find((p) => p.id === id)?.animFrames, [true, true, true, false]);
+    }
+
+    builder.setSelectedPropsAnimated(false);
+    assert.equal(spriteMap(scene, 'batch_1').name, stillUrl);
+    assert.equal(spriteMap(scene, 'batch_2').name, stillUrl);
+    builder.destroy();
+  });
+
+  await t.test('an animated-category prop exposes the same speed/frame controls', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = makeProp({ id: 'anim_ctrl_1', type: twinType, name: 'Smelting Crucible (Animated)' });
+    builder.importJson(JSON.stringify([prop]));
+    assert.equal(spriteMap(scene, prop.id).name, twinUrl);
+
+    builder.setPropAnimation(prop.id, { animSpeed: 0.5, animFrames: [true, false, false, true] });
+    const stored = builder.getProps().find((p) => p.id === prop.id) as PlacedProp;
+    assert.equal(stored.animSpeed, 0.5);
+    assert.deepEqual(stored.animFrames, [true, false, false, true]);
+    // the swap flag is meaningless for a sheet-only prop and is left alone
+    assert.equal(stored.animated, undefined);
+
+    // speed + frame mask feed the same loop (frame 1 and 2 stay skipped)
+    const map = spriteMap(scene, prop.id);
+    const grid = animGridFor(PROP_DEFINITIONS.find((d) => d.type === twinType) as PropDefinition);
+    const phase = animPhaseFor(prop.id, grid.cols * grid.rows);
+    const allowed = [0, 3].map((f) => animFrameUV(f, grid.cols, grid.rows)).map((uv) => `${uv.u},${uv.v}`);
+    for (const t of [0, 0.4, 1.7, 9.25]) {
+      builder.updateAnimations(t);
+      const shown = `${map.offset.x},${map.offset.y}`;
+      assert.ok(allowed.includes(shown), `frame at t=${t} is one of the checked frames (${shown})`);
+      const expected = animFrameUV(
+        animFrameAt(t, grid.fps * 0.5, grid.cols * grid.rows, phase, [true, false, false, true]),
+        grid.cols,
+        grid.rows,
+      );
+      assert.deepEqual([map.offset.x, map.offset.y], [expected.u, expected.v], `t=${t} honours speed 0.5`);
+    }
     builder.destroy();
   });
 });

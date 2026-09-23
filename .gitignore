@@ -10,3 +10,9 @@ scratch/
 # the copied decoration payload next to it is protected data and stays out of Git.
 baseline/snapshots/*/*
 !baseline/snapshots/*/manifest.json
+
+# Animated spritesheet generator inputs: the raw 1024x1024 sheets the image model
+# returned are the irreproducible inputs to the keying pipeline and are committed.
+# The *-reference.png 2x2 layout templates next to them are regenerated in seconds
+# by scripts/build-anim-reference.mjs and stay out of Git.
+art-src/animated/*-reference.png

@@ -37,6 +37,8 @@ export interface PropDefinition {
   animCols?: number; // sheet columns (default 2)
   animRows?: number; // sheet rows (default 2)
   animFps?: number; // playback speed (default 6)
+  stillType?: string; // animated defs: type of the still decoration this sheet was cut from
+  animatedTwin?: string; // still defs: type of the animated sheet cut from this decoration
 }
 
 export type DecalSide = 'front' | 'back' | 'left' | 'right';
@@ -55,11 +57,108 @@ export function animGridFor(def: PropDefinition): AnimGrid {
   return { cols, rows, fps };
 }
 
-/** Which frame of a `total`-frame loop is showing at `timeSec` (phase desyncs twins). */
-export function animFrameAt(timeSec: number, fps: number, total: number, phase = 0): number {
+/** Speed slider bounds for the attribute window's +/- control. */
+export const ANIM_SPEED_MIN = 0.25;
+export const ANIM_SPEED_MAX = 4;
+export const ANIM_SPEED_STEP = 0.25;
+
+/** Clamp a stored speed multiplier into the supported range (default 1). */
+export function animSpeedFor(prop: Pick<PlacedProp, 'animSpeed'> | undefined): number {
+  const raw = prop?.animSpeed;
+  if (raw === undefined || !Number.isFinite(raw)) return 1;
+  return Math.min(ANIM_SPEED_MAX, Math.max(ANIM_SPEED_MIN, raw));
+}
+
+/**
+ * Frame indices a prop is allowed to show. `animFrames` shorter than the sheet
+ * (or missing) counts as "all frames on"; an empty selection falls back to
+ * frame 0 so a prop can never vanish.
+ */
+export function animEnabledFrames(
+  prop: Pick<PlacedProp, 'animFrames'> | undefined,
+  total: number,
+): number[] {
+  const safeTotal = Math.max(1, Math.floor(total));
+  const flags = prop?.animFrames;
+  if (!Array.isArray(flags)) return Array.from({ length: safeTotal }, (_, i) => i);
+  const list: number[] = [];
+  for (let i = 0; i < safeTotal; i += 1) {
+    if (flags[i] !== false) list.push(i);
+  }
+  return list.length > 0 ? list : [0];
+}
+
+/**
+ * Which frame of a `total`-frame loop is showing at `timeSec` (phase desyncs
+ * twins). When `enabled` is supplied the loop runs over that subset only, so
+ * unchecked frames are skipped instead of showing as blank holds.
+ */
+export function animFrameAt(
+  timeSec: number,
+  fps: number,
+  total: number,
+  phase = 0,
+  enabled?: readonly boolean[],
+): number {
   if (!(total > 1) || !(fps > 0)) return 0;
   const t = timeSec * fps + phase;
-  return ((Math.floor(t) % total) + total) % total;
+  const list = enabled ? animEnabledFrames({ animFrames: [...enabled] }, total) : null;
+  if (!list) return ((Math.floor(t) % total) + total) % total;
+  const i = ((Math.floor(t) % list.length) + list.length) % list.length;
+  return list[i];
+}
+
+/** Animated sheet a prop currently renders, or null when it renders its still art. */
+export function animSheetFor(prop: PlacedProp | undefined): {
+  url: string;
+  cols: number;
+  rows: number;
+  fps: number;
+} | null {
+  if (!prop) return null;
+  const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+  if (!def) return null;
+  if (def.isAnimated) return { url: def.url, ...animGridFor(def) };
+  if (prop.animated === true && def.animatedTwin) {
+    const twin = PROP_DEFINITIONS.find((d) => d.type === def.animatedTwin);
+    if (twin?.isAnimated) return { url: twin.url, ...animGridFor(twin) };
+  }
+  return null;
+}
+
+/** The animated twin of a still definition (undefined when it has none). */
+export function animatedTwinDef(def: PropDefinition | undefined): PropDefinition | undefined {
+  if (!def || def.isAnimated || !def.animatedTwin) return undefined;
+  return PROP_DEFINITIONS.find((d) => d.type === def.animatedTwin);
+}
+
+/** True when the prop has an animated sheet it can be swapped to (still twin or animated def). */
+export function propHasAnimatedOption(prop: PlacedProp | undefined): boolean {
+  if (!prop) return false;
+  const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+  if (!def) return false;
+  return def.isAnimated === true || animatedTwinDef(def) !== undefined;
+}
+
+/** Editable animation settings for one placed prop (see `setPropAnimation`). */
+export interface AnimationSettings {
+  animated?: boolean; // still props: use the animated twin sheet instead of the still art
+  animate?: boolean; // play/pause frame cycling
+  animSpeed?: number; // fps multiplier
+  animFrames?: boolean[]; // per-frame enable flags
+}
+
+/** Coerce a checkbox array to exactly `total` booleans (missing entries count as on). */
+export function normalizeAnimFrames(frames: readonly boolean[] | undefined, total: number): boolean[] {
+  const safeTotal = Math.max(1, Math.floor(total));
+  const out: boolean[] = [];
+  for (let i = 0; i < safeTotal; i += 1) out.push(frames ? frames[i] !== false : true);
+  return out;
+}
+
+/** Wall-clock seconds for animation timing (works in browser and headless tests). */
+function nowSeconds(): number {
+  return (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
 }
 
 /**
@@ -111,6 +210,9 @@ export interface PlacedProp {
   lit?: boolean;
   visible?: boolean; // T08: visibility toggle (H key)
   animate?: boolean; // Animated category: frame playback on/off (default true)
+  animated?: boolean; // Still props with a twin: swap in the animated sheet (default false)
+  animSpeed?: number; // Playback speed multiplier (default 1, clamped 0.1..4)
+  animFrames?: boolean[]; // Per-frame enable flags; unchecked frames are skipped (default all on)
   authoringNotes?: string; // T08: optional authoring metadata
   // Allow unknown fields for forward compatibility
   [key: string]: unknown;
@@ -302,6 +404,63 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_19_waterfall_splash', name: 'Waterfall Splash (Animated)', category: 'animated', url: '/art/animated/alpha/anim-19-waterfall-splash.png', defaultWidth: 650, defaultHeight: 450, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
   { type: 'anim_20_waterfall_splash_b', name: 'Waterfall Splash B (Animated)', category: 'animated', url: '/art/animated/alpha/anim-20-waterfall-splash-b.png', defaultWidth: 650, defaultHeight: 450, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
 ];
+
+/**
+ * Source art every animated sheet was cut from. Mirrors the `src` field of
+ * `ANIMATED_VARIATIONS` in `scripts/process-animated.mjs` — keep the two in
+ * sync so still <-> animated twins stay wired to the art they share.
+ *
+ * `anim_20_waterfall_splash_b` is deliberately absent: its source
+ * (`track-parts/waterfall-splash-b.png`) has no still decoration of its own,
+ * so it stays an animated-only entry.
+ */
+export const ANIMATED_SOURCE_ART: Record<string, string> = {
+  anim_01_torchbearer_flame: '/art/goblins/alpha/goblin-04-torchbearer.png',
+  anim_02_firework_sparkler: '/art/goblins/alpha/goblin-18-firework-crew.png',
+  anim_03_torch_crowd: '/art/goblins/alpha/goblin-24-torch-crowd.png',
+  anim_04_lantern_warden: '/art/goblins/alpha/goblin-11-lantern-warden.png',
+  anim_05_smelting_crucible: '/art/props/alpha/prop-04-smelting-crucible.png',
+  anim_06_molten_cauldron: '/art/props/alpha/prop-07-tripod-cauldron-molten.png',
+  anim_07_slag_channel: '/art/props/alpha/prop-41-molten-slag-channel.png',
+  anim_08_waterwheel_cascade: '/art/props/alpha/prop-28-cavern-waterwheel-cascade.png',
+  anim_09_plunge_basin: '/art/props/alpha/prop-42-waterfall-plunge-basin.png',
+  anim_10_waterfall_curtain: '/art/track-parts/waterfall-curtain.png',
+  anim_11_tnt_fuse_spark: '/art/goblins/alpha/goblin-07-tnt-handler.png',
+  anim_12_drum_podium_braziers: '/art/goblins/alpha/goblin-22-drum-podium-mob.png',
+  anim_13_horn_riser_lantern: '/art/goblins/alpha/goblin-25-horn-riser.png',
+  anim_14_fan_aisle_torches: '/art/goblins/alpha/goblin-30-fan-aisle.png',
+  anim_15_triple_lantern_post: '/art/props/alpha/prop-01-lantern-post-triple.png',
+  anim_16_molten_rock_arch: '/art/props/alpha/prop-16-molten-rock-natural-arch.png',
+  anim_17_arch_gate_lanterns: '/art/props/alpha/prop-40-timber-arch-gate-lanterns.png',
+  anim_18_torch_sconce: '/art/props/alpha/prop-56-arch-torch-sconce.png',
+  anim_19_waterfall_splash: '/art/track-parts/waterfall-splash.png',
+};
+
+/**
+ * Wire every animated sheet to the still decoration it was cut from (and back).
+ * Links are derived from shared art, so a still prop gains an "Animated"
+ * toggle in the attribute window that swaps its sprite for the sheet.
+ * Decorative definitions win over powerups/barriers that merely reuse the art.
+ */
+function linkAnimatedTwins(): void {
+  for (const [animType, srcUrl] of Object.entries(ANIMATED_SOURCE_ART)) {
+    const animDef = PROP_DEFINITIONS.find((d) => d.type === animType);
+    if (!animDef) continue;
+    const stillDef = PROP_DEFINITIONS.find(
+      (d) =>
+        d.type !== animType &&
+        !d.isAnimated &&
+        !d.isPowerup &&
+        !d.isBarrier &&
+        d.url === srcUrl,
+    );
+    if (!stillDef) continue;
+    animDef.stillType = stillDef.type;
+    stillDef.animatedTwin = animType;
+  }
+}
+
+linkAnimatedTwins();
 
 export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
   {
@@ -900,6 +1059,86 @@ export class TrackBuilder3D {
     for (const prop of selected) {
       this.updatePropTransform(prop.id, { lit }, false);
     }
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /**
+   * Per-prop animation settings.
+   *
+   * - `animated` swaps a still decoration for the animated sheet cut from the
+   *   same art (rebuilds the sprite; ignored by props without a twin).
+   * - `animate` is the existing play/pause flag (paused props hold one frame).
+   * - `animSpeed` is a multiplier on the sheet's fps.
+   * - `animFrames` are per-frame checkboxes: unchecked frames are skipped.
+   */
+  setPropAnimation(id: string, updates: AnimationSettings, pushUndo = true): void {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop) return;
+    const patch: Partial<PlacedProp> = {};
+    if (updates.animated !== undefined) {
+      const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+      if (def && animatedTwinDef(def)) patch.animated = updates.animated === true;
+    }
+    if (updates.animate !== undefined) patch.animate = updates.animate === true;
+    if (updates.animSpeed !== undefined && Number.isFinite(updates.animSpeed)) {
+      patch.animSpeed = Math.min(ANIM_SPEED_MAX, Math.max(ANIM_SPEED_MIN, updates.animSpeed));
+    }
+    if (updates.animFrames !== undefined) {
+      const total = animGridFor(
+        PROP_DEFINITIONS.find((d) => d.type === prop.type) ?? ({} as PropDefinition),
+      );
+      patch.animFrames = normalizeAnimFrames(updates.animFrames, total.cols * total.rows);
+    }
+    if (Object.keys(patch).length === 0) return;
+    if (pushUndo) this.pushUndo();
+
+    const before = animSheetFor(prop)?.url;
+    Object.assign(prop, patch);
+    const after = animSheetFor(prop)?.url;
+
+    if (before !== after) {
+      const oldObj = this.propObjects.get(id);
+      if (oldObj) {
+        this.scene.remove(oldObj);
+        this.propObjects.delete(id);
+      }
+      this.createPropSprite(prop);
+    }
+    // Repaint the current frame straight away so speed/skip edits are visible
+    // even while the prop is paused.
+    this.updateAnimations(nowSeconds());
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Apply the same animation settings to every animated-capable prop selected. */
+  setSelectedPropsAnimation(updates: AnimationSettings): void {
+    const selected = this.getSelectedProps().filter((p) => propHasAnimatedOption(p));
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) this.setPropAnimation(prop.id, updates, false);
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Batch the animated-sheet swap across the current selection. */
+  setSelectedPropsAnimated(animated: boolean): void {
+    this.setSelectedPropsAnimation({ animated });
+  }
+
+  /** Nudge every animated-capable selected prop's speed by `delta` (clamped). */
+  nudgeSelectedAnimSpeed(delta: number): void {
+    const selected = this.getSelectedProps().filter((p) => propHasAnimatedOption(p));
+    if (selected.length === 0 || !Number.isFinite(delta) || delta === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      const next = Math.round((animSpeedFor(prop) + delta) * 100) / 100;
+      this.setPropAnimation(prop.id, { animSpeed: next }, false);
+    }
+    this.updateSelectionBox();
     this.saveToStorage();
     this.notify();
   }
@@ -1639,6 +1878,9 @@ export class TrackBuilder3D {
     const oldCameraFacing = prop.cameraFacing !== false;
     const oldIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));
     const oldLit = prop.lit !== false;
+    // Swapping a still prop to its animated twin (or back) changes the texture,
+    // so the sprite has to be rebuilt with the new sheet's UV window.
+    const oldSheetUrl = animSheetFor(prop)?.url;
 
     const willBeDecal = isPhysical3D ? false : (updates.isDecal !== undefined ? updates.isDecal : oldIsDecal);
 
@@ -1710,9 +1952,10 @@ export class TrackBuilder3D {
     const newCameraFacing = prop.cameraFacing !== false;
     const newIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));
     const newLit = prop.lit !== false;
+    const newSheetUrl = animSheetFor(prop)?.url;
 
-    // If cameraFacing, isDecal, or lit changed, recreate the 3D object
-    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal || (updates.lit !== undefined && oldLit !== newLit)) {
+    // If cameraFacing, isDecal, lit or the animated sheet changed, recreate the 3D object
+    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal || oldSheetUrl !== newSheetUrl || (updates.lit !== undefined && oldLit !== newLit)) {
       const oldObj = this.propObjects.get(id);
       if (oldObj) {
         this.scene.remove(oldObj);
@@ -2214,6 +2457,7 @@ export class TrackBuilder3D {
         tex = this.textureLoader.load(url);
         tex.colorSpace = THREE.SRGBColorSpace;
       }
+      tex.name = url; // cloned sheets inherit the name — handy for debugging/tests
       this.textureCache.set(url, tex);
     }
     return tex;
@@ -2228,12 +2472,13 @@ export class TrackBuilder3D {
   private readonly animTextureCache = new Map<string, THREE.Texture>();
 
   private getPropTexture(def: PropDefinition, prop: PlacedProp): THREE.Texture {
-    if (!def.isAnimated) return this.getTexture(def.url);
+    const sheet = animSheetFor(prop);
+    if (!sheet) return this.getTexture(def.url);
     let tex = this.animTextureCache.get(prop.id);
     if (!tex) {
-      const base = this.getTexture(def.url);
+      const base = this.getTexture(sheet.url);
       tex = base.clone();
-      const { cols, rows } = animGridFor(def);
+      const { cols, rows } = sheet;
       tex.repeat.set(1 / cols, 1 / rows);
       const uv = animFrameUV(0, cols, rows);
       tex.offset.set(uv.u, uv.v);
@@ -2265,28 +2510,32 @@ export class TrackBuilder3D {
       const anim = (obj?.userData as { anim?: AnimGrid & { phase: number } } | undefined)?.anim;
       if (!obj || !anim) continue;
       const prop = this.placedProps.find((p) => p.id === propId);
-      const def = prop ? PROP_DEFINITIONS.find((d) => d.type === prop.type) : undefined;
-      if (def) {
-        const base = this.getTexture(def.url);
+      const sheet = animSheetFor(prop);
+      if (sheet) {
+        const base = this.getTexture(sheet.url);
         if (!tex.image && base.image) {
           tex.image = base.image;
           tex.needsUpdate = true;
         }
       }
       const total = anim.cols * anim.rows;
-      const playing = !reducedMotion && prop?.animate !== false;
-      const frame = playing ? animFrameAt(timeSec, anim.fps, total, anim.phase) : 0;
+      const enabled = animEnabledFrames(prop, total);
+      const playing = !reducedMotion && prop?.animate !== false && enabled.length > 1;
+      const frame = playing
+        ? animFrameAt(timeSec, anim.fps * animSpeedFor(prop), total, anim.phase, prop?.animFrames)
+        : enabled[0];
       const uv = animFrameUV(frame, anim.cols, anim.rows);
       if (tex.offset.x !== uv.u || tex.offset.y !== uv.v) tex.offset.set(uv.u, uv.v);
     }
   }
 
-  /** True when at least one placed animated prop is playing (gates editor preview renders). */
+  /** True when at least one placed prop is cycling frames (gates editor preview renders). */
   hasPlayingAnimations(): boolean {
     return this.placedProps.some((p) => {
       if (p.animate === false) return false;
-      const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
-      return def?.isAnimated === true;
+      const sheet = animSheetFor(p);
+      if (!sheet) return false;
+      return animEnabledFrames(p, sheet.cols * sheet.rows).length > 1;
     });
   }
 
@@ -2297,8 +2546,13 @@ export class TrackBuilder3D {
     let obj: THREE.Object3D;
     const flip = prop.flipX ? -1 : 1;
     const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def.isDecal ?? false);
-    const animGrid = animGridFor(def);
-    const animState = def.isAnimated ? { ...animGrid, phase: animPhaseFor(prop.id, animGrid.cols * animGrid.rows) } : undefined;
+    // A still prop toggled to "Animated" borrows its twin's sheet (same art,
+    // same aspect) — it keeps its own defaultWidth/Height so nothing resizes.
+    const sheet = animSheetFor(prop);
+    const animGrid = sheet ?? animGridFor(def);
+    const animState = sheet
+      ? { cols: animGrid.cols, rows: animGrid.rows, fps: animGrid.fps, phase: animPhaseFor(prop.id, animGrid.cols * animGrid.rows) }
+      : undefined;
 
     if (def.isRamp) {
       // Create 3D wedge ramp mesh using base dimensions (scale 1.0)

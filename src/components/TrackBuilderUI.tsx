@@ -4,12 +4,21 @@ import {
   Trash2, Copy, Download, Upload, Compass, Play, X,
   Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
   Move, Database, History, Save, RefreshCw, CheckCircle2,
-  HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause
+  HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
+  Minus, Plus, Film
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
   TrackBuilder3D,
   PROP_DEFINITIONS,
+  animGridFor,
+  animSpeedFor,
+  animatedTwinDef,
+  normalizeAnimFrames,
+  propHasAnimatedOption,
+  ANIM_SPEED_MAX,
+  ANIM_SPEED_MIN,
+  ANIM_SPEED_STEP,
   type PropCategory,
   type PlacedProp,
   type DecalSide
@@ -1293,13 +1302,21 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
           </div>
 
-          {/* Group Animate Toggle (only when animated decorations are selected) */}
+          {/* Group Animation controls (animated sheets + stills that have one) */}
           {(() => {
-            const animatedSelected = selectedProps.filter((p) =>
-              PROP_DEFINITIONS.find((d) => d.type === p.type)?.isAnimated,
-            );
+            const animatedSelected = selectedProps.filter((p) => propHasAnimatedOption(p));
             if (animatedSelected.length === 0) return null;
             const playingCount = animatedSelected.filter((p) => p.animate !== false).length;
+            const swapCount = animatedSelected.filter((p) => {
+              const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
+              return def?.isAnimated === true || p.animated === true;
+            }).length;
+            const speeds = animatedSelected.map((p) => animSpeedFor(p));
+            const uniformSpeed = speeds.every((s) => s === speeds[0]);
+            const nudgeAllSpeeds = (delta: number) => {
+              builder.nudgeSelectedAnimSpeed(delta);
+              onRequestRender?.();
+            };
             return (
               <div className="bg-zinc-900/80 rounded-md p-2 border border-zinc-800 flex flex-col gap-1.5 text-xs">
                 <div className="flex items-center justify-between">
@@ -1308,7 +1325,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     <span>Animation:</span>
                   </span>
                   <span className="text-[10px] text-zinc-400">
-                    {playingCount}/{animatedSelected.length} Playing
+                    {playingCount}/{animatedSelected.length} Playing · {swapCount} Animated
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -1319,21 +1336,67 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       onRequestRender?.();
                     }}
                     className="flex-1 py-1 px-2 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 text-[11px] font-bold rounded border border-fuchsia-500/40 cursor-pointer flex items-center justify-center gap-1"
-                    title="Play animation on all selected animated decorations"
+                    title="Play animation on all selected decorations that have an animated sheet"
                   >
                     <Clapperboard size={11} /> All PLAY
                   </button>
                   <button
                     onClick={() => {
                       builder.setSelectedPropsAnimate(false);
-                      showToast(`Animation paused for ${animatedSelected.length} items (frame 1)`);
+                      showToast(`Animation paused for ${animatedSelected.length} items`);
                       onRequestRender?.();
                     }}
                     className="flex-1 py-1 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold rounded border border-zinc-700 cursor-pointer flex items-center justify-center gap-1"
-                    title="Pause animation on all selected animated decorations (frame 1)"
+                    title="Pause animation on all selected decorations (holds the first enabled frame)"
                   >
                     <Pause size={11} /> All PAUSE
                   </button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      builder.setSelectedPropsAnimated(true);
+                      showToast(`Swapped ${animatedSelected.length} items to their animated sheets`);
+                      onRequestRender?.();
+                    }}
+                    className="flex-1 py-1 px-2 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 text-[11px] font-bold rounded border border-fuchsia-500/40 cursor-pointer flex items-center justify-center gap-1"
+                    title="Swap every selected still decoration to its animated 4-frame sheet"
+                  >
+                    <Film size={11} /> All ANIMATED
+                  </button>
+                  <button
+                    onClick={() => {
+                      builder.setSelectedPropsAnimated(false);
+                      showToast(`Swapped ${animatedSelected.length} items back to still artwork`);
+                      onRequestRender?.();
+                    }}
+                    className="flex-1 py-1 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold rounded border border-zinc-700 cursor-pointer flex items-center justify-center gap-1"
+                    title="Swap every selected animated sheet back to its still artwork"
+                  >
+                    <Film size={11} /> All STILL
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-400 text-[11px]">Speed</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => nudgeAllSpeeds(-ANIM_SPEED_STEP)}
+                      className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 cursor-pointer"
+                      title="Slow every selected animation down"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <span className="w-12 text-center font-mono text-zinc-200 text-[11px]">
+                      {uniformSpeed ? `${speeds[0].toFixed(2)}x` : 'mixed'}
+                    </span>
+                    <button
+                      onClick={() => nudgeAllSpeeds(ANIM_SPEED_STEP)}
+                      className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 cursor-pointer"
+                      title="Speed every selected animation up"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1980,41 +2043,183 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             );
           })()}
 
-          {/* Animate Toggle (for 4-frame Animated decorations) */}
+          {/* Animation panel: animated-sheet swap, playback, speed, frame skip */}
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
-            if (!def?.isAnimated) return null;
-            const isPlaying = selectedProp.animate !== false;
+            if (!def) return null;
+            const twin = animatedTwinDef(def);
+            const isAnimatedDef = def.isAnimated === true;
+            if (!isAnimatedDef && !twin) return null; // no animated sheet behind this decoration
+
+            const sheetDef = isAnimatedDef ? def : twin!;
+            const grid = animGridFor(sheetDef);
+            const total = Math.max(1, grid.cols * grid.rows);
+            const frames = normalizeAnimFrames(selectedProp.animFrames, total);
+            const enabledCount = frames.filter(Boolean).length;
+            const speed = animSpeedFor(selectedProp);
+            const usingSheet = isAnimatedDef || selectedProp.animated === true;
+            const isPlaying = selectedProp.animate !== false && enabledCount > 1;
+            const stillDef = isAnimatedDef
+              ? PROP_DEFINITIONS.find((d) => d.type === def.stillType)
+              : undefined;
+            const apply = (updates: Parameters<typeof builder.setPropAnimation>[1]) => {
+              builder.setPropAnimation(selectedProp.id, updates);
+              onRequestRender?.();
+            };
+            const nudgeSpeed = (delta: number) => {
+              const next = Math.min(ANIM_SPEED_MAX, Math.max(ANIM_SPEED_MIN, Math.round((speed + delta) * 100) / 100));
+              apply({ animSpeed: next });
+            };
+
             return (
-              <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
-                <div className="flex flex-col">
-                  <span className="text-zinc-300 font-medium flex items-center gap-1.5">
-                    {isPlaying
-                      ? <Clapperboard size={13} className="text-fuchsia-400" />
-                      : <Pause size={13} className="text-zinc-500" />}
-                    <span>Animate:</span>
+              <div className="pt-2 border-t border-zinc-800/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-zinc-300 font-medium text-xs flex items-center gap-1.5">
+                    <Clapperboard size={13} className="text-fuchsia-400" />
+                    <span>Animation</span>
                   </span>
                   <span className="text-[10px] text-zinc-500">
-                    {isPlaying ? `Cycling 4 frames @ ${def.animFps ?? 6}fps` : 'Frozen on frame 1'}
+                    {total}-frame sheet @ {grid.fps}fps
                   </span>
                 </div>
-                <button
-                  onClick={() => {
-                    const next = !isPlaying;
-                    builder.updatePropTransform(selectedProp.id, { animate: next });
-                    showToast(next ? 'Animation: ON (cycling 4 frames)' : 'Animation: OFF (frozen on frame 1)');
-                    onRequestRender?.();
-                  }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
-                    isPlaying
-                      ? 'bg-fuchsia-600/90 hover:bg-fuchsia-500 text-zinc-950 border-fuchsia-400'
-                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
-                  }`}
-                  title="Toggle 4-frame animation playback for this decoration (pauses on frame 1)"
-                >
-                  {isPlaying ? <Clapperboard size={13} /> : <Pause size={13} />}
-                  <span>{isPlaying ? 'ON (Playing)' : 'OFF (Frame 1)'}</span>
-                </button>
+
+                {/* Still <-> animated swap (still decorations that have a twin sheet) */}
+                {twin && (
+                  <div className="flex items-center justify-between text-xs bg-fuchsia-950/20 border border-fuchsia-800/40 rounded px-2 py-1.5">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-fuchsia-200 font-medium">Animated</span>
+                      <span className="text-[10px] text-zinc-400 truncate" title={`Swaps this decoration for "${twin.name}" — the 4-frame sheet cut from the same art`}>
+                        {usingSheet ? `Playing "${twin.name}"` : `Swap in "${twin.name}"`}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const next = !usingSheet;
+                        apply({ animated: next });
+                        showToast(next ? `Swapped to animated sheet: ${twin.name}` : 'Swapped back to the still artwork');
+                      }}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                        usingSheet
+                          ? 'bg-fuchsia-600/90 hover:bg-fuchsia-500 text-zinc-950 border-fuchsia-400'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+                      }`}
+                      title="Swap this decoration between its still artwork and its animated 4-frame sheet (same art, same size)"
+                    >
+                      <Film size={13} />
+                      <span>{usingSheet ? 'ANIMATED' : 'STILL'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {isAnimatedDef && stillDef && (
+                  <div className="text-[10px] text-zinc-500 truncate" title={`This sheet was cut from the still decoration "${stillDef.name}"`}>
+                    Animated version of <span className="text-zinc-400">{stillDef.name}</span>
+                  </div>
+                )}
+
+                {usingSheet && (
+                  <>
+                    {/* Playback */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex flex-col">
+                        <span className="text-zinc-400">Playback</span>
+                        <span className="text-[10px] text-zinc-500">
+                          {isPlaying
+                            ? `Cycling ${enabledCount}/${total} frames @ ${(grid.fps * speed).toFixed(1)}fps`
+                            : enabledCount > 1
+                              ? `Paused on frame ${frames.indexOf(true) + 1}`
+                              : `Holding frame ${frames.indexOf(true) + 1}`}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const next = !(selectedProp.animate !== false);
+                          apply({ animate: next });
+                          showToast(next ? 'Animation: ON (cycling frames)' : `Animation: OFF (holding frame ${frames.indexOf(true) + 1})`);
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold border transition-colors cursor-pointer ${
+                          selectedProp.animate !== false
+                            ? 'bg-fuchsia-600/90 hover:bg-fuchsia-500 text-zinc-950 border-fuchsia-400'
+                            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-600'
+                        }`}
+                        title="Play or pause frame cycling (paused props hold their first enabled frame)"
+                      >
+                        {selectedProp.animate !== false ? <Clapperboard size={13} /> : <Pause size={13} />}
+                        <span>{selectedProp.animate !== false ? 'PLAYING' : 'PAUSED'}</span>
+                      </button>
+                    </div>
+
+                    {/* Speed +/- */}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400">Speed</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => nudgeSpeed(-ANIM_SPEED_STEP)}
+                          disabled={speed <= ANIM_SPEED_MIN}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Slow the animation down"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="w-12 text-center font-mono text-zinc-200">{speed.toFixed(2)}x</span>
+                        <button
+                          onClick={() => nudgeSpeed(ANIM_SPEED_STEP)}
+                          disabled={speed >= ANIM_SPEED_MAX}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          title="Speed the animation up"
+                        >
+                          <Plus size={12} />
+                        </button>
+                        <button
+                          onClick={() => apply({ animSpeed: 1 })}
+                          className="ml-1 px-1.5 py-0.5 text-[10px] rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-700 cursor-pointer"
+                          title="Reset speed to 1.00x"
+                        >
+                          RESET
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Per-frame checkboxes */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-400">Frames</span>
+                        <span className="text-[10px] text-zinc-500">
+                          {enabledCount === 0 ? 'keep at least one' : `${enabledCount} of ${total} on`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {frames.map((on, i) => (
+                          <label
+                            key={i}
+                            className={`flex flex-col items-center gap-0.5 py-1 rounded border text-[10px] cursor-pointer transition-colors ${
+                              on
+                                ? 'bg-fuchsia-950/50 border-fuchsia-700/60 text-fuchsia-200'
+                                : 'bg-zinc-900/80 border-zinc-700 text-zinc-500'
+                            }`}
+                            title={`Frame ${i + 1} of the sheet — uncheck to skip this frame in the loop`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={on}
+                              onChange={(e) => {
+                                const next = [...frames];
+                                next[i] = e.target.checked;
+                                if (!next.some(Boolean)) {
+                                  showToast('Keep at least one frame enabled');
+                                  return;
+                                }
+                                apply({ animFrames: next });
+                              }}
+                              className="accent-fuchsia-500 w-3 h-3"
+                            />
+                            <span className="font-mono">F{i + 1}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             );
           })()}
@@ -2168,6 +2373,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     title="4-frame animated sheet: shows one frame at a time in 3D"
                   >
                     <Clapperboard size={9} /> 4-FRAME
+                  </span>
+                )}
+                {!p.isAnimated && p.animatedTwin && (
+                  <span
+                    className="absolute top-1 right-1 flex items-center gap-0.5 text-[8px] px-1 py-px rounded font-mono font-bold bg-fuchsia-950/70 text-fuchsia-300/90 border border-fuchsia-800/60"
+                    title={`Has an animated 4-frame version (${p.animatedTwin}) — place it, then switch it on under Animation in the attribute window`}
+                  >
+                    <Film size={9} /> ANIM
                   </span>
                 )}
                 <div className="w-16 h-16 flex items-center justify-center overflow-hidden mb-1.5">

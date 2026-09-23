@@ -358,7 +358,80 @@ Built 10 more animated twins with the same masked travelling-band pipeline (`scr
 - Frame deltas verified numerically on the keyed sheets (whole-quadrant RMSE f0–f1 / f0–f2: anim-11 0.015/0.021, anim-16 0.012/0.017, anim-17 0.009/0.013, anim-19 0.034/0.047 — clearly visible motion, bodies static).
 - Reproducibility: re-running the script rebuilds Batch 1 sheets pixel-identical (RMSE=0 vs committed), so the Batch 1 raw files were left untouched — only metadata bytes differ. Contact sheet is now 5x4 (`animated-contact-sheet.png`, 1960x1568).
 - All 10 registered in `PROP_DEFINITIONS` under `animated`, mirroring static-twin world sizes (anim-19/20 mirror `waterfall_splash` at 650x450); the Animated palette tab, 4-FRAME badges, Animate toggle and batch PLAY/PAUSE pick them up automatically. Test count bumped 10 → 20.
-- Next agent: anim 21–30 → append to `ANIMATED_VARIATIONS`, run the script, register under `animated`, then commit to this branch and update the open animated-decorations PR — never open a second PR.
+
+### Animated Decorations (Batch 1 Rebuild — 10 AI-Generated Sheets Replacing the Travelling-Band Frames)
+
+The Batch 1/2 frames were derived by pushing travelling brightness bands through an
+element mask. That produced four near-identical frames (RMSE between frames ≈ 0.015) —
+technically a spritesheet, visually a still image. Batch 1 (anim 01–10) has been rebuilt
+with the image generator; **anim 11–20 still ship the old band frames and are next.**
+
+New pipeline (`scripts/`, all vision-free so it is verifiable without eyeballing art):
+
+1. `scripts/build-anim-reference.mjs` — builds a 2x2 template (four copies of the still
+   art on magenta, wide gutters) for every `ANIMATED_SOURCE` entry. Handing the model a
+   sheet that already has the layout is what fixed the slicing: asking it to *invent* a
+   2x2 grid made it fill the canvas, so the centre cut sliced the subject.
+2. Generate with that template; raw output lands in `art-src/animated/<name>-src.png`.
+3. `scripts/analyze-animated-sheets.mjs` — QA gate. Reports the magenta fraction of the
+   exact cut lines (layout), per-quadrant coverage, and RMSE between consecutive frames
+   (motion). `STATIC` (< 0.045) or `LAYOUT` (< 97% clean cut) = regenerate.
+4. `scripts/process-generated-animated.mjs` — production build:
+   - detects the panel grid from the magenta gutters (handles 2x2 and the 4x2 the model
+     sometimes returns; merges gutters broken by splashes),
+   - shaves 4px off gutter-adjacent edges so separator lines never enter a frame,
+   - crops all four panels to the **union** of their content boxes so the subject is
+     framed identically in every frame (no loop jitter),
+   - pads the frame to the still artwork's aspect ratio, then runs the standard key
+     pipeline (flood-normalise, 20% fuzz key, 6px unmix-despill) into
+     `public/art/animated/alpha/`, refusing sheets whose backdrop is not magenta.
+
+Rebuilt sheets (frame size, aspect matches the still art exactly):
+
+| sheet | frame | fps | min frame Δ | remnant |
+|---|---|---|---|---|
+| anim-01 torchbearer flame | 328x488 | 7 | 0.270 | 0.000% |
+| anim-02 firework sparkler | 918x500 | 9 | 0.133 | 0.012% |
+| anim-03 torch crowd | 534x298 | 7 | 0.128 | 0.021% |
+| anim-04 lantern warden | 298x444 | 6 | 0.266 | 0.042% |
+| anim-05 smelting crucible | 482x482 | 6 | 0.183 | 0.002% |
+| anim-06 molten cauldron | 340x340 | 6 | 0.217 | 0.000% |
+| anim-07 slag channel | 950x530 | 5 | 0.073 | 0.000% |
+| anim-08 waterwheel cascade | 330x660 | 5 | 0.259 | 0.040% |
+| anim-09 plunge basin | 810x442 | 5 | 0.109 | 0.015% |
+| anim-10 waterfall curtain | 494x986 | 5 | 0.148 | 0.004% |
+
+Frame Δ is RMSE between consecutive frames; the replaced band frames sat at ≈0.015.
+
+### Still ↔ Animated Linking + Per-Prop Animation Controls
+
+Animated sheets are no longer a separate island: every sheet is wired to the still
+decoration it was cut from.
+
+- `ANIMATED_SOURCE_ART` (in `src/game/track-builder-3d.ts`) maps each animated type to
+  the still art it came from; `linkAnimatedTwins()` runs at module load and sets
+  `stillType` / `animatedTwin` on both sides. 19 of 20 link up; `anim_20` (source art has
+  no still decoration) stays animated-only. Powerups/barriers that merely reuse prop art
+  never claim a twin (test-enforced).
+- **Animated toggle on the still version**: selecting a still decoration with a twin shows
+  an *Animation* panel with an `ANIMATED / STILL` swap button — flipping it swaps the prop
+  over to the 4-frame sheet in place, keeping its position, size and rotation. Frames are
+  padded to the still art's aspect, so the swap is a like-for-like (no squash).
+- **Speed −/+**: per-prop multiplier (`animSpeed`, 0.25–4.00 in 0.25 steps, with a RESET),
+  displayed as effective fps. Group selection nudges every selected prop at once.
+- **4 frame checkboxes**: `animFrames[4]`; unchecked frames are skipped by the loop rather
+  than shown as blank holds. At least one frame is always kept, and a paused prop holds
+  its first *enabled* frame.
+- Palette cards for still decorations with a twin carry an `ANIM` badge; animated-category
+  cards keep the `4-FRAME` badge and now show which still decoration they came from.
+- State lives on `PlacedProp` (`animated`, `animSpeed`, `animFrames`), so it round-trips
+  through save/load, undo/redo and duplication.
+- Tests: `tests/animated-props.test.ts` grew 15 → 29 checks (twin links, aspect parity,
+  frame skipping, speed, persistence, batch controls). `npm run check` 449/449 green;
+  `npm run build` green.
+- Next agent: anim 11–20 → run `scripts/build-anim-reference.mjs`, generate the ten
+  sheets into `art-src/animated/`, then `scripts/analyze-animated-sheets.mjs --all`
+  (regenerate any `STATIC`/`LAYOUT` rows) and `scripts/process-generated-animated.mjs`.
 
 ## Verification Boundary
 

@@ -5,6 +5,54 @@
 > - You can find all files from predecessor game "Heavy Metal 1" in the [`PreGame/`](file:///c:/MarbleGp/PreGame) folder (`PreGame/assets/`, `PreGame/src/assets/`). You are **strongly encouraged** to use existing PNG/WebP assets from there (e.g. `ball-*.webp`, `bumper-*.webp`, `spring.webp`, `strip-*.webp`, `uikit.png`, `repeatingBG.png`) to style and extend the game.
 > - **Image Generation Quota**: You can only generate **10 images per turn** before your quota needs to be reset. To reset them, simply say **"Reset please"** and stop working; the user will reply with "turns reset", and you can continue with 10 more calls.
 
+## T04 — Isolated Qualifying Attempts (this session, branch `arena/01a0ca89-heavymetal2`, PR #50)
+
+Issue [#37](https://github.com/Piskriek/HeavyMetal2/issues/37) is implemented as a headless
+simulation layer. Read [`docs/QUALIFYING.md`](docs/QUALIFYING.md) for the contract, the units table and
+the criterion-by-criterion evidence map; [`docs/CONTRACTS_PROVENANCE.md`](docs/CONTRACTS_PROVENANCE.md)
+explains which files are verbatim copies of the open T01/T02 PRs and why.
+
+**What landed**
+
+- `src/game/sim/` — the simulation half of `GameEngine` extracted into pure modules: `world.ts`
+  (bucketed obstacle/pickup index + surface queries), `racer-physics.ts` (the step, recovery,
+  obstacle hits, hop/bounce/boost), `cpu-driver.ts` (the AI, with the rival list and the rubber-band
+  target as *inputs*), `pickups.ts` (swept supply claims with an `onClaim` hook), `context.ts`
+  (`SimFx`, `RecoveryPolicy`, headless/recording sinks), `obstacle-state.ts` (the scalable `hitBy`
+  ledger that replaces `1 << racerId`).
+- `GameEngine` now delegates all of the above. Its own behaviour is unchanged, and
+  `tests/physics-parity.test.ts` proves it by driving the pre-refactor code (a **generated** verbatim
+  copy in `tests/fixtures/legacy-engine-sim.ts`, produced by
+  `node scripts/build-parity-fixture.mjs` from `f9ca189`) against the shared modules tick for tick.
+  `npm run check:parity-fixture` re-derives the fixture and fails on drift.
+- `src/game/qualifying/` — `gate.ts` (the named `first-loop-entry` gate derived from the course's
+  first loop, plus canonical segments and the pre-loop capture rule), `field.ts` (participants to
+  racers, the staging freeze, the bounded launch schedule, per-attempt seeds), `attempt.ts` (one
+  isolated run: private clone of the course, progress-anchored recovery, deadline, classifications),
+  `mystery.ts` (the optional deterministic mystery detour, rolled once per heat), `session.ts` (the
+  scheduler: staging, bounded CPU deployment, retries without freezing bots, contract ranking),
+  `harness.ts` (`runQualifyingHeat` + a reproducible fingerprint) and `index.ts`.
+- 55 new checks across four suites (parity, gate, attempt, session). `npm run check` = tsc over
+  `src`, tsc over `tests`, **113 tests**. `npm run qualifying` prints real 4/20/100-racer heat tables;
+  `--repeat` re-runs each heat and fails if the table changes.
+
+**Notes for whoever integrates next**
+
+- The falling branch now evaluates recovery through a policy before its early return. The race uses
+  `LEGACY_RECOVERY`, which keeps the 0.72 s timer as its only trigger — deliberately bit-compatible.
+  If T05/T09 want the race to end falls on depth too, that is a *gameplay* decision, not a bug fix.
+- `commands.ts` on this branch is PR #48's corrected version (`steer` is legal while flying/paused,
+  not only on the grid). Keep that resolution when #46 and #48 merge.
+- T04 does **not** touch `RaceScreen.tsx`, `renderer-3d.ts` or `track-builder-3d.ts`. The UI hooks are
+  `session.snapshot()`, `attempt.renderView()`, `session.send(command)` and
+  `session.qualifyingCompleteEvent()` (the exact `HeatEvent` for `transitionHeat`).
+- `syntheticField(size, seed)` is a stand-in for T02's roster so heats above four can be run and
+  tested today; replace it with the roster source when #47/#48 land.
+- Not verified: any browser/WebGL behaviour (this workspace's headless Chromium has no WebGL context,
+  the same blocker T00 recorded), and frame pacing in the browser after the extraction — the build
+  size is unchanged (1,446.39 kB / 398.95 kB gzip) and the trace is only allocated for callers that ask
+  for it, but that is not a measurement.
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

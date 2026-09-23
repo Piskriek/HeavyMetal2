@@ -241,6 +241,135 @@ function contentMask(src, out) {
   magick([src, '-fuzz', '12%', '-fill', 'black', '-opaque', MAGENTA, '-fill', 'white', '+opaque', 'black', out]);
 }
 
+/** Raw 8-bit grayscale bytes of a mask (255 = subject, 0 = backdrop). */
+const maskBytes = (file) =>
+  execFileSync('convert', [file, '-depth', '8', 'gray:-'], { encoding: 'buffer', maxBuffer: 1 << 28 });
+
+/** Intensity-weighted centroid of a mask; null when the mask is empty. */
+function centroidOf(buf, w, h, weight) {
+  let sw = 0;
+  let sx = 0;
+  let sy = 0;
+  for (let i = 0; i < buf.length; i += 1) {
+    const v = weight ? Math.min(buf[i], weight[i]) : buf[i];
+    if (!v) continue;
+    sw += v;
+    sx += v * (i % w);
+    sy += v * Math.floor(i / w);
+  }
+  return sw < 1 ? null : { x: sx / sw, y: sy / sw, sw };
+}
+
+/**
+ * Frame registration — the "onion skin" step.
+ *
+ * The union-bbox crop alone makes the four frames the same SIZE, but not the
+ * same FRAMING: when a flag whips up, the subject's bounding box grows upward
+ * and the goblin's body ends up sitting lower inside the frame than in the
+ * panel where the flag hangs down. The body therefore slides around as the
+ * animation plays, which reads as the frames "jumping".
+ *
+ * So align the frames on their COMMON SILHOUETTE — the pixels that are opaque
+ * in all four frames, which is the static body. Every frame is shifted until
+ * that silhouette sits at the same place, so the body holds still and only the
+ * animated element (flag, flame, splash, lava) moves.
+ *
+ * Two passes: a coarse alignment on each frame's own centroid to undo gross
+ * offsets, then refinement on the common silhouette. Falls back to the coarse
+ * result when no pixel is opaque in every frame (e.g. a splash whose shape
+ * changes completely).
+ *
+ * Mutates `files` in place; returns the total shift applied per frame.
+ */
+function registerFrames(files, w, h, tmp) {
+  const masks = files.map((_, i) => join(tmp, `rg${i}.png`));
+  const refresh = () => files.forEach((f, i) => contentMask(f, masks[i]));
+  refresh();
+
+  const total = files.map(() => [0, 0]);
+  const staged = files.map((f, i) => join(tmp, `rs${i}.png`));
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    const bufs = masks.map((m) => Array.from(maskBytes(m)));
+    const own = bufs.map((b) => centroidOf(b, w, h));
+    if (own.some((c) => !c)) break;
+
+    // Coarse target: the mean of the four centroids.
+    const mx = own.reduce((a, c) => a + c.x, 0) / 4;
+    const my = own.reduce((a, c) => a + c.y, 0) / 4;
+
+    // Common silhouette = per-pixel minimum across the four frames.
+    const common = new Array(bufs[0].length).fill(0);
+    for (let k = 0; k < common.length; k += 1) {
+      common[k] = Math.min(bufs[0][k], bufs[1][k], bufs[2][k], bufs[3][k]);
+    }
+    const anchor = centroidOf(common, w, h);
+    const target = anchor ?? { x: mx, y: my };
+
+    let moved = 0;
+    for (let i = 0; i < 4; i += 1) {
+      const weight = anchor ? bufs[i].map((v, k) => Math.min(v, common[k])) : null;
+      const c = anchor ? centroidOf(weight, w, h) : own[i];
+      if (!c) continue;
+      const dx = Math.round(target.x - c.x);
+      const dy = Math.round(target.y - c.y);
+      if (!dx && !dy) continue;
+      moved += 1;
+      magick([files[i], '-background', MAGENTA, '-extent', `${w}x${h}+${dx}+${dy}`, staged[i]]);
+      magick([staged[i], files[i]]);
+      total[i][0] += dx;
+      total[i][1] += dy;
+    }
+    refresh();
+    if (!moved) break;
+  }
+
+  // Final pass: cross-correlate every frame against frame 1 and keep the shift
+  // that maximises silhouette overlap. The centroid pass aligns the body's
+  // centre of mass, which is not the same thing as aligning its outline — when
+  // the common silhouette is small and off-centre (a cauldron's tripod under a
+  // surface that changes completely), the centroid can be spot on while the
+  // body around it sits several pixels out.
+  {
+    const bufs = masks.map((m) => Array.from(maskBytes(m)));
+    const ref = bufs[0];
+    const overlap = (b, dx, dy) => {
+      let inter = 0;
+      let uni = 0;
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const av = ref[y * w + x] > 127;
+          const y2 = y + dy;
+          const x2 = x + dx;
+          const bv = y2 >= 0 && y2 < h && x2 >= 0 && x2 < w && b[y2 * w + x2] > 127;
+          if (av || bv) {
+            uni += 1;
+            if (av && bv) inter += 1;
+          }
+        }
+      }
+      return uni ? inter / uni : 0;
+    };
+    for (let i = 1; i < 4; i += 1) {
+      let best = { dx: 0, dy: 0, v: overlap(bufs[i], 0, 0) };
+      for (let dy = -8; dy <= 8; dy += 1) {
+        for (let dx = -8; dx <= 8; dx += 1) {
+          if (!dx && !dy) continue;
+          const v = overlap(bufs[i], dx, dy);
+          if (v > best.v + 1e-4) best = { dx, dy, v };
+        }
+      }
+      if (!best.dx && !best.dy) continue;
+      magick([files[i], '-background', MAGENTA, '-extent', `${w}x${h}+${best.dx}+${best.dy}`, staged[i]]);
+      magick([staged[i], files[i]]);
+      total[i][0] += best.dx;
+      total[i][1] += best.dy;
+    }
+    refresh();
+  }
+  return total;
+}
+
 const filter = process.argv[2];
 const tmp = mkdtempSync(join(tmpdir(), 'gen-anim-'));
 let failures = 0;
@@ -286,14 +415,33 @@ try {
     const colSpans = cuts.xs.length + 1;
     const rowSpans = cuts.ys.length + 1;
 
-    // 2. union bounding box over the four frames so they share one framing
-    let ux0 = Infinity, uy0 = Infinity, ux1 = -Infinity, uy1 = -Infinity;
+    // 2. stage the four panels on one canvas (padded, so registration can
+    //    shift them without clipping), then register them on their common
+    //    silhouette so the static body holds still across the loop.
+    const maxW = Math.max(...panels.map((p) => p[2]));
+    const maxH = Math.max(...panels.map((p) => p[3]));
+    const PAD = Math.round(Math.max(maxW, maxH) * 0.2);
+    const CW = maxW + 2 * PAD;
+    const CH = maxH + 2 * PAD;
+    const staged = [];
     for (let i = 0; i < 4; i += 1) {
       const [x, y, w, h] = panels[i];
-      const p = join(tmp, `p${i}.png`);
-      magick([srcPath, '-crop', `${w}x${h}+${x}+${y}`, '+repage', p]);
-      const m = join(tmp, `pm${i}.png`);
-      contentMask(p, m);
+      const s = join(tmp, `s${i}.png`);
+      magick([
+        '-size', `${CW}x${CH}`, `xc:${MAGENTA}`,
+        '(', srcPath, '-crop', `${w}x${h}+${x}+${y}`, '+repage', ')',
+        '-gravity', 'center', '-composite', s,
+      ]);
+      staged.push(s);
+    }
+    const align = registerFrames(staged, CW, CH, tmp);
+    const alignPx = Math.max(...align.map(([dx, dy]) => Math.hypot(dx, dy)));
+
+    // 3. union bounding box over the registered frames so they share one framing
+    let ux0 = Infinity, uy0 = Infinity, ux1 = -Infinity, uy1 = -Infinity;
+    for (let i = 0; i < 4; i += 1) {
+      const m = join(tmp, `bm${i}.png`);
+      contentMask(staged[i], m);
       const [bw, bh, bx, by] = identify(['-format', '%@', m]).split(/[x+]/).map(Number);
       if (bw < 4 || bh < 4) { ux0 = -1; break; }
       ux0 = Math.min(ux0, bx); uy0 = Math.min(uy0, by);
@@ -307,7 +455,7 @@ try {
     let FW = ux1 - ux0;
     let FH = uy1 - uy0;
 
-    // 3. pad the frame to the still artwork's aspect ratio, so swapping a
+    // 4. pad the frame to the still artwork's aspect ratio, so swapping a
     //    decoration between still and animated never squashes it.
     const stillRel = SOURCE_ART[name];
     let targetAr = null;
@@ -323,13 +471,13 @@ try {
     if (FW % 2) FW += 1;
     if (FH % 2) FH += 1;
 
-    // 4. one crop per frame (identical box, no relative shift), padded to the
+    // 5. one crop per frame (identical box, no relative shift), padded to the
     //    padded target size with magenta so the aspect matches the still art.
     const flats = [];
     for (let i = 0; i < 4; i += 1) {
       const f = join(tmp, `f${i}.png`);
       magick([
-        join(tmp, `p${i}.png`),
+        staged[i],
         '-crop', `${ux1 - ux0}x${uy1 - uy0}+${ux0}+${uy0}`, '+repage',
         '-background', MAGENTA, '-gravity', 'center', '-extent', `${FW}x${FH}`,
         '-alpha', 'remove', '-alpha', 'off', f,
@@ -337,7 +485,7 @@ try {
       flats.push(f);
     }
 
-    // 4. clean 2x2 sheet (TL=f0, TR=f1, BL=f2, BR=f3)
+    // 5b. clean 2x2 sheet (TL=f0, TR=f1, BL=f2, BR=f3)
     magick([...flats.slice(0, 2), '+append', join(tmp, 'top.png')]);
     magick([...flats.slice(2, 4), '+append', join(tmp, 'bot.png')]);
     magick([join(tmp, 'top.png'), join(tmp, 'bot.png'), '-append', join(tmp, 'sheet.png')]);
@@ -408,18 +556,58 @@ try {
     for (let i = 1; i < 4; i += 1) deltas.push(rmse(frames[i - 1], frames[i]));
     deltas.push(rmse(frames[3], frames[0]));
     const minDelta = Math.min(...deltas);
+
+    // 6b. animation-only delta. Registration aligns the static body, which
+    //     legitimately drives the plain delta down — a perfectly registered
+    //     sheet differs only where the element animates. So blank the pixels
+    //     that are opaque in all four frames (the static body) and compare what
+    //     is left, normalised over the element's own area. This is the number
+    //     that answers "is it animating", independent of registration quality.
+    const qw = Math.floor(sw / 2);
+    const qh = Math.floor(sh / 2);
+    const rgb = [];
+    const alf = [];
+    for (let i = 0; i < 4; i += 1) {
+      const q = join(tmp, `nq${i}.png`);
+      magick([alphaPath, '-crop', `${qw}x${qh}+${(i % 2) * qw}+${Math.floor(i / 2) * qh}`, '+repage',
+        '-background', MAGENTA, '-flatten', q]);
+      rgb.push(execFileSync('convert', [q, '-depth', '8', 'rgb:-'], { encoding: 'buffer', maxBuffer: 1 << 28 }));
+      const a = join(tmp, `na${i}.png`);
+      magick([alphaPath, '-crop', `${qw}x${qh}+${(i % 2) * qw}+${Math.floor(i / 2) * qh}`, '+repage', '-alpha', 'extract', a]);
+      alf.push(execFileSync('convert', [a, '-depth', '8', 'gray:-'], { encoding: 'buffer', maxBuffer: 1 << 28 }));
+    }
+    const common = alf[0].map((v, k) => Math.min(v, alf[1][k], alf[2][k], alf[3][k]));
+    const eDeltas = [];
+    for (let i = 0; i < 4; i += 1) {
+      const j = (i + 1) % 4;
+      let sum = 0;
+      let n = 0;
+      for (let k = 0; k < common.length; k += 1) {
+        // "live" = part of the animated element rather than the static body
+        if (alf[i][k] <= common[k] + 2 && alf[j][k] <= common[k] + 2) continue;
+        n += 1;
+        for (let c = 0; c < 3; c += 1) {
+          const d = rgb[i][k * 3 + c] - rgb[j][k * 3 + c];
+          sum += d * d;
+        }
+      }
+      eDeltas.push(n ? Math.sqrt(sum / (n * 3)) / 255 : 0);
+    }
+    const minElemDelta = Math.min(...eDeltas);
     const coverage = (1 - meanOf(T('maskA'))) * 100;
 
     const problems = [];
     if (remnant > 0.5) problems.push(`REMNANT ${remnant.toFixed(3)}%`);
-    if (minDelta < MIN_FRAME_DELTA) problems.push('STATIC');
+    if (minElemDelta < MIN_FRAME_DELTA) problems.push(`STATIC elem=${minElemDelta.toFixed(3)}`);
     if (!alphaPixel.includes('rgba(0,0,0,0)') && !alphaPixel.includes('(0,0,0,0)')) problems.push(`CORNER ${alphaPixel}`);
     if (problems.length) failures += 1; else done += 1;
 
     console.log(
       `${problems.length ? '✗' : '✓'} ${name.padEnd(30)} grid=${colSpans}x${rowSpans} ` +
       `frame=${FW}x${FH} cover=${coverage.toFixed(1)}% remnant=${remnant.toFixed(3)}% ` +
-      `delta=${deltas.map((d) => d.toFixed(3)).join('/')} min=${minDelta.toFixed(3)} ` +
+      `align=${alignPx.toFixed(1)}px ` +
+      `elem=${eDeltas.map((d) => d.toFixed(3)).join('/')} min=${minElemDelta.toFixed(3)} ` +
+      `(plain min=${minDelta.toFixed(3)}) ` +
       `${problems.length ? '  <-- ' + problems.join(', ') : ''}`,
     );
   }

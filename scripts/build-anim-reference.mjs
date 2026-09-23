@@ -45,6 +45,16 @@ const SOURCE_ART = {
   'anim-18-torch-sconce': 'props/alpha/prop-56-arch-torch-sconce.png',
   'anim-19-waterfall-splash': 'track-parts/waterfall-splash.png',
   'anim-20-waterfall-splash-b': 'track-parts/waterfall-splash-b.png',
+  'anim-21-flag-waver': 'goblins/alpha/goblin-01-flag-waver.png',
+  'anim-22-war-drummer': 'goblins/alpha/goblin-02-war-drummer.png',
+  'anim-23-pit-mechanic': 'goblins/alpha/goblin-03-pit-mechanic.png',
+  'anim-24-ore-miner': 'goblins/alpha/goblin-05-ore-miner.png',
+  'anim-25-horn-blower': 'goblins/alpha/goblin-06-horn-blower.png',
+  'anim-26-track-marshal': 'goblins/alpha/goblin-08-track-marshal.png',
+  'anim-27-blacksmith': 'goblins/alpha/goblin-09-blacksmith.png',
+  'anim-28-tankard-celebrant': 'goblins/alpha/goblin-10-tankard-celebrant.png',
+  'anim-29-ball-loader': 'goblins/alpha/goblin-12-ball-loader.png',
+  'anim-30-bell-ringer': 'goblins/alpha/goblin-13-bell-ringer.png',
 };
 
 const outDir = join(root, 'art-src/animated');

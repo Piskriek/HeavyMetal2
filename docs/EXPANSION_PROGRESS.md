@@ -436,7 +436,61 @@ not an opaque backdrop — its raw sheet is 65% magenta with the whites belongin
 to the splash itself. Same check that caught the old `anim-05` white-studio
 background.
 
-### Still ↔ Animated Linking + Per-Prop Animation Controls
+### Frame registration — why the sheets used to look like they jumped
+
+The first rebuilt sheets passed every gate that existed (clean cut, four distinct
+frames, magenta backdrop) and still looked wrong in play. Two causes, neither of
+which a frame-delta check can see:
+
+1. **The union-bbox crop normalises the frame, not the subject.** When an
+   animated element is drawn much larger in one panel than the others, the union
+   box grows to fit it and every other frame's subject ends up looking smaller
+   inside that box. The sprite appears to swell and shrink as it loops.
+2. **Aligning centroids is not aligning outlines.** Registering on the body's
+   centre of mass can be spot-on while the body around it sits several pixels
+   out, whenever the common silhouette is small and off-centre.
+
+Both are now fixed in `scripts/process-generated-animated.mjs`:
+
+- **`registerFrames()`** stages the four panels on a padded canvas and aligns
+  them on their **common silhouette** — the pixels opaque in *every* frame, i.e.
+  the static body. A coarse pass aligns each frame's own centroid, then a
+  refinement pass aligns the common silhouette, then a final cross-correlation
+  pass searches ±8px and keeps whichever shift maximises silhouette overlap
+  against frame 1. The body holds still; only the element moves.
+- The generated prompts now also demand that the animated element keep a
+  **consistent size across all four panels**, which is what stops the swelling.
+
+**`scripts/onion-skin-check.mjs`** is the verification. For every sheet it
+cross-correlates each consecutive pair and reports:
+
+- `maxShift` — the largest shift that would align a pair better than zero shift
+  does. Gated at 6px, but **only when shifting actually helps** (`gain` > 0.02):
+  on a sheet whose element changes shape completely the correlator can always
+  find some far-off shift that wins by a hair, which is noise, not
+  misregistration.
+- `fillSpread` — the ratio between the largest and smallest per-frame subject
+  area. Gated at 1.6x; this is the number that catches the swelling.
+
+It also writes an onion-skin overlay per sheet to
+`art-src/animated/onion/<name>.png` — all four frames stacked, frame 1 white and
+frames 2–4 tinted, so misalignment shows up as coloured fringing around the
+silhouette and a size pop as a coloured halo.
+
+Results after the fix: `maxShift` is **0.0px on 18 of 20 sheets** (the two
+exceptions, anim-14 and anim-20, have zero overlap gain — noise), and
+`fillSpread` is **1.04–1.37x** across all twenty, down from 1.10–2.15x.
+
+### The STATIC gate had to be re-based
+
+Once the bodies were registered, the plain whole-frame delta dropped on every
+sheet — a perfectly registered sheet differs only where the element animates, so
+the old `MIN_FRAME_DELTA` of 0.045 started failing sheets that were animating
+perfectly well (anim-04 fell to 0.041, anim-15 to 0.033). The gate now measures
+an **animation-only delta**: pixels are classed as the static body when they are
+opaque in all four frames, and only the remaining element pixels are compared,
+normalised over the element's own area. Element deltas are now 0.120–0.515,
+versus ~0.015 for the band frames these replace.
 
 Animated sheets are no longer a separate island: every sheet is wired to the still
 decoration it was cut from.
@@ -462,7 +516,7 @@ decoration it was cut from.
 - Tests: `tests/animated-props.test.ts` grew 15 → 29 checks (twin links, aspect parity,
   frame skipping, speed, persistence, batch controls). `npm run check` 449/449 green;
   `npm run build` green.
-- **All 20 sheets now carry real motion.** No batch remains open.
+- **All 20 sheets now carry real motion, and they are registered so the body holds still across the loop.** See "Frame registration" above.
   sheets into `art-src/animated/`, then `scripts/analyze-animated-sheets.mjs --all`
   (regenerate any `STATIC`/`LAYOUT` rows) and `scripts/process-generated-animated.mjs`.
 

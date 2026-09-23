@@ -56,6 +56,8 @@ const FRAMES = 4;
 
 /**
  * Batch 1 (anim 01-10): fire + water decorations.
+ * Batch 2 (anim 11-20): more fire (TNT fuse, braziers, lanterns, lava arch,
+ * torch sconce) + splash-burst water.
  * `src` is relative to public/art. `w`/`h` mirror the source PROP_DEFINITIONS
  * entry so the animated twin matches the static one's world size.
  */
@@ -132,6 +134,80 @@ export const ANIMATED_VARIATIONS = [
     concept: 'Sheer waterfall curtain; sheet of water ripples downward',
     element: 'water',
     w: 900, h: 1400,
+  },
+  // --- Batch 2 (anim 11-20): more fire + splash water ---
+  // FIRE: goblins
+  {
+    file: 'anim-11-tnt-fuse-spark.png',
+    src: 'goblins/alpha/goblin-07-tnt-handler.png',
+    concept: 'TNT handler hugging a crate of dynamite; the lit fuse spark strobes',
+    element: 'spark',
+    w: 375, h: 560,
+  },
+  {
+    file: 'anim-12-drum-podium-braziers.png',
+    src: 'goblins/alpha/goblin-22-drum-podium-mob.png',
+    concept: 'Drum podium ringed by dancing goblins; torch braziers flicker',
+    element: 'fire',
+    w: 1254, h: 700,
+  },
+  {
+    file: 'anim-13-horn-riser-lantern.png',
+    src: 'goblins/alpha/goblin-25-horn-riser.png',
+    concept: 'War-horn riser band; hanging lantern sways with light',
+    element: 'fire',
+    w: 1254, h: 700,
+  },
+  {
+    file: 'anim-14-fan-aisle-torches.png',
+    src: 'goblins/alpha/goblin-30-fan-aisle.png',
+    concept: 'Victory aisle of cheering fans; torch posts ripple',
+    element: 'fire',
+    w: 1075, h: 600,
+  },
+  // FIRE: lantern / molten props
+  {
+    file: 'anim-15-triple-lantern-post.png',
+    src: 'props/alpha/prop-01-lantern-post-triple.png',
+    concept: 'Triple lantern post; amber lamps breathe',
+    element: 'fire',
+    w: 360, h: 480,
+  },
+  {
+    file: 'anim-16-molten-rock-arch.png',
+    src: 'props/alpha/prop-16-molten-rock-natural-arch.png',
+    concept: 'Molten rock arch; lava veins pulse through the stone',
+    element: 'fire',
+    w: 1400, h: 760,
+  },
+  {
+    file: 'anim-17-arch-gate-lanterns.png',
+    src: 'props/alpha/prop-40-timber-arch-gate-lanterns.png',
+    concept: 'Timber arch gate; hanging lanterns breathe',
+    element: 'fire',
+    w: 1300, h: 700,
+  },
+  {
+    file: 'anim-18-torch-sconce.png',
+    src: 'props/alpha/prop-56-arch-torch-sconce.png',
+    concept: 'Archway wall torch sconce; flame licks upward',
+    element: 'fire',
+    w: 320, h: 480,
+  },
+  // WATER: splash bursts
+  {
+    file: 'anim-19-waterfall-splash.png',
+    src: 'track-parts/waterfall-splash.png',
+    concept: 'Waterfall splash burst; foam churns and falls',
+    element: 'water',
+    w: 650, h: 450,
+  },
+  {
+    file: 'anim-20-waterfall-splash-b.png',
+    src: 'track-parts/waterfall-splash-b.png',
+    concept: 'Waterfall splash burst variant; foam churns and falls',
+    element: 'water',
+    w: 650, h: 450,
   },
 ];
 

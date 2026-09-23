@@ -338,6 +338,28 @@ Built 10 animated decoration twins from the shipped alpha cutouts: each source k
 - Tests: `tests/animated-props.test.ts` (15 checks: frame math, UVs, registry, sheet files + even dims, headless playback/freeze/batch/static paths), registered in `scripts/check.mjs`. `npm run check` 435/435 green; `npm run build` green.
 - Next agent: anim 11–20 → append to `ANIMATED_VARIATIONS`, run the script, register under `animated`, then commit to this branch and update the open animated-decorations PR — never open a second PR.
 
+### Animated Decorations (Batch 2 — 10 More Fire & Splash-Water 4-Frame Sheets)
+
+Built 10 more animated twins with the same masked travelling-band pipeline (`scripts/process-animated.mjs`, unchanged algorithm — Batch 2 only appends entries):
+
+11. `public/art/animated/anim-11-tnt-fuse-spark.png` (1032x1536, frame 516x768) — TNT-handler fuse spark strobes @ 9fps.
+12. `public/art/animated/anim-12-drum-podium-braziers.png` (1536x860, frame 768x430) — Podium torch braziers flicker @ 7fps.
+13. `public/art/animated/anim-13-horn-riser-lantern.png` (1536x860, frame 768x430) — Riser lantern breathes @ 6fps.
+14. `public/art/animated/anim-14-fan-aisle-torches.png` (1536x860, frame 768x430) — Aisle torch posts ripple @ 7fps.
+15. `public/art/animated/anim-15-triple-lantern-post.png` (1536x1536, frame 768x768) — Lantern-post lamps breathe @ 6fps.
+16. `public/art/animated/anim-16-molten-rock-arch.png` (1536x840, frame 768x420) — Arch lava veins pulse @ 5fps.
+17. `public/art/animated/anim-17-arch-gate-lanterns.png` (1536x840, frame 768x420) — Gate lanterns breathe @ 6fps.
+18. `public/art/animated/anim-18-torch-sconce.png` (1536x1536, frame 768x768) — Wall sconce flame licks @ 7fps.
+19. `public/art/animated/anim-19-waterfall-splash.png` (1024x1024, frame 512x512) — Splash burst churns @ 6fps.
+20. `public/art/animated/anim-20-waterfall-splash-b.png` (1024x1024, frame 512x512) — Splash burst variant churns @ 6fps.
+
+- Candidate masks probed before building (fire cover 2.6–8.6%, water 25.9–27.1% on the splashes); fully-opaque track-parts (`lava-sheet*`, `waterfall-sheet`) were skipped — the script requires real source transparency.
+- Remnants 0.000–0.073%: anim-17's 0.073% is interior lantern-glow paint (zero edge-touching remnant pixels on the edge-overlap check — same precedent as anim-02's 0.068% / goblin-18's 0.118%).
+- Frame deltas verified numerically on the keyed sheets (whole-quadrant RMSE f0–f1 / f0–f2: anim-11 0.015/0.021, anim-16 0.012/0.017, anim-17 0.009/0.013, anim-19 0.034/0.047 — clearly visible motion, bodies static).
+- Reproducibility: re-running the script rebuilds Batch 1 sheets pixel-identical (RMSE=0 vs committed), so the Batch 1 raw files were left untouched — only metadata bytes differ. Contact sheet is now 5x4 (`animated-contact-sheet.png`, 1960x1568).
+- All 10 registered in `PROP_DEFINITIONS` under `animated`, mirroring static-twin world sizes (anim-19/20 mirror `waterfall_splash` at 650x450); the Animated palette tab, 4-FRAME badges, Animate toggle and batch PLAY/PAUSE pick them up automatically. Test count bumped 10 → 20.
+- Next agent: anim 21–30 → append to `ANIMATED_VARIATIONS`, run the script, register under `animated`, then commit to this branch and update the open animated-decorations PR — never open a second PR.
+
 ## Verification Boundary
 
 Production compilation is verified (`npm run build` / the provided build tool). Type-checking and 18 focused persistence tests are verified locally via `node scripts/check.mjs`. Scripted headless-Chromium runs are verified: 21 recovery checks via `npm run check:browser` and 20 art checks via `npm run check:art` (the art suite also runs against the live dev server with `node tests/art-check.mjs <url>`), with screenshots and the alpha montages left in `tests/artifacts/` — those images were inspected by the agent, so the art is verified as *decoded and drawn*, not merely built. Not verified: frame pacing on real desktop/mobile hardware, long-run stability, empirical race/loadout/course balance, and accessibility certification. Do not represent compilation, type-checking, unit tests or a scripted browser pass as measured FPS, playtesting, accessibility certification or tournament balance.

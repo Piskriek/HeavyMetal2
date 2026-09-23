@@ -3,7 +3,7 @@
  *
  * Validates:
  * - Frame math: grid defaults, frame timing/looping, row-major UVs, id phases
- * - Registry: 10 animated entries with unique types, 2x2 grids, positive fps
+ * - Registry: 20 animated entries with unique types, 2x2 grids, positive fps
  * - Sheets on disk: keyed alpha files exist with even (cuttable) dimensions
  * - Headless builder: offsets advance per frame, animate=false and reduced
  *   motion freeze on frame 0, batch toggle flips the flag
@@ -125,8 +125,8 @@ test('Animated: frame math', async (t) => {
 test('Animated: registry entries', async (t) => {
   const animated = PROP_DEFINITIONS.filter((d) => d.category === 'animated');
 
-  await t.test('exactly 10 animated decorations are registered', () => {
-    assert.equal(animated.length, 10);
+  await t.test('exactly 20 animated decorations are registered', () => {
+    assert.equal(animated.length, 20);
   });
 
   await t.test('entries are unique 2x2 sheets with positive fps', () => {

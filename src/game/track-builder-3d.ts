@@ -7,8 +7,15 @@
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 import { classifyPlacedRamp, getTrackSpace } from './track-space';
+import {
+  readStorage,
+  writeStorage,
+  restoreFromBackup,
+  exportProps as exportTrackStorage,
+  importProps as importTrackStorage,
+} from './track-storage';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier';
 
 export interface PropDefinition {
   type: string;
@@ -17,16 +24,23 @@ export interface PropDefinition {
   url: string;
   defaultWidth: number;
   defaultHeight: number;
+  defaultDepth?: number; // T08: explicit depth for 3D props
   defaultAltitude?: number;
   alignBottom?: boolean;
   isRamp?: boolean;
   isDecal?: boolean;
   is3DModel?: boolean;
   isSlingshot?: boolean;
+  isPowerup?: boolean; // T08: powerup category
+  isBarrier?: boolean; // T08: barrier category
 }
 
 export type DecalSide = 'front' | 'back' | 'left' | 'right';
 
+/**
+ * T08: Extended PlacedProp with optional authoring fields.
+ * Unknown fields are preserved during round-trip for forward compatibility.
+ */
 export interface PlacedProp {
   id: string;
   type: string;
@@ -39,6 +53,9 @@ export interface PlacedProp {
   rotX?: number;
   quaternion?: [number, number, number, number];
   scale: number;
+  width?: number; // T08: explicit width override (in world units)
+  height?: number; // T08: explicit height override (in world units)
+  depth?: number; // T08: explicit depth override (in world units)
   alignToTrack: boolean;
   trackDist?: number;
   cameraFacing?: boolean;
@@ -46,6 +63,10 @@ export interface PlacedProp {
   isDecal?: boolean;
   groupId?: string;
   lit?: boolean;
+  visible?: boolean; // T08: visibility toggle (H key)
+  authoringNotes?: string; // T08: optional authoring metadata
+  // Allow unknown fields for forward compatibility
+  [key: string]: unknown;
 }
 
 export const PROP_DEFINITIONS: PropDefinition[] = [
@@ -197,6 +218,20 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'goblin_28_cheer_tower', name: 'Cheer Tower', category: 'goblins', url: '/art/goblins/alpha/goblin-28-cheer-tower.png', defaultWidth: 436, defaultHeight: 650 },
   { type: 'goblin_29_victory_stage', name: 'Victory Stage', category: 'goblins', url: '/art/goblins/alpha/goblin-29-victory-stage.png', defaultWidth: 1254, defaultHeight: 700 },
   { type: 'goblin_30_fan_aisle', name: 'Fan Aisle', category: 'goblins', url: '/art/goblins/alpha/goblin-30-fan-aisle.png', defaultWidth: 1075, defaultHeight: 600 },
+
+  // --- T08: POWERUPS ---
+  { type: 'powerup_speed_boost', name: 'Speed Boost Pickup', category: 'powerup', url: '/art/props/alpha/prop-03-tnt-powder-kegs.png', defaultWidth: 320, defaultHeight: 320, defaultDepth: 320, isPowerup: true },
+  { type: 'powerup_shield', name: 'Shield Generator', category: 'powerup', url: '/art/props/alpha/prop-04-smelting-crucible.png', defaultWidth: 360, defaultHeight: 360, defaultDepth: 360, isPowerup: true },
+  { type: 'powerup_missile', name: 'Missile Crate', category: 'powerup', url: '/art/props/alpha/prop-03-tnt-powder-kegs.png', defaultWidth: 340, defaultHeight: 340, defaultDepth: 340, isPowerup: true },
+  { type: 'powerup_jump_pad', name: 'Jump Pad Platform', category: 'powerup', url: '/art/props/alpha/prop-20-goblin-springboard-platform.png', defaultWidth: 400, defaultHeight: 200, defaultDepth: 400, isPowerup: true },
+  { type: 'powerup_repair_kit', name: 'Repair Kit', category: 'powerup', url: '/art/props/alpha/prop-07-tripod-cauldron-molten.png', defaultWidth: 300, defaultHeight: 300, defaultDepth: 300, isPowerup: true },
+
+  // --- T08: BARRIERS ---
+  { type: 'barrier_spike_wall', name: 'Spiked Barrier Wall', category: 'barrier', url: '/art/props/alpha/prop-29-spiked-boulder-barricade.png', defaultWidth: 800, defaultHeight: 600, defaultDepth: 200, isBarrier: true },
+  { type: 'barrier_electric_fence', name: 'Electric Fence', category: 'barrier', url: '/art/props/alpha/prop-38-scrap-iron-barricade.png', defaultWidth: 1000, defaultHeight: 500, defaultDepth: 150, isBarrier: true },
+  { type: 'barrier_fire_pit', name: 'Fire Pit Trap', category: 'barrier', url: '/art/props/alpha/prop-41-molten-slag-channel.png', defaultWidth: 600, defaultHeight: 400, defaultDepth: 600, isBarrier: true },
+  { type: 'barrier_rock_slide', name: 'Rock Slide Zone', category: 'barrier', url: '/art/props/alpha/prop-35-granite-strata-seam-wall.png', defaultWidth: 1200, defaultHeight: 800, defaultDepth: 300, isBarrier: true },
+  { type: 'barrier_mine_field', name: 'Mine Field', category: 'barrier', url: '/art/props/alpha/prop-02-ore-cart-spilling.png', defaultWidth: 500, defaultHeight: 300, defaultDepth: 500, isBarrier: true },
 ];
 
 export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
@@ -800,6 +835,113 @@ export class TrackBuilder3D {
     this.notify();
   }
 
+  // --- T08: VISIBILITY TOGGLE (H KEY) ---
+  /** T08: Toggle visibility on selected props. Hidden props retain selection identity but are excluded from fresh raycasts. */
+  toggleVisibility(): void {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      prop.visible = prop.visible === false ? true : false;
+      const obj = this.propObjects.get(prop.id);
+      if (obj) {
+        obj.visible = prop.visible !== false;
+      }
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** T08: Set visibility explicitly (show/hide) on selected props. */
+  setVisibility(visible: boolean): void {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      prop.visible = visible;
+      const obj = this.propObjects.get(prop.id);
+      if (obj) {
+        obj.visible = visible;
+      }
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** T08: Check if a prop is visible (defaults to true). */
+  isPropVisible(prop: PlacedProp): boolean {
+    return prop.visible !== false;
+  }
+
+  /**
+   * T08: Compute effective world-space dimensions for a prop.
+   * Convention: if width/height/depth are explicitly set, they ARE the final dimensions
+   * (scale is NOT applied again). Otherwise, dimensions = default * scale.
+   * This prevents double-application of scale.
+   */
+  getEffectiveDimensions(prop: PlacedProp): { width: number; height: number; depth: number } {
+    const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+    const baseW = def?.defaultWidth ?? 500;
+    const baseH = def?.defaultHeight ?? 500;
+    const baseD = def?.defaultDepth ?? baseW;
+
+    return {
+      width: prop.width !== undefined ? prop.width : baseW * prop.scale,
+      height: prop.height !== undefined ? prop.height : baseH * prop.scale,
+      depth: prop.depth !== undefined ? prop.depth : baseD * prop.scale,
+    };
+  }
+
+  /**
+   * T08: Set explicit width/height/depth on selected props.
+   * The dimensions are in world units and replace the scale-derived size.
+   */
+  setSelectedDimensions(updates: { width?: number; height?: number; depth?: number }): void {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      if (updates.width !== undefined && updates.width > 0 && isFinite(updates.width)) {
+        prop.width = updates.width;
+      }
+      if (updates.height !== undefined && updates.height > 0 && isFinite(updates.height)) {
+        prop.height = updates.height;
+      }
+      if (updates.depth !== undefined && updates.depth > 0 && isFinite(updates.depth)) {
+        prop.depth = updates.depth;
+      }
+    }
+    // Recreate sprites to apply new dimensions
+    this.propObjects.forEach((s) => this.scene.remove(s));
+    this.propObjects.clear();
+    this.placedProps.forEach((p) => this.createPropSprite(p));
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /**
+   * T08: Clear explicit dimensions on selected props, reverting to scale * default.
+   */
+  clearSelectedDimensions(): void {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      delete prop.width;
+      delete prop.height;
+      delete prop.depth;
+    }
+    this.propObjects.forEach((s) => this.scene.remove(s));
+    this.propObjects.clear();
+    this.placedProps.forEach((p) => this.createPropSprite(p));
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
   getPropTrackSection(prop: PlacedProp): 'alpine' | 'canyon' | 'cavern' | 'stadium' {
     if (this.track?.samples && this.track.samples.length > 0) {
       let minDist = Infinity;
@@ -916,7 +1058,13 @@ export class TrackBuilder3D {
     this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
 
     this.raycaster.setFromCamera(this.mouseNdc, this.camera);
-    const objects = Array.from(this.propObjects.values());
+    // T08: Exclude invisible props from raycasts
+    const objects = Array.from(this.propObjects.entries())
+      .filter(([id]) => {
+        const prop = this.placedProps.find(p => p.id === id);
+        return prop && prop.visible !== false;
+      })
+      .map(([, obj]) => obj);
     const hits = this.raycaster.intersectObjects(objects, true);
 
     if (hits.length > 0) {
@@ -930,11 +1078,14 @@ export class TrackBuilder3D {
       }
     }
 
-    // Screen-space proximity fallback:
+    // Screen-space proximity fallback (T08: skip invisible props):
     let bestProp: PlacedProp | null = null;
     let bestDistanceSq = Infinity;
 
     for (const prop of this.placedProps) {
+      // T08: Exclude invisible props from fresh raycasts
+      if (prop.visible === false) continue;
+      
       const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
       if (!def) continue;
 
@@ -2101,6 +2252,11 @@ export class TrackBuilder3D {
       obj = sprite;
     }
 
+    // T08: Respect visibility flag
+    if (prop.visible === false) {
+      obj.visible = false;
+    }
+
     this.scene.add(obj);
     this.propObjects.set(prop.id, obj);
     return obj;
@@ -2142,16 +2298,41 @@ export class TrackBuilder3D {
     this.saveToStorage();
   }
 
+  /** T08: Strip runtime-only fields before serialization (pickup state, transient markers). */
+  private stripRuntimeState(props: PlacedProp[]): PlacedProp[] {
+    return props.map((p) => {
+      const cleaned = { ...p } as PlacedProp;
+      delete (cleaned as any)._runtime;
+      delete (cleaned as any)._pickupCollected;
+      delete (cleaned as any)._pickupRespawn;
+      delete (cleaned as any)._runtimeState;
+      return cleaned;
+    });
+  }
+
   // --- PERSISTENCE & PERIODIC DISK BACKUP ---
   saveToStorage() {
+    // T08: Write via versioned storage module (separate key, not protected path)
+    const cleanProps = this.stripRuntimeState(this.placedProps);
+    const storageResult = writeStorage(cleanProps, this.courseId);
+
+    if (!storageResult.ok && storageResult.quotaExceeded) {
+      // T08: Quota-interrupted saves preserve the last valid feature version via backup
+      try {
+        restoreFromBackup();
+      } catch {
+        // Best-effort; backup may also be unavailable
+      }
+    }
+
+    // Maintain existing backup flow for backward compatibility with disk backups
     try {
-      localStorage.setItem('hm2-3d-track-props', JSON.stringify(this.placedProps));
       if (this.placedProps.length > 0) {
         const backupEntry = {
           course: this.courseId,
           timestamp: Date.now(),
           count: this.placedProps.length,
-          props: this.placedProps,
+          props: cleanProps,
         };
         localStorage.setItem('hm2-3d-track-props-backup-latest', JSON.stringify(backupEntry));
 
@@ -2164,7 +2345,7 @@ export class TrackBuilder3D {
               course: this.courseId,
               timestamp: Date.now(),
               count: this.placedProps.length,
-              props: this.placedProps,
+              props: cleanProps,
             });
             localStorage.setItem('hm2-3d-track-props-backup-history', JSON.stringify(hist.slice(0, 5)));
           }
@@ -2190,21 +2371,38 @@ export class TrackBuilder3D {
 
   private loadFromStorage() {
     let loaded = false;
-    try {
-      const raw = localStorage.getItem('hm2-3d-track-props');
-      if (raw) {
-        const props: PlacedProp[] = JSON.parse(raw);
-        if (Array.isArray(props) && props.length > 0) {
-          this.placedProps = props;
-          this.placedProps.forEach((p) => this.createPropSprite(p));
-          loaded = true;
-        }
+
+    // T08: Read via versioned storage module (validates, preserves unknown fields)
+    const storageResult = readStorage();
+    if (storageResult.props.length > 0) {
+      // Log any notices (migration warnings, validation issues)
+      if (storageResult.notices.length > 0) {
+        console.warn('[T08 Track Storage]', storageResult.notices.join('; '));
       }
-    } catch {
-      // Invalid JSON
+      this.placedProps = storageResult.props;
+      this.courseId = storageResult.courseId || this.courseId;
+      this.placedProps.forEach((p) => this.createPropSprite(p));
+      loaded = true;
     }
 
-    // If empty or missing, try browser local backup
+    // If empty or missing, try legacy path for backward compatibility
+    if (!loaded) {
+      try {
+        const raw = localStorage.getItem('hm2-3d-track-props');
+        if (raw) {
+          const props: PlacedProp[] = JSON.parse(raw);
+          if (Array.isArray(props) && props.length > 0) {
+            this.placedProps = props;
+            this.placedProps.forEach((p) => this.createPropSprite(p));
+            loaded = true;
+          }
+        }
+      } catch {
+        // Invalid JSON
+      }
+    }
+
+    // If still empty, try browser local backup
     if (!loaded) {
       try {
         const rawBackup = localStorage.getItem('hm2-3d-track-props-backup-latest');
@@ -2368,15 +2566,41 @@ export class TrackBuilder3D {
   }
 
   exportJson(): string {
-    return JSON.stringify(this.placedProps, null, 2);
+    // T08: Use versioned export with unknown-field preservation
+    const cleanProps = this.stripRuntimeState(this.placedProps);
+    return exportTrackStorage(cleanProps, this.courseId);
   }
 
   importJson(jsonStr: string) {
+    // T08: Use versioned import with validation, but support legacy plain arrays
     try {
-      const props: PlacedProp[] = JSON.parse(jsonStr);
-      if (Array.isArray(props)) {
+      const parsed = JSON.parse(jsonStr);
+      
+      // Backward compatibility: if it's a plain array, treat it as props
+      if (Array.isArray(parsed)) {
         this.pushUndo();
-        this.restorePropsState(props);
+        this.restorePropsState(parsed);
+        this.notify();
+        this.backupToFile(true);
+        return;
+      }
+      
+      // Otherwise, use versioned import
+      const result = importTrackStorage(jsonStr);
+      
+      if (result.errors.length > 0) {
+        console.error('[T08 Track Storage] Import failed:', result.errors);
+        return;
+      }
+      
+      if (result.warnings.length > 0) {
+        console.warn('[T08 Track Storage] Import warnings:', result.warnings);
+      }
+
+      if (result.props.length > 0) {
+        this.pushUndo();
+        this.courseId = result.courseId || this.courseId;
+        this.restorePropsState(result.props);
         this.notify();
         this.backupToFile(true);
       }

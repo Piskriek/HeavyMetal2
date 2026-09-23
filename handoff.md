@@ -223,6 +223,68 @@ npm run build → green, 1,454.55 kB / 402.24 kB gzip
 - Not yet wired into the engine — the legacy `resolveBumps()` is still in use. Integration is
   the next step.
 
+## T08 — Non-Destructive Feature-Prop Storage and Builder Authoring (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#41](https://github.com/Piskriek/HeavyMetal2/issues/41) adds versioned, non-destructive
+storage for track props with forward-compatible unknown-field preservation, input validation,
+quota handling, and new authoring controls. Read [`docs/TRACK_STORAGE.md`](docs/TRACK_STORAGE.md)
+for the full design and API reference.
+
+**What landed**
+
+- `src/game/track-storage.ts` — versioned storage module: `TRACK_STORAGE_VERSION=1`, validates
+  duplicate IDs and invalid dimensions (scale/width/height/depth must be positive and finite),
+  handles quota errors with `quotaExceeded` flag, preserves unknown fields via spread operator,
+  separate storage key (`hm2-track-props-v1`, not protected path), backup/restore, export/import
+  with validation.
+- `src/game/track-builder-3d.ts` — extended with T08 features:
+  - **New categories**: `powerup` (5 procedural pickups) and `barrier` (5 hazard obstacles) with
+    `isPowerup`/`isBarrier` flags and explicit `defaultDepth` for 3D bounding boxes.
+  - **Extended PlacedProp**: optional `width`, `height`, `depth` (world-unit overrides), `visible`
+    (H key toggle), `authoringNotes`, and `[key: string]: unknown` for forward compatibility.
+  - **Scale convention**: `getEffectiveDimensions()` returns explicit dims if set (no scale applied),
+    otherwise `default * scale`. Prevents double-application.
+  - **Visibility**: `toggleVisibility()`, `setVisibility()`, `isPropVisible()`. Hidden props retain
+    selection identity but are excluded from fresh raycasts.
+  - **Dimension controls**: `setSelectedDimensions()`, `clearSelectedDimensions()`.
+  - **Runtime stripping**: `stripRuntimeState()` removes `_pickupCollected`, `_pickupRespawn`,
+    `_runtimeState` before serialization.
+  - **Backward-compatible import**: `importJson()` accepts both versioned documents and legacy
+    plain arrays.
+- 30 new checks in `tests/track-storage.test.ts` covering versioned schema, unknown-field
+  preservation, validation (duplicate IDs, invalid dimensions, quota errors), backup restoration,
+  runtime state stripping, import/export, builder integration (visibility, dimensions, categories).
+
+**Verification**
+
+```
+npm run check → tsc(src) + tsc(tests) + 291 tests, 0 fail
+  (261 pre-existing + 30 track-storage)
+npm run build → green, 1,461.92 kB / 404.15 kB gzip
+```
+
+**Acceptance criteria → tests**
+
+| # | Criterion | Test |
+|---|-----------|------|
+| 1 | Synthetic legacy fixtures round-trip without losing unknown fields | `track-storage: synthetic legacy fixtures round-trip` |
+| 2 | Failed/quota-interrupted saves preserve last valid version | `track-storage: failed/quota-interrupted saves preserve last valid version via backup` |
+| 3 | Duplicate IDs and invalid dimensions rejected | `track-storage: duplicate IDs rejected`, `invalid dimensions rejected` |
+| 4 | Scale and dimensions not applied twice | `track-storage: explicit width/height/depth not scaled twice` |
+| 5 | Runtime pickup state not serialized | `track-storage: export strips runtime pickup state` |
+| 6 | No new writer targets protected path | `track-storage: storage module uses separate key` |
+
+**Notes for whoever integrates next**
+
+- The storage module is pure and headless. It writes to `hm2-track-props-v1`, not the protected
+  `hm2-3d-track-props` path. Legacy data is read as fallback during migration.
+- Powerup/barrier props are defined but not yet wired into gameplay physics. The `isPowerup` and
+  `isBarrier` flags are available for the engine to check.
+- Visibility is editor-only; hidden props are still serialized and rendered in the runtime.
+  Wire `visible === false` into the renderer to hide them in-game.
+- The dimension controls (`width`/`height`/`depth`) are authoring fields; the renderer should use
+  `getEffectiveDimensions()` to avoid double-scaling.
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

@@ -68,11 +68,11 @@ test('Track Props Backup and Recovery System', async (t) => {
     assert.equal(props.length, 14);
     assert.equal(props[0].type, 'slingshot_3d_launcher');
 
-    // Verify written to storage
-    const raw = mockLocalStorage.getItem('hm2-3d-track-props');
+    // Verify written to storage (T08: uses versioned storage key)
+    const raw = mockLocalStorage.getItem('hm2-track-props-v1');
     assert.ok(raw);
     const parsed = JSON.parse(raw);
-    assert.equal(parsed.length, 14);
+    assert.equal(parsed.props.length, 14);
 
     // Verify written to rolling backup latest
     const rawBackup = mockLocalStorage.getItem('hm2-3d-track-props-backup-latest');

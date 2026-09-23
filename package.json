@@ -16,7 +16,10 @@
     "art:textures": "node scripts/generate-stylized-track-textures.mjs",
     "check:textures": "node scripts/generate-stylized-track-textures.mjs --check",
     "balance:art": "node scripts/balance-asset-color.mjs",
-    "seamless:sky": "node scripts/make-skybox-seamless.mjs"
+    "seamless:sky": "node scripts/make-skybox-seamless.mjs",
+    "check:parity-fixture": "node scripts/build-parity-fixture.mjs --check",
+    "check:qualifying": "node --import tsx --test tests/physics-parity.test.ts tests/qualifying-gate.test.ts tests/qualifying-attempt.test.ts tests/qualifying-session.test.ts",
+    "qualifying": "node --import tsx scripts/qualifying-harness.ts"
   },
   "dependencies": {
     "clsx": "2.1.1",

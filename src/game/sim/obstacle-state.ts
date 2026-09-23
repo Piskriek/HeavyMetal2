@@ -18,20 +18,7 @@ export function recordObstacleHit(obstacle: Obstacle, racerId: number): void {
   }
 }
 
+/** Who has touched an obstacle, read from the scalable ledger. */
 export function obstacleTouchedBy(obstacle: Obstacle, racerId: number): boolean {
   return obstacle.hitBy?.has(racerId) ?? false;
-}
-
-/** Per-attempt state an isolated run owns: what it broke, what it set off, who touched it. */
-export interface ObstacleLedgerEntry {
-  readonly kind: Obstacle['kind'];
-  readonly x: number;
-  readonly hit: boolean;
-  readonly broken: boolean;
-}
-
-export function obstacleLedger(obstacles: readonly Obstacle[]): readonly ObstacleLedgerEntry[] {
-  return obstacles
-    .filter((obstacle) => obstacle.hit || obstacle.broken === true)
-    .map((obstacle) => Object.freeze({ kind: obstacle.kind, x: obstacle.x, hit: obstacle.hit, broken: obstacle.broken === true }));
 }

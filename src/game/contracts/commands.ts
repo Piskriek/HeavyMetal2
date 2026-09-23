@@ -86,8 +86,10 @@ export function validateCommand(command: GameCommand, gate: CommandGate): Comman
 
     case 'steer':
       if (command.direction !== -1 && command.direction !== 1) return deny(command, 'E_COMMAND', 'Steering direction must be -1 or 1.');
-      if (gate.status === 'ready') return allow(command);
-      // Steering is also accepted on the grid so a lane change made during staging sticks.
+      // Racing is the base case; the grid also accepts steering so a staged lane
+      // change sticks (T02 adopted this gate — the original condition only allowed
+      // "ready" while the message promised "grid or racing").
+      if (gate.status === 'ready' || gate.status === 'flying' || gate.status === 'paused') return allow(command);
       return deny(command, 'E_COMMAND', 'Steering is only available on the grid or while racing.');
 
     case 'hop':

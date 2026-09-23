@@ -16,7 +16,11 @@ carries byte-identical copies of the files T04 compiles against:
 
 - `src/game/contracts/**` — all 15 files, copied verbatim from
   [`4636c49`](https://github.com/Piskriek/HeavyMetal2/commit/4636c494efc70e15f1a4357e2976cc6b619cd430)
-  (PR #46, "T01: freeze shared contracts, config defaults and the headless stepping seam").
+  (PR #46, "T01: freeze shared contracts, config defaults and the headless stepping seam"), with one
+  exception: `commands.ts` is taken from **PR #48**, which corrects the inverted `steer` gate in
+  #46's copy (the condition allowed only `"ready"` while its own message promised "the grid or while
+  racing"). Steering is the base verb of a qualifying attempt, so T04 needs the corrected version;
+  whoever merges #46 and #48 finds this branch already holding their resolution.
 - `src/game/rng.ts` — copied verbatim from PR #48 (T02's separated gameplay/cosmetic RNG
   streams), because per-attempt determinism needs exactly that module.
 

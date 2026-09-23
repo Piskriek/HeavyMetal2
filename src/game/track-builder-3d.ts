@@ -423,6 +423,8 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_38_flag_terrace', name: 'Flag Terrace (Animated)', category: 'animated', url: '/art/animated/alpha/anim-38-flag-terrace.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
   { type: 'anim_39_mosh_pit', name: 'Mosh Pit (Animated)', category: 'animated', url: '/art/animated/alpha/anim-39-mosh-pit.png', defaultWidth: 420, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
   { type: 'anim_40_fence_fans', name: 'Fence Fans (Animated)', category: 'animated', url: '/art/animated/alpha/anim-40-fence-fans.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_41_cheer_tower', name: 'Cheer Tower (Animated)', category: 'animated', url: '/art/animated/alpha/anim-41-cheer-tower.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_42_victory_stage', name: 'Victory Stage (Animated)', category: 'animated', url: '/art/animated/alpha/anim-42-victory-stage.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
 ];
 
 /**
@@ -474,6 +476,8 @@ export const ANIMATED_SOURCE_ART: Record<string, string> = {
   anim_38_flag_terrace: '/art/goblins/alpha/goblin-23-flag-terrace.png',
   anim_39_mosh_pit: '/art/goblins/alpha/goblin-26-mosh-pit.png',
   anim_40_fence_fans: '/art/goblins/alpha/goblin-27-fence-fans.png',
+  anim_41_cheer_tower: '/art/goblins/alpha/goblin-28-cheer-tower.png',
+  anim_42_victory_stage: '/art/goblins/alpha/goblin-29-victory-stage.png',
 };
 
 /**

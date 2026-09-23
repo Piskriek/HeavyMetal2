@@ -65,6 +65,8 @@ const SOURCE_ART = {
   'anim-38-flag-terrace': 'goblins/alpha/goblin-23-flag-terrace.png',
   'anim-39-mosh-pit': 'goblins/alpha/goblin-26-mosh-pit.png',
   'anim-40-fence-fans': 'goblins/alpha/goblin-27-fence-fans.png',
+  'anim-41-cheer-tower': 'goblins/alpha/goblin-28-cheer-tower.png',
+  'anim-42-victory-stage': 'goblins/alpha/goblin-29-victory-stage.png',
 };
 
 const outDir = join(root, 'art-src/animated');

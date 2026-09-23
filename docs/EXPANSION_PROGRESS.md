@@ -579,15 +579,29 @@ misregistration — the crowd sheets have no single dominant silhouette for the
 cross-correlation to lock onto, so it drifts to an arbitrary far offset. The
 overlap-gain guard is what keeps these from being false positives.
 
-**anim-39-mosh-pit fails both gates and must be regenerated.** It came back with
-magenta remnant 3.775% (gate: 0.5%) and fillSpread 3.61x (gate: 1.6x), so the
-crowd changes size between panels *and* the gutter has bleed. It was built and
-registered but is not trustworthy; the regeneration prompt is ready and needs to
-carry both the gutter wording and the "reuse one tracing" wording together.
-The other nine are clean.
+### anim-39-mosh-pit, regenerated
 
-**Still to animate:** goblin-28 and goblin-29 — two more characters. After
-those: explosion sprites and general-play sprites.
+The first anim-39 came back with magenta remnant 3.775% (gate: 0.5%) **and**
+fillSpread 3.61x (gate: 1.6x) - the crowd changed size between panels and the
+gutter had bleed, two independent generation faults in one sheet. The fix was to
+carry both wordings at once: the gutter paragraph (declared the most important
+part of the image, forbidding any glow/halo/arm/elbow from touching it, and
+telling the model to shrink the whole crowd rather than let it overflow) *and*
+the "reuse one tracing" paragraph. **When a sheet fails for two reasons, both
+warnings must appear in the regeneration prompt - fixing one leaves the other.**
+
+That also completes the still-goblin set: all 30 characters now have animated
+twins. Two more sheets were added to finish it:
+
+| sheet | still twin | frame | fps | min elem Δ | maxShift | fillSpread |
+|---|---|---|---|---|---|---|
+| anim-39 mosh pit | goblin-26-mosh-pit | 838x468 | 9 | 0.406 | 27.3px | 1.18x |
+| anim-41 cheer tower | goblin-28-cheer-tower | 292x436 | 7 | 0.209 | 0.0px | 1.14x |
+| anim-42 victory stage | goblin-29-victory-stage | 416x232 | 7 | 0.149 | 0.0px | 1.08x |
+
+**All 30 goblins are now animated.** Next: explosion sprites and general-play
+sprites, which are a separate requirement and may need a different sheet
+structure than the 4-frame 2x2 pattern.
 
 The registry test no longer hardcodes a sheet count (`exactly 20 animated
 decorations` and `19 of the 20 sheets have a still counterpart`); it now derives

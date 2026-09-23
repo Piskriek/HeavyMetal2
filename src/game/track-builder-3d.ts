@@ -403,6 +403,14 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_18_torch_sconce', name: 'Torch Sconce (Animated)', category: 'animated', url: '/art/animated/alpha/anim-18-torch-sconce.png', defaultWidth: 320, defaultHeight: 480, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
   { type: 'anim_19_waterfall_splash', name: 'Waterfall Splash (Animated)', category: 'animated', url: '/art/animated/alpha/anim-19-waterfall-splash.png', defaultWidth: 650, defaultHeight: 450, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
   { type: 'anim_20_waterfall_splash_b', name: 'Waterfall Splash B (Animated)', category: 'animated', url: '/art/animated/alpha/anim-20-waterfall-splash-b.png', defaultWidth: 650, defaultHeight: 450, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_21_flag_waver', name: 'Flag-Waving Fan (Animated)', category: 'animated', url: '/art/animated/alpha/anim-21-flag-waver.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_22_war_drummer', name: 'War Drummer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-22-war-drummer.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_23_pit_mechanic', name: 'Pit Mechanic (Animated)', category: 'animated', url: '/art/animated/alpha/anim-23-pit-mechanic.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_24_ore_miner', name: 'Ore Miner (Animated)', category: 'animated', url: '/art/animated/alpha/anim-24-ore-miner.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_25_horn_blower', name: 'War Horn Blower (Animated)', category: 'animated', url: '/art/animated/alpha/anim-25-horn-blower.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_26_track_marshal', name: 'Track Marshal (Animated)', category: 'animated', url: '/art/animated/alpha/anim-26-track-marshal.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_27_blacksmith', name: 'Blacksmith (Animated)', category: 'animated', url: '/art/animated/alpha/anim-27-blacksmith.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_28_tankard_celebrant', name: 'Tankard Celebrant (Animated)', category: 'animated', url: '/art/animated/alpha/anim-28-tankard-celebrant.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
 ];
 
 /**
@@ -434,6 +442,14 @@ export const ANIMATED_SOURCE_ART: Record<string, string> = {
   anim_17_arch_gate_lanterns: '/art/props/alpha/prop-40-timber-arch-gate-lanterns.png',
   anim_18_torch_sconce: '/art/props/alpha/prop-56-arch-torch-sconce.png',
   anim_19_waterfall_splash: '/art/track-parts/waterfall-splash.png',
+  anim_21_flag_waver: '/art/goblins/alpha/goblin-01-flag-waver.png',
+  anim_22_war_drummer: '/art/goblins/alpha/goblin-02-war-drummer.png',
+  anim_23_pit_mechanic: '/art/goblins/alpha/goblin-03-pit-mechanic.png',
+  anim_24_ore_miner: '/art/goblins/alpha/goblin-05-ore-miner.png',
+  anim_25_horn_blower: '/art/goblins/alpha/goblin-06-horn-blower.png',
+  anim_26_track_marshal: '/art/goblins/alpha/goblin-08-track-marshal.png',
+  anim_27_blacksmith: '/art/goblins/alpha/goblin-09-blacksmith.png',
+  anim_28_tankard_celebrant: '/art/goblins/alpha/goblin-10-tankard-celebrant.png',
 };
 
 /**

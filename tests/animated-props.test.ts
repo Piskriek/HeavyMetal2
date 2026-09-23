@@ -3,14 +3,14 @@
  *
  * Validates:
  * - Frame math: grid defaults, frame timing/looping, row-major UVs, id phases
- * - Registry: 20 animated entries with unique types, 2x2 grids, positive fps
+ * - Registry: one entry per sheet on disk, unique types, 2x2 grids, positive fps
  * - Sheets on disk: keyed alpha files exist with even (cuttable) dimensions
  * - Headless builder: offsets advance per frame, animate=false and reduced
  *   motion freeze on frame 0, batch toggle flips the flag
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
@@ -134,8 +134,15 @@ test('Animated: frame math', async (t) => {
 test('Animated: registry entries', async (t) => {
   const animated = PROP_DEFINITIONS.filter((d) => d.category === 'animated');
 
-  await t.test('exactly 20 animated decorations are registered', () => {
-    assert.equal(animated.length, 20);
+  await t.test('every keyed sheet on disk is registered exactly once', () => {
+    // Derived rather than hardcoded: the count grows with each batch, and a
+    // stale literal here would fail a green build for no real reason.
+    const onDisk = readdirSync(alphaDir).filter((f) => f.endsWith('.png'));
+    assert.equal(animated.length, onDisk.length,
+      `registered ${animated.length} but ${onDisk.length} sheets exist`);
+    for (const file of onDisk) {
+      assert.ok(animated.some((d) => d.url.endsWith(`/${file}`)), `registered: ${file}`);
+    }
   });
 
   await t.test('entries are unique 2x2 sheets with positive fps', () => {
@@ -257,7 +264,8 @@ test('Animated: still <-> animated twins', async (t) => {
       assert.equal(stillDef?.animatedTwin, animType, `${stillDef?.type} -> animatedTwin is reciprocal`);
       linked += 1;
     }
-    assert.equal(linked, 19, '19 of the 20 sheets have a still counterpart');
+    assert.equal(linked, Object.keys(ANIMATED_SOURCE_ART).length,
+      'every sheet that has still art to link to, links to it');
   });
 
   await t.test('anim_20 has no still counterpart and stays unlinked', () => {

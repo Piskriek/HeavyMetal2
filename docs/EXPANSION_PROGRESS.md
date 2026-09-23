@@ -516,7 +516,47 @@ decoration it was cut from.
 - Tests: `tests/animated-props.test.ts` grew 15 → 29 checks (twin links, aspect parity,
   frame skipping, speed, persistence, batch controls). `npm run check` 449/449 green;
   `npm run build` green.
-- **All 20 sheets now carry real motion, and they are registered so the body holds still across the loop.** See "Frame registration" above.
+- **All 20 fire/water sheets now carry real motion, and they are registered so the body holds still across the loop.** See "Frame registration" above.
+
+### Animated Goblins (anim 21–28 — first batch of character animations)
+
+The 30 goblin cutouts were stills only. Ten reference templates were built and
+the first eight characters have been animated, each wired to its still twin the
+same way the fire/water sheets are:
+
+| sheet | still twin | frame | fps | min element Δ | remnant |
+|---|---|---|---|---|---|
+| anim-21 flag waver | goblin-01-flag-waver | 358x534 | 8 | 0.471 | 0.001% |
+| anim-22 war drummer | goblin-02-war-drummer | 272x488 | 9 | 0.137 | 0.001% |
+| anim-23 pit mechanic | goblin-03-pit-mechanic | 510x760 | 8 | 0.340 | 0.019% |
+| anim-24 ore miner | goblin-05-ore-miner | 510x914 | 6 | 0.414 | 0.002% |
+| anim-25 horn blower | goblin-06-horn-blower | 450x806 | 6 | 0.260 | 0.010% |
+| anim-26 track marshal | goblin-08-track-marshal | 426x764 | 8 | 0.500 | 0.001% |
+| anim-27 blacksmith | goblin-09-blacksmith | 500x744 | 9 | 0.339 | 0.024% |
+| anim-28 tankard celebrant | goblin-10-tankard-celebrant | 298x532 | 6 | 0.334 | 0.000% |
+
+The prompts carry the same two constraints that fixed the fire/water sheets: the
+body must stay put and the same size in every panel, and the animated element
+must keep a consistent size across panels. Seven of the eight come back at
+`maxShift` 0.0–2.2px and `fillSpread` 1.10–1.29x.
+
+**Known, not yet fixed:** `anim-25-horn-blower` has `fillSpread` 1.67x — the
+sound rings vary in extent between panels, so the blast visibly swells. It is
+otherwise clean (registered to 0.0px, element Δ 0.260, remnant 0.010%), and the
+pipeline gates pass it, but it trips the onion-skin size gate and should be
+regenerated.
+
+**Still to animate:** `anim-29-ball-loader` and `anim-30-bell-ringer` are
+registered in `SHEETS` and their reference templates exist, but the sheets were
+not generated this turn (image-generation budget ran out), so they are
+deliberately **not** registered in `PROP_DEFINITIONS` — the registry test derives
+its expected count from the sheets actually on disk, so adding the defs without
+the art would fail. After them: goblin-14…goblin-30 minus the eight already done.
+
+The registry test no longer hardcodes a sheet count (`exactly 20 animated
+decorations` and `19 of the 20 sheets have a still counterpart`); it now derives
+both from the sheets on disk and from `ANIMATED_SOURCE_ART`, so a new batch
+cannot fail a green build on a stale literal.
   sheets into `art-src/animated/`, then `scripts/analyze-animated-sheets.mjs --all`
   (regenerate any `STATIC`/`LAYOUT` rows) and `scripts/process-generated-animated.mjs`.
 

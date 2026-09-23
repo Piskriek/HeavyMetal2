@@ -24,7 +24,8 @@ const commands = [
     'tests/track-builder-validation.test.ts',
     'tests/physics-parity.test.ts', 'tests/qualifying-gate.test.ts', 'tests/qualifying-attempt.test.ts',
     'tests/qualifying-session.test.ts',
-    'tests/release-grid.test.ts', 'tests/release-scheduler.test.ts', 'tests/release-go-clock.test.ts'],
+    'tests/release-grid.test.ts', 'tests/release-scheduler.test.ts', 'tests/release-go-clock.test.ts',
+    'tests/staging-lifecycle.test.ts', 'tests/staging-presentation.test.ts'],
 ];
 
 for (const args of commands) {

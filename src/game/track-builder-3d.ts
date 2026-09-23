@@ -15,7 +15,7 @@ import {
   importProps as importTrackStorage,
 } from './track-storage';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated';
 
 export interface PropDefinition {
   type: string;
@@ -33,9 +33,154 @@ export interface PropDefinition {
   isSlingshot?: boolean;
   isPowerup?: boolean; // T08: powerup category
   isBarrier?: boolean; // T08: barrier category
+  isAnimated?: boolean; // Animated category: url is a multi-frame sheet, one frame shown at a time
+  animCols?: number; // sheet columns (default 2)
+  animRows?: number; // sheet rows (default 2)
+  animFps?: number; // playback speed (default 6)
+  stillType?: string; // animated defs: type of the still decoration this sheet was cut from
+  animatedTwin?: string; // still defs: type of the animated sheet cut from this decoration
 }
 
 export type DecalSide = 'front' | 'back' | 'left' | 'right';
+
+/** Grid + speed resolved from a definition (2x2 @ 6fps unless overridden). */
+export interface AnimGrid {
+  cols: number;
+  rows: number;
+  fps: number;
+}
+
+export function animGridFor(def: PropDefinition): AnimGrid {
+  const cols = def.animCols !== undefined && def.animCols > 0 ? Math.floor(def.animCols) : 2;
+  const rows = def.animRows !== undefined && def.animRows > 0 ? Math.floor(def.animRows) : 2;
+  const fps = def.animFps !== undefined && def.animFps > 0 ? def.animFps : 6;
+  return { cols, rows, fps };
+}
+
+/** Speed slider bounds for the attribute window's +/- control. */
+export const ANIM_SPEED_MIN = 0.25;
+export const ANIM_SPEED_MAX = 4;
+export const ANIM_SPEED_STEP = 0.25;
+
+/** Clamp a stored speed multiplier into the supported range (default 1). */
+export function animSpeedFor(prop: Pick<PlacedProp, 'animSpeed'> | undefined): number {
+  const raw = prop?.animSpeed;
+  if (raw === undefined || !Number.isFinite(raw)) return 1;
+  return Math.min(ANIM_SPEED_MAX, Math.max(ANIM_SPEED_MIN, raw));
+}
+
+/**
+ * Frame indices a prop is allowed to show. `animFrames` shorter than the sheet
+ * (or missing) counts as "all frames on"; an empty selection falls back to
+ * frame 0 so a prop can never vanish.
+ */
+export function animEnabledFrames(
+  prop: Pick<PlacedProp, 'animFrames'> | undefined,
+  total: number,
+): number[] {
+  const safeTotal = Math.max(1, Math.floor(total));
+  const flags = prop?.animFrames;
+  if (!Array.isArray(flags)) return Array.from({ length: safeTotal }, (_, i) => i);
+  const list: number[] = [];
+  for (let i = 0; i < safeTotal; i += 1) {
+    if (flags[i] !== false) list.push(i);
+  }
+  return list.length > 0 ? list : [0];
+}
+
+/**
+ * Which frame of a `total`-frame loop is showing at `timeSec` (phase desyncs
+ * twins). When `enabled` is supplied the loop runs over that subset only, so
+ * unchecked frames are skipped instead of showing as blank holds.
+ */
+export function animFrameAt(
+  timeSec: number,
+  fps: number,
+  total: number,
+  phase = 0,
+  enabled?: readonly boolean[],
+): number {
+  if (!(total > 1) || !(fps > 0)) return 0;
+  const t = timeSec * fps + phase;
+  const list = enabled ? animEnabledFrames({ animFrames: [...enabled] }, total) : null;
+  if (!list) return ((Math.floor(t) % total) + total) % total;
+  const i = ((Math.floor(t) % list.length) + list.length) % list.length;
+  return list[i];
+}
+
+/** Animated sheet a prop currently renders, or null when it renders its still art. */
+export function animSheetFor(prop: PlacedProp | undefined): {
+  url: string;
+  cols: number;
+  rows: number;
+  fps: number;
+} | null {
+  if (!prop) return null;
+  const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+  if (!def) return null;
+  if (def.isAnimated) return { url: def.url, ...animGridFor(def) };
+  if (prop.animated === true && def.animatedTwin) {
+    const twin = PROP_DEFINITIONS.find((d) => d.type === def.animatedTwin);
+    if (twin?.isAnimated) return { url: twin.url, ...animGridFor(twin) };
+  }
+  return null;
+}
+
+/** The animated twin of a still definition (undefined when it has none). */
+export function animatedTwinDef(def: PropDefinition | undefined): PropDefinition | undefined {
+  if (!def || def.isAnimated || !def.animatedTwin) return undefined;
+  return PROP_DEFINITIONS.find((d) => d.type === def.animatedTwin);
+}
+
+/** True when the prop has an animated sheet it can be swapped to (still twin or animated def). */
+export function propHasAnimatedOption(prop: PlacedProp | undefined): boolean {
+  if (!prop) return false;
+  const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+  if (!def) return false;
+  return def.isAnimated === true || animatedTwinDef(def) !== undefined;
+}
+
+/** Editable animation settings for one placed prop (see `setPropAnimation`). */
+export interface AnimationSettings {
+  animated?: boolean; // still props: use the animated twin sheet instead of the still art
+  animate?: boolean; // play/pause frame cycling
+  animSpeed?: number; // fps multiplier
+  animFrames?: boolean[]; // per-frame enable flags
+}
+
+/** Coerce a checkbox array to exactly `total` booleans (missing entries count as on). */
+export function normalizeAnimFrames(frames: readonly boolean[] | undefined, total: number): boolean[] {
+  const safeTotal = Math.max(1, Math.floor(total));
+  const out: boolean[] = [];
+  for (let i = 0; i < safeTotal; i += 1) out.push(frames ? frames[i] !== false : true);
+  return out;
+}
+
+/** Wall-clock seconds for animation timing (works in browser and headless tests). */
+function nowSeconds(): number {
+  return (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
+}
+
+/**
+ * UV origin of a frame in a row-major sheet (frame 0 = top-left).
+ * THREE flipY puts v=1 at the image top, so row 0 sits at v = 1 - 1/rows.
+ */
+export function animFrameUV(frame: number, cols: number, rows: number): { u: number; v: number } {
+  const c = Math.max(1, Math.floor(cols));
+  const r = Math.max(1, Math.floor(rows));
+  const f = ((Math.floor(frame) % (c * r)) + c * r) % (c * r);
+  const col = f % c;
+  const row = Math.floor(f / c);
+  return { u: col / c, v: 1 - (row + 1) / r };
+}
+
+/** Stable 0..total-1 phase from a prop id so twin torches flicker out of sync. */
+export function animPhaseFor(propId: string, total: number): number {
+  if (!(total > 1)) return 0;
+  let hash = 0;
+  for (let i = 0; i < propId.length; i += 1) hash = (hash * 31 + propId.charCodeAt(i)) | 0;
+  return Math.abs(hash) % total;
+}
 
 /**
  * T08: Extended PlacedProp with optional authoring fields.
@@ -64,6 +209,10 @@ export interface PlacedProp {
   groupId?: string;
   lit?: boolean;
   visible?: boolean; // T08: visibility toggle (H key)
+  animate?: boolean; // Animated category: frame playback on/off (default true)
+  animated?: boolean; // Still props with a twin: swap in the animated sheet (default false)
+  animSpeed?: number; // Playback speed multiplier (default 1, clamped 0.1..4)
+  animFrames?: boolean[]; // Per-frame enable flags; unchecked frames are skipped (default all on)
   authoringNotes?: string; // T08: optional authoring metadata
   // Allow unknown fields for forward compatibility
   [key: string]: unknown;
@@ -232,7 +381,140 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'barrier_fire_pit', name: 'Fire Pit Trap', category: 'barrier', url: '/art/props/alpha/prop-41-molten-slag-channel.png', defaultWidth: 600, defaultHeight: 400, defaultDepth: 600, isBarrier: true },
   { type: 'barrier_rock_slide', name: 'Rock Slide Zone', category: 'barrier', url: '/art/props/alpha/prop-35-granite-strata-seam-wall.png', defaultWidth: 1200, defaultHeight: 800, defaultDepth: 300, isBarrier: true },
   { type: 'barrier_mine_field', name: 'Mine Field', category: 'barrier', url: '/art/props/alpha/prop-02-ore-cart-spilling.png', defaultWidth: 500, defaultHeight: 300, defaultDepth: 500, isBarrier: true },
+
+  // --- ANIMATED (4-frame 2x2 sheets; built by scripts/process-animated.mjs) ---
+  { type: 'anim_01_torchbearer_flame', name: 'Torchbearer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-01-torchbearer-flame.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_02_firework_sparkler', name: 'Firework Sparkler (Animated)', category: 'animated', url: '/art/animated/alpha/anim-02-firework-sparkler.png', defaultWidth: 1100, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_03_torch_crowd', name: 'Torch Crowd (Animated)', category: 'animated', url: '/art/animated/alpha/anim-03-torch-crowd.png', defaultWidth: 1075, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_04_lantern_warden', name: 'Lantern Warden (Animated)', category: 'animated', url: '/art/animated/alpha/anim-04-lantern-warden.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_05_smelting_crucible', name: 'Smelting Crucible (Animated)', category: 'animated', url: '/art/animated/alpha/anim-05-smelting-crucible.png', defaultWidth: 460, defaultHeight: 500, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_06_molten_cauldron', name: 'Molten Cauldron (Animated)', category: 'animated', url: '/art/animated/alpha/anim-06-molten-cauldron.png', defaultWidth: 480, defaultHeight: 520, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_07_slag_channel', name: 'Slag Channel (Animated)', category: 'animated', url: '/art/animated/alpha/anim-07-slag-channel.png', defaultWidth: 1100, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_08_waterwheel_cascade', name: 'Waterwheel Cascade (Animated)', category: 'animated', url: '/art/animated/alpha/anim-08-waterwheel-cascade.png', defaultWidth: 700, defaultHeight: 1400, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_09_plunge_basin', name: 'Plunge Basin (Animated)', category: 'animated', url: '/art/animated/alpha/anim-09-plunge-basin.png', defaultWidth: 1100, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_10_waterfall_curtain', name: 'Waterfall Curtain (Animated)', category: 'animated', url: '/art/animated/alpha/anim-10-waterfall-curtain.png', defaultWidth: 900, defaultHeight: 1400, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_11_tnt_fuse_spark', name: 'TNT Fuse Spark (Animated)', category: 'animated', url: '/art/animated/alpha/anim-11-tnt-fuse-spark.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_12_drum_podium_braziers', name: 'Drum Podium Braziers (Animated)', category: 'animated', url: '/art/animated/alpha/anim-12-drum-podium-braziers.png', defaultWidth: 1254, defaultHeight: 700, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_13_horn_riser_lantern', name: 'Horn Riser Lantern (Animated)', category: 'animated', url: '/art/animated/alpha/anim-13-horn-riser-lantern.png', defaultWidth: 1254, defaultHeight: 700, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_14_fan_aisle_torches', name: 'Fan Aisle Torches (Animated)', category: 'animated', url: '/art/animated/alpha/anim-14-fan-aisle-torches.png', defaultWidth: 1075, defaultHeight: 600, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_15_triple_lantern_post', name: 'Triple Lantern Post (Animated)', category: 'animated', url: '/art/animated/alpha/anim-15-triple-lantern-post.png', defaultWidth: 360, defaultHeight: 480, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_16_molten_rock_arch', name: 'Molten Rock Arch (Animated)', category: 'animated', url: '/art/animated/alpha/anim-16-molten-rock-arch.png', defaultWidth: 1400, defaultHeight: 760, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_17_arch_gate_lanterns', name: 'Arch Gate Lanterns (Animated)', category: 'animated', url: '/art/animated/alpha/anim-17-arch-gate-lanterns.png', defaultWidth: 1300, defaultHeight: 700, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_18_torch_sconce', name: 'Torch Sconce (Animated)', category: 'animated', url: '/art/animated/alpha/anim-18-torch-sconce.png', defaultWidth: 320, defaultHeight: 480, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_19_waterfall_splash', name: 'Waterfall Splash (Animated)', category: 'animated', url: '/art/animated/alpha/anim-19-waterfall-splash.png', defaultWidth: 650, defaultHeight: 450, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_20_waterfall_splash_b', name: 'Waterfall Splash B (Animated)', category: 'animated', url: '/art/animated/alpha/anim-20-waterfall-splash-b.png', defaultWidth: 650, defaultHeight: 450, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_21_flag_waver', name: 'Flag-Waving Fan (Animated)', category: 'animated', url: '/art/animated/alpha/anim-21-flag-waver.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_22_war_drummer', name: 'War Drummer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-22-war-drummer.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_23_pit_mechanic', name: 'Pit Mechanic (Animated)', category: 'animated', url: '/art/animated/alpha/anim-23-pit-mechanic.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_24_ore_miner', name: 'Ore Miner (Animated)', category: 'animated', url: '/art/animated/alpha/anim-24-ore-miner.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_25_horn_blower', name: 'War Horn Blower (Animated)', category: 'animated', url: '/art/animated/alpha/anim-25-horn-blower.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_26_track_marshal', name: 'Track Marshal (Animated)', category: 'animated', url: '/art/animated/alpha/anim-26-track-marshal.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_27_blacksmith', name: 'Blacksmith (Animated)', category: 'animated', url: '/art/animated/alpha/anim-27-blacksmith.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_28_tankard_celebrant', name: 'Tankard Celebrant (Animated)', category: 'animated', url: '/art/animated/alpha/anim-28-tankard-celebrant.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_29_ball_loader', name: 'Ball Loader (Animated)', category: 'animated', url: '/art/animated/alpha/anim-29-ball-loader.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_30_bell_ringer', name: 'Bell Ringer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-30-bell-ringer.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_31_scarf_fan', name: 'Scarf Fan (Animated)', category: 'animated', url: '/art/animated/alpha/anim-31-scarf-fan.png', defaultWidth: 340, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_32_track_sweeper', name: 'Track Sweeper (Animated)', category: 'animated', url: '/art/animated/alpha/anim-32-track-sweeper.png', defaultWidth: 360, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_33_rope_heave_trio', name: 'Rope Heave Trio (Animated)', category: 'animated', url: '/art/animated/alpha/anim-33-rope-heave-trio.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_34_shoulder_ride_duo', name: 'Shoulder Ride Duo (Animated)', category: 'animated', url: '/art/animated/alpha/anim-34-shoulder-ride-duo.png', defaultWidth: 420, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_35_tire_carry_duo', name: 'Tire Carry Duo (Animated)', category: 'animated', url: '/art/animated/alpha/anim-35-tire-carry-duo.png', defaultWidth: 440, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_36_victory_huddle', name: 'Victory Huddle (Animated)', category: 'animated', url: '/art/animated/alpha/anim-36-victory-huddle.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_37_grandstand_roar', name: 'Grandstand Roar (Animated)', category: 'animated', url: '/art/animated/alpha/anim-37-grandstand-roar.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_38_flag_terrace', name: 'Flag Terrace (Animated)', category: 'animated', url: '/art/animated/alpha/anim-38-flag-terrace.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_39_mosh_pit', name: 'Mosh Pit (Animated)', category: 'animated', url: '/art/animated/alpha/anim-39-mosh-pit.png', defaultWidth: 420, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_40_fence_fans', name: 'Fence Fans (Animated)', category: 'animated', url: '/art/animated/alpha/anim-40-fence-fans.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_41_cheer_tower', name: 'Cheer Tower (Animated)', category: 'animated', url: '/art/animated/alpha/anim-41-cheer-tower.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_42_victory_stage', name: 'Victory Stage (Animated)', category: 'animated', url: '/art/animated/alpha/anim-42-victory-stage.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_43_explosion_fire', name: 'Fire Explosion', category: 'animated', url: '/art/animated/alpha/anim-43-explosion-fire.png', defaultWidth: 480, defaultHeight: 480, isAnimated: true, animCols: 2, animRows: 2, animFps: 16 },
+  { type: 'anim_44_spark_burst', name: 'Spark Burst', category: 'animated', url: '/art/animated/alpha/anim-44-spark-burst.png', defaultWidth: 420, defaultHeight: 420, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_45_smoke_puff', name: 'Smoke Puff', category: 'animated', url: '/art/animated/alpha/anim-45-smoke-puff.png', defaultWidth: 440, defaultHeight: 440, isAnimated: true, animCols: 2, animRows: 2, animFps: 10 },
+  { type: 'anim_46_gore_burst', name: 'Gore Burst', category: 'animated', url: '/art/animated/alpha/anim-46-gore-burst.png', defaultWidth: 400, defaultHeight: 400, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_47_gore_green_burst', name: 'Green Gore Burst', category: 'animated', url: '/art/animated/alpha/anim-47-gore-green-burst.png', defaultWidth: 400, defaultHeight: 400, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_48_ground_impact', name: 'Ground Impact', category: 'animated', url: '/art/animated/alpha/anim-48-ground-impact.png', defaultWidth: 480, defaultHeight: 300, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_49_dust_puff', name: 'Dust Puff', category: 'animated', url: '/art/animated/alpha/anim-49-dust-puff.png', defaultWidth: 460, defaultHeight: 360, isAnimated: true, animCols: 2, animRows: 2, animFps: 10 },
+  { type: 'anim_50_firework_red', name: 'Red Firework', category: 'animated', url: '/art/animated/alpha/anim-50-firework-red.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_51_firework_blue', name: 'Blue Firework', category: 'animated', url: '/art/animated/alpha/anim-51-firework-blue.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_52_firework_green', name: 'Green Firework', category: 'animated', url: '/art/animated/alpha/anim-52-firework-green.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
 ];
+
+/**
+ * Source art every animated sheet was cut from. Mirrors the `src` field of
+ * `ANIMATED_VARIATIONS` in `scripts/process-animated.mjs` — keep the two in
+ * sync so still <-> animated twins stay wired to the art they share.
+ *
+ * `anim_20_waterfall_splash_b` is deliberately absent: its source
+ * (`track-parts/waterfall-splash-b.png`) has no still decoration of its own,
+ * so it stays an animated-only entry.
+ */
+export const ANIMATED_SOURCE_ART: Record<string, string> = {
+  anim_01_torchbearer_flame: '/art/goblins/alpha/goblin-04-torchbearer.png',
+  anim_02_firework_sparkler: '/art/goblins/alpha/goblin-18-firework-crew.png',
+  anim_03_torch_crowd: '/art/goblins/alpha/goblin-24-torch-crowd.png',
+  anim_04_lantern_warden: '/art/goblins/alpha/goblin-11-lantern-warden.png',
+  anim_05_smelting_crucible: '/art/props/alpha/prop-04-smelting-crucible.png',
+  anim_06_molten_cauldron: '/art/props/alpha/prop-07-tripod-cauldron-molten.png',
+  anim_07_slag_channel: '/art/props/alpha/prop-41-molten-slag-channel.png',
+  anim_08_waterwheel_cascade: '/art/props/alpha/prop-28-cavern-waterwheel-cascade.png',
+  anim_09_plunge_basin: '/art/props/alpha/prop-42-waterfall-plunge-basin.png',
+  anim_10_waterfall_curtain: '/art/track-parts/waterfall-curtain.png',
+  anim_11_tnt_fuse_spark: '/art/goblins/alpha/goblin-07-tnt-handler.png',
+  anim_12_drum_podium_braziers: '/art/goblins/alpha/goblin-22-drum-podium-mob.png',
+  anim_13_horn_riser_lantern: '/art/goblins/alpha/goblin-25-horn-riser.png',
+  anim_14_fan_aisle_torches: '/art/goblins/alpha/goblin-30-fan-aisle.png',
+  anim_15_triple_lantern_post: '/art/props/alpha/prop-01-lantern-post-triple.png',
+  anim_16_molten_rock_arch: '/art/props/alpha/prop-16-molten-rock-natural-arch.png',
+  anim_17_arch_gate_lanterns: '/art/props/alpha/prop-40-timber-arch-gate-lanterns.png',
+  anim_18_torch_sconce: '/art/props/alpha/prop-56-arch-torch-sconce.png',
+  anim_19_waterfall_splash: '/art/track-parts/waterfall-splash.png',
+  anim_21_flag_waver: '/art/goblins/alpha/goblin-01-flag-waver.png',
+  anim_22_war_drummer: '/art/goblins/alpha/goblin-02-war-drummer.png',
+  anim_23_pit_mechanic: '/art/goblins/alpha/goblin-03-pit-mechanic.png',
+  anim_24_ore_miner: '/art/goblins/alpha/goblin-05-ore-miner.png',
+  anim_25_horn_blower: '/art/goblins/alpha/goblin-06-horn-blower.png',
+  anim_26_track_marshal: '/art/goblins/alpha/goblin-08-track-marshal.png',
+  anim_27_blacksmith: '/art/goblins/alpha/goblin-09-blacksmith.png',
+  anim_28_tankard_celebrant: '/art/goblins/alpha/goblin-10-tankard-celebrant.png',
+  anim_29_ball_loader: '/art/goblins/alpha/goblin-12-ball-loader.png',
+  anim_30_bell_ringer: '/art/goblins/alpha/goblin-13-bell-ringer.png',
+  anim_31_scarf_fan: '/art/goblins/alpha/goblin-14-scarf-fan.png',
+  anim_32_track_sweeper: '/art/goblins/alpha/goblin-15-track-sweeper.png',
+  anim_33_rope_heave_trio: '/art/goblins/alpha/goblin-16-rope-heave-trio.png',
+  anim_34_shoulder_ride_duo: '/art/goblins/alpha/goblin-17-shoulder-ride-duo.png',
+  anim_35_tire_carry_duo: '/art/goblins/alpha/goblin-19-tire-carry-duo.png',
+  anim_36_victory_huddle: '/art/goblins/alpha/goblin-20-victory-huddle.png',
+  anim_37_grandstand_roar: '/art/goblins/alpha/goblin-21-grandstand-roar.png',
+  anim_38_flag_terrace: '/art/goblins/alpha/goblin-23-flag-terrace.png',
+  anim_39_mosh_pit: '/art/goblins/alpha/goblin-26-mosh-pit.png',
+  anim_40_fence_fans: '/art/goblins/alpha/goblin-27-fence-fans.png',
+  anim_41_cheer_tower: '/art/goblins/alpha/goblin-28-cheer-tower.png',
+  anim_42_victory_stage: '/art/goblins/alpha/goblin-29-victory-stage.png',
+};
+
+/**
+ * Wire every animated sheet to the still decoration it was cut from (and back).
+ * Links are derived from shared art, so a still prop gains an "Animated"
+ * toggle in the attribute window that swaps its sprite for the sheet.
+ * Decorative definitions win over powerups/barriers that merely reuse the art.
+ */
+function linkAnimatedTwins(): void {
+  for (const [animType, srcUrl] of Object.entries(ANIMATED_SOURCE_ART)) {
+    const animDef = PROP_DEFINITIONS.find((d) => d.type === animType);
+    if (!animDef) continue;
+    const stillDef = PROP_DEFINITIONS.find(
+      (d) =>
+        d.type !== animType &&
+        !d.isAnimated &&
+        !d.isPowerup &&
+        !d.isBarrier &&
+        d.url === srcUrl,
+    );
+    if (!stillDef) continue;
+    animDef.stillType = stillDef.type;
+    stillDef.animatedTwin = animType;
+  }
+}
+
+linkAnimatedTwins();
 
 export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
   {
@@ -835,6 +1117,98 @@ export class TrackBuilder3D {
     this.notify();
   }
 
+  /**
+   * Per-prop animation settings.
+   *
+   * - `animated` swaps a still decoration for the animated sheet cut from the
+   *   same art (rebuilds the sprite; ignored by props without a twin).
+   * - `animate` is the existing play/pause flag (paused props hold one frame).
+   * - `animSpeed` is a multiplier on the sheet's fps.
+   * - `animFrames` are per-frame checkboxes: unchecked frames are skipped.
+   */
+  setPropAnimation(id: string, updates: AnimationSettings, pushUndo = true): void {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop) return;
+    const patch: Partial<PlacedProp> = {};
+    if (updates.animated !== undefined) {
+      const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+      if (def && animatedTwinDef(def)) patch.animated = updates.animated === true;
+    }
+    if (updates.animate !== undefined) patch.animate = updates.animate === true;
+    if (updates.animSpeed !== undefined && Number.isFinite(updates.animSpeed)) {
+      patch.animSpeed = Math.min(ANIM_SPEED_MAX, Math.max(ANIM_SPEED_MIN, updates.animSpeed));
+    }
+    if (updates.animFrames !== undefined) {
+      const total = animGridFor(
+        PROP_DEFINITIONS.find((d) => d.type === prop.type) ?? ({} as PropDefinition),
+      );
+      patch.animFrames = normalizeAnimFrames(updates.animFrames, total.cols * total.rows);
+    }
+    if (Object.keys(patch).length === 0) return;
+    if (pushUndo) this.pushUndo();
+
+    const before = animSheetFor(prop)?.url;
+    Object.assign(prop, patch);
+    const after = animSheetFor(prop)?.url;
+
+    if (before !== after) {
+      const oldObj = this.propObjects.get(id);
+      if (oldObj) {
+        this.scene.remove(oldObj);
+        this.propObjects.delete(id);
+      }
+      this.createPropSprite(prop);
+    }
+    // Repaint the current frame straight away so speed/skip edits are visible
+    // even while the prop is paused.
+    this.updateAnimations(nowSeconds());
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Apply the same animation settings to every animated-capable prop selected. */
+  setSelectedPropsAnimation(updates: AnimationSettings): void {
+    const selected = this.getSelectedProps().filter((p) => propHasAnimatedOption(p));
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) this.setPropAnimation(prop.id, updates, false);
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Batch the animated-sheet swap across the current selection. */
+  setSelectedPropsAnimated(animated: boolean): void {
+    this.setSelectedPropsAnimation({ animated });
+  }
+
+  /** Nudge every animated-capable selected prop's speed by `delta` (clamped). */
+  nudgeSelectedAnimSpeed(delta: number): void {
+    const selected = this.getSelectedProps().filter((p) => propHasAnimatedOption(p));
+    if (selected.length === 0 || !Number.isFinite(delta) || delta === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      const next = Math.round((animSpeedFor(prop) + delta) * 100) / 100;
+      this.setPropAnimation(prop.id, { animSpeed: next }, false);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Batch the animate flag across the current selection (static props ignore it). */
+  setSelectedPropsAnimate(animate: boolean) {
+    const selected = this.getSelectedProps();
+    if (selected.length === 0) return;
+    this.pushUndo();
+    for (const prop of selected) {
+      this.updatePropTransform(prop.id, { animate }, false);
+    }
+    this.saveToStorage();
+    this.notify();
+  }
+
   // --- T08: VISIBILITY TOGGLE (H KEY) ---
   /** T08: Toggle visibility on selected props. Hidden props retain selection identity but are excluded from fresh raycasts. */
   toggleVisibility(): void {
@@ -1417,6 +1791,7 @@ export class TrackBuilder3D {
       flipX: false,
       isDecal: isPhysical3D ? false : isDecal,
       lit: isDecal ? this.snapping.decalLightingDefault : undefined,
+      animate: def.isAnimated ? true : undefined,
     };
 
     this.placedProps.push(prop);
@@ -1469,6 +1844,7 @@ export class TrackBuilder3D {
           this.scene.remove(obj);
           this.propObjects.delete(prop.id);
         }
+        this.disposeAnimTexture(prop.id);
         const box = this.selectionBoxes.get(prop.id);
         if (box) {
           this.scene.remove(box);
@@ -1494,6 +1870,7 @@ export class TrackBuilder3D {
         this.scene.remove(obj);
         this.propObjects.delete(prop.id);
       }
+      this.disposeAnimTexture(prop.id);
       const box = this.selectionBoxes.get(prop.id);
       if (box) {
         this.scene.remove(box);
@@ -1555,6 +1932,9 @@ export class TrackBuilder3D {
     const oldCameraFacing = prop.cameraFacing !== false;
     const oldIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));
     const oldLit = prop.lit !== false;
+    // Swapping a still prop to its animated twin (or back) changes the texture,
+    // so the sprite has to be rebuilt with the new sheet's UV window.
+    const oldSheetUrl = animSheetFor(prop)?.url;
 
     const willBeDecal = isPhysical3D ? false : (updates.isDecal !== undefined ? updates.isDecal : oldIsDecal);
 
@@ -1626,9 +2006,10 @@ export class TrackBuilder3D {
     const newCameraFacing = prop.cameraFacing !== false;
     const newIsDecal = isPhysical3D ? false : (prop.isDecal !== undefined ? prop.isDecal : (def?.isDecal ?? false));
     const newLit = prop.lit !== false;
+    const newSheetUrl = animSheetFor(prop)?.url;
 
-    // If cameraFacing, isDecal, or lit changed, recreate the 3D object
-    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal || (updates.lit !== undefined && oldLit !== newLit)) {
+    // If cameraFacing, isDecal, lit or the animated sheet changed, recreate the 3D object
+    if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal || oldSheetUrl !== newSheetUrl || (updates.lit !== undefined && oldLit !== newLit)) {
       const oldObj = this.propObjects.get(id);
       if (oldObj) {
         this.scene.remove(oldObj);
@@ -2130,9 +2511,86 @@ export class TrackBuilder3D {
         tex = this.textureLoader.load(url);
         tex.colorSpace = THREE.SRGBColorSpace;
       }
+      tex.name = url; // cloned sheets inherit the name — handy for debugging/tests
       this.textureCache.set(url, tex);
     }
     return tex;
+  }
+
+  /**
+   * Animated decorations get one cloned texture per placed prop (keyed by
+   * prop id) showing a single sheet quadrant; static props share the cached
+   * texture. Clones are reused across sprite recreations (undo/redo, decal
+   * toggles) and disposed when the prop is deleted.
+   */
+  private readonly animTextureCache = new Map<string, THREE.Texture>();
+
+  private getPropTexture(def: PropDefinition, prop: PlacedProp): THREE.Texture {
+    const sheet = animSheetFor(prop);
+    if (!sheet) return this.getTexture(def.url);
+    let tex = this.animTextureCache.get(prop.id);
+    if (!tex) {
+      const base = this.getTexture(sheet.url);
+      tex = base.clone();
+      const { cols, rows } = sheet;
+      tex.repeat.set(1 / cols, 1 / rows);
+      const uv = animFrameUV(0, cols, rows);
+      tex.offset.set(uv.u, uv.v);
+      tex.needsUpdate = true;
+      this.animTextureCache.set(prop.id, tex);
+    }
+    return tex;
+  }
+
+  private disposeAnimTexture(propId: string) {
+    const tex = this.animTextureCache.get(propId);
+    if (tex) {
+      tex.dispose();
+      this.animTextureCache.delete(propId);
+    }
+  }
+
+  /**
+   * Advance every placed animated decoration to its current sheet frame.
+   * Called once per rendered frame (race loop) and from the editor preview
+   * tick; props with animate === false (or reduced motion) rest on frame 0.
+   * Late texture loads are picked up: a clone made before the base image
+   * arrived adopts it here instead of staying blank.
+   */
+  updateAnimations(timeSec: number, reducedMotion = false) {
+    if (this.animTextureCache.size === 0) return;
+    for (const [propId, tex] of this.animTextureCache) {
+      const obj = this.propObjects.get(propId);
+      const anim = (obj?.userData as { anim?: AnimGrid & { phase: number } } | undefined)?.anim;
+      if (!obj || !anim) continue;
+      const prop = this.placedProps.find((p) => p.id === propId);
+      const sheet = animSheetFor(prop);
+      if (sheet) {
+        const base = this.getTexture(sheet.url);
+        if (!tex.image && base.image) {
+          tex.image = base.image;
+          tex.needsUpdate = true;
+        }
+      }
+      const total = anim.cols * anim.rows;
+      const enabled = animEnabledFrames(prop, total);
+      const playing = !reducedMotion && prop?.animate !== false && enabled.length > 1;
+      const frame = playing
+        ? animFrameAt(timeSec, anim.fps * animSpeedFor(prop), total, anim.phase, prop?.animFrames)
+        : enabled[0];
+      const uv = animFrameUV(frame, anim.cols, anim.rows);
+      if (tex.offset.x !== uv.u || tex.offset.y !== uv.v) tex.offset.set(uv.u, uv.v);
+    }
+  }
+
+  /** True when at least one placed prop is cycling frames (gates editor preview renders). */
+  hasPlayingAnimations(): boolean {
+    return this.placedProps.some((p) => {
+      if (p.animate === false) return false;
+      const sheet = animSheetFor(p);
+      if (!sheet) return false;
+      return animEnabledFrames(p, sheet.cols * sheet.rows).length > 1;
+    });
   }
 
   private createPropSprite(prop: PlacedProp): THREE.Object3D {
@@ -2142,6 +2600,13 @@ export class TrackBuilder3D {
     let obj: THREE.Object3D;
     const flip = prop.flipX ? -1 : 1;
     const isDecal = prop.isDecal !== undefined ? prop.isDecal : (def.isDecal ?? false);
+    // A still prop toggled to "Animated" borrows its twin's sheet (same art,
+    // same aspect) — it keeps its own defaultWidth/Height so nothing resizes.
+    const sheet = animSheetFor(prop);
+    const animGrid = sheet ?? animGridFor(def);
+    const animState = sheet
+      ? { cols: animGrid.cols, rows: animGrid.rows, fps: animGrid.fps, phase: animPhaseFor(prop.id, animGrid.cols * animGrid.rows) }
+      : undefined;
 
     if (def.isRamp) {
       // Create 3D wedge ramp mesh using base dimensions (scale 1.0)
@@ -2172,7 +2637,7 @@ export class TrackBuilder3D {
       obj = model;
     } else if (isDecal) {
       // Flat surface decal (lies flat on track/ground)
-      const tex = this.getTexture(def.url);
+      const tex = this.getPropTexture(def, prop);
       const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
       const isLit = prop.lit !== false;
       const mat = isLit
@@ -2198,12 +2663,12 @@ export class TrackBuilder3D {
           });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;
-      mesh.userData = { propId: prop.id, isDecal: true };
+      mesh.userData = { propId: prop.id, isDecal: true, ...(animState ? { anim: animState } : {}) };
       this.applyDecalTransform(mesh, prop, def);
       obj = mesh;
     } else if (prop.cameraFacing === false) {
       // Fixed 3D World Orientation (Double-sided plane mesh)
-      const tex = this.getTexture(def.url);
+      const tex = this.getPropTexture(def, prop);
       const geom = new THREE.PlaneGeometry(def.defaultWidth, def.defaultHeight);
       if (def.alignBottom !== false) {
         geom.translate(0, def.defaultHeight / 2, 0);
@@ -2228,7 +2693,7 @@ export class TrackBuilder3D {
           });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.name = `PlacedProp_${prop.id}`;
-      mesh.userData = { propId: prop.id, isMeshProp: true };
+      mesh.userData = { propId: prop.id, isMeshProp: true, ...(animState ? { anim: animState } : {}) };
       mesh.position.set(prop.x, prop.y, prop.z);
       mesh.rotation.y = prop.rotY;
       mesh.rotation.z = prop.rotZ ?? 0;
@@ -2236,7 +2701,7 @@ export class TrackBuilder3D {
       obj = mesh;
     } else {
       // Camera Facing (Billboard Sprite)
-      const tex = this.getTexture(def.url);
+      const tex = this.getPropTexture(def, prop);
       const mat = new THREE.SpriteMaterial({
         map: tex,
         transparent: true,
@@ -2245,7 +2710,7 @@ export class TrackBuilder3D {
       });
       const sprite = new THREE.Sprite(mat);
       sprite.name = `PlacedProp_${prop.id}`;
-      sprite.userData = { propId: prop.id };
+      sprite.userData = { propId: prop.id, ...(animState ? { anim: animState } : {}) };
       sprite.position.set(prop.x, prop.y, prop.z);
       sprite.center.set(0.5, def.alignBottom !== false ? 0 : 0.5);
       sprite.scale.set(def.defaultWidth * prop.scale * flip, def.defaultHeight * prop.scale, 1);
@@ -2289,6 +2754,12 @@ export class TrackBuilder3D {
     // Remove current objects
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
+    // Prune animated textures for props the restored state no longer holds
+    // (surviving ids keep their cached texture: no re-upload on undo/redo).
+    const live = new Set(props.map((p) => p.id));
+    for (const id of [...this.animTextureCache.keys()]) {
+      if (!live.has(id)) this.disposeAnimTexture(id);
+    }
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
     this.selectionBoxes.clear();
 
@@ -2625,6 +3096,7 @@ export class TrackBuilder3D {
     if (this.rotationHandle) this.scene.remove(this.rotationHandle);
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
+    for (const id of [...this.animTextureCache.keys()]) this.disposeAnimTexture(id);
     this.listeners.length = 0;
     this.backupStatusListeners.length = 0;
   }

@@ -1774,8 +1774,9 @@ export class Renderer3D {
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;
 
-    // 3. Texture scrolls
+    // 3. Texture scrolls + animated decoration frames (frozen on frame 0 for reduced motion)
     const raw = frame.time;
+    this.trackBuilder.updateAnimations(raw, frame.reducedMotion);
     if (this.materials.water.map) this.materials.water.map.offset.y = raw * 0.55;
     if (this.materials.lava.map) {
       this.materials.lava.map.offset.x = raw * 0.004;

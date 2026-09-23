@@ -1,8 +1,8 @@
 {
   "course": "ridge",
-  "timestamp": 1790150754605,
-  "count": 339,
-  "updatedAt": "2026-09-23T08:05:54.605Z",
+  "timestamp": 1790180431942,
+  "count": 340,
+  "updatedAt": "2026-09-23T16:20:31.942Z",
   "props": [
     {
       "id": "prop_1790020259486_aj8o",
@@ -301,13 +301,15 @@
       "rotY": -0.791592653589793,
       "rotX": 0,
       "rotZ": 0.3316125578789226,
-      "scale": 0.55,
+      "scale": 0.9,
       "alignToTrack": true,
       "trackDist": 1200,
       "cameraFacing": false,
       "flipX": true,
       "isDecal": false,
-      "lit": false
+      "lit": false,
+      "animated": true,
+      "animSpeed": 0.5
     },
     {
       "id": "prop_1790021751012_o1hb",
@@ -6517,6 +6519,23 @@
       "flipX": false,
       "isDecal": true,
       "lit": true
+    },
+    {
+      "id": "prop_1790180429379_gkwj",
+      "type": "prop_28_cavern_waterwheel",
+      "name": "Cavern Waterwheel Cascade",
+      "x": 70,
+      "y": 17974,
+      "z": 15,
+      "rotY": 0.01584440382488468,
+      "rotX": 0,
+      "rotZ": 0,
+      "scale": 1,
+      "alignToTrack": true,
+      "trackDist": 2400,
+      "cameraFacing": true,
+      "flipX": false,
+      "isDecal": false
     }
   ]
 }

@@ -1,8 +1,8 @@
 {
   "course": "ridge",
-  "timestamp": 1790149555233,
+  "timestamp": 1790180390822,
   "count": 339,
-  "updatedAt": "2026-09-23T07:45:55.233Z",
+  "updatedAt": "2026-09-23T16:19:50.822Z",
   "props": [
     {
       "id": "prop_1790020259486_aj8o",
@@ -307,7 +307,8 @@
       "cameraFacing": false,
       "flipX": true,
       "isDecal": false,
-      "lit": false
+      "lit": false,
+      "animated": true
     },
     {
       "id": "prop_1790021751012_o1hb",

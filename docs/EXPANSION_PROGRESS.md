@@ -659,6 +659,40 @@ gore) and anim-50 (red firework).** Seven need a regeneration pass, with prompts
 prepared. The pipeline and the build-menu registration are all in place and the
 tree is green.
 
+## Update 5 — anim-40 fence fans redrawn facing the viewer
+
+The fence crowd was drawn turned away at an angle, so we were seeing the backs
+of the goblins' heads. The still `goblin-27-fence-fans` art shows the crowd
+facing the camera; the animated twin now matches it. Every goblin is square to
+the picture plane with both eyes, nose, mouth and ears visible.
+
+Final: `404x226` frame, cover 56.0%, remnant 0.033%, align 2.8px, min element
+delta 0.116. Onion check `0.0px` shift, `1.00x` fill spread. Cross-correlation
+puts every frame at `0,0` against frame 1 with 98% silhouette overlap.
+
+### When a pose is wrong, do not pass the wrong-pose sheet as an input
+
+This took three attempts and the first mistake is the instructive one. Attempt
+1 instructed the model to draw every goblin head on and passed only the magenta
+reference template — and the model reproduced the old angled pose anyway. **The
+template was anchoring the pose it was supposed to replace.**
+
+Attempt 2 added the still goblin art as a second input, which fixed the pose,
+but the generation came back as a **3x2 grid of six panels**. The pipeline
+sliced it as 2x2, so each bottom "frame" held two stacked crowds. The tell was
+that the bottom frames' opaque content measured `611px` tall against `252px`
+for the top frames — a frame cannot be taller than its panel, which means the
+cut was wrong, not the art. Reading the magenta gutter profile directly showed
+the true 3x2 grid.
+
+Attempt 3 dropped the previous sheet entirely so its layout could not be copied,
+kept the template plus the still art, and stated the panel count explicitly.
+Result: 2x2, both rows `197px` tall, pose held.
+
+**Rule: when a pose is wrong, pass the layout template plus correct-pose
+reference art and never the wrong-pose sheet itself — an input image overrides
+the written instruction. Always state the panel count explicitly.**
+
 The registry test no longer hardcodes a sheet count (`exactly 20 animated
 decorations` and `19 of the 20 sheets have a still counterpart`); it now derives
 both from the sheets on disk and from `ANIMATED_SOURCE_ART`, so a new batch

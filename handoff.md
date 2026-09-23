@@ -82,6 +82,218 @@ gh issue edit 37 --repo Piskriek/HeavyMetal2   # tick the six boxes
 gh pr ready 50 --repo Piskriek/HeavyMetal2     # or leave draft until #46/#48 merge order is settled
 ```
 
+## T05 — Safe Release Reservations and Common-Start Race Timing (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#38](https://github.com/Piskriek/HeavyMetal2/issues/38) replaces the legacy simultaneous
+slingshot launch with a wave-based release system. Read [`docs/RELEASE.md`](docs/RELEASE.md) for the
+full design, units table and criterion-by-criterion evidence map.
+
+**What landed**
+
+- `src/game/release/grid.ts` — frozen grid from ranked qualifying order: pole at the front of the
+  corridor (no teleport), wave spacing clamped to the corridor's safety minimum (reported, not
+  silently repaired), lane count auto-reduced when the corridor is too narrow, exit speed preserved
+  exactly (no ×1.08 boost), stalled entries flagged as `stalled` rather than silently assigned a speed.
+- `src/game/release/scheduler.ts` — release plan + executor: waves release front-to-back, each wave
+  checks live corridor occupancy before release, delayed slots reschedule with bounded retries,
+  permanently blocked waves are flagged (not silently skipped), all release times quantized upward
+  to tick boundaries, the actual release span is reported (not forced into a six-second target).
+  `ReleaseExecutor` is the runtime driver that re-checks occupancy at each tick.
+- `src/game/release/go-clock.ts` — common GO clock: one reference for finish order, timeout and
+  settling. Finish times are absolute (from GO tick), not per-racer. Ties broken by racerId.
+  Auto-settles when all participants finish or at timeout.
+- 65 new checks across three suites (grid 22, scheduler 27, go-clock 16). `npm run check` = tsc over
+  `src`, tsc over `tests`, **201 tests** (136 pre-existing + 65 new). `npm run build` green at
+  1,454.52 kB / 402.24 kB gzip (+8 kB / +3 kB gzip over T04 baseline — the release module).
+
+**Acceptance criteria → tests**
+
+All ten criteria from #38 are covered:
+
+| # | Criterion | Test |
+| --- | --- | --- |
+| 1 | Slow leader/fast follower | `release-scheduler: a slow leader is never rear-ended` |
+| 2 | Stopped leader and invalid speed | `release-scheduler: a stalled racer is flagged` |
+| 3 | One to four valid lanes | `release-scheduler: releases correctly with N lane(s)` (1/2/3/4) |
+| 4 | Narrowing mapped track | `release-scheduler: wave spacing adapts to large minSpacing` |
+| 5 | Blocked exit | `release-scheduler: flags a wave as blocked` |
+| 6 | Delayed earlier pole entries | `release-scheduler: delays a wave when occupancy is temporary` |
+| 7 | Acceleration during reserved horizon | `release-scheduler: reservations hold the slot` |
+| 8 | Clearance at actual emergence | `release-scheduler: executor checks occupancy at each release tick` |
+| 9 | Common-start finish accounting | `release-scheduler: finish order is by absolute finish tick` |
+| 10 | Report actual release span | `release-scheduler: reports span without enforcing a target` |
+
+**Notes for whoever integrates next**
+
+- The release module is pure: no DOM, no canvas, no three.js. It can be exercised headlessly.
+- `buildFrozenGrid()` takes `rankedQualifyingEntry[]` from T04's `rankQualifying()` and a
+  `ReleaseCorridor` from T01's `defaultReleaseCorridor()`. The grid is the bridge between
+  qualifying and the race.
+- `computeReleasePlan()` takes the grid and an `OccupancyProvider` (the engine provides live
+  racer positions; tests provide a mock). The plan is optimistic; `ReleaseExecutor` is the
+  runtime driver.
+- `GoClock` takes the plan's `goTick` and tracks finishes, timeouts and settling. The engine
+  calls `clock.tick()` each simulation tick and `clock.recordFinish()` when a racer crosses
+  the finish line.
+- The `hitMask` legacy field on obstacles is still written for racer IDs ≤ 30 (noted by T04's
+  agent). T05 does not read it; `hitBy` (the scalable Set) is the gameplay ledger.
+- Not verified: browser/WebGL integration (same blocker as T00/T04), UI wiring (T06's scope),
+  and `syntheticField` stands in for T02's roster above four racers.
+
+## T06 — Staging Presentation, Ready UI, and Input Lifecycle (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#39](https://github.com/Piskriek/HeavyMetal2/issues/39) adds the presentation layer
+between qualifying (T04) and the race release (T05). Read [`docs/STAGING.md`](docs/STAGING.md)
+for the full design and evidence map.
+
+**What landed**
+
+- `src/game/staging/lifecycle.ts` — pure state machine: `qualifying → results → staging →
+  countdown → released`, with `paused` and `retry` branches. Transitions are refusal-first.
+  Countdown is derived from simulation ticks (3 s = 360 ticks at 120 Hz), so the countdown
+  label and the official clock always agree.
+- `src/game/staging/presentation.ts` — orbit bands, leaderboard, and highlights derived from
+  the qualifying results and frozen grid. Leaderboard bounded at 100 rows. Orbit bands grouped
+  by wave when the field exceeds 20. No mutation of authoritative data.
+- `src/components/StagingOverlay.tsx` — React overlay with keyboard focus (`tabIndex`, `role`,
+  `aria-modal`), reduced-motion support (static staging, instant countdown), aria-live countdown
+  label, and the full leaderboard toggle.
+- 43 new checks across two suites (lifecycle 24, presentation 19). `npm run check` = tsc over
+  `src`, tsc over `tests`, **244 tests** (201 pre-existing + 43 new). `npm run build` green at
+  1,454.55 kB / 402.24 kB gzip.
+
+**Acceptance criteria → tests**
+
+| # | Criterion | Test |
+|---|-----------|------|
+| 1 | No frozen bots during retry | `staging-lifecycle: phase changes but CPU still steps` |
+| 2 | No duplicated ball/shadow at release | Architecture: overlay fades on `released` |
+| 3 | Countdown and official clock agree | `staging-lifecycle: derived from ticks, not wall time` |
+| 4 | No catch-up burst after pause | `staging-lifecycle: tick is frozen during pause` |
+| 5 | Keyboard focus and reduced-motion | `staging-lifecycle: respects reducedMotion` + overlay aria |
+| 6 | Leaderboard bounded at 100 rows | `staging-presentation: bounded at MAX_LEADERBOARD_ROWS` |
+
+**Notes for whoever integrates next**
+
+- The overlay is a standalone React component. Wire it into `RaceScreen.tsx` by passing the
+  staging state, qualifying entries, grid, and human racer ID. The overlay never mutates state.
+- CSS classes (`staging-overlay`, `orbit-band`, `countdown-number`, etc.) need matching styles.
+- The staging lifecycle connects to the heat phase machine via `transitionHeat(state, { type: 'release' })`
+  when the countdown reaches zero.
+
+## T07 — Scalable Collision Candidates and Robust Contact Events (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#40](https://github.com/Piskriek/HeavyMetal2/issues/40) replaces the legacy O(N²) pairwise
+collision loop with a scalable broad-phase/narrow-phase system. Read [`docs/COLLISION.md`](docs/COLLISION.md)
+for the full design and evidence map.
+
+**What landed**
+
+- `src/game/collision/spatial-hash.ts` — swept spatial hash with anisotropic cells (wider in x,
+  narrower in z). Racers are inserted into their cell plus swept-forward cells based on velocity.
+  Candidate pairs are generated from same-cell and adjacent-cell racers, deduplicated, and sorted
+  by distance for deterministic processing.
+- `src/game/collision/contacts.ts` — narrow-phase contact detection and resolution. Fixed 3-pass
+  iteration budget for stable stacking. Deterministic coincident-center normal (z-axis fallback).
+  Shield absorbs impulse but NOT penetration (prevents tunneling). Returns `CollisionEvent[]` for
+  audio/particles, separated from physics.
+- `src/game/collision/cooldowns.ts` — per-pair cooldown tracking with bounded cache (max 1000
+  entries, automatic cleanup). Prevents repeated collision responses within 0.38s.
+- `src/game/collision/types.ts` — shared type definitions.
+- 17 new checks in `tests/collision.test.ts` covering broad-phase accuracy, dense packs, coincident
+  centers, high speeds, NaN prevention, cache bounds, cooldown behavior, and full pipeline integration.
+
+**Verification**
+
+```
+npm run check → tsc(src) + tsc(tests) + 261 tests, 0 fail
+  (136 pre-existing + 65 release + 43 staging + 17 collision)
+npm run build → green, 1,454.55 kB / 402.24 kB gzip
+```
+
+**Acceptance criteria → tests**
+
+| # | Criterion | Test |
+|---|-----------|------|
+| 1 | Candidate set matches brute-force | `collision: matches brute-force on random scene` |
+| 2 | Dense packs, coincident centers, high speeds | `collision: handles dense pack`, `coincident centers`, `high relative speeds` |
+| 3 | No NaNs or unbounded cache growth | `collision: does not produce NaN values`, `prevents unbounded cache growth` |
+| 4 | Ongoing contact impulses not suppressed for 0.38s | `collision: prevents repeated responses within 0.38s` |
+| 5 | Report N, candidates, contacts, occupancy, timing | `collision: reports statistics correctly` |
+
+**Notes for whoever integrates next**
+
+- The collision module is pure and headless. Wire it into `engine.ts` by replacing the legacy
+  `resolveBumps()` loop with the spatial hash pipeline.
+- The broad phase reduces candidates from O(N²) to O(N·k) where k is average cell occupancy.
+  For 100 racers, this is a significant speedup.
+- Shield behavior is explicit: absorbs impulse, allows penetration correction, does not disable
+  non-penetration or create one-sided free momentum.
+- Not yet wired into the engine — the legacy `resolveBumps()` is still in use. Integration is
+  the next step.
+
+## T08 — Non-Destructive Feature-Prop Storage and Builder Authoring (this session, branch `arena/01a0cc4c-heavymetal2`)
+
+Issue [#41](https://github.com/Piskriek/HeavyMetal2/issues/41) adds versioned, non-destructive
+storage for track props with forward-compatible unknown-field preservation, input validation,
+quota handling, and new authoring controls. Read [`docs/TRACK_STORAGE.md`](docs/TRACK_STORAGE.md)
+for the full design and API reference.
+
+**What landed**
+
+- `src/game/track-storage.ts` — versioned storage module: `TRACK_STORAGE_VERSION=1`, validates
+  duplicate IDs and invalid dimensions (scale/width/height/depth must be positive and finite),
+  handles quota errors with `quotaExceeded` flag, preserves unknown fields via spread operator,
+  separate storage key (`hm2-track-props-v1`, not protected path), backup/restore, export/import
+  with validation.
+- `src/game/track-builder-3d.ts` — extended with T08 features:
+  - **New categories**: `powerup` (5 procedural pickups) and `barrier` (5 hazard obstacles) with
+    `isPowerup`/`isBarrier` flags and explicit `defaultDepth` for 3D bounding boxes.
+  - **Extended PlacedProp**: optional `width`, `height`, `depth` (world-unit overrides), `visible`
+    (H key toggle), `authoringNotes`, and `[key: string]: unknown` for forward compatibility.
+  - **Scale convention**: `getEffectiveDimensions()` returns explicit dims if set (no scale applied),
+    otherwise `default * scale`. Prevents double-application.
+  - **Visibility**: `toggleVisibility()`, `setVisibility()`, `isPropVisible()`. Hidden props retain
+    selection identity but are excluded from fresh raycasts.
+  - **Dimension controls**: `setSelectedDimensions()`, `clearSelectedDimensions()`.
+  - **Runtime stripping**: `stripRuntimeState()` removes `_pickupCollected`, `_pickupRespawn`,
+    `_runtimeState` before serialization.
+  - **Backward-compatible import**: `importJson()` accepts both versioned documents and legacy
+    plain arrays.
+- 30 new checks in `tests/track-storage.test.ts` covering versioned schema, unknown-field
+  preservation, validation (duplicate IDs, invalid dimensions, quota errors), backup restoration,
+  runtime state stripping, import/export, builder integration (visibility, dimensions, categories).
+
+**Verification**
+
+```
+npm run check → tsc(src) + tsc(tests) + 291 tests, 0 fail
+  (261 pre-existing + 30 track-storage)
+npm run build → green, 1,461.92 kB / 404.15 kB gzip
+```
+
+**Acceptance criteria → tests**
+
+| # | Criterion | Test |
+|---|-----------|------|
+| 1 | Synthetic legacy fixtures round-trip without losing unknown fields | `track-storage: synthetic legacy fixtures round-trip` |
+| 2 | Failed/quota-interrupted saves preserve last valid version | `track-storage: failed/quota-interrupted saves preserve last valid version via backup` |
+| 3 | Duplicate IDs and invalid dimensions rejected | `track-storage: duplicate IDs rejected`, `invalid dimensions rejected` |
+| 4 | Scale and dimensions not applied twice | `track-storage: explicit width/height/depth not scaled twice` |
+| 5 | Runtime pickup state not serialized | `track-storage: export strips runtime pickup state` |
+| 6 | No new writer targets protected path | `track-storage: storage module uses separate key` |
+
+**Notes for whoever integrates next**
+
+- The storage module is pure and headless. It writes to `hm2-track-props-v1`, not the protected
+  `hm2-3d-track-props` path. Legacy data is read as fallback during migration.
+- Powerup/barrier props are defined but not yet wired into gameplay physics. The `isPowerup` and
+  `isBarrier` flags are available for the engine to check.
+- Visibility is editor-only; hidden props are still serialized and rendered in the runtime.
+  Wire `visible === false` into the renderer to hide them in-game.
+- The dimension controls (`width`/`height`/`depth`) are authoring fields; the renderer should use
+  `getEffectiveDimensions()` to avoid double-scaling.
+
 ## Latest User Direction & Actionable Ticket Suite
 
 The user reviewed live gameplay and screenshots (Screenshots 1-5) and requested a major aesthetic and gameplay upgrade to make the game exciting, tactile, and immersive. A comprehensive 9-ticket suite has been created under [`docs/tickets/`](file:///c:/MarbleGp/docs/tickets/README.md):

@@ -55,6 +55,16 @@ const SOURCE_ART = {
   'anim-28-tankard-celebrant': 'goblins/alpha/goblin-10-tankard-celebrant.png',
   'anim-29-ball-loader': 'goblins/alpha/goblin-12-ball-loader.png',
   'anim-30-bell-ringer': 'goblins/alpha/goblin-13-bell-ringer.png',
+  'anim-31-scarf-fan': 'goblins/alpha/goblin-14-scarf-fan.png',
+  'anim-32-track-sweeper': 'goblins/alpha/goblin-15-track-sweeper.png',
+  'anim-33-rope-heave-trio': 'goblins/alpha/goblin-16-rope-heave-trio.png',
+  'anim-34-shoulder-ride-duo': 'goblins/alpha/goblin-17-shoulder-ride-duo.png',
+  'anim-35-tire-carry-duo': 'goblins/alpha/goblin-19-tire-carry-duo.png',
+  'anim-36-victory-huddle': 'goblins/alpha/goblin-20-victory-huddle.png',
+  'anim-37-grandstand-roar': 'goblins/alpha/goblin-21-grandstand-roar.png',
+  'anim-38-flag-terrace': 'goblins/alpha/goblin-23-flag-terrace.png',
+  'anim-39-mosh-pit': 'goblins/alpha/goblin-26-mosh-pit.png',
+  'anim-40-fence-fans': 'goblins/alpha/goblin-27-fence-fans.png',
 };
 
 const outDir = join(root, 'art-src/animated');

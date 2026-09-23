@@ -413,6 +413,16 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_28_tankard_celebrant', name: 'Tankard Celebrant (Animated)', category: 'animated', url: '/art/animated/alpha/anim-28-tankard-celebrant.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
   { type: 'anim_29_ball_loader', name: 'Ball Loader (Animated)', category: 'animated', url: '/art/animated/alpha/anim-29-ball-loader.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
   { type: 'anim_30_bell_ringer', name: 'Bell Ringer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-30-bell-ringer.png', defaultWidth: 312, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },
+  { type: 'anim_31_scarf_fan', name: 'Scarf Fan (Animated)', category: 'animated', url: '/art/animated/alpha/anim-31-scarf-fan.png', defaultWidth: 340, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_32_track_sweeper', name: 'Track Sweeper (Animated)', category: 'animated', url: '/art/animated/alpha/anim-32-track-sweeper.png', defaultWidth: 360, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_33_rope_heave_trio', name: 'Rope Heave Trio (Animated)', category: 'animated', url: '/art/animated/alpha/anim-33-rope-heave-trio.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_34_shoulder_ride_duo', name: 'Shoulder Ride Duo (Animated)', category: 'animated', url: '/art/animated/alpha/anim-34-shoulder-ride-duo.png', defaultWidth: 420, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_35_tire_carry_duo', name: 'Tire Carry Duo (Animated)', category: 'animated', url: '/art/animated/alpha/anim-35-tire-carry-duo.png', defaultWidth: 440, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 5 },
+  { type: 'anim_36_victory_huddle', name: 'Victory Huddle (Animated)', category: 'animated', url: '/art/animated/alpha/anim-36-victory-huddle.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_37_grandstand_roar', name: 'Grandstand Roar (Animated)', category: 'animated', url: '/art/animated/alpha/anim-37-grandstand-roar.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
+  { type: 'anim_38_flag_terrace', name: 'Flag Terrace (Animated)', category: 'animated', url: '/art/animated/alpha/anim-38-flag-terrace.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 6 },
+  { type: 'anim_39_mosh_pit', name: 'Mosh Pit (Animated)', category: 'animated', url: '/art/animated/alpha/anim-39-mosh-pit.png', defaultWidth: 420, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 9 },
+  { type: 'anim_40_fence_fans', name: 'Fence Fans (Animated)', category: 'animated', url: '/art/animated/alpha/anim-40-fence-fans.png', defaultWidth: 400, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
 ];
 
 /**
@@ -454,6 +464,16 @@ export const ANIMATED_SOURCE_ART: Record<string, string> = {
   anim_28_tankard_celebrant: '/art/goblins/alpha/goblin-10-tankard-celebrant.png',
   anim_29_ball_loader: '/art/goblins/alpha/goblin-12-ball-loader.png',
   anim_30_bell_ringer: '/art/goblins/alpha/goblin-13-bell-ringer.png',
+  anim_31_scarf_fan: '/art/goblins/alpha/goblin-14-scarf-fan.png',
+  anim_32_track_sweeper: '/art/goblins/alpha/goblin-15-track-sweeper.png',
+  anim_33_rope_heave_trio: '/art/goblins/alpha/goblin-16-rope-heave-trio.png',
+  anim_34_shoulder_ride_duo: '/art/goblins/alpha/goblin-17-shoulder-ride-duo.png',
+  anim_35_tire_carry_duo: '/art/goblins/alpha/goblin-19-tire-carry-duo.png',
+  anim_36_victory_huddle: '/art/goblins/alpha/goblin-20-victory-huddle.png',
+  anim_37_grandstand_roar: '/art/goblins/alpha/goblin-21-grandstand-roar.png',
+  anim_38_flag_terrace: '/art/goblins/alpha/goblin-23-flag-terrace.png',
+  anim_39_mosh_pit: '/art/goblins/alpha/goblin-26-mosh-pit.png',
+  anim_40_fence_fans: '/art/goblins/alpha/goblin-27-fence-fans.png',
 };
 
 /**

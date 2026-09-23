@@ -559,8 +559,35 @@ body must stay put and the same size in every panel, and the animated element
 must keep a consistent size across panels. Seven of the eight come back at
 `maxShift` 0.0–2.2px and `fillSpread` 1.10–1.29x.
 
-**Still to animate:** goblin-14, 15, 16, 17, 19, 20, 21, 23, 26, 27, 28, 29 —
-twelve more characters. After those: explosion sprites and general-play sprites.
+## Update 3 — goblins 14-27 (anim-31 to anim-40)
+
+| sheet | still twin | frame | fps | min elem Δ | maxShift | fillSpread |
+|---|---|---|---|---|---|---|
+| anim-31 scarf fan | goblin-14-scarf-fan | 412x614 | 8 | 0.270 | 0.0px | 1.04x |
+| anim-32 track sweeper | goblin-15-track-sweeper | 530x790 | 6 | 0.342 | 10.0px | 1.30x |
+| anim-33 rope heave trio | goblin-16-rope-heave-trio | 458x256 | 6 | 0.157 | 1.4px | 1.05x |
+| anim-34 shoulder ride duo | goblin-17-shoulder-ride-duo | 460x822 | 5 | 0.305 | 0.0px | 1.53x |
+| anim-35 tire carry duo | goblin-19-tire-carry-duo | 422x236 | 5 | 0.176 | 1.0px | 1.04x |
+| anim-36 victory huddle | goblin-20-victory-huddle | 434x236 | 6 | 0.250 | 0.0px | 1.17x |
+| anim-37 grandstand roar | goblin-21-grandstand-roar | 478x268 | 8 | 0.240 | 0.0px | 1.09x |
+| anim-38 flag terrace | goblin-23-flag-terrace | 904x504 | 6 | 0.408 | 24.3px | 1.30x |
+| anim-39 mosh pit | goblin-26-mosh-pit | 892x498 | 9 | 0.336 | 25.3px | **3.61x** |
+| anim-40 fence fans | goblin-27-fence-fans | 444x248 | 8 | 0.371 | 1.0px | 1.28x |
+
+`maxShift` of 10-25px with `gain` 0.000-0.001 is correlator noise, not
+misregistration — the crowd sheets have no single dominant silhouette for the
+cross-correlation to lock onto, so it drifts to an arbitrary far offset. The
+overlap-gain guard is what keeps these from being false positives.
+
+**anim-39-mosh-pit fails both gates and must be regenerated.** It came back with
+magenta remnant 3.775% (gate: 0.5%) and fillSpread 3.61x (gate: 1.6x), so the
+crowd changes size between panels *and* the gutter has bleed. It was built and
+registered but is not trustworthy; the regeneration prompt is ready and needs to
+carry both the gutter wording and the "reuse one tracing" wording together.
+The other nine are clean.
+
+**Still to animate:** goblin-28 and goblin-29 — two more characters. After
+those: explosion sprites and general-play sprites.
 
 The registry test no longer hardcodes a sheet count (`exactly 20 animated
 decorations` and `19 of the 20 sheets have a still counterpart`); it now derives

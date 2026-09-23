@@ -28,7 +28,8 @@ const commands = [
     'tests/staging-lifecycle.test.ts', 'tests/staging-presentation.test.ts',
     'tests/collision.test.ts',
     'tests/track-storage.test.ts',
-    'tests/t09-wall-pickups.test.ts'],
+    'tests/t09-wall-pickups.test.ts',
+    'tests/cube-sphere.test.ts'],
 ];
 
 for (const args of commands) {

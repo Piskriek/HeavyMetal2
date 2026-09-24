@@ -31,7 +31,7 @@ import {
 import type { Racer } from '../racers';
 import { advanceRoll } from '../gyro-ball';
 import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
-import { oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
+import { advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -394,6 +394,11 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     return;
   }
   if (!racer.loopRide) {
+    // M01 · T6 (the merge law): a path that ends in a merge hands the racer to its successor. Without
+    // this a racer simply drops back to the legacy corridor past the end of their own path, and the
+    // authored network stops existing mid-course. `advancePaths` leaves OOB and flag ends alone on
+    // purpose, so the OOB trigger still fires on the path it belongs to.
+    advancePaths([racer], ctx.laneNetwork ?? null);
     const isWet = racer.x >= STAGE_GRAVITY_START && racer.x <= STAGE_GRAVITY_END;
     const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling;
     // M01 · T6 (D12): with no network this is exactly `laneZ(targetLane)` and the legacy corridor;

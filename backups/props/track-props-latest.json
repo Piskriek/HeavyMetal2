@@ -1,7 +1,8 @@
 {
-  "version": 1,
-  "savedAt": "2026-09-23T10:13:08.519Z",
-  "courseId": "ridge",
+  "course": "ridge",
+  "timestamp": 1790254371292,
+  "count": 521,
+  "updatedAt": "2026-09-24T12:52:51.292Z",
   "props": [
     {
       "id": "prop_1790020259486_aj8o",

@@ -352,6 +352,44 @@ export function adoptNearestPaths(bearers: readonly PathBearer[], network: LaneN
   return adopted;
 }
 
+/**
+ * Hands a bearer who has ridden **past the end of their path** to its successor.
+ *
+ * An authored network is a set of runs that meet: four lanes that merge into one spine, a spine that
+ * splits at a fork. Until this existed, a racer who crossed the end of their own path simply fell back
+ * to the legacy corridor — the merge was never taken and the authored road quietly stopped existing
+ * mid-course. The rule is `successorPath`'s own:
+ *
+ *  - the end node is a **merge** → the single path that starts there is adopted;
+ *  - the end node is a **split** → the branch on the racer's own side is taken (`bias` from which side
+ *    of the junction they are on, so a racer steering down the left flank does not get yanked right);
+ *  - the end node is **oob**, the flag, or nothing continues → **the bearer is left exactly as they
+ *    are**. That is deliberate: an OOB node *is* the trigger a recovery fires on, and it can only fire
+ *    while the racer is still on the path that ends there. A racer past the end of a dead end is the
+ *    crew's business, not the network's.
+ *
+ * Returns how many bearers changed path, so a caller can log or assert on it.
+ */
+export function advancePaths(bearers: readonly PathBearer[], network: LaneNetwork | null): number {
+  if (!network) return 0;
+  let advanced = 0;
+  for (const bearer of bearers) {
+    if (bearer.pathId === null || bearer.finished) continue;
+    // Still on the road: nothing to do. This is the overwhelmingly common case, one sample per tick.
+    if (sampleLane(network, bearer.pathId, bearer.x)) continue;
+    const path = pathById(network, bearer.pathId);
+    const end = path ? path.nodeIds[path.nodeIds.length - 1] : undefined;
+    const endNode = end ? network.nodes.find((node) => node.id === end) : undefined;
+    // Which side of the junction the bearer is on decides a split; a merge has only one way on.
+    const bias: -1 | 0 | 1 = !endNode || Math.abs(bearer.z - endNode.z) <= 1
+      ? 0
+      : bearer.z < endNode.z ? 1 : -1;
+    const next = successorPath(network, bearer.pathId, bearer.z, bias);
+    if (next) { bearer.pathId = next; advanced++; }
+  }
+  return advanced;
+}
+
 /* -----------------------------------------------------------------------------
    4. MOVEMENT
    -------------------------------------------------------------------------- */

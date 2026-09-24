@@ -618,6 +618,38 @@ is open, its **gizmos** show the document being edited, while the painted road k
 document the run is driving until you press Test drive — the paint follows the physics, not the text
 buffer.
 
+## The merge law — an authored network is drivable end to end · **this commit**
+
+T6 shipped `successorPath`, documented it, tested it — and never called it. The consequence only showed
+up once the lanes were painted: a racer who crossed the end of their own path **silently fell back to
+the legacy lane corridor**. The four lanes never merged into the spine, the fork never opened, and the
+authored road stopped existing at x 36000. `advancePaths` (in `lane-network.ts`, called from
+`stepRacer`) is the missing line:
+
+* past an end node that is a **merge**, the racer adopts the single path that starts there;
+* past a **split**, they take the branch on their **own side** of the junction (`bias` from which flank
+  they are on, so a racer steering down the left does not get yanked across the fork);
+* past an **OOB** end, the flag, or a path nothing continues from, they are **left exactly as they
+  are**. That is deliberate and load-bearing: an OOB node *is* the trigger `oobCrossed` fires on, and it
+  can only fire while the racer is still on the path that ends there. Clearing the path would make the
+  recovery law silently unfireable.
+
+`tests/lane-successor.test.ts` (6) proves the rule unit by unit, then the law on a real run: the
+shipping physics, the goblin push and the sample network, 9000 ticks. The field rides
+**`ridge-start` → a lane → `ridge-spine` → `ridge-main`** and reaches the flag at x 72202, with the
+invariant that **no racer is ever off their path with nowhere to go** — and the legal lag (one tick at
+each junction: the second ring, the loop's mouth, the fork) bounded at 12 for four racers. A control
+run with `laneNetwork` absent asserts the sim is untouched without a network: no path is ever assigned,
+and the field still goes down the hill. That control is why this could be added to `stepRacer` at all:
+with no network `advancePaths` returns on its first line, which is what keeps the parity fingerprints
+and every tuned handling number intact.
+
+`npm run check`: **617 pass / 47 suites / 0 fail**. Build **1,634.16 kB (449.71 kB gzip)**. Edges 0.
+
+**UNVERIFIED.** How a lane change *feels* through a merge at speed — whether the handover tick is
+noticeable, and whether the split bias matches what a player steering toward a branch expects — is the
+browser's call.
+
 ## Next
 
 * **T7 is the last ticket in M01** — with it, T0..T7 are all in. What is left is the browser's word on

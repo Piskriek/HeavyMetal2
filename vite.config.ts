@@ -164,9 +164,80 @@ function trackPropsBackupPlugin(): Plugin {
   };
 }
 
+/**
+ * M01 · T6: the lane-network mirror. Same shape as the props route above (`POST` writes a latest
+ * file plus a history entry, and refuses to overwrite a much larger set with a much smaller one),
+ * in its own directory, so the two documents can never be confused for one another.
+ */
+function lanePathsBackupPlugin(): Plugin {
+  return {
+    name: "lane-paths-backup-plugin",
+    configureServer(server) {
+      const backupDir = path.resolve(__dirname, "backups/lane-paths");
+      const historyDir = path.resolve(backupDir, "history");
+      try {
+        fs.mkdirSync(historyDir, { recursive: true });
+      } catch {}
+
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ? req.url.split("?")[0] : "";
+        if (req.method !== "POST" || url !== "/api/backup-lane-paths") { next(); return; }
+        let body = "";
+        req.on("data", (chunk) => { body += chunk; });
+        req.on("end", () => {
+          try {
+            const data = JSON.parse(body);
+            const networks = data && typeof data.networks === "object" && data.networks !== null ? data.networks : null;
+            if (!networks) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "A backup needs a networks object." }));
+              return;
+            }
+            const countNodes = (value: Record<string, any>) => Object.values(value)
+              .reduce((total: number, net: any) => total + (Array.isArray(net?.nodes) ? net.nodes.length : 0), 0);
+            const timestamp = data.timestamp || Date.now();
+            const latestFile = path.resolve(backupDir, "lane-paths-latest.json");
+            const incoming = countNodes(networks);
+            if (fs.existsSync(latestFile)) {
+              try {
+                const existing = JSON.parse(fs.readFileSync(latestFile, "utf-8"));
+                const existingNodes = countNodes(existing?.networks ?? {});
+                // The same guard the props route uses: never let a nearly-empty save wipe the mirror.
+                if (existingNodes > 0 && incoming < existingNodes * 0.75) {
+                  res.writeHead(200, { "Content-Type": "application/json" });
+                  res.end(JSON.stringify({
+                    success: false,
+                    reason: `Refusing to overwrite ${existingNodes} nodes with a smaller set (${incoming} nodes)`,
+                    count: existingNodes,
+                  }));
+                  return;
+                }
+              } catch {}
+            }
+            const payload = { version: data.version ?? 1, course: data.course ?? "all", timestamp, count: incoming, updatedAt: new Date(timestamp).toISOString(), networks };
+            fs.writeFileSync(latestFile, JSON.stringify(payload, null, 2));
+            const historyFile = path.resolve(historyDir, `lane-paths-${timestamp}.json`);
+            fs.writeFileSync(historyFile, JSON.stringify(payload, null, 2));
+            const files = fs.readdirSync(historyDir).filter((file) => file.endsWith(".json")).sort();
+            while (files.length > 40) {
+              const oldest = files.shift();
+              if (oldest) { try { fs.unlinkSync(path.resolve(historyDir, oldest)); } catch {} }
+            }
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true, count: incoming, timestamp }));
+          } catch (error: any) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: error.message }));
+          }
+        });
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin()],
+  plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin(), lanePathsBackupPlugin()],
   // Dev server: allow the sandbox preview proxy host (e.g. 5173-<id>.e2b.app).
   server: {
     host: '0.0.0.0',

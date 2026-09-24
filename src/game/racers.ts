@@ -58,6 +58,12 @@ export interface Racer extends RacerFrame {
   mergeGhost: boolean;
   /** Run time the racer last left a loop, or -100. The ghost tail is measured from here. */
   loopExitTime: number;
+  /**
+   * M01 · T6 (IF-LANES): the authored path this racer is on, or `null` for the legacy four lanes.
+   * The path owns the steering target and the corridor; `targetLane` stays meaningful either way,
+   * because the HUD, the obstacles and the loop's lane filter all still speak in lanes.
+   */
+  pathId: string | null;
   visited: Set<Obstacle>;
   previous: { x: number; y: number; z: number; rotation: number };
 }
@@ -103,6 +109,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
       lane: entry.homeLane, targetLane: entry.homeLane, rotation: 0,
       rollPhase: 0, rollRate: 0,
       mergeHeld: false, mergeSlotZ: laneZ(entry.homeLane), mergeGhost: false, loopExitTime: -100,
+      pathId: null,
       falling: false, finished: false, grounded: false, bumpAt: -100,
       immuneUntil: -100, launchOrigin: { x: startX, y: START_Y },
       shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,

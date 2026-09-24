@@ -31,6 +31,7 @@ import {
 import type { Racer } from '../racers';
 import { advanceRoll } from '../gyro-ball';
 import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
+import { oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -61,6 +62,8 @@ export interface RacerStepTrace {
   loopExited: boolean;
   /** M01 · T2: the step was a pool hold, so only the lateral glide ran. */
   held: boolean;
+  /** M01 · T6: the id of the out-of-bounds node this step crossed, or null. */
+  oobNode: string | null;
   landed: boolean;
   rampLaunch: boolean;
   finished: boolean;
@@ -73,7 +76,8 @@ export function createStepTrace(): RacerStepTrace {
   return {
     preObstacleX: 0, preObstacleY: 0, preObstacleZ: 0, preObstacleVx: 0, preObstacleVy: 0,
     wasFalling: false, fell: false, recovered: false, recoveryReason: null, loopEngaged: false,
-    loopExited: false, held: false, landed: false, rampLaunch: false, finished: false, lavaPlunge: false, hits: [],
+    loopExited: false, held: false, oobNode: null, landed: false, rampLaunch: false, finished: false,
+    lavaPlunge: false, hits: [],
   };
 }
 
@@ -81,7 +85,7 @@ export function resetTrace(trace: RacerStepTrace): void {
   trace.preObstacleX = trace.preObstacleY = trace.preObstacleZ = 0;
   trace.preObstacleVx = trace.preObstacleVy = 0;
   trace.wasFalling = trace.fell = trace.recovered = trace.loopEngaged = trace.loopExited = false;
-  trace.held = false;
+  trace.held = false; trace.oobNode = null;
   trace.landed = trace.rampLaunch = trace.finished = trace.lavaPlunge = false;
   trace.recoveryReason = null;
   trace.hits.length = 0;
@@ -137,12 +141,32 @@ export function recoverRacer(racer: Racer, ctx: RacerStepContext, reason: Recove
   const recoveries = racer.recoveries;
   racer.x = ctx.recovery.respawnX({ racer, x, bestX: bestProgressX(racer), reason, recoveries });
   racer.recoveries = recoveries + 1;
-  let lane = racer.targetLane;
-  for (let i = 0; i < 4; i++) {
-    const candidate = (lane + i) % 4;
-    if (!ctx.world.inGap(racer.x, laneZ(candidate)) && !ctx.world.inGap(racer.x + 110, laneZ(candidate))) { lane = candidate; break; }
+  // M01 · T6: on a network the crew puts the racer back on the nearest *path*, not on the nearest
+  // legacy lane. The gap rule is the one it has always been: the first candidate whose centre is
+  // clear here and just ahead. With no network this walks the legacy lanes exactly as before.
+  const network = ctx.laneNetwork ?? null;
+  const candidates: { z: number; pathId: string | null }[] = [];
+  const currentPath = network && racer.pathId ? sampleLane(network, racer.pathId, racer.x) : null;
+  if (network && racer.pathId && currentPath) {
+    candidates.push({ z: currentPath.z, pathId: racer.pathId });
+    for (const path of network.paths) {
+      if (path.id === racer.pathId) continue;
+      const sample = sampleLane(network, path.id, racer.x);
+      if (sample) candidates.push({ z: sample.z, pathId: path.id });
+    }
+    candidates.sort((a, b) => Math.abs(a.z - racer.z) - Math.abs(b.z - racer.z));
+  } else {
+    const lane = racer.targetLane;
+    for (let i = 0; i < 4; i++) {
+      candidates.push({ z: laneZ((lane + i) % 4), pathId: null });
+    }
   }
-  racer.targetLane = racer.lane = lane; racer.z = laneZ(lane); racer.vz = 0;
+  let chosen = candidates[0];
+  for (const candidate of candidates) {
+    if (!ctx.world.inGap(racer.x, candidate.z) && !ctx.world.inGap(racer.x + 110, candidate.z)) { chosen = candidate; break; }
+  }
+  racer.pathId = chosen.pathId;
+  racer.targetLane = racer.lane = closestLane(chosen.z); racer.z = chosen.z; racer.vz = 0;
   racer.y = ctx.world.surfaceAt(racer.x, racer.z).y - RADIUS;
   racer.vx = ctx.recovery.respawnSpeed; racer.vy = ctx.world.slope(racer.x) * racer.vx;
   racer.falling = false; racer.grounded = true; racer.loopRide = null;
@@ -372,10 +396,15 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
   if (!racer.loopRide) {
     const isWet = racer.x >= STAGE_GRAVITY_START && racer.x <= STAGE_GRAVITY_END;
     const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling;
-    const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
+    // M01 · T6 (D12): with no network this is exactly `laneZ(targetLane)` and the legacy corridor;
+    // with one it is the racer's own path centre and the union corridor of the paths active here.
+    // The PD spring, its damping, the clamp of the spring's own output and the steer lock are all
+    // untouched — only the target and the two bounds are generalised.
+    const lane = resolveLaneTarget(racer, ctx.laneNetwork ?? null);
+    const steering = (lane.targetZ - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
     racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
     const previousZ = racer.z;
-    racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.z = clamp(racer.z + racer.vz * dt, lane.zMin, lane.zMax);
     if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
     racer.lane = closestLane(racer.z);
   }
@@ -498,6 +527,17 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
   racer.vx = clamp(racer.vx, 0, racer.maximumSpeed);
   racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
   racer.stoppedFor = racer.vx < 40 && !racer.loopRide ? racer.stoppedFor + dt : 0;
+  // M01 · T6: an authored out-of-bounds node ends the racer's line for this attempt. The crossing is
+  // the same swept test the gate uses — `prevX < node.x ≤ x` — so it fires exactly once, on the tick
+  // the ball passes the node, and only for a racer who is on that path.
+  if (ctx.laneNetwork && racer.pathId) {
+    const node = oobCrossed(ctx.laneNetwork, racer.pathId, oldX, racer.x);
+    if (node) {
+      if (trace) trace.oobNode = node;
+      recoverRacer(racer, ctx, 'oob', trace);
+      return;
+    }
+  }
   if (racer.x >= FINISH && !racer.falling) {
     racer.finishTime = ctx.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
     racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;

@@ -17,6 +17,8 @@ import {
   type QualifyingGateSpec,
 } from './qualifying/gate';
 import { POWERUPS, createAirPickups, type AirPickup } from './powerups';
+import { adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, type LaneNetwork } from './lane-network';
+import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
@@ -120,6 +122,12 @@ export class GameEngine {
   /** True once the pool has released everyone: the merge happens once per run, and only once. */
   private mergeDone = false;
   /**
+   * M01 · T6 (IF-LANES) — the authored lane network this course runs on, or `null` for the legacy
+   * lanes. Loaded once per course from `lane-storage`; the builder's "test drive" can replace it
+   * through `setLaneNetwork`. With `null` the physics is bit-identical to the legacy game.
+   */
+  private laneNetwork: LaneNetwork | null = null;
+  /**
    * The status a pause was taken from, so resuming puts the game back where it was. Pausing during
    * the pool has to come back to the pool: a resumed field that jumped straight to `flying` would
    * leave the queued riders held with nothing left to release them.
@@ -142,6 +150,7 @@ export class GameEngine {
     this.audio.setVolume(options.masterVolume);
     const engine = this;
     this.world = createSimWorld(config?.course ?? options.course);
+    this.laneNetwork = loadLaneNetwork(config?.course ?? options.course);
     this.simFx = {
       emit: (x, y, z, count, color, speed) => engine.emit(x, y, z, count, color, speed),
       effect: (kind, x, y, z, scale, racerId) => engine.effects.push(kind, x, y, z, scale, racerId, engine.tick),
@@ -170,6 +179,9 @@ export class GameEngine {
       random: () => Math.random(),
       get runTime() { return engine.runTime; },
       get wallTime() { return engine.time; },
+      // M01 · T6: read live, so the builder's "test drive" can swap the network without rebuilding
+      // the context, and so a course with no authored network stays exactly the legacy game.
+      get laneNetwork() { return engine.laneNetwork; },
     };
     this.cpuCtx = {
       get step() { return engine.simCtx; },
@@ -261,7 +273,7 @@ export class GameEngine {
     this.mergeDone = false;
     this.mergeLastReleased = null;
     this.pausedFrom = null;
-    this.racers = createRacers(this.config);
+    if (this.laneNetwork) this.assignPaths();
     // Solo mode: keep only the player, remove all AI racers
     if (this.soloMode) {
       const player = this.racers.find(r => r.isPlayer) ?? this.racers[0];
@@ -387,11 +399,62 @@ export class GameEngine {
     const racer = this.player;
     if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
     // Invert direction: A (left) should decrease lane number, D (right) should increase
-    this.setLane(racer, racer.targetLane - Math.sign(direction));
+    const step = -Math.sign(direction) as -1 | 1;
+    const network = this.laneNetwork;
+    // M01 · T6: on an authored network a lane change is a *path* change, at this x. With no network
+    // (or no path) it is the legacy lane change, unchanged.
+    if (network && racer.pathId) {
+      const next = adjacentPath(network, racer.pathId, racer.x, step);
+      if (next) {
+        racer.pathId = next;
+        const sample = sampleLane(network, next, racer.x);
+        if (sample) {
+          racer.targetLane = closestLane(sample.z);
+          racer.lastLaneChange = this.runTime;
+        }
+      }
+    } else {
+      this.setLane(racer, racer.targetLane - Math.sign(direction));
+    }
     this.refreshSnapshot(); this.notify();
   };
 
   private setLane(racer: Racer, lane: number) { setLaneSim(racer, lane, this.runTime); }
+
+  /**
+   * M01 · T6 — the authored network this race is running on, or `null` for the legacy lanes.
+   * `setLaneNetwork` is the builder's "test drive": the next run (and the current context, which
+   * reads it live) uses the network that was just authored.
+   */
+  get lanePaths(): LaneNetwork | null { return this.laneNetwork; }
+  setLaneNetwork(network: LaneNetwork | null) {
+    this.laneNetwork = network;
+    if (network) this.assignPaths();
+  }
+
+  /**
+   * Adopts a racer who is not on a path yet. The grid sits at x = 190 and an authored network may
+   * begin further down the hill (or a racer may be put back by the crew outside every path's x
+   * range), so this runs each tick and costs one scan per *unassigned* racer.
+   */
+  private adoptPaths() {
+    adoptNearestPaths(this.racers, this.laneNetwork);
+  }
+
+  /** Puts every racer on the path nearest to them at this moment. */
+  private assignPaths() {
+    assignNearestPaths(this.racers, this.laneNetwork);
+  }
+
+  /** The stored document, for the builder. Never throws: an unreadable store is simply empty. */
+  laneDocument(): LaneStorageDocument {
+    return readLaneStorage() ?? { version: 1, savedAt: new Date(0).toISOString(), networks: {} };
+  }
+
+  /** True when the stored document would validate — the builder's Save button asks this. */
+  laneDocumentValid(document_: LaneStorageDocument): boolean {
+    return validateLaneDocument(document_).length === 0;
+  }
 
   adjustAim = (powerDelta: number, angleDelta: number) => {
     if (this.status !== 'ready' || this.isDragging) return;
@@ -826,6 +889,7 @@ export class GameEngine {
     const clockStopped = pool !== null && pool.phase !== 'done' && pool.phase !== 'releasing';
     if (!clockStopped) this.runTime += dt;
 
+    this.adoptPaths();
     for (const racer of this.racers) {
       if (racer.finished) continue;
       // A held rider is out of the race: no CPU decisions, and the physics only glides their slot.
@@ -933,6 +997,14 @@ export class GameEngine {
 
   private shove(racer: Racer, direction: number, speed: number) {
     const lane = closestLane(racer.z);
+    // M01 · T6: a shove off an authored path moves to the neighbouring *path* on that side, and
+    // stays where it is when there is none. `direction > 0` pushes toward larger z, which is the
+    // `-1` side of the lane convention `adjacentPath` speaks.
+    const network = this.laneNetwork;
+    if (network && racer.pathId) {
+      const next = adjacentPath(network, racer.pathId, racer.x, -Math.sign(direction) as -1 | 1);
+      if (next) racer.pathId = next;
+    }
     racer.targetLane = clamp(lane - Math.sign(direction), 0, 3);
     racer.vz = clamp(racer.vz + direction * speed, -650, 650);
     racer.z = clamp(racer.z + direction * 5, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);

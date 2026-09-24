@@ -22,6 +22,7 @@ import type { PowerupKind } from '../powerups';
 import type { SoundName } from '../audio';
 import type { SimWorld } from './world';
 import type { EffectKind } from '../effects/events';
+import type { LaneNetwork } from '../lane-network';
 
 export type TallyKind = 'sheep' | 'explosions' | 'loops';
 
@@ -101,7 +102,7 @@ export function createRecordingFx(log: RecordedFx[] = []): SimFx & { readonly lo
 // Recovery
 // ---------------------------------------------------------------------------
 
-export type RecoveryReason = 'fall-timer' | 'depth' | 'lava' | 'stopped';
+export type RecoveryReason = 'fall-timer' | 'depth' | 'lava' | 'stopped' | 'oob';
 
 export interface RecoveryRequest {
   readonly racer: Racer;
@@ -191,4 +192,10 @@ export interface RacerStepContext {
   readonly runTime: number;
   /** Wall clock stamped onto obstacles (engine: `time`). */
   readonly wallTime: number;
+  /**
+   * M01 · T6 (IF-LANES): the authored lane network this race runs on, or `null`/absent for the
+   * legacy four lanes. Absent and `null` are the same thing — the integration point returns the
+   * legacy target and corridor for both, so an old context is not a special case.
+   */
+  readonly laneNetwork?: LaneNetwork | null;
 }

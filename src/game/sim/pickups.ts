@@ -55,6 +55,7 @@ export function collectPickup(racer: Racer, pickup: AirPickup, ctx: RacerStepCon
     notice = full ? 'AIR BOUNCES FULL. +75 CHAOS.' : 'AIR SPRING! +1 AIR BOUNCE';
   }
   ctx.fx.emit(pickup.x, pickup.y, pickup.z, 13, POWERUPS[pickup.kind].color, 120);
+  ctx.fx.effect('sparks', pickup.x, pickup.y, pickup.z, 0.5, racer.id);
   if (!racer.id) {
     ctx.fx.score(75);
     ctx.fx.pickupCollected(pickup.kind);

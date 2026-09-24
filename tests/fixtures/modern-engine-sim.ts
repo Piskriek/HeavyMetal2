@@ -43,6 +43,8 @@ export function attachModernSim(host: LegacyEngineSim): ModernSimHost {
   // drives, so a difference in *feedback* shows up in the comparison too.
   const fx: SimFx = {
     emit: (x, y, z, count, color, speed) => host.emit(x, y, z, count, color, speed),
+    // T5 effects are cosmetic: they never feed back into the physics the parity harness compares.
+    effect: () => {},
     airSheep: (spawn) => { host.airSheep.push({ x: spawn.x, y: spawn.y, z: spawn.z, vx: spawn.vx, vy: spawn.vy, rotation: 0, life: 3.1 }); },
     say: (text) => host.say(text),
     audio: (cue) => { host.audio.play(cue); },

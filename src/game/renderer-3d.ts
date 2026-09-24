@@ -8,6 +8,7 @@ import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
 import type { GameOptions } from './types';
 import { RADIUS } from './scene';
+import { EffectRenderer } from './effects/renderer-fx';
 import {
   compileRampSurfaces,
   engineDistanceFromX,
@@ -1542,6 +1543,8 @@ export class Renderer3D {
   private readonly firstPerson: boolean;
   /** Last frame's up, so the eye does not snap when the bank rolls through a turn. */
   private fpUp: Vec3 | null = null;
+  /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
+  private effects: EffectRenderer | null = null;
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
     this.storedAssets = assets;
@@ -1908,6 +1911,15 @@ export class Renderer3D {
       this.materials.lava.map.offset.y = raw * 0.0025;
     }
 
+    // 3b. M01 · T5 — painted effects: explosions, impacts, dust, smoke and sparks, drained from the
+    // sim's queue and drawn as camera-facing billboards (plus one Points object for sparks).
+    if (frame.effects) {
+      if (!this.effects) this.effects = new EffectRenderer(this.scene);
+      this.effects.update({
+        queue: frame.effects, space: this.space, ramps: rampSurfaces, time: raw, dt: Math.min(0.1, dt),
+      }, this.camera, frame.reducedMotion);
+    }
+
     // 4. Render 3D WebGL scene
     this.renderer.render(this.scene, this.camera);
   }
@@ -1915,6 +1927,8 @@ export class Renderer3D {
   destroy() {
     this.destroyed = true;
     this.disposeRacerPool();
+    this.effects?.destroy();
+    this.effects = null;
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

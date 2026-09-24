@@ -211,6 +211,8 @@ export interface Obstacle {
   deflectPower?: number;
 }
 
+import type { EffectEvent } from './effects/events';
+
 export interface Particle {
   x: number;
   y: number;
@@ -288,4 +290,14 @@ export interface SceneFrame {
   snapshot: GameSnapshot;
   options: GameOptions;
   reducedMotion: boolean;
+  /**
+   * M01 · T5 — the typed effect queue the sim fills and the 3D renderer drains. Optional so the
+   * builder, the audit and every headless preview keep working without a renderer to feed.
+   */
+  effects?: EffectHandoff;
+}
+
+/** The narrow slice of `EffectQueue` a renderer needs: a cursor and a drain. */
+export interface EffectHandoff {
+  readSince(cursor: number, out: EffectEvent[]): number;
 }

@@ -17,6 +17,7 @@ import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import CockpitHud from '../components/CockpitHud';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
+import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
@@ -229,6 +230,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         loadArtImage(riderCell(config.loadout.rider).pilot ?? riderCell(config.loadout.rider).image).catch(() => null),
         // M01 · T4: the cockpit is painted art; every file is decoded before the grid, never in-race.
         Promise.all(COCKPIT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
+        // M01 · T5: the effect sheets too — an explosion must not hitch on its first frame.
+        Promise.all(EFFECT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
       ]))
       .then(([loaded, raceBalls, pickupSprites, art, playerBadge]) => {
         if (!active) return;

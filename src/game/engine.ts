@@ -28,6 +28,7 @@ import { resolvePickups as resolvePickupsSim } from './sim/pickups';
 // lives in a pure module so a headless test can reproduce the launch without a canvas.
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
 import { steerFrom, type CockpitState } from './cockpit';
+import { EffectQueue } from './effects/events';
 
 const TAU = Math.PI * 2;
 const STEP = FIXED_STEP;
@@ -80,6 +81,11 @@ export class GameEngine {
   private lastSnapshot: GameSnapshot | null = null;
   private standingsKey = '';
 
+  /** M01 · T5 — typed effect events for the render runtime. Written by the sim and by the engine. */
+  private readonly effects = new EffectQueue();
+  /** Physics ticks since the run began. Effects are stamped with it so a replay lines up. */
+  private tick = 0;
+
   // Checkpoint system: freeze at first loop entrance
   private checkpointTriggered = false;
   /** M01 · T1: push cursor (0 while not pushing) and the per-racer targets for this run. */
@@ -108,6 +114,7 @@ export class GameEngine {
     this.world = createSimWorld(config?.course ?? options.course);
     this.simFx = {
       emit: (x, y, z, count, color, speed) => engine.emit(x, y, z, count, color, speed),
+      effect: (kind, x, y, z, scale, racerId) => engine.effects.push(kind, x, y, z, scale, racerId, engine.tick),
       airSheep: (spawn) => { engine.airSheep.push({ x: spawn.x, y: spawn.y, z: spawn.z, vx: spawn.vx, vy: spawn.vy, rotation: 0, life: 3.1 }); },
       say: (text) => engine.say(text),
       audio: (cue) => engine.audio.play(cue),
@@ -218,6 +225,8 @@ export class GameEngine {
     this.checkpointTriggered = false;
     this.pushTick = 0;
     this.pushTargets = [];
+    this.tick = 0;
+    this.effects.reset();
     this.frozenVelocities = [];
     if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
     this.racers = createRacers(this.config);
@@ -260,6 +269,7 @@ export class GameEngine {
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
       racer.launchOrigin = { x: racer.x, y: racer.y };
     }
+    for (const racer of this.racers) this.effects.push('dust', racer.x, racer.y, racer.z, 1.6, racer.id, this.tick);
     this.snapshot.status = 'pushing';
     this.snapshot.speed = 0;
     this.snapshot.notice = 'THE STARTER GOBLIN SHOVES THE WHOLE GRID.';
@@ -616,6 +626,7 @@ export class GameEngine {
             racer.previous.x = racer.x; racer.previous.y = racer.y;
             racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
           }
+          this.tick += 1;
           if (this.status === 'pushing') this.stepPush(STEP); else this.stepRace(STEP);
           this.accumulator -= STEP;
         }
@@ -668,7 +679,8 @@ export class GameEngine {
         drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
-        snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion }, interval);
+        snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion,
+        effects: this.effects }, interval);
     }
     if (now - this.lastNotify > 100) this.notify(false);
     const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
@@ -755,6 +767,10 @@ export class GameEngine {
       const particleColor = isHeavyImpact ? '#ffaa00' : '#ffe0a0';
       
       this.emit(x, y, z, particleCount, particleColor, particleSpeed);
+      // M01 · T5: every collision is an impact; a heavy one also throws sparks and smoke.
+      this.effects.push('impact', x, y, z, isHeavyImpact ? 1.4 : 0.8, a.id ? a.id : b.id, this.tick);
+      this.effects.push('sparks', x, y, z, isHeavyImpact ? 1.2 : 0.6, a.id ? a.id : b.id, this.tick);
+      if (isHeavyImpact) this.effects.push('smoke', x, y, z, 0.8, a.id ? a.id : b.id, this.tick);
       
       // Add sparks for heavy impacts
       if (isHeavyImpact) {

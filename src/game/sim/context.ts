@@ -21,6 +21,7 @@ import type { Racer } from '../racers';
 import type { PowerupKind } from '../powerups';
 import type { SoundName } from '../audio';
 import type { SimWorld } from './world';
+import type { EffectKind } from '../effects/events';
 
 export type TallyKind = 'sheep' | 'explosions' | 'loops';
 
@@ -28,6 +29,12 @@ export type TallyKind = 'sheep' | 'explosions' | 'loops';
 export interface SimFx {
   /** Cosmetic particle burst. Implementations cull and cap as they see fit. */
   emit(x: number, y: number, z: number, count: number, color: string, speed: number): void;
+  /**
+   * M01 · T5 — a typed effect (explosion, impact, dust, smoke, sparks) at an engine-space point.
+   * The particles above are the legacy spray; this is the one the effect runtime renders from a
+   * painted sheet. Headless runs drop it, exactly like every other cosmetic channel.
+   */
+  effect(kind: EffectKind, x: number, y: number, z: number, scale: number, racerId: number | null): void;
   /** A sheep went flying. */
   airSheep(spawn: { x: number; y: number; z: number; vx: number; vy: number }): void;
   /** On-screen one-liner. */
@@ -50,13 +57,14 @@ export interface SimFx {
 
 /** Qualifying attempts and every other headless run: side effects go nowhere. */
 export const HEADLESS_SIM_FX: SimFx = Object.freeze({
-  emit: () => {}, airSheep: () => {}, say: () => {}, audio: () => {}, score: () => {},
+  emit: () => {}, effect: () => {}, airSheep: () => {}, say: () => {}, audio: () => {}, score: () => {},
   shake: () => {}, tally: () => {}, refreshHud: () => {}, notifyHud: () => {}, setHopReady: () => {},
   clearTrail: () => {}, pickupCollected: () => {},
 });
 
 export type RecordedFx =
   | { readonly type: 'emit'; readonly x: number; readonly y: number; readonly z: number; readonly count: number; readonly color: string }
+  | { readonly type: 'effect'; readonly kind: EffectKind; readonly x: number; readonly y: number; readonly z: number; readonly scale: number; readonly racerId: number | null }
   | { readonly type: 'airSheep'; readonly x: number; readonly y: number; readonly z: number }
   | { readonly type: 'say'; readonly text: string }
   | { readonly type: 'audio'; readonly cue: SoundName }
@@ -74,6 +82,7 @@ export function createRecordingFx(log: RecordedFx[] = []): SimFx & { readonly lo
   return {
     log,
     emit: (x, y, z, count, color) => { log.push({ type: 'emit', x, y, z, count, color }); },
+    effect: (kind, x, y, z, scale, racerId) => { log.push({ type: 'effect', kind, x, y, z, scale, racerId }); },
     airSheep: (spawn) => { log.push({ type: 'airSheep', x: spawn.x, y: spawn.y, z: spawn.z }); },
     say: (text) => { log.push({ type: 'say', text }); },
     audio: (cue) => { log.push({ type: 'audio', cue }); },

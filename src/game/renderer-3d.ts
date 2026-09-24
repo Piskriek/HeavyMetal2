@@ -15,6 +15,12 @@ import {
   type PhysicalRampSurface,
   type TrackSpaceMap,
 } from './track-space';
+import {
+  FP_LOOK_AHEAD,
+  firstPersonFlag,
+  firstPersonFrame,
+  type Vec3,
+} from './first-person';
 
 /* -----------------------------------------------------------------------------
    0. CONFIG & CONSTANTS
@@ -1443,6 +1449,14 @@ interface RacerMeshResources {
   shieldMat: THREE.MeshBasicMaterial;
 }
 
+/** The subset of a rendered racer frame the first-person camera needs. */
+interface FpBallState {
+  readonly x: number; readonly y: number; readonly z: number;
+  readonly distance?: number;
+  readonly grounded?: boolean;
+  readonly falling?: boolean;
+}
+
 /** Legacy fallback colours for slots 0–3; larger fields get a deterministic hue. */
 const LEGACY_RACER_COLORS = [0xff7700, 0x33cc66, 0x3399ff, 0xcc33ff];
 
@@ -1481,9 +1495,18 @@ export class Renderer3D {
   private readonly exitD: number;
   private currentSkyPreset: SkyPreset;
   private destroyed = false;
+  /**
+   * M01 · T0 — the eye-level spike. `?fp=1` puts the camera on the ball at eye height using the
+   * plain track frame; T3 replaces the flag with the `first_person` camera mode and feeds the same
+   * function the gyro frame. Nothing else in the render path changes while the flag is off.
+   */
+  private readonly firstPerson: boolean;
+  /** Last frame's up, so the eye does not snap when the bank rolls through a turn. */
+  private fpUp: Vec3 | null = null;
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
     this.storedAssets = assets;
+    this.firstPerson = firstPersonFlag(typeof window !== 'undefined' ? window.location.search : '');
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -1610,6 +1633,53 @@ export class Renderer3D {
       }
     }
     return this.rampSurfaces;
+  }
+
+  /**
+   * M01 · T0 — the eye-level camera.
+   *
+   * Position, up and look target all come from the pure `firstPersonFrame()`; this method only
+   * copies numbers into the THREE camera and pushes the FOV/near/far once. It reads the *rendered*
+   * ball frame (already interpolated by the engine) so the eye and the ball cannot disagree.
+   */
+  private placeFirstPersonCamera(ball: FpBallState, ramps: readonly PhysicalRampSurface[], dt: number) {
+    const placement = placementFromEngine(
+      this.space,
+      { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded },
+      ramps,
+    );
+    const frame = placement.frame;
+    const look = this.track.sampleAt(clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.track.length));
+    const fp = firstPersonFrame({
+      ballCentre: [placement.world.x, placement.world.y, placement.world.z],
+      gyro: {
+        forward: [frame.tangent.x, frame.tangent.y, frame.tangent.z],
+        up: [frame.up.x, frame.up.y, frame.up.z],
+        right: [frame.right.x, frame.right.y, frame.right.z],
+      },
+      lookPoint: [
+        look.pos.x + look.up.x * 140,
+        look.pos.y + look.up.y * 140,
+        look.pos.z + look.up.z * 140,
+      ],
+      previousUp: this.fpUp,
+      dt,
+      falling: ball.falling === true,
+    });
+    this.fpUp = fp.up;
+    this.camera.position.set(fp.position[0], fp.position[1], fp.position[2]);
+    this.camera.up.set(fp.up[0], fp.up[1], fp.up[2]);
+    this.camera.lookAt(
+      fp.position[0] + fp.forward[0],
+      fp.position[1] + fp.forward[1],
+      fp.position[2] + fp.forward[2],
+    );
+    if (this.camera.fov !== fp.fov || this.camera.near !== fp.near || this.camera.far !== fp.far) {
+      this.camera.fov = fp.fov;
+      this.camera.near = fp.near;
+      this.camera.far = fp.far;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   private placeCamera(d: number, dt: number) {
@@ -1759,6 +1829,9 @@ export class Renderer3D {
       // Sphere rolling rotation along track tangent
       mesh.sphere.rotation.x += (racer.vx * dt) / RADIUS;
 
+      // T0: the eye sits inside the player's own ball, so the ball is not drawn in first person.
+      mesh.group.visible = !(this.firstPerson && i === 0);
+
       // Shield effect
       mesh.shield.visible = (racer.shieldUntil ?? 0) > frame.runTime;
       if (mesh.shield.visible) {
@@ -1768,7 +1841,8 @@ export class Renderer3D {
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
     if (!this.trackBuilder.freeFly.active) {
-      this.placeCamera(playerDist, dt);
+      if (this.firstPerson) this.placeFirstPersonCamera(frame.ball, rampSurfaces, dt);
+      else this.placeCamera(playerDist, dt);
       this.updateAtmosphere(playerDist);
     }
     this.sky.position.copy(this.camera.position);

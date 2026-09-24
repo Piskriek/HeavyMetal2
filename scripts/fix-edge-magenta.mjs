@@ -25,6 +25,7 @@ import {
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const DRY = process.argv.includes('--dry-run');
+const filter = process.argv.slice(2).find((a) => !a.startsWith('--'));
 // Feather when over half the silhouette boundary is hard 255-vs-0 steps.
 const HARD_EDGE_MAX = 0.5;
 const DESPILL_TOLERANCE = 30;
@@ -255,6 +256,7 @@ function main() {
   let touched = 0;
   for (const file of files) {
     const rel = relOf(root, file);
+    if (filter && !rel.includes(filter)) continue;
     if (classify(rel) !== 'runtime') continue;
     const res = fixFile(file, rel, root);
     if (!res.changed) continue;

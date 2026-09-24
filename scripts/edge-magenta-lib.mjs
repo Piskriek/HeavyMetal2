@@ -271,6 +271,8 @@ export function classify(rel) {
   if (r.includes('/art/sheets/')) return 'source';
   if (/\/art\/props\/prop-/.test(r) && !r.includes('/props/alpha/')) return 'source';
   if (/\/art\/goblins\/goblin-/.test(r) && !r.includes('/goblins/alpha/')) return 'source';
+  if (/\/art\/animated\/anim-/.test(r) && !r.includes('/animated/alpha/')) return 'source';
+  if (r.includes('/art/animated/animated-contact-sheet.png')) return 'source';
   return 'runtime';
 }
 
@@ -384,6 +386,7 @@ export function relOf(root, file) {
 export function rawCounterpart(rel) {
   if (rel.startsWith('public/art/props/alpha/')) return rel.replace('public/art/props/alpha/', 'public/art/props/');
   if (rel.startsWith('public/art/goblins/alpha/')) return rel.replace('public/art/goblins/alpha/', 'public/art/goblins/');
+  if (rel.startsWith('public/art/animated/alpha/')) return rel.replace('public/art/animated/alpha/', 'public/art/animated/');
   return null;
 }
 

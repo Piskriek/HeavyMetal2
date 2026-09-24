@@ -23,6 +23,7 @@ import {
 } from './edge-magenta-lib.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+const filter = process.argv.slice(2).find((a) => !a.startsWith('--'));
 
 // Max share of the silhouette boundary that may be a hard 255-vs-0 step.
 const HARD_EDGE_MAX = 0.5;
@@ -33,6 +34,7 @@ function main() {
 
   for (const file of files) {
     const rel = relOf(root, file);
+    if (filter && !rel.includes(filter)) continue;
     let decoded;
     try {
       decoded = decodePng(file);

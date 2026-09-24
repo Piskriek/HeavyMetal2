@@ -377,6 +377,9 @@ export class GameEngine {
       racer.vy = -Math.sin(angle) * velocity * racer.pace;
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
       this.emit(racer.x, racer.y, racer.z, 7, racer.color, 100);
+      // The legacy particles above are not drawn by the 3D renderer; this is the painted one, so a
+      // launch is something you can see rather than a number nothing reads.
+      this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
     }
     this.snapshot.status = 'flying';
     this.lastFrame = this.accumulator = 0;
@@ -1064,6 +1067,8 @@ export class GameEngine {
     racer.shieldHitAt = this.runTime;
     racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.3);
     this.emit(racer.x, racer.y, racer.z, 9, POWERUPS.shield.color, 155);
+    // Painted sibling: the shield holding is a *hit that did not land*, which is the impact read.
+    this.effects.push('impact', racer.x, racer.y, racer.z, 0.7, racer.id, this.tick);
     if (!racer.id) this.shieldBlocks++;
     return true;
   }
@@ -1106,6 +1111,10 @@ export class GameEngine {
       this.snapshot.distance = TRACK_DISTANCE; this.snapshot.progress = 1;
       this.snapshot.score += 3000 + (4 - this.snapshot.position) * 500;
       this.emit(this.player.x, this.y(FINISH) - 140, this.player.z, 42, this.player.color, 250);
+      // The finish burst is the one moment of a run that must never be invisible: an explosion-sized
+      // painted burst over the flag, with smoke under it.
+      this.effects.push('explosion', this.player.x, this.y(FINISH) - 140, this.player.z, 2.2, this.player.id, this.tick);
+      this.effects.push('smoke', this.player.x, this.y(FINISH) - 140, this.player.z, 1.4, this.player.id, this.tick);
     }
     this.audio.play('finish');
     const { sheep, explosions, loops, bumps } = this.counts;

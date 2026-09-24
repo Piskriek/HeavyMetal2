@@ -721,6 +721,39 @@ own geometry (`track-3d-data` / `renderer-3d`), and with no authored network tha
 **UNVERIFIED.** Whether the sprites read at the size the FPV camera sees them (150 units, against a
 62-unit ball), and whether their painted look lands against each sky preset, is the browser's call.
 
+## The effect events that were invisible · **this commit**
+
+The same sweep, one lens further out. The painted effect runtime (T5) is **generic over its kind** —
+five kinds, each with art, a spawn spec and a pool, and the renderer looks the kind up in a table rather
+than switching on it. That means a kind nobody emits is **not an error anywhere**: it is a thing the user
+asked for that never appears. Likewise, the engine still carries the **legacy particle list**
+(`this.emit(...)`, the 2D renderer's sparks), which the 3D renderer does not read at all — so an event
+that only emits particles is invisible.
+
+Three were:
+
+* **the launch kick-off** — the sling path (push mode routes to `start`), 7 particles, nothing drawn;
+* **a shield eating a bump** — nine particles in the shield's colour, and no visual at all;
+* **the finish burst** — 42 particles over the flag. *The one moment of a run that must never be
+  invisible* was the one nobody could see.
+
+Each now has a painted sibling: dust for the launch, an `impact` for the shield hold (a hit that did not
+land is the impact read), and an explosion-sized `explosion` plus `smoke` over the flag for the finish.
+The legacy `emit` calls stay — the ambient frame-scheduling flag and the counters read them, and hiding a
+painted effect must never mean deleting the record of the event.
+
+`tests/effect-coverage.test.ts` (3) guards both halves: **every one of the five kinds has an emitter
+somewhere in `src/`** (the reachability rule, with the reason written down), the three repaired events are
+asserted by their exact call, and the sim's fx channel is checked to be wired into the same painted queue
+the renderer drains.
+
+**Tried and failed, so it is not tried again:** standing up a real browser in this sandbox.
+`@sparticuz/chromium` and `playwright-core` are both installed and the binary downloads and starts — but it
+needs `libnspr4`/`libnss3`, the image does not have them, there is no root for `apt-get`, and the mirrors
+are not reachable for a local `dpkg -x`. So the pixel verdicts stay the browser's, as the PR says.
+
+`npm run check`: **635 pass / 47 suites / 0 fail**. Build **1,636.6 kB (450.7 kB gzip)**.
+
 ## Next
 
 * **T7 is the last ticket in M01** — with it, T0..T7 are all in. What is left is the browser's word on

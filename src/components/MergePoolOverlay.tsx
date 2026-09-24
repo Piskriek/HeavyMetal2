@@ -11,6 +11,8 @@
  */
 import { useEffect, useRef } from 'react';
 import type { MergeSnapshot } from '../game/types';
+import { COCKPIT_ART } from '../game/cockpit';
+import { poolGoblinFrame, poolGoblinSheetPosition } from '../game/merge/goblin';
 import { capsuleById, riderById, type Loadout } from '../game/loadouts';
 import '../merge-pool-overlay.css';
 
@@ -21,6 +23,8 @@ export interface MergePoolOverlayProps {
   loadout?: Loadout | null;
   /** Space, Enter or the button: the player is ready to go. */
   onReady: () => void;
+  /** Reduced motion holds each pose instead of animating the sweep. */
+  reducedMotion?: boolean;
 }
 
 /** The one flag worth a word on the row, most specific first. */
@@ -33,11 +37,35 @@ function flagLabel(flags: readonly string[]): string | null {
   return null;
 }
 
-export default function MergePoolOverlay({ merge, loadout, onReady }: MergePoolOverlayProps) {
+export default function MergePoolOverlay({ merge, loadout, onReady, reducedMotion = false }: MergePoolOverlayProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const goblinRef = useRef<HTMLDivElement | null>(null);
   const focused = useRef(false);
   const releasing = merge.phase === 'releasing';
+  const goActive = releasing && merge.countdownLabel !== null;
   const player = merge.entries.find((entry) => entry.isPlayer) ?? null;
+
+  // One animation loop for the goblin, and it writes only when the cell actually changes: the sheet
+  // is a background position, so a 12 fps character costs one style write every fifth frame.
+  useEffect(() => {
+    let frameId = 0;
+    let last = -1;
+    const start = performance.now();
+    const step = (now: number) => {
+      const element = goblinRef.current;
+      if (element) {
+        const cell = poolGoblinFrame(merge.phase, goActive, (now - start) / 1000, reducedMotion);
+        if (cell !== last) {
+          last = cell;
+          const position = poolGoblinSheetPosition(cell);
+          element.style.backgroundPosition = `${position.x}% ${position.y}%`;
+        }
+      }
+      frameId = requestAnimationFrame(step);
+    };
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
+  }, [merge.phase, goActive, reducedMotion]);
 
   // The countdown gets the player's attention automatically, once: when the window closes on a
   // player who has not readied, the button takes focus so Space/Enter are already aimed at it.
@@ -55,6 +83,14 @@ export default function MergePoolOverlay({ merge, loadout, onReady }: MergePoolO
       role="dialog"
       aria-label="First loop pool"
     >
+      {/* The pool goblin: hold, call, count, and the sweep that sends them off. Painted art on a 2x2
+          sheet, its cell chosen by the phase (see game/merge/goblin.ts). */}
+      <div
+        className="merge-pool__goblin"
+        ref={goblinRef}
+        style={{ backgroundImage: `url(${COCKPIT_ART.poolGoblin})` }}
+        aria-hidden="true"
+      />
       {releasing ? (
         merge.countdownLabel ? (
           <div className="merge-pool__go" role="status" aria-live="assertive">{merge.countdownLabel}</div>

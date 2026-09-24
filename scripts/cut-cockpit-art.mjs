@@ -512,9 +512,61 @@ function cutDial(name, pixels, threshold) {
    ------------------------------------------------------------------------------------------ */
 
 /**
- * The generator answered the "4 panels" prompt with 3 columns x 2 rows. The panels are separated
- * by goblin-free magenta, so the columns/rows are found by their *content*, not by their colour:
- * a gutter is a run of columns (or rows) with no opaque pixel at all.
+ * The figures a sheet actually contains, found by content rather than by asking the generator for a
+ * grid: the generator answers a "four panels" prompt with anywhere from four to seven goblins, laid
+ * out in whatever arrangement it likes. So the sheet is separated into *figures* — connected blobs of
+ * non-matte pixels — and the caller picks the ones it wants in reading order.
+ *
+ * "Matte" here is the tolerant test, not the key: a generator's magenta comes back shaded, and the
+ * soft shadow under a pair of boots is dark magenta rather than `#FF00FF`, so a blob test that only
+ * accepted the exact key would glue neighbouring figures together through their shadows.
+ */
+function findFigures(file) {
+  const shot = rgba(file);
+  const pinkish = (r, g, b) => r > 120 && b > 120 && r - g > 60 && b - g > 60;
+  const content = new Uint8Array(shot.w * shot.h);
+  for (let i = 0; i < content.length; i++) {
+    const p = i * 4;
+    if (shot.data[p + 3] > 8 && !pinkish(shot.data[p], shot.data[p + 1], shot.data[p + 2])) content[i] = 1;
+  }
+  // Four-connected blobs, with an explicit stack: a 1376x768 sheet is a million pixels and this has
+  // to stay linear.
+  const seen = new Uint8Array(content.length);
+  const stack = new Int32Array(content.length);
+  const figures = [];
+  for (let start = 0; start < content.length; start++) {
+    if (!content[start] || seen[start]) continue;
+    let top = 0; stack[top++] = start; seen[start] = 1;
+    let area = 0; let x0 = shot.w; let y0 = shot.h; let x1 = -1; let y1 = -1;
+    while (top > 0) {
+      const index = stack[--top];
+      const x = index % shot.w; const y = (index - x) / shot.w;
+      area += 1;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x > 0 && content[index - 1] && !seen[index - 1]) { seen[index - 1] = 1; stack[top++] = index - 1; }
+      if (x < shot.w - 1 && content[index + 1] && !seen[index + 1]) { seen[index + 1] = 1; stack[top++] = index + 1; }
+      if (y > 0 && content[index - shot.w] && !seen[index - shot.w]) { seen[index - shot.w] = 1; stack[top++] = index - shot.w; }
+      if (y < shot.h - 1 && content[index + shot.w] && !seen[index + shot.w]) { seen[index + shot.w] = 1; stack[top++] = index + shot.w; }
+    }
+    // A speck of matte noise is not a figure.
+    if (area < shot.w * shot.h * 0.004) continue;
+    figures.push({ x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1, area });
+  }
+  // Reading order: row bands first (a figure's own centre decides which band it is in), then left to
+  // right. The bands are the sheet's own halves unless the figures disagree with them.
+  const band = (figure) => (figure.y + figure.h / 2 < shot.h / 2 ? 0 : 1);
+  figures.sort((a, b) => band(a) - band(b) || a.x - b.x);
+  return { shot, figures };
+}
+
+/** Which figures a sheet must contain, so a generator that answers with a different layout is caught. */
+const SHEET_FIGURES = { 'starter-goblin-push': 6, 'pool-goblin': 7 };
+
+/**
+ * Kept for the reference sheet that *does* answer with a grid: the panels are separated by
+ * goblin-free magenta, so the columns/rows are found by their content, not by their colour — a
+ * gutter is a run of columns (or rows) with no opaque pixel at all.
  */
 function findPanels(file) {
   const shot = rgba(file);
@@ -541,32 +593,50 @@ function findPanels(file) {
   return { shot, columns: runs(columns, minRun), rows: runs(rows, minRun) };
 }
 
-function cutStarterSheet(picks) {
-  const source = src('starter-goblin-push');
-  const { shot, columns, rows } = findPanels(source);
-  if (columns.length < 3 || rows.length < 2) throw new Error(`starter sheet: found ${columns.length}x${rows.length} panels, expected a 3x2 grid`);
-  const grid = rows.map(([y0, y1]) => columns.map(([x0, x1]) => ({ x0, y0, x1, y1 })));
-  const chosen = picks.map(([row, column]) => {
-    const cell = grid[Math.min(row, grid.length - 1)][Math.min(column, columns.length - 1)];
-    if (!cell) throw new Error(`starter sheet: no panel at row ${row}, column ${column}`);
-    return cell;
+/**
+ * Cuts one four-frame goblin animation out of a generator sheet.
+ *
+ * `name` is the source/output stem: `art-src/cockpit/<name>-src.png` becomes
+ * `public/art/cockpit/<name>.png`. The grid is whatever arrangement the generator answered with; the
+ * picks are indices into the sheet's *figures* in reading order, and every sheet declares how many
+ * figures it must contain, so a different answer fails the build instead of shipping a half-goblin.
+ */
+function cutAnimSheet(name, picks) {
+  const source = src(name);
+  const { figures } = findFigures(source);
+  const expected = SHEET_FIGURES[name];
+  if (expected !== undefined && figures.length !== expected) {
+    throw new Error(`${name}: found ${figures.length} figures, expected ${expected} — re-check the sheet before cutting`);
+  }
+  const chosen = picks.map((index) => {
+    const figure = figures[index];
+    if (!figure) throw new Error(`${name}: no figure at reading-order index ${index} of ${figures.length}`);
+    return { x0: figure.x, y0: figure.y, x1: figure.x + figure.w - 1, y1: figure.y + figure.h - 1 };
   });
   // Per frame: crop, key, trim. The panels came back at two different sizes (the generator drew the
   // shove poses on wider canvases), so each frame is normalised to a common painted height and the
   // feet share one baseline — otherwise the goblin pops in scale and bobs between frames.
   const frames = chosen.map((cell, index) => {
-    const cellFile = temp(`starter-cell${index}`);
+    const cellFile = temp(`${name}-cell${index}`);
     run([source, '-crop', `${cell.x1 - cell.x0 + 1}x${cell.y1 - cell.y0 + 1}+${cell.x0}+${cell.y0}`, '+repage', cellFile]);
     keyOut(cellFile);
-    const trimmed = temp(`starter-trim${index}`);
+    const trimmed = temp(`${name}-trim${index}`);
     run([cellFile, '-trim', '+repage', trimmed]);
     return { file: trimmed, box: opaqueBBox(trimmed) };
   });
-  if (frames.some((frame) => !frame.box)) throw new Error('starter sheet: a chosen panel keyed to nothing');
+  if (frames.some((frame) => !frame.box)) throw new Error(`${name}: a chosen panel keyed to nothing`);
+  // One foot baseline for the whole sheet: the frames are normalised so their painted height matches
+  // the median frame's. The median is used rather than the tallest because a generator answering a
+  // "shove" prompt can paint one mid-stride pose half again as tall as the rest, and scaling
+  // everything up to that pose would make the goblin change size between frames.
   const heights = frames.map((frame) => frame.box.h).sort((a, b) => a - b);
   const reference = heights[Math.floor(heights.length / 2)];
   const cellSide = 512;
   const inner = cellSide - 28;
+  // The *binding* frame decides the scale exactly (it fills the cell or hits the reference height);
+  // everything else is a hair under 1 and is normalised out by the browser at the size the overlay
+  // draws. Tying the drawn size to the tallest frame instead would shrink every frame to fit the
+  // tallest, and the median pose would lose a third of its height.
   const scales = frames.map((frame) => Math.min(reference / frame.box.h, inner / frame.box.w, inner / frame.box.h));
   const cells = [[0, 0], [1, 0], [0, 1], [1, 1]];
   const args = ['-size', `${cellSide * 2}x${cellSide * 2}`, 'xc:none'];
@@ -574,22 +644,21 @@ function cutStarterSheet(picks) {
     const scale = scales[index];
     const scaledW = Math.max(1, Math.round(frame.box.w * scale));
     const scaledH = Math.max(1, Math.round(frame.box.h * scale));
-    const scaled = temp(`starter-scaled${index}`);
+    const scaled = temp(`${name}-scaled${index}`);
     run([frame.file, '-resize', `${scaledW}x${scaledH}`, scaled]);
     const [column, row] = cells[index];
     const x = column * cellSide + Math.round((cellSide - scaledW) / 2);
     const y = row * cellSide + (cellSide - 14) - scaledH;
     args.push('(', scaled, ')', '-gravity', 'northwest', '-geometry', xy(x, y), '-composite');
   });
-  const sheet = temp('starter-sheet');
+  const sheet = temp(`${name}-sheet`);
   args.push('-strip', sheet);
   run(args);
-  run([sheet, out('starter-goblin-push')]);
-  log('starter goblin', out('starter-goblin-push'));
+  run([sheet, out(name)]);
+  log(name, out(name));
   return {
-    file: 'art/cockpit/starter-goblin-push.png', sheet: cellSide * 2, cell: cellSide,
-    columns: columns.length, rows: rows.length,
-    picks, scale: scales.map((value) => +value.toFixed(3)),
+    file: `art/cockpit/${name}.png`, sheet: cellSide * 2, cell: cellSide,
+    figures: figures.length, picks, scale: scales.map((value) => +value.toFixed(3)),
     panels: chosen.map((cell) => ({ x: cell.x0, y: cell.y0, w: cell.x1 - cell.x0 + 1, h: cell.y1 - cell.y0 + 1 })),
   };
 }
@@ -654,8 +723,12 @@ const manifest = {
   arm: cutArm(),
   clusters: [cutCluster('gauge-cluster-left', 1024), cutCluster('gauge-cluster-right', 1024)],
   dials: [cutDial('gauge-face-speed', 512, 90), cutDial('gauge-face-small', 256, 90)],
-  // (row, column) into the generator's 3x2 answer: crouch, shout, hard shove, recover.
-  starter: cutStarterSheet([[0, 1], [0, 2], [1, 0], [1, 1]]),
+  // Reading-order indices into the sheet's own figures: crouch, shout, hard shove, recover.
+  starter: cutAnimSheet('starter-goblin-push', [1, 2, 3, 4]),
+  // The pool goblin (M01 · T2) — the poses the merge needs: palm out ("hold"), pointing at the ring,
+  // both hands cupped shouting the countdown, and the two-arm sweep that sends them off. Cut by the
+  // same code, so both goblins share a scale law and a common foot baseline.
+  poolGoblin: cutAnimSheet('pool-goblin', [0, 1, 2, 4]),
   rivetStrip: cutRivetStrip(),
 };
 
@@ -669,5 +742,6 @@ const manifestPath = join(root, 'src/game/cockpit-art.json');
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`\nMeasured manifest → src/game/cockpit-art.json`);
 console.log(`  aperture in the finished bezel: ${JSON.stringify(manifest.bezel.measured)}`);
-console.log(`  starter frames used (row, column): ${JSON.stringify(manifest.starter.picks)} of ${manifest.starter.columns}x${manifest.starter.rows}`);
+console.log(`  starter frames used (reading order): ${JSON.stringify(manifest.starter.picks)} of ${manifest.starter.figures} figures`);
+console.log(`  pool goblin frames used (reading order): ${JSON.stringify(manifest.poolGoblin.picks)} of ${manifest.poolGoblin.figures} figures`);
 console.log(readFileSync(manifestPath, 'utf8').split('\n').slice(0, 3).join('\n'));

@@ -105,6 +105,33 @@ queue and the notice line (`FIRST LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.`)
 `countdownLabel` shows `POOL` while the field is still filling and the pool's own `3 / 2 / 1 / GO!`
 while it counts down.
 
+## The pool goblin
+
+The queue has a face: a painted goblin in the lower-left corner of the overlay, driving the four
+moments of the merge. `art-src/cockpit/pool-goblin-src.png` is cut by the same code that cuts the
+starter goblin (`cutAnimSheet` in `scripts/cut-cockpit-art.mjs`), so both sheets share one scale law
+and one foot baseline: normalised to the **median** frame's height, the tallest pose clipped to its
+cell rather than shrinking every other pose to fit it.
+
+| Cell | Pose | Shown while |
+| --- | --- | --- |
+| 0 | palm out — *hold* | the pool is open: riders are still arriving |
+| 1 | pointing and calling | the window has closed, the field is all in |
+| 2 | both hands cupped, shouting | the countdown: `3 · 2 · 1` |
+| 3 | both arms swept forward | `GO!` — and this cell animates, all four poses at 12 fps |
+
+`src/game/merge/goblin.ts` is that law as a pure function (`poolGoblinFrame`,
+`poolGoblinSheetPosition`), asserted by `tests/merge-race.test.ts`; `tests/cockpit.test.ts` checks the
+finished sheet is the square the manifest promises. Reduced motion holds the first sweep pose instead
+of cycling it, like everything else in the project.
+
+The cutting code finds **figures**, not a grid: a generator answering a "four panels" prompt may
+return four to seven goblins in any arrangement, so a sheet is separated into connected blobs of
+non-matte pixels (`findFigures`) and the caller picks the ones it wants in reading order. Each sheet
+declares how many figures it must contain, so a different answer is caught at build time rather than
+shipping a half-goblin into a cell. The pool sheet came back with seven (four gestures in the top
+row, three in the bottom); the four that were picked are 0, 1, 2 and 4.
+
 ## Refusals
 
 Every command answers with a typed result rather than a silent no-op, so the overlay can tell "not
@@ -145,7 +172,11 @@ command.
 - `src/game/sim/racer-physics.ts` — the held branch, the loop exit stamp.
 - `src/game/engine.ts` — `mergeGateFor`, `ready`, `stepMerge`, `hold`, `release`, the ghost tail,
   the status and the snapshot.
-- `src/components/MergePoolOverlay.tsx`, `src/merge-pool-overlay.css` — the overlay.
+- `src/components/MergePoolOverlay.tsx`, `src/merge-pool-overlay.css` — the overlay, including the
+  pool goblin.
+- `src/game/merge/goblin.ts` — which goblin pose is on screen, and when (pure).
+- `art-src/cockpit/pool-goblin-src.png`, `public/art/cockpit/pool-goblin.png` — the painted sheet and
+  its four runtime cells, measured into `src/game/cockpit-art.json`.
   (`src/components/StagingOverlay.tsx` is T06's staging presentation component and is left alone.)
 - `src/game/types.ts` — `MergeSnapshot` / `MergeEntryView`.
 - `src/game/contracts/commands.ts` — the `ready` command.

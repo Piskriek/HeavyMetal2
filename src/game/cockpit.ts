@@ -250,6 +250,8 @@ export const COCKPIT_ART = {
   yoke: `/${YOKE.file}`,
   arm: `/${ARM.file}`,
   starter: `/${manifest.starter.file}`,
+  /** M01 · T2 — the pool goblin: hold, call, count, and the sweep that sends the field off. */
+  poolGoblin: `/${manifest.poolGoblin.file}`,
   strip: `/${manifest.rivetStrip.file}`,
   clusters: manifest.clusters.map((cluster) => `/${cluster.file}`),
   dials: manifest.dials.map((dial) => `/${dial.file}`),
@@ -257,8 +259,8 @@ export const COCKPIT_ART = {
 
 /** Every cockpit image, for the preloader (law 4: nothing decodes during a race). */
 export const COCKPIT_ART_PATHS: readonly string[] = [
-  COCKPIT_ART.bezel, COCKPIT_ART.yoke, COCKPIT_ART.arm, COCKPIT_ART.starter, COCKPIT_ART.strip,
-  ...COCKPIT_ART.clusters, ...COCKPIT_ART.dials,
+  COCKPIT_ART.bezel, COCKPIT_ART.yoke, COCKPIT_ART.arm, COCKPIT_ART.starter, COCKPIT_ART.poolGoblin,
+  COCKPIT_ART.strip, ...COCKPIT_ART.clusters, ...COCKPIT_ART.dials,
 ];
 
 export const COCKPIT_MANIFEST = manifest;

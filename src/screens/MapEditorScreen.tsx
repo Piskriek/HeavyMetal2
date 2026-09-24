@@ -243,6 +243,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
           <MergePoolOverlay
             merge={snapshot.merge}
             loadout={config.loadout}
+            reducedMotion={options.reducedMotion}
             onReady={() => engineRef.current?.ready()}
           />
         )}

@@ -237,6 +237,28 @@
   text-align: center;
 }
 
+/* ---- the pool goblin (hold / call / count / the sweep) ----------------------- */
+
+.merge-pool__goblin {
+  position: absolute;
+  left: 5%;
+  bottom: 4%;
+  width: min(15rem, 20vw);
+  aspect-ratio: 1 / 1;
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  background-position: 0% 0%;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.55));
+}
+
+/* While the panel is up the goblin stands beside it, a little further in from the corner. */
+.merge-pool:not(.merge-pool--releasing) .merge-pool__goblin {
+  left: 4%;
+  bottom: 6%;
+  width: min(13rem, 16vw);
+}
+
 /* Reduced motion: no fade, no movement — the overlay simply appears. */
 @media (prefers-reduced-motion: reduce) {
   .merge-pool { animation: none; }

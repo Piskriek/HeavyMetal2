@@ -19,6 +19,10 @@
  *   - the instrument can see such a bump: with the filter removed, held riders are knocked about.
  */
 import { statusSimulates } from '../src/game/engine';
+import {
+  POOL_GOBLIN_CALL, POOL_GOBLIN_COUNT, POOL_GOBLIN_FPS, POOL_GOBLIN_HOLD, POOL_GOBLIN_SWEEP,
+  poolGoblinFrame, poolGoblinSheetPosition,
+} from '../src/game/merge/goblin';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -493,6 +497,34 @@ test('the engine drives the pool the way this harness does', () => {
     'the frame loop must step the simulation during the pool');
   assert.match(source, /private get pausable\(\): boolean \{[\s\S]{0,200}?status === 'checkpoint'/,
     'a pause taken during the pool has to be allowed, and has to come back to the pool');
+});
+
+test('the pool goblin holds a pose per phase and sweeps the field off', () => {
+  // The overlay's own law, asserted like the rest of the presentation in this project: one pose per
+  // phase, and the sweep animates — all four cells at 12 fps — only while GO! is on screen.
+  const plain = false;
+  assert.equal(poolGoblinFrame('open', false, 0, plain), POOL_GOBLIN_HOLD);
+  assert.equal(poolGoblinFrame('closed', false, 9.5, plain), POOL_GOBLIN_CALL);
+  assert.equal(poolGoblinFrame('countdown', false, 3.4, plain), POOL_GOBLIN_COUNT);
+  // An open GO! window cycles every cell, in order, and repeats: floor(t·fps) mod 4.
+  const seen = new Set<number>();
+  for (let tick = 0; tick < 24; tick++) {
+    seen.add(poolGoblinFrame('releasing', true, tick / POOL_GOBLIN_FPS, plain));
+  }
+  assert.deepEqual([...seen].sort(), [0, 1, 2, 3], 'the sweep plays every pose');
+  assert.equal(poolGoblinFrame('releasing', true, 1 / (POOL_GOBLIN_FPS * 2), plain), 0);
+  assert.equal(poolGoblinFrame('releasing', true, 3.9 / POOL_GOBLIN_FPS, plain), 3);
+  assert.equal(poolGoblinFrame('releasing', true, 4 / POOL_GOBLIN_FPS, plain), 0, 'and wraps');
+  // Reduced motion holds the first sweep cell instead of animating.
+  for (const seconds of [0, 1 / POOL_GOBLIN_FPS, 7.3]) {
+    assert.equal(poolGoblinFrame('releasing', true, seconds, true), POOL_GOBLIN_SWEEP);
+  }
+  // The sheet is a 2x2 grid: the cells walk left-right, then the next row, and every one fits.
+  assert.deepEqual(poolGoblinSheetPosition(0), { x: 0, y: 0 });
+  assert.deepEqual(poolGoblinSheetPosition(1), { x: 100, y: 0 });
+  assert.deepEqual(poolGoblinSheetPosition(2), { x: 0, y: 100 });
+  assert.deepEqual(poolGoblinSheetPosition(3), { x: 100, y: 100 });
+  assert.deepEqual(poolGoblinSheetPosition(-1), { x: 100, y: 100 }, 'a wrapped index still lands on a cell');
 });
 
 /* -----------------------------------------------------------------------------

@@ -130,7 +130,8 @@ test('the channel starts clean and carries the field names the HUD reads', () =>
 });
 
 test('every cockpit image exists, at the size the manifest promises', () => {
-  assert.equal(COCKPIT_ART_PATHS.length, 9, 'nine images: bezel, yoke, arm, starter, strip, 2 clusters, 2 dials');
+  assert.equal(COCKPIT_ART_PATHS.length, 10,
+    'ten images: bezel, yoke, arm, starter, pool goblin, strip, 2 clusters, 2 dials');
   for (const url of COCKPIT_ART_PATHS) {
     const path = publicFile(url);
     assert.ok(existsSync(path), `${url} must exist`);
@@ -144,6 +145,11 @@ test('every cockpit image exists, at the size the manifest promises', () => {
   const starter = pngSize(publicFile(COCKPIT_ART.starter));
   assert.equal(starter.w, starter.h, 'the starter sheet is square (2x2)');
   assert.equal(starter.w, COCKPIT_MANIFEST.starter.sheet);
+  // M01 · T2: the pool goblin is cut by the same code, so it is square in the same way.
+  const poolGoblin = pngSize(publicFile(COCKPIT_ART.poolGoblin));
+  assert.equal(poolGoblin.w, poolGoblin.h, 'the pool goblin sheet is square (2x2)');
+  assert.equal(poolGoblin.w, COCKPIT_MANIFEST.poolGoblin.sheet);
+  assert.equal(COCKPIT_MANIFEST.poolGoblin.picks.length, 4, 'four poses, one per cell');
   // The dial holes the generator left in each plate must be measured, two per cluster.
   for (const cluster of COCKPIT_MANIFEST.clusters) {
     assert.equal(cluster.dials.length, 2, `${cluster.file}: two dial holes`);

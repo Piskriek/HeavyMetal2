@@ -216,6 +216,7 @@ went into it** — and then hands the field back to contact racing.
 | `engine.ts` | `mergeGateFor()` (the first loop's gate, containment widened to the whole corridor at `halfWidth 443`), `ready()` (Space/Enter/overlay), `stepMerge()` (crossing → hold → window → countdown → release → ghosts → status → snapshot), `hold`, `release`, `applyMergeStatus`, `refreshMergeSnapshot`, `pauseForMerge`; the race clock is stopped for the whole field until the pool is `releasing`; the contact pass skips held and ghost riders. |
 | `components/MergePoolOverlay.tsx` + `merge-pool-overlay.css` (new) | The queue as the player sees it: place, name, entry time, ready tick, flags, the countdown, the READY button. Mounted by `RaceScreen` and by the map editor's test run; hidden once the player is released. (The old `components/StagingOverlay.tsx` — T06's staging presentation component, dead code at HEAD — is left exactly as it was; this is a different component with a different name.) |
 | `contracts/commands.ts` | `{ type: 'ready' }` — legal while `checkpoint`/`countdown`, refused elsewhere with the usual typed verdict, collapses under `dedupeCommands`. |
+| `game/merge/goblin.ts` + `art-src/cockpit/pool-goblin-src.png` (new) | The queue's face: a painted goblin cut into four cells — *hold* while riders arrive, *calling* once the field is in, *shouting the count* on `3 · 2 · 1`, and a four-pose sweep at 12 fps under `GO!`. The pose law is a pure function with its own test. |
 
 Numbers: bots ready at `entryTick + 90 + 30·rank`, the player is readied for them at `+1800`, the
 window closes at the expected count or after `1200` ticks, the countdown is `360` ticks (`3 · 2 · 1`
@@ -267,11 +268,40 @@ with the `ready`-command test (41 tests).
    never finishes — the harness fails outright with the pin removed. It now reads
    `closestLane(obstacleZ(this.mergeGateFor().loop))`.
 
+### Art, this turn
+
+One painted asset: **the pool goblin** (`art-src/cockpit/pool-goblin-src.png`, four poses cut into a
+2x2 runtime sheet), plus one real change to the cutter that produced it.
+
+The cutter used to ask the generator for a grid. A "four panels" prompt comes back with anything from
+four to seven goblins in whatever arrangement it likes — the starter sheet answered 3x2, the pool
+sheet answered seven (four gestures in the top row, three in the bottom). So a sheet is now separated
+into **figures**: connected blobs of non-matte pixels (`findFigures`), with the matte test tolerant
+rather than exact, because a generator's magenta comes back shaded and the soft shadow under a pair of
+boots is dark magenta rather than `#FF00FF` — an exact-key blob test would glue the figures together
+through their shadows. The caller then picks figures in reading order, and each sheet declares the
+figure count it must contain, so a different answer fails the build instead of shipping a half-goblin
+into a cell.
+
+Measured off the finished pixels, both sheets: 1024x1024, 2x2 of 512x512; every cell shares one
+baseline (row 497) and one painted form height (340 px); the pool goblin's per-cell subject area
+spreads 1.19x (the starter's 1.13x). `npm run check:edges` is clean on both.
+
+The starter sheet was checked cell by cell against HEAD: three of its four cells are **pixel-identical**,
+and the shove cell moved because it is now cropped to the figure (459x332, the shove's own outline
+without its ground shadow) instead of to a panel-and-shadow box. The scale law itself did not change —
+the same `[1, 1, 1.024, 0.994]` — so no other animated asset was touched.
+
 **UNVERIFIED.** No WebGL here, so the overlay has only been proven as data plus markup (the
 `snapshot.merge` contract, the markup and the CSS are all that can be checked headlessly): the
 *look* of the queue card, the countdown's pulse and the hold note are the browser's call. The
 browser is also the only place the release rhythm can be *felt* (4 riders × 42 ticks = 1.4 s of
 staggered releases) — the tick maths is verified, the pacing judgement is not.
+
+`scratch/art-review/pool-overlay.png` is the closest thing to a screenshot that can be made here: the
+real panel art, the real goblin cells and the real grid, composed with ImageMagick. It shows the
+composition — and its own text placement is the mock's arithmetic, not a browser's layout engine, so
+it proves the art and the shape of the panel and nothing about the CSS.
 
 ## Next
 

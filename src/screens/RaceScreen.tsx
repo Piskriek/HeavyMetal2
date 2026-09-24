@@ -496,6 +496,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 <MergePoolOverlay
                   merge={snapshot.merge}
                   loadout={config.loadout}
+                  reducedMotion={options.reducedMotion}
                   onReady={() => engineRef.current?.ready()}
                 />
               )}

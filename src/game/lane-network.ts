@@ -558,11 +558,20 @@ export function sampleLaneNetwork(course: CourseId = 'ridge'): LaneNetwork {
 
 /**
  * Creates a clean standard 4-lane baseline network running straight from START_X to FINISH.
+ * Default node spacing is 600 units (~10m in world scale, ~9.68m per step),
+ * providing 121 editable nodes per lane (484 nodes total across 72,000 units).
  */
-export function createDefaultLaneNetwork(course: CourseId = 'ridge'): LaneNetwork {
+export function createDefaultLaneNetwork(course: CourseId = 'ridge', nodeSpacing = 600): LaneNetwork {
   const nodes: LaneNode[] = [];
   const paths: LanePath[] = [];
-  const xs = [START_X, 15000, 35000, 55000, FINISH];
+  const step = Math.max(50, Math.round(nodeSpacing));
+  const xs: number[] = [];
+  for (let x = START_X; x < FINISH; x += step) {
+    xs.push(x);
+  }
+  if (xs[xs.length - 1] !== FINISH) {
+    xs.push(FINISH);
+  }
   for (let lane = 0; lane < 4; lane++) {
     const nodeIds: string[] = [];
     const z = laneZOf(lane);

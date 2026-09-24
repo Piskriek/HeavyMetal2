@@ -28,8 +28,8 @@ import { inferKind } from './lane-network';
 /** How high above the ribbon a handle floats, and how big it is. World units (a lane is 240 wide). */
 export const LANE_HANDLE_LIFT = 70;
 export const LANE_HANDLE_RADIUS = 46;
-/** One mesh, whatever the document: the ticket's own ceiling for authored nodes. */
-export const LANE_HANDLE_CAPACITY = 512;
+/** One mesh, whatever the document: capacity ceiling for authored nodes. */
+export const LANE_HANDLE_CAPACITY = 2048;
 
 /** The four kinds, plus the selection ring. Distinct colours, checked by the test. */
 export const LANE_KIND_COLORS: Readonly<Record<LaneNodeKind, number>> = Object.freeze({

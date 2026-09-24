@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_HALF_WIDTH, LANE_NETWORK_VERSION, LANE_Z_LIMIT, LEGACY_CORRIDOR,
-  adjacentPath, corridorAt, inferKind, nearestPath, oobCrossed, resolveLaneTarget, sampleLane,
+  adjacentPath, corridorAt, createDefaultLaneNetwork, inferKind, nearestPath, oobCrossed, resolveLaneTarget, sampleLane,
   sampleLaneNetwork, successorPath, validateLaneNetwork,
   type LaneNetwork, type LaneRefusal,
 } from '../src/game/lane-network';
@@ -366,4 +366,40 @@ test('oob crossing', () => {
   assert.equal(trace.recoveryReason, 'oob');
   assert.ok(racer.x < 68000, 'and the ball is put back behind the node');
   assert.equal(racer.recoveries, 1, 'exactly one recovery per crossing');
+});
+
+test('createDefaultLaneNetwork builds a 4-lane network with ~10m (600 unit) node intervals all the way from START_X to FINISH', () => {
+  const net = createDefaultLaneNetwork('ridge', 600);
+  assert.equal(net.course, 'ridge');
+  assert.equal(net.paths.length, 4, 'four standard paths');
+
+  // Validate the whole network
+  const validation = validateLaneNetwork(net);
+  assert.equal(validation.ok, true, 'network passes validation');
+
+  // Track is 72,000 units from START_X (190) to FINISH (72190)
+  // With step 600, there are exactly 120 intervals -> 121 nodes per lane -> 484 total nodes
+  assert.equal(net.nodes.length, 484, '121 nodes per lane * 4 lanes = 484 total nodes');
+
+  for (let lane = 0; lane < 4; lane++) {
+    const path = net.paths[lane];
+    assert.equal(path.id, `default-lane-${lane + 1}`);
+    assert.equal(path.name, `Lane ${lane + 1}`);
+    assert.equal(path.nodeIds.length, 121);
+    assert.equal(path.halfWidth, DEFAULT_HALF_WIDTH);
+
+    const firstNode = net.nodes.find((n) => n.id === path.nodeIds[0])!;
+    const lastNode = net.nodes.find((n) => n.id === path.nodeIds[path.nodeIds.length - 1])!;
+    assert.equal(firstNode.x, START_X, 'starts at START_X');
+    assert.equal(lastNode.x, FINISH, 'ends at FINISH');
+
+    // Check spacing
+    for (let i = 0; i < path.nodeIds.length - 1; i++) {
+      const a = net.nodes.find((n) => n.id === path.nodeIds[i])!;
+      const b = net.nodes.find((n) => n.id === path.nodeIds[i + 1])!;
+      assert.equal(b.x - a.x, 600, 'nodes spaced by 600 units (~10m in world scale)');
+      assert.equal(a.z, b.z, 'nodes stay centered in their authored lane');
+      assert.equal(a.kind, 'normal');
+    }
+  }
 });

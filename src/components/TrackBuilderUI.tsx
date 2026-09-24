@@ -450,12 +450,21 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     if (category === 'lanes') {
       builder.setActivePropType(null);
       builder.setLanesToolActive(true);
+      if (!builder.getLaneNetwork()) {
+        const defaultNet = createDefaultLaneNetwork(course ?? 'ridge');
+        builder.setLaneNetwork(defaultNet);
+        setSelectedLanePathId('default-lane-1');
+        setLaneStatus('Generated standard 4 lanes (~10m node spacing, 121 nodes/lane)');
+        refreshLanes();
+      } else if (!selectedLanePathId && builder.getLaneNetwork()?.paths.length) {
+        setSelectedLanePathId(builder.getLaneNetwork()!.paths[0].id);
+      }
     } else {
       builder.setLanesToolActive(false);
     }
     onRequestRender?.();
     return () => { builder.setLanesToolActive(false); };
-  }, [builder, category, onRequestRender]);
+  }, [builder, category, course, onRequestRender, selectedLanePathId]);
 
   // Keyboard controls
   useEffect(() => {
@@ -470,6 +479,51 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           e.preventDefault();
           laneIntentRef.current(intent);
           return;
+        }
+
+        const selectedNode = builder.getSelectedLaneNode();
+        if (selectedNode) {
+          if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            builder.focusOnLaneNode(selectedNode.id);
+            showToast(`Framed node ${selectedNode.id} in view`);
+            onRequestRender?.();
+            return;
+          }
+          if (e.code === 'BracketLeft') {
+            e.preventDefault();
+            const net = builder.getLaneNetwork();
+            const activePath = net?.paths.find((p) => p.id === selectedLanePathId) ?? net?.paths.find((p) => p.nodeIds.includes(selectedNode.id));
+            if (activePath) {
+              const idx = activePath.nodeIds.indexOf(selectedNode.id);
+              if (idx > 0) {
+                const prevId = activePath.nodeIds[idx - 1];
+                builder.selectLaneNode(prevId);
+                builder.focusOnLaneNode(prevId);
+                refreshLanes();
+                onRequestRender?.();
+                showToast(`Node ${prevId} (${idx}/${activePath.nodeIds.length})`);
+              }
+            }
+            return;
+          }
+          if (e.code === 'BracketRight') {
+            e.preventDefault();
+            const net = builder.getLaneNetwork();
+            const activePath = net?.paths.find((p) => p.id === selectedLanePathId) ?? net?.paths.find((p) => p.nodeIds.includes(selectedNode.id));
+            if (activePath) {
+              const idx = activePath.nodeIds.indexOf(selectedNode.id);
+              if (idx >= 0 && idx < activePath.nodeIds.length - 1) {
+                const nextId = activePath.nodeIds[idx + 1];
+                builder.selectLaneNode(nextId);
+                builder.focusOnLaneNode(nextId);
+                refreshLanes();
+                onRequestRender?.();
+                showToast(`Node ${nextId} (${idx + 2}/${activePath.nodeIds.length})`);
+              }
+            }
+            return;
+          }
         }
       }
 
@@ -875,9 +929,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const initDefaultLanes = () => {
     const defaultNet = createDefaultLaneNetwork(course ?? 'ridge');
     builder.setLaneNetwork(defaultNet);
-    setSelectedLanePathId(null);
-    setLaneStatus('Generated standard 4 lanes');
-    showToast('Generated standard 4 lanes');
+    setSelectedLanePathId('default-lane-1');
+    setLaneStatus('Generated standard 4 lanes (~10m node spacing, 121 nodes/lane)');
+    showToast('Generated standard 4 lanes (~10m node spacing, 121 nodes/lane)');
     refreshLanes();
     onRequestRender?.();
   };
@@ -3404,6 +3458,10 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   onCommand={runLaneCommand}
                   onInitSample={initSampleLanes}
                   onInitDefault={initDefaultLanes}
+                  onFocusNode={(nodeId) => {
+                    builder.focusOnLaneNode(nodeId);
+                    onRequestRender?.();
+                  }}
                   onSave={saveLaneDoc}
                   onExport={exportLanes}
                   onImport={importLanes}

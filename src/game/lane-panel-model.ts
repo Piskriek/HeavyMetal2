@@ -29,6 +29,7 @@ export interface LanePathRow {
   readonly id: string;
   readonly name: string;
   readonly nodeCount: number;
+  readonly nodeIds?: readonly string[];
   readonly halfWidth: number;
   /** The kind of its last node: what happens where this path ends. */
   readonly terminalKind: LaneNodeKind | 'orphan';
@@ -86,6 +87,7 @@ export function lanePanelModel(
       id: path.id,
       name: path.name,
       nodeCount: path.nodeIds.length,
+      nodeIds: Object.freeze([...path.nodeIds]),
       halfWidth: path.halfWidth,
       terminalKind: last ? inferKind(network, last) : 'orphan',
       oob: path.nodeIds.some((nodeId) => inferKind(network, nodeId) === 'oob'),

@@ -15,6 +15,8 @@ import BlizzardGauge from '../components/ui/BlizzardGauge';
 import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
+import CockpitHud from '../components/CockpitHud';
+import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
@@ -115,6 +117,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     ballWeight: config.customPhysics ? options.ballWeight : stats.weight,
   }), [options, config, stats]);
   const optionsRef = useRef(raceOptions);
+  // M01 · T4: one reused cockpit channel, filled by the engine each frame and read by the HUD's rAF.
+  const cockpitRef = useRef<CockpitState>(createCockpitState());
+  const readCockpit = useCallback((state: CockpitState) => {
+    engineRef.current?.getCockpitState(state);
+  }, []);
+  const firstPerson = options.cameraMode === 'first_person';
   const finishRef = useRef(onRoundComplete);
   finishRef.current = onRoundComplete;
   const modalRef = useRef<ModalName>(null);
@@ -219,6 +227,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         loadAssets(), prepareRaceBalls(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster),
         // The off-screen pointer badge shows the player's portrait, not the ball.
         loadArtImage(riderCell(config.loadout.rider).pilot ?? riderCell(config.loadout.rider).image).catch(() => null),
+        // M01 · T4: the cockpit is painted art; every file is decoded before the grid, never in-race.
+        Promise.all(COCKPIT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
       ]))
       .then(([loaded, raceBalls, pickupSprites, art, playerBadge]) => {
         if (!active) return;
@@ -428,7 +438,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   onRequestRender={() => engineRef.current?.requestRender()}
                 />
               )}
-              <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
+              {!firstPerson && <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
                 <div className={`hud-gear ${gearHidden ? 'gear-hidden' : ''}`}>
                   <button className="gear-button" onClick={toggleGear} aria-haspopup="menu" aria-expanded={gearOpen} aria-label="Race menu" title="Race menu"><Settings2 size={17} /></button>
                   <AnimatePresence>
@@ -456,7 +466,15 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     <BlizzardGauge variant="dial" value={snapshot.speed} max={360} unit="km/h" label="SPEED" title={`Speed: ${snapshot.speed} km/h`} />
                   </div>
                 </div>
-              </div>
+              </div>}
+              {firstPerson && assets && !loadError && (
+                <CockpitHud
+                  state={cockpitRef.current}
+                  readState={readCockpit}
+                  reducedMotion={options.reducedMotion}
+                  active={playing || paused || snapshot.status === 'pushing'}
+                />
+              )}
               <AnimatePresence>
                 {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="grid-flag-img" aria-hidden="true" /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
                 {ready && !pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
@@ -537,7 +555,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 <div><h3><label htmlFor="race-camera-mode">Ball camera</label></h3><p>Follow ball chases your capsule so it stays framed. Fixed course holds the classic wide view; an edge arrow points when the ball leaves the screen.</p></div>
                 <select id="race-camera-mode" className="graphics-select" value={options.cameraMode} onChange={(event) => {
                   const cameraMode = event.target.value;
-                  if (cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
+                  if (cameraMode === 'first_person' || cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
                 }}>
                   <option value="follow_ball">Follow ball</option>
                   <option value="fixed">Fixed course</option>

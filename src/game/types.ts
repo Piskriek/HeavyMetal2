@@ -5,8 +5,12 @@ import type { PowerupKind } from './powerups';
 export type GameStatus = 'loading' | 'ready' | 'pushing' | 'flying' | 'paused' | 'finished' | 'checkpoint' | 'countdown';
 export type CourseId = 'ridge' | 'boomtown' | 'sheep';
 export type GraphicsMode = 'auto' | 'performance' | 'quality';
-/** TICKET-07: chase the player's ball, or hold the classic broad course view. */
-export type CameraMode = 'third_person' | 'follow_ball' | 'fixed';
+/**
+ * TICKET-07 + M01 · T3: the driver's own view through the cockpit window (`first_person`, the
+ * default since the cockpit landed), the tight chase that sits above and slightly back from the
+ * ball, or the classic wide broadcast view.
+ */
+export type CameraMode = 'first_person' | 'follow_ball' | 'fixed' | 'third_person';
 /**
  * M01 · T1: how the field leaves the grid. `push` is the goblin shove on the start pad (the
  * default); `sling` keeps the legacy slingshot path reachable for parity runs and for the
@@ -195,7 +199,8 @@ export const DEFAULT_OPTIONS: GameOptions = {
   downrange: true,
   parallax: true,
   aimAssist: true,
-  cameraMode: 'follow_ball',
+  // M01 · T3: the game is built for the cockpit; the chase and the broadcast views are options.
+  cameraMode: 'first_person',
   course: 'ridge',
   graphics: 'auto',
   launchSpeed: 160,

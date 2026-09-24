@@ -27,6 +27,7 @@ import { resolvePickups as resolvePickupsSim } from './sim/pickups';
 // M01 · T1: the goblin push start. The engine owns the clock and the surface query; the ramp math
 // lives in a pure module so a headless test can reproduce the launch without a canvas.
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
+import { steerFrom, type CockpitState } from './cockpit';
 
 const TAU = Math.PI * 2;
 const STEP = FIXED_STEP;
@@ -287,6 +288,35 @@ export class GameEngine {
 
   /** The next ramp speed for a racer at tick `k` — exposed for the start-zone harness. */
   static pushVelocityAt(target: number, k: number) { return pushRampVx(target, k); }
+
+  /**
+   * M01 · T4 — fill the cockpit channel for this frame.
+   *
+   * One reused object, no allocation: the HUD's rAF loop calls this and writes CSS. Everything is
+   * read from the same state the physics stepped — `steer` comes from the player's own `vz`, so the
+   * yoke leads the lane change rather than replaying it, and the speed is the HUD's own km/h.
+   */
+  getCockpitState(state: CockpitState): CockpitState {
+    const player = this.player;
+    state.steer = steerFrom(player.vz, player.handling);
+    state.speedKmh = this.snapshot.speed;
+    state.boostCharges = this.snapshot.boosts;
+    state.bounceCharges = this.snapshot.bounces;
+    state.shieldSeconds = this.snapshot.shieldSeconds;
+    state.gradePct = this.snapshot.grade;
+    state.grounded = this.snapshot.grounded;
+    state.inLoop = this.snapshot.inLoop;
+    state.status = this.snapshot.status;
+    state.position = this.snapshot.position;
+    state.raceTime = this.snapshot.raceTime;
+    state.pushing = this.snapshot.status === 'pushing';
+    state.countdownLabel = this.snapshot.countdownNumber !== undefined
+      ? String(this.snapshot.countdownNumber)
+      : this.snapshot.status === 'checkpoint'
+        ? 'POOL'
+        : null;
+    return state;
+  }
 
   /**
    * The slingshot. M01 · T1 retires it from input in push mode, but the method stays: it is the

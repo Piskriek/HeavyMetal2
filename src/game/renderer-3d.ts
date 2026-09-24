@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
+import type { GameOptions } from './types';
 import { RADIUS } from './scene';
 import {
   compileRampSurfaces,
@@ -1411,6 +1412,34 @@ function buildWorld(M: Materials, scene: THREE.Scene) {
 /* -----------------------------------------------------------------------------
    7. CAMERA RIG
    -------------------------------------------------------------------------- */
+
+/**
+ * The tight chase rig — the framing the game is watched from now that it is built for the
+ * cockpit: **right above the ball and slightly back**, looking down the road.
+ *
+ * `height` is the one number to tune if the ball should sit higher or lower in the frame; `back`
+ * moves the whole rig nearer or further. Both are ball-radius multiples so a change to `RADIUS`
+ * cannot silently ruin the framing.
+ *
+ * The wide, stage-reactive rig still exists (`fixed` mode: the classic broadcast view), and the
+ * M01 · T3 cockpit replaces this as the default once the bezel art is in.
+ */
+export const CHASE_RIG = {
+  /** Distance behind the ball. */
+  back: RADIUS * 10.6,
+  /** Height above the ball's own road sample. */
+  height: RADIUS * 5.7,
+  /** Lateral offset (0 = straight behind). */
+  side: 0,
+  /** How far down the road the camera aims. */
+  lookAhead: 820,
+  /** Extra lift applied to the aim point, in world units. */
+  lookLift: 150,
+  /** Share of the ball's altitude that lifts the camera on big air. */
+  airFollow: 0.5,
+} as const;
+
+/** The classic broadcast rig: high and far back, widening through the canyon, loops and arena. */
 function cameraRigAt(track: TrackData, d: number) {
   const rig = { back: 950, height: 430, side: 0, lookAhead: 1500 };
   const canyon = bump(d, track.stageStart.canyon - 1800, track.stageEnd.canyon + 300, 1400);
@@ -1422,6 +1451,16 @@ function cameraRigAt(track: TrackData, d: number) {
   const arena = smoothstep(track.stageStart.stadium, track.stageStart.stadium + 1800, d);
   rig.back += 500 * arena; rig.height += 450 * arena;
   return rig;
+}
+
+/** The tight chase rig with the ball's own altitude folded in, so a hop does not empty the frame. */
+function chaseRigAt(altitude: number) {
+  return {
+    back: CHASE_RIG.back,
+    height: CHASE_RIG.height + clamp(altitude, 0, 900) * CHASE_RIG.airFollow,
+    side: CHASE_RIG.side,
+    lookAhead: CHASE_RIG.lookAhead,
+  };
 }
 
 import { TrackBuilder3D } from './track-builder-3d';
@@ -1496,9 +1535,9 @@ export class Renderer3D {
   private currentSkyPreset: SkyPreset;
   private destroyed = false;
   /**
-   * M01 · T0 — the eye-level spike. `?fp=1` puts the camera on the ball at eye height using the
-   * plain track frame; T3 replaces the flag with the `first_person` camera mode and feeds the same
-   * function the gyro frame. Nothing else in the render path changes while the flag is off.
+   * M01 · T0 — the eye-level spike. `?fp=1` forces the first-person view on, whatever the camera
+   * option says; the `first_person` camera mode (T3, the default) selects it in normal play. Both
+   * feed the same `firstPersonFrame()`.
    */
   private readonly firstPerson: boolean;
   /** Last frame's up, so the eye does not snap when the bank rolls through a turn. */
@@ -1568,7 +1607,7 @@ export class Renderer3D {
     // Racers
     this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
 
-    this.placeCamera(this.D_START, 0.1);
+    this.placeCamera(this.D_START, 0.1, 'follow_ball', 0);
   }
 
   setSkybox(skyId: string) {
@@ -1682,12 +1721,18 @@ export class Renderer3D {
     }
   }
 
-  private placeCamera(d: number, dt: number) {
-    const rig = cameraRigAt(this.track, d);
+  /**
+   * @param altitude how far the ball currently is above its road sample (0 while rolling). The
+   *   chase rig lifts by a share of it, so a spring, a ramp or a blimp launch keeps the ball in
+   *   frame instead of leaving the camera staring at the dirt.
+   */
+  private placeCamera(d: number, dt: number, mode: GameOptions['cameraMode'], altitude: number) {
+    const wide = mode === 'fixed';
+    const rig = wide ? cameraRigAt(this.track, d) : chaseRigAt(altitude);
     const at = this.track.sampleAt(clamp(d - rig.back, 0, this.track.length));
     const look = this.track.sampleAt(clamp(d + rig.lookAhead, 0, this.track.length));
     this.camera.position.copy(at.pos).addScaledVector(at.up, rig.height).addScaledVector(at.right, rig.side);
-    const target = look.pos.clone().addScaledVector(look.up, 140);
+    const target = look.pos.clone().addScaledVector(look.up, wide ? 140 : CHASE_RIG.lookLift);
     this.camUp.lerp(at.up, 1 - Math.exp(-dt * 5)).normalize();
     this.camera.up.copy(this.camUp);
     this.camera.lookAt(target);
@@ -1811,7 +1856,10 @@ export class Renderer3D {
     const playerDistance = (frame.ball as any).distance ?? engineDistanceFromX((frame.ball as any).x ?? 190);
     const playerDist = this.trackDistFromDistance(playerDistance);
 
+    // M01 · T3: the cockpit is the default view; `?fp=1` stays as the T0 spike that forces it on.
+    const firstPerson = this.firstPerson || frame.options.cameraMode === 'first_person';
     const rampSurfaces = this.activeRampSurfaces();
+    let playerAltitude = 0;
     for (let i = 0; i < frame.racers.length; i++) {
       const racer = frame.racers[i];
       const mesh = this.racers3D[i];
@@ -1829,8 +1877,11 @@ export class Renderer3D {
       // Sphere rolling rotation along track tangent
       mesh.sphere.rotation.x += (racer.vx * dt) / RADIUS;
 
-      // T0: the eye sits inside the player's own ball, so the ball is not drawn in first person.
-      mesh.group.visible = !(this.firstPerson && i === 0);
+      // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
+      mesh.group.visible = !(firstPerson && i === 0);
+
+      // The tight chase rig needs the player's own altitude (see placeCamera).
+      if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);
 
       // Shield effect
       mesh.shield.visible = (racer.shieldUntil ?? 0) > frame.runTime;
@@ -1841,8 +1892,8 @@ export class Renderer3D {
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
     if (!this.trackBuilder.freeFly.active) {
-      if (this.firstPerson) this.placeFirstPersonCamera(frame.ball, rampSurfaces, dt);
-      else this.placeCamera(playerDist, dt);
+      if (firstPerson) this.placeFirstPersonCamera(frame.ball, rampSurfaces, dt);
+      else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
       this.updateAtmosphere(playerDist);
     }
     this.sky.position.copy(this.camera.position);

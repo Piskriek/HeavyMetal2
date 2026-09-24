@@ -287,11 +287,27 @@ function cutYoke() {
   const placedBand = placedRows.map((v, py) => [v, py]).filter(([v]) => v >= placedPeak * 0.8);
   const placedY = placedBand.reduce((sum, [, py]) => sum + py, 0) / placedBand.length;
   if (Math.abs(placedY - YOKE_OUT.h / 2) > 6) throw new Error(`yoke: bar landed at y=${placedY.toFixed(1)}, expected ${YOKE_OUT.h / 2}`);
+  // The two hand grips are the bar's own extremes; step in by a fraction of the span so the anchor
+  // lands on the middle of each grip rather than on its outer tip (or on a lever sticking out).
+  const bandRow = Math.round(placedY);
+  let minX = YOKE_OUT.w; let maxX = -1;
+  for (let py = bandRow - 6; py <= bandRow + 6; py++) {
+    for (let px = 0; px < YOKE_OUT.w; px++) {
+      if (placed.data[(py * YOKE_OUT.w + px) * 4 + 3] <= 8) continue;
+      if (px < minX) minX = px; if (px > maxX) maxX = px;
+    }
+  }
+  const span = maxX - minX;
+  const inset = Math.round(span * 0.075);
+  const grips = {
+    left: { x: minX + inset, y: bandRow },
+    right: { x: maxX - inset, y: bandRow },
+  };
   return {
     file: 'art/cockpit/cockpit-yoke.png', ...YOKE_OUT,
     pivot: { x: YOKE_OUT.w / 2, y: YOKE_OUT.h / 2 },
     spanWidth: scaledW,
-    gripLead: { x: Math.round(pivotX * scale), y: Math.round(pivotY * scale) },
+    grips,
   };
 }
 
@@ -360,18 +376,74 @@ function cutArm() {
    6. THE GAUGE CLUSTERS — trimmed to the painted plate, dial discs kept as flat key targets.
    ------------------------------------------------------------------------------------------ */
 
+/**
+ * Enclosed transparent regions — the dial holes the generator left in a plate.
+ *
+ * Flood-filled from the border, so anything transparent that the flood cannot reach is a hole *inside*
+ * the plate. Returns each hole's centre and radius in finished-sprite pixels: the HUD puts a dial
+ * face and a needle there, and never has to guess where the painted bezel ring is.
+ */
+function holesIn(file) {
+  const { w, h, data } = rgba(file);
+  const transparent = (p) => data[p * 4 + 3] < 8;
+  const outside = new Uint8Array(w * h);
+  const stack = [];
+  for (let x = 0; x < w; x++) { stack.push(x, (h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { stack.push(y * w, y * w + w - 1); }
+  while (stack.length) {
+    const p = stack.pop();
+    if (outside[p] || !transparent(p)) continue;
+    outside[p] = 1;
+    const x = p % w; const y = (p - x) / w;
+    if (x > 0) stack.push(p - 1);
+    if (x < w - 1) stack.push(p + 1);
+    if (y > 0) stack.push(p - w);
+    if (y < h - 1) stack.push(p + w);
+  }
+  const seen = new Uint8Array(w * h);
+  const holes = [];
+  for (let p = 0; p < w * h; p++) {
+    if (seen[p] || outside[p] || !transparent(p)) continue;
+    let x0 = w; let y0 = h; let x1 = -1; let y1 = -1; let area = 0;
+    const queue = [p];
+    seen[p] = 1;
+    while (queue.length) {
+      const q = queue.pop();
+      const x = q % w; const y = (q - x) / w;
+      area += 1;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx; const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const r = ny * w + nx;
+        if (seen[r] || outside[r] || !transparent(r)) continue;
+        seen[r] = 1; queue.push(r);
+      }
+    }
+    if (area > 400) holes.push({ x: (x0 + x1 + 1) / 2, y: (y0 + y1 + 1) / 2, r: (x1 - x0 + 1 + (y1 - y0 + 1)) / 4, area });
+  }
+  return holes.sort((a, b) => b.r - a.r);
+}
+
 function cutCluster(name, width) {
   const file = src(name);
   keyOut(file);
-  const trimmed = temp(`${name}-trim`);
   const background = identify(['-format', '%[pixel:p{0,0}]', file]);
   // The plate sits on a flat studio background: one trim takes it off without touching the discs.
+  const trimmed = temp(`${name}-trim`);
   run([file, '-bordercolor', background, '-fuzz', '12%', '-trim', '+repage', trimmed]);
   run([trimmed, '-resize', `${width}x`, out(name)]);
   log(name, out(name));
-  const discs = bboxWhere(rgba(out(name)), (r, g, b, a) => a > 200 && MAGENTA(r, g, b));
-  const [ow, oh] = size(out(name));
-  return { file: `art/cockpit/${name}.png`, w: ow, h: oh, keyedDiscPixels: discs?.count ?? 0 };
+  const holes = holesIn(out(name));
+  if (holes.length !== 2) throw new Error(`${name}: found ${holes.length} keyed dial holes, expected 2`);
+  return { file: `art/cockpit/${name}.png`, ...sizeTo(out(name)), dials: holes.map((hole) => ({ cx: +hole.x.toFixed(1), cy: +hole.y.toFixed(1), r: +hole.r.toFixed(1) })) };
+}
+
+/** { w, h } of a finished file. */
+function sizeTo(file) {
+  const [w, h] = size(file);
+  return { w, h };
 }
 
 /* ---------------------------------------------------------------------------------------------
@@ -564,6 +636,12 @@ const manifest = {
   starter: cutStarterSheet([[0, 1], [0, 2], [1, 0], [1, 1]]),
   rivetStrip: cutRivetStrip(),
 };
+
+// The project's own repair pass last: it keys any residual matte, despills the fringe and gives
+// every transparent pixel the mean of its visible neighbours — which is exactly what
+// `npm run check:edges` requires, so the pipeline cannot ship a sprite the audit would reject.
+console.log('\nEdge repair → scripts/fix-edge-magenta.mjs cockpit');
+execFileSync('node', [join(root, 'scripts/fix-edge-magenta.mjs'), 'cockpit'], { stdio: 'inherit' });
 
 const manifestPath = join(root, 'src/game/cockpit-art.json');
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

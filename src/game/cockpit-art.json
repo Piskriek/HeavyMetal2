@@ -39,9 +39,15 @@
       "y": 512
     },
     "spanWidth": 1000,
-    "gripLead": {
-      "x": 500,
-      "y": 392
+    "grips": {
+      "left": {
+        "x": 160,
+        "y": 512
+      },
+      "right": {
+        "x": 990,
+        "y": 512
+      }
     }
   },
   "arm": {
@@ -63,13 +69,35 @@
       "file": "art/cockpit/gauge-cluster-left.png",
       "w": 1024,
       "h": 419,
-      "keyedDiscPixels": 0
+      "dials": [
+        {
+          "cx": 509,
+          "cy": 198.5,
+          "r": 129.3
+        },
+        {
+          "cx": 834,
+          "cy": 204.5,
+          "r": 90.8
+        }
+      ]
     },
     {
       "file": "art/cockpit/gauge-cluster-right.png",
       "w": 1024,
       "h": 485,
-      "keyedDiscPixels": 0
+      "dials": [
+        {
+          "cx": 666,
+          "cy": 235.5,
+          "r": 139.8
+        },
+        {
+          "cx": 249,
+          "cy": 251.5,
+          "r": 97.8
+        }
+      ]
     }
   ],
   "dials": [

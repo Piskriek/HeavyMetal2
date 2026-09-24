@@ -363,7 +363,49 @@ builder draws nothing yet (that is T7), and `environment.ts` still paints the le
 corridor — a network is physics and logic until the dressing ticket catches up. What is proven is the
 model, the storage and the runtime integration, headlessly.
 
-## T1b — the player's split, and the retired slingshot off the view · **this commit**
+## T1c — the split is a run, not a fall off the pad · **this commit**
+
+The user's clarification of T1b: *"the split time should be measured from the start to the first loop,
+currently its 2 sec split times cos the ready up shows 2 sec after you start."* They were exactly
+right, and the number was structural.
+
+**Why it was 2 s.** `createQualifyingGate` anchors its plane to a loop's own outer reach, and the pool
+anchored at the course's **first** loop. The start pad is a flat crest 240 above the ground and its
+lip sits directly above that ring, so the plane was crossed **1.93 s after the shove — on every
+course**, i.e. the ready-up arrived before the opening stint had happened. The first honest run to a
+loop is the one at the bottom of the opening descent, so the sort moved there:
+`MERGE_SORTING_LOOP_INDEX = 2` (the third loop), gated through the `loopIndex` option added to
+`createQualifyingGate` — the qualifying path, the gate id and the `'first-loop-entry'` contract keep
+their default index 0 and are untouched.
+
+**Why it could not just be an index.** Measured with the shipping push and CPU drivers, the descent's
+rings are the only ground you can *cross*: keeping the jump line below the sorting plane means all
+four riders arrive at ridge's second loop 155–823 units up, outside the gate's own altitude band, so
+the whole field flies over the sort plane and the pool waits out its 50 s backstop instead of sorting.
+`TrackLayoutOptions.keepLoopsFromX` (T1c) is the answer: the push run-up is trimmed to the sorting
+plane but retains the **loops** below it. The field rides the descent's rings down on the ground; the
+jumps under the plane are gone. Measured sorting times become **7.45–7.79 s (ridge)**,
+**8.57–9.78 s (boomtown)**, **11.15–12.30 s (sheep)** — a real opening stint on every course, with the
+one-number knob (`1` = ~4–7 s, `3` = ~9–13 s) documented on the constant.
+
+**Two test-harness laws had to grow up with it.** `tests/merge-race.test.ts` now starts its own run at
+the sort plane, counts only rides *after* a rider has queued (the field rides run-up loops now, and a
+run-up ride is not a turn in the ring), and measures the pool's own window (first entry → last exit)
+against the 50 s backstop instead of a tick budget that included the run-up. Its "no teleport" cap
+gained the slope allowance the law always needed: `stepRacer` clamps `vx` *after* integrating, so a
+tick spent on a slope legitimately moves a little more than `maximumSpeed · dt` (the pad was flat, and
+no earlier harness ever met a slope at speed).
+
+Evidence: `tests/merge-runup.test.ts` (new, 3) — the run-up keeps exactly the loops between the start
+zone and the sorting plane and drops the jump line; driven as the engine drives it, all four riders
+queue on all three courses, the first arrival is ≥ 4 s, the field's spread ≤ 3 s and the last arrival
+< 20 s; and two `readFileSync` guards pin the engine's run-up and gate. `tests/merge-race.test.ts` 9/9,
+`npm run check`: **579 pass / 47 suites / 0 fail**; build **1,593.12 kB (437.45 kB gzip)**; edges 0.
+
+**UNVERIFIED.** Headless. What the split board reads at ~9 s and how the descent feels without its
+jump line are browser calls.
+
+## T1b — the player's split, and the retired slingshot off the view · **committed `d0d7087`**
 
 Two things the user asked for after seeing the FPV view in the browser, both fixed at the place the
 problem actually lives rather than by moving a camera.
@@ -436,6 +478,7 @@ claims (AC-4/AC-5).
 
 ## Next
 
+* **T1d** (if the depth needs tuning) — `MERGE_SORTING_LOOP_INDEX`, one constant.
 * **T7** — the builder "Lanes & Paths" tool: the gizmos and the panel over `lane-path-tool.ts`.
 * **T6/T7** — the lane network and the builder lane tool (T6 now done).
 * **In the browser now:** the goblin push at the top of the hill, the first-loop queue with its

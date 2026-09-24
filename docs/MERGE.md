@@ -1,12 +1,12 @@
-# M01 · T2 — The First-Loop Merge Pool
+# M01 · T2 / T1c — The Sorting-Loop Merge Pool
 
 > Interface `IF-MERGE` · Module `src/game/merge/pool.ts` · Overlay `src/components/MergePoolOverlay.tsx`
 
 ## Overview
 
 T2 replaces the legacy checkpoint — a hard-coded x, a `setInterval` countdown, and four racers
-teleported onto a line — with a **merge pool** at the first loop. The rule the game plays by is
-one sentence: **you come out of the first loop in the order you went into it.**
+teleported onto a line — with a **merge pool** at a loop on the course. The rule the game plays by is
+one sentence: **you come out of the sorting loop in the order you went into it.**
 
 Three modules carry it:
 
@@ -20,6 +20,48 @@ What the player sees is the **merge-pool overlay**
 (`src/components/MergePoolOverlay.tsx` + `src/merge-pool-overlay.css`, mounted by `RaceScreen` and
 by the map editor's test run),
 driven entirely by `snapshot.merge`.
+
+## Where the field is sorted (M01 · T1c)
+
+The pool used to anchor at the course's **first** loop. `createQualifyingGate` derives the gate plane
+from a loop's own outer reach, and the start pad is a flat crest 240 above the ground whose lip sits
+directly above the first ring — so the plane was **1.93 s from the shove on every course**. The
+ready-up panel therefore arrived two seconds into the run and every split read ~2 s, which is not the
+opening stint the split is supposed to measure.
+
+The sort now anchors at `MERGE_SORTING_LOOP_INDEX` — the loop at the **bottom of the opening
+descent**, which is the first honest run-to-the-loop the course has:
+
+| Loop (down-range) | ridge | boomtown | sheep |
+| --- | --- | --- | --- |
+| 1 | 1.93 s | 1.93 s | 1.93 s |
+| 2 | 4.17 s | 6.13 s | 7.22 s |
+| **3 — sorted here** | **7.45–7.79 s** | **8.57–9.78 s** | **11.15–12.30 s** |
+| 4 | 12.82 s | 13.47 s | — |
+
+(Measured with the shipping push and CPU drivers, four racers, `tick / 120`; the range is the
+field's own spread. `tests/merge-runup.test.ts` asserts the floor and the spread on every course.)
+
+Moving the plane deeper is not just "pass a bigger index": **what lies below the sorting loop is the
+jump line, and riders are airborne over it.** Measured at ridge's second loop, all four riders arrive
+155–823 units up — outside the gate's own altitude band — so with the descent left intact the whole
+field flies over the sort plane and the pool waits out its 50 s backstop instead of sorting. The
+push-mode layout therefore trims to the sorting plane and keeps the **loops** below it
+(`TrackLayoutOptions.keepLoopsFromX`): the descent's rings stay, the jumps under the plane go, and the
+field rides down on the ground and takes each loop in turn. `tests/merge-runup.test.ts` pins both
+halves of that rule — the kept loops, the dropped jump line, and a queueing field on every course.
+
+Everything else is unchanged, and deliberately so:
+
+* **The qualification gate still means the first loop.** `createQualifyingGate`'s default is index 0,
+  and only `GameEngine.mergeGateFor()` passes `MERGE_SORTING_LOOP_INDEX`. The time-trial path, the
+  gate id (`QUALIFYING_GATE_ID`) and the `'first-loop-entry'` contract are untouched.
+* **The start zone still ends at the first loop.** The push trim's `skipBeforeX` is the sorting plane
+  now, but `keepLoopsFromX` is the *start zone's* boundary — the two are separate numbers, and the
+  start-zone fingerprint in `tests/start-zone.test.ts` still holds.
+* **The countdown notice** now reads `SORTING LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.`
+
+The tuning knob is one constant: `1` gives a brisk ~4–7 s opening, `3` a long ~9–13 s one.
 
 ## The ordering law
 
@@ -47,18 +89,21 @@ The exit order is then forced by construction:
 
 `tests/merge-race.test.ts` drives exactly this — with the shipping physics and the shipping contact
 pass — over **100 push seeds on `ridge` and 24 on each of `boomtown` and `sheep`**, and asserts
-`exitOrder === entryOrder` every time, with riders leaving the ring at least 200 x-units apart.
+`exitOrder === entryOrder` every time, with riders leaving the ring at least 200 x-units apart. It
+counts only rides *after* a rider has queued: the field rides the descent's own loops on the way to
+the sorting gate (T1c), and a run-up ride is not a turn in the ring.
 
 ## The player's split
 
-The run from the grid to the first loop is the first **split** of the course, and it is the player's
-own: it runs from the shove to the gate plane, and the number it produces is their queue time. Two
+The run from the grid to the sorting loop is the first **split** of the course, and it is the
+player's own: it runs from the shove to the gate plane (7.5–12.3 s with the T1c depth, instead of the
+1.93 s the first loop used to give), and the number it produces is their queue time. Two
 rules protect it (M01 · T1b, after the player asked for exactly this):
 
 * **The window has no clock of its own while the player is on approach.** `step` closes the pool on
   `allHeld` or on `graceTick + POOL_MAX_WAIT_TICKS`, and `graceTick` is *the player's own crossing*
-  — `null` until they arrive. So a field that queues early waits for a player still racing the first
-  stretch, however long that takes, and the player is not flagged `late` for a gate they never had a
+  — `null` until they arrive. So a field that queues early waits for a player still racing the
+  descent, however long that takes, and the player is not flagged `late` for a gate they never had a
   race to reach. Once they are in the queue the grace is theirs: the field waits out the same 1200
   ticks for them that it always waited for a straggler.
 * **The overlay does not offer a READY before they are in the pool.** `poolIsWaiting` (entries with
@@ -178,6 +223,7 @@ command.
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
+| `MERGE_SORTING_LOOP_INDEX` | `2` | Which loop the field is sorted at, zero-based in down-range order (T1c — see above). |
 | `BOT_READY_BASE_TICKS` / `BOT_READY_RANK_TICKS` | `90` / `30` | A bot's ready, by rank. |
 | `POOL_MAX_WAIT_TICKS` | `1200` | The window closes on its own this long after the player's own crossing (see *The player's split*). |
 | `POOL_PLAYER_GRACE_TICKS` | `6000` | The backstop: after the field's first arrival, a player who never reaches the loop cannot hang the race for more than this. |

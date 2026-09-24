@@ -1,7 +1,7 @@
 /**
  * M01 · T1b — the player's split, and the wait for it.
  *
- * The run from the grid to the first loop is the first split of the course, and it belongs to the
+ * The run from the grid to the sorting loop is the first split of the course, and it belongs to the
  * player: the clock starts at the shove and stops when they cross the gate plane, which is the
  * moment the pool takes the run over. Two small pure helpers keep the overlay honest about that:
  *

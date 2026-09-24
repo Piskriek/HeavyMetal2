@@ -93,14 +93,28 @@ export interface QualifyingGateSpec extends QualifyingGate {
   readonly distance: number;
 }
 
-/** The lowest-`x` loop on a course. `kind === 'loop'` only; lava loops are a section 3 feature. */
+/**
+ * Every loop on a course in down-range order. `kind === 'loop'` only; lava loops are a section 3
+ * feature. Sorted by `x` rather than taken in array order, because the layout is not guaranteed to
+ * be sorted and "the first loop" has to mean down the hill, not first in a list.
+ */
+export function loopsInOrder(obstacles: readonly Obstacle[]): Obstacle[] {
+  return obstacles.filter((obstacle) => obstacle.kind === 'loop').sort((a, b) => a.x - b.x);
+}
+
+/** The lowest-`x` loop on a course. */
 export function findFirstLoop(obstacles: readonly Obstacle[]): Obstacle | null {
-  let best: Obstacle | null = null;
-  for (const obstacle of obstacles) {
-    if (obstacle.kind !== 'loop') continue;
-    if (best === null || obstacle.x < best.x) best = obstacle;
-  }
-  return best;
+  return loopsInOrder(obstacles)[0] ?? null;
+}
+
+/**
+ * The loop at a given index in down-range order, or `null` when the course has fewer than that many.
+ * `findFirstLoop` is this at index 0, kept because the qualifying attempt's language is "the first
+ * loop" and every one of its call sites should keep saying that.
+ */
+export function findLoopAt(obstacles: readonly Obstacle[], loopIndex: number): Obstacle | null {
+  const index = Math.max(0, Math.floor(loopIndex));
+  return loopsInOrder(obstacles)[index] ?? null;
 }
 
 /**
@@ -118,8 +132,26 @@ export function loopEngagementReach(obstacle: Obstacle, course: CourseId): numbe
   return loopGeometry(obstacle, course).radius + RADIUS;
 }
 
-export function createQualifyingGate(course: CourseId, obstacles: readonly Obstacle[]): QualifyingGateSpec {
-  const loop = findFirstLoop(obstacles);
+/**
+ * M01 · T1c — which loop a gate is anchored to.
+ *
+ * The qualifying attempt always qualifies at the **first** loop (index 0, the historical behaviour),
+ * while the race's merge pool sorts the field at a later one so the opening stint is a real run
+ * rather than the two seconds it takes to fall off the start pad (see `MERGE_SORTING_LOOP_INDEX` in
+ * the engine). Indexing rather than a distance keeps the choice course-independent and readable:
+ * every course's loops are authored in down-range order.
+ */
+export interface QualifyingGateOptions {
+  /** Zero-based loop index, in down-range order. Defaults to the first loop. */
+  readonly loopIndex?: number;
+}
+
+export function createQualifyingGate(
+  course: CourseId,
+  obstacles: readonly Obstacle[],
+  options: QualifyingGateOptions = {},
+): QualifyingGateSpec {
+  const loop = findLoopAt(obstacles, options.loopIndex ?? 0);
   if (!loop) {
     throw new QualifyingError('E_GATE_MISSING', `Course "${course}" has no loop to anchor the qualifying gate to.`, {
       course, obstacles: obstacles.length,

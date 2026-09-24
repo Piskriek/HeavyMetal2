@@ -19,6 +19,19 @@ import {
 export interface TrackLayoutOptions {
   /** Drop every obstacle whose `x` is below this (exclusive). */
   readonly skipBeforeX?: number;
+  /**
+   * M01 · T1c — the run-up the field actually rides: with `skipBeforeX` set to the sorting gate,
+   * loops at or after this `x` are kept anyway.
+   *
+   * Sorting the field deeper than the start pad (see `MERGE_SORTING_LOOP_INDEX`) cannot simply trim
+   * every obstacle below the new gate: what lies under it is the jump line, and riders are airborne
+   * over it — measured, all four riders arrive at ridge's second loop 155–823 units up, outside the
+   * gate's altitude band, so they would fly over the sort plane and the pool would wait out its whole
+   * backstop. Keeping the loops below the gate and nothing else is what works: every rider rides the
+   * descent on the ground and takes each loop in turn, and the measured sorting times become
+   * 7.5–12.3 s instead of 1.93 s.
+   */
+  readonly keepLoopsFromX?: number;
 }
 
 export function createTrackLayout(course: CourseId, options: TrackLayoutOptions = {}): Obstacle[] {
@@ -233,5 +246,8 @@ export function createTrackLayout(course: CourseId, options: TrackLayoutOptions 
 
   const sorted = obstacles.sort((a, b) => a.x - b.x);
   const skipBeforeX = options.skipBeforeX;
-  return skipBeforeX === undefined ? sorted : sorted.filter((obstacle) => obstacle.x >= skipBeforeX);
+  if (skipBeforeX === undefined) return sorted;
+  const keepLoopsFromX = options.keepLoopsFromX;
+  return sorted.filter((obstacle) => obstacle.x >= skipBeforeX
+    || (keepLoopsFromX !== undefined && obstacle.kind === 'loop' && obstacle.x >= keepLoopsFromX));
 }

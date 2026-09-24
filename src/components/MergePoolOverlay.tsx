@@ -1,5 +1,5 @@
 /**
- * M01 · T2 — the first-loop pool overlay.
+ * M01 · T2 / T1c — the sorting-loop pool overlay.
  *
  * Shown while the pool owns the race status: the queue as it stands (place, rider, when they
  * crossed, whether they are ready), the countdown once the window closes, and the player's own
@@ -93,7 +93,7 @@ export default function MergePoolOverlay({
       className={`merge-pool${releasing ? ' merge-pool--releasing' : ''}`}
       data-phase={merge.phase}
       role="dialog"
-      aria-label="First loop pool"
+      aria-label="Sorting loop pool"
     >
       {/* The pool goblin: hold, call, count, and the sweep that sends them off. Painted art on a 2x2
           sheet, its cell chosen by the phase (see game/merge/goblin.ts). */}
@@ -117,8 +117,8 @@ export default function MergePoolOverlay({
               <div>
                 <h2>Set your split</h2>
                 <p>
-                  The clock is running to the first loop and the split is yours to set. Nobody is
-                  waiting on you yet — the queue starts for you when you cross.
+                  The clock is running to the sorting loop and the split is yours to set. Nobody
+                  is waiting on you yet — the queue starts for you when you cross.
                 </p>
               </div>
               <span className="merge-pool__hold">{merge.holdTicks} ticks queued</span>
@@ -153,7 +153,7 @@ export default function MergePoolOverlay({
           <div className="merge-pool__panel">
             <header className="merge-pool__head">
               <div>
-                <h2>The first loop</h2>
+                <h2>The sorting loop</h2>
                 <p>
                   {merge.phase === 'open'
                     ? 'Everyone queues in the order they arrive. Nobody passes inside the ring.'

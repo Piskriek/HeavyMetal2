@@ -1,7 +1,7 @@
 /**
  * M01 · T2 — the first-loop merge pool (IF-MERGE).
  *
- * The mission's rule for the first loop is a queueing rule: everyone who reaches the loop goes into
+ * The mission's rule for the sorting loop is a queueing rule: everyone who reaches the loop goes into
  * a pool, the pool readies up, a countdown runs, and the riders are let go **one at a time in the
  * order they arrived**, so that the order they leave the loop in is the order they entered it in,
  * with no contact inside. After that the gloves come off.
@@ -19,7 +19,7 @@
  * them:
  *   - `rank`/`aligning`: a held rider waits in their own lane (`slotZ`), and the rider who is next
  *     to be released slides across to the loop's lane before they go. A rider released in the wrong
- *     lane would simply *skip* the lane-filtered first loop, and then the exit order could not
+ *     lane would simply *skip* the lane-filtered sorting loop, and then the exit order could not
  *     follow the entry order at all.
  *   - `candidateAligned`: the release of that sliding rider waits for them to arrive (bounded by
  *     `ALIGN_MAX_TICKS`, after which they are released anyway and flagged `alignForced`).
@@ -35,6 +35,27 @@ export const BOT_READY_BASE_TICKS = 90;
 /** Extra hold per place in the entry order: the riders who queued first ready first. */
 export const BOT_READY_RANK_TICKS = 30;
 /** The pool gives up waiting for stragglers this long after the first entry. */
+/**
+ * M01 · T1c — **which loop the field is sorted at**, zero-based in down-range order.
+ *
+ * The pool used to anchor at the course's *first* loop. Measured on the real layouts, that loop is
+ * `1.93 s` from the shove on **every** course — the start pad crests 300 units above it — so the
+ * ready-up panel arrived two seconds into the run, and every rider's split read ~2 s. The opening
+ * stint is supposed to be the player's first split, so the sort moved to the loop at the bottom of
+ * the opening descent (`2`, the third loop):
+ *
+ * | loop | ridge | boomtown | sheep |
+ * | --- | --- | --- | --- |
+ * | 1 | 1.93 s | 1.93 s | 1.93 s |
+ * | **2 (sorted here)** | **9.36 s** | **9.99 s** | **12.68 s** |
+ * | 3 | 12.82 s | 13.47 s | — |
+ *
+ * The field now rides the first loop (and the crest, and the gap) before anyone queues, and the
+ * split is the run they actually made. One number: move it to `1` for a brisk 4 s opening, or `3`
+ * for a longer one, and nothing else needs to change.
+ */
+export const MERGE_SORTING_LOOP_INDEX = 2;
+
 export const POOL_MAX_WAIT_TICKS = 1200;
 /**
  * M01 · T1b — the backstop for a player who cannot reach the first loop at all.
@@ -123,7 +144,7 @@ export interface MergeOccupancy {
 }
 
 export interface MergePoolOptions {
-  /** Gate plane x, from `createQualifyingGate` — the first loop's own outer reach. */
+  /** Gate plane x, from `createQualifyingGate` — the sorting loop's own outer reach. */
   readonly gateX: number;
   /** The loop's lane centre, the z every released rider must be in. */
   readonly loopZ: number;

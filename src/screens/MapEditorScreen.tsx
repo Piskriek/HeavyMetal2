@@ -146,7 +146,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         return;
       }
 
-      // M01 · T2: in a test run that has reached the first loop, Space or Enter readies the player —
+      // M01 · T2: in a test run that has reached the sorting loop, Space or Enter readies the player —
       // the pool is the only thing on screen then, and it refuses anything else.
       if (eng.inMerge && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault();

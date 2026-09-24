@@ -23,7 +23,8 @@ import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorag
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
 import {
-  MERGE_GATE_HALF_WIDTH, MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX, MergePool, loopRideProgress,
+  MERGE_GATE_HALF_WIDTH, MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX, MERGE_SORTING_LOOP_INDEX, MergePool,
+  loopRideProgress,
 } from './merge/pool';
 import { LEGACY_RECOVERY, type RacerStepContext, type SimFx } from './sim/context';
 import { createSimWorld, type SimWorld } from './sim/world';
@@ -519,7 +520,11 @@ export class GameEngine {
    */
   private mergeGateFor(): QualifyingGateSpec {
     if (!this.mergeGate) {
-      const gate = createQualifyingGate(this.options.course, this.obstacles);
+      // M01 · T1c: the sort is anchored at MERGE_SORTING_LOOP_INDEX, not at the loop the start pad
+      // sits above — see that constant for the measured splits it replaces.
+      const gate = createQualifyingGate(this.options.course, this.obstacles, {
+        loopIndex: MERGE_SORTING_LOOP_INDEX,
+      });
       this.mergeGate = { ...gate, z: 0, halfWidth: MERGE_GATE_HALF_WIDTH };
     }
     return this.mergeGate;
@@ -579,7 +584,7 @@ export class GameEngine {
           racerIds: this.racers.map((candidate) => candidate.id),
           playerId: this.player.id,
         });
-        this.onMergeNotice('FIRST LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.');
+        this.onMergeNotice('SORTING LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.');
       }
       const entered = this.merge.enter(racer.id, this.tick, outcome.fraction, gate.x);
       if (!entered.ok) continue;
@@ -746,8 +751,17 @@ export class GameEngine {
     // filter only removes a prefix — the layout itself has no RNG — so every obstacle from the
     // gate on keeps its exact identity (asserted by tests/start-zone.test.ts).
     const built = createTrackLayout(this.options.course);
+    // The push run-up is everything from the start zone's own boundary (`createQualifyingGate` with
+    // its default loop) down to the plane the field is sorted at, with the loops kept and the jump
+    // line below the sort removed (T1c — see `TrackLayoutOptions.keepLoopsFromX`).
+    const startZoneEndX = createQualifyingGate(this.options.course, built).x;
     this.obstacles = this.startMode === 'push'
-      ? createTrackLayout(this.options.course, { skipBeforeX: createQualifyingGate(this.options.course, built).x })
+      ? createTrackLayout(this.options.course, {
+        skipBeforeX: createQualifyingGate(this.options.course, built, {
+          loopIndex: MERGE_SORTING_LOOP_INDEX,
+        }).x,
+        keepLoopsFromX: startZoneEndX,
+      })
       : built;
     this.pickups = createAirPickups(this.options.course, this.obstacles);
     this.world.configure(this.options.course, this.obstacles, this.pickups);

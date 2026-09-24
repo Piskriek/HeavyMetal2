@@ -25,7 +25,7 @@ const commands = [
     'tests/cockpit.test.ts',
     'tests/effects.test.ts',
     'tests/gyro-ball.test.ts',
-    'tests/merge-pool.test.ts', 'tests/merge-race.test.ts',
+    'tests/merge-pool.test.ts', 'tests/merge-race.test.ts', 'tests/merge-runup.test.ts',
     'tests/contracts.test.ts',
     'tests/multi-select-grouping.test.ts', 'tests/track-props-backup.test.ts', 'tests/track-space.test.ts',
     'tests/track-builder-validation.test.ts',

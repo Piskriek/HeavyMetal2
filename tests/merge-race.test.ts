@@ -36,11 +36,12 @@ import { createAirPickups } from '../src/game/powerups';
 import {
   DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentForStep,
 } from '../src/game/qualifying/gate';
-import { LANE, RADIUS, closestLane, obstacleZ } from '../src/game/scene';
+import { GRAVITY, LANE, RADIUS, closestLane, obstacleZ } from '../src/game/scene';
 import { FIXED_STEP } from '../src/game/contracts/timing';
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, startPushVelocity } from '../src/game/sim/start-push';
 import {
   HELD_DAMPING, HELD_RESPONSE, MERGE_GATE_HALF_WIDTH, MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX,
+  MERGE_SORTING_LOOP_INDEX, POOL_PLAYER_GRACE_TICKS,
   MergePool, loopRideProgress,
 } from '../src/game/merge/pool';
 
@@ -148,14 +149,18 @@ interface RaceResult {
   readonly fingerprint: string;
   readonly ticks: number;
   readonly exitTick: number;
+  /** Ticks from the first rider's entry to the last rider's exit: the pool's own work, no run-up. */
+  readonly mergeTicks: number;
 }
 
 /** Drives the whole merge for one course. `seed` feeds the push; everything else is deterministic. */
 function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true): RaceResult {
   const bare = createTrackLayout(course);
-  const gate = createQualifyingGate(course, bare);
+  // M01 · T1c: the sort is anchored at MERGE_SORTING_LOOP_INDEX, while the start zone still ends at
+  // the *first* loop's entry plane — so the field rides that loop before it queues.
+  const gate = createQualifyingGate(course, bare, { loopIndex: MERGE_SORTING_LOOP_INDEX });
   const mergeGate = { ...gate, z: 0, halfWidth: MERGE_GATE_HALF_WIDTH };
-  const layout = createTrackLayout(course, { skipBeforeX: gate.x });
+  const layout = createTrackLayout(course, { skipBeforeX: createQualifyingGate(course, bare).x });
   const world = createSimWorld(course, layout, createAirPickups(course, layout));
   const loopZ = obstacleZ(gate.loop);
   const racers = createRacers();
@@ -188,6 +193,10 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
   const exitOrder: number[] = [];
   const exited: { racer: Racer; tick: number }[] = [];
   const riding = new Set<number>();
+  // Who has actually queued. The field rides the run-up loops on the way down to the sorting gate
+  // (T1c), and a ride before the gate is not this rider's turn in the ring.
+  const queued = new Set<number>();
+  let firstEntryTick = -1;
   let lastReleased: number | null = null;
   let bumpsOnHeldOrGhost = 0;
   let heldGlideErrors = 0;
@@ -200,7 +209,9 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
   let tick = PUSH_TICKS;
   let mergeFinishedTick = -1;
   let exitTick = -1;
-  const budget = PUSH_TICKS + 4000;
+  // A probe cap, not a law: it only has to be large enough for the run-up the field rides before the
+  // sorting gate. What the pool itself may cost is asserted separately, from `mergeTicks`.
+  const budget = PUSH_TICKS + 12000;
 
   for (; tick < budget; tick++) {
     runTime += FIXED_STEP;
@@ -231,6 +242,8 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
       if (!outcome.ok) continue;
       const entered = pool.enter(racer.id, tick, outcome.fraction, mergeGate.x);
       if (!entered.ok) continue;
+      if (firstEntryTick < 0) firstEntryTick = tick;
+      queued.add(racer.id);
       // The pool keys the queue on the *crossing* time — the tick plus the fraction of the tick the
       // plane was crossed at — and breaks exact ties by racer id. This is that key, derived here.
       crossings.push({ racerId: racer.id, order: tick + outcome.fraction });
@@ -311,7 +324,7 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
         if (Math.abs(racer.z - predicted.z) > 1e-9) heldGlideErrors += 1;
         if (racer.x !== mergeGate.x) heldOffPlane += 1;
       }
-      if (racer.loopRide) riding.add(racer.id);
+      if (racer.loopRide && queued.has(racer.id)) riding.add(racer.id);
       else if (riding.has(racer.id)) {
         riding.delete(racer.id);
         exitOrder.push(racer.id);
@@ -375,6 +388,7 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
     resumeGhostSkipped: ghostProbe.skipped,
     resumeGhostResolved: ghostProbe.resolved,
     fingerprint, ticks: tick, exitTick,
+    mergeTicks: firstEntryTick < 0 || exitTick < 0 ? -1 : exitTick - firstEntryTick,
   };
 }
 
@@ -435,17 +449,27 @@ test('no teleport', () => {
   // by design, and by no more than its own penetration split.)
   const fastest = Math.max(...createRacers().map((racer) => racer.maximumSpeed));
   const penetrationCap = (DIAMETER + 1) * 0.55;
+  // `stepRacer` clamps `vx` to the racer's maximum *after* the integration (`racer-physics.ts:527`),
+  // so a tick spent on a slope integrates the pre-clamp speed: the worst case is one tick of downhill
+  // acceleration on top of maximum speed. The downhill term is `stageGravity · slope / (1 + slope²) /
+  // 1.4`, which peaks at `stageGravity / 2.8` — and stage gravity is `GRAVITY · 1.45` in its band.
+  const slopeStep = GRAVITY * 1.45 / 2.8 * FIXED_STEP * FIXED_STEP;
   for (const course of COURSES) {
     const run = runMerge(DEFAULT_PUSH_SEED, course.id);
-    assert.ok(run.ticks < PUSH_TICKS + 4000, `${course.id}: the merge finishes inside the budget`);
+    assert.equal(run.entryOrder.length, 4, `${course.id}: the whole field queues`);
+    // Anti-stall law: the pool's whole window — first entry to last exit — stays well inside its 50 s
+    // backstop, so a healthy field never reaches the fallback. The run-up the field rides first is not
+    // part of this window (T1c moved the sort deeper).
+    assert.ok(run.mergeTicks > 0 && run.mergeTicks < POOL_PLAYER_GRACE_TICKS,
+      `${course.id}: the pool leaned on its backstop — ${run.mergeTicks} ticks from entry to exit`);
     assert.equal(run.heldOffPlane, 0, `${course.id}: held riders stayed on the plane`);
-    assert.ok(run.mergeStepMax <= fastest * FIXED_STEP + 1e-9,
+    assert.ok(run.mergeStepMax <= fastest * FIXED_STEP + slopeStep + 1e-9,
       `${course.id}: the merge moved a rider ${run.mergeStepMax.toFixed(4)} forward in one tick`);
     assert.equal(run.backwardOnFlat, 0,
       `${course.id}: the merge moved a rider ${run.mergeStepMin.toFixed(4)} backwards on flat ground`);
     assert.ok(run.snapBackMax <= fastest * FIXED_STEP + 1e-9,
       `${course.id}: the gate snap-back moved a rider ${run.snapBackMax.toFixed(4)}`);
-    assert.ok(run.contactStepMax <= fastest * FIXED_STEP + penetrationCap + 1e-9,
+    assert.ok(run.contactStepMax <= fastest * FIXED_STEP + slopeStep + penetrationCap + 1e-9,
       `${course.id}: contact moved a rider ${run.contactStepMax.toFixed(4)} in one tick`);
   }
 });

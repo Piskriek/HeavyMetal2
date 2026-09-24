@@ -129,15 +129,81 @@ painted aperture really is the frozen rectangle.
 * The left plate has a third painted boss ring with no keyed opening (the generator painted only two
   magenta discs per plate). It reads as a decorative blank boss. Regenerating the plates for two
   consistent openings is on the polish list.
-* The gyro-ball work (plan T3's independent sim-owned `rollPhase`, caps that stay level) is **not**
-  in yet: the camera and the meshes still use the plain banked track frame. The cockpit can be
-  judged without it, which is why it went first.
+* ~~The gyro-ball work is not in yet~~ — **T3's gyro is now in** (below). The cockpit section above was
+  written before it; the cockpit itself did not change.
 * Frame pacing with the two extra DOM layers (nine PNGs, 4 SVGs, 6 text nodes) is unmeasured.
+
+## T5 — the effect runtime (explosions, collisions, dust, smoke, sparks)
+
+The sim already knew *what happened*; it had no way to say it in paint. Now it does, in three
+modules and one render pass:
+
+| Piece | What it does |
+| --- | --- |
+| `src/game/effects/events.ts` | `EffectQueue`: a 128-slot ring of typed `EffectEvent`s (seq, tick, kind, engine-space x/y/z, scale, racerId). `readSince(cursor, out)` copies what is new into the reader's own array — zero allocation after construction, and an overflow **drops** the oldest effect and counts it, because an effect that could not be drawn in time is gone. An unknown kind throws `ContractError('E_EFFECT_KIND')`. |
+| `src/game/effects/pool.ts` | `EFFECT_SPECS` for the five kinds, a fixed **64-slot** `BillboardPool` (spawn/update/size/position, drop counting, exact `spawn + life` despawn, reduced-motion rules) and a fixed 160-particle `SparkField`. |
+| `src/game/effects/renderer-fx.ts` | `EffectRenderer`: 64 billboards + one `Points` object, built once. Sheets are **sliced into four frame textures at load**, because three.js applies a texture's offset as one shared uniform — 64 per-slot texture copies of a 972² sheet would be a quarter of a gigabyte of VRAM. Each frame, the queue is drained, engine → world via `placementFromEngine`, culled at 6000 units, billboards face the camera, sparks compact into their buffers. |
+| `sim/*` + `engine.ts` | `SimFx.effect(kind, x, y, z, scale, racerId)`: 22 sites in `sim/racer-physics.ts` and 1 in `sim/pickups.ts`, mapped per IF-FX (tnt/cauldron/blimp/lava → explosion + smoke; heavy bumps → impact + sparks + smoke; light bumps, shoves, shields, loop exits → sparks; landings, hops, springs, recoveries, broken bridges → dust; boost pads → smoke). The engine adds the ball-to-ball contact effects and the dust of the starting shove. |
+
+| Kind | Sheet | Size | Life | Spawn |
+| --- | --- | --- | --- | --- |
+| explosion | anim-43 16 fps | 480 u | 0.25 s | 1 billboard, grows 1.25× |
+| impact | anim-44 14 fps | 220 u | 0.29 s | 1 billboard |
+| dust | anim-49 10 fps | 180 u | 0.6 s | 3 billboards, rise 26 u/s, grows 1.6× |
+| smoke | anim-45 10 fps | 260 u | 1.1 s | 2 billboards, rise 40 u/s, grows 1.9× |
+| sparks | procedural | 26 u | 0.45 s | ≤160 particles in one additive `Points` |
+
+All four sheets are in the race preloader, so the first explosion does not hitch on a decode.
+
+**Verification.** `npm run check` → **487 tests / 47 suites green** · `tsc` clean · build
+1,571.56 kB (430.39 kB gzip) · `check:edges` **0 failures**.
+
+`tests/effects.test.ts` (7 tests) = the ticket's six names plus a cost test: the ring recycles its
+own records and drops the oldest on overflow; the pool is bounded, counts a refused spawn and
+despawns exactly at `spawn + life`; the frame index is `floor((t − t0)·fps) mod 4`, advances and plays
+all four frames; reduced motion holds frame 1 at half opacity without leaking; an invented kind is
+refused and nothing enters the queue; the mapping is proven on the *real* sim (one `hitObstacle` call
+per authored contact kind, then a full headless drive from the grid through the first loop) and
+checked against the four shipped sheets on disk; and 3 000 frames of a four-event pile-up stay under
+1 ms/frame with the pool never exceeding 64.
+
+**UNVERIFIED.** No WebGL in this sandbox, so the *look* is untested: frame sizes in world units,
+billboard blend order against the painted props, and — the one to watch — what an explosion looks like
+**in first person**, where the camera sits inside the ball and a 480-unit billboard can cross the whole
+aperture for a quarter of a second. The browser decides that.
+
+## T3 remainder — the gyro ball
+
+The goblin now rides the way the mission asked: a shell that rolls between two caps that do not.
+
+* `src/game/gyro-ball.ts` (IF-GYRO, pure): `CAP_THETA = 0.62`, `CAP_RADIUS_SCALE = 1.04`,
+  `AIR_ROLL_DECAY = 0.6`; `advanceRoll` (grounded Δphase = `hypot(vx,vz)·dt/31`, exponential air
+  decay, wrapped into [0, TAU), NaN-safe, mutates so a 120 Hz step never allocates); the quaternion
+  helpers; `gyroPose(rollPhase, frame)` → `core` = basis ∘ rotation(−rollPhase) about the frame's
+  right, `gyro` = the level basis; `gyroFrameFor(sample, loop, ballCentre, falling, lastGrounded)`.
+* **The physics owns the roll.** `Racer.rollPhase/rollRate` advance once per tick at the end of
+  `stepRacer`, so the renderer integrates nothing; the recovery resets them. Deliberately outside the
+  parity fingerprint: roll is presentation, not outcome.
+* **The renderer wears the pose.** Every racer is now `core + capLeft + capRight`, the caps sharing one
+  brass material and two mirrored cap geometries — three geometries per grid however big the field,
+  and no new geometry, material or quaternion inside `render()`. The old renderer-side spin line is
+  gone.
+* **The camera rides the gyro frame too**: riding a loop the up points at the ring's centre (so the
+  view goes head-over-heels with the track), and while falling it freezes at the last grounded frame.
+
+`tests/gyro-ball.test.ts` (5 tests): the no-slip law and its wrap over 20 000 ticks; air decay;
+caps level at 72 phases × 2 frames (and world up unchanged by any roll); the core turning about the
+frame's right axis by exactly −rollPhase; and the loop/fall/plain frame, 360 samples of a full ride
+with no NaN and no degenerate dot. `tests/racer-pool.test.ts` updated for the three-mesh tree, the
+shared cap resources and the "three geometries total" law.
+
+**UNVERIFIED.** The caps' brass shading and the cap/ball seam are unrendered here (no WebGL); the
+roll rate is proven in numbers, not on screen. The camera's loop up-vector is built from the loop's
+engine-space centre — an approximation of the ring's true centre within the road's own rise.
 
 ## Next
 
 * **T2** — first-loop merge: gate → pool → ready-up → ordered ghost release (depends on T1, unblocked).
-* **T5** — the effect runtime (explosions, collisions, dust, smoke, sparks). The anim-44 spark burst
-  regeneration this needed is **done and in** (`art-src/animated/anim-44-spark-burst-src.png`).
-* **T3 remainder** — the gyro ball (sim-owned roll phase, level caps, loop up-vector).
 * **T6/T7** — the lane network and the builder lane tool.
+* **In the browser now:** the goblin push at the top of the hill, the FPV cockpit, the tight chase
+  camera, painted effects on every collision, and a gyro ball that stays level while it rolls.

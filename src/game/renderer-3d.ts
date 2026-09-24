@@ -9,6 +9,7 @@ import type { SceneFrame } from './scene';
 import type { GameOptions } from './types';
 import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
+import { LanePaint } from './lane-paint';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
 import {
@@ -1555,6 +1556,12 @@ export class Renderer3D {
   private fpUp: Vec3 | null = null;
   /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
   private effects: EffectRenderer | null = null;
+  /**
+   * M01 · T6/T7 dressing — the authored lanes, painted on the road. Built lazily: a race with no
+   * authored network never constructs it, and `LanePaint.setNetwork` decides by identity, so the
+   * per-frame call below costs one reference comparison in the steady state.
+   */
+  private lanePaint: LanePaint | null = null;
   /** M01 · T3 — reused pose quaternions: the render loop never constructs a THREE object. */
   private readonly coreQuat = new THREE.Quaternion();
   private readonly gyroQuat = new THREE.Quaternion();
@@ -1985,6 +1992,11 @@ export class Renderer3D {
     }
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
+    if (frame.laneNetwork !== undefined) {
+      if (!this.lanePaint) this.lanePaint = new LanePaint(this.scene);
+      this.lanePaint.setNetwork(frame.laneNetwork);
+    }
+
     if (!this.trackBuilder.freeFly.active) {
       if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
@@ -2020,6 +2032,8 @@ export class Renderer3D {
     this.disposeRacerPool();
     this.effects?.destroy();
     this.effects = null;
+    this.lanePaint?.dispose();
+    this.lanePaint = null;
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

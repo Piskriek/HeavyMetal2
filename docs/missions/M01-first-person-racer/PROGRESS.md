@@ -500,7 +500,7 @@ that the slingshot models are `visible = false` in push mode. The framing — wh
 clear of *other* start-zone clutter, and whether the split board reads well over the road — is the
 browser's call.
 
-## T7 — the builder "Lanes & Paths" tool · **done, this commit**
+## T7 — the builder "Lanes & Paths" tool · **done, committed `d8d971d`**
 
 The tool exists end to end: a lane document the builder loads, edits, undoes and saves; handles drawn
 on the track; and a panel that shows the document, its refusals, and where to click next.
@@ -565,6 +565,58 @@ gzip over part 2a, inside the ticket's 40 kB budget. `npm run check:edges`: 0 fa
 on the road at the right lift, the grab-and-drag feel, the panel in the builder's dock next to the prop
 grid, the `Test drive` hand-off into a race, and whether Export's download lands. What is proven is the
 markup, the accounting (AC-1..AC-4 as counts) and the refusals.
+
+## Dressing — the lanes you authored, painted on the road you drive · **this commit**
+
+T6 was physics and logic: `sampleLane` steered the balls, the OOB nodes recovered them, and the only
+thing that ever *drew* a network was the builder's own gizmos. So an authored track drove like one
+shape and looked like another — the legacy four-lane corridor. `src/game/lane-paint.ts` closes that.
+
+**The paint is the physics' own spine.** One ribbon per path, sampled by `lanePaintSamples` — which
+calls the same `sampleLane` the steering calls — stroked to `LANE_PAINT_HALF_STROKE` (15) either side
+of the centre, lifted `LANE_PAINT_LIFT` (8) above the surface point that sample maps to. The test does
+not trust the inverse mapping to check this: `engineFromWorld` is *not single-valued* where the track
+doubles back through a giant loop (the same engine x meets two ribbons at different heights), so the
+law is written against the sample — every vertex is exactly the sample's edge point, lifted, to within
+float32's grain (~0.016 units at a world coordinate of 2·10⁵).
+
+**The end of a lane reads as what happens there.** Colour is per-vertex, so the neutral road paint and
+the kind tint are one draw call: a path that ends in a `merge` warms green over its last 900 units, a
+`split` amber, an `oob` dead end red — and the ribbon simply *stops* where the path does, because a
+painted lane that carried on past its last node would be a lie about where you can drive.
+
+**It is cheap by construction.** One material for the whole layer, ever (`materialsCreated` cannot
+exceed 1 — an empty document builds none at all), one mesh per path, and `setNetwork` decides by
+**identity**: the render loop hands it `engine.lanePaths` every frame and pays one reference comparison
+unless the document object itself changed — which is exactly what saving, undoing, importing or
+switching course does. 120 frames in the test, zero rebuilds.
+
+**Wiring.** `SceneFrame` gained `laneNetwork?: LaneNetwork | null` (optional, so the builder, the audit
+and every headless preview keep working), the engine passes `this.laneNetwork` with each frame, and the
+renderer builds `LanePaint` lazily on the first frame that carries a document and disposes it with the
+rest. Default play is untouched: with no authored network there is no paint, and the legacy corridor
+looks exactly as it did.
+
+**And the button that did nothing now does something.** T7 part 2b's panel has a **Test drive**, and its
+handler called `onTestRace?.()` — which `RaceScreen` never passed, so the button only saved. It now
+hands the engine the document the author is holding (`engine.setLaneNetwork(builder.getLaneNetwork())`),
+closes the builder, and requests a frame, so the lanes you just authored are the lanes the next race
+drives *and* the ones painted on the road under you.
+
+**Tests.** `tests/lane-paint.test.ts` (9): the accounting above, the geometry laws (coverage, step,
+stroke, lift), the kind tints on a network that exercises merge, split and oob, per-path repaint, the
+foreign-document refusal, disposal, and a structural guard for the wiring (each pattern is a claim
+about the join, which cannot be constructed headlessly because `Renderer3D` makes a WebGLRenderer).
+
+`npm run check`: **611 pass / 47 suites / 0 fail**. Build **1,633.34 kB (449.46 kB gzip)** — +1.07 kB
+of gzip. `npm run check:edges`: 0 failures.
+
+**UNVERIFIED.** Whether the painted line reads well at speed, whether the amber/green/red tints are
+legible against the road art in each sky preset, and whether 15 units of stroke is the right width from
+the FPV cockpit: those are the browser's call. The one deliberate limitation to note: while the builder
+is open, its **gizmos** show the document being edited, while the painted road keeps showing the
+document the run is driving until you press Test drive — the paint follows the physics, not the text
+buffer.
 
 ## Next
 

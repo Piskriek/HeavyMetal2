@@ -451,6 +451,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   canvas={canvasRef.current}
                   onClose={() => setBuildMode(false)}
                   onRequestRender={() => engineRef.current?.requestRender()}
+                  onTestRace={() => {
+                    // M01 · T7 — "Test drive": the engine adopts the document the builder is holding
+                    // (saved or not, that is what the author is looking at), the builder closes, and
+                    // the next frame paints those lanes on the road the balls will drive.
+                    const engine = engineRef.current;
+                    if (!engine) return;
+                    engine.setLaneNetwork(engine.trackBuilder.getLaneNetwork());
+                    setBuildMode(false);
+                    engine.requestRender();
+                  }}
                 />
               )}
               {!firstPerson && <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>

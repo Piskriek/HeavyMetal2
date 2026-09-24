@@ -212,6 +212,8 @@ export interface Obstacle {
 }
 
 import type { EffectEvent } from './effects/events';
+// Type-only, so the runtime cycle `lane-network → scene` stays a one-way street: erased at build time.
+import type { LaneNetwork } from './lane-network';
 
 export interface Particle {
   x: number;
@@ -297,6 +299,12 @@ export interface SceneFrame {
    * builder, the audit and every headless preview keep working without a renderer to feed.
    */
   effects?: EffectHandoff;
+  /**
+   * M01 · T6/T7 dressing — the authored lane network the physics is steering by, so the road the ball
+   * obeys is the road the player sees painted. Optional: a scene with no authored network (and every
+   * headless preview) simply has no lane paint to draw.
+   */
+  laneNetwork?: LaneNetwork | null;
 }
 
 /** The narrow slice of `EffectQueue` a renderer needs: a cursor and a drain. */

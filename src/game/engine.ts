@@ -918,7 +918,7 @@ export class GameEngine {
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
         snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion,
-        effects: this.effects }, interval);
+        effects: this.effects, laneNetwork: this.laneNetwork }, interval);
     }
     if (now - this.lastNotify > 100) this.notify(false);
     const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;

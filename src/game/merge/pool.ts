@@ -36,6 +36,17 @@ export const BOT_READY_BASE_TICKS = 90;
 export const BOT_READY_RANK_TICKS = 30;
 /** The pool gives up waiting for stragglers this long after the first entry. */
 export const POOL_MAX_WAIT_TICKS = 1200;
+/**
+ * M01 · T1b — the backstop for a player who cannot reach the first loop at all.
+ *
+ * `POOL_MAX_WAIT_TICKS` is the grace a *held* rider waits for the rest of the field, and it now
+ * measures from the player's own crossing (see `step`), because the run down to the loop is the
+ * player's split and must not be cut short by somebody else's clock. That leaves one hole: a player
+ * wrecked, out of bounds or stuck before the gate would hold the race for ever. This deadline is
+ * the answer — half a minute of grace after the field's first arrival, then the pool closes and the
+ * player is flagged `late` on arrival, exactly as any other late rider.
+ */
+export const POOL_PLAYER_GRACE_TICKS = 6000;
 /** An idle player readies automatically after this long, and keeps their place in the queue. */
 export const PLAYER_AUTO_READY_TICKS = 1800;
 /** The countdown itself: three seconds of ticks. */
@@ -224,6 +235,7 @@ export class MergePool {
       flags: this.phase === 'open' ? [] : ['late'],
     };
     if (this.firstEntryTick === null) this.firstEntryTick = tick;
+    if (entry.isPlayer) this.playerArrivalTick = tick;
     this.entries.push(entry);
     this.reindex();
     return { ok: true, value: entry };
@@ -236,6 +248,22 @@ export class MergePool {
     if (entry.readyTick !== null) return this.refuse(racerId, 'already_ready');
     entry.readyTick = tick;
     return { ok: true, value: entry };
+  }
+
+  /** The tick the player's own entry crossed the gate, or null while they are still on their way. */
+  private playerArrivalTick: number | null = null;
+
+  /**
+   * The tick the pool's closing grace measures from — the player's own crossing — or null while the
+   * player is still on their way down and the deadline above is the only thing that can close it.
+   */
+  get graceTick(): number | null {
+    return this.playerArrivalTick;
+  }
+
+  /** True while the player is still on their way down and has not queued yet. */
+  get playerOnApproach(): boolean {
+    return this.playerArrivalTick === null;
   }
 
   /**
@@ -263,7 +291,14 @@ export class MergePool {
 
     if (this.phase === 'open' && this.firstEntryTick !== null) {
       const allHeld = this.entries.length >= occupancy.expected;
-      if (allHeld || tick >= this.firstEntryTick + POOL_MAX_WAIT_TICKS) this.phase = 'closed';
+      // The grace starts when the rider we are waiting for has arrived. While that rider is the
+      // player they are still setting their split time down the hill, so the wait has no clock of
+      // its own: nothing but the deadline closes the window, and the player is not made `late` for a
+      // gate they never had a race to reach. Once they are in, the grace is theirs, exactly as it
+      // has always been for a held rider waiting on the field.
+      const grace = this.playerArrivalTick === null ? Infinity : this.playerArrivalTick + POOL_MAX_WAIT_TICKS;
+      const deadline = this.firstEntryTick + POOL_PLAYER_GRACE_TICKS;
+      if (allHeld || tick >= grace || tick >= deadline) this.phase = 'closed';
     }
 
     if (this.phase === 'closed' && this.entries.length > 0 && this.entries.every((entry) => entry.readyTick !== null)) {

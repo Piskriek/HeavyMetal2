@@ -91,6 +91,42 @@
   white-space: nowrap;
 }
 
+/* M01 · T1b — the split board. Shown while the player is still on the run down to the loop, so it
+   keeps the same frame as the panel but swaps the ready-up footer for the one number that is the
+   player's to set: the clock. */
+.merge-pool__panel--waiting {
+  border-color: rgba(159, 224, 196, 0.35);
+}
+
+.merge-pool__split {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem 1.1rem;
+  border-bottom: 1px solid rgba(214, 158, 74, 0.2);
+}
+
+.merge-pool__split-label,
+.merge-pool__split-note {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #cdb694;
+}
+
+.merge-pool__split-clock {
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #ffe6b8;
+  text-shadow: 0 0 18px rgba(255, 176, 74, 0.35);
+}
+
+.merge-pool__split-note { color: #9fe0c4; }
+
+.merge-pool__list--waiting { max-height: 30vh; }
+
 .merge-pool__list {
   margin: 0;
   padding: 0.5rem;

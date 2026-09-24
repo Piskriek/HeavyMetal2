@@ -10,6 +10,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { DEFAULT_TRACK_PROPS } from '../src/game/track-builder-3d';
 import { COURSES, type CourseId } from '../src/game/types';
 import { TRACKS } from '../src/game/courses';
 import { createRacers, type Racer } from '../src/game/racers';
@@ -189,4 +191,28 @@ test('distance semantics preserved', () => {
   // Sanity: the loop the acceptance run engages really is the first one on the course.
   const firstLoop = createTrackLayout('ridge').find((obstacle) => obstacle.kind === 'loop')!;
   assert.equal(loopGeometry(firstLoop, 'ridge').x, 1370);
+});
+
+test('the retired slingshot is not drawn in a push run', () => {
+  // The model stood exactly where the driver now sits, and at eye level its frame filled the
+  // window. The fix is a rendering decision, not a document one: the prop stays in the builder's
+  // document (and in the user's saved 521-prop file) with its id and transform intact, and only the
+  // view leaves it out — so nothing in storage, undo or validation changed.
+  const builder = readFileSync(new URL('../src/game/track-builder-3d.ts', import.meta.url), 'utf-8');
+  const renderer = readFileSync(new URL('../src/game/renderer-3d.ts', import.meta.url), 'utf-8');
+
+  assert.match(builder, /setSlingshotsVisible\(visible: boolean\): void \{/);
+  assert.match(builder, /private isSlingshotProp\(prop: PlacedProp\): boolean \{/);
+  // A prop built while the slingshot is hidden must not become visible again on a rebuild.
+  assert.match(builder, /isSlingshotProp\(prop\) && !this\.slingshotsVisible/);
+  // The race render path is the one place that decides, and it decides by start mode.
+  assert.match(renderer, /this\.trackBuilder\.setSlingshotsVisible\(frame\.options\.startMode === 'sling'\)/);
+  assert.equal((renderer.match(/setSlingshotsVisible/g) ?? []).length, 1, 'exactly one call site');
+
+  // And the prop itself is still authored: hiding it must never mean deleting it.
+  assert.match(builder, /id: 'prop_start_slingshot'/);
+  assert.match(builder, /type: 'slingshot_3d_launcher'/);
+  const defaultStart = DEFAULT_TRACK_PROPS.find((prop) => prop.id === 'prop_start_slingshot');
+  assert.ok(defaultStart, 'the default document keeps the slingshot');
+  assert.equal(defaultStart!.alignToTrack, true);
 });

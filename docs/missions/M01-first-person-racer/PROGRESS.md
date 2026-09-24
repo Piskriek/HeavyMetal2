@@ -363,6 +363,49 @@ builder draws nothing yet (that is T7), and `environment.ts` still paints the le
 corridor — a network is physics and logic until the dressing ticket catches up. What is proven is the
 model, the storage and the runtime integration, headlessly.
 
+## T1b — the player's split, and the retired slingshot off the view · **this commit**
+
+Two things the user asked for after seeing the FPV view in the browser, both fixed at the place the
+problem actually lives rather than by moving a camera.
+
+**The slingshot stood exactly where the driver now sits.** It is a *builder prop*
+(`slingshot_3d_launcher`, `isSlingshot: true`) — it is in `DEFAULT_TRACK_PROPS` and in the user's own
+saved document (`prop_1790054945777_rvtx`, `x −7, z −1268`, 521 props in total) — so the fix is a
+rendering decision, not a document one: `TrackBuilder3D.setSlingshotsVisible()` hides those models
+(and the placement ghost) without touching `placedProps`, the undo stack, storage or validation. The
+race render path sets it once per frame — visible only for a legacy `startMode: 'sling'`, hidden for
+the push mode the game actually ships. The model is still authorable and still in everyone's saved
+file; it simply is not built into the view of a run that has no sling.
+
+**The ready-up panel was appearing before the player had set their split.** The pool's closing wait
+measured from the *field's* first crossing, so ten seconds after the leaders queued the window closed
+and the READY panel (and then the countdown) was in front of a player still racing the first stretch
+— and a slow enough player was flagged `late` for their own gate. Now:
+
+* `step` measures the closing grace from **the player's own crossing** (`graceTick`, `null` until
+  they arrive), so while they are on approach nothing but the deadline can close the window;
+* `POOL_PLAYER_GRACE_TICKS` (`6000` = 50 s from the field's first arrival) is the backstop for a
+  player who cannot reach the loop at all — a wrecked run cannot hang the race, and a crossing after
+  it is `late`, flagged and never dropped;
+* `poolIsWaiting` swaps the ready-up panel for a **split board** — the live clock
+  (`formatSplit(raceTime)`, `m:ss.hh`), the field's queue shown as news, no READY button — until the
+  player's own entry exists. With the full field held the window then closes on that same tick, so
+  the panel's first frame is already true.
+
+Evidence: `tests/merge-pool.test.ts` (12) covers the player-centred grace, the arrival that is not
+late, the all-held close the moment they queue, the player's own timeout with the field short, and
+the deadline backstop; `tests/merge-split.test.ts` (2) covers the waiting predicate, the clock
+formatting (including NaN and negatives clamping) and the screen/overlay wiring; `tests/start-zone.test.ts`
+(5) gained a structural guard that the render path calls `setSlingshotsVisible` exactly once, keyed
+on the start mode, and that the prop is *still* authored (hiding it must never mean deleting it).
+`npm run check`: **576 pass / 47 suites / 0 fail**; build **1,592.89 kB (437.36 kB gzip)**.
+
+**UNVERIFIED.** Both changes are view-side and the sandbox has no WebGL, so what is proven is the
+rule and the wiring, not the pixels: that the ready panel is absent while `poolIsWaiting` is true and
+that the slingshot models are `visible = false` in push mode. The framing — whether the window is
+clear of *other* start-zone clutter, and whether the split board reads well over the road — is the
+browser's call.
+
 ## T7 — the builder "Lanes & Paths" tool · **in progress**
 
 The pure half is in: `src/game/lane-path-tool.ts` and `tests/lane-edit.test.ts` (6 tests). Eight

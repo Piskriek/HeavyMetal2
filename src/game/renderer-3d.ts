@@ -1942,6 +1942,10 @@ export class Renderer3D {
 
     // M01 · T3: the cockpit is the default view; `?fp=1` stays as the T0 spike that forces it on.
     const firstPerson = this.firstPerson || frame.options.cameraMode === 'first_person';
+    // M01 · T1b: a push-mode run has no slingshot, so it does not draw the model either. It stood
+    // exactly where the driver now looks from, and at eye level its frame filled the window. Only a
+    // legacy sling run (and the builder, which owns the prop) shows it.
+    this.trackBuilder.setSlingshotsVisible(frame.options.startMode === 'sling');
     const rampSurfaces = this.activeRampSurfaces();
     let playerAltitude = 0;
     for (let i = 0; i < frame.racers.length; i++) {

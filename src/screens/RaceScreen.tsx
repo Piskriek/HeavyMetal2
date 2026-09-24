@@ -497,6 +497,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   merge={snapshot.merge}
                   loadout={config.loadout}
                   reducedMotion={options.reducedMotion}
+                  raceTime={snapshot.raceTime}
                   onReady={() => engineRef.current?.ready()}
                 />
               )}

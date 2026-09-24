@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import {
   ALIGN_MAX_TICKS, BOT_READY_BASE_TICKS, BOT_READY_RANK_TICKS, COUNTDOWN_TICKS, MERGE_GATE_HALF_WIDTH,
   MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX, MergePool, PLAYER_AUTO_READY_TICKS, POOL_MAX_WAIT_TICKS,
+  POOL_PLAYER_GRACE_TICKS,
   RELEASE_GAP_TICKS, RELEASE_MAX_RETRIES, RELEASE_RETRY_TICKS, loopRideProgress, mergeOrder,
   type MergeEntry, type MergeOccupancy,
 } from '../src/game/merge/pool';
@@ -334,4 +335,56 @@ test('entry shape is the one the HUD reads', () => {
   for (const key of keys) assert.equal(key in entry, true, `MergeEntry.${key} is missing`);
   assert.equal(entry.isPlayer, true, 'racer 0 is the player');
   assert.equal(entry.crossX, GATE_X);
+});
+
+test('the window waits for the player to set their split', () => {
+  // The run down to the loop is the player's split, so a window that closed on the field's clock
+  // would take it away: while the player is on approach the wait has no clock of its own.
+  const pool = new MergePool({ gateX: GATE_X, loopZ: LOOP_Z, racerIds: RACERS, playerId: 0 });
+  for (const id of [1, 2, 3]) pool.enter(id, 500, 0, GATE_X);
+  assert.equal(pool.playerOnApproach, true, 'the player has not queued');
+  assert.equal(pool.graceTick, null, 'and there is no grace clock of the field\'s to close it');
+
+  // Long past the timeout that used to close the pool, and past the field's own auto-ready: the
+  // window is still open, because the rider it is waiting for is the player and the player is racing.
+  pool.step(500 + PLAYER_AUTO_READY_TICKS, { ...CLEAR, expected: 4 });
+  assert.equal(pool.phase, 'open', 'the pool holds the field while the player sets their split');
+  pool.step(500 + POOL_MAX_WAIT_TICKS * 3, { ...CLEAR, expected: 4 });
+  assert.equal(pool.phase, 'open', 'and it keeps holding it');
+
+  // The player arrives — on their own time, not the field's — and is not `late` for it.
+  const entry = pool.enter(0, 3000, 0.25, GATE_X);
+  assert.equal(entry.ok, true);
+  if (entry.ok) {
+    assert.deepEqual(entry.value.flags, [], 'a player who ran their own race is not late');
+    assert.equal(entry.value.entryTime, 3000.25 / 120);
+  }
+  assert.equal(pool.playerOnApproach, false);
+  assert.equal(pool.graceTick, 3000, 'the grace now measures from the player');
+  // The whole field is held, so the window closes at once: the ready-up panel appearing the moment
+  // the player is actually in the pool is the point of the whole change.
+  pool.step(3000, { ...CLEAR, expected: 4 });
+  assert.equal(pool.phase, 'closed', 'all four held ⇒ the pool closes on the player\'s arrival tick');
+
+  // With the field still short, the grace is the player's own, not the field's.
+  const playerGrace = new MergePool({ gateX: GATE_X, loopZ: LOOP_Z, racerIds: RACERS, playerId: 0 });
+  for (const id of [1, 2]) playerGrace.enter(id, 500, 0, GATE_X);
+  playerGrace.enter(0, 3000, 0, GATE_X);
+  playerGrace.step(3000 + POOL_MAX_WAIT_TICKS - 1, { ...CLEAR, expected: 4 });
+  assert.equal(playerGrace.phase, 'open', 'the field waits out the player\'s whole grace');
+  playerGrace.step(3000 + POOL_MAX_WAIT_TICKS, { ...CLEAR, expected: 4 });
+  // Closed — and, the moment it is, the ready field rolls straight into its countdown.
+  assert.notEqual(playerGrace.phase, 'open', 'and closes on the player\'s own timeout');
+
+  // The backstop: a player who never reaches the loop must not hold the race for ever.
+  const stuck = new MergePool({ gateX: GATE_X, loopZ: LOOP_Z, racerIds: RACERS, playerId: 0 });
+  for (const id of [1, 2, 3]) stuck.enter(id, 500, 0, GATE_X);
+  stuck.step(500 + POOL_PLAYER_GRACE_TICKS - 1, { ...CLEAR, expected: 4 });
+  assert.equal(stuck.phase, 'open', 'the grace deadline is the last tick it stays open');
+  stuck.step(500 + POOL_PLAYER_GRACE_TICKS, { ...CLEAR, expected: 4 });
+  assert.notEqual(stuck.phase, 'open', 'a wrecked run cannot hang the race');
+  // Whoever crosses after that is late, exactly as any other late rider.
+  const late = stuck.enter(0, 500 + POOL_PLAYER_GRACE_TICKS + 1, 0, GATE_X);
+  assert.equal(late.ok, true);
+  if (late.ok) assert.ok(late.value.flags.includes('late'), 'past the deadline the flag is earned');
 });

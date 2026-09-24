@@ -13,6 +13,7 @@ import { useEffect, useRef } from 'react';
 import type { MergeSnapshot } from '../game/types';
 import { COCKPIT_ART } from '../game/cockpit';
 import { poolGoblinFrame, poolGoblinSheetPosition } from '../game/merge/goblin';
+import { formatSplit, poolIsWaiting } from '../game/merge/split';
 import { capsuleById, riderById, type Loadout } from '../game/loadouts';
 import '../merge-pool-overlay.css';
 
@@ -23,6 +24,11 @@ export interface MergePoolOverlayProps {
   loadout?: Loadout | null;
   /** Space, Enter or the button: the player is ready to go. */
   onReady: () => void;
+  /**
+   * The run clock, in seconds. The player's first split is set by the run down to the loop, so while
+   * they are still on it the overlay shows the clock instead of a queue they are not in.
+   */
+  raceTime?: number;
   /** Reduced motion holds each pose instead of animating the sweep. */
   reducedMotion?: boolean;
 }
@@ -37,13 +43,19 @@ function flagLabel(flags: readonly string[]): string | null {
   return null;
 }
 
-export default function MergePoolOverlay({ merge, loadout, onReady, reducedMotion = false }: MergePoolOverlayProps) {
+export default function MergePoolOverlay({
+  merge, loadout, onReady, reducedMotion = false, raceTime = 0,
+}: MergePoolOverlayProps) {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const goblinRef = useRef<HTMLDivElement | null>(null);
   const focused = useRef(false);
   const releasing = merge.phase === 'releasing';
   const goActive = releasing && merge.countdownLabel !== null;
   const player = merge.entries.find((entry) => entry.isPlayer) ?? null;
+  // Still on the way down: the field is queuing, but the player's split is not set yet. The panel
+  // that asks them to ready up is not shown until they are actually in the pool (their own entry
+  // exists), so nothing is offered, auto-readied or released out from under the run.
+  const waiting = poolIsWaiting(merge.entries);
 
   // One animation loop for the goblin, and it writes only when the cell actually changes: the sheet
   // is a background position, so a 12 fps character costs one style write every fifth frame.
@@ -95,6 +107,44 @@ export default function MergePoolOverlay({ merge, loadout, onReady, reducedMotio
         merge.countdownLabel ? (
           <div className="merge-pool__go" role="status" aria-live="assertive">{merge.countdownLabel}</div>
         ) : null
+      ) : waiting ? (
+        // The split board: the run to the loop is still being set, so the clock is the only number
+        // that matters and the field's queue is shown as news, not as a place to claim.
+        <>
+          <div className="merge-pool__go" role="status" aria-live="polite">{merge.countdownLabel ?? 'POOL'}</div>
+          <div className="merge-pool__panel merge-pool__panel--waiting">
+            <header className="merge-pool__head">
+              <div>
+                <h2>Set your split</h2>
+                <p>
+                  The clock is running to the first loop and the split is yours to set. Nobody is
+                  waiting on you yet — the queue starts for you when you cross.
+                </p>
+              </div>
+              <span className="merge-pool__hold">{merge.holdTicks} ticks queued</span>
+            </header>
+
+            <div className="merge-pool__split">
+              <span className="merge-pool__split-label">Your split so far</span>
+              <strong className="merge-pool__split-clock" data-testid="pool-split-clock">{formatSplit(raceTime)}</strong>
+              <span className="merge-pool__split-note">READY UP appears once you are in the pool.</span>
+            </div>
+
+            <ol className="merge-pool__list merge-pool__list--waiting" aria-label="The field is queuing">
+              {merge.entries.map((entry) => (
+                <li key={entry.id} className="merge-pool__row">
+                  <span className="merge-pool__place">{entry.position}</span>
+                  <span className="merge-pool__swatch" style={{ background: entry.color }} aria-hidden="true" />
+                  <span className="merge-pool__name">{entry.name}</span>
+                  <span className="merge-pool__time">{formatSplit(entry.entryTime)}</span>
+                  <span className={`merge-pool__ready merge-pool__ready--${entry.released ? 'out' : entry.ready ? 'on' : 'off'}`}>
+                    {entry.released ? 'LOOP' : entry.ready ? 'READY' : 'WAITING'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </>
       ) : (
         <>
           <div className="merge-pool__go" role="status" aria-live="assertive">
@@ -129,7 +179,7 @@ export default function MergePoolOverlay({ merge, loadout, onReady, reducedMotio
                       {entry.name}
                       {entry.isPlayer && <em>YOU</em>}
                     </span>
-                    <span className="merge-pool__time">{entry.entryTime.toFixed(2)}s</span>
+                    <span className="merge-pool__time">{formatSplit(entry.entryTime)}</span>
                     <span className={`merge-pool__ready merge-pool__ready--${entry.released ? 'out' : entry.ready ? 'on' : 'off'}`}>
                       {entry.released ? 'LOOP' : entry.ready ? 'READY' : 'WAITING'}
                     </span>

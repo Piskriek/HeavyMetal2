@@ -732,6 +732,12 @@ export class TrackBuilder3D {
   /** T03: last visible rejection of an unsupported gameplay-prop placement. */
   private placementErrorState: string | null = null;
   private propObjects = new Map<string, THREE.Object3D>();
+  /**
+   * M01 · T1b — whether the retired grid slingshot is drawn. The builder always draws it (it is a
+   * placeable prop), and a legacy `startMode: 'sling'` run draws it because that path really does
+   * launch from it; a push-mode race does not, because nothing does.
+   */
+  private slingshotsVisible = true;
   private selectedPropIds: Set<string> = new Set();
   private activePropType: string | null = null;
   private ghostSprite: THREE.Sprite | null = null;
@@ -1308,6 +1314,34 @@ export class TrackBuilder3D {
     }
     this.saveToStorage();
     this.notify();
+  }
+
+  /** True for the slingshot launcher prop (the one model the retired start used to own). */
+  private isSlingshotProp(prop: PlacedProp): boolean {
+    const def = PROP_DEFINITIONS.find((definition) => definition.type === prop.type);
+    return Boolean(def?.isSlingshot);
+  }
+
+  /**
+   * M01 · T1b — draws (or stops drawing) the slingshot models without touching the document.
+   *
+   * The prop keeps its place in `placedProps`, its id and its authored transform: hiding it is a
+   * rendering decision, so the builder's storage, undo stack and validation are untouched, and a
+   * later push-mode race sees the same document with the model simply not built into the view. The
+   * per-prop `visible` flag (T08) still wins — an author who hid it on purpose gets it hidden either
+   * way.
+   */
+  setSlingshotsVisible(visible: boolean): void {
+    this.slingshotsVisible = visible;
+    for (const prop of this.placedProps) {
+      if (!this.isSlingshotProp(prop)) continue;
+      const object = this.propObjects.get(prop.id);
+      if (object) object.visible = visible && prop.visible !== false;
+    }
+    // The placement ghost is not a placed prop, so it is not in the map; hide it by name too, or a
+    // race that happens to be in the builder's placement mode would show a wireframe of the very
+    // model that was just retired.
+    if (!visible && this.ghostMesh) this.ghostMesh.visible = false;
   }
 
   // --- T08: VISIBILITY TOGGLE (H KEY) ---
@@ -2818,8 +2852,8 @@ export class TrackBuilder3D {
       obj = sprite;
     }
 
-    // T08: Respect visibility flag
-    if (prop.visible === false) {
+    // T08: Respect visibility flag, and M01 · T1b: the retired slingshot is not part of a push run.
+    if (prop.visible === false || (this.isSlingshotProp(prop) && !this.slingshotsVisible)) {
       obj.visible = false;
     }
 

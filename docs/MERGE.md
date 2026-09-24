@@ -35,7 +35,7 @@ The exit order is then forced by construction:
    later entry can never ready ahead of an earlier one. The player may ready at any time, and is
    readied for them at `PLAYER_AUTO_READY_TICKS` so a table that walks away cannot hold the field.
 3. **The window** closes as soon as every expected rider is queued, or at
-   `POOL_MAX_WAIT_TICKS` after the first crossing — whichever comes first. That starts
+   `POOL_MAX_WAIT_TICKS` after **the player's own crossing** — whichever comes first. That starts
    `COUNTDOWN_TICKS` of countdown (`3`, `2`, `1`, then `GO!` for its own 60-tick window).
 4. **The release** is one rider at a time, `RELEASE_GAP_TICKS` apart, always `pool.next` — the
    best-placed queued rider, which is the original entry order.
@@ -48,6 +48,30 @@ The exit order is then forced by construction:
 `tests/merge-race.test.ts` drives exactly this — with the shipping physics and the shipping contact
 pass — over **100 push seeds on `ridge` and 24 on each of `boomtown` and `sheep`**, and asserts
 `exitOrder === entryOrder` every time, with riders leaving the ring at least 200 x-units apart.
+
+## The player's split
+
+The run from the grid to the first loop is the first **split** of the course, and it is the player's
+own: it runs from the shove to the gate plane, and the number it produces is their queue time. Two
+rules protect it (M01 · T1b, after the player asked for exactly this):
+
+* **The window has no clock of its own while the player is on approach.** `step` closes the pool on
+  `allHeld` or on `graceTick + POOL_MAX_WAIT_TICKS`, and `graceTick` is *the player's own crossing*
+  — `null` until they arrive. So a field that queues early waits for a player still racing the first
+  stretch, however long that takes, and the player is not flagged `late` for a gate they never had a
+  race to reach. Once they are in the queue the grace is theirs: the field waits out the same 1200
+  ticks for them that it always waited for a straggler.
+* **The overlay does not offer a READY before they are in the pool.** `poolIsWaiting` (entries with
+  no player entry) swaps the ready-up panel for a **split board**: the live clock
+  (`formatSplit(raceTime)`), the field's queue as news, and no button. The READY panel appears on the
+  tick the player's own entry exists — which, with the whole field held, is the same tick the window
+  closes, so the panel's first frame is already telling them the truth about who is waiting on whom.
+
+The backstop is deliberate: a player wrecked, out of bounds or stuck before the gate would otherwise
+hold the race for ever. `POOL_PLAYER_GRACE_TICKS` (50 s, from the field's first arrival) closes the
+window anyway, and a rider who crosses after that is `late` — flagged, never dropped, exactly as
+before. `occupancy.expected` counts racers who are still in the race, so a rider who is genuinely out
+does not even reach that deadline: the window closes as soon as the remaining field is held.
 
 ## Holding a rider
 
@@ -155,7 +179,8 @@ command.
 | Constant | Value | Meaning |
 | --- | --- | --- |
 | `BOT_READY_BASE_TICKS` / `BOT_READY_RANK_TICKS` | `90` / `30` | A bot's ready, by rank. |
-| `POOL_MAX_WAIT_TICKS` | `1200` | The window closes on its own after this. |
+| `POOL_MAX_WAIT_TICKS` | `1200` | The window closes on its own this long after the player's own crossing (see *The player's split*). |
+| `POOL_PLAYER_GRACE_TICKS` | `6000` | The backstop: after the field's first arrival, a player who never reaches the loop cannot hang the race for more than this. |
 | `PLAYER_AUTO_READY_TICKS` | `1800` | The player is readied for them after this. |
 | `COUNTDOWN_TICKS` | `360` | `3 · 2 · 1`, then `GO!` for 60 more. |
 | `RELEASE_GAP_TICKS` | `42` | Minimum spacing between two releases. |

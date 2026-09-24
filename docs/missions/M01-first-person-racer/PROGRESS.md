@@ -3,6 +3,25 @@
 Hand-off document for the overwatch AI (which cannot read this repository). Everything here is a
 **fact measured in the checkout**, not a plan. Branch `arena/01a0d1d6-heavymetal2`.
 
+**Pull request: <https://github.com/Piskriek/HeavyMetal2/pull/58>** (base `main`, head this branch).
+The PR body carries the ticket table and the gate numbers, and is updated whenever a ticket lands.
+
+## If the session dies
+
+This build sandbox resets itself mid-session, and when it does the checkout comes back at
+`2d1088a` — the branch base, with an empty `node_modules` and **`scratch/` gone**. Nothing that was
+pushed is lost; recovery is four commands:
+
+```sh
+git fetch origin arena/01a0d1d6-heavymetal2 && git reset --hard FETCH_HEAD
+npm ci
+npm run check          # ends with "# pass N / # fail 0"
+npm run dev -- --port 5173 --host 0.0.0.0
+```
+
+Do **not** `git clean -fdx` (it would take `node_modules` and the protected `backups/` with it), and
+never push with `--force`: if a push is rejected, fetch and compare first — the remote is the truth.
+
 ---
 
 ## T0 — First-person spike + eye-level audit · **done, committed `0d755df`**

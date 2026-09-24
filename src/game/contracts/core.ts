@@ -11,7 +11,7 @@
  */
 
 /** Bumped whenever a contract changes shape in a way downstream code must notice. */
-export const CONTRACTS_VERSION = 1;
+export const CONTRACTS_VERSION = 2;
 
 export type ContractErrorCode =
   | 'E_CONTRACT_SHAPE'
@@ -30,7 +30,11 @@ export type ContractErrorCode =
   | 'E_CORRIDOR'
   | 'E_RESERVATION'
   | 'E_COMMAND'
-  | 'E_TICK';
+  | 'E_TICK'
+  /** M01 · T1: the goblin push is stepped by tick, and an out-of-range tick is a bug, not a clamp. */
+  | 'E_PUSH_TICK'
+  /** M01 · T5: an effect kind the specs do not know cannot be drawn, so it is refused at the door. */
+  | 'E_EFFECT_KIND';
 
 /** Typed failure so callers and tests branch on a stable code instead of a message. */
 export class ContractError extends Error {

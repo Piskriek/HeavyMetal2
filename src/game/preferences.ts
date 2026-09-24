@@ -29,7 +29,13 @@ export function readOptions(): GameOptions {
     }
     if (COURSES.some((course) => course.id === saved.course)) options.course = saved.course!;
     if (saved.graphics === 'auto' || saved.graphics === 'performance' || saved.graphics === 'quality') options.graphics = saved.graphics;
-    if (saved.cameraMode === 'third_person' || saved.cameraMode === 'follow_ball' || saved.cameraMode === 'fixed') options.cameraMode = saved.cameraMode;
+    // M01 · T3: 'first_person' joins the list; an unknown stored value still degrades to the default
+    // rather than throwing (AC-8: a stored 'banana' must not break the race).
+    if (saved.cameraMode === 'first_person' || saved.cameraMode === 'third_person'
+      || saved.cameraMode === 'follow_ball' || saved.cameraMode === 'fixed') options.cameraMode = saved.cameraMode;
+    // M01 · T1: only an explicit 'sling' restores the retired slingshot path; anything else is the
+    // starter goblin's push. Unknown values fall through to the push default.
+    if (saved.startMode === 'sling' || saved.startMode === 'push') options.startMode = saved.startMode;
     for (const [key, min, max] of [['launchSpeed', 80, 240], ['ballWeight', 40, 240], ['masterVolume', 0, 100]] as const) {
       if (typeof saved[key] === 'number' && Number.isFinite(saved[key])) options[key] = Math.max(min, Math.min(max, saved[key]!));
     }

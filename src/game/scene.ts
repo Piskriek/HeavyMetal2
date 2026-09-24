@@ -3,10 +3,47 @@ import { TRACKS } from './courses';
 import type { AirPickup } from './powerups';
 
 export const HEIGHT = 620;
+export const RADIUS = 31;
 export const GROUND = 478;
 export const START_X = 190;
-export const START_Y = 325;
-export const RADIUS = 31;
+/* -----------------------------------------------------------------------------
+   M01 · T1 — START PAD (the hill the goblin pushes you down)
+   -----------------------------------------------------------------------------
+   Authored courses all begin `[0, 0], [1400, 0]`: a dead-flat run-up. The pad
+   replaces that span in the *elevation table only* (the authored `TRACKS`
+   profiles and every rendered ribbon are untouched) with:
+
+     profile x:  0 … 240   pad, flat at −START_DROP       (engine x 190 … 430)
+                240 … 870   smooth descent back to 0       (engine x 430 … 1060)
+                870 … 1400  flat run-in at the original 0  (engine x 1060 … 1590)
+
+   The final pad knot sits exactly where the authored `[1400, 0]` knot sat, and
+   the spline tangent there is unchanged (both neighbours are 0-slope), so every
+   sample at profile x ≥ 1400 — and therefore every downstream obstacle, record
+   distance and `courseY(1370) = 478` — is bit-identical to the flat opening.
+   `tests/start-zone.test.ts` asserts that against a locally reconstructed table.
+
+   START_DROP is the smallest candidate that clears AC-3 with 10 % headroom
+   (measured with scratch/m01-start-drop.mjs: 220 was the smallest clean pass,
+   240 = 220 · 1.09 rounded).
+*/
+export const START_DROP = 240;
+/** Pad is flat from engine START_X to here. */
+export const START_PAD_END_X = START_X + 240;
+/** Descent rejoins the authored line here. */
+export const START_DESCENT_END_X = START_X + 870;
+/** Flat run-in ends here; the first loop's reach begins at x = 1184.44. */
+export const START_RUNIN_END_X = START_X + 1180;
+const START_PAD_PROFILE: readonly (readonly [number, number])[] = [
+  [0, -START_DROP], [240, -START_DROP], [870, 0], [1400, 0],
+];
+
+
+/**
+ * M01 · T1: the grid sits on the pad, a ball radius above its surface. The pad is START_DROP
+ * above the authored road, so the old absolute 325 would bury the field in the dirt.
+ */
+export const START_Y = GROUND - START_DROP - RADIUS;
 export const TRACK_DISTANCE = 36000;
 export const TRACK_LENGTH = TRACK_DISTANCE * 2;
 export const FINISH = START_X + TRACK_LENGTH;
@@ -64,12 +101,15 @@ export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0
 export const TERRAIN = GROUND + 154;
 export const GRANDSTAND = { z: 350, base: GROUND + 64, height: 217, foundation: TERRAIN, depth: 138 };
 export const LAUNCHER = { x: START_X + 128, tipY: GROUND - 241, halfWidth: 91, baseRear: START_X - 95, baseFront: START_X + 165 };
+
 export const AIM_ANCHOR = { x: LAUNCHER.x + 4, y: LAUNCHER.tipY - 7, maxDraw: 220, fullPowerDraw: 200 };
 
 const SAMPLE_STEP = 16;
 const elevations = {} as Record<CourseId, Float32Array>;
 for (const id of Object.keys(TRACKS) as CourseId[]) {
-  const profile = TRACKS[id].profile;
+  // M01 · T1: the authored profile with its flat 0…1400 opening replaced by the start pad.
+  const authored = TRACKS[id].profile;
+  const profile = [...START_PAD_PROFILE, ...authored.slice(2)];
   const table = new Float32Array(Math.ceil(78000 / SAMPLE_STEP) + 1);
   const slopes = profile.slice(0, -1).map((point, i) => (profile[i + 1][1] - point[1]) / (profile[i + 1][0] - point[0]));
   const tangents = profile.map((_, i) => !i || i === profile.length - 1 || !slopes[i - 1] || !slopes[i] ? 0 : 2 / (1 / slopes[i - 1] + 1 / slopes[i]));
@@ -171,6 +211,10 @@ export interface Obstacle {
   deflectPower?: number;
 }
 
+import type { EffectEvent } from './effects/events';
+// Type-only, so the runtime cycle `lane-network → scene` stays a one-way street: erased at build time.
+import type { LaneNetwork } from './lane-network';
+
 export interface Particle {
   x: number;
   y: number;
@@ -225,6 +269,8 @@ export interface RacerFrame {
   shieldHitAt: number;
   pickupAt: number;
   launchOrigin: { x: number; y: number };
+  /** M01 · T3: the shell's roll phase, in radians. Presentation only — never in the fingerprint. */
+  rollPhase?: number;
 }
 
 export interface SceneFrame {
@@ -248,4 +294,20 @@ export interface SceneFrame {
   snapshot: GameSnapshot;
   options: GameOptions;
   reducedMotion: boolean;
+  /**
+   * M01 · T5 — the typed effect queue the sim fills and the 3D renderer drains. Optional so the
+   * builder, the audit and every headless preview keep working without a renderer to feed.
+   */
+  effects?: EffectHandoff;
+  /**
+   * M01 · T6/T7 dressing — the authored lane network the physics is steering by, so the road the ball
+   * obeys is the road the player sees painted. Optional: a scene with no authored network (and every
+   * headless preview) simply has no lane paint to draw.
+   */
+  laneNetwork?: LaneNetwork | null;
+}
+
+/** The narrow slice of `EffectQueue` a renderer needs: a cursor and a drain. */
+export interface EffectHandoff {
+  readSince(cursor: number, out: EffectEvent[]): number;
 }

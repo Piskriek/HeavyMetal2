@@ -13,7 +13,8 @@ const WIDTH = 1440;
 const HEIGHT = 620;
 
 test('follow ball is the default camera mode', () => {
-  assert.equal(DEFAULT_OPTIONS.cameraMode, 'follow_ball');
+  // M01 · T3: the game is built for the cockpit, so first person is the default view.
+  assert.equal(DEFAULT_OPTIONS.cameraMode, 'first_person');
 });
 
 test('ball chase smoothing is the frame-rate independent lerp(camX, ballX, dt * 6)', () => {

@@ -15,6 +15,10 @@ import BlizzardGauge from '../components/ui/BlizzardGauge';
 import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
+import CockpitHud from '../components/CockpitHud';
+import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
+import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
+import MergePoolOverlay from '../components/MergePoolOverlay';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
@@ -115,6 +119,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     ballWeight: config.customPhysics ? options.ballWeight : stats.weight,
   }), [options, config, stats]);
   const optionsRef = useRef(raceOptions);
+  // M01 · T4: one reused cockpit channel, filled by the engine each frame and read by the HUD's rAF.
+  const cockpitRef = useRef<CockpitState>(createCockpitState());
+  const readCockpit = useCallback((state: CockpitState) => {
+    engineRef.current?.getCockpitState(state);
+  }, []);
+  const firstPerson = options.cameraMode === 'first_person';
   const finishRef = useRef(onRoundComplete);
   finishRef.current = onRoundComplete;
   const modalRef = useRef<ModalName>(null);
@@ -160,8 +170,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   const best = useMemo(() => Math.max(0, ...records.map((record) => record.distance)), [records]);
   const course = COURSES.find((item) => item.id === config.course) ?? COURSES[0];
-  const playing = snapshot.status === 'flying';
+  // M01 · T2: while the pool holds the field nobody is racing, but the player is still in the seat —
+  // held riders glide in the ring's shadow, so the world keeps drawing and the cockpit stays live.
+  const pooled = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
+  const playing = snapshot.status === 'flying' || pooled;
   const ready = snapshot.status === 'ready';
+  // M01 · T1: a normal run leaves the grid on the starter goblin's push, not on the slingshot.
+  const pushStart = options.startMode !== 'sling';
+  // M01 · T1: the 0.4 s shove is part of the run — the HUD has to be live for it, so the notice
+  // that explains what just happened is not swallowed by the grid state.
+  const onCourse = playing || snapshot.status === 'pushing';
   const paused = snapshot.status === 'paused';
   // The gear button is the single always-available race menu; it fades away
   // during active play and returns on any pointer or key activity.
@@ -214,6 +232,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         loadAssets(), prepareRaceBalls(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster),
         // The off-screen pointer badge shows the player's portrait, not the ball.
         loadArtImage(riderCell(config.loadout.rider).pilot ?? riderCell(config.loadout.rider).image).catch(() => null),
+        // M01 · T4: the cockpit is painted art; every file is decoded before the grid, never in-race.
+        Promise.all(COCKPIT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
+        // M01 · T5: the effect sheets too — an explosion must not hitch on its first frame.
+        Promise.all(EFFECT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
       ]))
       .then(([loaded, raceBalls, pickupSprites, art, playerBadge]) => {
         if (!active) return;
@@ -313,9 +335,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     if (roundComplete(session)) { onContinue(); return; }
     engineRef.current?.reset();
     setResult(null);
-    if (autoLaunch) engineRef.current?.launch();
+    // Push mode has no slingshot: "race again" is the starter goblin again.
+    if (autoLaunch) { if (pushStart) engineRef.current?.start(); else engineRef.current?.launch(); }
     canvasRef.current?.focus({ preventScroll: true });
-  }, [session, onContinue]);
+  }, [session, onContinue, pushStart]);
 
   const toggleFullscreen = useCallback(async () => {
     if (document.fullscreenElement) await document.exitFullscreen();
@@ -366,8 +389,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       if (engine.status === 'ready' && code === 'ArrowDown') { event.preventDefault(); engine.adjustAim(0, -3); return; }
       if (engine.status === 'ready' && code === 'ArrowLeft') { event.preventDefault(); engine.adjustAim(-0.05, 0); return; }
       if (engine.status === 'ready' && code === 'ArrowRight') { event.preventDefault(); engine.adjustAim(0.05, 0); return; }
+      // M01 · T2: while the first-loop pool holds the field, Space or Enter is "ready up" and the
+      // pool is the only thing it can mean — so it is handled before the grid/staging keys, or the
+      // "start the run" branch below would swallow Enter during the countdown.
+      if (engine.inMerge && (code === 'Space' || code === 'Enter')) {
+        event.preventDefault();
+        engine.ready();
+        return;
+      }
       // Fixed non-remappable actions
-      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.launch(); return; }
+      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.start(); return; }
       if (code === 'KeyR') { event.preventDefault(); retry(); return; }
       if (code === 'KeyM') { setOptions((previous) => ({ ...previous, sound: !previous.sound })); return; }
       if (code === 'KeyF') { event.preventDefault(); void toggleFullscreen(); return; }
@@ -420,9 +451,19 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   canvas={canvasRef.current}
                   onClose={() => setBuildMode(false)}
                   onRequestRender={() => engineRef.current?.requestRender()}
+                  onTestRace={() => {
+                    // M01 · T7 — "Test drive": the engine adopts the document the builder is holding
+                    // (saved or not, that is what the author is looking at), the builder closes, and
+                    // the next frame paints those lanes on the road the balls will drive.
+                    const engine = engineRef.current;
+                    if (!engine) return;
+                    engine.setLaneNetwork(engine.trackBuilder.getLaneNetwork());
+                    setBuildMode(false);
+                    engine.requestRender();
+                  }}
                 />
               )}
-              <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
+              {!firstPerson && <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
                 <div className={`hud-gear ${gearHidden ? 'gear-hidden' : ''}`}>
                   <button className="gear-button" onClick={toggleGear} aria-haspopup="menu" aria-expanded={gearOpen} aria-label="Race menu" title="Race menu"><Settings2 size={17} /></button>
                   <AnimatePresence>
@@ -450,11 +491,31 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     <BlizzardGauge variant="dial" value={snapshot.speed} max={360} unit="km/h" label="SPEED" title={`Speed: ${snapshot.speed} km/h`} />
                   </div>
                 </div>
-              </div>
+              </div>}
+              {firstPerson && assets && !loadError && (
+                <CockpitHud
+                  state={cockpitRef.current}
+                  readState={readCockpit}
+                  reducedMotion={options.reducedMotion}
+                  active={playing || paused || snapshot.status === 'pushing'}
+                />
+              )}
+              {/* M01 · T2: the first-loop pool. While it owns the status the queue panel is up; once
+                  the releases start only GO! is left, and never over a rider who is already racing. */}
+              {snapshot.merge && (snapshot.merge.phase !== 'releasing' || snapshot.merge.countdownLabel) && (
+                <MergePoolOverlay
+                  merge={snapshot.merge}
+                  loadout={config.loadout}
+                  reducedMotion={options.reducedMotion}
+                  raceTime={snapshot.raceTime}
+                  onReady={() => engineRef.current?.ready()}
+                />
+              )}
               <AnimatePresence>
                 {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="grid-flag-img" aria-hidden="true" /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
-                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
-                {snapshot.notice && playing && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
+                {ready && !pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
+                {ready && pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — press Space to be shoved down the hill.</p></motion.div>}
+                {snapshot.notice && onCourse && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
               <AirSupplies snapshot={snapshot} />
               <div className="mini-trackbar" aria-label={`Race progress: ${Math.round(trackPct(playerDistance))} percent`}>
@@ -530,7 +591,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 <div><h3><label htmlFor="race-camera-mode">Ball camera</label></h3><p>Follow ball chases your capsule so it stays framed. Fixed course holds the classic wide view; an edge arrow points when the ball leaves the screen.</p></div>
                 <select id="race-camera-mode" className="graphics-select" value={options.cameraMode} onChange={(event) => {
                   const cameraMode = event.target.value;
-                  if (cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
+                  if (cameraMode === 'first_person' || cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
                 }}>
                   <option value="follow_ball">Follow ball</option>
                   <option value="fixed">Fixed course</option>

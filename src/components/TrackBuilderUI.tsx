@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
   Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
   Move, Database, History, Save, RefreshCw, CheckCircle2,
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
-  Minus, Plus, Film
+  Minus, Plus, Film, Route
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import {
@@ -25,6 +25,10 @@ import {
   type DecalSide
 } from '../game/track-builder-3d';
 import { SKY_PRESETS } from '../game/renderer-3d';
+import LanePanel, { type LanePanelCommand } from './builder/LanePanel';
+import '../lane-panel.css';
+import { laneEditForCommand, laneKeyIntent, lanePanelModel, type LaneKeyIntent } from '../game/lane-panel-model';
+import { snapNode } from '../game/lane-path-tool';
 
 interface TrackBuilderUIProps {
   builder: TrackBuilder3D;
@@ -46,10 +50,15 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'powerup', label: 'Powerups', icon: <Zap size={16} /> },
   { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} /> },
   { id: 'animated', label: 'Animated', icon: <Clapperboard size={16} /> },
+  // M01 · T7 — not a prop shelf: this tab opens the Lanes & Paths panel and its 3D handles.
+  { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} /> },
 ];
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
   const [category, setCategory] = useState<PropCategory>('foliage');
+  const [selectedLanePathId, setSelectedLanePathId] = useState<string | null>(null);
+  const [laneRevision, setLaneRevision] = useState(0);
+  const [laneStatus, setLaneStatus] = useState<string | null>(null);
   const [activePropType, setActivePropType] = useState<string | null>(builder.getActivePropType());
   const [selectedProp, setSelectedProp] = useState<PlacedProp | null>(builder.getSelectedProp());
   const [selectedProps, setSelectedProps] = useState<PlacedProp[]>(builder.getSelectedProps());
@@ -94,6 +103,10 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const lastPointerPos = useRef({ x: 0, y: 0 });
   const animFrameRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
+  /** The key handler lives in an effect that must not re-bind on every render: it calls through here. */
+  const laneIntentRef = useRef<(intent: LaneKeyIntent) => void>(() => {});
+  const draggingLaneNode = useRef<string | null>(null);
+  const laneDragReason = useRef<string | null>(null);
 
   const showToast = (msg: string, stickyMs = 3500) => {
     setToast(msg);
@@ -111,6 +124,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       setCameraFacingDefault(builder.snapping.cameraFacingDefault);
       setDecalDefault(builder.snapping.decalDefault ?? false);
       setDecalLightingDefault(builder.snapping.decalLightingDefault ?? true);
+      // M01 · T7 — every builder change re-derives the lane panel from the document itself.
+      setLaneRevision((revision) => revision + 1);
       // T03: unsupported gameplay-prop placements fail visibly, not silently
       const placementError = builder.getPlacementError();
       if (placementError && placementError !== shownPlacementErrorRef.current) {
@@ -179,6 +194,21 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         lastPointerPos.current = { x: e.clientX, y: e.clientY };
       } else if (e.button === 0) {
         // Left click
+        // M01 · T7 — the lanes tool owns the left button: a handle under the pointer is picked up for a
+        // drag (undo pushed once, here, not per frame), and a click on open track clears the selection.
+        if (builder.getLanesToolActive()) {
+          const hitNode = builder.raycastLaneNode(e.clientX, e.clientY, canvas);
+          builder.selectLaneNode(hitNode);
+          laneDragReason.current = null;
+          if (hitNode) {
+            builder.pushUndo();
+            draggingLaneNode.current = hitNode;
+            showToast(`Node ${hitNode} [drag to move · Del delete · K kind · S split · I insert]`);
+          }
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+          return;
+        }
         if (builder.getActivePropType()) {
           const placed = builder.placeActiveProp(e.clientX, e.clientY, canvas);
           if (placed) {
@@ -241,6 +271,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      // M01 · T7 — a lane handle being dragged: pointer → track → snapNode → the tool's own moveNode.
+      // A refusal leaves the handle where the document says it is (so dragging along a limit works),
+      // and the last reason is held back for pointer-up rather than toasted once per frame.
+      if (draggingLaneNode.current && !isRightMouseDown.current) {
+        const moved = builder.dragLaneNode(draggingLaneNode.current, e.clientX, e.clientY, canvas);
+        laneDragReason.current = moved.ok ? null : moved.reason;
+        setLaneRevision((revision) => revision + 1);
+        onRequestRender?.();
+        return;
+      }
+
       if (isRightMouseDown.current) {
         const dx = e.clientX - lastPointerPos.current.x;
         const dy = e.clientY - lastPointerPos.current.y;
@@ -294,6 +335,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         }
       }
 
+      if (builder.getLanesToolActive() && !builder.getActivePropType()) {
+        // The lanes tool: a grab cursor over a handle, nothing special anywhere else.
+        canvas.style.cursor = builder.raycastLaneNode(e.clientX, e.clientY, canvas) ? 'grab' : 'default';
+        return;
+      }
+
       if (builder.getActivePropType()) {
         builder.updateGhostPosition(e.clientX, e.clientY, canvas);
         canvas.style.cursor = 'crosshair';
@@ -324,6 +371,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (draggingLaneNode.current) {
+          // The drag is over: say the last refusal once, if it was anything worth saying. "unchanged"
+          // is what a drag that never left its node reports, and that is not news.
+          const reason = laneDragReason.current;
+          draggingLaneNode.current = null;
+          laneDragReason.current = null;
+          if (reason && !reason.startsWith('unchanged')) showToast(reason, 5000);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+        }
         if (isDraggingDecalSide.current) {
           isDraggingDecalSide.current = false;
           activeDecalSide.current = null;
@@ -349,10 +406,35 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     };
   }, [builder, canvas]);
 
+  // M01 · T7 — the lanes tool. Its handles are drawn only while this tab is open, and leaving the tab
+  // puts the tool away (which also clears the node selection). Opening it ends any pending prop
+  // placement, because two tools must not share the left mouse button.
+  useEffect(() => {
+    if (category === 'lanes') {
+      builder.setActivePropType(null);
+      builder.setLanesToolActive(true);
+    } else {
+      builder.setLanesToolActive(false);
+    }
+    onRequestRender?.();
+    return () => { builder.setLanesToolActive(false); };
+  }, [builder, category, onRequestRender]);
+
   // Keyboard controls
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      // M01 · T7 — while the lanes tool is up, N/I/Del/K/S/M/O and Ctrl+Z / Ctrl+Y belong to it.
+      // `laneKeyIntent` decides what counts (a keypress with a modifier we do not own is not ours).
+      if (builder.getLanesToolActive()) {
+        const intent = laneKeyIntent({ key: e.key, ctrlOrMeta: e.ctrlKey || e.metaKey, typing: false });
+        if (intent) {
+          e.preventDefault();
+          laneIntentRef.current(intent);
+          return;
+        }
+      }
 
       keysRef.current.add(e.code);
 
@@ -636,6 +718,120 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
   const filteredProps = PROP_DEFINITIONS.filter((p) => p.category === category);
   const placedProps = builder.getProps();
+
+  /* ---------------------------------------------------------------------------
+     M01 · T7 — the lanes tool's wiring.
+     ---------------------------------------------------------------------------
+     The panel is presentational: everything it asks for becomes one `laneEditForCommand`
+     (pure: command + document + selection → edit) and then one builder call, which either lands or
+     refuses with a reason. A refusal is a toast and nothing changes — no half-applied edit, no undo
+     entry. The model is re-derived from the builder's own change notifications, so React never keeps
+     a second copy of the document that could drift from the one being edited.
+     ------------------------------------------------------------------------- */
+
+  const laneModel = useMemo(
+    () => lanePanelModel(builder.getLaneNetwork(), {
+      nodeId: builder.getSelectedLaneNode()?.id ?? null,
+      pathId: selectedLanePathId,
+    }),
+    [builder, laneRevision, selectedLanePathId],
+  );
+
+  const refreshLanes = () => setLaneRevision((revision) => revision + 1);
+
+  const runLaneCommand = (command: LanePanelCommand) => {
+    const outcome = laneEditForCommand(command, builder.getLaneNetwork(), {
+      nodeId: builder.getSelectedLaneNode()?.id ?? null,
+      pathId: selectedLanePathId,
+    });
+    if (!outcome.ok) { showToast(outcome.reason, 5000); return; }
+    if (outcome.action.kind === 'halfWidth') {
+      const result = builder.setLanePathHalfWidth(outcome.action.pathId, outcome.action.halfWidth);
+      if (!result.ok) { showToast(result.reason, 5000); return; }
+      setLaneStatus(`${outcome.action.pathId} half width ${outcome.action.halfWidth}`);
+    } else {
+      const result = builder.applyLaneCommand(outcome.action.edit);
+      if (!result.ok) { showToast(result.reason, 5000); return; }
+      setLaneStatus(`${outcome.action.edit.op} applied`);
+    }
+    refreshLanes();
+    onRequestRender?.();
+  };
+
+  const runLaneIntent = (intent: LaneKeyIntent) => {
+    switch (intent) {
+      case 'undo':
+        builder.undo();
+        setSelectedLanePathId(null);
+        setLaneStatus('Undo');
+        break;
+      case 'redo':
+        builder.redo();
+        setSelectedLanePathId(null);
+        setLaneStatus('Redo');
+        break;
+      case 'newPath': runLaneCommand({ op: 'newPath' }); return;
+      case 'insert': runLaneCommand({ op: 'insert' }); return;
+      case 'delete': runLaneCommand({ op: 'delete' }); return;
+      case 'cycleKind': runLaneCommand({ op: 'cycleKind' }); return;
+      case 'split': runLaneCommand({ op: 'split' }); return;
+      case 'merge': runLaneCommand({ op: 'merge' }); return;
+      case 'markOob': runLaneCommand({ op: 'markOob' }); return;
+    }
+    refreshLanes();
+    onRequestRender?.();
+  };
+  // The key handler is bound once; it calls through the ref so it always sees this render's runner.
+  laneIntentRef.current = runLaneIntent;
+
+  const moveLaneNodeFromPanel = (nodeId: string, x: number, z: number) => {
+    // A typed coordinate is clamped into the corridor but never snapped: a typed x means that x.
+    const clamped = snapNode(x, z, { lanes: false, grid: false });
+    const result = builder.applyLaneCommand({ op: 'moveNode', nodeId, x: clamped.x, z: clamped.z });
+    if (!result.ok) { showToast(result.reason, 5000); return; }
+    setLaneStatus(`Moved ${nodeId}`);
+    refreshLanes();
+    onRequestRender?.();
+  };
+
+  const saveLaneDoc = () => {
+    const result = builder.saveLaneDoc();
+    if (result.ok) {
+      setLaneStatus('Saved to storage');
+    } else {
+      setLaneStatus(`Not saved: ${result.reason}`);
+      showToast(`Lane network not saved: ${result.reason}`, 5000);
+    }
+    refreshLanes();
+  };
+
+  const exportLanes = () => {
+    const json = builder.exportLanes();
+    setLaneStatus(`Exported ${json.length} bytes of JSON`);
+    // The download itself needs a real browser; the status line is its headless-visible half.
+    try {
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `lane-network-${course ?? 'ridge'}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch { showToast('Export: the browser blocked the download', 5000); }
+  };
+
+  const importLanes = (json: string) => {
+    const result = builder.importLanes(json);
+    if (!result.ok) {
+      const codes = result.errors.map((error) => error.code).join(', ');
+      setLaneStatus(`Import refused: ${codes}`);
+      showToast(`Import refused: ${codes}`, 6000);
+    } else {
+      setLaneStatus('Imported');
+    }
+    setSelectedLanePathId(null);
+    refreshLanes();
+    onRequestRender?.();
+  };
 
   return (
     <div className="track-builder-root pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
@@ -2618,9 +2814,30 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           </div>
         </div>
 
-        {/* Prop Cards Grid (Horizontal Scrollable) */}
-        <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto max-h-40 scrollbar-thin">
-          {filteredProps.map((p) => {
+        {/* Prop Cards Grid (Horizontal Scrollable) · M01 · T7: the Lanes & Paths tab shows its panel */}
+        <div className={`flex gap-3 px-4 py-3 overflow-auto scrollbar-thin ${category === 'lanes' ? '' : 'items-center overflow-x-auto max-h-40'}`}>
+          {category === 'lanes' ? (
+            <LanePanel
+              model={laneModel}
+              status={laneStatus}
+              onSelectNode={(nodeId) => {
+                builder.selectLaneNode(nodeId);
+                refreshLanes();
+                onRequestRender?.();
+              }}
+              onSelectPath={(pathId) => {
+                setSelectedLanePathId(pathId);
+                refreshLanes();
+                onRequestRender?.();
+              }}
+              onMoveNode={moveLaneNodeFromPanel}
+              onCommand={runLaneCommand}
+              onSave={saveLaneDoc}
+              onExport={exportLanes}
+              onImport={importLanes}
+              onTestDrive={() => { saveLaneDoc(); onTestRace?.(); }}
+            />
+          ) : filteredProps.map((p) => {
             const isSelected = activePropType === p.type;
             return (
               <button

@@ -1,0 +1,308 @@
+/**
+ * M01 · T2 — the first-loop pool overlay.
+ *
+ * Painted in the same brass-and-ember language as the cockpit (T4): the panel is a dark plate with an
+ * amber edge, the queue rows read left to right (place, ball, name, entry time, state), and the whole
+ * thing sits above the canvas with `pointer-events: none` except on the button, so the camera and the
+ * keyboard both keep working underneath.
+ */
+
+.merge-pool {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  padding: 1.2rem;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 30%, rgba(24, 12, 4, 0.35), rgba(6, 4, 3, 0.78));
+  color: #ffe9c4;
+  font-family: inherit;
+  animation: merge-pool-in 180ms ease-out;
+}
+
+.merge-pool--releasing {
+  background: none;
+  justify-content: flex-start;
+  padding-top: 8vh;
+}
+
+@keyframes merge-pool-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.merge-pool__go {
+  font-size: clamp(3rem, 9vw, 7rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: #ffb64a;
+  text-shadow: 0 0 28px rgba(255, 150, 40, 0.55), 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.merge-pool__panel {
+  width: min(46rem, 94vw);
+  border: 1px solid rgba(214, 158, 74, 0.55);
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, rgba(28, 20, 13, 0.96), rgba(14, 11, 8, 0.96));
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 214, 150, 0.12);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.merge-pool__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(214, 158, 74, 0.28);
+  background: linear-gradient(90deg, rgba(74, 44, 12, 0.55), rgba(20, 14, 9, 0.2));
+}
+
+.merge-pool__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #ffd489;
+}
+
+.merge-pool__head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: #c9b394;
+}
+
+.merge-pool__hold {
+  flex: none;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9fe0c4;
+  border: 1px solid rgba(159, 224, 196, 0.35);
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  white-space: nowrap;
+}
+
+/* M01 · T1b — the split board. Shown while the player is still on the run down to the loop, so it
+   keeps the same frame as the panel but swaps the ready-up footer for the one number that is the
+   player's to set: the clock. */
+.merge-pool__panel--waiting {
+  border-color: rgba(159, 224, 196, 0.35);
+}
+
+.merge-pool__split {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem 1.1rem;
+  border-bottom: 1px solid rgba(214, 158, 74, 0.2);
+}
+
+.merge-pool__split-label,
+.merge-pool__split-note {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #cdb694;
+}
+
+.merge-pool__split-clock {
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #ffe6b8;
+  text-shadow: 0 0 18px rgba(255, 176, 74, 0.35);
+}
+
+.merge-pool__split-note { color: #9fe0c4; }
+
+.merge-pool__list--waiting { max-height: 30vh; }
+
+.merge-pool__list {
+  margin: 0;
+  padding: 0.5rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.merge-pool__row {
+  display: grid;
+  grid-template-columns: 1.6rem 1.1rem 1fr 4.2rem 5.2rem auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(120, 96, 62, 0.45);
+  border-radius: 0.5rem;
+  background: rgba(30, 23, 15, 0.72);
+  font-size: 0.86rem;
+}
+
+.merge-pool__row--player {
+  border-color: rgba(255, 176, 74, 0.75);
+  background: rgba(58, 36, 10, 0.55);
+}
+
+.merge-pool__row--released {
+  opacity: 0.62;
+}
+
+.merge-pool__place {
+  font-weight: 900;
+  text-align: center;
+  color: #ffc978;
+}
+
+.merge-pool__swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.merge-pool__name {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.merge-pool__name em {
+  margin-left: 0.4rem;
+  font-style: normal;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: #1a1206;
+  background: #ffc978;
+  border-radius: 999px;
+  padding: 0.08rem 0.35rem;
+  vertical-align: middle;
+}
+
+.merge-pool__time {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: #cdb694;
+}
+
+.merge-pool__ready {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  border-radius: 999px;
+  padding: 0.18rem 0.4rem;
+  border: 1px solid transparent;
+}
+
+.merge-pool__ready--on { color: #0f1a12; background: #9fe0c4; }
+.merge-pool__ready--off { color: #b8a68a; border-color: rgba(184, 166, 138, 0.4); }
+.merge-pool__ready--out { color: #1a1206; background: #ffc978; }
+
+.merge-pool__flag {
+  grid-column: 6;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffb0a0;
+  border: 1px solid rgba(255, 176, 160, 0.45);
+  border-radius: 999px;
+  padding: 0.12rem 0.35rem;
+  white-space: nowrap;
+}
+
+.merge-pool__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.8rem 1rem 0.95rem;
+  border-top: 1px solid rgba(214, 158, 74, 0.28);
+  background: rgba(12, 9, 6, 0.85);
+}
+
+.merge-pool__loadout {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c9b394;
+}
+
+.merge-pool__button {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 0.55rem;
+  font-weight: 900;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: #23160a;
+  background: linear-gradient(180deg, #ffcc7a, #e09a2c);
+  box-shadow: 0 6px 18px rgba(224, 154, 44, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.merge-pool__button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
+.merge-pool__button:active:not(:disabled) { transform: translateY(1px); }
+.merge-pool__button:focus-visible { outline: 3px solid #9fe0c4; outline-offset: 2px; }
+.merge-pool__button:disabled {
+  cursor: default;
+  color: #ded2bd;
+  background: linear-gradient(180deg, rgba(90, 76, 56, 0.9), rgba(52, 44, 32, 0.9));
+  box-shadow: none;
+}
+
+.merge-pool__hint {
+  margin: 0;
+  font-size: 0.7rem;
+  color: #a8987f;
+  text-align: center;
+}
+
+/* ---- the pool goblin (hold / call / count / the sweep) ----------------------- */
+
+.merge-pool__goblin {
+  position: absolute;
+  left: 5%;
+  bottom: 4%;
+  width: min(15rem, 20vw);
+  aspect-ratio: 1 / 1;
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  background-position: 0% 0%;
+  pointer-events: none;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.55));
+}
+
+/* While the panel is up the goblin stands beside it, a little further in from the corner. */
+.merge-pool:not(.merge-pool--releasing) .merge-pool__goblin {
+  left: 4%;
+  bottom: 6%;
+  width: min(13rem, 16vw);
+}
+
+/* Reduced motion: no fade, no movement — the overlay simply appears. */
+@media (prefers-reduced-motion: reduce) {
+  .merge-pool { animation: none; }
+  .merge-pool__button { transition: none; }
+}
+
+/* Narrow screens: the row drops the entry time before anything else useful. */
+@media (max-width: 560px) {
+  .merge-pool__row { grid-template-columns: 1.4rem 1rem 1fr 4.6rem auto; }
+  .merge-pool__time { display: none; }
+}

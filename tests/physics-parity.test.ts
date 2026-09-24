@@ -91,8 +91,15 @@ test('parity: every obstacle kind, on a synthetic layout with a four-lane gap', 
       label: 'every-kind',
       actions: [act(0, 'launch'), act(40, 'boost'), act(240, 'bounce'), act(400, 'laneLeft')],
     });
-    const hitKinds = new Set(observe(pair.a).obstacles.filter(([, , hit]) => hit === 1).map(([kind]) => kind));
-    assert.ok(hitKinds.size >= 4, `the synthetic layout must actually be collided with (hit kinds: ${[...hitKinds].join(', ') || 'none'})`);
+    // `hit` is only a flag on the four kinds that can be used up (tnt/sheep/blimp/sign); `hitAt`
+    // is written for every kind, so it is the honest "this was collided with" signal. The player's
+    // own ledger bit must be set too — otherwise the scenario proves CPU luck, not coverage.
+    const touched = observe(pair.a).obstacles.filter(([, , , hitAt]) => hitAt !== -100);
+    const byPlayer = touched.filter(([, , , , mask]) => (Number(mask) & 1) !== 0);
+    const kinds = [...new Set(touched.map(([kind]) => kind))];
+    const playerKinds = [...new Set(byPlayer.map(([kind]) => kind))];
+    assert.ok(kinds.length >= 6, `the synthetic layout must actually be collided with (hit kinds: ${kinds.join(', ') || 'none'})`);
+    assert.ok(playerKinds.length >= 6, `the player must sweep the synthetic course itself (kinds: ${playerKinds.join(', ') || 'none'})`);
   });
 });
 

@@ -1,0 +1,221 @@
+{
+  "generatedAt": "2026-09-24",
+  "tool": "scripts/cut-cockpit-art.mjs",
+  "aperture": {
+    "x": 0.07,
+    "y": 0.06,
+    "w": 0.86,
+    "h": 0.56,
+    "radiusOfHeight": 0.09
+  },
+  "bezel": {
+    "file": "art/cockpit/cockpit-bezel.png",
+    "w": 1920,
+    "h": 1080,
+    "aperture": {
+      "x": 134,
+      "y": 65,
+      "w": 1651,
+      "h": 605,
+      "radius": 97
+    },
+    "measured": {
+      "x": 135,
+      "y": 65,
+      "w": 1649,
+      "h": 604,
+      "warp": {
+        "scaleX": 1.6347,
+        "scaleY": 1.6396
+      }
+    }
+  },
+  "yoke": {
+    "file": "art/cockpit/cockpit-yoke.png",
+    "w": 1152,
+    "h": 1024,
+    "pivot": {
+      "x": 576,
+      "y": 512
+    },
+    "spanWidth": 1000,
+    "grips": {
+      "left": {
+        "x": 160,
+        "y": 512
+      },
+      "right": {
+        "x": 990,
+        "y": 512
+      }
+    }
+  },
+  "arm": {
+    "file": "art/cockpit/cockpit-arm.png",
+    "w": 1024,
+    "h": 1280,
+    "grip": {
+      "x": 365,
+      "y": 60
+    },
+    "gripFraction": {
+      "x": 0.3564,
+      "y": 0.0469
+    },
+    "reachFraction": 0.96,
+    "paint": {
+      "x": 152,
+      "y": 60,
+      "w": 720,
+      "h": 1168,
+      "widthFraction": 0.7031,
+      "heightFraction": 0.9125
+    }
+  },
+  "clusters": [
+    {
+      "file": "art/cockpit/gauge-cluster-left.png",
+      "w": 1024,
+      "h": 419,
+      "dials": [
+        {
+          "cx": 509,
+          "cy": 198.5,
+          "r": 129.3
+        },
+        {
+          "cx": 834,
+          "cy": 204.5,
+          "r": 90.8
+        }
+      ]
+    },
+    {
+      "file": "art/cockpit/gauge-cluster-right.png",
+      "w": 1024,
+      "h": 485,
+      "dials": [
+        {
+          "cx": 666,
+          "cy": 235.5,
+          "r": 139.8
+        },
+        {
+          "cx": 249,
+          "cy": 251.5,
+          "r": 97.8
+        }
+      ]
+    }
+  ],
+  "dials": [
+    {
+      "file": "art/cockpit/gauge-face-speed.png",
+      "w": 512,
+      "h": 512,
+      "sourceRadius": 484.9
+    },
+    {
+      "file": "art/cockpit/gauge-face-small.png",
+      "w": 256,
+      "h": 256,
+      "sourceRadius": 485.7
+    }
+  ],
+  "starter": {
+    "file": "art/cockpit/starter-goblin-push.png",
+    "sheet": 1024,
+    "cell": 512,
+    "figures": 6,
+    "picks": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "scale": [
+      1,
+      1,
+      1.024,
+      0.994
+    ],
+    "panels": [
+      {
+        "x": 719,
+        "y": 29,
+        "w": 285,
+        "h": 340
+      },
+      {
+        "x": 1047,
+        "y": 29,
+        "w": 297,
+        "h": 340
+      },
+      {
+        "x": 160,
+        "y": 417,
+        "w": 459,
+        "h": 332
+      },
+      {
+        "x": 718,
+        "y": 416,
+        "w": 292,
+        "h": 342
+      }
+    ]
+  },
+  "poolGoblin": {
+    "file": "art/cockpit/pool-goblin.png",
+    "sheet": 1024,
+    "cell": 512,
+    "figures": 7,
+    "picks": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "scale": [
+      0.991,
+      1,
+      1,
+      1.024
+    ],
+    "panels": [
+      {
+        "x": 34,
+        "y": 29,
+        "w": 313,
+        "h": 343
+      },
+      {
+        "x": 360,
+        "y": 29,
+        "w": 384,
+        "h": 340
+      },
+      {
+        "x": 752,
+        "y": 29,
+        "w": 257,
+        "h": 340
+      },
+      {
+        "x": 160,
+        "y": 417,
+        "w": 459,
+        "h": 332
+      }
+    ]
+  },
+  "rivetStrip": {
+    "file": "art/cockpit/cockpit-rivet-strip.png",
+    "w": 2048,
+    "h": 160,
+    "seamlessByMirror": true,
+    "rails": 1,
+    "bandHeight": 719
+  }
+}

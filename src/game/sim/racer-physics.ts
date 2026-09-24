@@ -29,6 +29,9 @@ import {
   type Obstacle,
 } from '../scene';
 import type { Racer } from '../racers';
+import { advanceRoll } from '../gyro-ball';
+import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
+import { advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -57,6 +60,10 @@ export interface RacerStepTrace {
   recoveryReason: RecoveryReason | null;
   loopEngaged: boolean;
   loopExited: boolean;
+  /** M01 · T2: the step was a pool hold, so only the lateral glide ran. */
+  held: boolean;
+  /** M01 · T6: the id of the out-of-bounds node this step crossed, or null. */
+  oobNode: string | null;
   landed: boolean;
   rampLaunch: boolean;
   finished: boolean;
@@ -69,7 +76,8 @@ export function createStepTrace(): RacerStepTrace {
   return {
     preObstacleX: 0, preObstacleY: 0, preObstacleZ: 0, preObstacleVx: 0, preObstacleVy: 0,
     wasFalling: false, fell: false, recovered: false, recoveryReason: null, loopEngaged: false,
-    loopExited: false, landed: false, rampLaunch: false, finished: false, lavaPlunge: false, hits: [],
+    loopExited: false, held: false, oobNode: null, landed: false, rampLaunch: false, finished: false,
+    lavaPlunge: false, hits: [],
   };
 }
 
@@ -77,6 +85,7 @@ export function resetTrace(trace: RacerStepTrace): void {
   trace.preObstacleX = trace.preObstacleY = trace.preObstacleZ = 0;
   trace.preObstacleVx = trace.preObstacleVy = 0;
   trace.wasFalling = trace.fell = trace.recovered = trace.loopEngaged = trace.loopExited = false;
+  trace.held = false; trace.oobNode = null;
   trace.landed = trace.rampLaunch = trace.finished = trace.lavaPlunge = false;
   trace.recoveryReason = null;
   trace.hits.length = 0;
@@ -97,6 +106,7 @@ export function performHop(racer: Racer, ctx: RacerStepContext): void {
   racer.grounded = false; racer.lastHopAt = ctx.runTime;
   racer.lastGroundedAt = racer.bufferedJump = -100;
   ctx.fx.emit(racer.x, racer.y + RADIUS, racer.z, 5, '#dbc294', 85);
+  ctx.fx.effect('dust', racer.x, racer.y + RADIUS, racer.z, 0.6, racer.id);
   if (!racer.id) { ctx.fx.setHopReady(false); ctx.fx.audio('hop'); ctx.fx.notifyHud(); }
 }
 
@@ -106,6 +116,7 @@ export function performBounce(racer: Racer, ctx: RacerStepContext): void {
   racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
   racer.grounded = false; racer.lastGroundedAt = -100;
   ctx.fx.emit(racer.x, racer.y + RADIUS, racer.z, 10, '#a7dec1', 160);
+  ctx.fx.effect('dust', racer.x, racer.y + RADIUS, racer.z, 1, racer.id);
   if (!racer.id) { ctx.fx.audio('bounce'); ctx.fx.say('GRAVITY IS A SUGGESTION.'); ctx.fx.refreshHud(); }
 }
 
@@ -117,6 +128,7 @@ export function performBoost(racer: Racer, ctx: RacerStepContext): void {
   racer.vx = Math.min(racer.maximumSpeed, racer.vx + impulse);
   if (racer.grounded) racer.vy = ctx.world.surfaceAt(racer.x, racer.z).slope * racer.vx;
   ctx.fx.emit(racer.x - RADIUS, racer.y, racer.z, 12, racer.color, 210);
+  ctx.fx.effect('smoke', racer.x - RADIUS, racer.y, racer.z, 0.7, racer.id);
   if (!racer.id) { ctx.fx.audio('boost'); ctx.fx.say('MORE SPEED. LESS THINKING.'); ctx.fx.shake(2); ctx.fx.refreshHud(); }
 }
 
@@ -129,20 +141,42 @@ export function recoverRacer(racer: Racer, ctx: RacerStepContext, reason: Recove
   const recoveries = racer.recoveries;
   racer.x = ctx.recovery.respawnX({ racer, x, bestX: bestProgressX(racer), reason, recoveries });
   racer.recoveries = recoveries + 1;
-  let lane = racer.targetLane;
-  for (let i = 0; i < 4; i++) {
-    const candidate = (lane + i) % 4;
-    if (!ctx.world.inGap(racer.x, laneZ(candidate)) && !ctx.world.inGap(racer.x + 110, laneZ(candidate))) { lane = candidate; break; }
+  // M01 · T6: on a network the crew puts the racer back on the nearest *path*, not on the nearest
+  // legacy lane. The gap rule is the one it has always been: the first candidate whose centre is
+  // clear here and just ahead. With no network this walks the legacy lanes exactly as before.
+  const network = ctx.laneNetwork ?? null;
+  const candidates: { z: number; pathId: string | null }[] = [];
+  const currentPath = network && racer.pathId ? sampleLane(network, racer.pathId, racer.x) : null;
+  if (network && racer.pathId && currentPath) {
+    candidates.push({ z: currentPath.z, pathId: racer.pathId });
+    for (const path of network.paths) {
+      if (path.id === racer.pathId) continue;
+      const sample = sampleLane(network, path.id, racer.x);
+      if (sample) candidates.push({ z: sample.z, pathId: path.id });
+    }
+    candidates.sort((a, b) => Math.abs(a.z - racer.z) - Math.abs(b.z - racer.z));
+  } else {
+    const lane = racer.targetLane;
+    for (let i = 0; i < 4; i++) {
+      candidates.push({ z: laneZ((lane + i) % 4), pathId: null });
+    }
   }
-  racer.targetLane = racer.lane = lane; racer.z = laneZ(lane); racer.vz = 0;
+  let chosen = candidates[0];
+  for (const candidate of candidates) {
+    if (!ctx.world.inGap(racer.x, candidate.z) && !ctx.world.inGap(racer.x + 110, candidate.z)) { chosen = candidate; break; }
+  }
+  racer.pathId = chosen.pathId;
+  racer.targetLane = racer.lane = closestLane(chosen.z); racer.z = chosen.z; racer.vz = 0;
   racer.y = ctx.world.surfaceAt(racer.x, racer.z).y - RADIUS;
   racer.vx = ctx.recovery.respawnSpeed; racer.vy = ctx.world.slope(racer.x) * racer.vx;
   racer.falling = false; racer.grounded = true; racer.loopRide = null;
+  racer.rollPhase = 0; racer.rollRate = 0;
   racer.fallingFor = racer.stoppedFor = 0; racer.immuneUntil = ctx.runTime + 1.5;
   racer.recoveryUntil = ctx.runTime + 1; racer.steerLockedUntil = ctx.runTime + 0.15;
   racer.boosts = Math.max(1, racer.boosts);
   racer.shieldUntil = -100;
   Object.assign(racer.previous, { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation });
+  ctx.fx.effect('dust', racer.x, racer.y, racer.z, 1.4, racer.id);
   if (!racer.id) { ctx.fx.score(-100); ctx.fx.clearTrail(); ctx.fx.say('PIT CREW TO THE RESCUE. KEEP RACING.'); }
   if (trace) { trace.recovered = true; trace.recoveryReason = reason; }
 }
@@ -151,6 +185,8 @@ export function recoverRacer(racer: Racer, ctx: RacerStepContext, reason: Recove
 function lavaPlunge(racer: Racer, ctx: RacerStepContext, trace?: RacerStepTrace): void {
   ctx.fx.emit(racer.x, racer.y, racer.z, 30, '#111111', 260);
   ctx.fx.emit(racer.x, racer.y, racer.z, 20, '#ff4400', 220);
+  ctx.fx.effect('explosion', racer.x, racer.y, racer.z, 1.6, racer.id);
+  ctx.fx.effect('smoke', racer.x, racer.y, racer.z, 1.2, racer.id);
   if (!racer.id) { ctx.fx.say('LAVA VAPORIZATION! RESCUED ONTO RAILS.'); ctx.fx.shake(5); }
   if (trace) trace.lavaPlunge = true;
 }
@@ -168,22 +204,27 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       racer.vx += 400 * impulse * racer.boostFactor;
       if (racer.grounded) racer.vy = ctx.world.surfaceAt(racer.x, racer.z).slope * racer.vx;
       racer.boosts = Math.min(2, racer.boosts + 1); ctx.fx.emit(x, y - 6, z, 8, '#ffbd6a', 135);
+      ctx.fx.effect('sparks', x, y - 6, z, 0.8, racer.id);
       if (!racer.id) { ctx.fx.score(100); ctx.fx.audio('boost'); ctx.fx.say('THROTTLE REFILLED. TRY NOT TO SHARE.'); }
       break;
     case 'spring':
       racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
       racer.bounces = Math.min(3, racer.bounces + 1); ctx.fx.emit(x, y - 24, z, 10, '#a1e1bd', 160);
+      ctx.fx.effect('dust', x, y - 24, z, 0.8, racer.id);
       if (!racer.id) { ctx.fx.score(100); ctx.fx.audio('bounce'); ctx.fx.say('SPRING BREAK! +1 BOUNCE'); }
       break;
     case 'tnt':
       obstacle.hit = true; racer.vx += 300 * impulse; racer.vy = -450 * impulse; racer.grounded = false;
       ctx.fx.emit(x, y - 30, z, 25, '#ffb25e', 245);
+      ctx.fx.effect('explosion', x, y - 30, z, 1.2, racer.id);
+      ctx.fx.effect('smoke', x, y - 30, z, 1, racer.id);
       if (!racer.id) { ctx.fx.score(200); ctx.fx.tally('explosions'); ctx.fx.shake(9); ctx.fx.audio('boom'); ctx.fx.say('THAT WAS PROBABLY LOAD-BEARING.'); }
       break;
     case 'sheep':
       obstacle.hit = true; racer.vx += 75 * impulse; racer.vy = -290 * impulse; racer.grounded = false;
       ctx.fx.airSheep({ x, y: y - 40, z, vx: racer.vx * 0.51, vy: -520 });
       ctx.fx.emit(x, y - 35, z, 8, '#e9e1c6', 115);
+      ctx.fx.effect('dust', x, y - 35, z, 1.1, racer.id);
       if (!racer.id) { ctx.fx.score(125); ctx.fx.tally('sheep'); ctx.fx.audio('sheep'); ctx.fx.say('BAA-D DECISIONS.'); }
       break;
     case 'blimp': {
@@ -191,6 +232,8 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       racer.vy = Math.max(950, 1200 * impulse);
       racer.vx = Math.max(120, racer.vx * 0.72);
       racer.grounded = false;
+      ctx.fx.effect('explosion', x, y - (obstacle.altitude ?? 540), z, 2, racer.id);
+      ctx.fx.effect('smoke', x, y - (obstacle.altitude ?? 540), z, 1.5, racer.id);
       ctx.fx.emit(x, y - (obstacle.altitude ?? 540), z, 35, '#ff4400', 320);
       ctx.fx.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#ffbb00', 250);
       ctx.fx.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#333333', 180);
@@ -214,6 +257,7 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       racer.vx = Math.max(90, racer.vx * 0.52);
       racer.vy = Math.max(90, racer.vy + 140);
       const signY = y - (obstacle.altitude ?? 315);
+      ctx.fx.effect('impact', x, signY, z, 1.3, racer.id);
       ctx.fx.emit(x, signY, z, 24, '#8b5a2b', 210);
       ctx.fx.emit(x, signY, z, 16, '#c29a64', 170);
       ctx.fx.emit(x, signY, z, 12, '#ffffff', 130);
@@ -233,6 +277,8 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       racer.grounded = false;
       ctx.fx.emit(x, y, z, 14, '#6ebad8', 180);
       ctx.fx.emit(x, y, z, 8, '#b8a77b', 120);
+      ctx.fx.effect('impact', x, y, z, 0.9, racer.id);
+      ctx.fx.effect('dust', x, y, z, 0.7, racer.id);
       if (!racer.id) {
         ctx.fx.score(80);
         ctx.fx.shake(3.5);
@@ -245,6 +291,8 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       if (racer.vx > 450) {
         obstacle.broken = true;
         ctx.fx.emit(x, y, z, 20, '#8b5a2b', 180);
+        ctx.fx.effect('impact', x, y, z, 1.1, racer.id);
+        ctx.fx.effect('dust', x, y, z, 1.3, racer.id);
         if (!racer.id) {
           ctx.fx.score(90);
           ctx.fx.shake(2.5);
@@ -258,6 +306,8 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       // has; an isolated attempt draws from its seeded stream so a replay matches.
       racer.vz = (ctx.random() > 0.5 ? 1 : -1) * 440;
       racer.vx += 120;
+      ctx.fx.effect('impact', x, y, z, 0.8, racer.id);
+      ctx.fx.effect('sparks', x, y, z, 1, racer.id);
       if (!racer.id) {
         ctx.fx.score(110);
         ctx.fx.shake(3.0);
@@ -270,14 +320,17 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       racer.vy = -140;
       racer.grounded = false;
       ctx.fx.emit(x, y, z, 22, '#ff6600', 220);
+      ctx.fx.effect('explosion', x, y, z, 1, racer.id);
       if (!racer.id) { ctx.fx.score(130); ctx.fx.shake(4.0); ctx.fx.audio('boom'); ctx.fx.say('MOLTEN SLAG BOOST! FEEL THE HEAT!'); }
       break;
     case 'roller_rails':
       racer.vx += 90;
       ctx.fx.emit(x, y, z, 6, '#ffd700', 90);
+      ctx.fx.effect('sparks', x, y, z, 0.6, racer.id);
       break;
     case 'waterfall_splash':
       ctx.fx.emit(x, y, z, 16, '#c6f1ff', 140);
+      ctx.fx.effect('smoke', x, y, z, 1.1, racer.id);
       if (!racer.id && ctx.wallTime - obstacle.hitAt < 0.2) {
         ctx.fx.say('THROUGH THE SPRAY!');
       }
@@ -297,6 +350,28 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     trace.wasFalling = racer.falling;
     trace.preObstacleX = racer.x; trace.preObstacleY = racer.y; trace.preObstacleZ = racer.z;
     trace.preObstacleVx = racer.vx; trace.preObstacleVy = racer.vy;
+  }
+  // M01 · T2 (IF-MERGE): a held rider is out of the race for a moment. Nothing integrates — they
+  // are pinned to the gate plane — except the lateral glide into their pool slot (or, when they are
+  // next to go, into the loop's own lane, so the lane-filtered loop will actually engage them).
+  if (racer.mergeHeld) {
+    const steering = (racer.mergeSlotZ - racer.z) * HELD_RESPONSE - racer.vz * HELD_DAMPING;
+    racer.vz = clamp(racer.vz + steering * dt, -650, 650);
+    const previousZ = racer.z;
+    racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
+    racer.lane = closestLane(racer.z);
+    racer.vx = 0; racer.vy = 0;
+    racer.y = world.y(racer.x) - RADIUS;
+    racer.falling = false; racer.grounded = true; racer.stoppedFor = 0;
+    racer.lastGroundedAt = ctx.runTime;
+    advanceRoll(racer, { vx: 0, vz: racer.vz, grounded: true, inLoop: false }, dt);
+    if (trace) {
+      trace.preObstacleX = racer.x; trace.preObstacleY = racer.y; trace.preObstacleZ = racer.z;
+      trace.preObstacleVx = 0; trace.preObstacleVy = 0;
+      trace.held = true;
+    }
+    return;
   }
   if (racer.falling) {
     racer.fallingFor += dt; racer.vy += GRAVITY * dt;
@@ -319,12 +394,22 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     return;
   }
   if (!racer.loopRide) {
+    // M01 · T6 (the merge law): a path that ends in a merge hands the racer to its successor. Without
+    // this a racer simply drops back to the legacy corridor past the end of their own path, and the
+    // authored network stops existing mid-course. `advancePaths` leaves OOB and flag ends alone on
+    // purpose, so the OOB trigger still fires on the path it belongs to.
+    advancePaths([racer], ctx.laneNetwork ?? null);
     const isWet = racer.x >= STAGE_GRAVITY_START && racer.x <= STAGE_GRAVITY_END;
     const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling;
-    const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
+    // M01 · T6 (D12): with no network this is exactly `laneZ(targetLane)` and the legacy corridor;
+    // with one it is the racer's own path centre and the union corridor of the paths active here.
+    // The PD spring, its damping, the clamp of the spring's own output and the steer lock are all
+    // untouched — only the target and the two bounds are generalised.
+    const lane = resolveLaneTarget(racer, ctx.laneNetwork ?? null);
+    const steering = (lane.targetZ - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
     racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
     const previousZ = racer.z;
-    racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.z = clamp(racer.z + racer.vz * dt, lane.zMin, lane.zMax);
     if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
     racer.lane = closestLane(racer.z);
   }
@@ -353,6 +438,9 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       racer.x = loop.x + 3; racer.y = loop.y + loop.ballRadius + world.y(racer.x) - world.y(loop.x);
       racer.vx = Math.min(racer.maximumSpeed, ride.speed * 1.08); racer.vy = world.slope(racer.x) * racer.vx;
       racer.loopRide = null; racer.grounded = false;
+      racer.loopExitTime = ctx.runTime;
+      ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1.2, racer.id);
+      ctx.fx.effect('dust', racer.x, racer.y, racer.z, 1, racer.id);
       if (trace) trace.loopExited = true;
       if (!racer.id) { ctx.fx.score(350); ctx.fx.tally('loops'); ctx.fx.say('A WELL-ROUNDED BAD IDEA.'); ctx.fx.audio('loop'); }
     }
@@ -426,6 +514,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       if (normalSpeed > 260) {
         racer.vy = surface.slope * racer.vx - normalSpeed * restitution;
         ctx.fx.emit(racer.x, surface.y, racer.z, 3, '#b8a77b', 70);
+        ctx.fx.effect('dust', racer.x, surface.y, racer.z, normalSpeed > 420 ? 1.2 : 0.7, racer.id);
         if (!racer.id) {
           ctx.fx.audio('land');
           if (normalSpeed > 360) ctx.fx.shake(Math.min(4.5, normalSpeed / 160));
@@ -435,9 +524,25 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     }
     racer.rotation += (racer.x - oldX) * (racer.grounded ? Math.sqrt(1 + surface.slope * surface.slope) : 1) / RADIUS;
   }
+  // M01 · T3 (IF-GYRO): the shell's roll is physics-owned and reads the *finished* velocities, so
+  // the renderer never has to integrate anything of its own.
+  advanceRoll(racer, {
+    vx: racer.vx, vz: racer.vz, grounded: racer.grounded, inLoop: racer.loopRide !== null,
+  }, dt);
   racer.vx = clamp(racer.vx, 0, racer.maximumSpeed);
   racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
   racer.stoppedFor = racer.vx < 40 && !racer.loopRide ? racer.stoppedFor + dt : 0;
+  // M01 · T6: an authored out-of-bounds node ends the racer's line for this attempt. The crossing is
+  // the same swept test the gate uses — `prevX < node.x ≤ x` — so it fires exactly once, on the tick
+  // the ball passes the node, and only for a racer who is on that path.
+  if (ctx.laneNetwork && racer.pathId) {
+    const node = oobCrossed(ctx.laneNetwork, racer.pathId, oldX, racer.x);
+    if (node) {
+      if (trace) trace.oobNode = node;
+      recoverRacer(racer, ctx, 'oob', trace);
+      return;
+    }
+  }
   if (racer.x >= FINISH && !racer.falling) {
     racer.finishTime = ctx.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
     racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;

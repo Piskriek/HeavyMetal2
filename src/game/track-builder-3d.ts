@@ -7,6 +7,12 @@
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 import { classifyPlacedRamp, getTrackSpace } from './track-space';
+import { LaneGizmos } from './lane-gizmos';
+import { applyLaneEdit, snapNode, type LaneEdit } from './lane-path-tool';
+import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
+import {
+  buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, writeLaneStorage,
+} from './lane-storage';
 import {
   readStorage,
   writeStorage,
@@ -15,7 +21,9 @@ import {
   importProps as importTrackStorage,
 } from './track-storage';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated'
+  /** M01 · T7 — not a prop shelf: this tab shows the Lanes & Paths panel instead of a card grid. */
+  | 'lanes';
 
 export interface PropDefinition {
   type: string;
@@ -727,11 +735,29 @@ export const DEFAULT_TRACK_PROPS: PlacedProp[] = [
   },
 ];
 
+/**
+ * M01 · T7 — one undo entry carries **both** documents.
+ *
+ * The builder edits two things now: the placed props and the lane network. They are separate documents
+ * (separate storage keys, separate validation), but the user's Ctrl+Z is one key, so an entry records
+ * both snapshots and a restore puts both back. `null` means "this document was absent at that moment".
+ */
+export interface LaneUndoEntry {
+  readonly props: string;
+  readonly lanes: string | null;
+}
+
 export class TrackBuilder3D {
   private placedProps: PlacedProp[] = [];
   /** T03: last visible rejection of an unsupported gameplay-prop placement. */
   private placementErrorState: string | null = null;
   private propObjects = new Map<string, THREE.Object3D>();
+  /**
+   * M01 · T1b — whether the retired grid slingshot is drawn. The builder always draws it (it is a
+   * placeable prop), and a legacy `startMode: 'sling'` run draws it because that path really does
+   * launch from it; a push-mode race does not, because nothing does.
+   */
+  private slingshotsVisible = true;
   private selectedPropIds: Set<string> = new Set();
   private activePropType: string | null = null;
   private ghostSprite: THREE.Sprite | null = null;
@@ -739,8 +765,21 @@ export class TrackBuilder3D {
   private selectionBoxes = new Map<string, THREE.BoxHelper>();
   private rotationHandle: THREE.Group | null = null;
 
-  private undoStack: string[] = [];
-  private redoStack: string[] = [];
+  private undoStack: LaneUndoEntry[] = [];
+  private redoStack: LaneUndoEntry[] = [];
+
+  /**
+   * M01 · T7 — the lane document this builder is editing, and its gizmos.
+   *
+   * The two documents (props, lanes) share one undo stack: an entry carries both, so one Ctrl+Z
+   * rewinds whichever the user last touched without the other one jumping. The gizmos are their own
+   * module (`lane-gizmos.ts`) so that the handle accounting is testable without a canvas.
+   */
+  private laneDoc: LaneNetwork | null = null;
+  private laneGizmos: LaneGizmos;
+  private selectedLaneNodeId: string | null = null;
+  /** M01 · T7 — drawn only while the lanes tool is the active tool. */
+  private lanesVisible = false;
 
   readonly freeFly = {
     active: false,
@@ -804,6 +843,11 @@ export class TrackBuilder3D {
   }
 
   setCourse(courseId: string) {
+    queueMicrotask(() => {
+      // A course switch swaps the whole lane document: the same key, a different network.
+      this.loadLaneDoc();
+      this.notify();
+    });
     this.courseId = courseId;
   }
 
@@ -856,6 +900,9 @@ export class TrackBuilder3D {
     private readonly materials?: any,
   ) {
     this.initDecalSideHandles();
+    this.laneGizmos = new LaneGizmos(this.scene);
+    this.laneGizmos.root.visible = false;
+    this.loadLaneDoc();
     if (typeof localStorage !== 'undefined') {
       try {
         const savedFacing = localStorage.getItem('hm2-builder-camera-facing-default');
@@ -1308,6 +1355,34 @@ export class TrackBuilder3D {
     }
     this.saveToStorage();
     this.notify();
+  }
+
+  /** True for the slingshot launcher prop (the one model the retired start used to own). */
+  private isSlingshotProp(prop: PlacedProp): boolean {
+    const def = PROP_DEFINITIONS.find((definition) => definition.type === prop.type);
+    return Boolean(def?.isSlingshot);
+  }
+
+  /**
+   * M01 · T1b — draws (or stops drawing) the slingshot models without touching the document.
+   *
+   * The prop keeps its place in `placedProps`, its id and its authored transform: hiding it is a
+   * rendering decision, so the builder's storage, undo stack and validation are untouched, and a
+   * later push-mode race sees the same document with the model simply not built into the view. The
+   * per-prop `visible` flag (T08) still wins — an author who hid it on purpose gets it hidden either
+   * way.
+   */
+  setSlingshotsVisible(visible: boolean): void {
+    this.slingshotsVisible = visible;
+    for (const prop of this.placedProps) {
+      if (!this.isSlingshotProp(prop)) continue;
+      const object = this.propObjects.get(prop.id);
+      if (object) object.visible = visible && prop.visible !== false;
+    }
+    // The placement ghost is not a placed prop, so it is not in the map; hide it by name too, or a
+    // race that happens to be in the builder's placement mode would show a wireframe of the very
+    // model that was just retired.
+    if (!visible && this.ghostMesh) this.ghostMesh.visible = false;
   }
 
   // --- T08: VISIBILITY TOGGLE (H KEY) ---
@@ -2818,8 +2893,8 @@ export class TrackBuilder3D {
       obj = sprite;
     }
 
-    // T08: Respect visibility flag
-    if (prop.visible === false) {
+    // T08: Respect visibility flag, and M01 · T1b: the retired slingshot is not part of a push run.
+    if (prop.visible === false || (this.isSlingshotProp(prop) && !this.slingshotsVisible)) {
       obj.visible = false;
     }
 
@@ -2828,27 +2903,222 @@ export class TrackBuilder3D {
     return obj;
   }
 
-  // --- UNDO / REDO ---
+  // ---------------------------------------------------------------------------
+  // M01 · T7 — LANES & PATHS
+  // ---------------------------------------------------------------------------
+
+  /** The lane document being edited, or null (which means the course's legacy four lanes). */
+  getLaneNetwork(): LaneNetwork | null { return this.laneDoc; }
+
+  /** What the runtime's own validator says about the document: the panel lists these. */
+  laneValidation(): LaneValidation {
+    return this.laneDoc
+      ? validateLaneNetwork(this.laneDoc)
+      : { ok: true, network: null as unknown as LaneNetwork };
+  }
+
+  /** Loads the stored network for the current course, if the document is trustworthy. */
+  private loadLaneDoc() {
+    this.laneDoc = loadLaneNetwork(this.courseId as never);
+    this.laneGizmos.setNetwork(this.laneDoc);
+    this.selectedLaneNodeId = null;
+  }
+
+  /** Replaces the whole document (import, open, course switch). Pushes undo unless told not to. */
+  setLaneNetwork(network: LaneNetwork | null, opts: { pushUndo?: boolean } = {}) {
+    if (opts.pushUndo !== false) this.pushUndo();
+    this.laneDoc = network;
+    this.laneGizmos.setNetwork(network);
+    this.selectedLaneNodeId = null;
+    this.notify();
+  }
+
+  /** The lanes tool is drawn only while it is the active tool. */
+  setLanesToolActive(active: boolean) {
+    this.lanesVisible = active;
+    this.laneGizmos.root.visible = active;
+    if (!active) {
+      this.selectedLaneNodeId = null;
+      this.laneGizmos.setSelectedNode(null);
+    }
+    this.notify();
+  }
+
+  getLanesToolActive(): boolean { return this.lanesVisible; }
+
+  /** Gizmo accounting, for the panel's status line and for the AC-4 test. */
+  laneGizmoStats() { return { ...this.laneGizmos.stats }; }
+
+  /**
+   * One edit from the panel or a key, through the pure tool. A refusal changes nothing and its reason
+   * is handed back for the toast; an accepted edit redraws only what moved.
+   */
+  applyLaneEditToDoc(edit: LaneEdit): { ok: true; focus?: string } | { ok: false; reason: string } {
+    if (!this.laneDoc) return { ok: false, reason: 'no_document: there is no lane network loaded' };
+    const result = applyLaneEdit(this.laneDoc, edit);
+    if (!result.ok) return { ok: false, reason: result.reason };
+    this.laneDoc = result.network;
+    // A move rewrites one handle and its own paths; anything structural rebuilds the drawing.
+    if (edit.op === 'moveNode') this.laneGizmos.moveNode(edit.nodeId);
+    else this.laneGizmos.setNetwork(this.laneDoc);
+    if (result.focus) this.selectedLaneNodeId = result.focus;
+    if (this.selectedLaneNodeId && !this.laneDoc.nodes.some((node) => node.id === this.selectedLaneNodeId)) {
+      this.selectedLaneNodeId = null;
+    }
+    this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
+    this.notify();
+    return { ok: true, focus: result.focus };
+  }
+
+  /**
+   * The panel's and the keyboard's way in: one edit, and **a refused edit leaves no undo entry**.
+   * `applyLaneEditToDoc` stays as it is (it is also what a drag calls, once per frame, with undo
+   * pushed once at drag start); this wraps it with the snapshot, so pressing D on a node the tool
+   * refuses cannot push an empty step onto the stack.
+   */
+  applyLaneCommand(edit: LaneEdit): { ok: true; focus?: string } | { ok: false; reason: string } {
+    const before = this.snapshot();
+    const result = this.applyLaneEditToDoc(edit);
+    if (!result.ok) return result;
+    this.undoStack.push(before);
+    if (this.undoStack.length > 30) this.undoStack.shift();
+    this.redoStack.length = 0;
+    return result;
+  }
+
+  /**
+   * A path's half width. The edit ops never touch it, so the panel's width control comes here: same
+   * contract as an edit — validated, one undo entry, refused means nothing changed.
+   */
+  setLanePathHalfWidth(pathId: string, halfWidth: number, opts: { pushUndo?: boolean } = {}): { ok: true } | { ok: false; reason: string } {
+    if (!this.laneDoc) return { ok: false, reason: 'no_document: there is no lane network loaded' };
+    const path = this.laneDoc.paths.find((candidate) => candidate.id === pathId);
+    if (!path) return { ok: false, reason: `unknown_path: there is no path ${pathId}` };
+    if (halfWidth < LANE_HALF_WIDTH_MIN || halfWidth > LANE_HALF_WIDTH_MAX) {
+      return { ok: false, reason: `bad_half_width: ${halfWidth} is outside ${LANE_HALF_WIDTH_MIN}\u2013${LANE_HALF_WIDTH_MAX}` };
+    }
+    if (path.halfWidth === halfWidth) return { ok: false, reason: `unchanged: ${pathId} is already ${halfWidth} wide` };
+    const next: LaneNetwork = {
+      ...this.laneDoc,
+      paths: this.laneDoc.paths.map((candidate) => (
+        candidate.id === pathId ? { ...candidate, halfWidth } : candidate
+      )),
+    };
+    const validation = validateLaneNetwork(next);
+    if (!validation.ok) return { ok: false, reason: 'invalid: the runtime refuses this document' };
+    if (opts.pushUndo !== false) this.pushUndo();
+    this.laneDoc = validation.network;
+    this.laneGizmos.setNetwork(this.laneDoc);
+    this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
+    this.notify();
+    return { ok: true };
+  }
+
+  /** The node handle under the pointer, or null. */
+  raycastLaneNode(clientX: number, clientY: number, canvas: HTMLCanvasElement): string | null {
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    return this.laneGizmos.raycast(this.raycaster);
+  }
+
+  /** The pointer's position as an engine (x, z), on the road. Null when the ray missed the track. */
+  lanePointAt(clientX: number, clientY: number, canvas: HTMLCanvasElement): { x: number; z: number } | null {
+    const hit = this.raycastSurface(clientX, clientY, canvas);
+    if (!hit) return null;
+    const point = this.laneGizmos.engineFromWorld(hit.point);
+    return { x: point.x, z: point.z };
+  }
+
+  selectLaneNode(nodeId: string | null) {
+    this.selectedLaneNodeId = nodeId;
+    this.laneGizmos.setSelectedNode(nodeId);
+    this.notify();
+  }
+
+  getSelectedLaneNode() {
+    return this.laneDoc?.nodes.find((node) => node.id === this.selectedLaneNodeId) ?? null;
+  }
+
+  /**
+   * A drag: pointer → surface → engine (x, z) → `snapNode` → the tool's own `moveNode`. The handle
+   * follows whatever the tool decided, so a snapped or refused move lands where the document says.
+   * Undo is pushed once, by the caller, at drag start.
+   */
+  dragLaneNode(
+    nodeId: string, clientX: number, clientY: number, canvas: HTMLCanvasElement,
+    snap: { lanes: boolean; grid: boolean } = { lanes: true, grid: true },
+  ): { ok: true } | { ok: false; reason: string } {
+    const point = this.lanePointAt(clientX, clientY, canvas);
+    if (!point) return { ok: false, reason: 'off_track: the pointer is not over the track' };
+    const snapped = snapNode(point.x, point.z, snap);
+    const result = this.applyLaneEditToDoc({ op: 'moveNode', nodeId, x: snapped.x, z: snapped.z });
+    return result.ok ? { ok: true } : result;
+  }
+
+  /** Writes the network to its own storage document (validate → backup → write, in the storage module). */
+  saveLaneDoc(store?: Storage) {
+    if (!this.laneDoc) return { ok: false as const, reason: 'empty' as const };
+    const doc = buildLaneDocument({ [this.courseId as never]: this.laneDoc });
+    const result = writeLaneStorage(store, doc);
+    this.notify();
+    return result;
+  }
+
+  /** Export for the panel's Export button. */
+  exportLanes(): string {
+    return exportLaneNetworks(buildLaneDocument(this.laneDoc ? { [this.courseId as never]: this.laneDoc } : {}));
+  }
+
+  /** Import: everything goes through validation, and a refusal lists the reasons. */
+  importLanes(json: string): { ok: true } | { ok: false; errors: { code: string }[] } {
+    const imported = importLaneNetworks(json);
+    if (!imported.ok) return imported;
+    const network = imported.doc.networks[this.courseId as never] ?? null;
+    if (!network) return { ok: false, errors: [{ code: 'unknown_course' }] };
+    this.setLaneNetwork(network);
+    return { ok: true };
+  }
+
+  // --- UNDO / REDO (both documents, one stack) ---
+  private snapshot(): LaneUndoEntry {
+    return {
+      props: JSON.stringify(this.placedProps),
+      lanes: this.laneDoc ? JSON.stringify(this.laneDoc) : null,
+    };
+  }
+
   pushUndo() {
-    this.undoStack.push(JSON.stringify(this.placedProps));
+    this.undoStack.push(this.snapshot());
     if (this.undoStack.length > 30) this.undoStack.shift();
     this.redoStack.length = 0;
   }
 
   undo() {
     if (!this.undoStack.length) return;
-    this.redoStack.push(JSON.stringify(this.placedProps));
-    const state = JSON.parse(this.undoStack.pop()!);
-    this.restorePropsState(state);
+    this.redoStack.push(this.snapshot());
+    this.restoreEntry(this.undoStack.pop()!);
     this.notify();
   }
 
   redo() {
     if (!this.redoStack.length) return;
-    this.undoStack.push(JSON.stringify(this.placedProps));
-    const state = JSON.parse(this.redoStack.pop()!);
-    this.restorePropsState(state);
+    this.undoStack.push(this.snapshot());
+    this.restoreEntry(this.redoStack.pop()!);
     this.notify();
+  }
+
+  /** Puts both documents back. Props keep their own restore path; the lanes redraw in full. */
+  private restoreEntry(entry: LaneUndoEntry) {
+    this.restorePropsState(JSON.parse(entry.props));
+    const lanes = entry.lanes === null ? null : JSON.parse(entry.lanes) as LaneNetwork;
+    this.laneDoc = lanes;
+    this.laneGizmos.setNetwork(lanes);
+    if (!lanes || !lanes.nodes.some((node) => node.id === this.selectedLaneNodeId)) {
+      this.selectedLaneNodeId = null;
+    }
+    this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
   }
 
   private restorePropsState(props: PlacedProp[]) {

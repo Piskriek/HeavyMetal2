@@ -36,6 +36,37 @@ export interface Racer extends RacerFrame {
   boosts: number;
   /** T02: true for the local player. Identity is `id` (always PLAYER_ID for the player). */
   isPlayer: boolean;
+  /**
+   * M01 · T3 (IF-GYRO): the shell's roll, owned by the physics, not the renderer. `rollPhase` is
+   * radians in [0, TAU) and `rollRate` radians/s; `advanceRoll` in `gyro-ball.ts` is the only writer.
+   * Deliberately outside the parity fingerprint (T3 AC-9): roll is presentation, not outcome.
+   */
+  rollPhase: number;
+  rollRate: number;
+  /**
+   * M01 · T2 (IF-MERGE): true while the first-loop pool holds this racer. Held racers are frozen at
+   * the gate plane and only glide sideways into their pool slot; they are skipped by contact and by
+   * every obstacle, and the race clock is stopped while the pool is filling.
+   */
+  mergeHeld: boolean;
+  /** Where a held racer is gliding to: their pool slot, or the loop lane when they are next to go. */
+  mergeSlotZ: number;
+  /**
+   * True from the moment of release until the rider is clear of the geometry loop (`passageExitX`), and
+   * at least `PASSAGE_GHOST_TAIL_S` after the release: the rider is
+   * intangible, so the ordered release cannot be spoiled by contact.
+   */
+  mergeGhost: boolean;
+  /** Run time after which this rider's merge intangibility may end, once they are clear of the loop. */
+  mergeGhostUntil: number;
+  /** Run time the racer last left a loop, or -100. The ghost tail is measured from here. */
+  loopExitTime: number;
+  /**
+   * M01 · T6 (IF-LANES): the authored path this racer is on, or `null` for the legacy four lanes.
+   * The path owns the steering target and the corridor; `targetLane` stays meaningful either way,
+   * because the HUD, the obstacles and the loop's lane filter all still speak in lanes.
+   */
+  pathId: string | null;
   visited: Set<Obstacle>;
   previous: { x: number; y: number; z: number; rotation: number };
 }
@@ -79,6 +110,10 @@ export function createRacers(config?: RaceConfig): Racer[] {
       launchSpeed: stats.launchSpeed, handling: stats.handling, boostFactor: stats.boostFactor,
       hopFactor: stats.hopFactor, bumpRecovery: stats.bumpRecovery, maximumSpeed: stats.maximumSpeed,
       lane: entry.homeLane, targetLane: entry.homeLane, rotation: 0,
+      rollPhase: 0, rollRate: 0,
+      mergeHeld: false, mergeSlotZ: laneZ(entry.homeLane), mergeGhost: false, mergeGhostUntil: -100,
+      loopExitTime: -100,
+      pathId: null,
       falling: false, finished: false, grounded: false, bumpAt: -100,
       immuneUntil: -100, launchOrigin: { x: startX, y: START_Y },
       shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,

@@ -1,6 +1,7 @@
 import { artUrl, drawToCanvas, loadArtImage, placeholderCanvas, supplyCell } from './art-assets';
 import type { CourseId } from './types';
-import { FINISH, GRAVITY, RADIUS, STADIUM_START, courseY, laneZ, type Obstacle } from './scene';
+import { FINISH, GRAVITY, RADIUS, STADIUM_START, closestLane, courseY, laneZ, type Obstacle } from './scene';
+import { nearestPath, sampleLane, type LaneNetwork } from './lane-network';
 
 export type PowerupKind = 'fuel' | 'shield' | 'bounce';
 export interface AirPickup {
@@ -97,4 +98,44 @@ export function preparePowerupSprites() {
     }
   })).then((entries) => Object.fromEntries(entries) as Record<PowerupKind, HTMLCanvasElement>);
   return spritePromise;
+}
+
+/**
+ * M01 · T6/T7 — **pickups follow the authored lanes.**
+ *
+ * `createAirPickups` above lays the field out on the legacy four lanes: `laneZ(0..3)` and altars at
+ * `y 106`. Under an authored network those lanes may not exist, so a pickup can hang in the air beside
+ * the drivable road (or inside a wall) — collectable in principle and unreachable in practice. This
+ * moves each one onto the *nearest point of the network* at its own x, keeping its altitude kind
+ * (a ground-level `y 106` stay low, a ramp launch stays high) and its order down the hill.
+ *
+ * The laws:
+ *  - **only `z` (and the lane label) move** — `y` is the pickup's own altitude design and the
+ *    network says nothing about heights;
+ *  - **a pickup with no path under it is dropped**, not left hanging off the road: a collectible
+ *    nobody can reach is worse than one that is not there;
+ *  - **`id` is re-numbered** so ids stay dense and stable for the sprite pool and for saves;
+ *  - **no network means the list comes back untouched** (a copy, same values) — the legacy layout is
+ *    what every course has always had, and this must not change it by a hair.
+ *
+ * Pure: takes the list, returns a new one. Tested headlessly in `tests/pickup-layout.test.ts`.
+ */
+export function layoutPickupsForNetwork(
+  pickups: readonly AirPickup[],
+  network: LaneNetwork | null,
+): AirPickup[] {
+  if (!network) return pickups.map((pickup) => ({ ...pickup }));
+  const out: AirPickup[] = [];
+  for (const pickup of pickups) {
+    const pathId = nearestPath(network, pickup.x, pickup.z);
+    if (pathId === null) continue;
+    const sample = sampleLane(network, pathId, pickup.x);
+    if (!sample) continue;
+    // "Nearest path" is not the same as "on the road": a pickup can be kilometres away from the only
+    // path active at its x. It is kept only when it is over the drivable width, which is the path's
+    // own half width — otherwise the network has no road there and nobody could reach it.
+    if (Math.abs(pickup.z - sample.z) > sample.halfWidth) continue;
+    out.push({ ...pickup, id: out.length, z: sample.z, lane: closestLane(sample.z) });
+  }
+  return out;
 }

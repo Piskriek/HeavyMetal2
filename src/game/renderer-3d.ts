@@ -6,7 +6,14 @@
 import * as THREE from 'three';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
-import { RADIUS } from './scene';
+import type { GameOptions } from './types';
+import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
+import { EffectRenderer } from './effects/renderer-fx';
+import { LanePaint } from './lane-paint';
+import { PickupView } from './pickup-view';
+import { cameraShake } from './camera-shake';
+import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
+import type { GyroFrame } from './first-person';
 import {
   compileRampSurfaces,
   engineDistanceFromX,
@@ -15,6 +22,12 @@ import {
   type PhysicalRampSurface,
   type TrackSpaceMap,
 } from './track-space';
+import {
+  FP_LOOK_AHEAD,
+  firstPersonFlag,
+  firstPersonFrame,
+  type Vec3,
+} from './first-person';
 
 /* -----------------------------------------------------------------------------
    0. CONFIG & CONSTANTS
@@ -1405,6 +1418,34 @@ function buildWorld(M: Materials, scene: THREE.Scene) {
 /* -----------------------------------------------------------------------------
    7. CAMERA RIG
    -------------------------------------------------------------------------- */
+
+/**
+ * The tight chase rig — the framing the game is watched from now that it is built for the
+ * cockpit: **right above the ball and slightly back**, looking down the road.
+ *
+ * `height` is the one number to tune if the ball should sit higher or lower in the frame; `back`
+ * moves the whole rig nearer or further. Both are ball-radius multiples so a change to `RADIUS`
+ * cannot silently ruin the framing.
+ *
+ * The wide, stage-reactive rig still exists (`fixed` mode: the classic broadcast view), and the
+ * M01 · T3 cockpit replaces this as the default once the bezel art is in.
+ */
+export const CHASE_RIG = {
+  /** Distance behind the ball. */
+  back: RADIUS * 10.6,
+  /** Height above the ball's own road sample. */
+  height: RADIUS * 5.7,
+  /** Lateral offset (0 = straight behind). */
+  side: 0,
+  /** How far down the road the camera aims. */
+  lookAhead: 820,
+  /** Extra lift applied to the aim point, in world units. */
+  lookLift: 150,
+  /** Share of the ball's altitude that lifts the camera on big air. */
+  airFollow: 0.5,
+} as const;
+
+/** The classic broadcast rig: high and far back, widening through the canyon, loops and arena. */
 function cameraRigAt(track: TrackData, d: number) {
   const rig = { back: 950, height: 430, side: 0, lookAhead: 1500 };
   const canyon = bump(d, track.stageStart.canyon - 1800, track.stageEnd.canyon + 300, 1400);
@@ -1418,6 +1459,16 @@ function cameraRigAt(track: TrackData, d: number) {
   return rig;
 }
 
+/** The tight chase rig with the ball's own altitude folded in, so a hop does not empty the frame. */
+function chaseRigAt(altitude: number) {
+  return {
+    back: CHASE_RIG.back,
+    height: CHASE_RIG.height + clamp(altitude, 0, 900) * CHASE_RIG.airFollow,
+    side: CHASE_RIG.side,
+    lookAhead: CHASE_RIG.lookAhead,
+  };
+}
+
 import { TrackBuilder3D } from './track-builder-3d';
 
 /* -----------------------------------------------------------------------------
@@ -1426,7 +1477,11 @@ import { TrackBuilder3D } from './track-builder-3d';
 interface Racer3DMesh {
   canvas: HTMLCanvasElement | null;
   group: THREE.Group;
-  sphere: THREE.Mesh;
+  /** M01 · T3 (IF-GYRO): the rolling shell — wears `gyroPose.core`. */
+  core: THREE.Mesh;
+  /** The two level brass caps either side of the rider — wear `gyroPose.gyro`. */
+  capLeft: THREE.Mesh;
+  capRight: THREE.Mesh;
   shadow: THREE.Mesh;
   shield: THREE.Mesh;
 }
@@ -1437,10 +1492,22 @@ interface Racer3DMesh {
  */
 interface RacerMeshResources {
   sphereGeo: THREE.SphereGeometry;
+  /** Cap geometries, poles baked onto local −X and +X, so the mesh quaternion is the level basis. */
+  capLeftGeo: THREE.SphereGeometry;
+  capRightGeo: THREE.SphereGeometry;
+  capMat: THREE.MeshStandardMaterial;
   shadowGeo: THREE.PlaneGeometry;
   shadowMat: THREE.MeshBasicMaterial;
   shieldGeo: THREE.SphereGeometry;
   shieldMat: THREE.MeshBasicMaterial;
+}
+
+/** The subset of a rendered racer frame the first-person camera needs. */
+interface FpBallState {
+  readonly x: number; readonly y: number; readonly z: number;
+  readonly distance?: number;
+  readonly grounded?: boolean;
+  readonly falling?: boolean;
 }
 
 /** Legacy fallback colours for slots 0–3; larger fields get a deterministic hue. */
@@ -1481,9 +1548,76 @@ export class Renderer3D {
   private readonly exitD: number;
   private currentSkyPreset: SkyPreset;
   private destroyed = false;
+  /**
+   * M01 · T0 — the eye-level spike. `?fp=1` forces the first-person view on, whatever the camera
+   * option says; the `first_person` camera mode (T3, the default) selects it in normal play. Both
+   * feed the same `firstPersonFrame()`.
+   */
+  private readonly firstPerson: boolean;
+  /** Last frame's up, so the eye does not snap when the bank rolls through a turn. */
+  private fpUp: Vec3 | null = null;
+  /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
+  private effects: EffectRenderer | null = null;
+  /**
+   * M01 · T6/T7 dressing — the authored lanes, painted on the road. Built lazily: a race with no
+   * authored network never constructs it, and `LanePaint.setNetwork` decides by identity, so the
+   * per-frame call below costs one reference comparison in the steady state.
+   */
+  private lanePaint: LanePaint | null = null;
+  /**
+   * The powerups. Built once, on the first race frame that has any: `assets.pickupSprites` were painted
+   * for this and had never been drawn, so a shield could be collected from a thing nobody could see.
+   */
+  private pickupView: PickupView | null = null;
+  /**
+   * Impact shake. Three reused vectors: the offset is applied along the camera's *own* axes after the
+   * camera has been placed and aimed, so a shake can never change where the camera is looking — only
+   * where the eye sits for that one frame. Preallocated, like every other vector in the render loop.
+   */
+  private readonly shakeRight = new THREE.Vector3(1, 0, 0);
+  private readonly shakeUp = new THREE.Vector3(0, 1, 0);
+  private readonly shakeForward = new THREE.Vector3(0, 0, -1);
+  /** M01 · T3 — reused pose quaternions: the render loop never constructs a THREE object. */
+  private readonly coreQuat = new THREE.Quaternion();
+  private readonly gyroQuat = new THREE.Quaternion();
+  /** Last frame the gyro was not falling, so a drop freezes the view instead of tumbling it. */
+  private lastGyroFrame: GyroFrame | null = null;
+
+  /**
+   * The world-space centre of the ring the player is riding, or null when they are not in a loop.
+   * The physics composes the ride in engine space, so the centre is the loop's own engine point —
+   * lifted by the road's own rise across the ring, exactly as `stepRacer` does it — mapped through
+   * the same track-space map every other point uses.
+   */
+  private loopCentreWorld(
+    ball: FpBallState,
+    ride: LoopRide | null,
+    course: GameOptions['course'],
+    ramps: readonly PhysicalRampSurface[],
+  ): Vec3 | null {
+    if (!ride) return null;
+    const loop = loopGeometry(ride.obstacle, course);
+    const rise = courseY(ball.x, course) - courseY(loop.x, course);
+    const placement = placementFromEngine(
+      this.space,
+      { x: loop.x, y: loop.y + rise, z: ball.z },
+      ramps,
+    );
+    return [placement.world.x, placement.world.y, placement.world.z];
+  }
+
+  /** The track's own frame as IF-FP's tuple type, without allocating a second object graph. */
+  private worldFrame(frame: { tangent: { x: number; y: number; z: number }; up: { x: number; y: number; z: number }; right: { x: number; y: number; z: number } }): GyroFrame {
+    return {
+      forward: [frame.tangent.x, frame.tangent.y, frame.tangent.z],
+      up: [frame.up.x, frame.up.y, frame.up.z],
+      right: [frame.right.x, frame.right.y, frame.right.z],
+    };
+  }
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
     this.storedAssets = assets;
+    this.firstPerson = firstPersonFlag(typeof window !== 'undefined' ? window.location.search : '');
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -1545,7 +1679,7 @@ export class Renderer3D {
     // Racers
     this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
 
-    this.placeCamera(this.D_START, 0.1);
+    this.placeCamera(this.D_START, 0.1, 'follow_ball', 0);
   }
 
   setSkybox(skyId: string) {
@@ -1612,15 +1746,98 @@ export class Renderer3D {
     return this.rampSurfaces;
   }
 
-  private placeCamera(d: number, dt: number) {
-    const rig = cameraRigAt(this.track, d);
+  /**
+   * M01 · T0 — the eye-level camera.
+   *
+   * Position, up and look target all come from the pure `firstPersonFrame()`; this method only
+   * copies numbers into the THREE camera and pushes the FOV/near/far once. It reads the *rendered*
+   * ball frame (already interpolated by the engine) so the eye and the ball cannot disagree.
+   */
+  private placeFirstPersonCamera(
+    ball: FpBallState,
+    ride: LoopRide | null,
+    course: GameOptions['course'],
+    ramps: readonly PhysicalRampSurface[],
+    dt: number,
+  ) {
+    const placement = placementFromEngine(
+      this.space,
+      { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded },
+      ramps,
+    );
+    const frame = this.worldFrame(placement.frame);
+    // T3 (IF-GYRO): in a loop the up points at the ring's centre; while falling it freezes at the
+    // last grounded frame. Both keep the aperture from rolling over the player's head.
+    const loopCentre = this.loopCentreWorld(ball, ride, course, ramps);
+    const gyro = gyroFrameFor(
+      frame,
+      loopCentre ? { centre: loopCentre } : null,
+      [placement.world.x, placement.world.y, placement.world.z],
+      ball.falling === true,
+      this.lastGyroFrame ?? frame,
+    );
+    this.lastGyroFrame = gyro;
+    const look = this.track.sampleAt(clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.track.length));
+    const fp = firstPersonFrame({
+      ballCentre: [placement.world.x, placement.world.y, placement.world.z],
+      gyro,
+      lookPoint: [
+        look.pos.x + look.up.x * 140,
+        look.pos.y + look.up.y * 140,
+        look.pos.z + look.up.z * 140,
+      ],
+      previousUp: this.fpUp,
+      dt,
+      falling: ball.falling === true,
+    });
+    this.fpUp = fp.up;
+    this.camera.position.set(fp.position[0], fp.position[1], fp.position[2]);
+    this.camera.up.set(fp.up[0], fp.up[1], fp.up[2]);
+    this.camera.lookAt(
+      fp.position[0] + fp.forward[0],
+      fp.position[1] + fp.forward[1],
+      fp.position[2] + fp.forward[2],
+    );
+    if (this.camera.fov !== fp.fov || this.camera.near !== fp.near || this.camera.far !== fp.far) {
+      this.camera.fov = fp.fov;
+      this.camera.near = fp.near;
+      this.camera.far = fp.far;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  /**
+   * @param altitude how far the ball currently is above its road sample (0 while rolling). The
+   *   chase rig lifts by a share of it, so a spring, a ramp or a blimp launch keeps the ball in
+   *   frame instead of leaving the camera staring at the dirt.
+   */
+  private placeCamera(d: number, dt: number, mode: GameOptions['cameraMode'], altitude: number) {
+    const wide = mode === 'fixed';
+    const rig = wide ? cameraRigAt(this.track, d) : chaseRigAt(altitude);
     const at = this.track.sampleAt(clamp(d - rig.back, 0, this.track.length));
     const look = this.track.sampleAt(clamp(d + rig.lookAhead, 0, this.track.length));
     this.camera.position.copy(at.pos).addScaledVector(at.up, rig.height).addScaledVector(at.right, rig.side);
-    const target = look.pos.clone().addScaledVector(look.up, 140);
+    const target = look.pos.clone().addScaledVector(look.up, wide ? 140 : CHASE_RIG.lookLift);
     this.camUp.lerp(at.up, 1 - Math.exp(-dt * 5)).normalize();
     this.camera.up.copy(this.camUp);
     this.camera.lookAt(target);
+  }
+
+  /**
+   * M01 · T5 — the engine's shake value, finally used. Both cameras (the cockpit and the chase rig)
+   * are placed and aimed first; this nudges the eye along the camera's own axes for that frame, so the
+   * aim is untouched and the horizon keeps its place. Zero at zero shake and under reduced motion.
+   */
+  private applyImpactShake(amount: number, time: number, reducedMotion: boolean): void {
+    const shake = cameraShake(amount, time, reducedMotion);
+    if (shake.right === 0 && shake.up === 0 && shake.forward === 0) return;
+    this.shakeRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    this.shakeUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    this.shakeForward.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    this.camera.position
+      .addScaledVector(this.shakeRight, shake.right)
+      .addScaledVector(this.shakeUp, shake.up)
+      .addScaledVector(this.shakeForward, shake.forward);
   }
 
   private updateAtmosphere(d: number) {
@@ -1654,8 +1871,16 @@ export class Renderer3D {
 
   private ensureRacerMeshes(count: number) {
     if (!this.racerResources) {
+      const capLeftGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      capLeftGeo.rotateZ(Math.PI / 2); // pole (+Y) → local −X
+      const capRightGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      capRightGeo.rotateZ(-Math.PI / 2); // pole (+Y) → local +X
       this.racerResources = {
         sphereGeo: new THREE.SphereGeometry(RADIUS, 24, 16),
+        capLeftGeo,
+        capRightGeo,
+        // Brass, shared by every racer on the grid: three geometries and one cap material in total.
+        capMat: new THREE.MeshStandardMaterial({ color: 0xc08a2e, metalness: 0.85, roughness: 0.32 }),
         shadowGeo: new THREE.PlaneGeometry(RADIUS * 2.2, RADIUS * 2.2),
         shadowMat: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
         shieldGeo: new THREE.SphereGeometry(RADIUS * 1.35, 16, 12),
@@ -1688,9 +1913,19 @@ export class Renderer3D {
       roughness: 0.3, metalness: 0.2,
     });
 
-    const sphere = new THREE.Mesh(shared.sphereGeo, material);
-    sphere.castShadow = true;
-    group.add(sphere);
+    // T3: core rolls, caps stay level. The two cap meshes share one material, and their geometry
+    // has the pole baked onto ±X, so the pose simply overwrites each quaternion.
+    const core = new THREE.Mesh(shared.sphereGeo, material);
+    core.castShadow = true;
+    group.add(core);
+
+    const capLeft = new THREE.Mesh(shared.capLeftGeo, shared.capMat);
+    capLeft.castShadow = true;
+    group.add(capLeft);
+
+    const capRight = new THREE.Mesh(shared.capRightGeo, shared.capMat);
+    capRight.castShadow = true;
+    group.add(capRight);
 
     const shadow = new THREE.Mesh(shared.shadowGeo, shared.shadowMat);
     shadow.rotation.x = -Math.PI / 2;
@@ -1702,7 +1937,7 @@ export class Renderer3D {
     group.add(shield);
 
     this.scene.add(group);
-    return { group, sphere, shadow, shield, canvas: canvas ?? null };
+    return { group, core, capLeft, capRight, shadow, shield, canvas: canvas ?? null };
   }
 
   /** Removes the newest mesh from the scene and disposes its per-mesh material. */
@@ -1712,7 +1947,7 @@ export class Renderer3D {
     this.scene.remove(mesh.group);
     // Shadow/shield materials are shared resources — only this mesh's own material
     // (and its participation in the canvas texture cache) belongs to the slot.
-    (mesh.sphere.material as THREE.Material).dispose();
+    (mesh.core.material as THREE.Material).dispose();
     if (mesh.canvas) {
       const cached = this.racerTextures.get(mesh.canvas);
       if (cached && --cached.refs === 0) {
@@ -1726,6 +1961,9 @@ export class Renderer3D {
   private disposeRacerPool() {
     while (this.racers3D.length) this.releaseRacerMesh();
     this.racerResources?.sphereGeo.dispose();
+    this.racerResources?.capLeftGeo.dispose();
+    this.racerResources?.capRightGeo.dispose();
+    this.racerResources?.capMat.dispose();
     this.racerResources?.shadowGeo.dispose();
     this.racerResources?.shadowMat.dispose();
     this.racerResources?.shieldGeo.dispose();
@@ -1741,7 +1979,14 @@ export class Renderer3D {
     const playerDistance = (frame.ball as any).distance ?? engineDistanceFromX((frame.ball as any).x ?? 190);
     const playerDist = this.trackDistFromDistance(playerDistance);
 
+    // M01 · T3: the cockpit is the default view; `?fp=1` stays as the T0 spike that forces it on.
+    const firstPerson = this.firstPerson || frame.options.cameraMode === 'first_person';
+    // M01 · T1b: a push-mode run has no slingshot, so it does not draw the model either. It stood
+    // exactly where the driver now looks from, and at eye level its frame filled the window. Only a
+    // legacy sling run (and the builder, which owns the prop) shows it.
+    this.trackBuilder.setSlingshotsVisible(frame.options.startMode === 'sling');
     const rampSurfaces = this.activeRampSurfaces();
+    let playerAltitude = 0;
     for (let i = 0; i < frame.racers.length; i++) {
       const racer = frame.racers[i];
       const mesh = this.racers3D[i];
@@ -1756,8 +2001,20 @@ export class Renderer3D {
       );
       mesh.group.position.set(placement.world.x, placement.world.y, placement.world.z);
 
-      // Sphere rolling rotation along track tangent
-      mesh.sphere.rotation.x += (racer.vx * dt) / RADIUS;
+      // T3 (IF-GYRO): the shell rolls, the caps and the rider do not. The pose is arithmetic from
+      // the sim's own roll phase (no renderer-side integration), copied into the reused quaternions.
+      const gyro = gyroPose(racer.rollPhase ?? 0, this.worldFrame(placement.frame));
+      this.coreQuat.set(gyro.core[0], gyro.core[1], gyro.core[2], gyro.core[3]);
+      mesh.core.quaternion.copy(this.coreQuat);
+      this.gyroQuat.set(gyro.gyro[0], gyro.gyro[1], gyro.gyro[2], gyro.gyro[3]);
+      mesh.capLeft.quaternion.copy(this.gyroQuat);
+      mesh.capRight.quaternion.copy(this.gyroQuat);
+
+      // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
+      mesh.group.visible = !(firstPerson && i === 0);
+
+      // The tight chase rig needs the player's own altitude (see placeCamera).
+      if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);
 
       // Shield effect
       mesh.shield.visible = (racer.shieldUntil ?? 0) > frame.runTime;
@@ -1767,8 +2024,26 @@ export class Renderer3D {
     }
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
+    if (frame.laneNetwork !== undefined) {
+      if (!this.lanePaint) this.lanePaint = new LanePaint(this.scene);
+      this.lanePaint.setNetwork(frame.laneNetwork);
+    }
+
+    // The powerups, at the position the collection solve tests against. Only one view is ever built:
+    // the sprites inside it are pooled, so a later race with fewer pickups reuses the same ones.
+    if (frame.pickups.length > 0) {
+      if (!this.pickupView) {
+        this.pickupView = new PickupView(this.scene, this.storedAssets.pickupSprites ?? {}, this.space);
+      }
+      this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces());
+    } else {
+      this.pickupView?.hideAll();
+    }
+
     if (!this.trackBuilder.freeFly.active) {
-      this.placeCamera(playerDist, dt);
+      if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
+      else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
+      this.applyImpactShake(frame.shake, frame.time, frame.reducedMotion);
       this.updateAtmosphere(playerDist);
     }
     this.sky.position.copy(this.camera.position);
@@ -1783,6 +2058,15 @@ export class Renderer3D {
       this.materials.lava.map.offset.y = raw * 0.0025;
     }
 
+    // 3b. M01 · T5 — painted effects: explosions, impacts, dust, smoke and sparks, drained from the
+    // sim's queue and drawn as camera-facing billboards (plus one Points object for sparks).
+    if (frame.effects) {
+      if (!this.effects) this.effects = new EffectRenderer(this.scene);
+      this.effects.update({
+        queue: frame.effects, space: this.space, ramps: rampSurfaces, time: raw, dt: Math.min(0.1, dt),
+      }, this.camera, frame.reducedMotion);
+    }
+
     // 4. Render 3D WebGL scene
     this.renderer.render(this.scene, this.camera);
   }
@@ -1790,6 +2074,12 @@ export class Renderer3D {
   destroy() {
     this.destroyed = true;
     this.disposeRacerPool();
+    this.effects?.destroy();
+    this.effects = null;
+    this.lanePaint?.dispose();
+    this.lanePaint = null;
+    this.pickupView?.dispose();
+    this.pickupView = null;
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

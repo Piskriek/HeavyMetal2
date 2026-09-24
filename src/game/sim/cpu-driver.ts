@@ -11,7 +11,8 @@
  * `id * 0.023 s`; a large qualifying field uses a bounded stagger so decisions never queue behind
  * the racer's index.
  */
-import { LANE_COUNT, laneZ, occupiesLane, weightImpulse, type Obstacle } from '../scene';
+import { LANE_COUNT, closestLane, laneZ, occupiesLane, weightImpulse, type Obstacle } from '../scene';
+import { adjacentPath, resolveLaneTarget, sampleLane, type LaneNetwork } from '../lane-network';
 import type { AirPickup } from '../powerups';
 import { hopTiming } from '../powerups';
 import type { Racer } from '../racers';
@@ -61,6 +62,59 @@ export function setLane(racer: Racer, lane: number, runTime: number): void {
   racer.targetLane = next; racer.lastLaneChange = runTime;
 }
 
+/**
+ * M01 · T6 (IF-LANES): one place a bot may be thinking of going, as a *place* rather than a lane
+ * number — the lane index (so obstacles, pickups and the HUD keep working), the lateral centre to
+ * score against, and the authored path that centre belongs to (`null` on the legacy lanes).
+ */
+export interface LaneCandidate {
+  readonly lane: number;
+  readonly z: number;
+  readonly pathId: string | null;
+  readonly current: boolean;
+}
+
+/**
+ * The candidates a bot may pick from, in a deterministic order.
+ *
+ * Without a network: the racer's lane and its two neighbours, ordered by ascending lane index —
+ * which is descending z, and is the order the legacy driver scored in. With a network: the racer's
+ * own path and the adjacent paths on either side at this x, in that same descending-z order, so a
+ * network race is the same race with better addresses.
+ */
+export function laneCandidates(racer: Racer, network: LaneNetwork | null): LaneCandidate[] {
+  if (network && racer.pathId) {
+    const own = sampleLane(network, racer.pathId, racer.x);
+    if (own) {
+      const out: LaneCandidate[] = [
+        { lane: closestLane(own.z), z: own.z, pathId: racer.pathId, current: true },
+      ];
+      for (const dir of [-1, 1] as const) {
+        const nextId = adjacentPath(network, racer.pathId, racer.x, dir);
+        if (!nextId) continue;
+        const sample = sampleLane(network, nextId, racer.x);
+        if (!sample) continue;
+        out.push({ lane: closestLane(sample.z), z: sample.z, pathId: nextId, current: false });
+      }
+      return out.sort((a, b) => b.z - a.z);
+    }
+  }
+  const current = racer.targetLane;
+  const out: LaneCandidate[] = [];
+  for (let lane = Math.max(0, current - 1); lane <= Math.min(3, current + 1); lane++) {
+    out.push({ lane, z: laneZ(lane), pathId: null, current: lane === current });
+  }
+  return out;
+}
+
+/** Commits a bot to a candidate: the path when there is one, the lane either way. */
+export function setCandidate(racer: Racer, candidate: LaneCandidate, runTime: number): void {
+  const changed = candidate.pathId !== racer.pathId || candidate.lane !== racer.targetLane;
+  racer.pathId = candidate.pathId;
+  racer.targetLane = clamp(Math.round(candidate.lane), 0, LANE_COUNT - 1);
+  if (changed) racer.lastLaneChange = runTime;
+}
+
 export function driveCpu(racer: Racer, ctx: CpuContext): void {
   const world = ctx.step.world;
   const runTime = ctx.step.runTime;
@@ -69,17 +123,18 @@ export function driveCpu(racer: Racer, ctx: CpuContext): void {
   racer.nextDecision = runTime + reaction + ctx.stagger(racer);
   if (racer.falling || racer.loopRide || racer.finished || runTime < racer.steerLockedUntil) return;
   const lookAhead = clamp(racer.vx * (difficulty === 'rookie' ? 0.54 : difficulty === 'veteran' ? 0.92 : 0.75), 360, 1350);
-  const current = racer.targetLane;
-  let bestLane = current; let bestScore = -Infinity;
+  const candidates = laneCandidates(racer, ctx.step.laneNetwork ?? null);
+  let bestCandidate = candidates[0]; let bestScore = -Infinity;
   const seen = new Set<Obstacle>();
   const supplies = new Set<AirPickup>();
   for (const obstacle of world.obstaclesInSpan(racer.x, racer.x + lookAhead)) seen.add(obstacle);
   for (const pickup of world.pickupsInSpan(racer.x, racer.x + lookAhead)) if (pickup.collectedBy === null) supplies.add(pickup);
-  for (let lane = Math.max(0, current - 1); lane <= Math.min(3, current + 1); lane++) {
-    let score = lane === current ? 1.1 : -0.25;
+  for (const candidate of candidates) {
+    const lane = candidate.lane;
+    let score = candidate.current ? 1.1 : -0.25;
     for (const obstacle of seen) {
       const distance = obstacle.x - racer.x;
-      if (distance < -obstacle.width || distance > lookAhead || !occupiesLane(obstacle, laneZ(lane), 0)) continue;
+      if (distance < -obstacle.width || distance > lookAhead || !occupiesLane(obstacle, candidate.z, 0)) continue;
       if (obstacle.kind === 'gap') score -= distance < racer.vx * 0.45 ? 13 : 7;
       else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
         const proximity = 1 - clamp(distance / lookAhead, 0, 1);
@@ -94,15 +149,16 @@ export function driveCpu(racer: Racer, ctx: CpuContext): void {
     }
     for (const other of ctx.others) {
       if (other.id === racer.id || other.finished || other.falling) continue;
-      if (Math.abs(other.x - racer.x) < 125 && Math.abs(other.z - laneZ(lane)) < 90) {
+      if (Math.abs(other.x - racer.x) < 125 && Math.abs(other.z - candidate.z) < 90) {
         score += racer.weight > other.weight * 1.05 && randomAt(racer.id, runTime) > 0.43 ? 3.8 : -2.8;
       }
     }
-    if (score > bestScore) { bestScore = score; bestLane = lane; }
+    if (score > bestScore) { bestScore = score; bestCandidate = candidate; }
   }
-  if (runTime - racer.lastLaneChange > laneCommitInterval(difficulty)) setLane(racer, bestLane, runTime);
+  if (runTime - racer.lastLaneChange > laneCommitInterval(difficulty)) setCandidate(racer, bestCandidate, runTime);
   const soon = racer.x + racer.vx * 0.22;
-  if (canHop(racer, runTime) && (world.inGap(soon, racer.z) || world.inGap(soon, laneZ(racer.targetLane)))) performHop(racer, ctx.step);
+  const targetZ = resolveLaneTarget(racer, ctx.step.laneNetwork ?? null).targetZ;
+  if (canHop(racer, runTime) && (world.inGap(soon, racer.z) || world.inGap(soon, targetZ))) performHop(racer, ctx.step);
   if (canHop(racer, runTime)) {
     const timing = hopTiming(racer.vx, 290 * weightImpulse(racer.weight) * racer.hopFactor);
     for (const pickup of supplies) {

@@ -29,6 +29,7 @@ import {
   type Obstacle,
 } from '../scene';
 import type { Racer } from '../racers';
+import { advanceRoll } from '../gyro-ball';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -141,6 +142,7 @@ export function recoverRacer(racer: Racer, ctx: RacerStepContext, reason: Recove
   racer.y = ctx.world.surfaceAt(racer.x, racer.z).y - RADIUS;
   racer.vx = ctx.recovery.respawnSpeed; racer.vy = ctx.world.slope(racer.x) * racer.vx;
   racer.falling = false; racer.grounded = true; racer.loopRide = null;
+  racer.rollPhase = 0; racer.rollRate = 0;
   racer.fallingFor = racer.stoppedFor = 0; racer.immuneUntil = ctx.runTime + 1.5;
   racer.recoveryUntil = ctx.runTime + 1; racer.steerLockedUntil = ctx.runTime + 0.15;
   racer.boosts = Math.max(1, racer.boosts);
@@ -461,6 +463,11 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     }
     racer.rotation += (racer.x - oldX) * (racer.grounded ? Math.sqrt(1 + surface.slope * surface.slope) : 1) / RADIUS;
   }
+  // M01 · T3 (IF-GYRO): the shell's roll is physics-owned and reads the *finished* velocities, so
+  // the renderer never has to integrate anything of its own.
+  advanceRoll(racer, {
+    vx: racer.vx, vz: racer.vz, grounded: racer.grounded, inLoop: racer.loopRide !== null,
+  }, dt);
   racer.vx = clamp(racer.vx, 0, racer.maximumSpeed);
   racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
   racer.stoppedFor = racer.vx < 40 && !racer.loopRide ? racer.stoppedFor + dt : 0;

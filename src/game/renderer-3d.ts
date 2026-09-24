@@ -7,8 +7,10 @@ import * as THREE from 'three';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
 import type { GameOptions } from './types';
-import { RADIUS } from './scene';
+import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
+import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
+import type { GyroFrame } from './first-person';
 import {
   compileRampSurfaces,
   engineDistanceFromX,
@@ -1472,7 +1474,11 @@ import { TrackBuilder3D } from './track-builder-3d';
 interface Racer3DMesh {
   canvas: HTMLCanvasElement | null;
   group: THREE.Group;
-  sphere: THREE.Mesh;
+  /** M01 · T3 (IF-GYRO): the rolling shell — wears `gyroPose.core`. */
+  core: THREE.Mesh;
+  /** The two level brass caps either side of the rider — wear `gyroPose.gyro`. */
+  capLeft: THREE.Mesh;
+  capRight: THREE.Mesh;
   shadow: THREE.Mesh;
   shield: THREE.Mesh;
 }
@@ -1483,6 +1489,10 @@ interface Racer3DMesh {
  */
 interface RacerMeshResources {
   sphereGeo: THREE.SphereGeometry;
+  /** Cap geometries, poles baked onto local −X and +X, so the mesh quaternion is the level basis. */
+  capLeftGeo: THREE.SphereGeometry;
+  capRightGeo: THREE.SphereGeometry;
+  capMat: THREE.MeshStandardMaterial;
   shadowGeo: THREE.PlaneGeometry;
   shadowMat: THREE.MeshBasicMaterial;
   shieldGeo: THREE.SphereGeometry;
@@ -1545,6 +1555,43 @@ export class Renderer3D {
   private fpUp: Vec3 | null = null;
   /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
   private effects: EffectRenderer | null = null;
+  /** M01 · T3 — reused pose quaternions: the render loop never constructs a THREE object. */
+  private readonly coreQuat = new THREE.Quaternion();
+  private readonly gyroQuat = new THREE.Quaternion();
+  /** Last frame the gyro was not falling, so a drop freezes the view instead of tumbling it. */
+  private lastGyroFrame: GyroFrame | null = null;
+
+  /**
+   * The world-space centre of the ring the player is riding, or null when they are not in a loop.
+   * The physics composes the ride in engine space, so the centre is the loop's own engine point —
+   * lifted by the road's own rise across the ring, exactly as `stepRacer` does it — mapped through
+   * the same track-space map every other point uses.
+   */
+  private loopCentreWorld(
+    ball: FpBallState,
+    ride: LoopRide | null,
+    course: GameOptions['course'],
+    ramps: readonly PhysicalRampSurface[],
+  ): Vec3 | null {
+    if (!ride) return null;
+    const loop = loopGeometry(ride.obstacle, course);
+    const rise = courseY(ball.x, course) - courseY(loop.x, course);
+    const placement = placementFromEngine(
+      this.space,
+      { x: loop.x, y: loop.y + rise, z: ball.z },
+      ramps,
+    );
+    return [placement.world.x, placement.world.y, placement.world.z];
+  }
+
+  /** The track's own frame as IF-FP's tuple type, without allocating a second object graph. */
+  private worldFrame(frame: { tangent: { x: number; y: number; z: number }; up: { x: number; y: number; z: number }; right: { x: number; y: number; z: number } }): GyroFrame {
+    return {
+      forward: [frame.tangent.x, frame.tangent.y, frame.tangent.z],
+      up: [frame.up.x, frame.up.y, frame.up.z],
+      right: [frame.right.x, frame.right.y, frame.right.z],
+    };
+  }
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
     this.storedAssets = assets;
@@ -1684,21 +1731,34 @@ export class Renderer3D {
    * copies numbers into the THREE camera and pushes the FOV/near/far once. It reads the *rendered*
    * ball frame (already interpolated by the engine) so the eye and the ball cannot disagree.
    */
-  private placeFirstPersonCamera(ball: FpBallState, ramps: readonly PhysicalRampSurface[], dt: number) {
+  private placeFirstPersonCamera(
+    ball: FpBallState,
+    ride: LoopRide | null,
+    course: GameOptions['course'],
+    ramps: readonly PhysicalRampSurface[],
+    dt: number,
+  ) {
     const placement = placementFromEngine(
       this.space,
       { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded },
       ramps,
     );
-    const frame = placement.frame;
+    const frame = this.worldFrame(placement.frame);
+    // T3 (IF-GYRO): in a loop the up points at the ring's centre; while falling it freezes at the
+    // last grounded frame. Both keep the aperture from rolling over the player's head.
+    const loopCentre = this.loopCentreWorld(ball, ride, course, ramps);
+    const gyro = gyroFrameFor(
+      frame,
+      loopCentre ? { centre: loopCentre } : null,
+      [placement.world.x, placement.world.y, placement.world.z],
+      ball.falling === true,
+      this.lastGyroFrame ?? frame,
+    );
+    this.lastGyroFrame = gyro;
     const look = this.track.sampleAt(clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.track.length));
     const fp = firstPersonFrame({
       ballCentre: [placement.world.x, placement.world.y, placement.world.z],
-      gyro: {
-        forward: [frame.tangent.x, frame.tangent.y, frame.tangent.z],
-        up: [frame.up.x, frame.up.y, frame.up.z],
-        right: [frame.right.x, frame.right.y, frame.right.z],
-      },
+      gyro,
       lookPoint: [
         look.pos.x + look.up.x * 140,
         look.pos.y + look.up.y * 140,
@@ -1772,8 +1832,16 @@ export class Renderer3D {
 
   private ensureRacerMeshes(count: number) {
     if (!this.racerResources) {
+      const capLeftGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      capLeftGeo.rotateZ(Math.PI / 2); // pole (+Y) → local −X
+      const capRightGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      capRightGeo.rotateZ(-Math.PI / 2); // pole (+Y) → local +X
       this.racerResources = {
         sphereGeo: new THREE.SphereGeometry(RADIUS, 24, 16),
+        capLeftGeo,
+        capRightGeo,
+        // Brass, shared by every racer on the grid: three geometries and one cap material in total.
+        capMat: new THREE.MeshStandardMaterial({ color: 0xc08a2e, metalness: 0.85, roughness: 0.32 }),
         shadowGeo: new THREE.PlaneGeometry(RADIUS * 2.2, RADIUS * 2.2),
         shadowMat: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
         shieldGeo: new THREE.SphereGeometry(RADIUS * 1.35, 16, 12),
@@ -1806,9 +1874,19 @@ export class Renderer3D {
       roughness: 0.3, metalness: 0.2,
     });
 
-    const sphere = new THREE.Mesh(shared.sphereGeo, material);
-    sphere.castShadow = true;
-    group.add(sphere);
+    // T3: core rolls, caps stay level. The two cap meshes share one material, and their geometry
+    // has the pole baked onto ±X, so the pose simply overwrites each quaternion.
+    const core = new THREE.Mesh(shared.sphereGeo, material);
+    core.castShadow = true;
+    group.add(core);
+
+    const capLeft = new THREE.Mesh(shared.capLeftGeo, shared.capMat);
+    capLeft.castShadow = true;
+    group.add(capLeft);
+
+    const capRight = new THREE.Mesh(shared.capRightGeo, shared.capMat);
+    capRight.castShadow = true;
+    group.add(capRight);
 
     const shadow = new THREE.Mesh(shared.shadowGeo, shared.shadowMat);
     shadow.rotation.x = -Math.PI / 2;
@@ -1820,7 +1898,7 @@ export class Renderer3D {
     group.add(shield);
 
     this.scene.add(group);
-    return { group, sphere, shadow, shield, canvas: canvas ?? null };
+    return { group, core, capLeft, capRight, shadow, shield, canvas: canvas ?? null };
   }
 
   /** Removes the newest mesh from the scene and disposes its per-mesh material. */
@@ -1830,7 +1908,7 @@ export class Renderer3D {
     this.scene.remove(mesh.group);
     // Shadow/shield materials are shared resources — only this mesh's own material
     // (and its participation in the canvas texture cache) belongs to the slot.
-    (mesh.sphere.material as THREE.Material).dispose();
+    (mesh.core.material as THREE.Material).dispose();
     if (mesh.canvas) {
       const cached = this.racerTextures.get(mesh.canvas);
       if (cached && --cached.refs === 0) {
@@ -1844,6 +1922,9 @@ export class Renderer3D {
   private disposeRacerPool() {
     while (this.racers3D.length) this.releaseRacerMesh();
     this.racerResources?.sphereGeo.dispose();
+    this.racerResources?.capLeftGeo.dispose();
+    this.racerResources?.capRightGeo.dispose();
+    this.racerResources?.capMat.dispose();
     this.racerResources?.shadowGeo.dispose();
     this.racerResources?.shadowMat.dispose();
     this.racerResources?.shieldGeo.dispose();
@@ -1877,8 +1958,14 @@ export class Renderer3D {
       );
       mesh.group.position.set(placement.world.x, placement.world.y, placement.world.z);
 
-      // Sphere rolling rotation along track tangent
-      mesh.sphere.rotation.x += (racer.vx * dt) / RADIUS;
+      // T3 (IF-GYRO): the shell rolls, the caps and the rider do not. The pose is arithmetic from
+      // the sim's own roll phase (no renderer-side integration), copied into the reused quaternions.
+      const gyro = gyroPose(racer.rollPhase ?? 0, this.worldFrame(placement.frame));
+      this.coreQuat.set(gyro.core[0], gyro.core[1], gyro.core[2], gyro.core[3]);
+      mesh.core.quaternion.copy(this.coreQuat);
+      this.gyroQuat.set(gyro.gyro[0], gyro.gyro[1], gyro.gyro[2], gyro.gyro[3]);
+      mesh.capLeft.quaternion.copy(this.gyroQuat);
+      mesh.capRight.quaternion.copy(this.gyroQuat);
 
       // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
       mesh.group.visible = !(firstPerson && i === 0);
@@ -1895,7 +1982,7 @@ export class Renderer3D {
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
     if (!this.trackBuilder.freeFly.active) {
-      if (firstPerson) this.placeFirstPersonCamera(frame.ball, rampSurfaces, dt);
+      if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
       this.updateAtmosphere(playerDist);
     }

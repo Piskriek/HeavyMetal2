@@ -24,6 +24,7 @@ const commands = [
     'tests/start-push.test.ts', 'tests/start-zone.test.ts',
     'tests/cockpit.test.ts',
     'tests/effects.test.ts',
+    'tests/gyro-ball.test.ts',
     'tests/multi-select-grouping.test.ts', 'tests/track-props-backup.test.ts', 'tests/track-space.test.ts',
     'tests/track-builder-validation.test.ts',
     'tests/physics-parity.test.ts', 'tests/qualifying-gate.test.ts', 'tests/qualifying-attempt.test.ts',

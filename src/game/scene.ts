@@ -267,6 +267,8 @@ export interface RacerFrame {
   shieldHitAt: number;
   pickupAt: number;
   launchOrigin: { x: number; y: number };
+  /** M01 · T3: the shell's roll phase, in radians. Presentation only — never in the fingerprint. */
+  rollPhase?: number;
 }
 
 export interface SceneFrame {

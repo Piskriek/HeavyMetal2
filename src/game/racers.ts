@@ -36,6 +36,13 @@ export interface Racer extends RacerFrame {
   boosts: number;
   /** T02: true for the local player. Identity is `id` (always PLAYER_ID for the player). */
   isPlayer: boolean;
+  /**
+   * M01 · T3 (IF-GYRO): the shell's roll, owned by the physics, not the renderer. `rollPhase` is
+   * radians in [0, TAU) and `rollRate` radians/s; `advanceRoll` in `gyro-ball.ts` is the only writer.
+   * Deliberately outside the parity fingerprint (T3 AC-9): roll is presentation, not outcome.
+   */
+  rollPhase: number;
+  rollRate: number;
   visited: Set<Obstacle>;
   previous: { x: number; y: number; z: number; rotation: number };
 }
@@ -79,6 +86,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
       launchSpeed: stats.launchSpeed, handling: stats.handling, boostFactor: stats.boostFactor,
       hopFactor: stats.hopFactor, bumpRecovery: stats.bumpRecovery, maximumSpeed: stats.maximumSpeed,
       lane: entry.homeLane, targetLane: entry.homeLane, rotation: 0,
+      rollPhase: 0, rollRate: 0,
       falling: false, finished: false, grounded: false, bumpAt: -100,
       immuneUntil: -100, launchOrigin: { x: startX, y: START_Y },
       shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,

@@ -641,6 +641,9 @@ export class GameEngine {
       rendered.y = racer.previous.y + (racer.y - racer.previous.y) * alpha;
       rendered.z = racer.previous.z + (racer.z - racer.previous.z) * alpha;
       rendered.rotation = racer.previous.rotation + (racer.rotation - racer.previous.rotation) * alpha;
+      // M01 · T3 (IF-GYRO): the roll phase is sampled, not interpolated — a shell that snaps to a
+      // slightly stale phase is invisible, while interpolating it would need a second wrapped field.
+      rendered.rollPhase = racer.rollPhase;
       rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
       rendered.falling = racer.falling; rendered.grounded = racer.grounded; rendered.distance = racer.distance;
       rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;

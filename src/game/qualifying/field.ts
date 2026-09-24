@@ -128,6 +128,8 @@ export function createAttemptRacer(participant: QualifyingParticipant): Racer {
     nextDecision: 0, lastBoostAt: -100, lastLaneChange: -100,
     loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
     isPlayer: (participant as any).isPlayer ?? participant.id === 0,
+    // T3 (IF-GYRO): the shell starts from rest on the grid.
+    rollPhase: 0, rollRate: 0,
     visited: new Set<Obstacle>(),
     previous: { x: START_X, y: START_Y, z, rotation: 0 },
   };

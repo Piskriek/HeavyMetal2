@@ -9,7 +9,7 @@ import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from
 import { classifyPlacedRamp, getTrackSpace } from './track-space';
 import { LaneGizmos } from './lane-gizmos';
 import { applyLaneEdit, snapNode, type LaneEdit } from './lane-path-tool';
-import { validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
+import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
   buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, writeLaneStorage,
 } from './lane-storage';
@@ -21,7 +21,9 @@ import {
   importProps as importTrackStorage,
 } from './track-storage';
 
-export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated';
+export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated'
+  /** M01 · T7 — not a prop shelf: this tab shows the Lanes & Paths panel instead of a card grid. */
+  | 'lanes';
 
 export interface PropDefinition {
   type: string;
@@ -2966,6 +2968,50 @@ export class TrackBuilder3D {
     this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
     this.notify();
     return { ok: true, focus: result.focus };
+  }
+
+  /**
+   * The panel's and the keyboard's way in: one edit, and **a refused edit leaves no undo entry**.
+   * `applyLaneEditToDoc` stays as it is (it is also what a drag calls, once per frame, with undo
+   * pushed once at drag start); this wraps it with the snapshot, so pressing D on a node the tool
+   * refuses cannot push an empty step onto the stack.
+   */
+  applyLaneCommand(edit: LaneEdit): { ok: true; focus?: string } | { ok: false; reason: string } {
+    const before = this.snapshot();
+    const result = this.applyLaneEditToDoc(edit);
+    if (!result.ok) return result;
+    this.undoStack.push(before);
+    if (this.undoStack.length > 30) this.undoStack.shift();
+    this.redoStack.length = 0;
+    return result;
+  }
+
+  /**
+   * A path's half width. The edit ops never touch it, so the panel's width control comes here: same
+   * contract as an edit — validated, one undo entry, refused means nothing changed.
+   */
+  setLanePathHalfWidth(pathId: string, halfWidth: number, opts: { pushUndo?: boolean } = {}): { ok: true } | { ok: false; reason: string } {
+    if (!this.laneDoc) return { ok: false, reason: 'no_document: there is no lane network loaded' };
+    const path = this.laneDoc.paths.find((candidate) => candidate.id === pathId);
+    if (!path) return { ok: false, reason: `unknown_path: there is no path ${pathId}` };
+    if (halfWidth < LANE_HALF_WIDTH_MIN || halfWidth > LANE_HALF_WIDTH_MAX) {
+      return { ok: false, reason: `bad_half_width: ${halfWidth} is outside ${LANE_HALF_WIDTH_MIN}\u2013${LANE_HALF_WIDTH_MAX}` };
+    }
+    if (path.halfWidth === halfWidth) return { ok: false, reason: `unchanged: ${pathId} is already ${halfWidth} wide` };
+    const next: LaneNetwork = {
+      ...this.laneDoc,
+      paths: this.laneDoc.paths.map((candidate) => (
+        candidate.id === pathId ? { ...candidate, halfWidth } : candidate
+      )),
+    };
+    const validation = validateLaneNetwork(next);
+    if (!validation.ok) return { ok: false, reason: 'invalid: the runtime refuses this document' };
+    if (opts.pushUndo !== false) this.pushUndo();
+    this.laneDoc = validation.network;
+    this.laneGizmos.setNetwork(this.laneDoc);
+    this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
+    this.notify();
+    return { ok: true };
   }
 
   /** The node handle under the pointer, or null. */

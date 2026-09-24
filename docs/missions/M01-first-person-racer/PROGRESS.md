@@ -363,7 +363,7 @@ builder draws nothing yet (that is T7), and `environment.ts` still paints the le
 corridor — a network is physics and logic until the dressing ticket catches up. What is proven is the
 model, the storage and the runtime integration, headlessly.
 
-## T1d — the checkpoint is the giant loop's mouth · **this commit**
+## T1d — the checkpoint is the giant loop's mouth · **committed `1d61db0`**
 
 The user's correction to T1c, verbatim: *"there is a 'Loop' decoration at the start of the course, you
 guys have set that as the first split time location, but the loop i was refering to is a giant loop in
@@ -500,38 +500,80 @@ that the slingshot models are `visible = false` in push mode. The framing — wh
 clear of *other* start-zone clutter, and whether the split board reads well over the road — is the
 browser's call.
 
-## T7 — the builder "Lanes & Paths" tool · **in progress**
+## T7 — the builder "Lanes & Paths" tool · **done, this commit**
 
-The pure half is in: `src/game/lane-path-tool.ts` and `tests/lane-edit.test.ts` (6 tests). Eight
-commands (`addPath`, `moveNode`, `insertNode`, `deleteNode`, `setKind`, `split`, `merge`, `markOob`),
-`snapNode` (lane centres within 30 z, a 50-unit x grid, clamped to the corridor), and the lanes half
-of the builder's undo stack. Every op is pure — a frozen document is handed in and comes back
-untouched, and the result is always a network `validateLaneNetwork` has accepted.
+The tool exists end to end: a lane document the builder loads, edits, undoes and saves; handles drawn
+on the track; and a panel that shows the document, its refusals, and where to click next.
 
-Three facts the implementation pinned down, which the panel and the gizmos have to live with:
+**Part 2a, committed `ca5435d` — the gizmos and the builder's lane document.** `lane-gizmos.ts` draws
+every node as one instance of a single `InstancedMesh` (capacity 512, coloured by kind: normal blue,
+merge green, split amber, out of bounds red) and every path as one `Line`. Its own statistics are the
+test's evidence: `handleWrites`, `pathRebuilds`, `materialsCreated`. Two habits it keeps:
 
-* **Kinds are derived, not authored.** T6 refuses a node whose authored kind disagrees with its
-  shape, so every structural op re-derives the kinds of the nodes it touched. The practical
-  consequence: `setKind` is only ever a no-op or a refusal that names what the node's shape actually
-  is — which is what the K key should show, not a way to overrule the graph.
-* **A fork is reached in two steps.** A node in the middle of a path has no *end* at it, so splitting
-  there starts a branch and leaves the node `normal` (the road carries on; the branch is a lane
-  option from that x onwards). A true `split` node — one path ending, two leaving — appears when a
-  path is merged into the fork, then branched again. Both steps are in the test.
-* **`markOob` is a confirmation.** Every dead end short of the flag is already an out-of-bounds
-  trigger by inference; its interesting answer is the refusal, because a path that reaches the flag
-  ends at the finish, not out of bounds.
+* **A move is one write.** AC-4's hundred-frame drag writes the instance matrix a hundred times, adds
+  no material, and rebuilds only the paths that contain the node — not the world.
+* **A refusal is invisible.** `applyLaneEdit` refusing an edit leaves the document, the handles and
+  the statistics byte-identical, which `tests/lane-gizmo.test.ts` (5 tests) asserts directly.
 
-Still to do, and it is the visible half: the lane gizmos in `track-builder-3d.ts` (an `InstancedMesh`
-for the handles, one line per path, picking, drag through `raycastSurface`), the `lanes` category and
-`LanePanel` (node inspector, kind buttons, the validation list, Save/Export/Import, test drive), the
-builder's shared `{ props, lanes }` undo entries, and `tests/lane-panel.mjs` for the DOM and a11y
-claims (AC-4/AC-5).
+The builder's undo stack now carries **both documents** in one entry (`LaneUndoEntry { props, lanes }`),
+so Ctrl+Z steps over a props edit and a lane edit the same way, in the order they happened.
+
+**Part 2b, this commit — the panel, its keys and its commands.** `lane-panel-model.ts` is the panel's
+brain, pure and testable: `lanePanelModel` (nodes, paths, the validator's own refusal sentences,
+`canSave`), `laneKeyIntent` (N/I/Del/K/S/M/O, Ctrl+Z/Y, and *nothing* while a text field has focus) and
+`laneEditForCommand`, which turns a command with no coordinates in it into one concrete edit. The
+defaults are decisions, so they are written down where they can be read:
+
+* **New path** runs to the flag — `[x, x+6000, FINISH]` — in the lane centre carrying the fewest nodes.
+  A path that stops short of the flag is an out-of-bounds trigger by T6's law, and that is not what
+  "new path" means.
+* **Insert** lands in the middle of the segment after the selected node (else the longest segment, so
+  a two-node path has somewhere to grow), with `z` read off the straight line between its neighbours.
+* **Split** branches 4000 down-range, or to the flag, onto the nearest other lane centre.
+* **Merge** needs both halves of the selection — the path to fold in, and the node it folds into;
+  **Mark OOB** marks the selected path's tail, which is usually a confirmation rather than a change.
+
+`LanePanel.tsx` renders that model and nothing else: a live (`aria-live="polite"`) list of the
+validator's refusals where each entry is a button that focuses the offending node, node and path lists,
+a selected-node inspector (x/z boxes that commit on blur or Enter, so typing `4200` does not drag the
+node to `4` on the way), kind buttons labelled by shape rather than authored label, and
+Save/Export/Import/Test drive. **Save is disabled on exactly `model.canSave`**, which is
+`validateLaneNetwork`'s verdict, so the button cannot be enabled over a document the runtime would
+refuse. `TrackBuilderUI.tsx` gained the `lanes` tab, the canvas pick-and-drag (pointer → track surface
+→ `snapNode` → the tool's own `moveNode`, one undo entry per drag, refusals toasted at pointer-up rather
+than once per frame) and the key bindings.
+
+**One law the merge command taught us, pinned in the test.** Folding a path *through* the split node it
+leaves is refused — `kind_mismatch: node grid is a normal node by its shape` — because that node would
+stop being an end and T6 requires the authored kind to equal the shape's. The command does not try to
+paper over it; the refusal is the answer, and the panel shows it.
+
+**Tests and gates.** `tests/lane-panel.test.tsx` (9 tests) covers the model, the command mapping (every
+command either produces an edit the tool accepts or a reason, checked by actually running
+`applyLaneEdit`), the key map, and — for AC-5 — the **rendered markup**: React renders to real HTML in
+node, so the live error list, the disabled Save on an invalid document, the enabled one on a valid
+document, and every control's label are asserted without a browser. The ticket named
+`tests/lane-panel.mjs`; the repo's `.mjs` DOM checks need chromium, and a `.tsx` suite that renders the
+shipping component is the executable form of the same claim, so the file is `tests/lane-panel.test.tsx`.
+`tests/lane-gizmo.test.ts` (5) and `tests/lane-builder.test.ts` (8) cover the handles and the builder
+document. All three suites are registered in `scripts/check.mjs`.
+
+`npm run check`: **602 pass / 47 suites / 0 fail**. Build **1,630.05 kB (448.39 kB gzip)** — 10.8 kB of
+gzip over part 2a, inside the ticket's 40 kB budget. `npm run check:edges`: 0 failures.
+
+**UNVERIFIED.** The sandbox has no browser, so the pixel half is the browser's call: the handles sitting
+on the road at the right lift, the grab-and-drag feel, the panel in the builder's dock next to the prop
+grid, the `Test drive` hand-off into a race, and whether Export's download lands. What is proven is the
+markup, the accounting (AC-1..AC-4 as counts) and the refusals.
 
 ## Next
 
-* **T7** — the builder "Lanes & Paths" tool: the gizmos and the panel over `lane-path-tool.ts`.
-* **T6/T7** — the lane network and the builder lane tool (T6 now done).
+* **T7 is the last ticket in M01** — with it, T0..T7 are all in. What is left is the browser's word on
+  the view (see the UNVERIFIED notes in each section) and the tuning that only the user can call:
+  the chase-cam height, the cockpit framing, and how the lane tool feels under the hand.
+* **The lane tool's honest limits**, for whoever drives it next: a merge is impossible through a node
+  whose kind the merge would break (see above), and a branch is authored as an out-of-bounds spur when
+  it stops short of the flag — both are T6's laws showing through, not bugs.
 * **In the browser now:** the goblin push at the top of the hill, the first-loop queue with its
   ready-up and ordered release, the FPV cockpit, the tight chase camera, painted effects on every
   collision, and a gyro ball that stays level while it rolls.

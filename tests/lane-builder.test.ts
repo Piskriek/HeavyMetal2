@@ -168,3 +168,50 @@ test('a network with no rings still has a document to edit', () => {
   assert.equal(builder.laneValidation().ok, true, 'an empty network is a legal document');
   assert.equal(builder.laneGizmoStats().nodes, 0, 'and it draws no handles');
 });
+
+test('a refused command leaves no undo entry behind', () => {
+  const builder = makeBuilder();
+  const network = sampleLaneNetwork('ridge');
+  builder.setLaneNetwork(network, { pushUndo: false });
+  const node = network.nodes[0];
+  const before = JSON.stringify(builder.getLaneNetwork());
+
+  // Degenerate edits: a move to where it already is, and a node that is not there. Both are refusals.
+  assert.equal(builder.applyLaneCommand({ op: 'moveNode', nodeId: node.id, x: node.x, z: node.z }).ok, false);
+  assert.equal(builder.applyLaneCommand({ op: 'moveNode', nodeId: 'nope', x: 500, z: 0 }).ok, false);
+  assert.equal(JSON.stringify(builder.getLaneNetwork()), before, 'a refusal changes nothing');
+
+  // The stack is empty, so an undo has nothing to put back — which is the point: if the refusals had
+  // pushed entries, the next undo would silently do nothing visible, or worse, step over a real edit.
+  builder.undo();
+  assert.equal(JSON.stringify(builder.getLaneNetwork()), before, 'undo after refusals is a no-op');
+
+  // One accepted command pushes exactly one entry, and it comes back.
+  const moved = builder.applyLaneCommand({ op: 'moveNode', nodeId: node.id, x: node.x + 50, z: node.z });
+  assert.equal(moved.ok, true, moved.ok ? '' : moved.reason);
+  assert.notEqual(JSON.stringify(builder.getLaneNetwork()), before, 'the accepted move landed');
+  builder.undo();
+  assert.equal(JSON.stringify(builder.getLaneNetwork()), before, 'and one undo unwinds it exactly');
+});
+
+test('half width is set through the builder, validated, and undoable', () => {
+  const builder = makeBuilder();
+  const network = sampleLaneNetwork('ridge');
+  builder.setLaneNetwork(network, { pushUndo: false });
+  const path = network.paths[0];
+
+  const widened = builder.setLanePathHalfWidth(path.id, 180);
+  assert.equal(widened.ok, true, widened.ok ? '' : widened.reason);
+  assert.equal(builder.getLaneNetwork()!.paths.find((p) => p.id === path.id)!.halfWidth, 180, 'the width is authored');
+
+  // The validator's own bounds are the door: 10 and 400 are not widths this game can drive.
+  assert.equal(builder.setLanePathHalfWidth(path.id, 10).ok, false);
+  assert.equal(builder.setLanePathHalfWidth(path.id, 400).ok, false);
+  assert.equal(builder.setLanePathHalfWidth('no-such-path', 180).ok, false);
+  assert.equal(builder.getLaneNetwork()!.paths.find((p) => p.id === path.id)!.halfWidth, 180, 'refusals leave it alone');
+  assert.equal(builder.setLanePathHalfWidth(path.id, 180).ok, false, 'and a no-op is refused, not recorded');
+
+  builder.undo();
+  assert.equal(builder.getLaneNetwork()!.paths.find((p) => p.id === path.id)!.halfWidth, path.halfWidth,
+    'one undo returns the authored width');
+});

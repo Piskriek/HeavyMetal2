@@ -681,6 +681,46 @@ nonsense handling is a centred yoke rather than a NaN one.
 centre read-out's size during the pool, and whether the shield ring is noticeable when it is ticking —
 is the browser's call.
 
+## The powerups — drawn where the physics collects them · **this commit**
+
+Two holes in one place, both found the same way as the merge law (grep for what exists and is never
+used):
+
+**Nothing ever drew a pickup.** `assets.pickupSprites` have been painted and loaded since the sprites
+existed; the engine asks `resolvePickups` whether a ball touched a pickup — so they are collectible and
+the HUD shows the charges they grant — and it hands `frame.pickups` to the renderer, which ignored the
+list. A player could gain a shield from something they never saw. `src/game/pickup-view.ts` draws them:
+a pooled `THREE.Sprite` per pickup, placed by `placementFromEngine` — the same mapping the racers use —
+fed with `pickupY`, the very function the collection solve reads for the bob, so the sprite and the
+collision point cannot drift apart. One texture and one material per kind, ever; the pool grows to the
+field's own size and then only hides and reuses (`spritesBuilt` is a high-water mark); a pickup inside
+its collected window is not drawn, so nobody chases a ghost.
+
+**The pickups were laid out on the legacy lanes.** `createAirPickups` builds the field at `laneZ(0..3)`,
+which under an authored network may be mid-air beside the road — collectable in principle, unreachable
+in practice. `layoutPickupsForNetwork` now moves each pickup onto the nearest point of the network at
+its own x, keeping its altitude (the network says nothing about heights), dropping any pickup with **no
+road under it** (the test's stranded pickup sits 1640 units off the only path at its x: "nearest path"
+is not the same as "on the road", so the rule is the path's own half width), and re-numbering ids so
+they stay dense for the sprite pool and the saves. With no network it returns the same values it was
+handed — the legacy layout, to the hair. The engine lays a fresh field out on the network when a race
+starts, and **re-lays it when Test drive hands a new document over**, because the document may have
+moved every lane.
+
+`tests/pickup-view.test.ts` (9): every sprite at its collection point, the bob (and its stillness under
+reduced motion), the collected window, the pool's reuse, a kind with no art skipped rather than drawn
+wrong, disposal, the layout laws, the legacy control, and a structural guard for the wiring.
+
+`npm run check`: **632 pass / 47 suites / 0 fail**. Build **1,636.32 kB (450.66 kB gzip)**.
+
+**CORRECTION to the T7d section above:** it claims `environment.ts` "still paints the legacy four-lane
+corridor". That is wrong — `environment.ts` exports `ArenaEnvironment`, which **no file imports**; the
+legacy corridor painter is dead code, not the thing on screen. The road the player sees is the 3D track's
+own geometry (`track-3d-data` / `renderer-3d`), and with no authored network that is what you drive.
+
+**UNVERIFIED.** Whether the sprites read at the size the FPV camera sees them (150 units, against a
+62-unit ball), and whether their painted look lands against each sky preset, is the browser's call.
+
 ## Next
 
 * **T7 is the last ticket in M01** — with it, T0..T7 are all in. What is left is the browser's word on

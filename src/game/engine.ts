@@ -17,7 +17,7 @@ import {
 import {
   QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
 } from './contracts/qualifying';
-import { POWERUPS, createAirPickups, type AirPickup } from './powerups';
+import { POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup } from './powerups';
 import { adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
@@ -420,7 +420,13 @@ export class GameEngine {
   get lanePaths(): LaneNetwork | null { return this.laneNetwork; }
   setLaneNetwork(network: LaneNetwork | null) {
     this.laneNetwork = network;
-    if (network) this.assignPaths();
+    if (network) {
+      this.assignPaths();
+      // The pickups follow the road: the builder's "Test drive" hands over a document that may move
+      // every lane, so the powerups are re-laid on it here rather than left where the old road was.
+      this.pickups = layoutPickupsForNetwork(this.pickups, network);
+      this.world.configure(this.options.course, this.obstacles, this.pickups);
+    }
   }
 
   /**
@@ -784,7 +790,12 @@ export class GameEngine {
         keepLoopsFromX: startZoneEndX,
       })
       : built;
-    this.pickups = createAirPickups(this.options.course, this.obstacles);
+    // M01 · T6/T7: with an authored network the pickups are laid out on *it*, not on the legacy four
+    // lanes — otherwise a pickup can hang beside the drivable road where nobody can reach it.
+    this.pickups = layoutPickupsForNetwork(
+      createAirPickups(this.options.course, this.obstacles),
+      this.laneNetwork,
+    );
     this.world.configure(this.options.course, this.obstacles, this.pickups);
   }
 

@@ -38,7 +38,7 @@ const commands = [
     'tests/lane-network.test.ts', 'tests/lane-storage.test.ts', 'tests/lane-parity.test.ts',
     'tests/lane-edit.test.ts', 'tests/lane-gizmo.test.ts', 'tests/lane-builder.test.ts',
     'tests/lane-paint.test.ts', 'tests/lane-successor.test.ts',
-    'tests/cockpit-channel.test.ts',
+    'tests/cockpit-channel.test.ts', 'tests/pickup-view.test.ts',
     'tests/lane-panel.test.tsx',
     'tests/merge-split.test.ts',
     'tests/t09-wall-pickups.test.ts',

@@ -10,6 +10,7 @@ import type { GameOptions } from './types';
 import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
+import { PickupView } from './pickup-view';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
 import {
@@ -1562,6 +1563,11 @@ export class Renderer3D {
    * per-frame call below costs one reference comparison in the steady state.
    */
   private lanePaint: LanePaint | null = null;
+  /**
+   * The powerups. Built once, on the first race frame that has any: `assets.pickupSprites` were painted
+   * for this and had never been drawn, so a shield could be collected from a thing nobody could see.
+   */
+  private pickupView: PickupView | null = null;
   /** M01 · T3 — reused pose quaternions: the render loop never constructs a THREE object. */
   private readonly coreQuat = new THREE.Quaternion();
   private readonly gyroQuat = new THREE.Quaternion();
@@ -1997,6 +2003,17 @@ export class Renderer3D {
       this.lanePaint.setNetwork(frame.laneNetwork);
     }
 
+    // The powerups, at the position the collection solve tests against. Only one view is ever built:
+    // the sprites inside it are pooled, so a later race with fewer pickups reuses the same ones.
+    if (frame.pickups.length > 0) {
+      if (!this.pickupView) {
+        this.pickupView = new PickupView(this.scene, this.storedAssets.pickupSprites ?? {}, this.space);
+      }
+      this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces());
+    } else {
+      this.pickupView?.hideAll();
+    }
+
     if (!this.trackBuilder.freeFly.active) {
       if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
@@ -2034,6 +2051,8 @@ export class Renderer3D {
     this.effects = null;
     this.lanePaint?.dispose();
     this.lanePaint = null;
+    this.pickupView?.dispose();
+    this.pickupView = null;
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

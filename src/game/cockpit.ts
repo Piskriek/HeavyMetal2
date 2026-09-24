@@ -29,6 +29,12 @@ export const BOB_MAX_PX = 6;
 /** Yoke span as a share of the viewport (width share first, height cap second). */
 const YOKE_SPAN_OF_WIDTH = 0.42;
 const YOKE_SPAN_OF_HEIGHT = 0.72;
+/**
+ * How wide the *painted* forearm should read, as a share of the viewport height. Scaled off the
+ * sprite's measured paint box (not its canvas, which carries the generator's margins), so the arm
+ * is a close-up forearm reaching in from below rather than a doll's arm on the dashboard.
+ */
+const ARM_WIDTH_OF_HEIGHT = 0.27;
 /** Where the yoke hub sits, as a share of viewport height. */
 const YOKE_HUB_Y = 0.86;
 /** Shoulders live this far below the viewport bottom: the arms must leave through the edge. */
@@ -142,9 +148,14 @@ const GRIP_FRACTION = {
   pivot: { x: YOKE.pivot.x / YOKE.w, y: YOKE.pivot.y / YOKE.h },
 } as const;
 
-/** The hand's anchor inside the arm sprite, and how much of the sprite the limb spans. */
+/** The hand's anchor inside the arm sprite. */
 const ARM_GRIP_FRACTION = ARM.gripFraction;
-const ARM_REACH = ARM.reachFraction;
+/**
+ * How far the *painted* sleeve runs below the fist, as a share of the sprite's canvas height. The
+ * arm is scaled so this span reaches the shoulder, which is what keeps the limb going off-screen at
+ * every viewport instead of ending in mid-air above the dashboard.
+ */
+export const ARM_FIST_TO_SLEEVE = (ARM.paint.y + ARM.paint.h) / ARM.h - ARM_GRIP_FRACTION.y;
 
 /** Where a yoke grip lands in viewport pixels, with the yoke turned by `yokeDeg`. */
 export function gripPoints(layout: CockpitLayout, yokeDeg: number): { left: Point; right: Point; hub: Point } {
@@ -167,12 +178,14 @@ function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point): Arm
     x: layout.w / 2 + sign * span * 0.62,
     y: layout.h * (1 + SHOULDER_BELOW),
   };
-  // The painted hand sits ARM_GRIP_FRACTION down the sprite and the sleeve reaches ARM_REACH of it,
-  // so scaling the sprite until that visible span equals the grip→shoulder distance lands the
-  // shoulder exactly off-screen — no matter which way the yoke is turned.
+  // Scale the sprite so the painted limb reads ARM_WIDTH_OF_HEIGHT tall. Where that would leave the
+  // sleeve short of the shoulder (small viewports, arms at full lock), grow it until it reaches:
+  // the limb must run off the bottom edge, never stop short of it.
+  const paintWidth = Math.max(0.05, ARM.paint.widthFraction);
   const distance = Math.hypot(grip.x - shoulder.x, grip.y - shoulder.y);
-  const spriteH = distance / Math.max(0.05, ARM_REACH - ARM_GRIP_FRACTION.y);
-  const spriteW = spriteH * (ARM.w / ARM.h);
+  const needed = (distance / Math.max(0.05, ARM_FIST_TO_SLEEVE)) * (ARM.w / ARM.h);
+  const spriteW = Math.max((layout.h * ARM_WIDTH_OF_HEIGHT) / paintWidth, needed / 1);
+  const spriteH = spriteW * (ARM.h / ARM.w);
   // Rotation is about the hand, so the hand cannot drift off the grip at any yoke angle. The angle
   // is measured from "straight down the sprite" to "toward the shoulder", in CSS degrees
   // (clockwise on screen): the arm hangs from the fist toward a shoulder that is off-screen.

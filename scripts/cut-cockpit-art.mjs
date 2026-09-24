@@ -364,11 +364,20 @@ function cutArm() {
   const reach = Math.round(ARM_OUT.h * ARM_REACH) - 4; // the resize can drop the final antialiased row
   if (!rowHasPaint(reach)) throw new Error(`arm: the sleeve does not reach y=${reach}; it would float above the screen edge`);
   const grip = { x: x + Math.round(gripX * scale), y: top };
+  // How much of the sprite canvas the painted limb actually covers. The HUD sizes the arm from
+  // this, not from the canvas: the generator's canvas has generous magenta margins, so using the
+  // canvas would draw a doll-sized arm in the cockpit.
+  const paint = bboxWhere(placed, (_r, _g, _b, a) => a > 8) ?? { x: 0, y: 0, w: ARM_OUT.w, h: ARM_OUT.h };
   return {
     file: 'art/cockpit/cockpit-arm.png', ...ARM_OUT,
     grip,
     gripFraction: { x: +(grip.x / ARM_OUT.w).toFixed(4), y: +(grip.y / ARM_OUT.h).toFixed(4) },
     reachFraction: +((reach + 4) / ARM_OUT.h).toFixed(3),
+    paint: {
+      x: paint.x, y: paint.y, w: paint.w, h: paint.h,
+      widthFraction: +(paint.w / ARM_OUT.w).toFixed(4),
+      heightFraction: +(paint.h / ARM_OUT.h).toFixed(4),
+    },
   };
 }
 
@@ -426,13 +435,26 @@ function holesIn(file) {
   return holes.sort((a, b) => b.r - a.r);
 }
 
+/** Fuzz for the plate's own flat studio background. High enough to clear the painted gradient,
+ *  low enough not to breach the plate's outline into its inner panels (22 % punched through). */
+const CLUSTER_BACKGROUND_FUZZ = 10;
+
 function cutCluster(name, width) {
   const file = src(name);
   keyOut(file);
   const background = identify(['-format', '%[pixel:p{0,0}]', file]);
-  // The plate sits on a flat studio background: one trim takes it off without touching the discs.
+  // The generator painted the plate on a flat studio background that its own border matte does not
+  // cover (the plate does not reach the canvas edge). Flood-filling that background from the border
+  // is what keeps the plate a cut-out: a plain `-trim` leaves a hard cream rectangle around it, and
+  // a global key would eat the bone-ivory dial faces too. The dial holes are enclosed, so the flood
+  // cannot reach them.
+  const cleared = temp(`${name}-clear`);
+  const [canvasW, canvasH] = size(file);
+  const corners = [[0, 0], [canvasW - 1, 0], [0, canvasH - 1], [canvasW - 1, canvasH - 1]];
+  run([file, '-bordercolor', background, '-fuzz', `${CLUSTER_BACKGROUND_FUZZ}%`, '-fill', 'none',
+    ...corners.flatMap(([cx, cy]) => ['-draw', `matte ${cx},${cy} floodfill`]), cleared]);
   const trimmed = temp(`${name}-trim`);
-  run([file, '-bordercolor', background, '-fuzz', '12%', '-trim', '+repage', trimmed]);
+  run([cleared, '-trim', '+repage', trimmed]);
   run([trimmed, '-resize', `${width}x`, out(name)]);
   log(name, out(name));
   const holes = holesIn(out(name));

@@ -62,7 +62,15 @@
       "x": 0.3564,
       "y": 0.0469
     },
-    "reachFraction": 0.96
+    "reachFraction": 0.96,
+    "paint": {
+      "x": 152,
+      "y": 60,
+      "w": 720,
+      "h": 1168,
+      "widthFraction": 0.7031,
+      "heightFraction": 0.9125
+    }
   },
   "clusters": [
     {

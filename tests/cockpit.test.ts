@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   APERTURE_FRACTION, BOB_MAX_PX, COCKPIT_ART, COCKPIT_ART_PATHS, COCKPIT_MANIFEST,
-  VZ_MAX, YOKE_MAX_DEG, armsAt, cockpitBob, cockpitLayout, createCockpitState, gripPoints,
+  ARM_FIST_TO_SLEEVE, VZ_MAX, YOKE_MAX_DEG, armsAt, cockpitBob, cockpitLayout, createCockpitState, gripPoints,
   needleAngle, steerFrom, yokeAngleDeg,
 } from '../src/game/cockpit';
 import { DEFAULT_OPTIONS, type GameOptions } from '../src/game/types';
@@ -90,8 +90,9 @@ test('the hands stay on the grips, and both arms leave through the bottom edge',
         assert.ok(Math.abs(pose.grip.x - (side === 'left' ? grips.left.x : grips.right.x)) < 1e-9, 'the grip is the yoke grip');
         // The shoulder is below the viewport, so the arm cannot end in mid-air on screen.
         assert.ok(pose.shoulder.y > h, `${w}x${h} ${side}: shoulder y ${pose.shoulder.y} must be below ${h}`);
-        // And the painted sleeve is long enough to reach it (the arm reaches 96 % of its sprite).
-        const drawn = pose.h * (COCKPIT_MANIFEST.arm.reachFraction - anchor.y);
+        // And the painted sleeve is long enough to reach it (measured from the finished PNG: the
+        // limb runs from the fist to 95.9 % of the sprite height).
+        const drawn = pose.h * (ARM_FIST_TO_SLEEVE);
         assert.ok(drawn >= Math.hypot(pose.shoulder.x - pose.grip.x, pose.shoulder.y - pose.grip.y) - 2,
           `${w}x${h} ${side}: the sleeve is shorter than the arm`);
         assert.ok(pose.w > 0 && pose.h > 0 && Number.isFinite(pose.rotDeg), `${w}x${h} ${side}: finite pose`);

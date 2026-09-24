@@ -36,7 +36,7 @@ const commands = [
     'tests/collision.test.ts',
     'tests/track-storage.test.ts',
     'tests/lane-network.test.ts', 'tests/lane-storage.test.ts', 'tests/lane-parity.test.ts',
-    'tests/lane-edit.test.ts',
+    'tests/lane-edit.test.ts', 'tests/lane-gizmo.test.ts', 'tests/lane-builder.test.ts',
     'tests/merge-split.test.ts',
     'tests/t09-wall-pickups.test.ts',
     'tests/cube-sphere.test.ts',

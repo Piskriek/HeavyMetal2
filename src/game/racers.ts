@@ -52,10 +52,13 @@ export interface Racer extends RacerFrame {
   /** Where a held racer is gliding to: their pool slot, or the loop lane when they are next to go. */
   mergeSlotZ: number;
   /**
-   * True from the moment of release until `MERGE_GHOST_TAIL_S` after the loop exit: the rider is
+   * True from the moment of release until the rider is clear of the geometry loop (`passageExitX`), and
+   * at least `PASSAGE_GHOST_TAIL_S` after the release: the rider is
    * intangible, so the ordered release cannot be spoiled by contact.
    */
   mergeGhost: boolean;
+  /** Run time after which this rider's merge intangibility may end, once they are clear of the loop. */
+  mergeGhostUntil: number;
   /** Run time the racer last left a loop, or -100. The ghost tail is measured from here. */
   loopExitTime: number;
   /**
@@ -108,7 +111,8 @@ export function createRacers(config?: RaceConfig): Racer[] {
       hopFactor: stats.hopFactor, bumpRecovery: stats.bumpRecovery, maximumSpeed: stats.maximumSpeed,
       lane: entry.homeLane, targetLane: entry.homeLane, rotation: 0,
       rollPhase: 0, rollRate: 0,
-      mergeHeld: false, mergeSlotZ: laneZ(entry.homeLane), mergeGhost: false, loopExitTime: -100,
+      mergeHeld: false, mergeSlotZ: laneZ(entry.homeLane), mergeGhost: false, mergeGhostUntil: -100,
+      loopExitTime: -100,
       pathId: null,
       falling: false, finished: false, grounded: false, bumpAt: -100,
       immuneUntil: -100, launchOrigin: { x: startX, y: START_Y },

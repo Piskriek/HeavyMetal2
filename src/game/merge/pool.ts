@@ -34,27 +34,11 @@ import { LANE_WIDTH, laneZ } from '../scene';
 export const BOT_READY_BASE_TICKS = 90;
 /** Extra hold per place in the entry order: the riders who queued first ready first. */
 export const BOT_READY_RANK_TICKS = 30;
-/** The pool gives up waiting for stragglers this long after the first entry. */
 /**
- * M01 · T1c — **which loop the field is sorted at**, zero-based in down-range order.
- *
- * The pool used to anchor at the course's *first* loop. Measured on the real layouts, that loop is
- * `1.93 s` from the shove on **every** course — the start pad crests 300 units above it — so the
- * ready-up panel arrived two seconds into the run, and every rider's split read ~2 s. The opening
- * stint is supposed to be the player's first split, so the sort moved to the loop at the bottom of
- * the opening descent (`2`, the third loop):
- *
- * | loop | ridge | boomtown | sheep |
- * | --- | --- | --- | --- |
- * | 1 | 1.93 s | 1.93 s | 1.93 s |
- * | **2 (sorted here)** | **9.36 s** | **9.99 s** | **12.68 s** |
- * | 3 | 12.82 s | 13.47 s | — |
- *
- * The field now rides the first loop (and the crest, and the gap) before anyone queues, and the
- * split is the run they actually made. One number: move it to `1` for a brisk 4 s opening, or `3`
- * for a longer one, and nothing else needs to change.
+ * M01 · T1d — the plane this pool sorts at is the **mouth of the track's own 360° geometry loop**,
+ * derived in `qualifying/passage.ts` from `track-space.ts`'s spline. It is not a ring-obstacle index any
+ * more: see that module for why (the user's own correction, and the measured crossing times).
  */
-export const MERGE_SORTING_LOOP_INDEX = 2;
 
 export const POOL_MAX_WAIT_TICKS = 1200;
 /**
@@ -78,8 +62,6 @@ export const RELEASE_RETRY_TICKS = 6;
 export const RELEASE_MAX_RETRIES = 8;
 /** Every released rider leaves at the same speed, so release order is exit order (D9). */
 export const MERGE_RELEASE_VX = 700;
-/** Riders stay intangible this long after their loop exit; contact racing resumes after that. */
-export const MERGE_GHOST_TAIL_S = 0.75;
 /** How long a rider may take to slide into the loop lane before being released regardless. */
 export const ALIGN_MAX_TICKS = 150;
 /**

@@ -1,4 +1,4 @@
-# M01 · T2 / T1c — The Sorting-Loop Merge Pool
+# M01 · T2 / T1d — The Merge Pool at the Geometry Loop
 
 > Interface `IF-MERGE` · Module `src/game/merge/pool.ts` · Overlay `src/components/MergePoolOverlay.tsx`
 
@@ -21,47 +21,62 @@ What the player sees is the **merge-pool overlay**
 by the map editor's test run),
 driven entirely by `snapshot.merge`.
 
-## Where the field is sorted (M01 · T1c)
+## Where the field is sorted (M01 · T1d)
 
-The pool used to anchor at the course's **first** loop. `createQualifyingGate` derives the gate plane
-from a loop's own outer reach, and the start pad is a flat crest 240 above the ground whose lip sits
-directly above the first ring — so the plane was **1.93 s from the shove on every course**. The
-ready-up panel therefore arrived two seconds into the run and every split read ~2 s, which is not the
-opening stint the split is supposed to measure.
+The sort anchors at the **mouth of the track's own 360° loop** — the giant loop in the 3D geometry where
+the lanes go through a full circle, with the granite tunnel portal
+(`prop_26_granite_tunnel_portal`, the user's own placed prop) standing at its mouth. That is the first
+checkpoint of the course, and the split the player sets is the run down to it.
 
-The sort now anchors at `MERGE_SORTING_LOOP_INDEX` — the loop at the **bottom of the opening
-descent**, which is the first honest run-to-the-loop the course has:
+Two corrections got here, and both were the user's:
 
-| Loop (down-range) | ridge | boomtown | sheep |
+1. the pool first anchored at the course's **first ring obstacle** — the decoration the start pad hangs
+   over — which is crossed **1.93 s** after the shove on every course. The ready-up panel therefore
+   arrived two seconds in, and every split read ~2 s;
+2. moving to a later *ring* (T1c) was still wrong: the loop the user means is not a ring at all. Their
+   words are quoted on `qualifying/passage.ts`.
+
+**The plane is derived, never authored.** `src/game/qualifying/passage.ts` reads the loop out of the
+compiled `TrackSpaceMap` (`LOOP_DEFINITIONS` in `track-space.ts` → arc length → engine x through the
+module's own monotone map). On the shipped track: alpine loop, mouth at engine **x 8304**, far side at
+**x 12358**, radius 1400. Re-authoring the loop in `track-space.ts` moves the checkpoint; nothing else
+needs to be touched, and no course needs its own number.
+
+| Measured from the shove | ridge | boomtown | sheep |
 | --- | --- | --- | --- |
-| 1 | 1.93 s | 1.93 s | 1.93 s |
-| 2 | 4.17 s | 6.13 s | 7.22 s |
-| **3 — sorted here** | **7.45–7.79 s** | **8.57–9.78 s** | **11.15–12.30 s** |
-| 4 | 12.82 s | 13.47 s | — |
+| first ring (the original) | 1.93 s | 1.93 s | 1.93 s |
+| **the mouth (shipped)** | **6.13–6.58 s** | **5.82–7.06 s** | **6.58–7.04 s** |
 
-(Measured with the shipping push and CPU drivers, four racers, `tick / 120`; the range is the
-field's own spread. `tests/merge-runup.test.ts` asserts the floor and the spread on every course.)
+### The barrel carries the field
 
-Moving the plane deeper is not just "pass a bigger index": **what lies below the sorting loop is the
-jump line, and riders are airborne over it.** Measured at ridge's second loop, all four riders arrive
-155–823 units up — outside the gate's own altitude band — so with the descent left intact the whole
-field flies over the sort plane and the pool waits out its 50 s backstop instead of sorting. The
-push-mode layout therefore trims to the sorting plane and keeps the **loops** below it
-(`TrackLayoutOptions.keepLoopsFromX`): the descent's rings stay, the jumps under the plane go, and the
-field rides down on the ground and takes each loop in turn. `tests/merge-runup.test.ts` pins both
-halves of that rule — the kept loops, the dropped jump line, and a queueing field on every course.
+The loop is a real barrel, and the headless sim is 2.5D — it cannot model a tube. So the merge models
+the tube's own rule instead: **a released rider inside the loop runs it at the release speed, on the
+ribbon, single file.** Concretely, for as long as a released rider is between the mouth and the far side:
 
-Everything else is unchanged, and deliberately so:
+* `vx` is the release speed exactly (`MERGE_RELEASE_VX`), so nobody closes the gap on the rider ahead —
+  the exit order is the entry order *by construction*;
+* position is carried on the ribbon (`y = world.y(x) − RADIUS`, grounded, not falling), so no gap, no
+  fall and no recovery can stop a rider inside the loop. Measured without the carry, a recovery inside
+  the barrel pulls a rider ~198 units back and a later rider passes them — which is exactly the
+  collision-with-the-law the user's spec forbids;
+* riders in there are intangible to contact: a barrel is not two dimensions, so two racers at one engine
+  x are not touching in the world. The ghost ends when the rider is **clear of the far side**, with a
+  cap (`PASSAGE_GHOST_CAP_S`) so a stopped rider cannot stay intangible for ever.
 
-* **The qualification gate still means the first loop.** `createQualifyingGate`'s default is index 0,
-  and only `GameEngine.mergeGateFor()` passes `MERGE_SORTING_LOOP_INDEX`. The time-trial path, the
-  gate id (`QUALIFYING_GATE_ID`) and the `'first-loop-entry'` contract are untouched.
-* **The start zone still ends at the first loop.** The push trim's `skipBeforeX` is the sorting plane
-  now, but `keepLoopsFromX` is the *start zone's* boundary — the two are separate numbers, and the
-  start-zone fingerprint in `tests/start-zone.test.ts` still holds.
-* **The countdown notice** now reads `SORTING LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.`
+A racer riding one of the course's own **rings** (they still stand on the road inside the loop's span)
+keeps that ride — the ring owns its arc and its speed floor — and the carry resumes when they come off it.
 
-The tuning knob is one constant: `1` gives a brisk ~4–7 s opening, `3` a long ~9–13 s one.
+### The run-up
+
+Trimmed to the mouth, with the descent's **rings kept** and the jump line under the plane dropped
+(`TrackLayoutOptions.keepLoopsFromX`). That is not a detail: keeping the jump line means all four riders
+arrive at ridge's second ring 155–823 units *up*, outside the gate's altitude band, so the field flies
+over the plane and never queues. With the rings kept and the jumps dropped, every rider rides the descent
+on the ground and reaches the plane at 5.8–7.1 s.
+
+The start zone still ends at the **first ring's** entry plane (that is `createQualifyingGate`'s default,
+and the qualification gate, its id and the `'first-loop-entry'` contract are all untouched), the altitude
+band is the qualifying gate's own, and the containment is the whole corridor.
 
 ## The ordering law
 
@@ -81,8 +96,9 @@ The exit order is then forced by construction:
    `COUNTDOWN_TICKS` of countdown (`3`, `2`, `1`, then `GO!` for its own 60-tick window).
 4. **The release** is one rider at a time, `RELEASE_GAP_TICKS` apart, always `pool.next` — the
    best-placed queued rider, which is the original entry order.
-5. **The ghost**: a released rider is intangible until `MERGE_GHOST_TAIL_S` after they leave the
-   ring, and the next rider is not released until the previous one has cleared the ring
+5. **The ghost**: a released rider is intangible until they are clear of the geometry loop
+   (`PASSAGE_GHOST_TAIL_S` after the release, and no earlier than the far side), and the next rider is
+   not released until the previous one is a quarter of the way through the loop
    (`previousProgress` occupancy, retried every `RELEASE_RETRY_TICKS`, forced after
    `RELEASE_MAX_RETRIES`). Riders in the ring are excluded from contact anyway, so no two riders
    can ever be in the ring together.
@@ -223,7 +239,6 @@ command.
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
-| `MERGE_SORTING_LOOP_INDEX` | `2` | Which loop the field is sorted at, zero-based in down-range order (T1c — see above). |
 | `BOT_READY_BASE_TICKS` / `BOT_READY_RANK_TICKS` | `90` / `30` | A bot's ready, by rank. |
 | `POOL_MAX_WAIT_TICKS` | `1200` | The window closes on its own this long after the player's own crossing (see *The player's split*). |
 | `POOL_PLAYER_GRACE_TICKS` | `6000` | The backstop: after the field's first arrival, a player who never reaches the loop cannot hang the race for more than this. |
@@ -232,7 +247,7 @@ command.
 | `RELEASE_GAP_TICKS` | `42` | Minimum spacing between two releases. |
 | `RELEASE_RETRY_TICKS` / `RELEASE_MAX_RETRIES` | `6` / `8` | Wait for the ring, then force it. |
 | `MERGE_RELEASE_VX` | `700` | The common release speed. |
-| `MERGE_GHOST_TAIL_S` | `0.75` | Intangibility after leaving the ring. |
+| `PASSAGE_GHOST_TAIL_S` / `PASSAGE_GHOST_CAP_S` | `0.75` / `20` | Intangibility inside the loop, and the cap on it. |
 | `MERGE_GATE_HALF_WIDTH` | `443` | Containment: the whole corridor queues, not just the loop's lane. |
 | `HELD_RESPONSE` / `HELD_DAMPING` | `20` / `6.2` | The held glide (the wet-steering pair). |
 | `ALIGN_MAX_TICKS` / `ALIGN_Z_TOLERANCE` / `ALIGN_VZ_TOLERANCE` | `150` / `6` / `30` | When a rider counts as lined up. |

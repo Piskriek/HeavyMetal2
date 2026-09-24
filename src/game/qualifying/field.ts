@@ -131,7 +131,7 @@ export function createAttemptRacer(participant: QualifyingParticipant): Racer {
     // T3 (IF-GYRO): the shell starts from rest on the grid.
     rollPhase: 0, rollRate: 0,
     // T2 (IF-MERGE): an isolated attempt never queues, so it is neither held nor a ghost.
-    mergeHeld: false, mergeSlotZ: z, mergeGhost: false, loopExitTime: -100,
+    mergeHeld: false, mergeSlotZ: z, mergeGhost: false, mergeGhostUntil: -100, loopExitTime: -100,
     // T6 (IF-LANES): an isolated attempt runs the legacy lanes.
     pathId: null,
     visited: new Set<Obstacle>(),

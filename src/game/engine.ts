@@ -7,25 +7,27 @@ import {
   AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
-  obstacleZ,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type StartMode } from './types';
 import type { RaceConfig } from './session';
 import { createTrackLayout } from './track-layout';
 import {
-  DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentForStep,
-  type QualifyingGateSpec,
+  DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentAtX, segmentForStep,
 } from './qualifying/gate';
+import {
+  QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
+} from './contracts/qualifying';
 import { POWERUPS, createAirPickups, type AirPickup } from './powerups';
 import { adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
+import { MERGE_GATE_HALF_WIDTH, MERGE_RELEASE_VX, MergePool } from './merge/pool';
 import {
-  MERGE_GATE_HALF_WIDTH, MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX, MERGE_SORTING_LOOP_INDEX, MergePool,
-  loopRideProgress,
-} from './merge/pool';
+  PASSAGE_CENTRE_Z, PASSAGE_GHOST_CAP_S, PASSAGE_GHOST_TAIL_S, insidePassage,
+  passageExitX, passageMouthX, passageProgress,
+} from './qualifying/passage';
 import { LEGACY_RECOVERY, type RacerStepContext, type SimFx } from './sim/context';
 import { createSimWorld, type SimWorld } from './sim/world';
 import {
@@ -117,7 +119,7 @@ export class GameEngine {
    * `setInterval` countdown and teleporting release) is gone: the pool replaces it entirely.
    */
   private merge: MergePool | null = null;
-  private mergeGate: QualifyingGateSpec | null = null;
+  private mergeGate: QualifyingGate | null = null;
   /** The last rider the pool released, for the occupancy check on the next one. */
   private mergeLastReleased: number | null = null;
   /** True once the pool has released everyone: the merge happens once per run, and only once. */
@@ -511,21 +513,30 @@ export class GameEngine {
   get isSoloMode() { return this.soloMode; }
 
   /**
-   * M01 · T2 — the first-loop merge pool (IF-MERGE).
+   * M01 · T2 / T1d — the sorting-loop merge pool (IF-MERGE).
    *
-   * The gate is the first loop's own entry plane, from `createQualifyingGate`, but the *containment*
-   * is the whole corridor: a rider in the outermost lane is 360 z-units off the loop's lane and must
-   * still queue, or they would bypass the order entirely. The pool then glides the rider who is next
-   * to go into the loop's own lane, which is what makes the lane-filtered loop engage them.
+   * The plane is the **mouth of the track's own 360° geometry loop** — the giant loop, with the granite
+   * tunnel portal standing at its mouth — not a ring decoration's outer reach (`passageMouthX`). The
+   * containment is still the whole corridor: everyone queues, whatever lane they crossed in, or they
+   * would bypass the order entirely. The altitude band is the qualifying gate's own, so a rider who
+   * leaves the ground short of the mouth is held at the plane (the `hold` snap) rather than flying
+   * through the order.
    */
-  private mergeGateFor(): QualifyingGateSpec {
+  private mergeGateFor(): QualifyingGate {
     if (!this.mergeGate) {
-      // M01 · T1c: the sort is anchored at MERGE_SORTING_LOOP_INDEX, not at the loop the start pad
-      // sits above — see that constant for the measured splits it replaces.
-      const gate = createQualifyingGate(this.options.course, this.obstacles, {
-        loopIndex: MERGE_SORTING_LOOP_INDEX,
-      });
-      this.mergeGate = { ...gate, z: 0, halfWidth: MERGE_GATE_HALF_WIDTH };
+      const x = passageMouthX();
+      // Built from the contract, not from an obstacle: the plane is geometry (T1d), so a document with
+      // no rings on it still has a sorting plane. The tolerance is the qualifying gate's own, and the
+      // containment is the whole corridor — a rider in the outermost lane queues like everyone else.
+      this.mergeGate = {
+        id: QUALIFYING_GATE_ID,
+        x,
+        z: PASSAGE_CENTRE_Z,
+        halfWidth: MERGE_GATE_HALF_WIDTH,
+        altitude: 0,
+        altitudeTolerance: QUALIFYING_GATE_ALTITUDE_TOLERANCE,
+        segment: segmentAtX(x),
+      };
     }
     return this.mergeGate;
   }
@@ -580,7 +591,7 @@ export class GameEngine {
       if (!this.merge) {
         this.merge = new MergePool({
           gateX: gate.x,
-          loopZ: obstacleZ(gate.loop),
+          loopZ: gate.z,
           racerIds: this.racers.map((candidate) => candidate.id),
           playerId: this.player.id,
         });
@@ -617,7 +628,7 @@ export class GameEngine {
       : this.racers.find((racer) => racer.id === this.mergeLastReleased) ?? null;
     const candidate = next ? this.racers.find((racer) => racer.id === next.racerId) ?? null : null;
     const released = pool.step(this.tick, {
-      previousProgress: loopRideProgress(previousRacer?.loopRide ?? null),
+      previousProgress: previousRacer ? passageProgress(previousRacer.x) : 1,
       candidateAligned: candidate !== null
         && Math.abs(candidate.z - pool.loopZ) <= 6
         && Math.abs(candidate.vz) <= 30,
@@ -630,10 +641,31 @@ export class GameEngine {
       this.mergeLastReleased = racerId;
     }
 
-    // 4. The ghost tail: contact racing resumes a fixed time after each rider's loop exit.
+    // 3b. The barrel carries the field, single file. A released rider inside the 360° geometry loop runs
+    //     the tube at exactly the release speed, on the ribbon, with nothing able to stop them: no gaps,
+    //     no falls, no recovery, and no closing the gap on the rider ahead. That is what makes the exit
+    //     order the entry order by construction rather than by hope — measured without it, a recovery
+    //     inside the barrel pulls a rider 198 units back and a later rider passes them. (The riders are
+    //     intangible in there too: a barrel is not two dimensions, so two racers at one engine x are not
+    //     in contact in the world.) A racer riding one of the course's own rings keeps that ride — the
+    //     ring owns its arc and its speed floor — and the carrier takes over when they come off it.
+    for (const racer of this.racers) {
+      if (!racer.mergeGhost || racer.loopRide !== null || !insidePassage(racer.x)) continue;
+      racer.vx = MERGE_RELEASE_VX;
+      racer.vy = 0;
+      racer.falling = false;
+      racer.grounded = true;
+      racer.y = this.world.y(racer.x) - RADIUS;
+    }
+
+    // 4. The ghost tail: contact racing resumes once a released rider is **clear of the geometry
+    //    loop** — there is no ring ride to key on any more, because the sorting plane is the loop's
+    //    own mouth (T1d). The cap keeps a rider stopped inside the barrel from staying a ghost for
+    //    ever, and the player is excluded from contact while intangible as before.
     for (const racer of this.racers) {
       if (!racer.mergeGhost) continue;
-      if (racer.loopExitTime > -100 && this.runTime >= racer.loopExitTime + MERGE_GHOST_TAIL_S) {
+      if (this.runTime < racer.mergeGhostUntil) continue;
+      if (racer.x >= passageExitX() || this.runTime >= racer.mergeGhostUntil + PASSAGE_GHOST_CAP_S) {
         racer.mergeGhost = false;
       }
     }
@@ -655,11 +687,13 @@ export class GameEngine {
   }
 
   /**
-   * Lets a rider go: a common speed for everyone (D9), and intangible until their ghost tail ends.
+   * Lets a rider go: a common speed for everyone (D9), and intangible into the loop.
    *
-   * The lane is pinned to the loop's own lane — that is what the glide inside the pool was aiming at,
-   * and the loop is lane-filtered, so a rider released on any other line would run straight past it
-   * and never take their turn in the ring. (The subsequent exit speed-up is the existing `×1.08`.)
+   * The lane is pinned to the mouth's own centre — the sorting plane is the mouth of the geometry loop
+   * (T1d), and the tunnel portal stands across the corridor there, so a rider released anywhere but the
+   * centre would fly the arch. The intangibility runs from here to the loop's exit (`passageExitX`),
+   * with a cap: inside a barrel, two racers at the same engine x are not in contact in the world, and
+   * the ordering law needs them not to be.
    */
   private release(racer: Racer) {
     racer.mergeHeld = false;
@@ -669,7 +703,8 @@ export class GameEngine {
     racer.steerLockedUntil = -100;
     racer.lastGroundedAt = this.runTime;
     racer.loopExitTime = -100;
-    racer.targetLane = closestLane(obstacleZ(this.mergeGateFor().loop));
+    racer.mergeGhostUntil = this.runTime + PASSAGE_GHOST_TAIL_S;
+    racer.targetLane = closestLane(PASSAGE_CENTRE_Z);
     this.effects.push('dust', racer.x, racer.y, racer.z, 1.4, racer.id, this.tick);
     if (racer.id === this.player.id) { this.audio.play('boost'); this.say('GO! HOLD THE LINE INTO THE LOOP.'); }
   }
@@ -751,15 +786,13 @@ export class GameEngine {
     // filter only removes a prefix — the layout itself has no RNG — so every obstacle from the
     // gate on keeps its exact identity (asserted by tests/start-zone.test.ts).
     const built = createTrackLayout(this.options.course);
-    // The push run-up is everything from the start zone's own boundary (`createQualifyingGate` with
-    // its default loop) down to the plane the field is sorted at, with the loops kept and the jump
-    // line below the sort removed (T1c — see `TrackLayoutOptions.keepLoopsFromX`).
+    // The push run-up runs from the start zone's own boundary to the **mouth of the geometry loop**
+    // (T1d), with the descent's rings kept and the jump line under the plane removed (T1c — see
+    // `TrackLayoutOptions.keepLoopsFromX`).
     const startZoneEndX = createQualifyingGate(this.options.course, built).x;
     this.obstacles = this.startMode === 'push'
       ? createTrackLayout(this.options.course, {
-        skipBeforeX: createQualifyingGate(this.options.course, built, {
-          loopIndex: MERGE_SORTING_LOOP_INDEX,
-        }).x,
+        skipBeforeX: passageMouthX(),
         keepLoopsFromX: startZoneEndX,
       })
       : built;

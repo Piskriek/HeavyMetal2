@@ -363,7 +363,59 @@ builder draws nothing yet (that is T7), and `environment.ts` still paints the le
 corridor — a network is physics and logic until the dressing ticket catches up. What is proven is the
 model, the storage and the runtime integration, headlessly.
 
-## T1c — the split is a run, not a fall off the pad · **this commit**
+## T1d — the checkpoint is the giant loop's mouth · **this commit**
+
+The user's correction to T1c, verbatim: *"there is a 'Loop' decoration at the start of the course, you
+guys have set that as the first split time location, but the loop i was refering to is a giant loop in
+the actual 3d geometry of the track where the lanes doe a 360 deg loop, at the mouth of the loop is a
+decoration called public/art/props/prop-26-granite-tunnel-portal.png it sits at the mouth of the loop and
+should serve as the first checkpoint for the first split time."*
+
+Right on both counts, and the codebase had two different kinds of "loop" to confuse:
+
+* a **ring obstacle** (`add('loop', x, …)`) — a 322-unit decoration standing on the road, lane-filtered,
+  rideable if you are in its lane. T1b/T1c anchored the sort to one of these;
+* the **geometry loop** (`LOOP_DEFINITIONS` in `track-space.ts`) — a real 360° circle in the centreline
+  spline, radius 1400 on the alpine stage. That is "the giant loop where the lanes do a 360".
+
+**The sort plane is now derived geometry.** New `src/game/qualifying/passage.ts` reads the alpine loop out
+of the compiled `TrackSpaceMap` (arc → engine x through the module's own monotone map): mouth at engine
+**x 8304**, far side at **x 12358**. Re-author the loop in `track-space.ts` and the checkpoint follows;
+no course carries its own number. The portal prop is named once (`PASSAGE_PORTAL_PROP_TYPE`) as the
+visual marker, never as a dependency — it is not in `DEFAULT_TRACK_PROPS`, and the plane must not need
+the user's document to exist. `MERGE_SORTING_LOOP_INDEX` and the ring-derived gate are gone from the
+merge; the qualifying gate, its id and the `'first-loop-entry'` contract keep their own meaning.
+
+**The barrel carries the field.** The sim is 2.5D and cannot model a tube, so the merge models the tube's
+rule instead. Inside the loop a released rider runs at exactly the release speed on the ribbon (grounded,
+not falling), which is what makes "exiting in entry-time order" true by construction. Measured without it:
+a recovery inside the barrel pulled a rider **198 units back** and a later rider passed them — the exact
+collision-with-the-law the spec forbids. Riders are intangible in there (two racers at one engine x inside
+a barrel are not touching in the world), and the tail ends when they are clear of the far side, capped at
+20 s so a stopped rider cannot stay a ghost for ever. A rider riding one of the course's own rings inside
+that span keeps their ride; the carry resumes when they come off it.
+
+**The descent.** Measured times to the mouth: **6.13–6.58 s (ridge)**, **5.82–7.06 s (boomtown)**,
+**6.58–7.04 s (sheep)** — against 1.93 s for the ring the pad hangs over. The run-up still trims to the
+plane and keeps the rings below it (T1c's `keepLoopsFromX`): keeping the jump line means all four riders
+arrive at ridge's second ring 155–823 units up, outside the gate's altitude band, and the field flies
+over the plane without queueing.
+
+**Evidence.** `tests/merge-runup.test.ts` (4) is rewritten around the passage: the plane is the geometry
+loop's mouth (radius, 4054-unit span, the portal identity, deeper than the first ring on every course);
+the run-up keeps exactly the rings between the start zone and the plane and drops the jump line; all four
+riders queue on every course, first arrival ≥ 4 s, spread ≤ 3 s; two `readFileSync` guards on the engine's
+plane, run-up and barrel carry. `tests/merge-race.test.ts` (9) — the ordering proof — now measures the
+exit as leaving the geometry loop, mirrors the barrel carry, measures exit spacing in time at the released
+speed, excludes recovery ticks from the merge's own displacement law (a recovery is the course's policy:
+`LEGACY_RECOVERY` respawns 200 units back by design), and its held/ghost filter control is a real
+both-ways one. `npm run check`: **580 pass / 47 suites / 0 fail**; build **1,593.56 kB (437.60 kB gzip)**;
+edges 0.
+
+**UNVERIFIED.** Headless. Whether the arch reads as "the checkpoint" on screen, what the split board says
+while the field goes through it, and how the barrel carry feels to drive are browser calls.
+
+## T1c — the split is a run, not a fall off the pad · **committed `b5f8b43`**
 
 The user's clarification of T1b: *"the split time should be measured from the start to the first loop,
 currently its 2 sec split times cos the ready up shows 2 sec after you start."* They were exactly
@@ -478,7 +530,6 @@ claims (AC-4/AC-5).
 
 ## Next
 
-* **T1d** (if the depth needs tuning) — `MERGE_SORTING_LOOP_INDEX`, one constant.
 * **T7** — the builder "Lanes & Paths" tool: the gizmos and the panel over `lane-path-tool.ts`.
 * **T6/T7** — the lane network and the builder lane tool (T6 now done).
 * **In the browser now:** the goblin push at the top of the hill, the first-loop queue with its

@@ -137,9 +137,10 @@ export function loopEngagementReach(obstacle: Obstacle, course: CourseId): numbe
  *
  * The qualifying attempt always qualifies at the **first** loop (index 0, the historical behaviour),
  * while the race's merge pool sorts the field at a later one so the opening stint is a real run
- * rather than the two seconds it takes to fall off the start pad (see `MERGE_SORTING_LOOP_INDEX` in
- * the engine). Indexing rather than a distance keeps the choice course-independent and readable:
- * every course's loops are authored in down-range order.
+ * rather than the two seconds it takes to fall off the start pad (see `qualifying/passage.ts`: the
+ * race sorts at the track's own geometry loop now, not at a ring). Indexing rather than a distance
+ * keeps the choice course-independent and readable: every course's loops are authored in down-range
+ * order.
  */
 export interface QualifyingGateOptions {
   /** Zero-based loop index, in down-range order. Defaults to the first loop. */
@@ -180,7 +181,7 @@ export interface PositionSample { readonly x: number; readonly y: number; readon
 /** Builds the contract's swept-crossing input from two engine-space samples of one tick. */
 export function crossingInput(
   world: SimWorld,
-  gate: QualifyingGateSpec,
+  gate: QualifyingGate,
   from: PositionSample,
   to: PositionSample,
   segment: string | null,
@@ -195,7 +196,7 @@ export function crossingInput(
 
 export function evaluateCrossing(
   world: SimWorld,
-  gate: QualifyingGateSpec,
+  gate: QualifyingGate,
   from: PositionSample,
   to: PositionSample,
   segment: string | null,

@@ -23,7 +23,7 @@ export interface TrackLayoutOptions {
    * M01 · T1c — the run-up the field actually rides: with `skipBeforeX` set to the sorting gate,
    * loops at or after this `x` are kept anyway.
    *
-   * Sorting the field deeper than the start pad (see `MERGE_SORTING_LOOP_INDEX`) cannot simply trim
+   * Sorting the field at the geometry loop's mouth (`qualifying/passage.ts`) cannot simply trim
    * every obstacle below the new gate: what lies under it is the jump line, and riders are airborne
    * over it — measured, all four riders arrive at ridge's second loop 155–823 units up, outside the
    * gate's altitude band, so they would fly over the sort plane and the pool would wait out its whole

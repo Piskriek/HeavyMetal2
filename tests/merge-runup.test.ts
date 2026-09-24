@@ -1,22 +1,27 @@
 /**
- * M01 · T1c — the run-up to the sorting loop.
+ * M01 · T1d — the run-up to the **geometry loop**, and the checkpoint at its mouth.
  *
- * The pool used to anchor at the course's *first* loop. That loop is 1.93 s from the goblin's shove on
- * every course — the start pad is a flat crest 240 above the ground and its lip sits directly above the
- * first ring — so the ready-up panel arrived two seconds into the run and every split read ~2 s. The
- * sort now anchors at `MERGE_SORTING_LOOP_INDEX`, the loop at the bottom of the opening descent.
+ * The sorting plane is not a ring decoration's reach: it is the mouth of the 360° loop that is part of
+ * the track's own geometry (`LOOP_DEFINITIONS` in `track-space.ts`), and the granite tunnel portal the
+ * user placed (`prop_26_granite_tunnel_portal`) stands at that mouth. Their words: *"the loop i was
+ * refering to is a giant loop in the actual 3d geometry of the track where the lanes do a 360 deg loop,
+ * at the mouth of the loop is a decoration called public/art/props/prop-26-granite-tunnel-portal.png
+ * ... that should serve as the first checkpoint."*
  *
- * This file is the law for the run-up that leads there:
+ * This file is the law for that run-up:
  *
- *   1. the run-up is the start zone plus the **loops** below the sorting gate, and nothing else. The
- *      jump line below the gate cannot simply be kept: riders are airborne over it (measured 155–823
- *      units up at ridge's second loop, outside the gate's own altitude band), a field that flies over
- *      the plane never queues, and the pool would then wait out its whole backstop;
- *   2. driving the field exactly as the engine does, all four riders reach the plane and queue, on every
+ *   1. the plane is **derived from the geometry** (arc length → engine x through the track-space map),
+ *      never authored: it is the alpine loop's mouth, and that loop is a real circle in the spline;
+ *   2. the run-up is the start zone plus the **rings** below the mouth, and nothing else. The jump line
+ *      under the plane cannot be kept: riders are airborne over it (measured 155–823 units up at ridge's
+ *      second ring, outside the gate's altitude band), a field that flies over the plane never queues,
+ *      and the pool would then wait out its whole backstop;
+ *   3. driving the field exactly as the engine does, all four riders reach the plane and queue, on every
  *      course, after a real opening stint rather than two seconds;
- *   3. the engine builds that same run-up and that same gate plane — the two `readFileSync` guards.
+ *   4. the engine builds that same plane and that same run-up — the `readFileSync` guards.
  *
- * UNVERIFIED: these are headless numbers. How the ready-up panel *looks* at that moment is browser-only.
+ * UNVERIFIED: these are headless numbers. Whether the portal reads as "the first checkpoint" on screen,
+ * and where the split board sits while the field goes through it, are browser calls.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,48 +35,54 @@ import { createTrackLayout } from '../src/game/track-layout';
 import { createAirPickups } from '../src/game/powerups';
 import { driveCpu, type CpuContext } from '../src/game/sim/cpu-driver';
 import {
-  DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentForStep,
+  DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentAtX, segmentForStep,
 } from '../src/game/qualifying/gate';
+import {
+  QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID,
+} from '../src/game/contracts/qualifying';
 import { FIXED_STEP } from '../src/game/contracts/timing';
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, startPushVelocity } from '../src/game/sim/start-push';
-import { MERGE_GATE_HALF_WIDTH, MERGE_SORTING_LOOP_INDEX } from '../src/game/merge/pool';
+import { MERGE_GATE_HALF_WIDTH } from '../src/game/merge/pool';
+import {
+  PASSAGE_CENTRE_Z, PASSAGE_PORTAL_PROP_TYPE, PASSAGE_STAGE,
+  passageExitX, passageLoop, passageMouthX, passageRadius,
+} from '../src/game/qualifying/passage';
 import { RADIUS } from '../src/game/scene';
 
-/** Every loop on a course, in down-range order — the same order `createQualifyingGate` indexes. */
-function loopsOf(course: CourseId) {
+/** Every ring obstacle on a course, in down-range order. */
+function ringsOf(course: CourseId) {
   return createTrackLayout(course).filter((obstacle) => obstacle.kind === 'loop')
     .sort((a, b) => a.x - b.x);
 }
 
-/** The engine's own run-up, verbatim: sort at `MERGE_SORTING_LOOP_INDEX`, start zone at the first loop. */
-function runUpOptions(course: CourseId) {
-  const bare = createTrackLayout(course);
+/** The start zone's own boundary: the first ring's entry plane (`createQualifyingGate`'s default). */
+function startZoneEndX(course: CourseId) {
+  return createQualifyingGate(course, createTrackLayout(course)).x;
+}
+
+/** The engine's own sorting plane (T1d), field for field — geometry, not an obstacle. */
+function mergeGate() {
+  const x = passageMouthX();
   return {
-    startZoneEndX: createQualifyingGate(course, bare).x,
-    sortGate: createQualifyingGate(course, bare, { loopIndex: MERGE_SORTING_LOOP_INDEX }),
+    id: QUALIFYING_GATE_ID, x, z: PASSAGE_CENTRE_Z, halfWidth: MERGE_GATE_HALF_WIDTH,
+    altitude: 0, altitudeTolerance: QUALIFYING_GATE_ALTITUDE_TOLERANCE, segment: segmentAtX(x),
   };
 }
 
+/** The engine's own run-up: trimmed to the mouth, with the rings above the start zone kept. */
 function runUpLayout(course: CourseId) {
-  const { startZoneEndX, sortGate } = runUpOptions(course);
   return createTrackLayout(course, {
-    skipBeforeX: sortGate.x,
-    keepLoopsFromX: startZoneEndX,
+    skipBeforeX: passageMouthX(),
+    keepLoopsFromX: startZoneEndX(course),
   });
 }
 
 /** Every rider's crossing of the sorting plane, driven as the engine drives the field. */
 function crossGate(course: CourseId) {
-  const { startZoneEndX, sortGate } = runUpOptions(course);
-  const layout = createTrackLayout(course, {
-    skipBeforeX: sortGate.x,
-    keepLoopsFromX: startZoneEndX,
-  });
+  const layout = runUpLayout(course);
   const world = createSimWorld(course, layout, createAirPickups(course, layout));
   const racers = createRacers();
-  // The engine's own merge gate, field for field: the sort plane, the race's own lane containment.
-  const gate = { ...sortGate, z: 0, halfWidth: MERGE_GATE_HALF_WIDTH };
-  const gateX = gate.x;
+  const gate = mergeGate();
   let tick = 0;
   const ctx: RacerStepContext = {
     world, fx: HEADLESS_SIM_FX, recovery: LEGACY_RECOVERY, random: () => 0.62,
@@ -110,7 +121,7 @@ function crossGate(course: CourseId) {
       const racer = racers[i];
       if (entries[i] >= 0) continue;
       const from = racer.previous;
-      if (!(from.x < gateX && racer.x >= gateX)) continue;
+      if (!(from.x < gate.x && racer.x >= gate.x)) continue;
       const segment = segmentForStep(
         DEFAULT_SEGMENT_PROVIDER,
         { x: from.x, loop: null },
@@ -125,69 +136,89 @@ function crossGate(course: CourseId) {
       entries[i] = tick;
     }
   }
-  return { entries, misses, ticks: tick };
+  return { entries, misses };
 }
 
-test('the run-up keeps the loops below the sorting gate and drops the jump line', () => {
+test('the sorting plane is the mouth of the track\'s own 360° loop', () => {
+  const loop = passageLoop();
+  const mouth = passageMouthX();
+  const exit = passageExitX();
+
+  assert.equal(loop.stage, PASSAGE_STAGE, 'the race sorts at the alpine loop');
+  assert.ok(loop.radius >= 1000,
+    `the sorting loop is a real circle, not a ring decoration (radius ${loop.radius})`);
+  assert.ok(exit - mouth > 3000,
+    `the circle spans ${(exit - mouth).toFixed(0)} engine x-units — it is a 360°, not a bump`);
+  assert.equal(passageRadius(), loop.radius, 'the radius is the geometry\'s own');
+
+  // Authored, not invented: the portal is the user's placed prop, named in exactly one place.
+  assert.equal(PASSAGE_PORTAL_PROP_TYPE, 'prop_26_granite_tunnel_portal',
+    'the checkpoint is marked by the granite tunnel portal');
+
+  // The plane has to be deeper than the ring the start pad hangs over, or the ready-up is back to
+  // arriving two seconds into the run — the whole point of the correction.
+  for (const course of COURSES) {
+    const rings = ringsOf(course.id);
+    assert.ok(rings[0].x < mouth,
+      `${course.id}: the plane is not past the first ring`);
+    const runUpRings = rings.filter((ring) => ring.x < mouth);
+    assert.ok(runUpRings.length >= 1,
+      `${course.id}: the run-up has no rings at all — the descent would be a straight line`);
+    assert.equal(runUpRings[0].x, rings[0].x, `${course.id}: the run-up rings start at the first ring`);
+  }
+});
+
+test('the run-up keeps the rings below the sorting plane and drops the jump line', () => {
   for (const course of COURSES) {
     const bare = createTrackLayout(course.id);
-    const { startZoneEndX, sortGate } = runUpOptions(course.id);
-    const loops = loopsOf(course.id);
+    const mouth = passageMouthX();
+    const startZone = startZoneEndX(course.id);
     const context = course.id;
 
-    assert.equal(sortGate.loop.x, loops[MERGE_SORTING_LOOP_INDEX].x,
-      `${context}: the sort is anchored at loop ${MERGE_SORTING_LOOP_INDEX + 1}`);
-    assert.ok(MERGE_SORTING_LOOP_INDEX >= 1,
-      `${context}: the sort must be deeper than the loop the start pad hangs over`);
-    assert.ok(sortGate.x > startZoneEndX + 4000,
-      `${context}: the sort plane is only ${(sortGate.x - startZoneEndX).toFixed(0)} past the start zone`);
-
     const runUp = runUpLayout(course.id);
-    const belowGate = runUp.filter((obstacle) => obstacle.x < sortGate.x);
-    assert.ok(belowGate.length > 0, `${context}: the run-up kept no loops at all`);
-    for (const obstacle of belowGate) {
+    const belowPlane = runUp.filter((obstacle) => obstacle.x < mouth);
+    assert.ok(belowPlane.length > 0, `${context}: the run-up kept nothing at all`);
+    for (const obstacle of belowPlane) {
       assert.equal(obstacle.kind, 'loop',
-        `${context}: the run-up kept a ${obstacle.kind} at x=${obstacle.x.toFixed(0)} below the sort`);
+        `${context}: the run-up kept a ${obstacle.kind} at x=${obstacle.x.toFixed(0)} below the plane`);
     }
-    assert.deepEqual(
-      belowGate.map((obstacle) => obstacle.x),
-      loops.filter((loop) => loop.x >= startZoneEndX && loop.x < sortGate.x).map((loop) => loop.x),
-      `${context}: the run-up loops are exactly the loops between the start zone and the sort`,
-    );
+    assert.deepEqual(belowPlane.map((obstacle) => obstacle.x),
+      ringsOf(course.id).filter((ring) => ring.x >= startZone && ring.x < mouth).map((ring) => ring.x),
+      `${context}: the run-up rings are exactly the rings between the start zone and the plane`);
 
     // The trim has to bite: the descent is jump line, and keeping it is what breaks the gate.
-    const dropped = bare.filter((obstacle) => obstacle.x >= startZoneEndX && obstacle.x < sortGate.x
+    const dropped = bare.filter((obstacle) => obstacle.x >= startZone && obstacle.x < mouth
       && obstacle.kind !== 'loop');
-    assert.ok(dropped.length > 0, `${context}: nothing was dropped below the sort — is the layout flat?`);
+    assert.ok(dropped.length > 0, `${context}: nothing was dropped below the plane — is the layout flat?`);
     for (const obstacle of dropped) {
       assert.ok(!runUp.includes(obstacle),
         `${context}: a ${obstacle.kind} at x=${obstacle.x.toFixed(0)} survived the run-up trim`);
     }
 
-    // Everything from the sort gate on is the course, untouched and in the same order.
-    const tail = bare.filter((obstacle) => obstacle.x >= sortGate.x);
-    assert.deepEqual(runUp.filter((obstacle) => obstacle.x >= sortGate.x).map((obstacle) => obstacle.x),
-      tail.map((obstacle) => obstacle.x), `${context}: the race course after the sort changed`);
+    // Everything from the plane on is the course, untouched and in the same order.
+    const tail = bare.filter((obstacle) => obstacle.x >= mouth);
+    assert.deepEqual(runUp.filter((obstacle) => obstacle.x >= mouth).map((obstacle) => obstacle.x),
+      tail.map((obstacle) => obstacle.x),
+      `${context}: the race course after the sorting plane changed`);
   }
 });
 
-test('the whole field queues at the sorting loop, after a real opening stint', () => {
+test('the whole field queues at the mouth, after a real opening stint', () => {
   for (const course of COURSES) {
     const run = crossGate(course.id);
     const context = course.id;
 
     assert.deepEqual(run.misses, [], `${context}: the field flew over its own sorting plane`);
     const times = run.entries.map((tick) => tick / 120);
-    for (const [index, tick] of run.entries.entries()) {
-      assert.ok(tick > 0, `${context}: racer ${index} never reached the sorting gate`);
+    for (const [index, tick] of entriesOf(run).entries()) {
+      assert.ok(tick > 0, `${context}: racer ${index} never reached the sorting plane`);
     }
-    // The user's complaint was a 2 s split: the ready-up arrived before the run had begun. The floor
-    // is deliberately not a tuning value — it only says the opening stint is a run and not a fall.
+
+    // The user's complaint was a 2 s split: the ready-up arrived before the run had begun. The floor is
+    // deliberately not a tuning value — it only says the opening stint is a run and not a fall.
     const first = Math.min(...times);
     assert.ok(first >= 4,
-      `${context}: the field reached the sorting plane ${first.toFixed(2)} s after the shove`);
-    // And the field is still a field when it gets there: the pool closes on its own, well inside the
-    // backstop it carries for a player who cannot make the plane at all.
+      `${context}: the field reached the plane ${first.toFixed(2)} s after the shove`);
     const spread = Math.max(...times) - first;
     assert.ok(spread <= 3,
       `${context}: the field arrived spread over ${spread.toFixed(2)} s — the run-up broke it up`);
@@ -196,14 +227,19 @@ test('the whole field queues at the sorting loop, after a real opening stint', (
   }
 });
 
-test('the engine builds the same run-up and the same gate plane', () => {
+function entriesOf(run: { entries: number[] }) {
+  return run.entries;
+}
+
+test('the engine builds the same plane and the same run-up', () => {
   const source = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(source, /loopIndex: MERGE_SORTING_LOOP_INDEX/,
-    'the merge gate must anchor at the sorting loop, not the first one');
+  assert.match(source, /const x = passageMouthX\(\);/,
+    'the merge gate must be the geometry loop\'s mouth (T1d), not a ring\'s reach');
+  assert.match(source, /skipBeforeX: passageMouthX\(\),/, 'the run-up must be trimmed to the mouth');
   assert.match(source, /keepLoopsFromX: startZoneEndX/,
-    'the push run-up must keep the loops the field rides down to the sorting gate');
-  assert.match(source, /skipBeforeX: createQualifyingGate\(this\.options\.course, built, \{\s*loopIndex: MERGE_SORTING_LOOP_INDEX,/,
-    'the run-up trim must stop at the sorting plane');
+    'the run-up must keep the rings the field rides down to the mouth');
   assert.doesNotMatch(source, /skipBeforeX: startZoneEndX/,
     'the run-up must not be trimmed back to the start zone — that is the two-second ready-up again');
+  assert.match(source, /if \(!racer\.mergeGhost \|\| racer\.loopRide !== null \|\| !insidePassage\(racer\.x\)\) continue;/,
+    'the barrel must carry released riders at the release speed, single file');
 });

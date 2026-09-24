@@ -13,11 +13,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ALIGN_MAX_TICKS, BOT_READY_BASE_TICKS, BOT_READY_RANK_TICKS, COUNTDOWN_TICKS, MERGE_GATE_HALF_WIDTH,
-  MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX, MergePool, PLAYER_AUTO_READY_TICKS, POOL_MAX_WAIT_TICKS,
+  MERGE_RELEASE_VX, MergePool, PLAYER_AUTO_READY_TICKS, POOL_MAX_WAIT_TICKS,
   POOL_PLAYER_GRACE_TICKS,
   RELEASE_GAP_TICKS, RELEASE_MAX_RETRIES, RELEASE_RETRY_TICKS, loopRideProgress, mergeOrder,
   type MergeEntry, type MergeOccupancy,
 } from '../src/game/merge/pool';
+import { PASSAGE_GHOST_TAIL_S } from '../src/game/qualifying/passage';
 import { laneZ } from '../src/game/scene';
 
 const RACERS = [0, 1, 2, 3];
@@ -318,9 +319,10 @@ test('loop progress feeds the occupancy check', () => {
   // A degenerate span (a loop someone authored with entry === exit) reads as clear, not as NaN.
   assert.equal(loopRideProgress({ entryProgress: 1, angle: 1, entryAngle: 1, exitAngle: 1 }), 1);
 
-  // Constants the rest of the system quotes.
+  // Constants the rest of the system quotes. (The release tail lives with the passage now: the rider
+  // is intangible until they are clear of the geometry loop, not until a ring ride ends — T1d.)
   assert.equal(MERGE_RELEASE_VX, 700);
-  assert.equal(MERGE_GHOST_TAIL_S, 0.75);
+  assert.equal(PASSAGE_GHOST_TAIL_S, 0.75);
   assert.equal(RELEASE_GAP_TICKS, 42);
 });
 

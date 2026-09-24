@@ -30,6 +30,7 @@ import {
 } from '../scene';
 import type { Racer } from '../racers';
 import { advanceRoll } from '../gyro-ball';
+import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -58,6 +59,8 @@ export interface RacerStepTrace {
   recoveryReason: RecoveryReason | null;
   loopEngaged: boolean;
   loopExited: boolean;
+  /** M01 · T2: the step was a pool hold, so only the lateral glide ran. */
+  held: boolean;
   landed: boolean;
   rampLaunch: boolean;
   finished: boolean;
@@ -70,7 +73,7 @@ export function createStepTrace(): RacerStepTrace {
   return {
     preObstacleX: 0, preObstacleY: 0, preObstacleZ: 0, preObstacleVx: 0, preObstacleVy: 0,
     wasFalling: false, fell: false, recovered: false, recoveryReason: null, loopEngaged: false,
-    loopExited: false, landed: false, rampLaunch: false, finished: false, lavaPlunge: false, hits: [],
+    loopExited: false, held: false, landed: false, rampLaunch: false, finished: false, lavaPlunge: false, hits: [],
   };
 }
 
@@ -78,6 +81,7 @@ export function resetTrace(trace: RacerStepTrace): void {
   trace.preObstacleX = trace.preObstacleY = trace.preObstacleZ = 0;
   trace.preObstacleVx = trace.preObstacleVy = 0;
   trace.wasFalling = trace.fell = trace.recovered = trace.loopEngaged = trace.loopExited = false;
+  trace.held = false;
   trace.landed = trace.rampLaunch = trace.finished = trace.lavaPlunge = false;
   trace.recoveryReason = null;
   trace.hits.length = 0;
@@ -323,6 +327,28 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     trace.preObstacleX = racer.x; trace.preObstacleY = racer.y; trace.preObstacleZ = racer.z;
     trace.preObstacleVx = racer.vx; trace.preObstacleVy = racer.vy;
   }
+  // M01 · T2 (IF-MERGE): a held rider is out of the race for a moment. Nothing integrates — they
+  // are pinned to the gate plane — except the lateral glide into their pool slot (or, when they are
+  // next to go, into the loop's own lane, so the lane-filtered loop will actually engage them).
+  if (racer.mergeHeld) {
+    const steering = (racer.mergeSlotZ - racer.z) * HELD_RESPONSE - racer.vz * HELD_DAMPING;
+    racer.vz = clamp(racer.vz + steering * dt, -650, 650);
+    const previousZ = racer.z;
+    racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
+    racer.lane = closestLane(racer.z);
+    racer.vx = 0; racer.vy = 0;
+    racer.y = world.y(racer.x) - RADIUS;
+    racer.falling = false; racer.grounded = true; racer.stoppedFor = 0;
+    racer.lastGroundedAt = ctx.runTime;
+    advanceRoll(racer, { vx: 0, vz: racer.vz, grounded: true, inLoop: false }, dt);
+    if (trace) {
+      trace.preObstacleX = racer.x; trace.preObstacleY = racer.y; trace.preObstacleZ = racer.z;
+      trace.preObstacleVx = 0; trace.preObstacleVy = 0;
+      trace.held = true;
+    }
+    return;
+  }
   if (racer.falling) {
     racer.fallingFor += dt; racer.vy += GRAVITY * dt;
     racer.x += racer.vx * dt * 0.45; racer.y += racer.vy * dt; racer.rotation += 9 * dt;
@@ -378,6 +404,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       racer.x = loop.x + 3; racer.y = loop.y + loop.ballRadius + world.y(racer.x) - world.y(loop.x);
       racer.vx = Math.min(racer.maximumSpeed, ride.speed * 1.08); racer.vy = world.slope(racer.x) * racer.vx;
       racer.loopRide = null; racer.grounded = false;
+      racer.loopExitTime = ctx.runTime;
       ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1.2, racer.id);
       ctx.fx.effect('dust', racer.x, racer.y, racer.z, 1, racer.id);
       if (trace) trace.loopExited = true;

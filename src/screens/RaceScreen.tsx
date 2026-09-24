@@ -18,6 +18,7 @@ import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import CockpitHud from '../components/CockpitHud';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
+import MergePoolOverlay from '../components/MergePoolOverlay';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
@@ -169,7 +170,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   const best = useMemo(() => Math.max(0, ...records.map((record) => record.distance)), [records]);
   const course = COURSES.find((item) => item.id === config.course) ?? COURSES[0];
-  const playing = snapshot.status === 'flying';
+  // M01 · T2: while the pool holds the field nobody is racing, but the player is still in the seat —
+  // held riders glide in the ring's shadow, so the world keeps drawing and the cockpit stays live.
+  const pooled = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
+  const playing = snapshot.status === 'flying' || pooled;
   const ready = snapshot.status === 'ready';
   // M01 · T1: a normal run leaves the grid on the starter goblin's push, not on the slingshot.
   const pushStart = options.startMode !== 'sling';
@@ -385,6 +389,14 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       if (engine.status === 'ready' && code === 'ArrowDown') { event.preventDefault(); engine.adjustAim(0, -3); return; }
       if (engine.status === 'ready' && code === 'ArrowLeft') { event.preventDefault(); engine.adjustAim(-0.05, 0); return; }
       if (engine.status === 'ready' && code === 'ArrowRight') { event.preventDefault(); engine.adjustAim(0.05, 0); return; }
+      // M01 · T2: while the first-loop pool holds the field, Space or Enter is "ready up" and the
+      // pool is the only thing it can mean — so it is handled before the grid/staging keys, or the
+      // "start the run" branch below would swallow Enter during the countdown.
+      if (engine.inMerge && (code === 'Space' || code === 'Enter')) {
+        event.preventDefault();
+        engine.ready();
+        return;
+      }
       // Fixed non-remappable actions
       if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.start(); return; }
       if (code === 'KeyR') { event.preventDefault(); retry(); return; }
@@ -476,6 +488,15 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   readState={readCockpit}
                   reducedMotion={options.reducedMotion}
                   active={playing || paused || snapshot.status === 'pushing'}
+                />
+              )}
+              {/* M01 · T2: the first-loop pool. While it owns the status the queue panel is up; once
+                  the releases start only GO! is left, and never over a rider who is already racing. */}
+              {snapshot.merge && (snapshot.merge.phase !== 'releasing' || snapshot.merge.countdownLabel) && (
+                <MergePoolOverlay
+                  merge={snapshot.merge}
+                  loadout={config.loadout}
+                  onReady={() => engineRef.current?.ready()}
                 />
               )}
               <AnimatePresence>

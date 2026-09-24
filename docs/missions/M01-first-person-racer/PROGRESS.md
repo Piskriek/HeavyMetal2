@@ -201,9 +201,81 @@ shared cap resources and the "three geometries total" law.
 roll rate is proven in numbers, not on screen. The camera's loop up-vector is built from the loop's
 engine-space centre — an approximation of the ring's true centre within the road's own rise.
 
+## T2 — the first-loop merge pool · **done, this commit**
+
+The legacy checkpoint is deleted, not shadowed: its fields, `triggerCheckpoint`, `readyUp`,
+`releaseFromCheckpoint`, its detection block, its `setInterval` and its `clearInterval`, and its
+snapshot fields (`checkpointStandings`, `countdownNumber`, `CheckpointStanding`). What replaces it
+is a pool at the first loop that makes one promise — **you come out of the loop in the order you
+went into it** — and then hands the field back to contact racing.
+
+| Piece | What it does |
+| --- | --- |
+| `src/game/merge/pool.ts` (IF-MERGE, new) | The queue: `enter` (order key = the crossing's `tick + fraction`, ties by racer id), `ready`, the window, the countdown, the ordered release, the ring-occupancy wait, the ghost tail, and typed refusals (`not_open`, `duplicate_entry`, `unknown_racer`, `not_held`, `already_ready`). Pure — no DOM, no three.js. |
+| `sim/racer-physics.ts` | The **held** branch: x pinned to the gate plane, the ball still rolling, and a lateral PD glide (the wet-steering pair `20 / 6.2`) into the slot; the rider who is next goes to the **ring's own lane**, because the loop is lane-filtered. `loopExitTime` is stamped on exit. |
+| `engine.ts` | `mergeGateFor()` (the first loop's gate, containment widened to the whole corridor at `halfWidth 443`), `ready()` (Space/Enter/overlay), `stepMerge()` (crossing → hold → window → countdown → release → ghosts → status → snapshot), `hold`, `release`, `applyMergeStatus`, `refreshMergeSnapshot`, `pauseForMerge`; the race clock is stopped for the whole field until the pool is `releasing`; the contact pass skips held and ghost riders. |
+| `components/MergePoolOverlay.tsx` + `merge-pool-overlay.css` (new) | The queue as the player sees it: place, name, entry time, ready tick, flags, the countdown, the READY button. Mounted by `RaceScreen` and by the map editor's test run; hidden once the player is released. (The old `components/StagingOverlay.tsx` — T06's staging presentation component, dead code at HEAD — is left exactly as it was; this is a different component with a different name.) |
+| `contracts/commands.ts` | `{ type: 'ready' }` — legal while `checkpoint`/`countdown`, refused elsewhere with the usual typed verdict, collapses under `dedupeCommands`. |
+
+Numbers: bots ready at `entryTick + 90 + 30·rank`, the player is readied for them at `+1800`, the
+window closes at the expected count or after `1200` ticks, the countdown is `360` ticks (`3 · 2 · 1`
+then `GO!` for 60), releases are `42` ticks apart and wait for the previous rider to clear the ring
+(retry `6`, forced after `8`), everyone leaves at `vx 700` with a `0.75 s` ghost tail.
+
+**Verification.** `npm run check` → **547 tests / 47 suites green** · `tsc` clean · build
+1,581.20 kB (433.80 kB gzip) · `check:edges` **0 failures**.
+
+`tests/merge-pool.test.ts` (11 tests) is the pool's own contract. `tests/merge-race.test.ts`
+(8 tests) is the law, driven end to end with the shipping physics **and the shipping contact pass**
+(mirroring `GameEngine.stepRace`/`stepMerge`/`resolveBumps`, the way `tests/start-zone.test.ts`
+mirrors `stepPush`: the engine cannot be constructed here — three.js needs a WebGL context):
+
+* `exitOrder === entryOrder` over **100 push seeds on `ridge` and 24 on each of `boomtown` and
+  `sheep`**, with riders leaving the ring ≥ 200 x-units apart;
+* no contact ever involves a held or ghost rider — a held rider's z matches an independently
+  computed glide to `1e-9` on every tick, and with the filter switched off the same runs *do* bump
+  queued riders, so the check is not vacuous;
+* contact resumes after the ghost tail (the field's own post-merge riders, overlapped, get
+  separated again);
+* no teleport: the merge machinery never moves a rider more than one tick of their own speed, and
+  the gate snap-back is strictly less than the tick that caused it;
+* a run is reproducible from its seed, and the seed really does change who arrives first;
+* the simulation predicate itself (`statusSimulates`: flying, pushing, checkpoint, countdown);
+* and a structural check that the engine still drives the pool this way, so the mirror cannot
+  silently drift.
+
+Also registered: `tests/contracts.test.ts` was green but **not in `scripts/check.mjs`** — it is now,
+with the `ready`-command test (41 tests).
+
+**Three bugs the verification caught, all fixed:**
+
+1. *The pool would have frozen the game.* `frame()` only stepped the physics for `flying` and
+   `pushing`, and the pool's clock is driven from `stepRace` — so the field would have been held at
+   the gate for ever, with nothing able to advance the window, the countdown or a single release. The
+   statuses are now one exported predicate (`statusSimulates`), tested directly and asserted
+   structurally where the frame loop uses it. Related: pausing is now pool-aware. A pause taken while
+   the field is queued records the status it came from and resumes into it — resuming straight into
+   `flying` would have left four riders frozen at the gate — and the pause key works during the pool
+   (the player is still in the seat). The 0.4 s push stays unpausable, as it was.
+2. *Two racers crossing on the same tick.* At seed 3 the third racer crossed the plane in a later
+   sub-tick fraction than a racer who queued after them, so the pool ordered them correctly while a
+   naive "insertion order" reading said otherwise. The law is now measured against the pool's own
+   quantity — the crossing time — and exact ties break by racer id.
+3. *The release was aiming nowhere.* `release()` carried a no-op placeholder where the lane pin
+   belonged (`world.course === undefined ? racer.targetLane : racer.targetLane`). Without it a
+   released rider drifts off the ring's lane, the lane-filtered loop never takes them, and the merge
+   never finishes — the harness fails outright with the pin removed. It now reads
+   `closestLane(obstacleZ(this.mergeGateFor().loop))`.
+
+**UNVERIFIED.** No WebGL here, so the overlay has only been proven as data plus markup (the
+`snapshot.merge` contract, the markup and the CSS are all that can be checked headlessly): the
+*look* of the queue card, the countdown's pulse and the hold note are the browser's call. The
+browser is also the only place the release rhythm can be *felt* (4 riders × 42 ticks = 1.4 s of
+staggered releases) — the tick maths is verified, the pacing judgement is not.
+
 ## Next
 
-* **T2** — first-loop merge: gate → pool → ready-up → ordered ghost release (depends on T1, unblocked).
 * **T6/T7** — the lane network and the builder lane tool.
-* **In the browser now:** the goblin push at the top of the hill, the FPV cockpit, the tight chase
-  camera, painted effects on every collision, and a gyro ball that stays level while it rolls.
+* **In the browser now:** the goblin push at the top of the hill, the first-loop queue with its
+  ready-up and ordered release, the FPV cockpit, the tight chase camera, painted effects on every
+  collision, and a gyro ball that stays level while it rolls.

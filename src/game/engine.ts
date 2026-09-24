@@ -7,15 +7,22 @@ import {
   AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
+  obstacleZ,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type StartMode } from './types';
 import type { RaceConfig } from './session';
 import { createTrackLayout } from './track-layout';
-import { createQualifyingGate } from './qualifying/gate';
+import {
+  DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentForStep,
+  type QualifyingGateSpec,
+} from './qualifying/gate';
 import { POWERUPS, createAirPickups, type AirPickup } from './powerups';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
+import {
+  MERGE_GATE_HALF_WIDTH, MERGE_GHOST_TAIL_S, MERGE_RELEASE_VX, MergePool, loopRideProgress,
+} from './merge/pool';
 import { LEGACY_RECOVERY, type RacerStepContext, type SimFx } from './sim/context';
 import { createSimWorld, type SimWorld } from './sim/world';
 import {
@@ -33,6 +40,18 @@ import { EffectQueue } from './effects/events';
 const TAU = Math.PI * 2;
 const STEP = FIXED_STEP;
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
+
+/**
+ * The statuses in which the simulation keeps stepping.
+ *
+ * The pool's own two are in here on purpose (M01 · T2): while the field is queued the physics still
+ * has to run — held riders glide into their slot and released riders ride the ring — and it is
+ * `stepRace` that drives the pool's own clock, so a status that stops stepping would stop the merge
+ * from ever finishing.
+ */
+export function statusSimulates(status: GameStatus): boolean {
+  return status === 'flying' || status === 'pushing' || status === 'checkpoint' || status === 'countdown';
+}
 
 export class GameEngine {
   private readonly renderer: RangeRenderer;
@@ -86,15 +105,26 @@ export class GameEngine {
   /** Physics ticks since the run began. Effects are stamped with it so a replay lines up. */
   private tick = 0;
 
-  // Checkpoint system: freeze at first loop entrance
-  private checkpointTriggered = false;
   /** M01 · T1: push cursor (0 while not pushing) and the per-racer targets for this run. */
   private pushTick = 0;
   private pushTargets: number[] = [];
-  private checkpointX = 17000; // After Granite Tunnel Portal (trackDist ~16999)
-  private frozenVelocities: { vx: number; vy: number; vz: number }[] = [];
-  private countdownTimer = 0;
-  private countdownInterval: ReturnType<typeof setInterval> | null = null;
+  /**
+   * M01 · T2 — the first-loop merge pool. Built on the first gate crossing, driven from `stepRace`
+   * and retired once every rider has been released. The legacy checkpoint (a fixed x at 17000 with a
+   * `setInterval` countdown and teleporting release) is gone: the pool replaces it entirely.
+   */
+  private merge: MergePool | null = null;
+  private mergeGate: QualifyingGateSpec | null = null;
+  /** The last rider the pool released, for the occupancy check on the next one. */
+  private mergeLastReleased: number | null = null;
+  /** True once the pool has released everyone: the merge happens once per run, and only once. */
+  private mergeDone = false;
+  /**
+   * The status a pause was taken from, so resuming puts the game back where it was. Pausing during
+   * the pool has to come back to the pool: a resumed field that jumped straight to `flying` would
+   * leave the queued riders held with nothing left to release them.
+   */
+  private pausedFrom: GameStatus | null = null;
 
   // Solo test mode: only the player marble
   private soloMode = false;
@@ -222,13 +252,15 @@ export class GameEngine {
 
   reset = () => {
     this.snapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
-    this.checkpointTriggered = false;
     this.pushTick = 0;
     this.pushTargets = [];
     this.tick = 0;
     this.effects.reset();
-    this.frozenVelocities = [];
-    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
+    this.merge = null;
+    this.mergeGate = null;
+    this.mergeDone = false;
+    this.mergeLastReleased = null;
+    this.pausedFrom = null;
     this.racers = createRacers(this.config);
     // Solo mode: keep only the player, remove all AI racers
     if (this.soloMode) {
@@ -320,11 +352,9 @@ export class GameEngine {
     state.position = this.snapshot.position;
     state.raceTime = this.snapshot.raceTime;
     state.pushing = this.snapshot.status === 'pushing';
-    state.countdownLabel = this.snapshot.countdownNumber !== undefined
-      ? String(this.snapshot.countdownNumber)
-      : this.snapshot.status === 'checkpoint'
-        ? 'POOL'
-        : null;
+    // M01 · T2: the cockpit's own countdown read-out is the pool's, and it says POOL while queued.
+    state.countdownLabel = this.snapshot.merge?.countdownLabel
+      ?? (this.snapshot.status === 'checkpoint' ? 'POOL' : null);
     return state;
   }
 
@@ -375,6 +405,16 @@ export class GameEngine {
 
   private canHop(racer: Racer) { return canHopSim(racer, this.runTime); }
 
+  /**
+   * Can a pause be taken right now? Racing, and — since M01 · T2 — the first-loop pool as well: a
+   * queued player who has to look away should be able to stop the clock without the merge getting
+   * ahead of them. The push is deliberately not pausable (it is 0.4 s of the starter goblin's work).
+   */
+  private get pausable(): boolean {
+    const status = this.status;
+    return status === 'flying' || status === 'checkpoint' || status === 'countdown';
+  }
+
   jump = () => {};
 
   bounce = () => {
@@ -390,8 +430,13 @@ export class GameEngine {
   private performBoost(racer: Racer) { performBoostSim(racer, this.simCtx); }
 
   togglePause = () => {
-    if (this.status === 'flying') this.snapshot.status = 'paused';
-    else if (this.status === 'paused') this.snapshot.status = 'flying';
+    if (this.status === 'paused') {
+      this.snapshot.status = this.pausedFrom ?? 'flying';
+      this.pausedFrom = null;
+    } else if (this.pausable) {
+      this.pausedFrom = this.status;
+      this.snapshot.status = 'paused';
+    }
     this.accumulator = this.lastFrame = 0; this.notify();
   };
 
@@ -401,145 +446,225 @@ export class GameEngine {
 
   get isSoloMode() { return this.soloMode; }
 
-  /** Trigger checkpoint: freeze all racers and show standings */
-  private triggerCheckpoint() {
-    if (this.checkpointTriggered) return;
-    this.checkpointTriggered = true;
-    this.snapshot.status = 'checkpoint';
-
-    // If in solo mode, restore the full field of racers at the checkpoint
-    if (this.soloMode && this.racers.length === 1) {
-      const player = this.racers[0];
-      const allRacers = createRacers(this.config);
-      
-      // Position AI racers near the checkpoint based on their "simulated" progress
-      // Player is at the checkpoint, AI racers are staggered behind
-      for (let i = 0; i < allRacers.length; i++) {
-        const racer = allRacers[i];
-        if (racer.isPlayer) {
-          // Keep player at current position
-          racer.x = player.x;
-          racer.y = player.y;
-          racer.z = player.z;
-          racer.vx = player.vx;
-          racer.vy = player.vy;
-          racer.vz = player.vz;
-          racer.lane = player.lane;
-          racer.targetLane = player.targetLane;
-          racer.distance = player.distance;
-        } else {
-          // AI racers staggered behind the player
-          const offset = (i + 1) * 50; // 50 units apart
-          racer.x = player.x - offset;
-          racer.y = player.y;
-          racer.z = player.z;
-          racer.vx = player.vx * 0.9; // Slightly slower
-          racer.vy = 0;
-          racer.vz = 0;
-          racer.lane = i % 4; // Distribute across lanes
-          racer.targetLane = racer.lane;
-          racer.distance = racer.x - START_X;
-        }
-      }
-      
-      this.racers = allRacers;
-      this.renderRacers = allRacers.map(r => ({ ...r }));
-      this.renderer.setRacerCount(allRacers.length);
+  /**
+   * M01 · T2 — the first-loop merge pool (IF-MERGE).
+   *
+   * The gate is the first loop's own entry plane, from `createQualifyingGate`, but the *containment*
+   * is the whole corridor: a rider in the outermost lane is 360 z-units off the loop's lane and must
+   * still queue, or they would bypass the order entirely. The pool then glides the rider who is next
+   * to go into the loop's own lane, which is what makes the lane-filtered loop engage them.
+   */
+  private mergeGateFor(): QualifyingGateSpec {
+    if (!this.mergeGate) {
+      const gate = createQualifyingGate(this.options.course, this.obstacles);
+      this.mergeGate = { ...gate, z: 0, halfWidth: MERGE_GATE_HALF_WIDTH };
     }
+    return this.mergeGate;
+  }
 
-    // Save all velocities for staggered release
-    this.frozenVelocities = this.racers.map(r => ({
-      vx: r.vx, vy: r.vy, vz: r.vz
-    }));
+  /** The pool, if it is still doing something. Drives the overlay and the HUD's countdown. */
+  get mergePool(): MergePool | null {
+    return this.merge && this.merge.phase !== 'done' ? this.merge : null;
+  }
 
-    // Freeze all racers
+  /** True while the first-loop pool owns the race status. */
+  get inMerge(): boolean { return this.mergePool !== null; }
+
+  /**
+   * The player readies up: Space, Enter or the overlay's READY button. Refused outside the pool and
+   * when they have already readied — the pool answers, and the refusal is a no-op, not an error.
+   */
+  ready = () => {
+    const pool = this.merge;
+    if (!pool || pool.phase === 'done') return;
+    const result = pool.ready(this.player.id, this.tick);
+    if (result.ok) {
+      this.snapshot.notice = 'READY. WAITING FOR THE REST OF THEM.';
+      this.audio.play('pickup');
+      this.refreshMergeSnapshot();
+      this.notify();
+      this.invalidate();
+    }
+  };
+
+  /** One tick of the pool: crossing detection, holds, the state machine and the ordered release. */
+  private stepMerge() {
+    if (this.mergeDone) return;
+    const gate = this.mergeGateFor();
+    const world = this.world;
+
+    // 1. Does anyone cross the gate plane on this tick? The swept validation from gate.ts decides
+    //    (forward motion, plane crossing inside the tick, altitude band, segment identity). The pool
+    //    itself is built by the first crossing, so a race that never reaches the loop never pays for
+    //    a pool it does not use.
     for (const racer of this.racers) {
-      racer.vx = 0;
-      racer.vy = 0;
-      racer.vz = 0;
+      if (racer.mergeHeld || racer.finished) continue;
+      if (this.merge?.entries.some((entry) => entry.racerId === racer.id)) continue;
+      const from = racer.previous;
+      if (!(from.x < gate.x && racer.x >= gate.x)) continue;
+      const segment = segmentForStep(
+        DEFAULT_SEGMENT_PROVIDER,
+        { x: from.x, loop: null },
+        { x: racer.x, loop: racer.loopRide?.obstacle ?? null },
+      );
+      const outcome = evaluateCrossing(world, gate, from, racer, segment);
+      if (!outcome.ok) continue;
+      if (!this.merge) {
+        this.merge = new MergePool({
+          gateX: gate.x,
+          loopZ: obstacleZ(gate.loop),
+          racerIds: this.racers.map((candidate) => candidate.id),
+          playerId: this.player.id,
+        });
+        this.onMergeNotice('FIRST LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.');
+      }
+      const entered = this.merge.enter(racer.id, this.tick, outcome.fraction, gate.x);
+      if (!entered.ok) continue;
+      this.hold(racer, entered.value.slotZ);
     }
 
-    // Build checkpoint standings (sorted by distance)
-    const standings = [...this.racers]
-      .sort((a, b) => b.x - a.x)
-      .map((racer, index) => ({
-        id: racer.id,
-        name: racer.name,
-        color: racer.color,
-        position: index + 1,
-        distance: Math.round((racer.x - START_X) / 2),
-        raceTime: Math.round(this.runTime * 10) / 10,
-        speed: Math.round(Math.hypot(this.frozenVelocities[racer.id].vx, this.frozenVelocities[racer.id].vy) * 0.16),
-        loadout: { ...racer.loadout },
-        isPlayer: racer.isPlayer,
-      }));
+    const pool = this.merge;
+    if (!pool) return;
+    if (pool.phase === 'done') {
+      this.mergeDone = true;
+      this.merge = null;
+      this.mergeLastReleased = null;
+      this.applyMergeStatus();
+      this.refreshMergeSnapshot();
+      return;
+    }
 
-    this.snapshot.checkpointStandings = standings;
-    this.accumulator = 0;
-    this.notify();
-  }
+    // 2. The rider who is next to go slides over to the loop's lane; everyone else waits in their slot.
+    const next = pool.next;
+    for (const entry of pool.entries) {
+      if (entry.releaseTick !== null) continue;
+      const racer = this.racers.find((candidate) => candidate.id === entry.racerId);
+      if (!racer) continue;
+      racer.mergeSlotZ = entry === next ? pool.loopZ : entry.slotZ;
+    }
 
-  /** Called by UI when player clicks "Ready Up" */
-  readyUp() {
-    if (this.snapshot.status !== 'checkpoint') return;
-    this.snapshot.status = 'countdown';
-    this.countdownTimer = 3;
-    this.snapshot.countdownNumber = 3;
-    this.notify();
-
-    // Start countdown interval
-    this.countdownInterval = setInterval(() => {
-      this.countdownTimer--;
-      if (this.countdownTimer > 0) {
-        this.snapshot.countdownNumber = this.countdownTimer;
-        this.notify();
-      } else {
-        // Release racers in staggered order
-        if (this.countdownInterval) clearInterval(this.countdownInterval);
-        this.countdownInterval = null;
-        this.snapshot.countdownNumber = 0;
-        this.releaseFromCheckpoint();
-      }
-    }, 1000);
-  }
-
-  /** Release all racers from checkpoint with staggered timing and proper spacing */
-  private releaseFromCheckpoint() {
-    // Sort by position (1st place first, then 2nd, etc.)
-    const sorted = [...this.racers].sort((a, b) => b.x - a.x);
-    
-    // Position racers with proper spacing to avoid overlap
-    const spacing = RADIUS * 3; // 3x radius spacing between balls
-    sorted.forEach((racer, index) => {
-      // Stagger X positions so they don't overlap
-      if (index > 0) {
-        racer.x = sorted[0].x - (index * spacing);
-        racer.distance = racer.x - START_X;
-      }
+    // 3. Advance the state machine. The occupancy input is the previous release's own progress.
+    const previousRacer = this.mergeLastReleased === null
+      ? null
+      : this.racers.find((racer) => racer.id === this.mergeLastReleased) ?? null;
+    const candidate = next ? this.racers.find((racer) => racer.id === next.racerId) ?? null : null;
+    const released = pool.step(this.tick, {
+      previousProgress: loopRideProgress(previousRacer?.loopRide ?? null),
+      candidateAligned: candidate !== null
+        && Math.abs(candidate.z - pool.loopZ) <= 6
+        && Math.abs(candidate.vz) <= 30,
+      expected: this.racers.filter((racer) => !racer.finished).length,
     });
-    
-    // Restore velocities in order with staggered timing
-    sorted.forEach((racer, index) => {
-      const saved = this.frozenVelocities[racer.id];
-      setTimeout(() => {
-        racer.vx = saved.vx;
-        racer.vy = saved.vy;
-        racer.vz = saved.vz;
-      }, index * 300); // 300ms stagger between each racer
-    });
+    for (const racerId of released) {
+      const racer = this.racers.find((candidateRacer) => candidateRacer.id === racerId);
+      if (!racer) continue;
+      this.release(racer);
+      this.mergeLastReleased = racerId;
+    }
 
-    this.snapshot.status = 'flying';
-    this.snapshot.checkpointStandings = undefined;
-    this.snapshot.countdownNumber = undefined;
-    this.frozenVelocities = [];
-    this.lastFrame = 0;
-    this.accumulator = 0;
-    this.notify();
+    // 4. The ghost tail: contact racing resumes a fixed time after each rider's loop exit.
+    for (const racer of this.racers) {
+      if (!racer.mergeGhost) continue;
+      if (racer.loopExitTime > -100 && this.runTime >= racer.loopExitTime + MERGE_GHOST_TAIL_S) {
+        racer.mergeGhost = false;
+      }
+    }
+
+    this.applyMergeStatus();
+    this.refreshMergeSnapshot();
   }
+
+  /** Freezes a rider at the gate plane and points them at their pool slot. */
+  private hold(racer: Racer, slotZ: number) {
+    racer.mergeHeld = true;
+    racer.mergeGhost = false;
+    racer.mergeSlotZ = slotZ;
+    racer.x = this.mergeGateFor().x;
+    racer.vx = 0; racer.vy = 0; racer.vz = 0;
+    racer.falling = false; racer.grounded = true;
+    racer.y = this.world.y(racer.x) - RADIUS;
+    this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
+  }
+
+  /**
+   * Lets a rider go: a common speed for everyone (D9), and intangible until their ghost tail ends.
+   *
+   * The lane is pinned to the loop's own lane — that is what the glide inside the pool was aiming at,
+   * and the loop is lane-filtered, so a rider released on any other line would run straight past it
+   * and never take their turn in the ring. (The subsequent exit speed-up is the existing `×1.08`.)
+   */
+  private release(racer: Racer) {
+    racer.mergeHeld = false;
+    racer.mergeGhost = true;
+    racer.vx = MERGE_RELEASE_VX; racer.vy = 0; racer.vz = 0;
+    racer.grounded = false; racer.falling = false;
+    racer.steerLockedUntil = -100;
+    racer.lastGroundedAt = this.runTime;
+    racer.loopExitTime = -100;
+    racer.targetLane = closestLane(obstacleZ(this.mergeGateFor().loop));
+    this.effects.push('dust', racer.x, racer.y, racer.z, 1.4, racer.id, this.tick);
+    if (racer.id === this.player.id) { this.audio.play('boost'); this.say('GO! HOLD THE LINE INTO THE LOOP.'); }
+  }
+
+  private onMergeNotice(text: string) {
+    this.snapshot.notice = text;
+    this.noticeUntil = this.time + 2.4;
+    this.audio.play('pickup');
+  }
+
+  /** The pool owns the game status while it is doing something: pooled, then counting down. */
+  private applyMergeStatus() {
+    const pool = this.merge;
+    if (!pool) return;
+    if (this.snapshot.status === 'paused' || this.snapshot.status === 'finished') return;
+    if (pool.phase === 'done') {
+      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') this.snapshot.status = 'flying';
+      return;
+    }
+    this.snapshot.status = pool.phase === 'open' || pool.phase === 'closed' ? 'checkpoint' : 'countdown';
+  }
+
+  /** One reused object per frame: the overlay reads this and allocates nothing. */
+  private refreshMergeSnapshot() {
+    const pool = this.merge;
+    if (!pool || pool.phase === 'done') { this.snapshot.merge = undefined; return; }
+    const previous = this.snapshot.merge;
+    const entries = pool.entries.map((entry) => {
+      const racer = this.racers.find((candidate) => candidate.id === entry.racerId);
+      return {
+        id: entry.racerId,
+        name: racer?.name ?? `RACER ${entry.racerId}`,
+        color: racer?.color ?? '#ffffff',
+        isPlayer: entry.isPlayer,
+        position: entry.rank + 1,
+        entryTime: Math.round(entry.entryTime * 100) / 100,
+        ready: entry.readyTick !== null,
+        released: entry.releaseTick !== null,
+        // A fresh array: the pool's own entry record stays private to the pool.
+        flags: [...entry.flags],
+      };
+    });
+    // Reuse the array and the entry objects when nothing changed, so a steady pool is allocation-free.
+    const same = previous !== undefined
+      && previous.entries.length === entries.length
+      && previous.entries.every((entry, index) => {
+        const nextEntry = entries[index];
+        return entry.id === nextEntry.id && entry.ready === nextEntry.ready
+          && entry.released === nextEntry.released && entry.position === nextEntry.position;
+      });
+    this.snapshot.merge = {
+      phase: pool.phase,
+      entries: same ? previous!.entries : entries,
+      countdownLabel: pool.countdownLabel(this.tick),
+      playerReady: pool.entries.some((entry) => entry.isPlayer && entry.readyTick !== null),
+      holdTicks: pool.holdTicks(),
+    };
+  }
+
   setVisible(visible: boolean) {
     this.visible = visible;
     if (!visible) {
-      if (this.status === 'flying') this.togglePause();
+      if (this.pausable) this.togglePause();
       cancelAnimationFrame(this.frameId); this.frameId = 0;
     } else { this.lastFrame = 0; this.invalidate(); }
   }
@@ -548,7 +673,7 @@ export class GameEngine {
   private visibilityChanged = () => {
     this.lastFrame = this.lastRender = this.accumulator = 0;
     if (document.hidden) {
-      if (this.status === 'flying') this.togglePause();
+      if (this.pausable) this.togglePause();
       cancelAnimationFrame(this.frameId); this.frameId = 0;
     } else this.invalidate();
   };
@@ -618,10 +743,10 @@ export class GameEngine {
     this.lastFrame = now;
     if (this.status !== 'paused' && this.inputEnabled) {
       this.time += dt; this.shake *= Math.exp(-9 * dt);
-      const simulating = this.status === 'flying' || this.status === 'pushing';
+      const simulating = statusSimulates(this.status);
       if (simulating && !this.pausedForBuild) {
         this.accumulator = Math.min(0.1, this.accumulator + dt);
-        while (this.accumulator >= STEP && (this.status === 'flying' || this.status === 'pushing') && !this.pausedForBuild) {
+        while (this.accumulator >= STEP && statusSimulates(this.status) && !this.pausedForBuild) {
           for (const racer of this.racers) {
             racer.previous.x = racer.x; racer.previous.y = racer.y;
             racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
@@ -634,7 +759,7 @@ export class GameEngine {
       this.updateParticles(dt);
       if (this.time > this.noticeUntil) this.snapshot.notice = '';
     }
-    const alpha = this.status === 'flying' || this.status === 'pushing' ? clamp(this.accumulator / STEP, 0, 1) : 1;
+    const alpha = statusSimulates(this.status) ? clamp(this.accumulator / STEP, 0, 1) : 1;
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i]; const rendered = this.renderRacers[i];
       rendered.x = racer.previous.x + (racer.x - racer.previous.x) * alpha;
@@ -653,7 +778,7 @@ export class GameEngine {
     const player = this.player; const rendered = this.renderRacers[0];
     // M01 · T1: the shove moves the whole field, so the legacy camera state tracks it too — the ball
     // is already sliding down the descent by the time the push hands over to 'flying'.
-    if ((this.status === 'flying' || this.status === 'pushing') && this.inputEnabled && !this.pausedForBuild) {
+    if (statusSimulates(this.status) && this.inputEnabled && !this.pausedForBuild) {
       const focus = player.loopRide?.obstacle.x ?? rendered.x;
       const view = this.renderer.view;
       // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
@@ -669,7 +794,7 @@ export class GameEngine {
       this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
     }
     this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
-    const active = ((this.status === 'flying' || this.status === 'pushing') && !this.pausedForBuild) || this.isDragging;
+    const active = (statusSimulates(this.status) && !this.pausedForBuild) || this.isDragging;
     const due = active || this.needsRender || !this.lastRender || now - this.lastRender >= 1000 / 30 - 0.5;
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
@@ -687,27 +812,30 @@ export class GameEngine {
     }
     if (now - this.lastNotify > 100) this.notify(false);
     const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
-    const checkpointActive = this.status === 'checkpoint' || this.status === 'countdown';
-    if (this.needsRender || checkpointActive || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
+    // While the pool holds the field the overlay is DOM, but the riders are still moving behind it,
+    // so the loop keeps its own frames coming rather than waiting for a redraw request.
+    const poolActive = this.status === 'checkpoint' || this.status === 'countdown';
+    if (this.needsRender || poolActive || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
   };
 
   private stepRace(dt: number) {
-    this.runTime += dt;
-
-    // Checkpoint detection: trigger when PLAYER reaches the checkpoint
-    // Freeze all balls immediately, then show the overlay
-    if (!this.checkpointTriggered && this.player.x >= this.checkpointX) {
-      this.triggerCheckpoint();
-      return;
-    }
+    // M01 · T2: while the first-loop pool is filling or counting down, the race clock is stopped for
+    // the whole field — nobody is racing, so nobody's timers should run. Released riders race again
+    // as soon as the pool reaches the release phase.
+    const pool = this.merge;
+    const clockStopped = pool !== null && pool.phase !== 'done' && pool.phase !== 'releasing';
+    if (!clockStopped) this.runTime += dt;
 
     for (const racer of this.racers) {
       if (racer.finished) continue;
+      // A held rider is out of the race: no CPU decisions, and the physics only glides their slot.
+      if (racer.mergeHeld) { stepRacerSim(racer, this.simCtx, dt); continue; }
       // A race lets the CPU see the whole field and rubber-band against the player; an isolated
       // qualifying attempt passes neither (see sim/cpu-driver.ts).
       if (racer.id && this.runTime >= racer.nextDecision) driveCpu(racer, this.cpuCtx);
       stepRacerSim(racer, this.simCtx, dt);
     }
+    this.stepMerge();
     this.resolveBumps();
     resolvePickupsSim(this.racers, this.simCtx, { reducedMotion: this.reducedMotion, candidates: this.pickupCandidates });
     this.refreshSnapshot();
@@ -722,7 +850,10 @@ export class GameEngine {
   private resolveBumps() {
     for (let i = 0; i < this.racers.length - 1; i++) for (let j = i + 1; j < this.racers.length; j++) {
       const a = this.racers[i]; const b = this.racers[j];
+      // M01 · T2: a held rider is not in the race yet and a ghost has just left the loop — neither
+      // can be touched, which is what keeps the ordered release from being spoiled by contact.
       if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
+        || a.mergeHeld || b.mergeHeld || a.mergeGhost || b.mergeGhost
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
       const diameter = RADIUS * 2 + 4;
@@ -908,7 +1039,6 @@ export class GameEngine {
   }
   destroy() {
     this.destroyed = true; cancelAnimationFrame(this.frameId);
-    if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
     document.removeEventListener('visibilitychange', this.visibilityChanged);
     this.canvas.removeEventListener('pointerdown', this.pointerDown); this.canvas.removeEventListener('pointermove', this.pointerMove);
     this.canvas.removeEventListener('pointerup', this.pointerUp); this.canvas.removeEventListener('pointercancel', this.pointerCancel); this.canvas.removeEventListener('pointerleave', this.pointerLeave);

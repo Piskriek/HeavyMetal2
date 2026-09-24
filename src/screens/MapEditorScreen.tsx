@@ -10,7 +10,7 @@ import { loadArtImage, riderCell } from '../game/art-assets';
 import { DEFAULT_SETUP, createSession, sessionConfig, type RaceConfig } from '../game/session';
 import { INITIAL_SNAPSHOT, type CourseId, type GameOptions, type GameSnapshot, type RunRecord } from '../game/types';
 import TrackBuilderUI from '../components/TrackBuilderUI';
-import CheckpointOverlay from '../components/CheckpointOverlay';
+import MergePoolOverlay from '../components/MergePoolOverlay';
 
 interface MapEditorScreenProps {
   options: GameOptions;
@@ -146,6 +146,14 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         return;
       }
 
+      // M01 · T2: in a test run that has reached the first loop, Space or Enter readies the player —
+      // the pool is the only thing on screen then, and it refuses anything else.
+      if (eng.inMerge && (e.key === ' ' || e.key === 'Enter')) {
+        e.preventDefault();
+        eng.ready();
+        return;
+      }
+
       // WASD lane changes during testing
       if (isTesting && eng.status === 'flying') {
         if (e.key === 'w' || e.key === 'W' || e.key === 'a' || e.key === 'A') {
@@ -161,7 +169,8 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isTesting]);
 
-  const isCheckpoint = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
+  // M01 · T2: the pool owns these two statuses, so the builder hides its own chrome while it is up.
+  const isPooled = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-black select-none">
@@ -197,7 +206,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       )}
 
       {/* Testing HUD overlay when test racing */}
-      {assets && isTesting && !isCheckpoint && (
+      {assets && isTesting && !isPooled && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -228,14 +237,13 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         </motion.div>
       )}
 
-      {/* Checkpoint overlay during test runs */}
+      {/* M01 · T2: the first-loop pool while a builder test run reaches the loop. */}
       <AnimatePresence>
-        {isTesting && isCheckpoint && snapshot.checkpointStandings && (
-          <CheckpointOverlay
-            standings={snapshot.checkpointStandings}
-            countdownNumber={snapshot.countdownNumber}
-            status={snapshot.status as 'checkpoint' | 'countdown'}
-            onReadyUp={() => engineRef.current?.readyUp()}
+        {isTesting && isPooled && snapshot.merge && (
+          <MergePoolOverlay
+            merge={snapshot.merge}
+            loadout={config.loadout}
+            onReady={() => engineRef.current?.ready()}
           />
         )}
       </AnimatePresence>

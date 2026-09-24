@@ -136,21 +136,37 @@ export interface GameSnapshot {
   shieldSeconds: number;
   lastPickup: PowerupKind | null;
   pickupNoticeUntil: number;
-  /** Checkpoint data when status is 'checkpoint' or 'countdown' */
-  checkpointStandings?: CheckpointStanding[];
-  countdownNumber?: number;
+  /**
+   * M01 · T2 — the first-loop pool, while it is doing something. Present from the first gate
+   * crossing until the last rider is released, then removed (the overlay is driven by it).
+   */
+  merge?: MergeSnapshot;
 }
 
-export interface CheckpointStanding {
+/** One rider in the pool queue, as the overlay shows them. */
+export interface MergeEntryView {
   id: number;
   name: string;
   color: string;
-  position: number;
-  distance: number;
-  raceTime: number;
-  speed: number;
-  loadout?: Loadout;
   isPlayer: boolean;
+  /** Place in the queue, 1-based for display: 1 is the rider who arrived first. */
+  position: number;
+  /** Seconds from the start of the run to the gate crossing. */
+  entryTime: number;
+  ready: boolean;
+  released: boolean;
+  flags: string[];
+}
+
+export interface MergeSnapshot {
+  phase: 'open' | 'closed' | 'countdown' | 'releasing';
+  entries: MergeEntryView[];
+  /** '3' | '2' | '1' | 'GO!' while the countdown runs, else null. */
+  countdownLabel: string | null;
+  /** True once the player has readied (by key, button or the automatic ready). */
+  playerReady: boolean;
+  /** Physics ticks the field has spent queued, for the HUD's "held" note. */
+  holdTicks: number;
 }
 
 export const INITIAL_SNAPSHOT: GameSnapshot = {
@@ -183,8 +199,7 @@ export const INITIAL_SNAPSHOT: GameSnapshot = {
   shieldSeconds: 0,
   lastPickup: null,
   pickupNoticeUntil: 0,
-  checkpointStandings: undefined,
-  countdownNumber: undefined,
+  merge: undefined,
 };
 
 export const COURSES: { id: CourseId; name: string; subtitle: string; number: string }[] = [

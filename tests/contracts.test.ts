@@ -686,6 +686,25 @@ test('commands: the push start is gated, and the sling is refused in push mode',
   assert.equal(validateCommand({ type: 'boost' }, gateState({ status: 'pushing' })).ok, true);
 });
 
+test('commands: ready is legal in the first-loop pool and nowhere else', () => {
+  // M01 · T2 — the staging ready command. The pool is the only window it means anything in, and
+  // outside it the refusal is typed like every other one instead of being silently absorbed.
+  for (const status of ['checkpoint', 'countdown'] as const) {
+    const verdict = validateCommand({ type: 'ready' }, gateState({ status }));
+    assert.equal(verdict.ok, true, `ready must be legal while "${status}"`);
+  }
+  for (const status of ['loading', 'ready', 'pushing', 'flying', 'paused', 'finished'] as const) {
+    const verdict = validateCommand({ type: 'ready' }, gateState({ status }));
+    assert.equal(verdict.ok, false, `ready must be refused while "${status}"`);
+    if (!verdict.ok) assert.equal(verdict.code, 'E_COMMAND');
+  }
+  // Input disabled (a modal or an authoring pause) refuses it like anything else.
+  assert.equal(validateCommand({ type: 'ready' }, gateState({ status: 'countdown', inputEnabled: false })).ok, false);
+  // A repeated ready is harmless: identical commands collapse, and a second one never queues twice.
+  assert.equal(commandKey({ type: 'ready' }), 'ready');
+  assert.equal(dedupeCommands([{ type: 'ready' }, { type: 'ready' }]).length, 1);
+});
+
 test('commands: repeated commands collapse and never double-apply', () => {
   const commands: GameCommand[] = [
     { type: 'boost' }, { type: 'boost' }, { type: 'boost' },

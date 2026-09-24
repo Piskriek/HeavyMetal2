@@ -130,6 +130,8 @@ export function createAttemptRacer(participant: QualifyingParticipant): Racer {
     isPlayer: (participant as any).isPlayer ?? participant.id === 0,
     // T3 (IF-GYRO): the shell starts from rest on the grid.
     rollPhase: 0, rollRate: 0,
+    // T2 (IF-MERGE): an isolated attempt never queues, so it is neither held nor a ghost.
+    mergeHeld: false, mergeSlotZ: z, mergeGhost: false, loopExitTime: -100,
     visited: new Set<Obstacle>(),
     previous: { x: START_X, y: START_Y, z, rotation: 0 },
   };

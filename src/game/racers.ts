@@ -43,6 +43,21 @@ export interface Racer extends RacerFrame {
    */
   rollPhase: number;
   rollRate: number;
+  /**
+   * M01 · T2 (IF-MERGE): true while the first-loop pool holds this racer. Held racers are frozen at
+   * the gate plane and only glide sideways into their pool slot; they are skipped by contact and by
+   * every obstacle, and the race clock is stopped while the pool is filling.
+   */
+  mergeHeld: boolean;
+  /** Where a held racer is gliding to: their pool slot, or the loop lane when they are next to go. */
+  mergeSlotZ: number;
+  /**
+   * True from the moment of release until `MERGE_GHOST_TAIL_S` after the loop exit: the rider is
+   * intangible, so the ordered release cannot be spoiled by contact.
+   */
+  mergeGhost: boolean;
+  /** Run time the racer last left a loop, or -100. The ghost tail is measured from here. */
+  loopExitTime: number;
   visited: Set<Obstacle>;
   previous: { x: number; y: number; z: number; rotation: number };
 }
@@ -87,6 +102,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
       hopFactor: stats.hopFactor, bumpRecovery: stats.bumpRecovery, maximumSpeed: stats.maximumSpeed,
       lane: entry.homeLane, targetLane: entry.homeLane, rotation: 0,
       rollPhase: 0, rollRate: 0,
+      mergeHeld: false, mergeSlotZ: laneZ(entry.homeLane), mergeGhost: false, loopExitTime: -100,
       falling: false, finished: false, grounded: false, bumpAt: -100,
       immuneUntil: -100, launchOrigin: { x: startX, y: START_Y },
       shieldUntil: -100, shieldHitAt: -100, pickupAt: -100,

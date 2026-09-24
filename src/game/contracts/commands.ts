@@ -24,6 +24,8 @@ export type GameCommand =
   | { readonly type: 'boost' }
   /** M01 · T1 — begin the run (the goblin push, or the legacy sling in `sling` mode). */
   | { readonly type: 'start' }
+  /** M01 · T2 — the player is ready to leave the first-loop pool. */
+  | { readonly type: 'ready' }
   | { readonly type: 'launch' }
   | { readonly type: 'toggle-pause' }
   | { readonly type: 'restart' }
@@ -83,6 +85,13 @@ export function validateCommand(command: GameCommand, gate: CommandGate): Comman
       return gate.status === 'ready'
         ? allow(command)
         : deny(command, 'E_COMMAND', `The run cannot start while "${gate.status}".`);
+
+    case 'ready':
+      // Ready is a staging command and nothing else: it is only meaningful while the field is held
+      // in the first-loop pool, and outside that window it is refused rather than quietly buffered.
+      return gate.status === 'checkpoint' || gate.status === 'countdown'
+        ? allow(command)
+        : deny(command, 'E_COMMAND', `Readying up is only available in the first-loop pool, not while "${gate.status}".`);
 
     case 'aim':
       if (gate.startMode === 'push') return deny(command, 'E_COMMAND', 'sling_disabled');

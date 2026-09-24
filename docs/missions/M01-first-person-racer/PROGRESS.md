@@ -754,6 +754,43 @@ are not reachable for a local `dpkg -x`. So the pixel verdicts stay the browser'
 
 `npm run check`: **635 pass / 47 suites / 0 fail**. Build **1,636.6 kB (450.7 kB gzip)**.
 
+## The impact shake, finally applied · **this commit**
+
+The engine has always computed a shake: a heavy bump sets it from the closing speed (up to 15), a shield
+hold 2, a nudge 4, decaying as `exp(-9t)` every tick. It rides the frame as `frame.shake` — and the 3D
+renderer, the only renderer left, read it **nowhere**. So the collision feedback the shake was written
+for did not exist in the first-person game: heavy impacts were silent apart from the painted effects.
+
+`src/game/camera-shake.ts` is the offset, pure:
+
+* **Deterministic** — sinusoids of the race clock, never a random number generator: the render path must
+  not roll dice, and a test can name the exact frame.
+* **Bounded as a distance** — the offset is a vector of *constant length* `strength × SHAKE_MAX_OFFSET`
+  (30 world units at the ceiling; a ball is 62 across) whose **direction rotates**, so the eye is never
+  further from where the camera was placed than the impact is allowed to move it, whichever way the axes
+  line up. My first version scaled each axis independently and the vector sum could reach √(1 + 1 + 0.35²)
+  ≈ 1.46× the ceiling — the test caught it, and the fix is the safety law in the cockpit.
+* **The axes are deliberately incommensurate** (31 / 24 / 17 rad/s, with phase offsets), so the shake
+  reads as a knock rather than a wobble on a loop; the view axis carries 35 % of the travel.
+* **Silent under reduced motion**, at every amount and every time, like every other motion effect here.
+
+`Renderer3D.applyImpactShake` applies it **after** both cameras are placed and aimed (the cockpit and the
+chase rig), along the camera's own axes, so a shake can never change where the camera is looking — only
+where the eye sits for that one frame. Three preallocated vectors, like every other vector in the render
+loop: no per-frame allocation.
+
+`tests/camera-shake.test.ts` (6): the strength scale (including a NaN/infinity amount being *no* shake
+rather than a poisoned camera), the constant-magnitude law swept over amounts and times, determinism and
+the direction rotating through many angles, the forward axis moving least, reduced motion, and a wiring
+guard that reads the source order — applied after both camera placements, along the camera's own axes,
+with preallocated vectors.
+
+`npm run check`: **641 pass / 47 suites / 0 fail**. Build **1,637.75 kB (451.05 kB gzip)**.
+
+**UNVERIFIED.** Whether 30 units at the heaviest impact is the right amount *in the cockpit* — too much
+and the tank window feels loose, too little and a heavy bump still feels soft — is the browser's call,
+and `SHAKE_MAX_OFFSET` is the one number to turn.
+
 ## Next
 
 * **T7 is the last ticket in M01** — with it, T0..T7 are all in. What is left is the browser's word on

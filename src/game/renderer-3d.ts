@@ -11,6 +11,7 @@ import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
 import { PickupView } from './pickup-view';
+import { cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
 import {
@@ -1568,6 +1569,14 @@ export class Renderer3D {
    * for this and had never been drawn, so a shield could be collected from a thing nobody could see.
    */
   private pickupView: PickupView | null = null;
+  /**
+   * Impact shake. Three reused vectors: the offset is applied along the camera's *own* axes after the
+   * camera has been placed and aimed, so a shake can never change where the camera is looking — only
+   * where the eye sits for that one frame. Preallocated, like every other vector in the render loop.
+   */
+  private readonly shakeRight = new THREE.Vector3(1, 0, 0);
+  private readonly shakeUp = new THREE.Vector3(0, 1, 0);
+  private readonly shakeForward = new THREE.Vector3(0, 0, -1);
   /** M01 · T3 — reused pose quaternions: the render loop never constructs a THREE object. */
   private readonly coreQuat = new THREE.Quaternion();
   private readonly gyroQuat = new THREE.Quaternion();
@@ -1814,6 +1823,23 @@ export class Renderer3D {
     this.camera.lookAt(target);
   }
 
+  /**
+   * M01 · T5 — the engine's shake value, finally used. Both cameras (the cockpit and the chase rig)
+   * are placed and aimed first; this nudges the eye along the camera's own axes for that frame, so the
+   * aim is untouched and the horizon keeps its place. Zero at zero shake and under reduced motion.
+   */
+  private applyImpactShake(amount: number, time: number, reducedMotion: boolean): void {
+    const shake = cameraShake(amount, time, reducedMotion);
+    if (shake.right === 0 && shake.up === 0 && shake.forward === 0) return;
+    this.shakeRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    this.shakeUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    this.shakeForward.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    this.camera.position
+      .addScaledVector(this.shakeRight, shake.right)
+      .addScaledVector(this.shakeUp, shake.up)
+      .addScaledVector(this.shakeForward, shake.forward);
+  }
+
   private updateAtmosphere(d: number) {
     const under = smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d));
     const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
@@ -2017,6 +2043,7 @@ export class Renderer3D {
     if (!this.trackBuilder.freeFly.active) {
       if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
+      this.applyImpactShake(frame.shake, frame.time, frame.reducedMotion);
       this.updateAtmosphere(playerDist);
     }
     this.sky.position.copy(this.camera.position);

@@ -650,6 +650,37 @@ and every tuned handling number intact.
 noticeable, and whether the split bias matches what a player steering toward a branch expects — is the
 browser's call.
 
+## The cockpit channel — the gauges are wired to the race · **this commit**
+
+The same class of gap the merge law had: `tests/cockpit.test.ts` proves the HUD's *laws* (needle sweep,
+the yoke's ±38° lock, the painted aperture, where the goblin's hands sit, the bob), but the thirteen
+assignments that **fill the channel** were a method on `GameEngine` — which cannot exist without WebGL,
+so nothing checked them. A gauge reading a constant, the wrong field, or a snapshot from an earlier tick
+would have looked exactly like a working gauge.
+
+`fillCockpitState(state, telemetry, steer)` is that mapping, extracted pure into `cockpit.ts`:
+`CockpitTelemetry` names the minimum a gauge needs, `GameSnapshot` satisfies it structurally, and the
+engine's method is now one line (`fillCockpitState(state, this.snapshot, steerFrom(player.vz,
+player.handling))`). `tests/cockpit-channel.test.ts` (6) feeds it literals — one per phase a race
+actually has — and asserts what each gauge would read, plus the two properties beyond correctness:
+
+* **the same object comes back**, mutated and returned, because a fresh record per frame is a per-frame
+  allocation in the render path and this project forbids those;
+* **the engine cannot drift back**: a structural guard asserts the one call, and that the engine
+  assigns **no** gauge field itself (`state.* = ` finds zero matches).
+
+Two laws the extraction made explicit, both of which the tests now pin rather than assume: the POOL
+fallback belongs to the **queued** phase alone (during the countdown the pool speaks for itself, and a
+pool with no label reads blank, not "POOL" forever), and the yoke's sign is `−vz / (VZ_MAX · handling)`
+clamped — so full lock is `steerFrom(∓VZ_MAX · handling, handling) = ±1` at *every* handling, and a
+nonsense handling is a centred yoke rather than a NaN one.
+
+`npm run check`: **623 pass / 47 suites / 0 fail**. Build **1,634.05 kB (449.68 kB gzip)**.
+
+**UNVERIFIED.** Whether the gauges *read* well at a glance from the FPV seat — needle legibility, the
+centre read-out's size during the pool, and whether the shield ring is noticeable when it is ticking —
+is the browser's call.
+
 ## Next
 
 * **T7 is the last ticket in M01** — with it, T0..T7 are all in. What is left is the browser's word on

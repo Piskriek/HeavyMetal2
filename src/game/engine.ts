@@ -39,7 +39,7 @@ import { resolvePickups as resolvePickupsSim } from './sim/pickups';
 // M01 · T1: the goblin push start. The engine owns the clock and the surface query; the ramp math
 // lives in a pure module so a headless test can reproduce the launch without a canvas.
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
-import { steerFrom, type CockpitState } from './cockpit';
+import { fillCockpitState, steerFrom, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
 
 const TAU = Math.PI * 2;
@@ -355,22 +355,10 @@ export class GameEngine {
    */
   getCockpitState(state: CockpitState): CockpitState {
     const player = this.player;
-    state.steer = steerFrom(player.vz, player.handling);
-    state.speedKmh = this.snapshot.speed;
-    state.boostCharges = this.snapshot.boosts;
-    state.bounceCharges = this.snapshot.bounces;
-    state.shieldSeconds = this.snapshot.shieldSeconds;
-    state.gradePct = this.snapshot.grade;
-    state.grounded = this.snapshot.grounded;
-    state.inLoop = this.snapshot.inLoop;
-    state.status = this.snapshot.status;
-    state.position = this.snapshot.position;
-    state.raceTime = this.snapshot.raceTime;
-    state.pushing = this.snapshot.status === 'pushing';
-    // M01 · T2: the cockpit's own countdown read-out is the pool's, and it says POOL while queued.
-    state.countdownLabel = this.snapshot.merge?.countdownLabel
-      ?? (this.snapshot.status === 'checkpoint' ? 'POOL' : null);
-    return state;
+    // The mapping itself lives in `cockpit.ts` (pure, and asserted against literals in
+    // tests/cockpit-channel.test.ts); this method's only job is to hand it live telemetry — the
+    // snapshot the physics just stepped, and the player's own lateral velocity for the yoke.
+    return fillCockpitState(state, this.snapshot, steerFrom(player.vz, player.handling));
   }
 
   /**

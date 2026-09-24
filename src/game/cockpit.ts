@@ -71,6 +71,61 @@ export interface CockpitState {
   pushing: boolean;
 }
 
+/**
+ * The snapshot fields the HUD's channel is filled from — the *minimum* the gauges need, named
+ * structurally so this function can be exercised with a literal instead of a whole `GameSnapshot`.
+ * `GameSnapshot` satisfies it, which is the point: the engine hands over the one it already has.
+ */
+export interface CockpitTelemetry {
+  status: GameStatus;
+  speed: number;
+  boosts: number;
+  bounces: number;
+  shieldSeconds: number;
+  /** Road grade in percent. */
+  grade: number;
+  grounded: boolean;
+  inLoop: boolean;
+  position: number;
+  raceTime: number;
+  merge?: { countdownLabel?: string | null } | null;
+}
+
+/**
+ * Fills the reused channel from live telemetry: **every gauge is read from the state the physics
+ * stepped**, never from a constant or a copy taken at some earlier moment.
+ *
+ * `steer` is passed in rather than read here because it is the player's own lateral velocity
+ * (`steerFrom(player.vz, handling)`) — the yoke leads the lane change instead of replaying it, which
+ * is only true if the value comes from the same tick the physics just integrated.
+ *
+ * The object is mutated and returned, never re-created: a fresh record per frame would be a per-frame
+ * allocation in the render path, which this project forbids.
+ */
+export function fillCockpitState(
+  state: CockpitState,
+  telemetry: CockpitTelemetry,
+  steer: number,
+): CockpitState {
+  state.steer = steer;
+  state.speedKmh = telemetry.speed;
+  state.boostCharges = telemetry.boosts;
+  state.bounceCharges = telemetry.bounces;
+  state.shieldSeconds = telemetry.shieldSeconds;
+  state.gradePct = telemetry.grade;
+  state.grounded = telemetry.grounded;
+  state.inLoop = telemetry.inLoop;
+  state.status = telemetry.status;
+  state.position = telemetry.position;
+  state.raceTime = telemetry.raceTime;
+  state.pushing = telemetry.status === 'pushing';
+  // M01 · T2: while the field is queued the centre gauge is the pool's, and it says POOL until the
+  // pool's own countdown starts speaking. Outside those phases the centre is blank.
+  state.countdownLabel = telemetry.merge?.countdownLabel
+    ?? (telemetry.status === 'checkpoint' ? 'POOL' : null);
+  return state;
+}
+
 export function createCockpitState(): CockpitState {
   return {
     steer: 0, speedKmh: 0, boostCharges: 0, bounceCharges: 0, shieldSeconds: 0, gradePct: 0,

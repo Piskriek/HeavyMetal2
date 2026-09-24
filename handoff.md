@@ -588,3 +588,41 @@ as images (`tests/artifacts/art-1-loadout.png`, `art-4-race.png`). The art-check
 ticket07 suites were also de-flaked while here: the loading cover owns Enter until
 dismissed (there is no auto-dismiss), the race screen has no header nav (workshop and main
 menu live in the gear menu), and launches retry until the status flips.
+
+## M01 — First-person racer (this session, branch `arena/01a0d1d6-heavymetal2`, PR #58)
+
+Draft PR: <https://github.com/Piskriek/HeavyMetal2/pull/58> (base `main`). Read
+[`docs/missions/M01-first-person-racer/PROGRESS.md`](docs/missions/M01-first-person-racer/PROGRESS.md)
+for the per-ticket build log and
+[`docs/missions/M01-first-person-racer/planning-site/src/plan/`](docs/missions/M01-first-person-racer/planning-site/src/plan)
+for the frozen plan (tickets, interfaces, decisions — `D11`/`D12` are the lane network's).
+
+**Status at handoff:** T0, T1, T2, T3, T4, T5, T6 done and committed; **T7 in progress** (its pure
+edit core landed, the builder gizmos and the panel are next). Gates on the branch head:
+`npm run check` 572 pass / 47 suites / 0 fail, `npm run build` 1,589.69 kB (436.71 kB gzip),
+`tsc --noEmit` clean, `check:edges` 0 failures.
+
+**If the sandbox resets mid-session** it restores the checkout at `2d1088a` with an empty
+`node_modules` and no `scratch/`. Everything pushed survives; recovery is four commands:
+
+```sh
+git fetch origin arena/01a0d1d6-heavymetal2 && git reset --hard FETCH_HEAD
+npm ci
+npm run check          # must end "# pass N / # fail 0"
+npm run dev -- --port 5173 --host 0.0.0.0
+```
+
+Never `git clean -fdx` (it takes `node_modules` and the protected `backups/` with it), and never
+push with `--force`: if a push is rejected, fetch and compare — the remote is the truth.
+
+**What future agents must not break** (all enforced by tests):
+
+* **A null lane network is exactly the old game.** `resolveLaneTarget` is the single integration
+  point; `tests/lane-parity.test.ts` compares 50 seeded *full* races absent-vs-null, finish ticks
+  included.
+* **A node's authored `kind` must equal what the graph says it is** (`inferKind`): merge = ≥2 in /
+  1 out, split = 1 in / ≥2 out, oob = dead end short of the flag. `lane-path-tool.ts` re-derives
+  kinds after every structural edit rather than letting an author overrule the graph.
+* **Physics stays fixed-step at 120 Hz**, no per-frame mesh or image generation, and the release
+  `targetLane` pin is load-bearing (stripping it reddens four merge-race tests).
+* **The image quota policy above still applies** — 10 generations per user turn.

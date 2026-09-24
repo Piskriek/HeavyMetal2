@@ -402,8 +402,9 @@ test('velocity inverse: canonicalVelocityFromWorld round-trips and reports units
   }
   // speed units: on a flat straight where the engine course is level, world
   // speed = |v| ≈ (vx/2)·ARC_PER_ENGINE_DISTANCE  (|∂P/∂s| = 1 by arc length)
-  const flatDist = 350; // engine start plateau: elevation 0, world spline flat
-  const flatX = engineXFromDistance(flatDist);
+  // M01 · T1: the old "engine start plateau" is now the start descent, so the unit check runs on
+  // the start pad instead — 190…430 is flat at −START_DROP in the world spline too.
+  const flatX = START_X + 120;
   const { worldV, canonical } = worldVelocityFromEngine(
     map,
     { x: flatX, y: courseY(flatX, 'ridge') - RADIUS, z: 0, grounded: true },

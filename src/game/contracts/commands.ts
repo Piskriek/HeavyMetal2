@@ -10,7 +10,7 @@
  * be re-sent any number of times and is either idempotent or refused, never double-applied.
  */
 
-import type { GameStatus } from '../types';
+import type { GameStatus, StartMode } from '../types';
 import { ContractError, isFiniteNumber } from './core';
 import type { ContractErrorCode } from './core';
 import type { HeatPhase } from './heat';
@@ -22,6 +22,8 @@ export type GameCommand =
   | { readonly type: 'hop' }
   | { readonly type: 'bounce' }
   | { readonly type: 'boost' }
+  /** M01 · T1 — begin the run (the goblin push, or the legacy sling in `sling` mode). */
+  | { readonly type: 'start' }
   | { readonly type: 'launch' }
   | { readonly type: 'toggle-pause' }
   | { readonly type: 'restart' }
@@ -40,6 +42,11 @@ export interface CommandGate {
   readonly inputEnabled: boolean;
   /** The racer issuing the command, when the command is player-scoped. */
   readonly racerId: RacerId | null;
+  /**
+   * M01 · T1 — how this run leaves the grid. Absent (or `'sling'`) keeps the legacy slingshot
+   * envelope; `'push'` refuses `aim`/`launch` with the typed reason `sling_disabled`.
+   */
+  readonly startMode?: StartMode;
 }
 
 export type CommandVerdict =
@@ -72,7 +79,13 @@ export function validateCommand(command: GameCommand, gate: CommandGate): Comman
     case 'noop':
       return allow(command);
 
+    case 'start':
+      return gate.status === 'ready'
+        ? allow(command)
+        : deny(command, 'E_COMMAND', `The run cannot start while "${gate.status}".`);
+
     case 'aim':
+      if (gate.startMode === 'push') return deny(command, 'E_COMMAND', 'sling_disabled');
       if (!isFiniteNumber(command.power) || !isFiniteNumber(command.angle)) {
         return deny(command, 'E_COMMAND', 'Aim needs finite power and angle values.');
       }
@@ -82,6 +95,7 @@ export function validateCommand(command: GameCommand, gate: CommandGate): Comman
       return gate.status === 'ready' ? allow(command) : deny(command, 'E_COMMAND', `Aim is only available on the grid, not while "${gate.status}".`);
 
     case 'launch':
+      if (gate.startMode === 'push') return deny(command, 'E_COMMAND', 'sling_disabled');
       return gate.status === 'ready' ? allow(command) : deny(command, 'E_COMMAND', `The field cannot be launched while "${gate.status}".`);
 
     case 'steer':
@@ -89,13 +103,13 @@ export function validateCommand(command: GameCommand, gate: CommandGate): Comman
       // Racing is the base case; the grid also accepts steering so a staged lane
       // change sticks (T02 adopted this gate — the original condition only allowed
       // "ready" while the message promised "grid or racing").
-      if (gate.status === 'ready' || gate.status === 'flying' || gate.status === 'paused') return allow(command);
+      if (gate.status === 'ready' || gate.status === 'pushing' || gate.status === 'flying' || gate.status === 'paused') return allow(command);
       return deny(command, 'E_COMMAND', 'Steering is only available on the grid or while racing.');
 
     case 'hop':
     case 'bounce':
     case 'boost':
-      return gate.status === 'ready' || gate.status === 'flying'
+      return gate.status === 'ready' || gate.status === 'pushing' || gate.status === 'flying'
         ? allow(command)
         : deny(command, 'E_COMMAND', `"${command.type}" is not available while "${gate.status}".`);
 

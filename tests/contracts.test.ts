@@ -658,6 +658,34 @@ test('commands: the gate decides what is legal, and refusals are typed', () => {
   assert.equal(validateCommand({ type: 'boost' }, gateState({ inputEnabled: false })).ok, false);
 });
 
+test('commands: the push start is gated, and the sling is refused in push mode', () => {
+  // The new start command: legal on the grid, refused everywhere else.
+  assert.equal(validateCommand({ type: 'start' }, gateState()).ok, true);
+  for (const status of ['flying', 'pushing', 'paused', 'finished', 'checkpoint', 'countdown', 'loading'] as const) {
+    const verdict = validateCommand({ type: 'start' }, gateState({ status }));
+    assert.equal(verdict.ok, false, `start must be refused while "${status}"`);
+  }
+  // In push mode the retired slingshot commands are refused with a typed reason, not silently.
+  for (const command of [{ type: 'launch' } as const, { type: 'aim', power: 0.8, angle: 36 } as const]) {
+    const verdict = validateCommand(command, gateState({ startMode: 'push' }));
+    assert.equal(verdict.ok, false, `${command.type} must be refused in push mode`);
+    if (!verdict.ok) {
+      assert.equal(verdict.code, 'E_COMMAND');
+      assert.equal(verdict.reason, 'sling_disabled');
+    }
+  }
+  // Sling mode keeps the legacy envelopes exactly (parity runs depend on it).
+  assert.equal(validateCommand({ type: 'launch' }, gateState({ startMode: 'sling' })).ok, true);
+  assert.equal(validateCommand({ type: 'aim', power: 0.8, angle: 36 }, gateState({ startMode: 'sling' })).ok, true);
+  assert.equal(validateCommand({ type: 'aim', power: 0.8, angle: 36 }, gateState({ startMode: 'sling', status: 'flying' })).ok, false);
+  // A gate that predates the mode (no startMode) behaves as sling — additive, never breaking.
+  assert.equal(validateCommand({ type: 'launch' }, gateState()).ok, true);
+  // Steer/bounce/boost stay legal through the shove itself.
+  assert.equal(validateCommand({ type: 'steer', direction: 1 }, gateState({ status: 'pushing' })).ok, true);
+  assert.equal(validateCommand({ type: 'bounce' }, gateState({ status: 'pushing' })).ok, true);
+  assert.equal(validateCommand({ type: 'boost' }, gateState({ status: 'pushing' })).ok, true);
+});
+
 test('commands: repeated commands collapse and never double-apply', () => {
   const commands: GameCommand[] = [
     { type: 'boost' }, { type: 'boost' }, { type: 'boost' },
@@ -770,7 +798,7 @@ test('contracts: the public barrel exposes every frozen module', () => {
     'validateCommand', 'dedupeCommands', 'commandKey', 'CommandQueue', 'isRaceEventType', 'countEvents', 'describeEvent',
   ];
   for (const name of surface) assert.ok(name in contracts, `the contracts barrel must export ${name}`);
-  assert.equal(contracts.CONTRACTS_VERSION, 1);
+  assert.equal(contracts.CONTRACTS_VERSION, 2, 'M01 · T1 added the start command and the start-mode gate');
   assert.equal(contracts.isRaceEventType('boost-used'), true);
   assert.equal(contracts.isRaceEventType('nope'), false);
   assert.deepEqual({ ...contracts.countEvents([{ type: 'hop', tick: 0, racerId: 0 }, { type: 'hop', tick: 1, racerId: 0 }]) }, { hop: 2 });

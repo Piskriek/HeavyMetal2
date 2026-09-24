@@ -2,11 +2,17 @@ import type { Loadout } from './loadouts';
 import type { Difficulty, RaceMode } from './session';
 import type { PowerupKind } from './powerups';
 
-export type GameStatus = 'loading' | 'ready' | 'flying' | 'paused' | 'finished' | 'checkpoint' | 'countdown';
+export type GameStatus = 'loading' | 'ready' | 'pushing' | 'flying' | 'paused' | 'finished' | 'checkpoint' | 'countdown';
 export type CourseId = 'ridge' | 'boomtown' | 'sheep';
 export type GraphicsMode = 'auto' | 'performance' | 'quality';
 /** TICKET-07: chase the player's ball, or hold the classic broad course view. */
 export type CameraMode = 'third_person' | 'follow_ball' | 'fixed';
+/**
+ * M01 · T1: how the field leaves the grid. `push` is the goblin shove on the start pad (the
+ * default); `sling` keeps the legacy slingshot path reachable for parity runs and for the
+ * builder's test drive.
+ */
+export type StartMode = 'push' | 'sling';
 
 export const RACER_DEFINITIONS = [
   { id: 0, name: 'YOU', color: '#f0a15b', homeLane: 2, weight: 120, pace: 1 },
@@ -43,6 +49,12 @@ export interface GameOptions {
   menuMotion: boolean;
   reducedMotion: boolean;
   highContrast: boolean;
+  /**
+   * M01 · T1: how the field leaves the grid. Optional so every stored option set and every test
+   * option literal written before the push start keeps working; anything other than `'sling'` is
+   * read as the push default.
+   */
+  startMode?: StartMode;
 }
 
 export interface RunRecord {
@@ -192,4 +204,6 @@ export const DEFAULT_OPTIONS: GameOptions = {
   menuMotion: true,
   reducedMotion: false,
   highContrast: false,
+  // M01 · T1: a normal run starts with the goblin push on the pad, not on the sling.
+  startMode: 'push',
 };

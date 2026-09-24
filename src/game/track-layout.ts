@@ -11,7 +11,17 @@ import {
   type ObstacleKind,
 } from './scene';
 
-export function createTrackLayout(course: CourseId): Obstacle[] {
+/**
+ * M01 · T1: the start pad and the whole run-up to the first loop stay empty in push mode. The
+ * layout has no RNG (measured: `tests/start-zone.test.ts` fingerprints it), so removing a prefix
+ * cannot move any obstacle that remains — the post-gate fingerprint is byte-identical.
+ */
+export interface TrackLayoutOptions {
+  /** Drop every obstacle whose `x` is below this (exclusive). */
+  readonly skipBeforeX?: number;
+}
+
+export function createTrackLayout(course: CourseId, options: TrackLayoutOptions = {}): Obstacle[] {
   const obstacles: Obstacle[] = [];
   const add = (
     kind: ObstacleKind,
@@ -221,5 +231,7 @@ export function createTrackLayout(course: CourseId): Obstacle[] {
   // Grand finish line gantry
   add('rock_gate', FINISH - 100, 520, 340, -1, 4, { variant: 'stadium-gantry' });
 
-  return obstacles.sort((a, b) => a.x - b.x);
-}
+  const sorted = obstacles.sort((a, b) => a.x - b.x);
+  const skipBeforeX = options.skipBeforeX;
+  return skipBeforeX === undefined ? sorted : sorted.filter((obstacle) => obstacle.x >= skipBeforeX);
+}

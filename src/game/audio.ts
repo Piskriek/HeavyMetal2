@@ -1,4 +1,4 @@
-export type SoundName = 'launch' | 'hop' | 'bounce' | 'bump' | 'boost' | 'boom' | 'sheep' | 'loop' | 'finish' | 'land' | 'pickup' | 'shield';
+export type SoundName = 'launch' | 'push' | 'hop' | 'bounce' | 'bump' | 'boost' | 'boom' | 'sheep' | 'loop' | 'finish' | 'land' | 'pickup' | 'shield';
 
 export class GameAudio {
   private context: AudioContext | null = null;
@@ -50,6 +50,8 @@ export class GameAudio {
 
     const notes: Record<Exclude<SoundName, 'boom'>, [number, number, number, OscillatorType]> = {
       launch: [490, 85, 0.3, 'sawtooth'],
+      // M01 · T1: the starter goblin's shove — lower, shorter and blunter than the sling.
+      push: [210, 430, 0.22, 'square'],
       hop: [130, 310, 0.12, 'sine'],
       bounce: [170, 620, 0.24, 'sine'],
       bump: [420, 85, 0.16, 'triangle'],

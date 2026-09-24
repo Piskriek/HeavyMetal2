@@ -3,8 +3,8 @@
 Status: **frozen for downstream tickets.** Owner: core architecture agent. Ticket: [#34](https://github.com/Piskriek/HeavyMetal2/issues/34).
 
 `src/game/contracts/` is the shared language for T02–T12. The public surface is
-`src/game/contracts/index.ts` (`CONTRACTS_VERSION = 1`). Tests: `tests/contracts.test.ts`
-(39 checks, part of `npm run check`).
+`src/game/contracts/index.ts` (**`CONTRACTS_VERSION = 2`**). Tests: `tests/contracts.test.ts`
+(40 checks, part of `npm run check`).
 
 ## The five rules
 
@@ -38,7 +38,7 @@ Status: **frozen for downstream tickets.** Owner: core architecture agent. Ticke
 | `release.ts` | Release corridor + reservations | `validateReleaseCorridor`, `createReservationLedger` | T05, T09, T12 |
 | `dents.ts` | Dent slots, cap, recovery, read-only view | `applyDent`, `recoverDents`, `dentRenderView` | T09, T11 |
 | `render.ts` | Read-only render frame | `createRenderView`, `deepFreeze`, `DeepReadonly` | T11, T12 |
-| `commands.ts` | Typed commands instead of UI mutation | `validateCommand`, `dedupeCommands`, `CommandQueue` | T03, T05, T09 |
+| `commands.ts` | Typed commands instead of UI mutation | `validateCommand`, `dedupeCommands`, `CommandQueue`, `start` command, `sling_disabled` | T03, T05, T09 |
 | `stepping.ts` | Headless stepping seam | `SimulationAdapter`, `runHeadless`, `HeatController` | T02, T04, T12 |
 
 ## Frozen decisions downstream tickets must not re-litigate
@@ -55,7 +55,8 @@ Status: **frozen for downstream tickets.** Owner: core architecture agent. Ticke
 | Dent budget | 3 slots, `DENT_MAX_TOTAL_DEPTH = 18`, per-slot ≤ 10.8, exponential recovery at 0.35/s, 50% repair notice fires exactly once, impacts below severity 0.12 are cosmetic | T11's cap and exactly-once repair |
 | Scale convention | `baked-extents`: extents are world units; a definition carrying both extents and a non-unit `scale` is rejected | T08's "scale and dimensions are not applied twice" |
 | Heat phases | `staging → qualifying? → release → racing → settling → results → staging`; everything else is refused | T05/T06 |
-| Commands | validated against `{ status, phase, inputEnabled, racerId }`; identical repeats collapse and are never double-applied | T03/T05 input lifecycle |
+| Commands | validated against `{ status, phase, inputEnabled, racerId, startMode? }`; identical repeats collapse and are never double-applied | T03/T05 input lifecycle |
+| Start of a run | one `start` command; legal only while `status === 'ready'`, refused with `E_COMMAND` anywhere else. In `startMode: 'push'` the retired slingshot is refused as `{ ok: false, reason: 'sling_disabled' }`, which is the pattern every later "that control no longer exists" case copies | M01 · T1 retires the slingshot without deleting it |
 
 ## The headless stepping seam
 
@@ -89,6 +90,21 @@ should extract that loop body into `stepOnce()` and implement `applyCommands` on
 `validateCommand` + `dedupeCommands`, keeping the visual loop unchanged. Until then the seam
 is exercised by `createNullAdapter()` and the contract tests, and by the phase machine.
 
+## Version 2 — M01 · T1, the goblin push
+
+`CONTRACTS_VERSION` moved from 1 to 2 in M01 · T1. The surface only grew; nothing v1 could do
+was removed or reinterpreted, so every v1 call site keeps working.
+
+| Addition | Shape | Meaning |
+| :--- | :--- | :--- |
+| `{ type: 'start' }` | `GameCommand` | Begin the run from the grid. Legal only while `status === 'ready'`; every other status refuses it with `E_COMMAND`. `Enter`, `Space` and the on-screen button all issue this one command. |
+| `'pushing'` | `GameStatus` (src/game/types.ts) | The 48 fixed ticks (0.4 s) between the command and the first `'flying'` tick: the starter goblin owns `vx` and the pad owns the height. `steer`, `hop`, `bounce` and `boost` stay legal; `aim` and `launch` do not. |
+| `gate.startMode?: 'push' \| 'sling'` | `CommandGate` | Absent or `'sling'` is the legacy slingshot envelope, byte-for-byte (this is what the regression path and the physics-parity fixture run). `'push'` refuses `aim`/`launch` with the typed reason `sling_disabled`. |
+
+The refusal is `{ ok: false, code: 'E_COMMAND', reason: 'sling_disabled' }` — a typed reason, not
+a silent drop, so the UI can say *why* the slingshot is gone. `E_PUSH_TICK` joins the
+`ContractErrorCode` union for the push ramp's range check (`k` outside `1…48`).
+
 ## Engine touch in this ticket
 
 `src/game/engine.ts` has exactly one change: `const STEP = 1 / 120` became
@@ -114,6 +130,6 @@ that T01 modifies.
 | Old configs load as four racers with qualifying disabled | `config: an old setup loads as four racers…`, `hostile input is repaired…` |
 | Snapshot reset does not share mutable arrays | `snapshot reset does not share mutable arrays with the previous state` |
 | Repeated commands are harmless | `commands: repeated commands collapse and never double-apply`, `release and finishing are once-only and idempotent`, reservation `already-held` |
-| Public contracts documented before downstream integration | this document; 39 contract tests green in `npm run check` |
+| Public contracts documented before downstream integration | this document; 40 contract tests green in `npm run check` |
 
-Verified on this branch: `npx tsc --noEmit` clean · `node --import tsx --test tests/contracts.test.ts` → 39/39 · `npm run build` green (see `handoff.md`).
+Verified on this branch: `npx tsc --noEmit` clean · `node --import tsx --test tests/contracts.test.ts` → 40/40 · `npm run build` green (see `handoff.md`).

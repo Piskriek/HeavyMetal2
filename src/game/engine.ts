@@ -8,9 +8,10 @@ import {
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
 } from './scene';
-import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
+import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type StartMode } from './types';
 import type { RaceConfig } from './session';
 import { createTrackLayout } from './track-layout';
+import { createQualifyingGate } from './qualifying/gate';
 import { POWERUPS, createAirPickups, type AirPickup } from './powerups';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
@@ -23,6 +24,9 @@ import {
 } from './sim/racer-physics';
 import { driveCpu, setLane as setLaneSim, type CpuContext } from './sim/cpu-driver';
 import { resolvePickups as resolvePickupsSim } from './sim/pickups';
+// M01 · T1: the goblin push start. The engine owns the clock and the surface query; the ramp math
+// lives in a pure module so a headless test can reproduce the launch without a canvas.
+import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
 
 const TAU = Math.PI * 2;
 const STEP = FIXED_STEP;
@@ -77,6 +81,9 @@ export class GameEngine {
 
   // Checkpoint system: freeze at first loop entrance
   private checkpointTriggered = false;
+  /** M01 · T1: push cursor (0 while not pushing) and the per-racer targets for this run. */
+  private pushTick = 0;
+  private pushTargets: number[] = [];
   private checkpointX = 17000; // After Granite Tunnel Portal (trackDist ~16999)
   private frozenVelocities: { vx: number; vy: number; vz: number }[] = [];
   private countdownTimer = 0;
@@ -143,6 +150,12 @@ export class GameEngine {
   }
 
   private get player() { return this.racers[0]; }
+  /**
+   * M01 · T1: how the field leaves the grid. `'push'` is the default (the goblin shove on the pad);
+   * `'sling'` keeps the legacy drag-aim/slingshot path so the regression suite can A/B it.
+   */
+  get startMode(): StartMode { return this.options.startMode === 'sling' ? 'sling' : 'push'; }
+  private get pushSeed(): number { return this.config?.seed ?? DEFAULT_PUSH_SEED; }
   private y(x: number) { return courseY(x, this.options.course); }
   private slope(x: number) { return courseSlope(x, this.options.course); }
   private get customPhysics() { return !this.config || this.config.customPhysics; }
@@ -202,6 +215,8 @@ export class GameEngine {
   reset = () => {
     this.snapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
     this.checkpointTriggered = false;
+    this.pushTick = 0;
+    this.pushTargets = [];
     this.frozenVelocities = [];
     if (this.countdownInterval) { clearInterval(this.countdownInterval); this.countdownInterval = null; }
     this.racers = createRacers(this.config);
@@ -229,7 +244,57 @@ export class GameEngine {
     this.notify(); this.invalidate();
   };
 
+  /**
+   * M01 · T1 — begin the run.
+   *
+   * In push mode every racer is standing on the pad; the starter goblin shoves the whole field at
+   * once and the downhill does the rest. In sling mode this is exactly the legacy `launch()`.
+   */
+  start = () => {
+    if (this.status !== 'ready') return;
+    if (this.startMode === 'sling') { this.launch(); return; }
+    this.pushTick = 0;
+    this.pushTargets = this.racers.map((racer) => startPushVelocity(racer.pace, this.pushSeed, racer.id));
+    for (const racer of this.racers) {
+      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
+      racer.launchOrigin = { x: racer.x, y: racer.y };
+    }
+    this.snapshot.status = 'pushing';
+    this.snapshot.speed = 0;
+    this.snapshot.notice = 'THE STARTER GOBLIN SHOVES THE WHOLE GRID.';
+    this.audio.play('push');
+    this.notify(); this.invalidate();
+  };
+
+  /**
+   * One push tick: the ramp owns vx (and locks vy/vz), and the pad owns the height. No obstacle is
+   * scanned here — the pad is empty by construction (`createTrackLayout({ skipBeforeX })`), which is
+   * also what keeps the layout fingerprint past the gate byte-identical.
+   */
+  private stepPush(dt: number) {
+    this.runTime += dt;
+    this.pushTick += 1;
+    for (let i = 0; i < this.racers.length; i++) {
+      const racer = this.racers[i];
+      applyPushTick(racer, this.pushTick, this.pushTargets[i]);
+      racer.x += racer.vx * dt;
+      racer.y = this.y(racer.x) - RADIUS;
+      racer.rotation += racer.vx * dt / RADIUS;
+    }
+    this.refreshSnapshot();
+    if (this.pushTick >= PUSH_TICKS) this.snapshot.status = 'flying';
+  }
+
+  /** The next ramp speed for a racer at tick `k` — exposed for the start-zone harness. */
+  static pushVelocityAt(target: number, k: number) { return pushRampVx(target, k); }
+
+  /**
+   * The slingshot. M01 · T1 retires it from input in push mode, but the method stays: it is the
+   * legacy start (and the sling-mode start), and `retry(true)` / a pointer release still land here.
+   * In push mode it routes to `start()` so no code path can slingshot a grid that has no slingshot.
+   */
   launch = () => {
+    if (this.startMode === 'push') { this.start(); return; }
     if (this.status !== 'ready') return;
     for (const racer of this.racers) {
       const velocity = launchVelocity(this.snapshot.power, racer.launchSpeed);
@@ -273,7 +338,8 @@ export class GameEngine {
   jump = () => {};
 
   bounce = () => {
-    if (this.status === 'ready') { this.launch(); return; }
+    // Space on the grid starts the run (the push, or the legacy sling).
+    if (this.status === 'ready') { this.start(); return; }
     if (this.status === 'flying') this.performBounce(this.player);
   };
 
@@ -448,7 +514,13 @@ export class GameEngine {
   };
 
   private makeTrack() {
-    this.obstacles = createTrackLayout(this.options.course);
+    // M01 · T1: in push mode the start pad and the whole run-up to the first loop are empty. The
+    // filter only removes a prefix — the layout itself has no RNG — so every obstacle from the
+    // gate on keeps its exact identity (asserted by tests/start-zone.test.ts).
+    const built = createTrackLayout(this.options.course);
+    this.obstacles = this.startMode === 'push'
+      ? createTrackLayout(this.options.course, { skipBeforeX: createQualifyingGate(this.options.course, built).x })
+      : built;
     this.pickups = createAirPickups(this.options.course, this.obstacles);
     this.world.configure(this.options.course, this.obstacles, this.pickups);
   }
@@ -462,6 +534,7 @@ export class GameEngine {
       (event.clientY - rect.top) / rect.height * HEIGHT, this.player.z);
   }
   private pointerDown = (event: PointerEvent) => {
+    if (this.startMode === 'push') return; // the slingshot handle does not exist in push mode
     if (!this.inputEnabled || this.status !== 'ready' || !event.isPrimary || event.button !== 0) return;
     const point = this.coordinates(event);
     if (Math.hypot(point.x - this.player.x, point.y - this.player.y) > RADIUS * 1.75) return;
@@ -470,6 +543,7 @@ export class GameEngine {
     this.canvas.setPointerCapture(event.pointerId); this.canvas.focus({ preventScroll: true }); this.invalidate();
   };
   private pointerMove = (event: PointerEvent) => {
+    if (this.startMode === 'push') return; // no aim cursor, no drag
     if (!this.inputEnabled) return;
     const point = this.coordinates(event); const rect = this.canvas.getBoundingClientRect();
     this.pointerDrift = ((event.clientX - rect.left) / rect.width - 0.5) * 10;
@@ -504,20 +578,22 @@ export class GameEngine {
     this.lastFrame = now;
     if (this.status !== 'paused' && this.inputEnabled) {
       this.time += dt; this.shake *= Math.exp(-9 * dt);
-      if (this.status === 'flying' && !this.pausedForBuild) {
+      const simulating = this.status === 'flying' || this.status === 'pushing';
+      if (simulating && !this.pausedForBuild) {
         this.accumulator = Math.min(0.1, this.accumulator + dt);
-        while (this.accumulator >= STEP && this.status === 'flying' && !this.pausedForBuild) {
+        while (this.accumulator >= STEP && (this.status === 'flying' || this.status === 'pushing') && !this.pausedForBuild) {
           for (const racer of this.racers) {
             racer.previous.x = racer.x; racer.previous.y = racer.y;
             racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
           }
-          this.stepRace(STEP); this.accumulator -= STEP;
+          if (this.status === 'pushing') this.stepPush(STEP); else this.stepRace(STEP);
+          this.accumulator -= STEP;
         }
       }
       this.updateParticles(dt);
       if (this.time > this.noticeUntil) this.snapshot.notice = '';
     }
-    const alpha = this.status === 'flying' ? clamp(this.accumulator / STEP, 0, 1) : 1;
+    const alpha = this.status === 'flying' || this.status === 'pushing' ? clamp(this.accumulator / STEP, 0, 1) : 1;
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i]; const rendered = this.renderRacers[i];
       rendered.x = racer.previous.x + (racer.x - racer.previous.x) * alpha;
@@ -531,7 +607,9 @@ export class GameEngine {
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
     }
     const player = this.player; const rendered = this.renderRacers[0];
-    if (this.status === 'flying' && this.inputEnabled && !this.pausedForBuild) {
+    // M01 · T1: the shove moves the whole field, so the legacy camera state tracks it too — the ball
+    // is already sliding down the descent by the time the push hands over to 'flying'.
+    if ((this.status === 'flying' || this.status === 'pushing') && this.inputEnabled && !this.pausedForBuild) {
       const focus = player.loopRide?.obstacle.x ?? rendered.x;
       const view = this.renderer.view;
       // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
@@ -547,7 +625,7 @@ export class GameEngine {
       this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
     }
     this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
-    const active = (this.status === 'flying' && !this.pausedForBuild) || this.isDragging;
+    const active = ((this.status === 'flying' || this.status === 'pushing') && !this.pausedForBuild) || this.isDragging;
     const due = active || this.needsRender || !this.lastRender || now - this.lastRender >= 1000 / 30 - 0.5;
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;

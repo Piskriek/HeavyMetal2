@@ -162,6 +162,11 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const course = COURSES.find((item) => item.id === config.course) ?? COURSES[0];
   const playing = snapshot.status === 'flying';
   const ready = snapshot.status === 'ready';
+  // M01 · T1: a normal run leaves the grid on the starter goblin's push, not on the slingshot.
+  const pushStart = options.startMode !== 'sling';
+  // M01 · T1: the 0.4 s shove is part of the run — the HUD has to be live for it, so the notice
+  // that explains what just happened is not swallowed by the grid state.
+  const onCourse = playing || snapshot.status === 'pushing';
   const paused = snapshot.status === 'paused';
   // The gear button is the single always-available race menu; it fades away
   // during active play and returns on any pointer or key activity.
@@ -313,9 +318,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     if (roundComplete(session)) { onContinue(); return; }
     engineRef.current?.reset();
     setResult(null);
-    if (autoLaunch) engineRef.current?.launch();
+    // Push mode has no slingshot: "race again" is the starter goblin again.
+    if (autoLaunch) { if (pushStart) engineRef.current?.start(); else engineRef.current?.launch(); }
     canvasRef.current?.focus({ preventScroll: true });
-  }, [session, onContinue]);
+  }, [session, onContinue, pushStart]);
 
   const toggleFullscreen = useCallback(async () => {
     if (document.fullscreenElement) await document.exitFullscreen();
@@ -367,7 +373,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       if (engine.status === 'ready' && code === 'ArrowLeft') { event.preventDefault(); engine.adjustAim(-0.05, 0); return; }
       if (engine.status === 'ready' && code === 'ArrowRight') { event.preventDefault(); engine.adjustAim(0.05, 0); return; }
       // Fixed non-remappable actions
-      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.launch(); return; }
+      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.start(); return; }
       if (code === 'KeyR') { event.preventDefault(); retry(); return; }
       if (code === 'KeyM') { setOptions((previous) => ({ ...previous, sound: !previous.sound })); return; }
       if (code === 'KeyF') { event.preventDefault(); void toggleFullscreen(); return; }
@@ -453,8 +459,9 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
               </div>
               <AnimatePresence>
                 {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="grid-flag-img" aria-hidden="true" /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
-                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
-                {snapshot.notice && playing && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
+                {ready && !pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
+                {ready && pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — press Space to be shoved down the hill.</p></motion.div>}
+                {snapshot.notice && onCourse && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
               <AirSupplies snapshot={snapshot} />
               <div className="mini-trackbar" aria-label={`Race progress: ${Math.round(trackPct(playerDistance))} percent`}>

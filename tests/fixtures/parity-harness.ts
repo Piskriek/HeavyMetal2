@@ -190,8 +190,15 @@ export function withPinnedRandom<T>(run: () => T): T {
   try { return run(); } finally { Math.random = original; }
 }
 
-/** A layout with one of every obstacle kind, plus a four-lane gap and the course's first loop. */
-export function everyKindLayout(course: CourseId, startX = 900, stride = 420): Obstacle[] {
+/**
+ * One of every obstacle kind in a line, plus a ramp, a wall-to-wall gap and the first loop.
+ *
+ * The line is laid in the player's own grid lane (2) and reuses the list's original lanes — the
+ * scenario's job is to be swept by the player, so `tests/physics-parity.test.ts` scores it against
+ * the player's ledger bit and against `hitAt`, not against the four kinds that happen to expose a
+ * `hit` flag.
+ */
+export function everyKindLayout(course: CourseId, startX = 900, stride = 420, lane = 2): Obstacle[] {
   const kinds: Obstacle['kind'][] = [
     'boost', 'spring', 'tnt', 'sheep', 'water_rock', 'break_bridge', 'pinball_spinner', 'cauldron',
     'roller_rails', 'waterfall_splash', 'sign', 'blimp', 'rock_gate', 'cave_torch', 'stalactite', 'lane_tube',
@@ -202,7 +209,7 @@ export function everyKindLayout(course: CourseId, startX = 900, stride = 420): O
     obstacles.push({
       kind, x, width: kind === 'sign' || kind === 'waterfall_splash' || kind === 'rock_gate' ? 400 : 120,
       height: kind === 'blimp' ? 115 : kind === 'sign' ? 150 : 90,
-      lane: 2, laneSpan: 1, hit: false, hitAt: -100, hitMask: 0,
+      lane, laneSpan: 1, hit: false, hitAt: -100, hitMask: 0,
       ...(kind === 'blimp' ? { altitude: 210 } : {}),
       ...(kind === 'sign' ? { altitude: 240, signType: 'tnt' as const } : {}),
       ...(kind === 'break_bridge' ? { broken: false, health: 1, lane: -1, laneSpan: 4 } : {}),
@@ -210,7 +217,7 @@ export function everyKindLayout(course: CourseId, startX = 900, stride = 420): O
     });
     x += stride;
   }
-  obstacles.push({ kind: 'ramp', x, width: 210, height: 120, lane: 2, laneSpan: 1, hit: false, hitAt: -100, hitMask: 0 });
+  obstacles.push({ kind: 'ramp', x, width: 210, height: 120, lane, laneSpan: 1, hit: false, hitAt: -100, hitMask: 0 });
   obstacles.push({ kind: 'gap', x: x + 900, width: 200, height: 0, lane: -1, laneSpan: 4, hit: false, hitAt: -100, hitMask: 0 });
   const firstLoop = createTrackLayout(course).filter((obstacle) => obstacle.kind === 'loop').slice(0, 1);
   return [...obstacles, ...firstLoop.map((obstacle) => ({ ...obstacle, x: Math.max(obstacle.x, x + 1600) }))].sort((left, right) => left.x - right.x);

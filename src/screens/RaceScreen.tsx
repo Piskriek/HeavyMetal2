@@ -370,7 +370,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (!activeRef.current || event.defaultPrevented || modalRef.current || (event.repeat && !event.code.startsWith('Arrow')) || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!activeRef.current || event.defaultPrevented || modalRef.current || buildMode || engineRef.current?.trackBuilder.keymap.hasScope('builder') || (event.repeat && !event.code.startsWith('Arrow')) || event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement;
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
       if (['BUTTON', 'A'].includes(target.tagName) && ['Space', 'Enter'].includes(event.code)) return;

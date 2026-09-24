@@ -1,0 +1,468 @@
+/* ==========================================================================
+   Heavy Metal GP 2 - 3D Track Builder Forged Iron & Brass UI Theme
+   ========================================================================== */
+
+/* Fantasy Font and Variables */
+:root {
+  --builder-brass-light: #fde68a;
+  --builder-brass: #d6ad5c;
+  --builder-brass-dark: #8e682d;
+  --builder-border-outer: #5a4225;
+  --builder-border-inner: #3d2813;
+  --builder-iron-dark: #0d120f;
+  --builder-iron-mid: #161c18;
+  --builder-iron-light: #242c26;
+  --builder-glow: rgba(245, 158, 11, 0.25);
+}
+
+/* Master panel container */
+.builder-forged-panel {
+  position: relative;
+  border: 2px solid var(--builder-border-outer);
+  border-radius: 6px;
+  background:
+    linear-gradient(145deg, rgba(22, 30, 24, 0.96), rgba(12, 16, 13, 0.98)),
+    url('/ui/stone-tile.png') 0 0 / 256px 256px repeat;
+  box-shadow:
+    inset 0 0 0 1px var(--builder-brass),
+    inset 0 0 0 3px var(--builder-border-inner),
+    inset 0 0 24px rgba(0, 0, 0, 0.85),
+    0 16px 40px rgba(0, 0, 0, 0.75);
+  color: #f3f4f6;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Panel Header Ribbon */
+.builder-forged-header {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(45, 34, 18, 0.95) 0%, rgba(22, 17, 9, 0.95) 100%);
+  border-bottom: 2px solid var(--builder-border-outer);
+  box-shadow: inset 0 -1px 0 var(--builder-brass-dark);
+  padding: 8px 12px;
+}
+
+.builder-forged-title {
+  font-family: var(--fantasy, 'Cinzel', serif);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+  text-transform: uppercase;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(245, 158, 11, 0.3);
+}
+
+/* Top Navigation Bar */
+.builder-topbar {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(28, 35, 30, 0.98) 0%, rgba(14, 18, 15, 0.96) 100%),
+    url('/ui/stone-tile.png') 0 0 / 256px 256px repeat;
+  border-bottom: 2px solid var(--builder-border-outer);
+  box-shadow:
+    inset 0 -1px 0 var(--builder-brass),
+    inset 0 -3px 0 var(--builder-border-inner),
+    0 8px 24px rgba(0, 0, 0, 0.7);
+}
+
+/* Gold & Forged Iron Buttons */
+.builder-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  border: 1px solid var(--builder-brass-dark);
+  background: linear-gradient(180deg, #322513 0%, #1b140a 100%);
+  color: #fde68a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 175, 0.25),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+.builder-btn:hover:not(:disabled) {
+  border-color: #fbbf24;
+  background: linear-gradient(180deg, #4d391c 0%, #291e0f 100%);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 175, 0.45),
+    0 0 10px rgba(245, 158, 11, 0.35),
+    0 2px 5px rgba(0, 0, 0, 0.6);
+  transform: translateY(-1px);
+}
+
+.builder-btn:active:not(:disabled) {
+  transform: translateY(0);
+  background: linear-gradient(180deg, #1b140a 0%, #2f2312 100%);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.builder-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+/* Primary Hero Button */
+.builder-btn--primary {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #b45309 0%, #78350f 100%);
+  color: #fffbeb;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 0 14px rgba(245, 158, 11, 0.45),
+    0 3px 6px rgba(0, 0, 0, 0.6);
+}
+
+.builder-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d97706 0%, #92400e 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 20px rgba(245, 158, 11, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.7);
+}
+
+/* Danger / Clear Button */
+.builder-btn--danger {
+  border-color: #991b1b;
+  background: linear-gradient(180deg, #7f1d1d 0%, #450a0a 100%);
+  color: #fecaca;
+  box-shadow:
+    inset 0 1px 0 rgba(254, 202, 202, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.builder-btn--danger:hover:not(:disabled) {
+  border-color: #ef4444;
+  background: linear-gradient(180deg, #991b1b 0%, #580d0d 100%);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+}
+
+/* Subtle Secondary / Tool Button */
+.builder-btn--secondary {
+  border-color: #3f3f46;
+  background: linear-gradient(180deg, #27272a 0%, #18181b 100%);
+  color: #d4d4d8;
+}
+
+.builder-btn--secondary:hover:not(:disabled) {
+  border-color: #a1a1aa;
+  color: #fafafa;
+}
+
+/* Active Pressed Toggle */
+.builder-btn[aria-pressed='true'] {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #451a03 0%, #291102 100%);
+  color: #fde68a;
+  box-shadow: inset 0 0 8px rgba(245, 158, 11, 0.35);
+}
+
+/* Category Tab Strip in Bottom Dock */
+.builder-category-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  border-top: 2px solid transparent;
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  background: rgba(18, 24, 20, 0.6);
+  color: #a1a1aa;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.builder-category-tab:hover {
+  background: rgba(30, 39, 32, 0.8);
+  color: #e4e4e7;
+}
+
+.builder-category-tab.is-active {
+  background:
+    linear-gradient(180deg, rgba(42, 33, 17, 0.95) 0%, rgba(20, 26, 21, 0.98) 100%);
+  border-top: 2px solid #fbbf24;
+  border-left: 1px solid var(--builder-border-outer);
+  border-right: 1px solid var(--builder-border-outer);
+  color: #fde68a;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 rgba(251, 191, 36, 0.4),
+    0 -3px 10px rgba(245, 158, 11, 0.15);
+}
+
+/* Floating Drawer Tabs (Screen Edge Handles) */
+.builder-drawer-tab {
+  position: absolute;
+  z-index: 45;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-family: var(--fantasy, 'Cinzel', serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fde68a;
+  background:
+    linear-gradient(180deg, #2b2112 0%, #151916 100%),
+    url('/ui/stone-tile.png') 0 0 / 128px 128px repeat;
+  border: 2px solid var(--builder-border-outer);
+  box-shadow:
+    inset 0 0 0 1px var(--builder-brass),
+    0 4px 16px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.builder-drawer-tab:hover {
+  border-color: #fbbf24;
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px #fef08a,
+    0 0 15px rgba(245, 158, 11, 0.35),
+    0 6px 20px rgba(0, 0, 0, 0.8);
+}
+
+.builder-drawer-tab--left {
+  top: 60px;
+  left: 0;
+  border-left: 0;
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.builder-drawer-tab--right {
+  top: 60px;
+  right: 0;
+  border-right: 0;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.builder-drawer-tab--bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom: 0;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+/* Drag Resize Handles */
+.builder-resize-handle-h {
+  width: 100%;
+  height: 8px;
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  user-select: none;
+  touch-action: none;
+}
+
+.builder-resize-handle-h::after {
+  content: '';
+  width: 48px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--builder-brass-dark);
+  box-shadow: 0 1px 0 rgba(255, 230, 160, 0.3);
+  transition: all 0.15s ease;
+}
+
+.builder-resize-handle-h:hover::after,
+.builder-resize-handle-h.is-resizing::after {
+  width: 72px;
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+}
+
+.builder-resize-handle-w {
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  user-select: none;
+  touch-action: none;
+}
+
+.builder-resize-handle-w::after {
+  content: '';
+  width: 3px;
+  height: 48px;
+  border-radius: 2px;
+  background: var(--builder-brass-dark);
+  box-shadow: 1px 0 0 rgba(255, 230, 160, 0.3);
+  transition: all 0.15s ease;
+}
+
+.builder-resize-handle-w:hover::after,
+.builder-resize-handle-w.is-resizing::after {
+  height: 72px;
+  background: #fbbf24;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+}
+
+/* Custom Scrollbars */
+.builder-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.builder-scroll::-webkit-scrollbar-track {
+  background: rgba(12, 17, 14, 0.85);
+  border-radius: 4px;
+}
+.builder-scroll::-webkit-scrollbar-thumb {
+  background: #5f4523;
+  border: 1px solid #926d32;
+  border-radius: 4px;
+}
+.builder-scroll::-webkit-scrollbar-thumb:hover {
+  background: #7a592d;
+  border-color: #d6ad5c;
+}
+
+/* Accordion sections inside inspector */
+.builder-accordion {
+  border: 1px solid rgba(90, 66, 37, 0.6);
+  border-radius: 5px;
+  background: rgba(14, 19, 16, 0.6);
+  overflow: hidden;
+}
+
+.builder-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 9px;
+  background: rgba(30, 24, 15, 0.6);
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fde68a;
+  border-bottom: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.builder-accordion-header:hover {
+  background: rgba(45, 34, 19, 0.8);
+  color: #fff;
+}
+
+.builder-accordion-header.is-open {
+  border-bottom-color: rgba(90, 66, 37, 0.6);
+}
+
+.builder-accordion-content {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Zen View restore button */
+.builder-zen-restore {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 60;
+  pointer-events: auto;
+  opacity: 0.85;
+}
+.builder-zen-restore:hover {
+  opacity: 1;
+}
+
+/* DCC Shelf Custom Heavy Grab Scrollbar */
+.builder-shelf-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: #8e682d rgba(18, 24, 20, 0.95);
+}
+.builder-shelf-scroll::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.builder-shelf-scroll::-webkit-scrollbar-track {
+  background: rgba(14, 18, 15, 0.95);
+  border: 1px solid rgba(90, 66, 37, 0.5);
+  border-radius: 6px;
+  margin: 2px 8px;
+}
+.builder-shelf-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #8e682d 0%, #5a4225 100%);
+  border: 1px solid #d6ad5c;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(253, 230, 138, 0.3);
+}
+.builder-shelf-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #d6ad5c 0%, #8e682d 100%);
+  border-color: #fbbf24;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+}
+
+/* DCC Dropdown Menus */
+.builder-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  z-index: 65;
+  background: rgba(16, 22, 18, 0.98);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--builder-brass-dark);
+  border-radius: 6px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(214, 173, 92, 0.25);
+  padding: 6px;
+  min-width: 220px;
+}
+
+.builder-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #e4e4e7;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-align: left;
+  user-select: none;
+}
+.builder-dropdown-item:hover {
+  background: rgba(55, 40, 20, 0.85);
+  color: #fbbf24;
+  border-color: rgba(214, 173, 92, 0.45);
+}
+.builder-dropdown-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+

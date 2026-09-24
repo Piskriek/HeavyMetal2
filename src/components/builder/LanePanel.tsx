@@ -30,6 +30,8 @@ export interface LanePanelProps {
   readonly onExport?: () => void;
   readonly onImport?: (json: string) => void;
   readonly onTestDrive?: () => void;
+  readonly onInitSample?: () => void;
+  readonly onInitDefault?: () => void;
   /** Result of the last save, shown as a status line. */
   readonly status?: string | null;
 }
@@ -40,7 +42,7 @@ const KIND_LABEL: Record<LaneNodeKind, string> = {
 
 export default function LanePanel({
   model, onSelectNode, onSelectPath, onMoveNode, onCommand, onSave, onExport, onImport,
-  onTestDrive, status,
+  onTestDrive, onInitSample, onInitDefault, status,
 }: LanePanelProps) {
   const selected = model.nodes.find((node) => node.id === model.selectedNodeId) ?? null;
   const selectedPath = model.paths.find((path) => path.id === model.selectedPathId) ?? null;
@@ -85,7 +87,69 @@ export default function LanePanel({
         </p>
       </header>
 
+      {!model.hasDocument ? (
+        <div className="lane-panel__starter" role="region" aria-label="Get started with lanes">
+          <p className="lane-panel__starter-text">
+            No custom lane network exists yet for this course. Start by generating standard lanes, loading the sample network, or importing a file:
+          </p>
+          <div className="lane-panel__actions">
+            <button
+              type="button"
+              className="lane-panel__button lane-panel__button--primary"
+              onClick={() => onInitDefault?.()}
+              aria-label="Generate standard 4-lane baseline for this course"
+            >
+              Generate Standard 4 Lanes
+            </button>
+            <button
+              type="button"
+              className="lane-panel__button"
+              onClick={() => onInitSample?.()}
+              aria-label="Load course sample lane network with merges and loops"
+            >
+              Load Sample Network
+            </button>
+            <button
+              type="button"
+              className="lane-panel__button"
+              onClick={() => onCommand?.({ op: 'newPath' })}
+              aria-label="Create a new single lane path"
+            >
+              + New Path [N]
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="lane-panel__actions" role="group" aria-label="Network file">
+        {model.hasDocument ? (
+          <>
+            <button
+              type="button"
+              className="lane-panel__button lane-panel__button--primary"
+              onClick={() => onCommand?.({ op: 'newPath' })}
+              aria-label="Create a new lane path"
+            >
+              + Path [N]
+            </button>
+            <button
+              type="button"
+              className="lane-panel__button"
+              onClick={() => onInitDefault?.()}
+              aria-label="Reset track to standard 4 lanes"
+            >
+              Standard 4 Lanes
+            </button>
+            <button
+              type="button"
+              className="lane-panel__button"
+              onClick={() => onInitSample?.()}
+              aria-label="Reset track to sample lane network"
+            >
+              Reset Sample
+            </button>
+          </>
+        ) : null}
         <button
           type="button"
           className="lane-panel__button"
@@ -285,6 +349,17 @@ export default function LanePanel({
           </div>
         </div>
       ) : null}
+
+      {!selected && !selectedPath && model.hasDocument ? (
+        <div className="lane-panel__guide" role="note" aria-label="Lane editing instructions">
+          <h4 className="lane-panel__subtitle">Authoring Lanes &amp; Paths</h4>
+          <p className="lane-panel__hint">
+            Click <strong>+ Path [N]</strong> to add a new lane path. Click any circular handle on the track to move it.
+            Select a node to <strong>Insert [I]</strong>, <strong>Split [S]</strong>, <strong>Merge [M]</strong>, change <strong>Kind [K]</strong>, or <strong>Delete [Del]</strong>.
+          </p>
+        </div>
+      ) : null}
     </section>
   );
 }
+

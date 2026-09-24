@@ -555,3 +555,46 @@ export function sampleLaneNetwork(course: CourseId = 'ridge'): LaneNetwork {
   paths.push({ id: 'ridge-spur', name: 'Decoy spur', nodeIds: ['fork', 'spur-end'], halfWidth: LANE_HALF_WIDTH_MIN });
   return { version: LANE_NETWORK_VERSION, course, nodes, paths };
 }
+
+/**
+ * Creates a clean standard 4-lane baseline network running straight from START_X to FINISH.
+ */
+export function createDefaultLaneNetwork(course: CourseId = 'ridge'): LaneNetwork {
+  const nodes: LaneNode[] = [];
+  const paths: LanePath[] = [];
+  const xs = [START_X, 15000, 35000, 55000, FINISH];
+  for (let lane = 0; lane < 4; lane++) {
+    const nodeIds: string[] = [];
+    const z = laneZOf(lane);
+    for (const x of xs) {
+      const id = `lane${lane}-x${x}`;
+      nodes.push({ id, x, z, kind: 'normal' });
+      nodeIds.push(id);
+    }
+    paths.push({
+      id: `default-lane-${lane + 1}`,
+      name: `Lane ${lane + 1}`,
+      nodeIds,
+      halfWidth: DEFAULT_HALF_WIDTH,
+    });
+  }
+  return { version: LANE_NETWORK_VERSION, course, nodes, paths };
+}
+
+/**
+ * Creates an initial single-path lane network along the center lane from START_X to FINISH.
+ */
+export function createBlankLaneNetwork(course: CourseId = 'ridge'): LaneNetwork {
+  const z = laneZOf(2);
+  const midX = Math.round((START_X + FINISH) / 2);
+  const nodes: LaneNode[] = [
+    { id: 'start-node', x: START_X, z, kind: 'normal' },
+    { id: 'mid-node', x: midX, z, kind: 'normal' },
+    { id: 'finish-node', x: FINISH, z, kind: 'normal' },
+  ];
+  const paths: LanePath[] = [
+    { id: 'path-1', name: 'Main Path', nodeIds: ['start-node', 'mid-node', 'finish-node'], halfWidth: DEFAULT_HALF_WIDTH },
+  ];
+  return { version: LANE_NETWORK_VERSION, course, nodes, paths };
+}
+

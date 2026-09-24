@@ -20,6 +20,18 @@ import {
   exportProps as exportTrackStorage,
   importProps as importTrackStorage,
 } from './track-storage';
+import { migrateV1toV2 } from './track-storage-migrate';
+import { createHmtPackage } from './export/track-package';
+import { bakeVertexLighting, DEFAULT_BAKE_OPTS } from './bake/vertex-baker';
+import type { MaterialDescriptor } from './materials/material-descriptor';
+import { MaterialCache } from './materials/material-cache';
+import type { RoleConfig } from './collision/obstacle-roles';
+import { PatchIndex } from './collision/patch-index';
+import { Keymap } from './builder/keymap';
+import { GizmoAdapter } from './builder/gizmo-adapter';
+import { CommandStack } from './builder/history';
+import { alignProps, distributeProps, marqueeSelect2D } from './builder/selection';
+import type { GizmoMode, GizmoSpace, SnapConfig } from './builder/gizmo-math';
 
 export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated'
   /** M01 · T7 — not a prop shelf: this tab shows the Lanes & Paths panel instead of a card grid. */
@@ -271,6 +283,9 @@ export interface PlacedProp {
   animFrames?: boolean[]; // Per-frame enable flags; unchecked frames are skipped (default all on)
   animFrameDelays?: number[]; // Per-frame hold delay in seconds (default 0)
   authoringNotes?: string; // T08: optional authoring metadata
+  materialDesc?: MaterialDescriptor;
+  roleConfig?: RoleConfig;
+  customAssetId?: string;
   // Allow unknown fields for forward compatibility
   [key: string]: unknown;
 }
@@ -748,6 +763,7 @@ export interface LaneUndoEntry {
 }
 
 export class TrackBuilder3D {
+  readonly keymap = new Keymap();
   private placedProps: PlacedProp[] = [];
   /** T03: last visible rejection of an unsupported gameplay-prop placement. */
   private placementErrorState: string | null = null;
@@ -764,6 +780,11 @@ export class TrackBuilder3D {
   private ghostMesh: THREE.Object3D | null = null;
   private selectionBoxes = new Map<string, THREE.BoxHelper>();
   private rotationHandle: THREE.Group | null = null;
+  private gizmoAdapter: GizmoAdapter<PlacedProp> | null = null;
+  private readonly commandHistory = new CommandStack<PlacedProp>();
+  private isGizmoDragging = false;
+  readonly materialCache = new MaterialCache();
+  readonly patchIndex = new PatchIndex();
 
   private undoStack: LaneUndoEntry[] = [];
   private redoStack: LaneUndoEntry[] = [];
@@ -1116,6 +1137,201 @@ export class TrackBuilder3D {
       y: Math.round(sy / n),
       z: Math.round(sz / n),
     };
+  }
+
+  initGizmo(canvas: HTMLElement) {
+    if (this.gizmoAdapter || typeof window === 'undefined') return;
+    this.gizmoAdapter = new GizmoAdapter<PlacedProp>(
+      this.camera,
+      canvas,
+      this.scene,
+      this.commandHistory,
+    );
+    this.gizmoAdapter.onChange((items) => {
+      for (const item of items) {
+        this.updatePropTransform(item.id, {}, false);
+      }
+      this.saveToStorage();
+      this.notify();
+    });
+    this.gizmoAdapter.onDrag((dragging) => {
+      this.isGizmoDragging = dragging;
+    });
+    if (this.selectedPropIds.size > 0 && this.freeFly.active) {
+      this.gizmoAdapter.attach(this.getSelectedProps());
+    }
+  }
+
+  getGizmoAdapter(): GizmoAdapter<PlacedProp> | null {
+    return this.gizmoAdapter;
+  }
+
+  isDraggingGizmo(): boolean {
+    return this.isGizmoDragging;
+  }
+
+  setGizmoMode(mode: GizmoMode) {
+    this.gizmoAdapter?.setMode(mode);
+    this.notify();
+  }
+
+  getGizmoMode(): GizmoMode {
+    return this.gizmoAdapter?.getMode() ?? 'translate';
+  }
+
+  setGizmoSpace(space: GizmoSpace) {
+    this.gizmoAdapter?.setSpace(space);
+    this.notify();
+  }
+
+  cycleGizmoSpace(): GizmoSpace {
+    const next = this.gizmoAdapter?.cycleSpace() ?? 'world';
+    this.notify();
+    return next;
+  }
+
+  getGizmoSpace(): GizmoSpace {
+    return this.gizmoAdapter?.getSpace() ?? 'world';
+  }
+
+  setGizmoSnap(config: Partial<SnapConfig>) {
+    this.gizmoAdapter?.setSnap(config);
+    this.notify();
+  }
+
+  getGizmoSnap(): SnapConfig {
+    return this.gizmoAdapter?.getSnap() ?? { grid: 0, angleDeg: 0, scaleStep: 0, surface: false, centerline: false };
+  }
+
+  cancelGizmoDrag() {
+    this.gizmoAdapter?.cancelDrag();
+  }
+
+  alignSelected(axis: 'x' | 'z', mode: 'min' | 'center' | 'max') {
+    const selected = this.getSelectedProps();
+    if (selected.length < 2) return;
+    this.pushUndo();
+    const ids = new Set(selected.map((p) => p.id));
+    this.placedProps = alignProps(this.placedProps, ids, axis, mode);
+    for (const id of ids) {
+      this.updatePropTransform(id, {}, false);
+    }
+    this.saveToStorage();
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  distributeSelected(axis: 'x' | 'z') {
+    const selected = this.getSelectedProps();
+    if (selected.length < 3) return;
+    this.pushUndo();
+    const ids = new Set(selected.map((p) => p.id));
+    this.placedProps = distributeProps(this.placedProps, ids, axis);
+    for (const id of ids) {
+      this.updatePropTransform(id, {}, false);
+    }
+    this.saveToStorage();
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  marqueeSelect(
+    x0: number,
+    z0: number,
+    x1: number,
+    z1: number,
+    additive = false,
+  ) {
+    const ids = marqueeSelect2D(this.placedProps, { x: x0, y: z0 }, { x: x1, y: z1 });
+    if (additive) {
+      for (const id of ids) this.selectedPropIds.add(id);
+    } else {
+      this.selectedPropIds = new Set(ids);
+    }
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  setCameraPreset(preset: 'top' | 'front' | 'side' | 'iso' | 'fly') {
+    if (preset === 'top') {
+      this.freeFly.pitch = -Math.PI / 2 + 0.001;
+      this.freeFly.yaw = 0;
+      this.freeFly.y = Math.max(this.freeFly.y, 19500);
+    } else if (preset === 'front') {
+      this.freeFly.pitch = 0;
+      this.freeFly.yaw = 0;
+    } else if (preset === 'side') {
+      this.freeFly.pitch = 0;
+      this.freeFly.yaw = Math.PI / 2;
+    } else if (preset === 'iso') {
+      this.freeFly.pitch = -Math.PI / 6;
+      this.freeFly.yaw = Math.PI / 4;
+    }
+    const lookDir = new THREE.Vector3(
+      Math.sin(this.freeFly.yaw) * Math.cos(this.freeFly.pitch),
+      Math.sin(this.freeFly.pitch),
+      Math.cos(this.freeFly.yaw) * Math.cos(this.freeFly.pitch),
+    );
+    this.camera.position.set(this.freeFly.x, this.freeFly.y, this.freeFly.z);
+    this.camera.lookAt(this.camera.position.clone().add(lookDir));
+    this.notify();
+  }
+
+  bakeVertexAO(): { count: number; totalVertices: number } {
+    let count = 0;
+    let totalVertices = 0;
+    for (const [, obj] of this.propObjects.entries()) {
+      obj.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          const geom = mesh.geometry;
+          if (geom && geom.attributes.position) {
+            const posAttr = geom.attributes.position;
+            const posArray = new Float32Array(posAttr.array);
+            const indexArray = geom.index ? new Uint32Array(geom.index.array) : new Uint32Array(Array.from({ length: posAttr.count }, (_, i) => i));
+            const bakeRes = bakeVertexLighting({ name: 'prop_mesh', positions: posArray, indices: indexArray }, { ...DEFAULT_BAKE_OPTS, rays: 16 });
+            geom.setAttribute('color', new THREE.BufferAttribute(bakeRes.colors, 3));
+            if (mesh.material) {
+              const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+              for (const m of mats) {
+                m.vertexColors = true;
+                m.needsUpdate = true;
+              }
+            }
+            count++;
+            totalVertices += posAttr.count;
+          }
+        }
+      });
+    }
+    this.notify();
+    return { count, totalVertices };
+  }
+
+  exportHmtPackage(): string {
+    const cleanProps = this.stripRuntimeState(this.placedProps);
+    const v2Doc = migrateV1toV2({ courseId: this.courseId, props: cleanProps });
+    const pkg = createHmtPackage(v2Doc, []);
+    return JSON.stringify(pkg, null, 2);
+  }
+
+  registerCustomModel(assetId: string, name: string) {
+    let def = PROP_DEFINITIONS.find((d) => d.type === assetId);
+    if (!def) {
+      def = {
+        type: assetId,
+        name,
+        category: 'cavern_mine',
+        url: '/art/custom-model.png',
+        defaultWidth: 500,
+        defaultHeight: 500,
+        defaultDepth: 500,
+        is3DModel: true,
+      };
+      PROP_DEFINITIONS.push(def);
+    }
+    this.setActivePropType(assetId);
+    this.notify();
   }
 
   moveSelectedProps(dx: number, dy: number, dz: number) {
@@ -2305,8 +2521,11 @@ export class TrackBuilder3D {
       this.selectionBoxes.forEach((box) => { box.visible = false; });
       if (this.rotationHandle) this.rotationHandle.visible = false;
       if (this.decalSideHandlesGroup) this.decalSideHandlesGroup.visible = false;
+      this.gizmoAdapter?.detach();
       return;
     }
+
+    this.gizmoAdapter?.attach(selected);
 
     const currentSelectedIds = new Set(selected.map((p) => p.id));
 
@@ -3468,6 +3687,10 @@ export class TrackBuilder3D {
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
     for (const id of [...this.animTextureCache.keys()]) this.disposeAnimTexture(id);
+    if (this.gizmoAdapter) {
+      this.gizmoAdapter.dispose();
+      this.gizmoAdapter = null;
+    }
     this.listeners.length = 0;
     this.backupStatusListeners.length = 0;
   }

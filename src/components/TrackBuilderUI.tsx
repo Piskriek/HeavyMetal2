@@ -2,12 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
-  Layers, Eye, MousePointer, Camera, Sun, ChevronDown, Users,
-  Move, Database, History, Save, RefreshCw, CheckCircle2,
+  Layers, Eye, MousePointer, Camera, Sun, ChevronDown,
+  Users, Move, Database, History, Save, RefreshCw,
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
-  Minus, Plus, Film, Route
+  Minus, Plus, Film, Route, Box, HelpCircle, Maximize2, Sparkles,
+  Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
+import ZenRestore from './builder/ZenRestore';
+import CheatSheet from './builder/CheatSheet';
+import CustomModelsTab from './builder/CustomModelsTab';
+import ShadingPanel from './builder/ShadingPanel';
+import CollisionPanel from './builder/CollisionPanel';
+import { DEFAULT_MATERIAL_DESCRIPTOR } from '../game/materials/material-descriptor';
+import { DEFAULT_ROLE_CONFIGS } from '../game/collision/obstacle-roles';
+import type { GizmoMode, GizmoSpace } from '../game/builder/gizmo-math';
 import {
   TrackBuilder3D,
   PROP_DEFINITIONS,
@@ -27,8 +36,10 @@ import {
 import { SKY_PRESETS } from '../game/renderer-3d';
 import LanePanel, { type LanePanelCommand } from './builder/LanePanel';
 import '../lane-panel.css';
+import '../builder-theme.css';
 import { laneEditForCommand, laneKeyIntent, lanePanelModel, type LaneKeyIntent } from '../game/lane-panel-model';
 import { snapNode } from '../game/lane-path-tool';
+import { sampleLaneNetwork, createDefaultLaneNetwork, createBlankLaneNetwork } from '../game/lane-network';
 
 interface TrackBuilderUIProps {
   builder: TrackBuilder3D;
@@ -50,12 +61,19 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'powerup', label: 'Powerups', icon: <Zap size={16} /> },
   { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} /> },
   { id: 'animated', label: 'Animated', icon: <Clapperboard size={16} /> },
+  { id: 'custom_models' as any, label: 'Custom 3D', icon: <Box size={16} /> },
   // M01 · T7 — not a prop shelf: this tab opens the Lanes & Paths panel and its 3D handles.
   { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} /> },
 ];
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
   const [category, setCategory] = useState<PropCategory>('foliage');
+  const [isZen, setIsZen] = useState(false);
+  const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const [inspectorTab, setInspectorTab] = useState<'transform' | 'shading' | 'collision' | 'animation'>('transform');
+  const [gizmoMode, setGizmoMode] = useState<GizmoMode>(builder.getGizmoMode());
+  const [gizmoSpace, setGizmoSpace] = useState<GizmoSpace>(builder.getGizmoSpace());
+  const [cameraPreset, setCameraPreset] = useState<'fly' | 'top' | 'front' | 'side' | 'iso'>('fly');
   const [selectedLanePathId, setSelectedLanePathId] = useState<string | null>(null);
   const [laneRevision, setLaneRevision] = useState(0);
   const [laneStatus, setLaneStatus] = useState<string | null>(null);
@@ -75,6 +93,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [animDelayTargetFrame, setAnimDelayTargetFrame] = useState<number | 'all'>(0);
   const [delayInputStr, setDelayInputStr] = useState<string>('0');
   const [showSkyMenu, setShowSkyMenu] = useState(false);
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const [showCameraMenu, setShowCameraMenu] = useState(false);
+  const [showSnappingMenu, setShowSnappingMenu] = useState(false);
+  const [shelfSearch, setShelfSearch] = useState('');
+  const [shelfExpanded, setShelfExpanded] = useState(false);
+  const shelfScrollRef = useRef<HTMLDivElement>(null);
   const [showBackupsModal, setShowBackupsModal] = useState(false);
   const [backupInfo, setBackupInfo] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; timestamp: number; count: number }>({
     status: 'idle',
@@ -88,6 +112,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   });
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly (Space: up, Z: down), Right-Drag to look, Click props to select');
+
+  const scrollShelf = (direction: 'left' | 'right') => {
+    if (shelfScrollRef.current) {
+      const offset = direction === 'left' ? -380 : 380;
+      shelfScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+
+
 
   const keysRef = useRef(new Set<string>());
   const isRightMouseDown = useRef(false);
@@ -138,10 +172,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     };
     builder.onChange(update);
     builder.freeFly.active = true;
+    builder.initGizmo(canvas);
+    builder.keymap.pushScope('builder');
     return () => {
       builder.freeFly.active = false;
+      builder.keymap.popScope('builder');
     };
-  }, [builder, onRequestRender]);
+  }, [builder, canvas, onRequestRender]);
 
   // Animated decorations preview: advance sheet frames while anything is playing.
   // Gated on hasPlayingAnimations() so idle scenes render nothing extra.
@@ -460,6 +497,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         return;
       }
 
+
       // 3. Group / Ungroup with Ctrl+G / Ctrl+Shift+G
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyG') {
         e.preventDefault();
@@ -576,13 +614,69 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           builder.focusProp(selected[0].id);
           showToast(`Focused camera on ${selected[0].name}`);
         }
+      } else if (e.code === 'KeyW' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
+        e.preventDefault();
+        builder.setGizmoMode('translate');
+        showToast('Gizmo: Translate [W]');
+      } else if (e.code === 'KeyE' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
+        e.preventDefault();
+        builder.setGizmoMode('rotate');
+        showToast('Gizmo: Rotate [E]');
+      } else if (e.code === 'KeyR' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
+        e.preventDefault();
+        builder.setGizmoMode('scale');
+        showToast('Gizmo: Scale [R]');
+      } else if (e.code === 'KeyQ' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
+        e.preventDefault();
+        const next = builder.cycleGizmoSpace();
+        showToast(`Gizmo Space: ${next.toUpperCase()} [Q]`);
+      } else if (e.code === 'KeyG' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (builder.ungroupSelected()) showToast('Ungrouped selection');
+        } else {
+          if (builder.groupSelected()) showToast('Grouped selection');
+        }
       } else if (e.code === 'KeyV') {
         e.preventDefault();
         builder.setActivePropType(null);
         showToast('Select / Inspect Tool Active');
+      } else if (e.code === 'Tab' || (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !e.altKey)) {
+        e.preventDefault();
+        setIsZen((prev) => !prev);
+      } else if ((e.key === '?' || (e.code === 'Slash' && e.shiftKey)) && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShowCheatSheet((prev) => !prev);
+      } else if (e.code === 'Numpad7') {
+        e.preventDefault();
+        builder.setCameraPreset('top');
+        setCameraPreset('top');
+        showToast('Camera: Top Ortho View [Num 7]');
+        onRequestRender?.();
+      } else if (e.code === 'Numpad1') {
+        e.preventDefault();
+        builder.setCameraPreset('front');
+        setCameraPreset('front');
+        showToast('Camera: Front Ortho View [Num 1]');
+        onRequestRender?.();
+      } else if (e.code === 'Numpad3') {
+        e.preventDefault();
+        builder.setCameraPreset('side');
+        setCameraPreset('side');
+        showToast('Camera: Side Ortho View [Num 3]');
+        onRequestRender?.();
+      } else if (e.code === 'Numpad0') {
+        e.preventDefault();
+        builder.setCameraPreset('iso');
+        setCameraPreset('iso');
+        showToast('Camera: Isometric View [Num 0]');
+        onRequestRender?.();
       } else if (e.code === 'Escape') {
         e.preventDefault();
-        if (builder.getActivePropType()) {
+        if (builder.isDraggingGizmo()) {
+          builder.cancelGizmoDrag();
+          showToast('Transform cancelled');
+        } else if (builder.getActivePropType()) {
           builder.setActivePropType(null);
           showToast('Select Tool Active');
         } else if (builder.getSelectedProps().length > 0) {
@@ -716,8 +810,37 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     showToast(`Downloaded ${name}!`);
   };
 
-  const filteredProps = PROP_DEFINITIONS.filter((p) => p.category === category);
+  // Click-outside listener to dismiss topbar dropdown menus
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.builder-dropdown-menu') || target.closest('[data-dropdown-trigger]')) {
+        return;
+      }
+      setShowFileMenu(false);
+      setShowCameraMenu(false);
+      setShowSnappingMenu(false);
+      setShowSkyMenu(false);
+    };
+    window.addEventListener('pointerdown', handleOutsideClick);
+    return () => window.removeEventListener('pointerdown', handleOutsideClick);
+  }, []);
+
+  const displayedProps = useMemo(() => {
+    if (shelfSearch.trim()) {
+      const q = shelfSearch.toLowerCase().trim();
+      return PROP_DEFINITIONS.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.type.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      );
+    }
+    return PROP_DEFINITIONS.filter((p) => p.category === category);
+  }, [category, shelfSearch]);
+
   const placedProps = builder.getProps();
+
 
   /* ---------------------------------------------------------------------------
      M01 · T7 — the lanes tool's wiring.
@@ -739,7 +862,38 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
   const refreshLanes = () => setLaneRevision((revision) => revision + 1);
 
+  const initSampleLanes = () => {
+    const sample = sampleLaneNetwork(course ?? 'ridge');
+    builder.setLaneNetwork(sample);
+    setSelectedLanePathId(null);
+    setLaneStatus('Loaded sample lane network');
+    showToast('Loaded sample lane network with merges & loops');
+    refreshLanes();
+    onRequestRender?.();
+  };
+
+  const initDefaultLanes = () => {
+    const defaultNet = createDefaultLaneNetwork(course ?? 'ridge');
+    builder.setLaneNetwork(defaultNet);
+    setSelectedLanePathId(null);
+    setLaneStatus('Generated standard 4 lanes');
+    showToast('Generated standard 4 lanes');
+    refreshLanes();
+    onRequestRender?.();
+  };
+
   const runLaneCommand = (command: LanePanelCommand) => {
+    if (command.op === 'newPath' && !builder.getLaneNetwork()) {
+      const fresh = createBlankLaneNetwork(course ?? 'ridge');
+      builder.setLaneNetwork(fresh);
+      setSelectedLanePathId(fresh.paths[0]?.id ?? null);
+      setLaneStatus('Created new path');
+      showToast('Created initial lane path');
+      refreshLanes();
+      onRequestRender?.();
+      return;
+    }
+
     const outcome = laneEditForCommand(command, builder.getLaneNetwork(), {
       nodeId: builder.getSelectedLaneNode()?.id ?? null,
       pathId: selectedLanePathId,
@@ -833,6 +987,34 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     onRequestRender?.();
   };
 
+  const handleExportPackage = () => {
+    try {
+      const json = builder.exportHmtPackage();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `track-${course ?? 'ridge'}.hmt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Exported .hmt Track Package');
+    } catch (e) {
+      showToast(`Package export error: ${(e as Error).message}`);
+    }
+  };
+
+  const handleBakeAO = () => {
+    try {
+      const res = builder.bakeVertexAO();
+      showToast(`Bake complete: ${res.count} meshes, ${res.totalVertices} vertices with contact AO`);
+      onRequestRender?.();
+    } catch (e) {
+      showToast(`Bake error: ${(e as Error).message}`);
+    }
+  };
+
   return (
     <div className="track-builder-root pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
       {/* Toast notification */}
@@ -843,252 +1025,517 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       )}
 
       {/* Top Bar */}
-      <div className="pointer-events-auto flex items-center justify-between bg-zinc-950/85 border-b border-amber-500/40 px-4 py-2.5 backdrop-blur-md text-amber-100">
-        <div className="flex items-center gap-3">
-          <span className="font-bold tracking-wider text-amber-400 flex items-center gap-1.5 text-sm">
-            <Compass size={18} /> 3D TRACK BUILDER
-          </span>
-
-          {/* Track Selector */}
-          {onCourseChange && (
-            <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-700/60 rounded px-2 py-1 text-xs">
-              <span className="text-zinc-400 font-medium">Track:</span>
-              <select
-                className="bg-transparent text-amber-300 focus:outline-none cursor-pointer font-bold"
-                value={course ?? 'ridge'}
-                onChange={(e) => onCourseChange(e.target.value as CourseId)}
-              >
-                {COURSES.map((c) => (
-                  <option key={c.id} value={c.id} className="bg-zinc-900 text-amber-200">
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+      {!isZen && (
+        <header className="pointer-events-auto relative z-30 bg-zinc-950/90 border-b border-amber-500/40 px-3 py-1.5 backdrop-blur-md text-amber-100 flex items-center justify-between gap-2 shadow-lg select-none">
+          {/* Left Zone: Brand + File Menu + Track/Sky + Props Hierarchy */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="flex items-center gap-1.5 font-bold tracking-wider text-amber-400 text-xs px-2 py-1 bg-amber-950/50 border border-amber-600/40 rounded shadow-inner">
+              <Compass size={15} className="text-amber-400" />
+              <span className="hidden sm:inline font-mono">FORGE 3D</span>
             </div>
-          )}
 
-          {/* Skybox / Atmosphere Environment Selector */}
-          <div className="relative">
-            <button
-              onClick={() => setShowSkyMenu(!showSkyMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/50 font-medium cursor-pointer"
-              title="Choose Skydome Environment & Atmosphere"
-            >
-              <Sun size={13} />
-              <span>Sky: {SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Ridge'}</span>
-              <ChevronDown size={11} />
-            </button>
+            {/* File & Project Dropdown */}
+            <div className="relative">
+              <button
+                data-dropdown-trigger
+                onClick={() => {
+                  setShowFileMenu(!showFileMenu);
+                  setShowCameraMenu(false);
+                  setShowSnappingMenu(false);
+                  setShowSkyMenu(false);
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded border transition-colors cursor-pointer font-bold ${
+                  showFileMenu ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow' : 'bg-zinc-900/90 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
+                }`}
+                title="Project, File, Export, Bake and Backup options"
+              >
+                <FolderDown size={13} />
+                <span>File</span>
+                <ChevronDown size={11} className={showFileMenu ? 'rotate-180 transition-transform' : 'transition-transform'} />
+              </button>
 
-            {showSkyMenu && (
-              <div className="absolute top-8 left-0 z-50 w-64 bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl p-2 flex flex-col gap-1 backdrop-blur-md">
-                <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider">
-                  Skydome Atmosphere
-                </span>
-                {Object.values(SKY_PRESETS).map((p) => {
-                  const isActive = currentSky === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        builder.setSkybox(p.id);
-                        setCurrentSky(p.id);
-                        setShowSkyMenu(false);
-                        showToast(`Atmosphere: ${p.name}`);
-                        onRequestRender?.();
-                      }}
-                      className={`flex items-center gap-2.5 px-2 py-1.5 rounded text-xs text-left transition-colors cursor-pointer ${
-                        isActive
-                          ? 'bg-amber-950/70 border border-amber-500/80 text-amber-200 font-bold'
-                          : 'hover:bg-zinc-900 text-zinc-300 border border-transparent'
-                      }`}
-                    >
-                      <div
-                        className="w-8 h-8 rounded border border-zinc-700 overflow-hidden shrink-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${p.url})` }}
-                      />
-                      <div className="flex flex-col min-w-0">
-                        <span className="truncate font-medium">{p.name}</span>
-                        <span className="text-[9px] text-zinc-500 capitalize">{p.id} biome</span>
+              {showFileMenu && (
+                <div className="builder-dropdown-menu left-0 w-64 flex flex-col gap-1 text-xs">
+                  <span className="text-[10px] font-bold text-amber-400 px-2.5 py-1 uppercase tracking-wider border-b border-zinc-800">
+                    Project & Storage
+                  </span>
+                  <button
+                    onClick={() => { setShowFileMenu(false); handleExport(); }}
+                    className="builder-dropdown-item"
+                  >
+                    <Download size={14} className="text-amber-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold">Export JSON Layout</span>
+                      <span className="text-[10px] text-zinc-400">Save placed props to disk JSON</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); handleImport(); }}
+                    className="builder-dropdown-item"
+                  >
+                    <Upload size={14} className="text-amber-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold">Import JSON Layout</span>
+                      <span className="text-[10px] text-zinc-400">Load a track props JSON file</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); handleExportPackage(); }}
+                    className="builder-dropdown-item"
+                  >
+                    <Box size={14} className="text-emerald-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-emerald-300">Export .hmt Track Package</span>
+                      <span className="text-[10px] text-zinc-400">Standalone bundle with 3D models</span>
+                    </div>
+                  </button>
+                  <div className="my-1 border-t border-zinc-800/80" />
+                  <button
+                    onClick={() => { setShowFileMenu(false); handleBakeAO(); }}
+                    className="builder-dropdown-item"
+                  >
+                    <Sparkles size={14} className="text-amber-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-amber-300">Bake Vertex AO & Lighting</span>
+                      <span className="text-[10px] text-zinc-400">Raytrace contact occlusion into vertices</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); setShowBackupsModal(true); }}
+                    className="builder-dropdown-item"
+                  >
+                    <Database size={14} className="text-cyan-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-cyan-300">Backups & Version History</span>
+                        {backupInfo.timestamp > 0 && (
+                          <span className="text-[9px] text-emerald-400 bg-emerald-950/60 px-1 rounded border border-emerald-700/50">Auto-saved</span>
+                        )}
                       </div>
-                    </button>
-                  );
-                })}
+                      <span className="text-[10px] text-zinc-400">Browse disk snapshots and local history</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); handleRestoreStarterDecorations(); }}
+                    className="builder-dropdown-item"
+                  >
+                    <RefreshCw size={14} className="text-zinc-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold">Restore Starter Preset</span>
+                      <span className="text-[10px] text-zinc-400">Load default 14 track decorations</span>
+                    </div>
+                  </button>
+                  <div className="my-1 border-t border-zinc-800/80" />
+                  <button
+                    onClick={() => {
+                      setShowFileMenu(false);
+                      if (confirm('Clear all placed props?')) {
+                        builder.clearAll();
+                        showToast('Cleared all props');
+                      }
+                    }}
+                    className="builder-dropdown-item text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                  >
+                    <Trash2 size={14} className="text-red-400 shrink-0" />
+                    <span className="font-semibold">Clear All Props...</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Track Selector */}
+            {onCourseChange && (
+              <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-700/60 rounded px-2 py-1 text-xs">
+                <span className="text-zinc-400 font-medium text-[11px]">Track:</span>
+                <select
+                  className="bg-transparent text-amber-300 focus:outline-none cursor-pointer font-bold text-xs"
+                  value={course ?? 'ridge'}
+                  onChange={(e) => onCourseChange(e.target.value as CourseId)}
+                >
+                  {COURSES.map((c) => (
+                    <option key={c.id} value={c.id} className="bg-zinc-900 text-amber-200">
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
-          </div>
 
-          {/* Placed Props Drawer Toggle */}
-          <button
-            onClick={() => setShowPropsDrawer(!showPropsDrawer)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border transition-colors ${
-              showPropsDrawer
-                ? 'bg-amber-500/25 text-amber-300 border-amber-500/80 font-bold'
-                : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700/50'
-            }`}
-            title="View all placed props in scene"
-          >
-            <Layers size={14} /> Props ({placedProps.length})
-          </button>
+            {/* Skybox Selector */}
+            <div className="relative">
+              <button
+                data-dropdown-trigger
+                onClick={() => {
+                  setShowSkyMenu(!showSkyMenu);
+                  setShowFileMenu(false);
+                  setShowCameraMenu(false);
+                  setShowSnappingMenu(false);
+                }}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/50 font-medium cursor-pointer"
+                title="Choose Skydome Environment & Atmosphere"
+              >
+                <Sun size={12} />
+                <span className="hidden md:inline text-[11px]">Sky: {SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Ridge'}</span>
+                <ChevronDown size={10} />
+              </button>
 
-          {/* Snapping Options */}
-          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300">
-            <input
-              type="checkbox"
-              checked={alignToTrack}
-              onChange={(e) => {
-                setAlignToTrack(e.target.checked);
-                builder.snapping.alignToTrack = e.target.checked;
-              }}
-              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
-            />
-            Align to Track
-          </label>
+              {showSkyMenu && (
+                <div className="absolute top-8 left-0 z-50 w-64 bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl p-2 flex flex-col gap-1 backdrop-blur-md">
+                  <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider">
+                    Skydome Atmosphere
+                  </span>
+                  {Object.values(SKY_PRESETS).map((p) => {
+                    const isActive = currentSky === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          builder.setSkybox(p.id);
+                          setCurrentSky(p.id);
+                          setShowSkyMenu(false);
+                          showToast(`Atmosphere: ${p.name}`);
+                          onRequestRender?.();
+                        }}
+                        className={`flex items-center gap-2.5 px-2 py-1.5 rounded text-xs text-left transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-amber-950/70 border border-amber-500/80 text-amber-200 font-bold'
+                            : 'hover:bg-zinc-900 text-zinc-300 border border-transparent'
+                        }`}
+                      >
+                        <div
+                          className="w-8 h-8 rounded border border-zinc-700 overflow-hidden shrink-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${p.url})` }}
+                        />
+                        <div className="flex flex-col min-w-0">
+                          <span className="truncate font-medium">{p.name}</span>
+                          <span className="text-[9px] text-zinc-500 capitalize">{p.id} biome</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
-          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300">
-            <input
-              type="checkbox"
-              checked={snapToCenterline}
-              onChange={(e) => {
-                setSnapToCenterline(e.target.checked);
-                builder.snapping.snapToCenterline = e.target.checked;
-              }}
-              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
-            />
-            Snap Centerline
-          </label>
-
-          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed PNG decorations rotate to always face the camera. When disabled, they are placed with a fixed 3D world orientation facing the camera angle.">
-            <input
-              type="checkbox"
-              checked={cameraFacingDefault}
-              onChange={(e) => {
-                setCameraFacingDefault(e.target.checked);
-                builder.setCameraFacingDefault(e.target.checked);
-                showToast(e.target.checked ? 'Mode: Camera Facing (Billboard) [Active for future placements]' : 'Mode: Fixed 3D World Orientation [Active for future placements]');
-              }}
-              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
-            />
-            Camera Facing
-          </label>
-
-          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed items are treated as flat decals on the track/ground surface.">
-            <input
-              type="checkbox"
-              checked={decalDefault}
-              onChange={(e) => {
-                setDecalDefault(e.target.checked);
-                builder.setDecalDefault(e.target.checked);
-                showToast(e.target.checked ? 'Default: Decal (Flat on Track/Ground)' : 'Default: Upright Decoration');
-              }}
-              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
-            />
-            Decal (Flat)
-          </label>
-
-          <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer hover:text-amber-300" title="When enabled, newly placed decals receive colored sky/sun/ambient lighting to match the track.">
-            <input
-              type="checkbox"
-              checked={decalLightingDefault}
-              onChange={(e) => {
-                setDecalLightingDefault(e.target.checked);
-                builder.setDecalLightingDefault(e.target.checked);
-                showToast(e.target.checked ? 'Default: Decals Receive Lighting (Match Track)' : 'Default: Decals Unlit (Raw Brightness)');
-              }}
-              className="rounded border-zinc-700 text-amber-500 focus:ring-0"
-            />
-            Decal Lighting
-          </label>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => builder.undo()}
-            className="p-1.5 text-zinc-300 hover:text-amber-400 bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50"
-            title="Undo (Ctrl+Z)"
-          >
-            <RotateCcw size={15} />
-          </button>
-          <button
-            onClick={() => builder.redo()}
-            className="p-1.5 text-zinc-300 hover:text-amber-400 bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50"
-            title="Redo (Ctrl+Y)"
-          >
-            <RotateCw size={15} />
-          </button>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/50"
-            title="Export to JSON"
-          >
-            <Download size={14} /> Export
-          </button>
-          <button
-            onClick={handleImport}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/50"
-            title="Import from JSON"
-          >
-            <Upload size={14} /> Import
-          </button>
-          <button
-            onClick={() => setShowBackupsModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-amber-950/80 hover:bg-amber-900 text-amber-300 rounded border border-amber-600/70 font-semibold transition-colors shadow-sm cursor-pointer"
-            title="Manage disk backups, historical versions, and restore default decorations"
-          >
-            <Database size={13} /> Backups
-          </button>
-          <div
-            onClick={() => setShowBackupsModal(true)}
-            className="hidden md:flex items-center gap-1.5 px-2 py-1 text-[11px] bg-zinc-900/90 hover:bg-zinc-850 rounded border border-zinc-700/60 text-zinc-300 cursor-pointer transition-colors"
-            title="Periodic disk auto-backup status (click to view backups)"
-          >
-            {backupInfo.status === 'saving' ? (
-              <span className="flex items-center gap-1 text-amber-400 font-medium">
-                <RefreshCw size={11} className="animate-spin" /> Saving...
-              </span>
-            ) : backupInfo.timestamp > 0 ? (
-              <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                <CheckCircle2 size={11} />
-                <span className="text-[10px]">Saved {new Date(backupInfo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-zinc-400 text-[10px]">
-                <HardDrive size={11} /> Auto-Backup Active
-              </span>
-            )}
-          </div>
-          <button
-            onClick={() => {
-              if (confirm('Clear all placed props?')) {
-                builder.clearAll();
-                showToast('Cleared all props');
-              }
-            }}
-            className="p-1.5 text-red-400 hover:text-red-300 bg-zinc-900/80 hover:bg-red-950/40 rounded border border-red-900/40"
-            title="Clear All Props"
-          >
-            <Trash2 size={15} />
-          </button>
-          {onTestRace && (
+            {/* Placed Props Drawer Toggle */}
             <button
-              onClick={onTestRace}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors shadow-lg shadow-emerald-600/30 cursor-pointer"
-              title="Test drive on this track!"
+              onClick={() => setShowPropsDrawer(!showPropsDrawer)}
+              className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border transition-colors cursor-pointer ${
+                showPropsDrawer
+                  ? 'bg-amber-500/25 text-amber-300 border-amber-500/80 font-bold'
+                  : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700/50'
+              }`}
+              title="View placed props hierarchy in scene"
             >
-              <Play size={13} fill="currentColor" /> TEST RACE
+              <Layers size={13} />
+              <span className="text-[11px]">Props ({placedProps.length})</span>
             </button>
-          )}
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1 px-3 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded transition-colors"
-          >
-            {onTestRace ? 'MENU' : 'EXIT BUILD [B]'}
-          </button>
-        </div>
-      </div>
+          </div>
+
+          {/* Center Zone: DCC Gizmo Bar + Camera Dropdown + Snapping Dropdown */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* DCC Gizmo Toolbar */}
+            <div className="flex items-center bg-zinc-900/95 rounded border border-zinc-700/60 p-0.5 text-xs shadow-inner">
+              <button
+                onClick={() => {
+                  builder.setGizmoMode('translate');
+                  setGizmoMode('translate');
+                  showToast('Gizmo: Translate [W]');
+                }}
+                className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                  gizmoMode === 'translate' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Translate Gizmo [W]"
+              >
+                W: Move
+              </button>
+              <button
+                onClick={() => {
+                  builder.setGizmoMode('rotate');
+                  setGizmoMode('rotate');
+                  showToast('Gizmo: Rotate [E]');
+                }}
+                className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                  gizmoMode === 'rotate' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Rotate Gizmo [E]"
+              >
+                E: Rotate
+              </button>
+              <button
+                onClick={() => {
+                  builder.setGizmoMode('scale');
+                  setGizmoMode('scale');
+                  showToast('Gizmo: Scale [R]');
+                }}
+                className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
+                  gizmoMode === 'scale' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+                title="Scale Gizmo [R]"
+              >
+                R: Scale
+              </button>
+              <button
+                onClick={() => {
+                  const next = builder.cycleGizmoSpace();
+                  setGizmoSpace(next);
+                  showToast(`Gizmo Space: ${next.toUpperCase()} [Q]`);
+                }}
+                className="px-1.5 py-0.5 text-amber-300 hover:text-amber-200 font-mono text-[10px] cursor-pointer"
+                title="Cycle Space (World / Local / Track) [Q]"
+              >
+                [{gizmoSpace.toUpperCase().slice(0, 4)}]
+              </button>
+            </div>
+
+            {/* Camera Views Dropdown */}
+            <div className="relative">
+              <button
+                data-dropdown-trigger
+                onClick={() => {
+                  setShowCameraMenu(!showCameraMenu);
+                  setShowFileMenu(false);
+                  setShowSnappingMenu(false);
+                  setShowSkyMenu(false);
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
+                title="Camera Rigs & Orthographic Views [0, 1, 3, 7]"
+              >
+                <Camera size={12} className="text-amber-400" />
+                <span className="text-[11px] capitalize">{cameraPreset} View</span>
+                <ChevronDown size={10} />
+              </button>
+
+              {showCameraMenu && (
+                <div className="builder-dropdown-menu left-0 w-44 flex flex-col gap-0.5 text-xs">
+                  <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider border-b border-zinc-800">
+                    Camera Rig Views
+                  </span>
+                  <button
+                    onClick={() => {
+                      builder.setCameraPreset('fly');
+                      setCameraPreset('fly');
+                      setShowCameraMenu(false);
+                      showToast('Camera: Perspective Free-Fly [WASD + Right-Drag]');
+                      onRequestRender?.();
+                    }}
+                    className={`builder-dropdown-item ${cameraPreset === 'fly' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
+                  >
+                    <span>Perspective Fly</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      builder.setCameraPreset('top');
+                      setCameraPreset('top');
+                      setShowCameraMenu(false);
+                      showToast('Camera: Top Ortho View [Num 7]');
+                      onRequestRender?.();
+                    }}
+                    className={`builder-dropdown-item ${cameraPreset === 'top' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span>Top Ortho</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">[Num 7]</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      builder.setCameraPreset('front');
+                      setCameraPreset('front');
+                      setShowCameraMenu(false);
+                      showToast('Camera: Front Ortho View [Num 1]');
+                      onRequestRender?.();
+                    }}
+                    className={`builder-dropdown-item ${cameraPreset === 'front' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span>Front Ortho</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">[Num 1]</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      builder.setCameraPreset('side');
+                      setCameraPreset('side');
+                      setShowCameraMenu(false);
+                      showToast('Camera: Side Ortho View [Num 3]');
+                      onRequestRender?.();
+                    }}
+                    className={`builder-dropdown-item ${cameraPreset === 'side' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span>Side Ortho</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">[Num 3]</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      builder.setCameraPreset('iso');
+                      setCameraPreset('iso');
+                      setShowCameraMenu(false);
+                      showToast('Camera: Isometric View [Num 0]');
+                      onRequestRender?.();
+                    }}
+                    className={`builder-dropdown-item ${cameraPreset === 'iso' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span>Isometric</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">[Num 0]</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Snapping & Placement Dropdown */}
+            <div className="relative">
+              <button
+                data-dropdown-trigger
+                onClick={() => {
+                  setShowSnappingMenu(!showSnappingMenu);
+                  setShowFileMenu(false);
+                  setShowCameraMenu(false);
+                  setShowSkyMenu(false);
+                }}
+                className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border transition-colors cursor-pointer font-medium ${
+                  alignToTrack || snapToCenterline
+                    ? 'bg-amber-950/60 border-amber-500/60 text-amber-200'
+                    : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700/50'
+                }`}
+                title="Surface alignment, snapping, billboard & decal placement options"
+              >
+                <Magnet size={12} className={alignToTrack || snapToCenterline ? 'text-amber-400' : 'text-zinc-400'} />
+                <span className="text-[11px]">Snapping</span>
+                <ChevronDown size={10} />
+              </button>
+
+              {showSnappingMenu && (
+                <div className="builder-dropdown-menu left-0 w-64 flex flex-col gap-1 p-2 text-xs">
+                  <span className="text-[10px] font-bold text-amber-400 px-1 py-0.5 uppercase tracking-wider border-b border-zinc-800">
+                    Placement & Snapping
+                  </span>
+                  <label className="flex items-center justify-between p-1.5 rounded hover:bg-zinc-900 cursor-pointer">
+                    <span className="text-zinc-200 font-medium">Align to Track Surface</span>
+                    <input
+                      type="checkbox"
+                      checked={alignToTrack}
+                      onChange={(e) => {
+                        setAlignToTrack(e.target.checked);
+                        builder.snapping.alignToTrack = e.target.checked;
+                      }}
+                      className="accent-amber-500 cursor-pointer"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between p-1.5 rounded hover:bg-zinc-900 cursor-pointer">
+                    <span className="text-zinc-200 font-medium">Snap to Centerline</span>
+                    <input
+                      type="checkbox"
+                      checked={snapToCenterline}
+                      onChange={(e) => {
+                        setSnapToCenterline(e.target.checked);
+                        builder.snapping.snapToCenterline = e.target.checked;
+                      }}
+                      className="accent-amber-500 cursor-pointer"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between p-1.5 rounded hover:bg-zinc-900 cursor-pointer">
+                    <span className="text-zinc-200 font-medium">Camera Facing (Billboard)</span>
+                    <input
+                      type="checkbox"
+                      checked={cameraFacingDefault}
+                      onChange={(e) => {
+                        setCameraFacingDefault(e.target.checked);
+                        builder.setCameraFacingDefault(e.target.checked);
+                        showToast(e.target.checked ? 'Mode: Billboard Camera Facing' : 'Mode: Fixed 3D Orientation');
+                      }}
+                      className="accent-amber-500 cursor-pointer"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between p-1.5 rounded hover:bg-zinc-900 cursor-pointer">
+                    <span className="text-zinc-200 font-medium">Decal (Flat on Track)</span>
+                    <input
+                      type="checkbox"
+                      checked={decalDefault}
+                      onChange={(e) => {
+                        setDecalDefault(e.target.checked);
+                        builder.setDecalDefault(e.target.checked);
+                        showToast(e.target.checked ? 'Default: Flat Decal' : 'Default: Upright Decoration');
+                      }}
+                      className="accent-amber-500 cursor-pointer"
+                    />
+                  </label>
+                  <label className="flex items-center justify-between p-1.5 rounded hover:bg-zinc-900 cursor-pointer">
+                    <span className="text-zinc-200 font-medium">Decal Receives Track Lighting</span>
+                    <input
+                      type="checkbox"
+                      checked={decalLightingDefault}
+                      onChange={(e) => {
+                        setDecalLightingDefault(e.target.checked);
+                        builder.setDecalLightingDefault(e.target.checked);
+                        showToast(e.target.checked ? 'Decals: Lit by Track' : 'Decals: Unlit Raw');
+                      }}
+                      className="accent-amber-500 cursor-pointer"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Zone: Undo/Redo + Help + Zen + Test Race + Exit */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={() => builder.undo()}
+              className="p-1 text-zinc-300 hover:text-amber-400 bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50 cursor-pointer"
+              title="Undo (Ctrl+Z)"
+            >
+              <RotateCcw size={13} />
+            </button>
+            <button
+              onClick={() => builder.redo()}
+              className="p-1 text-zinc-300 hover:text-amber-400 bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50 cursor-pointer"
+              title="Redo (Ctrl+Y)"
+            >
+              <RotateCw size={13} />
+            </button>
+            <button
+              onClick={() => setShowCheatSheet(true)}
+              className="p-1 text-amber-300 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50 cursor-pointer"
+              title="Hotkeys & Cheat Sheet [?]"
+            >
+              <HelpCircle size={13} />
+            </button>
+            <button
+              onClick={() => setIsZen(true)}
+              className="p-1 text-zinc-400 hover:text-amber-300 bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50 cursor-pointer"
+              title="Enter Zen Mode [H / Tab]"
+            >
+              <Maximize2 size={13} />
+            </button>
+
+            {onTestRace && (
+              <button
+                onClick={onTestRace}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors shadow-md shadow-emerald-700/30 cursor-pointer ml-1"
+                title="Test drive on this track!"
+              >
+                <Play size={12} fill="currentColor" /> TEST RACE
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded transition-colors cursor-pointer"
+            >
+              {onTestRace ? 'MENU' : 'EXIT [B]'}
+            </button>
+          </div>
+        </header>
+      )}
+
 
       {/* Placed Props Scene Drawer */}
-      {showPropsDrawer && (
+      {showPropsDrawer && !isZen && (
         <div className="pointer-events-auto absolute top-14 left-4 z-40 w-80 max-h-[calc(100vh-140px)] bg-zinc-950/95 border border-amber-500/50 rounded-lg shadow-2xl backdrop-blur-md flex flex-col text-amber-100 overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2.5 bg-zinc-900/90 border-b border-zinc-800">
             <span className="font-bold text-xs text-amber-400 flex items-center gap-1.5">
@@ -1288,7 +1735,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       )}
 
       {/* Selected Prop(s) Inspector (Floating Right) */}
-      {selectedProps.length > 1 ? (
+      {!isZen && (selectedProps.length > 1 ? (
         <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
           <div className="sticky -top-3.5 -mx-3.5 px-3.5 pt-1 pb-2 bg-zinc-950/95 backdrop-blur-md z-10 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <div className="flex flex-col min-w-0">
@@ -1774,8 +2221,72 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </div>
           )}
 
-          {/* Active Nudge Axis Indicator */}
-          <div className="flex items-center justify-between text-xs bg-zinc-900/60 px-2 py-1 rounded border border-zinc-800/80">
+          {/* Sub-tabs: Transform, Shading, Collision, Animation */}
+          <div className="flex border-b border-zinc-800 bg-zinc-900/60 rounded text-xs overflow-hidden">
+            <button
+              onClick={() => setInspectorTab('transform')}
+              className={`flex-1 py-1.5 font-bold text-center border-b-2 transition-all cursor-pointer ${
+                inspectorTab === 'transform' ? 'border-amber-400 text-amber-300 bg-zinc-800/60' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              Transform
+            </button>
+            <button
+              onClick={() => setInspectorTab('shading')}
+              className={`flex-1 py-1.5 font-bold text-center border-b-2 transition-all cursor-pointer ${
+                inspectorTab === 'shading' ? 'border-amber-400 text-amber-300 bg-zinc-800/60' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              Shading
+            </button>
+            <button
+              onClick={() => setInspectorTab('collision')}
+              className={`flex-1 py-1.5 font-bold text-center border-b-2 transition-all cursor-pointer ${
+                inspectorTab === 'collision' ? 'border-amber-400 text-amber-300 bg-zinc-800/60' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              Collision
+            </button>
+            {propHasAnimatedOption(selectedProp) && (
+              <button
+                onClick={() => setInspectorTab('animation')}
+                className={`flex-1 py-1.5 font-bold text-center border-b-2 transition-all cursor-pointer ${
+                  inspectorTab === 'animation' ? 'border-fuchsia-400 text-fuchsia-300 bg-zinc-800/60' : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                Animation
+              </button>
+            )}
+          </div>
+
+          {inspectorTab === 'shading' && (
+            <ShadingPanel
+              descriptor={selectedProp.materialDesc ?? DEFAULT_MATERIAL_DESCRIPTOR}
+              onChange={(updated) => {
+                const next = { ...(selectedProp.materialDesc ?? DEFAULT_MATERIAL_DESCRIPTOR), ...updated };
+                builder.updatePropTransform(selectedProp.id, { materialDesc: next });
+                onRequestRender?.();
+              }}
+            />
+          )}
+
+          {inspectorTab === 'collision' && (
+            <CollisionPanel
+              roleConfig={selectedProp.roleConfig ?? DEFAULT_ROLE_CONFIGS.decoration}
+              onChange={(updated) => {
+                const next = { ...(selectedProp.roleConfig ?? DEFAULT_ROLE_CONFIGS.decoration), ...updated };
+                builder.updatePropTransform(selectedProp.id, { roleConfig: next });
+                onRequestRender?.();
+              }}
+              patchHash={selectedProp.patchHash as string | undefined}
+              triangleCount={selectedProp.triangleCount as number | undefined}
+            />
+          )}
+
+          {inspectorTab === 'transform' && (
+            <>
+              {/* Active Nudge Axis Indicator */}
+              <div className="flex items-center justify-between text-xs bg-zinc-900/60 px-2 py-1 rounded border border-zinc-800/80">
             <span className="text-zinc-400">Nudge Axis: <b className="text-amber-400 font-mono">{nudgeAxis.toUpperCase()}</b></span>
             <button
               onClick={() => {
@@ -2334,9 +2845,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               </div>
             );
           })()}
+          </>
+        )}
 
-          {/* Animation panel: animated-sheet swap, playback, speed, frame skip */}
-          {(() => {
+        {/* Animation panel: animated-sheet swap, playback, speed, frame skip */}
+        {inspectorTab === 'animation' && (() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
             if (!def) return null;
             const twin = animatedTwinDef(def);
@@ -2716,171 +3229,258 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
           </div>
         </div>
-      ) : null}
+      ) : null)}
 
       {/* Bottom Prop Palette */}
-      <div className="pointer-events-auto bg-zinc-950/90 border-t border-amber-500/40 backdrop-blur-md flex flex-col">
-        {/* Category Tabs & Select Mode Toggle */}
-        <div className="flex items-center justify-between px-4 pt-2 border-b border-zinc-800/70">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                builder.setActivePropType(null);
-                showToast('Select Tool Active: Click any prop in 3D to select or delete it');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t font-bold transition-all ${
-                !activePropType
-                  ? 'bg-amber-600 text-zinc-950 shadow'
-                  : 'bg-zinc-900/80 text-amber-300 hover:bg-zinc-800 border-t border-x border-zinc-700/50'
-              }`}
-              title="Select / Inspect mode (click existing props)"
-            >
-              <MousePointer size={14} />
-              SELECT TOOL [V]
-            </button>
-
-            {/* Click Move Toggle Button */}
-            <button
-              onClick={() => {
-                setClickMoveEnabled((prev) => {
-                  const next = !prev;
-                  showToast(next ? 'Click Move: ON (Click & drag to move)' : 'Click Move: OFF (Clicking selects only)');
-                  return next;
-                });
-              }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-t font-bold transition-all border-t border-x cursor-pointer ${
-                clickMoveEnabled
-                  ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
-                  : 'bg-zinc-900/80 text-zinc-400 hover:text-zinc-200 border-zinc-700/50'
-              }`}
-              title="Toggle click-move mode [M] (Default: OFF, clicking only selects)"
-            >
-              <Move size={13} />
-              <span>CLICK MOVE: {clickMoveEnabled ? 'ON' : 'OFF'} [M]</span>
-            </button>
-
-            {/* Active Axis Cycle Button */}
-            <button
-              onClick={() => {
-                const nextAxis: 'y' | 'x' | 'z' = nudgeAxis === 'y' ? 'x' : nudgeAxis === 'x' ? 'z' : 'y';
-                setNudgeAxis(nextAxis);
-                showToast(`Nudge Axis: ${nextAxis.toUpperCase()} [Numpad/Arrows to move, 5 to cycle]`);
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-t font-bold bg-zinc-900/80 text-amber-300 hover:text-amber-200 border-t border-x border-zinc-700/50 transition-all cursor-pointer"
-              title="Active movement axis for Arrow/Numpad keys. Press 5 on Numpad or click to cycle: Y -> X -> Z -> Y"
-            >
-              <span className="text-zinc-400">AXIS:</span>
-              <span className="font-mono bg-zinc-800 px-1.5 py-0.5 rounded text-amber-400 border border-amber-500/40">
-                {nudgeAxis.toUpperCase()}
-              </span>
-              <span className="text-[10px] text-zinc-500">[5]</span>
-            </button>
-
-            {/* If multi-selected, show group pill in dock */}
-            {selectedProps.length > 1 && (
+      {!isZen && (
+        <div className="pointer-events-auto bg-zinc-950/95 border-t border-amber-500/40 backdrop-blur-md flex flex-col shadow-2xl transition-all select-none">
+          {/* Top Control Bar: Mode Toggles + Search Box + Shelf Expand/Collapse */}
+          <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/90 border-b border-zinc-800/80 gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => {
-                  if (builder.isSelectionGrouped()) {
-                    builder.ungroupSelected();
-                    showToast('Ungrouped selection');
-                  } else {
-                    builder.groupSelected();
-                    showToast(`Grouped ${selectedProps.length} items`);
-                  }
-                  onRequestRender?.();
+                  builder.setActivePropType(null);
+                  showToast('Select Tool Active: Click any prop in 3D to select or delete it');
                 }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-t font-bold bg-cyan-950 text-cyan-300 border-t border-x border-cyan-700/60 transition-all cursor-pointer hover:bg-cyan-900/60"
-                title="Group/Ungroup selected decorations [Ctrl+G / Ctrl+Shift+G]"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold transition-all cursor-pointer ${
+                  !activePropType
+                    ? 'bg-amber-600 text-zinc-950 shadow'
+                    : 'bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700/50'
+                }`}
+                title="Select / Inspect mode [V]"
               >
-                <Users size={13} />
-                <span>{builder.isSelectionGrouped() ? `Group (${selectedProps.length})` : `Selected (${selectedProps.length})`}</span>
+                <MousePointer size={13} />
+                <span>SELECT [V]</span>
               </button>
-            )}
 
+              <button
+                onClick={() => {
+                  setClickMoveEnabled((prev) => {
+                    const next = !prev;
+                    showToast(next ? 'Click Move: ON' : 'Click Move: OFF');
+                    return next;
+                  });
+                }}
+                className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
+                  clickMoveEnabled
+                    ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
+                    : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border-zinc-700/60'
+                }`}
+                title="Toggle click-move mode [M]"
+              >
+                <Move size={12} />
+                <span>MOVE: {clickMoveEnabled ? 'ON' : 'OFF'} [M]</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const nextAxis: 'y' | 'x' | 'z' = nudgeAxis === 'y' ? 'x' : nudgeAxis === 'x' ? 'z' : 'y';
+                  setNudgeAxis(nextAxis);
+                  showToast(`Nudge Axis: ${nextAxis.toUpperCase()} [5]`);
+                }}
+                className="flex items-center gap-1 px-2 py-1 text-xs rounded font-bold bg-zinc-850 hover:bg-zinc-800 text-amber-300 border border-zinc-700/60 transition-all cursor-pointer"
+                title="Nudge axis [5]"
+              >
+                <span className="text-zinc-400 text-[10px]">AXIS:</span>
+                <span className="font-mono bg-zinc-800 px-1 rounded text-amber-400">{nudgeAxis.toUpperCase()}</span>
+                <span className="text-[10px] text-zinc-500">[5]</span>
+              </button>
+
+              {selectedProps.length > 1 && (
+                <button
+                  onClick={() => {
+                    if (builder.isSelectionGrouped()) {
+                      builder.ungroupSelected();
+                      showToast('Ungrouped selection');
+                    } else {
+                      builder.groupSelected();
+                      showToast(`Grouped ${selectedProps.length} items`);
+                    }
+                    onRequestRender?.();
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 transition-all cursor-pointer hover:bg-cyan-900/60"
+                  title="Group/Ungroup selected decorations [Ctrl+G / Ctrl+Shift+G]"
+                >
+                  <Users size={12} />
+                  <span>{builder.isSelectionGrouped() ? `Group (${selectedProps.length})` : `Selected (${selectedProps.length})`}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Prop Search Filter & Shelf Expand/Collapse */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex items-center">
+                <Search size={12} className="absolute left-2 text-zinc-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search props..."
+                  value={shelfSearch}
+                  onChange={(e) => setShelfSearch(e.target.value)}
+                  className="w-36 sm:w-52 pl-6 pr-6 py-0.5 text-xs bg-zinc-950 text-amber-100 placeholder-zinc-500 rounded border border-zinc-700/70 focus:border-amber-500 focus:outline-none transition-colors"
+                />
+                {shelfSearch && (
+                  <button
+                    onClick={() => setShelfSearch('')}
+                    className="absolute right-1.5 text-zinc-400 hover:text-white p-0.5 text-xs cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+
+              {/* Shelf Expand/Collapse button */}
+              <button
+                onClick={() => setShelfExpanded(!shelfExpanded)}
+                className="flex items-center gap-1 px-2 py-0.5 text-xs bg-zinc-850 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
+                title={shelfExpanded ? 'Compact Shelf (Single Row)' : 'Expand Shelf (Multi-Row View)'}
+              >
+                {shelfExpanded ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+                <span className="hidden sm:inline text-[11px]">{shelfExpanded ? 'Compact' : 'Expand'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Category Tabs Strip */}
+          <div className="flex items-center gap-0.5 px-3 pt-1 overflow-x-auto border-b border-zinc-800/80 scrollbar-none bg-zinc-950/70">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-t font-medium transition-all whitespace-nowrap cursor-pointer ${
                   category === cat.id
-                    ? 'bg-zinc-900 text-amber-400 border-t border-x border-amber-500/40 font-bold'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+                    ? 'bg-zinc-900 text-amber-400 border-t-2 border-x border-amber-500 font-bold shadow-sm'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
                 }`}
               >
                 {cat.icon}
-                {cat.label}
+                <span>{cat.label}</span>
               </button>
             ))}
           </div>
-        </div>
 
-        {/* Prop Cards Grid (Horizontal Scrollable) · M01 · T7: the Lanes & Paths tab shows its panel */}
-        <div className={`flex gap-3 px-4 py-3 overflow-auto scrollbar-thin ${category === 'lanes' ? '' : 'items-center overflow-x-auto max-h-40'}`}>
-          {category === 'lanes' ? (
-            <LanePanel
-              model={laneModel}
-              status={laneStatus}
-              onSelectNode={(nodeId) => {
-                builder.selectLaneNode(nodeId);
-                refreshLanes();
-                onRequestRender?.();
-              }}
-              onSelectPath={(pathId) => {
-                setSelectedLanePathId(pathId);
-                refreshLanes();
-                onRequestRender?.();
-              }}
-              onMoveNode={moveLaneNodeFromPanel}
-              onCommand={runLaneCommand}
-              onSave={saveLaneDoc}
-              onExport={exportLanes}
-              onImport={importLanes}
-              onTestDrive={() => { saveLaneDoc(); onTestRace?.(); }}
-            />
-          ) : filteredProps.map((p) => {
-            const isSelected = activePropType === p.type;
-            return (
+          {/* Prop Cards Grid with Left/Right Scroll Arrows & Thick Grab Scrollbar */}
+          <div className="relative flex items-center bg-zinc-950/90 w-full overflow-hidden">
+            {category !== 'lanes' && (category as string) !== 'custom_models' && !shelfExpanded && (
               <button
-                key={p.type}
-                onClick={() => selectPropType(p.type)}
-                className={`group relative flex flex-col items-center p-2 rounded-lg border transition-all shrink-0 w-28 bg-zinc-900/90 hover:bg-zinc-850 ${
-                  isSelected
-                    ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-lg shadow-amber-950/50'
-                    : 'border-zinc-800 hover:border-zinc-600'
-                }`}
+                onClick={() => scrollShelf('left')}
+                className="absolute left-1.5 z-20 p-1.5 bg-zinc-900/95 hover:bg-amber-950 text-amber-300 hover:text-white border border-amber-500/60 rounded-full shadow-2xl transition-all cursor-pointer backdrop-blur-sm"
+                title="Scroll Left"
               >
-                {p.isAnimated && (
-                  <span
-                    className="absolute top-1 right-1 flex items-center gap-0.5 text-[8px] px-1 py-px rounded font-mono font-bold bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-700/60"
-                    title="4-frame animated sheet: shows one frame at a time in 3D"
-                  >
-                    <Clapperboard size={9} /> 4-FRAME
-                  </span>
-                )}
-                {!p.isAnimated && p.animatedTwin && (
-                  <span
-                    className="absolute top-1 right-1 flex items-center gap-0.5 text-[8px] px-1 py-px rounded font-mono font-bold bg-fuchsia-950/70 text-fuchsia-300/90 border border-fuchsia-800/60"
-                    title={`Has an animated 4-frame version (${p.animatedTwin}) — place it, then switch it on under Animation in the attribute window`}
-                  >
-                    <Film size={9} /> ANIM
-                  </span>
-                )}
-                <div className="w-16 h-16 flex items-center justify-center overflow-hidden mb-1.5">
-                  <img
-                    src={p.url}
-                    alt={p.name}
-                    className="max-w-full max-h-full object-contain filter drop-shadow group-hover:scale-105 transition-transform"
-                    draggable={false}
-                  />
-                </div>
-                <span className="text-[11px] text-zinc-300 group-hover:text-amber-200 truncate w-full text-center">
-                  {p.name}
-                </span>
+                <ChevronLeft size={16} />
               </button>
-            );
-          })}
+            )}
+
+            <div
+              ref={shelfScrollRef}
+              onWheel={(e) => {
+                if (shelfScrollRef.current && e.deltaY !== 0 && !e.shiftKey && !shelfExpanded) {
+                  shelfScrollRef.current.scrollLeft += e.deltaY;
+                }
+              }}
+              className={`builder-shelf-scroll flex gap-2.5 px-8 py-2 w-full transition-all ${
+                category === 'lanes'
+                  ? 'overflow-auto max-h-96'
+                  : shelfExpanded
+                  ? 'flex-wrap overflow-y-auto max-h-72 p-4'
+                  : 'items-center overflow-x-auto max-h-40'
+              }`}
+            >
+              {category === 'lanes' ? (
+                <LanePanel
+                  model={laneModel}
+                  status={laneStatus}
+                  onSelectNode={(nodeId) => {
+                    builder.selectLaneNode(nodeId);
+                    refreshLanes();
+                    onRequestRender?.();
+                  }}
+                  onSelectPath={(pathId) => {
+                    setSelectedLanePathId(pathId);
+                    refreshLanes();
+                    onRequestRender?.();
+                  }}
+                  onMoveNode={moveLaneNodeFromPanel}
+                  onCommand={runLaneCommand}
+                  onInitSample={initSampleLanes}
+                  onInitDefault={initDefaultLanes}
+                  onSave={saveLaneDoc}
+                  onExport={exportLanes}
+                  onImport={importLanes}
+                  onTestDrive={() => { saveLaneDoc(); onTestRace?.(); }}
+                />
+              ) : (category as string) === 'custom_models' ? (
+                <CustomModelsTab
+                  onSelectModel={(assetId, name) => {
+                    builder.registerCustomModel(assetId, name);
+                    showToast(`Selected custom model: ${name}. Click on track surface to place!`);
+                  }}
+                  activeAssetId={activePropType}
+                  usedAssetIds={new Set(placedProps.map((p) => (p.customAssetId || p.type) as string))}
+                />
+              ) : displayedProps.length === 0 ? (
+                <div className="flex items-center justify-center w-full py-8 text-zinc-500 text-xs italic">
+                  No props match &ldquo;{shelfSearch}&rdquo; in this category.
+                </div>
+              ) : (
+                displayedProps.map((p) => {
+                  const isSelected = activePropType === p.type;
+                  return (
+                    <button
+                      key={p.type}
+                      onClick={() => selectPropType(p.type)}
+                      className={`group relative flex flex-col items-center p-2 rounded-lg border transition-all shrink-0 w-28 bg-zinc-900/90 hover:bg-zinc-850 cursor-pointer ${
+                        isSelected
+                          ? 'border-amber-400 ring-2 ring-amber-400/40 shadow-lg shadow-amber-950/50'
+                          : 'border-zinc-800 hover:border-zinc-600'
+                      }`}
+                    >
+                      {p.isAnimated && (
+                        <span
+                          className="absolute top-1 right-1 flex items-center gap-0.5 text-[8px] px-1 py-px rounded font-mono font-bold bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-700/60"
+                          title="4-frame animated sheet: shows one frame at a time in 3D"
+                        >
+                          <Clapperboard size={9} /> 4-FRAME
+                        </span>
+                      )}
+                      {!p.isAnimated && p.animatedTwin && (
+                        <span
+                          className="absolute top-1 right-1 flex items-center gap-0.5 text-[8px] px-1 py-px rounded font-mono font-bold bg-fuchsia-950/70 text-fuchsia-300/90 border border-fuchsia-800/60"
+                          title={`Has an animated 4-frame version (${p.animatedTwin}) — place it, then switch it on under Animation in the attribute window`}
+                        >
+                          <Film size={9} /> ANIM
+                        </span>
+                      )}
+                      <div className="w-16 h-16 flex items-center justify-center overflow-hidden mb-1.5">
+                        <img
+                          src={p.url}
+                          alt={p.name}
+                          className="max-w-full max-h-full object-contain filter drop-shadow group-hover:scale-105 transition-transform"
+                          draggable={false}
+                        />
+                      </div>
+                      <span className="text-[11px] text-zinc-300 group-hover:text-amber-200 truncate w-full text-center">
+                        {p.name}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {category !== 'lanes' && (category as string) !== 'custom_models' && !shelfExpanded && (
+              <button
+                onClick={() => scrollShelf('right')}
+                className="absolute right-1.5 z-20 p-1.5 bg-zinc-900/95 hover:bg-amber-950 text-amber-300 hover:text-white border border-amber-500/60 rounded-full shadow-2xl transition-all cursor-pointer backdrop-blur-sm"
+                title="Scroll Right"
+              >
+                <ChevronRight size={16} />
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
 
       {/* Backups & Restore Modal */}
       {showBackupsModal && (
@@ -3114,6 +3714,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           </div>
         </div>
       )}
+
+      {/* Hotkeys Cheat Sheet Modal */}
+      <CheatSheet isOpen={showCheatSheet} onClose={() => setShowCheatSheet(false)} />
+
+      {/* Zen Mode Restore Floating Button */}
+      {isZen && <ZenRestore onRestore={() => setIsZen(false)} />}
     </div>
   );
 }

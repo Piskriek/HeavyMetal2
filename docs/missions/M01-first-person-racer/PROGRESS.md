@@ -303,9 +303,52 @@ real panel art, the real goblin cells and the real grid, composed with ImageMagi
 composition — and its own text placement is the mock's arithmetic, not a browser's layout engine, so
 it proves the art and the shape of the panel and nothing about the CSS.
 
+## T6 — the lane network · **done, committed `2876c9a`**
+
+Four fixed lane centres become a **network of authored paths** — nodes in engine space (`x`, lateral
+`z`), paths as ordered runs of nodes with strictly increasing `x`, and three kinds that say what
+happens where paths meet: `merge`, `split`, `oob`. `docs/LANE_NETWORK.md` is the page; the shape of it:
+
+| Piece | What it does |
+| --- | --- |
+| `src/game/lane-network.ts` | Schema, seven refusal codes, kind inference from topology, sampling, the corridor union, adjacency, successors, the swept OOB test, `resolveLaneTarget`, and the sample ridge network (29 nodes / 8 paths). |
+| `src/game/lane-storage.ts` | `hm2-lane-paths-v1` + backup: validate, back up, write; unknown fields survive; quota reported; one bad course does not take the others with it. |
+| Runtime (`sim/context`, `racer-physics`, `cpu-driver`, `engine`, `racers`) | Steering target and clamp, the OOB recovery, path centres for the bots, path-aware `changeLane`/`shove`, per-course load, adoption each tick, and the builder's API. |
+| `vite.config.ts` | `POST /api/backup-lane-paths` in its own directory, refusing to shrink a save. |
+
+**The law that makes it safe to land before the builder exists:** a null network is exactly the old
+game. `tests/lane-parity.test.ts` holds it with **50 seeded full races** — each driven twice, once with
+`laneNetwork` absent and once `null`, comparing every racer's position, lane and speed at the end of
+every second *plus each ball's finish tick*. All 50 pairs identical, including the four finish ticks
+(e.g. seed 1: `5354, 5095, 4542, 5064`). Two controls keep that from being vacuous: 50 different
+seeds all fingerprint differently, and a deliberately narrow authored line (one path, half width 40)
+finishes the same field at different ticks with only 3 lane changes instead of 105 and every ball
+ending pinned inside the authored corridor.
+
+**One real bug, caught by probing rather than by reading.** `successorPath` sampled each branch of a
+split *at the junction*, where every branch shares the same point — so both biases picked the same
+branch. It now probes ~400 px past the junction (`min(junction.x + 400, branchEnd.x)`) and scores
+against `z − bias · 900`: `bias +1` → the smaller-z branch, `bias −1` → the larger-z one.
+
+**The probe also found the adoption case.** The narrow-network control initially changed nothing,
+because the harness (like `stepRace` before this ticket) never gave a racer a `pathId` — a racer with
+no path is deliberately a legacy racer, so the network had nothing to steer. `adoptNearestPaths` /
+`assignNearestPaths` now live in `lane-network.ts`, the engine calls the first once per tick before
+anything is driven, and adoption is idempotent (asserted).
+
+Gates: `npm run check` **566 pass / 47 suites / 0 fail** (was 548 — the three new suites add 18),
+`npm run build` **1,589.69 kB / 436.71 kB gzip**, `tsc` clean, `check:edges` 0 failures.
+
+**UNVERIFIED.** No WebGL and no browser here, so nothing about how lanes *look* is proven: the
+builder draws nothing yet (that is T7), and `environment.ts` still paints the legacy four-lane
+corridor — a network is physics and logic until the dressing ticket catches up. What is proven is the
+model, the storage and the runtime integration, headlessly.
+
 ## Next
 
-* **T6/T7** — the lane network and the builder lane tool.
+* **T7** — the builder "Lanes & Paths" tool: node handles on the track surface, insert/delete/split/
+  merge, OOB marking, the validation list, one undo stack for props and lanes, and a test drive.
+* **T6/T7** — the lane network and the builder lane tool (T6 now done).
 * **In the browser now:** the goblin push at the top of the hill, the first-loop queue with its
   ready-up and ordered release, the FPV cockpit, the tight chase camera, painted effects on every
   collision, and a gyro ball that stays level while it rolls.

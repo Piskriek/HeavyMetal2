@@ -99,13 +99,42 @@ export function animFrameAt(
   total: number,
   phase = 0,
   enabled?: readonly boolean[],
+  delays?: readonly number[],
 ): number {
   if (!(total > 1) || !(fps > 0)) return 0;
-  const t = timeSec * fps + phase;
   const list = enabled ? animEnabledFrames({ animFrames: [...enabled] }, total) : null;
-  if (!list) return ((Math.floor(t) % total) + total) % total;
-  const i = ((Math.floor(t) % list.length) + list.length) % list.length;
-  return list[i];
+  const frames = list ?? Array.from({ length: total }, (_, i) => i);
+  if (frames.length === 0) return 0;
+  if (frames.length === 1) return frames[0];
+
+  const hasDelays = delays && delays.some((d) => typeof d === 'number' && Number.isFinite(d) && d > 0);
+  if (!hasDelays) {
+    const t = timeSec * fps + phase;
+    if (!list) return ((Math.floor(t) % total) + total) % total;
+    const i = ((Math.floor(t) % list.length) + list.length) % list.length;
+    return list[i];
+  }
+
+  const baseDuration = 1 / fps;
+  let totalDuration = 0;
+  const durations: number[] = new Array(frames.length);
+  for (let j = 0; j < frames.length; j += 1) {
+    const frameIdx = frames[j];
+    const extraDelay = delays?.[frameIdx];
+    const d = baseDuration + (typeof extraDelay === 'number' && Number.isFinite(extraDelay) && extraDelay > 0 ? extraDelay : 0);
+    durations[j] = d;
+    totalDuration += d;
+  }
+
+  if (!(totalDuration > 0)) return frames[0];
+  const phaseTime = phase / fps;
+  let t = ((timeSec + phaseTime) % totalDuration + totalDuration) % totalDuration;
+  let elapsed = 0;
+  for (let j = 0; j < frames.length; j += 1) {
+    elapsed += durations[j];
+    if (t < elapsed) return frames[j];
+  }
+  return frames[frames.length - 1];
 }
 
 /** Animated sheet a prop currently renders, or null when it renders its still art. */
@@ -146,6 +175,7 @@ export interface AnimationSettings {
   animate?: boolean; // play/pause frame cycling
   animSpeed?: number; // fps multiplier
   animFrames?: boolean[]; // per-frame enable flags
+  animFrameDelays?: number[]; // per-frame hold delay in seconds (default 0)
 }
 
 /** Coerce a checkbox array to exactly `total` booleans (missing entries count as on). */
@@ -153,6 +183,24 @@ export function normalizeAnimFrames(frames: readonly boolean[] | undefined, tota
   const safeTotal = Math.max(1, Math.floor(total));
   const out: boolean[] = [];
   for (let i = 0; i < safeTotal; i += 1) out.push(frames ? frames[i] !== false : true);
+  return out;
+}
+
+/** Coerce a delay array to exactly `total` non-negative numbers (in seconds, default 0). */
+export function normalizeAnimFrameDelays(
+  delays: readonly number[] | undefined,
+  total: number,
+): number[] {
+  const safeTotal = Math.max(1, Math.floor(total));
+  const out: number[] = [];
+  for (let i = 0; i < safeTotal; i += 1) {
+    const v = delays ? delays[i] : 0;
+    out.push(
+      typeof v === 'number' && Number.isFinite(v) && v > 0
+        ? Math.max(0, Math.min(60, Math.round(v * 100) / 100))
+        : 0,
+    );
+  }
   return out;
 }
 
@@ -213,6 +261,7 @@ export interface PlacedProp {
   animated?: boolean; // Still props with a twin: swap in the animated sheet (default false)
   animSpeed?: number; // Playback speed multiplier (default 1, clamped 0.1..4)
   animFrames?: boolean[]; // Per-frame enable flags; unchecked frames are skipped (default all on)
+  animFrameDelays?: number[]; // Per-frame hold delay in seconds (default 0)
   authoringNotes?: string; // T08: optional authoring metadata
   // Allow unknown fields for forward compatibility
   [key: string]: unknown;
@@ -1125,8 +1174,14 @@ export class TrackBuilder3D {
    * - `animate` is the existing play/pause flag (paused props hold one frame).
    * - `animSpeed` is a multiplier on the sheet's fps.
    * - `animFrames` are per-frame checkboxes: unchecked frames are skipped.
+   * - `animFrameDelays` are per-frame hold durations in seconds.
    */
-  setPropAnimation(id: string, updates: AnimationSettings, pushUndo = true): void {
+  setPropAnimation(
+    id: string,
+    updates: AnimationSettings,
+    pushUndo = true,
+    saveAndNotify = true,
+  ): void {
     const prop = this.placedProps.find((p) => p.id === id);
     if (!prop) return;
     const patch: Partial<PlacedProp> = {};
@@ -1144,6 +1199,12 @@ export class TrackBuilder3D {
       );
       patch.animFrames = normalizeAnimFrames(updates.animFrames, total.cols * total.rows);
     }
+    if (updates.animFrameDelays !== undefined) {
+      const total = animGridFor(
+        PROP_DEFINITIONS.find((d) => d.type === prop.type) ?? ({} as PropDefinition),
+      );
+      patch.animFrameDelays = normalizeAnimFrameDelays(updates.animFrameDelays, total.cols * total.rows);
+    }
     if (Object.keys(patch).length === 0) return;
     if (pushUndo) this.pushUndo();
 
@@ -1152,6 +1213,7 @@ export class TrackBuilder3D {
     const after = animSheetFor(prop)?.url;
 
     if (before !== after) {
+      this.disposeAnimTexture(id);
       const oldObj = this.propObjects.get(id);
       if (oldObj) {
         this.scene.remove(oldObj);
@@ -1159,12 +1221,14 @@ export class TrackBuilder3D {
       }
       this.createPropSprite(prop);
     }
-    // Repaint the current frame straight away so speed/skip edits are visible
+    // Repaint the current frame straight away so speed/skip/delay edits are visible
     // even while the prop is paused.
-    this.updateAnimations(nowSeconds());
-    this.updateSelectionBox();
-    this.saveToStorage();
-    this.notify();
+    if (saveAndNotify) {
+      this.updateAnimations(nowSeconds());
+      this.updateSelectionBox();
+      this.saveToStorage();
+      this.notify();
+    }
   }
 
   /** Apply the same animation settings to every animated-capable prop selected. */
@@ -1172,7 +1236,8 @@ export class TrackBuilder3D {
     const selected = this.getSelectedProps().filter((p) => propHasAnimatedOption(p));
     if (selected.length === 0) return;
     this.pushUndo();
-    for (const prop of selected) this.setPropAnimation(prop.id, updates, false);
+    for (const prop of selected) this.setPropAnimation(prop.id, updates, false, false);
+    this.updateAnimations(nowSeconds());
     this.updateSelectionBox();
     this.saveToStorage();
     this.notify();
@@ -1181,6 +1246,42 @@ export class TrackBuilder3D {
   /** Batch the animated-sheet swap across the current selection. */
   setSelectedPropsAnimated(animated: boolean): void {
     this.setSelectedPropsAnimation({ animated });
+  }
+
+  /**
+   * Switch all placed props that have animated twins to their animated sheets
+   * (or back to still artwork).
+   *
+   * @param animated true = switch to animated sheet twins; false = switch back to still art.
+   * @param filterSection optional section filter ('all' | 'alpine' | 'canyon' | 'cavern' | 'stadium')
+   * @returns count of props modified
+   */
+  setAllPropsAnimated(
+    animated: boolean,
+    filterSection: 'all' | 'alpine' | 'canyon' | 'cavern' | 'stadium' = 'all',
+  ): number {
+    this.pushUndo();
+    let count = 0;
+    for (const prop of this.placedProps) {
+      const def = PROP_DEFINITIONS.find((d) => d.type === prop.type);
+      if (!def || !animatedTwinDef(def)) continue;
+      if (filterSection !== 'all') {
+        const sec = this.getPropTrackSection(prop);
+        if (sec !== filterSection) continue;
+      }
+      const isCurrentlyAnimated = prop.animated === true;
+      if (isCurrentlyAnimated !== animated) {
+        this.setPropAnimation(prop.id, { animated }, false, false);
+        count++;
+      }
+    }
+    if (count > 0) {
+      this.updateAnimations(nowSeconds());
+      this.updateSelectionBox();
+      this.saveToStorage();
+      this.notify();
+    }
+    return count;
   }
 
   /** Nudge every animated-capable selected prop's speed by `delta` (clamped). */
@@ -2576,7 +2677,7 @@ export class TrackBuilder3D {
       const enabled = animEnabledFrames(prop, total);
       const playing = !reducedMotion && prop?.animate !== false && enabled.length > 1;
       const frame = playing
-        ? animFrameAt(timeSec, anim.fps * animSpeedFor(prop), total, anim.phase, prop?.animFrames)
+        ? animFrameAt(timeSec, anim.fps * animSpeedFor(prop), total, anim.phase, prop?.animFrames, prop?.animFrameDelays)
         : enabled[0];
       const uv = animFrameUV(frame, anim.cols, anim.rows);
       if (tex.offset.x !== uv.u || tex.offset.y !== uv.v) tex.offset.set(uv.u, uv.v);
@@ -2909,8 +3010,8 @@ export class TrackBuilder3D {
       const data = await res.json();
       const diskProps = data?.latest?.props;
       if (Array.isArray(diskProps) && diskProps.length > 0) {
-        // If scene currently only has default starter items, check if disk has custom items
-        if (this.placedProps.length === 0 || this.placedProps.length === DEFAULT_TRACK_PROPS.length) {
+        // If scene only has default starter items or disk has a richer/newer set of decorations
+        if (this.placedProps.length === 0 || this.placedProps.length === DEFAULT_TRACK_PROPS.length || diskProps.length > this.placedProps.length) {
           this.restorePropsState(diskProps);
           this.notify();
         }

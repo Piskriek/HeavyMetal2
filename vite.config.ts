@@ -37,13 +37,18 @@ function trackPropsBackupPlugin(): Plugin {
                 // 1. Save latest backup
                 const latestFile = path.resolve(backupDir, "track-props-latest.json");
 
-                // Safeguard: refuse to overwrite existing decorations if incoming array is empty
-                if (props.length === 0 && fs.existsSync(latestFile)) {
+                // Safeguard: refuse to overwrite existing decorations if incoming array is empty or significantly smaller
+                if (fs.existsSync(latestFile)) {
                   try {
                     const existing = JSON.parse(fs.readFileSync(latestFile, "utf-8"));
-                    if (existing?.props?.length > 0) {
+                    const existingCount = existing?.props?.length || 0;
+                    if (existingCount > 0 && props.length < existingCount * 0.75) {
                       res.writeHead(200, { "Content-Type": "application/json" });
-                      res.end(JSON.stringify({ success: false, reason: "Refusing to overwrite existing decorations with empty array", count: existing.props.length }));
+                      res.end(JSON.stringify({
+                        success: false,
+                        reason: `Refusing to overwrite ${existingCount} props with smaller set (${props.length} props)`,
+                        count: existingCount,
+                      }));
                       return;
                     }
                   } catch {}

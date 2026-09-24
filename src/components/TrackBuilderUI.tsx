@@ -15,6 +15,7 @@ import {
   animSpeedFor,
   animatedTwinDef,
   normalizeAnimFrames,
+  normalizeAnimFrameDelays,
   propHasAnimatedOption,
   ANIM_SPEED_MAX,
   ANIM_SPEED_MIN,
@@ -62,6 +63,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [currentSky, setCurrentSky] = useState<string>(builder.getSkybox());
   const [decalLightingDefault, setDecalLightingDefault] = useState<boolean>(builder.snapping.decalLightingDefault ?? true);
   const [selectedStageFilter, setSelectedStageFilter] = useState<'all' | 'alpine' | 'canyon' | 'cavern' | 'stadium'>('all');
+  const [animDelayTargetFrame, setAnimDelayTargetFrame] = useState<number | 'all'>(0);
+  const [delayInputStr, setDelayInputStr] = useState<string>('0');
   const [showSkyMenu, setShowSkyMenu] = useState(false);
   const [showBackupsModal, setShowBackupsModal] = useState(false);
   const [backupInfo, setBackupInfo] = useState<{ status: 'idle' | 'saving' | 'saved' | 'error'; timestamp: number; count: number }>({
@@ -951,6 +954,37 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 </button>
               </div>
             </div>
+            {/* Batch Animated Props per Section Controls */}
+            <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
+              <span className="font-bold text-[11px] text-fuchsia-300 flex items-center gap-1">
+                <Film size={12} className="text-fuchsia-400" />
+                <span>ANIMATED PROPS:</span>
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const count = builder.setAllPropsAnimated(true, selectedStageFilter);
+                    showToast(`Swapped ${count} props to animated versions in ${selectedStageFilter === 'all' ? 'entire track' : selectedStageFilter}`);
+                    onRequestRender?.();
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-bold bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 rounded border border-fuchsia-500/40 cursor-pointer flex items-center gap-1"
+                  title="Switch all props in this section to their animated versions"
+                >
+                  <Film size={10} /> ALL ANIMATED
+                </button>
+                <button
+                  onClick={() => {
+                    const count = builder.setAllPropsAnimated(false, selectedStageFilter);
+                    showToast(`Swapped ${count} props back to still versions in ${selectedStageFilter === 'all' ? 'entire track' : selectedStageFilter}`);
+                    onRequestRender?.();
+                  }}
+                  className="px-2 py-0.5 text-[10px] font-bold bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-700 cursor-pointer flex items-center gap-1"
+                  title="Switch all animated props in this section back to still versions"
+                >
+                  ALL STILL
+                </button>
+              </div>
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-zinc-400">Section:</span>
               <select
@@ -1148,6 +1182,68 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               >
                 All OFF (Unlit)
               </button>
+            </div>
+
+            {/* Batch Animated Props Controls */}
+            <div className="flex items-center justify-between pt-1.5 border-t border-zinc-800/60">
+              <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                <Film size={13} className="text-fuchsia-400" />
+                <span>Animated Versions:</span>
+              </span>
+              <span className="text-[10px] text-zinc-400">
+                {selectedProps.filter((p) => p.animated === true || PROP_DEFINITIONS.find((d) => d.type === p.type)?.isAnimated).length}/{selectedProps.filter((p) => propHasAnimatedOption(p)).length} Animated
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  builder.setSelectedPropsAnimated(true);
+                  showToast(`Swapped eligible selected props to animated versions`);
+                  onRequestRender?.();
+                }}
+                className="flex-1 py-1 px-2 bg-fuchsia-500/20 hover:bg-fuchsia-500/30 text-fuchsia-300 text-[11px] font-bold rounded border border-fuchsia-500/40 cursor-pointer flex items-center justify-center gap-1"
+                title="Switch selected props to their animated versions"
+              >
+                <Film size={11} /> All Animated
+              </button>
+              <button
+                onClick={() => {
+                  builder.setSelectedPropsAnimated(false);
+                  showToast(`Swapped selected props back to still versions`);
+                  onRequestRender?.();
+                }}
+                className="flex-1 py-1 px-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] font-bold rounded border border-zinc-700 cursor-pointer flex items-center justify-center gap-1"
+                title="Switch selected props back to still versions"
+              >
+                All Still (Back)
+              </button>
+            </div>
+            <div className="flex items-center justify-between pt-1 text-[10px] text-zinc-400 border-t border-zinc-800/40">
+              <span>All Props (Track):</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    const count = builder.setAllPropsAnimated(true);
+                    showToast(`Swapped all ${count} track props to animated versions`);
+                    onRequestRender?.();
+                  }}
+                  className="px-2 py-0.5 font-bold rounded bg-fuchsia-950/70 hover:bg-fuchsia-900/90 text-fuchsia-300 border border-fuchsia-800/50 cursor-pointer flex items-center gap-1"
+                  title="Switch ALL props across the entire track to animated versions"
+                >
+                  <Film size={10} /> Entire Track Animated
+                </button>
+                <button
+                  onClick={() => {
+                    const count = builder.setAllPropsAnimated(false);
+                    showToast(`Swapped all ${count} track props back to still versions`);
+                    onRequestRender?.();
+                  }}
+                  className="px-2 py-0.5 font-bold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 cursor-pointer"
+                  title="Switch ALL props across the entire track back to still versions"
+                >
+                  Track Still
+                </button>
+              </div>
             </div>
           </div>
 
@@ -2071,6 +2167,41 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               apply({ animSpeed: next });
             };
 
+            const frameDelays = normalizeAnimFrameDelays(selectedProp.animFrameDelays, total);
+            const targetIdx = typeof animDelayTargetFrame === 'number' ? Math.min(total - 1, Math.max(0, animDelayTargetFrame)) : 'all';
+            const currentDelay = targetIdx === 'all'
+              ? (frameDelays[0] ?? 0)
+              : (frameDelays[targetIdx] ?? 0);
+
+            const nudgeDelay = (delta: number) => {
+              const next = [...frameDelays];
+              if (targetIdx === 'all') {
+                for (let i = 0; i < total; i++) {
+                  next[i] = Math.max(0, Math.min(30, Math.round(((next[i] ?? 0) + delta) * 100) / 100));
+                }
+                showToast(`All frames delay: ${next[0].toFixed(2)}s (${delta > 0 ? `+${delta.toFixed(1)}s` : `${delta.toFixed(1)}s`})`);
+                setDelayInputStr(next[0] > 0 ? (Number.isInteger(next[0]) ? next[0].toFixed(1) : String(next[0])) : '0');
+              } else {
+                next[targetIdx] = Math.max(0, Math.min(30, Math.round(((next[targetIdx] ?? 0) + delta) * 100) / 100));
+                showToast(`Frame ${targetIdx + 1} delay: ${next[targetIdx].toFixed(2)}s`);
+                setDelayInputStr(next[targetIdx] > 0 ? (Number.isInteger(next[targetIdx]) ? next[targetIdx].toFixed(1) : String(next[targetIdx])) : '0');
+              }
+              apply({ animFrameDelays: next });
+            };
+
+            const setExactDelay = (val: number) => {
+              const clamped = Math.max(0, Math.min(30, Math.round(val * 100) / 100));
+              const next = [...frameDelays];
+              if (targetIdx === 'all') {
+                for (let i = 0; i < total; i++) next[i] = clamped;
+                showToast(`All frames delay set to ${clamped.toFixed(2)}s`);
+              } else {
+                next[targetIdx] = clamped;
+                showToast(`Frame ${targetIdx + 1} delay set to ${clamped.toFixed(2)}s`);
+              }
+              apply({ animFrameDelays: next });
+            };
+
             return (
               <div className="pt-2 border-t border-zinc-800/60 space-y-2">
                 <div className="flex items-center justify-between">
@@ -2180,42 +2311,176 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       </div>
                     </div>
 
-                    {/* Per-frame checkboxes */}
+                    {/* Per-frame checkboxes & delay targets */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400">Frames</span>
+                        <span className="text-zinc-400">Frames (On / Off)</span>
                         <span className="text-[10px] text-zinc-500">
                           {enabledCount === 0 ? 'keep at least one' : `${enabledCount} of ${total} on`}
                         </span>
                       </div>
                       <div className="grid grid-cols-4 gap-1">
-                        {frames.map((on, i) => (
-                          <label
-                            key={i}
-                            className={`flex flex-col items-center gap-0.5 py-1 rounded border text-[10px] cursor-pointer transition-colors ${
-                              on
-                                ? 'bg-fuchsia-950/50 border-fuchsia-700/60 text-fuchsia-200'
-                                : 'bg-zinc-900/80 border-zinc-700 text-zinc-500'
-                            }`}
-                            title={`Frame ${i + 1} of the sheet — uncheck to skip this frame in the loop`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={on}
-                              onChange={(e) => {
-                                const next = [...frames];
-                                next[i] = e.target.checked;
-                                if (!next.some(Boolean)) {
-                                  showToast('Keep at least one frame enabled');
-                                  return;
-                                }
-                                apply({ animFrames: next });
+                        {frames.map((on, i) => {
+                          const delay = frameDelays[i] || 0;
+                          const isTarget = targetIdx === i;
+                          return (
+                            <div
+                              key={i}
+                              onClick={() => setAnimDelayTargetFrame(i)}
+                              className={`flex flex-col items-center gap-0.5 py-1 px-0.5 rounded border text-[10px] cursor-pointer transition-all ${
+                                on
+                                  ? isTarget
+                                    ? 'bg-fuchsia-950/80 border-fuchsia-400 text-fuchsia-100 ring-1 ring-fuchsia-400/50 shadow-sm'
+                                    : 'bg-fuchsia-950/40 border-fuchsia-700/60 text-fuchsia-200 hover:border-fuchsia-500'
+                                  : isTarget
+                                    ? 'bg-zinc-900 border-amber-400/80 text-zinc-400 ring-1 ring-amber-400/40 shadow-sm'
+                                    : 'bg-zinc-900/80 border-zinc-700 text-zinc-500 hover:border-zinc-600'
+                              }`}
+                              title={`Frame ${i + 1} — toggle checkbox to enable/disable. Click card to select for delay adjustment (${delay > 0 ? `${delay.toFixed(1)}s hold` : '0.0s delay'})`}
+                            >
+                              <div className="flex items-center justify-between w-full px-1">
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    const next = [...frames];
+                                    next[i] = e.target.checked;
+                                    if (!next.some(Boolean)) {
+                                      showToast('Keep at least one frame enabled');
+                                      return;
+                                    }
+                                    apply({ animFrames: next });
+                                  }}
+                                  className="accent-fuchsia-500 w-3 h-3 cursor-pointer"
+                                />
+                                <span className="font-mono font-bold">F{i + 1}</span>
+                              </div>
+                              <div className="text-[9px] font-mono mt-0.5 flex items-center justify-center">
+                                {delay > 0 ? (
+                                  <span className="text-amber-300 font-semibold bg-amber-950/70 px-1 rounded border border-amber-700/60">
+                                    +{delay.toFixed(1)}s
+                                  </span>
+                                ) : (
+                                  <span className="text-zinc-500 text-[8px]">0.0s</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Frame Delay Box with +/- and frame selector */}
+                    <div className="bg-zinc-900/70 p-2 rounded border border-zinc-800 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-300 font-medium flex items-center gap-1.5">
+                          <Clock size={12} className="text-amber-400" />
+                          <span>Frame Delay / Hold:</span>
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-zinc-400">Target:</span>
+                          <div className="flex items-center bg-zinc-950 rounded p-0.5 border border-zinc-800 text-[10px]">
+                            {frames.map((_, i) => (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  setAnimDelayTargetFrame(i);
+                                  const d = frameDelays[i] ?? 0;
+                                  setDelayInputStr(d > 0 ? (Number.isInteger(d) ? d.toFixed(1) : String(d)) : '0');
+                                }}
+                                className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                  targetIdx === i
+                                    ? 'bg-fuchsia-600 text-zinc-950 font-bold'
+                                    : 'text-zinc-400 hover:text-zinc-200'
+                                }`}
+                                title={`Set delay for Frame ${i + 1}`}
+                              >
+                                F{i + 1}
+                              </button>
+                            ))}
+                            <button
+                              onClick={() => {
+                                setAnimDelayTargetFrame('all');
+                                const d = frameDelays[0] ?? 0;
+                                setDelayInputStr(d > 0 ? (Number.isInteger(d) ? d.toFixed(1) : String(d)) : '0');
                               }}
-                              className="accent-fuchsia-500 w-3 h-3"
+                              className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                targetIdx === 'all'
+                                  ? 'bg-fuchsia-600 text-zinc-950 font-bold'
+                                  : 'text-zinc-400 hover:text-zinc-200'
+                              }`}
+                              title="Set delay across all frames"
+                            >
+                              ALL
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 text-[11px]">
+                          {targetIdx === 'all' ? 'All Frames Extra Hold' : `F${targetIdx + 1} Extra Hold`}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => nudgeDelay(-0.1)}
+                            disabled={currentDelay <= 0}
+                            className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Decrease hold delay (-0.1s)"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="30"
+                              value={delayInputStr}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setDelayInputStr(raw);
+                                const parsed = parseFloat(raw);
+                                if (!isNaN(parsed) && parsed >= 0) {
+                                  setExactDelay(parsed);
+                                }
+                              }}
+                              onBlur={() => {
+                                const parsed = parseFloat(delayInputStr);
+                                if (isNaN(parsed) || parsed < 0) {
+                                  setExactDelay(0);
+                                  setDelayInputStr('0');
+                                } else {
+                                  const clamped = Math.min(30, Math.round(parsed * 100) / 100);
+                                  setExactDelay(clamped);
+                                  setDelayInputStr(clamped > 0 ? (Number.isInteger(clamped) ? clamped.toFixed(1) : String(clamped)) : '0');
+                                }
+                              }}
+                              className="w-16 h-6 text-center font-mono text-zinc-100 bg-zinc-950 rounded border border-zinc-700 text-xs px-1 focus:border-amber-400 focus:outline-none"
+                              title="Frame hold delay in seconds (0s = default frame speed)"
                             />
-                            <span className="font-mono">F{i + 1}</span>
-                          </label>
-                        ))}
+                            <span className="absolute right-1 text-[10px] text-zinc-500 pointer-events-none">s</span>
+                          </div>
+                          <button
+                            onClick={() => nudgeDelay(0.1)}
+                            className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-600 cursor-pointer"
+                            title="Increase hold delay (+0.1s)"
+                          >
+                            <Plus size={12} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setExactDelay(0);
+                              setDelayInputStr('0');
+                            }}
+                            disabled={currentDelay <= 0}
+                            className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-zinc-700 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Reset delay to 0.0s"
+                          >
+                            RESET
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </>

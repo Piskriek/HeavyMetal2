@@ -29,6 +29,7 @@ import {
   animSpeedFor,
   animatedTwinDef,
   normalizeAnimFrames,
+  normalizeAnimFrameDelays,
   propHasAnimatedOption,
   type PlacedProp,
   type PropDefinition,
@@ -331,6 +332,21 @@ test('Animated: still <-> animated twins', async (t) => {
     assert.equal(animSpeedFor({ animSpeed: 99 }), ANIM_SPEED_MAX);
     assert.equal(animSpeedFor({ animSpeed: -5 }), ANIM_SPEED_MIN);
     assert.deepEqual(normalizeAnimFrames([true, false], 4), [true, false, true, true]);
+    assert.deepEqual(normalizeAnimFrameDelays([0.5, -1, NaN, 1.25], 4), [0.5, 0, 0, 1.25]);
+    assert.deepEqual(normalizeAnimFrameDelays(undefined, 3), [0, 0, 0]);
+
+    // per-frame delays extend the hold duration of target frame(s)
+    // frame 0 has 0.5s delay added to 1/6s base duration
+    assert.equal(animFrameAt(0, 6, 4, 0, undefined, [0.5, 0, 0, 0]), 0);
+    assert.equal(animFrameAt(0.5, 6, 4, 0, undefined, [0.5, 0, 0, 0]), 0);
+    assert.equal(animFrameAt(1 / 6 + 0.5 + 1e-6, 6, 4, 0, undefined, [0.5, 0, 0, 0]), 1);
+    assert.equal(animFrameAt(1 / 6 + 0.5 + 1 / 6 + 1e-6, 6, 4, 0, undefined, [0.5, 0, 0, 0]), 2);
+    assert.equal(animFrameAt(1 / 6 + 0.5 + 2 / 6 + 1e-6, 6, 4, 0, undefined, [0.5, 0, 0, 0]), 3);
+    assert.equal(animFrameAt(1 / 6 + 0.5 + 3 / 6 + 1e-6, 6, 4, 0, undefined, [0.5, 0, 0, 0]), 0);
+
+    // frame skipping with delays
+    assert.equal(animFrameAt(0.1, 6, 4, 0, [true, false, true, false], [0.3, 0, 0.4, 0]), 0);
+    assert.equal(animFrameAt(1 / 6 + 0.3 + 1e-6, 6, 4, 0, [true, false, true, false], [0.3, 0, 0.4, 0]), 2);
   });
 });
 
@@ -509,6 +525,63 @@ test('Animated: attribute-window controls', async (t) => {
       );
       assert.deepEqual([map.offset.x, map.offset.y], [expected.u, expected.v], `t=${t} honours speed 0.5`);
     }
+    builder.destroy();
+  });
+
+  await t.test('per-frame delay controls save/load and drive frame holds', () => {
+    const { scene, builder } = makeBuilder();
+    const prop = placeStill(builder, 'delay_test_1');
+    builder.setPropAnimation(prop.id, {
+      animated: true,
+      animFrameDelays: [0.5, 0, 0, 0],
+    });
+
+    const stored = builder.getProps().find((p) => p.id === prop.id) as PlacedProp;
+    assert.deepEqual(stored.animFrameDelays, [0.5, 0, 0, 0]);
+
+    // Frame hold drives UV updates
+    const map = spriteMap(scene, prop.id);
+    const grid = animGridFor(PROP_DEFINITIONS.find((d) => d.type === twinType) as PropDefinition);
+    const phase = animPhaseFor(prop.id, grid.cols * grid.rows);
+    for (const t of [0, 0.2, 0.4, 0.8, 1.5]) {
+      builder.updateAnimations(t);
+      const expectedFrame = animFrameAt(t, grid.fps, grid.cols * grid.rows, phase, undefined, [0.5, 0, 0, 0]);
+      const expectedUv = animFrameUV(expectedFrame, grid.cols, grid.rows);
+      assert.deepEqual([map.offset.x, map.offset.y], [expectedUv.u, expectedUv.v], `t=${t} honours frame 0 delay`);
+    }
+
+    builder.destroy();
+  });
+
+  await t.test('setAllPropsAnimated switches all twin-capable props and back', () => {
+    const { scene, builder } = makeBuilder();
+    // 2 props with twins, 1 prop without twin
+    const p1 = placeStill(builder, 'all_twin_1');
+    const p2 = placeStill(builder, 'all_twin_2');
+    const noTwin = makeProp({ id: 'no_twin_1', type: 'prop_09_pine_lookout', name: 'Pine Lookout' });
+    builder.importJson(JSON.stringify([p1, p2, noTwin]));
+
+    // All still initially
+    assert.equal(spriteMap(scene, p1.id).name, stillUrl);
+    assert.equal(spriteMap(scene, p2.id).name, stillUrl);
+
+    // Switch all to animated
+    const count = builder.setAllPropsAnimated(true);
+    assert.equal(count, 2, 'switched both twin props');
+    assert.equal(builder.getProps().find((p) => p.id === p1.id)?.animated, true);
+    assert.equal(builder.getProps().find((p) => p.id === p2.id)?.animated, true);
+    assert.equal(builder.getProps().find((p) => p.id === noTwin.id)?.animated, undefined);
+    assert.equal(spriteMap(scene, p1.id).name, twinUrl);
+    assert.equal(spriteMap(scene, p2.id).name, twinUrl);
+
+    // Switch all back to still
+    const backCount = builder.setAllPropsAnimated(false);
+    assert.equal(backCount, 2, 'switched both back to still');
+    assert.equal(builder.getProps().find((p) => p.id === p1.id)?.animated, false);
+    assert.equal(builder.getProps().find((p) => p.id === p2.id)?.animated, false);
+    assert.equal(spriteMap(scene, p1.id).name, stillUrl);
+    assert.equal(spriteMap(scene, p2.id).name, stillUrl);
+
     builder.destroy();
   });
 });

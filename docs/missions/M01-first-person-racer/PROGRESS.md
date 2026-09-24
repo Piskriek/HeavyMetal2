@@ -344,10 +344,37 @@ builder draws nothing yet (that is T7), and `environment.ts` still paints the le
 corridor — a network is physics and logic until the dressing ticket catches up. What is proven is the
 model, the storage and the runtime integration, headlessly.
 
+## T7 — the builder "Lanes & Paths" tool · **in progress**
+
+The pure half is in: `src/game/lane-path-tool.ts` and `tests/lane-edit.test.ts` (6 tests). Eight
+commands (`addPath`, `moveNode`, `insertNode`, `deleteNode`, `setKind`, `split`, `merge`, `markOob`),
+`snapNode` (lane centres within 30 z, a 50-unit x grid, clamped to the corridor), and the lanes half
+of the builder's undo stack. Every op is pure — a frozen document is handed in and comes back
+untouched, and the result is always a network `validateLaneNetwork` has accepted.
+
+Three facts the implementation pinned down, which the panel and the gizmos have to live with:
+
+* **Kinds are derived, not authored.** T6 refuses a node whose authored kind disagrees with its
+  shape, so every structural op re-derives the kinds of the nodes it touched. The practical
+  consequence: `setKind` is only ever a no-op or a refusal that names what the node's shape actually
+  is — which is what the K key should show, not a way to overrule the graph.
+* **A fork is reached in two steps.** A node in the middle of a path has no *end* at it, so splitting
+  there starts a branch and leaves the node `normal` (the road carries on; the branch is a lane
+  option from that x onwards). A true `split` node — one path ending, two leaving — appears when a
+  path is merged into the fork, then branched again. Both steps are in the test.
+* **`markOob` is a confirmation.** Every dead end short of the flag is already an out-of-bounds
+  trigger by inference; its interesting answer is the refusal, because a path that reaches the flag
+  ends at the finish, not out of bounds.
+
+Still to do, and it is the visible half: the lane gizmos in `track-builder-3d.ts` (an `InstancedMesh`
+for the handles, one line per path, picking, drag through `raycastSurface`), the `lanes` category and
+`LanePanel` (node inspector, kind buttons, the validation list, Save/Export/Import, test drive), the
+builder's shared `{ props, lanes }` undo entries, and `tests/lane-panel.mjs` for the DOM and a11y
+claims (AC-4/AC-5).
+
 ## Next
 
-* **T7** — the builder "Lanes & Paths" tool: node handles on the track surface, insert/delete/split/
-  merge, OOB marking, the validation list, one undo stack for props and lanes, and a test drive.
+* **T7** — the builder "Lanes & Paths" tool: the gizmos and the panel over `lane-path-tool.ts`.
 * **T6/T7** — the lane network and the builder lane tool (T6 now done).
 * **In the browser now:** the goblin push at the top of the hill, the first-loop queue with its
   ready-up and ordered release, the FPV cockpit, the tight chase camera, painted effects on every

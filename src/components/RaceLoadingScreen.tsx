@@ -25,6 +25,7 @@ const DEFAULT_TIPS = [
   'Air springs provide extra aerial hang time',
   'Touch the chevrons for a fresh boost charge',
   'Heavy capsules shove harder — light ones jump higher',
+  'A rival that wobbles is about to shove: steer away or shield up',
 ];
 
 export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnter, tips }: RaceLoadingScreenProps) {
@@ -181,6 +182,7 @@ export default function RaceLoadingScreen({ bindings, ready, progress = 0, onEnt
               </div>
             </div>
             <div className="diagram-caption">Keyboard layout — highlighted keys are your current bindings</div>
+            <div className="diagram-caption">Also: <strong>V</strong> camera · <strong>[</strong> <strong>]</strong> slow motion · <strong>{formatKey(resolved.pause[0] ?? 'KeyP')}</strong> pause</div>
           </div>
         </div>
 

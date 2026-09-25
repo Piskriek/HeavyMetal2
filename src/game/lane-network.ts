@@ -336,6 +336,14 @@ export function assignNearestPaths(bearers: readonly PathBearer[], network: Lane
   return changed;
 }
 
+/** The first node of a path (where its racers wait before the start), or null. */
+export function startNodeOf(network: LaneNetwork | null, pathId: string | null | undefined): LaneNode | null {
+  if (!network || !pathId) return null;
+  const path = network.paths.find((candidate) => candidate.id === pathId);
+  const first = path?.nodeIds[0];
+  return first ? network.nodes.find((node) => node.id === first) ?? null : null;
+}
+
 /**
  * Adopts the bearers that are **not on a path yet**. The grid sits at `x = START_X` and an authored
  * network may begin further down the hill, so this is run every tick by the engine: a racer who is

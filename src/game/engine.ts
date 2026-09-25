@@ -22,7 +22,7 @@ import {
   QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
 } from './contracts/qualifying';
 import { POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup } from './powerups';
-import { adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, type LaneNetwork } from './lane-network';
+import { adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
@@ -307,6 +307,7 @@ export class GameEngine {
       const player = this.racers.find(r => r.isPlayer) ?? this.racers[0];
       this.racers = [player];
     }
+    this.placeOnStartNodes();
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
@@ -462,6 +463,26 @@ export class GameEngine {
    */
   private adoptPaths() {
     adoptNearestPaths(this.racers, this.laneNetwork);
+  }
+
+  /**
+   * Before the start, every racer sits on the first node of the path they were given, resting on the
+   * road (grid rows keep their spacing behind it). Without this the ball waited at the legacy grid
+   * spot, which is off the road — in the air — whenever the authored start node has been moved.
+   */
+  private placeOnStartNodes() {
+    const network = this.laneNetwork;
+    if (!network) return;
+    for (const racer of this.racers) {
+      const node = startNodeOf(network, racer.pathId);
+      if (!node) continue;
+      racer.x = node.x + (racer.x - START_X);
+      racer.z = node.z;
+      racer.y = this.y(racer.x) - RADIUS;
+      racer.vx = racer.vy = racer.vz = 0;
+      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
+      racer.launchOrigin = { x: racer.x, y: racer.y };
+    }
   }
 
   /** Puts every racer on the path nearest to them at this moment. */
@@ -915,11 +936,10 @@ export class GameEngine {
     const alpha = statusSimulates(this.status) ? clamp(this.accumulator / STEP, 0, 1) : 1;
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i]; const rendered = this.renderRacers[i];
-      if (!this.splitReached && racer.id !== PLAYER_ID) {
-        rendered.x = -999999;
-        rendered.y = -999999;
-        continue;
-      }
+      // A rival waiting for the player's solo first split is simply not drawn (it used to be parked
+      // at x = −999999, which the 3D placement clamps to the start line, high in the sky).
+      rendered.hidden = !this.splitReached && racer.id !== PLAYER_ID;
+      if (rendered.hidden) continue;
       rendered.x = racer.previous.x + (racer.x - racer.previous.x) * alpha;
       rendered.y = racer.previous.y + (racer.y - racer.previous.y) * alpha;
       rendered.z = racer.previous.z + (racer.z - racer.previous.z) * alpha;

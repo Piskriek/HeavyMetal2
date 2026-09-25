@@ -2011,7 +2011,7 @@ export class Renderer3D {
       mesh.capRight.quaternion.copy(this.gyroQuat);
 
       // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
-      mesh.group.visible = !(firstPerson && i === 0);
+      mesh.group.visible = !(firstPerson && i === 0) && !racer.hidden;
 
       // The tight chase rig needs the player's own altitude (see placeCamera).
       if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);

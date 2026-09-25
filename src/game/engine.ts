@@ -8,7 +8,7 @@ import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
 import { builderRampObstacles } from './sim/builder-ramps';
 import { SPLIT_TIMEOUT_S, simulateSplitTicks } from './sim/split-times';
 import { withoutLoopRides } from './sim/decor-loops';
-import { ROPE_PAYOUT_S } from './sim/rope';
+import { DEFAULT_ROPE, clampRope, type RopeConfig } from './sim/rope';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
   BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
@@ -114,6 +114,8 @@ export class GameEngine {
   private cameraY = 0;
   private drift = 0;
   private shake = 0;
+  /** H7b: the lane rope's timings. The defaults unless the test drive's dev sliders change them. */
+  private ropeConfig: RopeConfig = DEFAULT_ROPE;
   /** H8: the player's last hit (this.time), its side (+1 from the right) and strength (0..1). */
   private readonly impact = { at: -100, side: 0 as -1 | 0 | 1, strength: 0 };
   private topSpeed = 0;
@@ -238,6 +240,8 @@ export class GameEngine {
       // M01 · T6: read live, so the builder's "test drive" can swap the network without rebuilding
       // the context, and so a course with no authored network stays exactly the legacy game.
       get laneNetwork() { return engine.laneNetwork; },
+      // H7b: the test drive's rope sliders; the defaults unless someone is tuning.
+      get rope() { return engine.ropeConfig; },
     };
     this.cpuCtx = {
       get step() { return engine.simCtx; },
@@ -443,7 +447,7 @@ export class GameEngine {
     // Steering yourself takes up the rope's slack: after a knock you can drive straight back to a lane
     // instead of drifting until the rope reels you in.
     // (Only the slack phase is cut short — the reel-in still plays — so tapping a key can't shrug off a hit.)
-    if (racer.ropeSince !== undefined && this.runTime - racer.ropeSince < ROPE_PAYOUT_S) racer.ropeSince = this.runTime - ROPE_PAYOUT_S;
+    if (racer.ropeSince !== undefined && this.runTime - racer.ropeSince < this.ropeConfig.payoutS) racer.ropeSince = this.runTime - this.ropeConfig.payoutS;
     const network = this.laneNetwork;
     // M01 · T6: on an authored network a lane change is a *path* change, at this x. With no network
     // (or no path) it is the legacy lane change, unchanged.
@@ -539,6 +543,15 @@ export class GameEngine {
   }
 
   jump = () => {};
+
+  /** H7b: the rope timings in use. */
+  getRopeConfig(): RopeConfig { return this.ropeConfig; }
+
+  /** H7b: tune the rope live (dev test drive). Values are clamped to their ranges. */
+  setRopeConfig(partial: Partial<RopeConfig>): RopeConfig {
+    this.ropeConfig = clampRope(partial, this.ropeConfig);
+    return this.ropeConfig;
+  }
 
   /** M9: the T01 gate the player's commands are validated against. */
   commandGate(): CommandGate {

@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { YOKE_HOLD_S, YOKE_RETURN_S, yokeSteer } from '../src/game/cockpit';
-import { ROPE_PAYOUT_S, ROPE_REEL_S, ropeAt } from '../src/game/sim/rope';
+import { DEFAULT_ROPE, ROPE_LIMITS, ROPE_PAYOUT_S, ROPE_REEL_S, clampRope, ropeAt } from '../src/game/sim/rope';
 import { withoutLoopRides } from '../src/game/sim/decor-loops';
 import { createRacers, type Racer } from '../src/game/racers';
 import { createSimWorld } from '../src/game/sim/world';
@@ -90,7 +90,33 @@ test('once the player is released from the pool they can steer, boost and bounce
   const apply = engine.slice(engine.indexOf('private applyMergeStatus()'), engine.indexOf('private applyMergeStatus()') + 1200);
   assert.match(apply, /pool\.phase === 'releasing' && pool\.entries\.some\(\(entry\) => entry\.isPlayer && entry\.releaseTick !== null\)\) \{\n\s*if \(this\.snapshot\.status === 'checkpoint' \|\| this\.snapshot\.status === 'countdown'\) this\.snapshot\.status = 'flying';/,
     'the player is flying from their own release, not from the last rider\'s');
-  assert.match(engine, /if \(racer\.ropeSince !== undefined && this\.runTime - racer\.ropeSince < ROPE_PAYOUT_S\) racer\.ropeSince = this\.runTime - ROPE_PAYOUT_S;/,
+  assert.match(engine, /if \(racer\.ropeSince !== undefined && this\.runTime - racer\.ropeSince < this\.ropeConfig\.payoutS\) racer\.ropeSince = this\.runTime - this\.ropeConfig\.payoutS;/,
     'a steering press skips only the slack phase: the reel-in still plays, so tapping cannot shrug off a hit');
   assert.doesNotMatch(engine, /racer\.ropeSince = undefined;/);
+});
+
+// H7b: the rope timings are tunable (dev sliders) and default to the tuned constants.
+test('H7b: the rope defaults are the tuned constants, and ropeAt follows a config', () => {
+  assert.deepEqual({ ...DEFAULT_ROPE }, { payoutS: 0.6, reelS: 1.7, edgeSmashVz: 220 });
+  assert.deepEqual(ropeAt(10, 10.3), ropeAt(10, 10.3, DEFAULT_ROPE), 'no config is the defaults');
+  const long = { payoutS: 1.2, reelS: 3, edgeSmashVz: 220 };
+  assert.equal(ropeAt(10, 11, long).spring, ropeAt(10, 10.3).spring, 'still paying out at 1 s');
+  assert.ok(ropeAt(10, 11, DEFAULT_ROPE).spring > ropeAt(10, 11, long).spring, 'the default is already reeling');
+  assert.deepEqual(ropeAt(10, 12.9, long).slack, true);
+  assert.deepEqual(ropeAt(10, 13.01, long), { spring: 1, damping: 1, slack: false });
+});
+
+test('H7b: tuning is clamped to its ranges and the reel always ends after the payout', () => {
+  assert.deepEqual(clampRope({ payoutS: 99, reelS: 0, edgeSmashVz: -5 }), { payoutS: ROPE_LIMITS.payoutS.max, reelS: ROPE_LIMITS.payoutS.max + 0.05, edgeSmashVz: ROPE_LIMITS.edgeSmashVz.min });
+  assert.deepEqual(clampRope({ reelS: 2.5 }), { payoutS: 0.6, reelS: 2.5, edgeSmashVz: 220 }, 'a partial change keeps the rest');
+  assert.deepEqual(clampRope({ payoutS: Number.NaN }), { ...DEFAULT_ROPE }, 'nonsense is ignored');
+});
+
+test('H7b: the sim reads the rope from its context; the sliders are dev-only', () => {
+  const physics = readFileSync(new URL('../src/game/sim/racer-physics.ts', import.meta.url), 'utf8');
+  assert.match(physics, /const ropeConfig = ctx\.rope \?\? DEFAULT_ROPE;/);
+  assert.match(physics, /Math\.abs\(impactVz\) >= ropeConfig\.edgeSmashVz/);
+  const bar = readFileSync(new URL('../src/components/TestDriveBar.tsx', import.meta.url), 'utf8');
+  assert.match(bar, /const ropeTuning = ROPE_TUNING_AVAILABLE && rope && onRope;/);
+  assert.match(bar, /ROPE_TUNING_AVAILABLE = Boolean\(\(import\.meta as \{ env\?: \{ DEV\?: boolean \} \}\)\.env\?\.DEV\)/);
 });

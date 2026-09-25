@@ -19,6 +19,40 @@ export const ROPE_SLACK_DAMPING = 0.05;
 /** Sideways speed into the road edge that counts as smashing into the tree line. */
 export const EDGE_SMASH_VZ = 220;
 
+/**
+ * H7b: the three rope timings the owner tunes by feel in the test drive. They travel on the sim
+ * context (`RacerStepContext.rope`), never as a module global, so a race stays deterministic and a
+ * context without them is the tuned defaults below.
+ */
+export interface RopeConfig {
+  /** Seconds the rope pays out freely after a hit. */
+  readonly payoutS: number;
+  /** Seconds after the hit by which the rope is fully taut again. */
+  readonly reelS: number;
+  /** Sideways speed into the road edge that counts as a smash. */
+  readonly edgeSmashVz: number;
+}
+
+export const DEFAULT_ROPE: RopeConfig = Object.freeze({ payoutS: ROPE_PAYOUT_S, reelS: ROPE_REEL_S, edgeSmashVz: EDGE_SMASH_VZ });
+
+/** The tuning ranges (and slider steps) the test drive offers. */
+export const ROPE_LIMITS = Object.freeze({
+  payoutS: { min: 0.1, max: 2, step: 0.05 },
+  reelS: { min: 0.5, max: 4, step: 0.1 },
+  edgeSmashVz: { min: 100, max: 500, step: 10 },
+});
+
+/** A config with every value inside its range, and the reel always ending after the payout. */
+export function clampRope(config: Partial<RopeConfig>, base: RopeConfig = DEFAULT_ROPE): RopeConfig {
+  const pick = (key: keyof RopeConfig) => {
+    const value = config[key];
+    const { min, max } = ROPE_LIMITS[key];
+    return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : base[key];
+  };
+  const payoutS = pick('payoutS');
+  return { payoutS, reelS: Math.max(pick('reelS'), payoutS + 0.05), edgeSmashVz: pick('edgeSmashVz') };
+}
+
 export interface RopeState {
   /** Multiplies the lane spring. 1 = taut. */
   readonly spring: number;
@@ -31,12 +65,13 @@ export interface RopeState {
 const TAUT: RopeState = Object.freeze({ spring: 1, damping: 1, slack: false });
 
 /** The rope for a ball last hit at `hitAt` (seconds on the race clock), now `now`. */
-export function ropeAt(hitAt: number | undefined, now: number): RopeState {
+export function ropeAt(hitAt: number | undefined, now: number, config: RopeConfig = DEFAULT_ROPE): RopeState {
   if (hitAt === undefined || !Number.isFinite(hitAt)) return TAUT;
+  const { payoutS, reelS } = config;
   const t = now - hitAt;
-  if (t < 0 || t >= ROPE_REEL_S) return TAUT;
-  if (t < ROPE_PAYOUT_S) return { spring: ROPE_SLACK_SPRING, damping: ROPE_SLACK_DAMPING, slack: true };
-  const u = (t - ROPE_PAYOUT_S) / (ROPE_REEL_S - ROPE_PAYOUT_S);
+  if (t < 0 || t >= reelS) return TAUT;
+  if (t < payoutS) return { spring: ROPE_SLACK_SPRING, damping: ROPE_SLACK_DAMPING, slack: true };
+  const u = (t - payoutS) / (reelS - payoutS);
   const s = u * u * (3 - 2 * u); // smoothstep: the reel starts gently and finishes firm
   return {
     spring: ROPE_SLACK_SPRING + (1 - ROPE_SLACK_SPRING) * s,

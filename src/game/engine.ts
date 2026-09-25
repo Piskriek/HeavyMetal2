@@ -317,6 +317,10 @@ export class GameEngine {
       this.racers = [player];
     }
     this.placeOnStartNodes();
+    // In a push start everyone begins resting on the pad. Racers are created un-grounded (the old
+    // slingshot start had them in the air), and the renderer measures an un-grounded ball's height
+    // from the slingshot's ground, ~210 units below the pad: the whole grid hovered at the start.
+    if (this.startMode === 'push') for (const racer of this.racers) { racer.grounded = true; racer.y = this.y(racer.x) - RADIUS; }
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
@@ -378,6 +382,7 @@ export class GameEngine {
     applyPushTick(this.player, this.pushTick, this.pushTargets[0] ?? 240);
     this.player.x += this.player.vx * dt;
     this.player.y = this.y(this.player.x) - RADIUS;
+    this.player.grounded = true;
     this.player.rotation += this.player.vx * dt / RADIUS;
     this.refreshSnapshot();
     if (this.pushTick >= PUSH_TICKS) this.snapshot.status = 'flying';
@@ -435,6 +440,9 @@ export class GameEngine {
     if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
     // A (changeLane(-1)) steps to lane + 1, i.e. toward −z, which is screen-left in both cameras.
     const step = -Math.sign(direction) as -1 | 1;
+    // Steering yourself takes up the rope's slack: after a knock you can drive straight back to a lane
+    // instead of drifting until the rope reels you in.
+    racer.ropeSince = undefined;
     const network = this.laneNetwork;
     // M01 · T6: on an authored network a lane change is a *path* change, at this x. With no network
     // (or no path) it is the legacy lane change, unchanged.
@@ -827,6 +835,13 @@ export class GameEngine {
     if (!pool) return;
     if (this.snapshot.status === 'paused' || this.snapshot.status === 'finished') return;
     if (pool.phase === 'done') {
+      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') this.snapshot.status = 'flying';
+      return;
+    }
+    // Once the player is out of the pool they are racing, even while the rest of the field is still
+    // being let go behind them. Holding 'countdown' until the *last* rider left (≈35 s with 100 balls)
+    // refused every lane change, boost and bounce for that whole stretch.
+    if (pool.phase === 'releasing' && pool.entries.some((entry) => entry.isPlayer && entry.releaseTick !== null)) {
       if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') this.snapshot.status = 'flying';
       return;
     }

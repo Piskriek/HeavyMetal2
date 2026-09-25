@@ -84,3 +84,11 @@ test('ghost until fully out of the giant loop, and no contact inside it at all',
   assert.match(engine, /if \(racer\.x >= passageExitX\(\) \|\| racer\.x < this\.mergeGateFor\(\)\.x - 1\) \{\n\s*racer\.mergeGhost = false;/);
   assert.doesNotMatch(engine, /PASSAGE_GHOST_CAP_S/, 'no time cap that ends the ghost inside the loop');
 });
+
+test('once the player is released from the pool they can steer, boost and bounce at once', () => {
+  const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
+  const apply = engine.slice(engine.indexOf('private applyMergeStatus()'), engine.indexOf('private applyMergeStatus()') + 1200);
+  assert.match(apply, /pool\.phase === 'releasing' && pool\.entries\.some\(\(entry\) => entry\.isPlayer && entry\.releaseTick !== null\)\) \{\n\s*if \(this\.snapshot\.status === 'checkpoint' \|\| this\.snapshot\.status === 'countdown'\) this\.snapshot\.status = 'flying';/,
+    'the player is flying from their own release, not from the last rider\'s');
+  assert.match(engine, /racer\.ropeSince = undefined;\n\s*const network = this\.laneNetwork;/, 'a steering press takes up the rope slack');
+});

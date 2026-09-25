@@ -10,6 +10,7 @@
  * it, which is why this component never masks the viewport itself. The aperture's measured geometry
  * only positions the dials, the yoke and the arms.
  */
+import { gapLabel } from '../game/gap';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   armsAt, cockpitBob, cockpitLayout, needleAngle, yokeAngleDeg, yokeJolt,
@@ -54,6 +55,7 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const readouts = {
     speed: useRef<HTMLSpanElement>(null),
     position: useRef<HTMLSpanElement>(null),
+    gap: useRef<HTMLSpanElement>(null),
     time: useRef<HTMLSpanElement>(null),
     center: useRef<HTMLDivElement>(null),
     shield: useRef<HTMLSpanElement>(null),
@@ -105,6 +107,16 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
       if (readouts.speed.current) readouts.speed.current.textContent = String(Math.round(state.speedKmh));
       if (readouts.position.current) readouts.position.current.textContent = `P${state.position}`;
+      // H9: the gap to the rider ahead, coloured by whether it is closing.
+      const gapChip = readouts.gap.current;
+      if (gapChip) {
+        const show = state.gapPlace > 0;
+        gapChip.hidden = !show;
+        if (show) {
+          gapChip.textContent = gapLabel({ place: state.gapPlace, seconds: state.gapSeconds });
+          gapChip.dataset.trend = state.gapTrend;
+        }
+      }
       if (readouts.time.current) readouts.time.current.textContent = formatTime(state.raceTime);
       if (readouts.shield.current) readouts.shield.current.textContent = `${state.shieldSeconds.toFixed(1)}s`;
       if (readouts.boost.current) readouts.boost.current.textContent = `${state.boostCharges}/2`;
@@ -184,6 +196,7 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
       <div className="cockpit-readouts">
         <span className="cockpit-chip" aria-label="Race position" ref={readouts.position}>P1</span>
+        <span className="cockpit-chip cockpit-chip-gap" aria-label="Gap to the rider ahead" ref={readouts.gap} hidden />
         <span className="cockpit-chip" aria-label="Race time" ref={readouts.time}>0:00.0</span>
         <span className="cockpit-chip" aria-label="Shield" ref={readouts.shield}>0.0s</span>
         <span className="cockpit-chip" aria-label="Boosts" ref={readouts.boost}>0/2</span>

@@ -3200,7 +3200,7 @@ export class TrackBuilder3D {
     if (!result.ok) return { ok: false, reason: result.reason };
     this.laneDoc = result.network;
     // A move rewrites one handle and its own paths; anything structural rebuilds the drawing.
-    if (edit.op === 'moveNode') this.laneGizmos.moveNode(edit.nodeId);
+    if (edit.op === 'moveNode') this.laneGizmos.moveNode(edit.nodeId, this.laneDoc);
     else this.laneGizmos.setNetwork(this.laneDoc);
     if (result.focus) this.selectedLaneNodeId = result.focus;
     if (this.selectedLaneNodeId && !this.laneDoc.nodes.some((node) => node.id === this.selectedLaneNodeId)) {

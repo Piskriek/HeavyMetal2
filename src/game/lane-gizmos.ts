@@ -162,7 +162,11 @@ export class LaneGizmos {
    * Reads the position back out of the document, so the gizmo draws where the *network* says the node
    * is (a refused or snapped drag lands where the tool decided, not where the pointer was).
    */
-  moveNode(nodeId: string): number {
+  moveNode(nodeId: string, network?: LaneNetwork): number {
+    // The builder replaces its document on every edit (the tool is pure and returns a new network).
+    // Without adopting it here this layer kept reading the *old* document: the handle, its path line
+    // and the selection wireframe all stayed at the node's old spot until some later full rebuild.
+    if (network) this.network = network;
     const node = this.findNode(nodeId);
     const instance = this.index.get(nodeId);
     if (!node || instance === undefined || !this.handles) return 0;

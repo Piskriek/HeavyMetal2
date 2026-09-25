@@ -20,6 +20,7 @@ import {
   getTrackSpace,
   lateralFromLaneZ,
   placementFromEngine,
+  setEngineCourse,
   type PhysicalRampSurface,
   type TrackSpaceMap,
 } from './track-space';
@@ -2002,6 +2003,8 @@ export class Renderer3D {
     // exactly where the driver now looks from, and at eye level its frame filled the window. Only a
     // legacy sling run (and the builder, which owns the prop) shows it.
     this.trackBuilder.setSlingshotsVisible(frame.options.startMode === 'sling');
+    // Placement measures altitude against the course being raced (see setEngineCourse).
+    setEngineCourse(frame.options.course);
     const rampSurfaces = this.activeRampSurfaces();
     let playerAltitude = 0;
     for (let i = 0; i < frame.racers.length; i++) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
 import { ArrowLeft, ArrowRight, ArrowUpFromLine, ArrowUpRight, Pause, Play, RotateCcw, Zap } from 'lucide-react';
 import type { GameOptions, GameSnapshot } from '../game/types';
 import BallTuning, { type TuningKey } from './BallTuning';
@@ -69,14 +69,8 @@ export default function RaceControls({ snapshot, loaded, options, config, bindin
           <span className="steering-hint">{inLoop ? 'IN THE LOOP' : snapshot.laneLocked ? 'BUMPED!' : 'CHANGE LANES'}</span>
         </div>
         <div className="power-readout">
-          <span>{ready ? 'LAUNCH POWER' : 'CHAOS POINTS'}</span>
-          {ready ? <>
-            <div className="power-bars" role="meter" aria-label="Launch power" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(snapshot.power * 100)}>
-              {Array.from({ length: 12 }, (_, index) => <i key={index} className={index < Math.round(snapshot.power * 12) ? 'filled' : ''} />)}
-            </div>
-            <strong>{Math.round(snapshot.power * 100)}%</strong>
-            <strong className="angle-readout">{Math.round(snapshot.angle)} deg</strong>
-          </> : <><strong>{snapshot.score.toLocaleString('en-US')}</strong><span className="bumps-readout">{snapshot.bumps} BUMPS</span></>}
+          <span>CHAOS POINTS</span>
+          <strong>{snapshot.score.toLocaleString('en-US')}</strong><span className="bumps-readout">{snapshot.bumps} BUMPS</span>
         </div>
       </div>
       <div className="air-controls" aria-label="Air controls">
@@ -98,6 +92,66 @@ export default function RaceControls({ snapshot, loaded, options, config, bindin
         <span>{ready ? <>OR PRESS <kbd>ENTER</kbd></> : flying || paused ? <>PAUSE / RESUME <kbd>{pauseLabel}</kbd></> : 'UNLIMITED ATTEMPTS'}</span>
       </div>
     </div>
+    </div>
+  );
+}
+
+/**
+ * H5: fires on pointer-down, so a thumb gets the action with no tap delay, and the browser's own
+ * gesture (scroll, double-tap zoom) never starts. Keyboard activation (Enter/Space on a focused
+ * button, which reports `detail === 0`) still works through the click.
+ */
+function press(action: () => void) {
+  return {
+    onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      action();
+    },
+    onClick: (event: MouseEvent<HTMLButtonElement>) => { if (event.detail === 0) action(); },
+    onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => event.stopPropagation(),
+  };
+}
+
+interface TouchRaceControlsProps {
+  snapshot: GameSnapshot;
+  onLane: (direction: -1 | 1) => void;
+  onBounce: () => void;
+  onBoost: () => void;
+  /** GO on the grid, pause/resume while racing. */
+  onPrimary: () => void;
+}
+
+/**
+ * H5: the thumb layout for touch screens (coarse pointers). Lanes sit under the left thumb, bounce
+ * and boost under the right, and GO / pause in the middle, all clear of the cockpit gauges. The
+ * race screen only mounts it for a coarse pointer, so a mouse-and-keyboard desk never sees it.
+ */
+export function TouchRaceControls({ snapshot, onLane, onBounce, onBoost, onPrimary }: TouchRaceControlsProps) {
+  const { status, inLoop, falling, bounces, boosts } = snapshot;
+  const ready = status === 'ready';
+  const racing = status === 'flying' || status === 'pushing';
+  const paused = status === 'paused';
+  const canSteer = racing && !snapshot.settling && !inLoop && !falling && !snapshot.laneLocked;
+  return (
+    <div className="touch-controls" role="group" aria-label="Touch controls">
+      <div className="touch-cluster touch-lanes">
+        <button className="touch-button" disabled={!canSteer} aria-label="Change to the lane on the left" {...press(() => onLane(-1))}><ArrowLeft size={30} /></button>
+        <button className="touch-button" disabled={!canSteer} aria-label="Change to the lane on the right" {...press(() => onLane(1))}><ArrowRight size={30} /></button>
+      </div>
+      {(ready || racing || paused) && (
+        <button className="touch-button touch-primary" aria-label={ready ? 'Start the race' : paused ? 'Resume race' : 'Pause race'} {...press(onPrimary)}>
+          {ready ? 'GO' : paused ? <Play size={22} /> : <Pause size={22} />}
+        </button>
+      )}
+      <div className="touch-cluster touch-abilities">
+        <button className="touch-button" disabled={!racing || snapshot.settling || inLoop || falling || bounces === 0} aria-label={`Bounce. ${bounces} charges`} {...press(onBounce)}>
+          <ArrowUpFromLine size={26} /><span className="charge-dots" aria-hidden="true">{[0, 1, 2].map((index) => <i key={index} className={index < bounces ? 'charged' : ''} />)}</span>
+        </button>
+        <button className="touch-button" disabled={!racing || snapshot.settling || falling || boosts === 0} aria-label={`Boost. ${boosts} charges`} {...press(onBoost)}>
+          <Zap size={26} /><span className="charge-dots boost-charges" aria-hidden="true">{[0, 1].map((index) => <i key={index} className={index < boosts ? 'charged' : ''} />)}</span>
+        </button>
+      </div>
     </div>
   );
 }

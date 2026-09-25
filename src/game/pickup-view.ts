@@ -22,7 +22,7 @@
  * No DOM (beyond the `<canvas>` the sprites were painted into), no WebGL context, no React.
  */
 import * as THREE from 'three';
-import { pickupY, type AirPickup, type PowerupKind } from './powerups';
+import { POWERUPS, pickupY, type AirPickup, type PowerupKind } from './powerups';
 import type { CourseId } from './types';
 import {
   placementFromEngine, type PhysicalRampSurface, type TrackSpaceMap,
@@ -32,6 +32,50 @@ import {
 export const PICKUP_SPRITE_SIZE = 150;
 /** How long a taken pickup stays hidden. Matches the solve's own "already claimed" window. */
 export const PICKUP_HIDDEN_SECONDS = 6;
+
+/**
+ * P10 — making a pickup read from the cockpit, a long way down the road. The sprite breathes slowly
+ * (±12 %, one breath per 2.2 s), a four-point glint turns over it, a ring in its colour marks the
+ * spot on the road, and a faint shaft of light rises above it so it shows over a crest. Reduced
+ * motion stops the breathing and the turning; the ring and the shaft stay.
+ */
+export const PICKUP_PULSE = 0.12;
+export const PICKUP_PULSE_PERIOD_S = 2.2;
+export const PICKUP_BEAM_HEIGHT = 150;
+export const PICKUP_RING_SIZE = 190;
+
+/** The sprite's scale factor at `time` (1 when still). */
+export function pickupPulse(time: number, reducedMotion: boolean): number {
+  if (reducedMotion || !Number.isFinite(time)) return 1;
+  return 1 + PICKUP_PULSE * Math.sin((time * 2 * Math.PI) / PICKUP_PULSE_PERIOD_S);
+}
+
+/** A small RGBA texture from a per-pixel alpha function (white, so a material colour tints it). */
+function alphaTexture(size: number, alpha: (u: number, v: number) => number): THREE.DataTexture {
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const u = (x + 0.5) / size * 2 - 1; const v = (y + 0.5) / size * 2 - 1;
+    const a = Math.max(0, Math.min(1, alpha(u, v)));
+    const i = (y * size + x) * 4;
+    data[i] = data[i + 1] = data[i + 2] = 255; data[i + 3] = Math.round(a * 255);
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.needsUpdate = true;
+  return texture;
+}
+/** Four thin rays and a soft core. */
+const starAlpha = (u: number, v: number) => {
+  const ray = Math.max(Math.exp(-Math.abs(u) * 26) * (1 - Math.abs(v)), Math.exp(-Math.abs(v) * 26) * (1 - Math.abs(u)));
+  return ray + Math.exp(-(u * u + v * v) * 22) * 0.8;
+};
+/** A soft ring. */
+const ringAlpha = (u: number, v: number) => Math.exp(-(((Math.hypot(u, v) - 0.78) / 0.12) ** 2));
+/** A vertical shaft, bright at the bottom (v = 1) and fading to nothing at the top. */
+const beamAlpha = (u: number, v: number) => Math.exp(-(u * u) * 9) * ((v + 1) / 2) ** 2;
+
+interface PickupGlow { glint: THREE.Sprite; beam: THREE.Sprite; ring: THREE.Mesh }
+interface GlowMaterials { glint: THREE.SpriteMaterial; beam: THREE.SpriteMaterial; ring: THREE.MeshBasicMaterial }
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
 
 export interface PickupViewStats {
   /** Sprites built over the life of the view: the pool's high-water mark, not a per-frame number. */
@@ -59,6 +103,12 @@ export class PickupView {
   private readonly sprites: THREE.Sprite[] = [];
   private readonly materials = new Map<PowerupKind, THREE.SpriteMaterial>();
   private readonly geometry: THREE.PlaneGeometry;
+  /** P10: the glint, ring and shaft, beside `root` so `root` holds exactly one sprite per pickup. */
+  readonly glow = new THREE.Group();
+  private readonly glows: PickupGlow[] = [];
+  private readonly glowMaterials = new Map<PowerupKind, GlowMaterials>();
+  private readonly glowTextures = { star: alphaTexture(64, starAlpha), ring: alphaTexture(64, ringAlpha), beam: alphaTexture(32, beamAlpha) };
+  private readonly ringUp = new THREE.Vector3();
 
   constructor(
     private readonly parent: THREE.Object3D,
@@ -69,6 +119,8 @@ export class PickupView {
   ) {
     this.root.name = 'PickupView';
     parent.add(this.root);
+    this.glow.name = 'PickupGlow';
+    parent.add(this.glow);
     this.geometry = new THREE.PlaneGeometry(1, 1);
   }
 
@@ -95,20 +147,41 @@ export class PickupView {
       const material = this.materialFor(pickup.kind);
       if (!material) continue; // no art for this kind: not drawn rather than drawn wrong
       const sprite = this.spriteAt(index, material);
+      const glow = this.glowAt(index, pickup.kind);
       const taken = pickup.collectedBy !== null && runTime - pickup.collectedAt < PICKUP_HIDDEN_SECONDS;
       sprite.visible = !taken;
+      glow.glint.visible = glow.beam.visible = glow.ring.visible = !taken;
       if (taken) { hidden += 1; continue; }
       const y = pickupY(pickup, time, reducedMotion);
       const placement = placementFromEngine(this.map, { x: pickup.x, z: pickup.z, y, course }, ramps);
       sprite.position.set(placement.world.x, placement.world.y, placement.world.z);
       // Face the camera without a per-frame matrix rebuild of the whole scene: three's sprites always
       // billboard, so the only thing the render path pays for is the position above.
-      const scale = PICKUP_SPRITE_SIZE;
+      const scale = PICKUP_SPRITE_SIZE * pickupPulse(time, reducedMotion);
       sprite.scale.set(scale, scale, 1);
+      // P10: the glint over it, the shaft rising from it, and the ring on the road under it.
+      const f = placement.frame;
+      glow.glint.position.copy(sprite.position);
+      glow.glint.scale.setScalar(PICKUP_SPRITE_SIZE * 0.9 * pickupPulse(time + PICKUP_PULSE_PERIOD_S / 4, reducedMotion));
+      glow.beam.position.set(
+        placement.world.x + f.up.x * PICKUP_BEAM_HEIGHT / 2,
+        placement.world.y + f.up.y * PICKUP_BEAM_HEIGHT / 2,
+        placement.world.z + f.up.z * PICKUP_BEAM_HEIGHT / 2,
+      );
+      const ground = placement.lateral;
+      glow.ring.position.set(
+        f.pos.x + f.right.x * ground + f.up.x * 2,
+        f.pos.y + f.right.y * ground + f.up.y * 2,
+        f.pos.z + f.right.z * ground + f.up.z * 2,
+      );
+      glow.ring.quaternion.setFromUnitVectors(Z_AXIS, this.ringUp.set(f.up.x, f.up.y, f.up.z).normalize());
       visible += 1;
     }
     // Sprites beyond this frame's list are hidden, not destroyed: the next race reuses them.
     for (let index = pickups.length; index < this.sprites.length; index++) this.sprites[index].visible = false;
+    for (let index = pickups.length; index < this.glows.length; index++) this.hideGlow(this.glows[index]);
+    // The glints turn slowly, all together (a sprite's rotation lives on its material).
+    for (const materials of this.glowMaterials.values()) materials.glint.rotation = reducedMotion ? 0 : time * 0.6;
     this.stats.hidden = hidden;
     this.stats.visible = visible;
   }
@@ -116,6 +189,7 @@ export class PickupView {
   /** Hides everything (the pause screen, a finished race, a course with no pickups). */
   hideAll(): void {
     for (const sprite of this.sprites) sprite.visible = false;
+    for (const glow of this.glows) this.hideGlow(glow);
     this.stats.visible = 0;
   }
 
@@ -130,6 +204,50 @@ export class PickupView {
     this.materials.clear();
     this.geometry.dispose();
     this.parent.remove(this.root);
+    for (const glow of this.glows) this.glow.remove(glow.glint, glow.beam, glow.ring);
+    this.glows.length = 0;
+    for (const materials of this.glowMaterials.values()) { materials.glint.dispose(); materials.beam.dispose(); materials.ring.dispose(); }
+    this.glowMaterials.clear();
+    for (const texture of Object.values(this.glowTextures)) texture.dispose();
+    this.parent.remove(this.glow);
+  }
+
+  private hideGlow(glow: PickupGlow) { glow.glint.visible = glow.beam.visible = glow.ring.visible = false; }
+
+  /** P10: the glow for pickup `index` (pooled like the sprites), in its kind's colours. */
+  private glowAt(index: number, kind: PowerupKind): PickupGlow {
+    const materials = this.glowMaterialsFor(kind);
+    const existing = this.glows[index];
+    if (existing) {
+      existing.glint.material = materials.glint; existing.beam.material = materials.beam; existing.ring.material = materials.ring;
+      return existing;
+    }
+    const glint = new THREE.Sprite(materials.glint);
+    glint.renderOrder = 3;
+    const beam = new THREE.Sprite(materials.beam);
+    beam.scale.set(26, PICKUP_BEAM_HEIGHT, 1);
+    beam.renderOrder = 1;
+    const ring = new THREE.Mesh(this.geometry, materials.ring);
+    ring.scale.set(PICKUP_RING_SIZE, PICKUP_RING_SIZE, 1);
+    ring.renderOrder = 1;
+    this.glow.add(glint, beam, ring);
+    const glow = { glint, beam, ring };
+    this.glows.push(glow);
+    return glow;
+  }
+
+  private glowMaterialsFor(kind: PowerupKind): GlowMaterials {
+    const cached = this.glowMaterials.get(kind);
+    if (cached) return cached;
+    const color = new THREE.Color(POWERUPS[kind].color);
+    const additive = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color } as const;
+    const materials: GlowMaterials = {
+      glint: new THREE.SpriteMaterial({ ...additive, map: this.glowTextures.star, opacity: 0.95 }),
+      beam: new THREE.SpriteMaterial({ ...additive, map: this.glowTextures.beam, opacity: 0.55 }),
+      ring: new THREE.MeshBasicMaterial({ ...additive, map: this.glowTextures.ring, opacity: 0.85, side: THREE.DoubleSide }),
+    };
+    this.glowMaterials.set(kind, materials);
+    return materials;
   }
 
   private spriteAt(index: number, material: THREE.SpriteMaterial): THREE.Sprite {

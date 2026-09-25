@@ -80,7 +80,7 @@ export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) {
   const last = Math.min(3, first + (obstacle.laneSpan ?? 1) - 1);
   return { near: laneZ(last) - LANE_WIDTH / 2, far: laneZ(first) + LANE_WIDTH / 2 };
 }
-export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0.7) {
+export function occupiesLane(obstacle: Obstacle, z: number, padding = BALL_DRAW_RADIUS * 0.7) {
   if (
     obstacle.kind === 'gap' ||
     obstacle.kind === 'sign' ||

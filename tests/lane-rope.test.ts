@@ -90,5 +90,7 @@ test('once the player is released from the pool they can steer, boost and bounce
   const apply = engine.slice(engine.indexOf('private applyMergeStatus()'), engine.indexOf('private applyMergeStatus()') + 1200);
   assert.match(apply, /pool\.phase === 'releasing' && pool\.entries\.some\(\(entry\) => entry\.isPlayer && entry\.releaseTick !== null\)\) \{\n\s*if \(this\.snapshot\.status === 'checkpoint' \|\| this\.snapshot\.status === 'countdown'\) this\.snapshot\.status = 'flying';/,
     'the player is flying from their own release, not from the last rider\'s');
-  assert.match(engine, /racer\.ropeSince = undefined;\n\s*const network = this\.laneNetwork;/, 'a steering press takes up the rope slack');
+  assert.match(engine, /if \(racer\.ropeSince !== undefined && this\.runTime - racer\.ropeSince < ROPE_PAYOUT_S\) racer\.ropeSince = this\.runTime - ROPE_PAYOUT_S;/,
+    'a steering press skips only the slack phase: the reel-in still plays, so tapping cannot shrug off a hit');
+  assert.doesNotMatch(engine, /racer\.ropeSince = undefined;/);
 });

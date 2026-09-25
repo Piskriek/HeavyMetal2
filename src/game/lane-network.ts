@@ -492,10 +492,10 @@ export function successorPath(network: LaneNetwork, pathId: string, z: number, b
  * named by the racer, so a racer on a different path is unaffected even if the x ranges overlap.
  */
 export function oobCrossed(network: LaneNetwork, pathId: string, prevX: number, x: number): string | null {
-  const path = pathById(network, pathId);
-  if (!path) return null;
-  const endId = path.nodeIds[path.nodeIds.length - 1];
-  const end = network.nodes.find((node) => node.id === endId);
+  // Through the resolved-path cache: this runs for every racer on every tick, and a linear search of
+  // every node here was ~7% of a 100-ball race's CPU time.
+  const nodes = resolvedPath(network, pathId)?.nodes;
+  const end = nodes ? nodes[nodes.length - 1] : undefined;
   if (!end || end.kind !== 'oob') return null;
   return prevX < end.x && x >= end.x ? end.id : null;
 }

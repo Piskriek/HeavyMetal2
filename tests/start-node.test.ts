@@ -35,6 +35,6 @@ test('a moved start node moves the waiting ball with it, resting on the road', (
   const x = node.x + (player.x - 190);
   assert.equal(x, node.x, 'the front row sits exactly on the node');
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(engine, /this\.placeOnStartNodes\(\);\n\s*if \(this\.customPhysics\)/, 'runs on every reset, after paths are assigned');
+  assert.match(engine, /this\.placeOnStartNodes\(\);\n[\s\S]{0,800}?if \(this\.customPhysics\)/, 'runs on every reset, after paths are assigned');
   assert.match(engine, /racer\.x = node\.x \+ \(racer\.x - START_X\);\n\s*racer\.z = node\.z;\n\s*racer\.y = this\.y\(racer\.x\) - RADIUS;/, 'on the node, on the road');
 });

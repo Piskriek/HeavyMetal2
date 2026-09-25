@@ -33,6 +33,7 @@
    removed for the same reason: ballistic trajectories belong to physics.
    ========================================================================== */
 import { GROUND, LANE_WIDTH, RADIUS, START_X, TRACK_DISTANCE, courseY } from './scene';
+import type { CourseId } from './types';
 
 /* -----------------------------------------------------------------------------
    0. ERROR TYPE — singular/ambiguous transforms fail visibly
@@ -931,6 +932,17 @@ export function worldDisplacementFromCanonical(
 /* -----------------------------------------------------------------------------
    8. ENGINE-SPACE CONVERSIONS (the legacy renderer formulas, extracted)
    -------------------------------------------------------------------------- */
+/**
+ * The course the engine is racing. Engine y follows *that course's* hill profile (`courseY`), so an
+ * altitude above the road must be measured against the same profile. It used to be hard-wired to
+ * 'ridge', which on Boomtown and Sheep lifted every ball, pickup and effect off the road by the
+ * difference between the two profiles — hundreds of units, growing toward the end of the course.
+ * The renderer sets it every frame; headless callers can pass `course` on the state instead.
+ */
+let engineCourse: CourseId = 'ridge';
+export function setEngineCourse(course: CourseId): void { engineCourse = course; }
+export function getEngineCourse(): CourseId { return engineCourse; }
+
 export interface EngineRacerState {
   /** Engine down-track position x (START_X-based). Use either x or distance. */
   readonly x?: number;
@@ -941,6 +953,8 @@ export interface EngineRacerState {
   /** Engine screen Y (y grows downward in engine space). */
   readonly y: number;
   readonly grounded?: boolean;
+  /** The course the engine state belongs to; defaults to the one set with `setEngineCourse`. */
+  readonly course?: CourseId;
 }
 
 export interface EngineVelocity {
@@ -961,7 +975,7 @@ export function canonicalFromEngine(
   const engineDistance = st.distance ?? (st.x !== undefined ? engineDistanceFromX(st.x) : 0);
   const engineX = st.x ?? engineXFromDistance(engineDistance);
   const s = map.trackDistFromEngineDistance(engineDistance);
-  const engineAlt = Math.max(0, courseY(engineX, 'ridge') - st.y);
+  const engineAlt = Math.max(0, courseY(engineX, st.course ?? engineCourse) - st.y);
   const airborneAlt = st.grounded ? 0 : Math.max(0, GROUND - RADIUS - st.y);
   return { s, laneZ: st.z, engineAlt, airborneAlt, engineDistance, engineX };
 }
@@ -1038,7 +1052,7 @@ export function worldVelocityFromEngine(
  * slope is a subgradient between the two linear pieces (documented kink).
  */
 function engineSlopeApprox(engineX: number): number {
-  return (courseY(engineX + 4, 'ridge') - courseY(engineX - 4, 'ridge')) / 8;
+  return (courseY(engineX + 4, engineCourse) - courseY(engineX - 4, engineCourse)) / 8;
 }
 
 /**

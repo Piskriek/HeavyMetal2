@@ -5,6 +5,8 @@ import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
 import { PLAYER_ID } from './roster';
 import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
+import { builderRampObstacles } from './sim/builder-ramps';
+import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
   AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
@@ -820,7 +822,22 @@ export class GameEngine {
       createAirPickups(this.options.course, this.obstacles),
       this.laneNetwork,
     );
+    // Builder-placed ramps are physics too: without this the renderer lifted the ball up the ramp
+    // and dropped it back on the road at the crest, which read as the run being reset.
+    const placed = this.builderRamps();
+    if (placed.length) this.obstacles = [...this.obstacles, ...placed].sort((a, b) => a.x - b.x);
     this.world.configure(this.options.course, this.obstacles, this.pickups);
+  }
+
+  /** The builder's placed ramp props as engine ramp obstacles (none when no builder is attached). */
+  private builderRamps() {
+    const builder = this.renderer?.trackBuilder;
+    if (!builder || typeof builder.getPlacedRamps !== 'function') return [];
+    const map = getTrackSpace();
+    const ramps = builder.getPlacedRamps();
+    if (!ramps.length) return [];
+    const compiled = compileRampSurfaces(map, ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: r.scale, trackDist: r.trackDist })));
+    return builderRampObstacles(map, compiled.surfaces);
   }
 
   private inGap(x: number, z: number) { return this.world.inGap(x, z); }

@@ -23,6 +23,7 @@ import {
   BillboardPool, SparkField,
 } from './pool';
 import type { EffectEvent } from './events';
+import type { CourseId } from '../types';
 import { placementFromEngine, type PhysicalRampSurface, type TrackSpaceMap } from '../track-space';
 
 /** The sheets the runtime needs, with their grid. */
@@ -44,6 +45,8 @@ export interface EffectFrameInput {
   readonly queue: { readSince(cursor: number, out: EffectEvent[]): number };
   readonly space: TrackSpaceMap;
   readonly ramps: readonly PhysicalRampSurface[];
+  /** The course being raced: effects sit on its hill profile, like the balls (M10). */
+  readonly course: CourseId;
   /** Seconds, monotonic (the engine's run time). */
   readonly time: number;
   /** Seconds since the previous frame, clamped by the caller. */
@@ -161,13 +164,13 @@ export class EffectRenderer {
 
   /** Drains the queue, spawns, advances the pool, writes the GPU-side numbers. */
   update(input: EffectFrameInput, camera: THREE.Camera, reducedMotion: boolean): number {
-    const { queue, space, ramps, time, dt } = input;
+    const { queue, space, ramps, course, time, dt } = input;
     this.quaternion.copy(camera.quaternion);
     this.cursor = queue.readSince(this.cursor, this.events);
     let drawn = 0;
     for (const event of this.events) {
       const spec = EFFECT_SPECS[event.kind];
-      const placement = placementFromEngine(space, { x: event.x, y: event.y, z: event.z }, ramps);
+      const placement = placementFromEngine(space, { x: event.x, y: event.y, z: event.z, course }, ramps);
       const world = placement.world;
       const dx = world.x - camera.position.x;
       const dy = world.y - camera.position.y;

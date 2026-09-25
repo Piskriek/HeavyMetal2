@@ -932,17 +932,6 @@ export function worldDisplacementFromCanonical(
 /* -----------------------------------------------------------------------------
    8. ENGINE-SPACE CONVERSIONS (the legacy renderer formulas, extracted)
    -------------------------------------------------------------------------- */
-/**
- * The course the engine is racing. Engine y follows *that course's* hill profile (`courseY`), so an
- * altitude above the road must be measured against the same profile. It used to be hard-wired to
- * 'ridge', which on Boomtown and Sheep lifted every ball, pickup and effect off the road by the
- * difference between the two profiles — hundreds of units, growing toward the end of the course.
- * The renderer sets it every frame; headless callers can pass `course` on the state instead.
- */
-let engineCourse: CourseId = 'ridge';
-export function setEngineCourse(course: CourseId): void { engineCourse = course; }
-export function getEngineCourse(): CourseId { return engineCourse; }
-
 export interface EngineRacerState {
   /** Engine down-track position x (START_X-based). Use either x or distance. */
   readonly x?: number;
@@ -953,8 +942,13 @@ export interface EngineRacerState {
   /** Engine screen Y (y grows downward in engine space). */
   readonly y: number;
   readonly grounded?: boolean;
-  /** The course the engine state belongs to; defaults to the one set with `setEngineCourse`. */
-  readonly course?: CourseId;
+  /**
+   * The course the engine state belongs to. Engine y follows *that course's* hill profile
+   * (`courseY`), so an altitude above the road must be measured against the same profile: measured
+   * against Ridge's, Boomtown and Sheep lifted every ball, pickup and effect off the road. Every
+   * caller says which course it is placing on (M10); there is no module-wide default.
+   */
+  readonly course: CourseId;
 }
 
 export interface EngineVelocity {
@@ -978,7 +972,7 @@ export function canonicalFromEngine(
   // Height is always measured from the course under the ball. The slingshot-era rule that measured an
   // airborne ball from the flat legacy ground (GROUND − RADIUS) floated it ~210 units too high
   // wherever the course sits above that ground, such as the start pad (M5).
-  const engineAlt = Math.max(0, courseY(engineX, st.course ?? engineCourse) - st.y);
+  const engineAlt = Math.max(0, courseY(engineX, st.course) - st.y);
   return { s, laneZ: st.z, engineAlt, engineDistance, engineX };
 }
 
@@ -1033,7 +1027,7 @@ export function worldVelocityFromEngine(
   if (altitude === rampAlt && rampAlt > 0) {
     dAlt = rampSlopeAt(ramps!, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) * ds;
   } else {
-    dAlt = engineSlopeApprox(c.engineX) * vel.vx - vel.vy;
+    dAlt = engineSlopeApprox(c.engineX, st.course) * vel.vx - vel.vy;
   }
   const state: CanonicalState = { s: c.s, laneZ: c.laneZ, altitude };
   return {
@@ -1050,8 +1044,8 @@ export function worldVelocityFromEngine(
  * legacy courseSlope() uses for its own collision cycle. At table knots the
  * slope is a subgradient between the two linear pieces (documented kink).
  */
-function engineSlopeApprox(engineX: number): number {
-  return (courseY(engineX + 4, engineCourse) - courseY(engineX - 4, engineCourse)) / 8;
+function engineSlopeApprox(engineX: number, course: CourseId): number {
+  return (courseY(engineX + 4, course) - courseY(engineX - 4, course)) / 8;
 }
 
 /**

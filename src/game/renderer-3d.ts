@@ -22,7 +22,6 @@ import {
   getTrackSpace,
   lateralFromLaneZ,
   placementFromEngine,
-  setEngineCourse,
   type PhysicalRampSurface,
   type TrackSpaceMap,
 } from './track-space';
@@ -1640,7 +1639,7 @@ export class Renderer3D {
     const rise = courseY(ball.x, course) - courseY(loop.x, course);
     const placement = placementFromEngine(
       this.space,
-      { x: loop.x, y: loop.y + rise, z: ball.z },
+      { x: loop.x, y: loop.y + rise, z: ball.z, course },
       ramps,
     );
     return [placement.world.x, placement.world.y, placement.world.z];
@@ -1803,7 +1802,7 @@ export class Renderer3D {
   ) {
     const placement = placementFromEngine(
       this.space,
-      { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded },
+      { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded, course },
       ramps,
     );
     const frame = this.worldFrame(placement.frame);
@@ -2043,7 +2042,8 @@ export class Renderer3D {
       // headless physics consumes — one implementation, no parallel math.
       const placement = placementFromEngine(
         this.space,
-        { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded },
+        // Placement measures altitude against the course being raced (M10: passed, never global).
+        { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded, course: frame.options.course },
         rampSurfaces,
       );
       position.set(placement.world.x, placement.world.y, placement.world.z);
@@ -2106,8 +2106,6 @@ export class Renderer3D {
     // exactly where the driver now looks from, and at eye level its frame filled the window. Only a
     // legacy sling run (and the builder, which owns the prop) shows it.
     this.trackBuilder.setSlingshotsVisible(false);
-    // Placement measures altitude against the course being raced (see setEngineCourse).
-    setEngineCourse(frame.options.course);
     const rampSurfaces = this.activeRampSurfaces();
     const playerAltitude = this.drawRacers(frame, dt, firstPerson, rampSurfaces, playerDist);
 
@@ -2127,7 +2125,7 @@ export class Renderer3D {
       if (!this.pickupView) {
         this.pickupView = new PickupView(this.scene, this.storedAssets.pickupSprites ?? {}, this.space);
       }
-      this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces());
+      this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces(), frame.options.course);
     } else {
       this.pickupView?.hideAll();
     }
@@ -2155,7 +2153,7 @@ export class Renderer3D {
     if (frame.effects) {
       if (!this.effects) this.effects = new EffectRenderer(this.scene);
       this.effects.update({
-        queue: frame.effects, space: this.space, ramps: rampSurfaces, time: raw, dt: Math.min(0.1, dt),
+        queue: frame.effects, space: this.space, ramps: rampSurfaces, course: frame.options.course, time: raw, dt: Math.min(0.1, dt),
       }, this.camera, frame.reducedMotion);
     }
 

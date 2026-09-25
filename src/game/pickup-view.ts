@@ -23,6 +23,7 @@
  */
 import * as THREE from 'three';
 import { pickupY, type AirPickup, type PowerupKind } from './powerups';
+import type { CourseId } from './types';
 import {
   placementFromEngine, type PhysicalRampSurface, type TrackSpaceMap,
 } from './track-space';
@@ -83,7 +84,9 @@ export class PickupView {
     time: number,
     reducedMotion: boolean,
     runTime: number,
-    ramps: readonly PhysicalRampSurface[] = [],
+    ramps: readonly PhysicalRampSurface[],
+    /** The course being raced: a pickup's height is measured against its hill profile (M10). */
+    course: CourseId,
   ): void {
     let visible = 0;
     let hidden = 0;
@@ -96,7 +99,7 @@ export class PickupView {
       sprite.visible = !taken;
       if (taken) { hidden += 1; continue; }
       const y = pickupY(pickup, time, reducedMotion);
-      const placement = placementFromEngine(this.map, { x: pickup.x, z: pickup.z, y }, ramps);
+      const placement = placementFromEngine(this.map, { x: pickup.x, z: pickup.z, y, course }, ramps);
       sprite.position.set(placement.world.x, placement.world.y, placement.world.z);
       // Face the camera without a per-frame matrix rebuild of the whole scene: three's sprites always
       // billboard, so the only thing the render path pays for is the position above.

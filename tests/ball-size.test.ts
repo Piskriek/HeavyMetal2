@@ -17,7 +17,7 @@ test('a grounded ball drawn at BALL_DRAW_RADIUS rests on the road (no float)', (
   const map = getTrackSpace();
   for (const x of [190, 430, 2000, 9000, 30000]) {
     const y = courseY(x, 'ridge') - RADIUS; // how the engine holds a grounded ball
-    const p = placementFromEngine(map, { x, y, z: laneZ(1), grounded: true });
+    const p = placementFromEngine(map, { x, y, z: laneZ(1), grounded: true, course: 'ridge' });
     const f = p.frame;
     const surface = map.frameAt(p.state.s).pos;
     // Height of the centre above the ribbon, along the ribbon's up.

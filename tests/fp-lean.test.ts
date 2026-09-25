@@ -16,7 +16,7 @@ const dot = (a: Vec3, b: { x: number; y: number; z: number }) => a[0] * b.x + a[
 /** The renderer's own first-person composition for a ball in `lane` at engine x. */
 function viewAt(x: number, lane: number) {
   const map = getTrackSpace();
-  const p = placementFromEngine(map, { x, y: courseY(x, 'ridge') - RADIUS, z: laneZ(lane), grounded: true });
+  const p = placementFromEngine(map, { x, y: courseY(x, 'ridge') - RADIUS, z: laneZ(lane), grounded: true, course: 'ridge' });
   const f = map.frameAt(p.state.s);
   const gyro = { forward: [f.tangent.x, f.tangent.y, f.tangent.z] as Vec3, up: [f.up.x, f.up.y, f.up.z] as Vec3, right: [f.right.x, f.right.y, f.right.z] as Vec3 };
   const look = map.frameAt(Math.min(p.state.s + FP_LOOK_AHEAD, map.length));

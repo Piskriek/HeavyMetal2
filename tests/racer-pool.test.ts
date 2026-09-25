@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { Renderer3D } from '../src/game/renderer-3d';
 import { getTrackSpace } from '../src/game/track-space';
-import { START_X } from '../src/game/scene';
+import { RADIUS, START_X, courseY } from '../src/game/scene';
 
 // Only bypass the DOM/WebGL constructor. Exercise the production pool methods and
 // observe real Material/Texture/Geometry dispose events, not a replica of the pool.
@@ -14,6 +14,7 @@ function pool(canvases: HTMLCanvasElement[]) {
     racers3D: [], racerResources: null, racerTextures: new Map(), destroyed: false,
     racerMatrix: new THREE.Matrix4(), racerScale: new THREE.Vector3(1, 1, 1), racerOffset: new THREE.Vector3(),
     shadowQuat: new THREE.Quaternion(), shieldQuat: new THREE.Quaternion(),
+    shadowUp: new THREE.Vector3(), shadowScale: new THREE.Vector3(), shadowFade: new THREE.Color(),
     coreQuat: new THREE.Quaternion(), gyroQuat: new THREE.Quaternion(),
     space: getTrackSpace(), track: { sampleAt: () => ({ pos: { y: 0 } }) },
   }) as Pool;
@@ -98,7 +99,7 @@ test('M7: 100 racers draw in a handful of instanced calls, not ~400 meshes', () 
   const p = pool(Array.from({ length: 100 }, (_, i) => looks[i % looks.length]));
   p.setRacerCount(100);
   const racers = Array.from({ length: 100 }, (_, i) => ({
-    x: START_X + 400 + i * 60, y: 0, z: ((i % 4) - 1.5) * 120, grounded: true, rollPhase: i * 0.3,
+    x: START_X + 400 + i * 60, y: courseY(START_X + 400 + i * 60, 'ridge') - RADIUS, z: ((i % 4) - 1.5) * 120, grounded: true, rollPhase: i * 0.3,
     shieldUntil: i === 7 ? 99 : 0, hidden: i === 9,
   }));
   p.drawRacers({ racers, runTime: 1, options: { course: 'ridge' } }, 1 / 60, true, [], 0);
@@ -115,5 +116,36 @@ test('M7: 100 racers draw in a handful of instanced calls, not ~400 meshes', () 
   p.racers3D[1].core.mesh.getMatrixAt(0, m);
   at.setFromMatrixPosition(m);
   assert.ok(Number.isFinite(at.x) && at.lengthSq() > 0);
+  p.disposeRacerPool();
+});
+
+test('P5: a contact shadow lies on the road, tilted with it, and fades as the ball leaves it', async () => {
+  const { shadowAt, SHADOW_FADE_HEIGHT, SHADOW_LIFT } = await import('../src/game/renderer-3d');
+  assert.deepEqual(shadowAt(0), { fade: 1, scale: 1 });
+  assert.ok(shadowAt(SHADOW_FADE_HEIGHT / 2).fade > 0 && shadowAt(SHADOW_FADE_HEIGHT / 2).scale > 1, 'half-faded and spreading');
+  assert.equal(shadowAt(SHADOW_FADE_HEIGHT).fade, 0);
+  assert.equal(shadowAt(-5).fade, 1, 'a ball pressed into the road still has its full shadow');
+
+  const looks = [{} as HTMLCanvasElement];
+  const p = pool(looks);
+  p.setRacerCount(2);
+  const x = START_X + 9000;
+  const ground = courseY(x, 'ridge') - RADIUS;
+  const racers = [
+    { x, y: ground, z: 0, grounded: true, shieldUntil: 0 },
+    { x, y: ground - 400, z: 0, grounded: false, shieldUntil: 0 }, // well above the fade height
+  ];
+  p.drawRacers({ racers, runTime: 1, options: { course: 'ridge' } }, 1 / 60, false, [], 0);
+  assert.equal(p.racerResources.shadows.count, 1, 'the high ball casts no shadow');
+  const m = new THREE.Matrix4(); const at = new THREE.Vector3(); const q = new THREE.Quaternion(); const sc = new THREE.Vector3();
+  p.racerResources.shadows.getMatrixAt(0, m);
+  m.decompose(at, q, sc);
+  const placement = (await import('../src/game/track-space')).placementFromEngine(getTrackSpace(), { x, y: ground, z: 0, grounded: true, course: 'ridge' });
+  const f = placement.frame;
+  const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+  assert.ok(normal.dot(new THREE.Vector3(f.up.x, f.up.y, f.up.z)) > 0.9999, 'the plane faces the road\'s up, not the world\'s');
+  const ground3 = new THREE.Vector3(f.pos.x + f.right.x * placement.lateral, f.pos.y + f.right.y * placement.lateral, f.pos.z + f.right.z * placement.lateral);
+  const lift = at.clone().sub(ground3).dot(new THREE.Vector3(f.up.x, f.up.y, f.up.z));
+  assert.ok(Math.abs(lift - SHADOW_LIFT) < 1e-3, `pinned just above the road (lift ${lift}, off by ${at.distanceTo(ground3)})`);
   p.disposeRacerPool();
 });

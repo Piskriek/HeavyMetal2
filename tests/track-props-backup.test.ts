@@ -334,7 +334,7 @@ test('M12: the auto-backup only writes when the props change', async (t) => {
     await t.test('an edit makes the next auto-backup write', async () => {
       const [prop] = builder.getProps();
       builder.deleteProp(prop.id);
-      (builder as any).lastBackupTimestamp = 0; // past the 15 s spacing
+      (builder as any).backups.lastBackupTimestamp = 0; // past the 15 s spacing (M8: the backup service)
       const result = await builder.backupToFile(false);
       assert.equal(result?.unchanged, undefined);
       assert.equal(posts.length, 3);

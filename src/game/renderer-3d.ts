@@ -10,6 +10,7 @@ import type { GameOptions } from './types';
 import { BALL_DRAW_RADIUS, RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
+import { ObstacleView } from './obstacle-view';
 import { PickupView } from './pickup-view';
 import { cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
@@ -1573,6 +1574,7 @@ export class Renderer3D {
    * per-frame call below costs one reference comparison in the steady state.
    */
   private lanePaint: LanePaint | null = null;
+  private obstacleView: ObstacleView | null = null;
   /**
    * The powerups. Built once, on the first race frame that has any: `assets.pickupSprites` were painted
    * for this and had never been drawn, so a shield could be collected from a thing nobody could see.
@@ -1768,6 +1770,7 @@ export class Renderer3D {
     course: GameOptions['course'],
     ramps: readonly PhysicalRampSurface[],
     dt: number,
+    reducedMotion = false,
   ) {
     const placement = placementFromEngine(
       this.space,
@@ -1806,7 +1809,8 @@ export class Renderer3D {
     });
     this.fpUp = fp.up;
     // Lean into lane changes (visual only; the smoothed up above stays unleaned so it cannot drift).
-    this.fpLean = ball.falling ? stepLean(this.fpLean, 0, dt) : stepLean(this.fpLean, leanAngleFor(ball.vz ?? 0), dt);
+    // Reduced motion: no lean at all (the view stays level), like the shake and the bob.
+    this.fpLean = reducedMotion ? 0 : ball.falling ? stepLean(this.fpLean, 0, dt) : stepLean(this.fpLean, leanAngleFor(ball.vz ?? 0), dt);
     const up = leanUp(fp, this.fpLean);
     this.camera.position.set(fp.position[0], fp.position[1], fp.position[2]);
     this.camera.up.set(up[0], up[1], up[2]);
@@ -2049,6 +2053,10 @@ export class Renderer3D {
       this.lanePaint.setNetwork(frame.laneNetwork);
     }
 
+    // C1: the race's obstacles, drawn where the physics has them (they used to be invisible).
+    if (!this.obstacleView) this.obstacleView = new ObstacleView(this.scene, this.storedAssets, this.space);
+    this.obstacleView.update(frame.obstacles);
+
     // The powerups, at the position the collection solve tests against. Only one view is ever built:
     // the sprites inside it are pooled, so a later race with fewer pickups reuses the same ones.
     if (frame.pickups.length > 0) {
@@ -2061,7 +2069,7 @@ export class Renderer3D {
     }
 
     if (!this.trackBuilder.freeFly.active) {
-      if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
+      if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt, frame.reducedMotion);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
       this.applyImpactShake(frame.shake, frame.time, frame.reducedMotion);
       this.updateAtmosphere(playerDist);
@@ -2098,6 +2106,8 @@ export class Renderer3D {
     this.effects = null;
     this.lanePaint?.dispose();
     this.lanePaint = null;
+    this.obstacleView?.dispose();
+    this.obstacleView = null;
     this.pickupView?.dispose();
     this.pickupView = null;
     this.trackBuilder.destroy();

@@ -66,10 +66,9 @@ test('the events that were invisible are painted now', () => {
   assert.match(engine, /this\.effects\.push\('smoke', this\.player\.x, this\.y\(FINISH\) - 140, this\.player\.z, 1\.4, this\.player\.id, this\.tick\)/,
     'with smoke under it');
 
-  // …and the legacy particle call is still there: hiding the painted one must never mean deleting the
-  // record of the event (the ambient flag and the counters read it).
-  assert.match(engine, /this\.emit\(this\.player\.x, this\.y\(FINISH\) - 140, this\.player\.z, 42, this\.player\.color, 250\)/,
-    'the legacy burst is still emitted, for the record');
+  // …and the never-drawn legacy 2D particles are gone (M6): the painted effects are the only record.
+  assert.doesNotMatch(engine, /this\.emit\(|this\.particles|this\.airSheep|this\.trail\b/,
+    'the engine keeps no particle, sheep or trail lists the 3D renderer never reads');
 });
 
 test('the engine hands the sim the same queue, so sim-side effects are painted too', () => {

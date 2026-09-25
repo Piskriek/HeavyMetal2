@@ -19,12 +19,16 @@ import {
   AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
   RADIUS, STADIUM_START, START_X, START_Y, TRACK_DISTANCE, closestLane, courseY, courseSlope,
   laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, weightImpulse,
-  type AirSheep, type Obstacle, type Particle, type RacerFrame,
+  type Obstacle, type RacerFrame,
 } from '../../src/game/scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from '../../src/game/types';
 import type { RaceConfig } from '../../src/game/session';
 import { createTrackLayout } from '../../src/game/track-layout';
 import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from '../../src/game/powerups';
+
+// The live engine dropped these never-drawn 2D effects (M6); the frozen legacy copy still records them.
+interface Particle { x: number; y: number; z: number; vx: number; vy: number; life: number; maxLife: number; size: number; color: string }
+interface AirSheep { x: number; y: number; z: number; vx: number; vy: number; rotation: number; life: number }
 
 const TAU = Math.PI * 2;
 const STEP = 1 / 120;

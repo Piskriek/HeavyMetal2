@@ -13,7 +13,7 @@ import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
   AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
-  type AirSheep, type Obstacle, type Particle, type RacerFrame,
+  type Obstacle, type RacerFrame,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type StartMode } from './types';
 import type { RaceConfig } from './session';
@@ -24,7 +24,7 @@ import {
 import {
   QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
 } from './contracts/qualifying';
-import { POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup } from './powerups';
+import { createAirPickups, layoutPickupsForNetwork, type AirPickup } from './powerups';
 import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
@@ -49,7 +49,6 @@ import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelo
 import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
 
-const TAU = Math.PI * 2;
 const STEP = FIXED_STEP;
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
@@ -115,10 +114,6 @@ export class GameEngine {
   private readonly simFx: SimFx;
   private readonly simCtx: RacerStepContext;
   private readonly cpuCtx: CpuContext;
-  private particles: Particle[] = [];
-  private airSheep: AirSheep[] = [];
-  private trail: { x: number; y: number; z: number }[] = [];
-  private trailSample = 0;
   private snapshot: GameSnapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
   private lastSnapshot: GameSnapshot | null = null;
   private standingsKey = '';
@@ -175,9 +170,12 @@ export class GameEngine {
     this.world = createSimWorld(config?.course ?? options.course);
     this.laneNetwork = loadLaneNetwork(config?.course ?? options.course);
     this.simFx = {
-      emit: (x, y, z, count, color, speed) => engine.emit(x, y, z, count, color, speed),
+      // The legacy 2D particles, flying sheep and ball trail are not drawn by the 3D renderer: the sim
+      // still reports them (the parity recordings read them), and the painted `effect` queue below is
+      // what the player sees.
+      emit: () => {},
       effect: (kind, x, y, z, scale, racerId) => engine.effects.push(kind, x, y, z, scale, racerId, engine.tick),
-      airSheep: (spawn) => { engine.airSheep.push({ x: spawn.x, y: spawn.y, z: spawn.z, vx: spawn.vx, vy: spawn.vy, rotation: 0, life: 3.1 }); },
+      airSheep: () => {},
       say: (text) => engine.say(text),
       audio: (cue) => engine.audio.play(cue),
       // Chaos points never go below zero; the legacy recovery was the only negative delta.
@@ -187,7 +185,7 @@ export class GameEngine {
       refreshHud: () => { engine.refreshSnapshot(); engine.notify(); },
       notifyHud: () => { engine.notify(); },
       setHopReady: (ready) => { engine.snapshot.hopReady = ready; },
-      clearTrail: () => { engine.trail.length = 0; },
+      clearTrail: () => {},
       pickupCollected: (kind) => {
         engine.pickupCount++;
         engine.snapshot.lastPickup = kind;
@@ -333,7 +331,6 @@ export class GameEngine {
     this.pickupCount = this.shieldBlocks = 0;
     this.snapshot.sector = sectorAt(START_X, this.options.course);
     this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
-    this.particles.length = this.airSheep.length = this.trail.length = 0;
     this.canvas.style.cursor = '';
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
     this.makeTrack();
@@ -421,9 +418,7 @@ export class GameEngine {
       racer.vx = Math.cos(angle) * velocity * racer.pace;
       racer.vy = -Math.sin(angle) * velocity * racer.pace;
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
-      this.emit(racer.x, racer.y, racer.z, 7, racer.color, 100);
-      // The legacy particles above are not drawn by the 3D renderer; this is the painted one, so a
-      // launch is something you can see rather than a number nothing reads.
+      // A launch throws painted dust, so it is something you can see.
       this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
     }
     this.snapshot.status = 'flying';
@@ -947,7 +942,6 @@ export class GameEngine {
     return builderRampObstacles(map, compiled.surfaces);
   }
 
-  private inGap(x: number, z: number) { return this.world.inGap(x, z); }
   private surfaceAt(x: number, z: number) { return this.world.surfaceAt(x, z); }
 
   private coordinates(event: PointerEvent) {
@@ -1016,7 +1010,6 @@ export class GameEngine {
           this.accumulator -= STEP;
         }
       }
-      this.updateParticles(dt);
       if (this.time > this.noticeUntil) this.snapshot.notice = '';
     }
     const alpha = statusSimulates(this.status) ? clamp(this.accumulator / STEP, 0, 1) : 1;
@@ -1063,19 +1056,15 @@ export class GameEngine {
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
       this.lastRender = now; this.needsRender = false;
-      if (this.status === 'flying' && !this.pausedForBuild && now - this.trailSample > 16) {
-        this.trailSample = now; this.trail.push({ x: rendered.x, y: rendered.y, z: rendered.z });
-        if (this.trail.length > 9) this.trail.shift();
-      }
       this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
         drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
-        obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
+        obstacles: this.obstacles, pickups: this.pickups,
         snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion,
         effects: this.effects, laneNetwork: this.laneNetwork }, interval);
     }
     if (now - this.lastNotify > 100) this.notify(false);
-    const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
+    const ambient = this.status === 'ready' && !this.reducedMotion;
     // While the pool holds the field the overlay is DOM, but the riders are still moving behind it,
     // so the loop keeps its own frames coming rather than waiting for a redraw request.
     const poolActive = this.status === 'checkpoint' || this.status === 'countdown';
@@ -1184,22 +1173,12 @@ export class GameEngine {
       const x = (a.x + b.x) / 2; const z = (a.z + b.z) / 2;
       const y = (a.y + b.y) / 2;
       
-      // More dramatic particle effects for collisions
-      const particleCount = isHeavyImpact ? 25 : 12;
-      const particleSpeed = isHeavyImpact ? 280 : 140;
-      const particleColor = isHeavyImpact ? '#ffaa00' : '#ffe0a0';
-      
-      this.emit(x, y, z, particleCount, particleColor, particleSpeed);
       // M01 · T5: every collision is an impact; a heavy one also throws sparks and smoke.
       this.effects.push('impact', x, y, z, isHeavyImpact ? 1.4 : 0.8, a.id ? a.id : b.id, this.tick);
       this.effects.push('sparks', x, y, z, isHeavyImpact ? 1.2 : 0.6, a.id ? a.id : b.id, this.tick);
       if (isHeavyImpact) this.effects.push('smoke', x, y, z, 0.8, a.id ? a.id : b.id, this.tick);
       
-      // Add sparks for heavy impacts
       if (isHeavyImpact) {
-        this.emit(x, y, z, 8, '#ffff00', 350); // Bright yellow sparks
-        this.emit(x, y, z, 5, '#ff6600', 200); // Orange fire
-        
         // Screen shake and audio for heavy impacts
         if (!a.id || !b.id) { // Only if player is involved
           this.shake = Math.min(15, closing * 0.05);
@@ -1236,7 +1215,6 @@ export class GameEngine {
     racer.shieldUntil = -100;
     racer.shieldHitAt = this.runTime;
     racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.3);
-    this.emit(racer.x, racer.y, racer.z, 9, POWERUPS.shield.color, 155);
     // Painted sibling: the shield holding is a *hit that did not land*, which is the impact read.
     this.effects.push('impact', racer.x, racer.y, racer.z, 0.7, racer.id, this.tick);
     if (!racer.id) this.shieldBlocks++;
@@ -1280,7 +1258,6 @@ export class GameEngine {
     if (completed) {
       this.snapshot.distance = TRACK_DISTANCE; this.snapshot.progress = 1;
       this.snapshot.score += 3000 + (4 - this.snapshot.position) * 500;
-      this.emit(this.player.x, this.y(FINISH) - 140, this.player.z, 42, this.player.color, 250);
       // The finish burst is the one moment of a run that must never be invisible: an explosion-sized
       // painted burst over the flag, with smoke under it.
       this.effects.push('explosion', this.player.x, this.y(FINISH) - 140, this.player.z, 2.2, this.player.id, this.tick);
@@ -1300,30 +1277,6 @@ export class GameEngine {
   }
 
   private say(text: string) { this.snapshot.notice = text; this.noticeUntil = this.time + 2; }
-  private emit(x: number, y: number, z: number, count: number, color: string, speed: number) {
-    if (Math.abs(x - this.player.x) > this.renderer.view.width + 650) return;
-    if (this.renderer.lowDetail) count = Math.ceil(count * 0.65);
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * TAU; const v = speed * (0.2 + Math.random() * 0.8); const life = 0.35 + Math.random() * 0.6;
-      this.particles.push({ x, y, z, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 50, life, maxLife: life, size: 2 + Math.random() * 4, color });
-    }
-    if (this.particles.length > 160) this.particles.splice(0, this.particles.length - 160);
-  }
-  private updateParticles(dt: number) {
-    let alive = 0;
-    for (const particle of this.particles) if (particle.life > dt) {
-      particle.x += particle.vx * dt; particle.y += particle.vy * dt; particle.vy += 310 * dt; particle.life -= dt;
-      this.particles[alive++] = particle;
-    }
-    this.particles.length = alive; alive = 0;
-    for (const sheep of this.airSheep) if (sheep.life > dt) {
-      sheep.x += sheep.vx * dt; sheep.y += sheep.vy * dt; sheep.vy += 570 * dt; sheep.rotation += dt * 3; sheep.life -= dt;
-      const ground = this.y(sheep.x);
-      if (sheep.y > ground - 36 && !this.inGap(sheep.x, sheep.z)) { sheep.y = ground - 36; sheep.vy = -Math.abs(sheep.vy) * 0.4; sheep.vx *= 0.74; }
-      this.airSheep[alive++] = sheep;
-    }
-    this.airSheep.length = alive;
-  }
   private notify(force = true) {
     const now = performance.now();
     if (!force && now - this.lastNotify < 100) { this.invalidate(); return; }

@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import {
-  armsAt, cockpitBob, cockpitLayout, needleAngle, yokeAngleDeg,
+  armsAt, cockpitBob, cockpitLayout, needleAngle, yokeAngleDeg, yokeJolt,
   COCKPIT_ART, COCKPIT_MANIFEST, COCKPIT_MANIFEST as ART, type CockpitState,
 } from '../game/cockpit';
 import '../cockpit.css';
@@ -65,12 +65,15 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
     let frame = 0;
     const step = (now: number) => {
       readState(state);
-      const yokeDeg = yokeAngleDeg(state.steer);
+      // H8: a hit jolts the yoke (and the hands on it); with reduced motion the cockpit flashes.
+      const jolt = yokeJolt(state.impact, state.impactSide, now / 1000, reducedMotion);
+      const yokeDeg = yokeAngleDeg(state.steer) + jolt.rotDeg;
       const arms = armsAt(layout, yokeDeg);
 
       if (yokeRef.current) {
-        yokeRef.current.style.transform = `translate(-50%, -${(COCKPIT_MANIFEST.yoke.pivot.y / COCKPIT_MANIFEST.yoke.h) * 100}%) rotate(${yokeDeg.toFixed(2)}deg)`;
+        yokeRef.current.style.transform = `translate(-50%, calc(-${(COCKPIT_MANIFEST.yoke.pivot.y / COCKPIT_MANIFEST.yoke.h) * 100}% + ${jolt.dropPx.toFixed(1)}px)) rotate(${yokeDeg.toFixed(2)}deg)`;
       }
+      if (bobRef.current) bobRef.current.style.filter = jolt.flash > 0 ? `brightness(${(1 + 0.35 * jolt.flash).toFixed(3)})` : '';
       for (const [ref, pose] of [[armLeftRef, arms.left], [armRightRef, arms.right]] as const) {
         const style = ref.current?.style;
         if (!style) continue;

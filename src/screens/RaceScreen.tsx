@@ -17,6 +17,7 @@ import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import CockpitHud from '../components/CockpitHud';
 import TestDriveBar from '../components/TestDriveBar';
+import { DEFAULT_ROPE, type RopeConfig } from '../game/sim/rope';
 import { TouchRaceControls } from '../components/RaceControls';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
@@ -132,6 +133,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const changeTimeScale = useCallback((scale: number) => {
     engineRef.current?.setTimeScale(scale);
     setTimeScale(engineRef.current?.getTimeScale() ?? scale);
+  }, []);
+  // H7b: the rope timings the dev test drive tunes (defaults until someone moves a slider).
+  const [rope, setRope] = useState<RopeConfig>(DEFAULT_ROPE);
+  const changeRope = useCallback((change: Partial<RopeConfig>) => {
+    const next = engineRef.current?.setRopeConfig(change);
+    if (next) setRope(next);
   }, []);
   const changeCamera = useCallback((cameraMode: GameOptions['cameraMode']) => {
     setOptions((previous) => ({ ...previous, cameraMode }));
@@ -524,7 +531,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 </div>
               </div>}
               {config.mode === 'quick' && assets && !loadError && (
-                <TestDriveBar cameraMode={options.cameraMode} onCameraMode={changeCamera} timeScale={timeScale} onTimeScale={changeTimeScale} style={{ top: firstPerson ? 52 : 12 }} />
+                <TestDriveBar cameraMode={options.cameraMode} onCameraMode={changeCamera} timeScale={timeScale} onTimeScale={changeTimeScale} rope={rope} onRope={changeRope} style={{ top: firstPerson ? 52 : 12 }} />
               )}
               {firstPerson && assets && !loadError && (
                 <CockpitHud

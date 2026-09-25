@@ -16,6 +16,7 @@
  *
  * Everything here is pure: no DOM, no canvas, no three.js, no React.
  */
+import type { RopeConfig } from './rope';
 import { START_X } from '../scene';
 import type { Racer } from '../racers';
 import type { PowerupKind } from '../powerups';
@@ -199,4 +200,6 @@ export interface RacerStepContext {
    * legacy target and corridor for both, so an old context is not a special case.
    */
   readonly laneNetwork?: LaneNetwork | null;
+  /** H7b: the rope timings (the test drive's dev sliders). Absent means the tuned defaults. */
+  readonly rope?: RopeConfig;
 }

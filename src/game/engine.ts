@@ -399,7 +399,7 @@ export class GameEngine {
   changeLane = (direction: number) => {
     const racer = this.player;
     if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
-    // Invert direction: A (left) should decrease lane number, D (right) should increase
+    // A (changeLane(-1)) steps to lane + 1, i.e. toward −z, which is screen-left in both cameras.
     const step = -Math.sign(direction) as -1 | 1;
     const network = this.laneNetwork;
     // M01 · T6: on an authored network a lane change is a *path* change, at this x. With no network

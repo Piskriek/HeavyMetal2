@@ -20,6 +20,7 @@ import {
   needleAngle, steerFrom, yokeAngleDeg,
 } from '../src/game/cockpit';
 import { DEFAULT_OPTIONS, type GameOptions } from '../src/game/types';
+import { laneZ, PLAYER_LANE } from '../src/game/scene';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicFile = (url: string) => join(root, 'public', url.replace(/^\//, ''));
@@ -44,12 +45,15 @@ test('needle mapping: the ends are the sweep ends, and values clamp outside the 
 
 test('steer and yoke law: full lock is ±38°, and the sign matches the lane axis', () => {
   assert.equal(steerFrom(0, 1), 0);
-  assert.equal(steerFrom(-VZ_MAX, 1), 1, '‑z is the far lanes, so it steers clockwise');
-  assert.equal(steerFrom(VZ_MAX, 1), -1);
-  assert.equal(steerFrom(-VZ_MAX * 4, 1), 1, 'the clamp holds past the limit');
-  assert.equal(steerFrom(320, 0.5), -0.9846153846153847, 'handling scales the same way the physics does');
-  assert.equal(yokeAngleDeg(steerFrom(-VZ_MAX, 1)), YOKE_MAX_DEG);
-  assert.equal(yokeAngleDeg(steerFrom(VZ_MAX, 1)), -YOKE_MAX_DEG);
+  // steerLeft (A) is changeLane(-1), which the engine turns into lane + 1, i.e. toward −z: a
+  // negative vz. That is screen-left in both cameras, so it must be an anticlockwise yoke.
+  assert.ok(laneZ(PLAYER_LANE + 1) < laneZ(PLAYER_LANE), 'A moves the ball toward −z');
+  assert.equal(steerFrom(-VZ_MAX, 1), -1, 'steering left (−vz) turns the yoke anticlockwise');
+  assert.equal(steerFrom(VZ_MAX, 1), 1);
+  assert.equal(steerFrom(-VZ_MAX * 4, 1), -1, 'the clamp holds past the limit');
+  assert.equal(steerFrom(320, 0.5), 0.9846153846153847, 'handling scales the same way the physics does');
+  assert.equal(yokeAngleDeg(steerFrom(-VZ_MAX, 1)), -YOKE_MAX_DEG);
+  assert.equal(yokeAngleDeg(steerFrom(VZ_MAX, 1)), YOKE_MAX_DEG);
   assert.equal(yokeAngleDeg(Number.NaN), 0);
   assert.equal(Object.is(yokeAngleDeg(0), -0), false, 'zero steering is +0, so CSS never sees -0deg');
 });

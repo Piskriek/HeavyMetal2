@@ -64,7 +64,10 @@ const commands = [
     'tests/postfx-pipeline.test.ts',
     'tests/baker.test.ts',
     'tests/batcher.test.ts',
-    'tests/export.test.ts'],
+    'tests/export.test.ts',
+    'tests/protect-baseline.test.ts', 'tests/props-safety-copy.test.ts',
+    'tests/accessibility.test.ts', 'tests/racer-pool.test.ts', 'tests/roster-scale.test.ts',
+    'tests/integration-benchmarks.test.ts'],
 ];
 
 for (const args of commands) {

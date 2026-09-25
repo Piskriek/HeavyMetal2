@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check": "node scripts/check.mjs",
     "check:slow": "node --expose-gc --import tsx --test tests/soak.test.ts",
+    "report:art": "node scripts/art-size-report.mjs",
     "check:edges": "node scripts/check-edge-magenta.mjs",
     "fix:edges": "node scripts/fix-edge-magenta.mjs",
     "check:browser": "node scripts/browser-check.mjs",

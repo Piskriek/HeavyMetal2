@@ -29,6 +29,14 @@ export interface Racer extends RacerFrame {
   /** Race time of the last hit that shot this ball's lane rope out (sim/rope.ts). */
   ropeSince?: number;
   nextDecision: number;
+  /**
+   * H11: a bot winding up a shove. `ramTargetId` is the rival it means to hit (null when none),
+   * `ramTellUntil` the race time its wobble tell ends, and `ramLane`/`ramPathId` where it will go.
+   */
+  ramTargetId: number | null;
+  ramTellUntil: number;
+  ramLane: number;
+  ramPathId: string | null;
   lastBoostAt: number;
   lastLaneChange: number;
   loopRide: LoopRide | null;
@@ -124,6 +132,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
       // Legacy four keep the exact 0.35 + id * 0.11 ramp; big fields fold the identity
       // hash into a bounded 0.55 s window instead of an 11-second wait at racer 99.
       nextDecision: legacy ? 0.35 + entry.id * 0.11 : 0.35 + hash01(entry.id) * 0.55,
+      ramTargetId: null, ramTellUntil: -100, ramLane: entry.homeLane, ramPathId: null,
       lastBoostAt: -100, lastLaneChange: -100,
       loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
       isPlayer: entry.id === PLAYER_ID,

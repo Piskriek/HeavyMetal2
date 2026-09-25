@@ -205,8 +205,8 @@ test('the retired slingshot is not drawn in a push run', () => {
   assert.match(builder, /private isSlingshotProp\(prop: PlacedProp\): boolean \{/);
   // A prop built while the slingshot is hidden must not become visible again on a rebuild.
   assert.match(builder, /isSlingshotProp\(prop\) && !this\.slingshotsVisible/);
-  // The race render path is the one place that decides, and it decides by start mode.
-  assert.match(renderer, /this\.trackBuilder\.setSlingshotsVisible\(frame\.options\.startMode === 'sling'\)/);
+  // The race render path is the one place that decides: with the push as the only start (M5), never.
+  assert.match(renderer, /this\.trackBuilder\.setSlingshotsVisible\(false\)/);
   assert.equal((renderer.match(/setSlingshotsVisible/g) ?? []).length, 1, 'exactly one call site');
 
   // And the prop itself is still authored: hiding it must never mean deleting it.

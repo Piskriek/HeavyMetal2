@@ -83,7 +83,7 @@ test('the pool queues the field by split time and releases 100 riders in well un
 test('the engine queues the rivals by their simulated splits when the player reaches the pool', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
   assert.match(engine, /if \(racer\.id === PLAYER_ID\) this\.queueRivals\(this\.merge\);/);
-  assert.match(engine, /this\.rivalSplits = this\.startMode === 'push' && this\.racers\.length > 1\n\s*\? simulateSplitTicks\(/);
+  assert.match(engine, /this\.rivalSplits = this\.racers\.length > 1\n\s*\? simulateSplitTicks\(/);
   assert.match(engine, /if \(!this\.splitReached && racer\.id !== PLAYER_ID\) continue;/, 'no more parking rivals on the gate');
   assert.doesNotMatch(engine, /racer\.x = passageMouthX\(\);\n\s*racer\.vx = 0;/);
 });

@@ -2006,7 +2006,7 @@ export class Renderer3D {
     // M01 · T1b: a push-mode run has no slingshot, so it does not draw the model either. It stood
     // exactly where the driver now looks from, and at eye level its frame filled the window. Only a
     // legacy sling run (and the builder, which owns the prop) shows it.
-    this.trackBuilder.setSlingshotsVisible(frame.options.startMode === 'sling');
+    this.trackBuilder.setSlingshotsVisible(false);
     // Placement measures altitude against the course being raced (see setEngineCourse).
     setEngineCourse(frame.options.course);
     const rampSurfaces = this.activeRampSurfaces();

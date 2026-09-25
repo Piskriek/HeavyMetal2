@@ -32,12 +32,13 @@ import { createSimWorld } from '../src/game/sim/world';
 import { stepRacer } from '../src/game/sim/racer-physics';
 import { HEADLESS_SIM_FX, LEGACY_RECOVERY, type RacerStepContext } from '../src/game/sim/context';
 import { createTrackLayout } from '../src/game/track-layout';
+import { withoutLoopRides } from '../src/game/sim/decor-loops';
 import { createAirPickups } from '../src/game/powerups';
 import {
   DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentForStep,
 } from '../src/game/qualifying/gate';
 import {
-  PASSAGE_CENTRE_Z, PASSAGE_GHOST_CAP_S, PASSAGE_GHOST_TAIL_S, insidePassage, passageExitX,
+  PASSAGE_CENTRE_Z, PASSAGE_GHOST_TAIL_S, insidePassage, passageExitX,
   passageMouthX,
 } from '../src/game/qualifying/passage';
 import { GRAVITY, LANE, RADIUS, closestLane } from '../src/game/scene';
@@ -83,6 +84,9 @@ function resolveBumps(
     for (let j = i + 1; j < racers.length; j++) {
       const a = racers[i]; const b = racers[j];
       if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide) continue;
+      // The engine's filter: nobody touches anybody inside the giant loop. (The held/ghost control
+      // below calls with skipHeldGhost = false to prove the resolver itself still separates a pair.)
+      if (skipHeldGhost && (insidePassage(a.x) || insidePassage(b.x))) continue;
       if (runTime < a.immuneUntil || runTime < b.immuneUntil) continue;
       const intangible = a.mergeHeld || b.mergeHeld || a.mergeGhost || b.mergeGhost;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
@@ -171,7 +175,8 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
   // rides the descent's rings on the way down before it queues (T1c), and the loop itself is geometry.
   const startZone = createQualifyingGate(course, bare);
   const mergeGate = { ...startZone, x: passageMouthX(), z: PASSAGE_CENTRE_Z, halfWidth: MERGE_GATE_HALF_WIDTH };
-  const layout = createTrackLayout(course, { skipBeforeX: passageMouthX(), keepLoopsFromX: startZone.x });
+  // Mirrors the engine: the course's loops are scenery (no ring rides) in the race layout.
+  const layout = withoutLoopRides(createTrackLayout(course, { skipBeforeX: passageMouthX(), keepLoopsFromX: startZone.x }));
   const world = createSimWorld(course, layout, createAirPickups(course, layout));
   const loopZ = PASSAGE_CENTRE_Z;
   const racers = createRacers();
@@ -396,7 +401,7 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
     for (let i = 0; i < racers.length; i++) {
       const racer = racers[i];
       if (racer.mergeGhost && runTime >= racer.mergeGhostUntil
-        && (racer.x >= passageExitX() || runTime >= racer.mergeGhostUntil + PASSAGE_GHOST_CAP_S)) {
+        && (racer.x >= passageExitX() || racer.x < mergeGate.x - 1)) {
         racer.mergeGhost = false;
       }
       // A held rider must still be on its own glide, and on the gate plane.
@@ -617,8 +622,9 @@ test('the engine drives the pool the way this harness does', () => {
     'the sorting plane must be the mouth of the track\'s geometry loop (T1d)');
   assert.match(source, /racer\.mergeGhostUntil = this\.runTime \+ PASSAGE_GHOST_TAIL_S;/,
     'a release must stamp the ghost clock the tail law reads');
-  assert.match(source, /racer\.x >= passageExitX\(\) \|\| this\.runTime >= racer\.mergeGhostUntil \+ PASSAGE_GHOST_CAP_S/,
-    'the ghost tail must end once the rider is clear of the loop, with the cap behind it');
+  assert.match(source, /racer\.x >= passageExitX\(\) \|\| racer\.x < this\.mergeGateFor\(\)\.x - 1/,
+    'the ghost must last until the rider is fully out of the loop (no time cap inside it)');
+  assert.match(source, /this\.obstacles = withoutLoopRides\(this\.obstacles\);/, 'the engine drops loop rides like this harness');
   assert.match(source, /ready = \(\) => \{/, 'the player\'s ready must be the engine\'s own command');
   // The pool owns two statuses, and every place that used to ask "are we racing?" asks the shared
   // predicate instead — including the frame loop, whose answer decides whether the pool ever advances.

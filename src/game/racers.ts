@@ -26,6 +26,8 @@ export interface Racer extends RacerFrame {
   recoveries: number;
   recoveryUntil: number;
   steerLockedUntil: number;
+  /** Race time of the last hit that shot this ball's lane rope out (sim/rope.ts). */
+  ropeSince?: number;
   nextDecision: number;
   lastBoostAt: number;
   lastLaneChange: number;

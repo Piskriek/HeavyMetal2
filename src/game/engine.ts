@@ -7,9 +7,10 @@ import { PLAYER_ID } from './roster';
 import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
 import { builderRampObstacles } from './sim/builder-ramps';
 import { SPLIT_TIMEOUT_S, simulateSplitTicks } from './sim/split-times';
+import { withoutLoopRides } from './sim/decor-loops';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
-  AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
+  AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
 } from './scene';
@@ -23,14 +24,14 @@ import {
   QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
 } from './contracts/qualifying';
 import { POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup } from './powerups';
-import { adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
+import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
 import { MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX, MergePool, releaseOccupancy } from './merge/pool';
 import {
-  PASSAGE_CENTRE_Z, PASSAGE_GHOST_CAP_S, PASSAGE_GHOST_TAIL_S, insidePassage,
+  PASSAGE_CENTRE_Z, PASSAGE_GHOST_TAIL_S, insidePassage,
   passageExitX, passageMouthX,
 } from './qualifying/passage';
 import { LEGACY_RECOVERY, type RacerStepContext, type SimFx } from './sim/context';
@@ -44,7 +45,7 @@ import { resolvePickups as resolvePickupsSim } from './sim/pickups';
 // M01 · T1: the goblin push start. The engine owns the clock and the surface query; the ramp math
 // lives in a pure module so a headless test can reproduce the launch without a canvas.
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
-import { fillCockpitState, steerFrom, type CockpitState } from './cockpit';
+import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
 
 const TAU = Math.PI * 2;
@@ -100,6 +101,9 @@ export class GameEngine {
   private rivalSplits = new Map<number, number | null>();
   /** True once the rivals have been queued behind (or ahead of) the player at the split. */
   private rivalsQueued = false;
+  /** Last steering press for the cockpit yoke: direction (−1 left, +1 right) and when (this.time). */
+  private steerPress = 0;
+  private steerPressAt = -100;
   private obstacles: Obstacle[] = [];
   private pickups: AirPickup[] = [];
   private pickupCount = 0;
@@ -390,11 +394,10 @@ export class GameEngine {
    * yoke leads the lane change rather than replaying it, and the speed is the HUD's own km/h.
    */
   getCockpitState(state: CockpitState): CockpitState {
-    const player = this.player;
     // The mapping itself lives in `cockpit.ts` (pure, and asserted against literals in
     // tests/cockpit-channel.test.ts); this method's only job is to hand it live telemetry — the
-    // snapshot the physics just stepped, and the player's own lateral velocity for the yoke.
-    return fillCockpitState(state, this.snapshot, steerFrom(player.vz, player.handling));
+    // snapshot the physics just stepped, and the player's own last steering press for the yoke.
+    return fillCockpitState(state, this.snapshot, yokeSteer(this.steerPress, this.steerPressAt, this.time));
   }
 
   /**
@@ -427,6 +430,8 @@ export class GameEngine {
 
   changeLane = (direction: number) => {
     const racer = this.player;
+    // The yoke answers every press, even one the race refuses (inside the loop, mid-hit).
+    if (this.status === 'flying' || this.status === 'pushing') { this.steerPress = Math.sign(direction); this.steerPressAt = this.time; }
     if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
     // A (changeLane(-1)) steps to lane + 1, i.e. toward −z, which is screen-left in both cameras.
     const step = -Math.sign(direction) as -1 | 1;
@@ -726,7 +731,10 @@ export class GameEngine {
     for (const racer of this.racers) {
       if (!racer.mergeGhost) continue;
       if (this.runTime < racer.mergeGhostUntil) continue;
-      if (racer.x >= passageExitX() || this.runTime >= racer.mergeGhostUntil + PASSAGE_GHOST_CAP_S) {
+      // Ghost until the rider is fully out of the giant loop — never cut short inside it (the old
+      // time cap could drop a slow rider back into contact mid-barrel). A rider somehow sent back
+      // behind the mouth (a recovery) is not in the barrel either, so the ghost ends there too.
+      if (racer.x >= passageExitX() || racer.x < this.mergeGateFor().x - 1) {
         racer.mergeGhost = false;
       }
     }
@@ -904,6 +912,10 @@ export class GameEngine {
     // and dropped it back on the road at the crest, which read as the run being reset.
     const placed = this.builderRamps();
     if (placed.length) this.obstacles = [...this.obstacles, ...placed].sort((a, b) => a.x - b.x);
+    // The course's loops are decorations: the ball rolls past them. Riding their rings grabbed the
+    // ball on the opening descent (the hang-up at the start) and, on ridge, inside the giant loop
+    // (the stop-and-hop). The pickups were laid out above with the loops in place, so they are unchanged.
+    this.obstacles = withoutLoopRides(this.obstacles);
     this.world.configure(this.options.course, this.obstacles, this.pickups);
   }
 
@@ -1098,6 +1110,8 @@ export class GameEngine {
       // can be touched, which is what keeps the ordered release from being spoiled by contact.
       if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
         || a.mergeHeld || b.mergeHeld || a.mergeGhost || b.mergeGhost
+        // Nobody touches anybody inside the giant loop, pooled or not.
+        || insidePassage(a.x) || insidePassage(b.x)
         || (!this.splitReached && (a.id !== PLAYER_ID || b.id !== PLAYER_ID))
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
@@ -1111,8 +1125,8 @@ export class GameEngine {
       const penetration = (diameter - distance + 1) * 0.55;
       a.x -= nx * penetration * b.weight / sum; b.x += nx * penetration * a.weight / sum;
       a.z -= nz * penetration * b.weight / sum; b.z += nz * penetration * a.weight / sum;
-      a.z = clamp(a.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-      b.z = clamp(b.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+      a.z = clamp(a.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+      b.z = clamp(b.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
       const pair = (i << 10) | j;
       const lastCollision = this.collisionTimes.get(pair) ?? -100;
       if (this.runTime - lastCollision < 0.38) continue;
@@ -1185,18 +1199,12 @@ export class GameEngine {
   }
 
   private shove(racer: Racer, direction: number, speed: number) {
-    const lane = closestLane(racer.z);
-    // M01 · T6: a shove off an authored path moves to the neighbouring *path* on that side, and
-    // stays where it is when there is none. `direction > 0` pushes toward larger z, which is the
-    // `-1` side of the lane convention `adjacentPath` speaks.
-    const network = this.laneNetwork;
-    if (network && racer.pathId) {
-      const next = adjacentPath(network, racer.pathId, racer.x, -Math.sign(direction) as -1 | 1);
-      if (next) racer.pathId = next;
-    }
-    racer.targetLane = clamp(lane - Math.sign(direction), 0, 3);
+    // A hit shoots the ball's lane rope out (sim/rope.ts): it keeps its own lane/path — a bump never
+    // re-assigns it to the neighbouring one — takes the sideways speed, may be knocked as far as the
+    // road edge, and is then reeled back in.
     racer.vz = clamp(racer.vz + direction * speed, -650, 650);
-    racer.z = clamp(racer.z + direction * 5, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.z = clamp(racer.z + direction * 5, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    racer.ropeSince = this.runTime;
     racer.steerLockedUntil = this.runTime + 0.28 * racer.bumpRecovery; racer.bumpAt = this.runTime;
     racer.lastLaneChange = this.runTime;
   }

@@ -133,8 +133,8 @@ test('the yoke angle is the physics\' own steer, so the hands cannot drift from 
 
 test('the wiring: the engine hands the live snapshot to the mapping, every frame', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(engine, /fillCockpitState\(state, this\.snapshot, steerFrom\(player\.vz, player\.handling\)\)/,
-    'the engine fills the channel from the snapshot it just stepped');
+  assert.match(engine, /fillCockpitState\(state, this\.snapshot, yokeSteer\(this\.steerPress, this\.steerPressAt, this\.time\)\)/,
+    'the engine fills the channel from the snapshot it just stepped, and the yoke from the player\'s own press');
   // No assignment may slip back into the engine: the mapping has exactly one home.
   const assignments = engine.match(/state\.[a-zA-Z]+ = /g) ?? [];
   assert.deepEqual(assignments, [], `the engine assigns no gauge field itself (found ${assignments.join(', ')})`);

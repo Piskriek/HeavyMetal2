@@ -73,6 +73,10 @@ export interface CockpitState {
   impact: number;
   /** H8: which side it came from: +1 right, −1 left, 0 straight on. */
   impactSide: -1 | 0 | 1;
+  /** H9: the gap chip: place and seconds to the rider ahead (place 0 = nobody ahead). */
+  gapPlace: number;
+  gapSeconds: number;
+  gapTrend: 'closing' | 'steady' | 'falling';
 }
 
 /**
@@ -93,6 +97,8 @@ export interface CockpitTelemetry {
   position: number;
   raceTime: number;
   merge?: { countdownLabel?: string | null } | null;
+  /** H9: the rider ahead (see GameSnapshot.gapAhead). */
+  gapAhead?: { place: number; seconds: number; trend: 'closing' | 'steady' | 'falling' } | null;
 }
 
 /**
@@ -127,6 +133,9 @@ export function fillCockpitState(
   state.position = telemetry.position;
   state.raceTime = telemetry.raceTime;
   state.pushing = telemetry.status === 'pushing';
+  state.gapPlace = telemetry.gapAhead?.place ?? 0;
+  state.gapSeconds = telemetry.gapAhead?.seconds ?? 0;
+  state.gapTrend = telemetry.gapAhead?.trend ?? 'steady';
   // M01 · T2: while the field is queued the centre gauge is the pool's, and it says POOL until the
   // pool's own countdown starts speaking. Outside those phases the centre is blank.
   state.countdownLabel = telemetry.merge?.countdownLabel
@@ -139,6 +148,7 @@ export function createCockpitState(): CockpitState {
     steer: 0, speedKmh: 0, boostCharges: 0, bounceCharges: 0, shieldSeconds: 0, gradePct: 0,
     grounded: false, inLoop: false, status: 'loading', position: 1, raceTime: 0,
     countdownLabel: null, pushing: false, impact: 0, impactSide: 0,
+    gapPlace: 0, gapSeconds: 0, gapTrend: 'steady',
   };
 }
 

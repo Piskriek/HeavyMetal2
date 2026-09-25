@@ -36,6 +36,8 @@ export interface RacerStanding {
   recovering: boolean;
   finishTime: number | null;
   loadout?: Loadout;
+  /** P11: place at the first split (the pool's queue by split time); absent before the split. */
+  splitPosition?: number;
 }
 
 export interface GameOptions {

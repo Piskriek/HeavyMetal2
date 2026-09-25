@@ -39,8 +39,9 @@ world position = frame.pos
 `frameAt(s)` returns a re-orthonormalized frame marched along the spline
 (see below). `RADIUS = 31` (ball radius), `RADIUS × 1.2` is the edge margin.
 
-**Physical versus visual.** The altitude composition (`ramp vs airborne vs
-grounded elevation`) is **physical state** — it is part of the canonical
+**Physical versus visual.** The altitude composition (`ramp vs course
+elevation`, both measured from the surface under the ball; M5 retired the slingshot-era
+height above the flat legacy ground) is **physical state** — it is part of the canonical
 position and of the rendered mesh. Camera smoothing, screen shake, HUD
 bobbing, and ball *spin* are **visual only** and never feed back into
 positions or velocities — the tests treat the placement transform as exact.

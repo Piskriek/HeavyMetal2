@@ -32,7 +32,7 @@
    stay in the renderer. The old renderer-only scripted ramp "jump arc" was
    removed for the same reason: ballistic trajectories belong to physics.
    ========================================================================== */
-import { GROUND, LANE_WIDTH, RADIUS, START_X, TRACK_DISTANCE, courseY } from './scene';
+import { LANE_WIDTH, RADIUS, START_X, TRACK_DISTANCE, courseY } from './scene';
 import type { CourseId } from './types';
 
 /* -----------------------------------------------------------------------------
@@ -971,13 +971,15 @@ export const engineDistanceFromX = (x: number): number => clampN((x - START_X) /
 /** Canonical state (s, laneZ, altitude-source tag) extracted from engine state. */
 export function canonicalFromEngine(
   map: TrackSpaceMap, st: EngineRacerState,
-): { s: number; laneZ: number; engineAlt: number; airborneAlt: number; engineDistance: number; engineX: number } {
+): { s: number; laneZ: number; engineAlt: number; engineDistance: number; engineX: number } {
   const engineDistance = st.distance ?? (st.x !== undefined ? engineDistanceFromX(st.x) : 0);
   const engineX = st.x ?? engineXFromDistance(engineDistance);
   const s = map.trackDistFromEngineDistance(engineDistance);
+  // Height is always measured from the course under the ball. The slingshot-era rule that measured an
+  // airborne ball from the flat legacy ground (GROUND − RADIUS) floated it ~210 units too high
+  // wherever the course sits above that ground, such as the start pad (M5).
   const engineAlt = Math.max(0, courseY(engineX, st.course ?? engineCourse) - st.y);
-  const airborneAlt = st.grounded ? 0 : Math.max(0, GROUND - RADIUS - st.y);
-  return { s, laneZ: st.z, engineAlt, airborneAlt, engineDistance, engineX };
+  return { s, laneZ: st.z, engineAlt, engineDistance, engineX };
 }
 
 /**
@@ -998,11 +1000,10 @@ export function placementFromEngine(
 } {
   const c = canonicalFromEngine(map, st);
   const rampAlt = ramps && ramps.length > 0 ? rampHeightAt(ramps, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) : 0;
-  let altitude = Math.max(c.engineAlt, c.airborneAlt, rampAlt);
+  const altitude = Math.max(c.engineAlt, rampAlt);
   const altSource =
     altitude === rampAlt && rampAlt > 0 ? 'ramp'
-      : altitude === c.airborneAlt && c.airborneAlt > 0 ? 'airborne'
-        : altitude === c.engineAlt && c.engineAlt > 0 ? 'engine' : 'flat';
+      : altitude === c.engineAlt && c.engineAlt > 0 ? (st.grounded === false ? 'airborne' : 'engine') : 'flat';
   const placement = worldFromCanonical(map, { s: c.s, laneZ: c.laneZ, altitude });
   return Object.freeze({ ...placement, altitude, altSource });
 }
@@ -1026,13 +1027,11 @@ export function worldVelocityFromEngine(
 ): { worldV: CPoint; canonical: CanonicalVelocity; state: CanonicalState } {
   const c = canonicalFromEngine(map, st);
   const rampAlt = ramps && ramps.length > 0 ? rampHeightAt(ramps, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) : 0;
-  const altitude = Math.max(c.engineAlt, c.airborneAlt, rampAlt);
+  const altitude = Math.max(c.engineAlt, rampAlt);
   const ds = (vel.vx / 2) * map.ARC_PER_ENGINE_DISTANCE;
   let dAlt: number;
   if (altitude === rampAlt && rampAlt > 0) {
     dAlt = rampSlopeAt(ramps!, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) * ds;
-  } else if (altitude === c.airborneAlt && c.airborneAlt > 0) {
-    dAlt = -vel.vy;
   } else {
     dAlt = engineSlopeApprox(c.engineX) * vel.vx - vel.vy;
   }

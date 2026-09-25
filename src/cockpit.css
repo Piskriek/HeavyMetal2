@@ -181,3 +181,9 @@
 @media (prefers-reduced-motion: reduce) {
   .cockpit-starter { transition: none; }
 }
+
+/* H9: the gap to the rider ahead: green while closing, amber when steady, red when falling back. */
+.cockpit-chip-gap { color: #f3c77a; }
+.cockpit-chip-gap[data-trend='closing'] { color: #9fe39a; border-color: rgba(120, 200, 110, 0.6); }
+.cockpit-chip-gap[data-trend='falling'] { color: #f08a6e; border-color: rgba(220, 110, 80, 0.6); }
+.cockpit-chip-gap[hidden] { display: none; }

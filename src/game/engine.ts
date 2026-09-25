@@ -52,6 +52,7 @@ import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
 import { GamepadController } from './input/gamepad';
 import { impactEnvelope } from './camera-shake';
+import { gapSeconds, gapTrend } from './gap';
 
 const STEP = FIXED_STEP;
 
@@ -1237,14 +1238,50 @@ export class GameEngine {
     this.snapshot.laneLocked = this.runTime < player.steerLockedUntil;
     this.snapshot.bumps = this.counts.bumps; this.snapshot.raceTime = Math.floor(this.runTime * 10) / 10;
     let position = 1;
-    for (const racer of this.racers) if (racer.id && raceOrder(racer, player) < 0) position++;
+    let ahead: Racer | null = null;
+    for (const racer of this.racers) {
+      if (!racer.id || raceOrder(racer, player) >= 0) continue;
+      position++;
+      // H9: of everyone ahead, the one nearest the player.
+      if (!ahead || raceOrder(ahead, racer) < 0) ahead = racer;
+    }
     this.snapshot.position = position;
+    this.refreshGap(ahead, position);
     const sector = sectorAt(START_X + player.distance * 2, this.options.course);
     if (sector !== this.snapshot.sector && player.x >= STADIUM_START) { this.say('FINAL STRAIGHT. NO MORE MANNERS.'); this.audio.play('finish'); }
     this.snapshot.sector = sector; this.topSpeed = Math.max(this.topSpeed, this.snapshot.speed);
     this.snapshot.pickups = this.pickupCount;
     this.snapshot.shieldSeconds = Math.max(0, Math.ceil((player.shieldUntil - this.runTime) * 10) / 10);
   }
+
+  /** H9: the gap to the rider directly ahead, and its trend since the last refresh. */
+  private gapAt = 0;
+  private refreshGap(ahead: Racer | null, position: number) {
+    const player = this.player;
+    if (!ahead || !this.splitReached || player.finished) { this.snapshot.gapAhead = null; return; }
+    const place = position - 1;
+    const seconds = gapSeconds(ahead.x, player.x, player.vx, ahead.finishTime, this.runTime);
+    const previous = this.snapshot.gapAhead;
+    const trend = gapTrend(previous, place, seconds, this.runTime - this.gapAt);
+    this.gapAt = this.runTime;
+    this.snapshot.gapAhead = { place, seconds, name: ahead.name, trend };
+  }
+
+  /**
+   * H9: each racer's course progress (0..1), in racer order (the player first), into a reused buffer
+   * for the strip map; NaN for a rider not in the race yet. Returns how many were written.
+   */
+  fillStripProgress(out: Float32Array): number {
+    const count = Math.min(out.length, this.racers.length);
+    for (let i = 0; i < count; i++) {
+      const racer = this.racers[i];
+      out[i] = !this.splitReached && racer.id !== PLAYER_ID ? Number.NaN : clamp(racer.distance / TRACK_DISTANCE, 0, 1);
+    }
+    return count;
+  }
+
+  /** H9: racer colours in racer order (the strip map's dots). */
+  racerColors(): string[] { return this.racers.map((racer) => racer.color); }
 
   private standings(): RacerStanding[] {
     return [...this.racers].sort(raceOrder).map((racer, index) => ({

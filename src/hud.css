@@ -268,3 +268,9 @@
 .touch-button .charge-dots i.charged { background: #f0a15b; }
 .touch-primary { width: 50px; height: 50px; align-self: center; font: 700 16px 'Space Mono', monospace; letter-spacing: 1px; }
 @media (prefers-reduced-motion: reduce) { .touch-button:active:not(:disabled) { transform: none; } }
+
+/* ============ H9: the whole-field strip map along the top edge ============ */
+.track-strip-map {
+  position: absolute; top: 2px; left: 50%; transform: translateX(-50%);
+  width: min(720px, calc(100% - 220px)); height: 14px; z-index: 12; pointer-events: none;
+}

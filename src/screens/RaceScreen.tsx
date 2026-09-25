@@ -19,6 +19,7 @@ import CockpitHud from '../components/CockpitHud';
 import TestDriveBar from '../components/TestDriveBar';
 import { DEFAULT_ROPE, type RopeConfig } from '../game/sim/rope';
 import { TouchRaceControls } from '../components/RaceControls';
+import TrackStripMap from '../components/TrackStripMap';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
 import MergePoolOverlay from '../components/MergePoolOverlay';
@@ -358,6 +359,9 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     window.addEventListener('touchstart', touched, { once: true, passive: true });
     return () => { query?.removeEventListener?.('change', changed); window.removeEventListener('touchstart', touched); };
   }, []);
+  // H9: the strip map reads the engine directly each frame; the colours only change with the field.
+  const fillStrip = useCallback((out: Float32Array) => engineRef.current?.fillStripProgress(out) ?? 0, []);
+  const stripColors = useCallback(() => engineRef.current?.racerColors() ?? [], []);
   const retry = useCallback((autoLaunch = false) => {
     if (roundComplete(session)) { onContinue(); return; }
     engineRef.current?.reset();
@@ -491,6 +495,9 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     engine.requestRender();
                   }}
                 />
+              )}
+              {config.fieldSize > 4 && assets && !buildMode && engineRef.current && (snapshot.status === 'flying' || snapshot.status === 'paused' || snapshot.status === 'checkpoint' || snapshot.status === 'countdown') && (
+                <TrackStripMap fill={fillStrip} colors={stripColors} />
               )}
               {touchControls && assets && !buildMode && engineRef.current && (
                 <TouchRaceControls

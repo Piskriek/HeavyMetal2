@@ -125,7 +125,7 @@ test('bob is speed-driven, grounded-only, and gone under reduced motion', () => 
 test('the channel starts clean and carries the field names the HUD reads', () => {
   const state = createCockpitState();
   assert.deepEqual(Object.keys(state).sort(), [
-    'boostCharges', 'bounceCharges', 'countdownLabel', 'gradePct', 'grounded', 'inLoop',
+    'boostCharges', 'bounceCharges', 'countdownLabel', 'gradePct', 'grounded', 'impact', 'impactSide', 'inLoop',
     'position', 'pushing', 'raceTime', 'shieldSeconds', 'speedKmh', 'status', 'steer',
   ]);
   assert.equal(state.steer, 0);

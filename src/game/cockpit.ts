@@ -69,6 +69,10 @@ export interface CockpitState {
   countdownLabel: string | null;
   /** True while the starter goblin is shoving the grid. */
   pushing: boolean;
+  /** H8: how hard the last hit is still being felt, 0..1 (decays over KICK_SECONDS). */
+  impact: number;
+  /** H8: which side it came from: +1 right, −1 left, 0 straight on. */
+  impactSide: -1 | 0 | 1;
 }
 
 /**
@@ -106,8 +110,12 @@ export function fillCockpitState(
   state: CockpitState,
   telemetry: CockpitTelemetry,
   steer: number,
+  /** H8: the last hit as it is still felt (0..1) and its side; absent means none. */
+  impact?: { readonly amount: number; readonly side: -1 | 0 | 1 },
 ): CockpitState {
   state.steer = steer;
+  state.impact = impact && Number.isFinite(impact.amount) ? Math.max(0, Math.min(1, impact.amount)) : 0;
+  state.impactSide = impact?.side ?? 0;
   state.speedKmh = telemetry.speed;
   state.boostCharges = telemetry.boosts;
   state.bounceCharges = telemetry.bounces;
@@ -130,7 +138,7 @@ export function createCockpitState(): CockpitState {
   return {
     steer: 0, speedKmh: 0, boostCharges: 0, bounceCharges: 0, shieldSeconds: 0, gradePct: 0,
     grounded: false, inLoop: false, status: 'loading', position: 1, raceTime: 0,
-    countdownLabel: null, pushing: false,
+    countdownLabel: null, pushing: false, impact: 0, impactSide: 0,
   };
 }
 
@@ -371,3 +379,22 @@ export const COCKPIT_ART_PATHS: readonly string[] = [
 ];
 
 export const COCKPIT_MANIFEST = manifest;
+
+/** H8: the yoke's jolt at full impact: a ±4° shudder and a 6 px drop. */
+export const JOLT_MAX_DEG = 4;
+export const JOLT_MAX_DROP_PX = 6;
+/** Shudder frequency, radians per second. */
+export const JOLT_RATE = 70;
+
+/**
+ * H8: how the yoke answers a hit. `impact` is the channel's decaying 0..1 value, so the jolt is
+ * gone ~180 ms after the hit. It shudders (starting away from the hit) and drops; with reduced
+ * motion it holds still and the cockpit flashes instead (`flash`, 0..1).
+ */
+export function yokeJolt(impact: number, side: -1 | 0 | 1, time: number, reducedMotion: boolean): { rotDeg: number; dropPx: number; flash: number } {
+  const amount = Math.max(0, Math.min(1, Number.isFinite(impact) ? impact : 0));
+  if (amount === 0) return { rotDeg: 0, dropPx: 0, flash: 0 };
+  if (reducedMotion) return { rotDeg: 0, dropPx: 0, flash: amount };
+  const lead = side === 0 ? 1 : -side;
+  return { rotDeg: lead * JOLT_MAX_DEG * amount * Math.cos(time * JOLT_RATE), dropPx: JOLT_MAX_DROP_PX * amount, flash: 0 };
+}

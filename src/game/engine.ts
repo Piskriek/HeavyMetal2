@@ -51,6 +51,7 @@ import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelo
 import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
 import { GamepadController } from './input/gamepad';
+import { impactEnvelope } from './camera-shake';
 
 const STEP = FIXED_STEP;
 
@@ -113,6 +114,8 @@ export class GameEngine {
   private cameraY = 0;
   private drift = 0;
   private shake = 0;
+  /** H8: the player's last hit (this.time), its side (+1 from the right) and strength (0..1). */
+  private readonly impact = { at: -100, side: 0 as -1 | 0 | 1, strength: 0 };
   private topSpeed = 0;
   private noticeUntil = 0;
   private counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
@@ -210,7 +213,8 @@ export class GameEngine {
       audio: (cue) => engine.audio.play(cue),
       // Chaos points never go below zero; the legacy recovery was the only negative delta.
       score: (delta) => { engine.snapshot.score = Math.max(0, engine.snapshot.score + delta); },
-      shake: (amount) => { engine.shake = amount; },
+      // Only the player's events shake. From 3 up it is a hit (TNT, a wall, lava), not a boost.
+      shake: (amount) => { engine.shake = amount; if (amount >= 3) engine.playerImpact(Math.min(1, amount / 9), 0); },
       tally: (kind) => { engine.counts[kind]++; },
       refreshHud: () => { engine.refreshSnapshot(); engine.notify(); },
       notifyHud: () => { engine.notify(); },
@@ -424,7 +428,9 @@ export class GameEngine {
     // The mapping itself lives in `cockpit.ts` (pure, and asserted against literals in
     // tests/cockpit-channel.test.ts); this method's only job is to hand it live telemetry — the
     // snapshot the physics just stepped, and the player's own last steering press for the yoke.
-    return fillCockpitState(state, this.snapshot, yokeSteer(this.steerPress, this.steerPressAt, this.time));
+    // H8: and the hit still being felt, which the HUD turns into the yoke's jolt.
+    return fillCockpitState(state, this.snapshot, yokeSteer(this.steerPress, this.steerPressAt, this.time),
+      { amount: impactEnvelope(this.time - this.impact.at) * this.impact.strength, side: this.impact.side });
   }
 
   changeLane = (direction: number) => {
@@ -1035,7 +1041,7 @@ export class GameEngine {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
       this.lastRender = now; this.needsRender = false;
       this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
-        drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: false,
+        drift: this.drift, shake: this.shake, impact: this.impact, rotation: rendered.rotation, dragging: false,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups,
         snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion,
@@ -1168,6 +1174,9 @@ export class GameEngine {
       if (!a.id || !b.id) {
         // H10: the pad thuds with the hit, harder the faster the two closed (off with reduced motion).
         if (!this.reducedMotion) this.gamepad.rumble('bump', closing / 380);
+        // H8: the camera kicks away from the rival, the yoke jolts and the hull thuds, all by closing.
+        const player = a.id ? b : a; const rival = a.id ? a : b;
+        this.playerImpact(Math.max(0.25, closing / 380), Math.sign(rival.z - player.z) as -1 | 0 | 1);
         if ((!a.id && shieldA) || (!b.id && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
         else if ((!a.id && shieldB) || (!b.id && shieldA)) {
           this.audio.play('shield'); this.shake = 2;
@@ -1256,6 +1265,15 @@ export class GameEngine {
       round: this.config?.round, loadout: this.config?.loadout, difficulty: this.config?.difficulty,
       pickups: this.pickupCount, shieldsUsed: this.shieldBlocks });
     this.notify();
+  }
+
+  /** H8: records a hit on the player's ball for the camera kick and the yoke, and thuds. */
+  private playerImpact(strength: number, side: -1 | 0 | 1) {
+    const now = this.time;
+    // A second knock inside the same kick adds to it rather than restarting a weaker one.
+    const still = impactEnvelope(now - this.impact.at) * this.impact.strength;
+    this.impact.at = now; this.impact.side = side; this.impact.strength = Math.min(1, Math.max(strength, still));
+    this.audio.play('thud', 0.35 + 0.65 * this.impact.strength);
   }
 
   private say(text: string) { this.snapshot.notice = text; this.noticeUntil = this.time + 2; }

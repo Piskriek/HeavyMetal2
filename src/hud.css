@@ -126,6 +126,8 @@
 
 /* ============ Compact air supplies (in-stage corner) ============ */
 .hud-supplies { position: absolute; left: 22px; bottom: 36px; z-index: 3; display: flex; align-items: center; gap: 8px; pointer-events: auto; }
+.game-stage.is-first-person .hud-supplies { top: 18px; bottom: auto; left: 22px; z-index: 10; }
+.game-stage.is-first-person .mini-trackbar { top: 58px; bottom: auto; z-index: 10; }
 .supply-chip { position: relative; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid #8f985340; border-radius: 5px; background: #0d160fd9; box-shadow: inset 0 1px #f0cf8b17, 0 3px 8px #000a; opacity: .82; transition: opacity 150ms, border-color 150ms; }
 .supply-chip > img { width: 26px; height: 26px; }
 .supply-chip.active, .supply-chip.just-collected { opacity: 1; border-color: #d8b471; box-shadow: inset 0 1px #f0cf8b40, 0 0 10px #d8b47144, 0 3px 8px #000a; }

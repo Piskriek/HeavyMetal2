@@ -33,6 +33,8 @@ export interface LanePanelProps {
   readonly onInitSample?: () => void;
   readonly onInitDefault?: () => void;
   readonly onFocusNode?: (nodeId: string) => void;
+  readonly isDrawerOpen?: boolean;
+  readonly onToggleDrawer?: (open: boolean) => void;
   /** Result of the last save, shown as a status line. */
   readonly status?: string | null;
 }
@@ -43,11 +45,19 @@ const KIND_LABEL: Record<LaneNodeKind, string> = {
 
 export default function LanePanel({
   model, onSelectNode, onSelectPath, onMoveNode, onCommand, onSave, onExport, onImport,
-  onTestDrive, onInitSample, onInitDefault, onFocusNode, status,
+  onTestDrive, onInitSample, onInitDefault, onFocusNode, isDrawerOpen, onToggleDrawer, status,
 }: LanePanelProps) {
   const selected = model.nodes.find((node) => node.id === model.selectedNodeId) ?? null;
   const selectedPath = model.paths.find((path) => path.id === model.selectedPathId) ?? null;
   const [filterLane, setFilterLane] = useState<string>('all');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const isExpanded = isDrawerOpen !== undefined ? isDrawerOpen : drawerOpen;
+
+  const toggleDrawer = () => {
+    const next = !isExpanded;
+    setDrawerOpen(next);
+    onToggleDrawer?.(next);
+  };
 
   // The two coordinate boxes are a *draft*: a number typed a digit at a time ("4", "42", …) must not
   // be applied on every keystroke, or the node would be dragged to x 4 on the way to x 4200. The draft
@@ -80,13 +90,41 @@ export default function LanePanel({
 
   return (
     <section className="lane-panel" aria-label="Lanes and paths" data-testid="lane-panel">
-      <header className="lane-panel__head">
-        <h3 className="lane-panel__title">Lanes &amp; Paths</h3>
-        <p className="lane-panel__counts" data-testid="lane-counts">
-          {model.hasDocument
-            ? `${model.nodes.length} nodes · ${model.paths.length} paths on ${model.course}`
-            : 'No lane network loaded for this course'}
-        </p>
+      <header className="lane-panel__head" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+          <h3 className="lane-panel__title" style={{ margin: 0 }}>Lanes &amp; Paths</h3>
+          <p className="lane-panel__counts" data-testid="lane-counts">
+            {model.hasDocument
+              ? `${model.nodes.length} nodes · ${model.paths.length} paths on ${model.course}`
+              : 'No lane network loaded for this course'}
+          </p>
+        </div>
+        {model.hasDocument ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {model.errors.length === 0 ? (
+              <span className="lane-panel__ok" style={{ fontWeight: 600, fontSize: '11px' }}>✓ Valid</span>
+            ) : (
+              <button
+                type="button"
+                className="lane-panel__button"
+                style={{ borderColor: '#ef4444', color: '#fca5a5', padding: '2px 8px' }}
+                onClick={() => { setDrawerOpen(true); onToggleDrawer?.(true); }}
+                aria-label={`Show ${model.errors.length} validation errors in drawer`}
+              >
+                ⚠ {model.errors.length} Error{model.errors.length > 1 ? 's' : ''}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`lane-panel__button${isExpanded ? ' lane-panel__button--primary' : ''}`}
+              style={{ padding: '3px 8px' }}
+              onClick={toggleDrawer}
+              aria-label={isExpanded ? 'Hide node and path lists' : 'Show node and path lists'}
+            >
+              {isExpanded ? '▼ Hide Lists' : `▲ Lists (${model.nodes.length} Nodes)`}
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {!model.hasDocument ? (
@@ -195,225 +233,242 @@ export default function LanePanel({
 
       {status ? <p className="lane-panel__status" role="status" aria-live="polite">{status}</p> : null}
 
-      {/* The validator's own messages. Live, and clickable to focus the node they are about. */}
-      <div className="lane-panel__validation">
-        <h4 className="lane-panel__subtitle" id="lane-validation-title">Validation</h4>
-        <ul
-          className="lane-panel__errors"
-          aria-labelledby="lane-validation-title"
-          aria-live="polite"
-          data-testid="lane-errors"
-        >
-          {model.errors.length === 0
-            ? <li className="lane-panel__ok">The network is valid.</li>
-            : model.errors.map((message, index) => {
-              const nodeId = model.errorNodeIds[index];
-              return (
-                <li key={`${message}-${index}`} className="lane-panel__error">
-                  <button
-                    type="button"
-                    className="lane-panel__error-button"
-                    onClick={() => onSelectNode?.(nodeId)}
-                    aria-label={`Focus the node for: ${message}`}
-                  >
-                    {message}
-                  </button>
-                </li>
-              );
-            })}
-        </ul>
-      </div>
-
-      <div className="lane-panel__columns">
-        <div className="lane-panel__column">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-            <h4 className="lane-panel__subtitle" id="lane-nodes-title" style={{ margin: 0 }}>Nodes</h4>
-            {model.paths.length > 0 ? (
-              <div style={{ display: 'flex', gap: '3px' }} role="group" aria-label="Filter nodes by lane">
+      {/* Selected Node Quick-Action Inspector Bar (always easily visible when a node is selected) */}
+      {selected ? (
+        <div className="lane-panel__inspector" role="group" aria-label={`Selected node ${selected.id}`}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+            <h4 className="lane-panel__subtitle" style={{ margin: 0 }}>
+              Selected node <span style={{ color: '#fbbf24' }}>{selected.id}</span>
+            </h4>
+            <div className="lane-panel__fields" style={{ margin: 0 }}>
+              <label className="lane-panel__field">
+                <span>Node x</span>
+                <input
+                  type="number"
+                  value={fieldValue('x')}
+                  aria-label={`Node ${selected.id} down-range x`}
+                  onChange={(event) => editField('x', event.target.value)}
+                  onBlur={commitDraft}
+                  onKeyDown={(event) => { if (event.key === 'Enter') commitDraft(); }}
+                />
+              </label>
+              <label className="lane-panel__field">
+                <span>Node z</span>
+                <input
+                  type="number"
+                  value={fieldValue('z')}
+                  aria-label={`Node ${selected.id} lateral z`}
+                  onChange={(event) => editField('z', event.target.value)}
+                  onBlur={commitDraft}
+                  onKeyDown={(event) => { if (event.key === 'Enter') commitDraft(); }}
+                />
+              </label>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+            <div className="lane-panel__kinds" role="group" aria-label="Node kind">
+              {model.kinds.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  className="lane-panel__button"
+                  aria-pressed={selected.kind === kind}
+                  onClick={() => onCommand?.({ op: 'cycleKind', kind })}
+                  aria-label={`Set the selected node to ${KIND_LABEL[kind]}`}
+                >
+                  {KIND_LABEL[kind]}
+                </button>
+              ))}
+            </div>
+            <div className="lane-panel__commands" role="group" aria-label="Node commands">
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'insert' })}
+                aria-label="Insert a node on the path before the selected node">Insert [I]</button>
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'split' })}
+                aria-label="Split a new branch from the selected node">Split [S]</button>
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'merge' })}
+                aria-label="Merge the selected path end into a clicked node">Merge [M]</button>
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'markOob' })}
+                aria-label="Mark the selected path as the out-of-bounds branch">Mark OOB</button>
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'delete' })}
+                aria-label="Delete the selected node">Delete [Del]</button>
+            </div>
+            <div className="lane-panel__commands" role="group" aria-label="Node step and camera commands">
+              {onFocusNode ? (
                 <button
                   type="button"
-                  className={`lane-panel__button${filterLane === 'all' ? ' lane-panel__button--primary' : ''}`}
-                  style={{ padding: '2px 6px', fontSize: '11px' }}
-                  onClick={() => setFilterLane('all')}
-                  aria-label="Show all nodes from all paths"
+                  className="lane-panel__button"
+                  onClick={() => onFocusNode(selected.id)}
+                  aria-label="Frame the selected node in 3D camera"
                 >
-                  All
+                  👁 Frame Node [F]
                 </button>
-                {model.paths.map((p, idx) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`lane-panel__button${filterLane === p.id ? ' lane-panel__button--primary' : ''}`}
-                    style={{ padding: '2px 6px', fontSize: '11px' }}
-                    onClick={() => {
-                      setFilterLane(p.id);
-                      onSelectPath?.(p.id);
-                    }}
-                    aria-label={`Filter nodes for ${p.name}`}
-                  >
-                    L{idx + 1}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+              ) : null}
+              {selectedPath?.nodeIds ? (() => {
+                const pathNodeIds = selectedPath.nodeIds;
+                const idx = pathNodeIds.indexOf(selected.id);
+                return (
+                  <>
+                    <button
+                      type="button"
+                      className="lane-panel__button"
+                      disabled={idx <= 0}
+                      onClick={() => {
+                        if (idx > 0) {
+                          const prevId = pathNodeIds[idx - 1];
+                          onSelectNode?.(prevId);
+                          onFocusNode?.(prevId);
+                        }
+                      }}
+                      aria-label="Select previous node along path"
+                    >
+                      &larr; Prev [ [ ]
+                    </button>
+                    <button
+                      type="button"
+                      className="lane-panel__button"
+                      disabled={idx < 0 || idx >= pathNodeIds.length - 1}
+                      onClick={() => {
+                        if (idx >= 0 && idx < pathNodeIds.length - 1) {
+                          const nextId = pathNodeIds[idx + 1];
+                          onSelectNode?.(nextId);
+                          onFocusNode?.(nextId);
+                        }
+                      }}
+                      aria-label="Select next node along path"
+                    >
+                      Next [ ] ] &rarr;
+                    </button>
+                  </>
+                );
+              })() : null}
+            </div>
           </div>
-          <ul className="lane-panel__list" aria-labelledby="lane-nodes-title" data-testid="lane-nodes">
-            {model.nodes
-              .filter((node) => {
-                if (filterLane === 'all') return true;
-                const path = model.paths.find((p) => p.id === filterLane);
-                return path?.nodeIds ? path.nodeIds.includes(node.id) : true;
-              })
-              .map((node) => (
-                <li key={node.id}>
+        </div>
+      ) : null}
+
+      {/* Collapsible Drawer Section (Node & Path Lists + Full Validation) */}
+      <div
+        className="lane-panel__drawer"
+        style={{ display: isExpanded ? 'flex' : 'none', flexDirection: 'column', gap: '10px', marginTop: '6px' }}
+      >
+        {/* The validator's own messages. Live, and clickable to focus the node they are about. */}
+        <div className="lane-panel__validation">
+          <h4 className="lane-panel__subtitle" id="lane-validation-title">Validation</h4>
+          <ul
+            className="lane-panel__errors"
+            aria-labelledby="lane-validation-title"
+            aria-live="polite"
+            data-testid="lane-errors"
+          >
+            {model.errors.length === 0
+              ? <li className="lane-panel__ok">The network is valid.</li>
+              : model.errors.map((message, index) => {
+                const nodeId = model.errorNodeIds[index];
+                return (
+                  <li key={`${message}-${index}`} className="lane-panel__error">
+                    <button
+                      type="button"
+                      className="lane-panel__error-button"
+                      onClick={() => onSelectNode?.(nodeId)}
+                      aria-label={`Focus the node for: ${message}`}
+                    >
+                      {message}
+                    </button>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
+
+        <div className="lane-panel__columns">
+          <div className="lane-panel__column">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <h4 className="lane-panel__subtitle" id="lane-nodes-title" style={{ margin: 0 }}>Nodes</h4>
+              {model.paths.length > 0 ? (
+                <div style={{ display: 'flex', gap: '3px' }} role="group" aria-label="Filter nodes by lane">
                   <button
                     type="button"
-                    className={`lane-panel__row${node.id === model.selectedNodeId ? ' is-selected' : ''}`}
-                    onClick={() => {
-                      onSelectNode?.(node.id);
-                      onFocusNode?.(node.id);
-                    }}
-                    aria-pressed={node.id === model.selectedNodeId}
-                    aria-label={`Node ${node.id}, ${KIND_LABEL[node.kind as LaneNodeKind] ?? 'orphan'}, x ${Math.round(node.x)}, z ${Math.round(node.z)}, on ${node.pathCount} path(s)`}
+                    className={`lane-panel__button${filterLane === 'all' ? ' lane-panel__button--primary' : ''}`}
+                    style={{ padding: '2px 6px', fontSize: '11px' }}
+                    onClick={() => setFilterLane('all')}
+                    aria-label="Show all nodes from all paths"
                   >
-                    <span className="lane-panel__row-kind">{node.kind}</span>
-                    <span className="lane-panel__row-id">{node.id}</span>
-                    <span className="lane-panel__row-pos">{Math.round(node.x)} ({Math.round((node.x - 190) / 62)}m) · {Math.round(node.z)}</span>
+                    All
+                  </button>
+                  {model.paths.map((p, idx) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`lane-panel__button${filterLane === p.id ? ' lane-panel__button--primary' : ''}`}
+                      style={{ padding: '2px 6px', fontSize: '11px' }}
+                      onClick={() => {
+                        setFilterLane(p.id);
+                        onSelectPath?.(p.id);
+                      }}
+                      aria-label={`Filter nodes for ${p.name}`}
+                    >
+                      L{idx + 1}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <ul className="lane-panel__list" aria-labelledby="lane-nodes-title" data-testid="lane-nodes">
+              {model.nodes
+                .filter((node) => {
+                  if (filterLane === 'all') return true;
+                  const path = model.paths.find((p) => p.id === filterLane);
+                  return path?.nodeIds ? path.nodeIds.includes(node.id) : true;
+                })
+                .map((node) => (
+                  <li key={node.id}>
+                    <button
+                      type="button"
+                      className={`lane-panel__row${node.id === model.selectedNodeId ? ' is-selected' : ''}`}
+                      onClick={() => {
+                        onSelectNode?.(node.id);
+                        onFocusNode?.(node.id);
+                      }}
+                      aria-pressed={node.id === model.selectedNodeId}
+                      aria-label={`Node ${node.id}, ${KIND_LABEL[node.kind as LaneNodeKind] ?? 'orphan'}, x ${Math.round(node.x)}, z ${Math.round(node.z)}, on ${node.pathCount} path(s)`}
+                    >
+                      <span className="lane-panel__row-kind">{node.kind}</span>
+                      <span className="lane-panel__row-id">{node.id}</span>
+                      <span className="lane-panel__row-pos">{Math.round(node.x)} ({Math.round((node.x - 190) / 62)}m) · {Math.round(node.z)}</span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+
+          <div className="lane-panel__column">
+            <h4 className="lane-panel__subtitle" id="lane-paths-title">Paths</h4>
+            <ul className="lane-panel__list" aria-labelledby="lane-paths-title" data-testid="lane-paths">
+              {model.paths.map((path) => (
+                <li key={path.id}>
+                  <button
+                    type="button"
+                    className={`lane-panel__row${path.id === model.selectedPathId ? ' is-selected' : ''}`}
+                    onClick={() => {
+                      onSelectPath?.(path.id);
+                      setFilterLane(path.id);
+                    }}
+                    aria-pressed={path.id === model.selectedPathId}
+                    aria-label={`Path ${path.name}, ${path.nodeCount} nodes, ends as ${path.terminalKind}${path.oob ? ', out-of-bounds branch' : ''}`}
+                  >
+                    <span className="lane-panel__row-kind">{path.terminalKind}</span>
+                    <span className="lane-panel__row-id">{path.name}</span>
+                    <span className="lane-panel__row-pos">{path.nodeCount} nodes</span>
                   </button>
                 </li>
               ))}
-          </ul>
+            </ul>
+          </div>
         </div>
 
-        <div className="lane-panel__column">
-          <h4 className="lane-panel__subtitle" id="lane-paths-title">Paths</h4>
-          <ul className="lane-panel__list" aria-labelledby="lane-paths-title" data-testid="lane-paths">
-            {model.paths.map((path) => (
-              <li key={path.id}>
-                <button
-                  type="button"
-                  className={`lane-panel__row${path.id === model.selectedPathId ? ' is-selected' : ''}`}
-                  onClick={() => {
-                    onSelectPath?.(path.id);
-                    setFilterLane(path.id);
-                  }}
-                  aria-pressed={path.id === model.selectedPathId}
-                  aria-label={`Path ${path.name}, ${path.nodeCount} nodes, ends as ${path.terminalKind}${path.oob ? ', out-of-bounds branch' : ''}`}
-                >
-                  <span className="lane-panel__row-kind">{path.terminalKind}</span>
-                  <span className="lane-panel__row-id">{path.name}</span>
-                  <span className="lane-panel__row-pos">{path.nodeCount} nodes</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-
-      {selected ? (
-        <div className="lane-panel__inspector" role="group" aria-label={`Selected node ${selected.id}`}>
-          <h4 className="lane-panel__subtitle">Selected node</h4>
-          <div className="lane-panel__fields">
-            <label className="lane-panel__field">
-              <span>Node x</span>
-              <input
-                type="number"
-                value={fieldValue('x')}
-                aria-label={`Node ${selected.id} down-range x`}
-                onChange={(event) => editField('x', event.target.value)}
-                onBlur={commitDraft}
-                onKeyDown={(event) => { if (event.key === 'Enter') commitDraft(); }}
-              />
-            </label>
-            <label className="lane-panel__field">
-              <span>Node z</span>
-              <input
-                type="number"
-                value={fieldValue('z')}
-                aria-label={`Node ${selected.id} lateral z`}
-                onChange={(event) => editField('z', event.target.value)}
-                onBlur={commitDraft}
-                onKeyDown={(event) => { if (event.key === 'Enter') commitDraft(); }}
-              />
-            </label>
-          </div>
-          <div className="lane-panel__kinds" role="group" aria-label="Node kind">
-            {model.kinds.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                className="lane-panel__button"
-                aria-pressed={selected.kind === kind}
-                onClick={() => onCommand?.({ op: 'cycleKind', kind })}
-                aria-label={`Set the selected node to ${KIND_LABEL[kind]}`}
-              >
-                {KIND_LABEL[kind]}
-              </button>
-            ))}
-          </div>
-          <div className="lane-panel__commands" role="group" aria-label="Node commands">
-            <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'insert' })}
-              aria-label="Insert a node on the path before the selected node">Insert</button>
-            <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'split' })}
-              aria-label="Split a new branch from the selected node">Split</button>
-            <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'merge' })}
-              aria-label="Merge the selected path end into a clicked node">Merge</button>
-            <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'markOob' })}
-              aria-label="Mark the selected path as the out-of-bounds branch">Mark OOB</button>
-            <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'delete' })}
-              aria-label="Delete the selected node">Delete</button>
-          </div>
-          <div className="lane-panel__commands" role="group" aria-label="Node step and camera commands" style={{ marginTop: '6px' }}>
-            {onFocusNode ? (
-              <button
-                type="button"
-                className="lane-panel__button"
-                onClick={() => onFocusNode(selected.id)}
-                aria-label="Frame the selected node in 3D camera"
-              >
-                👁 Frame Node [F]
-              </button>
-            ) : null}
-            {selectedPath?.nodeIds ? (() => {
-              const pathNodeIds = selectedPath.nodeIds;
-              const idx = pathNodeIds.indexOf(selected.id);
-              return (
-                <>
-                  <button
-                    type="button"
-                    className="lane-panel__button"
-                    disabled={idx <= 0}
-                    onClick={() => {
-                      if (idx > 0) {
-                        const prevId = pathNodeIds[idx - 1];
-                        onSelectNode?.(prevId);
-                        onFocusNode?.(prevId);
-                      }
-                    }}
-                    aria-label="Select previous node along path"
-                  >
-                    &larr; Prev Node [ [ ]
-                  </button>
-                  <button
-                    type="button"
-                    className="lane-panel__button"
-                    disabled={idx < 0 || idx >= pathNodeIds.length - 1}
-                    onClick={() => {
-                      if (idx >= 0 && idx < pathNodeIds.length - 1) {
-                        const nextId = pathNodeIds[idx + 1];
-                        onSelectNode?.(nextId);
-                        onFocusNode?.(nextId);
-                      }
-                    }}
-                    aria-label="Select next node along path"
-                  >
-                    Next Node [ ] ] &rarr;
-                  </button>
-                </>
-              );
-            })() : null}
-          </div>
-          <div className="lane-panel__commands" role="group" aria-label="Node nudge coordinates" style={{ marginTop: '6px' }}>
+        {selected ? (
+          <div className="lane-panel__commands" role="group" aria-label="Node nudge coordinates" style={{ marginTop: '4px' }}>
+            <span style={{ fontSize: '11px', color: '#a1a1aa', marginRight: '4px' }}>Nudge:</span>
             <button
               type="button"
               className="lane-panel__button"
@@ -447,45 +502,42 @@ export default function LanePanel({
               +30 Z
             </button>
           </div>
-          <p className="lane-panel__hint">
-            Drag handle in 3D or type X/Z. F frame &middot; [ / ] step &middot; N new path &middot; I insert &middot; K kind &middot; S split &middot; M merge &middot; O mark OOB &middot; Del delete &middot; Ctrl+Z undo.
-          </p>
-        </div>
-      ) : null}
+        ) : null}
 
-      {selectedPath ? (
-        <div className="lane-panel__inspector" role="group" aria-label={`Selected path ${selectedPath.name}`}>
-          <h4 className="lane-panel__subtitle">Selected path</h4>
-          <label className="lane-panel__field">
-            <span>Half width (40–240)</span>
-            <input
-              type="range"
-              min={40}
-              max={240}
-              step={10}
-              value={selectedPath.halfWidth}
-              aria-label={`Half width of path ${selectedPath.name}`}
-              onChange={(event) => onCommand?.({
-                op: 'setHalfWidth', pathId: selectedPath.id, halfWidth: Number(event.target.value),
-              })}
-            />
-          </label>
-          <div className="lane-panel__commands" role="group" aria-label="Path commands">
-            <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'markOob' })}
-              aria-label="Mark the selected path as the out-of-bounds branch">Mark OOB</button>
+        {selectedPath ? (
+          <div className="lane-panel__inspector" role="group" aria-label={`Selected path ${selectedPath.name}`}>
+            <h4 className="lane-panel__subtitle">Selected path</h4>
+            <label className="lane-panel__field">
+              <span>Half width (40–240)</span>
+              <input
+                type="range"
+                min={40}
+                max={240}
+                step={10}
+                value={selectedPath.halfWidth}
+                aria-label={`Half width of path ${selectedPath.name}`}
+                onChange={(event) => onCommand?.({
+                  op: 'setHalfWidth', pathId: selectedPath.id, halfWidth: Number(event.target.value),
+                })}
+              />
+            </label>
+            <div className="lane-panel__commands" role="group" aria-label="Path commands">
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'markOob' })}
+                aria-label="Mark the selected path as the out-of-bounds branch">Mark OOB</button>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {!selected && !selectedPath && model.hasDocument ? (
-        <div className="lane-panel__guide" role="note" aria-label="Lane editing instructions">
-          <h4 className="lane-panel__subtitle">Authoring Lanes &amp; Paths</h4>
-          <p className="lane-panel__hint">
-            Click <strong>+ Path [N]</strong> to add a new lane path. Click any circular handle on the track to move it.
-            Select a node to <strong>Insert [I]</strong>, <strong>Split [S]</strong>, <strong>Merge [M]</strong>, change <strong>Kind [K]</strong>, or <strong>Delete [Del]</strong>.
-          </p>
-        </div>
-      ) : null}
+        {!selected && !selectedPath && model.hasDocument ? (
+          <div className="lane-panel__guide" role="note" aria-label="Lane editing instructions">
+            <h4 className="lane-panel__subtitle">Authoring Lanes &amp; Paths</h4>
+            <p className="lane-panel__hint">
+              Click <strong>+ Path [N]</strong> to add a new lane path. Click any circular handle on the track to move it with the 3D manipulator gizmo.
+              Select a node to <strong>Insert [I]</strong>, <strong>Split [S]</strong>, <strong>Merge [M]</strong>, change <strong>Kind [K]</strong>, or <strong>Delete [Del]</strong>.
+            </p>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -16,6 +16,13 @@ import {
   type Transformable,
 } from './gizmo-math';
 
+export interface LaneNodeGizmoTarget {
+  id: string;
+  onDragStart?: () => void;
+  onMove?: (worldPos: THREE.Vector3) => void;
+  onCommit?: () => void;
+}
+
 export class GizmoAdapter<T extends Transformable & { id: string }> {
   readonly controls: TransformControls;
   readonly helper: THREE.Object3D;
@@ -33,6 +40,7 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
   };
 
   private selectedItems: T[] = [];
+  private laneNodeTarget: LaneNodeGizmoTarget | null = null;
   private dragStartPivot = new THREE.Vector3();
   private dragStartProps = new Map<string, { x: number; y: number; z: number; rotY?: number; scale: number }>();
   private isDragging = false;
@@ -77,6 +85,17 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
         cb(dragging);
       }
 
+      if (this.laneNodeTarget) {
+        if (dragging) {
+          this.dragStartPivot.copy(this.proxy.position);
+          this.laneNodeTarget.onDragStart?.();
+        } else {
+          this.laneNodeTarget.onCommit?.();
+          this.notifyChange();
+        }
+        return;
+      }
+
       if (dragging) {
         this.dragStartPivot.copy(this.proxy.position);
         this.dragStartProps.clear();
@@ -98,7 +117,15 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
     });
 
     this.controls.addEventListener('objectChange', () => {
-      if (!this.isDragging || this.selectedItems.length === 0) return;
+      if (!this.isDragging) return;
+
+      if (this.laneNodeTarget) {
+        this.laneNodeTarget.onMove?.(this.proxy.position);
+        this.notifyChange();
+        return;
+      }
+
+      if (this.selectedItems.length === 0) return;
 
       if (this.mode === 'translate') {
         const rawDelta = new THREE.Vector3().subVectors(this.proxy.position, this.dragStartPivot);
@@ -151,6 +178,11 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
   }
 
   setMode(mode: GizmoMode): void {
+    if (this.laneNodeTarget) {
+      this.mode = 'translate';
+      this.controls.setMode('translate');
+      return;
+    }
     this.mode = mode;
     this.controls.setMode(mode);
   }
@@ -213,10 +245,42 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
   }
 
   attach(items: T[]): void {
+    this.laneNodeTarget = null;
     this.updateSelection(items);
   }
 
+  attachLaneNode(target: LaneNodeGizmoTarget, worldPos: THREE.Vector3): void {
+    this.selectedItems = [];
+    this.laneNodeTarget = target;
+    this.mode = 'translate';
+    this.controls.setMode('translate');
+    this.proxy.position.copy(worldPos);
+    this.proxy.rotation.set(0, 0, 0);
+    this.proxy.scale.set(1, 1, 1);
+    this.helper.visible = true;
+    this.controls.enabled = true;
+  }
+
+  updateLaneNodePosition(worldPos: THREE.Vector3): void {
+    if (this.laneNodeTarget && !this.isDragging) {
+      this.proxy.position.copy(worldPos);
+    }
+  }
+
+  isLaneNodeAttached(): boolean {
+    return Boolean(this.laneNodeTarget);
+  }
+
+  isHovered(): boolean {
+    return Boolean((this.controls as any).axis);
+  }
+
+  isInteracting(): boolean {
+    return this.isDragging || Boolean((this.controls as any).axis);
+  }
+
   detach(): void {
+    this.laneNodeTarget = null;
     this.updateSelection([]);
   }
 
@@ -226,6 +290,17 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
 
   cancelDrag(): void {
     if (!this.isDragging) return;
+    if (this.laneNodeTarget) {
+      this.proxy.position.copy(this.dragStartPivot);
+      this.laneNodeTarget.onMove?.(this.proxy.position);
+      this.laneNodeTarget.onCommit?.();
+      this.isDragging = false;
+      for (const cb of this.dragCallbacks) {
+        cb(false);
+      }
+      this.notifyChange();
+      return;
+    }
     this.history.cancel();
     for (const item of this.selectedItems) {
       const start = this.dragStartProps.get(item.id);

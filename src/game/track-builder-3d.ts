@@ -1158,7 +1158,9 @@ export class TrackBuilder3D {
     this.gizmoAdapter.onDrag((dragging) => {
       this.isGizmoDragging = dragging;
     });
-    if (this.selectedPropIds.size > 0 && this.freeFly.active) {
+    if (this.selectedLaneNodeId && this.lanesVisible) {
+      this.attachGizmoToLaneNode(this.selectedLaneNodeId);
+    } else if (this.selectedPropIds.size > 0 && this.freeFly.active) {
       this.gizmoAdapter.attach(this.getSelectedProps());
     }
   }
@@ -1169,6 +1171,14 @@ export class TrackBuilder3D {
 
   isDraggingGizmo(): boolean {
     return this.isGizmoDragging;
+  }
+
+  isGizmoHovered(): boolean {
+    return this.gizmoAdapter?.isHovered() ?? false;
+  }
+
+  isGizmoInteracting(): boolean {
+    return this.isGizmoDragging || (this.gizmoAdapter?.isInteracting() ?? false);
   }
 
   setGizmoMode(mode: GizmoMode) {
@@ -1921,7 +1931,11 @@ export class TrackBuilder3D {
         obj.name?.startsWith('DecalSide') ||
         obj.name?.startsWith('DecalHandle') ||
         obj.name === 'RotationHandleGroup' ||
-        obj.name === 'DecalSideHandlesGroup'
+        obj.name === 'DecalSideHandlesGroup' ||
+        obj.name === 'LaneHandles' ||
+        obj.name === 'LaneGizmos' ||
+        obj.name === 'GizmoPivotProxy' ||
+        obj.name?.startsWith('TransformControls')
       ) continue;
 
       // Find closest track sample
@@ -2522,7 +2536,9 @@ export class TrackBuilder3D {
       this.selectionBoxes.forEach((box) => { box.visible = false; });
       if (this.rotationHandle) this.rotationHandle.visible = false;
       if (this.decalSideHandlesGroup) this.decalSideHandlesGroup.visible = false;
-      this.gizmoAdapter?.detach();
+      if (!this.selectedLaneNodeId || !this.lanesVisible) {
+        this.gizmoAdapter?.detach();
+      }
       return;
     }
 
@@ -3160,6 +3176,11 @@ export class TrackBuilder3D {
     if (!active) {
       this.selectedLaneNodeId = null;
       this.laneGizmos.setSelectedNode(null);
+      if (this.gizmoAdapter?.isLaneNodeAttached()) {
+        this.gizmoAdapter.detach();
+      }
+    } else if (this.selectedLaneNodeId) {
+      this.attachGizmoToLaneNode(this.selectedLaneNodeId);
     }
     this.notify();
   }
@@ -3186,6 +3207,13 @@ export class TrackBuilder3D {
       this.selectedLaneNodeId = null;
     }
     this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
+    if (this.selectedLaneNodeId && this.lanesVisible) {
+      if (!this.gizmoAdapter?.isDraggingActive()) {
+        this.attachGizmoToLaneNode(this.selectedLaneNodeId);
+      }
+    } else if (this.gizmoAdapter?.isLaneNodeAttached()) {
+      this.gizmoAdapter.detach();
+    }
     this.notify();
     return { ok: true, focus: result.focus };
   }
@@ -3251,9 +3279,54 @@ export class TrackBuilder3D {
     return { x: point.x, z: point.z };
   }
 
+  attachGizmoToLaneNode(nodeId: string | null) {
+    if (!nodeId || !this.laneDoc || !this.gizmoAdapter) {
+      if (this.gizmoAdapter?.isLaneNodeAttached()) {
+        this.gizmoAdapter.detach();
+      }
+      return;
+    }
+    const node = this.laneDoc.nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      if (this.gizmoAdapter?.isLaneNodeAttached()) {
+        this.gizmoAdapter.detach();
+      }
+      return;
+    }
+    this.selectedPropIds.clear();
+    const worldPos = this.laneGizmos.worldFromEngine(node.x, node.z, 0);
+    this.gizmoAdapter.attachLaneNode(
+      {
+        id: node.id,
+        onDragStart: () => {
+          this.pushUndo();
+        },
+        onMove: (pos) => {
+          const engine = this.laneGizmos.engineFromWorld(pos);
+          const snapped = snapNode(engine.x, engine.z, { lanes: false, grid: true });
+          this.applyLaneEditToDoc({ op: 'moveNode', nodeId: node.id, x: snapped.x, z: snapped.z });
+        },
+        onCommit: () => {
+          const current = this.getSelectedLaneNode();
+          if (current) {
+            const finalWorld = this.laneGizmos.worldFromEngine(current.x, current.z, 0);
+            this.gizmoAdapter?.updateLaneNodePosition(finalWorld);
+          }
+          this.notify();
+        },
+      },
+      worldPos,
+    );
+  }
+
   selectLaneNode(nodeId: string | null) {
     this.selectedLaneNodeId = nodeId;
     this.laneGizmos.setSelectedNode(nodeId);
+    if (nodeId && this.lanesVisible) {
+      this.attachGizmoToLaneNode(nodeId);
+    } else if (this.gizmoAdapter?.isLaneNodeAttached()) {
+      this.gizmoAdapter.detach();
+    }
     this.notify();
   }
 
@@ -3268,6 +3341,7 @@ export class TrackBuilder3D {
     if (!this.laneDoc) return;
     const node = this.laneDoc.nodes.find((n) => n.id === nodeId);
     if (!node) return;
+    this.selectLaneNode(nodeId);
 
     try {
       const worldPos = this.laneGizmos.worldFromEngine(node.x, node.z, 0);
@@ -3374,6 +3448,11 @@ export class TrackBuilder3D {
       this.selectedLaneNodeId = null;
     }
     this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
+    if (this.selectedLaneNodeId && this.lanesVisible) {
+      this.attachGizmoToLaneNode(this.selectedLaneNodeId);
+    } else if (this.gizmoAdapter?.isLaneNodeAttached()) {
+      this.gizmoAdapter.detach();
+    }
   }
 
   private restorePropsState(props: PlacedProp[]) {

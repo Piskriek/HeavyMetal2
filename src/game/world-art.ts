@@ -59,11 +59,6 @@ function dirtMaterial(track: CourseDefinition, assets: GameAssets) {
     c.beginPath(); c.ellipse(noise(i + 450) * 512, y, 0.9 + noise(i + 730) * 1.5, 0.7, 0, 0, Math.PI * 2); c.fill();
   }
   for (const y of [0, 506]) { c.fillStyle = `${p.bank}40`; c.fillRect(0, y, 512, 6); }
-  for (const y of [128, 256, 384]) {
-    c.strokeStyle = `${p.chalk}9c`; c.lineWidth = 2.5; c.setLineDash([66, 62]);
-    c.beginPath(); c.moveTo(0, y); c.lineTo(512, y); c.stroke();
-  }
-  c.setLineDash([]);
   return image;
 }
 

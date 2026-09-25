@@ -77,6 +77,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [selectedLanePathId, setSelectedLanePathId] = useState<string | null>(null);
   const [laneRevision, setLaneRevision] = useState(0);
   const [laneStatus, setLaneStatus] = useState<string | null>(null);
+  const [laneDrawerOpen, setLaneDrawerOpen] = useState(false);
   const [activePropType, setActivePropType] = useState<string | null>(builder.getActivePropType());
   const [selectedProp, setSelectedProp] = useState<PlacedProp | null>(builder.getSelectedProp());
   const [selectedProps, setSelectedProps] = useState<PlacedProp[]>(builder.getSelectedProps());
@@ -234,13 +235,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         // M01 · T7 — the lanes tool owns the left button: a handle under the pointer is picked up for a
         // drag (undo pushed once, here, not per frame), and a click on open track clears the selection.
         if (builder.getLanesToolActive()) {
+          if (builder.isDraggingGizmo() || builder.isGizmoHovered()) {
+            return;
+          }
           const hitNode = builder.raycastLaneNode(e.clientX, e.clientY, canvas);
           builder.selectLaneNode(hitNode);
           laneDragReason.current = null;
           if (hitNode) {
-            builder.pushUndo();
-            draggingLaneNode.current = hitNode;
-            showToast(`Node ${hitNode} [drag to move · Del delete · K kind · S split · I insert]`);
+            showToast(`Node ${hitNode} [drag gizmo to move · Del delete · K kind · S split · I insert]`);
           }
           setLaneRevision((revision) => revision + 1);
           onRequestRender?.();
@@ -471,10 +473,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     const onKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
-      // M01 · T7 — while the lanes tool is up, N/I/Del/K/S/M/O and Ctrl+Z / Ctrl+Y belong to it.
-      // `laneKeyIntent` decides what counts (a keypress with a modifier we do not own is not ours).
+      // Always track pressed keys for free-fly camera movement
+      keysRef.current.add(e.code);
+
+      // M01 · T7 — while the lanes tool is up, N/I/Del/K/M/O and Ctrl+Z / Ctrl+Y belong to it.
+      // S key is reserved for reverse flying unless Shift/Alt is held or not in freeFly mode.
       if (builder.getLanesToolActive()) {
-        const intent = laneKeyIntent({ key: e.key, ctrlOrMeta: e.ctrlKey || e.metaKey, typing: false });
+        const isReverseFlying = (e.code === 'KeyS' || e.key === 's' || e.key === 'S') && (isRightMouseDown.current || builder.freeFly.active);
+        const intent = isReverseFlying ? null : laneKeyIntent({ key: e.key, ctrlOrMeta: e.ctrlKey || e.metaKey, typing: false });
         if (intent) {
           e.preventDefault();
           laneIntentRef.current(intent);
@@ -526,8 +532,6 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           }
         }
       }
-
-      keysRef.current.add(e.code);
 
       // Keyboard shortcuts
       // 1. Cycle active axis with Numpad 5 or Digit 5
@@ -1569,7 +1573,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
             {onTestRace && (
               <button
-                onClick={onTestRace}
+                onClick={(e) => {
+                  (e.currentTarget as HTMLElement)?.blur();
+                  (document.activeElement as HTMLElement)?.blur();
+                  onTestRace();
+                }}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors shadow-md shadow-emerald-700/30 cursor-pointer ml-1"
                 title="Test drive on this track!"
               >
@@ -3432,9 +3440,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   shelfScrollRef.current.scrollLeft += e.deltaY;
                 }
               }}
-              className={`builder-shelf-scroll flex gap-2.5 px-8 py-2 w-full transition-all ${
+              className={`builder-shelf-scroll flex gap-2.5 px-6 py-2 w-full transition-all ${
                 category === 'lanes'
-                  ? 'overflow-auto max-h-96'
+                  ? (laneDrawerOpen ? 'overflow-auto max-h-96' : 'overflow-x-auto max-h-36')
                   : shelfExpanded
                   ? 'flex-wrap overflow-y-auto max-h-72 p-4'
                   : 'items-center overflow-x-auto max-h-40'
@@ -3444,6 +3452,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <LanePanel
                   model={laneModel}
                   status={laneStatus}
+                  isDrawerOpen={laneDrawerOpen}
+                  onToggleDrawer={(open) => setLaneDrawerOpen(open)}
                   onSelectNode={(nodeId) => {
                     builder.selectLaneNode(nodeId);
                     refreshLanes();

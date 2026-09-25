@@ -196,10 +196,13 @@ export const APERTURE_FRACTION = {
   radius: BEZEL.aperture.radius / BEZEL.h,
 } as const;
 
+/** Upward offset for yoke grips to place hands higher on the wheel rim. */
+export const YOKE_GRIP_Y_OFFSET = 64;
+
 /** The yoke's grip anchors inside its own sprite, as shares of the sprite box. */
 const GRIP_FRACTION = {
-  left: { x: YOKE.grips.left.x / YOKE.w, y: YOKE.grips.left.y / YOKE.h },
-  right: { x: YOKE.grips.right.x / YOKE.w, y: YOKE.grips.right.y / YOKE.h },
+  left: { x: YOKE.grips.left.x / YOKE.w, y: (YOKE.grips.left.y - YOKE_GRIP_Y_OFFSET) / YOKE.h },
+  right: { x: YOKE.grips.right.x / YOKE.w, y: (YOKE.grips.right.y - YOKE_GRIP_Y_OFFSET) / YOKE.h },
   pivot: { x: YOKE.pivot.x / YOKE.w, y: YOKE.pivot.y / YOKE.h },
 } as const;
 
@@ -269,8 +272,8 @@ export function cockpitLayout(w: number, h: number): CockpitLayout {
     w, h, aperture, horizonY: aperture.y + aperture.h / 2, yoke,
     arms: { left: null as unknown as ArmPose, right: null as unknown as ArmPose },
     clusters: {
-      left: { x: w * 0.005, y: aperture.y + aperture.h + h * 0.01, w: clusterW },
-      right: { x: w - clusterW - w * 0.005, y: aperture.y + aperture.h + h * 0.01, w: clusterW },
+      left: { x: w * 0.005, y: h - clusterW * (419 / 1024) - 4, w: clusterW },
+      right: { x: w - clusterW - w * 0.005, y: h - clusterW * (485 / 1024) - 4, w: clusterW },
     },
     strip: { x: 0, y: h - Math.max(18, h * 0.05), w, h: Math.max(18, h * 0.05) },
   };

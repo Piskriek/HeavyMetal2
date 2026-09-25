@@ -3,6 +3,7 @@ import { GameAudio } from './audio';
 import { RangeRenderer } from './renderer';
 import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
+import { PLAYER_ID } from './roster';
 import {
   AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
@@ -86,7 +87,9 @@ export class GameEngine {
   private counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
   private racers = createRacers();
   private renderRacers: RacerFrame[] = [];
-  private readonly collisionTimes = new Float64Array(16).fill(-100);
+  private readonly collisionTimes = new Map<number, number>();
+  /** True once the player reaches the first split passage; rivals join at the merge gate. */
+  private splitReached = false;
   private obstacles: Obstacle[] = [];
   private pickups: AirPickup[] = [];
   private pickupCount = 0;
@@ -149,6 +152,8 @@ export class GameEngine {
     private readonly config?: RaceConfig,
   ) {
     this.renderer = new RangeRenderer(canvas, assets, config?.course ?? options.course);
+    this.racers = createRacers(config);
+    this.renderer.setRacerCount(this.racers.length);
     this.audio.setEnabled(options.sound);
     this.audio.setVolume(options.masterVolume);
     const engine = this;
@@ -276,6 +281,10 @@ export class GameEngine {
     this.mergeDone = false;
     this.mergeLastReleased = null;
     this.pausedFrom = null;
+    this.splitReached = false;
+    this.collisionTimes.clear();
+    this.racers = createRacers(this.config);
+    this.renderer.setRacerCount(this.racers.length);
     if (this.laneNetwork) this.assignPaths();
     // Solo mode: keep only the player, remove all AI racers
     if (this.soloMode) {
@@ -292,7 +301,7 @@ export class GameEngine {
     this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
     this.pickupCount = this.shieldBlocks = 0;
     this.snapshot.sector = sectorAt(START_X, this.options.course);
-    this.collisionTimes.fill(-100);
+    this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
     this.particles.length = this.airSheep.length = this.trail.length = 0;
     this.canvas.style.cursor = '';
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
@@ -316,10 +325,10 @@ export class GameEngine {
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
       racer.launchOrigin = { x: racer.x, y: racer.y };
     }
-    for (const racer of this.racers) this.effects.push('dust', racer.x, racer.y, racer.z, 1.6, racer.id, this.tick);
+    this.effects.push('dust', this.player.x, this.player.y, this.player.z, 1.6, this.player.id, this.tick);
     this.snapshot.status = 'pushing';
     this.snapshot.speed = 0;
-    this.snapshot.notice = 'THE STARTER GOBLIN SHOVES THE WHOLE GRID.';
+    this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
     this.audio.play('push');
     this.notify(); this.invalidate();
   };
@@ -332,13 +341,11 @@ export class GameEngine {
   private stepPush(dt: number) {
     this.runTime += dt;
     this.pushTick += 1;
-    for (let i = 0; i < this.racers.length; i++) {
-      const racer = this.racers[i];
-      applyPushTick(racer, this.pushTick, this.pushTargets[i]);
-      racer.x += racer.vx * dt;
-      racer.y = this.y(racer.x) - RADIUS;
-      racer.rotation += racer.vx * dt / RADIUS;
-    }
+    // Solo first split: only the player marble starts from the pad
+    applyPushTick(this.player, this.pushTick, this.pushTargets[0] ?? 240);
+    this.player.x += this.player.vx * dt;
+    this.player.y = this.y(this.player.x) - RADIUS;
+    this.player.rotation += this.player.vx * dt / RADIUS;
     this.refreshSnapshot();
     if (this.pushTick >= PUSH_TICKS) this.snapshot.status = 'flying';
   }
@@ -874,6 +881,11 @@ export class GameEngine {
     const alpha = statusSimulates(this.status) ? clamp(this.accumulator / STEP, 0, 1) : 1;
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i]; const rendered = this.renderRacers[i];
+      if (!this.splitReached && racer.id !== PLAYER_ID) {
+        rendered.x = -999999;
+        rendered.y = -999999;
+        continue;
+      }
       rendered.x = racer.previous.x + (racer.x - racer.previous.x) * alpha;
       rendered.y = racer.previous.y + (racer.y - racer.previous.y) * alpha;
       rendered.z = racer.previous.z + (racer.z - racer.previous.z) * alpha;
@@ -938,9 +950,21 @@ export class GameEngine {
     const clockStopped = pool !== null && pool.phase !== 'done' && pool.phase !== 'releasing';
     if (!clockStopped) this.runTime += dt;
 
+    if (!this.splitReached && this.player.x >= passageMouthX()) {
+      this.splitReached = true;
+      this.say('FIRST SPLIT COMPLETE! RIVALS JOIN THE RUN!');
+    }
+
     this.adoptPaths();
     for (const racer of this.racers) {
       if (racer.finished) continue;
+      // Solo run until first split: rivals wait at the merge gate until split is reached
+      if (!this.splitReached && racer.id !== PLAYER_ID) {
+        racer.x = passageMouthX();
+        racer.vx = 0;
+        racer.vy = 0;
+        continue;
+      }
       // A held rider is out of the race: no CPU decisions, and the physics only glides their slot.
       if (racer.mergeHeld) { stepRacerSim(racer, this.simCtx, dt); continue; }
       // A race lets the CPU see the whole field and rubber-band against the player; an isolated
@@ -967,6 +991,7 @@ export class GameEngine {
       // can be touched, which is what keeps the ordered release from being spoiled by contact.
       if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
         || a.mergeHeld || b.mergeHeld || a.mergeGhost || b.mergeGhost
+        || (!this.splitReached && (a.id !== PLAYER_ID || b.id !== PLAYER_ID))
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
       const diameter = RADIUS * 2 + 4;
@@ -980,30 +1005,37 @@ export class GameEngine {
       a.z -= nz * penetration * b.weight / sum; b.z += nz * penetration * a.weight / sum;
       a.z = clamp(a.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
       b.z = clamp(b.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-      const pair = i * 4 + j;
-      if (this.runTime - this.collisionTimes[pair] < 0.38) continue;
-      this.collisionTimes[pair] = this.runTime;
+      const pair = (i << 10) | j;
+      const lastCollision = this.collisionTimes.get(pair) ?? -100;
+      if (this.runTime - lastCollision < 0.38) continue;
+      this.collisionTimes.set(pair, this.runTime);
       const shieldA = this.absorbShield(a);
       const shieldB = this.absorbShield(b);
       const relative = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (relative < 0) {
-        const impulse = -(1.38 * relative) / (1 / a.weight + 1 / b.weight);
-        if (!shieldA) a.vx = clamp(a.vx - impulse * nx / a.weight, 100, a.maximumSpeed);
-        if (!shieldB) b.vx = clamp(b.vx + impulse * nx / b.weight, 100, b.maximumSpeed);
+        const impulse = -(0.8 * relative) / (1 / a.weight + 1 / b.weight);
+        if (!shieldA) a.vx = clamp(a.vx - impulse * nx * 0.25 / a.weight, a.vx * 0.92, a.maximumSpeed);
+        if (!shieldB) b.vx = clamp(b.vx + impulse * nx * 0.25 / b.weight, b.vx * 0.92, b.maximumSpeed);
       }
       // A rear-end hit also has a sideways component: heavy capsules shove the
       // lighter target toward an adjacent lane, rather than stacking in place.
       let side = Math.abs(dz) > 8 ? Math.sign(dz) : (closestLane(b.z) === 0 ? -1 : closestLane(b.z) === 3 ? 1 : ((i + j) % 2 ? 1 : -1));
       if (!side) side = 1;
       const closing = Math.min(380, Math.abs(a.vx - b.vx) + Math.abs(a.vz - b.vz));
-      const kick = 270 + closing * 0.22;
+      const kick = 220 + closing * 0.18;
       
       // Heavy impacts cause more dramatic lane changes
       const isHeavyImpact = closing > 200 || Math.abs(a.vx - b.vx) > 150;
-      const kickMultiplier = isHeavyImpact ? 2.5 : 1;
+      const kickMultiplier = isHeavyImpact ? 2.0 : 1;
       
-      if (!shieldA) this.shove(a, -side, kick * kickMultiplier * Math.min(1.65, b.weight / a.weight));
-      if (!shieldB) this.shove(b, side, kick * kickMultiplier * Math.min(1.65, a.weight / b.weight));
+      if (!shieldA) {
+        this.shove(a, -side, kick * kickMultiplier * Math.min(1.5, b.weight / a.weight));
+        a.rollRate += (side > 0 ? -1 : 1) * 16;
+      }
+      if (!shieldB) {
+        this.shove(b, side, kick * kickMultiplier * Math.min(1.5, a.weight / b.weight));
+        b.rollRate += (side > 0 ? 1 : -1) * 16;
+      }
       
       const x = (a.x + b.x) / 2; const z = (a.z + b.z) / 2;
       const y = (a.y + b.y) / 2;

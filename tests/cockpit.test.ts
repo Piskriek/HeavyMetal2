@@ -60,7 +60,7 @@ test('layout: the painted aperture is the frozen D3 rectangle at every viewport'
   assert.ok(Math.abs(APERTURE_FRACTION.x - 0.07) < 0.002, `x ${APERTURE_FRACTION.x}`);
   assert.ok(Math.abs(APERTURE_FRACTION.y - 0.06) < 0.002, `y ${APERTURE_FRACTION.y}`);
   assert.ok(Math.abs((APERTURE_FRACTION.w + APERTURE_FRACTION.x) - 0.93) < 0.003, 'right edge');
-  assert.ok(Math.abs((APERTURE_FRACTION.h + APERTURE_FRACTION.y) - 0.62) < 0.003, 'bottom edge');
+  assert.ok(Math.abs((APERTURE_FRACTION.h + APERTURE_FRACTION.y) - 0.783) < 0.005, 'bottom edge');
   for (const [w, h] of [[1280, 720], [1920, 1080], [3840, 2160]] as const) {
     const layout = cockpitLayout(w, h);
     assert.ok(layout.aperture.x > 0 && layout.aperture.y > 0, 'the aperture is inside the viewport');

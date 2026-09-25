@@ -83,6 +83,7 @@
   position: absolute;
   pointer-events: none;
   will-change: transform;
+  z-index: 5;
 }
 
 .cockpit-yoke > img {
@@ -98,6 +99,7 @@
   background-size: 100% 100%;
   will-change: transform;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+  z-index: 4;
 }
 
 /* ---- the starter goblin (4 frames, 12 fps) ---------------------------------- */
@@ -116,9 +118,7 @@
 }
 
 .cockpit-strip {
-  position: absolute;
-  user-select: none;
-  opacity: 0.96;
+  display: none;
 }
 
 .cockpit-center-readout {
@@ -137,7 +137,8 @@
 .cockpit-readouts {
   position: absolute;
   left: 50%;
-  bottom: 1.2%;
+  top: 18px;
+  bottom: auto;
   transform: translateX(-50%);
   display: flex;
   gap: 10px;
@@ -145,6 +146,7 @@
   font: 600 12px/1 'Trebuchet MS', system-ui, sans-serif;
   letter-spacing: 0.1em;
   color: #f7d9a6;
+  z-index: 10;
 }
 
 .cockpit-chip {

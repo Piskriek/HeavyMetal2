@@ -116,6 +116,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       engineRef.current.trackBuilder.freeFly.active = false;
       engineRef.current.inputEnabled = true;
       engineRef.current.reset(); // Reset to 'ready' state so user can launch
+      (document.activeElement as HTMLElement)?.blur();
       canvasRef.current?.focus({ preventScroll: true });
     }
   };
@@ -129,7 +130,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     }
   };
 
-  // Keyboard shortcut: B toggles test mode in editor, WASD for lane changes
+  // Keyboard shortcut: B toggles test mode in editor, Space/Enter to launch/ready, WASD for lane changes
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
@@ -146,22 +147,49 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         return;
       }
 
-      // M01 · T2: in a test run that has reached the sorting loop, Space or Enter readies the player —
-      // the pool is the only thing on screen then, and it refuses anything else.
-      if (eng.inMerge && (e.key === ' ' || e.key === 'Enter')) {
-        e.preventDefault();
-        eng.ready();
-        return;
-      }
+      if (isTesting) {
+        // Space or Enter: launch on grid, ready up in loop merge pool, or air-bounce while flying
+        if (e.key === ' ' || e.code === 'Space' || e.key === 'Enter') {
+          if (eng.inMerge) {
+            e.preventDefault();
+            eng.ready();
+            return;
+          }
+          if (eng.status === 'ready') {
+            e.preventDefault();
+            eng.start();
+            return;
+          }
+          if (eng.status === 'flying' && (e.key === ' ' || e.code === 'Space')) {
+            e.preventDefault();
+            eng.bounce();
+            return;
+          }
+        }
 
-      // WASD lane changes during testing
-      if (isTesting && eng.status === 'flying') {
-        if (e.key === 'w' || e.key === 'W' || e.key === 'a' || e.key === 'A') {
+        // Shift: turbo boost
+        if (e.key === 'Shift' && eng.status === 'flying') {
           e.preventDefault();
-          eng.changeLane(-1);
-        } else if (e.key === 's' || e.key === 'S' || e.key === 'd' || e.key === 'D') {
+          eng.boost();
+          return;
+        }
+
+        // R: restart test run
+        if (e.key === 'r' || e.key === 'R') {
           e.preventDefault();
-          eng.changeLane(1);
+          eng.reset();
+          return;
+        }
+
+        // WASD / Arrow keys: lane changes during testing
+        if (eng.status === 'flying') {
+          if (e.key === 'w' || e.key === 'W' || e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            eng.changeLane(-1);
+          } else if (e.key === 's' || e.key === 'S' || e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            eng.changeLane(1);
+          }
         }
       }
     };
@@ -207,34 +235,42 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
 
       {/* Testing HUD overlay when test racing */}
       {assets && isTesting && !isPooled && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-zinc-950/90 border border-emerald-500/60 px-5 py-2 rounded-xl shadow-2xl backdrop-blur-md"
-        >
-          <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            TEST DRIVE ACTIVE (Solo)
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-3 bg-zinc-950/90 border border-emerald-500/60 px-5 py-2 rounded-xl shadow-2xl backdrop-blur-md"
+          >
+            <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              TEST DRIVE ACTIVE (Solo)
+            </div>
+
+            <span className="text-zinc-500">|</span>
+
+            <button
+              onClick={() => engineRef.current?.reset()}
+              className="flex items-center gap-1 px-3 py-1 text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-700/60 cursor-pointer"
+              title="Restart Test Run (R)"
+            >
+              <RotateCcw size={13} /> Reset [R]
+            </button>
+
+            <button
+              onClick={returnToEditor}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-black rounded shadow transition-all cursor-pointer"
+              title="Return to 3D Track Builder"
+            >
+              RETURN TO BUILDER [B]
+            </button>
+          </motion.div>
+          <div className="bg-zinc-950/85 border border-amber-500/30 text-amber-200/90 text-xs px-3.5 py-1.5 rounded-lg shadow-lg flex items-center gap-2 backdrop-blur-sm">
+            <span className="font-bold text-amber-400">⏱ NOTE:</span>
+            <span>First split time is taken alone (rivals join after split).</span>
+            <span className="text-zinc-500">|</span>
+            <span className="text-zinc-300"><kbd className="bg-zinc-800 px-1 rounded text-white font-mono">SPACE</kbd> {snapshot.status === 'ready' ? 'Start Run' : 'Air Bounce'}</span>
           </div>
-
-          <span className="text-zinc-500">|</span>
-
-          <button
-            onClick={() => engineRef.current?.reset()}
-            className="flex items-center gap-1 px-3 py-1 text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-700/60 cursor-pointer"
-            title="Restart Test Run"
-          >
-            <RotateCcw size={13} /> Reset
-          </button>
-
-          <button
-            onClick={returnToEditor}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-black rounded shadow transition-all cursor-pointer"
-            title="Return to 3D Track Builder"
-          >
-            RETURN TO BUILDER [B]
-          </button>
-        </motion.div>
+        </div>
       )}
 
       {/* M01 · T2: the first-loop pool while a builder test run reaches the loop. */}

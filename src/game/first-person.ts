@@ -29,7 +29,7 @@ export const FP_LOOK_AHEAD = 520;
 /** Vertical field of view, degrees. */
 export const FP_FOV = 74;
 export const FP_NEAR = 4;
-export const FP_FAR = 60000;
+export const FP_FAR = 200000;
 /** Visual-only up smoothing, 1/s. Disabled while the frame turns faster than this can follow. */
 export const FP_UP_SMOOTH_RATE = 8;
 /** |forward · up| above this is a degenerate view: re-orthonormalise against the previous frame. */

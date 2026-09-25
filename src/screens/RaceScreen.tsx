@@ -397,6 +397,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         engine.ready();
         return;
       }
+      // On the grid, Space or Enter begins the run
+      if (engine.status === 'ready' && (code === 'Space' || code === 'Enter')) {
+        event.preventDefault();
+        engine.start();
+        return;
+      }
       // Fixed non-remappable actions
       if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.start(); return; }
       if (code === 'KeyR') { event.preventDefault(); retry(); return; }
@@ -443,7 +449,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
           {artFailures.length > 0 && <p className="race-storage-warning" role="status"><ImageIcon size={15} />{artFailures.length} painted sprite{artFailures.length === 1 ? '' : 's'} could not be loaded, so a stand-in is shown. The race is unaffected.</p>}
 
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
-            <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
+            <div ref={stageRef} className={`game-stage status-${snapshot.status} ${firstPerson ? 'is-first-person' : ''}`}>
               <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label={`Four-lane Heavy Metal GP 2. Drag your orange ball to launch the ${config.fieldSize} goblins. A and D change lanes and bump rivals. Space to air bounce, Shift to boost, P to pause, R to restart.`}>Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
               {buildMode && engineRef.current && canvasRef.current && (
                 <TrackBuilderUI
@@ -513,8 +519,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
               )}
               <AnimatePresence>
                 {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="grid-flag-img" aria-hidden="true" /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
-                {ready && !pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
-                {ready && pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — press Space to be shoved down the hill.</p></motion.div>}
+                {ready && !pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch. <span style={{ color: '#f0a15b', display: 'block', fontSize: '0.85em', marginTop: 3 }}>⏱ Note: The first split time is taken alone — rivals join after the split!</span></p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
+                {ready && pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — press <kbd>Space</kbd> to launch. <span style={{ color: '#f0a15b', display: 'block', fontSize: '0.85em', marginTop: 3 }}>⏱ Note: The first split time is taken alone — rivals join after the split!</span></p></motion.div>}
                 {snapshot.notice && onCourse && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
               <AirSupplies snapshot={snapshot} />

@@ -169,6 +169,9 @@ export class LaneGizmos {
     this.writeHandle(instance, node);
     this.handles.setColorAt(instance, new THREE.Color(LANE_KIND_COLORS[this.kindOf(node)]));
     if (this.handles.instanceColor) this.handles.instanceColor.needsUpdate = true;
+    if (this.selected && this.selected.visible && node) {
+      this.selected.position.copy(this.worldFromEngine(node.x, node.z));
+    }
     let rebuilt = 0;
     for (const pathId of this.pathsWith(nodeId)) {
       this.buildLine(pathId);

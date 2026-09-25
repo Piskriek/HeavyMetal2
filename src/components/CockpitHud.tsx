@@ -171,14 +171,12 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
         <div className="cockpit-starter" ref={starterRef} style={{ backgroundImage: `url(${COCKPIT_ART.starter})` }} aria-hidden="true" />
 
-        <div className="cockpit-yoke" ref={yokeRef} style={{ left: '50%', top: layout.yoke.hub.y, width: layout.yoke.w, height: layout.yoke.h }}>
-          <img src={COCKPIT_ART.yoke} alt="" aria-hidden="true" draggable={false} />
-        </div>
-
         <div className="cockpit-arm" ref={armLeftRef} style={{ backgroundImage: `url(${COCKPIT_ART.arm})` }} aria-hidden="true" />
         <div className="cockpit-arm" ref={armRightRef} style={{ backgroundImage: `url(${COCKPIT_ART.arm})` }} aria-hidden="true" />
 
-        <img className="cockpit-strip" style={{ left: layout.strip.x, top: layout.strip.y, width: layout.strip.w, height: layout.strip.h }} src={COCKPIT_ART.strip} alt="" aria-hidden="true" draggable={false} />
+        <div className="cockpit-yoke" ref={yokeRef} style={{ left: '50%', top: layout.yoke.hub.y, width: layout.yoke.w, height: layout.yoke.h }}>
+          <img src={COCKPIT_ART.yoke} alt="" aria-hidden="true" draggable={false} />
+        </div>
       </div>
 
       <div className="cockpit-readouts">

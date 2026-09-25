@@ -16,6 +16,7 @@ import './menu.css';
 import './setup.css';
 import './frames.css';
 import './hud.css';
+import './creator.css';
 
 // MP-T06: the goblin creator loads when it is opened.
 const BallCustomizer = lazy(() => import('./components/garage/BallCustomizer'));
@@ -169,7 +170,7 @@ export default function App() {
             <div className="fantasy-dialog-actions"><span className="subtle-note">No brakes. No refunds. Now you know.</span><button className="fantasy-primary" onClick={closePanel}>I Feel Qualified <Check size={16} /></button></div>
           </Modal>}
 
-          {panel === 'creator' && <Modal key="creator" title="Goblin Creator" eyebrow="EVERY FACE A BAD IDEA" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Warming up the workshop…</p>}><CharacterCreatorStudio /></Suspense></Modal>}
+          {panel === 'creator' && <Modal key="creator" title="Goblin Creator" eyebrow="EVERY FACE A BAD IDEA" onClose={closePanel} className="fantasy-dialog creator-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Warming up the workshop…</p>}><CharacterCreatorStudio /></Suspense></Modal>}
 
           {panel === 'garage' && <Modal key="garage" title="Ball Garage" eyebrow="PAINT IT, THEN ROLL IT" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Opening the garage…</p>}><BallCustomizer /></Suspense></Modal>}
 

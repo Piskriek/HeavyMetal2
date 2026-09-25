@@ -39,20 +39,19 @@ const ROPE_SLIDERS: readonly { key: keyof RopeConfig; label: string; unit: strin
 /** H7b: three sliders and a reset for the rope, under the test-drive bar. */
 export function RopeTuning({ rope, onRope }: { rope: RopeConfig; onRope: (change: Partial<RopeConfig>) => void }) {
   return (
-    <div className="rope-tuning" role="group" aria-label="Rope tuning (dev)"
-      style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, display: 'grid', gap: 6, padding: '8px 10px', background: '#1a1410ee', border: '1px solid #8a6a3a', borderRadius: 6, color: '#f7d9a6', font: '600 11px/1.2 Trebuchet MS, system-ui, sans-serif', minWidth: 230 }}>
+    <div className="rope-tuning td-panel" role="group" aria-label="Rope tuning (dev)">
       {ROPE_SLIDERS.map(({ key, label, unit }) => {
         const { min, max, step } = ROPE_LIMITS[key];
         return (
-          <label key={key} style={{ display: 'grid', gridTemplateColumns: '72px 1fr 44px', alignItems: 'center', gap: 6 }}>
+          <label key={key} className="td-slider">
             <span>{label}</span>
             <input type="range" min={min} max={max} step={step} value={rope[key]} aria-label={`${label} (${key})`}
               onChange={(event) => onRope({ [key]: Number(event.target.value) })} />
-            <output style={{ textAlign: 'right' }}>{key === 'edgeSmashVz' ? rope[key].toFixed(0) : rope[key].toFixed(2)}{unit}</output>
+            <output>{key === 'edgeSmashVz' ? rope[key].toFixed(0) : rope[key].toFixed(2)}{unit}</output>
           </label>
         );
       })}
-      <button type="button" style={{ ...button, justifySelf: 'end' }} onClick={() => onRope({ ...DEFAULT_ROPE })}>RESET DEFAULTS</button>
+      <button type="button" className="td-button td-reset" onClick={() => onRope({ ...DEFAULT_ROPE })}>RESET DEFAULTS</button>
     </div>
   );
 }
@@ -60,11 +59,6 @@ export function RopeTuning({ rope, onRope }: { rope: RopeConfig; onRope: (change
 /** The camera the toggle switches to: cockpit ↔ chase (fixed goes to cockpit). */
 export const nextCameraMode = (mode: CameraMode): CameraMode => (mode === 'first_person' ? 'follow_ball' : 'first_person');
 
-const button: React.CSSProperties = {
-  font: '700 12px/1 Trebuchet MS, system-ui, sans-serif', letterSpacing: '0.06em', color: '#f7d9a6',
-  background: '#1a1410e6', border: '1px solid #8a6a3a', borderRadius: 5, padding: '6px 9px', cursor: 'pointer',
-};
-const active: React.CSSProperties = { ...button, background: '#8a5a1ee6', color: '#fff3dc', borderColor: '#e0b060' };
 
 export default function TestDriveBar({ cameraMode, onCameraMode, timeScale, onTimeScale, style, rope, onRope }: TestDriveBarProps) {
   const [ropeOpen, setRopeOpen] = useState(false);
@@ -87,18 +81,18 @@ export default function TestDriveBar({ cameraMode, onCameraMode, timeScale, onTi
       className="test-drive-bar"
       role="toolbar"
       aria-label="Test drive controls"
-      style={{ position: 'absolute', top: 12, right: 12, zIndex: 60, display: 'flex', gap: 6, alignItems: 'center', pointerEvents: 'auto', ...style }}
+      style={{ top: 12, right: 12, ...style }}
       onMouseDown={(e) => e.preventDefault()}
     >
-      <button type="button" style={cameraMode === 'first_person' ? active : button} aria-pressed={cameraMode === 'first_person'} title="Cockpit view (V)" onClick={() => onCameraMode('first_person')}>COCKPIT</button>
-      <button type="button" style={cameraMode === 'follow_ball' ? active : button} aria-pressed={cameraMode === 'follow_ball'} title="Chase view (V)" onClick={() => onCameraMode('follow_ball')}>CHASE</button>
-      <span style={{ width: 8 }} />
-      <button type="button" style={button} disabled={slowest} title="Slower ([)" aria-label="Slower" onClick={() => onTimeScale(stepTimeScale(timeScale, -1))}>−</button>
-      <span style={{ ...button, cursor: 'default', minWidth: 52, textAlign: 'center' }} aria-live="polite" title="Game speed">{timeScaleLabel(timeScale)}</span>
-      <button type="button" style={button} disabled={fastest} title="Faster (])" aria-label="Faster" onClick={() => onTimeScale(stepTimeScale(timeScale, 1))}>+</button>
+      <button type="button" className={`td-button ${cameraMode === 'first_person' ? 'is-active' : ''}`} aria-pressed={cameraMode === 'first_person'} title="Cockpit view (V)" onClick={() => onCameraMode('first_person')}>COCKPIT</button>
+      <button type="button" className={`td-button ${cameraMode === 'follow_ball' ? 'is-active' : ''}`} aria-pressed={cameraMode === 'follow_ball'} title="Chase view (V)" onClick={() => onCameraMode('follow_ball')}>CHASE</button>
+      <span className="td-gap" />
+      <button type="button" className="td-stepper" disabled={slowest} title="Slower ([)" aria-label="Slower" onClick={() => onTimeScale(stepTimeScale(timeScale, -1))}>−</button>
+      <span className="td-readout" aria-live="polite" title="Game speed">{timeScaleLabel(timeScale)}</span>
+      <button type="button" className="td-stepper" disabled={fastest} title="Faster (])" aria-label="Faster" onClick={() => onTimeScale(stepTimeScale(timeScale, 1))}>+</button>
       {ropeTuning && <>
-        <span style={{ width: 8 }} />
-        <button type="button" style={ropeOpen ? active : button} aria-pressed={ropeOpen} aria-expanded={ropeOpen} title="Tune the lane rope (dev only)" onClick={() => setRopeOpen((open) => !open)}>ROPE</button>
+        <span className="td-gap" />
+        <button type="button" className={`td-button ${ropeOpen ? 'is-active' : ''}`} aria-pressed={ropeOpen} aria-expanded={ropeOpen} title="Tune the lane rope (dev only)" onClick={() => setRopeOpen((open) => !open)}>ROPE</button>
         {ropeOpen && <RopeTuning rope={rope} onRope={onRope} />}
       </>}
     </div>

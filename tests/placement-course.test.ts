@@ -33,9 +33,12 @@ test('the renderer tells placement which course it is drawing, every frame', () 
 test('the push-start grid rests on the pad (grounded), not in the air', () => {
   const map = getTrackSpace();
   const x = START_X; const y = courseY(x, 'ridge') - RADIUS;
-  assert.ok(placementFromEngine(map, { x, y, z: 0, grounded: false }).altitude > RADIUS + 100, 'un-grounded on the pad floats (the bug)');
+  // M5: height comes from the course under the ball, so an un-grounded ball no longer floats ~210
+  // units above the pad (it was measured from the retired slingshot's ground).
+  assert.equal(placementFromEngine(map, { x, y, z: 0, grounded: false }).altitude, RADIUS, 'un-grounded on the pad sits on it too');
+  assert.ok(placementFromEngine(map, { x, y: y - 300, z: 0, grounded: false }).altitude > RADIUS + 299, 'a jump is measured from the pad');
   assert.equal(placementFromEngine(map, { x, y, z: 0, grounded: true }).altitude, RADIUS);
   const e = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(e, /if \(this\.startMode === 'push'\) for \(const racer of this\.racers\) \{ racer\.grounded = true;/);
+  assert.match(e, /for \(const racer of this\.racers\) \{ racer\.grounded = true; racer\.y = this\.y\(racer\.x\) - RADIUS; \}/);
   assert.match(e, /this\.player\.y = this\.y\(this\.player\.x\) - RADIUS;\n\s*this\.player\.grounded = true;/);
 });

@@ -11,8 +11,8 @@ import { withoutLoopRides } from './sim/decor-loops';
 import { ROPE_PAYOUT_S } from './sim/rope';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
-  AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, RADIUS, STADIUM_START, START_X, START_Y,
-  TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
+  BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
+  TRACK_DISTANCE, closestLane, courseY, courseSlope, sectorAt,
   type Obstacle, type RacerFrame,
 } from './scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type StartMode } from './types';
@@ -84,11 +84,8 @@ export class GameEngine {
   private runTime = 0;
   private camera = 0;
   private cameraY = 0;
-  private pointerDrift = 0;
   private drift = 0;
   private shake = 0;
-  private isDragging = false;
-  private grabOffset = { x: 0, y: 0 };
   private topSpeed = 0;
   private noticeUntil = 0;
   private counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
@@ -212,20 +209,15 @@ export class GameEngine {
       stagger: (racer) => racer.id * 0.023,
     };
     this.reset();
-    canvas.addEventListener('pointerdown', this.pointerDown);
-    canvas.addEventListener('pointermove', this.pointerMove);
-    canvas.addEventListener('pointerup', this.pointerUp);
-    canvas.addEventListener('pointercancel', this.pointerCancel);
-    canvas.addEventListener('pointerleave', this.pointerLeave);
     document.addEventListener('visibilitychange', this.visibilityChanged);
   }
 
   private get player() { return this.racers[0]; }
   /**
-   * M01 · T1: how the field leaves the grid. `'push'` is the default (the goblin shove on the pad);
-   * `'sling'` keeps the legacy drag-aim/slingshot path so the regression suite can A/B it.
+   * M01 · T1: how the field leaves the grid. The goblin push is the only start (M5 retired the
+   * slingshot); the frozen parity and qualifying sims keep their own copies of the old one.
    */
-  get startMode(): StartMode { return this.options.startMode === 'sling' ? 'sling' : 'push'; }
+  get startMode(): StartMode { return 'push'; }
   private get pushSeed(): number { return this.config?.seed ?? DEFAULT_PUSH_SEED; }
   private y(x: number) { return courseY(x, this.options.course); }
   private slope(x: number) { return courseSlope(x, this.options.course); }
@@ -316,17 +308,16 @@ export class GameEngine {
       this.racers = [player];
     }
     this.placeOnStartNodes();
-    // In a push start everyone begins resting on the pad. Racers are created un-grounded (the old
-    // slingshot start had them in the air), and the renderer measures an un-grounded ball's height
-    // from the slingshot's ground, ~210 units below the pad: the whole grid hovered at the start.
-    if (this.startMode === 'push') for (const racer of this.racers) { racer.grounded = true; racer.y = this.y(racer.x) - RADIUS; }
+    // Everyone begins resting on the pad. Racers are created un-grounded, and the renderer measures an
+    // un-grounded ball's height from the old slingshot ground, ~210 units below the pad: without this
+    // the whole grid hovered at the start.
+    for (const racer of this.racers) { racer.grounded = true; racer.y = this.y(racer.x) - RADIUS; }
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
     this.camera = this.cameraY = this.runTime = 0;
     this.accumulator = this.lastFrame = this.lastRender = 0;
     this.topSpeed = this.shake = 0;
-    this.isDragging = false;
     this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
     this.pickupCount = this.shieldBlocks = 0;
     this.snapshot.sector = sectorAt(START_X, this.options.course);
@@ -335,7 +326,7 @@ export class GameEngine {
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
     this.makeTrack();
     this.rivalsQueued = false;
-    this.rivalSplits = this.startMode === 'push' && this.racers.length > 1
+    this.rivalSplits = this.racers.length > 1
       ? simulateSplitTicks(this.racers.filter((racer) => racer.id !== PLAYER_ID), {
         course: this.options.course, obstacles: this.obstacles, pickups: this.pickups,
         network: this.laneNetwork, gateX: this.mergeGateFor().x, pushSeed: this.pushSeed,
@@ -348,12 +339,11 @@ export class GameEngine {
   /**
    * M01 · T1 — begin the run.
    *
-   * In push mode every racer is standing on the pad; the starter goblin shoves the whole field at
-   * once and the downhill does the rest. In sling mode this is exactly the legacy `launch()`.
+   * Every racer is standing on the pad; the starter goblin shoves the whole field at once and the
+   * downhill does the rest.
    */
   start = () => {
     if (this.status !== 'ready') return;
-    if (this.startMode === 'sling') { this.launch(); return; }
     this.pushTick = 0;
     this.pushTargets = this.racers.map((racer) => startPushVelocity(racer.pace, this.pushSeed, racer.id));
     for (const racer of this.racers) {
@@ -402,32 +392,6 @@ export class GameEngine {
     // snapshot the physics just stepped, and the player's own last steering press for the yoke.
     return fillCockpitState(state, this.snapshot, yokeSteer(this.steerPress, this.steerPressAt, this.time));
   }
-
-  /**
-   * The slingshot. M01 · T1 retires it from input in push mode, but the method stays: it is the
-   * legacy start (and the sling-mode start), and `retry(true)` / a pointer release still land here.
-   * In push mode it routes to `start()` so no code path can slingshot a grid that has no slingshot.
-   */
-  launch = () => {
-    if (this.startMode === 'push') { this.start(); return; }
-    if (this.status !== 'ready') return;
-    for (const racer of this.racers) {
-      const velocity = launchVelocity(this.snapshot.power, racer.launchSpeed);
-      const angle = clamp(this.snapshot.angle + (racer.id ? (racer.id - 2) * 1.2 : 0), 12, 68) * Math.PI / 180;
-      racer.launchOrigin = { x: racer.x, y: racer.y };
-      racer.vx = Math.cos(angle) * velocity * racer.pace;
-      racer.vy = -Math.sin(angle) * velocity * racer.pace;
-      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
-      // A launch throws painted dust, so it is something you can see.
-      this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
-    }
-    this.snapshot.status = 'flying';
-    this.lastFrame = this.accumulator = 0;
-    this.isDragging = false;
-    this.canvas.style.cursor = '';
-    this.audio.play('launch');
-    this.say('FOUR GOBLINS. ZERO RIGHT OF WAY.'); this.notify();
-  };
 
   changeLane = (direction: number) => {
     const racer = this.player;
@@ -522,16 +486,6 @@ export class GameEngine {
     return validateLaneDocument(document_).length === 0;
   }
 
-  adjustAim = (powerDelta: number, angleDelta: number) => {
-    if (this.status !== 'ready' || this.isDragging) return;
-    this.snapshot.power = clamp(this.snapshot.power + powerDelta, 0.18, 1);
-    this.snapshot.angle = clamp(this.snapshot.angle + angleDelta, 12, 68);
-    const angle = this.snapshot.angle * Math.PI / 180;
-    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
-    this.player.y = AIM_ANCHOR.y + Math.sin(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
-    this.notify();
-  };
-
   private canHop(racer: Racer) { return canHopSim(racer, this.runTime); }
 
   /**
@@ -547,7 +501,7 @@ export class GameEngine {
   jump = () => {};
 
   bounce = () => {
-    // Space on the grid starts the run (the push, or the legacy sling).
+    // Space on the grid starts the run (the goblin push).
     if (this.status === 'ready') { this.start(); return; }
     if (this.status === 'flying') this.performBounce(this.player);
   };
@@ -908,12 +862,10 @@ export class GameEngine {
     // (T1d), with the descent's rings kept and the jump line under the plane removed (T1c — see
     // `TrackLayoutOptions.keepLoopsFromX`).
     const startZoneEndX = createQualifyingGate(this.options.course, built).x;
-    this.obstacles = this.startMode === 'push'
-      ? createTrackLayout(this.options.course, {
-        skipBeforeX: passageMouthX(),
-        keepLoopsFromX: startZoneEndX,
-      })
-      : built;
+    this.obstacles = createTrackLayout(this.options.course, {
+      skipBeforeX: passageMouthX(),
+      keepLoopsFromX: startZoneEndX,
+    });
     // M01 · T6/T7: with an authored network the pickups are laid out on *it*, not on the legacy four
     // lanes — otherwise a pickup can hang beside the drivable road where nobody can reach it.
     this.pickups = layoutPickupsForNetwork(
@@ -943,49 +895,6 @@ export class GameEngine {
   }
 
   private surfaceAt(x: number, z: number) { return this.world.surfaceAt(x, z); }
-
-  private coordinates(event: PointerEvent) {
-    const rect = this.canvas.getBoundingClientRect();
-    return this.renderer.view.unproject((event.clientX - rect.left) / rect.width * this.renderer.view.width,
-      (event.clientY - rect.top) / rect.height * HEIGHT, this.player.z);
-  }
-  private pointerDown = (event: PointerEvent) => {
-    if (this.startMode === 'push') return; // the slingshot handle does not exist in push mode
-    if (!this.inputEnabled || this.status !== 'ready' || !event.isPrimary || event.button !== 0) return;
-    const point = this.coordinates(event);
-    if (Math.hypot(point.x - this.player.x, point.y - this.player.y) > RADIUS * 1.75) return;
-    this.audio.unlock(); this.isDragging = true;
-    this.grabOffset = { x: this.player.x - point.x, y: this.player.y - point.y };
-    this.canvas.setPointerCapture(event.pointerId); this.canvas.focus({ preventScroll: true }); this.invalidate();
-  };
-  private pointerMove = (event: PointerEvent) => {
-    if (this.startMode === 'push') return; // no aim cursor, no drag
-    if (!this.inputEnabled) return;
-    const point = this.coordinates(event); const rect = this.canvas.getBoundingClientRect();
-    this.pointerDrift = ((event.clientX - rect.left) / rect.width - 0.5) * 10;
-    if (this.status === 'ready') this.canvas.style.cursor = this.isDragging ? 'grabbing' : Math.hypot(point.x - this.player.x, point.y - this.player.y) < 55 ? 'grab' : 'default';
-    if (!this.isDragging) return;
-    const dx = Math.max(16, AIM_ANCHOR.x - point.x - this.grabOffset.x);
-    const dy = Math.max(6, point.y + this.grabOffset.y - AIM_ANCHOR.y);
-    const distance = clamp(Math.hypot(dx, dy), 36, AIM_ANCHOR.maxDraw);
-    this.snapshot.power = clamp(distance / AIM_ANCHOR.fullPowerDraw, 0.18, 1);
-    this.snapshot.angle = clamp(Math.atan2(dy, dx) * 180 / Math.PI, 12, 68);
-    const angle = this.snapshot.angle * Math.PI / 180;
-    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * distance; this.player.y = AIM_ANCHOR.y + Math.sin(angle) * distance;
-    this.notify(false);
-  };
-  private pointerUp = (event: PointerEvent) => {
-    if (!this.isDragging) return;
-    if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
-    this.launch();
-  };
-  private pointerCancel = () => {
-    if (this.isDragging) {
-      this.isDragging = false; this.player.x = START_X; this.player.y = START_Y;
-      this.snapshot.power = 0.8; this.snapshot.angle = 36; this.notify(); this.invalidate();
-    }
-  };
-  private pointerLeave = () => { this.pointerDrift = 0; if (!this.isDragging) this.canvas.style.cursor = ''; };
 
   private frame = (now: number) => {
     this.frameId = 0;
@@ -1050,14 +959,13 @@ export class GameEngine {
       const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
       this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
     }
-    this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
-    const active = (statusSimulates(this.status) && !this.pausedForBuild) || this.isDragging;
+    const active = (statusSimulates(this.status) && !this.pausedForBuild) ;
     const due = active || this.needsRender || !this.lastRender || now - this.lastRender >= 1000 / 30 - 0.5;
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
       this.lastRender = now; this.needsRender = false;
       this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
-        drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
+        drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: false,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups,
         snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion,
@@ -1290,8 +1198,6 @@ export class GameEngine {
   destroy() {
     this.destroyed = true; cancelAnimationFrame(this.frameId);
     document.removeEventListener('visibilitychange', this.visibilityChanged);
-    this.canvas.removeEventListener('pointerdown', this.pointerDown); this.canvas.removeEventListener('pointermove', this.pointerMove);
-    this.canvas.removeEventListener('pointerup', this.pointerUp); this.canvas.removeEventListener('pointercancel', this.pointerCancel); this.canvas.removeEventListener('pointerleave', this.pointerLeave);
     this.renderer.destroy(); this.audio.destroy(); this.pickupCandidates.clear();
   }
 }

@@ -53,8 +53,8 @@ test('the events that were invisible are painted now', () => {
   const engine = readFileSync(join(root, 'src/game/engine.ts'), 'utf8');
 
   // 1. The launch kick-off: dust.
-  assert.match(engine, /this\.effects\.push\('dust', racer\.x, racer\.y, racer\.z, 1\.2, racer\.id, this\.tick\)/,
-    'a launch throws painted dust');
+  assert.match(engine, /this\.effects\.push\('dust', this\.player\.x, this\.player\.y, this\.player\.z, 1\.6, this\.player\.id, this\.tick\)/,
+    'the push start throws painted dust');
 
   // 2. A shield eating a bump: an impact, at the ball that was saved.
   assert.match(engine, /this\.effects\.push\('impact', racer\.x, racer\.y, racer\.z, 0\.7, racer\.id, this\.tick\)/,

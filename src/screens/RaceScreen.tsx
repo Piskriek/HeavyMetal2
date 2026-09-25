@@ -186,8 +186,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const pooled = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
   const playing = snapshot.status === 'flying' || pooled;
   const ready = snapshot.status === 'ready';
-  // M01 · T1: a normal run leaves the grid on the starter goblin's push, not on the slingshot.
-  const pushStart = options.startMode !== 'sling';
   // M01 · T1: the 0.4 s shove is part of the run — the HUD has to be live for it, so the notice
   // that explains what just happened is not swallowed by the grid state.
   const onCourse = playing || snapshot.status === 'pushing';
@@ -346,10 +344,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     if (roundComplete(session)) { onContinue(); return; }
     engineRef.current?.reset();
     setResult(null);
-    // Push mode has no slingshot: "race again" is the starter goblin again.
-    if (autoLaunch) { if (pushStart) engineRef.current?.start(); else engineRef.current?.launch(); }
+    // "Race again" is the starter goblin again.
+    if (autoLaunch) engineRef.current?.start();
     canvasRef.current?.focus({ preventScroll: true });
-  }, [session, onContinue, pushStart]);
+  }, [session, onContinue]);
 
   const toggleFullscreen = useCallback(async () => {
     if (document.fullscreenElement) await document.exitFullscreen();
@@ -395,11 +393,6 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       if (!engine) return;
       const code = event.code;
       const b = bindingsRef.current;
-      // Aim adjustments while on the grid (ready) keep arrow keys for fine-tuning regardless of remaps
-      if (engine.status === 'ready' && code === 'ArrowUp') { event.preventDefault(); engine.adjustAim(0, 3); return; }
-      if (engine.status === 'ready' && code === 'ArrowDown') { event.preventDefault(); engine.adjustAim(0, -3); return; }
-      if (engine.status === 'ready' && code === 'ArrowLeft') { event.preventDefault(); engine.adjustAim(-0.05, 0); return; }
-      if (engine.status === 'ready' && code === 'ArrowRight') { event.preventDefault(); engine.adjustAim(0.05, 0); return; }
       // M01 · T2: while the first-loop pool holds the field, Space or Enter is "ready up" and the
       // pool is the only thing it can mean — so it is handled before the grid/staging keys, or the
       // "start the run" branch below would swallow Enter during the countdown.
@@ -533,8 +526,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
               )}
               <AnimatePresence>
                 {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="grid-flag-img" aria-hidden="true" /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
-                {ready && !pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch. <span style={{ color: '#f0a15b', display: 'block', fontSize: '0.85em', marginTop: 3 }}>⏱ Note: The first split time is taken alone — rivals join after the split!</span></p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
-                {ready && pushStart && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — press <kbd>Space</kbd> to launch. <span style={{ color: '#f0a15b', display: 'block', fontSize: '0.85em', marginTop: 3 }}>⏱ Note: The first split time is taken alone — rivals join after the split!</span></p></motion.div>}
+                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — press <kbd>Space</kbd> to launch. <span style={{ color: '#f0a15b', display: 'block', fontSize: '0.85em', marginTop: 3 }}>⏱ Note: The first split time is taken alone — rivals join after the split!</span></p></motion.div>}
                 {snapshot.notice && onCourse && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
               <AirSupplies snapshot={snapshot} />

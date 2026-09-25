@@ -4,6 +4,7 @@
    3D goblin marble racers, dynamic camera rig, and atmospheric transitions.
    ============================================================================= */
 import * as THREE from 'three';
+import { RopeReelView } from './rope-reel-view';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
@@ -1644,6 +1645,8 @@ export class Renderer3D {
    * for this and had never been drawn, so a shield could be collected from a thing nobody could see.
    */
   private pickupView: PickupView | null = null;
+  /** H6: the rope goblins hauling out-of-bounds balls back. Built on first use. */
+  private ropeReelView: RopeReelView | null = null;
   /**
    * Impact shake. Three reused vectors: the offset is applied along the camera's *own* axes after the
    * camera has been placed and aimed, so a shake can never change where the camera is looking — only
@@ -2177,6 +2180,14 @@ export class Renderer3D {
     if (!this.obstacleView) this.obstacleView = new ObstacleView(this.scene, this.storedAssets, this.space);
     this.obstacleView.update(frame.obstacles);
 
+    // H6: the rope goblins, for any ball being hauled back from out of bounds.
+    if (frame.racers.some((racer) => racer.reelBack)) {
+      if (!this.ropeReelView) this.ropeReelView = new RopeReelView(this.scene, this.space);
+      this.ropeReelView.update(frame.racers, frame.options.course, frame.time, frame.reducedMotion);
+    } else {
+      this.ropeReelView?.update([], frame.options.course, frame.time, frame.reducedMotion);
+    }
+
     // The powerups, at the position the collection solve tests against. Only one view is ever built:
     // the sprites inside it are pooled, so a later race with fewer pickups reuses the same ones.
     if (frame.pickups.length > 0) {
@@ -2231,6 +2242,8 @@ export class Renderer3D {
     this.obstacleView = null;
     this.pickupView?.dispose();
     this.pickupView = null;
+    this.ropeReelView?.dispose();
+    this.ropeReelView = null;
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

@@ -204,3 +204,45 @@ export function firstPersonFlag(search: string): boolean {
   }
   return false;
 }
+
+/* -----------------------------------------------------------------------------
+   5. LEAN (visual only)
+   -------------------------------------------------------------------------- */
+
+/** Most the view leans into a lane change, degrees (at full lateral speed). */
+export const FP_LEAN_MAX_DEG = 8;
+/** Lateral speed that counts as full lean; matches the steering clamp (cockpit VZ_MAX). */
+export const FP_LEAN_FULL_VZ = 650;
+/** How fast the lean follows the lateral speed, 1/s. */
+export const FP_LEAN_RATE = 7;
+
+/**
+ * Target lean for a lateral speed, radians. Negative = leaning left. Steering left drives the ball at
+ * negative vz (screen-left), so the view leans left into it, like a rider into a bend.
+ */
+export function leanAngleFor(vz: number): number {
+  if (!Number.isFinite(vz)) return 0;
+  const t = Math.max(-1, Math.min(1, vz / FP_LEAN_FULL_VZ));
+  return (t * FP_LEAN_MAX_DEG * Math.PI) / 180;
+}
+
+/** One smoothing step of the lean toward its target (frame-rate independent). */
+export function stepLean(current: number, target: number, dt: number): number {
+  const k = 1 - Math.exp(-FP_LEAN_RATE * Math.min(Math.max(dt, 0), 0.1));
+  return current + (target - current) * k;
+}
+
+/**
+ * Tilts the camera's up about its forward axis by `angle` (radians). Positive tilts toward `right`
+ * (the screen-right of this basis), negative toward screen-left. Returns a unit vector ⊥ forward.
+ */
+export function leanUp(frame: Pick<FirstPersonFrame, 'up' | 'right'>, angle: number): Vec3 {
+  if (!Number.isFinite(angle) || angle === 0) return frame.up;
+  const c = Math.cos(angle); const s = Math.sin(angle);
+  const v: Vec3 = [
+    frame.up[0] * c + frame.right[0] * s,
+    frame.up[1] * c + frame.right[1] * s,
+    frame.up[2] * c + frame.right[2] * s,
+  ];
+  return unit(v[0], v[1], v[2]) ?? frame.up;
+}

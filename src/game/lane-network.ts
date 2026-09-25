@@ -256,25 +256,54 @@ function impliedKind(network: LaneNetwork, nodeId: string): LaneNodeKind {
 const pathById = (network: LaneNetwork, pathId: string): LanePath | null =>
   network.paths.find((path) => path.id === pathId) ?? null;
 
+/**
+ * Resolved paths, cached per network object. `sampleLane` runs several times per racer per physics
+ * tick; resolving 121 node ids by linear search over 484 nodes each time made a 100-ball race with the
+ * default network ~15× slower per step. The cache holds the node *objects* (so a node edited in place
+ * still reads its live x/z) and is rebuilt whenever the network's nodes or paths arrays change.
+ */
+interface ResolvedPath { readonly path: LanePath; readonly nodes: readonly LaneNode[] | null }
+const resolvedCache = new WeakMap<LaneNetwork, { nodes: LaneNode[]; paths: LanePath[]; byId: Map<string, ResolvedPath> }>();
+function resolvedPath(network: LaneNetwork, pathId: string): ResolvedPath | null {
+  let cache = resolvedCache.get(network);
+  if (!cache || cache.nodes !== network.nodes || cache.paths !== network.paths) {
+    const nodeById = new Map<string, LaneNode>();
+    for (const node of network.nodes) if (!nodeById.has(node.id)) nodeById.set(node.id, node);
+    const byId = new Map<string, ResolvedPath>();
+    for (const path of network.paths) {
+      if (byId.has(path.id)) continue;
+      const nodes = path.nodeIds.map((id) => nodeById.get(id));
+      byId.set(path.id, { path, nodes: nodes.some((node) => node === undefined) ? null : nodes as LaneNode[] });
+    }
+    cache = { nodes: network.nodes, paths: network.paths, byId };
+    resolvedCache.set(network, cache);
+  }
+  return cache.byId.get(pathId) ?? null;
+}
+
 /** The centre and half-width of a path at an x, or `null` when the path is not active there. */
 export function sampleLane(network: LaneNetwork, pathId: string, x: number): { z: number; halfWidth: number } | null {
-  const path = pathById(network, pathId);
-  if (!path) return null;
-  const nodes = path.nodeIds.map((id) => network.nodes.find((node) => node.id === id));
-  if (nodes.some((node) => node === undefined)) return null;
-  const first = nodes[0]!;
-  const last = nodes[nodes.length - 1]!;
-  if (x < first.x || x > last.x) return null;
-  for (let index = 1; index < nodes.length; index++) {
-    const a = nodes[index - 1]!;
-    const b = nodes[index]!;
-    if (x < a.x || x > b.x) continue;
+  const resolved = resolvedPath(network, pathId);
+  if (!resolved || !resolved.nodes) return null;
+  const { path, nodes } = resolved;
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  if (!first || x < first.x || x > last.x) return null;
+  // Node x is strictly increasing along a valid path: binary search for the segment [a, b] holding x.
+  let lo = 0; let hi = nodes.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (nodes[mid].x <= x) lo = mid; else hi = mid;
+  }
+  const a = nodes[lo];
+  const b = nodes[Math.min(lo + 1, nodes.length - 1)];
+  if (x >= a.x && x <= b.x) {
     const span = b.x - a.x;
     const t = span === 0 ? 0 : (x - a.x) / span;
     return { z: a.z + (b.z - a.z) * t, halfWidth: path.halfWidth };
   }
-  // A path whose nodes are not strictly increasing would have failed validation; x === last.x has
-  // been handled by the loop above, so this is the degenerate remainder.
+  // A path whose nodes are not strictly increasing would have failed validation; this is the
+  // degenerate remainder.
   return { z: last.z, halfWidth: path.halfWidth };
 }
 

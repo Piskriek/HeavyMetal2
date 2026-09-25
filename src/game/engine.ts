@@ -940,6 +940,7 @@ export class GameEngine {
       rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
+      rendered.ramTellUntil = racer.ramTellUntil;
     }
     const player = this.player; const rendered = this.renderRacers[0];
     // M01 · T1: the shove moves the whole field, so the legacy camera state tracks it too — the ball

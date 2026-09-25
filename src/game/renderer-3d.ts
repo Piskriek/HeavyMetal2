@@ -2047,6 +2047,13 @@ export class Renderer3D {
         rampSurfaces,
       );
       position.set(placement.world.x, placement.world.y, placement.world.z);
+      // H11: a bot about to shove wobbles sideways for its tell. Presentation only; with reduced
+      // motion the tell is the spark scrape alone.
+      if (!frame.reducedMotion && (racer.ramTellUntil ?? -1) > frame.runTime) {
+        const wobble = Math.sin(frame.runTime * 40) * 8;
+        const right = placement.frame.right;
+        position.x += right.x * wobble; position.y += right.y * wobble; position.z += right.z * wobble;
+      }
 
       // The tight chase rig needs the player's own altitude (see placeCamera).
       if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);

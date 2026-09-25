@@ -260,6 +260,8 @@ export interface RacerFrame {
   vz?: number;
   /** Not in the race yet (a rival waiting for the player's solo first split): draw nothing. */
   hidden?: boolean;
+  /** H11: a bot's shove tell ends at this race time; until then the renderer wobbles the ball. */
+  ramTellUntil?: number;
 }
 
 export interface SceneFrame {

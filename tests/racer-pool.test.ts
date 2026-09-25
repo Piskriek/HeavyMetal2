@@ -101,7 +101,7 @@ test('M7: 100 racers draw in a handful of instanced calls, not ~400 meshes', () 
     x: START_X + 400 + i * 60, y: 0, z: ((i % 4) - 1.5) * 120, grounded: true, rollPhase: i * 0.3,
     shieldUntil: i === 7 ? 99 : 0, hidden: i === 9,
   }));
-  p.drawRacers({ racers, runTime: 1 }, 1 / 60, true, [], 0);
+  p.drawRacers({ racers, runTime: 1, options: { course: 'ridge' } }, 1 / 60, true, [], 0);
   const drawn = (p.scene.children as THREE.InstancedMesh[]).filter((mesh) => mesh.count > 0);
   assert.ok(drawn.length <= 16, `${drawn.length} draw calls`);
   const cores = [...p.racerTextures.values()].reduce((sum, batch) => sum + batch.mesh.count, 0);

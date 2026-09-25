@@ -763,6 +763,32 @@ export interface LaneUndoEntry {
   readonly lanes: string | null;
 }
 
+/** T08: a copy of the props without runtime-only fields (pickup state, transient markers). */
+export function stripPropsRuntimeState(props: PlacedProp[]): PlacedProp[] {
+  return props.map((p) => {
+    const cleaned = { ...p } as PlacedProp;
+    delete (cleaned as any)._runtime;
+    delete (cleaned as any)._pickupCollected;
+    delete (cleaned as any)._pickupRespawn;
+    delete (cleaned as any)._runtimeState;
+    return cleaned;
+  });
+}
+
+/**
+ * FNV-1a (32-bit) over the course id and the saved form of every prop, in order. Two prop lists
+ * that serialise the same way get the same fingerprint; any move, add, delete or edit changes it.
+ */
+export function propsFingerprint(props: PlacedProp[], course: string): string {
+  const text = course + '\n' + JSON.stringify(stripPropsRuntimeState(props));
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0') + ':' + text.length;
+}
+
 export class TrackBuilder3D {
   readonly keymap = new Keymap();
   private placedProps: PlacedProp[] = [];
@@ -833,6 +859,8 @@ export class TrackBuilder3D {
   private backupIntervalTimer: any = null;
   private backupDebounceTimer: any = null;
   private lastBackupTimestamp = 0;
+  /** Fingerprint of the props the disk holds (M12): an unchanged track is never re-sent. */
+  private lastSavedPropsHash = '';
   private backupStatus: 'idle' | 'saving' | 'saved' | 'error' = 'idle';
   private backupStatusListeners: ((info: { status: 'idle' | 'saving' | 'saved' | 'error'; timestamp: number; count: number }) => void)[] = [];
   private courseId = 'ridge';
@@ -3476,14 +3504,7 @@ export class TrackBuilder3D {
 
   /** T08: Strip runtime-only fields before serialization (pickup state, transient markers). */
   private stripRuntimeState(props: PlacedProp[]): PlacedProp[] {
-    return props.map((p) => {
-      const cleaned = { ...p } as PlacedProp;
-      delete (cleaned as any)._runtime;
-      delete (cleaned as any)._pickupCollected;
-      delete (cleaned as any)._pickupRespawn;
-      delete (cleaned as any)._runtimeState;
-      return cleaned;
-    });
+    return stripPropsRuntimeState(props);
   }
 
   // --- PERSISTENCE & PERIODIC DISK BACKUP ---
@@ -3613,6 +3634,10 @@ export class TrackBuilder3D {
       if (!res.ok) return;
       const data = await res.json();
       const diskProps = data?.latest?.props;
+      if (Array.isArray(diskProps)) {
+        // What the disk already holds: the auto-backup skips a save that would write the same props.
+        this.lastSavedPropsHash = propsFingerprint(diskProps, data.latest.course ?? this.courseId);
+      }
       if (Array.isArray(diskProps) && diskProps.length > 0) {
         // If scene only has default starter items or disk has a richer/newer set of decorations
         if (this.placedProps.length === 0 || this.placedProps.length === DEFAULT_TRACK_PROPS.length || diskProps.length > this.placedProps.length) {
@@ -3625,9 +3650,18 @@ export class TrackBuilder3D {
     }
   }
 
-  async backupToFile(force = false): Promise<{ success: boolean; count: number; timestamp: number } | null> {
+  /**
+   * Writes the props to the dev server's disk backup. An automatic save (`force = false`) is skipped
+   * when the props match what the disk already holds, so an idle builder sends nothing (M12).
+   * An explicit save (`force = true`) always writes.
+   */
+  async backupToFile(force = false): Promise<{ success: boolean; count: number; timestamp: number; unchanged?: boolean } | null> {
     if (typeof fetch === 'undefined') return null;
     const now = Date.now();
+    const hash = propsFingerprint(this.placedProps, this.courseId);
+    if (!force && hash === this.lastSavedPropsHash) {
+      return { success: true, count: this.placedProps.length, timestamp: this.lastBackupTimestamp, unchanged: true };
+    }
     if (!force && this.lastBackupTimestamp && now - this.lastBackupTimestamp < 15000) {
       return null;
     }
@@ -3648,6 +3682,9 @@ export class TrackBuilder3D {
 
       if (res.ok) {
         this.lastBackupTimestamp = now;
+        // A refused save (the server keeps a bigger track) leaves the hash unset so it retries.
+        const body = await res.json().catch(() => null);
+        if (body?.success !== false) this.lastSavedPropsHash = hash;
         this.notifyBackupStatus('saved');
         return { success: true, count: this.placedProps.length, timestamp: now };
       } else {

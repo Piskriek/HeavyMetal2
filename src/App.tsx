@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
-import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Image as ImageIcon, Keyboard, MousePointer2, Play, Settings2, Trophy } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Image as ImageIcon, Keyboard, Play, Settings2, Trophy } from 'lucide-react';
 import MainMenu from './components/MainMenu';
 import SettingsPanel from './components/SettingsPanel';
 import Modal from './components/Modal';
@@ -157,10 +157,10 @@ export default function App() {
 
           {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop">
             <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the rival riders. Falling costs time, not the whole race.</p>
-            <div className="handbook-row"><MousePointer2 size={23} /><div><h3>Launch the whole grid</h3><p>Pull your glowing ball back and release. Or adjust power and angle with the arrow keys, then press Enter.</p></div><kbd>Drag</kbd></div>
+            <div className="handbook-row"><Play size={23} /><div><h3>One shove off the pad</h3><p>Press Space or Enter (tap GO on a phone) and the starter goblin pushes you off. Your first split is a solo run; the rivals join at the merge gate.</p></div><kbd>Space</kbd></div>
             <div className="handbook-row"><ArrowRight size={23} /><div><h3>Take the racing line. Or theirs.</h3><p>A and D change lanes. Contact shoves rivals sideways. Heavy balls push harder, but light balls jump higher.</p></div><kbd>A / D</kbd></div>
-            <div className="handbook-row"><Play size={22} /><div><h3>A little hop, a lot of trouble</h3><p>W or J bunny-hops from the ground. Space spends an air-bounce charge. Shift boosts; chevron pads refill a charge.</p></div><kbd>W / Space / Shift</kbd></div>
-            <div className="handbook-row"><Settings2 size={23} /><div><h3>Keep the chaos under control</h3><p>P pauses. R restarts the current unfinished race. M toggles sound. Presets are fixed during competition; Quick Race custom practice enables the tuning sliders.</p></div><Keyboard size={25} /></div>
+            <div className="handbook-row"><ArrowUpRight size={22} /><div><h3>A little air, a lot of trouble</h3><p>Space spends an air-bounce charge; spring pads refill them. Shift boosts; chevron pads refill a charge.</p></div><kbd>Space / Shift</kbd></div>
+            <div className="handbook-row"><Settings2 size={23} /><div><h3>Keep the chaos under control</h3><p>P pauses. R restarts the current unfinished race. M toggles sound. V changes the camera, and [ and ] slow the race down or speed it back up. Presets are fixed during competition; Quick Race custom practice enables the tuning sliders.</p></div><Keyboard size={25} /></div>
             <AirSupplyGuide />
             <div className="fantasy-dialog-actions"><span className="subtle-note">No brakes. No refunds. Now you know.</span><button className="fantasy-primary" onClick={closePanel}>I Feel Qualified <Check size={16} /></button></div>
           </Modal>}

@@ -436,7 +436,7 @@ export class GameEngine {
     // snapshot the physics just stepped, and the player's own last steering press for the yoke.
     // H8: and the hit still being felt, which the HUD turns into the yoke's jolt.
     return fillCockpitState(state, this.snapshot, yokeSteer(this.steerPress, this.steerPressAt, this.time),
-      { amount: impactEnvelope(this.time - this.impact.at) * this.impact.strength, side: this.impact.side });
+      { amount: impactEnvelope(this.time - this.impact.at) * this.impact.strength, side: this.impact.side, boostAge: this.runTime - this.player.lastBoostAt });
   }
 
   changeLane = (direction: number) => {

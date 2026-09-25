@@ -13,7 +13,7 @@
 import { gapLabel } from '../game/gap';
 import { useEffect, useMemo, useRef } from 'react';
 import {
-  armsAt, cockpitBob, cockpitLayout, needleAngle, yokeAngleDeg, yokeJolt,
+  armsAt, cockpitBob, cockpitLayout, driverGesture, needleAngle, yokeAngleDeg, yokeJolt,
   COCKPIT_ART, COCKPIT_MANIFEST, COCKPIT_MANIFEST as ART, type CockpitState,
 } from '../game/cockpit';
 import '../cockpit.css';
@@ -70,7 +70,9 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
       // H8: a hit jolts the yoke (and the hands on it); with reduced motion the cockpit flashes.
       const jolt = yokeJolt(state.impact, state.impactSide, now / 1000, reducedMotion);
       const yokeDeg = yokeAngleDeg(state.steer) + jolt.rotDeg;
-      const arms = armsAt(layout, yokeDeg);
+      // P3: the arms flinch, pump or brace with the race (still under reduced motion).
+      const gesture = driverGesture(state, reducedMotion);
+      const arms = armsAt(layout, yokeDeg, gesture.gesture, gesture.intensity, now / 1000);
 
       if (yokeRef.current) {
         yokeRef.current.style.transform = `translate(-50%, calc(-${(COCKPIT_MANIFEST.yoke.pivot.y / COCKPIT_MANIFEST.yoke.h) * 100}% + ${jolt.dropPx.toFixed(1)}px)) rotate(${yokeDeg.toFixed(2)}deg)`;

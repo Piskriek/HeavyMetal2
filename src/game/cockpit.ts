@@ -73,6 +73,8 @@ export interface CockpitState {
   impact: number;
   /** H8: which side it came from: +1 right, −1 left, 0 straight on. */
   impactSide: -1 | 0 | 1;
+  /** P3: seconds since the player last boosted (a large number when never). */
+  boostAge: number;
   /** H9: the gap chip: place and seconds to the rider ahead (place 0 = nobody ahead). */
   gapPlace: number;
   gapSeconds: number;
@@ -116,10 +118,11 @@ export function fillCockpitState(
   state: CockpitState,
   telemetry: CockpitTelemetry,
   steer: number,
-  /** H8: the last hit as it is still felt (0..1) and its side; absent means none. */
-  impact?: { readonly amount: number; readonly side: -1 | 0 | 1 },
+  /** H8: the last hit as it is still felt (0..1) and its side; absent means none. P3: the boost's age. */
+  impact?: { readonly amount: number; readonly side: -1 | 0 | 1; readonly boostAge?: number },
 ): CockpitState {
   state.steer = steer;
+  state.boostAge = impact?.boostAge !== undefined && Number.isFinite(impact.boostAge) ? impact.boostAge : 1e9;
   state.impact = impact && Number.isFinite(impact.amount) ? Math.max(0, Math.min(1, impact.amount)) : 0;
   state.impactSide = impact?.side ?? 0;
   state.speedKmh = telemetry.speed;
@@ -148,7 +151,7 @@ export function createCockpitState(): CockpitState {
     steer: 0, speedKmh: 0, boostCharges: 0, bounceCharges: 0, shieldSeconds: 0, gradePct: 0,
     grounded: false, inLoop: false, status: 'loading', position: 1, raceTime: 0,
     countdownLabel: null, pushing: false, impact: 0, impactSide: 0,
-    gapPlace: 0, gapSeconds: 0, gapTrend: 'steady',
+    gapPlace: 0, gapSeconds: 0, gapTrend: 'steady', boostAge: 1e9,
   };
 }
 
@@ -274,12 +277,13 @@ export function gripPoints(layout: CockpitLayout, yokeDeg: number): { left: Poin
   return { left: rotate(GRIP_FRACTION.left), right: rotate(GRIP_FRACTION.right), hub };
 }
 
-function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point): ArmPose {
+function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point, lean: ShoulderLean = NO_LEAN): ArmPose {
   const span = YOKE.spanWidth * layout.yoke.scale;
   const sign = side === 'left' ? -1 : 1;
+  // P3: a gesture moves the shoulder (off-screen), never the hand: the arm swings about the fist.
   const shoulder: Point = {
-    x: layout.w / 2 + sign * span * 0.62,
-    y: layout.h * (1 + SHOULDER_BELOW),
+    x: layout.w / 2 + sign * (span * 0.62 + lean.out * layout.h),
+    y: layout.h * (1 + SHOULDER_BELOW + lean.down),
   };
   // Scale the sprite so the painted limb reads ARM_WIDTH_OF_HEIGHT tall. Where that would leave the
   // sleeve short of the shoulder (small viewports, arms at full lock), grow it until it reaches:
@@ -350,9 +354,52 @@ export function cockpitLayout(w: number, h: number): CockpitLayout {
 }
 
 /** Arms for a turned yoke. The hands stay on the grips by construction. */
-export function armsAt(layout: CockpitLayout, yokeDeg: number): { left: ArmPose; right: ArmPose } {
+/**
+ * P3 — the driver's arms answer the race. A hit makes them flinch (elbows flare, arms pulled back),
+ * a boost pumps them forward, and airtime locks them in against the rim with a slight tremor. The
+ * hands never leave the grips: each gesture only moves the shoulders, which are off-screen.
+ */
+export type DriverGesture = 'normal' | 'flinch' | 'boost_pump' | 'air_brace';
+
+/** Shoulder offsets as shares of the viewport height: `out` away from the centre, `down` below it. */
+interface ShoulderLean { readonly out: number; readonly down: number }
+const NO_LEAN: ShoulderLean = { out: 0, down: 0 };
+
+/** Seconds a boost's pump lasts, and a hit's flinch is the H8 impact envelope (180 ms). */
+export const BOOST_PUMP_S = 0.6;
+
+/** Which gesture the arms make now, and how strongly (0..1). Reduced motion keeps them still. */
+export function driverGesture(
+  state: Pick<CockpitState, 'impact' | 'boostAge' | 'grounded' | 'inLoop' | 'status'>,
+  reducedMotion: boolean,
+): { gesture: DriverGesture; intensity: number } {
+  if (reducedMotion) return { gesture: 'normal', intensity: 0 };
+  if (state.impact > 0.05) return { gesture: 'flinch', intensity: Math.min(1, state.impact) };
+  if (state.boostAge >= 0 && state.boostAge < BOOST_PUMP_S) return { gesture: 'boost_pump', intensity: 1 - state.boostAge / BOOST_PUMP_S };
+  if (state.status === 'flying' && !state.grounded && !state.inLoop) return { gesture: 'air_brace', intensity: 1 };
+  return { gesture: 'normal', intensity: 0 };
+}
+
+function shoulderLean(gesture: DriverGesture, intensity: number, seconds: number): ShoulderLean {
+  const i = Math.max(0, Math.min(1, Number.isFinite(intensity) ? intensity : 0));
+  switch (gesture) {
+    case 'flinch': return { out: 0.05 * i, down: 0.035 * i };
+    case 'boost_pump': return { out: -0.02 * i, down: -0.05 * i * (0.75 + 0.25 * Math.sin(seconds * 18)) };
+    case 'air_brace': return { out: -0.04 * i, down: -0.02 * i + 0.004 * i * Math.sin(seconds * 47) };
+    default: return NO_LEAN;
+  }
+}
+
+export function armsAt(
+  layout: CockpitLayout,
+  yokeDeg: number,
+  gesture: DriverGesture = 'normal',
+  intensity = 0,
+  seconds = 0,
+): { left: ArmPose; right: ArmPose } {
   const grips = gripPoints(layout, yokeDeg);
-  return { left: armFor('left', layout, grips.left), right: armFor('right', layout, grips.right) };
+  const lean = shoulderLean(gesture, intensity, seconds);
+  return { left: armFor('left', layout, grips.left, lean), right: armFor('right', layout, grips.right, lean) };
 }
 
 /* -----------------------------------------------------------------------------

@@ -125,7 +125,7 @@ test('bob is speed-driven, grounded-only, and gone under reduced motion', () => 
 test('the channel starts clean and carries the field names the HUD reads', () => {
   const state = createCockpitState();
   assert.deepEqual(Object.keys(state).sort(), [
-    'boostCharges', 'bounceCharges', 'countdownLabel', 'gapPlace', 'gapSeconds', 'gapTrend', 'gradePct', 'grounded', 'impact', 'impactSide', 'inLoop',
+    'boostAge', 'boostCharges', 'bounceCharges', 'countdownLabel', 'gapPlace', 'gapSeconds', 'gapTrend', 'gradePct', 'grounded', 'impact', 'impactSide', 'inLoop',
     'position', 'pushing', 'raceTime', 'shieldSeconds', 'speedKmh', 'status', 'steer',
   ]);
   assert.equal(state.steer, 0);
@@ -199,4 +199,39 @@ test('layout: the gauge plates hang from the window bottom at every screen shape
 test('the bezel backup no longer ships in public/', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   assert.equal(existsSync(join(root, 'public/art/cockpit/cockpit-bezel.backup.png')), false);
+});
+
+// P3: the arms flinch on a hit, pump on a boost and brace in the air, without the hands ever
+// leaving the grips.
+test('P3: every gesture keeps both hands on the grips and moves only the shoulders', async () => {
+  const { driverGesture } = await import('../src/game/cockpit');
+  const anchor = COCKPIT_MANIFEST.arm.gripFraction;
+  const layout = cockpitLayout(1920, 1080);
+  const rest = armsAt(layout, 0);
+  for (const gesture of ['flinch', 'boost_pump', 'air_brace'] as const) {
+    for (const t of [0, 0.13, 0.5]) {
+      const arms = armsAt(layout, yokeAngleDeg(0.4), gesture, 1, t);
+      const grips = gripPoints(layout, yokeAngleDeg(0.4));
+      for (const [pose, grip] of [[arms.left, grips.left], [arms.right, grips.right]] as const) {
+        assert.ok(Math.abs(pose.x + anchor.x * pose.w - grip.x) < 0.5 && Math.abs(pose.y + anchor.y * pose.h - grip.y) < 0.5, `${gesture}: hand on grip`);
+        assert.ok(pose.shoulder.y > layout.h, `${gesture}: the shoulder stays off-screen`);
+      }
+    }
+  }
+  const flinch = armsAt(layout, 0, 'flinch', 1);
+  assert.ok(flinch.left.shoulder.x < rest.left.shoulder.x && flinch.right.shoulder.x > rest.right.shoulder.x, 'a flinch flares the elbows out');
+  assert.ok(flinch.left.shoulder.y > rest.left.shoulder.y, 'and pulls the arms back');
+  const pump = armsAt(layout, 0, 'boost_pump', 1);
+  assert.ok(pump.left.shoulder.y < rest.left.shoulder.y, 'a boost pushes the arms forward');
+  const brace = armsAt(layout, 0, 'air_brace', 1);
+  assert.ok(brace.left.shoulder.x > rest.left.shoulder.x, 'airtime locks the arms in');
+  assert.deepEqual(armsAt(layout, 0, 'flinch', 0), rest, 'no intensity, no gesture');
+
+  const base = { impact: 0, boostAge: 1e9, grounded: true, inLoop: false, status: 'flying' as const };
+  assert.deepEqual(driverGesture({ ...base, impact: 0.8 }, false), { gesture: 'flinch', intensity: 0.8 });
+  assert.equal(driverGesture({ ...base, boostAge: 0.15 }, false).gesture, 'boost_pump');
+  assert.equal(driverGesture({ ...base, boostAge: 0.9 }, false).gesture, 'normal', 'the pump is over by 0.6 s');
+  assert.equal(driverGesture({ ...base, grounded: false }, false).gesture, 'air_brace');
+  assert.equal(driverGesture({ ...base, grounded: false, inLoop: true }, false).gesture, 'normal');
+  assert.deepEqual(driverGesture({ ...base, impact: 1 }, true), { gesture: 'normal', intensity: 0 }, 'reduced motion: still arms');
 });

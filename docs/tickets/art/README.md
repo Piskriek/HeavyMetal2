@@ -1,15 +1,29 @@
-# Art wave 1: generated PNGs (one PR, one agent at a time)
+# Art wave 1: generated PNGs (one PR, four agents at once)
 
 All generated art for this wave lands in **one pull request**, on the branch `art/generated-wave-1`
-(base: `fix/flash-followups`). Codex agents run **one after another**, one batch each. Every agent
-checks out the same branch, generates its batch, keys and QA-checks it, pushes to the branch (the PR
-updates itself), ticks its boxes in the PR checklist, and stops. Then the next agent starts.
+(base: `fix/flash-followups`). **Four Codex agents work at the same time**, one batch each, all
+pushing to that one branch (the PR updates itself). Every agent adds only its own files, pulls with
+rebase before each push, and reports in a PR **comment**, never by editing the PR description (four
+agents would overwrite each other). The owner ticks the checklist from the comments.
 
-| Order | Batch | Images | Lands in |
+| Agent | Batch | Images | Lands in |
 |---|---|---|---|
 | 1 | [ART-B1](ART-B1-avatar-parts-1.md): painted goblin parts, part 1 | 30 | `art-src/avatar-parts/raw/` → `public/avatar-parts/keyed/` |
 | 2 | [ART-B2](ART-B2-avatar-parts-2-garage.md): painted goblin parts, part 2, and the Ball Garage | 26 | avatar parts + `art-src/garage-decals/raw/` → `public/art/garage/` |
-| 3 | [ART-B3](ART-B3-track-and-effects.md): track obstacles, boost pads, barriers, race effects | 22 | `art-src/track/raw/`, `art-src/animated/` → `public/art/track-obstacles/`, `public/art/animated/alpha/` |
+| 3 | [ART-B3a](ART-B3-track-and-effects.md): track textures, obstacle and barrier sprites, shield bubble (images 1–12 and 22) | 13 | `art-src/track/raw/` → `public/art/track-obstacles/` |
+| 4 | [ART-B3b](ART-B3-track-and-effects.md): animated race effects (images 13–21) | 9 | `art-src/animated/` → `public/art/animated/alpha/` |
+
+ART-B3b has only 9 images because every effect sheet has to pass the §10.4 gates, which usually
+takes several regenerations.
+
+### Who owns which shared file
+Image files never collide: every id belongs to one batch. Three files are shared:
+
+| File | Written by | Rule |
+|---|---|---|
+| `src/game/meta/painted-parts.generated.ts` | ART-B1 and ART-B2 (through `key-art.ts`) | Never edit it by hand. On a rebase conflict, take either side, then run `node --import tsx scripts/key-art.ts --set avatar-parts` (no `--only`): it re-keys every raw on the branch and rebuilds the manifest. `git add` it and continue the rebase. |
+| `scripts/process-generated-animated.mjs` (the `SHEETS` list) | ART-B3b only | Nobody else touches it. |
+| `art-src/animated/fx-template-2x2.png` | ART-B3b only | Nobody else touches it. |
 
 Art batches only add image files (and the regenerated `src/game/meta/painted-parts.generated.ts`).
 Wiring the art into the game is done by the coding tickets after the PR is merged:
@@ -23,12 +37,16 @@ Wiring the art into the game is done by the coding tickets after the PR is merge
 You are a Codex art agent on Heavy Metal GP 2 (repo Piskriek/HeavyMetal2). You generate ONE batch
 of images, named at the bottom. You write no game code.
 
+Three other agents are generating other batches on the same branch at the same time.
+
 SETUP
   git fetch origin
-  git checkout art/generated-wave-1 && git pull
+  git checkout art/generated-wave-1 && git pull --rebase
   npm ci   (only if node_modules is missing)
-  Read: docs/tickets/art/README.md (this file: the rules below are binding), your batch file,
-        docs/ART_PIPELINE.md §3 and §10 (keying rules; animated 2x2 sheet rules).
+  Read: docs/tickets/art/README.md (this file: the rules below are binding, including "Who owns
+        which shared file"), your batch file, docs/ART_PIPELINE.md §3 and §10 (keying rules;
+        animated 2x2 sheet rules).
+  Generate only the images of YOUR batch (ART-B3a and ART-B3b: only your image numbers).
 
 FOR EACH IMAGE IN YOUR BATCH, in order
   1. Generate it with the prompt given for that image (copy it exactly; add nothing).
@@ -39,21 +57,34 @@ FOR EACH IMAGE IN YOUR BATCH, in order
   3. Process it with the "Process" command. It must print PASS (or WARN with a note you accept).
      On FAIL: regenerate with the failing QA note appended to the prompt, up to 3 times; then
      move on and list it as failed in the PR.
-  4. Every 10 images: commit ("art(B<n>): images <a>-<b>"), push, and tick those boxes in the PR
-     description. If you hit the 10-images-per-turn limit, push first, then output
-     "[pause for turns to reset]" and stop until the user says "Reset".
+  4. Every 10 images (ART-B3b: every 3 sheets): stage ONLY your own files (git add <paths>, never
+     git add -A or git add .), commit ("art(<batch>): images <a>-<b>"), then
+       git pull --rebase && git push
+     If the push is rejected, pull --rebase again and retry. A rebase conflict can only be in
+     painted-parts.generated.ts: fix it with the rule in "Who owns which shared file".
+     Then post a PR comment "<batch>: images <a>-<b> pushed" with those rows of the results table
+     below. Do not edit the PR description.
+     (If you cannot comment on the PR, put those rows in the commit message body instead.)
+     If you hit the 10-images-per-turn limit, push first, then output "[pause for turns to reset]"
+     and stop until the user says "Reset".
 
 WHEN THE BATCH IS DONE
   npm run check:edges            (0 failures)
   node --import tsx --test tests/art-budget.test.ts
-  Push, tick the batch's last box in the PR, and finish with a table:
+  Push (pull --rebase first), then post a final PR comment "<batch> done" with the table:
     # | id | status (pass / warn / failed) | output path | notes
+  and end your reply with the same table.
   Do not merge. Do not edit game code. Do not touch backups/.
 
 YOUR BATCH:
 ```
 
-Then append one line, for example: `ART-B1 — docs/tickets/art/ART-B1-avatar-parts-1.md`.
+Then append the line for that agent:
+
+- Agent 1: `ART-B1 — docs/tickets/art/ART-B1-avatar-parts-1.md (images 1–30)`
+- Agent 2: `ART-B2 — docs/tickets/art/ART-B2-avatar-parts-2-garage.md (images 1–26)`
+- Agent 3: `ART-B3a — docs/tickets/art/ART-B3-track-and-effects.md (images 1–12 and 22 only)`
+- Agent 4: `ART-B3b — docs/tickets/art/ART-B3-track-and-effects.md (images 13–21 only)`
 
 ---
 

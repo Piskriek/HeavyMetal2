@@ -1,6 +1,8 @@
 # ART-B1: Painted goblin parts, part 1 (30 images)
 
-- **Batch**: 1 of 3 in art wave 1 (PR branch `art/generated-wave-1`). Read [README.md](README.md) first.
+- **Batch**: agent 1 of 4 in art wave 1 (PR branch `art/generated-wave-1`; the other three run at
+  the same time). Read [README.md](README.md) first. ART-B2 also writes
+  `painted-parts.generated.ts`: follow the conflict rule in the README.
 - **Feeds**: the Goblin Creator (`src/components/creator/CharacterCreatorStudio.tsx`) through
   [ART-I1](ART-I1-painted-parts-dna-v3.md).
 - **Why**: the creator's six painted parts point at PNGs that were never delivered (the dev server
@@ -147,4 +149,4 @@ Layer hair (front) · pivot: scalp line (bottom centre) · fill 45 %
       PASS (or WARN with a note) from `scripts/key-art.ts`.
 - [ ] `src/game/meta/painted-parts.generated.ts` lists all 30 (and nothing was removed).
 - [ ] `npm run check:edges` reports 0 failures; `tests/art-budget.test.ts` passes.
-- [ ] PR checklist boxes for B1 ticked; failed images (if any) listed in the PR with their QA notes.
+- [ ] Results table posted as a PR comment; failed images (if any) listed there with their QA notes.

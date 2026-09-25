@@ -1,7 +1,8 @@
 # ART-B2: Painted goblin parts, part 2, and the Ball Garage (26 images)
 
-- **Batch**: 2 of 3 in art wave 1 (PR branch `art/generated-wave-1`). Starts after ART-B1 is pushed.
-  Read [README.md](README.md) first.
+- **Batch**: agent 2 of 4 in art wave 1 (PR branch `art/generated-wave-1`; the other three run at
+  the same time). Read [README.md](README.md) first. ART-B1 also writes
+  `painted-parts.generated.ts`: follow the conflict rule in the README.
 - **Feeds**: the Goblin Creator via [ART-I1](ART-I1-painted-parts-dna-v3.md); the Ball Garage
   (`src/components/garage/BallCustomizer.tsx`) via [ART-I2](ART-I2-garage-art.md).
 - **Why**: the rest of the painted parts, and real painted decals for the garage, which currently
@@ -120,4 +121,4 @@ Layer background · square 1:1
 - [ ] Images 8–11 and 25: full-bleed outputs at the stated sizes, no magenta anywhere.
 - [ ] Band decals 18–21 tile: the first and last pixel columns of each keyed output match (check
       with `convert <out> -crop 1x+0+0 a.png; convert <out> -gravity east -crop 1x+0+0 b.png; compare -metric AE a.png b.png null:` ≤ 2 % of the height).
-- [ ] `npm run check:edges` 0 failures; `tests/art-budget.test.ts` passes; PR boxes for B2 ticked.
+- [ ] `npm run check:edges` 0 failures; `tests/art-budget.test.ts` passes; results table posted as a PR comment.

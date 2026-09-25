@@ -23,6 +23,7 @@
  * `preObstacle*`: the state after motion integration and **before** obstacle resolution, i.e.
  * before a loop ride floors the speed at 650 and before its exit hands back `speed * 1.08`.
  */
+import { datan2, dcos, dexp, dhypot, dsin } from './det-math';
 import {
   FINISH, GRAVITY, LANE, PLAYER_LANE, RADIUS, START_X, TRACK_DISTANCE,
   closestLane, laneZ, loopGeometry, obstacleZ, occupiesLane, weightImpulse,
@@ -489,13 +490,13 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     if (ride.entryProgress < 1) {
       ride.entryProgress = Math.min(1, ride.entryProgress + dt * 7);
       const t = ride.entryProgress; const ease = t * t * (3 - 2 * t);
-      const x = loop.x + Math.sin(ride.entryAngle) * loop.ballRadius;
-      const y = loop.y + Math.cos(ride.entryAngle) * loop.ballRadius + world.y(x) - world.y(loop.x);
+      const x = loop.x + dsin(ride.entryAngle) * loop.ballRadius;
+      const y = loop.y + dcos(ride.entryAngle) * loop.ballRadius + world.y(x) - world.y(loop.x);
       racer.x = ride.entry.x + (x - ride.entry.x) * ease; racer.y = ride.entry.y + (y - ride.entry.y) * ease;
     } else {
       ride.angle += Math.min(ride.speed, 760) / loop.ballRadius * dt;
-      racer.x = loop.x + Math.sin(ride.angle) * loop.ballRadius;
-      racer.y = loop.y + Math.cos(ride.angle) * loop.ballRadius + world.y(racer.x) - world.y(loop.x);
+      racer.x = loop.x + dsin(ride.angle) * loop.ballRadius;
+      racer.y = loop.y + dcos(ride.angle) * loop.ballRadius + world.y(racer.x) - world.y(loop.x);
     }
     racer.rotation += Math.min(ride.speed, 760) / RADIUS * dt;
     // A loop ride rewrites the position, so the canonical capture is the ring state *before* the
@@ -533,7 +534,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       }
     } else {
       racer.grounded = false;
-      racer.vx *= Math.exp(-0.009 * dragFactor * dt);
+      racer.vx *= dexp(-0.009 * dragFactor * dt);
       racer.vy += stageGravity * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
     }
     // Canonical gate-capture point: integrated motion, no obstacle or loop effect applied yet.
@@ -547,8 +548,8 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       if (obstacle.kind === 'loop') {
         const loop = loopGeometry(obstacle, world.course); const dx = racer.x - loop.x;
         const dy = racer.y - (world.y(racer.x) - world.y(loop.x)) - loop.y;
-        if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
-          const angle = (Math.atan2(dx, dy) + TAU) % TAU;
+        if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(dhypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
+          const angle = (datan2(dx, dy) + TAU) % TAU;
           racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
           racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
             speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };

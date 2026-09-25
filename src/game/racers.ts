@@ -28,6 +28,8 @@ export interface Racer extends RacerFrame {
   steerLockedUntil: number;
   /** Race time of the last hit that shot this ball's lane rope out (sim/rope.ts). */
   ropeSince?: number;
+  /** P6: race time of the last wall-scrape spark burst (presentation only, never physics). */
+  scrapeFxAt?: number;
   nextDecision: number;
   /**
    * H11: a bot winding up a shove. `ramTargetId` is the rival it means to hit (null when none),

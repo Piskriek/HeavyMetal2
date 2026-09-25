@@ -282,3 +282,15 @@ test("half width goes through its own door, bounded by the validator's own limit
   assert.equal(unknown.ok, false);
   if (!unknown.ok) assert.match(unknown.reason, /^unknown_path:/);
 });
+
+// M11: dragging a node no longer re-renders the builder UI once per pointer move.
+test('M11: the lane panel is memoised and the builder UI catches up once per frame', async () => {
+  const { readFileSync: read } = await import('node:fs');
+  assert.equal((LanePanel as unknown as { $$typeof: symbol }).$$typeof, Symbol.for('react.memo'), 'LanePanel is React.memo');
+  const ui = read(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
+  assert.match(ui, /builder\.onChange\(scheduleUpdate\);/, 'builder notifications are coalesced');
+  assert.match(ui, /pending = requestAnimationFrame\(\(\) => \{ pending = 0; update\(\); \}\);/, 'one React update per animation frame');
+  assert.match(ui, /const scheduleUpdate = \(\) => \{\s*onRequestRender\?\.\(\);/, 'the 3D view is still asked to redraw at once');
+  assert.match(ui, /\{\.\.\.laneHandlers\}/, 'the panel gets the stable handlers');
+  assert.match(ui, /latest\.current = handlers;/, 'which always call the latest render\'s handlers');
+});

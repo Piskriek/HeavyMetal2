@@ -12,7 +12,7 @@
  *  - every control carries a label (`<label>`, `aria-label`, or its own visible text), and the kind
  *    buttons say what the graph already decided.
  */
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { LaneNodeKind } from '../../game/lane-network';
 import type { LanePanelCommand, LanePanelModel } from '../../game/lane-panel-model';
 
@@ -43,7 +43,13 @@ const KIND_LABEL: Record<LaneNodeKind, string> = {
   normal: 'Road', merge: 'Merge', split: 'Split', oob: 'Out of bounds',
 };
 
-export default function LanePanel({
+/**
+ * M11: memoised. The builder re-derives the model at most once per frame, and the parent passes
+ * stable callbacks, so the panel only re-renders when its model, status or drawer state changes.
+ */
+export default memo(LanePanel);
+
+function LanePanel({
   model, onSelectNode, onSelectPath, onMoveNode, onCommand, onSave, onExport, onImport,
   onTestDrive, onInitSample, onInitDefault, onFocusNode, isDrawerOpen, onToggleDrawer, status,
 }: LanePanelProps) {

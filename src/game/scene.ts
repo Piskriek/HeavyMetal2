@@ -271,6 +271,8 @@ export interface SceneFrame {
   cameraY: number;
   drift: number;
   shake: number;
+  /** H8: the player's last hit: when (frame `time`), from which side, how hard (0..1). */
+  impact?: { readonly at: number; readonly side: -1 | 0 | 1; readonly strength: number };
   rotation: number;
   dragging: boolean;
   launchOrigin: { x: number; y: number };

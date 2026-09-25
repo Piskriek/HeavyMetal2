@@ -13,7 +13,7 @@ import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
 import { ObstacleView } from './obstacle-view';
 import { PickupView } from './pickup-view';
-import { cameraShake } from './camera-shake';
+import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
 import {
@@ -1889,6 +1889,15 @@ export class Renderer3D {
       .addScaledVector(this.shakeForward, shake.forward);
   }
 
+  /** H8: the hit kick, along the camera's own axes (see cameraKick). */
+  private applyImpactKick(impact: NonNullable<SceneFrame['impact']>, time: number, reducedMotion: boolean): void {
+    const kick = cameraKick(impact.side, impact.strength, time - impact.at, reducedMotion);
+    if (kick.right === 0 && kick.up === 0) return;
+    this.shakeRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    this.shakeUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    this.camera.position.addScaledVector(this.shakeRight, kick.right).addScaledVector(this.shakeUp, kick.up);
+  }
+
   private updateAtmosphere(d: number) {
     const under = smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d));
     const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
@@ -2134,6 +2143,7 @@ export class Renderer3D {
       if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt, frame.reducedMotion);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
       this.applyImpactShake(frame.shake, frame.time, frame.reducedMotion);
+      if (frame.impact) this.applyImpactKick(frame.impact, frame.time, frame.reducedMotion);
       this.updateAtmosphere(playerDist);
     }
     this.sky.position.copy(this.camera.position);

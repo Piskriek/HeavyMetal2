@@ -338,25 +338,3 @@
 .round-table .split-cell.lost { color: #f08a6e; }
 .biggest-climber { margin-top: 8px; padding: 7px 10px; border: 1px solid #d6ad5c66; border-radius: 4px; background: #0f1814cc; color: #e8d9ad; font-size: 12px; }
 .biggest-climber strong { color: #f0a15b; letter-spacing: .08em; margin-right: 6px; }
-
-/* ============ MP-T04: the Ball Garage ============ */
-.ball-garage { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; color: #e8d9ad; }
-@media (max-width: 900px) { .ball-garage { grid-template-columns: 1fr; } }
-.garage-stage { display: grid; gap: 12px; justify-items: center; }
-.garage-ball { width: 180px; height: 180px; border-radius: 50%; background-size: 200% 100%; box-shadow: inset -28px -22px 40px #000a, inset 10px 8px 24px #fff2, 0 8px 24px #000a; animation: garage-roll 6s linear infinite; }
-@keyframes garage-roll { from { background-position: 0 0; } to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .garage-ball { animation: none; } }
-.garage-map { width: 100%; max-width: 512px; aspect-ratio: 2 / 1; cursor: crosshair; border: 1px solid #d6ad5c66; image-rendering: auto; }
-.garage-controls { display: grid; gap: 10px; align-content: start; font-size: 12px; }
-.garage-controls select, .garage-controls input:not([type='range']) { background: #0f1814; color: #f0d8a8; border: 1px solid #2e3827; padding: 4px 6px; }
-.garage-swatches { display: flex; gap: 6px; }
-.garage-swatches button { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #33281a; }
-.garage-swatches button[aria-pressed='true'] { border-color: #f0b85e; box-shadow: 0 0 8px #f0a15b; }
-.garage-decals { display: flex; flex-wrap: wrap; gap: 5px; }
-.garage-decals button, .garage-actions button, .garage-stamp button { padding: 4px 8px; border: 1px solid #8a6a3a; background: #16100b; color: #f0d8a8; border-radius: 999px; }
-.garage-decals button[aria-pressed='true'] { background: #5e3c14; border-color: #f0b85e; }
-.garage-stamp { display: grid; gap: 4px; padding: 8px; border: 1px solid #2e3827; }
-.garage-stamp label { display: grid; grid-template-columns: 70px 1fr; align-items: center; }
-.garage-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.garage-locked { color: #f0a15b; }
-.garage-toast { color: #9fe39a; }

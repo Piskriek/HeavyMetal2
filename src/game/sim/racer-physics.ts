@@ -344,6 +344,26 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
  * Advances one racer by `dt` seconds. Mutates `racer` in place, exactly as the engine did, and
  * fills `trace` when the caller wants the canonical observations (gate capture, falls, hits).
  */
+/** P6: a scraping ball throws a spark burst this often (seconds), sized by its speed. */
+export const SCRAPE_SPARK_EVERY = 0.07;
+/** P6: below this forward speed a ball leaning on the edge is resting, not scraping. */
+export const SCRAPE_MIN_VX = 150;
+
+/**
+ * P6: a trail of sparks while a ball grinds along the road-edge wall: it is pinned at the road's
+ * edge (`±LANE_Z_LIMIT`, not a lane corridor), still pushing into it, and rolling. Presentation
+ * only: it emits effects and remembers when, and never touches the physics.
+ */
+export function scrapeSparks(racer: Racer, pushVz: number, ctx: RacerStepContext): void {
+  const atEdge = Math.abs(racer.z) >= LANE_Z_LIMIT - 0.5;
+  const intoEdge = Math.sign(pushVz) === Math.sign(racer.z) && Math.abs(pushVz) > 1;
+  if (!atEdge || !intoEdge || racer.vx < SCRAPE_MIN_VX || !racer.grounded || racer.falling) return;
+  if (racer.scrapeFxAt !== undefined && ctx.runTime - racer.scrapeFxAt < SCRAPE_SPARK_EVERY && ctx.runTime >= racer.scrapeFxAt) return;
+  racer.scrapeFxAt = ctx.runTime;
+  const scale = 0.3 + 0.5 * Math.min(1, racer.vx / 1200);
+  ctx.fx.effect('sparks', racer.x, racer.y, racer.z + Math.sign(racer.z) * 26, scale, racer.id);
+}
+
 export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace?: RacerStepTrace): void {
   const world = ctx.world;
   const oldX = racer.x;
@@ -427,6 +447,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1, racer.id);
       if (!racer.id) ctx.fx.say('INTO THE TREES! THE ROPE REELS YOU BACK.');
     }
+    scrapeSparks(racer, impactVz, ctx);
     racer.lane = closestLane(racer.z);
   }
   const dragFactor = 120 / racer.weight;

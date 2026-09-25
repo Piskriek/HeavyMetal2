@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import {
   APERTURE_FRACTION, BOB_MAX_PX, COCKPIT_ART, COCKPIT_ART_PATHS, COCKPIT_MANIFEST,
   ARM_FIST_TO_SLEEVE, VZ_MAX, YOKE_MAX_DEG, armsAt, cockpitBob, cockpitLayout, createCockpitState, gripPoints,
-  needleAngle, steerFrom, yokeAngleDeg,
+  needleAngle, steerFrom, yokeAngleDeg, CLUSTER_ASPECT,
 } from '../src/game/cockpit';
 import { DEFAULT_OPTIONS, type GameOptions } from '../src/game/types';
 import { laneZ, PLAYER_LANE } from '../src/game/scene';
@@ -167,4 +167,36 @@ test('every cockpit image exists, at the size the manifest promises', () => {
 test('the cockpit is a camera mode, and it is the default', () => {
   const mode: GameOptions['cameraMode'] = 'first_person';
   assert.equal(DEFAULT_OPTIONS.cameraMode, mode, 'the game opens in the cockpit');
+});
+
+test('layout: the gauge plates hang from the window bottom at every screen shape (no gap, no overlap)', () => {
+  for (const [w, h] of [[1280, 720], [1920, 1080], [1440, 1080], [2560, 1080], [3840, 2160], [1024, 768]] as const) {
+    const layout = cockpitLayout(w, h);
+    const windowBottom = layout.aperture.y + layout.aperture.h;
+    for (const side of ['left', 'right'] as const) {
+      const c = layout.clusters[side];
+      const gap = c.y - windowBottom;
+      assert.ok(gap >= -4 && gap <= 1, `${w}×${h} ${side}: gap ${gap.toFixed(1)} px`);
+      const bottom = c.y + c.w * CLUSTER_ASPECT[side];
+      assert.ok(bottom <= h + 1, `${w}×${h} ${side}: plate stays on screen (${bottom.toFixed(1)})`);
+      assert.ok(c.w <= w * 0.3 + 1e-9, `${w}×${h} ${side}: plate width capped`);
+    }
+    assert.ok(layout.clusters.left.x + layout.clusters.left.w < layout.clusters.right.x, `${w}×${h}: plates do not meet`);
+    // At 16:9 the plates also reach the screen bottom (the band is filled).
+    if (Math.abs(w / h - 16 / 9) < 0.01) {
+      for (const side of ['left', 'right'] as const) {
+        const c = layout.clusters[side];
+        assert.ok(Math.abs(c.y + c.w * CLUSTER_ASPECT[side] - h) <= 2, `${w}×${h} ${side}: reaches the bottom`);
+      }
+    }
+    for (const deg of [-YOKE_MAX_DEG, 0, YOKE_MAX_DEG]) {
+      const arms = armsAt(layout, deg);
+      for (const arm of [arms.left, arms.right]) assert.ok(arm.shoulder.y > h, `${w}×${h}: the arm runs off the bottom`);
+    }
+  }
+});
+
+test('the bezel backup no longer ships in public/', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  assert.equal(existsSync(join(root, 'public/art/cockpit/cockpit-bezel.backup.png')), false);
 });

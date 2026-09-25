@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import { writeSafetyCopyIfGrown } from "./scripts/props-safety-copy";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,6 +64,13 @@ function trackPropsBackupPlugin(): Plugin {
                 };
                 fs.writeFileSync(latestFile, JSON.stringify(payload, null, 2), "utf-8");
 
+                // Milestone safety copy (add-only) whenever the track grows past the biggest one.
+                let safetyCopy: string | undefined;
+                try {
+                  const safety = writeSafetyCopyIfGrown(path.resolve(backupDir, "user_safety_backup"), payload);
+                  if (safety.written && safety.file) safetyCopy = path.basename(safety.file);
+                } catch {}
+
                 // 2. Save history snapshot if there are props
                 if (props.length > 0) {
                   const historyFile = path.resolve(historyDir, `props-${course}-${timestamp}.json`);
@@ -79,7 +87,7 @@ function trackPropsBackupPlugin(): Plugin {
                 }
 
                 res.writeHead(200, { "Content-Type": "application/json" });
-                res.end(JSON.stringify({ success: true, count: props.length, timestamp }));
+                res.end(JSON.stringify({ success: true, count: props.length, timestamp, safetyCopy }));
                 return;
               }
             } catch (err: any) {

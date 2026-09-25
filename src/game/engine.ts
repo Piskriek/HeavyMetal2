@@ -32,7 +32,7 @@ import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorag
 import { FIXED_STEP } from './contracts/timing';
 import { validateCommand, type CommandGate, type CommandVerdict, type GameCommand } from './contracts/commands';
 import type { HeatPhase } from './contracts/heat';
-import { MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX, MergePool, releaseOccupancy } from './merge/pool';
+import { MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX, MergePool, queueRows, releaseOccupancy } from './merge/pool';
 import {
   PASSAGE_CENTRE_Z, PASSAGE_GHOST_TAIL_S, insidePassage,
   passageExitX, passageMouthX,
@@ -338,6 +338,7 @@ export class GameEngine {
     this.merge = null;
     this.mergeGate = null;
     this.mergeDone = false;
+    this.queueRow.clear(); this.queueOffset.clear();
     this.mergeLastReleased = null;
     this.pausedFrom = null;
     this.splitReached = false;
@@ -726,6 +727,8 @@ export class GameEngine {
       racer.mergeSlotZ = upcoming < MERGE_LINEUP ? pool.loopZ : entry.slotZ;
       upcoming += 1;
     }
+    // P7: and where each one is drawn in the queue (a row per ball up the hill, per lane).
+    this.queueRow = queueRows(pool.entries);
 
     // 3. Advance the state machine. The occupancy input is the previous release's own progress.
     const previousRacer = this.mergeLastReleased === null
@@ -820,6 +823,15 @@ export class GameEngine {
     return this.racerIndex;
   }
   private racerIndex = new Map<number, Racer>();
+  /** P7: each held rider's row in the pool queue, and the drawn offset easing toward it. */
+  private queueRow = new Map<number, number>();
+  private readonly queueOffset = new Map<number, number>();
+  private queueSpacing = 0;
+  /** P7: engine x between queue rows: two drawn balls (one ball of air between them) of world arc. */
+  private get queueSpacingX(): number {
+    if (!this.queueSpacing) this.queueSpacing = (2 * 4 * BALL_DRAW_RADIUS) / getTrackSpace().ARC_PER_ENGINE_DISTANCE;
+    return this.queueSpacing;
+  }
   private racerIndexOf: Racer[] | null = null;
 
   /** Freezes a rider at the gate plane and points them at their pool slot. */
@@ -1030,6 +1042,19 @@ export class GameEngine {
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
       rendered.ramTellUntil = racer.ramTellUntil;
+      // P7: a held rider is drawn in its queue row, up the hill behind the gate, not on the gate plane
+      // with the rest of its lane. The offset eases as the queue moves up (snaps with reduced motion);
+      // the physics never sees it.
+      const target = racer.mergeHeld ? (this.queueRow.get(racer.id) ?? 0) * this.queueSpacingX : 0;
+      let offset = this.queueOffset.get(racer.id) ?? target;
+      offset = this.reducedMotion ? target : offset + (target - offset) * Math.min(1, dt * 7);
+      if (Math.abs(offset) < 0.05) offset = 0;
+      if (offset !== 0 || this.queueOffset.has(racer.id)) this.queueOffset.set(racer.id, offset);
+      if (offset) {
+        rendered.y += this.y(rendered.x - offset) - this.y(rendered.x);
+        rendered.x -= offset;
+        rendered.distance = racer.distance - offset / 2;
+      }
     }
     const player = this.player; const rendered = this.renderRacers[0];
     // M01 · T1: the shove moves the whole field, so the legacy camera state tracks it too — the ball

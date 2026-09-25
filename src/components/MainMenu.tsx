@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Compass, Maximize2, Play, Settings, Trophy, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, Maximize2, Paintbrush, Play, Settings, Trophy, UserRound, Volume2, VolumeX } from 'lucide-react';
 import Brand from './Brand';
 import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 import type { GameOptions } from '../game/types';
@@ -21,6 +21,8 @@ interface MainMenuProps {
   onRecords: () => void;
   /** MP-T06: the goblin creator. */
   onCreator?: () => void;
+  /** MP-T04: the ball garage. */
+  onGarage?: () => void;
   onCredits: () => void;
   onSound: () => void;
   onFullscreen: () => void;
@@ -62,6 +64,7 @@ export default function MainMenu(props: MainMenuProps) {
     { label: 'Settings', sub: 'A little fine-tuning never hurt.', icon: Settings, action: props.onSettings, primary: false },
     { label: 'How to Play', sub: 'The very optional instruction manual.', icon: BookOpen, action: props.onGuide, primary: false },
     ...(props.onCreator ? [{ label: 'Goblin Creator', sub: 'Build your racer, face and all. Save it to your crew.', icon: UserRound, action: props.onCreator, primary: false }] : []),
+    ...(props.onGarage ? [{ label: 'Ball Garage', sub: 'Paint your ball: metal, pin-lines and up to twelve decals.', icon: Paintbrush, action: props.onGarage, primary: false }] : []),
     { label: 'Hall of Chaos', sub: 'Some things deserve to be remembered.', icon: Trophy, action: props.onRecords, primary: false },
   ];
 

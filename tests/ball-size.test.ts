@@ -33,10 +33,10 @@ test('ball-to-ball contact uses the drawn size', () => {
 
 test('the ball and its caps are flat-lit: no MeshStandard/Physical, no specular', () => {
   const renderer = readFileSync(new URL('../src/game/renderer-3d.ts', import.meta.url), 'utf8');
-  const build = renderer.slice(renderer.indexOf('private buildRacerMesh('), renderer.indexOf('private releaseRacerMesh('));
+  const build = renderer.slice(renderer.indexOf('private coreBatch('), renderer.indexOf('private releaseRacerMesh('));
   assert.match(build, /new THREE\.MeshLambertMaterial\(/);
   assert.doesNotMatch(build, /MeshStandardMaterial|MeshPhysicalMaterial|MeshPhongMaterial|metalness|envMap/);
-  assert.match(renderer, /capMat: new THREE\.MeshLambertMaterial\(/);
+  assert.match(renderer, /capMat = new THREE\.MeshLambertMaterial\(/);
   assert.match(renderer, /sphereGeo: new THREE\.SphereGeometry\(BALL_DRAW_RADIUS,/);
 });
 

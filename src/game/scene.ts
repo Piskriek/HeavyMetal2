@@ -4,6 +4,13 @@ import type { AirPickup } from './powerups';
 
 export const HEIGHT = 620;
 export const RADIUS = 31;
+/**
+ * The ball as drawn and as it touches other balls: twice the physics radius. The road, gap, loop and
+ * track-space maths keep `RADIUS` (their tests and the parity fixture are built on it). The renderer
+ * already places a grounded ball's centre 2·RADIUS above the road (the legacy +RADIUS lift), so a
+ * ball drawn at this radius sits exactly on the road instead of floating one radius above it.
+ */
+export const BALL_DRAW_RADIUS = RADIUS * 2;
 export const GROUND = 478;
 export const START_X = 190;
 /* -----------------------------------------------------------------------------

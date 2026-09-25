@@ -8,7 +8,7 @@ import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
 import { builderRampObstacles } from './sim/builder-ramps';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
-  AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
+  AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
   type AirSheep, type Obstacle, type Particle, type RacerFrame,
 } from './scene';
@@ -1048,9 +1048,10 @@ export class GameEngine {
         || (!this.splitReached && (a.id !== PLAYER_ID || b.id !== PLAYER_ID))
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
-      const diameter = RADIUS * 2 + 4;
+      // Balls touch at the size they are drawn (BALL_DRAW_RADIUS = 2 × the road-physics RADIUS).
+      const diameter = BALL_DRAW_RADIUS * 2 + 4;
       const distance = Math.hypot(dx, dz, dy);
-      if (distance >= diameter || Math.abs(dy) > RADIUS * 1.55) continue;
+      if (distance >= diameter || Math.abs(dy) > BALL_DRAW_RADIUS * 1.55) continue;
       const planar = Math.hypot(dx, dz) || 1;
       const nx = dx / planar; const nz = dz / planar;
       const sum = a.weight + b.weight;

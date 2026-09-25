@@ -396,31 +396,32 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       // M01 · T2: while the first-loop pool holds the field, Space or Enter is "ready up" and the
       // pool is the only thing it can mean — so it is handled before the grid/staging keys, or the
       // "start the run" branch below would swallow Enter during the countdown.
+      // M9: player input goes through engine.dispatch, which checks it against the command gate.
       if (engine.inMerge && (code === 'Space' || code === 'Enter')) {
         event.preventDefault();
-        engine.ready();
+        engine.dispatch({ type: 'ready' });
         return;
       }
       // On the grid, Space or Enter begins the run
       if (engine.status === 'ready' && (code === 'Space' || code === 'Enter')) {
         event.preventDefault();
-        engine.start();
+        engine.dispatch({ type: 'start' });
         return;
       }
       // Fixed non-remappable actions
-      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.start(); return; }
+      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.dispatch({ type: 'start' }); return; }
       if (code === 'KeyR') { event.preventDefault(); retry(); return; }
       if (code === 'KeyM') { setOptions((previous) => ({ ...previous, sound: !previous.sound })); return; }
       if (code === 'KeyF') { event.preventDefault(); void toggleFullscreen(); return; }
       // Customizable bindings
-      if ((b.steerLeft ?? []).includes(code)) { event.preventDefault(); engine.changeLane(-1); return; }
-      if ((b.steerRight ?? []).includes(code)) { event.preventDefault(); engine.changeLane(1); return; }
-      if ((b.bounce ?? []).includes(code)) { event.preventDefault(); engine.bounce(); return; }
-      if ((b.boost ?? []).includes(code)) { event.preventDefault(); engine.boost(); return; }
+      if ((b.steerLeft ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'steer', direction: -1 }); return; }
+      if ((b.steerRight ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'steer', direction: 1 }); return; }
+      if ((b.bounce ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'bounce' }); return; }
+      if ((b.boost ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'boost' }); return; }
       if ((b.pause ?? []).includes(code)) {
         event.preventDefault();
         if (code === 'Escape' && theater) setTheater(false);
-        else { engine.togglePause(); canvasRef.current?.focus({ preventScroll: true }); }
+        else { engine.dispatch({ type: 'toggle-pause' }); canvasRef.current?.focus({ preventScroll: true }); }
         return;
       }
       // Fallback: Escape should also close theater even if not bound to pause (defensive)
@@ -521,7 +522,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   loadout={config.loadout}
                   reducedMotion={options.reducedMotion}
                   raceTime={snapshot.raceTime}
-                  onReady={() => engineRef.current?.ready()}
+                  onReady={() => engineRef.current?.dispatch({ type: 'ready' })}
                 />
               )}
               <AnimatePresence>

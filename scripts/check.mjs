@@ -67,7 +67,8 @@ const commands = [
     'tests/export.test.ts',
     'tests/protect-baseline.test.ts', 'tests/props-safety-copy.test.ts',
     'tests/accessibility.test.ts', 'tests/racer-pool.test.ts', 'tests/roster-scale.test.ts',
-    'tests/integration-benchmarks.test.ts', 'tests/cpu-tactics.test.ts'],
+    'tests/integration-benchmarks.test.ts', 'tests/cpu-tactics.test.ts',
+    'tests/seeded-race.test.ts'],
 ];
 
 for (const args of commands) {

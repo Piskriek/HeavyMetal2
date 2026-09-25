@@ -7,9 +7,9 @@
  *
  * 1. **Side effects go through `SimFx`** instead of through the renderer, the audio graph and
  *    the snapshot, and gameplay randomness goes through `ctx.random()` instead of calling
- *    `Math.random()` inline (the pinball spinner). The race binds those to exactly what it did
- *    before, so nothing observable changed; a qualifying attempt binds them to a recorder and a
- *    seeded stream. `tests/physics-parity.test.ts` proves the port against a verbatim copy of
+ *    `Math.random()` inline (the pinball spinner). The race binds randomness to a hash of
+ *    (seed, tick, racer id) (M9) so a race replays; a qualifying attempt binds the effects to a
+ *    recorder and randomness to its seeded stream. `tests/physics-parity.test.ts` proves the port against a verbatim copy of
  *    the pre-refactor engine code.
  * 2. **Recovery is decided before the falling branch's early return.** The old code returned
  *    from `if (racer.falling)` immediately, so a falling racer could only ever be saved by the
@@ -303,9 +303,9 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       }
       break;
     case 'pinball_spinner':
-      // The only gameplay coin-flip in the step. The race draws from `Math.random` as it always
-      // has; an isolated attempt draws from its seeded stream so a replay matches.
-      racer.vz = (ctx.random() > 0.5 ? 1 : -1) * 440;
+      // The only gameplay coin-flip in the step. The race hashes (seed, tick, racer id) and an
+      // isolated attempt draws from its seeded stream, so either replays exactly (M9).
+      racer.vz = (ctx.random(racer.id) > 0.5 ? 1 : -1) * 440;
       racer.vx += 120;
       ctx.fx.effect('impact', x, y, z, 0.8, racer.id);
       ctx.fx.effect('sparks', x, y, z, 1, racer.id);

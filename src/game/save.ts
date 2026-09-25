@@ -210,6 +210,8 @@ function sanitizeStanding(raw: unknown, fieldSize: number): RacerStanding | null
     recovering: raw.recovering,
     finishTime: raw.finishTime === null ? null : raw.finishTime as number,
     loadout,
+    // P11: the split place survives a reload when it is a real place in this field.
+    ...(isInt(raw.splitPosition) && raw.splitPosition >= 1 && raw.splitPosition <= fieldSize ? { splitPosition: raw.splitPosition } : {}),
   };
 }
 

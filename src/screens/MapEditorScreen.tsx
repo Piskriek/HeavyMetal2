@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw } from 'lucide-react';
 import { GameEngine } from '../game/engine';
@@ -11,6 +11,9 @@ import { DEFAULT_SETUP, createSession, sessionConfig, type RaceConfig } from '..
 import { INITIAL_SNAPSHOT, type CourseId, type GameOptions, type GameSnapshot, type RunRecord } from '../game/types';
 import TrackBuilderUI from '../components/TrackBuilderUI';
 import MergePoolOverlay from '../components/MergePoolOverlay';
+import CockpitHud from '../components/CockpitHud';
+import TestDriveBar from '../components/TestDriveBar';
+import { createCockpitState, type CockpitState } from '../game/cockpit';
 
 interface MapEditorScreenProps {
   options: GameOptions;
@@ -22,6 +25,13 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
+  // Test-drive view and slow motion. Changed live on the engine: switching must not rebuild the race.
+  const [cameraMode, setCameraMode] = useState<GameOptions['cameraMode']>('follow_ball');
+  const [timeScale, setTimeScale] = useState(1);
+  const cockpitState = useRef<CockpitState>(createCockpitState());
+  const cameraModeRef = useRef(cameraMode); cameraModeRef.current = cameraMode;
+  const timeScaleRef = useRef(timeScale); timeScaleRef.current = timeScale;
+  const readCockpit = useCallback((state: CockpitState) => { engineRef.current?.getCockpitState(state); }, []);
   const [engine, setEngine] = useState<GameEngine | null>(null);
   const [snapshot, setSnapshot] = useState<GameSnapshot>(INITIAL_SNAPSHOT);
 
@@ -82,6 +92,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     );
     engineRef.current = createdEngine;
     setEngine(createdEngine);
+    createdEngine.setTimeScale(timeScaleRef.current);
 
     // Solo test mode: only the player marble
     createdEngine.setSoloMode(true);
@@ -107,12 +118,22 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     };
   }, [assets, course, config, options]);
 
+  const changeCamera = useCallback((mode: GameOptions['cameraMode']) => {
+    setCameraMode(mode);
+    engineRef.current?.setCameraMode(mode);
+  }, []);
+  const changeTimeScale = useCallback((scale: number) => {
+    engineRef.current?.setTimeScale(scale);
+    setTimeScale(engineRef.current?.getTimeScale() ?? scale);
+  }, []);
+
   // Toggle between testing and editing
   const startTesting = () => {
     setIsTesting(true);
     if (engineRef.current) {
       engineRef.current.trackBuilder.selectProp(null);
       engineRef.current.setBuildPaused(false);
+      engineRef.current.setCameraMode(cameraModeRef.current);
       engineRef.current.trackBuilder.freeFly.active = false;
       engineRef.current.inputEnabled = true;
       engineRef.current.reset(); // Reset to 'ready' state so user can launch
@@ -125,6 +146,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     setIsTesting(false);
     if (engineRef.current) {
       engineRef.current.setBuildPaused(true);
+      engineRef.current.setCameraMode('follow_ball');
       engineRef.current.trackBuilder.freeFly.active = true;
       engineRef.current.inputEnabled = false;
     }
@@ -233,9 +255,23 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
         />
       )}
 
+      {/* Cockpit view while test-driving (the builder itself always uses the free-fly camera) */}
+      {assets && isTesting && cameraMode === 'first_person' && (
+        <CockpitHud
+          state={cockpitState.current}
+          readState={readCockpit}
+          reducedMotion={options.reducedMotion}
+          active
+        />
+      )}
+
+      {assets && isTesting && (
+        <TestDriveBar cameraMode={cameraMode} onCameraMode={changeCamera} timeScale={timeScale} onTimeScale={changeTimeScale} />
+      )}
+
       {/* Testing HUD overlay when test racing */}
       {assets && isTesting && !isPooled && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+        <div className={`absolute ${cameraMode === 'first_person' ? 'top-14' : 'top-4'} left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2`}>
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}

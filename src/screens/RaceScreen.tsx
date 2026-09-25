@@ -17,6 +17,7 @@ import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import CockpitHud from '../components/CockpitHud';
 import TestDriveBar from '../components/TestDriveBar';
+import { TouchRaceControls } from '../components/RaceControls';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
 import MergePoolOverlay from '../components/MergePoolOverlay';
@@ -340,6 +341,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     setModal(name);
   }, []);
 
+  // H5: a touch screen (coarse pointer, or the first touch on a hybrid) gets the thumb controls.
+  const [touchControls, setTouchControls] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true);
+  useEffect(() => {
+    const query = window.matchMedia?.('(pointer: coarse)');
+    const changed = () => { if (query?.matches) setTouchControls(true); };
+    const touched = () => setTouchControls(true);
+    query?.addEventListener?.('change', changed);
+    window.addEventListener('touchstart', touched, { once: true, passive: true });
+    return () => { query?.removeEventListener?.('change', changed); window.removeEventListener('touchstart', touched); };
+  }, []);
   const retry = useCallback((autoLaunch = false) => {
     if (roundComplete(session)) { onContinue(); return; }
     engineRef.current?.reset();
@@ -472,6 +483,15 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     setBuildMode(false);
                     engine.requestRender();
                   }}
+                />
+              )}
+              {touchControls && assets && !buildMode && engineRef.current && (
+                <TouchRaceControls
+                  snapshot={snapshot}
+                  onLane={(direction) => engineRef.current?.dispatch({ type: 'steer', direction })}
+                  onBounce={() => engineRef.current?.dispatch({ type: 'bounce' })}
+                  onBoost={() => engineRef.current?.dispatch({ type: 'boost' })}
+                  onPrimary={() => engineRef.current?.dispatch({ type: snapshot.status === 'ready' ? 'start' : 'toggle-pause' })}
                 />
               )}
               {!firstPerson && <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>

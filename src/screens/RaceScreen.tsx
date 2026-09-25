@@ -16,6 +16,7 @@ import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
 import CockpitHud from '../components/CockpitHud';
+import TestDriveBar from '../components/TestDriveBar';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
 import MergePoolOverlay from '../components/MergePoolOverlay';
@@ -125,6 +126,16 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     engineRef.current?.getCockpitState(state);
   }, []);
   const firstPerson = options.cameraMode === 'first_person';
+  // Quick-race test tools: live camera switch and slow motion (never in a tournament).
+  const [timeScale, setTimeScale] = useState(1);
+  const changeTimeScale = useCallback((scale: number) => {
+    engineRef.current?.setTimeScale(scale);
+    setTimeScale(engineRef.current?.getTimeScale() ?? scale);
+  }, []);
+  const changeCamera = useCallback((cameraMode: GameOptions['cameraMode']) => {
+    setOptions((previous) => ({ ...previous, cameraMode }));
+    engineRef.current?.setCameraMode(cameraMode);
+  }, [setOptions]);
   const finishRef = useRef(onRoundComplete);
   finishRef.current = onRoundComplete;
   const modalRef = useRef<ModalName>(null);
@@ -498,6 +509,9 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   </div>
                 </div>
               </div>}
+              {config.mode === 'quick' && assets && !loadError && (
+                <TestDriveBar cameraMode={options.cameraMode} onCameraMode={changeCamera} timeScale={timeScale} onTimeScale={changeTimeScale} style={{ top: firstPerson ? 52 : 12 }} />
+              )}
               {firstPerson && assets && !loadError && (
                 <CockpitHud
                   state={cockpitRef.current}

@@ -303,6 +303,7 @@ test('the wiring: engine → frame → paint, and Test drive hands the document 
     'which adopts the document the author is holding');
 
   const builderUi = readFileSync(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
-  assert.match(builderUi, /onTestDrive=\{\(\) => \{ saveLaneDoc\(\); onTestRace\?\.\(\); \}\}/,
+  // M11: the panel's handlers are passed through useLatestHandlers, so the wiring is an object entry.
+  assert.match(builderUi, /onTestDrive: \(\) => \{ saveLaneDoc\(\); onTestRace\?\.\(\); \}/,
     'the panel\'s Test drive saves the document and then test drives it');
 });

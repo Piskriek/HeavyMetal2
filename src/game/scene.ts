@@ -271,6 +271,8 @@ export interface RacerFrame {
   launchOrigin: { x: number; y: number };
   /** M01 · T3: the shell's roll phase, in radians. Presentation only — never in the fingerprint. */
   rollPhase?: number;
+  /** Not in the race yet (a rival waiting for the player's solo first split): draw nothing. */
+  hidden?: boolean;
 }
 
 export interface SceneFrame {

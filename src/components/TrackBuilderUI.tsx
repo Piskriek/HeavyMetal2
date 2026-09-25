@@ -66,6 +66,22 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} /> },
 ];
 
+/**
+ * M11: stable callbacks (same identity every render) that always call the handlers from the latest
+ * render, so a memoised child never runs a stale closure. The set of keys must not change.
+ */
+function useLatestHandlers<T extends Record<string, (...args: never[]) => unknown>>(handlers: T): T {
+  const latest = useRef(handlers);
+  latest.current = handlers;
+  return useMemo(() => {
+    const stable = {} as Record<string, (...args: unknown[]) => unknown>;
+    for (const key of Object.keys(handlers)) {
+      stable[key] = (...args: unknown[]) => (latest.current[key] as (...a: unknown[]) => unknown)(...args);
+    }
+    return stable as unknown as T;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
   const [category, setCategory] = useState<PropCategory>('foliage');
   const [isZen, setIsZen] = useState(false);
@@ -171,11 +187,22 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       if (!placementError) shownPlacementErrorRef.current = null;
       onRequestRender?.();
     };
-    builder.onChange(update);
+    // M11: a drag notifies on every pointer move — several times a frame on a fast mouse. The 3D view
+    // is asked to redraw at once, but the React panels (the lane panel with its node list and
+    // sliders above all) catch up once per animation frame, not once per notification.
+    let pending = 0;
+    const scheduleUpdate = () => {
+      onRequestRender?.();
+      if (pending || typeof requestAnimationFrame !== 'function') { if (!pending) update(); return; }
+      pending = requestAnimationFrame(() => { pending = 0; update(); });
+    };
+    builder.onChange(scheduleUpdate);
     builder.freeFly.active = true;
     builder.initGizmo(canvas);
     builder.keymap.pushScope('builder');
     return () => {
+      if (pending) cancelAnimationFrame(pending);
+      pending = 0;
       builder.freeFly.active = false;
       builder.keymap.popScope('builder');
     };
@@ -1005,6 +1032,36 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     refreshLanes();
     onRequestRender?.();
   };
+
+  /**
+   * M11: the lane panel is memoised, so it gets callbacks that never change identity and always call
+   * the latest handlers (they read state such as the selected path and the course).
+   */
+  const laneHandlers = useLatestHandlers({
+    onToggleDrawer: (open: boolean) => setLaneDrawerOpen(open),
+    onSelectNode: (nodeId: string | null) => {
+      builder.selectLaneNode(nodeId);
+      refreshLanes();
+      onRequestRender?.();
+    },
+    onSelectPath: (pathId: string | null) => {
+      setSelectedLanePathId(pathId);
+      refreshLanes();
+      onRequestRender?.();
+    },
+    onMoveNode: (nodeId: string, x: number, z: number) => moveLaneNodeFromPanel(nodeId, x, z),
+    onCommand: (command: LanePanelCommand) => runLaneCommand(command),
+    onInitSample: () => initSampleLanes(),
+    onInitDefault: () => initDefaultLanes(),
+    onFocusNode: (nodeId: string) => {
+      builder.focusOnLaneNode(nodeId);
+      onRequestRender?.();
+    },
+    onSave: () => saveLaneDoc(),
+    onExport: () => exportLanes(),
+    onImport: (json: string) => importLanes(json),
+    onTestDrive: () => { saveLaneDoc(); onTestRace?.(); },
+  });
 
   const saveLaneDoc = () => {
     const result = builder.saveLaneDoc();
@@ -3453,29 +3510,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   model={laneModel}
                   status={laneStatus}
                   isDrawerOpen={laneDrawerOpen}
-                  onToggleDrawer={(open) => setLaneDrawerOpen(open)}
-                  onSelectNode={(nodeId) => {
-                    builder.selectLaneNode(nodeId);
-                    refreshLanes();
-                    onRequestRender?.();
-                  }}
-                  onSelectPath={(pathId) => {
-                    setSelectedLanePathId(pathId);
-                    refreshLanes();
-                    onRequestRender?.();
-                  }}
-                  onMoveNode={moveLaneNodeFromPanel}
-                  onCommand={runLaneCommand}
-                  onInitSample={initSampleLanes}
-                  onInitDefault={initDefaultLanes}
-                  onFocusNode={(nodeId) => {
-                    builder.focusOnLaneNode(nodeId);
-                    onRequestRender?.();
-                  }}
-                  onSave={saveLaneDoc}
-                  onExport={exportLanes}
-                  onImport={importLanes}
-                  onTestDrive={() => { saveLaneDoc(); onTestRace?.(); }}
+                  {...laneHandlers}
                 />
               ) : (category as string) === 'custom_models' ? (
                 <CustomModelsTab

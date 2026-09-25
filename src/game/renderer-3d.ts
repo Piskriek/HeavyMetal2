@@ -5,6 +5,7 @@
    ============================================================================= */
 import * as THREE from 'three';
 import { RopeReelView } from './rope-reel-view';
+import { BallTexturePool, arrayBallMaterial, layerPixels } from './ball-texture-pool';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
@@ -1493,7 +1494,12 @@ interface RacerSlot {
   /** An untextured slot's colour (the painted ones are white under their texture). */
   color: THREE.Color;
   shieldSpin: number;
+  /** MP-T03: this slot's layer in the ball texture array (null when drawn by a per-texture batch). */
+  layer: number | null;
 }
+
+/** MP-T03: the key of the one batch that draws every array-textured ball. */
+const ARRAY_BATCH_KEY = {} as HTMLCanvasElement;
 
 /** Every slot wearing one texture (or none) is drawn by one instanced mesh with one material. */
 interface CoreBatch {
@@ -1502,6 +1508,8 @@ interface CoreBatch {
   readonly texture: THREE.CanvasTexture | null;
   mesh: THREE.InstancedMesh;
   refs: number;
+  /** MP-T03: the array batch's per-instance layer index (on its own geometry). */
+  layers?: THREE.InstancedBufferAttribute;
 }
 
 /**
@@ -1600,6 +1608,8 @@ export class Renderer3D {
   private readonly ambient: THREE.AmbientLight;
   private readonly lavaGlow: THREE.HemisphereLight;
   private racers3D: RacerSlot[] = [];
+  /** MP-T03: every painted ball's layer (WebGL2), or null to use per-texture batches. */
+  private ballPool: BallTexturePool | null = null;
   private racerResources: RacerMeshResources | null = null;
   /** Core batches keyed by canvas (null = untextured), so identical loadout/rim combos share one draw. */
   private readonly racerTextures = new Map<HTMLCanvasElement | null, CoreBatch>();
@@ -1702,6 +1712,8 @@ export class Renderer3D {
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // MP-T03: texture arrays need WebGL2; without it the per-texture ball batches are used.
+    this.ballPool = this.renderer.capabilities.isWebGL2 ? new BallTexturePool(128) : null;
     this.renderer.setSize(canvas.clientWidth || 1440, canvas.clientHeight || 620, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2010,7 +2022,35 @@ export class Renderer3D {
     shared.caps = swap(shared.caps, false);
     shared.shadows = swap(shared.shadows, true); // P5: the fade rides in the instance colour
     shared.shields = swap(shared.shields, false);
-    for (const batch of this.racerTextures.values()) batch.mesh = swap(batch.mesh, batch.key === null);
+    for (const batch of this.racerTextures.values()) {
+      batch.mesh = swap(batch.mesh, batch.key === null);
+      if (batch.layers) {
+        batch.layers = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
+        batch.layers.setUsage(THREE.DynamicDrawUsage);
+        batch.mesh.geometry.setAttribute('aBallLayer', batch.layers);
+      }
+    }
+  }
+
+  /**
+   * MP-T03: the batch that draws every array-textured ball in one call, created on first use. Only
+   * on WebGL2 (`ballPool` is null otherwise, and the per-texture batches below are used).
+   */
+  private arrayBatch(): CoreBatch {
+    const existing = this.racerTextures.get(ARRAY_BATCH_KEY);
+    if (existing) { existing.refs++; return existing; }
+    const shared = this.racerResources!;
+    const material = arrayBallMaterial(this.ballPool!);
+    material.emissive = new THREE.Color(0x1a1816);
+    const geometry = shared.sphereGeo.clone();
+    const layers = new THREE.InstancedBufferAttribute(new Float32Array(shared.capacity), 1);
+    layers.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('aBallLayer', layers);
+    const mesh = racerBatch(geometry, material, shared.capacity, 'RacerCoresArray');
+    this.scene.add(mesh);
+    const batch: CoreBatch = { key: ARRAY_BATCH_KEY, material, texture: null, mesh, refs: 1, layers };
+    this.racerTextures.set(ARRAY_BATCH_KEY, batch);
+    return batch;
   }
 
   /** The core batch for a canvas (null = untextured), created on first use. */
@@ -2040,17 +2080,25 @@ export class Renderer3D {
 
   private buildRacerSlot(index: number): RacerSlot {
     const canvas = (this.storedAssets.raceBalls?.[index] as HTMLCanvasElement | undefined) ?? null;
+    const color = new THREE.Color(fallbackRacerColor(index));
+    // MP-T03: on WebGL2 a painted ball is a layer of the one texture array (one draw for all cores).
+    if (canvas && this.ballPool) {
+      const layer = this.ballPool.acquire(canvas, () => layerPixels(canvas));
+      if (layer !== null) return { canvas, core: this.arrayBatch(), color, shieldSpin: 0, layer };
+    }
     // T3: the core rolls and the caps stay level; render() poses each instance.
-    return { canvas, core: this.coreBatch(canvas), color: new THREE.Color(fallbackRacerColor(index)), shieldSpin: 0 };
+    return { canvas, core: this.coreBatch(canvas), color, shieldSpin: 0, layer: null };
   }
 
   /** Drops the newest slot; its core batch (material, texture, instanced mesh) goes with its last user. */
   private releaseRacerMesh() {
     const slot = this.racers3D.pop();
     if (!slot) return;
+    if (slot.layer !== null && slot.canvas) this.ballPool?.release(slot.canvas);
     const batch = slot.core;
     if (--batch.refs > 0) return;
     this.scene.remove(batch.mesh);
+    if (batch.layers) batch.mesh.geometry.dispose();
     batch.mesh.dispose();
     batch.material.dispose();
     batch.texture?.dispose();
@@ -2060,6 +2108,7 @@ export class Renderer3D {
   /** Full teardown: every core batch, cached canvas texture, shared geometry and material. */
   private disposeRacerPool() {
     while (this.racers3D.length) this.releaseRacerMesh();
+    this.ballPool?.dispose();
     const shared = this.racerResources;
     if (!shared) return;
     for (const mesh of [shared.caps, shared.shadows, shared.shields]) { this.scene.remove(mesh); mesh.dispose(); }
@@ -2123,6 +2172,7 @@ export class Renderer3D {
       const core = slot.core.mesh;
       core.setMatrixAt(core.count, m.compose(position, this.coreQuat, one));
       if (!slot.canvas) core.setColorAt(core.count, slot.color);
+      if (slot.layer !== null) slot.core.layers?.setX(core.count, slot.layer);
       core.count++;
       shared.caps.setMatrixAt(shared.caps.count++, m.compose(position, this.gyroQuat, one));
       if (shielded) {
@@ -2149,6 +2199,8 @@ export class Renderer3D {
       if (mesh.count === 0) continue;
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      const layers = mesh.geometry.getAttribute('aBallLayer');
+      if (layers) layers.needsUpdate = true;
     }
     return playerAltitude;
   }

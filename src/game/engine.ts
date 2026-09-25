@@ -30,6 +30,8 @@ import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorag
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
+import { validateCommand, type CommandGate, type CommandVerdict, type GameCommand } from './contracts/commands';
+import type { HeatPhase } from './contracts/heat';
 import { MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX, MergePool, releaseOccupancy } from './merge/pool';
 import {
   PASSAGE_CENTRE_Z, PASSAGE_GHOST_TAIL_S, insidePassage,
@@ -50,6 +52,30 @@ import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
 
 const STEP = FIXED_STEP;
+
+/**
+ * M9: the race's gameplay randomness, a hash of (seed, tick, racer id) in [0, 1). Stable for a given
+ * moment and racer, independent of how many other draws happened first.
+ */
+export function raceRandom01(seed: number, tick: number, racerId: number): number {
+  let h = Math.imul((seed | 0) ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= Math.imul((tick | 0) + 0x632be5ab, 0xc2b2ae35);
+  h ^= Math.imul((racerId | 0) + 0x27d4eb2f, 0x165667b1);
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12; h = Math.imul(h, 0x297a2d39);
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+
+/** M9: the heat phase a live-race status belongs to, for the T01 command gate. */
+export function heatPhaseOf(status: GameStatus): HeatPhase {
+  switch (status) {
+    case 'ready': return 'staging';
+    case 'pushing': case 'checkpoint': case 'countdown': return 'release';
+    case 'finished': return 'results';
+    default: return 'racing'; // flying, paused
+  }
+}
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
 /**
@@ -194,7 +220,8 @@ export class GameEngine {
       fx: this.simFx,
       // The race keeps the legacy timed recovery, bit for bit (see sim/context.ts).
       recovery: LEGACY_RECOVERY,
-      random: () => Math.random(),
+      // M9: seeded, not Math.random: the same seed and the same inputs give the same race.
+      random: (racerId = 0) => raceRandom01(engine.pushSeed, engine.tick, racerId),
       get runTime() { return engine.runTime; },
       get wallTime() { return engine.time; },
       // M01 · T6: read live, so the builder's "test drive" can swap the network without rebuilding
@@ -499,6 +526,30 @@ export class GameEngine {
   }
 
   jump = () => {};
+
+  /** M9: the T01 gate the player's commands are validated against. */
+  commandGate(): CommandGate {
+    return { status: this.status, phase: heatPhaseOf(this.status), inputEnabled: this.inputEnabled, racerId: PLAYER_ID, startMode: 'push' };
+  }
+
+  /**
+   * M9: the one door player input comes through (keyboard, touch, gamepad). The command is checked
+   * against the T01 gate first; a refused command changes nothing and comes back with its reason.
+   */
+  dispatch(command: GameCommand): CommandVerdict {
+    const verdict = validateCommand(command, this.commandGate());
+    if (!verdict.ok) return verdict;
+    switch (command.type) {
+      case 'steer': this.changeLane(command.direction); break;
+      case 'bounce': this.bounce(); break;
+      case 'boost': this.boost(); break;
+      case 'start': this.start(); break;
+      case 'ready': this.ready(); break;
+      case 'toggle-pause': this.togglePause(); break;
+      default: break; // the live race has no player-facing handler for the rest
+    }
+    return verdict;
+  }
 
   bounce = () => {
     // Space on the grid starts the run (the goblin push).

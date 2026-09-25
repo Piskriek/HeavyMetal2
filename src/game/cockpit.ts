@@ -455,3 +455,84 @@ export function yokeJolt(impact: number, side: -1 | 0 | 1, time: number, reduced
   const lead = side === 0 ? 1 : -side;
   return { rotDeg: lead * JOLT_MAX_DEG * amount * Math.cos(time * JOLT_RATE), dropPx: JOLT_MAX_DROP_PX * amount, flash: 0 };
 }
+
+/* -----------------------------------------------------------------------------
+   P2. THE GLASS
+   -------------------------------------------------------------------------- */
+
+/**
+ * P2 — the cockpit window has glass in it: a faint glare along the rim, a few smudges and scratches
+ * (all drawn, no painted art), and on a big hit a spiderweb crack at the side it came from, held for
+ * `CRACK_HOLD_S` and then fading over `CRACK_FADE_S`. Reduced motion never cracks.
+ */
+export const CRACK_THRESHOLD = 0.6;
+export const CRACK_HOLD_S = 2;
+export const CRACK_FADE_S = 1.5;
+
+/** How visible a crack is `seconds` after the hit: full while held, then fading to nothing. */
+export function crackOpacity(seconds: number): number {
+  if (!(seconds >= 0)) return 0;
+  if (seconds < CRACK_HOLD_S) return 1;
+  return Math.max(0, 1 - (seconds - CRACK_HOLD_S) / CRACK_FADE_S);
+}
+
+/** A small seeded PRNG (mulberry32): the same seed draws the same crack. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * An SVG path for a spiderweb crack across a `w` × `h` window, centred toward the side the hit came
+ * from (+1 right, −1 left, 0 the middle): jagged rays out of the impact and two broken rings.
+ */
+export function crackPath(seed: number, side: -1 | 0 | 1, w: number, h: number): string {
+  const random = seeded(seed);
+  const cx = w * (side > 0 ? 0.78 : side < 0 ? 0.22 : 0.5) + (random() - 0.5) * w * 0.06;
+  const cy = h * (0.3 + random() * 0.15);
+  const reach = Math.min(w, h) * (0.28 + random() * 0.12);
+  const rays = 8 + Math.floor(random() * 4);
+  const parts: string[] = [];
+  const rings: [number, number][][] = [[], []];
+  for (let i = 0; i < rays; i++) {
+    const angle = (i / rays) * Math.PI * 2 + (random() - 0.5) * 0.5;
+    const length = reach * (0.55 + random() * 0.45);
+    let x = cx; let y = cy;
+    const points: string[] = [`M${cx.toFixed(1)} ${cy.toFixed(1)}`];
+    for (let step = 1; step <= 4; step++) {
+      const r = (length * step) / 4;
+      const bend = angle + (random() - 0.5) * 0.35;
+      x = cx + Math.cos(bend) * r; y = cy + Math.sin(bend) * r;
+      points.push(`L${x.toFixed(1)} ${y.toFixed(1)}`);
+      if (step === 1) rings[0].push([x, y]);
+      if (step === 2) rings[1].push([x, y]);
+    }
+    parts.push(points.join(''));
+  }
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      if (random() < 0.3) continue; // a broken ring, not a drawn circle
+      const [ax, ay] = ring[i]; const [bx, by] = ring[(i + 1) % ring.length];
+      parts.push(`M${ax.toFixed(1)} ${ay.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}`);
+    }
+  }
+  return parts.join('');
+}
+
+/** The glass's fixed wear: a few scratches, as SVG path data for a `w` × `h` window. */
+export function glassScratches(w: number, h: number, seed = 0x51a55): string {
+  const random = seeded(seed);
+  const parts: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const x = w * (0.08 + random() * 0.84); const y = h * (0.1 + random() * 0.8);
+    const angle = (random() - 0.5) * 1.2; const length = Math.min(w, h) * (0.04 + random() * 0.09);
+    parts.push(`M${x.toFixed(1)} ${y.toFixed(1)}l${(Math.cos(angle) * length).toFixed(1)} ${(Math.sin(angle) * length).toFixed(1)}`);
+  }
+  return parts.join('');
+}

@@ -256,3 +256,49 @@ test('recovery: an event with no usable rounds is rejected instead of invented',
   assert.equal(recoverSession({ ...session, rounds: ['ridge', 'ridge', 'ridge'] }, 'grid'), null);
   assert.equal(recoverSession({ ...session, id: '' }, 'grid'), null);
 });
+
+// P11: a result keeps each rider's place at the split, so the results can show who climbed.
+test('P11: split places survive a save round-trip; nonsense ones are dropped', () => {
+  const session = createSession(setup());
+  const record = finishRecord(session, 0, 1);
+  const splits = [4, 1, 3, 2];
+  record.opponents = record.opponents!.map((row, i) => ({ ...row, splitPosition: splits[i] }));
+  record.opponents[2] = { ...record.opponents[2], splitPosition: 99 as never }; // not a place in a 4-field
+  session.results.push(record);
+  const hydration = readSave(new FakeStorage({ [SAVE_KEY]: savedDocument(session, 'round-results') }));
+  const restored = hydration.session!.results[0].opponents!;
+  assert.equal(restored.find((row) => row.id === 0)?.splitPosition, 4);
+  assert.equal(restored.find((row) => row.id === 1)?.splitPosition, 1);
+  assert.equal(restored.find((row) => row.id === 2)?.splitPosition, undefined, 'an impossible split place is dropped');
+});
+
+test('P11: places gained after the split, and the biggest climber', async () => {
+  const { biggestClimber, placesGained, splitLabel } = await import('../src/game/results');
+  const row = (id: number, position: number, splitPosition?: number, finished = true) => ({
+    id, name: `R${id}`, color: '#ffffff', position, distance: 0, lane: 0, finished, recovering: false, finishTime: finished ? 100 : null,
+    ...(splitPosition === undefined ? {} : { splitPosition }),
+  });
+  assert.equal(placesGained(row(0, 3, 14)), 11);
+  assert.equal(placesGained(row(0, 5, 3)), -2);
+  assert.equal(placesGained(row(0, 5)), null, 'no split place');
+  assert.equal(placesGained(row(0, 5, 9, false)), null, 'a DNF did not climb');
+  assert.equal(splitLabel(row(0, 3, 14)), 'P14 ▲11');
+  assert.equal(splitLabel(row(0, 5, 3)), 'P3 ▼2');
+  assert.equal(splitLabel(row(0, 7, 7)), 'P7 =');
+  assert.equal(splitLabel(row(0, 7)), '—');
+  const field = [row(0, 1, 2), row(1, 2, 20), row(2, 3, 21), row(3, 4, 1)];
+  const climber = biggestClimber(field)!;
+  assert.equal(climber.standing.id, 1, '20 → 2 and 21 → 3 both gain 18: the better finish wins the tie');
+  assert.equal(climber.gained, 18);
+  assert.equal(biggestClimber([row(0, 1, 1), row(1, 2, 2)]), null, 'nobody climbed');
+});
+
+test('P11: the engine records split places from the pool and the results show them', async () => {
+  const { readFileSync } = await import('node:fs');
+  const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
+  assert.match(engine, /this\.splitPlaces\.set\(entry\.racerId, entry\.rank \+ 1\);/);
+  assert.match(engine, /splitPosition: this\.splitPlaces\.get\(racer\.id\)!/);
+  const results = readFileSync(new URL('../src/components/RoundResult.tsx', import.meta.url), 'utf8');
+  assert.match(results, /\{hasSplits && <th>Split<\/th>\}/);
+  assert.match(results, /BIGGEST CLIMBER/);
+});

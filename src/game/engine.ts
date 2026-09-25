@@ -129,6 +129,8 @@ export class GameEngine {
   private splitReached = false;
   /** Rivals' first-split ticks (headless, computed at reset): how they queue in the pool. */
   private rivalSplits = new Map<number, number | null>();
+  /** P11: each rider's place at the first split (1-based), once the pool has everyone. */
+  private readonly splitPlaces = new Map<number, number>();
   /** True once the rivals have been queued behind (or ahead of) the player at the split. */
   private rivalsQueued = false;
   /** Last steering press for the cockpit yoke: direction (−1 left, +1 right) and when (this.time). */
@@ -338,7 +340,7 @@ export class GameEngine {
     this.merge = null;
     this.mergeGate = null;
     this.mergeDone = false;
-    this.queueRow.clear(); this.queueOffset.clear();
+    this.queueRow.clear(); this.queueOffset.clear(); this.splitPlaces.clear();
     this.mergeLastReleased = null;
     this.pausedFrom = null;
     this.splitReached = false;
@@ -815,6 +817,8 @@ export class GameEngine {
     for (const entry of pool.entries) {
       const racer = this.racersById.get(entry.racerId);
       if (racer && racer.id !== PLAYER_ID) { racer.mergeSlotZ = entry.slotZ; racer.z = entry.slotZ; racer.previous.z = racer.z; }
+      // P11: and the queue is the field by split time: that is each rider's split place.
+      this.splitPlaces.set(entry.racerId, entry.rank + 1);
     }
   }
 
@@ -1330,6 +1334,7 @@ export class GameEngine {
       distance: Math.round(clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE)), lane: closestLane(racer.z),
       finished: racer.finished, recovering: racer.falling || this.runTime < racer.recoveryUntil, finishTime: racer.finishTime,
       loadout: { ...racer.loadout },
+      ...(this.splitPlaces.has(racer.id) ? { splitPosition: this.splitPlaces.get(racer.id)! } : {}),
     }));
   }
 

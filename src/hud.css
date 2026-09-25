@@ -331,3 +331,10 @@
 .td-slider output { text-align: right; font-family: 'Space Mono', monospace; }
 .td-reset { justify-self: end; }
 @media (prefers-reduced-motion: reduce) { .td-button, .td-stepper { transition: none; } }
+
+/* ============ P11: split places and the biggest climber on the results ============ */
+.round-table .split-cell { font-family: 'Space Mono', monospace; font-size: .9em; color: #c9bb91; white-space: nowrap; }
+.round-table .split-cell.gained { color: #9fe39a; }
+.round-table .split-cell.lost { color: #f08a6e; }
+.biggest-climber { margin-top: 8px; padding: 7px 10px; border: 1px solid #d6ad5c66; border-radius: 4px; background: #0f1814cc; color: #e8d9ad; font-size: 12px; }
+.biggest-climber strong { color: #f0a15b; letter-spacing: .08em; margin-right: 6px; }

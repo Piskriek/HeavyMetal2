@@ -48,6 +48,8 @@ const TERRAIN_DROP = 100;
 const RIVER_X = -7000;
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+/** A PlaneGeometry faces +Z. */
+const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const ZERO = new THREE.Vector3();
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -1521,6 +1523,37 @@ interface RacerMeshResources {
   shields: THREE.InstancedMesh;
 }
 
+/** P5: the shadow is gone this far above the road, and grows by this share on the way. */
+export const SHADOW_FADE_HEIGHT = 250;
+export const SHADOW_GROW = 0.6;
+/** P5: lift off the road along its up, against z-fighting. */
+export const SHADOW_LIFT = 1.5;
+
+/**
+ * P5: how a ball's contact shadow reads at a clearance (world units between the ball's underside and
+ * the road): full at the road, fading to nothing and spreading as the ball climbs.
+ */
+export function shadowAt(clearance: number): { fade: number; scale: number } {
+  const lift = Math.max(0, Number.isFinite(clearance) ? clearance : 0);
+  const fade = Math.max(0, 1 - lift / SHADOW_FADE_HEIGHT);
+  return { fade, scale: 1 + SHADOW_GROW * (1 - fade) };
+}
+
+/**
+ * P5: the shadows are one instanced mesh, so each one's fade rides in its instance colour's red
+ * channel and becomes alpha here (the shadow itself stays black).
+ */
+function fadeShadowsByInstanceColor(material: THREE.MeshBasicMaterial): THREE.MeshBasicMaterial {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      '#include <color_fragment>\n#ifdef USE_COLOR\n\tdiffuseColor.rgb = vec3( 0.0 );\n\tdiffuseColor.a *= vColor.r;\n#endif',
+    );
+  };
+  material.customProgramCacheKey = () => 'racer-shadow-fade';
+  return material;
+}
+
 /** An instanced mesh that is drawn whatever the camera (its instances move; its bounds would not). */
 function racerBatch(geometry: THREE.BufferGeometry, material: THREE.Material, capacity: number, name: string): THREE.InstancedMesh {
   const mesh = new THREE.InstancedMesh(geometry, material, capacity);
@@ -1572,7 +1605,10 @@ export class Renderer3D {
   private readonly racerMatrix = new THREE.Matrix4();
   private readonly racerScale = new THREE.Vector3(1, 1, 1);
   private readonly racerOffset = new THREE.Vector3();
-  private readonly shadowQuat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+  private readonly shadowQuat = new THREE.Quaternion();
+  private readonly shadowUp = new THREE.Vector3();
+  private readonly shadowScale = new THREE.Vector3();
+  private readonly shadowFade = new THREE.Color();
   private readonly shieldQuat = new THREE.Quaternion();
   private storedAssets: GameAssets;
   private readonly camUp = new THREE.Vector3(0, 1, 0);
@@ -1939,7 +1975,7 @@ export class Renderer3D {
       // Brass, shared by every racer on the grid: one cap geometry and one cap material in total.
       const capMat = new THREE.MeshLambertMaterial({ color: 0xc08a2e });
       const shadowGeo = new THREE.PlaneGeometry(BALL_DRAW_RADIUS * 2.2, BALL_DRAW_RADIUS * 2.2);
-      const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false });
+      const shadowMat = fadeShadowsByInstanceColor(new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
       const shieldGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * 1.35, 16, 12);
       const shieldMat = new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true });
       this.racerResources = {
@@ -1969,7 +2005,7 @@ export class Renderer3D {
     };
     shared.capacity = capacity;
     shared.caps = swap(shared.caps, false);
-    shared.shadows = swap(shared.shadows, false);
+    shared.shadows = swap(shared.shadows, true); // P5: the fade rides in the instance colour
     shared.shields = swap(shared.shields, false);
     for (const batch of this.racerTextures.values()) batch.mesh = swap(batch.mesh, batch.key === null);
   }
@@ -2087,9 +2123,19 @@ export class Renderer3D {
         this.shieldQuat.setFromAxisAngle(WORLD_UP, slot.shieldSpin);
         shared.shields.setMatrixAt(shared.shields.count++, m.compose(position, this.shieldQuat, one));
       }
-      // The ground shadow: a level plane just under the ball.
-      position.y += -BALL_DRAW_RADIUS + 2;
-      shared.shadows.setMatrixAt(shared.shadows.count++, m.compose(position, this.shadowQuat, one));
+      // P5: the contact shadow lies on the road under the ball, tilted with the road (banks and
+      // drops), fading and spreading as the ball leaves it.
+      const f = placement.frame; const lateral = placement.lateral;
+      const groundX = f.pos.x + f.right.x * lateral; const groundY = f.pos.y + f.right.y * lateral; const groundZ = f.pos.z + f.right.z * lateral;
+      const clearance = (placement.world.x - groundX) * f.up.x + (placement.world.y - groundY) * f.up.y + (placement.world.z - groundZ) * f.up.z - BALL_DRAW_RADIUS;
+      const look = shadowAt(clearance);
+      if (look.fade > 0) {
+        position.set(groundX + f.up.x * SHADOW_LIFT, groundY + f.up.y * SHADOW_LIFT, groundZ + f.up.z * SHADOW_LIFT);
+        this.shadowQuat.setFromUnitVectors(PLANE_NORMAL, this.shadowUp.set(f.up.x, f.up.y, f.up.z).normalize());
+        const n = shared.shadows.count++;
+        shared.shadows.setMatrixAt(n, m.compose(position, this.shadowQuat, this.shadowScale.setScalar(look.scale)));
+        shared.shadows.setColorAt(n, this.shadowFade.setRGB(look.fade, look.fade, look.fade));
+      }
     }
     const batches = [shared.caps, shared.shadows, shared.shields];
     for (const batch of this.racerTextures.values()) batches.push(batch.mesh);

@@ -593,7 +593,7 @@ export class GameEngine {
   private performBounce(racer: Racer) { performBounceSim(racer, this.simCtx); }
 
   boost = () => {
-    if (this.status !== 'flying') return;
+    if (this.status !== 'flying' || this.player.reel) return; // H6: no boosting on the end of a rope
     const before = this.player.boosts;
     this.performBoost(this.player);
     if (this.player.boosts < before && !this.reducedMotion) this.gamepad.rumble('boost');
@@ -1050,6 +1050,20 @@ export class GameEngine {
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
       rendered.ramTellUntil = racer.ramTellUntil;
+      // H6: a ball the rope goblins are hauling back is drawn easing from where it went out to its lane.
+      if (racer.reel) {
+        const span = Math.max(1e-6, racer.reel.until - racer.reel.startedAt);
+        const t = clamp((this.runTime - racer.reel.startedAt) / span, 0, 1);
+        const ease = t * t * (3 - 2 * t);
+        rendered.reelBack = { toX: racer.x, toY: racer.y, toZ: racer.z, t };
+        rendered.x = racer.reel.fromX + (racer.x - racer.reel.fromX) * ease;
+        rendered.z = racer.reel.fromZ + (racer.z - racer.reel.fromZ) * ease;
+        rendered.y = racer.reel.fromY + (racer.y - racer.reel.fromY) * ease;
+        rendered.distance = clamp((rendered.x - START_X) / 2, 0, TRACK_DISTANCE);
+        rendered.grounded = t >= 1;
+      } else if (rendered.reelBack) {
+        rendered.reelBack = null;
+      }
       // P7: a held rider is drawn in its queue row, up the hill behind the gate, not on the gate plane
       // with the rest of its lane. The offset eases as the queue moves up (snaps with reduced motion);
       // the physics never sees it.

@@ -30,6 +30,12 @@ export interface Racer extends RacerFrame {
   ropeSince?: number;
   /** P6: race time of the last wall-scrape spark burst (presentation only, never physics). */
   scrapeFxAt?: number;
+  /**
+   * H6: the rope goblins are hauling this ball back from an out-of-bounds node. It went out at
+   * `from`, is already put back on its lane (x/y/z), and is held until `until`; then it rolls on at
+   * `releaseVx`. Null or absent when not being reeled.
+   */
+  reel?: { fromX: number; fromY: number; fromZ: number; startedAt: number; until: number; releaseVx: number } | null;
   nextDecision: number;
   /**
    * H11: a bot winding up a shove. `ramTargetId` is the rival it means to hit (null when none),

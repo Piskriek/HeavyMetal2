@@ -235,3 +235,24 @@ test('P3: every gesture keeps both hands on the grips and moves only the shoulde
   assert.equal(driverGesture({ ...base, grounded: false, inLoop: true }, false).gesture, 'normal');
   assert.deepEqual(driverGesture({ ...base, impact: 1 }, true), { gesture: 'normal', intensity: 0 }, 'reduced motion: still arms');
 });
+
+// P2: glass in the cockpit window, and a spiderweb crack on a big hit that holds and then fades.
+test('P2: a crack holds for 2 s, fades over 1.5 s, and is drawn at the side the hit came from', async () => {
+  const { CRACK_FADE_S, CRACK_HOLD_S, crackOpacity, crackPath, glassScratches } = await import('../src/game/cockpit');
+  assert.equal(crackOpacity(0), 1);
+  assert.equal(crackOpacity(CRACK_HOLD_S - 0.01), 1);
+  assert.ok(crackOpacity(CRACK_HOLD_S + CRACK_FADE_S / 2) > 0.4 && crackOpacity(CRACK_HOLD_S + CRACK_FADE_S / 2) < 0.6);
+  assert.equal(crackOpacity(CRACK_HOLD_S + CRACK_FADE_S), 0);
+  assert.equal(crackOpacity(-1), 0);
+  const w = 1600; const h = 780;
+  assert.equal(crackPath(7, 1, w, h), crackPath(7, 1, w, h), 'the same hit draws the same crack');
+  assert.notEqual(crackPath(7, 1, w, h), crackPath(8, 1, w, h), 'a new hit draws a new one');
+  const start = (path: string) => Number(/^M(-?[\d.]+)/.exec(path)![1]);
+  assert.ok(start(crackPath(3, 1, w, h)) > w * 0.6, 'from the right, on the right');
+  assert.ok(start(crackPath(3, -1, w, h)) < w * 0.4, 'from the left, on the left');
+  assert.ok(glassScratches(w, h).length > 0);
+  const hud = readFileSync(new URL('../src/components/CockpitHud.tsx', import.meta.url), 'utf8');
+  assert.match(hud, /if \(!reducedMotion && state\.impact >= CRACK_THRESHOLD && state\.impact > cracks\.lastImpact \+ 0\.15\)/, 'only a new big hit cracks, and never under reduced motion');
+  assert.match(hud, /<svg className="cockpit-glass"/);
+  assert.ok(hud.indexOf('className="cockpit-glass"') < hud.indexOf('className="cockpit-bezel"'), 'the glass is behind the bezel');
+});

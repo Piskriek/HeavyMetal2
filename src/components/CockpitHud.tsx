@@ -13,7 +13,7 @@
 import { gapLabel } from '../game/gap';
 import { useEffect, useMemo, useRef } from 'react';
 import {
-  armsAt, cockpitBob, cockpitLayout, driverGesture, needleAngle, yokeAngleDeg, yokeJolt,
+  CRACK_THRESHOLD, armsAt, cockpitBob, cockpitLayout, crackOpacity, crackPath, driverGesture, glassScratches, needleAngle, yokeAngleDeg, yokeJolt,
   COCKPIT_ART, COCKPIT_MANIFEST, COCKPIT_MANIFEST as ART, type CockpitState,
 } from '../game/cockpit';
 import '../cockpit.css';
@@ -41,6 +41,9 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const rootRef = useRef<HTMLDivElement>(null);
   const bezelRef = useRef<HTMLImageElement>(null);
   const yokeRef = useRef<HTMLDivElement>(null);
+  /** P2: the crack layer, and the hit that drew it. */
+  const crackRef = useRef<SVGPathElement>(null);
+  const crack = useRef({ at: -1e9, seed: 0, lastImpact: 0 });
   const armLeftRef = useRef<HTMLDivElement>(null);
   const armRightRef = useRef<HTMLDivElement>(null);
   const bobRef = useRef<HTMLDivElement>(null);
@@ -67,6 +70,14 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
     let frame = 0;
     const step = (now: number) => {
       readState(state);
+      // P2: a new big hit cracks the glass at its side (never under reduced motion); it holds, then fades.
+      const cracks = crack.current;
+      if (!reducedMotion && state.impact >= CRACK_THRESHOLD && state.impact > cracks.lastImpact + 0.15) {
+        cracks.at = now; cracks.seed += 1;
+        crackRef.current?.setAttribute('d', crackPath(cracks.seed, state.impactSide, layout.aperture.w, layout.aperture.h));
+      }
+      cracks.lastImpact = state.impact;
+      if (crackRef.current) crackRef.current.style.opacity = reducedMotion ? '0' : crackOpacity((now - cracks.at) / 1000).toFixed(3);
       // H8: a hit jolts the yoke (and the hands on it); with reduced motion the cockpit flashes.
       const jolt = yokeJolt(state.impact, state.impactSide, now / 1000, reducedMotion);
       const yokeDeg = yokeAngleDeg(state.steer) + jolt.rotDeg;
@@ -174,6 +185,26 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   return (
     <div className="cockpit-root" ref={rootRef} data-aperture={`${Math.round(layout.aperture.w)}x${Math.round(layout.aperture.h)}`}>
       <div className="cockpit-bob" ref={bobRef}>
+        {/* P2: the glass in the window: glare, smudges, scratches, and a crack on a big hit. */}
+        <svg className="cockpit-glass" aria-hidden="true" width={layout.aperture.w} height={layout.aperture.h}
+          style={{ left: layout.aperture.x, top: layout.aperture.y, borderRadius: layout.aperture.radius }}>
+          <defs>
+            <radialGradient id="cockpit-glare" cx="0.22" cy="0.12" r="0.9">
+              <stop offset="0" stopColor="#fff6e0" stopOpacity="0.16" />
+              <stop offset="0.35" stopColor="#fff6e0" stopOpacity="0.04" />
+              <stop offset="1" stopColor="#fff6e0" stopOpacity="0" />
+            </radialGradient>
+            <filter id="cockpit-smudge"><feGaussianBlur stdDeviation="14" /></filter>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#cockpit-glare)" />
+          <g filter="url(#cockpit-smudge)" fill="#d8c9a3" opacity="0.07">
+            <ellipse cx={layout.aperture.w * 0.18} cy={layout.aperture.h * 0.78} rx={layout.aperture.w * 0.06} ry={layout.aperture.h * 0.04} />
+            <ellipse cx={layout.aperture.w * 0.83} cy={layout.aperture.h * 0.2} rx={layout.aperture.w * 0.05} ry={layout.aperture.h * 0.03} />
+            <ellipse cx={layout.aperture.w * 0.62} cy={layout.aperture.h * 0.86} rx={layout.aperture.w * 0.08} ry={layout.aperture.h * 0.025} />
+          </g>
+          <path d={glassScratches(layout.aperture.w, layout.aperture.h)} stroke="#ffffff" strokeOpacity="0.09" strokeWidth="1" fill="none" />
+          <path ref={crackRef} className="cockpit-crack" d="" stroke="#f4fbff" strokeOpacity="0.75" strokeWidth="1.4" fill="none" strokeLinejoin="bevel" style={{ opacity: 0 }} />
+        </svg>
         <img className="cockpit-bezel" ref={bezelRef} src={COCKPIT_ART.bezel} alt="" aria-hidden="true" draggable={false} />
 
         <img className="cockpit-cluster" style={{ left: layout.clusters.left.x, top: layout.clusters.left.y, width: layout.clusters.left.w }} src={COCKPIT_ART.clusters[0]} alt="" aria-hidden="true" draggable={false} />

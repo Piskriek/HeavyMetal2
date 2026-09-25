@@ -92,6 +92,7 @@ export interface BillboardSlot {
   size: number;
   growth: number;
   opacity: number;
+  baseOpacity: number;
   /** 0..1 through its life, written by `update`. */
   age: number;
   frame: number;
@@ -124,7 +125,7 @@ export class BillboardPool {
     for (let i = 0; i < capacity; i++) {
       this.slots[i] = {
         active: false, kind: 'dust', sheet: 'anim-49', frames: 4, fps: 10, bornAt: 0, life: 1,
-        x: 0, y: 0, z: 0, upX: 0, upY: 1, upZ: 0, rise: 0, size: 100, growth: 1, opacity: 1, age: 0, frame: 0,
+        x: 0, y: 0, z: 0, upX: 0, upY: 1, upZ: 0, rise: 0, size: 100, growth: 1, opacity: 1, baseOpacity: 1, age: 0, frame: 0,
       };
     }
     this.random = makeRandom(seed);
@@ -174,6 +175,7 @@ export class BillboardPool {
       slot.size = spec.size * scale;
       slot.growth = spec.growth;
       slot.opacity = spec.opacity;
+      slot.baseOpacity = spec.opacity;
       slot.age = 0;
       slot.frame = 0;
       spawned += 1;
@@ -199,8 +201,9 @@ export class BillboardPool {
         slot.opacity = slot.kind === 'smoke' || slot.kind === 'dust' ? 0.3 : 0.5;
       } else {
         slot.frame = slot.fps > 0 ? Math.floor(elapsed * slot.fps) % Math.max(1, slot.frames) : 0;
-        // Fade the last third so nothing pops out of existence.
-        slot.opacity = slot.age > 0.66 ? slot.opacity * (1 - (slot.age - 0.66) / 0.34) : slot.opacity;
+        // Fade smoothly over the last third so nothing pops out of existence.
+        const fade = slot.age > 0.66 ? Math.max(0, 1 - (slot.age - 0.66) / 0.34) : 1;
+        slot.opacity = slot.baseOpacity * fade;
       }
     }
   }

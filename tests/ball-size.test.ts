@@ -39,3 +39,14 @@ test('the ball and its caps are flat-lit: no MeshStandard/Physical, no specular'
   assert.match(renderer, /capMat: new THREE\.MeshLambertMaterial\(/);
   assert.match(renderer, /sphereGeo: new THREE\.SphereGeometry\(BALL_DRAW_RADIUS,/);
 });
+
+test('a supply that touches the drawn ball is collected; pickup reach uses the drawn size', async () => {
+  const { pickupIntercept, PICKUP_RADIUS } = await import('../src/game/powerups');
+  const pickup = { x: 1000, z: 0 } as never;
+  // Ball centre (physics) grounded at y = 0; the drawn centre is one RADIUS higher (y − RADIUS).
+  const drawnCentreY = -RADIUS;
+  const side = BALL_DRAW_RADIUS + PICKUP_RADIUS - 2; // just inside the drawn ball's reach, sideways
+  assert.equal(pickupIntercept({ x: 1000, y: 0, z: side }, { x: 1000, y: 0, z: side }, pickup, drawnCentreY), 0, 'touching the drawn ball = collected');
+  const outside = BALL_DRAW_RADIUS + PICKUP_RADIUS + 2;
+  assert.equal(pickupIntercept({ x: 1000, y: 0, z: outside }, { x: 1000, y: 0, z: outside }, pickup, drawnCentreY), null, 'clear of it = not collected');
+});

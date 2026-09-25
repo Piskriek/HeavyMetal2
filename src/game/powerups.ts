@@ -1,6 +1,6 @@
 import { artUrl, drawToCanvas, loadArtImage, placeholderCanvas, supplyCell } from './art-assets';
 import type { CourseId } from './types';
-import { FINISH, GRAVITY, RADIUS, STADIUM_START, closestLane, courseY, laneZ, type Obstacle } from './scene';
+import { FINISH, GRAVITY, BALL_DRAW_RADIUS, RADIUS, STADIUM_START, closestLane, courseY, laneZ, type Obstacle } from './scene';
 import { nearestPath, sampleLane, type LaneNetwork } from './lane-network';
 
 export type PowerupKind = 'fuel' | 'shield' | 'bounce';
@@ -59,8 +59,10 @@ export function pickupIntercept(
   pickup: AirPickup, y: number,
 ) {
   const dx = to.x - from.x; const dy = to.y - from.y; const dz = to.z - from.z;
-  const rx = from.x - pickup.x; const ry = from.y - y; const rz = from.z - pickup.z;
-  const radius = RADIUS + PICKUP_RADIUS;
+  // Measured from the ball as drawn: its centre sits one physics radius higher (engine y grows
+  // downward) and its radius is BALL_DRAW_RADIUS, so a supply that visibly touches the ball is taken.
+  const rx = from.x - pickup.x; const ry = (from.y - RADIUS) - y; const rz = from.z - pickup.z;
+  const radius = BALL_DRAW_RADIUS + PICKUP_RADIUS;
   const c = rx * rx + ry * ry + rz * rz - radius * radius;
   if (c <= 0) return 0;
   const a = dx * dx + dy * dy + dz * dz;

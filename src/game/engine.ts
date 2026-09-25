@@ -8,6 +8,7 @@ import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
 import { builderRampObstacles } from './sim/builder-ramps';
 import { SPLIT_TIMEOUT_S, simulateSplitTicks } from './sim/split-times';
 import { withoutLoopRides } from './sim/decor-loops';
+import { ROPE_PAYOUT_S } from './sim/rope';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
   AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, RADIUS, STADIUM_START, START_X, START_Y,
@@ -442,7 +443,8 @@ export class GameEngine {
     const step = -Math.sign(direction) as -1 | 1;
     // Steering yourself takes up the rope's slack: after a knock you can drive straight back to a lane
     // instead of drifting until the rope reels you in.
-    racer.ropeSince = undefined;
+    // (Only the slack phase is cut short — the reel-in still plays — so tapping a key can't shrug off a hit.)
+    if (racer.ropeSince !== undefined && this.runTime - racer.ropeSince < ROPE_PAYOUT_S) racer.ropeSince = this.runTime - ROPE_PAYOUT_S;
     const network = this.laneNetwork;
     // M01 · T6: on an authored network a lane change is a *path* change, at this x. With no network
     // (or no path) it is the legacy lane change, unchanged.
@@ -1129,11 +1131,16 @@ export class GameEngine {
         || insidePassage(a.x) || insidePassage(b.x)
         || (!this.splitReached && (a.id !== PLAYER_ID || b.id !== PLAYER_ID))
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
-      const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
       // Balls touch at the size they are drawn (BALL_DRAW_RADIUS = 2 × the road-physics RADIUS).
+      // Cheap rejects first: with 100 balls the all-pairs Math.hypot cost ~0.45 ms a tick; squared
+      // distances behind an x test make the same check ~20× cheaper with identical results.
       const diameter = BALL_DRAW_RADIUS * 2 + 4;
-      const distance = Math.hypot(dx, dz, dy);
-      if (distance >= diameter || Math.abs(dy) > BALL_DRAW_RADIUS * 1.55) continue;
+      const dx = b.x - a.x;
+      if (dx >= diameter || dx <= -diameter) continue;
+      const dz = b.z - a.z; const dy = b.y - a.y;
+      const distanceSq = dx * dx + dz * dz + dy * dy;
+      if (distanceSq >= diameter * diameter || Math.abs(dy) > BALL_DRAW_RADIUS * 1.55) continue;
+      const distance = Math.sqrt(distanceSq);
       const planar = Math.hypot(dx, dz) || 1;
       const nx = dx / planar; const nz = dz / planar;
       const sum = a.weight + b.weight;

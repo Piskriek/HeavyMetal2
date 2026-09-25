@@ -68,7 +68,7 @@ const commands = [
     'tests/protect-baseline.test.ts', 'tests/props-safety-copy.test.ts',
     'tests/accessibility.test.ts', 'tests/racer-pool.test.ts', 'tests/roster-scale.test.ts',
     'tests/integration-benchmarks.test.ts', 'tests/cpu-tactics.test.ts',
-    'tests/seeded-race.test.ts', 'tests/touch-controls.test.tsx', 'tests/guide-text.test.ts', 'tests/gamepad.test.ts', 'tests/hit-feedback.test.ts', 'tests/gap-readout.test.ts', 'tests/wall-scrape.test.ts', 'tests/test-drive-bar.test.tsx', 'tests/oob-reel.test.ts', 'tests/art-budget.test.ts', 'tests/meta-contracts.test.ts', 'tests/goblin-dna.test.ts'],
+    'tests/seeded-race.test.ts', 'tests/touch-controls.test.tsx', 'tests/guide-text.test.ts', 'tests/gamepad.test.ts', 'tests/hit-feedback.test.ts', 'tests/gap-readout.test.ts', 'tests/wall-scrape.test.ts', 'tests/test-drive-bar.test.tsx', 'tests/oob-reel.test.ts', 'tests/art-budget.test.ts', 'tests/meta-contracts.test.ts', 'tests/goblin-dna.test.ts', 'tests/sphere-baker.test.ts'],
 ];
 
 for (const args of commands) {

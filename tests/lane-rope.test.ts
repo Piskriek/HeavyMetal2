@@ -88,7 +88,7 @@ test('ghost until fully out of the giant loop, and no contact inside it at all',
 test('once the player is released from the pool they can steer, boost and bounce at once', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
   const apply = engine.slice(engine.indexOf('private applyMergeStatus()'), engine.indexOf('private applyMergeStatus()') + 1200);
-  assert.match(apply, /pool\.phase === 'releasing' && pool\.entries\.some\(\(entry\) => entry\.isPlayer && entry\.releaseTick !== null\)\) \{\n\s*if \(this\.snapshot\.status === 'checkpoint' \|\| this\.snapshot\.status === 'countdown'\) this\.snapshot\.status = 'flying';/,
+  assert.match(apply, /pool\.phase === 'releasing' && pool\.entries\.some\(\(entry\) => entry\.isPlayer && entry\.releaseTick !== null\)\) \{\n(\s*\/\/.*\n)?\s*if \(this\.snapshot\.status === 'checkpoint' \|\| this\.snapshot\.status === 'countdown'\) \{? ?this\.snapshot\.status = 'flying';/,
     'the player is flying from their own release, not from the last rider\'s');
   assert.match(engine, /if \(racer\.ropeSince !== undefined && this\.runTime - racer\.ropeSince < this\.ropeConfig\.payoutS\) racer\.ropeSince = this\.runTime - this\.ropeConfig\.payoutS;/,
     'a steering press skips only the slack phase: the reel-in still plays, so tapping cannot shrug off a hit');

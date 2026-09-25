@@ -276,7 +276,7 @@ export class GameEngine {
   private pausedForBuild = false;
   get isBuildPaused() { return this.pausedForBuild; }
   /** Slow motion for the test drive: one of TIME_SCALES (anything else snaps to the nearest). */
-  setTimeScale(scale: number) { this.timeScale = snapTimeScale(scale); }
+  setTimeScale(scale: number) { this.timeScale = snapTimeScale(scale); this.audio.setTimeScale(this.timeScale); }
   getTimeScale(): TimeScale { return this.timeScale; }
 
   /** Switch camera live (cockpit / chase / fixed) without rebuilding the race. */
@@ -399,6 +399,7 @@ export class GameEngine {
     this.snapshot.speed = 0;
     this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
     this.audio.play('push');
+    this.audio.play('go', 0.8); // P9: and the horn for the start
     this.notify(); this.invalidate();
   };
 
@@ -466,6 +467,8 @@ export class GameEngine {
     } else {
       this.setLane(racer, racer.targetLane - Math.sign(direction));
     }
+    // P9: a lane change that took is an iron clunk.
+    if (racer.lastLaneChange === this.runTime) this.audio.play('lane_clunk', 0.7);
     this.refreshSnapshot(); this.notify();
   };
 
@@ -881,14 +884,15 @@ export class GameEngine {
     if (!pool) return;
     if (this.snapshot.status === 'paused' || this.snapshot.status === 'finished') return;
     if (pool.phase === 'done') {
-      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') this.snapshot.status = 'flying';
+      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') { this.snapshot.status = 'flying'; this.audio.play('go'); }
       return;
     }
     // Once the player is out of the pool they are racing, even while the rest of the field is still
     // being let go behind them. Holding 'countdown' until the *last* rider left (≈35 s with 100 balls)
     // refused every lane change, boost and bounce for that whole stretch.
     if (pool.phase === 'releasing' && pool.entries.some((entry) => entry.isPlayer && entry.releaseTick !== null)) {
-      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') this.snapshot.status = 'flying';
+      // P9: the horn goes as the player leaves the pool.
+      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') { this.snapshot.status = 'flying'; this.audio.play('go'); }
       return;
     }
     this.snapshot.status = pool.phase === 'open' || pool.phase === 'closed' ? 'checkpoint' : 'countdown';
@@ -1251,8 +1255,20 @@ export class GameEngine {
     return true;
   }
 
+  /** P9: the ratchet as the player's rope stops paying out and starts reeling in (once per hit). */
+  private reelCuedFor: number | undefined = undefined;
+  private cueRopeReel() {
+    const since = this.player.ropeSince;
+    if (since === undefined || since === this.reelCuedFor) return;
+    const age = this.runTime - since;
+    if (age < this.ropeConfig.payoutS || age >= this.ropeConfig.reelS) return;
+    this.reelCuedFor = since;
+    this.audio.play('rope_reel');
+  }
+
   private refreshSnapshot() {
     const player = this.player;
+    this.cueRopeReel();
     this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / TRACK_DISTANCE;
     this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : Math.hypot(player.vx, player.vy)) * 0.16);
     this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling;

@@ -445,7 +445,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     if (rope.slack && (racer.z === zMin || racer.z === zMax) && Math.abs(impactVz) >= ropeConfig.edgeSmashVz) {
       ctx.fx.effect('impact', racer.x, racer.y, racer.z, 1.2, racer.id);
       ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1, racer.id);
-      if (!racer.id) ctx.fx.say('INTO THE TREES! THE ROPE REELS YOU BACK.');
+      if (!racer.id) { ctx.fx.say('INTO THE TREES! THE ROPE REELS YOU BACK.'); ctx.fx.audio('tree_smash'); }
     }
     scrapeSparks(racer, impactVz, ctx);
     racer.lane = closestLane(racer.z);

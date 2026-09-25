@@ -126,6 +126,7 @@ export function createAttemptRacer(participant: QualifyingParticipant): Racer {
     lastGroundedAt: -100, lastHopAt: -100, bufferedJump: -100,
     fallingFor: 0, stoppedFor: 0, recoveries: 0, recoveryUntil: -100, steerLockedUntil: -100,
     nextDecision: 0, lastBoostAt: -100, lastLaneChange: -100,
+    ramTargetId: null, ramTellUntil: -100, ramLane: lane, ramPathId: null,
     loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
     isPlayer: (participant as any).isPlayer ?? participant.id === 0,
     // T3 (IF-GYRO): the shell starts from rest on the grid.
@@ -187,6 +188,7 @@ export function resetToStagedState(racer: Racer, staged: StagedState): void {
   racer.immuneUntil = -100; racer.recoveryUntil = -100; racer.steerLockedUntil = -100;
   racer.lastHopAt = -100; racer.lastGroundedAt = -100; racer.bufferedJump = -100;
   racer.lastBoostAt = -100; racer.lastLaneChange = -100;
+  racer.ramTargetId = null; racer.ramTellUntil = -100; racer.ramPathId = null;
   racer.bumpAt = -100; racer.shieldHitAt = -100; racer.pickupAt = -100;
   racer.launchOrigin = { x: START_X, y: START_Y };
   racer.visited.clear();

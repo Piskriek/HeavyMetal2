@@ -31,7 +31,8 @@ import {
 import type { Racer } from '../racers';
 import { advanceRoll } from '../gyro-ball';
 import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
-import { advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
+import { LANE_Z_LIMIT, advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
+import { EDGE_SMASH_VZ, ropeAt } from './rope';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -400,17 +401,31 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     // purpose, so the OOB trigger still fires on the path it belongs to.
     advancePaths([racer], ctx.laneNetwork ?? null);
     const isWet = racer.x >= STAGE_GRAVITY_START && racer.x <= STAGE_GRAVITY_END;
-    const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling;
+    // The lane rope (sim/rope.ts): after a hit the spring and damping go slack and the ball keeps its
+    // sideways speed, then the rope reels it back into its own lane. Untouched when never hit.
+    const rope = ropeAt(racer.ropeSince, ctx.runTime);
+    const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling * rope.spring;
     // M01 · T6 (D12): with no network this is exactly `laneZ(targetLane)` and the legacy corridor;
     // with one it is the racer's own path centre and the union corridor of the paths active here.
     // The PD spring, its damping, the clamp of the spring's own output and the steer lock are all
     // untouched — only the target and the two bounds are generalised.
     const lane = resolveLaneTarget(racer, ctx.laneNetwork ?? null);
-    const steering = (lane.targetZ - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
+    const steering = (lane.targetZ - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling) * rope.damping;
     racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
     const previousZ = racer.z;
-    racer.z = clamp(racer.z + racer.vz * dt, lane.zMin, lane.zMax);
+    // With slack on the rope the ball is not held to its lane corridor, only to the road itself.
+    const zMin = rope.slack ? -LANE_Z_LIMIT : lane.zMin;
+    const zMax = rope.slack ? LANE_Z_LIMIT : lane.zMax;
+    const impactVz = racer.vz;
+    racer.z = clamp(racer.z + racer.vz * dt, zMin, zMax);
     if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
+    // Knocked into the tree line at the road edge: a smash. (Out-of-bounds zones, when authored, are
+    // where a smash will hand the ball to the rope goblins for a reset instead.)
+    if (rope.slack && (racer.z === zMin || racer.z === zMax) && Math.abs(impactVz) >= EDGE_SMASH_VZ) {
+      ctx.fx.effect('impact', racer.x, racer.y, racer.z, 1.2, racer.id);
+      ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1, racer.id);
+      if (!racer.id) ctx.fx.say('INTO THE TREES! THE ROPE REELS YOU BACK.');
+    }
     racer.lane = closestLane(racer.z);
   }
   const dragFactor = 120 / racer.weight;

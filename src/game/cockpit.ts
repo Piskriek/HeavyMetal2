@@ -145,6 +145,29 @@ export function steerFrom(vz: number, handling: number): number {
   return steer === 0 ? 0 : steer; // normalise −0
 }
 
+/** How long a steering press holds the yoke at full lock, seconds. */
+export const YOKE_HOLD_S = 0.2;
+/** How long the yoke then takes to return to centre, seconds. */
+export const YOKE_RETURN_S = 0.3;
+
+/**
+ * The yoke follows the *player's hands*, not the ball: a press of steerLeft (−1) or steerRight (+1)
+ * holds full lock for YOKE_HOLD_S, then eases back to centre over YOKE_RETURN_S (key repeat while a
+ * key is held keeps it at lock). Driving it from the ball's lateral speed made the hands move on
+ * their own after the first split — the pool's glide into a slot, the giant loop's pull to its
+ * centre and every bump turned the wheel — while presses the game refused never turned it at all.
+ */
+export function yokeSteer(direction: number, pressedAt: number, now: number): number {
+  if (!Number.isFinite(direction) || direction === 0 || !Number.isFinite(pressedAt)) return 0;
+  const t = now - pressedAt;
+  if (t < 0) return 0;
+  const sign = direction < 0 ? -1 : 1;
+  if (t <= YOKE_HOLD_S) return sign;
+  const u = (t - YOKE_HOLD_S) / YOKE_RETURN_S;
+  if (u >= 1) return 0;
+  return sign * (1 - u * u * (3 - 2 * u));
+}
+
 export const yokeAngleDeg = (steer: number): number =>
   Math.max(-1, Math.min(1, Number.isFinite(steer) ? steer : 0)) * YOKE_MAX_DEG;
 

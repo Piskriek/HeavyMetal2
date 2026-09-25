@@ -38,15 +38,15 @@ import {
 } from '../src/game/qualifying/gate';
 import {
   PASSAGE_CENTRE_Z, PASSAGE_GHOST_CAP_S, PASSAGE_GHOST_TAIL_S, insidePassage, passageExitX,
-  passageMouthX, passageProgress,
+  passageMouthX,
 } from '../src/game/qualifying/passage';
 import { GRAVITY, LANE, RADIUS, closestLane } from '../src/game/scene';
 import { FIXED_STEP } from '../src/game/contracts/timing';
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, startPushVelocity } from '../src/game/sim/start-push';
 import {
-  HELD_DAMPING, HELD_RESPONSE, MERGE_GATE_HALF_WIDTH, MERGE_RELEASE_VX,
+  HELD_DAMPING, HELD_RESPONSE, MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX,
   POOL_PLAYER_GRACE_TICKS,
-  MergePool,
+  MergePool, releaseOccupancy,
 } from '../src/game/merge/pool';
 
 const DIAMETER = RADIUS * 2 + 4;
@@ -273,13 +273,15 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
       racer.y = world.y(racer.x) - RADIUS;
     }
 
-    // 3. The next rider slides into the ring's lane; everyone else waits in their slot.
+    // 3. The next MERGE_LINEUP riders slide into the ring's lane; everyone else waits in their slot.
     const next = pool.next;
+    let upcoming = 0;
     for (const entry of pool.entries) {
       if (entry.releaseTick !== null) continue;
       const racer = racers.find((candidate) => candidate.id === entry.racerId);
       if (!racer) continue;
-      racer.mergeSlotZ = entry === next ? pool.loopZ : entry.slotZ;
+      racer.mergeSlotZ = upcoming < MERGE_LINEUP ? pool.loopZ : entry.slotZ;
+      upcoming += 1;
     }
 
     // 4. The pool: occupancy from the previous release's own progress through the geometry loop, then
@@ -287,7 +289,7 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
     const previousRacer = lastReleased === null ? null : racers.find((racer) => racer.id === lastReleased) ?? null;
     const candidate = next ? racers.find((racer) => racer.id === next.racerId) ?? null : null;
     const released = pool.step(tick, {
-      previousProgress: previousRacer ? passageProgress(previousRacer.x) : 1,
+      previousProgress: previousRacer ? releaseOccupancy(previousRacer.x, mergeGate.x) : 1,
       candidateAligned: candidate !== null
         && Math.abs(candidate.z - pool.loopZ) <= 6
         && Math.abs(candidate.vz) <= 30,
@@ -607,8 +609,10 @@ test('the engine drives the pool the way this harness does', () => {
   assert.match(source, /this\.mergeGateFor\(\)\.x;/, 'a held rider is pinned to the gate plane');
   assert.match(source, /racer\.targetLane = closestLane\(PASSAGE_CENTRE_Z\);/,
     'a release must aim the rider through the tunnel portal at the mouth of the geometry loop');
-  assert.match(source, /previousProgress: previousRacer \? passageProgress\(previousRacer\.x\) : 1,/,
-    'the occupancy rule must read the previous rider\'s progress through the geometry loop');
+  assert.match(source, /previousProgress: previousRacer \? releaseOccupancy\(previousRacer\.x, gate\.x\) : 1,/,
+    'the occupancy rule must read the previous rider\'s spacing past the sorting plane');
+  assert.match(source, /racer\.mergeSlotZ = upcoming < MERGE_LINEUP \? pool\.loopZ : entry\.slotZ;/,
+    'the next riders line up in the loop lane exactly as the harness does');
   assert.match(source, /const x = passageMouthX\(\);/,
     'the sorting plane must be the mouth of the track\'s geometry loop (T1d)');
   assert.match(source, /racer\.mergeGhostUntil = this\.runTime \+ PASSAGE_GHOST_TAIL_S;/,

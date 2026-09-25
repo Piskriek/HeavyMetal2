@@ -6,6 +6,7 @@ import { createRacers, raceOrder, type Racer } from './racers';
 import { PLAYER_ID } from './roster';
 import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
 import { builderRampObstacles } from './sim/builder-ramps';
+import { SPLIT_TIMEOUT_S, simulateSplitTicks } from './sim/split-times';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
   AIM_ANCHOR, BALL_DRAW_RADIUS, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
@@ -27,10 +28,10 @@ import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorag
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
-import { MERGE_GATE_HALF_WIDTH, MERGE_RELEASE_VX, MergePool } from './merge/pool';
+import { MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX, MergePool, releaseOccupancy } from './merge/pool';
 import {
   PASSAGE_CENTRE_Z, PASSAGE_GHOST_CAP_S, PASSAGE_GHOST_TAIL_S, insidePassage,
-  passageExitX, passageMouthX, passageProgress,
+  passageExitX, passageMouthX,
 } from './qualifying/passage';
 import { LEGACY_RECOVERY, type RacerStepContext, type SimFx } from './sim/context';
 import { createSimWorld, type SimWorld } from './sim/world';
@@ -95,6 +96,10 @@ export class GameEngine {
   private readonly collisionTimes = new Map<number, number>();
   /** True once the player reaches the first split passage; rivals join at the merge gate. */
   private splitReached = false;
+  /** Rivals' first-split ticks (headless, computed at reset): how they queue in the pool. */
+  private rivalSplits = new Map<number, number | null>();
+  /** True once the rivals have been queued behind (or ahead of) the player at the split. */
+  private rivalsQueued = false;
   private obstacles: Obstacle[] = [];
   private pickups: AirPickup[] = [];
   private pickupCount = 0;
@@ -323,6 +328,13 @@ export class GameEngine {
     this.canvas.style.cursor = '';
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
     this.makeTrack();
+    this.rivalsQueued = false;
+    this.rivalSplits = this.startMode === 'push' && this.racers.length > 1
+      ? simulateSplitTicks(this.racers.filter((racer) => racer.id !== PLAYER_ID), {
+        course: this.options.course, obstacles: this.obstacles, pickups: this.pickups,
+        network: this.laneNetwork, gateX: this.mergeGateFor().x, pushSeed: this.pushSeed,
+      })
+      : new Map();
     this.standingsKey = '';
     this.notify(); this.invalidate();
   };
@@ -641,6 +653,7 @@ export class GameEngine {
       const entered = this.merge.enter(racer.id, this.tick, outcome.fraction, gate.x);
       if (!entered.ok) continue;
       this.hold(racer, entered.value.slotZ);
+      if (racer.id === PLAYER_ID) this.queueRivals(this.merge);
     }
 
     const pool = this.merge;
@@ -654,13 +667,17 @@ export class GameEngine {
       return;
     }
 
-    // 2. The rider who is next to go slides over to the loop's lane; everyone else waits in their slot.
+    // 2. The next few riders to go slide over to the loop's lane (held riders are intangible, so they
+    //    can line up there together); everyone else waits in their slot. Lining up only the very next
+    //    rider made every release wait for a fresh slide across the road.
     const next = pool.next;
+    let upcoming = 0;
     for (const entry of pool.entries) {
       if (entry.releaseTick !== null) continue;
-      const racer = this.racers.find((candidate) => candidate.id === entry.racerId);
+      const racer = this.racersById.get(entry.racerId);
       if (!racer) continue;
-      racer.mergeSlotZ = entry === next ? pool.loopZ : entry.slotZ;
+      racer.mergeSlotZ = upcoming < MERGE_LINEUP ? pool.loopZ : entry.slotZ;
+      upcoming += 1;
     }
 
     // 3. Advance the state machine. The occupancy input is the previous release's own progress.
@@ -669,7 +686,10 @@ export class GameEngine {
       : this.racers.find((racer) => racer.id === this.mergeLastReleased) ?? null;
     const candidate = next ? this.racers.find((racer) => racer.id === next.racerId) ?? null : null;
     const released = pool.step(this.tick, {
-      previousProgress: previousRacer ? passageProgress(previousRacer.x) : 1,
+      // Release spacing is a distance behind the rider ahead (MERGE_RELEASE_SPACING), expressed on the
+      // pool's own scale where 0.25 means "clear". It used to be a quarter of the whole geometry loop,
+      // ~1.45 s per rider: a 100-ball field took minutes to leave the pool.
+      previousProgress: previousRacer ? releaseOccupancy(previousRacer.x, gate.x) : 1,
       candidateAligned: candidate !== null
         && Math.abs(candidate.z - pool.loopZ) <= 6
         && Math.abs(candidate.vz) <= 30,
@@ -715,8 +735,45 @@ export class GameEngine {
     this.refreshMergeSnapshot();
   }
 
+  /**
+   * The player has reached the split: every rival joins the pool with the split time their own
+   * (headless) run set, so the queue — and the release order — is the field sorted by split time,
+   * and the overlay shows every rider's time. Rivals are ready at once; the player's ready starts it.
+   */
+  private queueRivals(pool: MergePool) {
+    if (this.rivalsQueued) return;
+    this.rivalsQueued = true;
+    const fallback = this.tick + Math.round(SPLIT_TIMEOUT_S * 120);
+    for (const racer of this.racers) {
+      if (racer.id === PLAYER_ID || racer.finished) continue;
+      const split = this.rivalSplits.get(racer.id) ?? fallback + racer.id;
+      const tick = Math.floor(split);
+      const entered = pool.enter(racer.id, tick, split - tick, pool.gateX);
+      if (!entered.ok) continue;
+      racer.z = entered.value.slotZ;
+      this.hold(racer, entered.value.slotZ, false);
+      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
+      pool.ready(racer.id, this.tick);
+    }
+    // Slots are handed out by rank, which only settles once everyone is in.
+    for (const entry of pool.entries) {
+      const racer = this.racersById.get(entry.racerId);
+      if (racer && racer.id !== PLAYER_ID) { racer.mergeSlotZ = entry.slotZ; racer.z = entry.slotZ; racer.previous.z = racer.z; }
+    }
+  }
+
+  private get racersById(): Map<number, Racer> {
+    if (this.racerIndex.size !== this.racers.length || this.racerIndexOf !== this.racers) {
+      this.racerIndex = new Map(this.racers.map((racer) => [racer.id, racer]));
+      this.racerIndexOf = this.racers;
+    }
+    return this.racerIndex;
+  }
+  private racerIndex = new Map<number, Racer>();
+  private racerIndexOf: Racer[] | null = null;
+
   /** Freezes a rider at the gate plane and points them at their pool slot. */
-  private hold(racer: Racer, slotZ: number) {
+  private hold(racer: Racer, slotZ: number, dust = true) {
     racer.mergeHeld = true;
     racer.mergeGhost = false;
     racer.mergeSlotZ = slotZ;
@@ -724,7 +781,7 @@ export class GameEngine {
     racer.vx = 0; racer.vy = 0; racer.vz = 0;
     racer.falling = false; racer.grounded = true;
     racer.y = this.world.y(racer.x) - RADIUS;
-    this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
+    if (dust) this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
   }
 
   /**
@@ -947,7 +1004,7 @@ export class GameEngine {
       // M01 · T3 (IF-GYRO): the roll phase is sampled, not interpolated — a shell that snaps to a
       // slightly stale phase is invisible, while interpolating it would need a second wrapped field.
       rendered.rollPhase = racer.rollPhase;
-      rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
+      rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.vz = racer.vz; rendered.lane = racer.targetLane;
       rendered.falling = racer.falling; rendered.grounded = racer.grounded; rendered.distance = racer.distance;
       rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
@@ -1012,13 +1069,9 @@ export class GameEngine {
     this.adoptPaths();
     for (const racer of this.racers) {
       if (racer.finished) continue;
-      // Solo run until first split: rivals wait at the merge gate until split is reached
-      if (!this.splitReached && racer.id !== PLAYER_ID) {
-        racer.x = passageMouthX();
-        racer.vx = 0;
-        racer.vy = 0;
-        continue;
-      }
+      // Solo first split: the rivals are not on the course yet. Their own split was run headlessly at
+      // reset; they join the pool, in split-time order, the moment the player reaches it.
+      if (!this.splitReached && racer.id !== PLAYER_ID) continue;
       // A held rider is out of the race: no CPU decisions, and the physics only glides their slot.
       if (racer.mergeHeld) { stepRacerSim(racer, this.simCtx, dt); continue; }
       // A race lets the CPU see the whole field and rubber-band against the player; an isolated

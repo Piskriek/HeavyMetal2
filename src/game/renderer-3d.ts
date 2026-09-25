@@ -18,6 +18,7 @@ import {
   compileRampSurfaces,
   engineDistanceFromX,
   getTrackSpace,
+  lateralFromLaneZ,
   placementFromEngine,
   type PhysicalRampSurface,
   type TrackSpaceMap,
@@ -26,6 +27,9 @@ import {
   FP_LOOK_AHEAD,
   firstPersonFlag,
   firstPersonFrame,
+  leanAngleFor,
+  leanUp,
+  stepLean,
   type Vec3,
 } from './first-person';
 
@@ -1508,6 +1512,8 @@ interface FpBallState {
   readonly distance?: number;
   readonly grounded?: boolean;
   readonly falling?: boolean;
+  /** Lateral speed, engine units/s: drives the cockpit lean. */
+  readonly vz?: number;
 }
 
 /** Legacy fallback colours for slots 0–3; larger fields get a deterministic hue. */
@@ -1556,6 +1562,8 @@ export class Renderer3D {
   private readonly firstPerson: boolean;
   /** Last frame's up, so the eye does not snap when the bank rolls through a turn. */
   private fpUp: Vec3 | null = null;
+  /** Current cockpit lean, radians (smoothed toward the lateral speed). */
+  private fpLean = 0;
   /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
   private effects: EffectRenderer | null = null;
   /**
@@ -1777,22 +1785,30 @@ export class Renderer3D {
       this.lastGyroFrame ?? frame,
     );
     this.lastGyroFrame = gyro;
-    const look = this.track.sampleAt(clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.track.length));
+    // Look down *your own lane*: the point ahead carries the ball's lateral offset. It used to be the
+    // road's centre line, so after a lane change the view slowly turned toward the middle of the road
+    // and stopped facing forward.
+    const aheadS = clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.space.length);
+    const look = this.space.frameAt(aheadS);
+    const lateral = lateralFromLaneZ(this.space, look.dist, ball.z);
     const fp = firstPersonFrame({
       ballCentre: [placement.world.x, placement.world.y, placement.world.z],
       gyro,
       lookPoint: [
-        look.pos.x + look.up.x * 140,
-        look.pos.y + look.up.y * 140,
-        look.pos.z + look.up.z * 140,
+        look.pos.x + look.right.x * lateral + look.up.x * 140,
+        look.pos.y + look.right.y * lateral + look.up.y * 140,
+        look.pos.z + look.right.z * lateral + look.up.z * 140,
       ],
       previousUp: this.fpUp,
       dt,
       falling: ball.falling === true,
     });
     this.fpUp = fp.up;
+    // Lean into lane changes (visual only; the smoothed up above stays unleaned so it cannot drift).
+    this.fpLean = ball.falling ? stepLean(this.fpLean, 0, dt) : stepLean(this.fpLean, leanAngleFor(ball.vz ?? 0), dt);
+    const up = leanUp(fp, this.fpLean);
     this.camera.position.set(fp.position[0], fp.position[1], fp.position[2]);
-    this.camera.up.set(fp.up[0], fp.up[1], fp.up[2]);
+    this.camera.up.set(up[0], up[1], up[2]);
     this.camera.lookAt(
       fp.position[0] + fp.forward[0],
       fp.position[1] + fp.forward[1],

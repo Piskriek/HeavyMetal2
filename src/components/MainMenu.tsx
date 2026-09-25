@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Compass, Maximize2, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, Maximize2, Play, Settings, Trophy, UserRound, Volume2, VolumeX } from 'lucide-react';
 import Brand from './Brand';
 import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 import type { GameOptions } from '../game/types';
@@ -19,6 +19,8 @@ interface MainMenuProps {
   onSettings: () => void;
   onGuide: () => void;
   onRecords: () => void;
+  /** MP-T06: the goblin creator. */
+  onCreator?: () => void;
   onCredits: () => void;
   onSound: () => void;
   onFullscreen: () => void;
@@ -59,6 +61,7 @@ export default function MainMenu(props: MainMenuProps) {
     { label: '3D Map Editor', sub: 'Design custom tracks, place props, and test drive.', icon: Compass, action: props.onMapEditor, primary: false },
     { label: 'Settings', sub: 'A little fine-tuning never hurt.', icon: Settings, action: props.onSettings, primary: false },
     { label: 'How to Play', sub: 'The very optional instruction manual.', icon: BookOpen, action: props.onGuide, primary: false },
+    ...(props.onCreator ? [{ label: 'Goblin Creator', sub: 'Build your racer, face and all. Save it to your crew.', icon: UserRound, action: props.onCreator, primary: false }] : []),
     { label: 'Hall of Chaos', sub: 'Some things deserve to be remembered.', icon: Trophy, action: props.onRecords, primary: false },
   ];
 

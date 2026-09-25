@@ -262,6 +262,8 @@ export interface RacerFrame {
   hidden?: boolean;
   /** H11: a bot's shove tell ends at this race time; until then the renderer wobbles the ball. */
   ramTellUntil?: number;
+  /** H6: being hauled back by the rope goblins: where it goes back to, and how far along (0..1). */
+  reelBack?: { toX: number; toY: number; toZ: number; t: number } | null;
 }
 
 export interface SceneFrame {

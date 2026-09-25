@@ -344,6 +344,25 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
  * Advances one racer by `dt` seconds. Mutates `racer` in place, exactly as the engine did, and
  * fills `trace` when the caller wants the canonical observations (gate capture, falls, hits).
  */
+/** H6: how long the rope goblins take to haul a ball back from out of bounds. */
+export const OOB_REEL_S = 1;
+/** H6: the least forward speed a ball leaves the reel with. */
+export const OOB_RELEASE_VX = 180;
+
+/**
+ * H6: an out-of-bounds recovery is not an instant teleport. The crew has already put the ball back
+ * on its lane (`recoverRacer`); it is held there for `OOB_REEL_S` while the rope goblins haul it in
+ * (the renderer draws it easing back from where it went out), then it rolls on.
+ */
+export function startRopeReel(racer: Racer, from: { x: number; y: number; z: number }, ctx: RacerStepContext): void {
+  const until = ctx.runTime + OOB_REEL_S;
+  racer.reel = { fromX: from.x, fromY: from.y, fromZ: from.z, startedAt: ctx.runTime, until, releaseVx: Math.max(OOB_RELEASE_VX, racer.vx) };
+  racer.vx = racer.vy = racer.vz = 0;
+  racer.steerLockedUntil = Math.max(racer.steerLockedUntil, until);
+  racer.immuneUntil = Math.max(racer.immuneUntil, until + 0.5);
+  if (!racer.id) { ctx.fx.audio('rope_reel'); ctx.fx.say('ROPE GOBLINS! HAULING YOU BACK ON COURSE.'); }
+}
+
 /** P6: a scraping ball throws a spark burst this often (seconds), sized by its speed. */
 export const SCRAPE_SPARK_EVERY = 0.07;
 /** P6: below this forward speed a ball leaning on the edge is resting, not scraping. */
@@ -371,6 +390,18 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     trace.wasFalling = racer.falling;
     trace.preObstacleX = racer.x; trace.preObstacleY = racer.y; trace.preObstacleZ = racer.z;
     trace.preObstacleVx = racer.vx; trace.preObstacleVy = racer.vy;
+  }
+  // H6: held on the lane while the rope goblins haul it in, then away at a rolling speed.
+  if (racer.reel) {
+    if (ctx.runTime < racer.reel.until) {
+      racer.vx = racer.vy = racer.vz = 0;
+      racer.y = world.surfaceAt(racer.x, racer.z).y - RADIUS;
+      racer.grounded = true; racer.falling = false; racer.stoppedFor = 0;
+      racer.lastGroundedAt = ctx.runTime;
+      return;
+    }
+    racer.vx = racer.reel.releaseVx; racer.vy = world.slope(racer.x) * racer.vx;
+    racer.reel = null;
   }
   // M01 · T2 (IF-MERGE): a held rider is out of the race for a moment. Nothing integrates — they
   // are pinned to the gate plane — except the lateral glide into their pool slot (or, when they are
@@ -576,7 +607,9 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     const node = oobCrossed(ctx.laneNetwork, racer.pathId, oldX, racer.x);
     if (node) {
       if (trace) trace.oobNode = node;
+      const from = { x: racer.x, y: racer.y, z: racer.z };
       recoverRacer(racer, ctx, 'oob', trace);
+      startRopeReel(racer, from, ctx);
       return;
     }
   }

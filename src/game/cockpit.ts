@@ -259,6 +259,29 @@ function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point): Arm
   };
 }
 
+/** Painted gauge plates' height as a share of their width (left 1024×419, right 1024×485). */
+export const CLUSTER_ASPECT = {
+  left: manifest.clusters[0].h / manifest.clusters[0].w,
+  right: manifest.clusters[1].h / manifest.clusters[1].w,
+} as const;
+/** How far a plate's top edge tucks under the window's bottom edge, px (hides the seam). */
+export const CLUSTER_TUCK = 2;
+/** Widest a plate may grow, as a share of the viewport width, so the two never meet mid-screen. */
+export const CLUSTER_MAX_OF_WIDTH = 0.3;
+
+/**
+ * A gauge plate hangs from the bottom of the window: its top edge tucks CLUSTER_TUCK px under the
+ * aperture, and it is sized (aspect kept) to fill the band between the window and the screen bottom.
+ * On narrow screens the width cap wins and the plate stops short of the bottom edge; the painted
+ * bezel is behind it there, so the window and the gauges still meet with no gap at any aspect.
+ */
+function clusterUnderAperture(side: 'left' | 'right', w: number, h: number, aperture: Rect) {
+  const top = aperture.y + aperture.h - CLUSTER_TUCK;
+  const cw = Math.min(w * CLUSTER_MAX_OF_WIDTH, Math.max(1, h - top) / CLUSTER_ASPECT[side]);
+  const x = side === 'left' ? w * 0.005 : w - cw - w * 0.005;
+  return { x, y: top, w: cw };
+}
+
 /** The whole first-person layout for a viewport. Pure: same numbers for the DOM and for tests. */
 export function cockpitLayout(w: number, h: number): CockpitLayout {
   const aperture = {
@@ -270,14 +293,13 @@ export function cockpitLayout(w: number, h: number): CockpitLayout {
   };
   const span = Math.min(w * YOKE_SPAN_OF_WIDTH, h * YOKE_SPAN_OF_HEIGHT);
   const scale = span / YOKE.spanWidth;
-  const clusterW = Math.min(w * 0.3, h * 0.46, (h * 0.3) / (419 / 1024));
   const yoke: CockpitLayout['yoke'] = { hub: { x: w / 2, y: h * YOKE_HUB_Y }, scale, w: YOKE.w * scale, h: YOKE.h * scale };
   const layout: CockpitLayout = {
     w, h, aperture, horizonY: aperture.y + aperture.h / 2, yoke,
     arms: { left: null as unknown as ArmPose, right: null as unknown as ArmPose },
     clusters: {
-      left: { x: w * 0.005, y: h - clusterW * (419 / 1024) - 4, w: clusterW },
-      right: { x: w - clusterW - w * 0.005, y: h - clusterW * (485 / 1024) - 4, w: clusterW },
+      left: clusterUnderAperture('left', w, h, aperture),
+      right: clusterUnderAperture('right', w, h, aperture),
     },
     strip: { x: 0, y: h - Math.max(18, h * 0.05), w, h: Math.max(18, h * 0.05) },
   };

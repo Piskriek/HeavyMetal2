@@ -4,6 +4,7 @@ import { RangeRenderer } from './renderer';
 import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
 import { PLAYER_ID } from './roster';
+import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
 import {
   AIM_ANCHOR, FINISH, GROUND, HEIGHT, LANE, RADIUS, STADIUM_START, START_X, START_Y,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, launchVelocity, sectorAt,
@@ -74,6 +75,8 @@ export class GameEngine {
   private readonly systemReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private get reducedMotion() { return this.systemReducedMotion || this.options.reducedMotion; }
   private time = 0;
+  /** Slow motion (test drive): simulated seconds per real second. The physics step never changes. */
+  private timeScale: TimeScale = 1;
   private runTime = 0;
   private camera = 0;
   private cameraY = 0;
@@ -227,6 +230,17 @@ export class GameEngine {
   get trackObstacles(): Obstacle[] { return this.obstacles; }
   private pausedForBuild = false;
   get isBuildPaused() { return this.pausedForBuild; }
+  /** Slow motion for the test drive: one of TIME_SCALES (anything else snaps to the nearest). */
+  setTimeScale(scale: number) { this.timeScale = snapTimeScale(scale); }
+  getTimeScale(): TimeScale { return this.timeScale; }
+
+  /** Switch camera live (cockpit / chase / fixed) without rebuilding the race. */
+  setCameraMode(mode: GameOptions['cameraMode']) {
+    if (this.options.cameraMode === mode) return;
+    this.options = { ...this.options, cameraMode: mode };
+    this.invalidate();
+  }
+
   setBuildPaused(paused: boolean) {
     this.pausedForBuild = paused;
     this.accumulator = this.lastFrame = 0;
@@ -858,8 +872,11 @@ export class GameEngine {
   private frame = (now: number) => {
     this.frameId = 0;
     if (this.destroyed || !this.visible || document.hidden) return;
-    const dt = Math.min(this.lastFrame ? (now - this.lastFrame) / 1000 : 1 / 60, 0.1);
+    const realDt = Math.min(this.lastFrame ? (now - this.lastFrame) / 1000 : 1 / 60, 0.1);
     this.lastFrame = now;
+    // Everything the race does (physics, particles, the notice timer, shake decay) runs on game time,
+    // so slow motion slows all of it together. Rendering still happens every real frame.
+    const dt = scaledDt(realDt, this.timeScale);
     if (this.status !== 'paused' && this.inputEnabled) {
       this.time += dt; this.shake *= Math.exp(-9 * dt);
       const simulating = statusSimulates(this.status);

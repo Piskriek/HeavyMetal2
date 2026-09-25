@@ -1,7 +1,11 @@
-# ART-B3: Track obstacles, boost pads, barriers and race effects (22 images)
+# ART-B3: Track obstacles, boost pads, barriers and race effects (22 images, two agents)
 
-- **Batch**: 3 of 3 in art wave 1 (PR branch `art/generated-wave-1`). Starts after ART-B2 is pushed.
-  Read [README.md](README.md) first.
+- **Batch**: agents 3 and 4 of 4 in art wave 1 (PR branch `art/generated-wave-1`; all four run at
+  the same time). Read [README.md](README.md) first.
+  - **ART-B3a** (agent 3): images **1–12 and 22** (textures, obstacle and barrier sprites, shield
+    bubble). Commit prefix `art(B3a)`.
+  - **ART-B3b** (agent 4): images **13–21** (the animated effect sheets). The only agent that edits
+    `scripts/process-generated-animated.mjs` and builds the template. Commit prefix `art(B3b)`.
 - **Feeds**: `src/game/obstacle-view.ts` (the race's obstacles), the builder's barrier props, and
   the effect renderer, via [ART-I3](ART-I3-track-art.md).
 - **Why**: boost pads are a flat orange strip, gaps a black quad and ramps a brown deck
@@ -119,4 +123,4 @@ Every effect prompt starts with this layout paragraph (keep it word for word):
 - [ ] Sprites 4–12 and 22: keyed PNGs in `public/art/track-obstacles/`, each PASS.
 - [ ] Sheets 13–21: registered in `SHEETS`, processed to `public/art/animated/alpha/`, passing the
       §10.4 effect gates (list any that need a regeneration).
-- [ ] `npm run check:edges` 0 failures; `tests/art-budget.test.ts` passes; PR boxes for B3 ticked.
+- [ ] `npm run check:edges` 0 failures; `tests/art-budget.test.ts` passes; each agent (B3a, B3b) posts its results table as a PR comment.

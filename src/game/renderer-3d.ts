@@ -2020,9 +2020,12 @@ export class Renderer3D {
       texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
     }
-    // Painted style: diffuse only, no specular highlight and no environment reflection. Lambert keeps
-    // a soft light/shadow side so the ball still reads as round and its roll stays visible.
-    const material = new THREE.MeshLambertMaterial({ map: texture ?? undefined, color: 0xffffff });
+    // Painted style: diffuse with subtle ambient warmth so dark sides never drop to pure black.
+    const material = new THREE.MeshLambertMaterial({
+      map: texture ?? undefined,
+      color: 0xffffff,
+      emissive: new THREE.Color(0x1a1816),
+    });
     const mesh = racerBatch(shared.sphereGeo, material, shared.capacity, canvas ? 'RacerCores' : 'RacerCoresPlain');
     // Untextured balls wear their slot colour per instance.
     if (!canvas) mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(shared.capacity * 3).fill(1), 3);

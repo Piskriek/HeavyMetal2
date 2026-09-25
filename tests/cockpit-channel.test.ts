@@ -133,7 +133,7 @@ test('the yoke angle is the physics\' own steer, so the hands cannot drift from 
 
 test('the wiring: the engine hands the live snapshot to the mapping, every frame', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(engine, /fillCockpitState\(state, this\.snapshot, yokeSteer\(this\.steerPress, this\.steerPressAt, this\.time\),\s*\{ amount: impactEnvelope\(this\.time - this\.impact\.at\) \* this\.impact\.strength, side: this\.impact\.side \}\)/,
+  assert.match(engine, /fillCockpitState\(state, this\.snapshot, yokeSteer\(this\.steerPress, this\.steerPressAt, this\.time\),\s*\{ amount: impactEnvelope\(this\.time - this\.impact\.at\) \* this\.impact\.strength, side: this\.impact\.side, boostAge: this\.runTime - this\.player\.lastBoostAt \}\)/,
     'the engine fills the channel from the snapshot it just stepped, the yoke from the player\'s own press, and (H8) the last hit');
   // No assignment may slip back into the engine: the mapping has exactly one home.
   const assignments = engine.match(/state\.[a-zA-Z]+ = /g) ?? [];

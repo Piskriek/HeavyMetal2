@@ -11,6 +11,7 @@
  * `id * 0.023 s`; a large qualifying field uses a bounded stagger so decisions never queue behind
  * the racer's index.
  */
+import { dsin } from './det-math';
 import { LANE_COUNT, closestLane, laneZ, occupiesLane, weightImpulse, type Obstacle } from '../scene';
 import { adjacentPath, resolveLaneTarget, sampleLane, type LaneNetwork } from '../lane-network';
 import type { AirPickup } from '../powerups';
@@ -24,7 +25,7 @@ const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
 /** The engine's deterministic per-racer noise: stable for a given racer and moment. */
 export const randomAt = (id: number, time: number) => {
-  const value = Math.sin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73;
+  const value = dsin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73;
   return value - Math.floor(value);
 };
 

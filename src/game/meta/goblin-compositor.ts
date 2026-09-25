@@ -158,9 +158,10 @@ function hairHidden(config: GoblinAvatarConfig): boolean {
 
 export function occlusionNotes(config: GoblinAvatarConfig): string[] {
   const notes: string[] = [];
-  if (hairHidden(config)) notes.push(`${AVATAR_CATALOG.headgear[config.layers.headgear].replace('painted:', '')} hides the ${AVATAR_CATALOG.hair[config.layers.hair]}`);
+  const plain = (s: string) => s.replace('painted:', '').replace(/^(headgear|mouth)-/, '').replace(/-/g, ' ');
+  if (hairHidden(config)) notes.push(`The ${plain(AVATAR_CATALOG.headgear[config.layers.headgear])} hides the ${plain(AVATAR_CATALOG.hair[config.layers.hair])}.`);
   const mouth = PAINTED_PARTS.find((p) => `painted:${p.id}` === AVATAR_CATALOG.mouth[config.layers.mouth]);
-  if (mouth?.skinLocked && config.skin !== mouth.skinLocked) notes.push(`${mouth.name} has painted ${mouth.skinLocked} lips — tint mask pending (Plan §9.6)`);
+  if (mouth?.skinLocked && config.skin !== mouth.skinLocked) notes.push(`The ${plain(mouth.id)} has painted green lips, so they keep their colour.`);
   return notes;
 }
 

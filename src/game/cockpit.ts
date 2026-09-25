@@ -134,10 +134,14 @@ export function createCockpitState(): CockpitState {
   };
 }
 
-/** Lateral speed → steer. The clamp is the physics' own `−vz / (VZ_MAX · handling)`. */
+/**
+ * Lateral speed → steer, clamped to the physics' own `vz / (VZ_MAX · handling)`.
+ * Sign: steerLeft (A) moves the ball toward lane 3 at negative vz, which is screen-left in both
+ * cameras, so negative vz must give a negative (anticlockwise) yoke.
+ */
 export function steerFrom(vz: number, handling: number): number {
   if (!Number.isFinite(vz) || !Number.isFinite(handling) || handling <= 0) return 0;
-  const steer = Math.max(-1, Math.min(1, -vz / (VZ_MAX * handling)));
+  const steer = Math.max(-1, Math.min(1, vz / (VZ_MAX * handling)));
   return steer === 0 ? 0 : steer; // normalise −0
 }
 

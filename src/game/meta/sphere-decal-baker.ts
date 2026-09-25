@@ -82,20 +82,23 @@ export function stampBounds(stamp: DecalStamp, _w: number, h: number) {
 
 /* ───────────── Sampling & blending ───────────── */
 
-export function sampleBilinear(img: RgbaImage, s: number, t: number, wrapS = false): [number, number, number, number] {
-  const fx = s * img.width - 0.5, fy = t * img.height - 0.5;
+/** A texel index inside [0, n): wrapped or clamped. Module-level so the hot loop creates no closures. */
+function clampTap(i: number, n: number, wrap: boolean): number {
+  return wrap ? ((i % n) + n) % n : i < 0 ? 0 : i >= n ? n - 1 : i;
+}
+
+export function sampleBilinear(img: RgbaImage, s: number, t: number, wrapS = false, out: [number, number, number, number] = [0, 0, 0, 0]): [number, number, number, number] {
+  const W = img.width, H = img.height, data = img.data;
+  const fx = s * W - 0.5, fy = t * H - 0.5;
   const x0 = Math.floor(fx), y0 = Math.floor(fy);
   const ax = fx - x0, ay = fy - y0;
-  const px = (x: number) => (wrapS ? ((x % img.width) + img.width) % img.width : Math.min(img.width - 1, Math.max(0, x)));
-  const py = (y: number) => Math.min(img.height - 1, Math.max(0, y));
-  const out: [number, number, number, number] = [0, 0, 0, 0];
-  const taps: [number, number, number][] = [[x0, y0, (1 - ax) * (1 - ay)], [x0 + 1, y0, ax * (1 - ay)], [x0, y0 + 1, (1 - ax) * ay], [x0 + 1, y0 + 1, ax * ay]];
-  for (const [x, y, wgt] of taps) {
-    const i = (py(y) * img.width + px(x)) * 4;
-    for (let k = 0; k < 4; k++) out[k] += img.data[i + k] * wgt;
-  }
+  const xa = clampTap(x0, W, wrapS), xb = clampTap(x0 + 1, W, wrapS), ya = clampTap(y0, H, false) * W, yb = clampTap(y0 + 1, H, false) * W;
+  const i00 = (ya + xa) * 4, i10 = (ya + xb) * 4, i01 = (yb + xa) * 4, i11 = (yb + xb) * 4;
+  const w00 = (1 - ax) * (1 - ay), w10 = ax * (1 - ay), w01 = (1 - ax) * ay, w11 = ax * ay;
+  for (let k = 0; k < 4; k++) out[k] = data[i00 + k] * w00 + data[i10 + k] * w10 + data[i01 + k] * w01 + data[i11 + k] * w11;
   return out;
 }
+const TAP: [number, number, number, number] = [0, 0, 0, 0];
 
 export function hexToRgb(hex: HexColor): [number, number, number] {
   const n = parseInt(hex.slice(1).padEnd(6, '0').slice(0, 6), 16);
@@ -202,6 +205,10 @@ export interface DecalSource { readonly projection: DecalProjection; readonly im
 
 export interface BakeResult { readonly albedo: RgbaImage; readonly emissive: RgbaImage | null; readonly bakeKey: string }
 
+/** Baked base layers by (base, accent, width): the noise pass is the slow part of a bake. */
+const BASE_LAYER_CACHE = new Map<string, { albedo: Uint8ClampedArray; emissive: Uint8ClampedArray | null }>();
+const BASE_LAYER_CACHE_MAX = 8;
+
 export function bakeBall(config: CustomBallConfig, decals: ReadonlyMap<string, DecalSource>, width = 512): BakeResult {
   const w = width, h = width / 2;
   const albedo = new Uint8ClampedArray(w * h * 4);
@@ -213,6 +220,13 @@ export function bakeBall(config: CustomBallConfig, decals: ReadonlyMap<string, D
   const accent = hexToRgb(config.accentColor);
 
   // 1) Base metal + baked ambient lift + equatorial accent pin-line (replaces the old 2D rim stroke).
+  //    It depends only on (base, accent, width), so it is cached: a decal edit re-stamps decals only.
+  const baseKey = `${config.base}|${config.accentColor}|${w}`;
+  const cached = BASE_LAYER_CACHE.get(baseKey);
+  if (cached) {
+    albedo.set(cached.albedo);
+    if (emissive && cached.emissive) emissive.set(cached.emissive);
+  } else {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const [u, v] = texelToUv(x, y, w, h);
@@ -232,6 +246,10 @@ export function bakeBall(config: CustomBallConfig, decals: ReadonlyMap<string, D
     }
   }
 
+  BASE_LAYER_CACHE.set(baseKey, { albedo: albedo.slice(), emissive: emissive ? emissive.slice() : null });
+  if (BASE_LAYER_CACHE.size > BASE_LAYER_CACHE_MAX) BASE_LAYER_CACHE.delete(BASE_LAYER_CACHE.keys().next().value!);
+  }
+
   // 2) Decals, back → front.
   for (const stamp of config.decals) {
     const src = decals.get(stamp.textureId);
@@ -248,7 +266,7 @@ export function bakeBall(config: CustomBallConfig, decals: ReadonlyMap<string, D
         const st = gnomonic(uvToDir(u, v), frame, b.halfTan);
         if (!st) continue;
         const s = stamp.mirrorU ? 1 - st[0] : st[0];
-        writeBlend(albedo, (y * w + x) * 4, sampleBilinear(src.image, s, st[1]), stamp.opacity, stamp.blendMode, tint);
+        writeBlend(albedo, (y * w + x) * 4, sampleBilinear(src.image, s, st[1], false, TAP), stamp.opacity, stamp.blendMode, tint);
       }
     }
   }
@@ -268,7 +286,7 @@ function bakeBand(out: Uint8ClampedArray, w: number, h: number, stamp: DecalStam
     for (let x = 0; x < w; x++) {
       const u = (x + 0.5) / w;
       const s = (u * repeats + stamp.rotation / TAU) % 1;
-      writeBlend(out, (y * w + x) * 4, sampleBilinear(img, s, t, true), stamp.opacity, stamp.blendMode, tint);
+      writeBlend(out, (y * w + x) * 4, sampleBilinear(img, s, t, true, TAP), stamp.opacity, stamp.blendMode, tint);
     }
   }
 }

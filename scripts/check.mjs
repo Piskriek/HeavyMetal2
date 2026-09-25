@@ -23,6 +23,8 @@ const commands = [
     'tests/first-person.test.ts', 'tests/eye-level-audit.test.ts',
     'tests/start-push.test.ts', 'tests/start-zone.test.ts',
     'tests/cockpit.test.ts',
+    'tests/time-scale.test.ts', 'tests/builder-ramps.test.ts', 'tests/start-node.test.ts',
+    'tests/lane-gizmo-follow.test.ts', 'tests/ball-size.test.ts',
     'tests/effects.test.ts',
     'tests/gyro-ball.test.ts',
     'tests/merge-pool.test.ts', 'tests/merge-race.test.ts', 'tests/merge-runup.test.ts',

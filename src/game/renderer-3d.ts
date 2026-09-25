@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
 import type { GameOptions } from './types';
-import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
+import { BALL_DRAW_RADIUS, RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
 import { PickupView } from './pickup-view';
@@ -1495,7 +1495,7 @@ interface RacerMeshResources {
   /** Cap geometries, poles baked onto local −X and +X, so the mesh quaternion is the level basis. */
   capLeftGeo: THREE.SphereGeometry;
   capRightGeo: THREE.SphereGeometry;
-  capMat: THREE.MeshStandardMaterial;
+  capMat: THREE.MeshLambertMaterial;
   shadowGeo: THREE.PlaneGeometry;
   shadowMat: THREE.MeshBasicMaterial;
   shieldGeo: THREE.SphereGeometry;
@@ -1871,19 +1871,19 @@ export class Renderer3D {
 
   private ensureRacerMeshes(count: number) {
     if (!this.racerResources) {
-      const capLeftGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      const capLeftGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
       capLeftGeo.rotateZ(Math.PI / 2); // pole (+Y) → local −X
-      const capRightGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      const capRightGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
       capRightGeo.rotateZ(-Math.PI / 2); // pole (+Y) → local +X
       this.racerResources = {
-        sphereGeo: new THREE.SphereGeometry(RADIUS, 24, 16),
+        sphereGeo: new THREE.SphereGeometry(BALL_DRAW_RADIUS, 24, 16),
         capLeftGeo,
         capRightGeo,
         // Brass, shared by every racer on the grid: three geometries and one cap material in total.
-        capMat: new THREE.MeshStandardMaterial({ color: 0xc08a2e, metalness: 0.85, roughness: 0.32 }),
-        shadowGeo: new THREE.PlaneGeometry(RADIUS * 2.2, RADIUS * 2.2),
+        capMat: new THREE.MeshLambertMaterial({ color: 0xc08a2e }),
+        shadowGeo: new THREE.PlaneGeometry(BALL_DRAW_RADIUS * 2.2, BALL_DRAW_RADIUS * 2.2),
         shadowMat: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
-        shieldGeo: new THREE.SphereGeometry(RADIUS * 1.35, 16, 12),
+        shieldGeo: new THREE.SphereGeometry(BALL_DRAW_RADIUS * 1.35, 16, 12),
         shieldMat: new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true }),
       };
     }
@@ -1907,10 +1907,11 @@ export class Renderer3D {
         this.racerTextures.set(canvas, { texture, refs: 1 });
       }
     }
-    const material = new THREE.MeshStandardMaterial({
+    // Painted style: diffuse only, no specular highlight and no environment reflection. Lambert keeps
+    // a soft light/shadow side so the ball still reads as round and its roll stays visible.
+    const material = new THREE.MeshLambertMaterial({
       map: texture ?? undefined,
       color: texture ? 0xffffff : fallbackRacerColor(index),
-      roughness: 0.3, metalness: 0.2,
     });
 
     // T3: core rolls, caps stay level. The two cap meshes share one material, and their geometry
@@ -1929,7 +1930,7 @@ export class Renderer3D {
 
     const shadow = new THREE.Mesh(shared.shadowGeo, shared.shadowMat);
     shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = -RADIUS + 2;
+    shadow.position.y = -BALL_DRAW_RADIUS + 2;
     group.add(shadow);
 
     const shield = new THREE.Mesh(shared.shieldGeo, shared.shieldMat);

@@ -16,6 +16,7 @@
  * two ball radii) so the candidate sets are identical and physics cannot drift between the
  * race and a qualifying attempt.
  */
+import { dpow } from './det-math';
 import { RADIUS, courseSlope, courseY, occupiesLane, rampSurface, type Obstacle } from '../scene';
 import type { CourseId } from '../types';
 import type { AirPickup } from '../powerups';
@@ -134,7 +135,7 @@ export function createSimWorld(
       for (const obstacle of obstacleBuckets.get(Math.floor(x / SPATIAL_BUCKET)) ?? NO_OBSTACLES) {
         if (obstacle.kind === 'ramp' && x >= obstacle.x && x <= obstacle.x + obstacle.width && occupiesLane(obstacle, z, 5)) {
           y = rampSurface(obstacle, x, activeCourse);
-          slope -= 1.6 * obstacle.height / obstacle.width * Math.pow((x - obstacle.x) / obstacle.width, 0.6);
+          slope -= 1.6 * obstacle.height / obstacle.width * dpow((x - obstacle.x) / obstacle.width, 0.6);
           ramp = obstacle;
         }
       }

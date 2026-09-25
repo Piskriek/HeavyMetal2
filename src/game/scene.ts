@@ -222,28 +222,6 @@ import type { EffectEvent } from './effects/events';
 // Type-only, so the runtime cycle `lane-network → scene` stays a one-way street: erased at build time.
 import type { LaneNetwork } from './lane-network';
 
-export interface Particle {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  size: number;
-  color: string;
-}
-
-export interface AirSheep {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  rotation: number;
-  life: number;
-}
-
 export interface LoopRide {
   obstacle: Obstacle;
   angle: number;
@@ -299,9 +277,6 @@ export interface SceneFrame {
   loopRide: LoopRide | null;
   obstacles: Obstacle[];
   pickups: AirPickup[];
-  particles: Particle[];
-  sheep: AirSheep[];
-  trail: { x: number; y: number; z: number }[];
   snapshot: GameSnapshot;
   options: GameOptions;
   reducedMotion: boolean;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, RotateCcw, Keyboard } from 'lucide-react';
 import {
   ACTIONS,
+  GAMEPAD_LABELS,
   formatKey,
   getConflictCodes,
   getConflicts,
@@ -232,6 +233,7 @@ export default function ControlsSettings({ onBindingsChange }: ControlsSettingsP
         <span><kbd>F</kbd> Fullscreen</span>
         <span><kbd>V</kbd> Camera: cockpit / chase</span>
         <span><kbd>[</kbd> <kbd>]</kbd> Slow motion down / up</span>
+        <span className="controls-gamepad">Gamepad: {GAMEPAD_LABELS.steerLeft.split(' / ')[0]} or d-pad changes lanes · {GAMEPAD_LABELS.bounce} bounces · {GAMEPAD_LABELS.boost} boosts · {GAMEPAD_LABELS.pause} pauses</span>
       </div>
 
       <div className="fantasy-dialog-actions controls-actions">
@@ -315,6 +317,7 @@ export default function ControlsSettings({ onBindingsChange }: ControlsSettingsP
         .key-pill.is-empty { border-style: dashed; opacity: .85; }
         .key-pill-label { white-space: nowrap; }
         .controls-fixed-keys { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; padding: 10px 12px; border: 1px solid #2e3827; border-radius: 6px; background: #0f1814; font-size: 11px; color: #9aa68d; }
+        .controls-fixed-keys .controls-gamepad { flex-basis: 100%; }
         .controls-fixed-keys strong { flex-basis: 100%; color: #f0a15b; font-size: 9px; letter-spacing: .6px; }
         .key-pill-icon { opacity: .55; }
         .key-pill.is-capturing .key-pill-icon { opacity: 1; }

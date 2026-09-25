@@ -50,6 +50,7 @@ import { resolvePickups as resolvePickupsSim } from './sim/pickups';
 import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
 import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
 import { EffectQueue } from './effects/events';
+import { GamepadController } from './input/gamepad';
 
 const STEP = FIXED_STEP;
 
@@ -140,6 +141,12 @@ export class GameEngine {
   private snapshot: GameSnapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
   private lastSnapshot: GameSnapshot | null = null;
   private standingsKey = '';
+
+  /** H10: the connected gamepad, polled once per frame; its commands go through `dispatch`. */
+  private readonly gamepad = new GamepadController((name) => {
+    this.say(`CONTROLLER READY: ${name.replace(/\s*\(.*$/, '').slice(0, 28).toUpperCase() || 'GAMEPAD'}`);
+    this.notify(); this.invalidate();
+  });
 
   /** M01 · T5 — typed effect events for the render runtime. Written by the sim and by the engine. */
   private readonly effects = new EffectQueue();
@@ -559,7 +566,12 @@ export class GameEngine {
 
   private performBounce(racer: Racer) { performBounceSim(racer, this.simCtx); }
 
-  boost = () => { if (this.status === 'flying') this.performBoost(this.player); };
+  boost = () => {
+    if (this.status !== 'flying') return;
+    const before = this.player.boosts;
+    this.performBoost(this.player);
+    if (this.player.boosts < before && !this.reducedMotion) this.gamepad.rumble('boost');
+  };
 
   private performBoost(racer: Racer) { performBoostSim(racer, this.simCtx); }
 
@@ -950,6 +962,12 @@ export class GameEngine {
   private frame = (now: number) => {
     this.frameId = 0;
     if (this.destroyed || !this.visible || document.hidden) return;
+    // H10: the pad speaks the keyboard's commands. In the first-loop pool, bounce means "ready".
+    if (this.inputEnabled) {
+      for (const command of this.gamepad.poll()) {
+        this.dispatch(this.inMerge && command.type === 'bounce' ? { type: 'ready' } : command);
+      }
+    }
     const realDt = Math.min(this.lastFrame ? (now - this.lastFrame) / 1000 : 1 / 60, 0.1);
     this.lastFrame = now;
     // Everything the race does (physics, particles, the notice timer, shake decay) runs on game time,
@@ -1028,7 +1046,9 @@ export class GameEngine {
     // While the pool holds the field the overlay is DOM, but the riders are still moving behind it,
     // so the loop keeps its own frames coming rather than waiting for a redraw request.
     const poolActive = this.status === 'checkpoint' || this.status === 'countdown';
-    if (this.needsRender || poolActive || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
+    // H10: with a pad connected the loop keeps polling it, so Start can resume a paused race.
+    const padListening = this.gamepad.connected && this.inputEnabled && this.status !== 'finished';
+    if (this.needsRender || poolActive || padListening || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
   };
 
   private stepRace(dt: number) {
@@ -1146,6 +1166,8 @@ export class GameEngine {
         }
       }
       if (!a.id || !b.id) {
+        // H10: the pad thuds with the hit, harder the faster the two closed (off with reduced motion).
+        if (!this.reducedMotion) this.gamepad.rumble('bump', closing / 380);
         if ((!a.id && shieldA) || (!b.id && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
         else if ((!a.id && shieldB) || (!b.id && shieldA)) {
           this.audio.play('shield'); this.shake = 2;
@@ -1248,7 +1270,7 @@ export class GameEngine {
     this.lastNotify = now; this.lastSnapshot = { ...this.snapshot }; this.onUpdate({ ...this.snapshot }); this.invalidate();
   }
   destroy() {
-    this.destroyed = true; cancelAnimationFrame(this.frameId);
+    this.destroyed = true; cancelAnimationFrame(this.frameId); this.gamepad.destroy();
     document.removeEventListener('visibilitychange', this.visibilityChanged);
     this.renderer.destroy(); this.audio.destroy(); this.pickupCandidates.clear();
   }

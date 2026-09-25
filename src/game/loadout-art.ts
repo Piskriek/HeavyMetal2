@@ -60,14 +60,43 @@ function bakeRaceBall(loadout: Loadout, rimColor: string): Promise<HTMLCanvasEle
     canvas.width = canvas.height = size;
     const paint = canvas.getContext('2d');
     if (!paint) throw new Error('Canvas is unavailable.');
+
+    // 1. Base metal hull fill: Prevents transparent corners from sampling as pitch black on the sphere.
+    const baseMetal = loadout.capsule === 'springsteel' ? '#334446' : loadout.capsule === 'siege' ? '#383a42' : '#3d3730';
+    paint.fillStyle = baseMetal;
+    paint.fillRect(0, 0, size, size);
+
+    // 2. Continuous circumferential team racing bands (rolls visibly across the track):
+    const bandY = size * 0.42;
+    const bandHeight = size * 0.16;
+    paint.fillStyle = rimColor;
+    paint.fillRect(0, bandY, size, bandHeight);
+    paint.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    paint.fillRect(0, bandY - 2, size, 2);
+    paint.fillRect(0, bandY + bandHeight, size, 2);
+
+    // 3. Draw the painted ball artwork centered
     paint.drawImage(ball, 0, 0, size, size);
-    // Team colour stays readable without recolouring the painted metalwork. The hull is
-    // normalised to 452 of the 512 canvas, so a 0.455 radius ring hugs the painted ball.
+
+    // 4. Team colour ring hugging the painted ball
     paint.strokeStyle = rimColor;
-    paint.lineWidth = Math.max(3, size * 0.026);
+    paint.lineWidth = Math.max(5, size * 0.04);
     paint.beginPath();
-    paint.arc(size / 2, size / 2, size * 0.455, 0.16 * Math.PI, 1.84 * Math.PI);
+    paint.arc(size / 2, size / 2, size * 0.455, 0, 2 * Math.PI);
     paint.stroke();
+
+    // 5. Stylized brass rivets for authentic steampunk detail
+    const rivetCount = 12;
+    paint.fillStyle = '#e8c060';
+    for (let i = 0; i < rivetCount; i++) {
+      const angle = (i / rivetCount) * Math.PI * 2;
+      const rx = size / 2 + Math.cos(angle) * (size * 0.42);
+      const ry = size / 2 + Math.sin(angle) * (size * 0.42);
+      paint.beginPath();
+      paint.arc(rx, ry, 2.5, 0, Math.PI * 2);
+      paint.fill();
+    }
+
     return canvas;
   })();
   raceBallCells.set(cellKey, promise);

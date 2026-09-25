@@ -11,7 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_HALF_WIDTH, LANE_NETWORK_VERSION, LANE_Z_LIMIT, LEGACY_CORRIDOR,
+  DEFAULT_HALF_WIDTH, LANE_BAKE_STEP, LANE_NETWORK_VERSION, LANE_Z_LIMIT, LEGACY_CORRIDOR,
   adjacentPath, corridorAt, createDefaultLaneNetwork, inferKind, nearestPath, oobCrossed, resolveLaneTarget, sampleLane,
   sampleLaneNetwork, successorPath, validateLaneNetwork,
   type LaneNetwork, type LaneRefusal,
@@ -401,5 +401,57 @@ test('createDefaultLaneNetwork builds a 4-lane network with ~10m (600 unit) node
       assert.equal(a.z, b.z, 'nodes stay centered in their authored lane');
       assert.equal(a.kind, 'normal');
     }
+  }
+});
+
+// H2b: the baked lookup gives exactly the binary search's answer, and follows nodes edited in place.
+function searchedSample(network: LaneNetwork, pathId: string, x: number): { z: number; halfWidth: number } | null {
+  const path = network.paths.find((p) => p.id === pathId);
+  if (!path) return null;
+  const byId = new Map(network.nodes.map((n) => [n.id, n] as const));
+  const nodes = path.nodeIds.map((id) => byId.get(id)!);
+  const first = nodes[0]; const last = nodes[nodes.length - 1];
+  if (!first || x < first.x || x > last.x) return null;
+  let lo = 0; let hi = nodes.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (nodes[mid].x <= x) lo = mid; else hi = mid; }
+  const a = nodes[lo]; const b = nodes[Math.min(lo + 1, nodes.length - 1)];
+  if (x >= a.x && x <= b.x) { const span = b.x - a.x; const t = span === 0 ? 0 : (x - a.x) / span; return { z: a.z + (b.z - a.z) * t, halfWidth: path.halfWidth }; }
+  return { z: last.z, halfWidth: path.halfWidth };
+}
+
+test('H2b: baked lane lookup matches the binary search exactly, on every path', () => {
+  for (const network of [createDefaultLaneNetwork('ridge'), createDefaultLaneNetwork('boomtown', 170), sampleLaneNetwork('ridge')]) {
+    const xs = network.nodes.map((n) => n.x);
+    const lo = Math.min(...xs) - 100; const hi = Math.max(...xs) + 100;
+    for (const path of network.paths) {
+      for (let x = lo; x <= hi; x += 23.7) {
+        assert.deepEqual(sampleLane(network, path.id, x), searchedSample(network, path.id, x), `${path.id} at x ${x}`);
+      }
+      // Every node x and the bake boundaries either side of it.
+      for (const id of path.nodeIds) {
+        const nx = network.nodes.find((n) => n.id === id)!.x;
+        for (const x of [nx - LANE_BAKE_STEP, nx - 1e-9, nx, nx + 1e-9, nx + LANE_BAKE_STEP]) {
+          assert.deepEqual(sampleLane(network, path.id, x), searchedSample(network, path.id, x));
+        }
+      }
+    }
+  }
+});
+
+test('H2b: a node dragged in place is sampled live, past the baked boundaries', () => {
+  const network = createDefaultLaneNetwork('ridge');
+  const path = network.paths[0];
+  sampleLane(network, path.id, 1000); // bake
+  const node = network.nodes.find((n) => n.id === path.nodeIds[3])!;
+  const prev = network.nodes.find((n) => n.id === path.nodeIds[2])!;
+  const next = network.nodes.find((n) => n.id === path.nodeIds[4])!;
+  for (const dx of [-0.6, -0.3, 0.3, 0.6]) {
+    node.x = dx < 0 ? node.x + (node.x - prev.x) * dx : node.x + (next.x - node.x) * dx;
+    node.z += 17;
+    for (let x = prev.x; x <= next.x; x += 11.1) {
+      assert.deepEqual(sampleLane(network, path.id, x), searchedSample(network, path.id, x), `dx ${dx} x ${x}`);
+    }
+    const corridor = corridorAt(network, node.x);
+    assert.ok(corridor && corridor.zMax >= Math.min(LANE_Z_LIMIT, node.z + path.halfWidth) - 1e-9);
   }
 });

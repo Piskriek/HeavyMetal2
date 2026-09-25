@@ -262,9 +262,38 @@ const pathById = (network: LaneNetwork, pathId: string): LanePath | null =>
  * default network ~15× slower per step. The cache holds the node *objects* (so a node edited in place
  * still reads its live x/z) and is rebuilt whenever the network's nodes or paths arrays change.
  */
-interface ResolvedPath { readonly path: LanePath; readonly nodes: readonly LaneNode[] | null }
+interface ResolvedPath {
+  readonly path: LanePath;
+  readonly nodes: readonly LaneNode[] | null;
+  /**
+   * H2b — the baked lookup: `segments[i]` is the segment (the index of its first node) holding
+   * `x0 + i * LANE_BAKE_STEP`, so `sampleLane` finds its segment in O(1) instead of a binary search.
+   * The table stores indices, not z values: the z (and x) are still read from the live nodes, so a
+   * node dragged in place is sampled exactly. `null` for a path whose nodes are not strictly increasing.
+   */
+  readonly segments: Int32Array | null;
+  readonly x0: number;
+}
+
+/** H2b: the baked lookup samples each path every 50 engine units along x. */
+export const LANE_BAKE_STEP = 50;
+
+function bakeSegments(nodes: readonly LaneNode[]): Int32Array | null {
+  for (let k = 1; k < nodes.length; k++) if (!(nodes[k].x > nodes[k - 1].x)) return null;
+  const x0 = nodes[0].x;
+  const count = Math.floor((nodes[nodes.length - 1].x - x0) / LANE_BAKE_STEP) + 1;
+  const segments = new Int32Array(count);
+  const lastSegment = Math.max(0, nodes.length - 2);
+  let lo = 0;
+  for (let i = 0; i < count; i++) {
+    const x = x0 + i * LANE_BAKE_STEP;
+    while (lo < lastSegment && nodes[lo + 1].x <= x) lo++;
+    segments[i] = lo;
+  }
+  return segments;
+}
 const resolvedCache = new WeakMap<LaneNetwork, { nodes: LaneNode[]; paths: LanePath[]; byId: Map<string, ResolvedPath> }>();
-function resolvedPath(network: LaneNetwork, pathId: string): ResolvedPath | null {
+function resolvedPaths(network: LaneNetwork): Map<string, ResolvedPath> {
   let cache = resolvedCache.get(network);
   if (!cache || cache.nodes !== network.nodes || cache.paths !== network.paths) {
     const nodeById = new Map<string, LaneNode>();
@@ -273,38 +302,70 @@ function resolvedPath(network: LaneNetwork, pathId: string): ResolvedPath | null
     for (const path of network.paths) {
       if (byId.has(path.id)) continue;
       const nodes = path.nodeIds.map((id) => nodeById.get(id));
-      byId.set(path.id, { path, nodes: nodes.some((node) => node === undefined) ? null : nodes as LaneNode[] });
+      const resolved = nodes.some((node) => node === undefined) || nodes.length === 0 ? null : nodes as LaneNode[];
+      byId.set(path.id, {
+        path, nodes: resolved,
+        segments: resolved ? bakeSegments(resolved) : null,
+        x0: resolved ? resolved[0].x : 0,
+      });
     }
     cache = { nodes: network.nodes, paths: network.paths, byId };
     resolvedCache.set(network, cache);
   }
-  return cache.byId.get(pathId) ?? null;
+  return cache.byId;
 }
+const resolvedPath = (network: LaneNetwork, pathId: string): ResolvedPath | null =>
+  resolvedPaths(network).get(pathId) ?? null;
 
-/** The centre and half-width of a path at an x, or `null` when the path is not active there. */
-export function sampleLane(network: LaneNetwork, pathId: string, x: number): { z: number; halfWidth: number } | null {
-  const resolved = resolvedPath(network, pathId);
-  if (!resolved || !resolved.nodes) return null;
-  const { path, nodes } = resolved;
-  const first = nodes[0];
-  const last = nodes[nodes.length - 1];
-  if (!first || x < first.x || x > last.x) return null;
-  // Node x is strictly increasing along a valid path: binary search for the segment [a, b] holding x.
+/**
+ * The segment of `nodes` holding `x` (the index of its first node): the largest index whose node x
+ * is ≤ x, capped at the last segment. Node x is strictly increasing along a valid path.
+ */
+function searchSegment(nodes: readonly LaneNode[], x: number): number {
   let lo = 0; let hi = nodes.length - 1;
   while (hi - lo > 1) {
     const mid = (lo + hi) >> 1;
     if (nodes[mid].x <= x) lo = mid; else hi = mid;
+  }
+  return lo;
+}
+
+/** A resolved path's centre z at an x, or NaN when the path is not active there. Allocates nothing. */
+function centreZ(resolved: ResolvedPath, x: number): number {
+  const { nodes, segments } = resolved;
+  if (!nodes) return NaN;
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  if (!first || x < first.x || x > last.x) return NaN;
+  let lo: number;
+  const bucket = segments ? Math.floor((x - resolved.x0) / LANE_BAKE_STEP) : -1;
+  if (segments && bucket >= 0 && bucket < segments.length && nodes[segments[bucket]].x <= x) {
+    // O(1): the baked segment at the bucket's start, then (at most a node or two) forward to x.
+    lo = segments[bucket];
+    const lastSegment = nodes.length - 2;
+    while (lo < lastSegment && nodes[lo + 1].x <= x) lo++;
+  } else {
+    // No table, or a node was dragged in place past the baked boundary: search the live nodes.
+    lo = searchSegment(nodes, x);
   }
   const a = nodes[lo];
   const b = nodes[Math.min(lo + 1, nodes.length - 1)];
   if (x >= a.x && x <= b.x) {
     const span = b.x - a.x;
     const t = span === 0 ? 0 : (x - a.x) / span;
-    return { z: a.z + (b.z - a.z) * t, halfWidth: path.halfWidth };
+    return a.z + (b.z - a.z) * t;
   }
   // A path whose nodes are not strictly increasing would have failed validation; this is the
   // degenerate remainder.
-  return { z: last.z, halfWidth: path.halfWidth };
+  return last.z;
+}
+
+/** The centre and half-width of a path at an x, or `null` when the path is not active there. */
+export function sampleLane(network: LaneNetwork, pathId: string, x: number): { z: number; halfWidth: number } | null {
+  const resolved = resolvedPath(network, pathId);
+  if (!resolved) return null;
+  const z = centreZ(resolved, x);
+  return Number.isNaN(z) ? null : { z, halfWidth: resolved.path.halfWidth };
 }
 
 /**
@@ -317,11 +378,16 @@ export function sampleLane(network: LaneNetwork, pathId: string, x: number): { z
  */
 export function corridorAt(network: LaneNetwork, x: number): { zMin: number; zMax: number } | null {
   let zMin = Infinity; let zMax = -Infinity;
+  const byId = resolvedPaths(network);
   for (const path of network.paths) {
-    const sample = sampleLane(network, path.id, x);
-    if (!sample) continue;
-    zMin = Math.min(zMin, sample.z - sample.halfWidth);
-    zMax = Math.max(zMax, sample.z + sample.halfWidth);
+    // By id, as sampleLane does: a duplicated path id samples the first path that carries it.
+    const resolved = byId.get(path.id);
+    if (!resolved) continue;
+    const z = centreZ(resolved, x);
+    if (Number.isNaN(z)) continue;
+    const halfWidth = resolved.path.halfWidth;
+    zMin = Math.min(zMin, z - halfWidth);
+    zMax = Math.max(zMax, z + halfWidth);
   }
   if (zMin === Infinity) return null;
   return { zMin: Math.max(-LANE_Z_LIMIT, zMin), zMax: Math.min(LANE_Z_LIMIT, zMax) };

@@ -111,6 +111,12 @@ whole reason the builder can offer a "fix kinds" button.
 and returns `null` outside the path. `corridorAt(network, x)` unions every active path's
 `[z − halfWidth, z + halfWidth]`, clipped to `±LANE_Z_LIMIT`; `null` where no path is active.
 
+The bracketing segment is found in O(1) (H2b): each resolved path carries a table of segment indices
+sampled every `LANE_BAKE_STEP` (50) engine units, rebuilt whenever the network's `nodes` or `paths`
+arrays change. The table holds indices, not z values, so a node dragged in place is still sampled from
+its live x/z; a lookup the drag has made stale falls back to a binary search. The result is exactly the
+search's (tests/lane-network.test.ts).
+
 `resolveLaneTarget(racer, network)` is the one call the physics makes:
 
 * `network` null → `laneZ(targetLane)` and the legacy corridor (`LANE.near + RADIUS + 6` ..

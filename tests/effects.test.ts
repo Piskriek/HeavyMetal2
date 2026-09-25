@@ -435,11 +435,11 @@ test('render path stays cheap', () => {
   const space = getTrackSpace();
   const camera = new THREE.PerspectiveCamera(62, 1.6, 4, 60000);
   // Sit where the race starts, so the events below are inside the cull distance rather than behind it.
-  const home = placementFromEngine(space, { x: 900, y: 200, z: 0 }, []).world;
+  const home = placementFromEngine(space, { x: 900, y: 200, z: 0, course: 'ridge' }, []).world;
   camera.position.set(home.x, home.y, home.z);
   camera.updateMatrixWorld();
   const queue = new EffectQueue(EFFECT_QUEUE);
-  const input = { queue, space, ramps: [], time: 0, dt: 1 / 120 };
+  const input = { queue, space, ramps: [], course: 'ridge' as const, time: 0, dt: 1 / 120 };
 
   // A pile-up: every kind, as fast as the sim could possibly report it, for 3 000 frames.
   const kinds = EFFECT_KINDS;

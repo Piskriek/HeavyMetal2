@@ -42,7 +42,7 @@ test('every pickup is drawn, at the exact point the collection solve tests again
   const { view } = makeView();
   const list = pickups();
   assert.ok(list.length > 10, `the ridge course has a field of pickups (${list.length})`);
-  view.update(list, 3.25, false, 40);
+  view.update(list, 3.25, false, 40, [], 'ridge');
 
   assert.equal(view.poolSize, list.length, 'one sprite per pickup');
   assert.equal(view.stats.visible, list.length, 'and all of them are visible');
@@ -57,7 +57,7 @@ test('every pickup is drawn, at the exact point the collection solve tests again
     const pickup = list[index];
     const sprite = view.root.children[index] as THREE.Sprite;
     const y = pickupY(pickup, 3.25, false);
-    const placement = placementFromEngine(getTrackSpace(), { x: pickup.x, z: pickup.z, y });
+    const placement = placementFromEngine(getTrackSpace(), { x: pickup.x, z: pickup.z, y, course: 'ridge' });
     assert.equal(sprite.position.x, placement.world.x, `pickup ${pickup.id} x`);
     assert.equal(sprite.position.y, placement.world.y, `pickup ${pickup.id} y`);
     assert.equal(sprite.position.z, placement.world.z, `pickup ${pickup.id} z`);
@@ -69,16 +69,16 @@ test('every pickup is drawn, at the exact point the collection solve tests again
 test('the bob is the solve\'s own bob, and reduced motion stills it', () => {
   const { view } = makeView();
   const list = pickups().slice(0, 4);
-  view.update(list, 0, false, 10);
+  view.update(list, 0, false, 10, [], 'ridge');
   const moving = list.map((_, index) => (view.root.children[index] as THREE.Sprite).position.y);
 
-  view.update(list, 0.9, false, 10);
+  view.update(list, 0.9, false, 10, [], 'ridge');
   const later = list.map((_, index) => (view.root.children[index] as THREE.Sprite).position.y);
   assert.ok(moving.some((y, index) => Math.abs(y - later[index]) > 1e-6), 'the field floats');
 
-  view.update(list, 0.9, true, 10);
+  view.update(list, 0.9, true, 10, [], 'ridge');
   const still = list.map((_, index) => (view.root.children[index] as THREE.Sprite).position.y);
-  view.update(list, 1.8, true, 10);
+  view.update(list, 1.8, true, 10, [], 'ridge');
   const stillLater = list.map((_, index) => (view.root.children[index] as THREE.Sprite).position.y);
   assert.deepEqual(still, stillLater, 'reduced motion: no bob at all');
 });
@@ -89,31 +89,31 @@ test('a collected pickup is not drawn, and comes back when its window has passed
   list[1].collectedBy = 0;
   list[1].collectedAt = 20;
 
-  view.update(list, 0, false, 21);
+  view.update(list, 0, false, 21, [], 'ridge');
   assert.equal(view.stats.visible, 2, 'the taken one is not drawn');
   assert.equal(view.stats.hidden, 1);
   assert.equal((view.root.children[1] as THREE.Sprite).visible, false);
 
-  view.update(list, 0, false, 20 + PICKUP_HIDDEN_SECONDS - 0.01);
+  view.update(list, 0, false, 20 + PICKUP_HIDDEN_SECONDS - 0.01, [], 'ridge');
   assert.equal((view.root.children[1] as THREE.Sprite).visible, false, 'still hidden inside the window');
 
-  view.update(list, 0, false, 20 + PICKUP_HIDDEN_SECONDS);
+  view.update(list, 0, false, 20 + PICKUP_HIDDEN_SECONDS, [], 'ridge');
   assert.equal((view.root.children[1] as THREE.Sprite).visible, true, 'and back once the window closes');
 });
 
 test('the pool is a pool: a shorter field reuses sprites and builds nothing', () => {
   const { view } = makeView();
   const list = pickups();
-  view.update(list, 0, false, 0);
+  view.update(list, 0, false, 0, [], 'ridge');
   const built = view.stats.spritesBuilt;
   assert.equal(built, list.length);
 
-  view.update(list.slice(0, 5), 0, false, 0);
+  view.update(list.slice(0, 5), 0, false, 0, [], 'ridge');
   assert.equal(view.stats.spritesBuilt, built, 'no new sprites for a shorter list');
   assert.equal(view.stats.visible, 5);
   assert.equal((view.root.children[built - 1] as THREE.Sprite).visible, false, 'the spares are hidden');
 
-  view.update(list, 0, false, 0);
+  view.update(list, 0, false, 0, [], 'ridge');
   assert.equal(view.stats.spritesBuilt, built, 'and the full field again costs nothing');
   assert.equal(view.stats.visible, list.length);
 
@@ -127,7 +127,7 @@ test('a kind with no art is skipped rather than drawn wrong', () => {
   const scene = new THREE.Scene();
   const view = new PickupView(scene, { fuel: fakeCanvas() }, getTrackSpace());
   const list = pickups();
-  view.update(list, 0, false, 0);
+  view.update(list, 0, false, 0, [], 'ridge');
   const fuel = list.filter((pickup) => pickup.kind === 'fuel').length;
   assert.equal(view.stats.visible, fuel, 'only the kind we have art for');
   assert.equal(view.stats.materialsCreated, 1);
@@ -137,7 +137,7 @@ test('dispose leaves the scene as it found it, textures and all', () => {
   const scene = new THREE.Scene();
   const before = scene.children.length;
   const view = new PickupView(scene, ART, getTrackSpace());
-  view.update(pickups(), 0, false, 0);
+  view.update(pickups(), 0, false, 0, [], 'ridge');
   view.dispose();
   assert.equal(scene.children.length, before, 'the scene is exactly as it was');
   assert.equal(view.poolSize, 0);

@@ -273,7 +273,7 @@ export function classify(rel) {
   if (/\/art\/props\/prop-/.test(r) && !r.includes('/props/alpha/')) return 'source';
   if (/\/art\/goblins\/goblin-/.test(r) && !r.includes('/goblins/alpha/')) return 'source';
   if (/\/art\/animated\/anim-/.test(r) && !r.includes('/animated/alpha/')) return 'source';
-  if (r.includes('/art/animated/animated-contact-sheet.png')) return 'source';
+  if (r.includes('animated-contact-sheet.png')) return 'source';
   return 'runtime';
 }
 

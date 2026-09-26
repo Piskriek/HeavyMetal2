@@ -398,6 +398,15 @@
   opacity: 1;
 }
 
+/* Painted shelf art stays in its authored colours; browsers downscale the 256 px sources. */
+.builder-shelf-icon {
+  width: 56px;
+  height: 56px;
+  max-width: 100%;
+  max-height: 100%;
+  image-rendering: auto;
+}
+
 /* DCC Shelf Custom Heavy Grab Scrollbar */
 .builder-shelf-scroll {
   scrollbar-width: auto;

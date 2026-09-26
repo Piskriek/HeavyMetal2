@@ -34,6 +34,12 @@ function arcPath(center: number, radius: number, startDeg: number, endDeg: numbe
 }
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+/** The painted arc needle uses the same 270° sweep as the original gauge. */
+export function arcGaugeNeedleAngle(value: number, max = 10): number {
+  const fraction = clamp(value / max, 0, 1);
+  return 135 + fraction * 270;
+}
+
 /** Shared molten fill shared by every gauge variant. */
 function MoltenGradient({ id }: { id: string }) {
   return (
@@ -64,34 +70,31 @@ function FaceGradient({ id }: { id: string }) {
   );
 }
 
-function ArcGauge({ value, max, label, title, size = 106, gradientIds }: BlizzardGaugeProps & { gradientIds: { molten: string; metal: string; face: string } }) {
-  const fraction = clamp(value / (max ?? 10), 0, 1);
-  const needleDeg = 135 + fraction * 270;
-  const center = 60;
-  const ticks = Array.from({ length: 11 }, (_, index) => {
-    const angle = 135 + (index / 10) * 270;
-    const outer = point(center, 55, angle);
-    const inner = point(center, index % 5 === 0 ? 48.5 : 51.5, angle);
-    return <line key={index} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} className={`gauge-tick ${index <= fraction * 10 ? 'lit' : ''}`} />;
-  });
+function ArcGauge({ value, max = 10, label, title, size = 106 }: BlizzardGaugeProps) {
+  const needleDeg = arcGaugeNeedleAngle(value, max);
   return (
-    <figure className="blizzard-gauge" title={title}>
-      <svg viewBox="0 0 120 120" width={size} height={size} role="meter" aria-valuemin={0} aria-valuemax={max ?? 10} aria-valuenow={value} aria-label={label ?? title}>
-        <circle cx={center} cy={center} r={57} className="gauge-bezel" />
-        <circle cx={center} cy={center} r={53.5} fill={`url(#${gradientIds.face})`} className="gauge-face" />
-        {ticks}
-        <path d={arcPath(center, 43, 135, 405)} className="gauge-track" />
-        <path d={arcPath(center, 43, 135, 405)} pathLength={100} className="gauge-value-arc" stroke={`url(#${gradientIds.molten})`} style={{ strokeDasharray: 100, strokeDashoffset: 100 - fraction * 100 }} />
-        <g className="gauge-needle" style={{ transform: `rotate(${needleDeg}deg)` }}>
-          <line x1={center} y1={center + 9} x2={center} y2={24} stroke={`url(#${gradientIds.metal})`} strokeWidth={3.4} strokeLinecap="round" />
-          <line x1={center} y1={center + 9} x2={center} y2={24} className="gauge-needle-glint" />
-        </g>
-        <circle cx={center} cy={center} r={7.5} className="gauge-cap" />
-        <circle cx={center} cy={center} r={3.4} fill={`url(#${gradientIds.metal})`} />
-        <text x={center} y={96} textAnchor="middle" className="gauge-value-text">
-          {value}<tspan className="gauge-value-max"> / {max ?? 10}</tspan>
-        </text>
-      </svg>
+    <figure className="blizzard-gauge blizzard-arc-painted" title={title}>
+      <div
+        className="painted-arc-gauge"
+        style={{ width: size, height: size }}
+        role="meter"
+        aria-valuemin={0}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        aria-label={label ?? title}
+      >
+        <img className="painted-arc-face" src="/art/ui/icons/ui-gauge-arc-face.png" alt="" draggable={false} />
+        <img
+          className="painted-arc-needle"
+          src="/art/ui/icons/ui-gauge-needle.png"
+          alt=""
+          draggable={false}
+          style={{ transform: `translate(-50%, -100%) rotate(${needleDeg}deg)` }}
+        />
+        <span className="painted-arc-readout" aria-hidden="true">
+          {value}<small> / {max}</small>
+        </span>
+      </div>
       {label && <figcaption className="gauge-caption">{label}</figcaption>}
     </figure>
   );
@@ -158,9 +161,10 @@ export default function BlizzardGauge(props: BlizzardGaugeProps) {
   const id = raw.replace(/[^a-zA-Z0-9_-]/g, '');
   const gradientIds = { molten: `molten-${id}`, metal: `metal-${id}`, face: `face-${id}` };
   if (props.variant === 'meter') return <MeterBar {...props} />;
+  if (props.variant !== 'dial') return <ArcGauge {...props} />;
   return (
     <>
-      {/* Gradient defs are emitted once per gauge; ids are stable per component instance. */}
+      {/* Gradient defs are emitted once per dial; ids are stable per component instance. */}
       <svg width="0" height="0" className="gauge-defs" aria-hidden="true" focusable="false">
         <defs>
           <MoltenGradient id={gradientIds.molten} />
@@ -168,7 +172,7 @@ export default function BlizzardGauge(props: BlizzardGaugeProps) {
           <FaceGradient id={gradientIds.face} />
         </defs>
       </svg>
-      {props.variant === 'dial' ? <DialGauge {...props} gradientIds={gradientIds} /> : <ArcGauge {...props} gradientIds={gradientIds} />}
+      <DialGauge {...props} gradientIds={gradientIds} />
     </>
   );
 }

@@ -113,8 +113,13 @@ export default function CustomModelsTab({
         onClick={() => fileInputRef.current?.click()}
         className="border-2 border-dashed border-amber-500/40 hover:border-amber-400 bg-amber-950/20 hover:bg-amber-900/30 rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-all text-center gap-1.5"
       >
-        <Upload size={20} className="text-amber-400" />
-        <span className="text-xs font-bold text-amber-200">DROP .OBJ / .GLTF HERE</span>
+        <img
+          src="/art/ui/icons/custom-model.png"
+          alt="Custom 3D model"
+          className="builder-shelf-icon object-contain drop-shadow"
+          draggable={false}
+        />
+        <span className="flex items-center gap-1.5 text-xs font-bold text-amber-200"><Upload size={14} />DROP .OBJ / .GLTF HERE</span>
         <span className="text-[10px] text-zinc-400">or click to browse files</span>
         <input
           ref={fileInputRef}

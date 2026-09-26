@@ -54,6 +54,13 @@ interface TrackBuilderUIProps {
   onCourseChange?: (course: CourseId) => void;
 }
 
+const BUILDER_PAINTED_ICONS = [
+  ...PROP_DEFINITIONS
+    .filter((def) => def.category === 'primitives' || def.category === 'lights')
+    .map((def) => def.url),
+  '/art/ui/icons/custom-model.png',
+];
+
 const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] = [
   { id: 'foliage', label: 'Foliage & Nature', icon: <TreePine size={16} /> },
   { id: 'trackside', label: 'Trackside & Stunts', icon: <Compass size={16} /> },
@@ -171,6 +178,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     setTimeout(() => setToast(null), stickyMs);
   };
   const shownPlacementErrorRef = useRef<string | null>(null);
+
+  // Warm the painted shelf art as soon as the builder opens, before the player changes tabs.
+  useEffect(() => {
+    for (const src of BUILDER_PAINTED_ICONS) {
+      const image = new Image();
+      image.src = src;
+    }
+  }, []);
 
   // Sync builder changes
   useEffect(() => {
@@ -3598,7 +3613,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         <img
                           src={p.url}
                           alt={p.name}
-                          className="max-w-full max-h-full object-contain filter drop-shadow group-hover:scale-105 transition-transform"
+                          className="builder-shelf-icon object-contain drop-shadow group-hover:scale-105 transition-transform"
                           draggable={false}
                         />
                       </div>

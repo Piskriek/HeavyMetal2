@@ -34,22 +34,21 @@ export interface LightSettings {
 export const LIGHT_PREFIX = 'light_';
 export const isLightType = (type: string) => type.startsWith(LIGHT_PREFIX);
 
-const svg = (color: string, body: string) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#f0b85e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="28" r="12" fill="${color}" fill-opacity="0.35" stroke="${color}"/>${body}</svg>`)}`;
-const RAYS = '<path d="M32 6v5M32 45v5M10 28h5M49 28h5M16.4 12.4l3.5 3.5M44.1 40.1l3.5 3.5M16.4 43.6l3.5-3.5M44.1 15.9l3.5-3.5"/>';
+const ICON_ROOT = '/art/ui/icons/builder-light-';
 
 interface Preset { type: string; name: string; settings: LightSettings; icon: string }
 const PRESETS: readonly Preset[] = [
-  { type: `${LIGHT_PREFIX}lantern`, name: 'Lantern glow', icon: svg('#ffb35c', RAYS),
+  { type: `${LIGHT_PREFIX}lantern`, name: 'Lantern glow', icon: `${ICON_ROOT}lantern.png`,
     settings: { kind: 'point', color: '#ffb35c', brightness: 4, reach: 1800, angle: 35, softness: 0.4, flicker: 0.12 } },
-  { type: `${LIGHT_PREFIX}torch`, name: 'Torch fire', icon: svg('#ff7a2a', `${RAYS}<path d="M32 50v8"/>`),
+  { type: `${LIGHT_PREFIX}torch`, name: 'Torch fire', icon: `${ICON_ROOT}torch.png`,
     settings: { kind: 'point', color: '#ff8a3a', brightness: 5, reach: 1500, angle: 35, softness: 0.4, flicker: 0.45 } },
-  { type: `${LIGHT_PREFIX}crystal`, name: 'Crystal glow', icon: svg('#6fe3ff', '<path d="M32 12l6 10-6 12-6-12z"/>'),
+  { type: `${LIGHT_PREFIX}crystal`, name: 'Crystal glow', icon: `${ICON_ROOT}crystal.png`,
     settings: { kind: 'point', color: '#6fe3ff', brightness: 3.5, reach: 1600, angle: 35, softness: 0.4, flicker: 0 } },
-  { type: `${LIGHT_PREFIX}lava`, name: 'Lava glow', icon: svg('#ff4d1a', '<path d="M14 50c6-4 10 4 18 0s12 4 18 0"/>'),
+  { type: `${LIGHT_PREFIX}lava`, name: 'Lava glow', icon: `${ICON_ROOT}lava.png`,
     settings: { kind: 'point', color: '#ff5a1a', brightness: 6, reach: 2600, angle: 35, softness: 0.4, flicker: 0.2 } },
-  { type: `${LIGHT_PREFIX}worklamp`, name: 'Work lamp (spot)', icon: svg('#fff1d6', '<path d="M24 38 14 58h36L40 38"/>'),
+  { type: `${LIGHT_PREFIX}worklamp`, name: 'Work lamp (spot)', icon: `${ICON_ROOT}worklamp.png`,
     settings: { kind: 'spot', color: '#fff1d6', brightness: 7, reach: 3200, angle: 32, softness: 0.45, flicker: 0 } },
-  { type: `${LIGHT_PREFIX}bulb`, name: 'Plain light', icon: svg('#ffffff', RAYS),
+  { type: `${LIGHT_PREFIX}bulb`, name: 'Plain light', icon: `${ICON_ROOT}bulb.png`,
     settings: { kind: 'point', color: '#ffffff', brightness: 3, reach: 2000, angle: 35, softness: 0.4, flicker: 0 } },
 ];
 

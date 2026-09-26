@@ -17,7 +17,10 @@ import type { EffectKind } from './events';
 
 export interface EffectSpec {
   /** Which painted sheet plays, or `points` for the spark particles. */
-  readonly sheet: 'anim-43' | 'anim-44' | 'anim-45' | 'anim-49' | 'points';
+  readonly sheet:
+    | 'anim-43' | 'anim-44' | 'anim-45' | 'anim-49'
+    | 'anim-54' | 'anim-55' | 'anim-56' | 'anim-57' | 'anim-58' | 'anim-59' | 'anim-60'
+    | 'points';
   /** Frames in the sheet (2x2 for every painted effect). */
   readonly frames: number;
   /** Frames per second. */
@@ -62,6 +65,41 @@ export const EFFECT_SPECS: Readonly<Record<EffectKind, EffectSpec>> = Object.fre
     sheet: 'points' as const, frames: 1, fps: 0, size: 26, life: 0.45, count: 0, rise: 0, growth: 1,
     particles: 160, tint: 0xffd070, opacity: 1,
   }),
+  // A nitro burst out of the back of the ball.
+  boost: Object.freeze({
+    sheet: 'anim-54' as const, frames: 4, fps: 14, size: 300, life: 0.42, count: 1, rise: 0, growth: 1.3,
+    particles: 0, tint: 0xffa04a, opacity: 1,
+  }),
+  // The pad itself lighting up under the ball.
+  'boost-pad': Object.freeze({
+    sheet: 'anim-55' as const, frames: 4, fps: 14, size: 420, life: 0.36, count: 1, rise: 0, growth: 1.2,
+    particles: 0, tint: 0xffc06a, opacity: 0.95,
+  }),
+  // A supply taken: tinted by the supply's own colour (the event carries the tint).
+  pickup: Object.freeze({
+    sheet: 'anim-56' as const, frames: 4, fps: 14, size: 280, life: 0.38, count: 1, rise: 30, growth: 1.35,
+    particles: 0, tint: 0xffffff, opacity: 1,
+  }),
+  // A shield eating a shove and going.
+  'shield-break': Object.freeze({
+    sheet: 'anim-57' as const, frames: 4, fps: 14, size: 340, life: 0.4, count: 1, rise: 0, growth: 1.3,
+    particles: 0, tint: 0x8cceff, opacity: 1,
+  }),
+  // A spring throwing the ball into the air.
+  spring: Object.freeze({
+    sheet: 'anim-58' as const, frames: 4, fps: 12, size: 260, life: 0.45, count: 1, rise: 48, growth: 1.4,
+    particles: 0, tint: 0xa7e2ba, opacity: 0.95,
+  }),
+  // A hard landing: a ring of shock across the road.
+  landing: Object.freeze({
+    sheet: 'anim-59' as const, frames: 4, fps: 14, size: 380, life: 0.34, count: 1, rise: 0, growth: 1.6,
+    particles: 0, tint: 0xd8c79a, opacity: 0.9,
+  }),
+  // Knocked into the tree line.
+  'tree-smash': Object.freeze({
+    sheet: 'anim-60' as const, frames: 4, fps: 14, size: 320, life: 0.44, count: 1, rise: 12, growth: 1.25,
+    particles: 0, tint: 0x9bb26a, opacity: 1,
+  }),
 });
 
 /** World units: nothing beyond this from the camera is worth drawing. */
@@ -93,6 +131,8 @@ export interface BillboardSlot {
   growth: number;
   opacity: number;
   baseOpacity: number;
+  /** 0xRRGGBB the billboard is multiplied by (the spec's own colour unless the event tinted it). */
+  colour: number;
   /** 0..1 through its life, written by `update`. */
   age: number;
   frame: number;
@@ -125,7 +165,8 @@ export class BillboardPool {
     for (let i = 0; i < capacity; i++) {
       this.slots[i] = {
         active: false, kind: 'dust', sheet: 'anim-49', frames: 4, fps: 10, bornAt: 0, life: 1,
-        x: 0, y: 0, z: 0, upX: 0, upY: 1, upZ: 0, rise: 0, size: 100, growth: 1, opacity: 1, baseOpacity: 1, age: 0, frame: 0,
+        x: 0, y: 0, z: 0, upX: 0, upY: 1, upZ: 0, rise: 0, size: 100, growth: 1, opacity: 1, baseOpacity: 1,
+        colour: 0xffffff, age: 0, frame: 0,
       };
     }
     this.random = makeRandom(seed);
@@ -152,6 +193,7 @@ export class BillboardPool {
     kind: EffectKind, spec: EffectSpec, t: number,
     x: number, y: number, z: number, scale = 1,
     up: { x: number; y: number; z: number } = { x: 0, y: 1, z: 0 },
+    tint: number | null = null,
   ): number {
     if (spec.count <= 0) return 0;
     let spawned = 0;
@@ -176,6 +218,8 @@ export class BillboardPool {
       slot.growth = spec.growth;
       slot.opacity = spec.opacity;
       slot.baseOpacity = spec.opacity;
+      // A painted sheet keeps its own colours unless the event asked for a tint (a supply burst).
+      slot.colour = tint ?? (spec.sheet === 'points' ? spec.tint : 0xffffff);
       slot.age = 0;
       slot.frame = 0;
       spawned += 1;
@@ -187,7 +231,7 @@ export class BillboardPool {
 
   /**
    * Advances every live slot. A slot deactivates at exactly `bornAt + life`.
-   * Under reduced motion the sheet holds frame 1 at half opacity and dust/smoke do not grow.
+   * Under reduced motion the sheet holds frame 0 at half opacity and dust/smoke do not grow.
    */
   update(t: number, reducedMotion = false): void {
     for (const slot of this.slots) {
@@ -197,7 +241,7 @@ export class BillboardPool {
       if (!(elapsed < slot.life)) { slot.active = false; slot.age = 0; continue; }
       slot.age = elapsed / slot.life;
       if (reducedMotion) {
-        slot.frame = 1;
+        slot.frame = 0;
         slot.opacity = slot.kind === 'smoke' || slot.kind === 'dust' ? 0.3 : 0.5;
       } else {
         slot.frame = slot.fps > 0 ? Math.floor(elapsed * slot.fps) % Math.max(1, slot.frames) : 0;

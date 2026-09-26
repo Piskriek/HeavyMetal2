@@ -242,3 +242,30 @@ test('P10: each pickup gets a glint, a shaft and a ring on the road, in its own 
   view.dispose();
   assert.equal(scene.children.length, before - 2, 'dispose removes the sprites and the glow');
 });
+
+// The wiring wave: taking a supply is a painted burst in the supply's own colour, spawned from the
+// engine (which is the only place that knows *which* supply the player just took).
+test('taking a supply paints a burst wearing the supply colour', async () => {
+  const { POWERUPS } = await import('../src/game/powerups');
+  const { EFFECT_SPECS } = await import('../src/game/effects/pool');
+  const { EFFECT_SHEETS } = await import('../src/game/effects/renderer-fx');
+  const { EffectQueue } = await import('../src/game/effects/events');
+
+  assert.equal(EFFECT_SPECS.pickup.sheet, 'anim-56', 'the burst has its own painted sheet');
+  assert.ok(EFFECT_SHEETS['anim-56'], 'and the runtime loads it');
+
+  const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
+  assert.match(engine, /function powerupTint\(kind: PowerupKind\): number/,
+    'the engine turns the supply colour into a tint');
+  assert.match(engine, /push\(\s*'pickup',[\s\S]{0,200}powerupTint\(kind\)/,
+    'and the collected supply spawns the burst with it');
+
+  // Every supply colour is a real 0xRRGGBB, so no burst can come out black.
+  for (const kind of ['fuel', 'shield', 'bounce'] as const) {
+    const tint = Number.parseInt(POWERUPS[kind].color.slice(1), 16);
+    assert.ok(Number.isFinite(tint) && tint > 0, `${kind} has a painted colour`);
+    const queue = new EffectQueue(4);
+    queue.push('pickup', 0, 0, 0, 1, 0, 0, tint);
+    assert.equal(queue.drain()[0].tint, tint, `${kind}'s burst carries its colour`);
+  }
+});

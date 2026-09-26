@@ -22,6 +22,7 @@ import { TouchRaceControls } from '../components/RaceControls';
 import TrackStripMap from '../components/TrackStripMap';
 import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
+import { preloadTrackArt } from '../game/obstacle-view';
 import { ROPE_REEL_ART } from '../game/rope-reel-view';
 import MergePoolOverlay from '../components/MergePoolOverlay';
 import { loadArtImage, riderCell } from '../game/art-assets';
@@ -255,6 +256,8 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         Promise.all(COCKPIT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
         // M01 · T5: the effect sheets too — an explosion must not hitch on its first frame.
         Promise.all([...EFFECT_ART_PATHS, ROPE_REEL_ART.url].map((path) => loadArtImage(path).catch(() => null))),
+        // WIRE-2: the road textures, obstacle sprites and effect sheets the race draws with.
+        preloadTrackArt(),
       ]))
       .then(([loaded, raceBalls, pickupSprites, art, playerBadge]) => {
         if (!active) return;

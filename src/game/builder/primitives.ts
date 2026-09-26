@@ -11,20 +11,22 @@ export type PrimitiveShape = 'box' | 'sphere' | 'cylinder' | 'cone' | 'torus' | 
 
 interface ShapeInfo { shape: PrimitiveShape; name: string; size: [number, number, number]; icon: string }
 
-// Line icons in the builder's amber, as data URIs so the shelf's <img> needs no files.
-const svg = (body: string) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#f0b85e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">${body}</svg>`)}`;
+/** Painted shelf icons (WIRE-4): one 256 px sprite per shape, sitting on the zinc tiles at their
+ *  natural painted look. The shelf name and the file can differ (the ramp paints as a wedge, the
+ *  plane as a flat panel), so each entry names its file explicitly. */
+const icon = (file: string) => `/art/ui/icons/builder-prim-${file}.png`;
 
 const SHAPES: readonly ShapeInfo[] = [
-  { shape: 'box', name: 'Box', size: [400, 400, 400], icon: svg('<path d="M12 22 32 12l20 10v22L32 54 12 44z"/><path d="M12 22l20 10 20-10M32 32v22"/>') },
-  { shape: 'sphere', name: 'Sphere', size: [400, 400, 400], icon: svg('<circle cx="32" cy="32" r="20"/><ellipse cx="32" cy="32" rx="20" ry="7"/>') },
-  { shape: 'cylinder', name: 'Cylinder', size: [300, 500, 300], icon: svg('<ellipse cx="32" cy="16" rx="16" ry="6"/><path d="M16 16v32c0 3.3 7.2 6 16 6s16-2.7 16-6V16"/>') },
-  { shape: 'cone', name: 'Cone', size: [400, 500, 400], icon: svg('<path d="M32 10 14 48c0 3.3 8 6 18 6s18-2.7 18-6z"/><ellipse cx="32" cy="48" rx="18" ry="6"/>') },
-  { shape: 'torus', name: 'Ring', size: [500, 500, 160], icon: svg('<circle cx="32" cy="32" r="20"/><circle cx="32" cy="32" r="9"/>') },
-  { shape: 'ramp', name: 'Wedge', size: [400, 200, 600], icon: svg('<path d="M10 46h44V22z"/><path d="M10 46 54 22"/>') },
-  { shape: 'plane', name: 'Flat panel', size: [800, 10, 800], icon: svg('<path d="M8 38 30 26l26 8-22 14z"/>') },
-  { shape: 'rock', name: 'Rock', size: [420, 320, 380], icon: svg('<path d="M12 44 18 24l14-10 16 6 6 18-8 10H20z"/><path d="M18 24l12 8 18-12M30 32l-2 22"/>') },
-  { shape: 'capsule', name: 'Capsule', size: [200, 500, 200], icon: svg('<rect x="22" y="8" width="20" height="48" rx="10"/>') },
-  { shape: 'arch', name: 'Arch', size: [600, 400, 160], icon: svg('<path d="M10 54V30a22 22 0 0 1 44 0v24h-10V30a12 12 0 0 0-24 0v24z"/>') },
+  { shape: 'box', name: 'Box', size: [400, 400, 400], icon: icon('box') },
+  { shape: 'sphere', name: 'Sphere', size: [400, 400, 400], icon: icon('sphere') },
+  { shape: 'cylinder', name: 'Cylinder', size: [300, 500, 300], icon: icon('cylinder') },
+  { shape: 'cone', name: 'Cone', size: [400, 500, 400], icon: icon('cone') },
+  { shape: 'torus', name: 'Ring', size: [500, 500, 160], icon: icon('torus') },
+  { shape: 'ramp', name: 'Wedge', size: [400, 200, 600], icon: icon('wedge') },
+  { shape: 'plane', name: 'Flat panel', size: [800, 10, 800], icon: icon('panel') },
+  { shape: 'rock', name: 'Rock', size: [420, 320, 380], icon: icon('rock') },
+  { shape: 'capsule', name: 'Capsule', size: [200, 500, 200], icon: icon('capsule') },
+  { shape: 'arch', name: 'Arch', size: [600, 400, 160], icon: icon('arch') },
 ];
 
 export const PRIMITIVE_PREFIX = 'prim_';

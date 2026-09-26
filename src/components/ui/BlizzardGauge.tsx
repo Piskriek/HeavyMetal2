@@ -2,7 +2,7 @@ import { useId, type ReactElement } from 'react';
 
 /**
  * TICKET-02: engraved, tactile gauges in the molten orange/gold family.
- * - `arc`: circular 270° meter with an embossed needle (loadout ratings).
+ * - `arc`: circular 270° meter (loadout ratings) — WIRE-4: a painted face and needle sprite.
  * - `dial`: tachometer-style speedometer with tick marks and a digital readout.
  * - `meter`: horizontal engraved progress meter (drill-down breakdowns).
  * Value changes animate smoothly via CSS transitions on dash-offset/rotation.
@@ -34,6 +34,55 @@ function arcPath(center: number, radius: number, startDeg: number, endDeg: numbe
 }
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
+/* ───────────── The painted arc gauge (WIRE-4) ─────────────
+   The face and the needle are hand-painted PNGs, not SVG strokes. Both sprites were measured off the
+   finished art, and the numbers below are those measurements, so the needle turns about the hub the
+   painter put at the bottom of its sprite and lands on the ticks the face prints:
+
+   - ui-gauge-arc-face.png (256²) is drawn over the whole 120-unit viewBox; its dial centre is the
+     image centre, i.e. (60, 60). Its 270° tick arc runs from the lower left (≈210°), over the top,
+     to the lower right (≈150°), with the last third painted as the orange danger band — the same
+     lower-left → top → lower-right sweep the cockpit's needleAngle() uses. The old SVG version
+     started at 135° (lower right), which against this face would read backwards: 0 in the danger
+     band, max in the middle of it. The start moves to 225° so the needle agrees with its own
+     painted ticks; the sweep (270°, clockwise) is unchanged.
+   - ui-gauge-needle.png (53×256) points straight up with its hub at (26, 230). It is scaled so the
+     hub sits exactly on the dial centre and the blade tip stops 36 units out — as far as the old
+     SVG needle reached — leaving the painted ticks clear of the blade. */
+
+export const ARC_FACE_URL = '/art/ui/icons/ui-gauge-arc-face.png';
+export const ARC_NEEDLE_URL = '/art/ui/icons/ui-gauge-needle.png';
+/** The 120-unit viewBox the arc gauge is drawn in; its centre is the dial centre. */
+export const ARC_VIEWBOX = 120;
+/** Where the needle rests (lower left) and how far it sweeps (clockwise, over the top). */
+export const ARC_START_DEG = 225;
+export const ARC_SWEEP_DEG = 270;
+/** The painted face, drawn over the whole viewBox. */
+export const ARC_FACE_RECT = { x: 0, y: 0, w: ARC_VIEWBOX, h: ARC_VIEWBOX };
+/** The needle sprite's hub centre, measured in its own pixels. */
+export const ARC_NEEDLE_HUB = { x: 26, y: 230 };
+/** The blade tip's row in the sprite (the top of the painted blade). */
+export const ARC_NEEDLE_TIP_Y = 1;
+/** How far the blade tip reaches from the dial centre, in viewBox units (the old needle reached 36). */
+export const ARC_NEEDLE_TIP_RADIUS = 36;
+const needleScale = ARC_NEEDLE_TIP_RADIUS / (ARC_NEEDLE_HUB.y - ARC_NEEDLE_TIP_Y);
+const NEEDLE_SPRITE_W = 53;
+const NEEDLE_SPRITE_H = 256;
+/** The drawn needle: hub on (60, 60), tip 36 units up, in the 120-unit viewBox. */
+export const ARC_NEEDLE_RECT = {
+  x: ARC_VIEWBOX / 2 - ARC_NEEDLE_HUB.x * needleScale,
+  y: ARC_VIEWBOX / 2 - ARC_NEEDLE_HUB.y * needleScale,
+  w: NEEDLE_SPRITE_W * needleScale,
+  h: NEEDLE_SPRITE_H * needleScale,
+};
+
+/** The arc gauge's needle angle: 0 rests at the lower left, the max lands at the end of the painted
+ *  danger band, over the same 270° sweep (angles clockwise from 12 o'clock, as the CSS rotation). */
+export function arcNeedleAngle(value: number, max?: number): number {
+  const fraction = clamp(value / (max ?? 10), 0, 1);
+  return ARC_START_DEG + fraction * ARC_SWEEP_DEG;
+}
+
 /** Shared molten fill shared by every gauge variant. */
 function MoltenGradient({ id }: { id: string }) {
   return (
@@ -64,31 +113,19 @@ function FaceGradient({ id }: { id: string }) {
   );
 }
 
-function ArcGauge({ value, max, label, title, size = 106, gradientIds }: BlizzardGaugeProps & { gradientIds: { molten: string; metal: string; face: string } }) {
-  const fraction = clamp(value / (max ?? 10), 0, 1);
-  const needleDeg = 135 + fraction * 270;
-  const center = 60;
-  const ticks = Array.from({ length: 11 }, (_, index) => {
-    const angle = 135 + (index / 10) * 270;
-    const outer = point(center, 55, angle);
-    const inner = point(center, index % 5 === 0 ? 48.5 : 51.5, angle);
-    return <line key={index} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} className={`gauge-tick ${index <= fraction * 10 ? 'lit' : ''}`} />;
-  });
+function ArcGauge({ value, max, label, title, size = 106 }: BlizzardGaugeProps) {
+  const needleDeg = arcNeedleAngle(value, max);
+  const centre = ARC_VIEWBOX / 2;
   return (
     <figure className="blizzard-gauge" title={title}>
-      <svg viewBox="0 0 120 120" width={size} height={size} role="meter" aria-valuemin={0} aria-valuemax={max ?? 10} aria-valuenow={value} aria-label={label ?? title}>
-        <circle cx={center} cy={center} r={57} className="gauge-bezel" />
-        <circle cx={center} cy={center} r={53.5} fill={`url(#${gradientIds.face})`} className="gauge-face" />
-        {ticks}
-        <path d={arcPath(center, 43, 135, 405)} className="gauge-track" />
-        <path d={arcPath(center, 43, 135, 405)} pathLength={100} className="gauge-value-arc" stroke={`url(#${gradientIds.molten})`} style={{ strokeDasharray: 100, strokeDashoffset: 100 - fraction * 100 }} />
-        <g className="gauge-needle" style={{ transform: `rotate(${needleDeg}deg)` }}>
-          <line x1={center} y1={center + 9} x2={center} y2={24} stroke={`url(#${gradientIds.metal})`} strokeWidth={3.4} strokeLinecap="round" />
-          <line x1={center} y1={center + 9} x2={center} y2={24} className="gauge-needle-glint" />
+      <svg viewBox={`0 0 ${ARC_VIEWBOX} ${ARC_VIEWBOX}`} width={size} height={size} role="meter" aria-valuemin={0} aria-valuemax={max ?? 10} aria-valuenow={value} aria-label={label ?? title}>
+        {/* The painted face carries its own brass bezel, ticks and orange danger band. */}
+        <image href={ARC_FACE_URL} x={ARC_FACE_RECT.x} y={ARC_FACE_RECT.y} width={ARC_FACE_RECT.w} height={ARC_FACE_RECT.h} />
+        {/* The painted needle, turned about the hub the sprite paints at its bottom centre. */}
+        <g className="gauge-needle arc-needle" style={{ transform: `rotate(${needleDeg}deg)` }}>
+          <image href={ARC_NEEDLE_URL} x={ARC_NEEDLE_RECT.x} y={ARC_NEEDLE_RECT.y} width={ARC_NEEDLE_RECT.w} height={ARC_NEEDLE_RECT.h} />
         </g>
-        <circle cx={center} cy={center} r={7.5} className="gauge-cap" />
-        <circle cx={center} cy={center} r={3.4} fill={`url(#${gradientIds.metal})`} />
-        <text x={center} y={96} textAnchor="middle" className="gauge-value-text">
+        <text x={centre} y={96} textAnchor="middle" className="gauge-value-text">
           {value}<tspan className="gauge-value-max"> / {max ?? 10}</tspan>
         </text>
       </svg>
@@ -168,7 +205,7 @@ export default function BlizzardGauge(props: BlizzardGaugeProps) {
           <FaceGradient id={gradientIds.face} />
         </defs>
       </svg>
-      {props.variant === 'dial' ? <DialGauge {...props} gradientIds={gradientIds} /> : <ArcGauge {...props} gradientIds={gradientIds} />}
+      {props.variant === 'dial' ? <DialGauge {...props} gradientIds={gradientIds} /> : <ArcGauge {...props} />}
     </>
   );
 }

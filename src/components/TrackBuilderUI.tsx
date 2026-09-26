@@ -72,6 +72,15 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} /> },
 ];
 
+/** WIRE-4: the shelves' painted icons (the primitives, the lights and the Custom 3D card), warmed as
+ *  the builder opens so the tiles never pop in. */
+const PAINTED_SHELF_ICON_URLS = [
+  ...new Set([
+    ...PROP_DEFINITIONS.filter((p) => p.category === 'primitives' || p.category === 'lights').map((p) => p.url),
+    '/art/ui/icons/custom-model.png',
+  ]),
+];
+
 /**
  * M11: stable callbacks (same identity every render) that always call the handlers from the latest
  * render, so a memoised child never runs a stale closure. The set of keys must not change.
@@ -136,6 +145,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   });
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly (Space: up, Z: down), Right-Drag to look, Click props to select');
+
+  // WIRE-4: warm the shelves' painted icons as the builder opens, so the tiles never pop in.
+  useEffect(() => {
+    for (const url of PAINTED_SHELF_ICON_URLS) {
+      const img = new Image();
+      img.src = url;
+      img.decode().catch(() => { /* a warm-up that fails will surface on the tile itself */ });
+    }
+  }, []);
 
   const scrollShelf = (direction: 'left' | 'right') => {
     if (shelfScrollRef.current) {
@@ -3598,7 +3616,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         <img
                           src={p.url}
                           alt={p.name}
-                          className="max-w-full max-h-full object-contain filter drop-shadow group-hover:scale-105 transition-transform"
+                          className="builder-shelf-icon max-w-full max-h-full object-contain filter drop-shadow group-hover:scale-105 transition-transform"
                           draggable={false}
                         />
                       </div>

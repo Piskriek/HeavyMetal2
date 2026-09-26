@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Box, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { AssetDB } from '../../game/assets/asset-db';
 import { parseOBJ, analyzeMesh, type AssetRecord } from '../../game/assets/model-import';
 
@@ -164,8 +164,15 @@ export default function CustomModelsTab({
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded bg-black/60 border border-amber-700/40 flex items-center justify-center text-amber-300 flex-shrink-0">
-                  <Box size={18} />
+                {/* WIRE-4: the painted Custom 3D icon, framed like the other shelf tiles (dark zinc,
+                    natural painted look, no tint). */}
+                <div className="w-16 h-16 rounded-lg bg-zinc-900/90 border border-zinc-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <img
+                    src="/art/ui/icons/custom-model.png"
+                    alt=""
+                    draggable={false}
+                    className="builder-shelf-icon max-w-full max-h-full object-contain filter drop-shadow"
+                  />
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-amber-200 truncate">{asset.name}</div>

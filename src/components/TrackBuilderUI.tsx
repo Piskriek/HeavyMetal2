@@ -6,7 +6,7 @@ import {
   Users, Move, Database, History, Save, RefreshCw,
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
   Minus, Plus, Film, Route, Box, HelpCircle, Maximize2, Sparkles,
-  Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp
+  Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import ZenRestore from './builder/ZenRestore';
@@ -14,6 +14,9 @@ import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
 import ShadingPanel from './builder/ShadingPanel';
 import CollisionPanel from './builder/CollisionPanel';
+import ShaderManager from './builder/ShaderManager';
+import KitInspector from './builder/KitInspector';
+import SceneShelfBox from './builder/SceneShelfBox';
 import { DEFAULT_MATERIAL_DESCRIPTOR } from '../game/materials/material-descriptor';
 import { DEFAULT_ROLE_CONFIGS } from '../game/collision/obstacle-roles';
 import type { GizmoMode, GizmoSpace } from '../game/builder/gizmo-math';
@@ -62,6 +65,9 @@ const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] =
   { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} /> },
   { id: 'animated', label: 'Animated', icon: <Clapperboard size={16} /> },
   { id: 'custom_models' as any, label: 'Custom 3D', icon: <Box size={16} /> },
+  // Scene kit: shapes that wear shaders (and, in this tab, the course's own scenery), and lights.
+  { id: 'primitives', label: 'Primitives & Scenery', icon: <Shapes size={16} /> },
+  { id: 'lights', label: 'Lights', icon: <Lightbulb size={16} /> },
   // M01 · T7 — not a prop shelf: this tab opens the Lanes & Paths panel and its 3D handles.
   { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} /> },
 ];
@@ -84,6 +90,7 @@ function useLatestHandlers<T extends Record<string, (...args: never[]) => unknow
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
   const [category, setCategory] = useState<PropCategory>('foliage');
+  const [showShaders, setShowShaders] = useState(false);
   const [isZen, setIsZen] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [inspectorTab, setInspectorTab] = useState<'transform' | 'shading' | 'collision' | 'animation'>('transform');
@@ -302,9 +309,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             return;
           }
 
-          // Select mode: check if clicking on an existing placed prop
-          const hitProp = builder.raycastProp(e.clientX, e.clientY, canvas);
+          // Select mode: check if clicking on an existing placed prop (then, in Primitives mode, scenery)
           const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+          let hitProp = builder.raycastProp(e.clientX, e.clientY, canvas);
+          if (!hitProp && builder.getTerrainPicking()) {
+            hitProp = builder.pickTerrain(e.clientX, e.clientY, canvas, isMulti);
+            if (hitProp) {
+              showToast(`Selected scenery: ${hitProp.name} [gizmo: move / turn / scale · Del: hide · Shading: shader]`);
+              onRequestRender?.();
+              return;
+            }
+          }
           if (hitProp) {
             builder.selectProp(hitProp.id, isMulti);
             const currentSelected = builder.getSelectedProps();
@@ -495,6 +510,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     return () => { builder.setLanesToolActive(false); };
   }, [builder, category, course, onRequestRender, selectedLanePathId]);
 
+  // Primitives mode: clicks on the course's own scenery select it (and only in this tab).
+  useEffect(() => {
+    builder.setTerrainPicking(category === 'primitives');
+    onRequestRender?.();
+    return () => builder.setTerrainPicking(false);
+  }, [builder, category, onRequestRender]);
+
   // Keyboard controls
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -680,8 +702,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         e.preventDefault();
         const count = builder.getSelectedProps().length;
         if (count > 0) {
+          const scenery = builder.getSelectedProps().filter((p) => p.type === 'terrain_edit').length;
           builder.deleteSelected();
-          showToast(`Deleted ${count} item(s)`);
+          const error = builder.getPlacementError();
+          showToast(error ?? (scenery === count ? `Hid ${count} scenery part(s) (Show hidden on the Primitives shelf brings them back)` : `Deleted ${count} item(s)`), error ? 4000 : undefined);
+          builder.clearPlacementError();
           onRequestRender?.();
         }
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
@@ -1275,6 +1300,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 </select>
               </div>
             )}
+
+            {/* Shader Manager */}
+            <button
+              onClick={() => setShowShaders((v) => !v)}
+              className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border font-medium cursor-pointer ${showShaders ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 border-zinc-700/50'}`}
+              title="Shader Manager: blend three textures with cloud noise, and dress primitives and scenery"
+            >
+              <Paintbrush size={12} />
+              <span className="hidden md:inline text-[11px]">Shaders</span>
+            </button>
 
             {/* Skybox Selector */}
             <div className="relative">
@@ -2339,6 +2374,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               </button>
             </div>
           )}
+
+          <KitInspector builder={builder} prop={selectedProp} onRequestRender={onRequestRender} showToast={showToast} onOpenShaders={() => setShowShaders(true)} />
 
           {/* Sub-tabs: Transform, Shading, Collision, Animation */}
           <div className="flex border-b border-zinc-800 bg-zinc-900/60 rounded text-xs overflow-hidden">
@@ -3505,6 +3542,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   : 'items-center overflow-x-auto max-h-40'
               }`}
             >
+              {(category === 'primitives' || category === 'lights') && (
+                <SceneShelfBox builder={builder} mode={category} onOpenShaders={() => setShowShaders(true)} onRequestRender={onRequestRender} showToast={showToast} />
+              )}
               {category === 'lanes' ? (
                 <LanePanel
                   model={laneModel}
@@ -3584,6 +3624,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         </div>
       )}
 
+
+      {showShaders && <ShaderManager builder={builder} onClose={() => setShowShaders(false)} onRequestRender={onRequestRender} showToast={showToast} />}
 
       {/* Backups & Restore Modal */}
       {showBackupsModal && (

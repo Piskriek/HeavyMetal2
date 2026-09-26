@@ -136,12 +136,13 @@ test('no stall on the run-in', () => {
 });
 
 test('post-gate layout fingerprint unchanged (ridge, canyon, stadium)', () => {
-  assert.equal(COURSE_COUNT, 3, 'all three authored courses are covered');
+  assert.equal(COURSE_COUNT, 4, 'all four authored courses are covered');
   // Pinned against the unmodified generator: every course dresses the descent with the same eleven
   // start-zone pieces (four ramp copies, four boosts, a sign, a blimp, a sheep) and they are the
   // only things removed. The totals are the generator's own counts, so a silent layout change is
   // caught here rather than by a shrug.
-  const FULL_COUNTS: Record<CourseId, number> = { ridge: 228, boomtown: 241, sheep: 241 };
+  // Basalt Isle rides Rustbucket Ridge's layout (ISLAND-ROUTE, first version).
+  const FULL_COUNTS: Record<CourseId, number> = { ridge: 228, boomtown: 241, sheep: 241, basalt: 228 };
   for (const course of COURSES) {
     const full = createTrackLayout(course.id);
     const gate = createQualifyingGate(course.id, full);

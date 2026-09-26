@@ -489,9 +489,9 @@ function runMerge(seed: number, course: CourseId = 'ridge', skipHeldGhost = true
    AC-2/AC-3/AC-4: the ordering law, under contact
    -------------------------------------------------------------------------- */
 
-test('exit order equals entry order (100 seeds × 3 courses)', () => {
-  assert.equal(COURSES.length, 3, 'all three authored courses are covered');
-  const seedsPerCourse: Record<CourseId, number> = { ridge: 100, boomtown: 24, sheep: 24 };
+test('exit order equals entry order (100 seeds × 4 courses)', () => {
+  assert.equal(COURSES.length, 4, 'all four authored courses are covered');
+  const seedsPerCourse: Record<CourseId, number> = { ridge: 100, boomtown: 24, sheep: 24, basalt: 24 };
   for (const course of COURSES) {
     for (let seed = 0; seed < seedsPerCourse[course.id]; seed++) {
       const run = runMerge((seed * 2654435761) >>> 0, course.id);

@@ -18,6 +18,10 @@ import { PickupView } from './pickup-view';
 import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
+import { buildIslandWorld, type IslandWorld } from './island-route/island-world';
+import { islandTrackSpace } from './island-route/island-space';
+import { readOptions } from './preferences';
+import type { CourseId } from './types';
 import {
   compileRampSurfaces,
   engineDistanceFromX,
@@ -1705,7 +1709,13 @@ export class Renderer3D {
     };
   }
 
-  constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge') {
+  /** ISLAND-ROUTE: Basalt Isle's world, when this renderer draws the island (null on the classic courses). */
+  private readonly island: IslandWorld | null = null;
+  /** The day fog: the sky preset's on the classic courses, the sea haze on the island. */
+  private fogNear = 6000;
+  private fogFar = 48000;
+
+  constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge', course: CourseId = 'ridge') {
     this.storedAssets = assets;
     this.firstPerson = firstPersonFlag(typeof window !== 'undefined' ? window.location.search : '');
     this.renderer = new THREE.WebGLRenderer({
@@ -1750,23 +1760,35 @@ export class Renderer3D {
     // Named for the builder's scenery lists ("Cliff", "Cave rock"…) and for debugging.
     for (const [key, material] of Object.entries(this.materials)) if (!material.name) material.name = key;
 
-    this.space = getTrackSpace();
+    const onIsland = course === 'basalt';
+    this.space = onIsland ? islandTrackSpace() : getTrackSpace();
     this.track = buildTrack(this.space);
     this.enterD = this.track.distOf('caveEnter');
     this.exitD = this.track.distOf('caveExit');
 
-    const terrain = makeAlpineTerrain(this.track);
-    buildTrackSurface(this.track, this.materials, this.scene);
-    buildAlpine(this.track, this.materials, this.scene, terrain);
-    buildCliffs(this.track, this.materials, this.scene, terrain);
-    buildCavern(this.track, this.materials, this.scene);
-    buildMine(this.track, this.materials, this.scene);
-    buildBreakthrough(this.track, this.materials, this.scene);
-    buildStadium(this.track, this.materials, this.scene);
-    buildWorld(this.materials, this.scene);
+    if (onIsland) {
+      // ISLAND-ROUTE: Basalt Isle is its own world: its roads, its carved ground, the sea and a haze sky.
+      this.island = buildIslandWorld(this.materials, { performance: readOptions().graphics === 'performance' });
+      this.scene.add(this.island.group);
+      this.sky.visible = false;
+      this.fogNear = 18000;
+      this.fogFar = 160000;
+      this.scene.fog = new THREE.Fog(this.island.fogColor.clone(), this.fogNear, this.fogFar);
+    } else {
+      const terrain = makeAlpineTerrain(this.track);
+      buildTrackSurface(this.track, this.materials, this.scene);
+      buildAlpine(this.track, this.materials, this.scene, terrain);
+      buildCliffs(this.track, this.materials, this.scene, terrain);
+      buildCavern(this.track, this.materials, this.scene);
+      buildMine(this.track, this.materials, this.scene);
+      buildBreakthrough(this.track, this.materials, this.scene);
+      buildStadium(this.track, this.materials, this.scene);
+      buildWorld(this.materials, this.scene);
+    }
 
-    // 3D Track Builder (handles placed props, free-fly, and surface snapping)
-    this.trackBuilder = new TrackBuilder3D(this.scene, this.camera, this.track, this.materials);
+    // 3D Track Builder (handles placed props, free-fly, and surface snapping). On the island it never
+    // loads or saves the owner's track: that document belongs to the classic world.
+    this.trackBuilder = new TrackBuilder3D(this.scene, this.camera, this.track, this.materials, !onIsland);
     this.trackBuilder.setInitialSky(skyKey);
     this.trackBuilder.onSkyboxChange((newSky) => this.setSkybox(newSky));
 
@@ -1778,7 +1800,7 @@ export class Renderer3D {
 
   setSkybox(skyId: string) {
     const preset = SKY_PRESETS[skyId];
-    if (!preset) return;
+    if (!preset || this.island) return;
     this.currentSkyPreset = preset;
 
     const loader = new THREE.TextureLoader();
@@ -1955,11 +1977,11 @@ export class Renderer3D {
 
   private updateAtmosphere(d: number) {
     const under = smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d));
-    const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
+    const dayFog = this.island ? this.island.fogColor : new THREE.Color(this.currentSkyPreset.fogColor);
     const dayAmbient = new THREE.Color(this.currentSkyPreset.ambientColor);
     (this.scene.fog as THREE.Fog).color.copy(dayFog).lerp(SKY.fogCave, under);
-    (this.scene.fog as THREE.Fog).near = lerp(6000, 1500, under);
-    (this.scene.fog as THREE.Fog).far = lerp(48000, 17000, under);
+    (this.scene.fog as THREE.Fog).near = lerp(this.fogNear, 1500, under);
+    (this.scene.fog as THREE.Fog).far = lerp(this.fogFar, 17000, under);
     this.ambient.color.copy(dayAmbient).lerp(SKY.ambientCave, under);
     this.ambient.intensity = lerp(1.6, 1.1, under);
     this.sun.intensity = lerp(this.currentSkyPreset.sunIntensity, 0.15, under);
@@ -2273,6 +2295,7 @@ export class Renderer3D {
     }
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;
+    this.island?.sky.position.copy(this.camera.position);
 
     // 3. Texture scrolls + animated decoration frames (frozen on frame 0 for reduced motion)
     const raw = frame.time;

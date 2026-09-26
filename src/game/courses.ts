@@ -17,7 +17,7 @@ export interface CourseLighting {
 
 export interface CourseDefinition {
   id: CourseId;
-  biome: 'forest' | 'canyon' | 'meadow';
+  biome: 'forest' | 'canyon' | 'meadow' | 'island';
   region: string;
   character: string;
   description: string;
@@ -33,17 +33,24 @@ export interface CourseDefinition {
   lighting: CourseLighting;
 }
 
+/**
+ * Rustbucket Ridge's profile. Basalt Isle rides it too for now (ISLAND-ROUTE): the sorting pool, the
+ * start and the loops are tuned and tested on it, so the island's first version changes the world, not
+ * the physics.
+ */
+const RIDGE_PROFILE: readonly (readonly [number, number])[] = [
+  [0, 0], [1400, 0], [5400, 600], [10000, 1960], [13600, 2130], [18600, 3830], [23000, 4380], [24000, 4500],
+  [24800, 4800], [26000, 7200], [30000, 11000], [36000, 14500], [42000, 17200], [46000, 18500], [48000, 19000],
+  [50000, 19800], [54000, 20800], [58000, 21200], [62000, 20500], [66000, 21400], [68000, 21000],
+  [70000, 18500], [71000, 18000], [72000, 18000], [76000, 18000]
+];
+
 export const TRACKS: Record<CourseId, CourseDefinition> = {
   ridge: {
     id: 'ridge', biome: 'forest', region: 'Copperwood Valley', character: 'Flow & momentum',
     description: 'Ochre dirt, pine shadows, and sweeping grades. A flowing route with room to line up the next jump.',
     stadium: 'THE SCRAPDOME',
-    profile: [
-      [0, 0], [1400, 0], [5400, 600], [10000, 1960], [13600, 2130], [18600, 3830], [23000, 4380], [24000, 4500],
-      [24800, 4800], [26000, 7200], [30000, 11000], [36000, 14500], [42000, 17200], [46000, 18500], [48000, 19000],
-      [50000, 19800], [54000, 20800], [58000, 21200], [62000, 20500], [66000, 21400], [68000, 21000],
-      [70000, 18500], [71000, 18000], [72000, 18000], [76000, 18000]
-    ],
+    profile: RIDGE_PROFILE,
     sectors: [
       'THE LAUNCH RIDGE', 'COPPERWOOD DESCENT', 'THE SCREAMING SLOPE',
       'THE CANYON LIP', 'THE WALL OF WATER', 'PINBALL CHASM',
@@ -110,6 +117,27 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
       sunbeamIntensity: 0.35,
       sunColor: '#d8e8c8',
       trackTint: '#a79b70',
+    },
+  },
+  basalt: {
+    id: 'basalt', biome: 'island', region: 'Basalt Isle', character: 'Forks & crossings',
+    description: 'Late for the race: out of the shack on the summit, into the Maw, then down a braid of roads that split, cross and rejoin, all the way to the lagoon.',
+    stadium: 'THE LAGOON ARENA',
+    profile: RIDGE_PROFILE,
+    sectors: [
+      'THE SUMMIT SHACK', 'THE MAW', 'THE CALDERA',
+      'OBSIDIAN SPIRAL', 'THE LAVA TUBE', 'THE CHAMBERS',
+      'WATERFALL BREAKTHROUGH', 'CLIFF ROAD', 'THE CROSSING',
+      'THE SEA ARCH', 'SEA STACK SLALOM', 'THE DRAIN'
+    ],
+    palette: { sky: '#6f8b94', horizon: '#b9c7c4', distant: '#7d9290', middle: '#5b5249', foreground: '#2f2a27', dirt: '#a07a4a', dirtLight: '#b68d58', bank: '#4a3f36', soil: '#3b332d', shoulder: '#6e5a42', chalk: '#e6d3a8', grass: '#8c7a4a', accent: '#e3a24f', haze: '#a9bcbd' },
+    lighting: {
+      skyboxUrl: '/art/tracks/sky_copperwood_misty_dawn.png',
+      fogColor: '#aebfbf',
+      ambientLight: '#5d6566',
+      sunbeamIntensity: 0.4,
+      sunColor: '#fff0cf',
+      trackTint: '#a07a4a',
     },
   },
 };

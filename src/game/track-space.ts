@@ -562,6 +562,11 @@ export interface TrackSpaceMap {
   readonly TRACK_DISTANCE: number;
   /** World arc units per engine distance unit: (D_END − D_START)/TRACK_DISTANCE. */
   readonly ARC_PER_ENGINE_DISTANCE: number;
+  /**
+   * The local rate at an engine distance. Without knots it is ARC_PER_ENGINE_DISTANCE everywhere;
+   * with knots (ISLAND-ROUTE) it is the slope of the knot segment the distance falls in.
+   */
+  arcPerEngineDistanceAt(distance: number): number;
   distOf(label: string): number;
   halfWidthAt(dist: number): number;
   dHalfWidthAt(dist: number): number;
@@ -582,10 +587,30 @@ export function resetTrackSpaceForTests(): void {
   compiledMap = null;
 }
 
+/**
+ * ISLAND-ROUTE: pins a labelled waypoint to an engine x, so a course authors exactly where each part of
+ * the race lands in the world (the Maw at the sorting gate, every fork's split and merge). Between knots
+ * the engine distance maps linearly onto arc length.
+ */
+export interface TrackKnot {
+  readonly label: string;
+  readonly x: number;
+}
+
+export interface TrackSpaceOptions {
+  /**
+   * Engine-x knots, in ascending x. Without them the map is the legacy single linear segment from
+   * D_START to the finish run-out, byte for byte. With them, engine distance 0 and TRACK_DISTANCE map
+   * to the first and last knot (author the start and the run-out as knots).
+   */
+  readonly knots?: readonly TrackKnot[];
+}
+
 export function buildTrackSpace(
   waypoints: readonly CenterlineWaypoint[] = CENTERLINE_WAYPOINTS,
   loopDefs: readonly LoopDefinition[] = LOOP_DEFINITIONS,
   bridgeLabels: readonly { start: string; end: string }[] = BRIDGE_SPAN_LABELS,
+  options: TrackSpaceOptions = {},
 ): TrackSpaceMap {
   const centerline = expandCenterline(waypoints, loopDefs);
   const { points, stages, labelIndex } = centerline;
@@ -695,7 +720,9 @@ export function buildTrackSpace(
     }));
   }
 
-  const D_END = distOf('finish') + D_END_RUNOUT;
+  const knotted = options.knots?.length ? compileKnots(options.knots, distOf) : null;
+  const D_START_MAP = knotted ? knotted.arc[0] : D_START;
+  const D_END = knotted ? knotted.arc[knotted.arc.length - 1] : distOf('finish') + D_END_RUNOUT;
   const samplesPerArc = count / length;
 
   const sampleAt = (dist: number): TrackFrameData => {
@@ -732,13 +759,16 @@ export function buildTrackSpace(
     spline, length, centerline, samples: Object.freeze(samples), samplesPerArc,
     stageStart: Object.freeze({ ...stageStart }), stageEnd: Object.freeze({ ...stageEnd }),
     loops: Object.freeze(loops), bridges: Object.freeze(bridges),
-    D_START, D_END, TRACK_DISTANCE,
-    ARC_PER_ENGINE_DISTANCE: (D_END - D_START) / TRACK_DISTANCE,
+    D_START: D_START_MAP, D_END, TRACK_DISTANCE,
+    ARC_PER_ENGINE_DISTANCE: (D_END - D_START_MAP) / TRACK_DISTANCE,
     distOf, halfWidthAt, dHalfWidthAt, sampleAt, frameAt,
-    trackDistFromEngineDistance: (distance: number) =>
-      lerpN(D_START, D_END, clampN(distance / TRACK_DISTANCE, 0, 1)),
-    engineDistanceFromTrackDist: (dist: number) =>
-      clampN((dist - D_START) / (D_END - D_START), 0, 1) * TRACK_DISTANCE,
+    ...(knotted ? knotted.mapping : {
+      trackDistFromEngineDistance: (distance: number) =>
+        lerpN(D_START, D_END, clampN(distance / TRACK_DISTANCE, 0, 1)),
+      engineDistanceFromTrackDist: (dist: number) =>
+        clampN((dist - D_START) / (D_END - D_START), 0, 1) * TRACK_DISTANCE,
+      arcPerEngineDistanceAt: () => (D_END - D_START) / TRACK_DISTANCE,
+    }),
   });
 
   // Fail visibly if the compiled map itself is structurally broken.
@@ -766,6 +796,46 @@ function rotateAroundAxis(v: CPoint, k: CPoint, angle: number): CPoint {
     v.y * c + kxv.y * s + kkv.y,
     v.z * c + kxv.z * s + kkv.z,
   );
+}
+
+/**
+ * Engine distance ↔ arc length through knots: strictly increasing on both sides, the first knot at
+ * engine distance 0 and the last at TRACK_DISTANCE. Throws on a knot out of order, so a bad course fails
+ * at load instead of racing backwards.
+ */
+function compileKnots(knots: readonly TrackKnot[], distOf: (label: string) => number) {
+  const dist = knots.map((k) => clampN((k.x - START_X) / 2, 0, TRACK_DISTANCE));
+  const arc = knots.map((k) => distOf(k.label));
+  if (dist[0] !== 0 || dist[dist.length - 1] !== TRACK_DISTANCE) {
+    throw new TrackSpaceError('knot-range', `knots must start at x ${START_X} and end at the finish run-out`);
+  }
+  for (let i = 1; i < knots.length; i++) {
+    if (!(dist[i] > dist[i - 1]) || !(arc[i] > arc[i - 1])) {
+      throw new TrackSpaceError('knot-order', `knot "${knots[i].label}" is not after "${knots[i - 1].label}"`);
+    }
+  }
+  const segment = (values: readonly number[], v: number) => {
+    let i = 0;
+    while (i < values.length - 2 && v >= values[i + 1]) i++;
+    return i;
+  };
+  const mapping = {
+    trackDistFromEngineDistance: (distance: number) => {
+      const d = clampN(distance, 0, TRACK_DISTANCE);
+      const i = segment(dist, d);
+      return lerpN(arc[i], arc[i + 1], (d - dist[i]) / (dist[i + 1] - dist[i]));
+    },
+    engineDistanceFromTrackDist: (a: number) => {
+      const v = clampN(a, arc[0], arc[arc.length - 1]);
+      const i = segment(arc, v);
+      return lerpN(dist[i], dist[i + 1], (v - arc[i]) / (arc[i + 1] - arc[i]));
+    },
+    arcPerEngineDistanceAt: (distance: number) => {
+      const i = segment(dist, clampN(distance, 0, TRACK_DISTANCE));
+      return (arc[i + 1] - arc[i]) / (dist[i + 1] - dist[i]);
+    },
+  };
+  return { dist, arc, mapping };
 }
 
 /* -----------------------------------------------------------------------------
@@ -1022,7 +1092,7 @@ export function worldVelocityFromEngine(
   const c = canonicalFromEngine(map, st);
   const rampAlt = ramps && ramps.length > 0 ? rampHeightAt(ramps, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) : 0;
   const altitude = Math.max(c.engineAlt, rampAlt);
-  const ds = (vel.vx / 2) * map.ARC_PER_ENGINE_DISTANCE;
+  const ds = (vel.vx / 2) * map.arcPerEngineDistanceAt(c.engineDistance);
   let dAlt: number;
   if (altitude === rampAlt && rampAlt > 0) {
     dAlt = rampSlopeAt(ramps!, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) * ds;

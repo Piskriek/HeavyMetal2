@@ -198,6 +198,12 @@ export class TrackBuilder3D {
     private readonly camera: THREE.PerspectiveCamera,
     private readonly track: TrackData,
     private readonly materials?: any,
+    /**
+     * ISLAND-ROUTE: false for a world the owner's saved track does not belong to (Basalt Isle). The
+     * builder then never loads the saved props, never writes them to this device and never writes a
+     * disk backup, so nothing done in that world can reach the owner's track or its backups.
+     */
+    private readonly persistent = true,
   ) {
     this.kit = new SceneKit(this.scene, this.materialCache, this.materials);
     this.shaderLibrary = loadShaderLibrary();
@@ -221,10 +227,10 @@ export class TrackBuilder3D {
         }
       } catch {}
     }
-    this.loadFromStorage();
+    if (this.persistent) this.loadFromStorage();
     const merged = mergeShadersFromProps(this.shaderLibrary, this.placedProps as { shader?: unknown }[]);
     if (merged.added) { this.shaderLibrary = merged.library; saveShaderLibrary(this.shaderLibrary); }
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && this.persistent) {
       this.startPeriodicBackupTimer(30000);
     }
   }
@@ -2739,7 +2745,7 @@ export class TrackBuilder3D {
 
   /** Writes the network to its own storage document (validate → backup → write, in the storage module). */
   saveLaneDoc(store?: Storage) {
-    if (!this.laneDoc) return { ok: false as const, reason: 'empty' as const };
+    if (!this.persistent || !this.laneDoc) return { ok: false as const, reason: 'empty' as const };
     const doc = buildLaneDocument({ [this.courseId as never]: this.laneDoc });
     const result = writeLaneStorage(store, doc);
     this.notify();
@@ -2833,6 +2839,7 @@ export class TrackBuilder3D {
 
   // --- PERSISTENCE & PERIODIC DISK BACKUP ---
   saveToStorage() {
+    if (!this.persistent) return;
     // T08: Write via versioned storage module (separate key, not protected path)
     const cleanProps = this.stripRuntimeState(this.persistableProps());
     const storageResult = writeStorage(cleanProps, this.courseId);
@@ -2970,6 +2977,7 @@ export class TrackBuilder3D {
    * An explicit save (`force = true`) always writes.
    */
   async backupToFile(force = false): Promise<{ success: boolean; count: number; timestamp: number; unchanged?: boolean } | null> {
+    if (!this.persistent) return null;
     return this.backups.backupToFile(force);
   }
 

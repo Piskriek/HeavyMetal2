@@ -55,7 +55,9 @@ export const capsuleCell = (id: CapsuleId): ArtCell => ART_CELLS[`capsule:${id}`
 /** TICKET-04: public URL of a rider's full-body render (falls back to the portrait). */
 export const riderFullBody = (id: RiderId): string => artUrl(riderCell(id).fullbody ?? riderCell(id).image);
 export const supplyCell = (kind: PowerupKind): ArtCell => ART_CELLS[`supply:${kind}`];
-export const courseCell = (id: CourseId): ArtCell => ART_CELLS[`course:${id}`];
+/** Basalt Isle's card is a crop of the owner's island render, not a cell of the generated courses sheet. */
+const BASALT_CARD: ArtCell = { sheet: 'courses', sheetCell: 3, image: 'art/basalt-course.png', runtime: { width: 800, height: 440 }, action: 'preview' };
+export const courseCell = (id: CourseId): ArtCell => id === 'basalt' ? BASALT_CARD : ART_CELLS[`course:${id}`];
 export const blimpCell = (): ArtCell => ART_CELLS['prop:blimp'];
 export const LANDMARK_IDS = ['pines', 'quarry', 'windmill', 'pasture'] as const;
 export type LandmarkId = typeof LANDMARK_IDS[number];

@@ -3,7 +3,7 @@ import type { Difficulty, RaceMode } from './session';
 import type { PowerupKind } from './powerups';
 
 export type GameStatus = 'loading' | 'ready' | 'pushing' | 'flying' | 'paused' | 'finished' | 'checkpoint' | 'countdown';
-export type CourseId = 'ridge' | 'boomtown' | 'sheep';
+export type CourseId = 'ridge' | 'boomtown' | 'sheep' | 'basalt';
 export type GraphicsMode = 'auto' | 'performance' | 'quality';
 /**
  * TICKET-07 + M01 · T3: the driver's own view through the cockpit window (`first_person`, the
@@ -222,6 +222,7 @@ export const COURSES: { id: CourseId; name: string; subtitle: string; number: st
   { id: 'ridge', name: 'Rustbucket Ridge', subtitle: 'Pine valleys. Flowing dirt. Questionable shortcuts.', number: '01' },
   { id: 'boomtown', name: 'Boomtown Run', subtitle: 'Copper canyons. Steep drops. Extra dynamite.', number: '02' },
   { id: 'sheep', name: 'Woolly Wasteland', subtitle: 'Open pastures. Airborne prizes. Angry locals.', number: '03' },
+  { id: 'basalt', name: 'Basalt Isle', subtitle: 'Summit to sea. Roads that split, cross and rejoin.', number: '04' },
 ];
 
 export const DEFAULT_OPTIONS: GameOptions = {

@@ -14,7 +14,7 @@ export class RangeRenderer {
   private readonly renderer3d: Renderer3D;
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, course: CourseId = 'ridge') {
-    this.renderer3d = new Renderer3D(canvas, assets, course);
+    this.renderer3d = new Renderer3D(canvas, assets, course, course);
   }
 
   resize(width: number, height: number) {

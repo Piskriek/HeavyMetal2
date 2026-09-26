@@ -35,6 +35,8 @@ export interface TrackLayoutOptions {
 }
 
 export function createTrackLayout(course: CourseId, options: TrackLayoutOptions = {}): Obstacle[] {
+  // ISLAND-ROUTE, first version: Basalt Isle races Rustbucket Ridge's obstacles (and profile) on its own roads.
+  if (course === 'basalt') return createTrackLayout('ridge', options);
   const obstacles: Obstacle[] = [];
   const add = (
     kind: ObstacleKind,

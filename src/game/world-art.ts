@@ -333,6 +333,7 @@ const LANDMARK_BY_COURSE: Record<CourseId, [LandmarkId, LandmarkId]> = {
   ridge: ['pines', 'windmill'],
   boomtown: ['quarry', 'pasture'],
   sheep: ['pasture', 'windmill'],
+  basalt: ['quarry', 'windmill'],
 };
 
 /**
@@ -340,7 +341,7 @@ const LANDMARK_BY_COURSE: Record<CourseId, [LandmarkId, LandmarkId]> = {
  * (or all courses). Used by the asset preloader pipeline.
  */
 export function skyboxPathsForCourse(courseId?: CourseId): string[] {
-  const ids: CourseId[] = courseId ? [courseId] : ['ridge', 'boomtown', 'sheep'];
+  const ids: CourseId[] = courseId ? [courseId] : ['ridge', 'boomtown', 'sheep', 'basalt'];
   return ids.map((id) => TRACKS[id].lighting.skyboxUrl);
 }
 

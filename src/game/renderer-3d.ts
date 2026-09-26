@@ -13,7 +13,7 @@ import type { GameOptions } from './types';
 import { BALL_DRAW_RADIUS, RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
-import { ObstacleView } from './obstacle-view';
+import { ObstacleView, shieldBubbleTexture } from './obstacle-view';
 import { PickupView } from './pickup-view';
 import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
@@ -1996,7 +1996,12 @@ export class Renderer3D {
       const shadowGeo = new THREE.PlaneGeometry(BALL_DRAW_RADIUS * 2.2, BALL_DRAW_RADIUS * 2.2);
       const shadowMat = fadeShadowsByInstanceColor(new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
       const shieldGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * 1.35, 16, 12);
-      const shieldMat = new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true });
+      // The painted hex bubble, added over the scene rather than cut into it: a shield reads as
+      // light around the ball, never as a wireframe cage.
+      const shieldMat = new THREE.MeshBasicMaterial({
+        map: shieldBubbleTexture(), color: 0x9fe4ff, transparent: true, opacity: 0.55,
+        depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false,
+      });
       this.racerResources = {
         sphereGeo: new THREE.SphereGeometry(BALL_DRAW_RADIUS, 24, 16),
         capGeo, capMat, shadowGeo, shadowMat, shieldGeo, shieldMat, capacity: 0,
@@ -2163,7 +2168,8 @@ export class Renderer3D {
       if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);
 
       const shielded = (racer.shieldUntil ?? 0) > frame.runTime;
-      if (shielded) slot.shieldSpin += dt * 4;
+      // A slow spin on the bubble, held still under reduced motion.
+      if (shielded && !frame.reducedMotion) slot.shieldSpin += dt * 0.9;
       // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
       if ((firstPerson && i === 0) || racer.hidden) continue;
 

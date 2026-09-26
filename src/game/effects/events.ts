@@ -19,9 +19,15 @@ import { ContractError } from '../contracts/core';
    1. KINDS AND SIZING (IF-FX)
    -------------------------------------------------------------------------- */
 
-export type EffectKind = 'explosion' | 'impact' | 'dust' | 'smoke' | 'sparks';
+export type EffectKind =
+  | 'explosion' | 'impact' | 'dust' | 'smoke' | 'sparks'
+  // The painted wave: one kind per thing the race already reacts to.
+  | 'boost' | 'boost-pad' | 'pickup' | 'shield-break' | 'spring' | 'landing' | 'tree-smash';
 
-export const EFFECT_KINDS: readonly EffectKind[] = ['explosion', 'impact', 'dust', 'smoke', 'sparks'];
+export const EFFECT_KINDS: readonly EffectKind[] = [
+  'explosion', 'impact', 'dust', 'smoke', 'sparks',
+  'boost', 'boost-pad', 'pickup', 'shield-break', 'spring', 'landing', 'tree-smash',
+];
 
 /** Ring capacity. A full queue overwrites the oldest event and counts the loss. */
 export const EFFECT_QUEUE = 128;
@@ -56,6 +62,11 @@ export interface EffectEvent {
   readonly scale: number;
   /** Who caused it, when a racer did (the HUD can ignore other racers). */
   readonly racerId: number | null;
+  /**
+   * 0xRRGGBB the billboard is multiplied by, or `null` for the sheet's own colours. A supply burst
+   * is tinted with the supply's colour; everything else paints itself.
+   */
+  readonly tint: number | null;
 }
 
 /**
@@ -78,7 +89,7 @@ export class EffectQueue {
     const size = Math.max(1, Math.floor(capacity));
     this.events = new Array<EffectEvent>(size);
     for (let i = 0; i < size; i++) {
-      this.events[i] = { seq: 0, tick: 0, kind: 'dust', x: 0, y: 0, z: 0, scale: 1, racerId: null };
+      this.events[i] = { seq: 0, tick: 0, kind: 'dust', x: 0, y: 0, z: 0, scale: 1, racerId: null, tint: null };
     }
   }
 
@@ -93,7 +104,10 @@ export class EffectQueue {
   /** The cursor a reader should start from to see only new events. */
   get cursor(): number { return this.seq; }
 
-  push(kind: EffectKind, x: number, y: number, z: number, scale = 1, racerId: number | null = null, tick = 0): void {
+  push(
+    kind: EffectKind, x: number, y: number, z: number, scale = 1, racerId: number | null = null,
+    tick = 0, tint: number | null = null,
+  ): void {
     assertEffectKind(kind);
     const slot = this.events[this.head];
     // The seq the slot is about to lose, so an overwrite of an unread event can be counted.
@@ -107,6 +121,7 @@ export class EffectQueue {
     (slot as { z: number }).z = Number.isFinite(z) ? z : 0;
     (slot as { scale: number }).scale = Number.isFinite(scale) ? Math.max(0.25, Math.min(3, scale)) : 1;
     (slot as { racerId: number | null }).racerId = racerId ?? null;
+    (slot as { tint: number | null }).tint = Number.isFinite(tint as number) ? (tint as number) : null;
     this.head = (this.head + 1) % this.events.length;
     this.seq += 1;
     if (this.count === this.events.length) {

@@ -24,7 +24,10 @@ import {
 import {
   QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
 } from './contracts/qualifying';
-import { createAirPickups, layoutPickupsForNetwork, type AirPickup } from './powerups';
+import {
+  POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup, type PowerupKind,
+} from './powerups';
+
 import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
@@ -53,6 +56,11 @@ import { EffectQueue } from './effects/events';
 import { GamepadController } from './input/gamepad';
 import { impactEnvelope } from './camera-shake';
 import { gapSeconds, gapTrend } from './gap';
+
+/** A supply's painted colour as 0xRRGGBB, so its collect burst wears it. */
+function powerupTint(kind: PowerupKind): number {
+  return Number.parseInt(POWERUPS[kind].color.slice(1), 16);
+}
 
 const STEP = FIXED_STEP;
 
@@ -229,6 +237,11 @@ export class GameEngine {
         engine.pickupCount++;
         engine.snapshot.lastPickup = kind;
         engine.snapshot.pickupNoticeUntil = engine.runTime + 2.5;
+        // The painted collect burst, wearing the supply's own colour.
+        engine.effects.push(
+          'pickup', engine.player.x, engine.player.y, engine.player.z, 1, engine.player.id, engine.tick,
+          powerupTint(kind),
+        );
       },
     };
     this.simCtx = {
@@ -1269,6 +1282,8 @@ export class GameEngine {
     racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.3);
     // Painted sibling: the shield holding is a *hit that did not land*, which is the impact read.
     this.effects.push('impact', racer.x, racer.y, racer.z, 0.7, racer.id, this.tick);
+    // …and the bubble itself shattering as it spends the save.
+    this.effects.push('shield-break', racer.x, racer.y, racer.z, 1, racer.id, this.tick);
     if (!racer.id) this.shieldBlocks++;
     return true;
   }

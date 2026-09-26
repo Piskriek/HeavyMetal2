@@ -424,11 +424,11 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'powerup_repair_kit', name: 'Repair Kit', category: 'powerup', url: '/art/props/alpha/prop-07-tripod-cauldron-molten.png', defaultWidth: 300, defaultHeight: 300, defaultDepth: 300, isPowerup: true },
 
   // --- T08: BARRIERS ---
-  { type: 'barrier_spike_wall', name: 'Spiked Barrier Wall', category: 'barrier', url: '/art/props/alpha/prop-29-spiked-boulder-barricade.png', defaultWidth: 800, defaultHeight: 600, defaultDepth: 200, isBarrier: true },
-  { type: 'barrier_electric_fence', name: 'Electric Fence', category: 'barrier', url: '/art/props/alpha/prop-38-scrap-iron-barricade.png', defaultWidth: 1000, defaultHeight: 500, defaultDepth: 150, isBarrier: true },
-  { type: 'barrier_fire_pit', name: 'Fire Pit Trap', category: 'barrier', url: '/art/props/alpha/prop-41-molten-slag-channel.png', defaultWidth: 600, defaultHeight: 400, defaultDepth: 600, isBarrier: true },
-  { type: 'barrier_rock_slide', name: 'Rock Slide Zone', category: 'barrier', url: '/art/props/alpha/prop-35-granite-strata-seam-wall.png', defaultWidth: 1200, defaultHeight: 800, defaultDepth: 300, isBarrier: true },
-  { type: 'barrier_mine_field', name: 'Mine Field', category: 'barrier', url: '/art/props/alpha/prop-02-ore-cart-spilling.png', defaultWidth: 500, defaultHeight: 300, defaultDepth: 500, isBarrier: true },
+  { type: 'barrier_spike_wall', name: 'Spiked Barrier Wall', category: 'barrier', url: '/art/track-obstacles/barrier-spike-wall.png', defaultWidth: 800, defaultHeight: 600, defaultDepth: 200, isBarrier: true },
+  { type: 'barrier_electric_fence', name: 'Electric Fence', category: 'barrier', url: '/art/track-obstacles/barrier-electric-fence.png', defaultWidth: 1000, defaultHeight: 500, defaultDepth: 150, isBarrier: true },
+  { type: 'barrier_fire_pit', name: 'Fire Pit Trap', category: 'barrier', url: '/art/track-obstacles/barrier-fire-pit.png', defaultWidth: 600, defaultHeight: 400, defaultDepth: 600, isBarrier: true },
+  { type: 'barrier_rock_slide', name: 'Rock Slide Zone', category: 'barrier', url: '/art/track-obstacles/barrier-rock-slide.png', defaultWidth: 1200, defaultHeight: 800, defaultDepth: 300, isBarrier: true },
+  { type: 'barrier_mine_field', name: 'Mine Field', category: 'barrier', url: '/art/track-obstacles/barrier-mine-field.png', defaultWidth: 500, defaultHeight: 300, defaultDepth: 500, isBarrier: true },
 
   // --- ANIMATED (4-frame 2x2 sheets; built by scripts/process-animated.mjs) ---
   { type: 'anim_01_torchbearer_flame', name: 'Torchbearer (Animated)', category: 'animated', url: '/art/animated/alpha/anim-01-torchbearer-flame.png', defaultWidth: 375, defaultHeight: 560, isAnimated: true, animCols: 2, animRows: 2, animFps: 7 },

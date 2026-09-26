@@ -25,7 +25,7 @@ import {
 } from '../src/game/effects/pool';
 import { EFFECT_ART_PATHS, EFFECT_SHEETS } from '../src/game/effects/renderer-fx';
 import { createEffectLog } from '../src/game/effects/events';
-import { hitObstacle, stepRacer } from '../src/game/sim/racer-physics';
+import { hitObstacle, performBoost, stepRacer } from '../src/game/sim/racer-physics';
 import { LEGACY_RECOVERY, createRecordingFx, type RacerStepContext } from '../src/game/sim/context';
 import { createRacers, type Racer } from '../src/game/racers';
 import { createSimWorld } from '../src/game/sim/world';
@@ -243,8 +243,8 @@ test('reduced motion', () => {
   pool.update(t0 + EFFECT_SPECS.explosion.life * 0.8, true);
   const explosion = pool.all.find((slot) => slot.active && slot.kind === 'explosion');
   const smoke = pool.all.find((slot) => slot.active && slot.kind === 'smoke');
-  assert.equal(explosion?.frame, 1, 'reduced motion holds the sheet on frame 1');
-  assert.equal(smoke?.frame, 1);
+  assert.equal(explosion?.frame, 0, 'reduced motion holds the sheet on frame 0');
+  assert.equal(smoke?.frame, 0);
   assert.equal(explosion?.opacity, 0.5, 'and halves the flash');
   if (explosion && smoke) {
     assert.equal(pool.sizeOf(smoke, true), smoke.size, 'smoke does not scale under reduced motion');
@@ -275,7 +275,7 @@ test('unknown kind refused', () => {
   assert.equal(log.log.length, 0);
 
   // Everything the contract publishes is accepted.
-  const good = new EffectQueue(8);
+  const good = new EffectQueue(EFFECT_KINDS.length);
   for (const kind of EFFECT_KINDS) good.push(kind, 0, 0, 0, 1, 0, 0);
   assert.equal(good.pending, EFFECT_KINDS.length);
 });
@@ -302,8 +302,10 @@ test('event mapping coverage', () => {
     assert.equal(h % 2, 0, `${key} height must divide by its 2 rows`);
     // The generator returns roughly 1000px sheets whatever the prop's default quad size is, so the
     // assertion is a band, not an exact size: a thumbnail or a 4K monster both mean a bad export.
-    assert.equal(w >= 512 && w <= 2048, true, `${key} is a real sheet (${w}px)`);
-    assert.equal(h >= 512 && h <= 2048, true, `${key} is a real sheet (${h}px)`);
+    // The generator crops each sheet to its own content, so a tall flame and a wide shockwave are
+    // different shapes; the band only rules out a thumbnail or a 4K monster.
+    assert.equal(w >= 384 && w <= 2048, true, `${key} is a real sheet (${w}px)`);
+    assert.equal(h >= 384 && h <= 2048, true, `${key} is a real sheet (${h}px)`);
   }
 
   // The mapping itself: each gameplay event the sim reports must be one of the drawn kinds, and
@@ -318,9 +320,19 @@ test('event mapping coverage', () => {
     lightBump: ['impact', 'sparks'],
     // Landing, hopping, recovering, ground impacts.
     landing: ['dust'],
+    // A landing hard enough to ring the road.
+    hardLanding: ['landing'],
     // Boost pads trail smoke; loop exits throw sparks.
     boost: ['smoke'],
     loopExit: ['sparks', 'dust'],
+    // The painted wave: the nitro charge, the pad under it, a supply taken, a shield spent, a
+    // spring throwing the ball up and a ball knocked into the tree line.
+    nitro: ['boost'],
+    boostPad: ['boost-pad'],
+    supply: ['pickup'],
+    shieldSpent: ['shield-break'],
+    springLaunch: ['spring'],
+    treeSmash: ['tree-smash'],
     finish: [],
   };
   const used = new Set<string>();
@@ -340,8 +352,8 @@ test('event mapping coverage', () => {
   const layout = createTrackLayout('ridge');
   const templateOf = (kind: string) => layout.find((obstacle) => obstacle.kind === kind);
   const expectedByKind: Record<string, string[]> = {
-    boost: ['sparks'],
-    spring: ['dust'],
+    boost: ['sparks', 'boost-pad'],
+    spring: ['dust', 'spring'],
     tnt: ['explosion', 'smoke'],
     sheep: ['dust'],
     blimp: ['explosion', 'smoke'],
@@ -415,10 +427,104 @@ test('event mapping coverage', () => {
     for (const kind of kinds) seen.add(kind);
   }
 
-  // Between them these two drives exercise every kind the runtime knows how to draw.
+  // 3. The nitro burst: spending a boost charge, through the shipping sim call.
+  {
+    const world = createSimWorld('ridge', layout, createAirPickups('ridge', layout));
+    const recorder = createRecordingFx();
+    let runTime = 0;
+    const ctx: RacerStepContext = {
+      world, fx: recorder, recovery: LEGACY_RECOVERY, random: () => 0.5,
+      get runTime() { return runTime; }, get wallTime() { return runTime; },
+    };
+    const racer: Racer = { ...createRacers()[0], boosts: 1, vx: 600, grounded: true };
+    runTime += FIXED_STEP;
+    performBoost(racer, ctx);
+    const kinds = recorder.log.filter((entry) => entry.type === 'effect').map((entry) => (entry as { kind: string }).kind);
+    assert.equal(kinds.includes('boost'), true, 'spending a boost charge paints a nitro flame');
+    for (const kind of kinds) seen.add(kind);
+  }
+
+  // 4. A hard landing: dropped from a height onto the road, the ball rings it.
+  {
+    const world = createSimWorld('ridge', layout, createAirPickups('ridge', layout));
+    const recorder = createRecordingFx();
+    let runTime = 0;
+    const ctx: RacerStepContext = {
+      world, fx: recorder, recovery: LEGACY_RECOVERY, random: () => 0.5,
+      get runTime() { return runTime; }, get wallTime() { return runTime; },
+    };
+    const racer: Racer = { ...createRacers()[0] };
+    racer.x = 2400;
+    racer.z = laneZ(racer.lane);
+    racer.grounded = false;
+    racer.vx = 700;
+    racer.vy = 900;
+    racer.y = world.surfaceAt(racer.x, racer.z).y - RADIUS - 900;
+    let landed = false;
+    for (let tick = 0; tick < 600 && !landed; tick++) {
+      runTime += FIXED_STEP;
+      stepRacer(racer, ctx, FIXED_STEP);
+      landed = recorder.log.some((entry) => entry.type === 'effect' && (entry as { kind: string }).kind === 'landing');
+    }
+    assert.equal(landed, true, 'a hard landing paints a shockwave on the road');
+    for (const entry of recorder.log) if (entry.type === 'effect') seen.add((entry as { kind: string }).kind);
+  }
+
+  // The drives above exercise every kind the sim itself can produce here; the three that belong to
+  // the engine (a supply taken, a shield spent, a ball reeled out of the trees) are asserted in
+  // tests/effect-coverage.test.ts, which reads every emitter out of the tree.
+  const engineOwned = new Set(['pickup', 'shield-break', 'tree-smash']);
   for (const kind of EFFECT_KINDS) {
+    if (engineOwned.has(kind)) continue;
     assert.equal(seen.has(kind), true, `no gameplay event produces ${kind}: the spec is dead weight`);
   }
+});
+
+/* -----------------------------------------------------------------------------
+   6b. THE PAINTED WAVE: THE NEW KINDS, THEIR SHEETS AND THE SUPPLY TINT
+   -------------------------------------------------------------------------- */
+
+test('the painted wave has its own sheets, and a supply burst wears the supply colour', () => {
+  // One painted sheet per new kind, and no kind borrows another's.
+  const wave: Record<string, string> = {
+    boost: 'anim-54', 'boost-pad': 'anim-55', pickup: 'anim-56', 'shield-break': 'anim-57',
+    spring: 'anim-58', landing: 'anim-59', 'tree-smash': 'anim-60',
+  };
+  for (const [kind, sheet] of Object.entries(wave)) {
+    const spec = EFFECT_SPECS[kind as keyof typeof EFFECT_SPECS];
+    assert.equal(spec.sheet, sheet, `${kind} plays ${sheet}`);
+    assert.equal(existsSync(publicFile(EFFECT_SHEETS[sheet as keyof typeof EFFECT_SHEETS].url)), true,
+      `${sheet} must ship`);
+    assert.equal(spec.count >= 1, true, `${kind} spawns a billboard`);
+    assert.equal(spec.life > 0 && spec.life < 1.5, true, `${kind} is a flash, not a fixture`);
+  }
+  // Every kind is on a sheet of its own or the shared spark points: nothing is left unpainted.
+  const sheets = EFFECT_KINDS.map((kind) => EFFECT_SPECS[kind].sheet);
+  assert.equal(new Set(sheets).size >= EFFECT_KINDS.length - 1, true, 'the kinds do not share art');
+
+  // The supply burst is tinted by the event, not by the spec: the sheet itself paints white.
+  const queue = new EffectQueue(8);
+  queue.push('pickup', 10, 20, 30, 1, 0, 4, 0x8cceff);
+  const out: EffectEvent[] = [];
+  queue.readSince(0, out);
+  assert.equal(out[0].tint, 0x8cceff, 'the queue carries the supply colour');
+
+  const pool = new BillboardPool(4);
+  pool.spawn('pickup', EFFECT_SPECS.pickup, 0, 0, 0, 0, 1, UP, 0x8cceff);
+  const tinted = pool.all.find((slot) => slot.active);
+  assert.equal(tinted?.colour, 0x8cceff, 'and the billboard is multiplied by it');
+  const plain = new BillboardPool(4);
+  plain.spawn('landing', EFFECT_SPECS.landing, 0, 0, 0, 0, 1, UP);
+  assert.equal(plain.all.find((slot) => slot.active)?.colour, 0xffffff,
+    'an untinted sheet keeps its own painted colours');
+
+  // Reduced motion: every sheet holds frame 0, whatever its fps.
+  const still = new BillboardPool(8);
+  for (const kind of ['boost', 'boost-pad', 'pickup', 'shield-break', 'spring', 'landing', 'tree-smash'] as const) {
+    still.spawn(kind, EFFECT_SPECS[kind], 0, 0, 0, 0, 1, UP);
+  }
+  still.update(0.2, true);
+  for (const slot of still.all) if (slot.active) assert.equal(slot.frame, 0, `${slot.kind} holds frame 0`);
 });
 
 /* -----------------------------------------------------------------------------

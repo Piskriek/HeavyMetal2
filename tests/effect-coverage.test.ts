@@ -17,10 +17,12 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EFFECT_KINDS } from '../src/game/effects/events';
+import { EFFECT_SPECS } from '../src/game/effects/pool';
+import { EFFECT_SHEETS } from '../src/game/effects/renderer-fx';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
@@ -86,4 +88,42 @@ test('the engine hands the sim the same queue, so sim-side effects are painted t
   const renderer = readFileSync(join(root, 'src/game/renderer-3d.ts'), 'utf8');
   assert.match(renderer, /this\.effects\?\.destroy\(\)|new EffectRenderer/,
     'the 3D renderer owns the painted runtime');
+});
+
+test('every effect kind has painted art that ships, and the painted wave is wired to its event', () => {
+  // 1. A sheet per kind (or the shared spark points), and the file is really in public/.
+  for (const kind of EFFECT_KINDS) {
+    const spec = EFFECT_SPECS[kind];
+    assert.ok(spec, `${kind} has a spec`);
+    if (spec.sheet === 'points') continue;
+    const sheet = EFFECT_SHEETS[spec.sheet];
+    assert.ok(sheet, `${kind} names a sheet the runtime loads`);
+    assert.equal(
+      existsSync(join(root, 'public', sheet.url.replace(/^\//, ''))), true,
+      `${kind}'s sheet (${sheet.url}) must ship`,
+    );
+  }
+
+  // 2. Each new kind is emitted where the race already reacts, and nowhere else would do.
+  const physics = readFileSync(join(root, 'src/game/sim/racer-physics.ts'), 'utf8');
+  const engine = readFileSync(join(root, 'src/game/engine.ts'), 'utf8');
+  assert.match(physics, /performBoost[\s\S]{0,900}effect\('boost',/, 'spending a boost charge paints the nitro flame');
+  assert.match(physics, /case 'boost':[\s\S]{0,400}effect\('boost-pad',/, 'a boost pad lights up under the ball');
+  assert.match(physics, /case 'spring':[\s\S]{0,400}effect\('spring',/, 'a spring throws a painted puff');
+  assert.match(physics, /normalSpeed > 420\) ctx\.fx\.effect\('landing',/, 'only a hard landing rings the road');
+  assert.match(physics, /edgeSmashVz[\s\S]{0,400}effect\('tree-smash',/, 'the tree line smash is painted');
+  assert.match(engine, /pickupCollected[\s\S]{0,400}push\(\s*'pickup'[\s\S]{0,200}powerupTint\(kind\)/,
+    'a supply taken bursts in the supply\'s own colour');
+  assert.match(engine, /absorbShield[\s\S]{0,600}push\('shield-break'/, 'a shield spent shatters');
+});
+
+test('the race draws the painted track art, and nothing is a tinted box any more', () => {
+  const view = readFileSync(join(root, 'src/game/obstacle-view.ts'), 'utf8');
+  assert.doesNotMatch(view, /BLOCK_COLOURS|wireframe/, 'the interim tinted blocks are gone');
+  assert.match(view, /preloadTrackArt/, 'the module preloads its own art');
+  const race = readFileSync(join(root, 'src/screens/RaceScreen.tsx'), 'utf8');
+  assert.match(race, /preloadTrackArt\(\)/, 'and the race screen calls it before the grid');
+  const renderer = readFileSync(join(root, 'src/game/renderer-3d.ts'), 'utf8');
+  assert.match(renderer, /shieldBubbleTexture\(\)/, 'the shield wears the painted hex bubble');
+  assert.doesNotMatch(renderer, /wireframe: true/, 'and no wireframe sphere is left');
 });

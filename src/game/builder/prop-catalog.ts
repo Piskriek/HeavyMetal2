@@ -493,6 +493,7 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_59_landing_shockwave', name: 'Landing Shockwave', category: 'animated', url: '/art/animated/alpha/anim-59-landing-shockwave.png', defaultWidth: 560, defaultHeight: 320, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
   { type: 'anim_60_tree_smash_splinters', name: 'Tree Smash Splinters', category: 'animated', url: '/art/animated/alpha/anim-60-tree-smash-splinters.png', defaultWidth: 480, defaultHeight: 440, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
   { type: 'anim_61_speed_lines', name: 'Speed Lines', category: 'animated', url: '/art/animated/alpha/anim-61-speed-lines.png', defaultWidth: 520, defaultHeight: 360, isAnimated: true, animCols: 2, animRows: 2, animFps: 16 },
+  { type: 'anim_62_goblin_rope_reel', name: 'Rope-Reel Goblin', category: 'animated', url: '/art/animated/alpha/anim-62-goblin-rope-reel.png', defaultWidth: 360, defaultHeight: 360, isAnimated: true, animCols: 2, animRows: 2, animFps: 8 },
 
   // --- SCENE KIT: primitives, lights, and the record type for edits to generated scenery ---
   ...PRIMITIVE_DEFINITIONS,

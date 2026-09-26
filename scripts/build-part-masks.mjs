@@ -51,7 +51,7 @@ export function channelOf(r, g, b) {
 const CHANNELS = ['skin', 'leather', 'metal', 'accent'];
 /** What each layer is allowed to re-tint (eyes are yellow, not brass; hair is painted in the accent red). */
 const ALLOWED = {
-  eyes: ['skin'], ears: ['skin'], nose: ['skin', 'metal'], mouth: ['skin', 'metal'],
+  head: ['skin'], eyes: ['skin'], ears: ['skin'], nose: ['skin', 'metal'], mouth: ['skin', 'metal'],
   hair: ['accent'], eyewear: ['leather', 'metal'], headgear: ['leather', 'metal', 'accent'], neck: ['leather', 'metal', 'accent'], warpaint: [],
 };
 mkdirSync(maskDir, { recursive: true });

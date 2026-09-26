@@ -47,6 +47,31 @@ ordered release (drive the existing pool from the drum); "lethal" branch state i
 authored as many short sections; the post-finish run-out (racers keep physics after `finished`, results
 frozen).
 
+## 0b. It must look like one natural place (owner: "very important")
+
+The island has to read as a natural environment where everything belongs, not a kit dropped on a
+heightfield. Binding rules for every ticket that builds or places anything:
+
+1. **Roads live in the ground.** The terrain is shaped *by* the route: roads are cut into slopes (cuttings with
+   rock faces above), carried on embankments, or held by visible structures (trestles, bridges). A road never
+   floats and never clips through a hill. Where a road meets terrain, a shoulder of gravel and scree blends it.
+2. **Pieces are rooted.** Every Meshy piece is sunk into the terrain (its base below the surface), and every
+   base is dressed with scattered rocks, scree and sand drifts so no straight model edge meets the ground.
+   Cliff and rock pieces overlap and interpenetrate to hide seams, like real rock.
+3. **One palette, one light.** Terrain materials and model textures share the same sand, basalt, ochre, timber
+   and iron colours. Meshy textures carry baked shading: generate with even lighting, and match the in-game
+   sun direction (upper left) so baked and real shadows agree. One colour grade over everything.
+4. **Transitions, not borders.** Terrain materials blend by slope and height (sand → scree → basalt → ochre
+   bands), wet sand at the waterline, foam at the shore, darker rock where water runs. No hard material seams.
+5. **Atmosphere ties it together.** Distance fog and aerial perspective (far things bluer and paler), a sky
+   that matches the fog, soft ambient occlusion where pieces meet the ground.
+6. **Nature is irregular.** Vary scale and rotation of repeated pieces (no two rocks, palms or stacks alike),
+   break straight lines, cluster things the way nature does (palms in groups near water, rocks at cliff feet).
+7. **Scale is consistent.** A marble, a road lane, a timber plank and a cliff all keep believable proportions
+   at the island's ten-times scale; landmarks are big because they are far, not because they are inflated.
+8. **Review for it.** Every placement and terrain change is checked in the browser from race-camera height and
+   from above: any floating piece, visible seam, repeated tile or colour clash is a bug.
+
 ## 1. The route: twelve sections
 
 | # | Section | Where | Branches (fork) | Kit and landmarks |

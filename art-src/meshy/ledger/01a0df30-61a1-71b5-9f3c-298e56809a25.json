@@ -1,0 +1,22 @@
+{
+  "name": "stunt-suspension-bridge",
+  "taskId": "01a0df30-61a1-71b5-9f3c-298e56809a25",
+  "kind": "image-to-3d",
+  "ref": "art-src/meshy/refs/stunt-suspension-bridge.png",
+  "params": {
+    "image_url": "(data uri)",
+    "ai_model": "latest",
+    "should_remesh": true,
+    "topology": "triangle",
+    "target_polycount": 8000,
+    "should_texture": true,
+    "enable_pbr": false,
+    "texture_resolution": "2k",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 30,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:28:06.970Z"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "stunt-launch-ramp:collision",
+  "taskId": "01a0df2f-05f0-76dd-a499-7593f1a769f6",
+  "kind": "remesh",
+  "source": "01a0df2c-401e-7528-af56-232073f48c81",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:26:36.844Z"
+}

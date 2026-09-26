@@ -1,0 +1,10 @@
+{
+  "name": "stunt-cliff-ramp:lod",
+  "taskId": "01a0df2d-b6c9-73bb-9032-7d89b760d955",
+  "kind": "remesh",
+  "source": "01a0df2c-3e53-7021-a91a-db384a3f0712",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:25:11.103Z"
+}

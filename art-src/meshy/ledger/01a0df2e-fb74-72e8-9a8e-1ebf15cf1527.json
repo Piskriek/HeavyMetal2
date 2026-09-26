@@ -1,0 +1,10 @@
+{
+  "name": "stunt-corkscrew:collision",
+  "taskId": "01a0df2e-fb74-72e8-9a8e-1ebf15cf1527",
+  "kind": "remesh",
+  "source": "01a0df2c-4062-7772-af51-69e02ec03cca",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:26:34.169Z"
+}

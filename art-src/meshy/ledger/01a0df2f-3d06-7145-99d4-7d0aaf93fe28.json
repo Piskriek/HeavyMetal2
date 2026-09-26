@@ -1,0 +1,10 @@
+{
+  "name": "stunt-cliff-deck:collision",
+  "taskId": "01a0df2f-3d06-7145-99d4-7d0aaf93fe28",
+  "kind": "remesh",
+  "source": "01a0df2c-3d31-72c5-ba5a-b6cd5b40bd3a",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:26:50.946Z"
+}

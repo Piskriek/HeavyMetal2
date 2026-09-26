@@ -1,0 +1,10 @@
+{
+  "name": "stunt-landing-deck:collision",
+  "taskId": "01a0df2e-fcbd-722c-bfb7-ee6f41ce12a1",
+  "kind": "remesh",
+  "source": "01a0df2c-3f6e-754f-a96a-f21bb2689702",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:26:34.495Z"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "stunt-scaffold-tower:lod",
+  "taskId": "01a0df32-b16f-76fc-9e81-4b62b6fd8fdc",
+  "kind": "remesh",
+  "source": "01a0df30-5511-74d7-ac29-628538999f43",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:30:37.349Z"
+}

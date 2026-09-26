@@ -1,0 +1,10 @@
+{
+  "name": "stunt-landing-deck:lod",
+  "taskId": "01a0df2d-e9a6-7456-927d-3d0cf87e198f",
+  "kind": "remesh",
+  "source": "01a0df2c-3f6e-754f-a96a-f21bb2689702",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:25:24.046Z"
+}

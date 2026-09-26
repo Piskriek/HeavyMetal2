@@ -1,0 +1,10 @@
+{
+  "name": "stunt-giant-loop:collision",
+  "taskId": "01a0df2f-1f60-70ae-a011-7d787c0fefd1",
+  "kind": "remesh",
+  "source": "01a0df2c-4084-722c-8406-568f68a2f73b",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:26:43.356Z"
+}

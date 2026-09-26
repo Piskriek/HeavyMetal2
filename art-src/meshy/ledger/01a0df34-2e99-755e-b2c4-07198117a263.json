@@ -1,0 +1,10 @@
+{
+  "name": "stunt-waterfall-portal:collision",
+  "taskId": "01a0df34-2e99-755e-b2c4-07198117a263",
+  "kind": "remesh",
+  "source": "01a0df30-cfd7-75a1-90a5-02338e050a51",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:32:14.927Z"
+}

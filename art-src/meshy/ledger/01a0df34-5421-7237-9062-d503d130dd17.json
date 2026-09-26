@@ -1,0 +1,10 @@
+{
+  "name": "stunt-scaffold-tower:collision",
+  "taskId": "01a0df34-5421-7237-9062-d503d130dd17",
+  "kind": "remesh",
+  "source": "01a0df30-5511-74d7-ac29-628538999f43",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:32:24.546Z"
+}

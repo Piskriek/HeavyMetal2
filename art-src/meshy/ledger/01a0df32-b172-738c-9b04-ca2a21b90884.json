@@ -1,0 +1,10 @@
+{
+  "name": "stunt-waterfall-portal:lod",
+  "taskId": "01a0df32-b172-738c-9b04-ca2a21b90884",
+  "kind": "remesh",
+  "source": "01a0df30-cfd7-75a1-90a5-02338e050a51",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:30:37.364Z"
+}

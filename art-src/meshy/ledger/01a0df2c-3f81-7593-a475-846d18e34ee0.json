@@ -1,0 +1,22 @@
+{
+  "name": "stunt-half-pipe",
+  "taskId": "01a0df2c-3f81-7593-a475-846d18e34ee0",
+  "kind": "image-to-3d",
+  "ref": "art-src/meshy/refs/stunt-half-pipe.png",
+  "params": {
+    "image_url": "(data uri)",
+    "ai_model": "latest",
+    "should_remesh": true,
+    "topology": "triangle",
+    "target_polycount": 8000,
+    "should_texture": true,
+    "enable_pbr": false,
+    "texture_resolution": "2k",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 30,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:23:36.613Z"
+}

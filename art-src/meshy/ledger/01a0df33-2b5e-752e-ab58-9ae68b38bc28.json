@@ -1,0 +1,10 @@
+{
+  "name": "stunt-suspension-bridge:collision",
+  "taskId": "01a0df33-2b5e-752e-ab58-9ae68b38bc28",
+  "kind": "remesh",
+  "source": "01a0df30-61a1-71b5-9f3c-298e56809a25",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:31:08.554Z"
+}

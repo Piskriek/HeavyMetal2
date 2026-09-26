@@ -1,0 +1,10 @@
+{
+  "name": "stunt-corkscrew:lod",
+  "taskId": "01a0df2d-bfb3-766e-842d-5fb43265f4ea",
+  "kind": "remesh",
+  "source": "01a0df2c-4062-7772-af51-69e02ec03cca",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:25:13.324Z"
+}

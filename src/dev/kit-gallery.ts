@@ -54,7 +54,12 @@ async function show(index: number) {
   const mine = ++token;
   document.querySelectorAll('li button').forEach((b) => b.setAttribute('aria-current', String(b.getAttribute('data-id') === id)));
   document.getElementById('name')!.textContent = pretty(id);
-  const url = `/models/kit/${id}${tier}.glb`;
+  let url = `/models/kit/${id}${tier}.glb`;
+  if (tier === '.drive') {
+    // The dev server answers a missing file with its HTML page, so check the type, not just the status.
+    const probe = await fetch(url, { method: 'HEAD' });
+    if (!probe.ok || probe.headers.get('content-type')?.includes('html')) url = `/models/kit/${id}.glb`;
+  }
   const [model, head] = await Promise.all([loadGlb(url), fetch(url, { method: 'HEAD' })]);
   if (mine !== token) return;
   if (shown) scene.remove(shown);
@@ -72,7 +77,8 @@ async function show(index: number) {
     if (!mesh.isMesh) return;
     mesh.castShadow = mesh.receiveShadow = true;
     tris += (mesh.geometry.index?.count ?? mesh.geometry.getAttribute('position').count) / 3;
-    if (tier === '.collision') mesh.material = new THREE.MeshStandardMaterial({ color: '#c46f3a', wireframe: false, flatShading: true, roughness: 0.9 });
+    if (tier === '.collision') mesh.material = new THREE.MeshStandardMaterial({ color: '#c46f3a', flatShading: true, roughness: 0.9 });
+    if (tier === '.drive') { mesh.material = new THREE.MeshStandardMaterial({ color: '#e0a13a', flatShading: false, roughness: 0.7, side: THREE.DoubleSide }); mesh.geometry.computeVertexNormals(); }
   });
   scene.add(o);
   shown = o;

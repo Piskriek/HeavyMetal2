@@ -1,0 +1,22 @@
+{
+  "name": "stunt-hoop-tunnel",
+  "taskId": "01a0df3e-be64-7651-8109-058b9832eaef",
+  "kind": "image-to-3d",
+  "ref": "art-src/meshy/refs/stunt-hoop-tunnel.png",
+  "params": {
+    "image_url": "(data uri)",
+    "ai_model": "latest",
+    "should_remesh": true,
+    "topology": "triangle",
+    "target_polycount": 8000,
+    "should_texture": true,
+    "enable_pbr": false,
+    "texture_resolution": "2k",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 30,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:43:48.390Z"
+}

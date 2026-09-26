@@ -1,0 +1,10 @@
+{
+  "name": "stunt-loop-ramp:lod",
+  "taskId": "01a0df40-9d46-701f-99c2-6a0332ba4b6e",
+  "kind": "remesh",
+  "source": "01a0df3e-befa-7645-aa03-3ba1bee0db50",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:45:50.651Z"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "stunt-hoop-tunnel:collision",
+  "taskId": "01a0df41-58a4-7107-b3ed-82eb59663327",
+  "kind": "remesh",
+  "source": "01a0df3e-be64-7651-8109-058b9832eaef",
+  "polycount": 300,
+  "credits": 5,
+  "status": "PENDING",
+  "at": "2026-09-26T19:46:37.669Z"
+}

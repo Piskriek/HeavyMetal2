@@ -1,0 +1,10 @@
+{
+  "name": "stunt-hoop-tunnel:lod",
+  "taskId": "01a0df40-1d58-722b-8fad-bd09fc35b4b6",
+  "kind": "remesh",
+  "source": "01a0df3e-be64-7651-8109-058b9832eaef",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:45:16.994Z"
+}

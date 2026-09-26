@@ -24,13 +24,27 @@ All four files are in `public/art/meshy-reference/` and are 1536 × 1024 PNGs.
 | `stunt-object-kit-01.png` | Individual stunt-prop silhouettes | loop, scaffold tower, launch ramp, quarter-pipe, bridge jump, portals, waterfall curtain and landing platform |
 | `terrain-modular-kit-01.png` | Modular terrain/connector kit | island slabs, downhill pieces, banked curves, tunnel/waterfall chunks, loop base, guard rail and small side boxes |
 
+### Mega-scale revision
+
+The first four references were deliberately compact. The **02** set raises the target to a full expansion-sized island: several mountain masses, long sightlines, deep ravines, multiple waterfalls, multiple route layers and stunt structures that are much taller than the surrounding terrain.
+
+| File | Use it for | What must remain legible |
+| --- | --- | --- |
+| `mega-island-overview-02.png` | Macro world scale | several peaks, five route bands, giant loop, long bridges, deep water basin and underground shelf |
+| `mega-cutaway-network-02.png` | Full route/cave network | separate mountain masses, long underground route, multiple cave portals and waterfall breakthroughs |
+| `mega-stunt-structures-02.png` | Oversized stunt assets | towering loop, double loop, corkscrew, giant launch ramp, suspended bridge, scaffold tower and landing deck |
+| `mega-terrain-kit-02.png` | Large modular chunks | mountain modules, long connectors, large tunnel sections, loop foundation, retaining walls and side boxes |
+
+Use the **02** images as the primary references when the goal is the larger island. Keep the **01** images as close-up shape references for clean individual meshes.
+
 ### Recommended image usage
 
-1. Give `island-overview-01.png` to the agent first as the **world composition reference**.
-2. Give `mountain-track-cutaway-01.png` second as the **elevation and cave reference**.
-3. Generate the terrain pieces from `terrain-modular-kit-01.png` one at a time.
-4. Generate the stunt objects from `stunt-object-kit-01.png` one at a time.
-5. Do not ask for one giant Meshy scene. The builder needs separate meshes with predictable pivots and clean collision surfaces.
+1. Give `mega-island-overview-02.png` to the agent first as the **world composition and scale reference**.
+2. Give `mega-cutaway-network-02.png` second as the **elevation, cave and route-network reference**.
+3. Use `mega-terrain-kit-02.png` to generate large terrain modules one at a time.
+4. Use `mega-stunt-structures-02.png` to generate the oversized loop, ramp, bridge and scaffold family one at a time.
+5. Use the **01** object sheet only when Meshy needs a simpler close-up silhouette.
+6. Do not ask for one giant Meshy scene. The builder needs separate meshes with predictable pivots and clean collision surfaces.
 
 ## Meshy generation rules
 
@@ -78,8 +92,11 @@ Generate these as independent assets rather than a single island scene.
 
 ## Provisional scale for the builder
 
-Use these ratios first; convert to engine units only after the first import test.
+Use these ratios first; convert to engine units only after the first import test. The mega set is a world-scale target, not a literal single mesh: build it from many modules and let the builder own the final route length.
 
+- Macro island target: **3–5 mountain masses**, **5 distinct route bands**, **2–3 deep ravines**, and **3+ waterfall/cave breakthroughs**.
+- Stunt scale target: the hero loop and summit ramp should be **roughly 2–3 times the height of nearby scaffold bays**, with long bridge spans between separate terrain masses.
+- Route spacing target: keep enough vertical and lateral separation that the upper route, mid route and underground route read as separate tracks from the overview camera.
 - One lane module: **1 unit of width**.
 - Four-lane route: **4 units wide** at the clean deck surface.
 - Marble diameter: about **0.26 lane units** (the game uses radius 31 and lane width 240).

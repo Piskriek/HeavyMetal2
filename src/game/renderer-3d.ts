@@ -776,7 +776,9 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
   let runStart = 0;
   for (let i = 1; i <= samples.length; i++) {
     if (i === samples.length || surfaceKey(samples[i]) !== surfaceKey(samples[runStart])) {
-      scene.add(sweepProfile(samples, runStart, Math.min(i, samples.length - 1), SURFACE, M[surfaceKey(samples[runStart])]));
+      const surface = sweepProfile(samples, runStart, Math.min(i, samples.length - 1), SURFACE, M[surfaceKey(samples[runStart])]);
+      surface.name = 'TrackSurface'; // the builder's scenery index keeps the race line locked
+      scene.add(surface);
       runStart = i;
     }
   }
@@ -1745,6 +1747,8 @@ export class Renderer3D {
     const manager = new THREE.LoadingManager();
     const textures = loadTextures(manager);
     this.materials = buildMaterials(textures);
+    // Named for the builder's scenery lists ("Cliff", "Cave rock"…) and for debugging.
+    for (const [key, material] of Object.entries(this.materials)) if (!material.name) material.name = key;
 
     this.space = getTrackSpace();
     this.track = buildTrack(this.space);
@@ -2257,6 +2261,9 @@ export class Renderer3D {
       this.applyImpactShake(frame.shake, frame.time, frame.reducedMotion);
       if (frame.impact) this.applyImpactKick(frame.impact, frame.time, frame.reducedMotion);
       this.updateAtmosphere(playerDist);
+    } else {
+      // The builder: the underground is as dark as in a race around the camera (so placed lights read true), unless turned off.
+      this.updateAtmosphere(this.trackBuilder.previewAtmosphere ? this.trackBuilder.cameraTrackDistance() : 0);
     }
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;

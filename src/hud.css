@@ -9,10 +9,11 @@
 .gauge-face { stroke: #caa55c55; stroke-width: 1; }
 .gauge-track { fill: none; stroke: #060d09; stroke-width: 7; stroke-linecap: round; opacity: .9; }
 .gauge-value-arc { fill: none; stroke-width: 7; stroke-linecap: round; filter: drop-shadow(0 0 4px #f2a34166); transition: stroke-dashoffset .55s cubic-bezier(.22, .9, .3, 1); }
-.gauge-tick { stroke: #4e5c3d; stroke-width: 1.4; }
-.gauge-tick.lit { stroke: #d9b26e; }
 .gauge-needle { transform-origin: 60px 60px; transform-box: view-box; transition: transform .55s cubic-bezier(.22, .9, .3, 1); }
 .gauge-needle-glint { stroke: #ffe9b0; stroke-width: 1; opacity: .55; stroke-linecap: round; }
+/* WIRE-4: the arc gauge's needle is the painted sprite; it still glides between values, but not
+   for players who asked for stillness (the dial's quick tracking motion is untouched). */
+@media (prefers-reduced-motion: reduce) { .blizzard-gauge .arc-needle { transition: none; } }
 .gauge-cap { fill: #1a2417; stroke: #b58f4d; stroke-width: 1.6; }
 .gauge-value-text { font: 600 15px 'Space Mono', monospace; fill: #f3d69b; }
 .gauge-value-max { font-size: 9px; fill: #8ba07a; }

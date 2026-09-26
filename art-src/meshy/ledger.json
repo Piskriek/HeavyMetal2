@@ -1,0 +1,298 @@
+[
+  {
+    "name": "arch-bridge",
+    "taskId": "01a0dedd-e84a-76bb-ba55-b3726eecb908",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/arch-bridge.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T17:58:02.075Z"
+  },
+  {
+    "name": "jump-ramp",
+    "taskId": "01a0dedd-daf5-71e8-8211-0fa234a1d2ba",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/jump-ramp.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T17:57:58.201Z"
+  },
+  {
+    "name": "basalt-cave",
+    "taskId": "01a0dedd-fa3c-7428-ab6d-7e1736e2e5e0",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/basalt-cave.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T17:58:06.817Z"
+  },
+  {
+    "name": "beach-shelf",
+    "taskId": "01a0dee3-2e25-77eb-b9b2-4816bfe65149",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/beach-shelf.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:03:47.499Z"
+  },
+  {
+    "name": "hairpin-turn",
+    "taskId": "01a0dee3-4b1f-76a0-8427-a493d998755c",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/hairpin-turn.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:03:54.919Z"
+  },
+  {
+    "name": "cliff-block",
+    "taskId": "01a0dee3-3efb-7784-b86e-21d625bceebe",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/cliff-block.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:03:51.510Z"
+  },
+  {
+    "name": "road-straight",
+    "taskId": "01a0dee3-5841-7454-b7f6-a61390edde42",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/road-straight.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:03:58.260Z"
+  },
+  {
+    "name": "boardwalk-bridge",
+    "taskId": "01a0dee3-6527-76f1-8b8e-d2558fd45578",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/boardwalk-bridge.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:04:01.526Z"
+  },
+  {
+    "name": "waterfall-cave",
+    "taskId": "01a0dee3-7270-73b8-8876-73de526fd3b3",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/waterfall-cave.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:04:04.721Z"
+  },
+  {
+    "name": "lagoon-platform",
+    "taskId": "01a0dee3-7fc7-7015-b34a-ac2c8ec4ee28",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/lagoon-platform.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:04:08.532Z"
+  },
+  {
+    "name": "iron-crate",
+    "taskId": "01a0dee3-a514-7757-ab69-afecb162e195",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/iron-crate.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:04:17.624Z"
+  },
+  {
+    "name": "stone-wall",
+    "taskId": "01a0dee3-8d16-733c-b7aa-b2a8c099a038",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/stone-wall.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:04:11.232Z"
+  },
+  {
+    "name": "railing-wall",
+    "taskId": "01a0dee3-97d4-76a3-8652-422016cb5fb2",
+    "kind": "image-to-3d",
+    "ref": "art-src/meshy/refs/railing-wall.png",
+    "params": {
+      "image_url": "(data uri)",
+      "ai_model": "latest",
+      "should_remesh": true,
+      "topology": "triangle",
+      "target_polycount": 8000,
+      "should_texture": true,
+      "enable_pbr": false,
+      "texture_resolution": "2k",
+      "target_formats": [
+        "glb"
+      ]
+    },
+    "credits": 30,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:04:14.129Z"
+  },
+  {
+    "name": "jump-ramp:lod",
+    "taskId": "01a0dee5-ce10-7714-80a9-4bfadd87c59e",
+    "kind": "remesh",
+    "source": "01a0dedd-daf5-71e8-8211-0fa234a1d2ba",
+    "polycount": 1500,
+    "credits": 5,
+    "status": "SUCCEEDED",
+    "at": "2026-09-26T18:06:38.429Z"
+  }
+]

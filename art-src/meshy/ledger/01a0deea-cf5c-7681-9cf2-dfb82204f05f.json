@@ -1,0 +1,10 @@
+{
+  "name": "arch-bridge:collision",
+  "taskId": "01a0deea-cf5c-7681-9cf2-dfb82204f05f",
+  "kind": "remesh",
+  "source": "01a0dedd-e84a-76bb-ba55-b3726eecb908",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:06.469Z"
+}

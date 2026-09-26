@@ -1,0 +1,10 @@
+{
+  "name": "hairpin-turn:collision",
+  "taskId": "01a0deea-f7c7-7080-8ac8-f1929830f2ae",
+  "kind": "remesh",
+  "source": "01a0dee3-4b1f-76a0-8427-a493d998755c",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:17.027Z"
+}

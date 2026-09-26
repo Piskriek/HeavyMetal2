@@ -1,0 +1,10 @@
+{
+  "name": "jump-ramp:collision",
+  "taskId": "01a0deea-cf52-7188-bf04-05cb7b8e221a",
+  "kind": "remesh",
+  "source": "01a0dedd-daf5-71e8-8211-0fa234a1d2ba",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:06.438Z"
+}

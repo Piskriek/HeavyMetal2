@@ -1,0 +1,10 @@
+{
+  "name": "cliff-block:lod",
+  "taskId": "01a0deeb-1101-76f5-b4ed-5b9777eee949",
+  "kind": "remesh",
+  "source": "01a0dee3-3efb-7784-b86e-21d625bceebe",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:23.237Z"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "waterfall-cave:collision",
+  "taskId": "01a0deec-d600-719e-a3c4-ecd9c3c8bade",
+  "kind": "remesh",
+  "source": "01a0dee3-7270-73b8-8876-73de526fd3b3",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:14:19.223Z"
+}

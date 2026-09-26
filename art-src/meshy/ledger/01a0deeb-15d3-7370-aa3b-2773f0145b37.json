@@ -1,0 +1,10 @@
+{
+  "name": "hairpin-turn:lod",
+  "taskId": "01a0deeb-15d3-7370-aa3b-2773f0145b37",
+  "kind": "remesh",
+  "source": "01a0dee3-4b1f-76a0-8427-a493d998755c",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:24.476Z"
+}

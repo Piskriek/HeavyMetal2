@@ -1,0 +1,10 @@
+{
+  "name": "stone-wall:lod",
+  "taskId": "01a0deee-0e33-7371-8714-53f9c5dd8fb3",
+  "kind": "remesh",
+  "source": "01a0dee3-8d16-733c-b7aa-b2a8c099a038",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:15:39.160Z"
+}

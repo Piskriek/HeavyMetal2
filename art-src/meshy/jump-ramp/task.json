@@ -1,0 +1,22 @@
+{
+  "id": "01a0dedd-daf5-71e8-8211-0fa234a1d2ba",
+  "type": "image-to-3d",
+  "name": "",
+  "art_style": "",
+  "object_prompt": "",
+  "style_prompt": "",
+  "negative_prompt": "",
+  "texture_prompt": "",
+  "texture_image_url": "",
+  "text_style_prompt": "",
+  "image_style_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790445477331,
+  "progress": 100,
+  "started_at": 1790445477343,
+  "finished_at": 1790445546085,
+  "expires_at": 1790704746085,
+  "task_error": null,
+  "model_url": "https://assets.meshy.ai/4a677934-3b25-41d2-bcb2-4a89d77d1767/tasks/01a0dedd-daf5-71e8-8211-0fa234a1d2ba/output/model.glb?Expires=1790704746&Signature=U6qrrdlf3Gyo3Pn45RyOXxIRsJltKmDDidIf2E-MSjDrK2ItB~R2glfFH35s3KGUoS2xuMilzZuOeNUWnfSRClUixIrpysR67nm83rCbUFAdJLSjLPUYhnEgL3enC7~Rw~nC5thuoz5PzbYd~5SX-A1FEKMfFVL3GR4wz4WX9wWM8lTe9JEAE7HsQx3L0RTj4ropB4wmjFuJsjNcnlv9zzgJs1vO5UNe1ETaJx23i5DzsUnzSddLTJiTSN1YJtR1mBp9577GEGPhD5Yb~3WT0FWJVrWuT6m6rbABm7kQZZfQlFWjkp1PBqT8rLsph3Z5OoFTrYm3yc7MiYVkIJeXsg__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "consumed_credits": 30
+}

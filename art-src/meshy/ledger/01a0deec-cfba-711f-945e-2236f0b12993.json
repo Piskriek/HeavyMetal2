@@ -1,0 +1,10 @@
+{
+  "name": "waterfall-cave:lod",
+  "taskId": "01a0deec-cfba-711f-945e-2236f0b12993",
+  "kind": "remesh",
+  "source": "01a0dee3-7270-73b8-8876-73de526fd3b3",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:14:17.601Z"
+}

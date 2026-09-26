@@ -1,0 +1,10 @@
+{
+  "name": "beach-shelf:collision",
+  "taskId": "01a0deea-d654-738f-85aa-46a191e00b90",
+  "kind": "remesh",
+  "source": "01a0dee3-2e25-77eb-b9b2-4816bfe65149",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:10.146Z"
+}

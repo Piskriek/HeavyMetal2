@@ -1,0 +1,10 @@
+{
+  "name": "basalt-cave:collision",
+  "taskId": "01a0deea-ed24-752e-aab2-2850b9f9dde2",
+  "kind": "remesh",
+  "source": "01a0dedd-fa3c-7428-ab6d-7e1736e2e5e0",
+  "polycount": 300,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:12:14.050Z"
+}

@@ -32,3 +32,9 @@ tmp-art/
 
 # Art review sheets (wave 2 review loop); never committed
 art-src/review/
+
+# Meshy raw downloads (~15 MB a model): kept locally, the optimized copies ship in public/models/kit/
+art-src/meshy/*/*.glb
+art-src/meshy/.ref-upload.png
+art-src/meshy/ledger/*.tmp
+src/dev-kit-viewer.ts

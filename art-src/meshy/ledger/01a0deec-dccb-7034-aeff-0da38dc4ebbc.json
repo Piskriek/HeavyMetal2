@@ -1,0 +1,10 @@
+{
+  "name": "lagoon-platform:lod",
+  "taskId": "01a0deec-dccb-7034-aeff-0da38dc4ebbc",
+  "kind": "remesh",
+  "source": "01a0dee3-7fc7-7015-b34a-ac2c8ec4ee28",
+  "polycount": 1500,
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T18:14:20.958Z"
+}

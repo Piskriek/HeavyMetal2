@@ -8,7 +8,8 @@
  * Held still under reduced motion.
  */
 import type { RunRecord } from './types';
-import { roundPointsFor } from './session';
+import { CUP_ROUNDS, cupStandings, type RaceSession } from './session';
+import { PLAYER_ID } from './roster';
 
 export type TrinketId =
   | 'none'
@@ -105,7 +106,7 @@ export const TRINKET_DEFS: Record<TrinketId, TrinketDef> = {
     name: 'Gold Scrap Cup',
     type: 'rocking',
     file: '/art/cockpit/trinkets/trinket-cup-gold.png',
-    description: '1st Place in the Scrapdome Cup tournament.',
+    description: 'Win the Scrapdome Cup to earn it.',
     width: 90,
     height: 74,
     anchorFraction: { x: 0.5, y: 0.95 },
@@ -115,7 +116,7 @@ export const TRINKET_DEFS: Record<TrinketId, TrinketDef> = {
     name: 'Silver Scrap Cup',
     type: 'rocking',
     file: '/art/cockpit/trinkets/trinket-cup-silver.png',
-    description: '2nd Place or better in the Scrapdome Cup tournament.',
+    description: 'Finish the Scrapdome Cup in the top two to earn it.',
     width: 90,
     height: 74,
     anchorFraction: { x: 0.5, y: 0.95 },
@@ -125,7 +126,7 @@ export const TRINKET_DEFS: Record<TrinketId, TrinketDef> = {
     name: 'Bronze Scrap Cup',
     type: 'rocking',
     file: '/art/cockpit/trinkets/trinket-cup-bronze.png',
-    description: '3rd Place or better in the Scrapdome Cup tournament.',
+    description: 'Finish the Scrapdome Cup in the top three to earn it.',
     width: 90,
     height: 74,
     anchorFraction: { x: 0.5, y: 0.95 },
@@ -157,60 +158,28 @@ export const ALL_TRINKET_FILES: readonly string[] = [
 ];
 
 /**
- * Determine best tournament placement from stored records.
- * Returns best place (1 = 1st, 2 = 2nd, 3 = 3rd, Infinity = none).
+ * The player's best final rank in a finished Scrapdome Cup (1 = won it), or Infinity if none.
+ * Only a cup with every round raced counts, ranked exactly as the cup results screen ranks it;
+ * a cup saved with summarised standings has no final rank, so it never counts.
  */
 export function bestTournamentRank(records: readonly RunRecord[]): number {
-  if (!records || records.length === 0) return Infinity;
+  const bySession = new Map<string, RunRecord[]>();
+  for (const record of records ?? []) {
+    if (record.mode !== 'tournament' || !record.sessionId) continue;
+    const list = bySession.get(record.sessionId) ?? [];
+    list.push(record);
+    bySession.set(record.sessionId, list);
+  }
 
   let best = Infinity;
-
-  // Group tournament records by session to calculate cumulative points
-  const bySession = new Map<string, RunRecord[]>();
-  for (const record of records) {
-    if (record.mode !== 'tournament') continue;
-
-    const sid = record.sessionId || record.id;
-    const list = bySession.get(sid) ?? [];
-    list.push(record);
-    bySession.set(sid, list);
+  for (const results of bySession.values()) {
+    const rounds = new Set(results.map((record) => record.round ?? -1));
+    if (rounds.has(-1) || rounds.size < CUP_ROUNDS.length) continue;
+    if (results.some((record) => record.opponentsSummary || !record.opponents?.length)) continue;
+    const table = cupStandings({ setup: { fieldSize: results[0].fieldSize }, results } as RaceSession);
+    const rank = table.findIndex((row) => row.id === PLAYER_ID) + 1;
+    if (rank > 0 && rank < best) best = rank;
   }
-
-  // Calculate cumulative points across sessions with multiple rounds
-  for (const sessionRecords of bySession.values()) {
-    const hasOpponents = sessionRecords.some((r) => r.opponents && r.opponents.length > 0);
-    if (hasOpponents) {
-      const pointsMap = new Map<number, number>();
-      for (const rec of sessionRecords) {
-        const fieldSize = rec.fieldSize ?? 4;
-        if (typeof rec.position === 'number' && rec.completed) {
-          // Player id is 0
-          pointsMap.set(0, (pointsMap.get(0) ?? 0) + roundPointsFor(rec.position, true, fieldSize));
-        }
-        if (rec.opponents) {
-          for (const opp of rec.opponents) {
-            pointsMap.set(opp.id, (pointsMap.get(opp.id) ?? 0) + roundPointsFor(opp.position, opp.finished, fieldSize));
-          }
-        }
-      }
-
-      if (pointsMap.has(0)) {
-        const sorted = [...pointsMap.entries()].sort((a, b) => b[1] - a[1]);
-        const playerRank = sorted.findIndex(([id]) => id === 0) + 1;
-        if (playerRank > 0 && playerRank < best) {
-          best = playerRank;
-        }
-      }
-    } else {
-      // Without opponent records, check recorded finish position
-      for (const rec of sessionRecords) {
-        if (typeof rec.position === 'number' && rec.position > 0 && rec.position < best) {
-          best = rec.position;
-        }
-      }
-    }
-  }
-
   return best;
 }
 
@@ -276,6 +245,34 @@ export function saveDashboardTrinkets(trinkets: DashboardTrinkets): boolean {
   } catch {
     return false;
   }
+}
+
+/* -----------------------------------------------------------------------------
+   PLACEMENT
+   -------------------------------------------------------------------------- */
+
+/** The aperture width the trinket sizes were drawn for (1366 × 657); they scale with the window. */
+const TRINKET_BASE_APERTURE_W = 1175;
+
+/**
+ * Where a trinket sits, in cockpit pixels. Standing trinkets stand on the ledge near the window's
+ * corners, outside the yoke and the arms; hanging ones hang by their hook from the top of the
+ * window, in the gaps between the supply chips, the race readouts and the camera buttons.
+ */
+export function trinketPlacement(
+  def: TrinketDef,
+  slot: 1 | 2,
+  aperture: { readonly x: number; readonly y: number; readonly w: number; readonly h: number },
+): { x: number; y: number; w: number; h: number } {
+  const scale = aperture.w / TRINKET_BASE_APERTURE_W;
+  const w = def.width * scale;
+  const h = def.height * scale;
+  if (def.type === 'hanging') {
+    const centre = aperture.x + aperture.w * (slot === 1 ? 0.25 : 0.67);
+    return { x: centre - w / 2, y: aperture.y, w, h };
+  }
+  const centre = aperture.x + aperture.w * (slot === 1 ? 0.13 : 0.87);
+  return { x: centre - w / 2, y: aperture.y + aperture.h - h * 0.92, w, h };
 }
 
 /* -----------------------------------------------------------------------------

@@ -22,10 +22,12 @@ import {
   readDashboardTrinkets,
   saveDashboardTrinkets,
   stepTrinketSpring,
+  trinketPlacement,
   DEFAULT_TRINKETS,
   TRINKETS_STORAGE_KEY,
 } from '../src/game/cockpit-trinkets';
 import type { RunRecord } from '../src/game/types';
+import { cockpitLayout } from '../src/game/cockpit';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicFile = (url: string) => join(root, 'public', url.replace(/^\//, ''));
@@ -72,35 +74,73 @@ test('trinket unlock rules: defaults are free, cups stay locked until tournament
   };
   assert.equal(isTrinketUnlocked('cup_bronze', [quickWinRecord]), false, 'quick race win does not unlock cup');
 
-  // 3rd place in tournament unlocks bronze only
-  const bronzeRecord: RunRecord = {
-    id: 't-1', distance: 10000, topSpeed: 300, score: 5000, sheep: 2, explosions: 0, loops: 1,
-    course: 'ridge', date: '2026-09-26', completed: true, position: 3, mode: 'tournament',
-  };
-  assert.equal(bestTournamentRank([bronzeRecord]), 3);
-  assert.equal(isTrinketUnlocked('cup_bronze', [bronzeRecord]), true);
-  assert.equal(isTrinketUnlocked('cup_silver', [bronzeRecord]), false);
-  assert.equal(isTrinketUnlocked('cup_gold', [bronzeRecord]), false);
+  // A cup = three rounds in one session; the player (id 0) finishes `place` in every round,
+  // so they end the cup ranked `place` of four.
+  const cup = (sessionId: string, place: number, rounds = 3): RunRecord[] =>
+    Array.from({ length: rounds }, (_, round) => ({
+      id: `${sessionId}-${round}`, distance: 10000, topSpeed: 300, score: 5000, sheep: 2, explosions: 0, loops: 1,
+      course: 'ridge', date: '2026-09-26', completed: true, position: place, mode: 'tournament', sessionId, round, fieldSize: 4,
+      opponents: [0, 1, 2, 3].map((id) => {
+        const position = id === 0 ? place : [1, 2, 3, 4].filter((p) => p !== place)[id - 1];
+        return { id, name: `R${id}`, color: '#fff', position, finished: true, finishTime: 60 + position };
+      }),
+    }) as RunRecord);
 
-  // 2nd place in tournament unlocks bronze and silver
-  const silverRecord: RunRecord = {
-    id: 't-2', distance: 10000, topSpeed: 300, score: 5000, sheep: 2, explosions: 0, loops: 1,
-    course: 'ridge', date: '2026-09-26', completed: true, position: 2, mode: 'tournament',
-  };
-  assert.equal(bestTournamentRank([silverRecord]), 2);
-  assert.equal(isTrinketUnlocked('cup_bronze', [silverRecord]), true);
-  assert.equal(isTrinketUnlocked('cup_silver', [silverRecord]), true);
-  assert.equal(isTrinketUnlocked('cup_gold', [silverRecord]), false);
+  assert.equal(bestTournamentRank(cup('b', 3)), 3);
+  assert.equal(isTrinketUnlocked('cup_bronze', cup('b', 3)), true, 'third in a finished cup earns bronze');
+  assert.equal(isTrinketUnlocked('cup_silver', cup('b', 3)), false);
+  assert.equal(isTrinketUnlocked('cup_gold', cup('b', 3)), false);
 
-  // 1st place in tournament unlocks all three cups
-  const goldRecord: RunRecord = {
-    id: 't-3', distance: 10000, topSpeed: 300, score: 5000, sheep: 2, explosions: 0, loops: 1,
-    course: 'ridge', date: '2026-09-26', completed: true, position: 1, mode: 'tournament',
-  };
-  assert.equal(bestTournamentRank([goldRecord]), 1);
-  assert.equal(isTrinketUnlocked('cup_bronze', [goldRecord]), true);
-  assert.equal(isTrinketUnlocked('cup_silver', [goldRecord]), true);
-  assert.equal(isTrinketUnlocked('cup_gold', [goldRecord]), true);
+  assert.equal(bestTournamentRank(cup('s', 2)), 2);
+  assert.equal(isTrinketUnlocked('cup_silver', cup('s', 2)), true);
+  assert.equal(isTrinketUnlocked('cup_gold', cup('s', 2)), false);
+
+  assert.equal(bestTournamentRank(cup('g', 1)), 1);
+  assert.equal(isTrinketUnlocked('cup_gold', cup('g', 1)), true, 'winning the cup earns every cup');
+  assert.equal(isTrinketUnlocked('cup_bronze', cup('g', 1)), true);
+
+  assert.equal(bestTournamentRank(cup('fourth', 4)), 4);
+  assert.equal(isTrinketUnlocked('cup_bronze', cup('fourth', 4)), false, 'fourth place earns nothing');
+
+  // Leading after one or two rounds is not finishing the cup.
+  assert.equal(isTrinketUnlocked('cup_gold', cup('p1', 1, 1)), false, 'a round-one win is not a cup win');
+  assert.equal(isTrinketUnlocked('cup_gold', cup('p2', 1, 2)), false, 'two rounds of three is not a finished cup');
+
+  // A cup saved with summarised standings has no final rank, so it never unlocks.
+  const summarised = cup('sum', 1).map((record) => ({ ...record, opponentsSummary: { policy: 1, totalField: 4, kept: 4 } }));
+  assert.equal(bestTournamentRank(summarised), Infinity);
+
+  // The best cup across several wins.
+  assert.equal(bestTournamentRank([...cup('x', 3), ...cup('y', 2)]), 2);
+});
+
+test('placement: standing trinkets clear the yoke on the ledge; hanging ones hang from the top of the window', () => {
+  for (const [w, h] of [[1366, 657], [1920, 1080]]) {
+    const layout = cockpitLayout(w, h);
+    const { aperture, yoke } = layout;
+    const yokeLeft = yoke.hub.x - yoke.w / 2;
+    const yokeRight = yoke.hub.x + yoke.w / 2;
+    const yokeTop = yoke.hub.y - yoke.h / 2;
+    for (const id of ALL_TRINKET_IDS) {
+      if (id === 'none') continue;
+      const def = TRINKET_DEFS[id];
+      for (const slot of [1, 2] as const) {
+        const box = trinketPlacement(def, slot, aperture);
+        assert.ok(box.x >= aperture.x && box.x + box.w <= aperture.x + aperture.w, `${id} slot ${slot} inside the window at ${w}x${h}`);
+        if (def.type === 'hanging') {
+          assert.equal(box.y, aperture.y, `${id} hangs from the top edge`);
+          assert.ok(box.y + box.h < yokeTop, `${id} hangs clear above the yoke at ${w}x${h}`);
+        } else {
+          assert.ok(Math.abs(box.y + box.h * 0.92 - (aperture.y + aperture.h)) < 0.5, `${id} stands on the ledge`);
+          assert.ok(box.x + box.w < yokeLeft || box.x > yokeRight, `${id} slot ${slot} is not hidden behind the yoke at ${w}x${h}`);
+        }
+      }
+    }
+    // Sizes follow the window, so the trinkets read the same at every resolution.
+    const small = trinketPlacement(TRINKET_DEFS.sheep, 1, cockpitLayout(1366, 657).aperture);
+    const large = trinketPlacement(TRINKET_DEFS.sheep, 1, cockpitLayout(1920, 1080).aperture);
+    assert.ok(large.w > small.w * 1.3);
+  }
 });
 
 test('spring-damper: sways with steering and dampens back to rest', () => {

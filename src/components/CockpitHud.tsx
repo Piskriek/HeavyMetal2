@@ -20,9 +20,10 @@ import {
   COCKPIT_ART, COCKPIT_MANIFEST, COCKPIT_MANIFEST as ART, type CockpitState,
 } from '../game/cockpit';
 import {
-  TRINKET_DEFS, createTrinketSpringState, readDashboardTrinkets, stepTrinketSpring,
+  TRINKET_DEFS, createTrinketSpringState, readDashboardTrinkets, stepTrinketSpring, trinketPlacement,
   type DashboardTrinkets, type TrinketDef,
 } from '../game/cockpit-trinkets';
+import { readRecords } from '../game/preferences';
 import '../cockpit.css';
 
 interface CockpitHudProps {
@@ -68,7 +69,7 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   };
 
   /** WIRE-3 / X12: dashboard trinkets */
-  const [trinkets, setTrinkets] = useState<DashboardTrinkets>(() => readDashboardTrinkets());
+  const [trinkets, setTrinkets] = useState<DashboardTrinkets>(() => readDashboardTrinkets(readRecords()));
   const trinket1Ref = useRef<HTMLDivElement>(null);
   const trinket2Ref = useRef<HTMLDivElement>(null);
   const trinket1HeadRef = useRef<HTMLImageElement>(null);
@@ -78,9 +79,9 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const lastTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    const handler = (e: any) => {
-      if (e.detail) setTrinkets(e.detail);
-      else setTrinkets(readDashboardTrinkets());
+    const handler = () => {
+      // Re-read through the unlock rule so an earned cup shows and a locked one never does.
+      setTrinkets(readDashboardTrinkets(readRecords()));
     };
     window.addEventListener('goblin-trinkets-changed' as any, handler);
     window.addEventListener('storage', handler);
@@ -314,9 +315,10 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
     );
   };
 
-  /** WIRE-3: render a dashboard trinket sprite on the ledge */
-  const renderTrinket = (def: TrinketDef, slotRef: React.RefObject<HTMLDivElement | null>, headRef: React.RefObject<HTMLImageElement | null>, x: number, y: number) => {
+  /** WIRE-3: a dashboard trinket, standing on the ledge or hanging from the top of the window. */
+  const renderTrinket = (def: TrinketDef, slot: 1 | 2, slotRef: React.RefObject<HTMLDivElement | null>, headRef: React.RefObject<HTMLImageElement | null>) => {
     if (def.id === 'none') return null;
+    const box = trinketPlacement(def, slot, layout.aperture);
 
     if (def.type === 'bobblehead' && def.bodyFile && def.headFile) {
       return (
@@ -324,10 +326,10 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
           ref={slotRef}
           className="cockpit-trinket cockpit-trinket-bobble"
           style={{
-            left: `${x}px`,
-            top: `${y}px`,
-            width: `${def.width}px`,
-            height: `${def.height}px`,
+            left: box.x,
+            top: box.y,
+            width: box.w,
+            height: box.h,
             transform: 'none',
           }}
         >
@@ -342,27 +344,21 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
         ref={slotRef}
         className="cockpit-trinket"
         style={{
-          left: `${x}px`,
-          top: `${y}px`,
-          width: `${def.width}px`,
-          height: `${def.height}px`,
+          left: box.x,
+          top: box.y,
+          width: box.w,
+          height: box.h,
           transformOrigin: `${(def.anchorFraction.x * 100).toFixed(0)}% ${(def.anchorFraction.y * 100).toFixed(0)}%`,
           transform: 'none',
         }}
       >
-        <img src={def.file} alt="" style={{ width: '100%', height: '100%' }} draggable={false} />
+        <img src={def.file} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
       </div>
     );
   };
 
-  // Dashboard ledge coordinates: right under the aperture bottom edge
-  const ledgeY = layout.aperture.y + layout.aperture.h;
   const trinket1Def = TRINKET_DEFS[trinkets.slot1];
   const trinket2Def = TRINKET_DEFS[trinkets.slot2];
-  const trinket1X = layout.aperture.x + layout.aperture.w * 0.28;
-  const trinket1Y = ledgeY - trinket1Def.height * 0.78;
-  const trinket2X = layout.aperture.x + layout.aperture.w * 0.72 - trinket2Def.width;
-  const trinket2Y = ledgeY - trinket2Def.height * 0.78;
 
   return (
     <div className="cockpit-root" ref={rootRef} data-aperture={`${Math.round(layout.aperture.w)}x${Math.round(layout.aperture.h)}`} data-reduced-motion={reducedMotion ? 'true' : 'false'}>
@@ -398,8 +394,8 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
         <img className="cockpit-cluster" style={{ left: layout.clusters.right.x, top: layout.clusters.right.y, width: layout.clusters.right.w }} src={COCKPIT_ART.clusters[1]} alt="" aria-hidden="true" draggable={false} />
 
         {/* WIRE-3 / X12: dashboard ledge trinkets */}
-        {renderTrinket(trinket1Def, trinket1Ref, trinket1HeadRef, trinket1X, trinket1Y)}
-        {renderTrinket(trinket2Def, trinket2Ref, trinket2HeadRef, trinket2X, trinket2Y)}
+        {renderTrinket(trinket1Def, 1, trinket1Ref, trinket1HeadRef)}
+        {renderTrinket(trinket2Def, 2, trinket2Ref, trinket2HeadRef)}
 
         {dial(leftBig, COCKPIT_ART.dials[0], needles.grade, 'grade', 'GRADE', false)}
         {dial(leftSmall, COCKPIT_ART.dials[1], needles.boost, 'boost', 'BOOST', false)}

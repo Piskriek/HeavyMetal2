@@ -7,11 +7,11 @@
  *  - Stored in `public/art/props/` (raw magenta key transparency) and
  *    `public/art/props/alpha/` (keyed true alpha transparency).
  *  - Combined sprite sheets stored in:
- *    - `public/art/sheets/props-sheet.png` (all 50 variations, 5x10)
- *    - `public/art/sheets/props-sheet-b.png` (Batch 2: props 11-20, 5x2)
- *    - `public/art/sheets/props-sheet-c.png` (Batch 3: props 21-30, 5x2)
- *    - `public/art/sheets/props-sheet-d.png` (Batch 4: props 31-40, 5x2)
- *    - `public/art/sheets/props-sheet-e.png` (Batch 5: props 41-50, 5x2)
+ *    - `art-src/sheets/props-sheet.png` (all 50 variations, 5x10)
+ *    - `art-src/sheets/props-sheet-b.png` (Batch 2: props 11-20, 5x2)
+ *    - `art-src/sheets/props-sheet-c.png` (Batch 3: props 21-30, 5x2)
+ *    - `art-src/sheets/props-sheet-d.png` (Batch 4: props 31-40, 5x2)
+ *    - `art-src/sheets/props-sheet-e.png` (Batch 5: props 41-50, 5x2)
  *
  * Keying & despill:
  *  - Detects magenta matte (#FF00FF signature: high R and B, low G).
@@ -47,7 +47,8 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const propsDir = join(root, 'public/art/props');
 const alphaDir = join(root, 'public/art/props/alpha');
-const sheetsDir = join(root, 'public/art/sheets');
+// Review sheets are build output, not shipped art: they live in art-src/ (outside the public/ budget).
+const sheetsDir = join(root, 'art-src/sheets');
 mkdirSync(alphaDir, { recursive: true });
 mkdirSync(sheetsDir, { recursive: true });
 

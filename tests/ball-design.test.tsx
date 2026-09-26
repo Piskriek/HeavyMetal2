@@ -56,6 +56,6 @@ test('MP-T04: unowned items block saving; owned ones save', () => {
 
 test('MP-T04: the Garage renders', () => {
   const html = renderToStaticMarkup(createElement(BallCustomizer));
-  assert.match(html, /class="garage-map"/);
+  assert.match(html, /class="garage-ball-3d"/);
   assert.match(html, /0 \/ 12 decals/);
 });

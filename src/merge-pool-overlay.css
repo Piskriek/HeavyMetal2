@@ -1,10 +1,11 @@
 /**
  * M01 · T2 — the first-loop pool overlay.
  *
- * Painted in the same brass-and-ember language as the cockpit (T4): the panel is a dark plate with an
- * amber edge, the queue rows read left to right (place, ball, name, entry time, state), and the whole
- * thing sits above the canvas with `pointer-events: none` except on the button, so the camera and the
- * keyboard both keep working underneath.
+ * Built from the game's own frame language, not a web card: the panel is the dialogs' stone plate
+ * with the brass rings and ornate corners (frames.css), headings are Cinzel, the big call is set
+ * like the menu wordmark, and the queue reads like the finish table (place, ball, name, entry time,
+ * state). The overlay sits above the canvas with `pointer-events: none` except on the panel, so the
+ * camera and the keyboard keep working underneath.
  */
 
 .merge-pool {
@@ -15,12 +16,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.1rem;
-  padding: 1.2rem;
+  gap: clamp(8px, 2vh, 18px);
+  padding: 18px;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 30%, rgba(24, 12, 4, 0.35), rgba(6, 4, 3, 0.78));
-  color: #ffe9c4;
-  font-family: inherit;
+  background: radial-gradient(ellipse at 50% 35%, #0c120e59, #050806cc);
+  color: #e9dfc9;
+  font-family: 'DM Sans', sans-serif;
   animation: merge-pool-in 180ms ease-out;
 }
 
@@ -35,241 +36,210 @@
   to { opacity: 1; }
 }
 
+/* The big call (POOL, READY, 3, 2, 1, GO!): set like the menu wordmark. */
 .merge-pool__go {
-  font-size: clamp(3rem, 9vw, 7rem);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  color: #ffb64a;
-  text-shadow: 0 0 28px rgba(255, 150, 40, 0.55), 0 3px 0 rgba(0, 0, 0, 0.5);
+  font: 900 clamp(46px, 8vw, 104px)/1 'Cinzel', Georgia, serif;
+  letter-spacing: .06em;
+  color: #e7c577;
+  -webkit-text-stroke: 1px #6b4a1e;
+  text-shadow: 0 1px 0 #fff0b66b, 0 3px 0 #85542e, 0 5px 0 #392817, 0 10px 18px #000e, 0 0 42px #e5930255;
 }
 
+/* The panel: the dialogs' plate, brass rings and inner line, with the ornate corners. */
 .merge-pool__panel {
-  width: min(46rem, 94vw);
-  border: 1px solid rgba(214, 158, 74, 0.55);
-  border-radius: 0.75rem;
-  background: linear-gradient(180deg, rgba(28, 20, 13, 0.96), rgba(14, 11, 8, 0.96));
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 214, 150, 0.12);
-  overflow: hidden;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  width: min(720px, 94vw);
+  max-height: min(78vh, 720px);
+  border: 4px solid #33281a;
+  border-radius: 2px;
+  background:
+    linear-gradient(145deg, #18231ce8, #0d1511f2),
+    url('/ui/stone-tile.png') 0 0 / 384px 384px repeat;
+  box-shadow:
+    inset 0 0 0 2px #d6ad5c,
+    inset 0 0 0 5px #4b351b,
+    inset 0 0 0 7px #aa813e,
+    inset 0 0 42px #000b,
+    0 28px 110px #000c;
   pointer-events: auto;
+}
+.merge-pool__panel::before {
+  content: ''; position: absolute; z-index: 4; pointer-events: none;
+  inset: 8px; border: 1px solid #e0be7570;
+  outline: 1px solid #392715; outline-offset: 3px;
 }
 
 .merge-pool__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(214, 158, 74, 0.28);
-  background: linear-gradient(90deg, rgba(74, 44, 12, 0.55), rgba(20, 14, 9, 0.2));
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 22px 30px 16px;
+  text-align: center;
+  border-bottom: 1px solid #8f7b473e;
+  background: linear-gradient(180deg, #7f683915, transparent);
 }
-
+.merge-pool__eyebrow {
+  font: 8px 'Space Mono', monospace;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+  color: #ad9c74;
+}
 .merge-pool__head h2 {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 900;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: #ffd489;
+  margin: 2px 0 0;
+  font: 700 clamp(20px, 2.6vw, 26px)/1.2 'Cinzel', Georgia, serif;
+  color: #e9cea0;
+  text-shadow: 0 2px 1px #000;
 }
-
 .merge-pool__head p {
-  margin: 0.2rem 0 0;
-  font-size: 0.78rem;
-  color: #c9b394;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a9bd98;
 }
-
 .merge-pool__hold {
-  flex: none;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #9fe0c4;
-  border: 1px solid rgba(159, 224, 196, 0.35);
-  border-radius: 999px;
-  padding: 0.2rem 0.55rem;
-  white-space: nowrap;
+  justify-self: center;
+  margin-top: 6px;
+  padding: 3px 12px;
+  border: 1px solid #6b5631;
+  border-radius: 2px;
+  background: #10190f;
+  font: 9px 'Space Mono', monospace;
+  letter-spacing: .6px;
+  color: #b7c5a2;
 }
 
-/* M01 · T1b — the split board. Shown while the player is still on the run down to the loop, so it
-   keeps the same frame as the panel but swaps the ready-up footer for the one number that is the
-   player's to set: the clock. */
-.merge-pool__panel--waiting {
-  border-color: rgba(159, 224, 196, 0.35);
-}
+/* M01 · T1b — the split board. Shown while the player is still on the run down to the loop: the
+   same plate, but the ready-up footer is swapped for the one number that is the player's to set. */
+.merge-pool__panel--waiting .merge-pool__head { border-bottom-color: #8f7b4724; }
 
 .merge-pool__split {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
-  padding: 0.9rem 1rem 1.1rem;
-  border-bottom: 1px solid rgba(214, 158, 74, 0.2);
+  gap: 4px;
+  padding: 14px 24px 18px;
+  border-bottom: 1px solid #8f7b473e;
 }
-
 .merge-pool__split-label,
 .merge-pool__split-note {
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+  font: 8px 'Space Mono', monospace;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
-  color: #cdb694;
+  color: #ad9c74;
 }
-
 .merge-pool__split-clock {
-  font-size: clamp(2.2rem, 6vw, 3.4rem);
-  line-height: 1;
+  font: 700 clamp(40px, 6vw, 60px)/1 'Barlow Condensed', sans-serif;
   font-variant-numeric: tabular-nums;
-  color: #ffe6b8;
-  text-shadow: 0 0 18px rgba(255, 176, 74, 0.35);
+  letter-spacing: .02em;
+  color: #f3dcaa;
+  text-shadow: 0 3px 0 #2a1a08, 0 0 22px #e5930244;
 }
+.merge-pool__split-note { color: #a9c794; }
 
-.merge-pool__split-note { color: #9fe0c4; }
-
-.merge-pool__list--waiting { max-height: 30vh; }
-
+/* The queue: the finish table's rows. */
 .merge-pool__list {
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0;
-  padding: 0.5rem;
+  padding: 8px 26px 10px;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  max-height: 46vh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #684d26 #0d151180;
 }
+.merge-pool__list--waiting { max-height: 30vh; }
 
 .merge-pool__row {
   display: grid;
-  grid-template-columns: 1.6rem 1.1rem 1fr 4.2rem 5.2rem auto;
+  grid-template-columns: 30px 12px minmax(0, 1fr) 70px 64px 52px;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid rgba(120, 96, 62, 0.45);
-  border-radius: 0.5rem;
-  background: rgba(30, 23, 15, 0.72);
-  font-size: 0.86rem;
+  gap: 10px;
+  padding: 8px 6px;
+  border-bottom: 1px solid #5d784224;
+  font-size: 12px;
+  color: #c7d5b6;
 }
-
-.merge-pool__row--player {
-  border-color: rgba(255, 176, 74, 0.75);
-  background: rgba(58, 36, 10, 0.55);
-}
-
-.merge-pool__row--released {
-  opacity: 0.62;
-}
+.merge-pool__row:last-child { border-bottom: 0; }
+.merge-pool__row--player { background: linear-gradient(90deg, #bfa25124, #bfa2510a); box-shadow: inset 2px 0 0 #d6ad5c; }
+.merge-pool__row--player .merge-pool__name { color: #edd2a0; }
+.merge-pool__row--released { opacity: .55; }
 
 .merge-pool__place {
-  font-weight: 900;
+  font: 600 16px 'Barlow Condensed', sans-serif;
   text-align: center;
-  color: #ffc978;
+  color: #91a776;
 }
-
+.merge-pool__row--player .merge-pool__place { color: #f0c878; }
 .merge-pool__swatch {
-  width: 1rem;
-  height: 1rem;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 1px #000a, 0 0 0 2px #6b563188;
 }
-
 .merge-pool__name {
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .merge-pool__name em {
-  margin-left: 0.4rem;
-  font-style: normal;
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  color: #1a1206;
-  background: #ffc978;
-  border-radius: 999px;
-  padding: 0.08rem 0.35rem;
+  margin-left: 8px;
+  font: normal 7px 'Space Mono', monospace;
+  letter-spacing: 1px;
+  color: #b9a36b;
   vertical-align: middle;
 }
-
 .merge-pool__time {
+  font: 11px 'Space Mono', monospace;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  color: #cdb694;
+  color: #c9bb91;
 }
-
-.merge-pool__ready {
-  text-align: center;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  border-radius: 999px;
-  padding: 0.18rem 0.4rem;
-  border: 1px solid transparent;
-}
-
-.merge-pool__ready--on { color: #0f1a12; background: #9fe0c4; }
-.merge-pool__ready--off { color: #b8a68a; border-color: rgba(184, 166, 138, 0.4); }
-.merge-pool__ready--out { color: #1a1206; background: #ffc978; }
-
+.merge-pool__ready,
 .merge-pool__flag {
-  grid-column: 6;
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
+  font: 700 8px 'Space Mono', monospace;
+  letter-spacing: 1px;
   text-transform: uppercase;
-  color: #ffb0a0;
-  border: 1px solid rgba(255, 176, 160, 0.45);
-  border-radius: 999px;
-  padding: 0.12rem 0.35rem;
+  text-align: center;
   white-space: nowrap;
 }
+.merge-pool__ready--on { color: #a9c794; }
+.merge-pool__ready--off { color: #7d8a70; }
+.merge-pool__ready--out { color: #d9bd7c; }
+.merge-pool__flag { grid-column: 6; color: #f0a07a; }
 
+/* The foot: loadout, the game's gold button, the hint. */
 .merge-pool__foot {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.8rem 1rem 0.95rem;
-  border-top: 1px solid rgba(214, 158, 74, 0.28);
-  background: rgba(12, 9, 6, 0.85);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px 30px 20px;
+  border-top: 1px solid #95804a38;
+  background: linear-gradient(180deg, #0c141000, #0c1410cc);
 }
-
 .merge-pool__loadout {
   margin: 0;
-  font-size: 0.74rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #c9b394;
+  font: 600 11px 'Cinzel', Georgia, serif;
+  letter-spacing: .6px;
+  color: #d9bd7c;
 }
-
 .merge-pool__button {
-  width: 100%;
-  padding: 0.7rem 1rem;
-  border: 0;
-  border-radius: 0.55rem;
-  font-weight: 900;
-  font-size: 1rem;
-  letter-spacing: 0.1em;
-  color: #23160a;
-  background: linear-gradient(180deg, #ffcc7a, #e09a2c);
-  box-shadow: 0 6px 18px rgba(224, 154, 44, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  min-width: min(320px, 100%);
+  min-height: 48px;
+  font: 700 15px 'Cinzel', Georgia, serif;
+  letter-spacing: 1.2px;
   cursor: pointer;
-  transition: transform 120ms ease, filter 120ms ease;
 }
-
-.merge-pool__button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
-.merge-pool__button:active:not(:disabled) { transform: translateY(1px); }
-.merge-pool__button:focus-visible { outline: 3px solid #9fe0c4; outline-offset: 2px; }
-.merge-pool__button:disabled {
-  cursor: default;
-  color: #ded2bd;
-  background: linear-gradient(180deg, rgba(90, 76, 56, 0.9), rgba(52, 44, 32, 0.9));
-  box-shadow: none;
-}
-
+.merge-pool__button:focus-visible { outline: 3px solid #ffe39c; outline-offset: 4px; }
+.merge-pool__button:disabled { cursor: default; opacity: .7; filter: saturate(.6); }
 .merge-pool__hint {
   margin: 0;
-  font-size: 0.7rem;
-  color: #a8987f;
+  font-size: 11px;
+  color: #a0b18e;
   text-align: center;
 }
 
@@ -295,14 +265,24 @@
   width: min(13rem, 16vw);
 }
 
-/* Reduced motion: no fade, no movement — the overlay simply appears. */
+/* Reduced motion: no fade — the overlay simply appears. */
 @media (prefers-reduced-motion: reduce) {
   .merge-pool { animation: none; }
-  .merge-pool__button { transition: none; }
+}
+
+/* Short windows: the call and the panel give up height before anything is cut off. */
+@media (max-height: 640px) {
+  .merge-pool__go { font-size: clamp(34px, 11vh, 64px); }
+  .merge-pool__head { padding: 14px 24px 10px; }
+  .merge-pool__head p { display: none; }
+  .merge-pool__panel { max-height: 72vh; }
 }
 
 /* Narrow screens: the row drops the entry time before anything else useful. */
 @media (max-width: 560px) {
-  .merge-pool__row { grid-template-columns: 1.4rem 1rem 1fr 4.6rem auto; }
+  .merge-pool__row { grid-template-columns: 26px 10px minmax(0, 1fr) 60px 44px; }
+  .merge-pool__flag { grid-column: 5; grid-row: 1; justify-self: end; }
   .merge-pool__time { display: none; }
+  .merge-pool__head, .merge-pool__foot { padding-inline: 18px; }
+  .merge-pool__list { padding-inline: 14px; }
 }

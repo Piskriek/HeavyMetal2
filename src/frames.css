@@ -81,6 +81,41 @@
   background: #9a7433;
 }
 
+/* A dialog's action row never scrolls away: it pins to the bottom of the scrolling content, on
+   its own opaque rail, so Start / Save / Close are always on screen. */
+.fantasy-dialog .modal-content { --dialog-pad-x: 31px; --dialog-pad-b: 27px; }
+.fantasy-dialog .modal-content > .fantasy-dialog-actions,
+.fantasy-dialog .modal-content > * > .fantasy-dialog-actions,
+.fantasy-dialog .modal-content > .modal-bottom {
+  position: sticky; bottom: calc(-1 * var(--dialog-pad-b)); z-index: 7;
+  margin-inline: calc(-1 * var(--dialog-pad-x)); margin-bottom: calc(-1 * var(--dialog-pad-b));
+  padding: 16px var(--dialog-pad-x) var(--dialog-pad-b);
+  background: linear-gradient(180deg, #121c17f5, #0c1410fc);
+  border-top: 1px solid #95804a52;
+  box-shadow: 0 -1px 0 #060a07, 0 -16px 18px -12px #000d;
+}
+/* Once the content has scrolled, the heading casts a shadow onto it. */
+.modal.fantasy-dialog .modal-heading { transition: box-shadow .2s; }
+.modal.fantasy-dialog[data-scrolled='true'] .modal-heading { box-shadow: 0 12px 16px -12px #000e; z-index: 3; }
+/* "More below": a brass tab at the foot of the visible content whenever more is hidden. */
+.modal.fantasy-dialog[data-more-below='true']::after {
+  content: ''; position: absolute; z-index: 8; left: 9px; right: 9px; bottom: calc(var(--cue-bottom, 14px) - 10px); height: 46px; pointer-events: none;
+  background: linear-gradient(180deg, transparent, #0b120ee6);
+}
+.modal-scroll-cue {
+  position: absolute; left: 50%; bottom: var(--cue-bottom, 14px); z-index: 9; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 13px 5px 10px;
+  border: 1px solid #b8893e; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(180deg, #3a2a14f2, #1d150bf2); color: #f0d8a8;
+  font: 700 9px 'Cinzel', Georgia, serif; letter-spacing: 1.4px; text-transform: uppercase;
+  box-shadow: inset 0 1px #f0cf8b55, 0 4px 14px #000c;
+  animation: modal-cue-bob 1.6s ease-in-out infinite;
+}
+.modal-scroll-cue:hover { border-color: #f0c878; color: #fff3dc; }
+@keyframes modal-cue-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 3px; } }
+@media (prefers-reduced-motion: reduce) { .modal-scroll-cue { animation: none; } .modal.fantasy-dialog .modal-heading { transition: none; } }
+@media (max-width: 700px) { .fantasy-dialog .modal-content { --dialog-pad-x: 21px; --dialog-pad-b: 22px; } }
+
 /* Menu button: repeating steel/gold rails and fixed end-caps. No border-image. */
 .forged-menu-button {
   isolation: isolate;
@@ -217,4 +252,25 @@
   /* The mobile-position nudge for the menu painting is now driven by the
      AnimatedMenuBackground component (`backdrop.position`). */
   .studio-signature > .brand-emblem { width: 30px; height: 30px; }
+}
+
+/* The main menu always fits the window. Eight actions under the logo need ~950px at full size,
+   so on a laptop the logo, the buttons and their gaps scale with the window's height, and the
+   column stops above the key hints. Below ~600px the column scrolls on its own; the painting
+   behind it never moves. */
+@media (min-width: 721px) {
+  .main-menu, .main-menu[data-resumable='true'] { min-height: 0; }
+  .menu-composition {
+    max-height: 100dvh; overflow-y: auto; overflow-x: hidden; scrollbar-width: none;
+    padding-top: clamp(50px, 7vh, 150px); padding-bottom: clamp(44px, 8.5vh, 66px);
+  }
+  .menu-composition::-webkit-scrollbar { display: none; }
+  .game-wordmark .brand-hero { width: min(100%, 500px, 44vh); }
+  .game-wordmark p { margin-top: clamp(0px, .5vh, 4px); font-size: clamp(11px, 1.5vh, 14px); }
+  .main-menu-actions, .menu-composition[data-resume-note='true'] .main-menu-actions { margin-top: clamp(8px, 2.6vh, 31px); gap: clamp(4px, 1.05vh, 11px); }
+  .forged-menu-button { min-height: clamp(34px, 5.8vh, 58px); padding-block: clamp(3px, .9vh, 12px); }
+  .forged-menu-button::before, .forged-menu-button::after,
+  .forged-menu-button.forged-primary::before { width: clamp(38px, 5.4vh, 54px); height: clamp(35px, 5vh, 50px); }
+  .forged-menu-button > span:not(.button-rivet) { font-size: clamp(12px, 1.7vh, 15px); }
+  .menu-bottom-flourish, .menu-composition[data-resume-note='true'] .menu-bottom-flourish { margin: clamp(6px, 1.8vh, 23px) auto clamp(4px, 1vh, 12px); }
 }

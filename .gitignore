@@ -29,3 +29,6 @@ temp/
 archive/
 tmp-art/
 /p[0-9][0-9].png
+
+# Art review sheets (wave 2 review loop); never committed
+art-src/review/

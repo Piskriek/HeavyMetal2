@@ -32,8 +32,10 @@ test('MP-T06: the built-in riders get stable profiles, so old saves keep their i
   assert.notEqual(a[0].dna, a[1].dna);
 });
 
-test('MP-T06: the creator studio renders with a live DNA readout', () => {
+test('MP-T06: the creator studio renders the goblin, its name plate and the parts tray', () => {
   const html = renderToStaticMarkup(createElement(CharacterCreatorStudio));
-  assert.match(html, /GOB-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}/);
   assert.match(html, /<svg/);
+  assert.match(html, /aria-label="Goblin name"[^>]*value="Rivet-8"|value="Rivet-8"[^>]*aria-label="Goblin name"/);
+  assert.match(html, /role="radiogroup" aria-label="Eyewear options"/);
+  assert.match(html, /Save to crew/);
 });

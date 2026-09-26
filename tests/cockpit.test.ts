@@ -134,8 +134,8 @@ test('the channel starts clean and carries the field names the HUD reads', () =>
 });
 
 test('every cockpit image exists, at the size the manifest promises', () => {
-  assert.equal(COCKPIT_ART_PATHS.length, 10,
-    'ten images: bezel, yoke, arm, starter, pool goblin, strip, 2 clusters, 2 dials');
+  assert.equal(COCKPIT_ART_PATHS.length, 25,
+    '25 images: bezel, yoke, arm, starter, pool goblin, strip, 2 clusters, 2 dials, grime, 2 cracks, 2 needles, speed lines, 9 trinkets');
   for (const url of COCKPIT_ART_PATHS) {
     const path = publicFile(url);
     assert.ok(existsSync(path), `${url} must exist`);
@@ -236,23 +236,49 @@ test('P3: every gesture keeps both hands on the grips and moves only the shoulde
   assert.deepEqual(driverGesture({ ...base, impact: 1 }, true), { gesture: 'normal', intensity: 0 }, 'reduced motion: still arms');
 });
 
-// P2: glass in the cockpit window, and a spiderweb crack on a big hit that holds and then fades.
-test('P2: a crack holds for 2 s, fades over 1.5 s, and is drawn at the side the hit came from', async () => {
-  const { CRACK_FADE_S, CRACK_HOLD_S, crackOpacity, crackPath, glassScratches } = await import('../src/game/cockpit');
+// P2 & WIRE-3: glass in the cockpit window, and a spiderweb crack on a big hit that holds and then fades.
+test('P2 & WIRE-3: a crack holds for 2 s, fades over 1.5 s, and is rotated toward impact side', async () => {
+  const { CRACK_FADE_S, CRACK_HOLD_S, crackOpacity, crackTransform } = await import('../src/game/cockpit');
   assert.equal(crackOpacity(0), 1);
   assert.equal(crackOpacity(CRACK_HOLD_S - 0.01), 1);
   assert.ok(crackOpacity(CRACK_HOLD_S + CRACK_FADE_S / 2) > 0.4 && crackOpacity(CRACK_HOLD_S + CRACK_FADE_S / 2) < 0.6);
   assert.equal(crackOpacity(CRACK_HOLD_S + CRACK_FADE_S), 0);
   assert.equal(crackOpacity(-1), 0);
+
   const w = 1600; const h = 780;
-  assert.equal(crackPath(7, 1, w, h), crackPath(7, 1, w, h), 'the same hit draws the same crack');
-  assert.notEqual(crackPath(7, 1, w, h), crackPath(8, 1, w, h), 'a new hit draws a new one');
-  const start = (path: string) => Number(/^M(-?[\d.]+)/.exec(path)![1]);
-  assert.ok(start(crackPath(3, 1, w, h)) > w * 0.6, 'from the right, on the right');
-  assert.ok(start(crackPath(3, -1, w, h)) < w * 0.4, 'from the left, on the left');
-  assert.ok(glassScratches(w, h).length > 0);
+  const rightHit = crackTransform(7, 1, w, h);
+  const leftHit = crackTransform(7, -1, w, h);
+  assert.ok(rightHit.x > w * 0.6, 'from the right, positioned on the right');
+  assert.ok(rightHit.rotDeg > 0, 'from the right, rotated toward right');
+  assert.ok(leftHit.x < w * 0.4, 'from the left, positioned on the left');
+  assert.ok(leftHit.rotDeg < 0, 'from the left, rotated toward left');
+  assert.match(rightHit.file, /cockpit-glass-crack-[12]\.png$/);
+
   const hud = readFileSync(new URL('../src/components/CockpitHud.tsx', import.meta.url), 'utf8');
   assert.match(hud, /if \(!reducedMotion && state\.impact >= CRACK_THRESHOLD && state\.impact > cracks\.lastImpact \+ 0\.15\)/, 'only a new big hit cracks, and never under reduced motion');
-  assert.match(hud, /<svg className="cockpit-glass"/);
+  assert.match(hud, /className="cockpit-glass"/);
   assert.ok(hud.indexOf('className="cockpit-glass"') < hud.indexOf('className="cockpit-bezel"'), 'the glass is behind the bezel');
+});
+
+test('WIRE-3: speed lines appear above ~80% top speed and never under reduced motion', async () => {
+  const { speedLinesOpacity, SPEED_MAX, SPEED_LINES_THRESHOLD } = await import('../src/game/cockpit');
+  assert.equal(speedLinesOpacity(0, false), 0);
+  assert.equal(speedLinesOpacity(SPEED_MAX * 0.79, false), 0);
+  assert.equal(speedLinesOpacity(SPEED_MAX * SPEED_LINES_THRESHOLD, false), 0);
+  assert.ok(speedLinesOpacity(SPEED_MAX * 0.9, false) > 0.4 && speedLinesOpacity(SPEED_MAX * 0.9, false) < 0.6);
+  assert.equal(speedLinesOpacity(SPEED_MAX, false), 1);
+  assert.equal(speedLinesOpacity(SPEED_MAX, true), 0, 'reduced motion disables speed lines');
+});
+
+test('WIRE-3: no SVG path or line art left in the cockpit (glass, cracks and needles are painted PNGs)', () => {
+  const hud = readFileSync(new URL('../src/components/CockpitHud.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(hud, /<svg[^>]*className="cockpit-glass"/);
+  assert.doesNotMatch(hud, /<svg[^>]*className="cockpit-needle"/);
+  assert.doesNotMatch(hud, /<line\b/);
+  assert.doesNotMatch(hud, /<path\b/);
+  assert.match(hud, /className="cockpit-glass"/);
+  assert.match(hud, /className="cockpit-glass-grime"/);
+  assert.match(hud, /className="cockpit-glass-crack"/);
+  assert.match(hud, /className="cockpit-speed-lines"/);
+  assert.match(hud, /cockpit-needle-img/);
 });

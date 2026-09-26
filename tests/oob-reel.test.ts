@@ -66,9 +66,9 @@ test('H6: the player hears the ratchet and is told what is happening', () => {
 });
 
 test('H6: the crew is drawn on the lane with a rope to the ball, and the sheet animates', () => {
-  assert.equal(ROPE_REEL_ART.url, '/art/animated/alpha/anim-33-rope-heave-trio.png', 'the existing trio art, no new images');
+  assert.equal(ROPE_REEL_ART.url, '/art/animated/alpha/anim-62-goblin-rope-reel.png', 'painted single rope-reel goblin');
   assert.equal(ropeCrewFrame(0.2, false), 1);
-  assert.equal(ropeCrewFrame(0.7, false), 0, 'four frames at 6 fps loop');
+  assert.equal(ropeCrewFrame(0.5, false), 0, 'four frames at 8 fps loop');
   assert.equal(ropeCrewFrame(0.7, true), 0, 'still under reduced motion');
   const scene = new THREE.Scene();
   const view = new RopeReelView(scene, getTrackSpace());

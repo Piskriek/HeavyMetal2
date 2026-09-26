@@ -417,6 +417,9 @@ export function cockpitBob(speedKmh: number, grounded: boolean, reducedMotion: b
    5. ART PATHS
    -------------------------------------------------------------------------- */
 
+import { ALL_TRINKET_FILES } from './cockpit-trinkets';
+import { loadArtImage } from './art-assets';
+
 export const COCKPIT_ART = {
   bezel: `/${BEZEL.file}`,
   yoke: `/${YOKE.file}`,
@@ -427,13 +430,80 @@ export const COCKPIT_ART = {
   strip: `/${manifest.rivetStrip.file}`,
   clusters: manifest.clusters.map((cluster) => `/${cluster.file}`),
   dials: manifest.dials.map((dial) => `/${dial.file}`),
+  glassGrime: '/art/cockpit/cockpit-glass-grime.png',
+  cracks: [
+    '/art/cockpit/cockpit-glass-crack-1.png',
+    '/art/cockpit/cockpit-glass-crack-2.png',
+  ] as const,
+  needles: {
+    large: '/art/cockpit/cockpit-needle-large.png',
+    small: '/art/cockpit/cockpit-needle-small.png',
+  },
+  speedLines: '/art/animated/alpha/anim-61-speed-lines.png',
+  trinkets: ALL_TRINKET_FILES,
 } as const;
 
 /** Every cockpit image, for the preloader (law 4: nothing decodes during a race). */
 export const COCKPIT_ART_PATHS: readonly string[] = [
   COCKPIT_ART.bezel, COCKPIT_ART.yoke, COCKPIT_ART.arm, COCKPIT_ART.starter, COCKPIT_ART.poolGoblin,
   COCKPIT_ART.strip, ...COCKPIT_ART.clusters, ...COCKPIT_ART.dials,
+  COCKPIT_ART.glassGrime, ...COCKPIT_ART.cracks,
+  COCKPIT_ART.needles.large, COCKPIT_ART.needles.small,
+  COCKPIT_ART.speedLines,
+  ...ALL_TRINKET_FILES,
 ];
+
+/** Preload and warm-cache all cockpit art assets ahead of the race. */
+export async function preloadCockpitArt(): Promise<void> {
+  await Promise.all(COCKPIT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null)));
+}
+
+export const NEEDLE_ANCHORS = {
+  large: {
+    hubFraction: { x: 0.5, y: 753 / 899 },
+    aspect: 280 / 899,
+  },
+  small: {
+    hubFraction: { x: 0.5, y: 504 / 696 },
+    aspect: 392 / 696,
+  },
+} as const;
+
+export const SPEED_MAX = 360;
+export const SPEED_LINES_THRESHOLD = 0.8; // 80% of top speed (288 km/h)
+
+/** Speed lines opacity: 0 below 80% top speed; ramps to 1 at 360 km/h; 0 under reduced motion. */
+export function speedLinesOpacity(speedKmh: number, reducedMotion: boolean): number {
+  if (reducedMotion || !Number.isFinite(speedKmh)) return 0;
+  const threshold = SPEED_MAX * SPEED_LINES_THRESHOLD;
+  if (speedKmh <= threshold) return 0;
+  const t = (speedKmh - threshold) / (SPEED_MAX - threshold);
+  return Math.max(0, Math.min(1, t));
+}
+
+export interface CockpitCrackTransform {
+  file: string;
+  x: number;
+  y: number;
+  rotDeg: number;
+  scale: number;
+}
+
+/** Determines which painted crack PNG to display, positioned and rotated toward the impact side. */
+export function crackTransform(
+  seed: number,
+  impactSide: -1 | 0 | 1,
+  apertureW: number,
+  apertureH: number,
+): CockpitCrackTransform {
+  const file = COCKPIT_ART.cracks[Math.abs(seed) % COCKPIT_ART.cracks.length];
+  const sideX = impactSide > 0 ? 0.72 : impactSide < 0 ? 0.28 : 0.5;
+  const rotDeg = impactSide > 0 ? 30 : impactSide < 0 ? -30 : 0;
+  const x = apertureW * sideX;
+  const y = apertureH * 0.42;
+  const scale = (Math.min(apertureW, apertureH) / 1024) * 0.85;
+  return { file, x, y, rotDeg, scale };
+}
 
 export const COCKPIT_MANIFEST = manifest;
 

@@ -50,19 +50,12 @@
   border-radius: 50%;
 }
 
-.cockpit-needle {
+.cockpit-needle-img {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.cockpit-needle line {
-  stroke: #2a1a10;
-  stroke-width: 3.4;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 1.5px rgba(255, 226, 170, 0.8));
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
 }
 
 .cockpit-dial-tag {
@@ -188,6 +181,88 @@
 .cockpit-chip-gap[data-trend='falling'] { color: #f08a6e; border-color: rgba(220, 110, 80, 0.6); }
 .cockpit-chip-gap[hidden] { display: none; }
 
-/* P2: the glass sits in the window, behind the bezel, and never takes a click. */
-.cockpit-glass { position: absolute; pointer-events: none; overflow: hidden; }
-.cockpit-crack { filter: drop-shadow(0 0 1px #0008); }
+/* P2 & WIRE-3: painted glass, grime, cracks, and speed lines */
+.cockpit-glass {
+  position: absolute;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.cockpit-glass-grime {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cockpit-glass-crack {
+  position: absolute;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.7));
+  will-change: transform, opacity;
+}
+
+.cockpit-speed-lines {
+  position: absolute;
+  inset: 0;
+  background-image: url('/art/animated/alpha/anim-61-speed-lines.png');
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+  will-change: opacity, background-position;
+}
+
+/* WIRE-3 / X12: dashboard trinkets */
+.cockpit-trinket {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+  z-index: 4;
+}
+
+.cockpit-trinket img {
+  user-select: none;
+  pointer-events: none;
+}
+
+.cockpit-trinket-sheep-body {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.cockpit-trinket-sheep-head {
+  position: absolute;
+  bottom: 24%;
+  left: 50%;
+  width: 90%;
+  height: auto;
+  transform: translateX(-50%);
+  transform-origin: 50% 85%;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.cockpit-root[data-reduced-motion='true'] .cockpit-speed-lines {
+  display: none !important;
+}
+
+.cockpit-root[data-reduced-motion='true'] .cockpit-glass-crack {
+  display: none !important;
+}

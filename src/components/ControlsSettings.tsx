@@ -13,6 +13,17 @@ import {
   type KeyBindings,
 } from '../game/controls';
 
+import { readRecords } from '../game/preferences';
+import {
+  ALL_TRINKET_IDS,
+  TRINKET_DEFS,
+  isTrinketUnlocked,
+  readDashboardTrinkets,
+  saveDashboardTrinkets,
+  type DashboardTrinkets,
+  type TrinketId,
+} from '../game/cockpit-trinkets';
+
 interface ControlsSettingsProps {
   onBindingsChange?: (bindings: KeyBindings) => void;
 }
@@ -22,6 +33,20 @@ export default function ControlsSettings({ onBindingsChange }: ControlsSettingsP
   const [capturing, setCapturing] = useState<{ action: ActionId; index: number } | null>(null);
   const [message, setMessage] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const records = useMemo(() => readRecords(), []);
+  const [trinkets, setTrinkets] = useState<DashboardTrinkets>(() => readDashboardTrinkets(records));
+  const [pickingSlot, setPickingSlot] = useState<1 | 2 | null>(null);
+
+  const handleSelectTrinket = useCallback((slot: 1 | 2, id: TrinketId) => {
+    setTrinkets((prev) => {
+      const next = slot === 1 ? { ...prev, slot1: id } : { ...prev, slot2: id };
+      saveDashboardTrinkets(next);
+      return next;
+    });
+    setPickingSlot(null);
+    setMessage(`Dashboard ${slot === 1 ? 'left' : 'right'} trinket updated`);
+  }, []);
 
   // Refresh if another tab/window or component changes bindings
   useEffect(() => {
@@ -224,6 +249,79 @@ export default function ControlsSettings({ onBindingsChange }: ControlsSettingsP
         })}
       </div>
 
+      {/* WIRE-3 / X12: Cockpit Dashboard Trinkets row */}
+      <div className="cockpit-dashboard-section" aria-label="Cockpit dashboard settings">
+        <div className="cockpit-dashboard-header">
+          <div>
+            <h3>Dashboard Trinkets</h3>
+            <p>Two mounts on your armored dashboard ledge. They sway with steering and bob on landings.</p>
+          </div>
+        </div>
+
+        <div className="cockpit-slots-grid">
+          {([1, 2] as const).map((slotNum) => {
+            const currentId = slotNum === 1 ? trinkets.slot1 : trinkets.slot2;
+            const def = TRINKET_DEFS[currentId] ?? TRINKET_DEFS.none;
+            const isActive = pickingSlot === slotNum;
+            return (
+              <button
+                key={slotNum}
+                type="button"
+                className={`cockpit-slot-card ${isActive ? 'is-active' : ''}`}
+                onClick={() => setPickingSlot(isActive ? null : slotNum)}
+                aria-expanded={isActive}
+                aria-label={`Slot ${slotNum}: ${def.name}. Click to change`}
+              >
+                <div className="cockpit-slot-thumb">
+                  {def.id !== 'none' ? (
+                    <img src={def.bodyFile || def.file} alt="" draggable={false} />
+                  ) : (
+                    <span style={{ color: '#687766', fontSize: '11px', fontWeight: 600 }}>Empty</span>
+                  )}
+                </div>
+                <div className="cockpit-slot-info">
+                  <span>{slotNum === 1 ? 'Left Mount' : 'Right Mount'}</span>
+                  <strong>{def.name}</strong>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {pickingSlot && (
+          <div className="trinket-picker-modal" role="region" aria-label={`Choose trinket for slot ${pickingSlot}`}>
+            {ALL_TRINKET_IDS.map((id) => {
+              const def = TRINKET_DEFS[id];
+              const unlocked = isTrinketUnlocked(id, records);
+              const currentId = pickingSlot === 1 ? trinkets.slot1 : trinkets.slot2;
+              const isSelected = currentId === id;
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`trinket-option ${isSelected ? 'is-selected' : ''}`}
+                  disabled={!unlocked}
+                  onClick={() => handleSelectTrinket(pickingSlot, id)}
+                  aria-pressed={isSelected}
+                  title={!unlocked ? def.description : undefined}
+                >
+                  {id !== 'none' ? (
+                    <img src={def.bodyFile || def.file} alt="" className="trinket-option-img" draggable={false} />
+                  ) : (
+                    <div style={{ width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#687766', fontSize: 11 }}>
+                      None
+                    </div>
+                  )}
+                  <span className="trinket-option-name">{def.name}</span>
+                  {!unlocked && <span className="trinket-option-lock">Locked</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* H13: the keys that are not rebindable, so the whole keyboard is written down in one place. */}
       <div className="controls-fixed-keys" aria-label="Fixed keys">
         <strong>FIXED KEYS</strong>
@@ -325,10 +423,97 @@ export default function ControlsSettings({ onBindingsChange }: ControlsSettingsP
         .controls-actions { margin-top: 4px; align-items: center; flex-wrap: wrap; gap: 10px; }
         .controls-hint { font: 6px var(--mono); letter-spacing: .8px; color: #8b9a7d; display: inline-flex; gap: 6px; align-items: center; }
         .controls-hint kbd { background: #1e2823; border: 1px solid #3a4a3a; border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; font: 600 7px var(--mono); }
+        .cockpit-dashboard-section {
+          display: flex; flex-direction: column; gap: 12px;
+          padding: 14px 16px;
+          background: linear-gradient(180deg, #1a2420 0%, #121a17 100%);
+          border: 1px solid #3b4a3a;
+          border-radius: 8px;
+          box-shadow: inset 0 1px 0 #ffffff0a, 0 2px 8px #0000003a;
+        }
+        .cockpit-dashboard-header h3 {
+          font: 700 12px var(--display);
+          letter-spacing: .4px;
+          color: #ececdb;
+          text-transform: uppercase;
+          margin: 0;
+        }
+        .cockpit-dashboard-header p {
+          font-size: 10px; line-height: 1.45; color: #9aa68d;
+          margin: 2px 0 0;
+        }
+        .cockpit-slots-grid {
+          display: flex; gap: 14px; flex-wrap: wrap;
+        }
+        .cockpit-slot-card {
+          display: flex; align-items: center; gap: 12px;
+          background: #141c18; border: 1px solid #2e3d32;
+          border-radius: 8px; padding: 8px 12px;
+          cursor: pointer; transition: all 160ms ease;
+          min-width: 180px; text-align: left;
+        }
+        .cockpit-slot-card:hover {
+          border-color: #f0a15b; background: #19241f;
+        }
+        .cockpit-slot-card.is-active {
+          border-color: #ffb86a; box-shadow: 0 0 0 2px #ffb86a33;
+        }
+        .cockpit-slot-thumb {
+          width: 40px; height: 40px;
+          display: flex; align-items: center; justify-content: center;
+          background: #0f1612; border: 1px solid #3b4a3a;
+          border-radius: 6px; overflow: hidden; flex-shrink: 0;
+        }
+        .cockpit-slot-thumb img {
+          max-width: 36px; max-height: 36px; object-fit: contain;
+        }
+        .cockpit-slot-info {
+          display: flex; flex-direction: column;
+        }
+        .cockpit-slot-info span {
+          font: 600 8px var(--mono); color: #f0a15b;
+          text-transform: uppercase; letter-spacing: .8px;
+        }
+        .cockpit-slot-info strong {
+          font-size: 12px; color: #f5f5ea;
+        }
+        .trinket-picker-modal {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+          gap: 8px; margin-top: 6px; padding: 10px;
+          background: #0e1411; border: 1px solid #2e3d32;
+          border-radius: 8px;
+        }
+        .trinket-option {
+          display: flex; flex-direction: column; align-items: center; gap: 4px;
+          padding: 8px 6px; background: #18221d; border: 1px solid #324437;
+          border-radius: 6px; cursor: pointer; text-align: center;
+          transition: all 140ms;
+        }
+        .trinket-option:hover:not(:disabled) {
+          border-color: #ffb86a; background: #202e27; transform: translateY(-1px);
+        }
+        .trinket-option.is-selected {
+          border-color: #f0a15b; background: #293830;
+          box-shadow: 0 0 0 2px #f0a15b44;
+        }
+        .trinket-option:disabled {
+          opacity: 0.45; cursor: not-allowed; filter: grayscale(0.8);
+        }
+        .trinket-option-img {
+          width: 36px; height: 36px; object-fit: contain;
+        }
+        .trinket-option-name {
+          font-size: 10px; font-weight: 600; color: #ececdb;
+        }
+        .trinket-option-lock {
+          font: 600 7px var(--mono); color: #e07260; text-transform: uppercase;
+        }
         @media (max-width: 640px) {
           .controls-row { grid-template-columns: 1fr; gap: 10px; }
           .controls-pills { justify-content: flex-start; }
           .key-pill { min-width: 84px; height: 34px; font-size: 10px; }
+          .cockpit-slots-grid { flex-direction: column; }
         }
       `}</style>
     </div>

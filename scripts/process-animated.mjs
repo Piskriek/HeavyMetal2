@@ -421,7 +421,7 @@ try {
   // 9. Review contact sheet (keyed sheets, 5x2 @ 384px).
   const sheets = ANIMATED_VARIATIONS.map((v) => join(alphaDir, v.file)).filter((p) => existsSync(p));
   if (sheets.length) {
-    const contact = join(animDir, 'animated-contact-sheet.png');
+    const contact = join(root, 'art-src/animated/animated-contact-sheet.png'); // review only, never shipped
     const rows = Math.ceil(sheets.length / 5);
     execFileSync('montage', [
       ...sheets, '-tile', `5x${rows}`, '-geometry', '384x384+4+4>',

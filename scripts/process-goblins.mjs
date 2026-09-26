@@ -7,10 +7,10 @@
  *  - Stored in `public/art/goblins/` (raw magenta key transparency) and
  *    `public/art/goblins/alpha/` (keyed true alpha transparency).
  *  - Combined sprite sheets stored in:
- *    - `public/art/sheets/goblins-sheet.png` (all goblins, 5xN)
- *    - `public/art/sheets/goblins-sheet-a.png` (Batch 1: goblins 01-10, 5x2)
- *    - `public/art/sheets/goblins-sheet-b.png` (Batch 2: goblins 11-20, 5x2)
- *    - `public/art/sheets/goblins-sheet-c.png` (Batch 3: goblins 21-30, 5x2)
+ *    - `art-src/sheets/goblins-sheet.png` (all goblins, 5xN)
+ *    - `art-src/sheets/goblins-sheet-a.png` (Batch 1: goblins 01-10, 5x2)
+ *    - `art-src/sheets/goblins-sheet-b.png` (Batch 2: goblins 11-20, 5x2)
+ *    - `art-src/sheets/goblins-sheet-c.png` (Batch 3: goblins 21-30, 5x2)
  *    - ... one letter per batch of 10.
  *
  * Keying & despill (identical to `scripts/process-props.mjs`):
@@ -50,7 +50,8 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const goblinsDir = join(root, 'public/art/goblins');
 const alphaDir = join(root, 'public/art/goblins/alpha');
-const sheetsDir = join(root, 'public/art/sheets');
+// Review sheets are build output, not shipped art: they live in art-src/ (outside the public/ budget).
+const sheetsDir = join(root, 'art-src/sheets');
 mkdirSync(alphaDir, { recursive: true });
 mkdirSync(sheetsDir, { recursive: true });
 

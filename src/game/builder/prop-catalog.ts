@@ -5,10 +5,18 @@
  */
 import type { MaterialDescriptor } from '../materials/material-descriptor';
 import type { RoleConfig } from '../collision/obstacle-roles';
+import { PRIMITIVE_DEFINITIONS } from './primitives';
+import { LIGHT_DEFINITIONS } from './light-rig';
 
 export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated'
   /** M01 · T7 — not a prop shelf: this tab shows the Lanes & Paths panel instead of a card grid. */
-  | 'lanes';
+  | 'lanes'
+  /** 3D shapes that wear shaders; in this tab the course's own scenery can be selected too. */
+  | 'primitives'
+  /** Placed point and spot lights. */
+  | 'lights'
+  /** Not a shelf: edits to the course's generated scenery (never shown as cards). */
+  | 'scenery';
 
 export interface PropDefinition {
   type: string;
@@ -475,6 +483,11 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_50_firework_red', name: 'Red Firework', category: 'animated', url: '/art/animated/alpha/anim-50-firework-red.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
   { type: 'anim_51_firework_blue', name: 'Blue Firework', category: 'animated', url: '/art/animated/alpha/anim-51-firework-blue.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
   { type: 'anim_52_firework_green', name: 'Green Firework', category: 'animated', url: '/art/animated/alpha/anim-52-firework-green.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+
+  // --- SCENE KIT: primitives, lights, and the record type for edits to generated scenery ---
+  ...PRIMITIVE_DEFINITIONS,
+  ...LIGHT_DEFINITIONS,
+  { type: 'terrain_edit', name: 'Scenery edit', category: 'scenery', url: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#f0b85e" stroke-width="2.5" stroke-linejoin="round"><path d="M6 50 22 24l10 14 8-10 18 22z"/></svg>'), defaultWidth: 100, defaultHeight: 100 },
 ];
 
 /**

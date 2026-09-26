@@ -31,6 +31,12 @@ import { GizmoAdapter } from './builder/gizmo-adapter';
 import { CommandStack } from './builder/history';
 import { alignProps, distributeProps, marqueeSelect2D } from './builder/selection';
 import type { GizmoMode, GizmoSpace, SnapConfig } from './builder/gizmo-math';
+import { SceneKit, isKitType, isTerrainEdit } from './builder/scene-kit';
+import { isLightType, lightPreset, lightSettingsFor } from './builder/light-rig';
+import { isPrimitiveType } from './builder/primitives';
+import {
+  loadShaderLibrary, mergeShadersFromProps, normalizeShader, saveShaderLibrary, type ShaderDef,
+} from './materials/shader-library';
 
 // M8: the prop catalog and the disk backup live in their own modules; everything they export is
 // re-exported here, so importers of track-builder-3d are unchanged.
@@ -124,7 +130,19 @@ export class TrackBuilder3D {
   private readonly decalSideBoxes = new Map<DecalSide, THREE.Mesh>();
 
   /** M8: the disk backup (C2's server safety copies, M12's skip-if-unchanged, the timers, the status). */
-  private readonly backups = new PropBackupService({ props: () => this.placedProps, course: () => this.courseId });
+  private readonly backups = new PropBackupService({ props: () => this.persistableProps(), course: () => this.courseId });
+
+  /**
+   * Lights, primitives and scenery edits (builder/scene-kit.ts). Built first in the constructor, so
+   * its scenery index snapshots only the course's generated scenery.
+   */
+  readonly kit: SceneKit;
+  /** The shader library (editable here, saved on this device; props carry inline copies). */
+  private shaderLibrary: ShaderDef[] = [];
+  /** The shader new primitives are placed with (the one picked in the Shader Manager), if any. */
+  private activeShaderId: string | null = null;
+  /** Primitives mode: clicks on the course's own scenery select it. */
+  private terrainPicking = false;
   private courseId = 'ridge';
 
   private listeners: (() => void)[] = [];
@@ -181,6 +199,8 @@ export class TrackBuilder3D {
     private readonly track: TrackData,
     private readonly materials?: any,
   ) {
+    this.kit = new SceneKit(this.scene, this.materialCache, this.materials);
+    this.shaderLibrary = loadShaderLibrary();
     this.initDecalSideHandles();
     this.laneGizmos = new LaneGizmos(this.scene);
     this.laneGizmos.root.visible = false;
@@ -202,6 +222,8 @@ export class TrackBuilder3D {
       } catch {}
     }
     this.loadFromStorage();
+    const merged = mergeShadersFromProps(this.shaderLibrary, this.placedProps as { shader?: unknown }[]);
+    if (merged.added) { this.shaderLibrary = merged.library; saveShaderLibrary(this.shaderLibrary); }
     if (typeof window !== 'undefined') {
       this.startPeriodicBackupTimer(30000);
     }
@@ -239,8 +261,9 @@ export class TrackBuilder3D {
     this.notify();
   }
 
-  onChange(cb: () => void) {
+  onChange(cb: () => void): () => void {
     this.listeners.push(cb);
+    return () => { this.listeners = this.listeners.filter((l) => l !== cb); };
   }
 
   private notify() {
@@ -416,6 +439,7 @@ export class TrackBuilder3D {
       this.notify();
     });
     this.gizmoAdapter.onDrag((dragging) => {
+      if (dragging && !this.isGizmoDragging && !this.gizmoAdapter?.isLaneNodeAttached()) this.pushUndo();
       this.isGizmoDragging = dragging;
     });
     if (this.selectedLaneNodeId && this.lanesVisible) {
@@ -552,6 +576,7 @@ export class TrackBuilder3D {
     let count = 0;
     let totalVertices = 0;
     for (const [, obj] of this.propObjects.entries()) {
+      if (obj.userData?.isPrimitive || obj.userData?.isLight || obj.userData?.terrainEdit || obj.userData?.orphanTerrainEdit) continue;
       obj.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
@@ -748,11 +773,7 @@ export class TrackBuilder3D {
 
     if (before !== after) {
       this.disposeAnimTexture(id);
-      const oldObj = this.propObjects.get(id);
-      if (oldObj) {
-        this.scene.remove(oldObj);
-        this.propObjects.delete(id);
-      }
+      this.removePropObject(prop);
       this.createPropSprite(prop);
     }
     // Repaint the current frame straight away so speed/skip/delay edits are visible
@@ -951,9 +972,7 @@ export class TrackBuilder3D {
       }
     }
     // Recreate sprites to apply new dimensions
-    this.propObjects.forEach((s) => this.scene.remove(s));
-    this.propObjects.clear();
-    this.placedProps.forEach((p) => this.createPropSprite(p));
+    this.rebuildPropObjects();
     this.updateSelectionBox();
     this.saveToStorage();
     this.notify();
@@ -971,9 +990,7 @@ export class TrackBuilder3D {
       delete prop.height;
       delete prop.depth;
     }
-    this.propObjects.forEach((s) => this.scene.remove(s));
-    this.propObjects.clear();
-    this.placedProps.forEach((p) => this.createPropSprite(p));
+    this.rebuildPropObjects();
     this.updateSelectionBox();
     this.saveToStorage();
     this.notify();
@@ -1099,6 +1116,7 @@ export class TrackBuilder3D {
     const objects = Array.from(this.propObjects.entries())
       .filter(([id]) => {
         const prop = this.placedProps.find(p => p.id === id);
+        if (prop && isTerrainEdit(prop) && (!this.terrainPicking || prop.terrainHidden)) return false;
         return prop && prop.visible !== false;
       })
       .map(([, obj]) => obj);
@@ -1121,7 +1139,7 @@ export class TrackBuilder3D {
 
     for (const prop of this.placedProps) {
       // T08: Exclude invisible props from fresh raycasts
-      if (prop.visible === false) continue;
+      if (prop.visible === false || isTerrainEdit(prop)) continue;
       
       const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
       if (!def) continue;
@@ -1178,7 +1196,9 @@ export class TrackBuilder3D {
 
     for (const hit of intersects) {
       const obj = hit.object;
-      // Skip sky, markers, gizmos, ghosts, sprites, placed props, and handles
+      // three.js raycasts hit hidden objects: a hidden scenery part or prop is not a surface.
+      if (!SceneKit.shown(obj) || obj.name?.startsWith('Light') || obj.name === 'BuilderLightSlot') continue;
+      // Skip sky, markers, gizmos, ghosts, sprites, placed props (except primitives), and handles
       if (
         obj.name === 'Sky' ||
         obj.name === 'Ghost' ||
@@ -1187,7 +1207,7 @@ export class TrackBuilder3D {
         obj.name === 'GhostSlingshotMesh' ||
         (obj as any).isSprite ||
         obj.name === 'DebugMarkers' ||
-        obj.name?.startsWith('PlacedProp_') ||
+        (obj.name?.startsWith('PlacedProp_') && !obj.userData?.isPrimitive) ||
         obj.name?.startsWith('DecalSide') ||
         obj.name?.startsWith('DecalHandle') ||
         obj.name === 'RotationHandleGroup' ||
@@ -1440,6 +1460,33 @@ export class TrackBuilder3D {
       rotZ = Math.asin(R_surface.y);
     }
 
+    if (isKitType(def.type)) {
+      const kitProp: PlacedProp = {
+        id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: def.type,
+        name: def.name,
+        x: Math.round(pos.x),
+        // Lights hang a little above what was clicked, so they are not buried in it.
+        y: Math.round(pos.y + (isLightType(def.type) ? 160 : 0)),
+        z: Math.round(pos.z),
+        rotY, rotX: 0, rotZ: 0, scale: 1,
+        alignToTrack: this.snapping.alignToTrack,
+        trackDist: hit.sample ? Math.round(hit.sample.dist) : undefined,
+        cameraFacing: false, isDecal: false, flipX: false,
+      };
+      if (isLightType(def.type)) kitProp.light = { ...lightPreset(def.type) };
+      if (isPrimitiveType(def.type)) {
+        const shader = this.activeShaderId ? this.shaderLibrary.find((sh) => sh.id === this.activeShaderId) : undefined;
+        if (shader) kitProp.shader = normalizeShader(shader);
+      }
+      this.placedProps.push(kitProp);
+      this.createPropSprite(kitProp);
+      this.selectProp(kitProp.id);
+      this.saveToStorage();
+      this.notify();
+      return kitProp;
+    }
+
     const prop: PlacedProp = {
       id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       type: def.type,
@@ -1470,7 +1517,12 @@ export class TrackBuilder3D {
   }
 
   duplicateSelected(): PlacedProp[] {
-    const selected = this.getSelectedProps();
+    const all = this.getSelectedProps();
+    const selected = all.filter((p) => !isTerrainEdit(p));
+    if (selected.length < all.length) {
+      this.placementErrorState = 'Course scenery cannot be duplicated. Place a primitive instead.';
+      this.notify();
+    }
     if (selected.length === 0) return [];
 
     this.pushUndo();
@@ -1504,13 +1556,21 @@ export class TrackBuilder3D {
     if (selected.length === 0) return;
     this.pushUndo();
     for (const prop of selected) {
+      if (isTerrainEdit(prop)) {
+        if (this.kit.isLockedEdit(prop)) {
+          this.placementErrorState = 'The road shows the race line: it can take a shader but cannot be removed.';
+          continue;
+        }
+        prop.terrainHidden = true;
+        const obj = this.propObjects.get(prop.id);
+        if (obj) this.kit.applyTransform(prop, obj);
+        const box = this.selectionBoxes.get(prop.id);
+        if (box) { this.scene.remove(box); this.selectionBoxes.delete(prop.id); }
+        continue;
+      }
       const idx = this.placedProps.findIndex((p) => p.id === prop.id);
       if (idx >= 0) {
-        const obj = this.propObjects.get(prop.id);
-        if (obj) {
-          this.scene.remove(obj);
-          this.propObjects.delete(prop.id);
-        }
+        this.removePropObject(prop);
         this.disposeAnimTexture(prop.id);
         const box = this.selectionBoxes.get(prop.id);
         if (box) {
@@ -1532,11 +1592,8 @@ export class TrackBuilder3D {
     const idx = this.placedProps.findIndex((p) => p.id === id);
     if (idx >= 0) {
       const prop = this.placedProps[idx];
-      const obj = this.propObjects.get(prop.id);
-      if (obj) {
-        this.scene.remove(obj);
-        this.propObjects.delete(prop.id);
-      }
+      // For a scenery edit this is "restore": the part goes back exactly as generated.
+      this.removePropObject(prop);
       this.disposeAnimTexture(prop.id);
       const box = this.selectionBoxes.get(prop.id);
       if (box) {
@@ -1576,6 +1633,35 @@ export class TrackBuilder3D {
   updatePropTransform(id: string, updates: Partial<PlacedProp>, autoSync = true) {
     const prop = this.placedProps.find((p) => p.id === id);
     if (!prop) return;
+
+    if (isKitType(prop.type)) {
+      if (updates.rotY !== undefined) {
+        let r = updates.rotY;
+        while (r > Math.PI) r -= 2 * Math.PI;
+        while (r < -Math.PI) r += 2 * Math.PI;
+        updates.rotY = r;
+      }
+      const oldKind = isLightType(prop.type) ? lightSettingsFor(prop).kind : null;
+      Object.assign(prop, updates);
+      if (isTerrainEdit(prop) && this.kit.isLockedEdit(prop) && prop.terrainOrigin) {
+        // The road moves with nothing: only its shader can change.
+        [prop.x, prop.y, prop.z] = prop.terrainOrigin as [number, number, number];
+        prop.rotY = 0; prop.rotX = 0; prop.rotZ = 0; prop.scale = 1;
+      }
+      if (oldKind && lightSettingsFor(prop).kind !== oldKind) {
+        this.removePropObject(prop);
+        this.createPropSprite(prop);
+      } else {
+        const obj = this.propObjects.get(id);
+        if (obj) this.kit.applyTransform(prop, obj);
+      }
+      if (autoSync) {
+        this.updateSelectionBox();
+        this.saveToStorage();
+        this.notify();
+      }
+      return;
+    }
 
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
 
@@ -1677,11 +1763,7 @@ export class TrackBuilder3D {
 
     // If cameraFacing, isDecal, lit or the animated sheet changed, recreate the 3D object
     if (oldCameraFacing !== newCameraFacing || oldIsDecal !== newIsDecal || oldSheetUrl !== newSheetUrl || (updates.lit !== undefined && oldLit !== newLit)) {
-      const oldObj = this.propObjects.get(id);
-      if (oldObj) {
-        this.scene.remove(oldObj);
-        this.propObjects.delete(id);
-      }
+      this.removePropObject(prop);
       this.createPropSprite(prop);
     } else {
       const obj = this.propObjects.get(id);
@@ -1792,7 +1874,9 @@ export class TrackBuilder3D {
   // --- SELECTION BOX HIGHLIGHT & ROTATION HANDLE ---
   private updateSelectionBox() {
     const selected = this.getSelectedProps();
+    this.pruneNoOpTerrainEdits();
     if (selected.length === 0 || !this.freeFly.active) {
+      this.kit.setSelected(this.selectedPropIds, this.propObjects);
       this.selectionBoxes.forEach((box) => { box.visible = false; });
       if (this.rotationHandle) this.rotationHandle.visible = false;
       if (this.decalSideHandlesGroup) this.decalSideHandlesGroup.visible = false;
@@ -1802,7 +1886,8 @@ export class TrackBuilder3D {
       return;
     }
 
-    this.gizmoAdapter?.attach(selected);
+    this.gizmoAdapter?.attach(selected.filter((p) => !(isTerrainEdit(p) && this.kit.isLockedEdit(p))));
+    this.kit.setSelected(this.selectedPropIds, this.propObjects);
 
     const currentSelectedIds = new Set(selected.map((p) => p.id));
 
@@ -2230,6 +2315,7 @@ export class TrackBuilder3D {
    * arrived adopts it here instead of staying blank.
    */
   updateAnimations(timeSec: number, reducedMotion = false) {
+    this.kit.update(this.camera, timeSec, reducedMotion, this.freeFly.active);
     if (this.animTextureCache.size === 0) return;
     for (const [propId, tex] of this.animTextureCache) {
       const obj = this.propObjects.get(propId);
@@ -2266,6 +2352,11 @@ export class TrackBuilder3D {
   }
 
   private createPropSprite(prop: PlacedProp): THREE.Object3D {
+    if (isKitType(prop.type)) {
+      const obj = this.kit.create(prop);
+      this.propObjects.set(prop.id, obj);
+      return obj;
+    }
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
     if (!def) return new THREE.Object3D();
 
@@ -2716,7 +2807,8 @@ export class TrackBuilder3D {
   }
 
   private restorePropsState(props: PlacedProp[]) {
-    // Remove current objects
+    // Remove current objects (a scenery edit puts its part back before the new state re-applies it)
+    for (const prop of [...this.placedProps]) this.removePropObject(prop);
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
     // Prune animated textures for props the restored state no longer holds
@@ -2742,7 +2834,7 @@ export class TrackBuilder3D {
   // --- PERSISTENCE & PERIODIC DISK BACKUP ---
   saveToStorage() {
     // T08: Write via versioned storage module (separate key, not protected path)
-    const cleanProps = this.stripRuntimeState(this.placedProps);
+    const cleanProps = this.stripRuntimeState(this.persistableProps());
     const storageResult = writeStorage(cleanProps, this.courseId);
 
     if (!storageResult.ok && storageResult.quotaExceeded) {
@@ -2953,6 +3045,218 @@ export class TrackBuilder3D {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // SCENE KIT — lights, primitives, scenery edits and the shader library
+  // ---------------------------------------------------------------------------
+
+  /** The one way a prop's object leaves the scene: kit props go through the kit (a scenery edit puts its part back). */
+  private removePropObject(prop: PlacedProp | undefined) {
+    if (!prop) return;
+    const obj = this.propObjects.get(prop.id);
+    if (isKitType(prop.type)) this.kit.release(prop, obj);
+    else if (obj) this.scene.remove(obj);
+    this.propObjects.delete(prop.id);
+  }
+
+  /** Every prop's object rebuilt (all released first, so no scenery part is wrapped twice). */
+  private rebuildPropObjects() {
+    for (const prop of this.placedProps) this.removePropObject(prop);
+    this.propObjects.forEach((o) => this.scene.remove(o));
+    this.propObjects.clear();
+    this.placedProps.forEach((p) => this.createPropSprite(p));
+  }
+
+  /** What is saved and backed up: everything except scenery edits that change nothing. */
+  private persistableProps(): PlacedProp[] {
+    if (!this.kit) return this.placedProps;
+    return this.placedProps.filter((p) => !(isTerrainEdit(p) && this.kit.isNoOpEdit(p)));
+  }
+
+  /** A scenery part that was clicked but never changed is dropped once it is no longer selected. */
+  private pruneNoOpTerrainEdits() {
+    if (!this.kit) return;
+    for (let i = this.placedProps.length - 1; i >= 0; i--) {
+      const p = this.placedProps[i];
+      if (!isTerrainEdit(p) || this.selectedPropIds.has(p.id) || !this.kit.isNoOpEdit(p)) continue;
+      this.removePropObject(p);
+      const box = this.selectionBoxes.get(p.id);
+      if (box) { this.scene.remove(box); this.selectionBoxes.delete(p.id); }
+      this.placedProps.splice(i, 1);
+    }
+  }
+
+  /** Primitives mode: clicks on the course's own scenery select it. */
+  setTerrainPicking(on: boolean) {
+    if (this.terrainPicking === on) return;
+    this.terrainPicking = on;
+    if (!on && this.getSelectedProps().some((p) => isTerrainEdit(p))) this.selectProp(null);
+  }
+
+  getTerrainPicking(): boolean { return this.terrainPicking; }
+
+  /** The scenery part under the pointer, as its (possibly new) scenery edit, selected. */
+  pickTerrain(clientX: number, clientY: number, canvas: HTMLCanvasElement, multi = false): PlacedProp | null {
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const part = this.kit.pickScenery(this.raycaster);
+    if (!part) return null;
+    let prop = this.placedProps.find((p) => isTerrainEdit(p) && p.terrainKey === part.key);
+    if (!prop) {
+      prop = { id: `terrain_${part.key}_${Date.now().toString(36)}`, ...this.kit.newEditFields(part) } as PlacedProp;
+      this.placedProps.push(prop);
+      this.createPropSprite(prop);
+    }
+    this.selectProp(prop.id, multi);
+    return prop;
+  }
+
+  /** The scenery edits, for the Primitives panel. */
+  getTerrainEdits(): { prop: PlacedProp; hidden: boolean; moved: boolean; shaded: boolean; orphan: boolean; locked: boolean }[] {
+    return this.placedProps.filter((p) => isTerrainEdit(p) && !this.kit.isNoOpEdit(p)).map((p) => {
+      const o = p.terrainOrigin as [number, number, number] | undefined;
+      const moved = !!o && (Math.abs(p.x - o[0]) >= 1 || Math.abs(p.y - o[1]) >= 1 || Math.abs(p.z - o[2]) >= 1
+        || Math.abs(p.rotY ?? 0) > 1e-4 || Math.abs(p.rotX ?? 0) > 1e-4 || Math.abs(p.rotZ ?? 0) > 1e-4 || Math.abs((p.scale || 1) - 1) > 1e-4);
+      return { prop: p, hidden: !!p.terrainHidden, moved, shaded: !!p.shader, orphan: !this.kit.editMatches(p), locked: this.kit.isLockedEdit(p) };
+    });
+  }
+
+  /** Puts one scenery part back exactly as generated (removes its edit). */
+  resetTerrainEdit(id: string) {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (prop && isTerrainEdit(prop)) this.deleteProp(id);
+  }
+
+  /** Shows a hidden part again (keeping any move or shader). */
+  unhideTerrainEdit(id: string) {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop || !isTerrainEdit(prop) || !prop.terrainHidden) return;
+    this.pushUndo();
+    delete prop.terrainHidden;
+    const obj = this.propObjects.get(id);
+    if (obj) this.kit.applyTransform(prop, obj);
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Shows every hidden part again. Returns how many. */
+  unhideAllTerrain(): number {
+    const hidden = this.placedProps.filter((p) => isTerrainEdit(p) && p.terrainHidden);
+    if (!hidden.length) return 0;
+    this.pushUndo();
+    for (const prop of hidden) {
+      delete prop.terrainHidden;
+      const obj = this.propObjects.get(prop.id);
+      if (obj) this.kit.applyTransform(prop, obj);
+    }
+    this.pruneNoOpTerrainEdits();
+    this.saveToStorage();
+    this.notify();
+    return hidden.length;
+  }
+
+  /* Shaders */
+
+  getShaderLibrary(): readonly ShaderDef[] { return this.shaderLibrary; }
+
+  shaderUsage(id: string): number {
+    return this.placedProps.filter((p) => (p.shader as ShaderDef | undefined)?.id === id).length;
+  }
+
+  private lastShaderEditAt = 0;
+  private shaderSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Adds or updates a library shader. Live materials change at once; every prop wearing it gets the
+   * new inline copy. A burst of edits (a slider drag) is one undo step and one save.
+   */
+  saveShader(def: ShaderDef) {
+    const shader = normalizeShader(def);
+    const now = Date.now();
+    const users = this.placedProps.filter((p) => (p.shader as ShaderDef | undefined)?.id === shader.id);
+    if (users.length && now - this.lastShaderEditAt > 1500) this.pushUndo();
+    this.lastShaderEditAt = now;
+    const i = this.shaderLibrary.findIndex((x) => x.id === shader.id);
+    if (i >= 0) this.shaderLibrary[i] = shader; else this.shaderLibrary.push(shader);
+    saveShaderLibrary(this.shaderLibrary);
+    for (const p of users) p.shader = shader;
+    this.kit.refreshShader(shader);
+    if (users.length) {
+      if (this.shaderSaveTimer) clearTimeout(this.shaderSaveTimer);
+      this.shaderSaveTimer = setTimeout(() => { this.shaderSaveTimer = null; this.saveToStorage(); }, 600);
+    }
+    this.notify();
+  }
+
+  /** Removes a shader from the library, unless something still wears it. */
+  deleteShader(id: string): { ok: true } | { ok: false; reason: string } {
+    const used = this.shaderUsage(id);
+    if (used) return { ok: false, reason: `${used} object${used === 1 ? '' : 's'} still wear this shader. Give them another one first.` };
+    this.shaderLibrary = this.shaderLibrary.filter((x) => x.id !== id);
+    if (this.activeShaderId === id) this.activeShaderId = null;
+    saveShaderLibrary(this.shaderLibrary);
+    this.notify();
+    return { ok: true };
+  }
+
+  /** The shader new primitives are placed with. */
+  setActiveShader(id: string | null) { this.activeShaderId = id; this.notify(); }
+  getActiveShader(): string | null { return this.activeShaderId; }
+
+  /** Dresses the selected primitives and scenery parts with a shader (null takes it off). Returns how many. */
+  applyShaderToSelected(id: string | null): number {
+    const targets = this.getSelectedProps().filter((p) => isPrimitiveType(p.type) || isTerrainEdit(p));
+    const def = id ? this.shaderLibrary.find((x) => x.id === id) : null;
+    if (!targets.length || (id && !def)) return 0;
+    this.pushUndo();
+    for (const p of targets) {
+      if (def) p.shader = normalizeShader(def); else delete p.shader;
+      const obj = this.propObjects.get(p.id);
+      if (obj) this.kit.applyTransform(p, obj);
+    }
+    this.pruneNoOpTerrainEdits();
+    this.saveToStorage();
+    this.notify();
+    return targets.length;
+  }
+
+  /* Lights */
+
+  /** Changes the selected lights' settings (colour, brightness, reach, cone, flicker, kind). */
+  updateSelectedLights(changes: Record<string, unknown>) {
+    const lights = this.getSelectedProps().filter((p) => isLightType(p.type));
+    if (!lights.length) return;
+    this.pushUndo();
+    for (const p of lights) this.updatePropTransform(p.id, { light: { ...lightSettingsFor(p), ...changes } }, false);
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** How many placed lights there are, and how many shine right now (the rig's slots). */
+  lightStats(): { placed: number; lit: number } { return { placed: this.kit.lights.count, lit: this.kit.lights.lit }; }
+
+  /* Scene-wide tile randomiser and the underground preview */
+
+  getSceneryTileRandomization() { return this.kit.tileRandomization; }
+  setSceneryTileRandomization(on: boolean, variation?: number) { this.kit.setSceneryTileRandomization(on, variation); this.notify(); }
+
+  /** Builder only: the renderer darkens the underground around the camera like a race does. */
+  previewAtmosphere = true;
+
+  /** Track distance of the sample nearest the camera (for the underground preview). */
+  cameraTrackDistance(): number {
+    const samples = this.track.samples;
+    if (!samples?.length) return 0;
+    const eye = this.camera.position;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < samples.length; i += 4) {
+      const d = samples[i].pos.distanceToSquared(eye);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return samples[best].dist;
+  }
+
   clearAll() {
     this.pushUndo();
     this.restorePropsState([]);
@@ -2966,8 +3270,10 @@ export class TrackBuilder3D {
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
     this.selectionBoxes.clear();
     if (this.rotationHandle) this.scene.remove(this.rotationHandle);
+    for (const prop of [...this.placedProps]) this.removePropObject(prop);
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
+    this.kit.dispose();
     for (const id of [...this.animTextureCache.keys()]) this.disposeAnimTexture(id);
     if (this.gizmoAdapter) {
       this.gizmoAdapter.dispose();

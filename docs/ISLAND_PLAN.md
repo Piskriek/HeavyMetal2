@@ -9,6 +9,44 @@ different open-route and lane layout every race.
 Reference: the owner's volcanic-island render (broad beaches, turquoise lagoons, basalt cliffs, timber and
 iron) and the modular kit sheet. Clean low-poly shapes; the owner has since asked for palm trees and rocks.
 
+## 0. The owner's race structure (2026-09-26) — this shapes everything below
+
+Every race, single player and multiplayer, follows one shape. Section 1's twelve sections are the places
+this shape runs through; where they disagree, this section wins.
+
+1. **Prologue: "Late for the race"** (tutorial and seeding). Every race starts at the highest point: the
+   goblin's crooked shack on the summit crag, alarm-clock bell ringing (story: you live on the mountain and
+   are late). A short run: **two turns and one jump**, the jump sailing over the rim into the starting area.
+   First-timers get the tutorial here (one prompt per turn and at the jump: steer, hop, boost). **Arrival
+   order seeds the start** (the engine's existing sorting pool / ordered release; multiplayer uses it too).
+2. **The starting area: "The Maw".** A giant goblin head carved into the crater wall (brass teeth, glowing
+   eyes, steam from the nostrils). Inside it, a **brass revolver drum**: each ball landing from the prologue
+   drops into the next chamber in arrival order and the drum clicks round, visible through the open jaw. On
+   the crew's lever the jaw drops and the drum **fires the balls out of the mouth one by one** (a cannon
+   crack and a steam puff each) down a chute onto the first slope. The seeding made visible: first in, first
+   out of the gun. Meshy pieces: the carved head, the revolver drum, the chute.
+3. **The veins.** The first split is **three branches: two good roads and one longer road** (the longer one
+   earns its time: a boost line or a pickup cache). After that the roads **split and rejoin like veins,
+   again and again**: a braid of short forked sections (ROUTE-1 sections chained), each split-to-merge long
+   enough to change lanes and collide, so every merge is a collision zone. Roads **cross over each other**
+   on bridges and trestles (rivals above and below you).
+   - Width: **mostly 2 or 3 lanes**, some **single-lane** squeezes (a trestle, a ledge, a pipe). The seeded
+     lane variants choose widths per race.
+   - **Dead ends where you die spectacularly**: a bridge ending in mid-air over lava, a snapping rope, a cave
+     that floods. Death uses the existing recovery (the rope-reel goblin hauls you back, time lost).
+     **ROUTE-2 extension:** a branch can be *open but lethal* in a given race ("the bridge is out today"),
+     not only open or closed, so players read the island each race; daredevil CPUs sometimes take the bait.
+4. **The funnel: "The Drain".** All veins pour into **one lane**: a huge basalt vortex funnel spiralling
+   down to sea level, tighter and faster, a final lip firing the balls through the finish arch.
+5. **The finish, not a freeze.** Past the line the balls **keep flying** into the **lagoon arena bowl**:
+   splash down, roll up the bowl's walls and settle, the camera following. The finish order is decided at
+   the line; the run-out after it is simulated but can never change results.
+
+Engine work this needs, on top of ROUTE-1/2: the prologue course segment and seeding hand-off; the Maw's
+ordered release (drive the existing pool from the drum); "lethal" branch state in `RouteLayout`; the braid
+authored as many short sections; the post-finish run-out (racers keep physics after `finished`, results
+frozen).
+
 ## 1. The route: twelve sections
 
 | # | Section | Where | Branches (fork) | Kit and landmarks |

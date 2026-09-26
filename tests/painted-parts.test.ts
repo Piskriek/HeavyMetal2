@@ -25,7 +25,10 @@ test('ART-I1: every painted catalog item is registered, and its file is on disk'
       assert.ok(onDisk(file!.file), `${file!.file} is missing`);
     }
   }
-  for (const def of PAINTED_PARTS) assert.ok(AVATAR_CATALOG[def.layer].includes(`painted:${def.id}`), `${def.id} is registered but not in the catalog`);
+  for (const def of PAINTED_PARTS) {
+    const reachable = AVATAR_CATALOG[def.layer].includes(`painted:${def.id}`) || (!!def.replaces && AVATAR_CATALOG[def.layer].includes(def.replaces));
+    assert.ok(reachable, `${def.id} is registered but no catalog item draws it`);
+  }
 });
 
 test('ART-I1: every part lands on its anchor on all three heads and stays (mostly) in frame', () => {

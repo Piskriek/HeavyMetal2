@@ -13,23 +13,25 @@
  * Any version may carry the nudge block except v1.
  * All arithmetic stays below 2^53 (no BigInt, no >32-bit bitwise ops).
  */
+import { drawnItem } from './painted-parts';
 import type { AvatarLayerId, GoblinAvatarConfig, GoblinDna, NudgeLayerId, NudgeState, SkinToneId, SpreadLayerId } from './interfaces';
 import { mulberry32 } from './economy-sim';
 
 /** Catalog item names per layer. Index 0 of optional layers = none. APPEND-ONLY; never reorder. */
 export const AVATAR_CATALOG: Readonly<Record<AvatarLayerId, readonly string[]>> = {
-  // Art wave 1 (ART-B1/B2) appended the painted parts after each layer's v2 items.
+  // Art wave 1 (ART-B1/B2) appended the painted parts after each layer's v2 items; art wave 2 appended more.
+  // Every vector item now draws as its painted twin (painted-parts.ts `replaces`), so none is ever drawn.
   background: ['workshop-wall', 'furnace-glow', 'racing-pennants', 'smog-sky', 'painted:background-workshop-wall', 'painted:background-furnace-glow', 'painted:background-racing-pennants', 'painted:background-smog-sky'],
-  ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound', 'painted:ears-bat-pointed', 'painted:ears-notched-fins', 'painted:ears-torn-brass-ring', 'painted:ears-droopy-hound'],
+  ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound', 'painted:ears-bat-pointed', 'painted:ears-notched-fins', 'painted:ears-torn-brass-ring', 'painted:ears-droopy-hound', 'painted:ears-cauliflower-studs', 'painted:ears-long-ragged'],
   head: ['angular', 'bloated', 'scrawny'],
-  mouth: ['lower-tusks', 'gold-jags', 'cigar-stub', 'stitched-scar', 'painted:mouth-gold-tusk-grin', 'painted:mouth-lower-tusks', 'painted:mouth-gold-jag-teeth', 'painted:mouth-cigar-stub', 'painted:mouth-stitched-scar'],
-  nose: ['hooked-beak', 'warted-bulb', 'prosthetic-plate', 'painted:nose-hooked-beak', 'painted:nose-warted-bulb', 'painted:nose-brass-prosthetic'],
-  eyes: ['bloodshot-crazy', 'narrow-squint', 'wide-mismatched', 'sleepy-lidded', 'painted:eyes-bloodshot-crazy', 'painted:eyes-narrow-squint', 'painted:eyes-wide-mismatched', 'painted:eyes-sleepy-lidded'],
-  eyewear: ['none', 'goggles-up', 'goggles-down', 'brass-monocle', 'leather-eyepatch', 'painted:eyewear-welding-goggles', 'painted:eyewear-clockwork-monocle', 'painted:eyewear-racing-goggles', 'painted:eyewear-leather-eyepatch', 'painted:eyewear-cracked-spectacles', 'painted:eyewear-cyclops-lens-rig'],
-  hair: ['none', 'grease-mohawk', 'mutton-chops', 'singed-topknot', 'wire-tufts', 'painted:hair-grease-mohawk', 'painted:hair-mutton-chops', 'painted:hair-singed-topknot', 'painted:hair-wire-tufts'],
-  headgear: ['none', 'aviator-cap', 'miner-headlamp', 'pickelhaube', 'grease-bowler', 'painted:headgear-aviator-helmet', 'painted:headgear-gear-tophat', 'painted:headgear-miner-headlamp', 'painted:headgear-spiked-pickelhaube', 'painted:headgear-grease-bowler', 'painted:headgear-scrap-crown'],
-  neck: ['none', 'spiked-collar', 'gear-chain', 'boiler-suit', 'tool-bandolier', 'painted:neck-brass-gorget', 'painted:neck-spiked-collar', 'painted:neck-gear-chain', 'painted:neck-boiler-suit-collar', 'painted:neck-tool-bandolier'],
-  warpaint: ['none', 'mud-stripes', 'red-handprint', 'cog-tattoo', 'soot-smudges'],
+  mouth: ['lower-tusks', 'gold-jags', 'cigar-stub', 'stitched-scar', 'painted:mouth-gold-tusk-grin', 'painted:mouth-lower-tusks', 'painted:mouth-gold-jag-teeth', 'painted:mouth-cigar-stub', 'painted:mouth-stitched-scar', 'painted:mouth-rusty-grille', 'painted:mouth-buck-teeth', 'painted:mouth-corncob-pipe'],
+  nose: ['hooked-beak', 'warted-bulb', 'prosthetic-plate', 'painted:nose-hooked-beak', 'painted:nose-warted-bulb', 'painted:nose-brass-prosthetic', 'painted:nose-pierced-ring', 'painted:nose-snub-button', 'painted:nose-long-droop'],
+  eyes: ['bloodshot-crazy', 'narrow-squint', 'wide-mismatched', 'sleepy-lidded', 'painted:eyes-bloodshot-crazy', 'painted:eyes-narrow-squint', 'painted:eyes-wide-mismatched', 'painted:eyes-sleepy-lidded', 'painted:eyes-cyborg-lens', 'painted:eyes-furnace-glow'],
+  eyewear: ['none', 'goggles-up', 'goggles-down', 'brass-monocle', 'leather-eyepatch', 'painted:eyewear-welding-goggles', 'painted:eyewear-clockwork-monocle', 'painted:eyewear-racing-goggles', 'painted:eyewear-leather-eyepatch', 'painted:eyewear-cracked-spectacles', 'painted:eyewear-cyclops-lens-rig', 'painted:eyewear-aviator-shades', 'painted:eyewear-triple-loupe'],
+  hair: ['none', 'grease-mohawk', 'mutton-chops', 'singed-topknot', 'wire-tufts', 'painted:hair-grease-mohawk', 'painted:hair-mutton-chops', 'painted:hair-singed-topknot', 'painted:hair-wire-tufts', 'painted:hair-slicked-quiff', 'painted:hair-long-braids', 'painted:hair-wild-flame'],
+  headgear: ['none', 'aviator-cap', 'miner-headlamp', 'pickelhaube', 'grease-bowler', 'painted:headgear-aviator-helmet', 'painted:headgear-gear-tophat', 'painted:headgear-miner-headlamp', 'painted:headgear-spiked-pickelhaube', 'painted:headgear-grease-bowler', 'painted:headgear-scrap-crown', 'painted:headgear-horned-scrap-helm', 'painted:headgear-bandana-knot', 'painted:headgear-propeller-beanie', 'painted:headgear-bucket-pot'],
+  neck: ['none', 'spiked-collar', 'gear-chain', 'boiler-suit', 'tool-bandolier', 'painted:neck-brass-gorget', 'painted:neck-spiked-collar', 'painted:neck-gear-chain', 'painted:neck-boiler-suit-collar', 'painted:neck-tool-bandolier', 'painted:neck-wool-scarf', 'painted:neck-padlock-collar', 'painted:neck-trophy-medal'],
+  warpaint: ['none', 'mud-stripes', 'red-handprint', 'cog-tattoo', 'soot-smudges', 'painted:warpaint-tribal-stripes', 'painted:warpaint-bone-skull'],
 };
 
 export const SKIN_TONES: readonly { id: SkinToneId; name: string; base: string; shade: string; light: string }[] = [
@@ -58,6 +60,17 @@ const V2_SIZES: Readonly<Record<AvatarLayerId, number>> = {
  * FROZEN: v3's fixed room per layer. The catalog may grow up to these sizes with no format change;
  * the product (times the palettes) stays under 2^52, the 13 hex digits of a v3 payload.
  */
+/**
+ * A vector item whose painted twin is also in the catalog: the same look twice. The creator hides it and
+ * the v3 randomizer skips it. (A vector item whose twin is not in the catalog, like the three heads,
+ * stays: it is the only way to pick that painted part.)
+ */
+export function isDuplicateItem(layer: AvatarLayerId, index: number): boolean {
+  const item = AVATAR_CATALOG[layer][index];
+  const drawn = drawnItem(layer, item);
+  return drawn !== item && AVATAR_CATALOG[layer].includes(drawn);
+}
+
 export const V3_CAPACITY: Readonly<Record<AvatarLayerId, number>> = {
   background: 12, ears: 12, head: 4, mouth: 20, nose: 12, eyes: 12, eyewear: 20, hair: 16, headgear: 24, neck: 20, warpaint: 12,
 };
@@ -230,9 +243,11 @@ export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3
   const layers = {} as Record<AvatarLayerId, number>;
   for (const layer of LAYER_KEYS) {
     if (generator === 3) {
-      const size = AVATAR_CATALOG[layer].length;
-      const optional = AVATAR_CATALOG[layer][0] === 'none';
-      layers[layer] = pickWeighted(rand, size, optional ? noneWeighted(size, Math.max(2, Math.round(size / 4))) : undefined);
+      const items = AVATAR_CATALOG[layer];
+      const optional = items[0] === 'none';
+      const live = items.map((_, i) => i).filter((i) => !isDuplicateItem(layer, i));
+      const weights = optional ? noneWeighted(live.length, Math.max(2, Math.round(live.length / 4))) : undefined;
+      layers[layer] = live[pickWeighted(rand, live.length, weights)];
     } else {
       layers[layer] = pickWeighted(rand, RADIX_BY_VERSION[generator].find((r) => r.key === layer)!.size, WEIGHTS[generator][layer]);
     }

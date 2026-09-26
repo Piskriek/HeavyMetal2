@@ -4,10 +4,10 @@ import GoblinSvg from './GoblinSvg';
 import { occlusionNotes, rasterizeGoblin } from '../../game/meta/goblin-compositor';
 import {
   ACCENT_PALETTE, AVATAR_CATALOG, EMPTY_NUDGE, LEATHER_PALETTE, METAL_PALETTE, NUDGE_LAYERS, NUDGE_PARENT, NUDGE_RANGE,
-  NUDGE_STEP_PX, SKIN_TONES, SPREAD_LAYERS, SPREAD_STEP_PX, decodeGoblinDna, encodeGoblinDna, generateRandomGoblin, isNudged,
+  NUDGE_STEP_PX, SKIN_TONES, SPREAD_LAYERS, SPREAD_STEP_PX, decodeGoblinDna, encodeGoblinDna, generateRandomGoblin, isDuplicateItem, isNudged,
 } from '../../game/meta/goblin-dna';
 import type { AvatarLayerId, GoblinAvatarConfig, NudgeLayerId, NudgeState, SpreadLayerId } from '../../game/meta/interfaces';
-import { paintedById } from '../../game/meta/painted-parts';
+import { drawnItem, paintedById } from '../../game/meta/painted-parts';
 import { PART_MASKS } from '../../game/meta/painted-masks.generated';
 import { listProfiles, saveProfile } from '../../game/meta/goblin-profiles';
 import { avoidMissing, useMissingPaintedArt } from './usePaintedArt';
@@ -40,6 +40,15 @@ const LAYER_FALLBACK: Record<AvatarLayerId, [number, number, number, number]> = 
 };
 
 const TITLES = ['The Rookie', 'The Mechanic', 'The Daredevil', 'The Bruiser', 'The Rocket Jockey', 'The Unkillable', 'Scrap Baron', 'Soot Saint'];
+/** An item's name as a player reads it: its painted part's name, or the catalog name made readable. */
+const itemName = (layer: AvatarLayerId, item: string) => paintedById.get(drawnItem(layer, item))?.name ?? pretty(item);
+/** The catalog indices the creator offers (duplicates of a painted part are hidden). */
+const offered = (layer: AvatarLayerId) => AVATAR_CATALOG[layer].map((_, i) => i).filter((i) => !isDuplicateItem(layer, i));
+/** The tile that shows a pick: a hidden duplicate lights up its painted twin. */
+const shownIndex = (layer: AvatarLayerId, index: number) => {
+  if (!isDuplicateItem(layer, index)) return index;
+  return AVATAR_CATALOG[layer].indexOf(drawnItem(layer, AVATAR_CATALOG[layer][index]));
+};
 /** Catalog names read as words: "painted:eyewear-racing-goggles" becomes "Racing goggles". */
 const pretty = (s: string) => {
   const w = s.replace('painted:', '').replace(/^(background|ears|eyes|eyewear|hair|headgear|neck|mouth|nose|warpaint|head)-/, '').replace(/-/g, ' ');
@@ -126,7 +135,7 @@ export default function CharacterCreatorStudio() {
   const layerDef = LAYERS.find((l) => l.id === layer)!;
   const currentItem = AVATAR_CATALOG[layer][config.layers[layer]];
   const missingArt = useMissingPaintedArt();
-  const channels = channelsFor(layer, currentItem, layerDef.uses);
+  const channels = channelsFor(layer, drawnItem(layer, currentItem), layerDef.uses);
   const say = useCallback((kind: 'ok' | 'err', text: string) => setMessage({ kind, text, at: Date.now() }), []);
 
   useEffect(() => {
@@ -162,10 +171,11 @@ export default function CharacterCreatorStudio() {
   }, [commit, locks, missingArt]);
 
   const cycleItem = useCallback((d: number) => commit((c) => {
-    const items = AVATAR_CATALOG[layer], n = items.length;
-    let i = c.layers[layer];
-    for (let k = 0; k < n; k++) { i = (i + d + n) % n; if (!missingArt.has(items[i])) break; }
-    return { ...c, layers: { ...c.layers, [layer]: i } };
+    const list = offered(layer).filter((i) => !missingArt.has(drawnItem(layer, AVATAR_CATALOG[layer][i])));
+    if (!list.length) return c;
+    const at = list.indexOf(shownIndex(layer, c.layers[layer]));
+    const next = list[((at < 0 ? 0 : at + d) + list.length) % list.length];
+    return { ...c, layers: { ...c.layers, [layer]: next } };
   }), [commit, layer, missingArt]);
 
   const toggleLock = (l: AvatarLayerId) => setLocks((s) => { const n = new Set(s); if (n.has(l)) n.delete(l); else n.add(l); return n; });
@@ -252,7 +262,7 @@ export default function CharacterCreatorStudio() {
         const nudged = isNudgeLayer(l.id) && (!!config.nudge?.offset[l.id] || (isSpreadLayer(l.id) && !!config.nudge?.spread[l.id]));
         return (
           <button key={l.id} role="tab" aria-selected={l.id === layer} className="part-chip" onClick={() => setLayer(l.id)}
-            title={`${l.label}: ${pretty(AVATAR_CATALOG[l.id][config.layers[l.id]])}`}>
+            title={`${l.label}: ${itemName(l.id, AVATAR_CATALOG[l.id][config.layers[l.id]])}`}>
             <span className="part-chip-art"><CroppedGoblin config={config} layer={l.id} size={46} dim={false} transparent={l.id !== 'background'} /></span>
             <span className="part-chip-name">{l.label}</span>
             {locks.has(l.id) && <Lock className="part-chip-flag" size={11} aria-label="kept" />}
@@ -311,7 +321,7 @@ export default function CharacterCreatorStudio() {
             <div className="bench-panel">
               {partStrip}
               <div className="tray-head">
-                <h3>{layerDef.label}<span>{pretty(currentItem)}</span></h3>
+                <h3>{layerDef.label}<span>{itemName(layer, currentItem)}</span></h3>
                 <div className="tray-tools">
                   <button className="tool small" aria-pressed={locks.has(layer)} onClick={() => toggleLock(layer)} title="Keep this part when you roll a new goblin">
                     {locks.has(layer) ? <Lock size={13} aria-hidden /> : <LockOpen size={13} aria-hidden />}{locks.has(layer) ? 'Kept' : 'Keep'}
@@ -321,16 +331,17 @@ export default function CharacterCreatorStudio() {
                 </div>
               </div>
               <div className="tray" role="radiogroup" aria-label={`${layerDef.label} options`}>
-                {AVATAR_CATALOG[layer].map((item, i) => {
-                  const coming = missingArt.has(item);
-                  const on = config.layers[layer] === i;
+                {offered(layer).map((i) => {
+                  const item = AVATAR_CATALOG[layer][i];
+                  const coming = missingArt.has(drawnItem(layer, item));
+                  const on = shownIndex(layer, config.layers[layer]) === i;
                   const preview: GoblinAvatarConfig = { ...config, layers: { ...config.layers, [layer]: i } };
                   return (
-                    <button key={item} role="radio" aria-checked={on} aria-label={coming ? `${pretty(item)} (art on its way)` : pretty(item)}
+                    <button key={item} role="radio" aria-checked={on} aria-label={coming ? `${itemName(layer, item)} (art on its way)` : itemName(layer, item)}
                       className={`well ${on ? 'on' : ''} ${coming ? 'coming' : ''}`} disabled={coming}
                       onClick={() => commit((c) => ({ ...c, layers: { ...c.layers, [layer]: i } }))}>
                       <span className="well-art"><CroppedGoblin config={preview} layer={layer} size={96} transparent={layer !== 'background'} /></span>
-                      <span className="well-name">{coming ? 'Art on its way' : pretty(item)}</span>
+                      <span className="well-name">{coming ? 'Art on its way' : itemName(layer, item)}</span>
                     </button>
                   );
                 })}

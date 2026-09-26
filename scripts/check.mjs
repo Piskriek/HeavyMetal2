@@ -25,7 +25,7 @@ const commands = [
     'tests/cockpit.test.ts', 'tests/scene-kit.test.ts', 'tests/painted-parts.test.ts',
     'tests/time-scale.test.ts', 'tests/builder-ramps.test.ts', 'tests/start-node.test.ts',
     'tests/lane-gizmo-follow.test.ts', 'tests/ball-size.test.ts', 'tests/fp-lean.test.ts', 'tests/split-queue.test.ts', 'tests/lane-rope.test.ts', 'tests/placement-course.test.ts', 'tests/obstacle-view.test.ts',
-    'tests/effects.test.ts', 'tests/depth-mask.test.ts',
+    'tests/effects.test.ts', 'tests/depth-mask.test.ts', 'tests/painted-goblin.test.ts',
     'tests/gyro-ball.test.ts',
     'tests/merge-pool.test.ts', 'tests/merge-race.test.ts', 'tests/merge-runup.test.ts',
     'tests/contracts.test.ts',

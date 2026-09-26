@@ -11,6 +11,7 @@
  * chosen from the racer's lateral position at the split, never from randomness.
  */
 import { LANE_Z_RANGE } from '../track-space';
+import { createRng } from '../rng';
 
 export interface RouteBranch {
   readonly id: string;
@@ -42,9 +43,51 @@ export interface RouteTag {
 /** A racer's choices so far: section id → branch id. */
 export type RacerRoute = Readonly<Record<string, string>>;
 
-/** The branches open in this race, per section (ROUTE-2 fills it from the race seed). Absent = all open. */
+/** This race's layout: the branches open per section (absent = all), and each open branch's lane variant. */
 export interface RouteLayout {
   readonly open?: Readonly<Record<string, readonly string[]>>;
+  /** section → branch → lane-network variant (0 … LANE_VARIANTS − 1): narrow, wide, weave. */
+  readonly lanes?: Readonly<Record<string, Readonly<Record<string, number>>>>;
+}
+
+/** Authored lane-network variants per branch (ISLAND-ROUTE authors three: narrow, wide, weave). */
+export const LANE_VARIANTS = 3;
+/** Mixed into the race seed so the layout stream never shares draws with any other stream. */
+const LAYOUT_SALT = 0x2f0a7e1b;
+
+/**
+ * ROUTE-2: the race seed's layout. Deterministic: the same seed always opens the same branches with
+ * the same lane variants, so a race replays exactly and can be shared. Two-branch forks are usually
+ * both open (70 %), otherwise one is forced; wider forks are all open 40 % of the time, lose one branch
+ * 45 %, and force a single branch 15 %. At least one branch is always open.
+ */
+export function layoutForSeed(graph: RouteGraph, seed: number): RouteLayout {
+  const rng = createRng((seed ^ LAYOUT_SALT) | 0);
+  const open: Record<string, readonly string[]> = {};
+  const lanes: Record<string, Record<string, number>> = {};
+  for (const section of graph.sections) {
+    const ids = section.branches.map((b) => b.id);
+    const roll = rng.next();
+    let chosen: string[];
+    if (ids.length === 2) {
+      chosen = roll < 0.7 ? ids : [ids[rng.nextInt(2)]];
+    } else if (roll < 0.4) {
+      chosen = ids;
+    } else if (roll < 0.85) {
+      const drop = rng.nextInt(ids.length);
+      chosen = ids.filter((_, i) => i !== drop);
+    } else {
+      chosen = [ids[rng.nextInt(ids.length)]];
+    }
+    open[section.id] = chosen;
+    lanes[section.id] = Object.fromEntries(chosen.map((id) => [id, rng.nextInt(LANE_VARIANTS)]));
+  }
+  return { open, lanes };
+}
+
+/** True when a branch is shut in this layout (its gate is down). */
+export function branchClosed(section: RouteSection, branchId: string, layout?: RouteLayout | null): boolean {
+  return !openBranches(section, layout).some((b) => b.id === branchId);
 }
 
 export class RouteGraphError extends Error {}

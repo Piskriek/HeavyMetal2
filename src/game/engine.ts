@@ -30,7 +30,7 @@ import {
 
 import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
-import { sameRoad, validateRouteGraph, type RouteGraph, type RouteLayout } from './sim/route';
+import { layoutForSeed, sameRoad, validateRouteGraph, type RouteGraph, type RouteLayout } from './sim/route';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
@@ -194,7 +194,7 @@ export class GameEngine {
    * ROUTE-1: the course's forks and this race's open branches, or `null` for an unforked course
    * (bit-identical to the old game: nothing is tagged, no pair is kept apart).
    */
-  private routeSetup: { graph: RouteGraph; layout: RouteLayout | null } | null = null;
+  private routeSetup: { graph: RouteGraph; layout: RouteLayout | null; fromSeed: boolean } | null = null;
   /**
    * The status a pause was taken from, so resuming puts the game back where it was. Pausing during
    * the pool has to come back to the pool: a resumed field that jumped straight to `flying` would
@@ -413,6 +413,12 @@ export class GameEngine {
     if (this.status !== 'ready') return;
     this.pushTick = 0;
     this.pushTargets = this.racers.map((racer) => startPushVelocity(racer.pace, this.pushSeed, racer.id));
+    // ROUTE-2: a seeded layout is re-derived at every start (the seed may have changed), and every
+    // racer faces each fork afresh.
+    if (this.routeSetup) {
+      if (this.routeSetup.fromSeed) this.routeSetup.layout = layoutForSeed(this.routeSetup.graph, this.pushSeed);
+      for (const racer of this.racers) racer.route = undefined;
+    }
     for (const racer of this.racers) {
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
       racer.launchOrigin = { x: racer.x, y: racer.y };
@@ -505,15 +511,17 @@ export class GameEngine {
   get lanePaths(): LaneNetwork | null { return this.laneNetwork; }
 
   /**
-   * ROUTE-1: points the race at a course's forks and this race's open branches (ROUTE-2 derives the
-   * layout from the seed). `null` is the unforked game. Racers' choices are cleared, so the next
-   * run starts with every fork ahead of them.
+   * ROUTE-1/2: points the race at a course's forks. Without a `layout`, every race derives its own
+   * from its seed (ROUTE-2: which branches are open, which lane variant each uses), so the same seed
+   * replays the same route. `null` is the unforked game. Racers' choices are cleared.
    */
   setRouteGraph(graph: RouteGraph | null, layout: RouteLayout | null = null) {
     if (graph) validateRouteGraph(graph);
-    this.routeSetup = graph ? { graph, layout } : null;
+    this.routeSetup = graph ? { graph, layout: layout ?? layoutForSeed(graph, this.pushSeed), fromSeed: !layout } : null;
     for (const racer of this.racers) racer.route = undefined;
   }
+  /** ROUTE-2: this race's open branches and lane variants (for the gates, the strip map and saves). */
+  get routeLayout(): RouteLayout | null { return this.routeSetup?.layout ?? null; }
   get routeGraph(): RouteGraph | null { return this.routeSetup?.graph ?? null; }
   setLaneNetwork(network: LaneNetwork | null) {
     this.laneNetwork = network;

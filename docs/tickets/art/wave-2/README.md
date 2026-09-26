@@ -80,8 +80,12 @@ images, named at the bottom. You write no game code (W2-B adds one line to SHEET
 Six other agents are painting other batches on the same branch right now.
 
 SETUP
-  git fetch origin
-  git checkout art/generated-wave-2 && git pull --rebase
+  git fetch origin art/generated-wave-2:refs/remotes/origin/art/generated-wave-2
+  (Name the branch: a plain "git fetch origin" may only fetch main.)
+  If you can switch branches:   git checkout -B art/generated-wave-2 origin/art/generated-wave-2
+  If your session is locked to its own branch (arena/…): stay on it and bring the wave in:
+                                git merge --no-edit origin/art/generated-wave-2
+  Either way, docs/tickets/art/wave-2/README.md must now exist. If it does not, stop and report.
   npm ci   (only if node_modules is missing)
   Read, in this order: docs/tickets/art/wave-2/README.md (binding: art direction, depth maps, the
   review loop, who owns which shared file), your batch file (its "Where these are seen" notes are the
@@ -99,11 +103,12 @@ FOR EACH IMAGE, in the batch file's order
      mark it weak or failed in your table with the reason.
   5. If the image has a Depth map: do the README's depth-map steps now.
   6. Every 10 images: stage ONLY your own files (git add <paths>, never git add -A or git add .),
-     commit ("art(<batch>): images <a>-<b>"), then
-       git pull --rebase && git push
+     commit ("art(<batch>): images <a>-<b>"), then push:
+       on art/generated-wave-2:  git pull --rebase origin art/generated-wave-2 && git push origin HEAD:art/generated-wave-2
+       on your own arena/… branch: git push origin HEAD   (the owner's session merges it into the wave)
      If the push is rejected, pull --rebase again and retry. A rebase conflict can only be in
      painted-parts.generated.ts: fix it with the rule in "Who owns which shared file".
-     If you can only push to your own branch, push there and say so in your report.
+     Say in every report which branch you pushed to.
      Then post a PR comment "<batch>: images <a>-<b> pushed" with those rows of the results table.
      Do not edit the PR description. (No PR access: put the rows in the commit message body.)
   At most 10 generated images per turn: when you reach it, push, then output
@@ -112,7 +117,7 @@ FOR EACH IMAGE, in the batch file's order
 WHEN THE BATCH IS DONE
   npm run check:edges            (0 failures)
   node --import tsx --test tests/art-budget.test.ts
-  Push (pull --rebase first), then post a final PR comment "<batch> done" with the table:
+  Push (as in step 6), then post a final PR comment "<batch> done" with the table:
     # | id | status (pass / warn / weak / failed) | output path | depth map (pass / — ) | notes
   and end your reply with the same table.
   Do not merge. Do not edit game code. Do not touch backups/. Never commit art-src/review/.

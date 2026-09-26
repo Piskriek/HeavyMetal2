@@ -1,0 +1,22 @@
+{
+  "name": "sea-arch",
+  "taskId": "01a0df1e-503d-7394-81dd-dd480d80792b",
+  "kind": "image-to-3d",
+  "ref": "art-src/meshy/refs/sea-arch.png",
+  "params": {
+    "image_url": "(data uri)",
+    "ai_model": "latest",
+    "should_remesh": true,
+    "topology": "triangle",
+    "target_polycount": 8000,
+    "should_texture": true,
+    "enable_pbr": false,
+    "texture_resolution": "2k",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 30,
+  "status": "SUCCEEDED",
+  "at": "2026-09-26T19:08:22.889Z"
+}

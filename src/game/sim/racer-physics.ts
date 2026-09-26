@@ -131,6 +131,8 @@ export function performBoost(racer: Racer, ctx: RacerStepContext): void {
   if (racer.grounded) racer.vy = ctx.world.surfaceAt(racer.x, racer.z).slope * racer.vx;
   ctx.fx.emit(racer.x - RADIUS, racer.y, racer.z, 12, racer.color, 210);
   ctx.fx.effect('smoke', racer.x - RADIUS, racer.y, racer.z, 0.7, racer.id);
+  // The painted nitro flame out of the back of the ball (presentation only).
+  ctx.fx.effect('boost', racer.x - RADIUS, racer.y, racer.z, 1, racer.id);
   if (!racer.id) { ctx.fx.audio('boost'); ctx.fx.say('MORE SPEED. LESS THINKING.'); ctx.fx.shake(2); ctx.fx.refreshHud(); }
 }
 
@@ -207,12 +209,14 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       if (racer.grounded) racer.vy = ctx.world.surfaceAt(racer.x, racer.z).slope * racer.vx;
       racer.boosts = Math.min(2, racer.boosts + 1); ctx.fx.emit(x, y - 6, z, 8, '#ffbd6a', 135);
       ctx.fx.effect('sparks', x, y - 6, z, 0.8, racer.id);
+      ctx.fx.effect('boost-pad', x, y - 6, z, 1, racer.id);
       if (!racer.id) { ctx.fx.score(100); ctx.fx.audio('boost'); ctx.fx.say('THROTTLE REFILLED. TRY NOT TO SHARE.'); }
       break;
     case 'spring':
       racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
       racer.bounces = Math.min(3, racer.bounces + 1); ctx.fx.emit(x, y - 24, z, 10, '#a1e1bd', 160);
       ctx.fx.effect('dust', x, y - 24, z, 0.8, racer.id);
+      ctx.fx.effect('spring', x, y - 24, z, 1, racer.id);
       if (!racer.id) { ctx.fx.score(100); ctx.fx.audio('bounce'); ctx.fx.say('SPRING BREAK! +1 BOUNCE'); }
       break;
     case 'tnt':
@@ -477,6 +481,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     if (rope.slack && (racer.z === zMin || racer.z === zMax) && Math.abs(impactVz) >= ropeConfig.edgeSmashVz) {
       ctx.fx.effect('impact', racer.x, racer.y, racer.z, 1.2, racer.id);
       ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1, racer.id);
+      ctx.fx.effect('tree-smash', racer.x, racer.y, racer.z, 1.2, racer.id);
       if (!racer.id) { ctx.fx.say('INTO THE TREES! THE ROPE REELS YOU BACK.'); ctx.fx.audio('tree_smash'); }
     }
     scrapeSparks(racer, impactVz, ctx);
@@ -584,6 +589,8 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
         racer.vy = surface.slope * racer.vx - normalSpeed * restitution;
         ctx.fx.emit(racer.x, surface.y, racer.z, 3, '#b8a77b', 70);
         ctx.fx.effect('dust', racer.x, surface.y, racer.z, normalSpeed > 420 ? 1.2 : 0.7, racer.id);
+        // A hard landing also puts a painted shockwave on the road.
+        if (normalSpeed > 420) ctx.fx.effect('landing', racer.x, surface.y, racer.z, 1, racer.id);
         if (!racer.id) {
           ctx.fx.audio('land');
           if (normalSpeed > 360) ctx.fx.shake(Math.min(4.5, normalSpeed / 160));

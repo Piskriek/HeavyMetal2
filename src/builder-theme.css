@@ -398,6 +398,13 @@
   opacity: 1;
 }
 
+/* WIRE-4: the shelves' painted icons (256 px art on the ~56 px zinc tiles). They sit at their
+   natural painted look — no tint over them — and the browser downscales them (image-rendering
+   stays auto, never pixelated). */
+.builder-shelf-icon {
+  image-rendering: auto;
+}
+
 /* DCC Shelf Custom Heavy Grab Scrollbar */
 .builder-shelf-scroll {
   scrollbar-width: auto;

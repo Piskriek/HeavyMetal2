@@ -22,10 +22,10 @@ const commands = [
     'tests/session-save.test.ts', 'tests/camera-decal.test.ts', 'tests/ticket05-backdrop.test.ts',
     'tests/first-person.test.ts', 'tests/eye-level-audit.test.ts',
     'tests/start-push.test.ts', 'tests/start-zone.test.ts',
-    'tests/cockpit.test.ts', 'tests/cockpit-trinkets.test.ts', 'tests/scene-kit.test.ts', 'tests/painted-parts.test.ts',
+    'tests/cockpit.test.ts', 'tests/cockpit-trinkets.test.ts', 'tests/scene-kit.test.ts', 'tests/painted-icons.test.ts', 'tests/painted-parts.test.ts',
     'tests/time-scale.test.ts', 'tests/builder-ramps.test.ts', 'tests/start-node.test.ts',
     'tests/lane-gizmo-follow.test.ts', 'tests/ball-size.test.ts', 'tests/fp-lean.test.ts', 'tests/split-queue.test.ts', 'tests/lane-rope.test.ts', 'tests/placement-course.test.ts', 'tests/obstacle-view.test.ts',
-    'tests/effects.test.ts', 'tests/depth-mask.test.ts',
+    'tests/effects.test.ts', 'tests/depth-mask.test.ts', 'tests/painted-goblin.test.ts',
     'tests/gyro-ball.test.ts',
     'tests/merge-pool.test.ts', 'tests/merge-race.test.ts', 'tests/merge-runup.test.ts',
     'tests/contracts.test.ts',
@@ -68,7 +68,7 @@ const commands = [
     'tests/protect-baseline.test.ts', 'tests/props-safety-copy.test.ts',
     'tests/accessibility.test.ts', 'tests/racer-pool.test.ts', 'tests/roster-scale.test.ts',
     'tests/integration-benchmarks.test.ts', 'tests/cpu-tactics.test.ts',
-    'tests/seeded-race.test.ts', 'tests/touch-controls.test.tsx', 'tests/guide-text.test.ts', 'tests/gamepad.test.ts', 'tests/hit-feedback.test.ts', 'tests/gap-readout.test.ts', 'tests/wall-scrape.test.ts', 'tests/test-drive-bar.test.tsx', 'tests/oob-reel.test.ts', 'tests/art-budget.test.ts', 'tests/meta-contracts.test.ts', 'tests/goblin-dna.test.ts', 'tests/sphere-baker.test.ts', 'tests/det-math.test.ts', 'tests/chroma-key.test.ts', 'tests/ball-texture-pool.test.ts', 'tests/goblin-creator.test.tsx', 'tests/ball-design.test.tsx'],
+    'tests/seeded-race.test.ts', 'tests/touch-controls.test.tsx', 'tests/guide-text.test.ts', 'tests/gamepad.test.ts', 'tests/hit-feedback.test.ts', 'tests/gap-readout.test.ts', 'tests/wall-scrape.test.ts', 'tests/test-drive-bar.test.tsx', 'tests/oob-reel.test.ts', 'tests/art-budget.test.ts', 'tests/meta-contracts.test.ts', 'tests/goblin-dna.test.ts', 'tests/sphere-baker.test.ts', 'tests/det-math.test.ts', 'tests/chroma-key.test.ts', 'tests/ball-texture-pool.test.ts', 'tests/goblin-creator.test.tsx', 'tests/ball-design.test.tsx', 'tests/garage-decal-art.test.ts'],
 ];
 
 for (const args of commands) {

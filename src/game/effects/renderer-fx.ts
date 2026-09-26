@@ -32,6 +32,13 @@ export const EFFECT_SHEETS = {
   'anim-44': { url: '/art/animated/alpha/anim-44-spark-burst.png', cols: 2, rows: 2 },
   'anim-45': { url: '/art/animated/alpha/anim-45-smoke-puff.png', cols: 2, rows: 2 },
   'anim-49': { url: '/art/animated/alpha/anim-49-dust-puff.png', cols: 2, rows: 2 },
+  'anim-54': { url: '/art/animated/alpha/anim-54-nitro-flame.png', cols: 2, rows: 2 },
+  'anim-55': { url: '/art/animated/alpha/anim-55-boost-pad-flash.png', cols: 2, rows: 2 },
+  'anim-56': { url: '/art/animated/alpha/anim-56-pickup-collect-burst.png', cols: 2, rows: 2 },
+  'anim-57': { url: '/art/animated/alpha/anim-57-shield-shatter.png', cols: 2, rows: 2 },
+  'anim-58': { url: '/art/animated/alpha/anim-58-spring-launch-puff.png', cols: 2, rows: 2 },
+  'anim-59': { url: '/art/animated/alpha/anim-59-landing-shockwave.png', cols: 2, rows: 2 },
+  'anim-60': { url: '/art/animated/alpha/anim-60-tree-smash-splinters.png', cols: 2, rows: 2 },
 } as const;
 
 export type SheetKey = keyof typeof EFFECT_SHEETS;
@@ -183,7 +190,7 @@ export class EffectRenderer {
         continue;
       }
       const spawned = this.pool.spawn(
-        event.kind, spec, time, world.x, world.y, world.z, event.scale, placement.frame.up,
+        event.kind, spec, time, world.x, world.y, world.z, event.scale, placement.frame.up, event.tint,
       );
       if (spawned > 0) this.spawned += spawned;
       drawn += 1;
@@ -214,6 +221,8 @@ export class EffectRenderer {
       const frame = frames?.[slot.frame % (frames?.length || 1)];
       // A pointer swap between two decoded frames (or the stand-in) — never a recompile, never a copy.
       if (frame && material.map !== frame) material.map = frame;
+      // A supply burst wears the supply's colour; every other sheet paints itself (white).
+      if (material.color.getHex() !== slot.colour) material.color.setHex(slot.colour);
       material.opacity = slot.opacity;
       if (!mesh.visible) mesh.visible = true;
     }

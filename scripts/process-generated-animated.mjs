@@ -113,6 +113,7 @@ const SHEETS = [
   'anim-25-horn-blower',
   'anim-26-track-marshal',
   'anim-27-blacksmith',
+  'anim-62-goblin-rope-reel',
   'anim-28-tankard-celebrant',
   'anim-29-ball-loader',
   'anim-30-bell-ringer',

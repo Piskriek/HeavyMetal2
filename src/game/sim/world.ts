@@ -20,6 +20,7 @@ import { dpow } from './det-math';
 import { RADIUS, courseSlope, courseY, occupiesLane, rampSurface, type Obstacle } from '../scene';
 import type { CourseId } from '../types';
 import type { AirPickup } from '../powerups';
+import { onRoute, routeKey, type RacerRoute } from './route';
 
 /** Spatial bucket width shared by the obstacle and pickup indices. */
 export const SPATIAL_BUCKET = 512;
@@ -53,6 +54,13 @@ export interface SimWorld {
   pickupsInSpan(fromX: number, toX: number): readonly AirPickup[];
   /** Points the world at a new course/layout and rebuilds both indices. */
   configure(course: CourseId, obstacles: readonly Obstacle[], pickups?: readonly AirPickup[]): void;
+  /** ROUTE-1: true when any obstacle or pickup is tagged to a branch. */
+  readonly routed: boolean;
+  /**
+   * ROUTE-1: the world as a racer on `route` meets it (content on other branches is absent). When
+   * nothing is tagged this is the world itself, so an unforked course runs exactly as before.
+   */
+  forRoute(route: RacerRoute | undefined): SimWorld;
 }
 
 /** Altitude above the road surface in world units; `0` is rolling on the dirt. */
@@ -65,6 +73,9 @@ export function createSimWorld(
   obstacles: readonly Obstacle[] = NO_OBSTACLES,
   pickups: readonly AirPickup[] = NO_PICKUPS,
 ): SimWorld {
+  const views = new Map<string, SimWorld>();
+  let routed = false;
+  const scanRouted = () => { routed = activeObstacles.some((o) => o.route) || activePickups.some((p) => p.route); };
   let activeCourse = course;
   let activeObstacles: readonly Obstacle[] = obstacles;
   let activePickups: readonly AirPickup[] = pickups;
@@ -95,6 +106,7 @@ export function createSimWorld(
 
   indexObstacles();
   indexPickups();
+  scanRouted();
 
   const world: SimWorld = {
     get course() { return activeCourse; },
@@ -147,6 +159,28 @@ export function createSimWorld(
       if (nextPickups) activePickups = nextPickups;
       indexObstacles();
       indexPickups();
+      scanRouted();
+      views.clear();
+    },
+    get routed() { return routed; },
+    forRoute: (route) => {
+      if (!routed) return world;
+      const key = routeKey(route);
+      let view = views.get(key);
+      if (!view) {
+        // A view shares the live obstacle and pickup records (hits, breaks and collections stay
+        // one truth) but indexes only what is on this route. Built once per route, cached.
+        view = createSimWorld(
+          activeCourse,
+          activeObstacles.filter((o) => onRoute(o.route, route)),
+          activePickups.filter((p) => onRoute(p.route, route)),
+        );
+        // A view is already on its route: asking it again returns itself.
+        const self = view;
+        (view as { forRoute: SimWorld['forRoute'] }).forRoute = () => self;
+        views.set(key, view);
+      }
+      return view;
     },
   };
   return world;

@@ -13,7 +13,7 @@
 import { POWERUPS, SHIELD_DURATION, pickupIntercept, pickupY, type AirPickup } from '../powerups';
 import { weightImpulse } from '../scene';
 import type { Racer } from '../racers';
-import type { RacerStepContext } from './context';
+import { routed, type RacerStepContext } from './context';
 
 const NO_CLAIMS: readonly PickupClaim[] = Object.freeze([]);
 
@@ -36,6 +36,7 @@ export interface PickupResolutionOptions {
 }
 
 export function collectPickup(racer: Racer, pickup: AirPickup, ctx: RacerStepContext): void {
+  ctx = routed(ctx, racer);
   pickup.collectedBy = racer.id;
   pickup.collectedAt = ctx.runTime;
   racer.pickupAt = ctx.runTime;
@@ -78,7 +79,7 @@ export function resolvePickups(
   candidates.clear();
   for (const racer of racers) {
     if (racer.falling || racer.finished || racer.loopRide) continue;
-    for (const pickup of world.pickupsInSpan(racer.previous.x, racer.x)) {
+    for (const pickup of world.forRoute(racer.route).pickupsInSpan(racer.previous.x, racer.x)) {
       if (pickup.collectedBy === null) candidates.add(pickup);
     }
   }

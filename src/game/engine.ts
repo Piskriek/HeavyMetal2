@@ -30,6 +30,7 @@ import {
 
 import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
+import { sameRoad, validateRouteGraph, type RouteGraph, type RouteLayout } from './sim/route';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
@@ -190,6 +191,11 @@ export class GameEngine {
    */
   private laneNetwork: LaneNetwork | null = null;
   /**
+   * ROUTE-1: the course's forks and this race's open branches, or `null` for an unforked course
+   * (bit-identical to the old game: nothing is tagged, no pair is kept apart).
+   */
+  private routeSetup: { graph: RouteGraph; layout: RouteLayout | null } | null = null;
+  /**
    * The status a pause was taken from, so resuming puts the game back where it was. Pausing during
    * the pool has to come back to the pool: a resumed field that jumped straight to `flying` would
    * leave the queued riders held with nothing left to release them.
@@ -258,6 +264,8 @@ export class GameEngine {
       get laneNetwork() { return engine.laneNetwork; },
       // H7b: the test drive's rope sliders; the defaults unless someone is tuning.
       get rope() { return engine.ropeConfig; },
+      // ROUTE-1: read live, like the lane network.
+      get route() { return engine.routeSetup; },
     };
     this.cpuCtx = {
       get step() { return engine.simCtx; },
@@ -495,6 +503,18 @@ export class GameEngine {
    * reads it live) uses the network that was just authored.
    */
   get lanePaths(): LaneNetwork | null { return this.laneNetwork; }
+
+  /**
+   * ROUTE-1: points the race at a course's forks and this race's open branches (ROUTE-2 derives the
+   * layout from the seed). `null` is the unforked game. Racers' choices are cleared, so the next
+   * run starts with every fork ahead of them.
+   */
+  setRouteGraph(graph: RouteGraph | null, layout: RouteLayout | null = null) {
+    if (graph) validateRouteGraph(graph);
+    this.routeSetup = graph ? { graph, layout } : null;
+    for (const racer of this.racers) racer.route = undefined;
+  }
+  get routeGraph(): RouteGraph | null { return this.routeSetup?.graph ?? null; }
   setLaneNetwork(network: LaneNetwork | null) {
     this.laneNetwork = network;
     if (network) {
@@ -1178,6 +1198,8 @@ export class GameEngine {
         || a.mergeHeld || b.mergeHeld || a.mergeGhost || b.mergeGhost
         // Nobody touches anybody inside the giant loop, pooled or not.
         || insidePassage(a.x) || insidePassage(b.x)
+        // ROUTE-1: two racers on different branches of a fork are on different roads.
+        || (this.routeSetup !== null && !sameRoad(a, b, this.routeSetup.graph))
         || (!this.splitReached && (a.id !== PLAYER_ID || b.id !== PLAYER_ID))
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       // Balls touch at the size they are drawn (BALL_DRAW_RADIUS = 2 × the road-physics RADIUS).

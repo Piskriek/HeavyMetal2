@@ -13,6 +13,8 @@ export interface AirPickup {
   lane: number;
   collectedBy: number | null;
   collectedAt: number;
+  /** ROUTE-1: the branch this pickup floats over; absent = on every branch. */
+  route?: import('./sim/route').RouteTag;
 }
 export const POWERUPS = {
   fuel: { name: 'Rocket Fuel', label: '+1 boost', color: '#ffc46f', description: 'Refills one boost charge and gives a small forward surge. Boost stock is capped at two.' },

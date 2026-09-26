@@ -35,7 +35,8 @@ import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
 import { LANE_Z_LIMIT, advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
 import { DEFAULT_ROPE, ropeAt } from './rope';
 import { recordObstacleHit } from './obstacle-state';
-import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
+import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, routed, type RacerStepContext, type RecoveryReason } from './context';
+import { advanceRoute } from './route';
 
 const TAU = Math.PI * 2;
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
@@ -104,6 +105,7 @@ export function canHop(racer: Racer, runTime: number): boolean {
 }
 
 export function performHop(racer: Racer, ctx: RacerStepContext): void {
+  ctx = routed(ctx, racer);
   racer.vy = racer.vx * ctx.world.surfaceAt(racer.x, racer.z).slope - 290 * weightImpulse(racer.weight) * racer.hopFactor;
   racer.grounded = false; racer.lastHopAt = ctx.runTime;
   racer.lastGroundedAt = racer.bufferedJump = -100;
@@ -113,6 +115,7 @@ export function performHop(racer: Racer, ctx: RacerStepContext): void {
 }
 
 export function performBounce(racer: Racer, ctx: RacerStepContext): void {
+  ctx = routed(ctx, racer);
   if (!racer.bounces || racer.falling || racer.loopRide || racer.finished) return;
   racer.bounces--; racer.vy = -760 * weightImpulse(racer.weight) * racer.hopFactor;
   racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
@@ -123,6 +126,7 @@ export function performBounce(racer: Racer, ctx: RacerStepContext): void {
 }
 
 export function performBoost(racer: Racer, ctx: RacerStepContext): void {
+  ctx = routed(ctx, racer);
   if (!racer.boosts || racer.falling || racer.finished) return;
   const impulse = 430 * weightImpulse(racer.weight) * racer.boostFactor;
   racer.boosts--; racer.lastBoostAt = ctx.runTime;
@@ -141,6 +145,7 @@ export function performBoost(racer: Racer, ctx: RacerStepContext): void {
  * `RecoveryPolicy`; everything after that is the legacy crew routine.
  */
 export function recoverRacer(racer: Racer, ctx: RacerStepContext, reason: RecoveryReason, trace?: RacerStepTrace): void {
+  ctx = routed(ctx, racer);
   const x = racer.x;
   const recoveries = racer.recoveries;
   racer.x = ctx.recovery.respawnX({ racer, x, bestX: bestProgressX(racer), reason, recoveries });
@@ -196,6 +201,7 @@ function lavaPlunge(racer: Racer, ctx: RacerStepContext, trace?: RacerStepTrace)
 }
 
 export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepContext, trace?: RacerStepTrace): void {
+  ctx = routed(ctx, racer);
   racer.visited.add(obstacle);
   obstacle.hitAt = ctx.wallTime;
   recordObstacleHit(obstacle, racer.id);
@@ -360,6 +366,7 @@ export const OOB_RELEASE_VX = 180;
  * (the renderer draws it easing back from where it went out), then it rolls on.
  */
 export function startRopeReel(racer: Racer, from: { x: number; y: number; z: number }, ctx: RacerStepContext): void {
+  ctx = routed(ctx, racer);
   const until = ctx.runTime + OOB_REEL_S;
   racer.reel = { fromX: from.x, fromY: from.y, fromZ: from.z, startedAt: ctx.runTime, until, releaseVx: Math.max(OOB_RELEASE_VX, racer.vx) };
   racer.vx = racer.vy = racer.vz = 0;
@@ -379,6 +386,7 @@ export const SCRAPE_MIN_VX = 150;
  * only: it emits effects and remembers when, and never touches the physics.
  */
 export function scrapeSparks(racer: Racer, pushVz: number, ctx: RacerStepContext): void {
+  ctx = routed(ctx, racer);
   const atEdge = Math.abs(racer.z) >= LANE_Z_LIMIT - 0.5;
   const intoEdge = Math.sign(pushVz) === Math.sign(racer.z) && Math.abs(pushVz) > 1;
   if (!atEdge || !intoEdge || racer.vx < SCRAPE_MIN_VX || !racer.grounded || racer.falling) return;
@@ -389,6 +397,9 @@ export function scrapeSparks(racer: Racer, pushVz: number, ctx: RacerStepContext
 }
 
 export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace?: RacerStepTrace): void {
+  // ROUTE-1: at a split the racer commits to the branch its lateral position points at.
+  if (ctx.route) racer.route = advanceRoute(racer.route, racer.x, racer.z, ctx.route.graph, ctx.route.layout);
+  ctx = routed(ctx, racer);
   const world = ctx.world;
   const oldX = racer.x;
   if (trace) {

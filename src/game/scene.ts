@@ -216,6 +216,8 @@ export interface Obstacle {
   variant?: string;
   spinAngle?: number;
   deflectPower?: number;
+  /** ROUTE-1: the branch this obstacle stands on; absent = on every branch. */
+  route?: import('./sim/route').RouteTag;
 }
 
 import type { EffectEvent } from './effects/events';

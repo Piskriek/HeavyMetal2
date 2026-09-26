@@ -18,7 +18,7 @@ import type { AirPickup } from '../powerups';
 import { hopTiming } from '../powerups';
 import type { Racer } from '../racers';
 import type { Difficulty } from '../session';
-import type { RacerStepContext } from './context';
+import { routed, type RacerStepContext } from './context';
 import { canHop, performBoost, performBounce, performHop } from './racer-physics';
 
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
@@ -188,6 +188,8 @@ function steerWithTell(racer: Racer, best: LaneCandidate, ram: Racer | null, ctx
 }
 
 export function driveCpu(racer: Racer, ctx: CpuContext): void {
+  // ROUTE-1: a bot plans against its own branch (no-op on an unforked course).
+  if (ctx.step.world.routed) ctx = { ...ctx, step: routed(ctx.step, racer) };
   const world = ctx.step.world;
   const runTime = ctx.step.runTime;
   const difficulty = ctx.difficulty;

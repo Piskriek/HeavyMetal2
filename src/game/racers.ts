@@ -85,6 +85,8 @@ export interface Racer extends RacerFrame {
    * because the HUD, the obstacles and the loop's lane filter all still speak in lanes.
    */
   pathId: string | null;
+  /** ROUTE-1: the branch this racer took at each fork so far (absent on an unforked course). */
+  route?: import('./sim/route').RacerRoute;
   visited: Set<Obstacle>;
   previous: { x: number; y: number; z: number; rotation: number };
 }

@@ -24,6 +24,7 @@ import type { SoundName } from '../audio';
 import type { SimWorld } from './world';
 import type { EffectKind } from '../effects/events';
 import type { LaneNetwork } from '../lane-network';
+import type { RouteGraph, RouteLayout } from './route';
 
 export type TallyKind = 'sheep' | 'explosions' | 'loops';
 
@@ -202,4 +203,19 @@ export interface RacerStepContext {
   readonly laneNetwork?: LaneNetwork | null;
   /** H7b: the rope timings (the test drive's dev sliders). Absent means the tuned defaults. */
   readonly rope?: RopeConfig;
+  /**
+   * ROUTE-1: the course's forks and this race's open branches, or absent/`null` for an unforked
+   * course (the old game, exactly).
+   */
+  readonly route?: { readonly graph: RouteGraph; readonly layout?: RouteLayout | null } | null;
+}
+
+/**
+ * ROUTE-1: the context as this racer meets the world: only the obstacles and pickups on its branches.
+ * On a course with no tagged content it is the same context object, so nothing changes.
+ */
+export function routed(ctx: RacerStepContext, racer: Racer): RacerStepContext {
+  if (!ctx.world.routed) return ctx;
+  const world = ctx.world.forRoute(racer.route);
+  return world === ctx.world ? ctx : { ...ctx, world };
 }

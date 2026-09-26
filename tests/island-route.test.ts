@@ -16,7 +16,7 @@ import {
   CAMERA_TAIL_X, cameraTrackSpace, courseTrackSpace, islandBranchRoads, islandBranchSpace, islandRoadsAt, islandTrackSpace,
   racerTrackSpace,
 } from '../src/game/island-route/island-space';
-import { buildClosedGates, type IslandMaterials } from '../src/game/island-route/island-world';
+import { buildClosedGates, islandBumps, type IslandMaterials } from '../src/game/island-route/island-world';
 import {
   ROAD_BED, RoadIndex, carvedHeight, markBridges, naturalHeight, roadSamples,
 } from '../src/game/island-route/island-ground';
@@ -112,6 +112,7 @@ test('the ground never pokes through a road: under every road it sits below the 
   const roads = [{ map: main, from: 0, to: main.length }, ...islandBranchRoads()];
   const index = new RoadIndex(roadSamples(roads, 2));
   markBridges(index);
+  const bumps = islandBumps();
   const worst: string[] = [];
   for (const { map, from, to } of roads) {
     for (let d = from; d <= to; d += 400) {
@@ -121,7 +122,7 @@ test('the ground never pokes through a road: under every road it sits below the 
         const x = f.pos.x + f.right.x * f.halfWidth * k;
         const z = f.pos.z + f.right.z * f.halfWidth * k;
         const surface = f.pos.y + f.right.y * f.halfWidth * k;
-        const ground = carvedHeight(x, z, naturalHeight(x, z), index);
+        const ground = carvedHeight(x, z, naturalHeight(x, z, bumps), index);
         if (ground > surface - ROAD_BED / 2) worst.push(`${f.stage} d ${Math.round(d)} lane ${k}: ground ${Math.round(ground - surface)} above`);
       }
     }

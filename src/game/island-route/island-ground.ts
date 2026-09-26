@@ -75,7 +75,11 @@ function terrace(h: number, shift: number): number {
 }
 
 /** Local rock masses: the summit crag the shack sits on, and the basalt massif the Drain spirals into. */
-export interface GroundBump { readonly x: number; readonly z: number; readonly height: number; readonly radius: number }
+export interface GroundBump {
+  readonly x: number; readonly z: number; readonly height: number; readonly radius: number;
+  /** Share of the radius that stays at full height (a mesa); 0 = a rounded crag. */
+  readonly plateau?: number;
+}
 
 export function naturalHeight(x: number, z: number, bumps: readonly GroundBump[] = []): number {
   const r = Math.hypot(x, z);
@@ -88,7 +92,7 @@ export function naturalHeight(x: number, z: number, bumps: readonly GroundBump[]
   let h = terrace(body, fbm(x - 8000, z + 6000, 7000) * 0.6);
   for (const b of bumps) {
     const d = Math.hypot(x - b.x, z - b.z) / b.radius;
-    if (d < 1) h = Math.max(h, h + b.height * (1 - smooth(0, 1, d)));
+    if (d < 1) h += b.height * (1 - smooth(b.plateau ?? 0, 1, d));
   }
   const grain = Math.sin(x * 0.00061 + z * 0.00047) * Math.sin(z * 0.00083 - x * 0.00029);
   return h + grain * 180 * smooth(-200, 600, h);

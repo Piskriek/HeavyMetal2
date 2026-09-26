@@ -13,6 +13,7 @@ import {
 } from './island-ground';
 import { islandBranchRoads, islandBranchSpace, islandTrackSpace } from './island-space';
 import { openBranches, type RouteLayout } from '../sim/route';
+import { placeIslandLandmarks } from './island-landmarks';
 
 export interface IslandMaterials {
   dirt: THREE.MeshStandardMaterial;
@@ -40,12 +41,13 @@ const GROUND_HALF = 38000;
 const SEA_HALF = 160000;
 
 /** The summit crag the shack sits on, and the basalt massif the Drain spirals down into. */
-function islandBumps(): GroundBump[] {
+export function islandBumps(): GroundBump[] {
   const start = polar(ISLAND_ANCHORS[0].at);
   const drain = polar({ theta: 700, r: 27800, y: 0 });
   return [
     { x: start.x, z: start.z, height: 2300, radius: 3200 },
-    { x: drain.x, z: drain.z, height: 2600, radius: 4200 },
+    // A basalt mesa the Drain's vortex is cut down into (the carving makes the funnel).
+    { x: drain.x, z: drain.z, height: 2500, radius: 4600, plateau: 0.7 },
   ];
 }
 
@@ -383,6 +385,12 @@ export function buildIslandWorld(M: IslandMaterials, opts: { performance?: boole
 
   const skyColor = new THREE.Color('#7d9fb3');
   const fogColor = new THREE.Color('#b9c8c6');
+  // The Meshy kit and landmarks arrive as their models load (the race never waits for them).
+  const landmarks = new THREE.Group();
+  landmarks.name = 'Landmarks';
+  group.add(landmarks);
+  void placeIslandLandmarks(landmarks, opts);
+
   const sky = buildSkyDome(fogColor, skyColor);
   group.add(sky);
   return { group, groundAt, skyColor, fogColor, sky };

@@ -353,7 +353,7 @@ test('velocity: analytic world velocity matches FD of the placement trajectory',
     () => {
       const x = 43000;
       return {
-        st: { x, y: courseY(x, 'ridge') - RADIUS, z: 120, grounded: true },
+        st: { x, y: courseY(x, 'ridge') - RADIUS, z: 120, grounded: true, course: 'ridge' as const },
         vel: { vx: 640, vy: 0, vz: 30 },
       };
     },
@@ -361,7 +361,7 @@ test('velocity: analytic world velocity matches FD of the placement trajectory',
     () => {
       const x = 21000;
       return {
-        st: { x, y: courseY(x, 'ridge') - 500, z: -260, grounded: false },
+        st: { x, y: courseY(x, 'ridge') - 500, z: -260, grounded: false, course: 'ridge' as const },
         vel: { vx: 720, vy: -150, vz: -80 },
       };
     },
@@ -369,7 +369,7 @@ test('velocity: analytic world velocity matches FD of the placement trajectory',
     () => {
       const x = 61000;
       return {
-        st: { x, y: courseY(x, 'ridge') - RADIUS, z: 300, grounded: true },
+        st: { x, y: courseY(x, 'ridge') - RADIUS, z: 300, grounded: true, course: 'ridge' as const },
         vel: { vx: 560, vy: 0, vz: -120 },
       };
     },
@@ -407,7 +407,7 @@ test('velocity inverse: canonicalVelocityFromWorld round-trips and reports units
   const flatX = START_X + 120;
   const { worldV, canonical } = worldVelocityFromEngine(
     map,
-    { x: flatX, y: courseY(flatX, 'ridge') - RADIUS, z: 0, grounded: true },
+    { x: flatX, y: courseY(flatX, 'ridge') - RADIUS, z: 0, grounded: true, course: 'ridge' as const },
     { vx: 700, vy: 0, vz: 0 },
   );
   const expected = (700 / 2) * map.ARC_PER_ENGINE_DISTANCE;
@@ -511,7 +511,7 @@ test('ramps: placement elevation flows into the shared racer placement', () => {
   // grounded racer riding the ramp surface: ramp altitude must dominate
   const placement = placementFromEngine(
     map,
-    { x, distance: engineDistance, y: courseY(x, 'ridge') - RADIUS, z: 0, grounded: true },
+    { x, distance: engineDistance, y: courseY(x, 'ridge') - RADIUS, z: 0, grounded: true, course: 'ridge' as const },
     surfaces,
   );
   const expectedAlt = 260 * Math.pow(0.5, 1.4);
@@ -526,10 +526,10 @@ test('ramps: placement elevation flows into the shared racer placement', () => {
    ------------------------------------------------------------------------ */
 test('placement: extracted composition matches the legacy renderer formula exactly', () => {
   const cases = [
-    { x: 43000, y: courseY(43000, 'ridge') - RADIUS, z: 120, grounded: true },
-    { x: 21000, y: courseY(21000, 'ridge') - 480, z: -300, grounded: false },
-    { x: 61000, y: courseY(61000, 'ridge') - 90, z: 330, grounded: false },
-    { x: 70000, y: courseY(70000, 'ridge') - RADIUS, z: -480, grounded: true },
+    { x: 43000, y: courseY(43000, 'ridge') - RADIUS, z: 120, grounded: true, course: 'ridge' as const },
+    { x: 21000, y: courseY(21000, 'ridge') - 480, z: -300, grounded: false, course: 'ridge' as const },
+    { x: 61000, y: courseY(61000, 'ridge') - 90, z: 330, grounded: false, course: 'ridge' as const },
+    { x: 70000, y: courseY(70000, 'ridge') - RADIUS, z: -480, grounded: true, course: 'ridge' as const },
   ];
   for (const st of cases) {
     const distance = engineDistanceFromX(st.x);
@@ -538,8 +538,8 @@ test('placement: extracted composition matches the legacy renderer formula exact
     // === legacy Renderer3D.render() formula, replicated longhand ===
     const lateral = (st.z / 480) * (frame.halfWidth - RADIUS * 1.2);
     const engineElev = Math.max(0, courseY(st.x, 'ridge') - st.y);
-    const airborneElev = st.grounded ? 0 : Math.max(0, GROUND - RADIUS - st.y);
-    const altitude = Math.max(engineElev, airborneElev, 0);
+    // M5: the slingshot-era height above the flat legacy ground is retired; height is from the course.
+    const altitude = Math.max(engineElev, 0);
     const expected = add(
       add(frame.pos, scaleP(frame.right, lateral)),
       scaleP(frame.up, RADIUS + altitude),

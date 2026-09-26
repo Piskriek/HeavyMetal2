@@ -205,13 +205,15 @@ test('the retired slingshot is not drawn in a push run', () => {
   assert.match(builder, /private isSlingshotProp\(prop: PlacedProp\): boolean \{/);
   // A prop built while the slingshot is hidden must not become visible again on a rebuild.
   assert.match(builder, /isSlingshotProp\(prop\) && !this\.slingshotsVisible/);
-  // The race render path is the one place that decides, and it decides by start mode.
-  assert.match(renderer, /this\.trackBuilder\.setSlingshotsVisible\(frame\.options\.startMode === 'sling'\)/);
+  // The race render path is the one place that decides: with the push as the only start (M5), never.
+  assert.match(renderer, /this\.trackBuilder\.setSlingshotsVisible\(false\)/);
   assert.equal((renderer.match(/setSlingshotsVisible/g) ?? []).length, 1, 'exactly one call site');
 
   // And the prop itself is still authored: hiding it must never mean deleting it.
-  assert.match(builder, /id: 'prop_start_slingshot'/);
-  assert.match(builder, /type: 'slingshot_3d_launcher'/);
+  // M8: the default document (and so the authored slingshot prop) lives in the prop catalog now.
+  const catalog = readFileSync(new URL('../src/game/builder/prop-catalog.ts', import.meta.url), 'utf-8');
+  assert.match(catalog, /id: 'prop_start_slingshot'/);
+  assert.match(catalog, /type: 'slingshot_3d_launcher'/);
   const defaultStart = DEFAULT_TRACK_PROPS.find((prop) => prop.id === 'prop_start_slingshot');
   assert.ok(defaultStart, 'the default document keeps the slingshot');
   assert.equal(defaultStart!.alignToTrack, true);

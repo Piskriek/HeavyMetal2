@@ -6,6 +6,7 @@ import {
   DEFAULT_TRACK_PROPS,
   PROP_DEFINITIONS,
   type PlacedProp,
+  propsFingerprint,
 } from '../src/game/track-builder-3d';
 import type { TrackData } from '../src/game/types';
 
@@ -291,4 +292,56 @@ test('Track Props Backup and Recovery System', async (t) => {
 
     builder.destroy();
   });
+});
+
+test('M12: the auto-backup only writes when the props change', async (t) => {
+  mockLocalStorage.clear();
+  const posts: string[] = [];
+  const originalFetch = globalThis.fetch;
+  (globalThis as any).fetch = async (url: string, init?: { method?: string; body?: string }) => {
+    if (init?.method === 'POST') posts.push(init.body ?? '');
+    return { ok: true, json: async () => ({ success: true, latest: null, history: [] }) };
+  };
+  const builder = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), mockTrack);
+  try {
+    await t.test('the fingerprint follows content, not identity or runtime fields', () => {
+      const props = builder.getProps();
+      const copy = JSON.parse(JSON.stringify(props)) as PlacedProp[];
+      assert.equal(propsFingerprint([...props], "ridge"), propsFingerprint(copy, "ridge"));
+      (copy[0] as any)._runtimeState = { collected: true };
+      assert.equal(propsFingerprint([...props], 'ridge'), propsFingerprint(copy, 'ridge'), 'runtime state is not saved');
+      copy[0] = { ...copy[0], x: copy[0].x + 1 };
+      assert.notEqual(propsFingerprint([...props], 'ridge'), propsFingerprint(copy, 'ridge'), 'a move changes it');
+      assert.notEqual(propsFingerprint([...props], 'ridge'), propsFingerprint([...props], 'canyon'), 'so does the course');
+    });
+
+    await t.test('an unchanged track is written once, then never again', async () => {
+      const first = await builder.backupToFile(false);
+      assert.equal(first?.unchanged, undefined);
+      assert.equal(posts.length, 1);
+      for (let i = 0; i < 5; i++) {
+        const again = await builder.backupToFile(false);
+        assert.equal(again?.unchanged, true);
+      }
+      assert.equal(posts.length, 1, 'idle auto-backups send nothing');
+    });
+
+    await t.test('an explicit save always writes', async () => {
+      await builder.backupToFile(true);
+      assert.equal(posts.length, 2);
+    });
+
+    await t.test('an edit makes the next auto-backup write', async () => {
+      const [prop] = builder.getProps();
+      builder.deleteProp(prop.id);
+      (builder as any).backups.lastBackupTimestamp = 0; // past the 15 s spacing (M8: the backup service)
+      const result = await builder.backupToFile(false);
+      assert.equal(result?.unchanged, undefined);
+      assert.equal(posts.length, 3);
+      assert.equal(JSON.parse(posts[2]).props.length, 13);
+    });
+  } finally {
+    builder.destroy();
+    (globalThis as any).fetch = originalFetch;
+  }
 });

@@ -17,9 +17,10 @@ import { dirname, join } from 'node:path';
 import {
   APERTURE_FRACTION, BOB_MAX_PX, COCKPIT_ART, COCKPIT_ART_PATHS, COCKPIT_MANIFEST,
   ARM_FIST_TO_SLEEVE, VZ_MAX, YOKE_MAX_DEG, armsAt, cockpitBob, cockpitLayout, createCockpitState, gripPoints,
-  needleAngle, steerFrom, yokeAngleDeg,
+  needleAngle, steerFrom, yokeAngleDeg, CLUSTER_ASPECT,
 } from '../src/game/cockpit';
 import { DEFAULT_OPTIONS, type GameOptions } from '../src/game/types';
+import { laneZ, PLAYER_LANE } from '../src/game/scene';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const publicFile = (url: string) => join(root, 'public', url.replace(/^\//, ''));
@@ -44,12 +45,15 @@ test('needle mapping: the ends are the sweep ends, and values clamp outside the 
 
 test('steer and yoke law: full lock is ±38°, and the sign matches the lane axis', () => {
   assert.equal(steerFrom(0, 1), 0);
-  assert.equal(steerFrom(-VZ_MAX, 1), 1, '‑z is the far lanes, so it steers clockwise');
-  assert.equal(steerFrom(VZ_MAX, 1), -1);
-  assert.equal(steerFrom(-VZ_MAX * 4, 1), 1, 'the clamp holds past the limit');
-  assert.equal(steerFrom(320, 0.5), -0.9846153846153847, 'handling scales the same way the physics does');
-  assert.equal(yokeAngleDeg(steerFrom(-VZ_MAX, 1)), YOKE_MAX_DEG);
-  assert.equal(yokeAngleDeg(steerFrom(VZ_MAX, 1)), -YOKE_MAX_DEG);
+  // steerLeft (A) is changeLane(-1), which the engine turns into lane + 1, i.e. toward −z: a
+  // negative vz. That is screen-left in both cameras, so it must be an anticlockwise yoke.
+  assert.ok(laneZ(PLAYER_LANE + 1) < laneZ(PLAYER_LANE), 'A moves the ball toward −z');
+  assert.equal(steerFrom(-VZ_MAX, 1), -1, 'steering left (−vz) turns the yoke anticlockwise');
+  assert.equal(steerFrom(VZ_MAX, 1), 1);
+  assert.equal(steerFrom(-VZ_MAX * 4, 1), -1, 'the clamp holds past the limit');
+  assert.equal(steerFrom(320, 0.5), 0.9846153846153847, 'handling scales the same way the physics does');
+  assert.equal(yokeAngleDeg(steerFrom(-VZ_MAX, 1)), -YOKE_MAX_DEG);
+  assert.equal(yokeAngleDeg(steerFrom(VZ_MAX, 1)), YOKE_MAX_DEG);
   assert.equal(yokeAngleDeg(Number.NaN), 0);
   assert.equal(Object.is(yokeAngleDeg(0), -0), false, 'zero steering is +0, so CSS never sees -0deg');
 });
@@ -121,7 +125,7 @@ test('bob is speed-driven, grounded-only, and gone under reduced motion', () => 
 test('the channel starts clean and carries the field names the HUD reads', () => {
   const state = createCockpitState();
   assert.deepEqual(Object.keys(state).sort(), [
-    'boostCharges', 'bounceCharges', 'countdownLabel', 'gradePct', 'grounded', 'inLoop',
+    'boostAge', 'boostCharges', 'bounceCharges', 'countdownLabel', 'gapPlace', 'gapSeconds', 'gapTrend', 'gradePct', 'grounded', 'impact', 'impactSide', 'inLoop',
     'position', 'pushing', 'raceTime', 'shieldSeconds', 'speedKmh', 'status', 'steer',
   ]);
   assert.equal(state.steer, 0);
@@ -163,4 +167,92 @@ test('every cockpit image exists, at the size the manifest promises', () => {
 test('the cockpit is a camera mode, and it is the default', () => {
   const mode: GameOptions['cameraMode'] = 'first_person';
   assert.equal(DEFAULT_OPTIONS.cameraMode, mode, 'the game opens in the cockpit');
+});
+
+test('layout: the gauge plates hang from the window bottom at every screen shape (no gap, no overlap)', () => {
+  for (const [w, h] of [[1280, 720], [1920, 1080], [1440, 1080], [2560, 1080], [3840, 2160], [1024, 768]] as const) {
+    const layout = cockpitLayout(w, h);
+    const windowBottom = layout.aperture.y + layout.aperture.h;
+    for (const side of ['left', 'right'] as const) {
+      const c = layout.clusters[side];
+      const gap = c.y - windowBottom;
+      assert.ok(gap >= -4 && gap <= 1, `${w}×${h} ${side}: gap ${gap.toFixed(1)} px`);
+      const bottom = c.y + c.w * CLUSTER_ASPECT[side];
+      assert.ok(bottom <= h + 1, `${w}×${h} ${side}: plate stays on screen (${bottom.toFixed(1)})`);
+      assert.ok(c.w <= w * 0.3 + 1e-9, `${w}×${h} ${side}: plate width capped`);
+    }
+    assert.ok(layout.clusters.left.x + layout.clusters.left.w < layout.clusters.right.x, `${w}×${h}: plates do not meet`);
+    // At 16:9 the plates also reach the screen bottom (the band is filled).
+    if (Math.abs(w / h - 16 / 9) < 0.01) {
+      for (const side of ['left', 'right'] as const) {
+        const c = layout.clusters[side];
+        assert.ok(Math.abs(c.y + c.w * CLUSTER_ASPECT[side] - h) <= 2, `${w}×${h} ${side}: reaches the bottom`);
+      }
+    }
+    for (const deg of [-YOKE_MAX_DEG, 0, YOKE_MAX_DEG]) {
+      const arms = armsAt(layout, deg);
+      for (const arm of [arms.left, arms.right]) assert.ok(arm.shoulder.y > h, `${w}×${h}: the arm runs off the bottom`);
+    }
+  }
+});
+
+test('the bezel backup no longer ships in public/', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  assert.equal(existsSync(join(root, 'public/art/cockpit/cockpit-bezel.backup.png')), false);
+});
+
+// P3: the arms flinch on a hit, pump on a boost and brace in the air, without the hands ever
+// leaving the grips.
+test('P3: every gesture keeps both hands on the grips and moves only the shoulders', async () => {
+  const { driverGesture } = await import('../src/game/cockpit');
+  const anchor = COCKPIT_MANIFEST.arm.gripFraction;
+  const layout = cockpitLayout(1920, 1080);
+  const rest = armsAt(layout, 0);
+  for (const gesture of ['flinch', 'boost_pump', 'air_brace'] as const) {
+    for (const t of [0, 0.13, 0.5]) {
+      const arms = armsAt(layout, yokeAngleDeg(0.4), gesture, 1, t);
+      const grips = gripPoints(layout, yokeAngleDeg(0.4));
+      for (const [pose, grip] of [[arms.left, grips.left], [arms.right, grips.right]] as const) {
+        assert.ok(Math.abs(pose.x + anchor.x * pose.w - grip.x) < 0.5 && Math.abs(pose.y + anchor.y * pose.h - grip.y) < 0.5, `${gesture}: hand on grip`);
+        assert.ok(pose.shoulder.y > layout.h, `${gesture}: the shoulder stays off-screen`);
+      }
+    }
+  }
+  const flinch = armsAt(layout, 0, 'flinch', 1);
+  assert.ok(flinch.left.shoulder.x < rest.left.shoulder.x && flinch.right.shoulder.x > rest.right.shoulder.x, 'a flinch flares the elbows out');
+  assert.ok(flinch.left.shoulder.y > rest.left.shoulder.y, 'and pulls the arms back');
+  const pump = armsAt(layout, 0, 'boost_pump', 1);
+  assert.ok(pump.left.shoulder.y < rest.left.shoulder.y, 'a boost pushes the arms forward');
+  const brace = armsAt(layout, 0, 'air_brace', 1);
+  assert.ok(brace.left.shoulder.x > rest.left.shoulder.x, 'airtime locks the arms in');
+  assert.deepEqual(armsAt(layout, 0, 'flinch', 0), rest, 'no intensity, no gesture');
+
+  const base = { impact: 0, boostAge: 1e9, grounded: true, inLoop: false, status: 'flying' as const };
+  assert.deepEqual(driverGesture({ ...base, impact: 0.8 }, false), { gesture: 'flinch', intensity: 0.8 });
+  assert.equal(driverGesture({ ...base, boostAge: 0.15 }, false).gesture, 'boost_pump');
+  assert.equal(driverGesture({ ...base, boostAge: 0.9 }, false).gesture, 'normal', 'the pump is over by 0.6 s');
+  assert.equal(driverGesture({ ...base, grounded: false }, false).gesture, 'air_brace');
+  assert.equal(driverGesture({ ...base, grounded: false, inLoop: true }, false).gesture, 'normal');
+  assert.deepEqual(driverGesture({ ...base, impact: 1 }, true), { gesture: 'normal', intensity: 0 }, 'reduced motion: still arms');
+});
+
+// P2: glass in the cockpit window, and a spiderweb crack on a big hit that holds and then fades.
+test('P2: a crack holds for 2 s, fades over 1.5 s, and is drawn at the side the hit came from', async () => {
+  const { CRACK_FADE_S, CRACK_HOLD_S, crackOpacity, crackPath, glassScratches } = await import('../src/game/cockpit');
+  assert.equal(crackOpacity(0), 1);
+  assert.equal(crackOpacity(CRACK_HOLD_S - 0.01), 1);
+  assert.ok(crackOpacity(CRACK_HOLD_S + CRACK_FADE_S / 2) > 0.4 && crackOpacity(CRACK_HOLD_S + CRACK_FADE_S / 2) < 0.6);
+  assert.equal(crackOpacity(CRACK_HOLD_S + CRACK_FADE_S), 0);
+  assert.equal(crackOpacity(-1), 0);
+  const w = 1600; const h = 780;
+  assert.equal(crackPath(7, 1, w, h), crackPath(7, 1, w, h), 'the same hit draws the same crack');
+  assert.notEqual(crackPath(7, 1, w, h), crackPath(8, 1, w, h), 'a new hit draws a new one');
+  const start = (path: string) => Number(/^M(-?[\d.]+)/.exec(path)![1]);
+  assert.ok(start(crackPath(3, 1, w, h)) > w * 0.6, 'from the right, on the right');
+  assert.ok(start(crackPath(3, -1, w, h)) < w * 0.4, 'from the left, on the left');
+  assert.ok(glassScratches(w, h).length > 0);
+  const hud = readFileSync(new URL('../src/components/CockpitHud.tsx', import.meta.url), 'utf8');
+  assert.match(hud, /if \(!reducedMotion && state\.impact >= CRACK_THRESHOLD && state\.impact > cracks\.lastImpact \+ 0\.15\)/, 'only a new big hit cracks, and never under reduced motion');
+  assert.match(hud, /<svg className="cockpit-glass"/);
+  assert.ok(hud.indexOf('className="cockpit-glass"') < hud.indexOf('className="cockpit-bezel"'), 'the glass is behind the bezel');
 });

@@ -32,7 +32,8 @@
    stay in the renderer. The old renderer-only scripted ramp "jump arc" was
    removed for the same reason: ballistic trajectories belong to physics.
    ========================================================================== */
-import { GROUND, LANE_WIDTH, RADIUS, START_X, TRACK_DISTANCE, courseY } from './scene';
+import { LANE_WIDTH, RADIUS, START_X, TRACK_DISTANCE, courseY } from './scene';
+import type { CourseId } from './types';
 
 /* -----------------------------------------------------------------------------
    0. ERROR TYPE — singular/ambiguous transforms fail visibly
@@ -941,6 +942,13 @@ export interface EngineRacerState {
   /** Engine screen Y (y grows downward in engine space). */
   readonly y: number;
   readonly grounded?: boolean;
+  /**
+   * The course the engine state belongs to. Engine y follows *that course's* hill profile
+   * (`courseY`), so an altitude above the road must be measured against the same profile: measured
+   * against Ridge's, Boomtown and Sheep lifted every ball, pickup and effect off the road. Every
+   * caller says which course it is placing on (M10); there is no module-wide default.
+   */
+  readonly course: CourseId;
 }
 
 export interface EngineVelocity {
@@ -957,13 +965,15 @@ export const engineDistanceFromX = (x: number): number => clampN((x - START_X) /
 /** Canonical state (s, laneZ, altitude-source tag) extracted from engine state. */
 export function canonicalFromEngine(
   map: TrackSpaceMap, st: EngineRacerState,
-): { s: number; laneZ: number; engineAlt: number; airborneAlt: number; engineDistance: number; engineX: number } {
+): { s: number; laneZ: number; engineAlt: number; engineDistance: number; engineX: number } {
   const engineDistance = st.distance ?? (st.x !== undefined ? engineDistanceFromX(st.x) : 0);
   const engineX = st.x ?? engineXFromDistance(engineDistance);
   const s = map.trackDistFromEngineDistance(engineDistance);
-  const engineAlt = Math.max(0, courseY(engineX, 'ridge') - st.y);
-  const airborneAlt = st.grounded ? 0 : Math.max(0, GROUND - RADIUS - st.y);
-  return { s, laneZ: st.z, engineAlt, airborneAlt, engineDistance, engineX };
+  // Height is always measured from the course under the ball. The slingshot-era rule that measured an
+  // airborne ball from the flat legacy ground (GROUND − RADIUS) floated it ~210 units too high
+  // wherever the course sits above that ground, such as the start pad (M5).
+  const engineAlt = Math.max(0, courseY(engineX, st.course) - st.y);
+  return { s, laneZ: st.z, engineAlt, engineDistance, engineX };
 }
 
 /**
@@ -984,11 +994,10 @@ export function placementFromEngine(
 } {
   const c = canonicalFromEngine(map, st);
   const rampAlt = ramps && ramps.length > 0 ? rampHeightAt(ramps, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) : 0;
-  let altitude = Math.max(c.engineAlt, c.airborneAlt, rampAlt);
+  const altitude = Math.max(c.engineAlt, rampAlt);
   const altSource =
     altitude === rampAlt && rampAlt > 0 ? 'ramp'
-      : altitude === c.airborneAlt && c.airborneAlt > 0 ? 'airborne'
-        : altitude === c.engineAlt && c.engineAlt > 0 ? 'engine' : 'flat';
+      : altitude === c.engineAlt && c.engineAlt > 0 ? (st.grounded === false ? 'airborne' : 'engine') : 'flat';
   const placement = worldFromCanonical(map, { s: c.s, laneZ: c.laneZ, altitude });
   return Object.freeze({ ...placement, altitude, altSource });
 }
@@ -1012,15 +1021,13 @@ export function worldVelocityFromEngine(
 ): { worldV: CPoint; canonical: CanonicalVelocity; state: CanonicalState } {
   const c = canonicalFromEngine(map, st);
   const rampAlt = ramps && ramps.length > 0 ? rampHeightAt(ramps, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) : 0;
-  const altitude = Math.max(c.engineAlt, c.airborneAlt, rampAlt);
+  const altitude = Math.max(c.engineAlt, rampAlt);
   const ds = (vel.vx / 2) * map.ARC_PER_ENGINE_DISTANCE;
   let dAlt: number;
   if (altitude === rampAlt && rampAlt > 0) {
     dAlt = rampSlopeAt(ramps!, c.s, lateralFromLaneZ(map, c.s, c.laneZ)) * ds;
-  } else if (altitude === c.airborneAlt && c.airborneAlt > 0) {
-    dAlt = -vel.vy;
   } else {
-    dAlt = engineSlopeApprox(c.engineX) * vel.vx - vel.vy;
+    dAlt = engineSlopeApprox(c.engineX, st.course) * vel.vx - vel.vy;
   }
   const state: CanonicalState = { s: c.s, laneZ: c.laneZ, altitude };
   return {
@@ -1037,8 +1044,8 @@ export function worldVelocityFromEngine(
  * legacy courseSlope() uses for its own collision cycle. At table knots the
  * slope is a subgradient between the two linear pieces (documented kink).
  */
-function engineSlopeApprox(engineX: number): number {
-  return (courseY(engineX + 4, 'ridge') - courseY(engineX - 4, 'ridge')) / 8;
+function engineSlopeApprox(engineX: number, course: CourseId): number {
+  return (courseY(engineX + 4, course) - courseY(engineX - 4, course)) / 8;
 }
 
 /**

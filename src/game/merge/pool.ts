@@ -62,6 +62,39 @@ export const RELEASE_RETRY_TICKS = 6;
 export const RELEASE_MAX_RETRIES = 8;
 /** Every released rider leaves at the same speed, so release order is exit order (D9). */
 export const MERGE_RELEASE_VX = 700;
+/**
+ * Release spacing: how far (engine x) the rider ahead must be past the sorting plane before the next
+ * one goes (≈ 2 drawn ball diameters). The engine maps it onto the pool's occupancy scale, where 0.25
+ * means clear. The old rule — a quarter of the whole geometry loop, ~1.45 s per rider — made a
+ * 100-ball field take minutes to leave the pool.
+ */
+export const MERGE_RELEASE_SPACING = 250;
+/** How many riders line up in the loop's lane ahead of their release (held riders are intangible). */
+export const MERGE_LINEUP = 4;
+
+/**
+ * P7: where each held rider waits in the queue, as a row in their lane: 0 is at the gate, 1 one
+ * place up the hill, and so on. The next `MERGE_LINEUP` riders line up in the loop's own lane; the
+ * rest wait in their slot's lane in release order. Presentation only: the pool holds everyone at the
+ * gate plane and releases them from there, so the rows only move where the balls are drawn.
+ */
+export function queueRows(entries: readonly { readonly racerId: number; readonly slotZ: number; readonly releaseTick: number | null }[]): Map<number, number> {
+  const rows = new Map<number, number>();
+  const perLane = new Map<number | 'loop', number>();
+  let upcoming = 0;
+  for (const entry of entries) {
+    if (entry.releaseTick !== null) continue;
+    const lane = upcoming < MERGE_LINEUP ? 'loop' : entry.slotZ;
+    upcoming += 1;
+    const row = perLane.get(lane) ?? 0;
+    perLane.set(lane, row + 1);
+    rows.set(entry.racerId, row);
+  }
+  return rows;
+}
+/** The occupancy input for `step`: the rider ahead's distance past the plane, on the 0.25 = clear scale. */
+export const releaseOccupancy = (previousX: number, gateX: number): number =>
+  Math.max(0, Math.min(1, 0.25 * (previousX - gateX) / MERGE_RELEASE_SPACING));
 /** How long a rider may take to slide into the loop lane before being released regardless. */
 export const ALIGN_MAX_TICKS = 150;
 /**

@@ -36,6 +36,8 @@ export interface RacerStanding {
   recovering: boolean;
   finishTime: number | null;
   loadout?: Loadout;
+  /** P11: place at the first split (the pool's queue by split time); absent before the split. */
+  splitPosition?: number;
 }
 
 export interface GameOptions {
@@ -137,10 +139,24 @@ export interface GameSnapshot {
   lastPickup: PowerupKind | null;
   pickupNoticeUntil: number;
   /**
+   * H9: the rider directly ahead of the player: their place, the gap in seconds at the player's
+   * speed (or time behind them once they have finished), and whether it is shrinking. Null when
+   * nobody is ahead, and during the solo first split.
+   */
+  gapAhead?: GapAhead | null;
+  /**
    * M01 · T2 — the first-loop pool, while it is doing something. Present from the first gate
    * crossing until the last rider is released, then removed (the overlay is driven by it).
    */
   merge?: MergeSnapshot;
+}
+
+/** H9: see `GameSnapshot.gapAhead`. */
+export interface GapAhead {
+  place: number;
+  seconds: number;
+  name: string;
+  trend: 'closing' | 'steady' | 'falling';
 }
 
 /** One rider in the pool queue, as the overlay shows them. */

@@ -16,6 +16,7 @@
  *
  * Everything here is pure: no DOM, no canvas, no three.js, no React.
  */
+import type { RopeConfig } from './rope';
 import { START_X } from '../scene';
 import type { Racer } from '../racers';
 import type { PowerupKind } from '../powerups';
@@ -184,10 +185,11 @@ export interface RacerStepContext {
   readonly fx: SimFx;
   readonly recovery: RecoveryPolicy;
   /**
-   * Gameplay randomness. The live race draws from `Math.random` (unchanged behaviour); an
-   * isolated attempt draws from its seeded stream, so the same seed replays the same attempt.
+   * Gameplay randomness, in [0, 1). The live race hashes (seed, tick, racer id) (M9), so the same
+   * seed and the same inputs replay the same race; an isolated attempt draws from its seeded
+   * stream and may ignore the racer id.
    */
-  readonly random: () => number;
+  readonly random: (racerId?: number) => number;
   /** Simulation clock in seconds (engine: `runTime`); advanced by the caller before the step. */
   readonly runTime: number;
   /** Wall clock stamped onto obstacles (engine: `time`). */
@@ -198,4 +200,6 @@ export interface RacerStepContext {
    * legacy target and corridor for both, so an old context is not a special case.
    */
   readonly laneNetwork?: LaneNetwork | null;
+  /** H7b: the rope timings (the test drive's dev sliders). Absent means the tuned defaults. */
+  readonly rope?: RopeConfig;
 }

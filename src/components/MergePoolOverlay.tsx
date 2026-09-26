@@ -15,6 +15,7 @@ import { COCKPIT_ART } from '../game/cockpit';
 import { poolGoblinFrame, poolGoblinSheetPosition } from '../game/merge/goblin';
 import { formatSplit, poolIsWaiting } from '../game/merge/split';
 import { capsuleById, riderById, type Loadout } from '../game/loadouts';
+import OrnateCorners from './OrnateCorners';
 import '../merge-pool-overlay.css';
 
 export interface MergePoolOverlayProps {
@@ -32,6 +33,10 @@ export interface MergePoolOverlayProps {
   /** Reduced motion holds each pose instead of animating the sweep. */
   reducedMotion?: boolean;
 }
+
+/** The pool counts in physics ticks; the sim runs at 120 of them a second. */
+const TICKS_PER_SECOND = 120;
+const heldLabel = (ticks: number) => `Race clock held ${(ticks / TICKS_PER_SECOND).toFixed(1)} s`;
 
 /** The one flag worth a word on the row, most specific first. */
 function flagLabel(flags: readonly string[]): string | null {
@@ -113,21 +118,17 @@ export default function MergePoolOverlay({
         <>
           <div className="merge-pool__go" role="status" aria-live="polite">{merge.countdownLabel ?? 'POOL'}</div>
           <div className="merge-pool__panel merge-pool__panel--waiting">
+            <OrnateCorners />
             <header className="merge-pool__head">
-              <div>
-                <h2>Set your split</h2>
-                <p>
-                  The clock is running to the sorting loop and the split is yours to set. Nobody
-                  is waiting on you yet — the queue starts for you when you cross.
-                </p>
-              </div>
-              <span className="merge-pool__hold">{merge.holdTicks} ticks queued</span>
+              <span className="merge-pool__eyebrow">First loop · the sorting pool</span>
+              <h2>Set your split</h2>
+              <p>The field is queuing at the loop. Your clock is still running until you cross the gate.</p>
             </header>
 
             <div className="merge-pool__split">
               <span className="merge-pool__split-label">Your split so far</span>
               <strong className="merge-pool__split-clock" data-testid="pool-split-clock">{formatSplit(raceTime)}</strong>
-              <span className="merge-pool__split-note">READY UP appears once you are in the pool.</span>
+              <span className="merge-pool__split-note">Ready up once you are in the pool.</span>
             </div>
 
             <ol className="merge-pool__list merge-pool__list--waiting" aria-label="The field is queuing">
@@ -151,18 +152,16 @@ export default function MergePoolOverlay({
             {merge.countdownLabel ?? (merge.phase === 'open' ? 'POOL' : 'READY')}
           </div>
           <div className="merge-pool__panel">
+            <OrnateCorners />
             <header className="merge-pool__head">
-              <div>
-                <h2>The sorting loop</h2>
-                <p>
-                  {merge.phase === 'open'
-                    ? 'Everyone queues in the order they arrive. Nobody passes inside the ring.'
-                    : 'All in. The ring takes them in order — first in, first out.'}
-                </p>
-              </div>
-              <span className="merge-pool__hold" title="Simulated ticks spent queued">
-                {merge.holdTicks} ticks held
-              </span>
+              <span className="merge-pool__eyebrow">First loop · the sorting pool</span>
+              <h2>The sorting loop</h2>
+              <p>
+                {merge.phase === 'open'
+                  ? 'Everyone queues in the order they arrived. Nobody passes inside the ring.'
+                  : 'All in. The ring sends them out in order: first in, first out.'}
+              </p>
+              <span className="merge-pool__hold" title="Queuing time is taken off the race clock">{heldLabel(merge.holdTicks)}</span>
             </header>
 
             <ol className="merge-pool__list">
@@ -198,14 +197,14 @@ export default function MergePoolOverlay({
               <button
                 ref={buttonRef}
                 type="button"
-                className="merge-pool__button"
+                className="fantasy-primary merge-pool__button"
                 onClick={onReady}
                 disabled={!player || player.ready}
               >
-                {player?.ready ? 'READY — WAITING ON THE FIELD' : 'READY UP'}
+                {player?.ready ? 'Ready. Waiting on the field' : 'Ready up'}
               </button>
               <p className="merge-pool__hint">
-                Space or Enter also readies up. An idle rider is readied automatically and keeps their place.
+                Space or Enter works too. If you wait, you are readied automatically and keep your place.
               </p>
             </footer>
           </div>

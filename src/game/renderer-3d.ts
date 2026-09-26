@@ -4,20 +4,25 @@
    3D goblin marble racers, dynamic camera rig, and atmospheric transitions.
    ============================================================================= */
 import * as THREE from 'three';
+import { RopeReelView } from './rope-reel-view';
+import { BallTexturePool, arrayBallMaterial, layerPixels } from './ball-texture-pool';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
 import type { GameOptions } from './types';
-import { RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
+import { BALL_DRAW_RADIUS, RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { LanePaint } from './lane-paint';
+import { ObstacleView } from './obstacle-view';
 import { PickupView } from './pickup-view';
-import { cameraShake } from './camera-shake';
+import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
 import {
   compileRampSurfaces,
   engineDistanceFromX,
   getTrackSpace,
+  lateralFromLaneZ,
   placementFromEngine,
   type PhysicalRampSurface,
   type TrackSpaceMap,
@@ -26,6 +31,9 @@ import {
   FP_LOOK_AHEAD,
   firstPersonFlag,
   firstPersonFrame,
+  leanAngleFor,
+  leanUp,
+  stepLean,
   type Vec3,
 } from './first-person';
 
@@ -42,6 +50,8 @@ const TERRAIN_DROP = 100;
 const RIVER_X = -7000;
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+/** A PlaneGeometry faces +Z. */
+const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const ZERO = new THREE.Vector3();
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -596,7 +606,6 @@ export function createSlingshotMesh(scale = 1, materials?: any): THREE.Group {
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(x, y, z);
     if (rx || ry || rz) mesh.rotation.set(rx, ry, rz);
-    mesh.castShadow = true;
     mesh.receiveShadow = true;
     g.add(mesh);
     return mesh;
@@ -607,7 +616,6 @@ export function createSlingshotMesh(scale = 1, materials?: any): THREE.Group {
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(x, y, z);
     if (rx || ry || rz) mesh.rotation.set(rx, ry, rz);
-    mesh.castShadow = true;
     mesh.receiveShadow = true;
     g.add(mesh);
     return mesh;
@@ -768,7 +776,9 @@ function buildTrackSurface(track: TrackData, M: Materials, scene: THREE.Scene) {
   let runStart = 0;
   for (let i = 1; i <= samples.length; i++) {
     if (i === samples.length || surfaceKey(samples[i]) !== surfaceKey(samples[runStart])) {
-      scene.add(sweepProfile(samples, runStart, Math.min(i, samples.length - 1), SURFACE, M[surfaceKey(samples[runStart])]));
+      const surface = sweepProfile(samples, runStart, Math.min(i, samples.length - 1), SURFACE, M[surfaceKey(samples[runStart])]);
+      surface.name = 'TrackSurface'; // the builder's scenery index keeps the race line locked
+      scene.add(surface);
       runStart = i;
     }
   }
@@ -1474,32 +1484,95 @@ import { TrackBuilder3D } from './track-builder-3d';
 /* -----------------------------------------------------------------------------
    9. RACER 3D MESHES & OBSTACLES
    -------------------------------------------------------------------------- */
-interface Racer3DMesh {
+/**
+ * M7: one racer slot. The balls are drawn by instanced batches (one per painted texture for the
+ * rolling cores, one each for the brass caps, the ground shadows and the shield bubbles), so a slot
+ * owns no scene objects: it only remembers the texture it wears and its shield spin.
+ */
+interface RacerSlot {
   canvas: HTMLCanvasElement | null;
-  group: THREE.Group;
-  /** M01 · T3 (IF-GYRO): the rolling shell — wears `gyroPose.core`. */
-  core: THREE.Mesh;
-  /** The two level brass caps either side of the rider — wear `gyroPose.gyro`. */
-  capLeft: THREE.Mesh;
-  capRight: THREE.Mesh;
-  shadow: THREE.Mesh;
-  shield: THREE.Mesh;
+  /** The core batch this slot draws into: its painted texture's, or the untextured one. */
+  core: CoreBatch;
+  /** An untextured slot's colour (the painted ones are white under their texture). */
+  color: THREE.Color;
+  shieldSpin: number;
+  /** MP-T03: this slot's layer in the ball texture array (null when drawn by a per-texture batch). */
+  layer: number | null;
+}
+
+/** MP-T03: the key of the one batch that draws every array-textured ball. */
+const ARRAY_BATCH_KEY = {} as HTMLCanvasElement;
+
+/** Every slot wearing one texture (or none) is drawn by one instanced mesh with one material. */
+interface CoreBatch {
+  readonly key: HTMLCanvasElement | null;
+  readonly material: THREE.MeshLambertMaterial;
+  readonly texture: THREE.CanvasTexture | null;
+  mesh: THREE.InstancedMesh;
+  refs: number;
+  /** MP-T03: the array batch's per-instance layer index (on its own geometry). */
+  layers?: THREE.InstancedBufferAttribute;
 }
 
 /**
- * T02: every racer mesh owns its material (and, for textured slots, participates in a
- * canvas-keyed texture cache). The geometry and shadow/shield resources are shared.
+ * The geometry, the shared materials and the instanced meshes every slot draws through. Geometry is
+ * three shapes however big the grid is; the instanced meshes are rebuilt only when the grid outgrows
+ * their capacity.
  */
 interface RacerMeshResources {
   sphereGeo: THREE.SphereGeometry;
-  /** Cap geometries, poles baked onto local −X and +X, so the mesh quaternion is the level basis. */
-  capLeftGeo: THREE.SphereGeometry;
-  capRightGeo: THREE.SphereGeometry;
-  capMat: THREE.MeshStandardMaterial;
+  /** Both cap shells in one geometry, poles baked onto local −X and +X: one draw for every cap. */
+  capGeo: THREE.BufferGeometry;
+  capMat: THREE.MeshLambertMaterial;
   shadowGeo: THREE.PlaneGeometry;
   shadowMat: THREE.MeshBasicMaterial;
   shieldGeo: THREE.SphereGeometry;
   shieldMat: THREE.MeshBasicMaterial;
+  capacity: number;
+  caps: THREE.InstancedMesh;
+  shadows: THREE.InstancedMesh;
+  shields: THREE.InstancedMesh;
+}
+
+/** P5: the shadow is gone this far above the road, and grows by this share on the way. */
+export const SHADOW_FADE_HEIGHT = 250;
+export const SHADOW_GROW = 0.6;
+/** P5: lift off the road along its up, against z-fighting. */
+export const SHADOW_LIFT = 1.5;
+
+/**
+ * P5: how a ball's contact shadow reads at a clearance (world units between the ball's underside and
+ * the road): full at the road, fading to nothing and spreading as the ball climbs.
+ */
+export function shadowAt(clearance: number): { fade: number; scale: number } {
+  const lift = Math.max(0, Number.isFinite(clearance) ? clearance : 0);
+  const fade = Math.max(0, 1 - lift / SHADOW_FADE_HEIGHT);
+  return { fade, scale: 1 + SHADOW_GROW * (1 - fade) };
+}
+
+/**
+ * P5: the shadows are one instanced mesh, so each one's fade rides in its instance colour's red
+ * channel and becomes alpha here (the shadow itself stays black).
+ */
+function fadeShadowsByInstanceColor(material: THREE.MeshBasicMaterial): THREE.MeshBasicMaterial {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      '#include <color_fragment>\n#ifdef USE_COLOR\n\tdiffuseColor.rgb = vec3( 0.0 );\n\tdiffuseColor.a *= vColor.r;\n#endif',
+    );
+  };
+  material.customProgramCacheKey = () => 'racer-shadow-fade';
+  return material;
+}
+
+/** An instanced mesh that is drawn whatever the camera (its instances move; its bounds would not). */
+function racerBatch(geometry: THREE.BufferGeometry, material: THREE.Material, capacity: number, name: string): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+  mesh.name = name;
+  mesh.count = 0;
+  mesh.frustumCulled = false;
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  return mesh;
 }
 
 /** The subset of a rendered racer frame the first-person camera needs. */
@@ -1508,6 +1581,8 @@ interface FpBallState {
   readonly distance?: number;
   readonly grounded?: boolean;
   readonly falling?: boolean;
+  /** Lateral speed, engine units/s: drives the cockpit lean. */
+  readonly vz?: number;
 }
 
 /** Legacy fallback colours for slots 0–3; larger fields get a deterministic hue. */
@@ -1534,10 +1609,20 @@ export class Renderer3D {
   private readonly sun: THREE.DirectionalLight;
   private readonly ambient: THREE.AmbientLight;
   private readonly lavaGlow: THREE.HemisphereLight;
-  private racers3D: Racer3DMesh[] = [];
+  private racers3D: RacerSlot[] = [];
+  /** MP-T03: every painted ball's layer (WebGL2), or null to use per-texture batches. */
+  private ballPool: BallTexturePool | null = null;
   private racerResources: RacerMeshResources | null = null;
-  /** Canvas-keyed texture cache so identical loadout/rim combos share one GPU texture. */
-  private readonly racerTextures = new Map<HTMLCanvasElement, { texture: THREE.CanvasTexture; refs: number }>();
+  /** Core batches keyed by canvas (null = untextured), so identical loadout/rim combos share one draw. */
+  private readonly racerTextures = new Map<HTMLCanvasElement | null, CoreBatch>();
+  private readonly racerMatrix = new THREE.Matrix4();
+  private readonly racerScale = new THREE.Vector3(1, 1, 1);
+  private readonly racerOffset = new THREE.Vector3();
+  private readonly shadowQuat = new THREE.Quaternion();
+  private readonly shadowUp = new THREE.Vector3();
+  private readonly shadowScale = new THREE.Vector3();
+  private readonly shadowFade = new THREE.Color();
+  private readonly shieldQuat = new THREE.Quaternion();
   private storedAssets: GameAssets;
   private readonly camUp = new THREE.Vector3(0, 1, 0);
   readonly trackBuilder: TrackBuilder3D;
@@ -1556,6 +1641,8 @@ export class Renderer3D {
   private readonly firstPerson: boolean;
   /** Last frame's up, so the eye does not snap when the bank rolls through a turn. */
   private fpUp: Vec3 | null = null;
+  /** Current cockpit lean, radians (smoothed toward the lateral speed). */
+  private fpLean = 0;
   /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
   private effects: EffectRenderer | null = null;
   /**
@@ -1564,11 +1651,14 @@ export class Renderer3D {
    * per-frame call below costs one reference comparison in the steady state.
    */
   private lanePaint: LanePaint | null = null;
+  private obstacleView: ObstacleView | null = null;
   /**
    * The powerups. Built once, on the first race frame that has any: `assets.pickupSprites` were painted
    * for this and had never been drawn, so a shield could be collected from a thing nobody could see.
    */
   private pickupView: PickupView | null = null;
+  /** H6: the rope goblins hauling out-of-bounds balls back. Built on first use. */
+  private ropeReelView: RopeReelView | null = null;
   /**
    * Impact shake. Three reused vectors: the offset is applied along the camera's *own* axes after the
    * camera has been placed and aimed, so a shake can never change where the camera is looking — only
@@ -1600,7 +1690,7 @@ export class Renderer3D {
     const rise = courseY(ball.x, course) - courseY(loop.x, course);
     const placement = placementFromEngine(
       this.space,
-      { x: loop.x, y: loop.y + rise, z: ball.z },
+      { x: loop.x, y: loop.y + rise, z: ball.z, course },
       ramps,
     );
     return [placement.world.x, placement.world.y, placement.world.z];
@@ -1624,6 +1714,8 @@ export class Renderer3D {
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // MP-T03: texture arrays need WebGL2; without it the per-texture ball batches are used.
+    this.ballPool = this.renderer.capabilities.isWebGL2 ? new BallTexturePool(128) : null;
     this.renderer.setSize(canvas.clientWidth || 1440, canvas.clientHeight || 620, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1655,6 +1747,8 @@ export class Renderer3D {
     const manager = new THREE.LoadingManager();
     const textures = loadTextures(manager);
     this.materials = buildMaterials(textures);
+    // Named for the builder's scenery lists ("Cliff", "Cave rock"…) and for debugging.
+    for (const [key, material] of Object.entries(this.materials)) if (!material.name) material.name = key;
 
     this.space = getTrackSpace();
     this.track = buildTrack(this.space);
@@ -1759,10 +1853,11 @@ export class Renderer3D {
     course: GameOptions['course'],
     ramps: readonly PhysicalRampSurface[],
     dt: number,
+    reducedMotion = false,
   ) {
     const placement = placementFromEngine(
       this.space,
-      { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded },
+      { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded, course },
       ramps,
     );
     const frame = this.worldFrame(placement.frame);
@@ -1777,22 +1872,31 @@ export class Renderer3D {
       this.lastGyroFrame ?? frame,
     );
     this.lastGyroFrame = gyro;
-    const look = this.track.sampleAt(clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.track.length));
+    // Look down *your own lane*: the point ahead carries the ball's lateral offset. It used to be the
+    // road's centre line, so after a lane change the view slowly turned toward the middle of the road
+    // and stopped facing forward.
+    const aheadS = clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.space.length);
+    const look = this.space.frameAt(aheadS);
+    const lateral = lateralFromLaneZ(this.space, look.dist, ball.z);
     const fp = firstPersonFrame({
       ballCentre: [placement.world.x, placement.world.y, placement.world.z],
       gyro,
       lookPoint: [
-        look.pos.x + look.up.x * 140,
-        look.pos.y + look.up.y * 140,
-        look.pos.z + look.up.z * 140,
+        look.pos.x + look.right.x * lateral + look.up.x * 140,
+        look.pos.y + look.right.y * lateral + look.up.y * 140,
+        look.pos.z + look.right.z * lateral + look.up.z * 140,
       ],
       previousUp: this.fpUp,
       dt,
       falling: ball.falling === true,
     });
     this.fpUp = fp.up;
+    // Lean into lane changes (visual only; the smoothed up above stays unleaned so it cannot drift).
+    // Reduced motion: no lean at all (the view stays level), like the shake and the bob.
+    this.fpLean = reducedMotion ? 0 : ball.falling ? stepLean(this.fpLean, 0, dt) : stepLean(this.fpLean, leanAngleFor(ball.vz ?? 0), dt);
+    const up = leanUp(fp, this.fpLean);
     this.camera.position.set(fp.position[0], fp.position[1], fp.position[2]);
-    this.camera.up.set(fp.up[0], fp.up[1], fp.up[2]);
+    this.camera.up.set(up[0], up[1], up[2]);
     this.camera.lookAt(
       fp.position[0] + fp.forward[0],
       fp.position[1] + fp.forward[1],
@@ -1840,6 +1944,15 @@ export class Renderer3D {
       .addScaledVector(this.shakeForward, shake.forward);
   }
 
+  /** H8: the hit kick, along the camera's own axes (see cameraKick). */
+  private applyImpactKick(impact: NonNullable<SceneFrame['impact']>, time: number, reducedMotion: boolean): void {
+    const kick = cameraKick(impact.side, impact.strength, time - impact.at, reducedMotion);
+    if (kick.right === 0 && kick.up === 0) return;
+    this.shakeRight.set(1, 0, 0).applyQuaternion(this.camera.quaternion);
+    this.shakeUp.set(0, 1, 0).applyQuaternion(this.camera.quaternion);
+    this.camera.position.addScaledVector(this.shakeRight, kick.right).addScaledVector(this.shakeUp, kick.up);
+  }
+
   private updateAtmosphere(d: number) {
     const under = smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d));
     const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
@@ -1871,104 +1984,229 @@ export class Renderer3D {
 
   private ensureRacerMeshes(count: number) {
     if (!this.racerResources) {
-      const capLeftGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      const capLeftGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
       capLeftGeo.rotateZ(Math.PI / 2); // pole (+Y) → local −X
-      const capRightGeo = new THREE.SphereGeometry(RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
+      const capRightGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * CAP_RADIUS_SCALE, 20, 12, 0, TAU, 0, CAP_THETA);
       capRightGeo.rotateZ(-Math.PI / 2); // pole (+Y) → local +X
+      const capGeo = mergeGeometries([capLeftGeo, capRightGeo]) ?? capLeftGeo;
+      if (capGeo !== capLeftGeo) capLeftGeo.dispose();
+      capRightGeo.dispose();
+      // Brass, shared by every racer on the grid: one cap geometry and one cap material in total.
+      const capMat = new THREE.MeshLambertMaterial({ color: 0xc08a2e });
+      const shadowGeo = new THREE.PlaneGeometry(BALL_DRAW_RADIUS * 2.2, BALL_DRAW_RADIUS * 2.2);
+      const shadowMat = fadeShadowsByInstanceColor(new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
+      const shieldGeo = new THREE.SphereGeometry(BALL_DRAW_RADIUS * 1.35, 16, 12);
+      const shieldMat = new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true });
       this.racerResources = {
-        sphereGeo: new THREE.SphereGeometry(RADIUS, 24, 16),
-        capLeftGeo,
-        capRightGeo,
-        // Brass, shared by every racer on the grid: three geometries and one cap material in total.
-        capMat: new THREE.MeshStandardMaterial({ color: 0xc08a2e, metalness: 0.85, roughness: 0.32 }),
-        shadowGeo: new THREE.PlaneGeometry(RADIUS * 2.2, RADIUS * 2.2),
-        shadowMat: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
-        shieldGeo: new THREE.SphereGeometry(RADIUS * 1.35, 16, 12),
-        shieldMat: new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true }),
+        sphereGeo: new THREE.SphereGeometry(BALL_DRAW_RADIUS, 24, 16),
+        capGeo, capMat, shadowGeo, shadowMat, shieldGeo, shieldMat, capacity: 0,
+        caps: racerBatch(capGeo, capMat, 1, 'RacerCaps'),
+        shadows: racerBatch(shadowGeo, shadowMat, 1, 'RacerShadows'),
+        shields: racerBatch(shieldGeo, shieldMat, 1, 'RacerShields'),
       };
+      this.scene.add(this.racerResources.caps, this.racerResources.shadows, this.racerResources.shields);
     }
-    const shared = this.racerResources;
-    while (this.racers3D.length < count) this.racers3D.push(this.buildRacerMesh(this.racers3D.length, shared));
+    this.growRacerBatches(count);
+    while (this.racers3D.length < count) this.racers3D.push(this.buildRacerSlot(this.racers3D.length));
     while (this.racers3D.length > count) this.releaseRacerMesh();
   }
 
-  private buildRacerMesh(index: number, shared: RacerMeshResources): Racer3DMesh {
-    const group = new THREE.Group();
-    group.name = `Racer_${index}`;
+  /** Rebuilds every instanced mesh with room for `count` racers (capacity only ever grows). */
+  private growRacerBatches(count: number) {
+    const shared = this.racerResources!;
+    if (count <= shared.capacity) return;
+    const capacity = Math.max(8, 2 ** Math.ceil(Math.log2(count)));
+    const swap = (old: THREE.InstancedMesh, tinted: boolean): THREE.InstancedMesh => {
+      const next = racerBatch(old.geometry, old.material as THREE.Material, capacity, old.name);
+      if (tinted) next.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3).fill(1), 3);
+      this.scene.remove(old); old.dispose(); this.scene.add(next);
+      return next;
+    };
+    shared.capacity = capacity;
+    shared.caps = swap(shared.caps, false);
+    shared.shadows = swap(shared.shadows, true); // P5: the fade rides in the instance colour
+    shared.shields = swap(shared.shields, false);
+    for (const batch of this.racerTextures.values()) {
+      batch.mesh = swap(batch.mesh, batch.key === null);
+      if (batch.layers) {
+        batch.layers = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
+        batch.layers.setUsage(THREE.DynamicDrawUsage);
+        batch.mesh.geometry.setAttribute('aBallLayer', batch.layers);
+      }
+    }
+  }
 
+  /**
+   * MP-T03: the batch that draws every array-textured ball in one call, created on first use. Only
+   * on WebGL2 (`ballPool` is null otherwise, and the per-texture batches below are used).
+   */
+  private arrayBatch(): CoreBatch {
+    const existing = this.racerTextures.get(ARRAY_BATCH_KEY);
+    if (existing) { existing.refs++; return existing; }
+    const shared = this.racerResources!;
+    const material = arrayBallMaterial(this.ballPool!);
+    material.emissive = new THREE.Color(0x1a1816);
+    const geometry = shared.sphereGeo.clone();
+    const layers = new THREE.InstancedBufferAttribute(new Float32Array(shared.capacity), 1);
+    layers.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('aBallLayer', layers);
+    const mesh = racerBatch(geometry, material, shared.capacity, 'RacerCoresArray');
+    this.scene.add(mesh);
+    const batch: CoreBatch = { key: ARRAY_BATCH_KEY, material, texture: null, mesh, refs: 1, layers };
+    this.racerTextures.set(ARRAY_BATCH_KEY, batch);
+    return batch;
+  }
+
+  /** The core batch for a canvas (null = untextured), created on first use. */
+  private coreBatch(canvas: HTMLCanvasElement | null): CoreBatch {
+    const existing = this.racerTextures.get(canvas);
+    if (existing) { existing.refs++; return existing; }
+    const shared = this.racerResources!;
     let texture: THREE.CanvasTexture | null = null;
-    const canvas = this.storedAssets.raceBalls?.[index] as HTMLCanvasElement | undefined;
     if (canvas) {
-      const cached = this.racerTextures.get(canvas);
-      if (cached) { texture = cached.texture; cached.refs++; }
-      else {
-        texture = new THREE.CanvasTexture(canvas);
-        texture.colorSpace = THREE.SRGBColorSpace;
-        this.racerTextures.set(canvas, { texture, refs: 1 });
-      }
+      texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
     }
-    const material = new THREE.MeshStandardMaterial({
+    // Painted style: diffuse with subtle ambient warmth so dark sides never drop to pure black.
+    const material = new THREE.MeshLambertMaterial({
       map: texture ?? undefined,
-      color: texture ? 0xffffff : fallbackRacerColor(index),
-      roughness: 0.3, metalness: 0.2,
+      color: 0xffffff,
+      emissive: new THREE.Color(0x1a1816),
     });
-
-    // T3: core rolls, caps stay level. The two cap meshes share one material, and their geometry
-    // has the pole baked onto ±X, so the pose simply overwrites each quaternion.
-    const core = new THREE.Mesh(shared.sphereGeo, material);
-    core.castShadow = true;
-    group.add(core);
-
-    const capLeft = new THREE.Mesh(shared.capLeftGeo, shared.capMat);
-    capLeft.castShadow = true;
-    group.add(capLeft);
-
-    const capRight = new THREE.Mesh(shared.capRightGeo, shared.capMat);
-    capRight.castShadow = true;
-    group.add(capRight);
-
-    const shadow = new THREE.Mesh(shared.shadowGeo, shared.shadowMat);
-    shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = -RADIUS + 2;
-    group.add(shadow);
-
-    const shield = new THREE.Mesh(shared.shieldGeo, shared.shieldMat);
-    shield.visible = false;
-    group.add(shield);
-
-    this.scene.add(group);
-    return { group, core, capLeft, capRight, shadow, shield, canvas: canvas ?? null };
+    const mesh = racerBatch(shared.sphereGeo, material, shared.capacity, canvas ? 'RacerCores' : 'RacerCoresPlain');
+    // Untextured balls wear their slot colour per instance.
+    if (!canvas) mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(shared.capacity * 3).fill(1), 3);
+    this.scene.add(mesh);
+    const batch: CoreBatch = { key: canvas, material, texture, mesh, refs: 1 };
+    this.racerTextures.set(canvas, batch);
+    return batch;
   }
 
-  /** Removes the newest mesh from the scene and disposes its per-mesh material. */
-  private releaseRacerMesh() {
-    const mesh = this.racers3D.pop();
-    if (!mesh) return;
-    this.scene.remove(mesh.group);
-    // Shadow/shield materials are shared resources — only this mesh's own material
-    // (and its participation in the canvas texture cache) belongs to the slot.
-    (mesh.core.material as THREE.Material).dispose();
-    if (mesh.canvas) {
-      const cached = this.racerTextures.get(mesh.canvas);
-      if (cached && --cached.refs === 0) {
-        cached.texture.dispose();
-        this.racerTextures.delete(mesh.canvas);
-      }
+  private buildRacerSlot(index: number): RacerSlot {
+    const canvas = (this.storedAssets.raceBalls?.[index] as HTMLCanvasElement | undefined) ?? null;
+    const color = new THREE.Color(fallbackRacerColor(index));
+    // MP-T03: on WebGL2 a painted ball is a layer of the one texture array (one draw for all cores).
+    if (canvas && this.ballPool) {
+      const layer = this.ballPool.acquire(canvas, () => layerPixels(canvas));
+      if (layer !== null) return { canvas, core: this.arrayBatch(), color, shieldSpin: 0, layer };
     }
+    // T3: the core rolls and the caps stay level; render() poses each instance.
+    return { canvas, core: this.coreBatch(canvas), color, shieldSpin: 0, layer: null };
   }
 
-  /** Full teardown: every racer material, cached canvas texture and shared geometry. */
+  /** Drops the newest slot; its core batch (material, texture, instanced mesh) goes with its last user. */
+  private releaseRacerMesh() {
+    const slot = this.racers3D.pop();
+    if (!slot) return;
+    if (slot.layer !== null && slot.canvas) this.ballPool?.release(slot.canvas);
+    const batch = slot.core;
+    if (--batch.refs > 0) return;
+    this.scene.remove(batch.mesh);
+    if (batch.layers) batch.mesh.geometry.dispose();
+    batch.mesh.dispose();
+    batch.material.dispose();
+    batch.texture?.dispose();
+    this.racerTextures.delete(batch.key);
+  }
+
+  /** Full teardown: every core batch, cached canvas texture, shared geometry and material. */
   private disposeRacerPool() {
     while (this.racers3D.length) this.releaseRacerMesh();
-    this.racerResources?.sphereGeo.dispose();
-    this.racerResources?.capLeftGeo.dispose();
-    this.racerResources?.capRightGeo.dispose();
-    this.racerResources?.capMat.dispose();
-    this.racerResources?.shadowGeo.dispose();
-    this.racerResources?.shadowMat.dispose();
-    this.racerResources?.shieldGeo.dispose();
-    this.racerResources?.shieldMat.dispose();
+    this.ballPool?.dispose();
+    const shared = this.racerResources;
+    if (!shared) return;
+    for (const mesh of [shared.caps, shared.shadows, shared.shields]) { this.scene.remove(mesh); mesh.dispose(); }
+    shared.sphereGeo.dispose();
+    shared.capGeo.dispose();
+    shared.capMat.dispose();
+    shared.shadowGeo.dispose();
+    shared.shadowMat.dispose();
+    shared.shieldGeo.dispose();
+    shared.shieldMat.dispose();
     this.racerResources = null;
+  }
+
+  /**
+   * M7: writes every visible racer into the instanced batches (the rolling core, the level caps, the
+   * ground shadow and, while it lasts, the shield bubble) and returns the player's placement height.
+   */
+  private drawRacers(frame: SceneFrame, dt: number, firstPerson: boolean, rampSurfaces: readonly PhysicalRampSurface[], playerDist: number): number {
+    const shared = this.racerResources;
+    if (!shared) return 0;
+    for (const batch of this.racerTextures.values()) batch.mesh.count = 0;
+    shared.caps.count = shared.shadows.count = shared.shields.count = 0;
+    let playerAltitude = 0;
+    const m = this.racerMatrix; const one = this.racerScale; const position = this.racerOffset;
+    for (let i = 0; i < frame.racers.length; i++) {
+      const racer = frame.racers[i];
+      const slot = this.racers3D[i];
+      if (!slot) continue;
+
+      // Shared placement (T03): identical lateral/altitude composition that
+      // headless physics consumes — one implementation, no parallel math.
+      const placement = placementFromEngine(
+        this.space,
+        // Placement measures altitude against the course being raced (M10: passed, never global).
+        { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded, course: frame.options.course },
+        rampSurfaces,
+      );
+      position.set(placement.world.x, placement.world.y, placement.world.z);
+      // H11: a bot about to shove wobbles sideways for its tell. Presentation only; with reduced
+      // motion the tell is the spark scrape alone.
+      if (!frame.reducedMotion && (racer.ramTellUntil ?? -1) > frame.runTime) {
+        const wobble = Math.sin(frame.runTime * 40) * 8;
+        const right = placement.frame.right;
+        position.x += right.x * wobble; position.y += right.y * wobble; position.z += right.z * wobble;
+      }
+
+      // The tight chase rig needs the player's own altitude (see placeCamera).
+      if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);
+
+      const shielded = (racer.shieldUntil ?? 0) > frame.runTime;
+      if (shielded) slot.shieldSpin += dt * 4;
+      // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
+      if ((firstPerson && i === 0) || racer.hidden) continue;
+
+      // T3 (IF-GYRO): the shell rolls, the caps and the rider do not. The pose is arithmetic from
+      // the sim's own roll phase (no renderer-side integration), copied into the reused quaternions.
+      const gyro = gyroPose(racer.rollPhase ?? 0, this.worldFrame(placement.frame));
+      this.coreQuat.set(gyro.core[0], gyro.core[1], gyro.core[2], gyro.core[3]);
+      this.gyroQuat.set(gyro.gyro[0], gyro.gyro[1], gyro.gyro[2], gyro.gyro[3]);
+
+      const core = slot.core.mesh;
+      core.setMatrixAt(core.count, m.compose(position, this.coreQuat, one));
+      if (!slot.canvas) core.setColorAt(core.count, slot.color);
+      if (slot.layer !== null) slot.core.layers?.setX(core.count, slot.layer);
+      core.count++;
+      shared.caps.setMatrixAt(shared.caps.count++, m.compose(position, this.gyroQuat, one));
+      if (shielded) {
+        this.shieldQuat.setFromAxisAngle(WORLD_UP, slot.shieldSpin);
+        shared.shields.setMatrixAt(shared.shields.count++, m.compose(position, this.shieldQuat, one));
+      }
+      // P5: the contact shadow lies on the road under the ball, tilted with the road (banks and
+      // drops), fading and spreading as the ball leaves it.
+      const f = placement.frame; const lateral = placement.lateral;
+      const groundX = f.pos.x + f.right.x * lateral; const groundY = f.pos.y + f.right.y * lateral; const groundZ = f.pos.z + f.right.z * lateral;
+      const clearance = (placement.world.x - groundX) * f.up.x + (placement.world.y - groundY) * f.up.y + (placement.world.z - groundZ) * f.up.z - BALL_DRAW_RADIUS;
+      const look = shadowAt(clearance);
+      if (look.fade > 0) {
+        position.set(groundX + f.up.x * SHADOW_LIFT, groundY + f.up.y * SHADOW_LIFT, groundZ + f.up.z * SHADOW_LIFT);
+        this.shadowQuat.setFromUnitVectors(PLANE_NORMAL, this.shadowUp.set(f.up.x, f.up.y, f.up.z).normalize());
+        const n = shared.shadows.count++;
+        shared.shadows.setMatrixAt(n, m.compose(position, this.shadowQuat, this.shadowScale.setScalar(look.scale)));
+        shared.shadows.setColorAt(n, this.shadowFade.setRGB(look.fade, look.fade, look.fade));
+      }
+    }
+    const batches = [shared.caps, shared.shadows, shared.shields];
+    for (const batch of this.racerTextures.values()) batches.push(batch.mesh);
+    for (const mesh of batches) {
+      if (mesh.count === 0) continue;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      const layers = mesh.geometry.getAttribute('aBallLayer');
+      if (layers) layers.needsUpdate = true;
+    }
+    return playerAltitude;
   }
 
   render(frame: SceneFrame, intervalMs = 16.67) {
@@ -1984,49 +2222,26 @@ export class Renderer3D {
     // M01 · T1b: a push-mode run has no slingshot, so it does not draw the model either. It stood
     // exactly where the driver now looks from, and at eye level its frame filled the window. Only a
     // legacy sling run (and the builder, which owns the prop) shows it.
-    this.trackBuilder.setSlingshotsVisible(frame.options.startMode === 'sling');
+    this.trackBuilder.setSlingshotsVisible(false);
     const rampSurfaces = this.activeRampSurfaces();
-    let playerAltitude = 0;
-    for (let i = 0; i < frame.racers.length; i++) {
-      const racer = frame.racers[i];
-      const mesh = this.racers3D[i];
-      if (!mesh) continue;
-
-      // Shared placement (T03): identical lateral/altitude composition that
-      // headless physics consumes — one implementation, no parallel math.
-      const placement = placementFromEngine(
-        this.space,
-        { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded },
-        rampSurfaces,
-      );
-      mesh.group.position.set(placement.world.x, placement.world.y, placement.world.z);
-
-      // T3 (IF-GYRO): the shell rolls, the caps and the rider do not. The pose is arithmetic from
-      // the sim's own roll phase (no renderer-side integration), copied into the reused quaternions.
-      const gyro = gyroPose(racer.rollPhase ?? 0, this.worldFrame(placement.frame));
-      this.coreQuat.set(gyro.core[0], gyro.core[1], gyro.core[2], gyro.core[3]);
-      mesh.core.quaternion.copy(this.coreQuat);
-      this.gyroQuat.set(gyro.gyro[0], gyro.gyro[1], gyro.gyro[2], gyro.gyro[3]);
-      mesh.capLeft.quaternion.copy(this.gyroQuat);
-      mesh.capRight.quaternion.copy(this.gyroQuat);
-
-      // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
-      mesh.group.visible = !(firstPerson && i === 0);
-
-      // The tight chase rig needs the player's own altitude (see placeCamera).
-      if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);
-
-      // Shield effect
-      mesh.shield.visible = (racer.shieldUntil ?? 0) > frame.runTime;
-      if (mesh.shield.visible) {
-        mesh.shield.rotation.y += dt * 4;
-      }
-    }
+    const playerAltitude = this.drawRacers(frame, dt, firstPerson, rampSurfaces, playerDist);
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
     if (frame.laneNetwork !== undefined) {
       if (!this.lanePaint) this.lanePaint = new LanePaint(this.scene);
       this.lanePaint.setNetwork(frame.laneNetwork);
+    }
+
+    // C1: the race's obstacles, drawn where the physics has them (they used to be invisible).
+    if (!this.obstacleView) this.obstacleView = new ObstacleView(this.scene, this.storedAssets, this.space);
+    this.obstacleView.update(frame.obstacles);
+
+    // H6: the rope goblins, for any ball being hauled back from out of bounds.
+    if (frame.racers.some((racer) => racer.reelBack)) {
+      if (!this.ropeReelView) this.ropeReelView = new RopeReelView(this.scene, this.space);
+      this.ropeReelView.update(frame.racers, frame.options.course, frame.time, frame.reducedMotion);
+    } else {
+      this.ropeReelView?.update([], frame.options.course, frame.time, frame.reducedMotion);
     }
 
     // The powerups, at the position the collection solve tests against. Only one view is ever built:
@@ -2035,16 +2250,20 @@ export class Renderer3D {
       if (!this.pickupView) {
         this.pickupView = new PickupView(this.scene, this.storedAssets.pickupSprites ?? {}, this.space);
       }
-      this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces());
+      this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces(), frame.options.course);
     } else {
       this.pickupView?.hideAll();
     }
 
     if (!this.trackBuilder.freeFly.active) {
-      if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt);
+      if (firstPerson) this.placeFirstPersonCamera(frame.ball, frame.loopRide, frame.options.course, rampSurfaces, dt, frame.reducedMotion);
       else this.placeCamera(playerDist, dt, frame.options.cameraMode, playerAltitude);
       this.applyImpactShake(frame.shake, frame.time, frame.reducedMotion);
+      if (frame.impact) this.applyImpactKick(frame.impact, frame.time, frame.reducedMotion);
       this.updateAtmosphere(playerDist);
+    } else {
+      // The builder: the underground is as dark as in a race around the camera (so placed lights read true), unless turned off.
+      this.updateAtmosphere(this.trackBuilder.previewAtmosphere ? this.trackBuilder.cameraTrackDistance() : 0);
     }
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;
@@ -2063,7 +2282,7 @@ export class Renderer3D {
     if (frame.effects) {
       if (!this.effects) this.effects = new EffectRenderer(this.scene);
       this.effects.update({
-        queue: frame.effects, space: this.space, ramps: rampSurfaces, time: raw, dt: Math.min(0.1, dt),
+        queue: frame.effects, space: this.space, ramps: rampSurfaces, course: frame.options.course, time: raw, dt: Math.min(0.1, dt),
       }, this.camera, frame.reducedMotion);
     }
 
@@ -2078,8 +2297,12 @@ export class Renderer3D {
     this.effects = null;
     this.lanePaint?.dispose();
     this.lanePaint = null;
+    this.obstacleView?.dispose();
+    this.obstacleView = null;
     this.pickupView?.dispose();
     this.pickupView = null;
+    this.ropeReelView?.dispose();
+    this.ropeReelView = null;
     this.trackBuilder.destroy();
     this.renderer.dispose();
   }

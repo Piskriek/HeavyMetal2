@@ -71,3 +71,27 @@ export function cameraShake(amount: number, time: number, reducedMotion: boolean
   const scale = travel / magnitude;
   return { right: right * scale, up: up * scale, forward: forward * scale };
 }
+
+/**
+ * H8 — the hit kick. On top of the shake, a hit knocks the camera *away from the side it came from*
+ * and lets it settle, in `KICK_SECONDS`. `side` is +1 for a hit from the camera's right (the rival
+ * at higher z), −1 from the left and 0 straight on (an obstacle), which only dips the view. With
+ * reduced motion the kick is cut to a tenth, a nudge you can feel but not a lurch.
+ */
+export const KICK_MAX_OFFSET = 18;
+export const KICK_SECONDS = 0.18;
+export const KICK_REDUCED_SHARE = 0.1;
+
+/** 1 at the moment of the hit, easing to 0 at `KICK_SECONDS`; 0 before and after. */
+export function impactEnvelope(since: number): number {
+  if (!(since >= 0) || since >= KICK_SECONDS) return 0;
+  const left = 1 - since / KICK_SECONDS;
+  return left * left;
+}
+
+export function cameraKick(side: -1 | 0 | 1, strength: number, since: number, reducedMotion: boolean): ShakeOffset {
+  const amount = impactEnvelope(since) * clamp(Number.isFinite(strength) ? strength : 0, 0, 1);
+  if (amount <= 0) return STILL;
+  const travel = amount * KICK_MAX_OFFSET * (reducedMotion ? KICK_REDUCED_SHARE : 1);
+  return { right: side === 0 ? 0 : -side * travel, up: -0.35 * travel, forward: 0 };
+}

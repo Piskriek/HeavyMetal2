@@ -113,19 +113,19 @@ test('the yoke angle is the physics\' own steer, so the hands cannot drift from 
     assert.ok(Math.abs(state.steer) <= 1, 'and it is −1..1 whatever the handling');
   }
 
-  // The sign law, stated as the module states it: `steer = −vz / (VZ_MAX · handling)`, clamped — so
-  // positive steer (clockwise, toward lane 3) comes from *negative* lateral velocity, and the two
-  // sides of the road are opposite lock rather than the same one.
+  // The sign law: `steer = vz / (VZ_MAX · handling)`, clamped. steerLeft (A) drives the ball at
+  // negative vz (screen-left in both cameras), so it must turn the yoke anticlockwise (negative).
+  // The old law had this backwards: in the cockpit the hands turned right when you steered left.
   fillCockpitState(state, telemetry(), steerFrom(-VZ_MAX, 1));
-  assert.equal(state.steer, 1, 'full lock one way');
+  assert.equal(state.steer, -1, 'steering left is full left lock');
   fillCockpitState(state, telemetry(), steerFrom(VZ_MAX, 1));
-  assert.equal(state.steer, -1, 'and full lock the other');
+  assert.equal(state.steer, 1, 'and steering right is full right lock');
   fillCockpitState(state, telemetry(), steerFrom(0, 1));
   assert.equal(state.steer, 0, 'straight ahead is centred');
 
   // Handling changes how much lateral speed means full lock, never the sign or the range.
   for (const handling of [0.5, 1, 2]) {
-    const lock = steerFrom(-VZ_MAX * handling, handling);
+    const lock = steerFrom(VZ_MAX * handling, handling);
     assert.ok(Math.abs(lock - 1) < 1e-9, `full lock at handling ${handling}`);
   }
   assert.equal(steerFrom(100, 0), 0, 'and a nonsense handling is a centred yoke, not a NaN one');
@@ -133,8 +133,8 @@ test('the yoke angle is the physics\' own steer, so the hands cannot drift from 
 
 test('the wiring: the engine hands the live snapshot to the mapping, every frame', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(engine, /fillCockpitState\(state, this\.snapshot, steerFrom\(player\.vz, player\.handling\)\)/,
-    'the engine fills the channel from the snapshot it just stepped');
+  assert.match(engine, /fillCockpitState\(state, this\.snapshot, yokeSteer\(this\.steerPress, this\.steerPressAt, this\.time\),\s*\{ amount: impactEnvelope\(this\.time - this\.impact\.at\) \* this\.impact\.strength, side: this\.impact\.side, boostAge: this\.runTime - this\.player\.lastBoostAt \}\)/,
+    'the engine fills the channel from the snapshot it just stepped, the yoke from the player\'s own press, and (H8) the last hit');
   // No assignment may slip back into the engine: the mapping has exactly one home.
   const assignments = engine.match(/state\.[a-zA-Z]+ = /g) ?? [];
   assert.deepEqual(assignments, [], `the engine assigns no gauge field itself (found ${assignments.join(', ')})`);

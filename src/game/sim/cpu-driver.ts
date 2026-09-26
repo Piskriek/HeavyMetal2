@@ -11,6 +11,7 @@
  * `id * 0.023 s`; a large qualifying field uses a bounded stagger so decisions never queue behind
  * the racer's index.
  */
+import { dsin } from './det-math';
 import { LANE_COUNT, closestLane, laneZ, occupiesLane, weightImpulse, type Obstacle } from '../scene';
 import { adjacentPath, resolveLaneTarget, sampleLane, type LaneNetwork } from '../lane-network';
 import type { AirPickup } from '../powerups';
@@ -24,7 +25,7 @@ const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
 /** The engine's deterministic per-racer noise: stable for a given racer and moment. */
 export const randomAt = (id: number, time: number) => {
-  const value = Math.sin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73;
+  const value = dsin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73;
   return value - Math.floor(value);
 };
 
@@ -32,6 +33,12 @@ export interface CpuContext {
   /** Shared simulation context (world, effects, clocks). */
   readonly step: RacerStepContext;
   readonly difficulty: Difficulty;
+  /**
+   * H11: how a bot decides to shove a rival. `'rope'` (the default) weighs mass, shields and hazards
+   * and gives a wobble tell before the lane slam; `'legacy'` is the old coin flip, kept for the
+   * frozen parity recordings.
+   */
+  readonly tactics?: 'legacy' | 'rope';
   /** Racers the driver may react to. An isolated attempt passes an empty list. */
   readonly others: readonly Racer[];
   /**
@@ -54,6 +61,39 @@ export function laneCommitInterval(difficulty: Difficulty): number {
 export function boostHoldOff(difficulty: Difficulty): number {
   return difficulty === 'rookie' ? 5.5 : difficulty === 'veteran' ? 2.8 : 3.4;
 }
+
+/** H11: how long a bot wobbles before it slams into a rival's lane. */
+export function ramTell(difficulty: Difficulty): number {
+  return difficulty === 'rookie' ? 0.5 : 0.3;
+}
+
+/** H11: the mass edge a bot wants before it shoves (rookies only pick on much lighter balls). */
+export function ramMassEdge(difficulty: Difficulty): number {
+  return difficulty === 'rookie' ? 1.25 : difficulty === 'veteran' ? 1 : 1.05;
+}
+
+/** H11: a rival counts as in reach from this far behind to this far ahead (engine x units). */
+export const RAM_REACH_BEHIND = 80;
+export const RAM_REACH_AHEAD = 160;
+
+/**
+ * H11: what shoving `other` is worth to `racer`, as a lane score. Positive means go for it, negative
+ * means keep out of that lane. A shielded or still-immune rival is never worth it, a rival without
+ * the mass edge is avoided, and a veteran (less so a pro) goes for a rival with a gap just ahead of
+ * it, where a knock costs the most. Deterministic: no noise at all.
+ */
+export function ramWorth(racer: Racer, other: Racer, ctx: CpuContext): number {
+  const runTime = ctx.step.runTime;
+  if (other.shieldUntil > runTime || other.immuneUntil > runTime) return -3.5;
+  if (!(racer.weight >= other.weight * ramMassEdge(ctx.difficulty))) return -2.8;
+  let worth = 3.2 + Math.min(1.2, (racer.weight / other.weight - 1) * 3);
+  const hazardAhead = ctx.step.world.inGap(other.x + Math.max(0, other.vx) * 0.6, other.z);
+  if (hazardAhead) worth += ctx.difficulty === 'veteran' ? 1.6 : ctx.difficulty === 'rookie' ? 0 : 0.8;
+  return worth;
+}
+
+const inReach = (racer: Racer, other: Racer, z: number) =>
+  other.x - racer.x > -RAM_REACH_BEHIND && other.x - racer.x < RAM_REACH_AHEAD && Math.abs(other.z - z) < 90;
 
 /** Requests a lane change; a lane only changes when the request is actually different. */
 export function setLane(racer: Racer, lane: number, runTime: number): void {
@@ -115,6 +155,38 @@ export function setCandidate(racer: Racer, candidate: LaneCandidate, runTime: nu
   if (changed) racer.lastLaneChange = runTime;
 }
 
+/**
+ * H11: commit a lane, telegraphing a shove. A lane change *into a rival in reach* is not taken at
+ * once: the bot first wobbles for `ramTell` seconds (`ramTellUntil`, drawn by the renderer) and only
+ * then slams across, if the rival is still there and still worth it. Every other lane change
+ * commits as before.
+ */
+function steerWithTell(racer: Racer, best: LaneCandidate, ram: Racer | null, ctx: CpuContext): void {
+  const runTime = ctx.step.runTime;
+  if (racer.ramTargetId !== null) {
+    if (runTime < racer.ramTellUntil) return; // still wobbling: hold the lane
+    const target = ctx.others.find((other) => other.id === racer.ramTargetId);
+    const z = racer.ramPathId && ctx.step.laneNetwork
+      ? sampleLane(ctx.step.laneNetwork, racer.ramPathId, racer.x)?.z ?? laneZ(racer.ramLane)
+      : laneZ(racer.ramLane);
+    const lane = racer.ramLane; const pathId = racer.ramPathId;
+    racer.ramTargetId = null; racer.ramPathId = null;
+    if (target && !target.finished && !target.falling && inReach(racer, target, z) && ramWorth(racer, target, ctx) > 0) {
+      setCandidate(racer, { lane, z, pathId, current: false }, runTime);
+    }
+    return;
+  }
+  if (runTime - racer.lastLaneChange <= laneCommitInterval(ctx.difficulty)) return;
+  if (ram && !best.current) {
+    racer.ramTargetId = ram.id; racer.ramTellUntil = runTime + ramTell(ctx.difficulty);
+    racer.ramLane = best.lane; racer.ramPathId = best.pathId;
+    // The tell is also heard and seen at the rims: a scrape of sparks as the bot winds up.
+    ctx.step.fx.effect('sparks', racer.x, racer.y, racer.z, 0.35, racer.id);
+    return;
+  }
+  setCandidate(racer, best, runTime);
+}
+
 export function driveCpu(racer: Racer, ctx: CpuContext): void {
   const world = ctx.step.world;
   const runTime = ctx.step.runTime;
@@ -124,7 +196,8 @@ export function driveCpu(racer: Racer, ctx: CpuContext): void {
   if (racer.falling || racer.loopRide || racer.finished || runTime < racer.steerLockedUntil) return;
   const lookAhead = clamp(racer.vx * (difficulty === 'rookie' ? 0.54 : difficulty === 'veteran' ? 0.92 : 0.75), 360, 1350);
   const candidates = laneCandidates(racer, ctx.step.laneNetwork ?? null);
-  let bestCandidate = candidates[0]; let bestScore = -Infinity;
+  const legacyTactics = ctx.tactics === 'legacy';
+  let bestCandidate = candidates[0]; let bestScore = -Infinity; let bestRam: Racer | null = null;
   const seen = new Set<Obstacle>();
   const supplies = new Set<AirPickup>();
   for (const obstacle of world.obstaclesInSpan(racer.x, racer.x + lookAhead)) seen.add(obstacle);
@@ -147,15 +220,27 @@ export function driveCpu(racer: Racer, ctx: CpuContext): void {
       const needed = pickup.kind === 'shield' ? racer.shieldUntil <= runTime : pickup.kind === 'fuel' ? racer.boosts < 2 : racer.bounces < 3;
       score += (needed ? 4.8 : 0.8) * (1 - distance / lookAhead) * (world.y(pickup.x) - pickup.y > 160 ? 0.35 : 1);
     }
+    let ram: Racer | null = null; let ramBest = 0;
     for (const other of ctx.others) {
       if (other.id === racer.id || other.finished || other.falling) continue;
-      if (Math.abs(other.x - racer.x) < 125 && Math.abs(other.z - candidate.z) < 90) {
-        score += racer.weight > other.weight * 1.05 && randomAt(racer.id, runTime) > 0.43 ? 3.8 : -2.8;
+      if (legacyTactics) {
+        if (Math.abs(other.x - racer.x) < 125 && Math.abs(other.z - candidate.z) < 90) {
+          score += racer.weight > other.weight * 1.05 && randomAt(racer.id, runTime) > 0.43 ? 3.8 : -2.8;
+        }
+        continue;
       }
+      if (!inReach(racer, other, candidate.z)) continue;
+      const worth = ramWorth(racer, other, ctx);
+      score += worth;
+      if (worth > ramBest) { ramBest = worth; ram = other; }
     }
-    if (score > bestScore) { bestScore = score; bestCandidate = candidate; }
+    if (score > bestScore) { bestScore = score; bestCandidate = candidate; bestRam = ram; }
   }
-  if (runTime - racer.lastLaneChange > laneCommitInterval(difficulty)) setCandidate(racer, bestCandidate, runTime);
+  if (legacyTactics) {
+    if (runTime - racer.lastLaneChange > laneCommitInterval(difficulty)) setCandidate(racer, bestCandidate, runTime);
+  } else {
+    steerWithTell(racer, bestCandidate, bestRam, ctx);
+  }
   const soon = racer.x + racer.vx * 0.22;
   const targetZ = resolveLaneTarget(racer, ctx.step.laneNetwork ?? null).targetZ;
   if (canHop(racer, runTime) && (world.inGap(soon, racer.z) || world.inGap(soon, targetZ))) performHop(racer, ctx.step);

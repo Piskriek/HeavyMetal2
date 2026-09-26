@@ -2,7 +2,7 @@ import { copyFileSync } from 'node:fs';
 import { decodePng, encodePng } from './edge-magenta-lib.mjs';
 
 const bezelFile = 'public/art/cockpit/cockpit-bezel.png';
-const backupFile = 'public/art/cockpit/cockpit-bezel.backup.png';
+const backupFile = 'art-src/cockpit/cockpit-bezel.pre-aperture-expand.png';
 
 try {
   copyFileSync(bezelFile, backupFile);

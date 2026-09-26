@@ -14,24 +14,30 @@
  * regenerate it deliberately, never edit it casually.
  */
 
+// MP-T14: the frozen copy uses the sim's deterministic maths too, so parity stays bit-exact.
+import { datan2, dcos, dexp, dhypot, dpow, dsin } from '../../src/game/sim/det-math';
 import { createRacers, raceOrder, type Racer } from '../../src/game/racers';
 import {
   AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
   RADIUS, STADIUM_START, START_X, START_Y, TRACK_DISTANCE, closestLane, courseY, courseSlope,
   laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, weightImpulse,
-  type AirSheep, type Obstacle, type Particle, type RacerFrame,
+  type Obstacle, type RacerFrame,
 } from '../../src/game/scene';
 import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from '../../src/game/types';
 import type { RaceConfig } from '../../src/game/session';
 import { createTrackLayout } from '../../src/game/track-layout';
 import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from '../../src/game/powerups';
 
+// The live engine dropped these never-drawn 2D effects (M6); the frozen legacy copy still records them.
+interface Particle { x: number; y: number; z: number; vx: number; vy: number; life: number; maxLife: number; size: number; color: string }
+interface AirSheep { x: number; y: number; z: number; vx: number; vy: number; rotation: number; life: number }
+
 const TAU = Math.PI * 2;
 const STEP = 1 / 120;
 const BUCKET = 512;
 const EMPTY: Obstacle[] = [];
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
-const randomAt = (id: number, time: number) => { const value = Math.sin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73; return value - Math.floor(value); };
+const randomAt = (id: number, time: number) => { const value = dsin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73; return value - Math.floor(value); };
 
 // --- browser replacements ---------------------------------------------------
 // The fixture imports in a plain Node process, so the objects the engine talked to are replaced by
@@ -230,7 +236,7 @@ export class LegacyEngineSim {
         const slope = this.surfaceAt(player.x, player.z).slope;
         player.vx = speed / Math.sqrt(1 + slope * slope); player.vy = player.vx * slope;
       } else {
-        const ratio = speed / Math.max(1, Math.hypot(player.vx, player.vy));
+        const ratio = speed / Math.max(1, dhypot(player.vx, player.vy));
         player.vx *= ratio; player.vy *= ratio;
       }
       if (this.status === 'flying') this.snapshot.speed = options.launchSpeed;
@@ -296,8 +302,8 @@ export class LegacyEngineSim {
       const velocity = launchVelocity(this.snapshot.power, racer.launchSpeed);
       const angle = clamp(this.snapshot.angle + (racer.id ? (racer.id - 2) * 1.2 : 0), 12, 68) * Math.PI / 180;
       racer.launchOrigin = { x: racer.x, y: racer.y };
-      racer.vx = Math.cos(angle) * velocity * racer.pace;
-      racer.vy = -Math.sin(angle) * velocity * racer.pace;
+      racer.vx = dcos(angle) * velocity * racer.pace;
+      racer.vy = -dsin(angle) * velocity * racer.pace;
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
       this.emit(racer.x, racer.y, racer.z, 7, racer.color, 100);
     }
@@ -327,8 +333,8 @@ export class LegacyEngineSim {
     this.snapshot.power = clamp(this.snapshot.power + powerDelta, 0.18, 1);
     this.snapshot.angle = clamp(this.snapshot.angle + angleDelta, 12, 68);
     const angle = this.snapshot.angle * Math.PI / 180;
-    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
-    this.player.y = AIM_ANCHOR.y + Math.sin(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
+    this.player.x = AIM_ANCHOR.x - dcos(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
+    this.player.y = AIM_ANCHOR.y + dsin(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
     this.notify();
   };
 
@@ -407,7 +413,7 @@ export class LegacyEngineSim {
   surfaceAt(x: number, z: number) {
     let y = this.y(x); let slope = this.slope(x); let ramp: Obstacle | null = null;
     for (const o of this.nearby(x)) if (o.kind === 'ramp' && x >= o.x && x <= o.x + o.width && occupiesLane(o, z, 5)) {
-      y = rampSurface(o, x, this.options.course); slope -= 1.6 * o.height / o.width * Math.pow((x - o.x) / o.width, 0.6); ramp = o;
+      y = rampSurface(o, x, this.options.course); slope -= 1.6 * o.height / o.width * dpow((x - o.x) / o.width, 0.6); ramp = o;
     }
     return { y, slope, ramp };
   }
@@ -513,13 +519,13 @@ export class LegacyEngineSim {
       if (ride.entryProgress < 1) {
         ride.entryProgress = Math.min(1, ride.entryProgress + dt * 7);
         const t = ride.entryProgress; const ease = t * t * (3 - 2 * t);
-        const x = loop.x + Math.sin(ride.entryAngle) * loop.ballRadius;
-        const y = loop.y + Math.cos(ride.entryAngle) * loop.ballRadius + this.y(x) - this.y(loop.x);
+        const x = loop.x + dsin(ride.entryAngle) * loop.ballRadius;
+        const y = loop.y + dcos(ride.entryAngle) * loop.ballRadius + this.y(x) - this.y(loop.x);
         racer.x = ride.entry.x + (x - ride.entry.x) * ease; racer.y = ride.entry.y + (y - ride.entry.y) * ease;
       } else {
         ride.angle += Math.min(ride.speed, 760) / loop.ballRadius * dt;
-        racer.x = loop.x + Math.sin(ride.angle) * loop.ballRadius;
-        racer.y = loop.y + Math.cos(ride.angle) * loop.ballRadius + this.y(racer.x) - this.y(loop.x);
+        racer.x = loop.x + dsin(ride.angle) * loop.ballRadius;
+        racer.y = loop.y + dcos(ride.angle) * loop.ballRadius + this.y(racer.x) - this.y(loop.x);
       }
       racer.rotation += Math.min(ride.speed, 760) / RADIUS * dt;
       if (ride.angle >= ride.exitAngle) {
@@ -548,7 +554,7 @@ export class LegacyEngineSim {
         }
       } else {
         racer.grounded = false;
-        racer.vx *= Math.exp(-0.009 * dragFactor * dt);
+        racer.vx *= dexp(-0.009 * dragFactor * dt);
         racer.vy += stageGravity * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
       }
       for (const obstacle of this.nearby(racer.x)) {
@@ -557,8 +563,8 @@ export class LegacyEngineSim {
         if (obstacle.kind === 'loop') {
           const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
           const dy = racer.y - (this.y(racer.x) - this.y(loop.x)) - loop.y;
-          if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
-            const angle = (Math.atan2(dx, dy) + TAU) % TAU;
+          if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(dhypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
+            const angle = (datan2(dx, dy) + TAU) % TAU;
             racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
             racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
               speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
@@ -638,9 +644,9 @@ export class LegacyEngineSim {
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
       const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
       const diameter = RADIUS * 2 + 4;
-      const distance = Math.hypot(dx, dz, dy);
+      const distance = dhypot(dx, dz, dy);
       if (distance >= diameter || Math.abs(dy) > RADIUS * 1.55) continue;
-      const planar = Math.hypot(dx, dz) || 1;
+      const planar = dhypot(dx, dz) || 1;
       const nx = dx / planar; const nz = dz / planar;
       const sum = a.weight + b.weight;
       const penetration = (diameter - distance + 1) * 0.55;
@@ -884,7 +890,7 @@ export class LegacyEngineSim {
   refreshSnapshot() {
     const player = this.player;
     this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / TRACK_DISTANCE;
-    this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : Math.hypot(player.vx, player.vy)) * 0.16);
+    this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : dhypot(player.vx, player.vy)) * 0.16);
     this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling;
     this.snapshot.grounded = player.grounded; this.snapshot.hopReady = this.canHop(player);
     this.snapshot.bounces = player.bounces; this.snapshot.boosts = player.boosts;
@@ -940,7 +946,7 @@ export class LegacyEngineSim {
     if (this.renderer.lowDetail) count = Math.ceil(count * 0.65);
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * TAU; const v = speed * (0.2 + Math.random() * 0.8); const life = 0.35 + Math.random() * 0.6;
-      this.particles.push({ x, y, z, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 50, life, maxLife: life, size: 2 + Math.random() * 4, color });
+      this.particles.push({ x, y, z, vx: dcos(angle) * v, vy: dsin(angle) * v - 50, life, maxLife: life, size: 2 + Math.random() * 4, color });
     }
     if (this.particles.length > 160) this.particles.splice(0, this.particles.length - 160);
   }

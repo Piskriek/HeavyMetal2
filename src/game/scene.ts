@@ -4,6 +4,13 @@ import type { AirPickup } from './powerups';
 
 export const HEIGHT = 620;
 export const RADIUS = 31;
+/**
+ * The ball as drawn and as it touches other balls: twice the physics radius. The road, gap, loop and
+ * track-space maths keep `RADIUS` (their tests and the parity fixture are built on it). The renderer
+ * already places a grounded ball's centre 2·RADIUS above the road (the legacy +RADIUS lift), so a
+ * ball drawn at this radius sits exactly on the road instead of floating one radius above it.
+ */
+export const BALL_DRAW_RADIUS = RADIUS * 2;
 export const GROUND = 478;
 export const START_X = 190;
 /* -----------------------------------------------------------------------------
@@ -73,7 +80,7 @@ export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) {
   const last = Math.min(3, first + (obstacle.laneSpan ?? 1) - 1);
   return { near: laneZ(last) - LANE_WIDTH / 2, far: laneZ(first) + LANE_WIDTH / 2 };
 }
-export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0.7) {
+export function occupiesLane(obstacle: Obstacle, z: number, padding = BALL_DRAW_RADIUS * 0.7) {
   if (
     obstacle.kind === 'gap' ||
     obstacle.kind === 'sign' ||
@@ -215,28 +222,6 @@ import type { EffectEvent } from './effects/events';
 // Type-only, so the runtime cycle `lane-network → scene` stays a one-way street: erased at build time.
 import type { LaneNetwork } from './lane-network';
 
-export interface Particle {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  size: number;
-  color: string;
-}
-
-export interface AirSheep {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  rotation: number;
-  life: number;
-}
-
 export interface LoopRide {
   obstacle: Obstacle;
   angle: number;
@@ -271,6 +256,14 @@ export interface RacerFrame {
   launchOrigin: { x: number; y: number };
   /** M01 · T3: the shell's roll phase, in radians. Presentation only — never in the fingerprint. */
   rollPhase?: number;
+  /** Lateral speed (engine units/s), for the cockpit lean. */
+  vz?: number;
+  /** Not in the race yet (a rival waiting for the player's solo first split): draw nothing. */
+  hidden?: boolean;
+  /** H11: a bot's shove tell ends at this race time; until then the renderer wobbles the ball. */
+  ramTellUntil?: number;
+  /** H6: being hauled back by the rope goblins: where it goes back to, and how far along (0..1). */
+  reelBack?: { toX: number; toY: number; toZ: number; t: number } | null;
 }
 
 export interface SceneFrame {
@@ -280,6 +273,8 @@ export interface SceneFrame {
   cameraY: number;
   drift: number;
   shake: number;
+  /** H8: the player's last hit: when (frame `time`), from which side, how hard (0..1). */
+  impact?: { readonly at: number; readonly side: -1 | 0 | 1; readonly strength: number };
   rotation: number;
   dragging: boolean;
   launchOrigin: { x: number; y: number };
@@ -288,9 +283,6 @@ export interface SceneFrame {
   loopRide: LoopRide | null;
   obstacles: Obstacle[];
   pickups: AirPickup[];
-  particles: Particle[];
-  sheep: AirSheep[];
-  trail: { x: number; y: number; z: number }[];
   snapshot: GameSnapshot;
   options: GameOptions;
   reducedMotion: boolean;

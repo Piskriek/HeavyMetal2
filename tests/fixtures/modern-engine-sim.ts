@@ -71,6 +71,8 @@ export function attachModernSim(host: LegacyEngineSim): ModernSimHost {
   };
   const cpuCtx: CpuContext = {
     step: ctx,
+    // H11: the frozen legacy driver still flips its coin; the parity run compares like with like.
+    tactics: 'legacy',
     get difficulty() { return host.config?.difficulty ?? 'racer'; },
     get others() { return host.racers; },
     get paceTargetX() { return host.racers[0].x; },

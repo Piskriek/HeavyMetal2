@@ -29,6 +29,7 @@ import { legacyParticipants, syntheticField } from '../src/game/qualifying/field
 import type { CourseId } from '../src/game/types';
 import type { OBB, SweptSphere } from '../src/game/physics/wall-ccd';
 import type { PlacedProp } from '../src/game/track-builder-3d';
+import { corridorAt, createDefaultLaneNetwork, resolveLaneTarget, sampleLane } from '../src/game/lane-network';
 
 /** Helper to build a valid RaceConfigV1 for qualifying heats */
 function heatConfig(size: number, seed: number, course: CourseId = 'ridge') {
@@ -659,4 +660,32 @@ test('T12: Rolling state and resistance integration', () => {
   assert.ok(rollingState.rollingPhase > 0);
   
   console.log(`Rolling state: phase=${rollingState.rollingPhase.toFixed(2)}`);
+});
+
+test('H2b: Lane lookups - 100 racers x 1000 ticks on the baked lane tables', () => {
+  // Before the bake (binary search per sample, a result object per path in corridorAt) this loop took
+  // ~163 ms on the dev machine; with the baked tables ~114 ms. The budget is loose: it guards against
+  // a return to per-sample searches over hundreds of nodes, not against a noisy machine.
+  const network = createDefaultLaneNetwork('ridge');
+  const xs = network.nodes.map((n) => n.x);
+  const minX = Math.min(...xs); const span = Math.max(...xs) - minX;
+  const racers = Array.from({ length: 100 }, (_, i) => ({
+    targetLane: i % 4, pathId: network.paths[i % network.paths.length].id, x: minX + span * (i / 100),
+  }));
+  const run = (ticks: number) => {
+    let sum = 0;
+    for (let t = 0; t < ticks; t++) for (const racer of racers) {
+      racer.x = minX + ((racer.x - minX + 7.3) % span);
+      const target = resolveLaneTarget(racer, network); sum += target.targetZ + target.zMin;
+      sum += sampleLane(network, racer.pathId, racer.x + 40)?.z ?? 0;
+      sum += corridorAt(network, racer.x + 80)?.zMax ?? 0;
+    }
+    return sum;
+  };
+  run(200);
+  const start = performance.now();
+  assert.ok(Number.isFinite(run(1000)));
+  const elapsed = performance.now() - start;
+  console.log(`Lane lookups: 1000 ticks x 100 racers in ${elapsed.toFixed(1)} ms (${(elapsed / 1000).toFixed(3)} ms/tick)`);
+  assert.ok(elapsed < 1500, `lane lookups took ${elapsed.toFixed(0)} ms`);
 });

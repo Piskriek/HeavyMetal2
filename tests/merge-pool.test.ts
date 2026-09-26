@@ -390,3 +390,34 @@ test('the window waits for the player to set their split', () => {
   assert.equal(late.ok, true);
   if (late.ok) assert.ok(late.value.flags.includes('late'), 'past the deadline the flag is earned');
 });
+
+// P7: the pool's waiting riders are drawn queued up the hill, one row per ball, per lane.
+test('P7: queue rows: the next four line up in the loop lane, the rest in their own lanes, in order', async () => {
+  const { queueRows, MERGE_LINEUP } = await import('../src/game/merge/pool');
+  const { laneZ } = await import('../src/game/scene');
+  const entries = Array.from({ length: 100 }, (_, i) => ({ racerId: i, slotZ: laneZ(i % 4), releaseTick: null as number | null }));
+  const rows = queueRows(entries);
+  assert.equal(rows.size, 100);
+  for (let i = 0; i < MERGE_LINEUP; i++) assert.equal(rows.get(i), i, 'the lineup queues in the loop lane');
+  // After the lineup, 96 riders over four lanes: 24 rows each, in release order.
+  assert.equal(rows.get(4), 0); assert.equal(rows.get(8), 1);
+  assert.equal(Math.max(...rows.values()), 23);
+  const perLane = new Map<number, number[]>();
+  for (const entry of entries.slice(MERGE_LINEUP)) perLane.set(entry.slotZ, [...(perLane.get(entry.slotZ) ?? []), rows.get(entry.racerId)!]);
+  for (const list of perLane.values()) assert.deepEqual(list, list.map((_, i) => i), 'one ball per row, no two on a spot');
+  // Releasing the front rider moves everyone behind up a row.
+  entries[0].releaseTick = 10;
+  const after = queueRows(entries);
+  assert.equal(after.has(0), false, 'a released rider is not queued');
+  assert.equal(after.get(1), 0);
+  assert.equal(after.get(4), 3, 'the next rider joins the lineup');
+});
+
+test('P7: the queue is drawn, not simulated: the offset only touches the rendered racer', async () => {
+  const { readFileSync } = await import('node:fs');
+  const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
+  assert.match(engine, /const target = racer\.mergeHeld \? \(this\.queueRow\.get\(racer\.id\) \?\? 0\) \* this\.queueSpacingX : 0;/);
+  assert.match(engine, /rendered\.x -= offset;/);
+  assert.doesNotMatch(engine, /racer\.x -= offset/);
+  assert.match(engine, /offset = this\.reducedMotion \? target :/, 'snaps under reduced motion');
+});

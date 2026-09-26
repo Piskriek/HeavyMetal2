@@ -69,6 +69,16 @@ export interface CockpitState {
   countdownLabel: string | null;
   /** True while the starter goblin is shoving the grid. */
   pushing: boolean;
+  /** H8: how hard the last hit is still being felt, 0..1 (decays over KICK_SECONDS). */
+  impact: number;
+  /** H8: which side it came from: +1 right, −1 left, 0 straight on. */
+  impactSide: -1 | 0 | 1;
+  /** P3: seconds since the player last boosted (a large number when never). */
+  boostAge: number;
+  /** H9: the gap chip: place and seconds to the rider ahead (place 0 = nobody ahead). */
+  gapPlace: number;
+  gapSeconds: number;
+  gapTrend: 'closing' | 'steady' | 'falling';
 }
 
 /**
@@ -89,6 +99,8 @@ export interface CockpitTelemetry {
   position: number;
   raceTime: number;
   merge?: { countdownLabel?: string | null } | null;
+  /** H9: the rider ahead (see GameSnapshot.gapAhead). */
+  gapAhead?: { place: number; seconds: number; trend: 'closing' | 'steady' | 'falling' } | null;
 }
 
 /**
@@ -106,8 +118,13 @@ export function fillCockpitState(
   state: CockpitState,
   telemetry: CockpitTelemetry,
   steer: number,
+  /** H8: the last hit as it is still felt (0..1) and its side; absent means none. P3: the boost's age. */
+  impact?: { readonly amount: number; readonly side: -1 | 0 | 1; readonly boostAge?: number },
 ): CockpitState {
   state.steer = steer;
+  state.boostAge = impact?.boostAge !== undefined && Number.isFinite(impact.boostAge) ? impact.boostAge : 1e9;
+  state.impact = impact && Number.isFinite(impact.amount) ? Math.max(0, Math.min(1, impact.amount)) : 0;
+  state.impactSide = impact?.side ?? 0;
   state.speedKmh = telemetry.speed;
   state.boostCharges = telemetry.boosts;
   state.bounceCharges = telemetry.bounces;
@@ -119,6 +136,9 @@ export function fillCockpitState(
   state.position = telemetry.position;
   state.raceTime = telemetry.raceTime;
   state.pushing = telemetry.status === 'pushing';
+  state.gapPlace = telemetry.gapAhead?.place ?? 0;
+  state.gapSeconds = telemetry.gapAhead?.seconds ?? 0;
+  state.gapTrend = telemetry.gapAhead?.trend ?? 'steady';
   // M01 · T2: while the field is queued the centre gauge is the pool's, and it says POOL until the
   // pool's own countdown starts speaking. Outside those phases the centre is blank.
   state.countdownLabel = telemetry.merge?.countdownLabel
@@ -130,15 +150,43 @@ export function createCockpitState(): CockpitState {
   return {
     steer: 0, speedKmh: 0, boostCharges: 0, bounceCharges: 0, shieldSeconds: 0, gradePct: 0,
     grounded: false, inLoop: false, status: 'loading', position: 1, raceTime: 0,
-    countdownLabel: null, pushing: false,
+    countdownLabel: null, pushing: false, impact: 0, impactSide: 0,
+    gapPlace: 0, gapSeconds: 0, gapTrend: 'steady', boostAge: 1e9,
   };
 }
 
-/** Lateral speed → steer. The clamp is the physics' own `−vz / (VZ_MAX · handling)`. */
+/**
+ * Lateral speed → steer, clamped to the physics' own `vz / (VZ_MAX · handling)`.
+ * Sign: steerLeft (A) moves the ball toward lane 3 at negative vz, which is screen-left in both
+ * cameras, so negative vz must give a negative (anticlockwise) yoke.
+ */
 export function steerFrom(vz: number, handling: number): number {
   if (!Number.isFinite(vz) || !Number.isFinite(handling) || handling <= 0) return 0;
-  const steer = Math.max(-1, Math.min(1, -vz / (VZ_MAX * handling)));
+  const steer = Math.max(-1, Math.min(1, vz / (VZ_MAX * handling)));
   return steer === 0 ? 0 : steer; // normalise −0
+}
+
+/** How long a steering press holds the yoke at full lock, seconds. */
+export const YOKE_HOLD_S = 0.2;
+/** How long the yoke then takes to return to centre, seconds. */
+export const YOKE_RETURN_S = 0.3;
+
+/**
+ * The yoke follows the *player's hands*, not the ball: a press of steerLeft (−1) or steerRight (+1)
+ * holds full lock for YOKE_HOLD_S, then eases back to centre over YOKE_RETURN_S (key repeat while a
+ * key is held keeps it at lock). Driving it from the ball's lateral speed made the hands move on
+ * their own after the first split — the pool's glide into a slot, the giant loop's pull to its
+ * centre and every bump turned the wheel — while presses the game refused never turned it at all.
+ */
+export function yokeSteer(direction: number, pressedAt: number, now: number): number {
+  if (!Number.isFinite(direction) || direction === 0 || !Number.isFinite(pressedAt)) return 0;
+  const t = now - pressedAt;
+  if (t < 0) return 0;
+  const sign = direction < 0 ? -1 : 1;
+  if (t <= YOKE_HOLD_S) return sign;
+  const u = (t - YOKE_HOLD_S) / YOKE_RETURN_S;
+  if (u >= 1) return 0;
+  return sign * (1 - u * u * (3 - 2 * u));
 }
 
 export const yokeAngleDeg = (steer: number): number =>
@@ -229,12 +277,13 @@ export function gripPoints(layout: CockpitLayout, yokeDeg: number): { left: Poin
   return { left: rotate(GRIP_FRACTION.left), right: rotate(GRIP_FRACTION.right), hub };
 }
 
-function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point): ArmPose {
+function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point, lean: ShoulderLean = NO_LEAN): ArmPose {
   const span = YOKE.spanWidth * layout.yoke.scale;
   const sign = side === 'left' ? -1 : 1;
+  // P3: a gesture moves the shoulder (off-screen), never the hand: the arm swings about the fist.
   const shoulder: Point = {
-    x: layout.w / 2 + sign * span * 0.62,
-    y: layout.h * (1 + SHOULDER_BELOW),
+    x: layout.w / 2 + sign * (span * 0.62 + lean.out * layout.h),
+    y: layout.h * (1 + SHOULDER_BELOW + lean.down),
   };
   // Scale the sprite so the painted limb reads ARM_WIDTH_OF_HEIGHT tall. Where that would leave the
   // sleeve short of the shoulder (small viewports, arms at full lock), grow it until it reaches:
@@ -255,6 +304,29 @@ function armFor(side: 'left' | 'right', layout: CockpitLayout, grip: Point): Arm
   };
 }
 
+/** Painted gauge plates' height as a share of their width (left 1024×419, right 1024×485). */
+export const CLUSTER_ASPECT = {
+  left: manifest.clusters[0].h / manifest.clusters[0].w,
+  right: manifest.clusters[1].h / manifest.clusters[1].w,
+} as const;
+/** How far a plate's top edge tucks under the window's bottom edge, px (hides the seam). */
+export const CLUSTER_TUCK = 2;
+/** Widest a plate may grow, as a share of the viewport width, so the two never meet mid-screen. */
+export const CLUSTER_MAX_OF_WIDTH = 0.3;
+
+/**
+ * A gauge plate hangs from the bottom of the window: its top edge tucks CLUSTER_TUCK px under the
+ * aperture, and it is sized (aspect kept) to fill the band between the window and the screen bottom.
+ * On narrow screens the width cap wins and the plate stops short of the bottom edge; the painted
+ * bezel is behind it there, so the window and the gauges still meet with no gap at any aspect.
+ */
+function clusterUnderAperture(side: 'left' | 'right', w: number, h: number, aperture: Rect) {
+  const top = aperture.y + aperture.h - CLUSTER_TUCK;
+  const cw = Math.min(w * CLUSTER_MAX_OF_WIDTH, Math.max(1, h - top) / CLUSTER_ASPECT[side]);
+  const x = side === 'left' ? w * 0.005 : w - cw - w * 0.005;
+  return { x, y: top, w: cw };
+}
+
 /** The whole first-person layout for a viewport. Pure: same numbers for the DOM and for tests. */
 export function cockpitLayout(w: number, h: number): CockpitLayout {
   const aperture = {
@@ -266,14 +338,13 @@ export function cockpitLayout(w: number, h: number): CockpitLayout {
   };
   const span = Math.min(w * YOKE_SPAN_OF_WIDTH, h * YOKE_SPAN_OF_HEIGHT);
   const scale = span / YOKE.spanWidth;
-  const clusterW = Math.min(w * 0.3, h * 0.46, (h * 0.3) / (419 / 1024));
   const yoke: CockpitLayout['yoke'] = { hub: { x: w / 2, y: h * YOKE_HUB_Y }, scale, w: YOKE.w * scale, h: YOKE.h * scale };
   const layout: CockpitLayout = {
     w, h, aperture, horizonY: aperture.y + aperture.h / 2, yoke,
     arms: { left: null as unknown as ArmPose, right: null as unknown as ArmPose },
     clusters: {
-      left: { x: w * 0.005, y: h - clusterW * (419 / 1024) - 4, w: clusterW },
-      right: { x: w - clusterW - w * 0.005, y: h - clusterW * (485 / 1024) - 4, w: clusterW },
+      left: clusterUnderAperture('left', w, h, aperture),
+      right: clusterUnderAperture('right', w, h, aperture),
     },
     strip: { x: 0, y: h - Math.max(18, h * 0.05), w, h: Math.max(18, h * 0.05) },
   };
@@ -283,9 +354,52 @@ export function cockpitLayout(w: number, h: number): CockpitLayout {
 }
 
 /** Arms for a turned yoke. The hands stay on the grips by construction. */
-export function armsAt(layout: CockpitLayout, yokeDeg: number): { left: ArmPose; right: ArmPose } {
+/**
+ * P3 — the driver's arms answer the race. A hit makes them flinch (elbows flare, arms pulled back),
+ * a boost pumps them forward, and airtime locks them in against the rim with a slight tremor. The
+ * hands never leave the grips: each gesture only moves the shoulders, which are off-screen.
+ */
+export type DriverGesture = 'normal' | 'flinch' | 'boost_pump' | 'air_brace';
+
+/** Shoulder offsets as shares of the viewport height: `out` away from the centre, `down` below it. */
+interface ShoulderLean { readonly out: number; readonly down: number }
+const NO_LEAN: ShoulderLean = { out: 0, down: 0 };
+
+/** Seconds a boost's pump lasts, and a hit's flinch is the H8 impact envelope (180 ms). */
+export const BOOST_PUMP_S = 0.6;
+
+/** Which gesture the arms make now, and how strongly (0..1). Reduced motion keeps them still. */
+export function driverGesture(
+  state: Pick<CockpitState, 'impact' | 'boostAge' | 'grounded' | 'inLoop' | 'status'>,
+  reducedMotion: boolean,
+): { gesture: DriverGesture; intensity: number } {
+  if (reducedMotion) return { gesture: 'normal', intensity: 0 };
+  if (state.impact > 0.05) return { gesture: 'flinch', intensity: Math.min(1, state.impact) };
+  if (state.boostAge >= 0 && state.boostAge < BOOST_PUMP_S) return { gesture: 'boost_pump', intensity: 1 - state.boostAge / BOOST_PUMP_S };
+  if (state.status === 'flying' && !state.grounded && !state.inLoop) return { gesture: 'air_brace', intensity: 1 };
+  return { gesture: 'normal', intensity: 0 };
+}
+
+function shoulderLean(gesture: DriverGesture, intensity: number, seconds: number): ShoulderLean {
+  const i = Math.max(0, Math.min(1, Number.isFinite(intensity) ? intensity : 0));
+  switch (gesture) {
+    case 'flinch': return { out: 0.05 * i, down: 0.035 * i };
+    case 'boost_pump': return { out: -0.02 * i, down: -0.05 * i * (0.75 + 0.25 * Math.sin(seconds * 18)) };
+    case 'air_brace': return { out: -0.04 * i, down: -0.02 * i + 0.004 * i * Math.sin(seconds * 47) };
+    default: return NO_LEAN;
+  }
+}
+
+export function armsAt(
+  layout: CockpitLayout,
+  yokeDeg: number,
+  gesture: DriverGesture = 'normal',
+  intensity = 0,
+  seconds = 0,
+): { left: ArmPose; right: ArmPose } {
   const grips = gripPoints(layout, yokeDeg);
-  return { left: armFor('left', layout, grips.left), right: armFor('right', layout, grips.right) };
+  const lean = shoulderLean(gesture, intensity, seconds);
+  return { left: armFor('left', layout, grips.left, lean), right: armFor('right', layout, grips.right, lean) };
 }
 
 /* -----------------------------------------------------------------------------
@@ -322,3 +436,103 @@ export const COCKPIT_ART_PATHS: readonly string[] = [
 ];
 
 export const COCKPIT_MANIFEST = manifest;
+
+/** H8: the yoke's jolt at full impact: a ±4° shudder and a 6 px drop. */
+export const JOLT_MAX_DEG = 4;
+export const JOLT_MAX_DROP_PX = 6;
+/** Shudder frequency, radians per second. */
+export const JOLT_RATE = 70;
+
+/**
+ * H8: how the yoke answers a hit. `impact` is the channel's decaying 0..1 value, so the jolt is
+ * gone ~180 ms after the hit. It shudders (starting away from the hit) and drops; with reduced
+ * motion it holds still and the cockpit flashes instead (`flash`, 0..1).
+ */
+export function yokeJolt(impact: number, side: -1 | 0 | 1, time: number, reducedMotion: boolean): { rotDeg: number; dropPx: number; flash: number } {
+  const amount = Math.max(0, Math.min(1, Number.isFinite(impact) ? impact : 0));
+  if (amount === 0) return { rotDeg: 0, dropPx: 0, flash: 0 };
+  if (reducedMotion) return { rotDeg: 0, dropPx: 0, flash: amount };
+  const lead = side === 0 ? 1 : -side;
+  return { rotDeg: lead * JOLT_MAX_DEG * amount * Math.cos(time * JOLT_RATE), dropPx: JOLT_MAX_DROP_PX * amount, flash: 0 };
+}
+
+/* -----------------------------------------------------------------------------
+   P2. THE GLASS
+   -------------------------------------------------------------------------- */
+
+/**
+ * P2 — the cockpit window has glass in it: a faint glare along the rim, a few smudges and scratches
+ * (all drawn, no painted art), and on a big hit a spiderweb crack at the side it came from, held for
+ * `CRACK_HOLD_S` and then fading over `CRACK_FADE_S`. Reduced motion never cracks.
+ */
+export const CRACK_THRESHOLD = 0.6;
+export const CRACK_HOLD_S = 2;
+export const CRACK_FADE_S = 1.5;
+
+/** How visible a crack is `seconds` after the hit: full while held, then fading to nothing. */
+export function crackOpacity(seconds: number): number {
+  if (!(seconds >= 0)) return 0;
+  if (seconds < CRACK_HOLD_S) return 1;
+  return Math.max(0, 1 - (seconds - CRACK_HOLD_S) / CRACK_FADE_S);
+}
+
+/** A small seeded PRNG (mulberry32): the same seed draws the same crack. */
+function seeded(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * An SVG path for a spiderweb crack across a `w` × `h` window, centred toward the side the hit came
+ * from (+1 right, −1 left, 0 the middle): jagged rays out of the impact and two broken rings.
+ */
+export function crackPath(seed: number, side: -1 | 0 | 1, w: number, h: number): string {
+  const random = seeded(seed);
+  const cx = w * (side > 0 ? 0.78 : side < 0 ? 0.22 : 0.5) + (random() - 0.5) * w * 0.06;
+  const cy = h * (0.3 + random() * 0.15);
+  const reach = Math.min(w, h) * (0.28 + random() * 0.12);
+  const rays = 8 + Math.floor(random() * 4);
+  const parts: string[] = [];
+  const rings: [number, number][][] = [[], []];
+  for (let i = 0; i < rays; i++) {
+    const angle = (i / rays) * Math.PI * 2 + (random() - 0.5) * 0.5;
+    const length = reach * (0.55 + random() * 0.45);
+    let x = cx; let y = cy;
+    const points: string[] = [`M${cx.toFixed(1)} ${cy.toFixed(1)}`];
+    for (let step = 1; step <= 4; step++) {
+      const r = (length * step) / 4;
+      const bend = angle + (random() - 0.5) * 0.35;
+      x = cx + Math.cos(bend) * r; y = cy + Math.sin(bend) * r;
+      points.push(`L${x.toFixed(1)} ${y.toFixed(1)}`);
+      if (step === 1) rings[0].push([x, y]);
+      if (step === 2) rings[1].push([x, y]);
+    }
+    parts.push(points.join(''));
+  }
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      if (random() < 0.3) continue; // a broken ring, not a drawn circle
+      const [ax, ay] = ring[i]; const [bx, by] = ring[(i + 1) % ring.length];
+      parts.push(`M${ax.toFixed(1)} ${ay.toFixed(1)}L${bx.toFixed(1)} ${by.toFixed(1)}`);
+    }
+  }
+  return parts.join('');
+}
+
+/** The glass's fixed wear: a few scratches, as SVG path data for a `w` × `h` window. */
+export function glassScratches(w: number, h: number, seed = 0x51a55): string {
+  const random = seeded(seed);
+  const parts: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const x = w * (0.08 + random() * 0.84); const y = h * (0.1 + random() * 0.8);
+    const angle = (random() - 0.5) * 1.2; const length = Math.min(w, h) * (0.04 + random() * 0.09);
+    parts.push(`M${x.toFixed(1)} ${y.toFixed(1)}l${(Math.cos(angle) * length).toFixed(1)} ${(Math.sin(angle) * length).toFixed(1)}`);
+  }
+  return parts.join('');
+}

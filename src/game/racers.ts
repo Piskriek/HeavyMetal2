@@ -26,7 +26,25 @@ export interface Racer extends RacerFrame {
   recoveries: number;
   recoveryUntil: number;
   steerLockedUntil: number;
+  /** Race time of the last hit that shot this ball's lane rope out (sim/rope.ts). */
+  ropeSince?: number;
+  /** P6: race time of the last wall-scrape spark burst (presentation only, never physics). */
+  scrapeFxAt?: number;
+  /**
+   * H6: the rope goblins are hauling this ball back from an out-of-bounds node. It went out at
+   * `from`, is already put back on its lane (x/y/z), and is held until `until`; then it rolls on at
+   * `releaseVx`. Null or absent when not being reeled.
+   */
+  reel?: { fromX: number; fromY: number; fromZ: number; startedAt: number; until: number; releaseVx: number } | null;
   nextDecision: number;
+  /**
+   * H11: a bot winding up a shove. `ramTargetId` is the rival it means to hit (null when none),
+   * `ramTellUntil` the race time its wobble tell ends, and `ramLane`/`ramPathId` where it will go.
+   */
+  ramTargetId: number | null;
+  ramTellUntil: number;
+  ramLane: number;
+  ramPathId: string | null;
   lastBoostAt: number;
   lastLaneChange: number;
   loopRide: LoopRide | null;
@@ -122,6 +140,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
       // Legacy four keep the exact 0.35 + id * 0.11 ramp; big fields fold the identity
       // hash into a bounded 0.55 s window instead of an 11-second wait at racer 99.
       nextDecision: legacy ? 0.35 + entry.id * 0.11 : 0.35 + hash01(entry.id) * 0.55,
+      ramTargetId: null, ramTellUntil: -100, ramLane: entry.homeLane, ramPathId: null,
       lastBoostAt: -100, lastLaneChange: -100,
       loopRide: null, finishTime: null, distance: 0, bounces: 3, boosts: 2,
       isPlayer: entry.id === PLAYER_ID,

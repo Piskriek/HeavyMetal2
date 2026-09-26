@@ -10,9 +10,10 @@
  * it, which is why this component never masks the viewport itself. The aperture's measured geometry
  * only positions the dials, the yoke and the arms.
  */
+import { gapLabel } from '../game/gap';
 import { useEffect, useMemo, useRef } from 'react';
 import {
-  armsAt, cockpitBob, cockpitLayout, needleAngle, yokeAngleDeg,
+  CRACK_THRESHOLD, armsAt, cockpitBob, cockpitLayout, crackOpacity, crackPath, driverGesture, glassScratches, needleAngle, yokeAngleDeg, yokeJolt,
   COCKPIT_ART, COCKPIT_MANIFEST, COCKPIT_MANIFEST as ART, type CockpitState,
 } from '../game/cockpit';
 import '../cockpit.css';
@@ -40,6 +41,9 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const rootRef = useRef<HTMLDivElement>(null);
   const bezelRef = useRef<HTMLImageElement>(null);
   const yokeRef = useRef<HTMLDivElement>(null);
+  /** P2: the crack layer, and the hit that drew it. */
+  const crackRef = useRef<SVGPathElement>(null);
+  const crack = useRef({ at: -1e9, seed: 0, lastImpact: 0 });
   const armLeftRef = useRef<HTMLDivElement>(null);
   const armRightRef = useRef<HTMLDivElement>(null);
   const bobRef = useRef<HTMLDivElement>(null);
@@ -54,6 +58,7 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const readouts = {
     speed: useRef<HTMLSpanElement>(null),
     position: useRef<HTMLSpanElement>(null),
+    gap: useRef<HTMLSpanElement>(null),
     time: useRef<HTMLSpanElement>(null),
     center: useRef<HTMLDivElement>(null),
     shield: useRef<HTMLSpanElement>(null),
@@ -65,12 +70,25 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
     let frame = 0;
     const step = (now: number) => {
       readState(state);
-      const yokeDeg = yokeAngleDeg(state.steer);
-      const arms = armsAt(layout, yokeDeg);
+      // P2: a new big hit cracks the glass at its side (never under reduced motion); it holds, then fades.
+      const cracks = crack.current;
+      if (!reducedMotion && state.impact >= CRACK_THRESHOLD && state.impact > cracks.lastImpact + 0.15) {
+        cracks.at = now; cracks.seed += 1;
+        crackRef.current?.setAttribute('d', crackPath(cracks.seed, state.impactSide, layout.aperture.w, layout.aperture.h));
+      }
+      cracks.lastImpact = state.impact;
+      if (crackRef.current) crackRef.current.style.opacity = reducedMotion ? '0' : crackOpacity((now - cracks.at) / 1000).toFixed(3);
+      // H8: a hit jolts the yoke (and the hands on it); with reduced motion the cockpit flashes.
+      const jolt = yokeJolt(state.impact, state.impactSide, now / 1000, reducedMotion);
+      const yokeDeg = yokeAngleDeg(state.steer) + jolt.rotDeg;
+      // P3: the arms flinch, pump or brace with the race (still under reduced motion).
+      const gesture = driverGesture(state, reducedMotion);
+      const arms = armsAt(layout, yokeDeg, gesture.gesture, gesture.intensity, now / 1000);
 
       if (yokeRef.current) {
-        yokeRef.current.style.transform = `translate(-50%, -${(COCKPIT_MANIFEST.yoke.pivot.y / COCKPIT_MANIFEST.yoke.h) * 100}%) rotate(${yokeDeg.toFixed(2)}deg)`;
+        yokeRef.current.style.transform = `translate(-50%, calc(-${(COCKPIT_MANIFEST.yoke.pivot.y / COCKPIT_MANIFEST.yoke.h) * 100}% + ${jolt.dropPx.toFixed(1)}px)) rotate(${yokeDeg.toFixed(2)}deg)`;
       }
+      if (bobRef.current) bobRef.current.style.filter = jolt.flash > 0 ? `brightness(${(1 + 0.35 * jolt.flash).toFixed(3)})` : '';
       for (const [ref, pose] of [[armLeftRef, arms.left], [armRightRef, arms.right]] as const) {
         const style = ref.current?.style;
         if (!style) continue;
@@ -102,6 +120,16 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
       if (readouts.speed.current) readouts.speed.current.textContent = String(Math.round(state.speedKmh));
       if (readouts.position.current) readouts.position.current.textContent = `P${state.position}`;
+      // H9: the gap to the rider ahead, coloured by whether it is closing.
+      const gapChip = readouts.gap.current;
+      if (gapChip) {
+        const show = state.gapPlace > 0;
+        gapChip.hidden = !show;
+        if (show) {
+          gapChip.textContent = gapLabel({ place: state.gapPlace, seconds: state.gapSeconds });
+          gapChip.dataset.trend = state.gapTrend;
+        }
+      }
       if (readouts.time.current) readouts.time.current.textContent = formatTime(state.raceTime);
       if (readouts.shield.current) readouts.shield.current.textContent = `${state.shieldSeconds.toFixed(1)}s`;
       if (readouts.boost.current) readouts.boost.current.textContent = `${state.boostCharges}/2`;
@@ -157,6 +185,26 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   return (
     <div className="cockpit-root" ref={rootRef} data-aperture={`${Math.round(layout.aperture.w)}x${Math.round(layout.aperture.h)}`}>
       <div className="cockpit-bob" ref={bobRef}>
+        {/* P2: the glass in the window: glare, smudges, scratches, and a crack on a big hit. */}
+        <svg className="cockpit-glass" aria-hidden="true" width={layout.aperture.w} height={layout.aperture.h}
+          style={{ left: layout.aperture.x, top: layout.aperture.y, borderRadius: layout.aperture.radius }}>
+          <defs>
+            <radialGradient id="cockpit-glare" cx="0.22" cy="0.12" r="0.9">
+              <stop offset="0" stopColor="#fff6e0" stopOpacity="0.16" />
+              <stop offset="0.35" stopColor="#fff6e0" stopOpacity="0.04" />
+              <stop offset="1" stopColor="#fff6e0" stopOpacity="0" />
+            </radialGradient>
+            <filter id="cockpit-smudge"><feGaussianBlur stdDeviation="14" /></filter>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#cockpit-glare)" />
+          <g filter="url(#cockpit-smudge)" fill="#d8c9a3" opacity="0.07">
+            <ellipse cx={layout.aperture.w * 0.18} cy={layout.aperture.h * 0.78} rx={layout.aperture.w * 0.06} ry={layout.aperture.h * 0.04} />
+            <ellipse cx={layout.aperture.w * 0.83} cy={layout.aperture.h * 0.2} rx={layout.aperture.w * 0.05} ry={layout.aperture.h * 0.03} />
+            <ellipse cx={layout.aperture.w * 0.62} cy={layout.aperture.h * 0.86} rx={layout.aperture.w * 0.08} ry={layout.aperture.h * 0.025} />
+          </g>
+          <path d={glassScratches(layout.aperture.w, layout.aperture.h)} stroke="#ffffff" strokeOpacity="0.09" strokeWidth="1" fill="none" />
+          <path ref={crackRef} className="cockpit-crack" d="" stroke="#f4fbff" strokeOpacity="0.75" strokeWidth="1.4" fill="none" strokeLinejoin="bevel" style={{ opacity: 0 }} />
+        </svg>
         <img className="cockpit-bezel" ref={bezelRef} src={COCKPIT_ART.bezel} alt="" aria-hidden="true" draggable={false} />
 
         <img className="cockpit-cluster" style={{ left: layout.clusters.left.x, top: layout.clusters.left.y, width: layout.clusters.left.w }} src={COCKPIT_ART.clusters[0]} alt="" aria-hidden="true" draggable={false} />
@@ -181,6 +229,7 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
       <div className="cockpit-readouts">
         <span className="cockpit-chip" aria-label="Race position" ref={readouts.position}>P1</span>
+        <span className="cockpit-chip cockpit-chip-gap" aria-label="Gap to the rider ahead" ref={readouts.gap} hidden />
         <span className="cockpit-chip" aria-label="Race time" ref={readouts.time}>0:00.0</span>
         <span className="cockpit-chip" aria-label="Shield" ref={readouts.shield}>0.0s</span>
         <span className="cockpit-chip" aria-label="Boosts" ref={readouts.boost}>0/2</span>

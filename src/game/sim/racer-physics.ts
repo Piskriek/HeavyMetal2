@@ -7,9 +7,9 @@
  *
  * 1. **Side effects go through `SimFx`** instead of through the renderer, the audio graph and
  *    the snapshot, and gameplay randomness goes through `ctx.random()` instead of calling
- *    `Math.random()` inline (the pinball spinner). The race binds those to exactly what it did
- *    before, so nothing observable changed; a qualifying attempt binds them to a recorder and a
- *    seeded stream. `tests/physics-parity.test.ts` proves the port against a verbatim copy of
+ *    `Math.random()` inline (the pinball spinner). The race binds randomness to a hash of
+ *    (seed, tick, racer id) (M9) so a race replays; a qualifying attempt binds the effects to a
+ *    recorder and randomness to its seeded stream. `tests/physics-parity.test.ts` proves the port against a verbatim copy of
  *    the pre-refactor engine code.
  * 2. **Recovery is decided before the falling branch's early return.** The old code returned
  *    from `if (racer.falling)` immediately, so a falling racer could only ever be saved by the
@@ -23,6 +23,7 @@
  * `preObstacle*`: the state after motion integration and **before** obstacle resolution, i.e.
  * before a loop ride floors the speed at 650 and before its exit hands back `speed * 1.08`.
  */
+import { datan2, dcos, dexp, dhypot, dsin } from './det-math';
 import {
   FINISH, GRAVITY, LANE, PLAYER_LANE, RADIUS, START_X, TRACK_DISTANCE,
   closestLane, laneZ, loopGeometry, obstacleZ, occupiesLane, weightImpulse,
@@ -31,7 +32,8 @@ import {
 import type { Racer } from '../racers';
 import { advanceRoll } from '../gyro-ball';
 import { HELD_DAMPING, HELD_RESPONSE } from '../merge/pool';
-import { advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
+import { LANE_Z_LIMIT, advancePaths, oobCrossed, resolveLaneTarget, sampleLane } from '../lane-network';
+import { DEFAULT_ROPE, ropeAt } from './rope';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, type RacerStepContext, type RecoveryReason } from './context';
 
@@ -302,9 +304,9 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
       }
       break;
     case 'pinball_spinner':
-      // The only gameplay coin-flip in the step. The race draws from `Math.random` as it always
-      // has; an isolated attempt draws from its seeded stream so a replay matches.
-      racer.vz = (ctx.random() > 0.5 ? 1 : -1) * 440;
+      // The only gameplay coin-flip in the step. The race hashes (seed, tick, racer id) and an
+      // isolated attempt draws from its seeded stream, so either replays exactly (M9).
+      racer.vz = (ctx.random(racer.id) > 0.5 ? 1 : -1) * 440;
       racer.vx += 120;
       ctx.fx.effect('impact', x, y, z, 0.8, racer.id);
       ctx.fx.effect('sparks', x, y, z, 1, racer.id);
@@ -343,6 +345,45 @@ export function hitObstacle(racer: Racer, obstacle: Obstacle, ctx: RacerStepCont
  * Advances one racer by `dt` seconds. Mutates `racer` in place, exactly as the engine did, and
  * fills `trace` when the caller wants the canonical observations (gate capture, falls, hits).
  */
+/** H6: how long the rope goblins take to haul a ball back from out of bounds. */
+export const OOB_REEL_S = 1;
+/** H6: the least forward speed a ball leaves the reel with. */
+export const OOB_RELEASE_VX = 180;
+
+/**
+ * H6: an out-of-bounds recovery is not an instant teleport. The crew has already put the ball back
+ * on its lane (`recoverRacer`); it is held there for `OOB_REEL_S` while the rope goblins haul it in
+ * (the renderer draws it easing back from where it went out), then it rolls on.
+ */
+export function startRopeReel(racer: Racer, from: { x: number; y: number; z: number }, ctx: RacerStepContext): void {
+  const until = ctx.runTime + OOB_REEL_S;
+  racer.reel = { fromX: from.x, fromY: from.y, fromZ: from.z, startedAt: ctx.runTime, until, releaseVx: Math.max(OOB_RELEASE_VX, racer.vx) };
+  racer.vx = racer.vy = racer.vz = 0;
+  racer.steerLockedUntil = Math.max(racer.steerLockedUntil, until);
+  racer.immuneUntil = Math.max(racer.immuneUntil, until + 0.5);
+  if (!racer.id) { ctx.fx.audio('rope_reel'); ctx.fx.say('ROPE GOBLINS! HAULING YOU BACK ON COURSE.'); }
+}
+
+/** P6: a scraping ball throws a spark burst this often (seconds), sized by its speed. */
+export const SCRAPE_SPARK_EVERY = 0.07;
+/** P6: below this forward speed a ball leaning on the edge is resting, not scraping. */
+export const SCRAPE_MIN_VX = 150;
+
+/**
+ * P6: a trail of sparks while a ball grinds along the road-edge wall: it is pinned at the road's
+ * edge (`±LANE_Z_LIMIT`, not a lane corridor), still pushing into it, and rolling. Presentation
+ * only: it emits effects and remembers when, and never touches the physics.
+ */
+export function scrapeSparks(racer: Racer, pushVz: number, ctx: RacerStepContext): void {
+  const atEdge = Math.abs(racer.z) >= LANE_Z_LIMIT - 0.5;
+  const intoEdge = Math.sign(pushVz) === Math.sign(racer.z) && Math.abs(pushVz) > 1;
+  if (!atEdge || !intoEdge || racer.vx < SCRAPE_MIN_VX || !racer.grounded || racer.falling) return;
+  if (racer.scrapeFxAt !== undefined && ctx.runTime - racer.scrapeFxAt < SCRAPE_SPARK_EVERY && ctx.runTime >= racer.scrapeFxAt) return;
+  racer.scrapeFxAt = ctx.runTime;
+  const scale = 0.3 + 0.5 * Math.min(1, racer.vx / 1200);
+  ctx.fx.effect('sparks', racer.x, racer.y, racer.z + Math.sign(racer.z) * 26, scale, racer.id);
+}
+
 export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace?: RacerStepTrace): void {
   const world = ctx.world;
   const oldX = racer.x;
@@ -350,6 +391,18 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     trace.wasFalling = racer.falling;
     trace.preObstacleX = racer.x; trace.preObstacleY = racer.y; trace.preObstacleZ = racer.z;
     trace.preObstacleVx = racer.vx; trace.preObstacleVy = racer.vy;
+  }
+  // H6: held on the lane while the rope goblins haul it in, then away at a rolling speed.
+  if (racer.reel) {
+    if (ctx.runTime < racer.reel.until) {
+      racer.vx = racer.vy = racer.vz = 0;
+      racer.y = world.surfaceAt(racer.x, racer.z).y - RADIUS;
+      racer.grounded = true; racer.falling = false; racer.stoppedFor = 0;
+      racer.lastGroundedAt = ctx.runTime;
+      return;
+    }
+    racer.vx = racer.reel.releaseVx; racer.vy = world.slope(racer.x) * racer.vx;
+    racer.reel = null;
   }
   // M01 · T2 (IF-MERGE): a held rider is out of the race for a moment. Nothing integrates — they
   // are pinned to the gate plane — except the lateral glide into their pool slot (or, when they are
@@ -400,17 +453,33 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     // purpose, so the OOB trigger still fires on the path it belongs to.
     advancePaths([racer], ctx.laneNetwork ?? null);
     const isWet = racer.x >= STAGE_GRAVITY_START && racer.x <= STAGE_GRAVITY_END;
-    const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling;
+    // The lane rope (sim/rope.ts): after a hit the spring and damping go slack and the ball keeps its
+    // sideways speed, then the rope reels it back into its own lane. Untouched when never hit.
+    const ropeConfig = ctx.rope ?? DEFAULT_ROPE;
+    const rope = ropeAt(racer.ropeSince, ctx.runTime, ropeConfig);
+    const response = (ctx.runTime < racer.steerLockedUntil ? 7 : (isWet ? 20 : 33)) * racer.handling * rope.spring;
     // M01 · T6 (D12): with no network this is exactly `laneZ(targetLane)` and the legacy corridor;
     // with one it is the racer's own path centre and the union corridor of the paths active here.
     // The PD spring, its damping, the clamp of the spring's own output and the steer lock are all
     // untouched — only the target and the two bounds are generalised.
     const lane = resolveLaneTarget(racer, ctx.laneNetwork ?? null);
-    const steering = (lane.targetZ - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling);
+    const steering = (lane.targetZ - racer.z) * response - racer.vz * (isWet ? 6.2 : 9.5) * Math.sqrt(racer.handling) * rope.damping;
     racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
     const previousZ = racer.z;
-    racer.z = clamp(racer.z + racer.vz * dt, lane.zMin, lane.zMax);
+    // With slack on the rope the ball is not held to its lane corridor, only to the road itself.
+    const zMin = rope.slack ? -LANE_Z_LIMIT : lane.zMin;
+    const zMax = rope.slack ? LANE_Z_LIMIT : lane.zMax;
+    const impactVz = racer.vz;
+    racer.z = clamp(racer.z + racer.vz * dt, zMin, zMax);
     if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
+    // Knocked into the tree line at the road edge: a smash. (Out-of-bounds zones, when authored, are
+    // where a smash will hand the ball to the rope goblins for a reset instead.)
+    if (rope.slack && (racer.z === zMin || racer.z === zMax) && Math.abs(impactVz) >= ropeConfig.edgeSmashVz) {
+      ctx.fx.effect('impact', racer.x, racer.y, racer.z, 1.2, racer.id);
+      ctx.fx.effect('sparks', racer.x, racer.y, racer.z, 1, racer.id);
+      if (!racer.id) { ctx.fx.say('INTO THE TREES! THE ROPE REELS YOU BACK.'); ctx.fx.audio('tree_smash'); }
+    }
+    scrapeSparks(racer, impactVz, ctx);
     racer.lane = closestLane(racer.z);
   }
   const dragFactor = 120 / racer.weight;
@@ -421,13 +490,13 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     if (ride.entryProgress < 1) {
       ride.entryProgress = Math.min(1, ride.entryProgress + dt * 7);
       const t = ride.entryProgress; const ease = t * t * (3 - 2 * t);
-      const x = loop.x + Math.sin(ride.entryAngle) * loop.ballRadius;
-      const y = loop.y + Math.cos(ride.entryAngle) * loop.ballRadius + world.y(x) - world.y(loop.x);
+      const x = loop.x + dsin(ride.entryAngle) * loop.ballRadius;
+      const y = loop.y + dcos(ride.entryAngle) * loop.ballRadius + world.y(x) - world.y(loop.x);
       racer.x = ride.entry.x + (x - ride.entry.x) * ease; racer.y = ride.entry.y + (y - ride.entry.y) * ease;
     } else {
       ride.angle += Math.min(ride.speed, 760) / loop.ballRadius * dt;
-      racer.x = loop.x + Math.sin(ride.angle) * loop.ballRadius;
-      racer.y = loop.y + Math.cos(ride.angle) * loop.ballRadius + world.y(racer.x) - world.y(loop.x);
+      racer.x = loop.x + dsin(ride.angle) * loop.ballRadius;
+      racer.y = loop.y + dcos(ride.angle) * loop.ballRadius + world.y(racer.x) - world.y(loop.x);
     }
     racer.rotation += Math.min(ride.speed, 760) / RADIUS * dt;
     // A loop ride rewrites the position, so the canonical capture is the ring state *before* the
@@ -465,7 +534,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       }
     } else {
       racer.grounded = false;
-      racer.vx *= Math.exp(-0.009 * dragFactor * dt);
+      racer.vx *= dexp(-0.009 * dragFactor * dt);
       racer.vy += stageGravity * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
     }
     // Canonical gate-capture point: integrated motion, no obstacle or loop effect applied yet.
@@ -479,8 +548,8 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       if (obstacle.kind === 'loop') {
         const loop = loopGeometry(obstacle, world.course); const dx = racer.x - loop.x;
         const dy = racer.y - (world.y(racer.x) - world.y(loop.x)) - loop.y;
-        if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
-          const angle = (Math.atan2(dx, dy) + TAU) % TAU;
+        if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(dhypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
+          const angle = (datan2(dx, dy) + TAU) % TAU;
           racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
           racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: Math.ceil((angle + TAU * 0.65) / TAU) * TAU,
             speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
@@ -539,7 +608,9 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     const node = oobCrossed(ctx.laneNetwork, racer.pathId, oldX, racer.x);
     if (node) {
       if (trace) trace.oobNode = node;
+      const from = { x: racer.x, y: racer.y, z: racer.z };
       recoverRacer(racer, ctx, 'oob', trace);
+      startRopeReel(racer, from, ctx);
       return;
     }
   }

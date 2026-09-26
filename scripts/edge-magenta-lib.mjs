@@ -186,6 +186,7 @@ function makeChunk(type, data) {
 }
 
 function encodePngNode(w, h, data) {
+  const buf = Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   const sig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(w, 0);
@@ -202,7 +203,7 @@ function encodePngNode(w, h, data) {
   for (let y = 0; y < h; y++) {
     const rawPos = y * (1 + w * 4);
     rawScanlines[rawPos] = 0;
-    data.copy(rawScanlines, rawPos + 1, y * w * 4, (y + 1) * w * 4);
+    buf.copy(rawScanlines, rawPos + 1, y * w * 4, (y + 1) * w * 4);
   }
 
   const compressed = deflateSync(rawScanlines);
@@ -272,7 +273,7 @@ export function classify(rel) {
   if (/\/art\/props\/prop-/.test(r) && !r.includes('/props/alpha/')) return 'source';
   if (/\/art\/goblins\/goblin-/.test(r) && !r.includes('/goblins/alpha/')) return 'source';
   if (/\/art\/animated\/anim-/.test(r) && !r.includes('/animated/alpha/')) return 'source';
-  if (r.includes('/art/animated/animated-contact-sheet.png')) return 'source';
+  if (r.includes('animated-contact-sheet.png')) return 'source';
   return 'runtime';
 }
 

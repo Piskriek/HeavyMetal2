@@ -132,4 +132,4 @@ that T01 modifies.
 | Repeated commands are harmless | `commands: repeated commands collapse and never double-apply`, `release and finishing are once-only and idempotent`, reservation `already-held` |
 | Public contracts documented before downstream integration | this document; 40 contract tests green in `npm run check` |
 
-Verified on this branch: `npx tsc --noEmit` clean · `node --import tsx --test tests/contracts.test.ts` → 40/40 · `npm run build` green (see `handoff.md`).
+Verified on this branch: `npx tsc --noEmit` clean · `node --import tsx --test tests/contracts.test.ts` → 40/40 · `npm run build` green (see `docs/archive/handoff-legacy.md`).

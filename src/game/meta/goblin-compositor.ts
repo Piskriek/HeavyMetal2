@@ -13,6 +13,13 @@ import {
   SKIN_TONES, SPREAD_LAYERS, SPREAD_STEP_PX,
 } from './goblin-dna';
 import { PAINTED_PARTS, paintedPlacement, rigAnchor, type RigAnchorId } from './painted-parts';
+import { PART_MASKS, type MaskChannel } from './painted-masks.generated';
+
+/** The colours the parts are painted in: a swatch equal to these needs no re-tint. */
+const PAINTED_DEFAULTS: Readonly<Record<MaskChannel, string>> = {
+  skin: SKIN_TONES[0].base, leather: LEATHER_PALETTE[0], metal: METAL_PALETTE[0], accent: ACCENT_PALETTE[0],
+};
+export const maskUrl = (id: string, channel: MaskChannel) => `/avatar-parts/masks/${id}-${channel}.png`;
 
 interface Ctx {
   skin: (typeof SKIN_TONES)[number];
@@ -153,7 +160,7 @@ function hairHidden(config: GoblinAvatarConfig): boolean {
   const hat = AVATAR_CATALOG.headgear[config.layers.headgear];
   const painted = PAINTED_PARTS.find((p) => `painted:${p.id}` === hat);
   if (painted) return (painted.hidesHair ?? []).includes(config.layers.hair);
-  return config.layers.headgear !== 0 && [1, 3].includes(config.layers.hair);
+  return config.layers.headgear !== 0 && [1, 3, 5, 7].includes(config.layers.hair);
 }
 
 export function occlusionNotes(config: GoblinAvatarConfig): string[] {
@@ -177,7 +184,20 @@ function spreadWrap(frag: string, s: number, id: (n: string) => string, key: str
 function paintedFragment(item: string, c: Ctx, resolve: (u: string) => string): string {
   const place = paintedPlacement(item, c);
   if (!place) return '';
-  return `<image href="${resolve(place.file.file)}" x="${place.x.toFixed(2)}" y="${place.y.toFixed(2)}" width="${place.w.toFixed(2)}" height="${place.h.toFixed(2)}" preserveAspectRatio="none"/>`;
+  const box = `x="${place.x.toFixed(2)}" y="${place.y.toFixed(2)}" width="${place.w.toFixed(2)}" height="${place.h.toFixed(2)}"`;
+  // Tint masks (plan §9.6): the swatch colour through the channel's mask, blended as colour, so the
+  // painted light and shade stay and only hue and saturation change.
+  const swatch: Record<MaskChannel, string> = { skin: c.skin.base, leather: c.leather, metal: c.metal, accent: c.accent };
+  const channels = (PART_MASKS[place.def.id] ?? []).filter((ch) => swatch[ch].toLowerCase() !== PAINTED_DEFAULTS[ch].toLowerCase());
+  const maskId = (ch: MaskChannel) => c.id(`m-${place.def.id}-${ch}`);
+  // Masks are defined once, outside the mirror, in user space: a mirrored ear reuses them mirrored.
+  const defs = channels.length
+    ? `<defs>${channels.map((ch) => `<mask id="${maskId(ch)}" maskUnits="userSpaceOnUse"><image href="${resolve(maskUrl(place.def.id, ch))}" ${box} preserveAspectRatio="none"/></mask>`).join('')}</defs>`
+    : '';
+  const tints = channels.map((ch) => `<rect ${box} fill="${swatch[ch]}" mask="url(#${maskId(ch)})" style="mix-blend-mode:color"/>`).join('');
+  const part = `<image href="${resolve(place.file.file)}" ${box} preserveAspectRatio="none"/>${tints}`;
+  // Ears: the right ear is the left one mirrored about the face's centre line (x = 128).
+  return defs + (place.def.mirrorPair ? `${part}<g transform="translate(256 0) scale(-1 1)">${part}</g>` : part);
 }
 
 const GUIDE_ANCHORS: readonly RigAnchorId[] = ['eye-left', 'eye-mid', 'eye-right', 'brow-line', 'crown', 'nose', 'mouth', 'chin'];
@@ -232,8 +252,10 @@ export function toDataUri(url: string): Promise<string> {
 }
 
 export async function rasterizeGoblin(config: GoblinAvatarConfig, size = 256, transparentBackground = false): Promise<HTMLCanvasElement> {
-  const urls = RENDER_ORDER.map((l) => AVATAR_CATALOG[l][config.layers[l]]).filter((i) => i?.startsWith('painted:'))
-    .map((i) => paintedPlacement(i, { headW: 54, headTop: 70 })?.file.file).filter((u): u is string => !!u);
+  const urls = RENDER_ORDER.map((l) => AVATAR_CATALOG[l][config.layers[l]]).filter((i) => i?.startsWith('painted:')).flatMap((i) => {
+    const place = paintedPlacement(i, { headW: 54, headTop: 70 });
+    return place ? [place.file.file, ...(PART_MASKS[place.def.id] ?? []).map((ch) => maskUrl(place.def.id, ch))] : [];
+  });
   const map = new Map<string, string>();
   await Promise.all(urls.map(async (u) => map.set(u, await toDataUri(u))));
   const svg = composeGoblinSvg(config, { size, transparentBackground, idPrefix: 'r', resolveImage: (u) => map.get(u) ?? u });

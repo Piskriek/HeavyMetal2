@@ -3,10 +3,14 @@
  * Target in game repo: `src/game/avatar/goblin-dna.ts`.
  *
  * v1  GOB-XXXX-XXXX-XXXX                 version 1 · frozen v1 radix table · FNV-8 checksum
- * v2  GOB-XXXX-XXXX-XXXX                 version 2 · extended catalog (painted parts appended)
+ * v2  GOB-XXXX-XXXX-XXXX                 version 2 · frozen v2 radix table (the catalog as it was before art wave 1)
+ * v3  GOB-XXXX-XXXX-XXXX-XXXX            version 3 · fixed per-layer capacities, so the catalog can keep growing
+ *                                          (append-only) without ever changing what a code decodes to
  *     GOB-XXXX-XXXX-XXXX-NNNN-NNNN-NNNN  + base-36 nudge block (18 radix-7 digits + 2-char checksum
  *                                          seeded with the head, so blocks can't be spliced between goblins)
- * The encoder emits the SHORTEST valid form: v1 when only v1 items are used and nothing is nudged.
+ * The encoder emits the SHORTEST valid form: v1 when only v1 items are used and nothing is nudged, else v2
+ * when every item existed in v2, else v3. A goblin that v1 or v2 can express keeps its old code.
+ * Any version may carry the nudge block except v1.
  * All arithmetic stays below 2^53 (no BigInt, no >32-bit bitwise ops).
  */
 import type { AvatarLayerId, GoblinAvatarConfig, GoblinDna, NudgeLayerId, NudgeState, SkinToneId, SpreadLayerId } from './interfaces';
@@ -14,16 +18,17 @@ import { mulberry32 } from './economy-sim';
 
 /** Catalog item names per layer. Index 0 of optional layers = none. APPEND-ONLY; never reorder. */
 export const AVATAR_CATALOG: Readonly<Record<AvatarLayerId, readonly string[]>> = {
-  background: ['workshop-wall', 'furnace-glow', 'racing-pennants', 'smog-sky'],
-  ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound'],
+  // Art wave 1 (ART-B1/B2) appended the painted parts after each layer's v2 items.
+  background: ['workshop-wall', 'furnace-glow', 'racing-pennants', 'smog-sky', 'painted:background-workshop-wall', 'painted:background-furnace-glow', 'painted:background-racing-pennants', 'painted:background-smog-sky'],
+  ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound', 'painted:ears-bat-pointed', 'painted:ears-notched-fins', 'painted:ears-torn-brass-ring', 'painted:ears-droopy-hound'],
   head: ['angular', 'bloated', 'scrawny'],
-  mouth: ['lower-tusks', 'gold-jags', 'cigar-stub', 'stitched-scar', 'painted:mouth-gold-tusk-grin'],
-  nose: ['hooked-beak', 'warted-bulb', 'prosthetic-plate'],
-  eyes: ['bloodshot-crazy', 'narrow-squint', 'wide-mismatched', 'sleepy-lidded'],
-  eyewear: ['none', 'goggles-up', 'goggles-down', 'brass-monocle', 'leather-eyepatch', 'painted:eyewear-welding-goggles', 'painted:eyewear-clockwork-monocle'],
-  hair: ['none', 'grease-mohawk', 'mutton-chops', 'singed-topknot', 'wire-tufts'],
-  headgear: ['none', 'aviator-cap', 'miner-headlamp', 'pickelhaube', 'grease-bowler', 'painted:headgear-aviator-helmet', 'painted:headgear-gear-tophat'],
-  neck: ['none', 'spiked-collar', 'gear-chain', 'boiler-suit', 'tool-bandolier', 'painted:neck-brass-gorget'],
+  mouth: ['lower-tusks', 'gold-jags', 'cigar-stub', 'stitched-scar', 'painted:mouth-gold-tusk-grin', 'painted:mouth-lower-tusks', 'painted:mouth-gold-jag-teeth', 'painted:mouth-cigar-stub', 'painted:mouth-stitched-scar'],
+  nose: ['hooked-beak', 'warted-bulb', 'prosthetic-plate', 'painted:nose-hooked-beak', 'painted:nose-warted-bulb', 'painted:nose-brass-prosthetic'],
+  eyes: ['bloodshot-crazy', 'narrow-squint', 'wide-mismatched', 'sleepy-lidded', 'painted:eyes-bloodshot-crazy', 'painted:eyes-narrow-squint', 'painted:eyes-wide-mismatched', 'painted:eyes-sleepy-lidded'],
+  eyewear: ['none', 'goggles-up', 'goggles-down', 'brass-monocle', 'leather-eyepatch', 'painted:eyewear-welding-goggles', 'painted:eyewear-clockwork-monocle', 'painted:eyewear-racing-goggles', 'painted:eyewear-leather-eyepatch', 'painted:eyewear-cracked-spectacles', 'painted:eyewear-cyclops-lens-rig'],
+  hair: ['none', 'grease-mohawk', 'mutton-chops', 'singed-topknot', 'wire-tufts', 'painted:hair-grease-mohawk', 'painted:hair-mutton-chops', 'painted:hair-singed-topknot', 'painted:hair-wire-tufts'],
+  headgear: ['none', 'aviator-cap', 'miner-headlamp', 'pickelhaube', 'grease-bowler', 'painted:headgear-aviator-helmet', 'painted:headgear-gear-tophat', 'painted:headgear-miner-headlamp', 'painted:headgear-spiked-pickelhaube', 'painted:headgear-grease-bowler', 'painted:headgear-scrap-crown'],
+  neck: ['none', 'spiked-collar', 'gear-chain', 'boiler-suit', 'tool-bandolier', 'painted:neck-brass-gorget', 'painted:neck-spiked-collar', 'painted:neck-gear-chain', 'painted:neck-boiler-suit-collar', 'painted:neck-tool-bandolier'],
   warpaint: ['none', 'mud-stripes', 'red-handprint', 'cog-tattoo', 'soot-smudges'],
 };
 
@@ -44,17 +49,39 @@ const V1_SIZES: Readonly<Record<AvatarLayerId, number>> = {
   background: 4, ears: 4, head: 3, mouth: 4, nose: 3, eyes: 4, eyewear: 5, hair: 5, headgear: 5, neck: 5, warpaint: 5,
 };
 
+/** FROZEN: catalog sizes when v2 shipped (before art wave 1). Never edit — v2 codes depend on it. */
+const V2_SIZES: Readonly<Record<AvatarLayerId, number>> = {
+  background: 4, ears: 4, head: 3, mouth: 5, nose: 3, eyes: 4, eyewear: 7, hair: 5, headgear: 7, neck: 6, warpaint: 5,
+};
+
+/**
+ * FROZEN: v3's fixed room per layer. The catalog may grow up to these sizes with no format change;
+ * the product (times the palettes) stays under 2^52, the 13 hex digits of a v3 payload.
+ */
+export const V3_CAPACITY: Readonly<Record<AvatarLayerId, number>> = {
+  background: 12, ears: 12, head: 4, mouth: 20, nose: 12, eyes: 12, eyewear: 20, hair: 16, headgear: 24, neck: 20, warpaint: 12,
+};
+
 type Radix = readonly { key: string; size: number }[];
 const paletteRadix = [
   { key: 'skin', size: SKIN_TONES.length }, { key: 'accent', size: ACCENT_PALETTE.length },
   { key: 'leather', size: LEATHER_PALETTE.length }, { key: 'metal', size: METAL_PALETTE.length },
 ];
-const RADIX_BY_VERSION: Readonly<Record<1 | 2, Radix>> = {
+type Version = 1 | 2 | 3;
+const RADIX_BY_VERSION: Readonly<Record<Version, Radix>> = {
   1: [...LAYER_KEYS.map((k) => ({ key: k, size: V1_SIZES[k] })), ...paletteRadix],
-  2: [...LAYER_KEYS.map((k) => ({ key: k, size: AVATAR_CATALOG[k].length })), ...paletteRadix],
+  2: [...LAYER_KEYS.map((k) => ({ key: k, size: V2_SIZES[k] })), ...paletteRadix],
+  3: [...LAYER_KEYS.map((k) => ({ key: k, size: V3_CAPACITY[k] })), ...paletteRadix],
 };
-export const PAYLOAD_SPACE = { 1: RADIX_BY_VERSION[1].reduce((p, r) => p * r.size, 1), 2: RADIX_BY_VERSION[2].reduce((p, r) => p * r.size, 1) } as const;
-if (PAYLOAD_SPACE[2] >= 16 ** 9) throw new Error('DNA v2 payload no longer fits 36 bits — bump to v3 with a wider head');
+const space = (v: Version) => RADIX_BY_VERSION[v].reduce((p, r) => p * r.size, 1);
+export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3) } as const;
+/** Hex digits of payload per version (v1/v2: 9, v3: 13). */
+const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13 };
+if (PAYLOAD_SPACE[2] >= 16 ** 9) throw new Error('DNA v2 payload no longer fits 36 bits');
+if (PAYLOAD_SPACE[3] >= 16 ** 13) throw new Error('DNA v3 payload no longer fits 52 bits');
+for (const k of LAYER_KEYS) {
+  if (AVATAR_CATALOG[k].length > V3_CAPACITY[k]) throw new Error(`The ${k} catalog outgrew DNA v3 (${AVATAR_CATALOG[k].length} > ${V3_CAPACITY[k]}): add a v4`);
+}
 
 /* ───────────── Nudge block ───────────── */
 
@@ -99,7 +126,7 @@ function configDigits(config: GoblinAvatarConfig, radix: Radix): number[] {
   });
 }
 
-function packHead(version: 1 | 2, digits: number[]): string {
+function packHead(version: Version, digits: number[]): string {
   const radix = RADIX_BY_VERSION[version];
   let payload = 0;
   for (let i = radix.length - 1; i >= 0; i--) {
@@ -107,16 +134,17 @@ function packHead(version: 1 | 2, digits: number[]): string {
     if (!Number.isInteger(d) || d < 0 || d >= radix[i].size) throw new RangeError(`DNA digit ${radix[i].key}=${d} out of range for v${version}`);
     payload = payload * radix[i].size + d;
   }
-  const head = (version.toString(16) + payload.toString(16).padStart(9, '0')).toUpperCase();
+  const head = (version.toString(16) + payload.toString(16).padStart(PAYLOAD_HEX[version], '0')).toUpperCase();
   return head + checksum8(head).toString(16).padStart(2, '0').toUpperCase();
 }
 
 export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
   const fitsV1 = LAYER_KEYS.every((k) => config.layers[k] < V1_SIZES[k]);
+  const fitsV2 = LAYER_KEYS.every((k) => config.layers[k] < V2_SIZES[k]);
   const nudged = isNudged(config.nudge);
-  const version: 1 | 2 = fitsV1 && !nudged ? 1 : 2;
+  const version: Version = fitsV1 && !nudged ? 1 : fitsV2 ? 2 : 3;
   const hex = packHead(version, configDigits(config, RADIX_BY_VERSION[version]));
-  let dna = `GOB-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}`;
+  let dna = hex.match(/.{4}/g)!.reduce((out, group) => `${out}-${group}`, 'GOB');
   if (nudged) {
     let payload = 0;
     const d = nudgeDigits(config.nudge);
@@ -130,13 +158,22 @@ export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
 }
 
 export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
-  const m = /^GOB-([0-9A-F]{4})-([0-9A-F]{4})-([0-9A-F]{4})(?:-([0-9A-Z]{4})-([0-9A-Z]{4})-([0-9A-Z]{4}))?$/i.exec(dna.trim());
-  if (!m) throw new SyntaxError('Malformed goblin DNA');
-  const hex = (m[1] + m[2] + m[3]).toUpperCase();
-  const head = hex.slice(0, 10);
-  if (parseInt(hex.slice(10), 16) !== checksum8(head)) throw new SyntaxError('Goblin DNA checksum mismatch');
-  const version = parseInt(head[0], 16);
-  if (version !== 1 && version !== 2) throw new RangeError(`Unsupported DNA version ${version}`);
+  // Groups after GOB: 3 (v1/v2) or 4 (v3) hex groups, then optionally the 3-group nudge block.
+  const groups = dna.trim().toUpperCase().split('-');
+  if (groups[0] !== 'GOB' || !groups.slice(1).every((g) => /^[0-9A-Z]{4}$/.test(g))) throw new SyntaxError('Malformed goblin DNA');
+  const version = parseInt(groups[1]?.[0] ?? '', 16);
+  if (version !== 1 && version !== 2 && version !== 3) {
+    if (/^[0-9A-F]$/.test(groups[1]?.[0] ?? '')) throw new RangeError(`Unsupported DNA version ${version}`);
+    throw new SyntaxError('Malformed goblin DNA');
+  }
+  const headGroups = version === 3 ? 4 : 3;
+  if (groups.length !== 1 + headGroups && groups.length !== 1 + headGroups + 3) throw new SyntaxError('Malformed goblin DNA');
+  const hex = groups.slice(1, 1 + headGroups).join('');
+  if (!/^[0-9A-F]+$/.test(hex)) throw new SyntaxError('Malformed goblin DNA');
+  const nudgeGroups = groups.slice(1 + headGroups);
+  const m: (string | undefined)[] = [undefined, undefined, undefined, undefined, ...nudgeGroups];
+  const head = hex.slice(0, -2);
+  if (parseInt(hex.slice(-2), 16) !== checksum8(head)) throw new SyntaxError('Goblin DNA checksum mismatch');
   const radix = RADIX_BY_VERSION[version];
   let payload = parseInt(head.slice(1), 16);
   if (payload >= PAYLOAD_SPACE[version]) throw new RangeError('DNA payload out of range');
@@ -146,8 +183,10 @@ export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
   radix.forEach((r, i) => { if (r.key in AVATAR_CATALOG) layers[r.key as AvatarLayerId] = digits[i]; });
   const at = (key: string) => digits[radix.findIndex((r) => r.key === key)];
   const config: GoblinAvatarConfig = { version: 1, layers, skin: SKIN_TONES[at('skin')].id, accent: at('accent'), leather: at('leather'), metal: at('metal') };
+  // A layer index past what the catalog holds (a v3 code from a newer build) can't be drawn here.
+  for (const k of LAYER_KEYS) if (layers[k] >= AVATAR_CATALOG[k].length) throw new RangeError(`This goblin uses a ${k} item this game doesn't have yet`);
   if (!m[4]) return config;
-  if (version === 1) throw new SyntaxError('Nudge block requires DNA v2');
+  if (version === 1) throw new SyntaxError('Nudge block requires DNA v2 or later');
   const block = (m[4] + m[5] + m[6]).toUpperCase();
   const body = block.slice(0, 10);
   if (parseInt(block.slice(10), 36) !== fnv(body, fnv(hex)) % 1296) throw new SyntaxError('Nudge block checksum mismatch');
@@ -165,10 +204,13 @@ export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
 /* ───────────── Deterministic generation (versioned) ───────────── */
 
 /** v1 weights are frozen alongside V1_SIZES so `generateRandomGoblin(seed, 1)` never changes. */
-const WEIGHTS: Readonly<Record<1 | 2, Partial<Record<AvatarLayerId, readonly number[]>>>> = {
+const WEIGHTS: Readonly<Record<1 | 2 | 3, Partial<Record<AvatarLayerId, readonly number[]>>>> = {
   1: { eyewear: [4, 3, 2, 1, 1], hair: [2, 3, 2, 2, 3], headgear: [4, 2, 2, 1, 2], neck: [3, 2, 2, 2, 1], warpaint: [5, 2, 1, 1, 2] },
   2: { eyewear: [4, 3, 2, 1, 1, 2, 1], hair: [2, 3, 2, 2, 3], headgear: [4, 2, 2, 1, 2, 2, 2], neck: [3, 2, 2, 2, 1, 2], warpaint: [5, 2, 1, 1, 2], mouth: [3, 3, 2, 2, 1] },
+  // v3 draws from the live catalog; layers not listed are uniform. "none" stays the likeliest single pick.
+  3: {},
 };
+const noneWeighted = (size: number, noneWeight: number) => Array.from({ length: size }, (_, i) => (i === 0 ? noneWeight : 1));
 
 function pickWeighted(rand: () => number, size: number, weights?: readonly number[]) {
   const w = weights && weights.length === size ? weights : Array.from({ length: size }, () => 1);
@@ -183,11 +225,18 @@ function pickWeighted(rand: () => number, size: number, weights?: readonly numbe
  * Lobbies persist the generator version they were created with, so AI faces never change mid-season
  * when the catalog grows (a question the first draft of the plan didn't ask).
  */
-export function generateRandomGoblin(seed: number | string, generator: 1 | 2 = 2): GoblinAvatarConfig {
+export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3 = 2): GoblinAvatarConfig {
   const rand = mulberry32(typeof seed === 'number' ? seed : checksum32(seed));
-  const radix = RADIX_BY_VERSION[generator];
   const layers = {} as Record<AvatarLayerId, number>;
-  for (const layer of LAYER_KEYS) layers[layer] = pickWeighted(rand, radix.find((r) => r.key === layer)!.size, WEIGHTS[generator][layer]);
+  for (const layer of LAYER_KEYS) {
+    if (generator === 3) {
+      const size = AVATAR_CATALOG[layer].length;
+      const optional = AVATAR_CATALOG[layer][0] === 'none';
+      layers[layer] = pickWeighted(rand, size, optional ? noneWeighted(size, Math.max(2, Math.round(size / 4))) : undefined);
+    } else {
+      layers[layer] = pickWeighted(rand, RADIX_BY_VERSION[generator].find((r) => r.key === layer)!.size, WEIGHTS[generator][layer]);
+    }
+  }
   if (layers.headgear === 3 && layers.hair === 1) layers.hair = 4;
   if (layers.eyewear === 2 && layers.headgear === 2) layers.eyewear = 1;
   return {

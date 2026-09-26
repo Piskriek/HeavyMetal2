@@ -98,7 +98,7 @@ export default function CharacterCreatorStudio() {
   }, [commit]);
 
   const randomize = useCallback((colorsOnly = false) => {
-    const fresh = generateRandomGoblin((Math.random() * 2 ** 31) >>> 0);
+    const fresh = generateRandomGoblin((Math.random() * 2 ** 31) >>> 0, 3); // the whole catalog, painted parts included
     commit((c) => {
       if (colorsOnly) return { ...c, skin: fresh.skin, accent: fresh.accent, leather: fresh.leather, metal: fresh.metal };
       const layers = { ...avoidMissing(fresh.layers, missingArt) };

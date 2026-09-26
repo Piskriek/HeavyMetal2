@@ -483,6 +483,16 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   { type: 'anim_50_firework_red', name: 'Red Firework', category: 'animated', url: '/art/animated/alpha/anim-50-firework-red.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
   { type: 'anim_51_firework_blue', name: 'Blue Firework', category: 'animated', url: '/art/animated/alpha/anim-51-firework-blue.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
   { type: 'anim_52_firework_green', name: 'Green Firework', category: 'animated', url: '/art/animated/alpha/anim-52-firework-green.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  // Art wave 1 (ART-B3b): race effects, placeable as animated decorations until ART-I3 wires them into the race.
+  { type: 'anim_53_pinball_spinner', name: 'Pinball Spinner', category: 'animated', url: '/art/animated/alpha/anim-53-pinball-spinner.png', defaultWidth: 420, defaultHeight: 420, isAnimated: true, animCols: 2, animRows: 2, animFps: 12 },
+  { type: 'anim_54_nitro_flame', name: 'Nitro Flame', category: 'animated', url: '/art/animated/alpha/anim-54-nitro-flame.png', defaultWidth: 360, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_55_boost_pad_flash', name: 'Boost Pad Flash', category: 'animated', url: '/art/animated/alpha/anim-55-boost-pad-flash.png', defaultWidth: 520, defaultHeight: 360, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_56_pickup_collect_burst', name: 'Pickup Burst', category: 'animated', url: '/art/animated/alpha/anim-56-pickup-collect-burst.png', defaultWidth: 420, defaultHeight: 420, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_57_shield_shatter', name: 'Shield Shatter', category: 'animated', url: '/art/animated/alpha/anim-57-shield-shatter.png', defaultWidth: 460, defaultHeight: 460, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_58_spring_launch_puff', name: 'Spring Launch Puff', category: 'animated', url: '/art/animated/alpha/anim-58-spring-launch-puff.png', defaultWidth: 380, defaultHeight: 520, isAnimated: true, animCols: 2, animRows: 2, animFps: 12 },
+  { type: 'anim_59_landing_shockwave', name: 'Landing Shockwave', category: 'animated', url: '/art/animated/alpha/anim-59-landing-shockwave.png', defaultWidth: 560, defaultHeight: 320, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_60_tree_smash_splinters', name: 'Tree Smash Splinters', category: 'animated', url: '/art/animated/alpha/anim-60-tree-smash-splinters.png', defaultWidth: 480, defaultHeight: 440, isAnimated: true, animCols: 2, animRows: 2, animFps: 14 },
+  { type: 'anim_61_speed_lines', name: 'Speed Lines', category: 'animated', url: '/art/animated/alpha/anim-61-speed-lines.png', defaultWidth: 520, defaultHeight: 360, isAnimated: true, animCols: 2, animRows: 2, animFps: 16 },
 
   // --- SCENE KIT: primitives, lights, and the record type for edits to generated scenery ---
   ...PRIMITIVE_DEFINITIONS,

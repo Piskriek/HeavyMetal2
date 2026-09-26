@@ -29,7 +29,7 @@ export function useMissingPaintedArt(): ReadonlySet<string> {
   useEffect(() => {
     let live = true;
     void Promise.all(PAINTED_PARTS.map(async (p) => {
-      const file = KEYED_PARTS[p.id];
+      const file = p.fixedFile ?? KEYED_PARTS[p.id];
       return file && (await probe(file.file)) ? null : `painted:${p.id}`;
     })).then((names) => {
       if (live) setMissing(new Set(names.filter((n): n is string => !!n)));

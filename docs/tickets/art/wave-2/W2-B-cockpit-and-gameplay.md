@@ -1,4 +1,4 @@
-# W2-B: Cockpit plate, glass, dashboard trinkets and the rope-reel goblin (14 images)
+# W2-B: Cockpit plate, glass, dashboard trinkets and the rope-reel goblin (13 images; image 1 dropped)
 
 - **Batch**: agent 3 of 7 in art wave 2 (branch `art/generated-wave-2`; the others run at the same time).
   Read [README.md](README.md) first: its prompt, review loop and depth-map steps are binding.
@@ -24,10 +24,9 @@ Everything here is the cockpit view: the player looks through the windscreen at 
   screenshot-like background instead; nothing may cover the middle third).
 - The builder's Custom 3D icon moved to W2-E, so it matches the other builder icons.
 
-### 1. `gauge-cluster-left`
-Ticket P1 → `public/art/cockpit/gauge-cluster-left.png` · **Reference:** public/art/cockpit/gauge-cluster-left.png (the image itself: keep everything but the third ring)
-Process: `node --import tsx scripts/key-art.ts --set cockpit --only gauge-cluster-left` (raw `art-src/cockpit/raw/gauge-cluster-left.png`). The keyer trims to the content, so then put it back on the original canvas: `convert public/art/cockpit/gauge-cluster-left.png -background none -resize 1024x419 -gravity center -extent 1024x419 public/art/cockpit/gauge-cluster-left.png`, and compare with the old file (`git show HEAD~:public/art/cockpit/gauge-cluster-left.png`): the two existing rings must sit on the same pixels (their dial anchors are in `src/game/cockpit-art.json`). If they drift, regenerate rather than ship it.
-> Repaint this goblin cockpit instrument plate exactly as it is: same shape, same size, the same three brass rings in the same places, the same iron plate and rivets, the same outline weight and brushwork. One change only: the third ring, at the lower left, becomes a real gauge housing like the other two, with an empty dark round dial recessed inside a bevelled brass bezel (no needle, no numbers). Keep the painting style of the input image exactly: hand-painted, visible brushwork, thick dark brown-black outlines, warm light from the upper left; not flat vector art, not a 3D render. Background: perfectly flat, solid pure magenta #FF00FF filling the entire image edge to edge, no gradient, no shadow, no floor, no vignette, no texture. The subject contains absolutely no pink, purple or magenta, and no glow, haze or soft halo spreads past its outline. No text, no letters, no numbers, no watermark, nothing else in frame.
+### 1. ~~`gauge-cluster-left`~~ — dropped
+Ticket P1 assumed the plate has a third, empty ring. It does not: `gauge-cluster-left.png` has two rings and both are
+working dials (`src/game/cockpit-art.json`). **Do not repaint the plate**; leave `public/art/cockpit/gauge-cluster-left.png` untouched.
 
 ### 2. `cockpit-glass-grime`
 Ticket P2 → `public/art/cockpit/cockpit-glass-grime.png` · **Reference:** none

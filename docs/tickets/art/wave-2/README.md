@@ -9,7 +9,7 @@ agent prompt is below, complete.
 |---|---|---|---|
 | 1 | [W2-A1](W2-A1-goblin-parts-3a.md): goblin parts 3a (eyes, eyewear, hair, headgear, a mouth) | 12 + 5 depth maps | `public/avatar-parts/keyed/`, `…/depth/` |
 | 2 | [W2-A2](W2-A2-goblin-parts-3b.md): goblin parts 3b (mouths, necks, noses, ears, war paint) | 12 + 3 depth maps | `public/avatar-parts/keyed/`, `…/depth/` |
-| 3 | [W2-B](W2-B-cockpit-and-gameplay.md): cockpit plate, glass grime and cracks, dashboard trinkets, rope-reel goblin | 14 | `public/art/cockpit/`, `public/art/animated/alpha/` |
+| 3 | [W2-B](W2-B-cockpit-and-gameplay.md): glass grime and cracks, dashboard trinkets, rope-reel goblin (image 1 dropped) | 13 | `public/art/cockpit/`, `public/art/animated/alpha/` |
 | 4 | [W2-C](W2-C-garage-decals-2.md): Ball Garage decal pack 2 | 16 | `public/art/garage/decals/` |
 | 5 | [W2-D](W2-D-goblin-base-and-gauges.md): the last vector goblin parts (heads, war paint, goggles up) and painted needles | 12 + 1 depth map | `public/avatar-parts/keyed/`, `public/art/cockpit/`, `public/art/ui/icons/` |
 | 6 | [W2-E](W2-E-builder-icons.md): painted builder shelf icons and the Custom 3D icon | 17 | `public/art/ui/icons/` |
@@ -128,7 +128,7 @@ YOUR BATCH:
 The line to append, per agent:
 - Agent 1: `W2-A1 — docs/tickets/art/wave-2/W2-A1-goblin-parts-3a.md (images 1–12, 5 depth maps)`
 - Agent 2: `W2-A2 — docs/tickets/art/wave-2/W2-A2-goblin-parts-3b.md (images 1–12, 3 depth maps)`
-- Agent 3: `W2-B — docs/tickets/art/wave-2/W2-B-cockpit-and-gameplay.md (images 1–14)`
+- Agent 3: `W2-B — docs/tickets/art/wave-2/W2-B-cockpit-and-gameplay.md (images 2–14; image 1 dropped)`
 - Agent 4: `W2-C — docs/tickets/art/wave-2/W2-C-garage-decals-2.md (images 1–16)`
 - Agent 5: `W2-D — docs/tickets/art/wave-2/W2-D-goblin-base-and-gauges.md (images 1–12, 1 depth map)`
 - Agent 6: `W2-E — docs/tickets/art/wave-2/W2-E-builder-icons.md (images 1–17)`

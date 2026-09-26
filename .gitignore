@@ -38,3 +38,7 @@ art-src/meshy/*/*.glb
 art-src/meshy/.ref-upload.png
 art-src/meshy/ledger/*.tmp
 src/dev-kit-viewer.ts
+
+# Local secrets (API keys); never committed
+.env.local
+*.local.env

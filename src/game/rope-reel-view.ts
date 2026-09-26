@@ -11,11 +11,11 @@ import { placementFromEngine, type TrackSpaceMap } from './track-space';
 import type { RacerFrame } from './scene';
 import type { CourseId } from './types';
 
-/** The rope-heave trio sheet: 2 columns × 2 rows, played at 6 frames a second. */
-export const ROPE_REEL_ART = Object.freeze({ url: '/art/animated/alpha/anim-33-rope-heave-trio.png', cols: 2, rows: 2, fps: 6 });
-/** How tall the trio stands (world units; a ball is 124 across), and its aspect (400 × 560 art). */
-export const ROPE_CREW_HEIGHT = 300;
-const ROPE_CREW_ASPECT = 400 / 560;
+/** The rope-reel goblin sheet: 2 columns × 2 rows, played at 8 frames a second. */
+export const ROPE_REEL_ART = Object.freeze({ url: '/art/animated/alpha/anim-62-goblin-rope-reel.png', cols: 2, rows: 2, fps: 8 });
+/** How tall the single goblin stands (world units; a ball is 124 across), and its cell aspect (500 × 410). */
+export const ROPE_CREW_HEIGHT = 190;
+const ROPE_CREW_ASPECT = 500 / 410;
 
 /** The 2×2 sheet frame shown at `time` (frozen on the first under reduced motion). */
 export function ropeCrewFrame(time: number, reducedMotion: boolean): number {

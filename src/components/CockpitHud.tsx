@@ -1,21 +1,29 @@
 /**
- * M01 · T4 — the first-person cockpit overlay.
+ * M01 · T4 / WIRE-3 — The first-person cockpit overlay.
  *
- * Everything is a painted PNG from `public/art/cockpit/` (measured by `scripts/cut-cockpit-art.mjs`
- * into `src/game/cockpit-art.json`) plus SVG needles bound to live state. No image decoding, no
- * layout thrash and no React re-render happens per frame: one `requestAnimationFrame` loop reads
- * `engine.getCockpitState()` and writes CSS transforms and a handful of text nodes through refs.
+ * All painted art from `public/art/cockpit/` (measured by `scripts/cut-cockpit-art.mjs`
+ * into `src/game/cockpit-art.json`):
+ * - Glass grime and painted spiderweb cracks (PNGs with screen blend, no SVG path art)
+ * - Painted large and small needles rotating around measured hub anchors
+ * - Painted animated speed lines overlay inside the aperture at >80% top speed
+ * - Dashboard trinkets with a spring-damper responding to steering, jolts, and bob
+ * - Painted bezel, gauge clusters, starter goblin, yoke, and goblin arms
  *
- * The bezel is painted art with a genuinely transparent aperture — the WebGL canvas shows through
- * it, which is why this component never masks the viewport itself. The aperture's measured geometry
- * only positions the dials, the yoke and the arms.
+ * No layout thrash, no per-frame React state re-render: one rAF loop reads
+ * `engine.getCockpitState()` and updates CSS transforms via refs.
  */
 import { gapLabel } from '../game/gap';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CRACK_THRESHOLD, armsAt, cockpitBob, cockpitLayout, crackOpacity, crackPath, driverGesture, glassScratches, needleAngle, yokeAngleDeg, yokeJolt,
+  CRACK_THRESHOLD, NEEDLE_ANCHORS, SPEED_MAX, armsAt, cockpitBob, cockpitLayout, crackOpacity,
+  crackTransform, driverGesture, needleAngle, speedLinesOpacity, yokeAngleDeg, yokeJolt,
   COCKPIT_ART, COCKPIT_MANIFEST, COCKPIT_MANIFEST as ART, type CockpitState,
 } from '../game/cockpit';
+import {
+  TRINKET_DEFS, createTrinketSpringState, readDashboardTrinkets, stepTrinketSpring, trinketPlacement,
+  type DashboardTrinkets, type TrinketDef,
+} from '../game/cockpit-trinkets';
+import { readRecords } from '../game/preferences';
 import '../cockpit.css';
 
 interface CockpitHudProps {
@@ -30,7 +38,6 @@ interface CockpitHudProps {
 /** The hand's anchor inside the painted arm sprite; the CSS rotation pivots exactly here. */
 const GRIP_ANCHOR = { x: ART.arm.gripFraction.x, y: ART.arm.gripFraction.y };
 const SPEED_SWEEP = 240;
-const SPEED_MAX = 360;
 const GRADE_SWEEP = 220;
 
 export default function CockpitHud({ readState, state, reducedMotion, active }: CockpitHudProps) {
@@ -41,20 +48,49 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const rootRef = useRef<HTMLDivElement>(null);
   const bezelRef = useRef<HTMLImageElement>(null);
   const yokeRef = useRef<HTMLDivElement>(null);
-  /** P2: the crack layer, and the hit that drew it. */
-  const crackRef = useRef<SVGPathElement>(null);
+
+  /** P2 & WIRE-3: painted glass crack and speed lines */
+  const crackImgRef = useRef<HTMLImageElement>(null);
+  const speedLinesRef = useRef<HTMLDivElement>(null);
   const crack = useRef({ at: -1e9, seed: 0, lastImpact: 0 });
+
   const armLeftRef = useRef<HTMLDivElement>(null);
   const armRightRef = useRef<HTMLDivElement>(null);
   const bobRef = useRef<HTMLDivElement>(null);
   const starterRef = useRef<HTMLDivElement>(null);
+
+  /** WIRE-3: painted needles as HTMLImageElements (zero SVG lines) */
   const needles = {
-    speed: useRef<SVGLineElement>(null),
-    grade: useRef<SVGLineElement>(null),
-    boost: useRef<SVGLineElement>(null),
-    bounce: useRef<SVGLineElement>(null),
-    shield: useRef<SVGLineElement>(null),
+    speed: useRef<HTMLImageElement>(null),
+    grade: useRef<HTMLImageElement>(null),
+    boost: useRef<HTMLImageElement>(null),
+    bounce: useRef<HTMLImageElement>(null),
+    shield: useRef<HTMLImageElement>(null),
   };
+
+  /** WIRE-3 / X12: dashboard trinkets */
+  const [trinkets, setTrinkets] = useState<DashboardTrinkets>(() => readDashboardTrinkets(readRecords()));
+  const trinket1Ref = useRef<HTMLDivElement>(null);
+  const trinket2Ref = useRef<HTMLDivElement>(null);
+  const trinket1HeadRef = useRef<HTMLImageElement>(null);
+  const trinket2HeadRef = useRef<HTMLImageElement>(null);
+  const spring1 = useRef(createTrinketSpringState());
+  const spring2 = useRef(createTrinketSpringState());
+  const lastTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handler = () => {
+      // Re-read through the unlock rule so an earned cup shows and a locked one never does.
+      setTrinkets(readDashboardTrinkets(readRecords()));
+    };
+    window.addEventListener('goblin-trinkets-changed' as any, handler);
+    window.addEventListener('storage', handler);
+    return () => {
+      window.removeEventListener('goblin-trinkets-changed' as any, handler);
+      window.removeEventListener('storage', handler);
+    };
+  }, []);
+
   const readouts = {
     speed: useRef<HTMLSpanElement>(null),
     position: useRef<HTMLSpanElement>(null),
@@ -70,18 +106,42 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
     let frame = 0;
     const step = (now: number) => {
       readState(state);
-      // P2: a new big hit cracks the glass at its side (never under reduced motion); it holds, then fades.
+      const dt = lastTimeRef.current > 0 ? Math.min(0.05, (now - lastTimeRef.current) / 1000) : 0.016;
+      lastTimeRef.current = now;
+
+      // P2 & WIRE-3: a new big hit cracks the glass at its side with a painted crack PNG
       const cracks = crack.current;
       if (!reducedMotion && state.impact >= CRACK_THRESHOLD && state.impact > cracks.lastImpact + 0.15) {
-        cracks.at = now; cracks.seed += 1;
-        crackRef.current?.setAttribute('d', crackPath(cracks.seed, state.impactSide, layout.aperture.w, layout.aperture.h));
+        cracks.at = now;
+        cracks.seed += 1;
+        const tf = crackTransform(cracks.seed, state.impactSide, layout.aperture.w, layout.aperture.h);
+        if (crackImgRef.current) {
+          crackImgRef.current.src = tf.file;
+          crackImgRef.current.style.left = `${tf.x.toFixed(1)}px`;
+          crackImgRef.current.style.top = `${tf.y.toFixed(1)}px`;
+          crackImgRef.current.style.transform = `translate(-50%, -50%) rotate(${tf.rotDeg}deg) scale(${tf.scale.toFixed(2)})`;
+        }
       }
       cracks.lastImpact = state.impact;
-      if (crackRef.current) crackRef.current.style.opacity = reducedMotion ? '0' : crackOpacity((now - cracks.at) / 1000).toFixed(3);
-      // H8: a hit jolts the yoke (and the hands on it); with reduced motion the cockpit flashes.
+      if (crackImgRef.current) {
+        crackImgRef.current.style.opacity = reducedMotion ? '0' : crackOpacity((now - cracks.at) / 1000).toFixed(3);
+      }
+
+      // WIRE-3: speed lines appear above ~80% top speed, fading in and out; off under reduced motion
+      if (speedLinesRef.current) {
+        const spdOpacity = speedLinesOpacity(state.speedKmh, reducedMotion);
+        speedLinesRef.current.style.opacity = spdOpacity.toFixed(3);
+        if (spdOpacity > 0) {
+          const sheetFrame = Math.floor((now / 1000) * 12) % 4;
+          speedLinesRef.current.style.backgroundPosition = `${(sheetFrame % 2) * 100}% ${sheetFrame > 1 ? 100 : 0}%`;
+        }
+      }
+
+      // H8: a hit jolts the yoke (and the hands on it); with reduced motion the cockpit flashes
       const jolt = yokeJolt(state.impact, state.impactSide, now / 1000, reducedMotion);
       const yokeDeg = yokeAngleDeg(state.steer) + jolt.rotDeg;
-      // P3: the arms flinch, pump or brace with the race (still under reduced motion).
+
+      // P3: the arms flinch, pump or brace with the race (still under reduced motion)
       const gesture = driverGesture(state, reducedMotion);
       const arms = armsAt(layout, yokeDeg, gesture.gesture, gesture.intensity, now / 1000);
 
@@ -102,25 +162,24 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
           : `rotate(${pose.rotDeg.toFixed(2)}deg)`;
       }
 
-      if (needles.speed.current) {
-        needles.speed.current.setAttribute('transform', `rotate(${needleAngle(state.speedKmh, 0, SPEED_MAX, SPEED_SWEEP).toFixed(2)})`);
-      }
-      if (needles.grade.current) {
-        needles.grade.current.setAttribute('transform', `rotate(${needleAngle(state.gradePct, -30, 30, GRADE_SWEEP).toFixed(2)})`);
-      }
-      if (needles.boost.current) {
-        needles.boost.current.setAttribute('transform', `rotate(${needleAngle(state.boostCharges, 0, 2, GRADE_SWEEP).toFixed(2)})`);
-      }
-      if (needles.bounce.current) {
-        needles.bounce.current.setAttribute('transform', `rotate(${needleAngle(state.bounceCharges, 0, 3, GRADE_SWEEP).toFixed(2)})`);
-      }
-      if (needles.shield.current) {
-        needles.shield.current.setAttribute('transform', `rotate(${needleAngle(state.shieldSeconds, 0, 12, GRADE_SWEEP).toFixed(2)})`);
-      }
+      // WIRE-3: rotate painted needles about their measured hub anchor
+      const setNeedleAngle = (img: HTMLImageElement | null, angle: number, isLarge: boolean) => {
+        if (!img) return;
+        const anchor = isLarge ? NEEDLE_ANCHORS.large : NEEDLE_ANCHORS.small;
+        const hubYPercent = (anchor.hubFraction.y * 100).toFixed(2);
+        img.style.transform = `translate(-50%, -${hubYPercent}%) rotate(${angle.toFixed(2)}deg)`;
+      };
+
+      setNeedleAngle(needles.speed.current, needleAngle(state.speedKmh, 0, SPEED_MAX, SPEED_SWEEP), true);
+      setNeedleAngle(needles.grade.current, needleAngle(state.gradePct, -30, 30, GRADE_SWEEP), false);
+      setNeedleAngle(needles.boost.current, needleAngle(state.boostCharges, 0, 2, GRADE_SWEEP), false);
+      setNeedleAngle(needles.bounce.current, needleAngle(state.bounceCharges, 0, 3, GRADE_SWEEP), false);
+      setNeedleAngle(needles.shield.current, needleAngle(state.shieldSeconds, 0, 12, GRADE_SWEEP), false);
 
       if (readouts.speed.current) readouts.speed.current.textContent = String(Math.round(state.speedKmh));
       if (readouts.position.current) readouts.position.current.textContent = `P${state.position}`;
-      // H9: the gap to the rider ahead, coloured by whether it is closing.
+
+      // H9: the gap to the rider ahead, coloured by whether it is closing
       const gapChip = readouts.gap.current;
       if (gapChip) {
         const show = state.gapPlace > 0;
@@ -138,10 +197,57 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
       const speedMeter = rootRef.current?.querySelector('[data-gauge="speed"]');
       if (speedMeter) speedMeter.setAttribute('aria-valuenow', String(Math.round(state.speedKmh)));
+
+      const bob = active ? cockpitBob(state.speedKmh, state.grounded, reducedMotion, now / 1000) : 0;
       if (bobRef.current) {
-        const bob = active ? cockpitBob(state.speedKmh, state.grounded, reducedMotion, now / 1000) : 0;
         bobRef.current.style.transform = `translateY(${bob.toFixed(2)}px)`;
       }
+
+      // WIRE-3 / X12: step trinket spring-dampers and update transforms
+      const motionInput = {
+        steer: state.steer,
+        bob,
+        impact: state.impact,
+        impactSide: state.impactSide,
+        reducedMotion,
+        dt,
+      };
+      const s1 = stepTrinketSpring(spring1.current, motionInput);
+      const s2 = stepTrinketSpring(spring2.current, motionInput);
+
+      const def1 = TRINKET_DEFS[trinkets.slot1];
+      const def2 = TRINKET_DEFS[trinkets.slot2];
+
+      if (trinket1Ref.current && def1 && def1.id !== 'none') {
+        if (def1.type === 'bobblehead') {
+          trinket1Ref.current.style.transform = `translateY(${s1.yPx.toFixed(1)}px)`;
+          if (trinket1HeadRef.current) {
+            trinket1HeadRef.current.style.transform = `translateX(-50%) rotate(${s1.angleDeg.toFixed(2)}deg) translateY(${s1.yPx.toFixed(1)}px)`;
+          }
+        } else if (def1.type === 'hanging') {
+          trinket1Ref.current.style.transformOrigin = `${(def1.anchorFraction.x * 100).toFixed(0)}% ${(def1.anchorFraction.y * 100).toFixed(0)}%`;
+          trinket1Ref.current.style.transform = `rotate(${s1.angleDeg.toFixed(2)}deg) translateY(${s1.yPx.toFixed(1)}px)`;
+        } else {
+          trinket1Ref.current.style.transformOrigin = `${(def1.anchorFraction.x * 100).toFixed(0)}% ${(def1.anchorFraction.y * 100).toFixed(0)}%`;
+          trinket1Ref.current.style.transform = `rotate(${s1.angleDeg.toFixed(2)}deg) translateY(${s1.yPx.toFixed(1)}px)`;
+        }
+      }
+
+      if (trinket2Ref.current && def2 && def2.id !== 'none') {
+        if (def2.type === 'bobblehead') {
+          trinket2Ref.current.style.transform = `translateY(${s2.yPx.toFixed(1)}px)`;
+          if (trinket2HeadRef.current) {
+            trinket2HeadRef.current.style.transform = `translateX(-50%) rotate(${s2.angleDeg.toFixed(2)}deg) translateY(${s2.yPx.toFixed(1)}px)`;
+          }
+        } else if (def2.type === 'hanging') {
+          trinket2Ref.current.style.transformOrigin = `${(def2.anchorFraction.x * 100).toFixed(0)}% ${(def2.anchorFraction.y * 100).toFixed(0)}%`;
+          trinket2Ref.current.style.transform = `rotate(${s2.angleDeg.toFixed(2)}deg) translateY(${s2.yPx.toFixed(1)}px)`;
+        } else {
+          trinket2Ref.current.style.transformOrigin = `${(def2.anchorFraction.x * 100).toFixed(0)}% ${(def2.anchorFraction.y * 100).toFixed(0)}%`;
+          trinket2Ref.current.style.transform = `rotate(${s2.angleDeg.toFixed(2)}deg) translateY(${s2.yPx.toFixed(1)}px)`;
+        }
+      }
+
       if (starterRef.current) {
         // The starter goblin's shove, 4 frames at 12 fps. Hidden the instant the push ends.
         starterRef.current.style.opacity = state.pushing ? '1' : '0';
@@ -154,7 +260,7 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [layout, readState, state, reducedMotion, active]);
+  }, [layout, readState, state, reducedMotion, active, trinkets]);
 
   const clusterLeft = COCKPIT_MANIFEST.clusters[0];
   const clusterRight = COCKPIT_MANIFEST.clusters[1];
@@ -169,51 +275,132 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
   const rightSmall = placement(clusterRight, clusterRight.dials[1], layout.clusters.right.w, layout.clusters.right.x, layout.clusters.right.y);
   const rightBig = placement(clusterRight, clusterRight.dials[0], layout.clusters.right.w, layout.clusters.right.x, layout.clusters.right.y);
 
+  /** WIRE-3: dial with painted needle image (no SVG paths/lines) */
   const dial = (
-    box: { x: number; y: number; size: number }, file: string,
-    needleRef: React.RefObject<SVGLineElement | null>, meter: string, label: string,
-  ) => (
-    <div className="cockpit-dial" style={{ left: box.x - box.size / 2, top: box.y - box.size / 2, width: box.size, height: box.size }}>
-      <img src={file} alt="" aria-hidden="true" draggable={false} />
-      <svg className="cockpit-needle" viewBox="-50 -50 100 100" aria-hidden="true">
-        <line ref={needleRef} x1="0" y1="6" x2="0" y2={-46} />
-      </svg>
-      <span className="cockpit-dial-tag" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} data-gauge={meter}>{label}</span>
-    </div>
-  );
+    box: { x: number; y: number; size: number },
+    faceFile: string,
+    needleRef: React.RefObject<HTMLImageElement | null>,
+    meter: string,
+    label: string,
+    isLarge = false,
+  ) => {
+    const anchor = isLarge ? NEEDLE_ANCHORS.large : NEEDLE_ANCHORS.small;
+    const needleFile = isLarge ? COCKPIT_ART.needles.large : COCKPIT_ART.needles.small;
+    const reach = (box.size / 2) * 0.86;
+    const needleH = reach / anchor.hubFraction.y;
+    const needleW = needleH * anchor.aspect;
+    const hubYPercent = (anchor.hubFraction.y * 100).toFixed(2);
+
+    return (
+      <div className="cockpit-dial" style={{ left: box.x - box.size / 2, top: box.y - box.size / 2, width: box.size, height: box.size }}>
+        <img src={faceFile} alt="" aria-hidden="true" draggable={false} />
+        <img
+          ref={needleRef}
+          className={`cockpit-needle-img ${isLarge ? 'cockpit-needle-large' : 'cockpit-needle-small'}`}
+          src={needleFile}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          style={{
+            left: '50%',
+            top: '50%',
+            width: `${needleW.toFixed(1)}px`,
+            height: `${needleH.toFixed(1)}px`,
+            transformOrigin: `50% ${hubYPercent}%`,
+            transform: `translate(-50%, -${hubYPercent}%) rotate(0deg)`,
+          }}
+        />
+        <span className="cockpit-dial-tag" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={0} data-gauge={meter}>{label}</span>
+      </div>
+    );
+  };
+
+  /** WIRE-3: a dashboard trinket, standing on the ledge or hanging from the top of the window. */
+  const renderTrinket = (def: TrinketDef, slot: 1 | 2, slotRef: React.RefObject<HTMLDivElement | null>, headRef: React.RefObject<HTMLImageElement | null>) => {
+    if (def.id === 'none') return null;
+    const box = trinketPlacement(def, slot, layout.aperture);
+
+    if (def.type === 'bobblehead' && def.bodyFile && def.headFile) {
+      return (
+        <div
+          ref={slotRef}
+          className="cockpit-trinket cockpit-trinket-bobble"
+          style={{
+            left: box.x,
+            top: box.y,
+            width: box.w,
+            height: box.h,
+            transform: 'none',
+          }}
+        >
+          <img src={def.bodyFile} alt="" className="cockpit-trinket-sheep-body" draggable={false} />
+          <img ref={headRef} src={def.headFile} alt="" className="cockpit-trinket-sheep-head" draggable={false} />
+        </div>
+      );
+    }
+
+    return (
+      <div
+        ref={slotRef}
+        className="cockpit-trinket"
+        style={{
+          left: box.x,
+          top: box.y,
+          width: box.w,
+          height: box.h,
+          transformOrigin: `${(def.anchorFraction.x * 100).toFixed(0)}% ${(def.anchorFraction.y * 100).toFixed(0)}%`,
+          transform: 'none',
+        }}
+      >
+        <img src={def.file} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} draggable={false} />
+      </div>
+    );
+  };
+
+  const trinket1Def = TRINKET_DEFS[trinkets.slot1];
+  const trinket2Def = TRINKET_DEFS[trinkets.slot2];
 
   return (
-    <div className="cockpit-root" ref={rootRef} data-aperture={`${Math.round(layout.aperture.w)}x${Math.round(layout.aperture.h)}`}>
+    <div className="cockpit-root" ref={rootRef} data-aperture={`${Math.round(layout.aperture.w)}x${Math.round(layout.aperture.h)}`} data-reduced-motion={reducedMotion ? 'true' : 'false'}>
       <div className="cockpit-bob" ref={bobRef}>
-        {/* P2: the glass in the window: glare, smudges, scratches, and a crack on a big hit. */}
-        <svg className="cockpit-glass" aria-hidden="true" width={layout.aperture.w} height={layout.aperture.h}
-          style={{ left: layout.aperture.x, top: layout.aperture.y, borderRadius: layout.aperture.radius }}>
-          <defs>
-            <radialGradient id="cockpit-glare" cx="0.22" cy="0.12" r="0.9">
-              <stop offset="0" stopColor="#fff6e0" stopOpacity="0.16" />
-              <stop offset="0.35" stopColor="#fff6e0" stopOpacity="0.04" />
-              <stop offset="1" stopColor="#fff6e0" stopOpacity="0" />
-            </radialGradient>
-            <filter id="cockpit-smudge"><feGaussianBlur stdDeviation="14" /></filter>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#cockpit-glare)" />
-          <g filter="url(#cockpit-smudge)" fill="#d8c9a3" opacity="0.07">
-            <ellipse cx={layout.aperture.w * 0.18} cy={layout.aperture.h * 0.78} rx={layout.aperture.w * 0.06} ry={layout.aperture.h * 0.04} />
-            <ellipse cx={layout.aperture.w * 0.83} cy={layout.aperture.h * 0.2} rx={layout.aperture.w * 0.05} ry={layout.aperture.h * 0.03} />
-            <ellipse cx={layout.aperture.w * 0.62} cy={layout.aperture.h * 0.86} rx={layout.aperture.w * 0.08} ry={layout.aperture.h * 0.025} />
-          </g>
-          <path d={glassScratches(layout.aperture.w, layout.aperture.h)} stroke="#ffffff" strokeOpacity="0.09" strokeWidth="1" fill="none" />
-          <path ref={crackRef} className="cockpit-crack" d="" stroke="#f4fbff" strokeOpacity="0.75" strokeWidth="1.4" fill="none" strokeLinejoin="bevel" style={{ opacity: 0 }} />
-        </svg>
+        {/* P2 & WIRE-3: painted glass in the window (grime, cracks, and speed lines) */}
+        <div
+          className="cockpit-glass"
+          aria-hidden="true"
+          style={{
+            left: layout.aperture.x,
+            top: layout.aperture.y,
+            width: layout.aperture.w,
+            height: layout.aperture.h,
+            borderRadius: layout.aperture.radius,
+          }}
+        >
+          <img className="cockpit-glass-grime" src={COCKPIT_ART.glassGrime} alt="" aria-hidden="true" draggable={false} />
+          <img
+            ref={crackImgRef}
+            className="cockpit-glass-crack"
+            src={COCKPIT_ART.cracks[0]}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            style={{ opacity: 0 }}
+          />
+          <div ref={speedLinesRef} className="cockpit-speed-lines" aria-hidden="true" style={{ opacity: 0 }} />
+        </div>
+
         <img className="cockpit-bezel" ref={bezelRef} src={COCKPIT_ART.bezel} alt="" aria-hidden="true" draggable={false} />
 
         <img className="cockpit-cluster" style={{ left: layout.clusters.left.x, top: layout.clusters.left.y, width: layout.clusters.left.w }} src={COCKPIT_ART.clusters[0]} alt="" aria-hidden="true" draggable={false} />
         <img className="cockpit-cluster" style={{ left: layout.clusters.right.x, top: layout.clusters.right.y, width: layout.clusters.right.w }} src={COCKPIT_ART.clusters[1]} alt="" aria-hidden="true" draggable={false} />
 
-        {dial(leftBig, COCKPIT_ART.dials[0], needles.grade, 'grade', 'GRADE')}
-        {dial(leftSmall, COCKPIT_ART.dials[1], needles.boost, 'boost', 'BOOST')}
-        {dial(rightSmall, COCKPIT_ART.dials[1], needles.bounce, 'bounce', 'BOUNCE')}
-        {dial(rightBig, COCKPIT_ART.dials[0], needles.speed, 'speed', 'SPEED')}
+        {/* WIRE-3 / X12: dashboard ledge trinkets */}
+        {renderTrinket(trinket1Def, 1, trinket1Ref, trinket1HeadRef)}
+        {renderTrinket(trinket2Def, 2, trinket2Ref, trinket2HeadRef)}
+
+        {dial(leftBig, COCKPIT_ART.dials[0], needles.grade, 'grade', 'GRADE', false)}
+        {dial(leftSmall, COCKPIT_ART.dials[1], needles.boost, 'boost', 'BOOST', false)}
+        {dial(rightSmall, COCKPIT_ART.dials[1], needles.bounce, 'bounce', 'BOUNCE', false)}
+        {dial(rightBig, COCKPIT_ART.dials[0], needles.speed, 'speed', 'SPEED', true)}
 
         <div className="cockpit-center-readout" ref={readouts.center} role="status" />
 

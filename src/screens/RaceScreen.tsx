@@ -20,7 +20,7 @@ import TestDriveBar from '../components/TestDriveBar';
 import { DEFAULT_ROPE, type RopeConfig } from '../game/sim/rope';
 import { TouchRaceControls } from '../components/RaceControls';
 import TrackStripMap from '../components/TrackStripMap';
-import { COCKPIT_ART_PATHS, createCockpitState, type CockpitState } from '../game/cockpit';
+import { createCockpitState, preloadCockpitArt, type CockpitState } from '../game/cockpit';
 import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
 import { preloadTrackArt } from '../game/obstacle-view';
 import { ROPE_REEL_ART } from '../game/rope-reel-view';
@@ -253,7 +253,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         // The off-screen pointer badge shows the player's portrait, not the ball.
         loadArtImage(riderCell(config.loadout.rider).pilot ?? riderCell(config.loadout.rider).image).catch(() => null),
         // M01 · T4: the cockpit is painted art; every file is decoded before the grid, never in-race.
-        Promise.all(COCKPIT_ART_PATHS.map((path) => loadArtImage(path).catch(() => null))),
+        preloadCockpitArt(),
         // M01 · T5: the effect sheets too — an explosion must not hitch on its first frame.
         Promise.all([...EFFECT_ART_PATHS, ROPE_REEL_ART.url].map((path) => loadArtImage(path).catch(() => null))),
         // WIRE-2: the road textures, obstacle sprites and effect sheets the race draws with.

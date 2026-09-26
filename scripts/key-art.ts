@@ -14,17 +14,22 @@
  * PNG only (pure Node; ImageMagick fallback). Convert a JPEG first:
  *   convert in.jpg -depth 8 art-src/<set>/raw/<id>.png
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_KEY_PARAMS, keyPart, type Rgba } from '../src/game/meta/chroma-key';
 // @ts-expect-error — plain .mjs helper without types
 import { decodePng, encodePng } from './edge-magenta-lib.mjs';
 
-interface SetConfig { raw: string; out: string; publicPrefix: string; master: number; manifest?: string }
+interface SetConfig { raw: string; out: string; publicPrefix: string; master: number; manifest?: string; tileableBands?: boolean }
 const SETS: Record<string, SetConfig> = {
   'avatar-parts': { raw: 'art-src/avatar-parts/raw', out: 'public/avatar-parts/keyed', publicPrefix: '/avatar-parts/keyed', master: 512, manifest: 'src/game/meta/painted-parts.generated.ts' },
-  'garage-decals': { raw: 'art-src/garage-decals/raw', out: 'public/art/garage/decals', publicPrefix: '/art/garage/decals', master: 256 },
+  // pattern-* decals are tileable bands: they touch the left and right edges by design.
+  'garage-decals': { raw: 'art-src/garage-decals/raw', out: 'public/art/garage/decals', publicPrefix: '/art/garage/decals', master: 256, tileableBands: true },
   'track-sprites': { raw: 'art-src/track/raw', out: 'public/art/track-obstacles', publicPrefix: '/art/track-obstacles', master: 512 },
+  'cockpit': { raw: 'art-src/cockpit/raw', out: 'public/art/cockpit', publicPrefix: '/art/cockpit', master: 1024 },
+  'cockpit-trinkets': { raw: 'art-src/cockpit/trinkets-raw', out: 'public/art/cockpit/trinkets', publicPrefix: '/art/cockpit/trinkets', master: 256 },
+  'ui-icons': { raw: 'art-src/ui/raw', out: 'public/art/ui/icons', publicPrefix: '/art/ui/icons', master: 256 },
 };
 
 const args = process.argv.slice(2);
@@ -47,6 +52,10 @@ for (const file of existsSync(config.raw) ? readdirSync(config.raw).sort() : [])
   const img: Rgba = { width: w, height: h, data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.length) };
   const t0 = Date.now();
   const { master, qa } = keyPart(img, DEFAULT_KEY_PARAMS, config.master);
+  if (config.tileableBands && id.startsWith('pattern-') && qa.verdict === 'fail' && qa.notes.length && qa.notes.every((n) => /border/i.test(n))) {
+    qa.verdict = 'warn';
+    qa.notes.push('tileable band: border touch expected');
+  }
   encodePng(path.join(config.out, `${id}.png`), master.width, master.height, Buffer.from(master.data.buffer, master.data.byteOffset, master.data.length));
   keyed++; if (qa.verdict === 'fail') failed++;
   console.log(`${qa.verdict.toUpperCase().padEnd(4)} ${id.padEnd(36)} ${w}×${h} → ${master.width}×${master.height}  key=${qa.key}  residual=${qa.residualMagenta}  ${Date.now() - t0} ms ${qa.notes.join('; ')}`);
@@ -67,6 +76,15 @@ export const KEYED_PARTS: Record<string, KeyedPartFile> = {
 ${body}
 };
 `);
+}
+// The edge repair runs last, here, so re-keying can never undo it (it only touches fringe pixels).
+if (keyed) {
+  const targets = only ? [...only].map((id) => `${config.out}/${id}.png`) : [config.out];
+  for (const target of targets) {
+    const run = spawnSync(process.execPath, ['scripts/fix-edge-magenta.mjs', target], { encoding: 'utf8' });
+    if (run.status !== 0) { console.error(run.stdout, run.stderr); failed++; }
+  }
+  console.log('edge repair: done');
 }
 console.log(`${keyed} keyed now, ${failed} failed QA${config.manifest ? `, ${lines.size} in the manifest` : ''}`);
 process.exit(failed ? 1 : 0);

@@ -113,6 +113,7 @@ const SHEETS = [
   'anim-25-horn-blower',
   'anim-26-track-marshal',
   'anim-27-blacksmith',
+  'anim-62-goblin-rope-reel',
   'anim-28-tankard-celebrant',
   'anim-29-ball-loader',
   'anim-30-bell-ringer',
@@ -138,6 +139,15 @@ const SHEETS = [
   'anim-50-firework-red',
   'anim-51-firework-blue',
   'anim-52-firework-green',
+  'anim-53-pinball-spinner',
+  'anim-54-nitro-flame',
+  'anim-55-boost-pad-flash',
+  'anim-56-pickup-collect-burst',
+  'anim-57-shield-shatter',
+  'anim-58-spring-launch-puff',
+  'anim-59-landing-shockwave',
+  'anim-60-tree-smash-splinters',
+  'anim-61-speed-lines',
 ];
 
 const magick = (args) => execFileSync('convert', args, { encoding: 'utf8' });

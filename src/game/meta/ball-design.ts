@@ -23,6 +23,23 @@ export const DECAL_CATALOG: readonly CatalogDecal[] = [
   { id: 'tech.pressure-gauge', name: 'Pressure Gauge', projection: 'gnomonic', price: 350 },
   { id: 'tech.exhaust-louver', name: 'Exhaust Louver', projection: 'gnomonic', price: 200 },
   { id: 'roundel.number', name: 'Number Roundel', projection: 'gnomonic', price: 0 },
+  // Pack 2 — painted in the same white-on-transparent style, tinted by the stamp colour.
+  { id: 'emblem.hot-rod-flames', name: 'Hot Rod Flames', projection: 'gnomonic', price: 300 },
+  { id: 'emblem.crossbones', name: 'Crossbones', projection: 'gnomonic', price: 250 },
+  { id: 'emblem.marble-comet', name: 'Marble Comet', projection: 'gnomonic', price: 400 },
+  { id: 'emblem.lightning-bolt', name: 'Lightning Bolt', projection: 'gnomonic', price: 0 },
+  { id: 'emblem.sheep-head', name: 'Sheep Head', projection: 'gnomonic', price: 350 },
+  { id: 'emblem.tnt-bundle', name: 'TNT Bundle', projection: 'gnomonic', price: 300 },
+  { id: 'emblem.winged-cog', name: 'Winged Cog', projection: 'gnomonic', price: 250 },
+  { id: 'emblem.spiked-star', name: 'Spiked Star', projection: 'gnomonic', price: 0 },
+  { id: 'emblem.anvil', name: 'Anvil', projection: 'gnomonic', price: 200 },
+  { id: 'emblem.bomb-fuse', name: 'Bomb Fuse', projection: 'gnomonic', price: 250 },
+  { id: 'pattern.flame-band', name: 'Flame Band', projection: 'band', price: 300 },
+  { id: 'pattern.lightning-band', name: 'Lightning Band', projection: 'band', price: 250 },
+  { id: 'pattern.sawtooth-band', name: 'Sawtooth Band', projection: 'band', price: 0 },
+  { id: 'pattern.chain-link', name: 'Chain Link', projection: 'band', price: 200 },
+  { id: 'pattern.rope-twist', name: 'Rope Twist', projection: 'band', price: 0 },
+  { id: 'pattern.skull-row', name: 'Skull Row', projection: 'band', price: 350 },
 ];
 export const BASE_PRICES: Readonly<Record<BaseMaterialId, number>> = { 'scrap-iron': 0, 'galvanized-brass': 0, damascus: 900, 'scorched-obsidian': 1200, 'boiler-copper': 600 };
 
@@ -47,6 +64,30 @@ export function decalImage(id: DecalTextureId): RgbaImage {
       case 'tech.pressure-gauge': on = (r > 0.7 && r < 0.9) || (Math.abs(u * 0.7 + v * 0.7) < 0.07 && r < 0.6) || r < 0.1; break;
       case 'tech.exhaust-louver': on = Math.abs(u) < 0.8 && Math.abs(v) < 0.7 && ((y >> 3) % 2 === 0); break;
       case 'roundel.number': on = r < 0.9 && !(r > 0.7 && r < 0.78); break;
+      // Pack 2 fallbacks: only used headless (in the browser the painted PNGs replace them).
+      case 'emblem.hot-rod-flames': on = v > -0.6 + 0.35 * Math.sin(u * 7) - 0.25 * Math.cos(u * 3) && v < 0.75 && Math.abs(u) < 0.92; break;
+      case 'emblem.crossbones': on = ((Math.abs(u - v) < 0.14 || Math.abs(u + v) < 0.14) && r < 0.82)
+        || [[-1, -1], [-1, 1], [1, -1], [1, 1]].some(([sx, sy]) => Math.hypot(u - sx * 0.62, v - sy * 0.62) < 0.26); break;
+      case 'emblem.marble-comet': on = Math.hypot(u - 0.35, v) < 0.38 || (u < 0.3 && Math.abs(v) < 0.26 * (1 + u) && Math.sin((u + 1) * 12) > -0.4); break;
+      case 'emblem.lightning-bolt': on = Math.abs(u - (0.45 - 0.9 * ((v + 1) / 2)) - (v > 0 ? 0.25 : -0.25)) < 0.24 && Math.abs(v) < 0.92; break;
+      case 'emblem.sheep-head': on = Math.hypot(u, (v + 0.12) * 1.25) < 0.5
+        || [-1, 1].some((s) => Math.abs(Math.hypot(u - s * 0.52, v - 0.28) - 0.3) < 0.11 && v < 0.5); break;
+      case 'emblem.tnt-bundle': on = (Math.abs(v) < 0.45 && [-0.5, 0, 0.5].some((c) => Math.abs(u - c) < 0.19))
+        || (v > 0.45 && v < 0.85 && Math.abs(u - 0.3 * Math.sin((v - 0.45) * 8)) < 0.07); break;
+      case 'emblem.winged-cog': on = (r < 0.5 + (Math.cos(a * 9) > 0.35 ? 0.16 : 0) && r > 0.2)
+        || (Math.abs(u) > 0.5 && Math.abs(u) < 0.98 && Math.abs(v - 0.18 * (Math.abs(u) - 0.5)) < 0.16 - 0.1 * (Math.abs(u) - 0.5)); break;
+      case 'emblem.spiked-star': on = r < 0.35 + 0.55 * Math.abs(Math.cos(a * 2.5)) ** 1.5; break;
+      case 'emblem.anvil': on = (v > 0.32 && v < 0.78 && Math.abs(u) < 0.85 - 0.25 * (v - 0.32))
+        || (Math.abs(v) < 0.34 && Math.abs(u) < 0.3) || (v < -0.34 && v > -0.78 && Math.abs(u) < 0.62); break;
+      case 'emblem.bomb-fuse': on = Math.hypot(u, v + 0.18) < 0.6
+        || (v > 0.4 && Math.abs(u - 0.35 * Math.sin((v - 0.4) * 7)) < 0.08); break;
+      case 'pattern.flame-band': on = v > 0.55 - 1.3 * Math.abs(Math.sin(x * Math.PI / 8)) ** 0.6; break;
+      case 'pattern.lightning-band': on = Math.abs(v - (((x % 16) < 8 ? (x % 16) : 16 - (x % 16)) / 8 - 0.5) * 1.3) < 0.34; break;
+      case 'pattern.sawtooth-band': on = v > 1 - 2 * ((x % 16) / 16); break;
+      case 'pattern.chain-link': on = Math.abs(Math.hypot(((x % 16) - 8) / 7, v) - 0.62) < 0.26; break;
+      case 'pattern.rope-twist': on = [0, Math.PI].some((p) => Math.abs(v - 0.55 * Math.sin(x * Math.PI / 8 + p)) < 0.3); break;
+      case 'pattern.skull-row': on = Math.hypot(((x % 16) - 8) / 7, v * 1.1) < 0.62
+        && !([-3, 3].some((d) => Math.hypot((x % 16) - 8 - d, (y - h / 2) + 1) < 1.6)); break;
     }
     const i = (y * w + x) * 4;
     data[i] = data[i + 1] = data[i + 2] = 255; data[i + 3] = on ? 255 : 0;
@@ -54,10 +95,56 @@ export function decalImage(id: DecalTextureId): RgbaImage {
   return { width: w, height: h, data };
 }
 
-/** The bake's decal sources, generated once. */
+/* ───────────── Painted decal art (browser) ───────────── */
+
+/** Where a decal's painted PNG lives: the id's dot becomes a dash; the roundel uses the blank plate. */
+export const DECAL_ART_DIR = '/art/garage/decals';
+export const decalArtUrl = (id: DecalTextureId): string =>
+  `${DECAL_ART_DIR}/${id === 'roundel.number' ? 'roundel-blank' : id.replace('.', '-')}.png`;
+
+/** Painted art decoded from the PNGs; empty headless, so `decalImage()` stays the fallback. */
+const painted = new Map<DecalTextureId, RgbaImage>();
+export const paintedDecal = (id: DecalTextureId): RgbaImage | null => painted.get(id) ?? null;
+/** The art a bake uses for an id: painted if it decoded, code-drawn otherwise. */
+export const decalArt = (id: DecalTextureId): RgbaImage => painted.get(id) ?? decalImage(id);
+
+async function decodePng(url: string): Promise<RgbaImage> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`missing ${url}`);
+  const blob = await response.blob();
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) throw new Error('no 2d context');
+    ctx.drawImage(bitmap, 0, 0);
+    const { data, width, height } = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+    return { width, height, data };
+  } finally { bitmap.close?.(); }
+}
+
+let loading: Promise<number> | null = null;
+/**
+ * Decodes every catalog decal's painted PNG once (browser only). Resolves with how many loaded;
+ * anything that fails simply keeps its code-drawn fallback. Call before the garage's first bake.
+ */
+export function loadPaintedDecals(): Promise<number> {
+  if (loading) return loading;
+  if (typeof document === 'undefined' || typeof fetch === 'undefined') return Promise.resolve(0);
+  loading = Promise.all(DECAL_CATALOG.map(async (d) => {
+    try { painted.set(d.id, await decodePng(decalArtUrl(d.id))); return 1; } catch { return 0; }
+  })).then((results) => {
+    sources = null; // the next bake picks the painted art up
+    return results.reduce<number>((a, b) => a + b, 0);
+  });
+  return loading;
+}
+
+/** The bake's decal sources, built once per art generation (painted art rebuilds them). */
 let sources: Map<string, DecalSource> | null = null;
 export function decalSources(): ReadonlyMap<string, DecalSource> {
-  if (!sources) sources = new Map(DECAL_CATALOG.map((d) => [d.id, { projection: d.projection, image: decalImage(d.id) }]));
+  if (!sources) sources = new Map(DECAL_CATALOG.map((d) => [d.id, { projection: d.projection, image: decalArt(d.id) }]));
   return sources;
 }
 

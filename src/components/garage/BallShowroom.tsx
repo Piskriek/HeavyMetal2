@@ -46,6 +46,7 @@ function paint(canvas: HTMLCanvasElement, img: RgbaImage) {
 
 export default function BallShowroom({ baked, capFinish, onSurface, onCap, label }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cradleRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene | null>(null);
   const handlers = useRef({ onSurface, onCap });
   handlers.current = { onSurface, onCap };
@@ -100,12 +101,30 @@ export default function BallShowroom({ baked, capFinish, onSurface, onCap, label
     scene.add(turn);
     sceneRef.current = { renderer, camera, scene, turn, roll, shell, caps, shellMat, capMat, albedo, emissive, albedoCanvas, emissiveCanvas };
 
+    // The brass cradle is a DOM layer, so it is kept on the ball's contact point by projecting the
+    // ball's lowest point (and its silhouette width) through the same camera on every resize.
+    const placeCradle = (width: number, height: number) => {
+      const cradle = cradleRef.current;
+      if (!cradle) return;
+      const bottom = new THREE.Vector3(0, -1, 0).project(camera);
+      const side = new THREE.Vector3(1, 0, 0).project(camera);
+      const centre = new THREE.Vector3(0, 0, 0).project(camera);
+      const px = (n: number) => ((n + 1) / 2) * width;
+      const py = (n: number) => ((1 - n) / 2) * height;
+      const radius = Math.max(8, Math.abs(px(side.x) - px(centre.x)));
+      cradle.style.width = `${radius * 1.9}px`;
+      cradle.style.opacity = '1';
+      cradle.style.left = `${px(centre.x)}px`;
+      cradle.style.top = `${py(bottom.y)}px`;
+    };
+
     const resize = () => {
       const box = canvas.parentElement?.getBoundingClientRect();
       if (!box?.width) return;
       renderer.setSize(box.width, box.height, false);
       camera.aspect = box.width / Math.max(1, box.height);
       camera.updateProjectionMatrix();
+      placeCradle(box.width, box.height);
     };
     resize();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
@@ -199,6 +218,7 @@ export default function BallShowroom({ baked, capFinish, onSurface, onCap, label
 
   return (
     <div className="garage-ball-3d" role="img" aria-label={label}>
+      <div className={`garage-cradle${failed ? ' flat' : ''}`} ref={cradleRef} aria-hidden="true" />
       {failed
         ? <div className="garage-ball-fallback" style={{ backgroundImage: fallback ? `url(${fallback})` : undefined }} />
         : <canvas ref={canvasRef} />}

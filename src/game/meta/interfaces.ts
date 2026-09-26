@@ -67,7 +67,13 @@ export type DecalTextureId =
   | 'emblem.crossed-wrenches' | 'emblem.flaming-skull' | 'emblem.clockwork-gear' | 'emblem.goblin-fist' | 'emblem.trefoil'
   | 'pattern.dual-stripes' | 'pattern.hazard-chevrons' | 'pattern.checker-band' | 'pattern.boiler-rivets'
   | 'tech.patch-plate' | 'tech.pressure-gauge' | 'tech.exhaust-louver'
-  | 'roundel.number';
+  | 'roundel.number'
+  // Pack 2 (painted art). The union only grows, so designs saved before it still load.
+  | 'emblem.hot-rod-flames' | 'emblem.crossbones' | 'emblem.marble-comet' | 'emblem.lightning-bolt'
+  | 'emblem.sheep-head' | 'emblem.tnt-bundle' | 'emblem.winged-cog' | 'emblem.spiked-star'
+  | 'emblem.anvil' | 'emblem.bomb-fuse'
+  | 'pattern.flame-band' | 'pattern.lightning-band' | 'pattern.sawtooth-band'
+  | 'pattern.chain-link' | 'pattern.rope-twist' | 'pattern.skull-row';
 
 export type DecalBlendMode = 'normal' | 'multiply' | 'overlay';
 

@@ -276,7 +276,11 @@ export function bakeBall(config: CustomBallConfig, decals: ReadonlyMap<string, D
 /** Constant-latitude ring. `scale` = half-height in latitude fraction; repeats are integral → seam-free. */
 function bakeBand(out: Uint8ClampedArray, w: number, h: number, stamp: DecalStamp, img: RgbaImage, tint: [number, number, number] | null) {
   const halfV = stamp.scale * 0.5;
-  const repeats = Math.max(1, Math.round(img.height > 0 ? (w / h) * (img.width / img.height) * (0.5 / Math.max(halfV, 1e-3)) / 4 : 1));
+  // Whole repeats around the ring, chosen so one repeat keeps the artwork's aspect ratio: the
+  // ring is `w` texels around and `2·halfV·h` texels tall.
+  const bandTexels = Math.max(1, 2 * halfV * h);
+  const aspect = img.height > 0 ? img.width / img.height : 1;
+  const repeats = Math.max(1, Math.round(w / (bandTexels * aspect)));
   const yMin = Math.max(0, Math.floor((1 - (stamp.v + halfV)) * h));
   const yMax = Math.min(h - 1, Math.ceil((1 - (stamp.v - halfV)) * h));
   for (let y = yMin; y <= yMax; y++) {
@@ -285,7 +289,9 @@ function bakeBand(out: Uint8ClampedArray, w: number, h: number, stamp: DecalStam
     if (t < 0 || t > 1) continue;
     for (let x = 0; x < w; x++) {
       const u = (x + 0.5) / w;
-      const s = (u * repeats + stamp.rotation / TAU) % 1;
+      // Integral `repeats` + wrap-around sampling ⇒ the ring closes on itself with no seam,
+      // including for a negative turn (the modulo is lifted back into [0, 1)).
+      const s = (((u * repeats + stamp.rotation / TAU) % 1) + 1) % 1;
       writeBlend(out, (y * w + x) * 4, sampleBilinear(img, s, t, true, TAP), stamp.opacity, stamp.blendMode, tint);
     }
   }

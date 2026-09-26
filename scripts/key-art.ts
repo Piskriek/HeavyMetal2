@@ -52,7 +52,7 @@ for (const file of existsSync(config.raw) ? readdirSync(config.raw).sort() : [])
   const img: Rgba = { width: w, height: h, data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.length) };
   const t0 = Date.now();
   const { master, qa } = keyPart(img, DEFAULT_KEY_PARAMS, config.master);
-  if (config.tileableBands && id.startsWith('pattern-') && qa.verdict === 'fail' && qa.notes.length && qa.notes.every((n) => /border/i.test(n))) {
+  if (config.tileableBands && id.startsWith('pattern-') && qa.verdict === 'fail' && qa.notes.length && qa.notes.every((n) => /border|touch the frame/i.test(n))) {
     qa.verdict = 'warn';
     qa.notes.push('tileable band: border touch expected');
   }

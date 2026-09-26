@@ -228,11 +228,20 @@ export class ObstacleView {
   /** The scrolling road textures (the boost pads' chevrons). */
   private scrolling: { texture: THREE.Texture; rate: number }[] = [];
 
+  /** The map the marker being built is placed on (one of `roadsAt`'s). */
+  private map: TrackSpaceMap;
+
   constructor(
     private readonly parent: THREE.Object3D,
     private readonly assets: Partial<GameAssets>,
-    private readonly map: TrackSpaceMap,
+    map: TrackSpaceMap,
+    /**
+     * ISLAND-ROUTE: the roads an obstacle at engine x stands on. Inside a fork an obstacle exists on
+     * every branch, so it gets a marker on each branch's road. Absent: the one map.
+     */
+    private readonly roadsAt?: (x: number) => readonly TrackSpaceMap[],
   ) {
+    this.map = map;
     this.root.name = 'ObstacleView';
     parent.add(this.root);
   }
@@ -283,13 +292,18 @@ export class ObstacleView {
     this.clear();
     this.layout = obstacles;
     let drawn = 0; let skipped = 0;
+    const home = this.map;
     for (const obstacle of obstacles) {
-      const object = this.markerFor(obstacle);
-      if (!object) { skipped += 1; continue; }
-      this.root.add(object);
-      drawn += 1;
-      if (obstacle.kind === 'tnt' || obstacle.kind === 'sheep') this.removable.push({ obstacle, object });
+      for (const road of this.roadsAt?.(obstacle.x) ?? [home]) {
+        this.map = road;
+        const object = this.markerFor(obstacle);
+        if (!object) { skipped += 1; break; }
+        this.root.add(object);
+        drawn += 1;
+        if (obstacle.kind === 'tnt' || obstacle.kind === 'sheep') this.removable.push({ obstacle, object });
+      }
     }
+    this.map = home;
     this.stats.drawn = drawn;
     this.stats.skipped = skipped;
   }

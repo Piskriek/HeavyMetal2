@@ -58,6 +58,7 @@ test('the view leans into a lane change and settles back upright', () => {
 
 test('the renderer uses the lane-true look point and the lean', () => {
   const r = readFileSync(new URL('../src/game/renderer-3d.ts', import.meta.url), 'utf8');
-  assert.match(r, /const lateral = lateralFromLaneZ\(this\.space, look\.dist, ball\.z\);/);
+  // ISLAND-ROUTE: the camera's map is the view map (the player's branch on the island, the one map elsewhere).
+  assert.match(r, /const lateral = lateralFromLaneZ\(this\.viewSpace, look\.dist, ball\.z\);/);
   assert.match(r, /const up = leanUp\(fp, this\.fpLean\);\n\s*this\.camera\.position\.set\(fp\.position\[0\], fp\.position\[1\], fp\.position\[2\]\);\n\s*this\.camera\.up\.set\(up\[0\], up\[1\], up\[2\]\);/);
 });

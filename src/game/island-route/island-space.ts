@@ -48,6 +48,30 @@ export function courseTrackSpace(course: CourseId | undefined): TrackSpaceMap {
   return course === 'basalt' ? islandTrackSpace() : getTrackSpace();
 }
 
+/** Every road an obstacle at engine x stands on: each branch's inside a fork, the main road elsewhere. */
+export function islandRoadsAt(x: number): readonly TrackSpaceMap[] {
+  const section = ISLAND_ROUTE_GRAPH.sections.find((s) => x >= s.x0 && x < s.x1);
+  return section ? section.branches.map((b) => islandBranchSpace(section.id, b.id)) : [islandTrackSpace()];
+}
+
+/**
+ * How far past a merge (engine x) the camera keeps the branch's map: its chase rig looks back up to
+ * ~3,000 arc units, and every shared stretch after a merge is longer than this.
+ */
+export const CAMERA_TAIL_X = 900;
+
+/**
+ * The map the camera follows the player on: its branch's map inside a fork and for a short tail past the
+ * merge, so the point the camera looks back from never lands on another branch's road.
+ */
+export function cameraTrackSpace(course: CourseId | undefined, x: number, route: RacerRoute | undefined): TrackSpaceMap {
+  if (course !== 'basalt') return getTrackSpace();
+  const inside = ISLAND_ROUTE_GRAPH.sections.find((s) => x >= s.x0 && x < s.x1)
+    ?? ISLAND_ROUTE_GRAPH.sections.find((s) => x >= s.x1 && x < s.x1 + CAMERA_TAIL_X);
+  const branch = inside ? route?.[inside.id] : undefined;
+  return inside && branch ? islandBranchSpace(inside.id, branch) : islandTrackSpace();
+}
+
 /**
  * The map a racer at engine x is drawn on: its branch's map inside a fork it has chosen, the main
  * map everywhere else. Branch maps equal the main map at every split and merge, so the switch is

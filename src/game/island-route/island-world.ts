@@ -6,12 +6,13 @@
  */
 import * as THREE from 'three';
 import type { TrackSpaceMap, TrackFrameData, TrackStageId } from '../track-space';
-import { ISLAND_ANCHORS } from './basalt-route';
+import { ISLAND_ANCHORS, ISLAND_ROUTE_GRAPH } from './basalt-route';
 import { polar } from './geometry';
 import {
   RoadIndex, carvedHeight, markBridges, naturalHeight, roadSamples, type GroundBump,
 } from './island-ground';
-import { islandBranchRoads, islandTrackSpace } from './island-space';
+import { islandBranchRoads, islandBranchSpace, islandTrackSpace } from './island-space';
+import { openBranches, type RouteLayout } from '../sim/route';
 
 export interface IslandMaterials {
   dirt: THREE.MeshStandardMaterial;
@@ -268,6 +269,56 @@ function buildSkyDome(horizon: THREE.Color, zenith: THREE.Color): THREE.Mesh {
   mesh.name = 'Island sky';
   mesh.renderOrder = -10;
   return mesh;
+}
+
+/**
+ * ROUTE-2's closed branches, made visible: a timber barricade across the road just past the split, and a
+ * rockfall piled against it, so a player reads which roads are shut this race.
+ */
+export function buildClosedGates(layout: RouteLayout | null, M: IslandMaterials): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'Closed branches';
+  if (!layout) return group;
+  const beam = new THREE.BoxGeometry(1, 1, 1);
+  const rock = new THREE.DodecahedronGeometry(1, 0);
+  const rockMaterial = new THREE.MeshStandardMaterial({ color: '#4a423d', roughness: 1, flatShading: true });
+  for (const section of ISLAND_ROUTE_GRAPH.sections) {
+    const open = openBranches(section, layout).map((b) => b.id);
+    for (const b of section.branches) {
+      if (open.includes(b.id)) continue;
+      const map = islandBranchSpace(section.id, b.id);
+      const f = map.frameAt(map.distOf(`${section.id}:split`) + 1500);
+      const basis = new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(f.right.x, f.right.y, f.right.z),
+        new THREE.Vector3(f.up.x, f.up.y, f.up.z),
+        new THREE.Vector3(f.tangent.x, f.tangent.y, f.tangent.z),
+      );
+      const gate = new THREE.Group();
+      gate.name = `Closed: ${section.id}/${b.id}`;
+      gate.position.set(f.pos.x, f.pos.y, f.pos.z);
+      gate.quaternion.setFromRotationMatrix(basis);
+      const add = (geo: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number, rz = 0) => {
+        const m = new THREE.Mesh(geo, material);
+        m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.z = rz;
+        gate.add(m);
+      };
+      const w = f.halfWidth;
+      // Two posts and three planks, one crooked.
+      add(beam, M.wood, -w + 40, 260, 0, 90, 520, 90);
+      add(beam, M.wood, w - 40, 260, 0, 90, 520, 90);
+      add(beam, M.wood, 0, 380, 0, 2 * w, 70, 50);
+      add(beam, M.wood, 0, 240, 0, 2 * w, 70, 50, 0.06);
+      add(beam, M.wood, 0, 110, 0, 2 * w, 70, 50, -0.04);
+      // The rockfall piled against it, irregular like nature.
+      for (let i = 0; i < 9; i++) {
+        const t = (i / 8) * 2 - 1;
+        const r = 140 + ((i * 53) % 90);
+        add(rock, rockMaterial, t * w * 0.9, r * 0.55, 180 + ((i * 37) % 120), r, r * 0.8, r);
+      }
+      group.add(gate);
+    }
+  }
+  return group;
 }
 
 export function buildIslandWorld(M: IslandMaterials, opts: { performance?: boolean } = {}): IslandWorld {

@@ -260,6 +260,8 @@ export interface RacerFrame {
   rollPhase?: number;
   /** Lateral speed (engine units/s), for the cockpit lean. */
   vz?: number;
+  /** ISLAND-ROUTE: the branches this racer has taken, so it is drawn on its own road. */
+  route?: import('./sim/route').RacerRoute;
   /** Not in the race yet (a rival waiting for the player's solo first split): draw nothing. */
   hidden?: boolean;
   /** H11: a bot's shove tell ends at this race time; until then the renderer wobbles the ball. */
@@ -269,6 +271,8 @@ export interface RacerFrame {
 }
 
 export interface SceneFrame {
+  /** ISLAND-ROUTE: this race's open branches (ROUTE-2), so shut roads are drawn shut. */
+  routeLayout?: import('./sim/route').RouteLayout | null;
   time: number;
   runTime: number;
   camera: number;

@@ -18,8 +18,8 @@ import { PickupView } from './pickup-view';
 import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
-import { buildIslandWorld, type IslandWorld } from './island-route/island-world';
-import { islandTrackSpace } from './island-route/island-space';
+import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-route/island-world';
+import { cameraTrackSpace, islandRoadsAt, islandTrackSpace, racerTrackSpace } from './island-route/island-space';
 import { readOptions } from './preferences';
 import type { CourseId } from './types';
 import {
@@ -1633,8 +1633,16 @@ export class Renderer3D {
   private rampCacheKey = '';
   private rampSurfaces: readonly PhysicalRampSurface[] = [];
   private readonly D_START = 1100;
-  private readonly enterD: number;
-  private readonly exitD: number;
+  private enterD: number;
+  private exitD: number;
+  /**
+   * ISLAND-ROUTE: the map and track the camera follows the player on (the chosen branch's inside a fork,
+   * the main road's elsewhere; always the one map on the classic courses), each built once.
+   */
+  private view: { space: TrackSpaceMap; track: TrackData } | null = null;
+  private readonly viewTracks = new Map<TrackSpaceMap, TrackData>();
+  private get viewSpace(): TrackSpaceMap { return this.view?.space ?? this.space; }
+  private get viewTrack(): TrackData { return this.view?.track ?? this.track; }
   private currentSkyPreset: SkyPreset;
   private destroyed = false;
   /**
@@ -1693,7 +1701,7 @@ export class Renderer3D {
     const loop = loopGeometry(ride.obstacle, course);
     const rise = courseY(ball.x, course) - courseY(loop.x, course);
     const placement = placementFromEngine(
-      this.space,
+      this.viewSpace,
       { x: loop.x, y: loop.y + rise, z: ball.z, course },
       ramps,
     );
@@ -1712,6 +1720,8 @@ export class Renderer3D {
   /** ISLAND-ROUTE: Basalt Isle's world, when this renderer draws the island (null on the classic courses). */
   private readonly island: IslandWorld | null = null;
   /** The day fog: the sky preset's on the classic courses, the sea haze on the island. */
+  /** The closed-branch gates of the race being drawn, rebuilt when its layout changes. */
+  private islandGates: { layout: SceneFrame['routeLayout']; group: THREE.Group } | null = null;
   private fogNear = 6000;
   private fogFar = 48000;
 
@@ -1763,6 +1773,7 @@ export class Renderer3D {
     const onIsland = course === 'basalt';
     this.space = onIsland ? islandTrackSpace() : getTrackSpace();
     this.track = buildTrack(this.space);
+    this.viewTracks.set(this.space, this.track);
     this.enterD = this.track.distOf('caveEnter');
     this.exitD = this.track.distOf('caveExit');
 
@@ -1831,12 +1842,29 @@ export class Renderer3D {
     this.renderer.setSize(width, height, false);
   }
 
+  /** ISLAND-ROUTE: points the camera's map at the player's branch (a no-op off the island). */
+  private followPlayerView(frame: SceneFrame): void {
+    if (!this.island) return;
+    if (!this.islandGates || this.islandGates.layout !== frame.routeLayout) {
+      if (this.islandGates) this.island.group.remove(this.islandGates.group);
+      this.islandGates = { layout: frame.routeLayout, group: buildClosedGates(frame.routeLayout ?? null, this.materials) };
+      this.island.group.add(this.islandGates.group);
+    }
+    const map = cameraTrackSpace(frame.options.course, frame.ball.x, frame.racers[0]?.route);
+    if (map === this.viewSpace) return;
+    let track = this.viewTracks.get(map);
+    if (!track) { track = buildTrack(map); this.viewTracks.set(map, track); }
+    this.view = { space: map, track };
+    this.enterD = track.distOf('caveEnter');
+    this.exitD = track.distOf('caveExit');
+  }
+
   /**
    * Maps linear race distance (0..TRACK_DISTANCE) to 3D track spline distance.
    * Delegates to the shared track-space map (legacy constants D_START/D_END).
    */
   trackDistFromDistance(dist: number) {
-    return this.space.trackDistFromEngineDistance(dist);
+    return this.viewSpace.trackDistFromEngineDistance(dist);
   }
 
   /**
@@ -1878,7 +1906,7 @@ export class Renderer3D {
     reducedMotion = false,
   ) {
     const placement = placementFromEngine(
-      this.space,
+      this.viewSpace,
       { x: ball.x, distance: ball.distance, y: ball.y, z: ball.z, grounded: ball.grounded, course },
       ramps,
     );
@@ -1897,9 +1925,9 @@ export class Renderer3D {
     // Look down *your own lane*: the point ahead carries the ball's lateral offset. It used to be the
     // road's centre line, so after a lane change the view slowly turned toward the middle of the road
     // and stopped facing forward.
-    const aheadS = clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.space.length);
-    const look = this.space.frameAt(aheadS);
-    const lateral = lateralFromLaneZ(this.space, look.dist, ball.z);
+    const aheadS = clamp(placement.state.s + FP_LOOK_AHEAD, 0, this.viewSpace.length);
+    const look = this.viewSpace.frameAt(aheadS);
+    const lateral = lateralFromLaneZ(this.viewSpace, look.dist, ball.z);
     const fp = firstPersonFrame({
       ballCentre: [placement.world.x, placement.world.y, placement.world.z],
       gyro,
@@ -1939,9 +1967,10 @@ export class Renderer3D {
    */
   private placeCamera(d: number, dt: number, mode: GameOptions['cameraMode'], altitude: number) {
     const wide = mode === 'fixed';
-    const rig = wide ? cameraRigAt(this.track, d) : chaseRigAt(altitude);
-    const at = this.track.sampleAt(clamp(d - rig.back, 0, this.track.length));
-    const look = this.track.sampleAt(clamp(d + rig.lookAhead, 0, this.track.length));
+    const track = this.viewTrack;
+    const rig = wide ? cameraRigAt(track, d) : chaseRigAt(altitude);
+    const at = track.sampleAt(clamp(d - rig.back, 0, track.length));
+    const look = track.sampleAt(clamp(d + rig.lookAhead, 0, track.length));
     this.camera.position.copy(at.pos).addScaledVector(at.up, rig.height).addScaledVector(at.right, rig.side);
     const target = look.pos.clone().addScaledVector(look.up, wide ? 140 : CHASE_RIG.lookLift);
     this.camUp.lerp(at.up, 1 - Math.exp(-dt * 5)).normalize();
@@ -2172,7 +2201,8 @@ export class Renderer3D {
       // Shared placement (T03): identical lateral/altitude composition that
       // headless physics consumes — one implementation, no parallel math.
       const placement = placementFromEngine(
-        this.space,
+        // ISLAND-ROUTE: on the island each racer is placed on the road of the branch it took.
+        this.island ? racerTrackSpace(frame.options.course, racer.x, racer.route) : this.space,
         // Placement measures altitude against the course being raced (M10: passed, never global).
         { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded, course: frame.options.course },
         rampSurfaces,
@@ -2187,7 +2217,7 @@ export class Renderer3D {
       }
 
       // The tight chase rig needs the player's own altitude (see placeCamera).
-      if (i === 0) playerAltitude = placement.world.y - (this.track.sampleAt(playerDist).pos.y + RADIUS);
+      if (i === 0) playerAltitude = placement.world.y - (this.viewTrack.sampleAt(playerDist).pos.y + RADIUS);
 
       const shielded = (racer.shieldUntil ?? 0) > frame.runTime;
       // A slow spin on the bubble, held still under reduced motion.
@@ -2243,6 +2273,7 @@ export class Renderer3D {
 
     // 1. Update racers along the 3D spline
     const playerDistance = (frame.ball as any).distance ?? engineDistanceFromX((frame.ball as any).x ?? 190);
+    this.followPlayerView(frame);
     const playerDist = this.trackDistFromDistance(playerDistance);
 
     // M01 · T3: the cockpit is the default view; `?fp=1` stays as the T0 spike that forces it on.
@@ -2261,7 +2292,9 @@ export class Renderer3D {
     }
 
     // C1: the race's obstacles, drawn where the physics has them (they used to be invisible).
-    if (!this.obstacleView) this.obstacleView = new ObstacleView(this.scene, this.storedAssets, this.space);
+    if (!this.obstacleView) {
+      this.obstacleView = new ObstacleView(this.scene, this.storedAssets, this.space, this.island ? islandRoadsAt : undefined);
+    }
     this.obstacleView.update(frame.obstacles);
 
     // H6: the rope goblins, for any ball being hauled back from out of bounds.
@@ -2278,6 +2311,7 @@ export class Renderer3D {
       if (!this.pickupView) {
         this.pickupView = new PickupView(this.scene, this.storedAssets.pickupSprites ?? {}, this.space);
       }
+      if (this.island) this.pickupView.useMap(this.viewSpace);
       this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces(), frame.options.course);
     } else {
       this.pickupView?.hideAll();
@@ -2311,7 +2345,7 @@ export class Renderer3D {
     if (frame.effects) {
       if (!this.effects) this.effects = new EffectRenderer(this.scene);
       this.effects.update({
-        queue: frame.effects, space: this.space, ramps: rampSurfaces, course: frame.options.course, time: raw, dt: Math.min(0.1, dt),
+        queue: frame.effects, space: this.viewSpace, ramps: rampSurfaces, course: frame.options.course, time: raw, dt: Math.min(0.1, dt),
       }, this.camera, frame.reducedMotion);
     }
 

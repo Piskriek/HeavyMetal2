@@ -31,6 +31,7 @@ import {
 import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 import { layoutForSeed, sameRoad, validateRouteGraph, type RouteGraph, type RouteLayout } from './sim/route';
+import { ISLAND_ROUTE_GRAPH } from './island-route/basalt-route';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
@@ -274,6 +275,8 @@ export class GameEngine {
       get paceTargetX() { return engine.player.x; },
       stagger: (racer) => racer.id * 0.023,
     };
+    // ISLAND-ROUTE: Basalt Isle races its forks; each race's layout comes from its seed (ROUTE-2).
+    if ((config?.course ?? options.course) === 'basalt') this.setRouteGraph(ISLAND_ROUTE_GRAPH);
     this.reset();
     document.addEventListener('visibilitychange', this.visibilityChanged);
   }
@@ -1091,6 +1094,7 @@ export class GameEngine {
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
       rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
       rendered.ramTellUntil = racer.ramTellUntil;
+      rendered.route = racer.route;
       // H6: a ball the rope goblins are hauling back is drawn easing from where it went out to its lane.
       if (racer.reel) {
         const span = Math.max(1e-6, racer.reel.until - racer.reel.startedAt);
@@ -1142,7 +1146,7 @@ export class GameEngine {
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
       this.lastRender = now; this.needsRender = false;
-      this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
+      this.renderer.render({ routeLayout: this.routeLayout, time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
         drift: this.drift, shake: this.shake, impact: this.impact, rotation: rendered.rotation, dragging: false,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
         obstacles: this.obstacles, pickups: this.pickups,

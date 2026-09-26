@@ -10,11 +10,13 @@ import { TRACK_DISTANCE, START_X, courseY } from '../src/game/scene';
 import { COURSES } from '../src/game/types';
 import { TRACKS } from '../src/game/courses';
 import { D_START, getTrackSpace, type TrackSpaceMap } from '../src/game/track-space';
-import { validateRouteGraph } from '../src/game/sim/route';
+import { layoutForSeed, validateRouteGraph } from '../src/game/sim/route';
 import { ISLAND_ANCHORS, ISLAND_ROUTE_GRAPH, ISLAND_SEGMENTS } from '../src/game/island-route/basalt-route';
 import {
-  courseTrackSpace, islandBranchRoads, islandBranchSpace, islandTrackSpace, racerTrackSpace,
+  CAMERA_TAIL_X, cameraTrackSpace, courseTrackSpace, islandBranchRoads, islandBranchSpace, islandRoadsAt, islandTrackSpace,
+  racerTrackSpace,
 } from '../src/game/island-route/island-space';
+import { buildClosedGates, type IslandMaterials } from '../src/game/island-route/island-world';
 import {
   ROAD_BED, RoadIndex, carvedHeight, markBridges, naturalHeight, roadSamples,
 } from '../src/game/island-route/island-ground';
@@ -151,4 +153,25 @@ test('Basalt Isle is the fourth course and rides Rustbucket Ridge\'s physics pro
   assert.deepEqual(COURSES.map((c) => c.id), ['ridge', 'boomtown', 'sheep', 'basalt']);
   assert.equal(TRACKS.basalt.profile, TRACKS.ridge.profile);
   for (const x of [190, 5000, 8304, 30000, 60000, 72190]) assert.equal(courseY(x, 'basalt'), courseY(x, 'ridge'));
+});
+
+test('an obstacle inside a fork stands on every branch; the camera keeps the branch just past the merge', () => {
+  const rim = ISLAND_ROUTE_GRAPH.sections[0];
+  assert.deepEqual(islandRoadsAt(rim.x0 + 500), rim.branches.map((b) => islandBranchSpace('rim', b.id)));
+  assert.deepEqual(islandRoadsAt(rim.x0 - 500), [islandTrackSpace()]);
+  const ledge = islandBranchSpace('rim', 'ledge');
+  assert.equal(cameraTrackSpace('basalt', rim.x1 + CAMERA_TAIL_X - 1, { rim: 'ledge' }), ledge, 'the look-back stays on the ledge');
+  assert.equal(cameraTrackSpace('basalt', rim.x1 + CAMERA_TAIL_X + 1, { rim: 'ledge' }), islandTrackSpace());
+  const next = ISLAND_ROUTE_GRAPH.sections[1];
+  assert.ok(next.x0 > rim.x1 + CAMERA_TAIL_X, 'the camera tail never reaches the next split');
+});
+
+test('every branch shut this race gets a gate, and only those', () => {
+  const layout = layoutForSeed(ISLAND_ROUTE_GRAPH, 12345);
+  const materials = { wood: new THREE.MeshStandardMaterial() } as unknown as IslandMaterials;
+  const gates = buildClosedGates(layout, materials);
+  const closed = ISLAND_ROUTE_GRAPH.sections.flatMap((s) => s.branches
+    .filter((b) => !layout.open?.[s.id]?.includes(b.id)).map((b) => `Closed: ${s.id}/${b.id}`));
+  assert.deepEqual(gates.children.map((g) => g.name), closed);
+  assert.equal(buildClosedGates(null, materials).children.length, 0);
 });

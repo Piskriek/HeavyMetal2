@@ -115,13 +115,21 @@ export class PickupView {
     /** The painted pickup canvases, by kind. A kind with no art is simply not drawn. */
     private readonly art: Partial<Record<PowerupKind, HTMLCanvasElement>> = {},
     /** The track-space map the rest of the scene is placed with. */
-    private readonly map: TrackSpaceMap,
+    private map: TrackSpaceMap,
   ) {
     this.root.name = 'PickupView';
     parent.add(this.root);
     this.glow.name = 'PickupGlow';
     parent.add(this.glow);
     this.geometry = new THREE.PlaneGeometry(1, 1);
+  }
+
+  /**
+   * ISLAND-ROUTE: places the pickups on another road from the next update (on the island, the branch
+   * the camera follows: a pickup inside a fork is on every branch, so the player sees it on theirs).
+   */
+  useMap(map: TrackSpaceMap): void {
+    this.map = map;
   }
 
   /** How many sprites the pool currently holds. */

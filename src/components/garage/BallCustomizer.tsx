@@ -9,8 +9,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Lock, Move, Redo2, Save, Trash2, Undo2 } from 'lucide-react';
 import { BASE_MATERIALS, bakeBall, type RgbaImage } from '../../game/meta/sphere-decal-baker';
 import {
-  BASE_PRICES, DECAL_CATALOG, addDecal, decalImage, decalSources, edit, listDesigns, ownedCosmetics, redo, removeDecal, saveDesign,
-  startHistory, undo, unownedItems, updateDecal, withBakeKey, type DesignFields,
+  BASE_PRICES, DECAL_CATALOG, addDecal, decalArtUrl, decalImage, decalSources, edit, listDesigns, loadPaintedDecals, ownedCosmetics,
+  paintedDecal, redo, removeDecal, saveDesign, startHistory, undo, unownedItems, updateDecal, withBakeKey, type DesignFields,
 } from '../../game/meta/ball-design';
 import { MAX_DECALS_PER_BALL, type BaseMaterialId, type DecalTextureId, type HexColor } from '../../game/meta/interfaces';
 import { ACCENT_PALETTE } from '../../game/meta/goblin-dna';
@@ -37,20 +37,49 @@ function toDataUrl(img: RgbaImage, tint?: [number, number, number]): string {
   return canvas.toDataURL();
 }
 
-/** Decal thumbnails and base-metal swatches, drawn once in the browser (never during SSR). */
+/**
+ * Decal thumbnails and base-metal swatches, prepared once in the browser (never during SSR).
+ * The painted PNGs are decoded first so the very first bake already uses them; a decal whose file
+ * will not load keeps its code-drawn art, here and on the ball.
+ */
 function useArtwork() {
-  const [art, setArt] = useState<{ decals: Record<string, string>; bases: Record<string, string> }>({ decals: {}, bases: {} });
+  const [art, setArt] = useState<{ ready: boolean; decals: Record<string, string>; bases: Record<string, string> }>({ ready: false, decals: {}, bases: {} });
   useEffect(() => {
-    const decals: Record<string, string> = {};
-    for (const d of DECAL_CATALOG) decals[d.id] = toDataUrl(decalImage(d.id), [240, 216, 168]);
-    const bases: Record<string, string> = {};
-    for (const id of Object.keys(BASE_MATERIALS) as BaseMaterialId[]) {
-      bases[id] = toDataUrl(bakeBall(withBakeKey({ version: 1, base: id, accentColor: '#e58a2b' as HexColor, capFinish: 'brass', decals: [] }), decalSources(), 96).albedo);
-    }
-    setArt({ decals, bases });
+    let live = true;
+    void loadPaintedDecals().then(() => {
+      if (!live) return;
+      const decals: Record<string, string> = {};
+      for (const d of DECAL_CATALOG) decals[d.id] = paintedDecal(d.id) ? decalArtUrl(d.id) : toDataUrl(decalImage(d.id));
+      const bases: Record<string, string> = {};
+      for (const id of Object.keys(BASE_MATERIALS) as BaseMaterialId[]) {
+        bases[id] = toDataUrl(bakeBall(withBakeKey({ version: 1, base: id, accentColor: '#e58a2b' as HexColor, capFinish: 'brass', decals: [] }), decalSources(), 96).albedo);
+      }
+      setArt({ ready: true, decals, bases });
+    });
+    return () => { live = false; };
   }, []);
   return art;
 }
+
+/** The default stamp colour, and how many decal buttons fit on a row (for arrow-key paging). */
+const PICKER_TINT = '#f2e6c8' as HexColor;
+const decalColumns = () => {
+  const grid = typeof document === 'undefined' ? null : document.querySelector('.garage-decals');
+  const cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 4;
+  return Math.max(1, cols);
+};
+
+/**
+ * A painted decal in the stamp's colour: the art multiplies the tint (so its painted shading
+ * survives, exactly as the bake tints it) and masks itself (so nothing spills past the artwork).
+ */
+const maskArt = (url: string | undefined, tint: string) => (url
+  ? {
+    backgroundImage: `linear-gradient(${tint}, ${tint}), url(${url})`,
+    backgroundBlendMode: 'multiply',
+    WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`,
+  }
+  : undefined);
 
 export default function BallCustomizer() {
   const [history, setHistory] = useState(startHistory);
@@ -65,7 +94,7 @@ export default function BallCustomizer() {
   const art = useArtwork();
 
   // One bake per design change (the base layer is cached, so a decal edit re-stamps decals only).
-  const baked = useMemo(() => bakeBall(withBakeKey(design), decalSources(), MAP_W), [design]);
+  const baked = useMemo(() => bakeBall(withBakeKey(design), decalSources(), MAP_W), [design, art.ready]);
 
   useEffect(() => {
     if (!toast) return;
@@ -76,6 +105,7 @@ export default function BallCustomizer() {
   const say = (text: string, ok = false) => setToast({ ok, text });
   const change = (next: DesignFields, coalesce: string | null = null) => setHistory((h) => edit(h, next, coalesce));
   const current = design.decals.find((d) => d.uid === selected) ?? null;
+  const pickerTint = current?.tintColor ?? PICKER_TINT;
   const missing = unownedItems(design, ownedCosmetics());
   const owned = ownedCosmetics();
 
@@ -117,7 +147,7 @@ export default function BallCustomizer() {
           <div className="garage-stage-frame">
             <BallShowroom baked={baked} capFinish={design.capFinish} onSurface={onSurface}
               onCap={() => say('That is the cap. Decals go on the painted shell.')} label="Your ball. Drag to spin it, click to place a decal." />
-            <div className="garage-stage-hint" aria-live="polite">{hint}</div>
+            <div className="garage-stage-hint" aria-live="polite">{art.ready ? hint : 'Warming the paint…'}</div>
             <div className="garage-stage-help">Drag to spin</div>
           </div>
 
@@ -130,7 +160,7 @@ export default function BallCustomizer() {
                   {design.decals.map((d, i) => (
                     <button key={d.uid} type="button" role="option" aria-selected={d.uid === selected} className="garage-chip"
                       onClick={() => { setSelected(d.uid === selected ? null : d.uid); setMoving(false); }}>
-                      <span className="garage-chip-art" style={{ backgroundImage: art.decals[d.textureId] ? `url(${art.decals[d.textureId]})` : undefined }} />
+                      <span className="garage-chip-art" style={maskArt(art.decals[d.textureId], d.tintColor ?? PICKER_TINT)} />
                       <span>{i + 1}. {decalName(d.textureId)}</span>
                     </button>
                   ))}
@@ -211,12 +241,24 @@ export default function BallCustomizer() {
                   <button type="button" className="fantasy-secondary" aria-label="Next decal" onClick={() => cycleTool(1)}><ChevronRight size={14} /></button>
                 </span>
               </div>
-              <div className="garage-decals" role="radiogroup" aria-label="Decal to stamp">
+              <div className="garage-decals tray" role="radiogroup" aria-label="Decal to stamp"
+                onKeyDown={(e) => {
+                  const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' ? decalColumns() : e.key === 'ArrowUp' ? -decalColumns() : 0;
+                  if (!step) return;
+                  e.preventDefault();
+                  const i = DECAL_CATALOG.findIndex((x) => x.id === tool);
+                  const next = DECAL_CATALOG[Math.min(DECAL_CATALOG.length - 1, Math.max(0, i + step))];
+                  setTool(next.id); setMoving(false);
+                  (e.currentTarget.querySelector(`[data-decal="${next.id}"]`) as HTMLElement | null)?.focus();
+                }}>
                 {DECAL_CATALOG.map((d) => {
                   const locked = d.price > 0 && !owned.has(d.id);
                   return (
-                    <button key={d.id} type="button" role="radio" aria-checked={tool === d.id} className="garage-decal" onClick={() => { setTool(d.id); setMoving(false); }}>
-                      <span className={`garage-decal-art ${d.projection === 'band' ? 'band' : ''}`} style={{ backgroundImage: art.decals[d.id] ? `url(${art.decals[d.id]})` : undefined }} />
+                    <button key={d.id} type="button" role="radio" aria-checked={tool === d.id} data-decal={d.id} tabIndex={tool === d.id ? 0 : -1}
+                      className="garage-decal well" onClick={() => { setTool(d.id); setMoving(false); }}>
+                      <span className="garage-decal-well">
+                        <span className={`garage-decal-art ${d.projection === 'band' ? 'band' : ''}`} style={maskArt(art.decals[d.id], pickerTint)} />
+                      </span>
                       <span className="garage-card-name">{d.name}</span>
                       {locked && <span className="garage-price locked"><Lock size={10} />{d.price}</span>}
                     </button>

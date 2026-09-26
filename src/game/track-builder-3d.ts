@@ -618,7 +618,7 @@ export class TrackBuilder3D {
         type: assetId,
         name,
         category: 'cavern_mine',
-        url: '/art/custom-model.png',
+        url: '/art/ui/icons/custom-model.png',
         defaultWidth: 500,
         defaultHeight: 500,
         defaultDepth: 500,

@@ -9,7 +9,7 @@
  * The API key is read from C:\MarbleGp\.env.local (MESHY_API_KEY=…, git-ignored) and is only ever
  * sent to api.meshy.ai; it is never printed or written anywhere else. Every task is recorded in
  * art-src/meshy/ledger.json with its credits, and a new task is refused when the ledger plus the
- * task's cost would pass MESHY_CEILING (default 1000). Outputs land in art-src/meshy/<name>/
+ * task's cost would pass MESHY_CEILING (default 1800). Outputs land in art-src/meshy/<name>/
  * (model.glb, thumbnail.png, task.json); the runtime copy is made by the wiring step, not here.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -21,7 +21,8 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const API = 'https://api.meshy.ai/openapi/v1';
 const OUT = join(root, 'art-src/meshy');
 const LEDGER = join(OUT, 'ledger.json');
-const CEILING = Number(process.env.MESHY_CEILING ?? 1000);
+/** The owner's ceiling (2026-09-26: raised from 1000 to 1800; the account's hard limit is 2021). */
+const CEILING = Number(process.env.MESHY_CEILING ?? 1800);
 /** Worst-case cost of one textured image-to-3d task on the latest model (Meshy pricing, 2026-09). */
 const IMAGE_TASK_COST = 30;
 

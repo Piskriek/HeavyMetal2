@@ -1,0 +1,17 @@
+# W2-R2: the last two decals (2 images)
+
+One agent. Same rules as [W2-R](W2-R-redo.md) and the [README](README.md) agent prompt, with one change: **generate these two with no image input** (no reference). Every reference so far has leaked its own subject into these emblems. Style comes from the prompt alone.
+
+Raw `art-src/garage-decals/raw/<id>.png`, then `node --import tsx scripts/key-art.ts --set garage-decals --only <id>` → PASS. In the review loop, compare the result with `public/art/garage/decals/emblem-tnt-bundle.png` for style (outline weight, values), and reject any try that contains a lightning bolt, a skull, ears or flames that were not asked for.
+
+### 1. `emblem-hot-rod-flames`
+**Why:** Twice now the reference image's subject leaked in (a skull, then a lightning bolt). This time: **no image input at all**.
+> A painted emblem decal for a goblin racing ball, seen perfectly flat from the front: classic hot-rod flames and nothing else: three long curling flame tongues licking forward from the left to the right, like the flames painted on a hot-rod's hood. No lightning, no bolt, no skull, no face, no ears, no ball, no other object: only the three flames. Bold, simple and readable at 48 pixels, one silhouette you could recognise in black. Centered, filling about 80% of the width. Colours: near-white and pale grey only, plus the dark brown-black outline (the game tints it). Painted in a Blizzard/Warcraft goblin style: bold thick dark brown-black ink outlines, chunky shapes, two or three flat values of white and pale grey with simple cel shading and a little visible brushwork. Not flat vector clip art, not a 3D render. Background: perfectly flat, solid pure magenta #FF00FF filling the entire image edge to edge, no gradient, no shadow, no floor, no vignette, no texture. The subject contains absolutely no pink, purple or magenta, and no glow, haze or soft halo spreads past its outline. No text, no letters, no numbers, no watermark, nothing else in frame.
+
+### 2. `emblem-anvil`
+**Why:** The reference's lightning bolt leaked in and the anvil barely reads. This time: **no image input at all**.
+> A painted emblem decal for a goblin racing ball, seen perfectly flat from the front: a heavy blacksmith anvil seen straight from the side, its classic silhouette clear (flat top, horn pointing left, narrow waist, wide foot), with a hammer lying across the top and three small sparks above it. No lightning, no bolt, no flames, no ears, nothing behind it. Bold, simple and readable at 48 pixels, one silhouette you could recognise in black. Centered, filling about 80% of the width. Colours: near-white and pale grey only, plus the dark brown-black outline (the game tints it). Painted in a Blizzard/Warcraft goblin style: bold thick dark brown-black ink outlines, chunky shapes, two or three flat values of white and pale grey with simple cel shading and a little visible brushwork. Not flat vector clip art, not a 3D render. Background: perfectly flat, solid pure magenta #FF00FF filling the entire image edge to edge, no gradient, no shadow, no floor, no vignette, no texture. The subject contains absolutely no pink, purple or magenta, and no glow, haze or soft halo spreads past its outline. No text, no letters, no numbers, no watermark, nothing else in frame.
+
+## Acceptance
+- [ ] Both replaced, PASS, nothing in them but the subject asked for.
+- [ ] `npm run check:edges` 0 failures; results table in the report.

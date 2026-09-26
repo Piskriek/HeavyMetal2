@@ -193,10 +193,10 @@ function buildTrestles(
 }
 
 /* Ground colours (multiplied over the dirt texture's grain): sand, wet sand, ochre tops, basalt faces. */
-const SAND = new THREE.Color('#e2cfa2');
-const WET_SAND = new THREE.Color('#9d8a66');
-const OCHRE = new THREE.Color('#c79a5c');
-const BASALT = new THREE.Color('#4a423d');
+const SAND = new THREE.Color('#efdcb0');
+const WET_SAND = new THREE.Color('#a8946e');
+const OCHRE = new THREE.Color('#dcaa66');
+const BASALT = new THREE.Color('#5e554e');
 const SEA_FLOOR = new THREE.Color('#6f8f86');
 
 const smooth = (a: number, b: number, x: number) => {
@@ -204,18 +204,25 @@ const smooth = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+/** The island never changes, so its heightfield is measured once a session per detail level. */
+const groundHeights = new Map<number, Float32Array>();
+
 function buildGround(groundAt: (x: number, z: number) => number, detail: number, texture: THREE.Texture | null): THREE.Mesh {
   const n = detail;
   const cell = (2 * GROUND_HALF) / n;
   const positions = new Float32Array((n + 1) * (n + 1) * 3);
   const colors = new Float32Array((n + 1) * (n + 1) * 3);
   const uvs = new Float32Array((n + 1) * (n + 1) * 2);
-  const H = new Float32Array((n + 1) * (n + 1));
-  for (let j = 0; j <= n; j++) {
-    for (let i = 0; i <= n; i++) {
-      const x = -GROUND_HALF + i * cell, z = -GROUND_HALF + j * cell;
-      H[j * (n + 1) + i] = groundAt(x, z);
+  let H = groundHeights.get(n);
+  if (!H) {
+    H = new Float32Array((n + 1) * (n + 1));
+    for (let j = 0; j <= n; j++) {
+      for (let i = 0; i <= n; i++) {
+        const x = -GROUND_HALF + i * cell, z = -GROUND_HALF + j * cell;
+        H[j * (n + 1) + i] = groundAt(x, z);
+      }
     }
+    groundHeights.set(n, H);
   }
   const c = new THREE.Color();
   for (let j = 0; j <= n; j++) {
@@ -390,6 +397,11 @@ export function buildIslandWorld(M: IslandMaterials, opts: { performance?: boole
   landmarks.name = 'Landmarks';
   group.add(landmarks);
   void placeIslandLandmarks(landmarks, opts);
+
+  // Sky and ground fill: the sea haze lights the shadow sides (the sun alone left them black).
+  const fill = new THREE.HemisphereLight('#c9dde4', '#7a6248', 1.35);
+  fill.name = 'Island fill';
+  group.add(fill);
 
   const sky = buildSkyDome(fogColor, skyColor);
   group.add(sky);

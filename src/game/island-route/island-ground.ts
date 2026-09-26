@@ -64,10 +64,26 @@ export function fbm(x: number, z: number, wavelength: number): number {
   return sum / norm;
 }
 
+/** Ridged noise in [0, 1]: sharp crests where plain noise crosses zero (spires, knife-edge ridges). */
+export function ridged(x: number, z: number, wavelength: number): number {
+  let sum = 0, amp = 1, norm = 0, f = 1 / wavelength;
+  for (let o = 0; o < 3; o++) {
+    const n = 1 - Math.abs(valueNoise(x * f + o * 31.7, z * f + o * 12.9));
+    sum += n * n * amp;
+    norm += amp; amp *= 0.5; f *= 2.1;
+  }
+  return sum / norm;
+}
+
+/** Offshore islets (polar degrees, distance, height, radius): stepped mesas like the reference's. */
+const ISLETS: readonly (readonly [number, number, number, number])[] = [
+  [15, 33500, 3200, 2600], [58, 31800, 1800, 1700], [118, 34200, 4200, 3000], [165, 32600, 2400, 2000],
+  [214, 34800, 3600, 2800], [262, 31600, 1500, 1500], [300, 33900, 2800, 2300], [338, 35200, 4600, 3200],
+];
+
 /** Soft terraces: flat plateaus with steeper steps between, the stepped look of the reference. */
-function terrace(h: number, shift: number): number {
+function terrace(h: number, shift: number, step: number): number {
   if (h < 900) return h;
-  const step = 2300;
   const f = h / step + shift;
   const k = Math.floor(f);
   const stepped = (k + smooth(0.62, 0.9, f - k) - shift) * step;
@@ -88,8 +104,19 @@ export function naturalHeight(x: number, z: number, bumps: readonly GroundBump[]
   // Irregular plateaus: the body is bent by broad noise before the terraces, and the terrace levels
   // drift with a second noise, so no step runs round the island like a contour line.
   const warp = fbm(x, z, 9000);
-  const body = radial(r / wobble + warp * 2600) + fbm(x + 5000, z - 3000, 5200) * 900 * smooth(1500, 5000, r);
-  let h = terrace(body, fbm(x - 8000, z + 6000, 7000) * 0.6);
+  let body = radial(r / wobble + warp * 2600) + fbm(x + 5000, z - 3000, 5200) * 900 * smooth(1500, 5000, r);
+  // Jagged spires and knife-edge ridges on the flanks (strongest mid-slope, none in the crater or sea).
+  const spire = ridged(x + 1300, z - 700, 4600);
+  body += spire * spire * spire * 5600 * smooth(4200, 9000, r) * (1 - smooth(19500, 24500, r));
+  // Islets offshore.
+  for (const [deg, dist, height, radius] of ISLETS) {
+    const a = (deg * Math.PI) / 180;
+    const d = Math.hypot(x - dist * Math.sin(a), z + dist * Math.cos(a)) / radius;
+    if (d < 1.4) body = Math.max(body, -900 + (height + 900) * (1 - smooth(0.45, 1.4, d)) + spire * spire * 1400 * (1 - smooth(0, 1, d)));
+  }
+  // Terrace steps vary from place to place, so plateaus are broad here and narrow there.
+  const step = 1700 + 1500 * (fbm(x + 2000, z + 9000, 12000) * 0.5 + 0.5);
+  let h = terrace(body, fbm(x - 8000, z + 6000, 7000) * 0.6, step);
   for (const b of bumps) {
     const d = Math.hypot(x - b.x, z - b.z) / b.radius;
     if (d < 1) h += b.height * (1 - smooth(b.plateau ?? 0, 1, d));
@@ -142,7 +169,9 @@ export function roadSamples(
 
 /** A bucket grid over road samples, so the ground only looks at the roads near it. */
 export class RoadIndex {
-  private readonly cells = new Map<string, RoadSample[]>();
+  private readonly cells = new Map<number, RoadSample[]>();
+  /** Reused by `near`, which the ground asks about 90,000 times. */
+  private readonly scratch: RoadSample[] = [];
   constructor(readonly samples: readonly RoadSample[], readonly cell = 1500) {
     for (const s of samples) {
       const key = this.key(Math.floor(s.pos.x / cell), Math.floor(s.pos.z / cell));
@@ -150,9 +179,11 @@ export class RoadIndex {
       if (list) list.push(s); else this.cells.set(key, [s]);
     }
   }
-  private key(i: number, j: number) { return `${i},${j}`; }
-  near(x: number, z: number, radius: number): RoadSample[] {
-    const out: RoadSample[] = [];
+  private key(i: number, j: number) { return (i + 4096) * 8192 + (j + 4096); }
+  /** Samples within `radius` (a square) of (x, z). The array is reused: read it before the next call. */
+  near(x: number, z: number, radius: number): readonly RoadSample[] {
+    const out = this.scratch;
+    out.length = 0;
     const n = Math.ceil(radius / this.cell);
     const ci = Math.floor(x / this.cell), cj = Math.floor(z / this.cell);
     for (let i = ci - n; i <= ci + n; i++) {
@@ -182,6 +213,8 @@ export function markBridges(index: RoadIndex, clearance = 350): void {
 export const ROAD_BED = 70;
 /** Flat ground either side of the road before a cutting or embankment starts. */
 export const ROAD_SHOULDER = 260;
+/** How far from a road its cutting or embankment can reach. */
+export const CARVE_REACH = 3000;
 /** Width of the scree slope at the foot of a cutting before the rock face. */
 export const CUT_SCREE = 500;
 /** A road this far above the natural ground is carried on a trestle, not an embankment. */
@@ -195,7 +228,8 @@ export const TRESTLE_GAP = 1000;
 export function carvedHeight(x: number, z: number, natural: number, index: RoadIndex): number {
   let ceiling = Infinity;
   let fill = -Infinity;
-  for (const s of index.near(x, z, 5200)) {
+  // Reach: half a road, its shoulder, the scree foot, then a rock face of up to ~8,000 of relief at 5:1.
+  for (const s of index.near(x, z, CARVE_REACH)) {
     if (s.tunnel) continue;
     const dx = x - s.pos.x, dz = z - s.pos.z;
     const side = dx * s.rx + dz * s.rz;

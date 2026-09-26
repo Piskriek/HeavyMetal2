@@ -10,7 +10,11 @@ These are clean, shape-first 3D concept references for a new island stunt map.
 - `mega-cutaway-network-02.png` — large multi-level route/cave network with long bridges and multiple waterfall breakthroughs.
 - `mega-stunt-structures-02.png` — oversized loops, corkscrew, launch ramp, bridge, scaffold tower and landing deck.
 - `mega-terrain-kit-02.png` — large-scale terrain modules, route connectors, tunnel sections, loop foundation and side boxes.
+- `colossal-island-10x-overview-03.png` — ten-times-expanded island world with a central mountain range, broad outer plateaus and long routes across the ocean basin.
+- `colossal-island-10x-map-03.png` — ten-times-expanded geographic route map with separated regions, elevation bands and a central underground zone.
+- `colossal-island-10x-cutaway-03.png` — huge layered island cutaway with long underground routes, waterfall shafts and multiple cave tiers.
+- `colossal-structures-10x-03.png` — isolated oversized loops, ramps, bridge spans, portals and repeated support structures.
 
-Use the **mega** overview and cutaway to explain the new world scale; use the **mega** kit sheets for large individual Meshy generations. Keep the original 01 sheets as close-up shape references. These images intentionally omit foliage, vehicles, crowds, text and decorative clutter so the 3D silhouettes stay readable.
+Use the **colossal 10x** overview and map as the primary world-scale handoff. Use the cutaway and structures sheet to generate the separate Meshy models. Keep the mega 02 sheets for intermediate-scale composition and the original 01 sheets for close-up object silhouettes. These images intentionally omit foliage, vehicles, crowds, text and decorative clutter so the 3D silhouettes stay readable.
 
 The detailed handoff, scale ratios, axis/pivot rules, import caveat and suggested asset breakdown are in [`docs/MESHY_ISLAND_REFERENCE_PLAN.md`](../../../docs/MESHY_ISLAND_REFERENCE_PLAN.md).

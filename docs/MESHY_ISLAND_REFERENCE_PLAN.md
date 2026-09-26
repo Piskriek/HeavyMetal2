@@ -37,13 +37,26 @@ The first four references were deliberately compact. The **02** set raises the t
 
 Use the **02** images as the primary references when the goal is the larger island. Keep the **01** images as close-up shape references for clean individual meshes.
 
+### 10× scale revision
+
+The **03** set is the new target: an island-scale world roughly **10× the footprint and route-length budget** of the original compact concept. This means more geographic regions and longer travel between stunts, not ten-times-thicker lanes or ten-times-heavier collision meshes. Keep the lane width and object thickness consistent; expand the world by adding modular terrain regions, long connectors, deep vertical layers and large unoccupied spaces.
+
+| File | Use it for | What must remain legible |
+| --- | --- | --- |
+| `colossal-island-10x-overview-03.png` | Primary world-scale reference | one huge island footprint, central mountain range, outer plateaus, long routes, ocean perimeter and distant stunts |
+| `colossal-island-10x-map-03.png` | Route planning reference | several geographic regions, route corridors across the full island, separated elevation bands and a central underground zone |
+| `colossal-island-10x-cutaway-03.png` | Underground scale reference | long cave network, multiple underground tiers, waterfall shafts, large chambers and distant exits |
+| `colossal-structures-10x-03.png` | Large structure reference | giant loops, long bridge spans, very long ramps, waterfall portals and repeated support bays |
+
+Primary handoff order is now `colossal-island-10x-overview-03.png`, `colossal-island-10x-map-03.png`, then the cutaway and structures sheets. Do not shrink this back into a small tabletop scene when generating the Meshy models.
+
 ### Recommended image usage
 
-1. Give `mega-island-overview-02.png` to the agent first as the **world composition and scale reference**.
-2. Give `mega-cutaway-network-02.png` second as the **elevation, cave and route-network reference**.
-3. Use `mega-terrain-kit-02.png` to generate large terrain modules one at a time.
-4. Use `mega-stunt-structures-02.png` to generate the oversized loop, ramp, bridge and scaffold family one at a time.
-5. Use the **01** object sheet only when Meshy needs a simpler close-up silhouette.
+1. Give `colossal-island-10x-overview-03.png` to the agent first as the **full world composition and scale reference**.
+2. Give `colossal-island-10x-map-03.png` second as the **route-planning and geographic-region reference**.
+3. Use `colossal-island-10x-cutaway-03.png` to generate the large underground terrain family.
+4. Use `colossal-structures-10x-03.png` to generate the oversized loop, ramp, bridge, portal and scaffold family one at a time.
+5. Keep the **02** images for closer mega-scale composition and the **01** images for individual shape close-ups.
 6. Do not ask for one giant Meshy scene. The builder needs separate meshes with predictable pivots and clean collision surfaces.
 
 ## Meshy generation rules
@@ -92,11 +105,12 @@ Generate these as independent assets rather than a single island scene.
 
 ## Provisional scale for the builder
 
-Use these ratios first; convert to engine units only after the first import test. The mega set is a world-scale target, not a literal single mesh: build it from many modules and let the builder own the final route length.
+Use these ratios first; convert to engine units only after the first import test. The 10× set is a world-scale target, not a literal single mesh: build it from many modules and let the builder own the final route length.
 
-- Macro island target: **3–5 mountain masses**, **5 distinct route bands**, **2–3 deep ravines**, and **3+ waterfall/cave breakthroughs**.
+- Macro island target: **7–10 geographic regions**, **5–8 distinct route bands**, **4–6 deep ravines**, and **6+ waterfall/cave breakthroughs**.
+- World footprint target: roughly **10× the original compact concept's island footprint and route length**, achieved through more regions and longer connectors, not thicker lanes.
 - Stunt scale target: the hero loop and summit ramp should be **roughly 2–3 times the height of nearby scaffold bays**, with long bridge spans between separate terrain masses.
-- Route spacing target: keep enough vertical and lateral separation that the upper route, mid route and underground route read as separate tracks from the overview camera.
+- Route spacing target: keep enough vertical and lateral separation that the upper route, mid route, coastal route and underground route read as separate tracks from the overview camera.
 - One lane module: **1 unit of width**.
 - Four-lane route: **4 units wide** at the clean deck surface.
 - Marble diameter: about **0.26 lane units** (the game uses radius 31 and lane width 240).

@@ -6,7 +6,9 @@
    ============================================================================= */
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
-import { classifyPlacedRamp, getTrackSpace } from './track-space';
+import { classifyPlacedRamp } from './track-space';
+import { courseTrackSpace } from './island-route/island-space';
+import type { CourseId } from './types';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, START_X } from './scene';
 import { applyLaneEdit, snapNode, type LaneEdit } from './lane-path-tool';
@@ -222,7 +224,7 @@ export class TrackBuilder3D {
     this.kit = new SceneKit(this.scene, this.materialCache, this.materials);
     this.shaderLibrary = loadShaderLibrary();
     this.initDecalSideHandles();
-    this.laneGizmos = new LaneGizmos(this.scene);
+    this.laneGizmos = new LaneGizmos(this.scene, () => courseTrackSpace(this.courseId as CourseId));
     this.laneGizmos.root.visible = false;
     this.loadLaneDoc();
     if (typeof localStorage !== 'undefined') {
@@ -320,7 +322,7 @@ export class TrackBuilder3D {
   private validateRampSupport(type: string, vals: { id?: string; x: number; y: number; z: number; scale: number; trackDist?: number }): string | null {
     const def = PROP_DEFINITIONS.find((d) => d.type === type);
     if (!def?.isRamp) return null;
-    const verdict = classifyPlacedRamp(getTrackSpace(), {
+    const verdict = classifyPlacedRamp(courseTrackSpace(this.courseId as CourseId), {
       id: vals.id, x: vals.x, y: vals.y, z: vals.z, scale: vals.scale, trackDist: vals.trackDist,
     });
     if (verdict.supported) return null;

@@ -293,9 +293,8 @@ test('the wiring: engine → frame → paint, and Test drive hands the document 
   assert.match(engine, /setLaneNetwork\(network: LaneNetwork \| null\)/, 'and the engine can be handed a new one');
 
   const renderer = readFileSync(new URL('../src/game/renderer-3d.ts', import.meta.url), 'utf8');
-  assert.match(renderer, /new LanePaint\(this\.scene\)/, 'the paint is built lazily');
-  assert.match(renderer, /this\.lanePaint\.setNetwork\(frame\.laneNetwork\)/, 'and fed the frame\'s network');
-  assert.match(renderer, /this\.lanePaint\?\.dispose\(\)/, 'and disposed with the renderer');
+  // The owner wants no lane paint: the race never draws the lanes (the builder's Lanes tab still shows them).
+  assert.doesNotMatch(renderer, /LanePaint/, 'the race draws no lane paint');
 
   const screen = readFileSync(new URL('../src/screens/RaceScreen.tsx', import.meta.url), 'utf8');
   assert.match(screen, /onTestRace=\{/, 'the builder is given a Test drive handler');

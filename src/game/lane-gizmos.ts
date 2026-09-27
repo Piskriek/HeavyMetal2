@@ -20,7 +20,7 @@
  */
 import * as THREE from 'three';
 import {
-  engineDistanceFromX, engineFromWorld, engineXFromDistance, getTrackSpace, worldFromCanonical,
+  engineDistanceFromX, engineFromWorld, engineXFromDistance, getTrackSpace, worldFromCanonical, type TrackSpaceMap,
 } from './track-space';
 import type { LaneNetwork, LaneNode, LaneNodeKind } from './lane-network';
 import { inferKind } from './lane-network';
@@ -74,7 +74,11 @@ export class LaneGizmos {
   private order: string[] = [];
   private index = new Map<string, number>();
 
-  constructor(private readonly parent: THREE.Object3D) {
+  /**
+   * `space` is the course's road (the island's own for the island): handles sit on that road, and a
+   * drag lands back on it. The classic courses share one.
+   */
+  constructor(private readonly parent: THREE.Object3D, private readonly space: () => TrackSpaceMap = getTrackSpace) {
     this.root.name = 'LaneGizmos';
     parent.add(this.root);
   }
@@ -88,7 +92,7 @@ export class LaneGizmos {
 
   /** Engine (x, z) → the point on the ribbon a handle floats above. */
   worldFromEngine(x: number, z: number, lift = LANE_HANDLE_LIFT): THREE.Vector3 {
-    const map = getTrackSpace();
+    const map = this.space();
     const s = map.trackDistFromEngineDistance(engineDistanceFromX(x));
     const placement = worldFromCanonical(map, { s, laneZ: z, altitude: 0 });
     const { world } = placement;
@@ -97,7 +101,7 @@ export class LaneGizmos {
 
   /** A raycast hit in the world → engine (x, z). The inverse of `worldFromEngine`. */
   engineFromWorld(point: THREE.Vector3): { x: number; z: number; residual: number; ambiguous: boolean } {
-    const map = getTrackSpace();
+    const map = this.space();
     const canonical = engineFromWorld(map, { x: point.x, y: point.y, z: point.z });
     return {
       x: engineXFromDistance(canonical.distance),

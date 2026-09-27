@@ -12,7 +12,6 @@ import type { SceneFrame } from './scene';
 import type { GameOptions } from './types';
 import { BALL_DRAW_RADIUS, RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
-import { LanePaint } from './lane-paint';
 import { ObstacleView, shieldBubbleTexture } from './obstacle-view';
 import { PickupView } from './pickup-view';
 import { cameraKick, cameraShake } from './camera-shake';
@@ -1662,12 +1661,6 @@ export class Renderer3D {
   private fpLean = 0;
   /** M01 · T5 — the painted effect runtime. Built lazily on the first race frame that has effects. */
   private effects: EffectRenderer | null = null;
-  /**
-   * M01 · T6/T7 dressing — the authored lanes, painted on the road. Built lazily: a race with no
-   * authored network never constructs it, and `LanePaint.setNetwork` decides by identity, so the
-   * per-frame call below costs one reference comparison in the steady state.
-   */
-  private lanePaint: LanePaint | null = null;
   private obstacleView: ObstacleView | null = null;
   /**
    * The powerups. Built once, on the first race frame that has any: `assets.pickupSprites` were painted
@@ -2312,10 +2305,7 @@ export class Renderer3D {
     const playerAltitude = this.drawRacers(frame, dt, firstPerson, rampSurfaces, playerDist);
 
     // 2. Position camera (skip if free-fly camera is active in track builder)
-    if (frame.laneNetwork !== undefined) {
-      if (!this.lanePaint) this.lanePaint = new LanePaint(this.scene);
-      this.lanePaint.setNetwork(frame.laneNetwork);
-    }
+    // The owner wants no lane paint on the road: the lanes steer the racers but are never drawn in a race.
 
     // C1: the race's obstacles, drawn where the physics has them (they used to be invisible).
     if (!this.obstacleView) {
@@ -2384,8 +2374,6 @@ export class Renderer3D {
     this.disposeRacerPool();
     this.effects?.destroy();
     this.effects = null;
-    this.lanePaint?.dispose();
-    this.lanePaint = null;
     this.obstacleView?.dispose();
     this.obstacleView = null;
     this.pickupView?.dispose();

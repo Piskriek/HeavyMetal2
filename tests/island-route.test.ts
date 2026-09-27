@@ -11,7 +11,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { TRACK_DISTANCE, courseY } from '../src/game/scene';
 import { COURSES } from '../src/game/types';
 import { TRACKS } from '../src/game/courses';
-import { D_START, getTrackSpace, lateralFromLaneZ } from '../src/game/track-space';
+import { D_START, engineDistanceFromX, getTrackSpace, lateralFromLaneZ, worldFromCanonical } from '../src/game/track-space';
 import { validateLaneNetwork } from '../src/game/lane-network';
 import { loadLaneNetwork, readLaneStorage, writeLaneStorage, buildLaneDocument } from '../src/game/lane-storage';
 import { ISLAND_HALF_WIDTH, ISLAND_ROUTE_GRAPH } from '../src/game/island-route/serpentine-route';
@@ -198,3 +198,21 @@ test('the detail map finds its places in this three.js version\'s standard shade
   assert.ok('detailMap' in shader.uniforms);
   assert.ok(ISLAND_DETAIL.fineFade < ISLAND_DETAIL.coarseFade && ISLAND_DETAIL.fineTile < ISLAND_DETAIL.coarseTile);
 });
+
+test('the island\'s lane handles sit on the island road, not on the classic track in the sky', () => {
+  const { store } = mockStorage();
+  (globalThis as any).localStorage = store;
+  const track = { id: 't', name: 't', theme: 'ridge', points: [{ x: 0, y: 0, z: 0 }] } as unknown as TrackData;
+  const builder = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), track, undefined, 'none');
+  builder.setCourse('basalt');
+  const gizmos = (builder as any).laneGizmos;
+  const island = islandTrackSpace();
+  for (const x of [190, 20000, 50000, 72190]) {
+    const handle = gizmos.worldFromEngine(x, 0, 0);
+    const truth = worldFromCanonical(island, { s: island.trackDistFromEngineDistance(engineDistanceFromX(x)), laneZ: 0, altitude: 0 }).world;
+    assert.ok(Math.hypot(handle.x - truth.x, handle.y - truth.y, handle.z - truth.z) < 1e-6, `x ${x} on the island road`);
+    const back = gizmos.engineFromWorld(handle);
+    assert.ok(Math.abs(back.x - x) < 2, `x ${x} drags back to ${back.x}`);
+  }
+});
+

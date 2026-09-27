@@ -1804,9 +1804,9 @@ export class Renderer3D {
       buildWorld(this.materials, this.scene);
     }
 
-    // 3D Track Builder (handles placed props, free-fly, and surface snapping). On the island it never
-    // loads or saves the owner's track: that document belongs to the classic world.
-    this.trackBuilder = new TrackBuilder3D(this.scene, this.camera, this.track, this.materials, !onIsland);
+    // 3D Track Builder (handles placed props, free-fly, and surface snapping). On the island it loads and
+    // saves the island's own props; the owner's classic track belongs to the classic world.
+    this.trackBuilder = new TrackBuilder3D(this.scene, this.camera, this.track, this.materials, onIsland ? 'island' : 'track');
     // The island's lanes are its own: the builder loads and saves them under the island course.
     if (onIsland) this.trackBuilder.setCourse(course);
     this.trackBuilder.setInitialSky(skyKey);

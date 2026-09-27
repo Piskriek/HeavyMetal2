@@ -43,7 +43,14 @@ import {
 export * from './builder/prop-catalog';
 export { propsFingerprint, stripPropsRuntimeState } from './builder/backup-service';
 import { type PropDefinition, type DecalSide, type AnimGrid, animGridFor, ANIM_SPEED_MIN, ANIM_SPEED_MAX, animSpeedFor, animEnabledFrames, animFrameAt, animSheetFor, animatedTwinDef, propHasAnimatedOption, type AnimationSettings, normalizeAnimFrames, normalizeAnimFrameDelays, animFrameUV, animPhaseFor, type PlacedProp, PROP_DEFINITIONS, DEFAULT_TRACK_PROPS, } from './builder/prop-catalog';
-import { PropBackupService, stripPropsRuntimeState } from './builder/backup-service';
+import { PropBackupService, stripPropsRuntimeState, TRACK_BACKUP_ENDPOINTS } from './builder/backup-service';
+import { ISLAND_BACKUP_ENDPOINTS, readIslandProps, writeIslandProps } from './island-route/island-props-storage';
+
+/**
+ * Which saved props a builder works on: the owner's classic track, the island's own props, or none
+ * (a throwaway world). Each store has its own browser key and its own disk folder.
+ */
+export type PropStore = 'track' | 'island' | 'none';
 
 /** Wall-clock seconds for animation timing (works in browser and headless tests). */
 function nowSeconds(): number {
@@ -130,7 +137,13 @@ export class TrackBuilder3D {
   private readonly decalSideBoxes = new Map<DecalSide, THREE.Mesh>();
 
   /** M8: the disk backup (C2's server safety copies, M12's skip-if-unchanged, the timers, the status). */
-  private readonly backups = new PropBackupService({ props: () => this.persistableProps(), course: () => this.courseId });
+  private readonly backups = new PropBackupService({
+    props: () => this.persistableProps(),
+    course: () => this.courseId,
+    endpoints: () => this.propStore === 'island'
+      ? { backup: ISLAND_BACKUP_ENDPOINTS.backup, restore: ISLAND_BACKUP_ENDPOINTS.restore, browserHistory: false }
+      : TRACK_BACKUP_ENDPOINTS,
+  });
 
   /**
    * Lights, primitives and scenery edits (builder/scene-kit.ts). Built first in the constructor, so
@@ -199,12 +212,13 @@ export class TrackBuilder3D {
     private readonly track: TrackData,
     private readonly materials?: any,
     /**
-     * ISLAND-ROUTE: false for a world the owner's saved track does not belong to (the island course). The
-     * builder then never loads the saved props, never writes them to this device and never writes a
-     * disk backup, so nothing done in that world can reach the owner's track or its backups.
+     * ISLAND-ROUTE: the island course passes 'island', so its builder loads and saves the island's own
+     * props (island-props-storage.ts, backups/island/) and never reads or writes the owner's track or
+     * its backups. 'none' saves nothing at all.
      */
-    private readonly persistent = true,
+    private readonly propStore: PropStore = 'track',
   ) {
+    if (propStore === 'island') this.courseId = 'basalt';
     this.kit = new SceneKit(this.scene, this.materialCache, this.materials);
     this.shaderLibrary = loadShaderLibrary();
     this.initDecalSideHandles();
@@ -227,10 +241,11 @@ export class TrackBuilder3D {
         }
       } catch {}
     }
-    if (this.persistent) this.loadFromStorage();
+    if (this.propStore === 'track') this.loadFromStorage();
+    else if (this.propStore === 'island') this.loadIslandProps();
     const merged = mergeShadersFromProps(this.shaderLibrary, this.placedProps as { shader?: unknown }[]);
     if (merged.added) { this.shaderLibrary = merged.library; saveShaderLibrary(this.shaderLibrary); }
-    if (typeof window !== 'undefined' && this.persistent) {
+    if (typeof window !== 'undefined' && this.propStore !== 'none') {
       this.startPeriodicBackupTimer(30000);
     }
   }
@@ -2844,7 +2859,13 @@ export class TrackBuilder3D {
 
   // --- PERSISTENCE & PERIODIC DISK BACKUP ---
   saveToStorage() {
-    if (!this.persistent) return;
+    if (this.propStore === 'none') return;
+    if (this.propStore === 'island') {
+      const result = writeIslandProps(this.stripRuntimeState(this.persistableProps()));
+      if (!result.ok) console.warn('[Island props] not saved:', result.error);
+      this.backups.scheduleDebounced(2500);
+      return;
+    }
     // T08: Write via versioned storage module (separate key, not protected path)
     const cleanProps = this.stripRuntimeState(this.persistableProps());
     const storageResult = writeStorage(cleanProps, this.courseId);
@@ -2953,10 +2974,22 @@ export class TrackBuilder3D {
     this.syncLatestFromDisk();
   }
 
+  /** The island's own props: this device's copy, then the disk's if it holds more. */
+  private loadIslandProps() {
+    this.placedProps = readIslandProps();
+    this.placedProps.forEach((p) => this.createPropSprite(p));
+    this.syncLatestFromDisk();
+  }
+
+  /** The file name of the store's latest disk save (shown in the backups list). */
+  latestBackupName(): string {
+    return this.propStore === 'island' ? ISLAND_BACKUP_ENDPOINTS.latestFile : 'track-props-latest.json';
+  }
+
   private async syncLatestFromDisk() {
     if (typeof fetch === 'undefined') return;
     try {
-      const res = await fetch('/api/backup-props');
+      const res = await fetch(this.propStore === 'island' ? ISLAND_BACKUP_ENDPOINTS.backup : TRACK_BACKUP_ENDPOINTS.backup);
       if (!res.ok) return;
       const data = await res.json();
       const diskProps = data?.latest?.props;
@@ -2966,7 +2999,8 @@ export class TrackBuilder3D {
       }
       if (Array.isArray(diskProps) && diskProps.length > 0) {
         // If scene only has default starter items or disk has a richer/newer set of decorations
-        if (this.placedProps.length === 0 || this.placedProps.length === DEFAULT_TRACK_PROPS.length || diskProps.length > this.placedProps.length) {
+        const starter = this.propStore === 'track' && this.placedProps.length === DEFAULT_TRACK_PROPS.length;
+        if (this.placedProps.length === 0 || starter || diskProps.length > this.placedProps.length) {
           this.restorePropsState(diskProps);
           this.notify();
         }
@@ -2982,7 +3016,7 @@ export class TrackBuilder3D {
    * An explicit save (`force = true`) always writes.
    */
   async backupToFile(force = false): Promise<{ success: boolean; count: number; timestamp: number; unchanged?: boolean } | null> {
-    if (!this.persistent) return null;
+    if (this.propStore === 'none') return null;
     return this.backups.backupToFile(force);
   }
 
@@ -3007,6 +3041,8 @@ export class TrackBuilder3D {
   }
 
   async restoreDefaultPreset(): Promise<boolean> {
+    // The starter decorations stand along the classic track; the island has none.
+    if (this.propStore !== 'track') return false;
     this.pushUndo();
     this.restorePropsState(JSON.parse(JSON.stringify(DEFAULT_TRACK_PROPS)));
     this.notify();
@@ -3048,7 +3084,8 @@ export class TrackBuilder3D {
 
       if (result.props.length > 0) {
         this.pushUndo();
-        this.courseId = result.courseId || this.courseId;
+        // A file keeps its course on the classic track; the island's builder stays on the island.
+        if (this.propStore === 'track') this.courseId = result.courseId || this.courseId;
         this.restorePropsState(result.props);
         this.notify();
         this.backupToFile(true);

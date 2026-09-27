@@ -20,7 +20,6 @@ import { ISLAND_LANE_Z, islandLaneNetwork } from '../src/game/island-route/islan
 import { islandHeightField, prepareIslandModel, softenNormals } from '../src/game/island-route/island-world';
 import { ISLAND_DETAIL, injectDetailMap } from '../src/game/island-route/detail-map';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
-import { writeStorage, TRACK_STORAGE_KEY_V2 } from '../src/game/track-storage';
 import type { TrackData } from '../src/game/renderer-3d';
 
 const model = new OBJLoader().parse(readFileSync(new URL('../public/models/island/serpentine-isle.obj', import.meta.url), 'utf8'));
@@ -145,30 +144,13 @@ test('saving a course\'s lanes keeps every other course\'s saved lanes', () => {
   const ridge = { ...islandLaneNetwork(), course: 'ridge' as const };
   assert.equal(writeLaneStorage(store, buildLaneDocument({ ridge })).ok, true);
   const track = { id: 't', name: 't', theme: 'ridge', points: [{ x: 0, y: 0, z: 0 }] } as unknown as TrackData;
-  const builder = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), track, undefined, false);
+  const builder = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), track, undefined, 'none');
   builder.setCourse('basalt');
   builder.setLaneNetwork(islandLaneNetwork());
   assert.equal(builder.saveLaneDoc(store).ok, true);
   const saved = readLaneStorage(store)?.networks;
   assert.ok(saved?.ridge, 'the ridge lanes survive');
   assert.ok(saved?.basalt, 'the island lanes are saved');
-});
-
-test('the island builder never loads, saves or backs up the owner\'s track', async () => {
-  const { data, store } = mockStorage();
-  (globalThis as any).localStorage = store;
-  const saved = [{ id: 'owner-1', type: 'prop_14_scrapdome_gantry', x: 1, y: 2, z: 3, rotY: 0, scale: 1 }];
-  writeStorage(saved as never, 'ridge');
-  const before = data.get(TRACK_STORAGE_KEY_V2);
-  assert.ok(before, 'the owner\'s track is in storage');
-  const track = { id: 't', name: 't', theme: 'ridge', points: [{ x: 0, y: 0, z: 0 }] } as unknown as TrackData;
-  const builder = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), track, undefined, false);
-  assert.equal(builder.getProps().length, 0, 'the saved props stay out of the island');
-  builder.saveToStorage();
-  assert.equal(data.get(TRACK_STORAGE_KEY_V2), before, 'nothing is written over the saved track');
-  assert.equal(await builder.backupToFile(true), null, 'no disk backup');
-  const classic = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), track);
-  assert.equal(classic.getProps().length, 1, 'the classic builder still loads it');
 });
 
 test('Serpentine Isle is the fourth course and rides Rustbucket Ridge\'s physics profile', () => {

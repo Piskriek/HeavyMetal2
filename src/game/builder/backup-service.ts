@@ -17,7 +17,18 @@ import type { PlacedProp } from './prop-catalog';
 
 export type BackupStatus = 'idle' | 'saving' | 'saved' | 'error';
 export interface BackupInfo { status: BackupStatus; timestamp: number; count: number }
-export interface BackupSource { props(): PlacedProp[]; course(): string }
+export interface BackupSource {
+  props(): PlacedProp[];
+  course(): string;
+  /** Where the props go on disk. Absent = the owner's classic track (`/api/backup-props`). */
+  endpoints?(): BackupEndpoints;
+}
+/**
+ * One prop document's dev-server routes. `browserHistory` lists the classic track's rolling browser
+ * copies in the backups list; the island keeps none, so its list shows only its disk saves.
+ */
+export interface BackupEndpoints { backup: string; restore: string; browserHistory: boolean }
+export const TRACK_BACKUP_ENDPOINTS: BackupEndpoints = { backup: '/api/backup-props', restore: '/api/restore-backup', browserHistory: true };
 export interface BackupResult { success: boolean; count: number; timestamp: number; unchanged?: boolean }
 
 /** T08: a copy of the props without runtime-only fields (pickup state, transient markers). */
@@ -61,6 +72,10 @@ export class PropBackupService {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly source: BackupSource) {}
+
+  private get endpoints(): BackupEndpoints {
+    return this.source.endpoints?.() ?? TRACK_BACKUP_ENDPOINTS;
+  }
 
   /** Calls back at once with the current status, then on every change. Returns an unsubscribe. */
   onStatus(cb: (info: BackupInfo) => void): () => void {
@@ -122,7 +137,7 @@ export class PropBackupService {
     this.notify('saving');
     try {
       const payload = { course, timestamp: now, props };
-      const res = await fetch('/api/backup-props', {
+      const res = await fetch(this.endpoints.backup, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -152,7 +167,7 @@ export class PropBackupService {
 
     if (typeof fetch !== 'undefined') {
       try {
-        const res = await fetch('/api/backup-props');
+        const res = await fetch(this.endpoints.backup);
         if (res.ok) {
           const data = await res.json();
           latest = data.latest ?? null;
@@ -161,7 +176,7 @@ export class PropBackupService {
       } catch {}
     }
 
-    try {
+    if (this.endpoints.browserHistory) try {
       const rawLatest = localStorage.getItem('hm2-3d-track-props-backup-latest');
       if (rawLatest) {
         const parsed = JSON.parse(rawLatest);
@@ -196,7 +211,7 @@ export class PropBackupService {
   /** The props of one disk history file, or null. */
   async fetchHistoryFile(filename: string): Promise<PlacedProp[] | null> {
     if (typeof fetch === 'undefined') return null;
-    const res = await fetch('/api/restore-backup', {
+    const res = await fetch(this.endpoints.restore, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename }),

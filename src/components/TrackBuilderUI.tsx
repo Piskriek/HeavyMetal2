@@ -899,7 +899,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
   const handleRestoreStarterDecorations = async () => {
     if (confirm('Restore the 14 starter track decorations? This will replace your current placed props.')) {
-      await builder.restoreDefaultPreset();
+      if (!(await builder.restoreDefaultPreset())) { showToast('This course has no starter decorations.'); return; }
       showToast('Restored 14 starter track decorations!');
       setShowBackupsModal(false);
     }
@@ -3752,7 +3752,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-amber-200 truncate">track-props-latest.json</span>
+                          <span className="font-bold text-amber-200 truncate">{builder.latestBackupName()}</span>
                           <span className="bg-amber-950/80 text-amber-300 text-[10px] px-1.5 py-0.2 rounded border border-amber-600/40">
                             Latest Disk Baseline
                           </span>
@@ -3771,7 +3771,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                           if (backupsList.latest?.props) {
                             handleRestoreLocalSnapshot(backupsList.latest.props);
                           } else {
-                            handleRestoreFile('track-props-latest.json');
+                            handleRestoreFile(builder.latestBackupName());
                           }
                         }}
                         className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/50 rounded text-xs font-semibold cursor-pointer transition-colors"
@@ -3779,9 +3779,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         Restore
                       </button>
                       <button
-                        onClick={() => handleDownloadSpecificBackup(backupsList.latest, 'track-props-latest.json')}
+                        onClick={() => handleDownloadSpecificBackup(backupsList.latest, builder.latestBackupName())}
                         className="p-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded border border-zinc-600 cursor-pointer transition-colors"
-                        title="Download track-props-latest.json"
+                        title={`Download ${builder.latestBackupName()}`}
                       >
                         <Download size={13} />
                       </button>

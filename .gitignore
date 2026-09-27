@@ -22,6 +22,7 @@ art-src/animated/onion/
 
 # Transient dev-server track prop history backups
 backups/props/history/
+backups/island/history/
 temp/
 
 

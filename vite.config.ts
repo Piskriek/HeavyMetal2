@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { writeSafetyCopyIfGrown } from "./scripts/props-safety-copy";
+import { listIslandBackups, readIslandBackup, saveIslandBackup } from "./scripts/island-props-backup";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -243,9 +244,48 @@ function lanePathsBackupPlugin(): Plugin {
   };
 }
 
+/**
+ * ISLAND-ROUTE: the island's own props on disk, in backups/island/ (scripts/island-props-backup.ts).
+ * Separate routes and a separate folder: nothing here can reach the classic track's props folder.
+ */
+function islandPropsBackupPlugin(): Plugin {
+  return {
+    name: "island-props-backup-plugin",
+    configureServer(server) {
+      const dir = path.resolve(__dirname, "backups/island");
+      const json = (res: any, status: number, value: unknown) => {
+        res.writeHead(status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(value));
+      };
+      const readBody = (req: any, done: (data: any) => void, res: any) => {
+        let body = "";
+        req.on("data", (chunk: any) => { body += chunk; });
+        req.on("end", () => {
+          try { done(JSON.parse(body)); } catch (err: any) { json(res, 400, { error: err.message }); }
+        });
+      };
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ? req.url.split("?")[0] : "";
+        if (url === "/api/backup-island-props" && req.method === "POST") {
+          readBody(req, (data) => json(res, 200, saveIslandBackup(dir, data)), res);
+        } else if (url === "/api/backup-island-props" && req.method === "GET") {
+          try { json(res, 200, listIslandBackups(dir)); } catch (err: any) { json(res, 500, { error: err.message }); }
+        } else if (url === "/api/restore-island-backup" && req.method === "POST") {
+          readBody(req, (data) => {
+            const found = readIslandBackup(dir, data?.filename ?? "");
+            if (found) json(res, 200, found); else json(res, 404, { error: "Backup file not found" });
+          }, res);
+        } else {
+          next();
+        }
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin(), lanePathsBackupPlugin()],
+  plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin(), lanePathsBackupPlugin(), islandPropsBackupPlugin()],
   // Dev server: allow the sandbox preview proxy host (e.g. 5173-<id>.e2b.app).
   server: {
     host: '0.0.0.0',

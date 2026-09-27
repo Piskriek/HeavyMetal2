@@ -1,0 +1,19 @@
+{
+  "id": "01a0e205-cf44-76ca-84fd-816303783c04",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2446626932,
+  "prompt": "a dense rounded tropical shrub, one solid compact mass of broad glossy green leaves with a few red hibiscus flowers, no gaps, no loose leaves, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a dense rounded tropical shrub, one solid compact mass of broad glossy green leaves with a few red hibiscus flowers, no gaps, no loose leaves, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790498426968,
+  "progress": 100,
+  "started_at": 1790498426980,
+  "finished_at": 1790498569771,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

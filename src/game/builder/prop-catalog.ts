@@ -17,7 +17,7 @@ export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' |
   /** Placed point and spot lights. */
   | 'lights'
   /** The Meshy models (models/kit-catalog.ts): island pieces, stunts, and decorative rings. */
-  | 'island_kit' | 'stunts' | 'decoration'
+  | 'island_kit' | 'stunts' | 'decoration' | 'foliage_3d' | 'rocks_3d'
   /** Not a shelf: edits to the course's generated scenery (never shown as cards). */
   | 'scenery';
 

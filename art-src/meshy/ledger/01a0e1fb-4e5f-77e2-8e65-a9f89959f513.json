@@ -1,0 +1,16 @@
+{
+  "name": "dry-shrub",
+  "taskId": "01a0e1fb-4e5f-77e2-8e65-a9f89959f513",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a scrubby windswept coastal shrub with twisted grey branches and small olive leaves, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2500,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:29:01.088Z"
+}

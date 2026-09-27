@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fe-89a1-75d8-8754-227d4127f7aa",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2548509529,
+  "prompt": "a small pile of mixed sandstone and dark basalt rocks, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a small pile of mixed sandstone and dark basalt rocks, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497950361,
+  "progress": 100,
+  "started_at": 1790497950373,
+  "finished_at": 1790497990543,
+  "task_error": null,
+  "consumed_credits": 10
+}

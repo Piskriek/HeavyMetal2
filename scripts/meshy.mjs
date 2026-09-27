@@ -4,6 +4,9 @@
  *   node scripts/meshy.mjs balance                      credits left on the account (free)
  *   node scripts/meshy.mjs image <name> <ref.png>       image → textured GLB (≈30 credits)
  *   node scripts/meshy.mjs wait <name>                  poll until done, then download
+ *   node scripts/meshy.mjs text <name> <model> <polycount> <prompt…>
+ *                                                       text → textured GLB: preview then texture
+ *                                                       (meshy-6-lite 5+10, meshy-6 20+10 credits)
  *   node scripts/meshy.mjs ledger                       every task this project has paid for
  *
  * The API key is read from C:\MarbleGp\.env.local (MESHY_API_KEY=…, git-ignored) and is only ever
@@ -30,8 +33,12 @@ function apiKey() {
   // The key lives in the main checkout; worktrees look there too.
   for (const f of [join(root, '.env.local'), 'C:/MarbleGp/.env.local']) {
     if (!existsSync(f)) continue;
-    const line = readFileSync(f, 'utf8').split(/\r?\n/).find((l) => l.startsWith('MESHY_API_KEY='));
+    const lines = readFileSync(f, 'utf8').split(/\r?\n/).map((l) => l.trim());
+    const line = lines.find((l) => l.startsWith('MESHY_API_KEY='));
     if (line) return line.slice('MESHY_API_KEY='.length).trim();
+    // The file may hold just the key itself (Meshy keys start with msy_).
+    const bare = lines.find((l) => /^msy_[A-Za-z0-9]+$/.test(l));
+    if (bare) return bare;
   }
   throw new Error('No MESHY_API_KEY in .env.local');
 }
@@ -126,10 +133,67 @@ async function wait(name) {
   }
 }
 
+/** Text-to-3D preview costs by model (Meshy pricing, 2026-09); the texture pass is 10 more. */
+const TEXT_PREVIEW_COST = { 'meshy-6-lite': 5, 'meshy-6': 20, 'meshy-7.1': 20, latest: 20 };
+const TEXT_REFINE_COST = 10;
+const API2 = 'https://api.meshy.ai/openapi/v2';
+async function call2(method, path, body) {
+  const res = await fetch(`${API2}${path}`, { method, headers: headers(), body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 300)}`);
+  return text ? JSON.parse(text) : {};
+}
+async function pollText(entry) {
+  for (;;) {
+    const t = await call2('GET', `/text-to-3d/${entry.taskId}`);
+    if (['SUCCEEDED', 'FAILED', 'CANCELED'].includes(t.status)) {
+      record({ ...entry, status: t.status, credits: t.consumed_credits ?? entry.credits });
+      if (t.status !== 'SUCCEEDED') throw new Error(`${entry.name}: ${t.status} ${t.task_error?.message ?? ''}`);
+      return t;
+    }
+    await new Promise((r) => setTimeout(r, 10000));
+  }
+}
+
+/**
+ * A model from a text prompt, end to end: an untextured preview, then the texture pass. The result
+ * lands where image tasks put theirs (art-src/meshy/<name>/model.glb + thumbnail.png). Re-running
+ * after a finished preview skips straight to the texture pass, so nothing is paid twice.
+ */
+async function text(name, model, polycount, prompt) {
+  const previewCost = TEXT_PREVIEW_COST[model];
+  if (previewCost === undefined) throw new Error(`Unknown model ${model}`);
+  let preview = ledger().filter((t) => t.name === name && t.kind === 'text-preview' && t.status === 'SUCCEEDED').at(-1);
+  if (!preview) {
+    if (spent() + previewCost + TEXT_REFINE_COST > CEILING) throw new Error(`Refused: ${spent()} credits spent, ceiling ${CEILING}`);
+    const body = { mode: 'preview', prompt, ai_model: model, topology: 'triangle', target_polycount: Number(polycount), should_remesh: true };
+    const { result: taskId } = await call2('POST', '/text-to-3d', body);
+    preview = { name, taskId, kind: 'text-preview', params: body, credits: previewCost, status: 'PENDING', at: new Date().toISOString() };
+    record(preview);
+    console.log(`${name}: preview ${taskId} started (ledger ${spent()} / ${CEILING})`);
+    await pollText(preview);
+  }
+  if (spent() + TEXT_REFINE_COST > CEILING) throw new Error(`Refused: ${spent()} credits spent, ceiling ${CEILING}`);
+  const refineBody = { mode: 'refine', preview_task_id: preview.taskId, enable_pbr: false, texture_prompt: prompt };
+  const { result: refineId } = await call2('POST', '/text-to-3d', refineBody);
+  const refine = { name, taskId: refineId, kind: 'text-refine', source: preview.taskId, credits: TEXT_REFINE_COST, status: 'PENDING', at: new Date().toISOString() };
+  record(refine);
+  const t = await pollText(refine);
+  const dir = join(OUT, name);
+  mkdirSync(dir, { recursive: true });
+  for (const [file, url] of [['model.glb', t.model_urls?.glb], ['thumbnail.png', t.thumbnail_url]]) {
+    if (!url) continue;
+    const res = await fetch(url);
+    writeFileSync(join(dir, file), Buffer.from(await res.arrayBuffer()));
+  }
+  writeFileSync(join(dir, 'task.json'), JSON.stringify({ ...t, model_urls: undefined, texture_urls: undefined, thumbnail_url: undefined, prompt }, null, 2) + '\n');
+  console.log(`${name}: done → art-src/meshy/${name}/model.glb (ledger ${spent()} / ${CEILING})`);
+}
+
 /** A lighter copy of a finished model (5 credits): `tier` names the file, e.g. lod → lod.glb. */
 const REMESH_COST = 5;
 async function remesh(name, tier, polycount) {
-  const source = ledger().filter((t) => t.name === name && t.kind === 'image-to-3d' && t.status === 'SUCCEEDED').at(-1);
+  const source = ledger().filter((t) => t.name === name && (t.kind === 'image-to-3d' || t.kind === 'text-refine') && t.status === 'SUCCEEDED').at(-1);
   if (!source) throw new Error(`No finished model named ${name}`);
   if (spent() + REMESH_COST > CEILING) throw new Error(`Refused: ${spent()} credits spent, ceiling ${CEILING}`);
   const { result: taskId } = await call('POST', '/remesh', { input_task_id: source.taskId, target_polycount: Number(polycount), topology: 'triangle', target_formats: ['glb'] });
@@ -155,6 +219,7 @@ try {
   else if (cmd === 'image') await image(a, b);
   else if (cmd === 'wait') await wait(a);
   else if (cmd === 'remesh') await remesh(a, b, c);
+  else if (cmd === 'text') await text(a, b, c, process.argv.slice(6).join(' '));
   else if (cmd === 'ledger') { for (const t of ledger()) console.log(`${t.name.padEnd(20)} ${t.status.padEnd(10)} ${t.credits}`); console.log(`total ${spent()} / ${CEILING}`); }
   else console.log('usage: balance | image <name> <ref.png> | wait <name> | remesh <name> <tier> <polycount> | ledger');
 } catch (e) {

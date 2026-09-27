@@ -1,0 +1,19 @@
+{
+  "id": "01a0e203-f325-71d9-89be-a54803ee8e20",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 742900178,
+  "prompt": "a dense round tussock of many tall dry golden beach grass blades growing from one sandy clump, marram grass, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a dense round tussock of many tall dry golden beach grass blades growing from one sandy clump, marram grass, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790498305026,
+  "progress": 100,
+  "started_at": 1790498305038,
+  "finished_at": 1790498409576,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

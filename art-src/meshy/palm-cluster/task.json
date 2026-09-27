@@ -1,0 +1,19 @@
+{
+  "id": "01a0e1fa-9f2f-7052-88d9-a8f10eff8dc7",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 4201528961,
+  "prompt": "a cluster of three young palm trees of different heights growing from one sandy clump, green fronds, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a cluster of three young palm trees of different heights growing from one sandy clump, green fronds, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497694907,
+  "progress": 100,
+  "started_at": 1790497694920,
+  "finished_at": 1790497759082,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

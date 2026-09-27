@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fe-cd8c-73aa-b3bf-78b11a8323e8",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2651348011,
+  "prompt": "a tall eroded layered sandstone rock spire, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a tall eroded layered sandstone rock spire, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497967715,
+  "progress": 100,
+  "started_at": 1790497967726,
+  "finished_at": 1790498012216,
+  "task_error": null,
+  "consumed_credits": 10
+}

@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fb-a202-7475-a4ed-cfd2fba76f6d",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 3525925101,
+  "prompt": "a tuft of tall dry golden beach grass, marram grass, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a tuft of tall dry golden beach grass, marram grass, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497759969,
+  "progress": 100,
+  "started_at": 1790497759979,
+  "finished_at": 1790497792807,
+  "task_error": null,
+  "consumed_credits": 10
+}

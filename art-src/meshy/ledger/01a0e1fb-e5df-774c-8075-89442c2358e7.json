@@ -1,0 +1,16 @@
+{
+  "name": "driftwood",
+  "taskId": "01a0e1fb-e5df-774c-8075-89442c2358e7",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a large bleached grey driftwood log with broken branch stubs, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2000,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:29:40.056Z"
+}

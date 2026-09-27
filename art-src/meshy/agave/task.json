@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fc-6e56-77f5-bca9-0f8ad87998b2",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 1084537034,
+  "prompt": "a spiky blue-green agave succulent plant, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a spiky blue-green agave succulent plant, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497812433,
+  "progress": 100,
+  "started_at": 1790497812445,
+  "finished_at": 1790497881775,
+  "task_error": null,
+  "consumed_credits": 10
+}

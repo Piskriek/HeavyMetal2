@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fd-92f3-7783-a803-31786e05b79f",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2286950732,
+  "prompt": "a flat layered sandstone rock slab with eroded edges, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a flat layered sandstone rock slab with eroded edges, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497888324,
+  "progress": 100,
+  "started_at": 1790497888333,
+  "finished_at": 1790497955444,
+  "task_error": null,
+  "consumed_credits": 10
+}

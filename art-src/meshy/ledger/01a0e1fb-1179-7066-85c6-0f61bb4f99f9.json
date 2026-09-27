@@ -1,0 +1,16 @@
+{
+  "name": "beach-grass",
+  "taskId": "01a0e1fb-1179-7066-85c6-0f61bb4f99f9",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a tuft of tall dry golden beach grass, marram grass, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2000,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:28:45.888Z"
+}

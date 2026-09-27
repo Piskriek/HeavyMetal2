@@ -9,6 +9,7 @@ import { preparePowerupSprites } from '../game/powerups';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { DEFAULT_SETUP, createSession, sessionConfig, type RaceConfig } from '../game/session';
 import { INITIAL_SNAPSHOT, type CourseId, type GameOptions, type GameSnapshot, type RunRecord } from '../game/types';
+import { ISLAND_COURSE } from '../game/course-archive';
 import TrackBuilderUI from '../components/TrackBuilderUI';
 import MergePoolOverlay from '../components/MergePoolOverlay';
 import CockpitHud from '../components/CockpitHud';
@@ -21,7 +22,8 @@ interface MapEditorScreenProps {
 }
 
 export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreenProps) {
-  const [course, setCourse] = useState<CourseId>('ridge');
+  // The island is the only track (classic tracks archived: game/course-archive.ts).
+  const [course, setCourse] = useState<CourseId>(ISLAND_COURSE);
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isTesting, setIsTesting] = useState(false);

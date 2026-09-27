@@ -1,0 +1,16 @@
+{
+  "name": "fern-clump",
+  "taskId": "01a0e1f9-55d6-7476-b20a-365066c18979",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a dense clump of lush green tropical ferns, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2500,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:26:52.511Z"
+}

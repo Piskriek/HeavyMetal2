@@ -1,4 +1,5 @@
-import { COURSES, DEFAULT_OPTIONS, type GameOptions, type RunRecord } from './types';
+import { isPlayableCourse } from './course-archive';
+import { DEFAULT_OPTIONS, type GameOptions, type RunRecord } from './types';
 import { runRecordKey } from './session';
 import { summarizeRecord } from './save';
 
@@ -27,7 +28,7 @@ export function readOptions(): GameOptions {
     for (const key of ['sound', 'screenShake', 'downrange', 'parallax', 'aimAssist', 'menuMotion', 'reducedMotion', 'highContrast'] as const) {
       if (typeof saved[key] === 'boolean') options[key] = saved[key];
     }
-    if (COURSES.some((course) => course.id === saved.course)) options.course = saved.course!;
+    if (isPlayableCourse(saved.course)) options.course = saved.course;
     if (saved.graphics === 'auto' || saved.graphics === 'performance' || saved.graphics === 'quality') options.graphics = saved.graphics;
     // M01 · T3: 'first_person' joins the list; an unknown stored value still degrades to the default
     // rather than throwing (AC-8: a stored 'banana' must not break the race).

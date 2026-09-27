@@ -416,7 +416,7 @@ test('summary: invalid markers on full lists are rejected, not erased', () => {
 
 test('storage: older summarized sessions surface a partial-standings warning', () => {
   const base = createSession(setup({ mode: 'tournament', fieldSize: 100 }));
-  base.results = [summarizeRecord({ ...recordOf(100), sessionId: base.id })];
+  base.results = [summarizeRecord({ ...recordOf(100), course: base.rounds[0], sessionId: base.id })];
   const values = new Map<string, string>();
   const storage: StorageLike = {
     getItem: (key) => values.get(key) ?? null,

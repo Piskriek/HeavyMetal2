@@ -1,0 +1,9 @@
+{
+  "name": "race-start-gate",
+  "taskId": "01a0e20f-c9be-73f0-b840-3abdfe98f44b",
+  "kind": "text-refine",
+  "source": "01a0e20d-b77d-70bb-bd46-1c834551733a",
+  "credits": 10,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:51:21.929Z"
+}

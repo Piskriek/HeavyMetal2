@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fd-88e1-758c-916e-c3df658309ca",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2974195425,
+  "prompt": "a cluster of dark grey basalt hexagonal columns of different heights, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a cluster of dark grey basalt hexagonal columns of different heights, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497884644,
+  "progress": 100,
+  "started_at": 1790497884658,
+  "finished_at": 1790497935388,
+  "task_error": null,
+  "consumed_credits": 10
+}

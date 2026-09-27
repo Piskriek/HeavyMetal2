@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fa-2264-7453-8262-89c9877f7b9c",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 3941672209,
+  "prompt": "a dense clump of lush green tropical ferns, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a dense clump of lush green tropical ferns, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497662405,
+  "progress": 100,
+  "started_at": 1790497662417,
+  "finished_at": 1790497699317,
+  "task_error": null,
+  "consumed_credits": 10
+}

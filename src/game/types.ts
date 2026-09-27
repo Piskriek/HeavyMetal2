@@ -233,7 +233,7 @@ export const DEFAULT_OPTIONS: GameOptions = {
   aimAssist: true,
   // M01 · T3: the game is built for the cockpit; the chase and the broadcast views are options.
   cameraMode: 'first_person',
-  course: 'ridge',
+  course: 'basalt',
   graphics: 'auto',
   launchSpeed: 160,
   ballWeight: 120,

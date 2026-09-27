@@ -1,4 +1,5 @@
-import { COURSES, type CourseId, type RacerStanding, type RunRecord } from './types';
+import { type CourseId, type RacerStanding, type RunRecord } from './types';
+import { ISLAND_COURSE, cupRounds, playableCourse } from './course-archive';
 import { DEFAULT_LOADOUT, isCapsule, isRider, type Loadout } from './loadouts';
 // T02: field sizes, seeds and the qualifying rule come from the frozen config contract.
 import { DEFAULT_SEED, QUALIFYING_REQUIRED_ABOVE, isFieldSize, type FieldSize } from './contracts/config';
@@ -57,7 +58,7 @@ export const CUP_NAME = 'The Scrapdome Cup';
 export const CUP_POINTS = [9, 6, 3, 1] as const;
 export const CUP_ROUNDS: CourseId[] = ['ridge', 'boomtown', 'sheep'];
 export const SETUP_KEY = 'goblin-rally-setup-v2';
-export const DEFAULT_SETUP: RaceSetup = { mode: 'quick', course: 'ridge', loadout: DEFAULT_LOADOUT, difficulty: 'racer', customPhysics: false, fieldSize: 4 };
+export const DEFAULT_SETUP: RaceSetup = { mode: 'quick', course: ISLAND_COURSE, loadout: DEFAULT_LOADOUT, difficulty: 'racer', customPhysics: false, fieldSize: 4 };
 
 /**
  * T02: qualifying is a contract rule, not a preference — required above four
@@ -92,7 +93,7 @@ export function readSetup(): RaceSetup {
     if (!saved || typeof saved !== 'object') return { ...DEFAULT_SETUP, loadout: { ...DEFAULT_LOADOUT } };
     return {
       mode: saved.mode === 'tournament' ? 'tournament' : 'quick',
-      course: COURSES.some((course) => course.id === saved.course) ? saved.course! : 'ridge',
+      course: playableCourse(saved.course),
       loadout: { rider: isRider(saved.loadout?.rider) ? saved.loadout.rider : 'rivet', capsule: isCapsule(saved.loadout?.capsule) ? saved.loadout.capsule : 'iron' },
       difficulty: saved.difficulty === 'rookie' || saved.difficulty === 'veteran' ? saved.difficulty : 'racer',
       customPhysics: saved.mode !== 'tournament' && saved.customPhysics === true,
@@ -106,7 +107,7 @@ export function createSession(setup: RaceSetup): RaceSession {
     fieldSize: isFieldSize(setup.fieldSize) ? setup.fieldSize : 4 };
   return {
     id: typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    setup: safe, rounds: safe.mode === 'tournament' ? [...CUP_ROUNDS] : [safe.course], round: 0,
+    setup: safe, rounds: safe.mode === 'tournament' ? cupRounds() : [safe.course], round: 0,
     roster: buildRosterLoadouts(safe.fieldSize, safe.loadout), results: [], seed: newSessionSeed(),
   };
 }

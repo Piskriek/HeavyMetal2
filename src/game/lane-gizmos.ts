@@ -40,6 +40,8 @@ export const LANE_KIND_COLORS: Readonly<Record<LaneNodeKind, number>> = Object.f
 });
 export const LANE_PATH_COLOR = 0x38bdf8;
 export const LANE_SELECTED_COLOR = 0xffffff;
+/** A node in a group selection (amber, the builder's selection colour). */
+export const LANE_GROUP_COLOR = 0xffb020;
 
 export interface LaneGizmoStats {
   /** Per-instance matrix writes: one per handle moved. */
@@ -152,7 +154,7 @@ export class LaneGizmos {
       this.order.push(node.id);
       this.index.set(node.id, i);
       this.writeHandle(i, node);
-      handles.setColorAt(i, new THREE.Color(LANE_KIND_COLORS[this.kindOf(node)]));
+      handles.setColorAt(i, this.colorOf(node));
     }
     if (handles.instanceColor) handles.instanceColor.needsUpdate = true;
     this.stats.nodes = nodeCount;
@@ -175,7 +177,7 @@ export class LaneGizmos {
     const instance = this.index.get(nodeId);
     if (!node || instance === undefined || !this.handles) return 0;
     this.writeHandle(instance, node);
-    this.handles.setColorAt(instance, new THREE.Color(LANE_KIND_COLORS[this.kindOf(node)]));
+    this.handles.setColorAt(instance, this.colorOf(node));
     if (this.handles.instanceColor) this.handles.instanceColor.needsUpdate = true;
     if (this.selected && this.selected.visible && node) {
       this.selected.position.copy(this.worldFromEngine(node.x, node.z));
@@ -192,6 +194,33 @@ export class LaneGizmos {
   pathsWith(nodeId: string): string[] {
     if (!this.network) return [];
     return this.network.paths.filter((path) => path.nodeIds.includes(nodeId)).map((path) => path.id);
+  }
+
+  /** Nodes in a group selection: their handles turn the selection colour (no new materials). */
+  private group = new Set<string>();
+  private colorOf(node: LaneNode): THREE.Color {
+    return new THREE.Color(this.group.has(node.id) ? LANE_GROUP_COLOR : LANE_KIND_COLORS[this.kindOf(node)]);
+  }
+
+  /** Recolours the handles for a group selection (the panel's primary node keeps its wireframe too). */
+  setGroupSelection(ids: ReadonlySet<string>): void {
+    this.group = new Set(ids);
+    if (!this.handles || !this.network) return;
+    for (const node of this.network.nodes) {
+      const instance = this.index.get(node.id);
+      if (instance !== undefined) this.handles.setColorAt(instance, this.colorOf(node));
+    }
+    if (this.handles.instanceColor) this.handles.instanceColor.needsUpdate = true;
+  }
+
+  /** Each handle's point on the screen (normalised device coordinates), for a box selection. */
+  handlesInNdc(camera: THREE.Camera): { id: string; x: number; y: number; inFront: boolean }[] {
+    if (!this.network) return [];
+    const v = new THREE.Vector3();
+    return this.network.nodes.map((node) => {
+      v.copy(this.worldFromEngine(node.x, node.z)).project(camera);
+      return { id: node.id, x: v.x, y: v.y, inFront: v.z > -1 && v.z < 1 };
+    });
   }
 
   /** Highlights the node the panel has selected. Reuses one mesh and one material, created once. */

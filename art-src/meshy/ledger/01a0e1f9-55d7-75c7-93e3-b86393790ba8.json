@@ -1,0 +1,16 @@
+{
+  "name": "palm-cluster",
+  "taskId": "01a0e1f9-55d7-75c7-93e3-b86393790ba8",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a cluster of three young palm trees of different heights growing from one sandy clump, green fronds, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 6000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:26:52.262Z"
+}

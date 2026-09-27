@@ -1,0 +1,19 @@
+{
+  "id": "01a0e1fa-70cf-7680-abc9-6bf11e01d42f",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 191587741,
+  "prompt": "a tall slender coconut palm tree with a gently curved ringed trunk and a lush full crown of green fronds with a few coconuts, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a tall slender coconut palm tree with a gently curved ringed trunk and a lush full crown of green fronds with a few coconuts, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497681934,
+  "progress": 100,
+  "started_at": 1790497681944,
+  "finished_at": 1790497753874,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

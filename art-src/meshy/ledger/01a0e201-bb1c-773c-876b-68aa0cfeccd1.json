@@ -1,0 +1,16 @@
+{
+  "name": "rock-boulder-rough",
+  "taskId": "01a0e201-bb1c-773c-876b-68aa0cfeccd1",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a large rough weathered sandstone boulder with cracks and chipped facets, warm ochre and tan with darker shading, flat underside, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 1500,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:36:02.165Z"
+}

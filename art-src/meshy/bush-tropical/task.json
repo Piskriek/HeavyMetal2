@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fa-4c53-7455-b62e-f960435083d2",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 30608978,
+  "prompt": "a round tropical bush with large glossy green leaves and a few red hibiscus flowers, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a round tropical bush with large glossy green leaves and a few red hibiscus flowers, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497672484,
+  "progress": 100,
+  "started_at": 1790497672495,
+  "finished_at": 1790497725255,
+  "task_error": null,
+  "consumed_credits": 10
+}

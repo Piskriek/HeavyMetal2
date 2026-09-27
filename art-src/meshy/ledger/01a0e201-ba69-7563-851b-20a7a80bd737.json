@@ -1,0 +1,16 @@
+{
+  "name": "bush-leafy",
+  "taskId": "01a0e201-ba69-7563-851b-20a7a80bd737",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a dense rounded tropical shrub, one solid compact mass of broad glossy green leaves with a few red hibiscus flowers, no gaps, no loose leaves, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 4000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:36:02.205Z"
+}

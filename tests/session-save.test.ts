@@ -13,6 +13,7 @@ import {
   type StorageLike,
 } from '../src/game/save';
 import { RACER_DEFINITIONS, type CourseId, type RunRecord } from '../src/game/types';
+import { cupRounds } from '../src/game/course-archive';
 import { mergeRunRecord } from '../src/game/preferences';
 
 class FakeStorage implements StorageLike {
@@ -146,7 +147,8 @@ test('recovery: an impossible cup order is restored to the Scrapdome order', () 
   const session = createSession(setup());
   const tampered = { ...session, rounds: ['sheep', 'ridge', 'boomtown'] };
   const hydration = readSave(new FakeStorage({ [SAVE_KEY]: savedDocument(tampered, 'grid') }));
-  assert.deepEqual(hydration.session?.rounds, CUP_ROUNDS);
+  // The official order is today's cup: the island three times while the classic tracks are archived.
+  assert.deepEqual(hydration.session?.rounds, cupRounds());
   assert.ok(hydration.notices.some((notice) => /official three-round order/.test(notice.text)));
 });
 

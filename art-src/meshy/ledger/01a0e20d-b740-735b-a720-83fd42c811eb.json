@@ -1,0 +1,16 @@
+{
+  "name": "race-finish-arch",
+  "taskId": "01a0e20d-b740-735b-a720-83fd42c811eb",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a goblin-built finish line arch spanning a wide dirt race road: two riveted scrap-metal towers with brass trim joined overhead by a long black and white checkered banner, open underneath, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 6000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:49:07.243Z"
+}

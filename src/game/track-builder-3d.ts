@@ -109,6 +109,8 @@ export class TrackBuilder3D {
   private laneDoc: LaneNetwork | null = null;
   private laneGizmos: LaneGizmos;
   private selectedLaneNodeId: string | null = null;
+  /** Every selected lane node (a group drag moves them all); the primary one above carries the gizmo. */
+  private selectedLaneNodeIds = new Set<string>();
   /** M01 · T7 — drawn only while the lanes tool is the active tool. */
   private lanesVisible = false;
 
@@ -2537,6 +2539,7 @@ export class TrackBuilder3D {
     this.laneDoc = loadLaneNetwork(this.courseId as never);
     this.laneGizmos.setNetwork(this.laneDoc);
     this.selectedLaneNodeId = null;
+    this.setLaneGroup([]);
   }
 
   /** Replaces the whole document (import, open, course switch). Pushes undo unless told not to. */
@@ -2545,6 +2548,7 @@ export class TrackBuilder3D {
     this.laneDoc = network;
     this.laneGizmos.setNetwork(network);
     this.selectedLaneNodeId = null;
+    this.setLaneGroup([]);
     this.notify();
   }
 
@@ -2554,6 +2558,7 @@ export class TrackBuilder3D {
     this.laneGizmos.root.visible = active;
     if (!active) {
       this.selectedLaneNodeId = null;
+      this.setLaneGroup([]);
       this.laneGizmos.setSelectedNode(null);
       if (this.gizmoAdapter?.isLaneNodeAttached()) {
         this.gizmoAdapter.detach();
@@ -2580,11 +2585,15 @@ export class TrackBuilder3D {
     this.laneDoc = result.network;
     // A move rewrites one handle and its own paths; anything structural rebuilds the drawing.
     if (edit.op === 'moveNode') this.laneGizmos.moveNode(edit.nodeId, this.laneDoc);
+    else if (edit.op === 'moveNodes') for (const move of edit.moves) this.laneGizmos.moveNode(move.nodeId, this.laneDoc);
     else this.laneGizmos.setNetwork(this.laneDoc);
-    if (result.focus) this.selectedLaneNodeId = result.focus;
+    // A group move keeps the primary node the user grabbed; other edits focus what they made.
+    if (result.focus && edit.op !== 'moveNodes') this.selectedLaneNodeId = result.focus;
     if (this.selectedLaneNodeId && !this.laneDoc.nodes.some((node) => node.id === this.selectedLaneNodeId)) {
       this.selectedLaneNodeId = null;
     }
+    const alive = new Set(this.laneDoc.nodes.map((node) => node.id));
+    this.setLaneGroup([...this.selectedLaneNodeIds].filter((id) => alive.has(id)));
     this.laneGizmos.setSelectedNode(this.selectedLaneNodeId);
     if (this.selectedLaneNodeId && this.lanesVisible) {
       if (!this.gizmoAdapter?.isDraggingActive()) {
@@ -2674,16 +2683,27 @@ export class TrackBuilder3D {
     }
     this.selectedPropIds.clear();
     const worldPos = this.laneGizmos.worldFromEngine(node.x, node.z, 0);
+    // Where every selected node stood when the drag began: a group drag offsets them all by the primary's move.
+    let groupStart = new Map<string, { x: number; z: number }>();
     this.gizmoAdapter.attachLaneNode(
       {
         id: node.id,
         onDragStart: () => {
           this.pushUndo();
+          groupStart = new Map((this.laneDoc?.nodes ?? [])
+            .filter((n) => this.selectedLaneNodeIds.has(n.id) || n.id === node.id)
+            .map((n) => [n.id, { x: n.x, z: n.z }]));
         },
         onMove: (pos) => {
           const engine = this.laneGizmos.engineFromWorld(pos);
           const snapped = snapNode(engine.x, engine.z, { lanes: false, grid: true });
-          this.applyLaneEditToDoc({ op: 'moveNode', nodeId: node.id, x: snapped.x, z: snapped.z });
+          const start = groupStart.get(node.id);
+          if (groupStart.size > 1 && start) {
+            const dx = snapped.x - start.x, dz = snapped.z - start.z;
+            this.applyLaneEditToDoc({ op: 'moveNodes', moves: [...groupStart].map(([nodeId, p]) => ({ nodeId, x: p.x + dx, z: p.z + dz })) });
+          } else {
+            this.applyLaneEditToDoc({ op: 'moveNode', nodeId: node.id, x: snapped.x, z: snapped.z });
+          }
         },
         onCommit: () => {
           const current = this.getSelectedLaneNode();
@@ -2698,7 +2718,81 @@ export class TrackBuilder3D {
     );
   }
 
-  selectLaneNode(nodeId: string | null) {
+  /** The selected lane nodes' ids (the primary one included). */
+  getSelectedLaneNodeIds(): string[] { return [...this.selectedLaneNodeIds]; }
+
+  private setLaneGroup(ids: Iterable<string>) {
+    this.selectedLaneNodeIds = new Set(ids);
+    this.laneGizmos.setGroupSelection(this.selectedLaneNodeIds.size > 1 ? this.selectedLaneNodeIds : new Set());
+  }
+
+  /**
+   * Selects lane nodes. `additive` (Shift or Ctrl) adds them to the selection, or takes a clicked node
+   * that is already selected back out. The last node added is the primary one, which carries the gizmo.
+   */
+  selectLaneNodes(ids: readonly string[], additive = false) {
+    const next = additive ? new Set(this.selectedLaneNodeIds) : new Set<string>();
+    if (additive && ids.length === 1 && next.has(ids[0])) next.delete(ids[0]);
+    else for (const id of ids) next.add(id);
+    const last = ids[ids.length - 1];
+    const primary = last !== undefined && next.has(last) ? last : ([...next].pop() ?? null);
+    this.setLaneGroup(next);
+    this.applyPrimaryLaneNode(primary);
+  }
+
+  /** Every node of the lanes the selected nodes belong to (a whole lane at once). */
+  selectLanePaths() {
+    if (!this.laneDoc || !this.selectedLaneNodeIds.size) return;
+    const ids = this.laneDoc.paths
+      .filter((p) => p.nodeIds.some((id) => this.selectedLaneNodeIds.has(id)))
+      .flatMap((p) => p.nodeIds);
+    this.selectLaneNodes([...new Set(ids)]);
+  }
+
+  /** Box selection: the nodes whose handles fall inside a screen rectangle (client pixels). */
+  selectLaneNodesInRect(rect: { x0: number; y0: number; x1: number; y1: number }, canvas: HTMLCanvasElement, additive = false): number {
+    const r = canvas.getBoundingClientRect();
+    const ndc = (px: number, py: number) => ({ x: ((px - r.left) / r.width) * 2 - 1, y: -(((py - r.top) / r.height) * 2 - 1) });
+    const a = ndc(Math.min(rect.x0, rect.x1), Math.min(rect.y0, rect.y1));
+    const b = ndc(Math.max(rect.x0, rect.x1), Math.max(rect.y0, rect.y1));
+    const ids = this.laneGizmos.handlesInNdc(this.camera)
+      .filter((h) => h.inFront && h.x >= a.x && h.x <= b.x && h.y <= a.y && h.y >= b.y)
+      .map((h) => h.id);
+    if (ids.length || !additive) this.selectLaneNodes(ids, additive);
+    return ids.length;
+  }
+
+  /** Moves every selected lane node by (dx, dz) engine units, in one undoable step. */
+  nudgeLaneNodes(dx: number, dz: number): { ok: true } | { ok: false; reason: string } {
+    if (!this.laneDoc || !this.selectedLaneNodeIds.size) return { ok: false, reason: 'no_selection: select lane nodes first' };
+    const moves = this.laneDoc.nodes
+      .filter((n) => this.selectedLaneNodeIds.has(n.id))
+      .map((n) => ({ nodeId: n.id, x: n.x + dx, z: n.z + dz }));
+    this.pushUndo();
+    const result = this.applyLaneEditToDoc({ op: 'moveNodes', moves });
+    if (this.selectedLaneNodeId && this.lanesVisible) this.attachGizmoToLaneNode(this.selectedLaneNodeId);
+    return result.ok ? { ok: true } : result;
+  }
+
+  /** Deletes every selected lane node it can (a lane keeps at least two nodes); returns how many went. */
+  deleteSelectedLaneNodes(): number {
+    if (!this.laneDoc || !this.selectedLaneNodeIds.size) return 0;
+    this.pushUndo();
+    let deleted = 0;
+    for (const id of [...this.selectedLaneNodeIds]) {
+      if (this.applyLaneEditToDoc({ op: 'deleteNode', nodeId: id }).ok) deleted++;
+    }
+    this.selectLaneNodes([]);
+    return deleted;
+  }
+
+  selectLaneNode(nodeId: string | null, additive = false) {
+    if (additive && nodeId) { this.selectLaneNodes([nodeId], true); return; }
+    this.setLaneGroup(nodeId ? [nodeId] : []);
+    this.applyPrimaryLaneNode(nodeId);
+  }
+
+  private applyPrimaryLaneNode(nodeId: string | null) {
     this.selectedLaneNodeId = nodeId;
     this.laneGizmos.setSelectedNode(nodeId);
     if (nodeId && this.lanesVisible) {

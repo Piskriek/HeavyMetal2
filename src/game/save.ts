@@ -18,6 +18,7 @@ import {
   CUP_ROUNDS, DEFAULT_SETUP, isSessionPhase,
   type Difficulty, type RaceMode, type RaceSession, type RaceSetup, type SessionPhase,
 } from './session';
+import { ISLAND_COURSE, cupRounds } from './course-archive';
 import { DEFAULT_LOADOUT, isCapsule, isRider, type CapsuleId, type Loadout, type RiderId } from './loadouts';
 // T02: field sizes, seeds and the summary policy for persisted standings.
 import { DEFAULT_SEED, isFieldSize } from './contracts/config';
@@ -163,6 +164,8 @@ export function sanitizeRounds(raw: unknown): CourseId[] | null {
   if (!Array.isArray(raw) || !raw.length) return null;
   if (!raw.every(isCourse)) return null;
   const rounds = raw as CourseId[];
+  // The island cup races the island three times (each round picks its own finish): only it may repeat.
+  if (rounds.every((id) => id === ISLAND_COURSE)) return [...rounds];
   return rounds.every((id, index) => rounds.indexOf(id) === index) ? [...rounds] : null;
 }
 
@@ -359,10 +362,11 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   const tournament = mode === 'tournament';
   let rounds = rawRounds;
   if (tournament) {
-    const canonical = CUP_ROUNDS.join() === rounds.join();
+    // The classic cup (archived, still restorable) and the island cup are both official orders.
+    const canonical = [CUP_ROUNDS.join(), cupRounds().join(), [ISLAND_COURSE, ISLAND_COURSE, ISLAND_COURSE].join()].includes(rounds.join());
     if (!canonical) {
       notices.push({ level: 'warning', text: 'The cup race order in the save file was not the Scrapdome order. The official three-round order was restored.' });
-      rounds = [...CUP_ROUNDS];
+      rounds = cupRounds();
     }
   } else if (rounds.length !== 1) {
     notices.push({ level: 'warning', text: 'The saved event had more than one course selected. The first course was kept.' });
@@ -448,7 +452,7 @@ export function sanitizeDocument(raw: unknown): { save: PersistedSave; notices: 
   if (typeof raw.savedAt !== 'string' || Number.isNaN(Date.parse(raw.savedAt))) return null;
   if (!isSessionPhase(raw.phase)) return null;
   const revision = isInt(raw.revision) && raw.revision >= 0 ? raw.revision : 0;
-  const draft = sanitizeSetup(raw.draft, 'ridge') ?? { ...DEFAULT_SETUP, loadout: { ...DEFAULT_LOADOUT } };
+  const draft = sanitizeSetup(raw.draft, ISLAND_COURSE) ?? { ...DEFAULT_SETUP, loadout: { ...DEFAULT_LOADOUT } };
   if (raw.phase === 'setup') {
     return { save: { version: SAVE_VERSION, revision, savedAt: raw.savedAt, phase: 'setup', draft, session: null }, notices: [], restartNotice: null, restartedRound: null };
   }
@@ -527,7 +531,7 @@ export function readSave(storage: StorageLike | null = resolveStorage()): Hydrat
 function readLegacyDraft(storage: StorageLike): RaceSetup | null {
   try {
     const raw: unknown = JSON.parse(storage.getItem('goblin-rally-setup-v2') || 'null');
-    return sanitizeSetup(raw, 'ridge');
+    return sanitizeSetup(raw, ISLAND_COURSE);
   } catch { return null; }
 }
 

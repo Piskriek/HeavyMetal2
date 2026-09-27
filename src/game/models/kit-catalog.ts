@@ -8,7 +8,7 @@
  */
 import type { PropCategory, PropDefinition } from '../builder/prop-catalog';
 
-export type KitShelf = Extract<PropCategory, 'island_kit' | 'stunts' | 'decoration'>;
+export type KitShelf = Extract<PropCategory, 'island_kit' | 'stunts' | 'decoration' | 'foliage_3d' | 'rocks_3d'>;
 
 export interface KitModel {
   id: string;
@@ -51,6 +51,23 @@ export const KIT_MODELS: readonly KitModel[] = [
   { id: 'stunt-giant-loop', name: 'Giant Ring', shelf: 'decoration', size: 2400 },
   { id: 'stunt-double-loop', name: 'Double Ring', shelf: 'decoration', size: 2400 },
   { id: 'stunt-hoop-tunnel', name: 'Hoop Tunnel', shelf: 'decoration', size: 3000 },
+  // Foliage (text-to-3D, art-src/meshy/foliage-rocks*.tsv).
+  { id: 'palm-tall', name: 'Tall Palm', shelf: 'foliage_3d', size: 1800 },
+  { id: 'palm-leaning', name: 'Leaning Palm', shelf: 'foliage_3d', size: 1500 },
+  { id: 'palm-cluster', name: 'Palm Cluster', shelf: 'foliage_3d', size: 1600 },
+  { id: 'bush-leafy', name: 'Tropical Bush', shelf: 'foliage_3d', size: 380 },
+  { id: 'fern-clump', name: 'Fern Clump', shelf: 'foliage_3d', size: 320 },
+  { id: 'grass-tussock', name: 'Beach Grass', shelf: 'foliage_3d', size: 260 },
+  { id: 'dry-shrub', name: 'Dry Shrub', shelf: 'foliage_3d', size: 420 },
+  { id: 'agave', name: 'Agave', shelf: 'foliage_3d', size: 300 },
+  { id: 'driftwood', name: 'Driftwood', shelf: 'foliage_3d', size: 600 },
+  // Rocks.
+  { id: 'rock-boulder-rough', name: 'Sandstone Boulder', shelf: 'rocks_3d', size: 520 },
+  { id: 'rock-basalt-columns', name: 'Basalt Columns', shelf: 'rocks_3d', size: 700 },
+  { id: 'rock-slab', name: 'Sandstone Slab', shelf: 'rocks_3d', size: 700 },
+  { id: 'rock-pile', name: 'Rock Pile', shelf: 'rocks_3d', size: 420 },
+  { id: 'rock-spire', name: 'Sandstone Spire', shelf: 'rocks_3d', size: 1400 },
+  { id: 'sea-rock-mossy', name: 'Mossy Sea Rock', shelf: 'rocks_3d', size: 900 },
 ];
 
 export const KIT_PREFIX = 'kit_';

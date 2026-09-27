@@ -7,9 +7,10 @@ import {
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
   Minus, Plus, Film, Route, Box, HelpCircle, Maximize2, Sparkles,
   Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush,
-  Castle, Rocket, CircleDot
+  Castle, Rocket, CircleDot, Palmtree, Gem
 } from 'lucide-react';
-import { COURSES, type CourseId } from '../game/types';
+import { type CourseId } from '../game/types';
+import { ISLAND_COURSE, playableCourses } from '../game/course-archive';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -55,26 +56,32 @@ interface TrackBuilderUIProps {
   onCourseChange?: (course: CourseId) => void;
 }
 
-const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] = [
+/** The shelf's two sets: 3D models and shapes, or the painted 2D sprites. Lanes & Paths is a tool, in both. */
+type ShelfMode = '3d' | '2d';
+const SHELF_MODE_KEY = 'hm2-builder-shelf-mode';
+
+const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode; modes: readonly ShelfMode[] }[] = [
   // The Meshy models: island pieces, stunts and decorative rings (models/kit-catalog.ts).
-  { id: 'island_kit', label: 'Island Kit', icon: <Castle size={16} /> },
-  { id: 'stunts', label: 'Stunts', icon: <Rocket size={16} /> },
-  { id: 'decoration', label: 'Decoration', icon: <CircleDot size={16} /> },
-  { id: 'foliage', label: 'Foliage & Nature', icon: <TreePine size={16} /> },
-  { id: 'trackside', label: 'Trackside & Stunts', icon: <Compass size={16} /> },
-  { id: 'cavern_mine', label: 'Cavern & Mine', icon: <Mountain size={16} /> },
-  { id: 'stadium', label: 'Stadium & Crowds', icon: <Flag size={16} /> },
-  { id: 'decals', label: 'Road Decals', icon: <Layers size={16} /> },
-  { id: 'goblins', label: 'Goblins & Crew', icon: <Users size={16} /> },
-  { id: 'powerup', label: 'Powerups', icon: <Zap size={16} /> },
-  { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} /> },
-  { id: 'animated', label: 'Animated', icon: <Clapperboard size={16} /> },
-  { id: 'custom_models' as any, label: 'Custom 3D', icon: <Box size={16} /> },
+  { id: 'island_kit', label: 'Island Kit', icon: <Castle size={16} />, modes: ['3d'] },
+  { id: 'stunts', label: 'Stunts', icon: <Rocket size={16} />, modes: ['3d'] },
+  { id: 'decoration', label: 'Decoration', icon: <CircleDot size={16} />, modes: ['3d'] },
+  { id: 'foliage_3d', label: 'Foliage', icon: <Palmtree size={16} />, modes: ['3d'] },
+  { id: 'rocks_3d', label: 'Rocks', icon: <Gem size={16} />, modes: ['3d'] },
+  { id: 'foliage', label: 'Foliage & Nature', icon: <TreePine size={16} />, modes: ['2d'] },
+  { id: 'trackside', label: 'Trackside & Stunts', icon: <Compass size={16} />, modes: ['2d'] },
+  { id: 'cavern_mine', label: 'Cavern & Mine', icon: <Mountain size={16} />, modes: ['2d'] },
+  { id: 'stadium', label: 'Stadium & Crowds', icon: <Flag size={16} />, modes: ['2d'] },
+  { id: 'decals', label: 'Road Decals', icon: <Layers size={16} />, modes: ['2d'] },
+  { id: 'goblins', label: 'Goblins & Crew', icon: <Users size={16} />, modes: ['2d'] },
+  { id: 'powerup', label: 'Powerups', icon: <Zap size={16} />, modes: ['2d'] },
+  { id: 'barrier', label: 'Barriers', icon: <ShieldCheck size={16} />, modes: ['2d'] },
+  { id: 'animated', label: 'Animated', icon: <Clapperboard size={16} />, modes: ['2d'] },
+  { id: 'custom_models' as any, label: 'Custom 3D', icon: <Box size={16} />, modes: ['3d'] },
   // Scene kit: shapes that wear shaders (and, in this tab, the course's own scenery), and lights.
-  { id: 'primitives', label: 'Primitives & Scenery', icon: <Shapes size={16} /> },
-  { id: 'lights', label: 'Lights', icon: <Lightbulb size={16} /> },
+  { id: 'primitives', label: 'Primitives & Scenery', icon: <Shapes size={16} />, modes: ['3d'] },
+  { id: 'lights', label: 'Lights', icon: <Lightbulb size={16} />, modes: ['3d'] },
   // M01 · T7 — not a prop shelf: this tab opens the Lanes & Paths panel and its 3D handles.
-  { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} /> },
+  { id: 'lanes', label: 'Lanes & Paths', icon: <Route size={16} />, modes: ['3d', '2d'] },
 ];
 
 /** WIRE-4: the shelves' painted icons (the primitives, the lights and the Custom 3D card), warmed as
@@ -103,7 +110,21 @@ function useLatestHandlers<T extends Record<string, (...args: never[]) => unknow
 }
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
-  const [category, setCategory] = useState<PropCategory>('island_kit');
+  // The builder opens on the first shelf of the set last used (3D unless the 2D set was picked).
+  const [category, setCategory] = useState<PropCategory>(() => {
+    try { return localStorage.getItem(SHELF_MODE_KEY) === '2d' ? 'foliage' : 'island_kit'; } catch { return 'island_kit'; }
+  });
+  const [shelfMode, setShelfModeState] = useState<ShelfMode>(() => {
+    try { return localStorage.getItem(SHELF_MODE_KEY) === '2d' ? '2d' : '3d'; } catch { return '3d'; }
+  });
+  const shelfCategories = CATEGORIES.filter((cat) => cat.modes.includes(shelfMode));
+  const setShelfMode = (mode: ShelfMode) => {
+    setShelfModeState(mode);
+    try { localStorage.setItem(SHELF_MODE_KEY, mode); } catch {}
+    // Keep the open tab when it is in both sets (Lanes & Paths); otherwise open the set's first shelf.
+    const next = CATEGORIES.filter((cat) => cat.modes.includes(mode));
+    if (!next.some((cat) => cat.id === category)) setCategory(next[0].id);
+  };
   const [showShaders, setShowShaders] = useState(false);
   const [isZen, setIsZen] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
@@ -187,6 +208,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   /** The key handler lives in an effect that must not re-bind on every render: it calls through here. */
   const laneIntentRef = useRef<(intent: LaneKeyIntent) => void>(() => {});
   const draggingLaneNode = useRef<string | null>(null);
+  /** A box selection of lane nodes, dragged out from open ground (client pixels). */
+  const laneMarquee = useRef<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
+  const [marqueeRect, setMarqueeRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const laneDragReason = useRef<string | null>(null);
 
   const showToast = (msg: string, stickyMs = 3500) => {
@@ -296,10 +320,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             return;
           }
           const hitNode = builder.raycastLaneNode(e.clientX, e.clientY, canvas);
-          builder.selectLaneNode(hitNode);
+          const additive = e.shiftKey || e.ctrlKey || e.metaKey;
           laneDragReason.current = null;
           if (hitNode) {
-            showToast(`Node ${hitNode} [drag gizmo to move · Del delete · K kind · S split · I insert]`);
+            builder.selectLaneNode(hitNode, additive);
+            const count = builder.getSelectedLaneNodeIds().length;
+            showToast(count > 1
+              ? `${count} nodes selected: drag the gizmo to move them together · arrows nudge · L whole lanes · Del delete`
+              : `Node ${hitNode}: drag the gizmo to move · Shift-click or drag a box to select more · Del delete · K kind · S split · I insert`);
+          } else {
+            // Open ground: drag out a box to select every node inside it (a plain click clears the selection).
+            laneMarquee.current = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, additive };
           }
           setLaneRevision((revision) => revision + 1);
           onRequestRender?.();
@@ -378,6 +409,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // M01 · T7 — a lane handle being dragged: pointer → track → snapNode → the tool's own moveNode.
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
+      if (laneMarquee.current && !isRightMouseDown.current) {
+        const m = laneMarquee.current;
+        m.x1 = e.clientX; m.y1 = e.clientY;
+        setMarqueeRect({ left: Math.min(m.x0, m.x1), top: Math.min(m.y0, m.y1), width: Math.abs(m.x1 - m.x0), height: Math.abs(m.y1 - m.y0) });
+        return;
+      }
       if (draggingLaneNode.current && !isRightMouseDown.current) {
         const moved = builder.dragLaneNode(draggingLaneNode.current, e.clientX, e.clientY, canvas);
         laneDragReason.current = moved.ok ? null : moved.reason;
@@ -475,6 +512,22 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (laneMarquee.current) {
+          const m = laneMarquee.current;
+          laneMarquee.current = null;
+          setMarqueeRect(null);
+          if (Math.abs(m.x1 - m.x0) < 5 && Math.abs(m.y1 - m.y0) < 5) {
+            if (!m.additive) builder.selectLaneNode(null);
+          } else {
+            const found = builder.selectLaneNodesInRect(m, canvas, m.additive);
+            const total = builder.getSelectedLaneNodeIds().length;
+            showToast(found
+              ? `${total} nodes selected: drag the gizmo to move them together · arrows nudge · L whole lanes · Del delete`
+              : 'No lane nodes inside the box');
+          }
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+        }
         if (draggingLaneNode.current) {
           // The drag is over: say the last refusal once, if it was anything worth saying. "unchanged"
           // is what a drag that never left its node reports, and that is not news.
@@ -551,6 +604,52 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // M01 · T7 — while the lanes tool is up, N/I/Del/K/M/O and Ctrl+Z / Ctrl+Y belong to it.
       // S key is reserved for reverse flying unless Shift/Alt is held or not in freeFly mode.
       if (builder.getLanesToolActive()) {
+        // Group tools for selected lane nodes: nudge with the arrows (Shift for big steps), L for the
+        // whole lanes, Ctrl+A for every node, Esc to let go, Delete for all of them at once.
+        const laneGroup = builder.getSelectedLaneNodeIds();
+        const arrow = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code);
+        if (arrow && laneGroup.length && !e.ctrlKey && !e.metaKey && !isRightMouseDown.current) {
+          e.preventDefault();
+          const along = e.shiftKey ? 600 : 100;
+          const across = e.shiftKey ? 100 : 20;
+          const dx = e.code === 'ArrowUp' ? along : e.code === 'ArrowDown' ? -along : 0;
+          const dz = e.code === 'ArrowRight' ? across : e.code === 'ArrowLeft' ? -across : 0;
+          const moved = builder.nudgeLaneNodes(dx, dz);
+          if (!moved.ok) showToast(moved.reason, 4000);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+          return;
+        }
+        if (e.code === 'KeyL' && !e.ctrlKey && !e.metaKey && laneGroup.length) {
+          e.preventDefault();
+          builder.selectLanePaths();
+          showToast(`${builder.getSelectedLaneNodeIds().length} nodes: the whole lanes selected`);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyA') {
+          e.preventDefault();
+          builder.selectLaneNodes(builder.getLaneNetwork()?.nodes.map((node) => node.id) ?? []);
+          showToast(`All ${builder.getSelectedLaneNodeIds().length} lane nodes selected`);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+          return;
+        }
+        if (e.code === 'Escape' && laneGroup.length) {
+          builder.selectLaneNode(null);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+          return;
+        }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && laneGroup.length > 1) {
+          e.preventDefault();
+          const gone = builder.deleteSelectedLaneNodes();
+          showToast(gone === laneGroup.length ? `Deleted ${gone} lane nodes` : `Deleted ${gone} of ${laneGroup.length} lane nodes (a lane keeps at least two)`, 4000);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+          return;
+        }
         const isReverseFlying = (e.code === 'KeyS' || e.key === 's' || e.key === 'S') && (isRightMouseDown.current || builder.freeFly.active);
         const intent = isReverseFlying ? null : laneKeyIntent({ key: e.key, ctrlOrMeta: e.ctrlKey || e.metaKey, typing: false });
         if (intent) {
@@ -1312,10 +1411,10 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <span className="text-zinc-400 font-medium text-[11px]">Track:</span>
                 <select
                   className="bg-transparent text-amber-300 focus:outline-none cursor-pointer font-bold text-xs"
-                  value={course ?? 'ridge'}
+                  value={course ?? ISLAND_COURSE}
                   onChange={(e) => onCourseChange(e.target.value as CourseId)}
                 >
-                  {COURSES.map((c) => (
+                  {playableCourses().map((c) => (
                     <option key={c.id} value={c.id} className="bg-zinc-900 text-amber-200">
                       {c.name}
                     </option>
@@ -3520,9 +3619,34 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </div>
           </div>
 
+          {/* The lane box selection being dragged out */}
+          {marqueeRect && (
+            <div
+              aria-hidden="true"
+              className="fixed z-50 pointer-events-none border border-amber-400 bg-amber-400/10 rounded-sm"
+              style={marqueeRect}
+            />
+          )}
+
           {/* Category Tabs Strip */}
           <div className="flex items-center gap-0.5 px-3 pt-1 overflow-x-auto border-b border-zinc-800/80 scrollbar-none bg-zinc-950/70">
-            {CATEGORIES.map((cat) => (
+            <div role="radiogroup" aria-label="Asset type" className="flex items-center shrink-0 mr-2 mb-1 p-0.5 rounded-md bg-zinc-900 border border-zinc-700/70">
+              {(['3d', '2d'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  role="radio"
+                  aria-checked={shelfMode === mode}
+                  onClick={() => setShelfMode(mode)}
+                  title={mode === '3d' ? '3D models, shapes and lights' : 'Painted 2D sprites and decals'}
+                  className={`px-2.5 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400 ${
+                    shelfMode === mode ? 'bg-amber-500 text-zinc-950' : 'text-zinc-400 hover:text-amber-200'
+                  }`}
+                >
+                  {mode === '3d' ? '3D' : '2D'}
+                </button>
+              ))}
+            </div>
+            {shelfCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setCategory(cat.id)}

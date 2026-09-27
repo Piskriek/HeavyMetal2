@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Cuts the hand-painted UI art (generated sources in `public/art/sheets/ui/` and
+ * Cuts the hand-painted UI art (generated sources in `art-src/sheets/ui/` and
  * `PreGame/public/art/*-src.png`) into the runtime PNGs the UI actually loads.
  *
  * This is the UI-facing sibling of `build-art.mjs`: the same matte rules (magenta
@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const src = (file) => join(root, 'public/art/sheets/ui', file);
+const src = (file) => join(root, 'art-src/sheets/ui', file);
 const preSrc = (file) => join(root, 'PreGame/public/art', file);
 const out = (file) => join(root, 'public', file);
 const preOut = (file) => join(root, 'PreGame/public/art', file);

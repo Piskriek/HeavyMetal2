@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fc-b4c8-717a-8cfc-343b11e19fac",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2988786821,
+  "prompt": "a large rounded weathered sandstone boulder, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a large rounded weathered sandstone boulder, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497830370,
+  "progress": 100,
+  "started_at": 1790497830402,
+  "finished_at": 1790497883921,
+  "task_error": null,
+  "consumed_credits": 10
+}

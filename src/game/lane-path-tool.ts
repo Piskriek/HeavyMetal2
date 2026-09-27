@@ -31,6 +31,8 @@ import { FINISH, START_X } from './scene';
 export type LaneEdit =
   | { op: 'addPath'; at: { x: number; z: number }[] }
   | { op: 'moveNode'; nodeId: string; x: number; z: number }
+  /** Several nodes at once (a group drag or nudge): all land together or none do. */
+  | { op: 'moveNodes'; moves: { nodeId: string; x: number; z: number }[] }
   | { op: 'insertNode'; pathId: string; x: number; z: number }
   | { op: 'deleteNode'; nodeId: string }
   | { op: 'setKind'; nodeId: string; kind: LaneNodeKind }
@@ -185,6 +187,7 @@ export function applyLaneEdit(network: LaneNetwork, edit: LaneEdit): LaneEditRes
   switch (edit.op) {
     case 'addPath': return addPath(network, edit.at);
     case 'moveNode': return moveNode(network, edit.nodeId, edit.x, edit.z);
+    case 'moveNodes': return moveNodes(network, edit.moves);
     case 'insertNode': return insertNode(network, edit.pathId, edit.x, edit.z);
     case 'deleteNode': return deleteNode(network, edit.nodeId);
     case 'setKind': return setKind(network, edit.nodeId, edit.kind);
@@ -227,6 +230,28 @@ function moveNode(network: LaneNetwork, nodeId: string, x: number, z: number): L
   nodeById(next, nodeId)!.x = x;
   nodeById(next, nodeId)!.z = z;
   return finish(next, nodeId);
+}
+
+/**
+ * A group move: every node lands at once, then the whole network is validated, so a group can slide
+ * past positions that one node moved alone could not pass through. Points off the road are pulled back
+ * onto it, as a single drag is.
+ */
+function moveNodes(network: LaneNetwork, moves: readonly { nodeId: string; x: number; z: number }[]): LaneEditResult {
+  if (!moves.length) return refuse('unchanged', 'no nodes to move');
+  const next = copyNetwork(network);
+  let changed = false;
+  for (const move of moves) {
+    const node = nodeById(next, move.nodeId);
+    if (!node) return refuse('unknown_node', `there is no node ${move.nodeId}`);
+    const x = clamp(move.x, START_X, FINISH);
+    const z = clamp(move.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    if (node.x !== x || node.z !== z) changed = true;
+    node.x = x;
+    node.z = z;
+  }
+  if (!changed) return refuse('unchanged', 'the nodes are already there');
+  return finish(next, moves[0].nodeId);
 }
 
 function insertNode(network: LaneNetwork, pathId: string, x: number, z: number): LaneEditResult {

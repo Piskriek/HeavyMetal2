@@ -1,0 +1,18 @@
+{
+  "id": "01a0e1fb-dfba-70ef-a352-d451cb9cf859",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 1979838211,
+  "prompt": "a scrubby windswept coastal shrub with twisted grey branches and small olive leaves, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a scrubby windswept coastal shrub with twisted grey branches and small olive leaves, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790497775789,
+  "progress": 100,
+  "started_at": 1790497775801,
+  "finished_at": 1790497814324,
+  "task_error": null,
+  "consumed_credits": 10
+}

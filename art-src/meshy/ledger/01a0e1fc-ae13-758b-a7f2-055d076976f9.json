@@ -1,0 +1,16 @@
+{
+  "name": "rock-slab",
+  "taskId": "01a0e1fc-ae13-758b-a7f2-055d076976f9",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a flat layered sandstone rock slab with eroded edges, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 1500,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:30:30.997Z"
+}

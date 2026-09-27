@@ -6,7 +6,8 @@ import Drawer from './ui/Drawer';
 import { CAPSULES, DEFAULT_LOADOUT, RIDERS, STAT_LABELS, capsuleById, loadoutStats, riderById } from '../game/loadouts';
 import CharacterShowcase from './CharacterShowcase';
 import { capsuleArt, riderArt } from '../game/loadout-art';
-import { CUP_NAME, CUP_POINTS, CUP_ROUNDS, DIFFICULTIES, type RaceSetup } from '../game/session';
+import { CUP_NAME, CUP_POINTS, DIFFICULTIES, type RaceSetup } from '../game/session';
+import { classicTracksEnabled, cupRounds, playableCourse, playableCourses } from '../game/course-archive';
 import { FIELD_SIZES, QUALIFYING_REQUIRED_ABOVE, type FieldSize } from '../game/contracts/config';
 import { COURSES } from '../game/types';
 import { TRACKS } from '../game/courses';
@@ -33,7 +34,8 @@ function radioKeys(event: KeyboardEvent<HTMLElement>) {
 }
 
 export default function NewGameSetup({ initial, hasSession, finishedSession, onStart, onClose }: NewGameSetupProps) {
-  const [setup, setSetup] = useState<RaceSetup>(() => ({ ...initial, loadout: { ...initial.loadout } }));
+  // A draft saved on an archived classic track opens on the island.
+  const [setup, setSetup] = useState<RaceSetup>(() => ({ ...initial, course: playableCourse(initial.course), loadout: { ...initial.loadout } }));
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -170,14 +172,14 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
           {step === 2 && <div className="setup-final">
             <section className="event-selection">
               <div className="choice-heading"><span>{tournament ? 'THE SCRAPDOME CUP / RACE ORDER' : 'CHOOSE YOUR TRACK'}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
-              {tournament ? <div className="cup-itinerary">{CUP_ROUNDS.map((id, index) => {
+              {tournament ? <div className="cup-itinerary">{cupRounds().map((id, index) => {
                 const track = COURSES.find((c) => c.id === id)!;
                 return <div className="itinerary-stop" key={id}><img className="course-thumbnail" src={coursePreview(id)} alt={`${TRACKS[id].region} scenery`} /><span>{String(index + 1).padStart(2, '0')}</span><div><h3>{track.name}</h3><p>{TRACKS[id].region} / {TRACKS[id].character}</p></div><small>15 km</small></div>;
               })}<div className="cup-scoring"><Trophy size={18} /><div><strong>Every finish matters.</strong><p>{setup.fieldSize === 4 ? `1st: ${CUP_POINTS[0]} pts / 2nd: ${CUP_POINTS[1]} / 3rd: ${CUP_POINTS[2]} / 4th: ${CUP_POINTS[3]}. DNF: 0.` : '1st–9th: 9–1 pts. Remaining places and DNF: 0.'}</p></div></div></div> :
-                <div className="new-race-courses" role="radiogroup" aria-label="Choose a track" onKeyDown={radioKeys}>{COURSES.map((track) => <button key={track.id} className={`new-race-course ${setup.course === track.id ? 'selected' : ''}`} role="radio" aria-checked={setup.course === track.id} tabIndex={setup.course === track.id ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, course: track.id }))}>
+                <div className="new-race-courses" role="radiogroup" aria-label="Choose a track" onKeyDown={radioKeys}>{playableCourses().map((track) => <button key={track.id} className={`new-race-course ${setup.course === track.id ? 'selected' : ''}`} role="radio" aria-checked={setup.course === track.id} tabIndex={setup.course === track.id ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, course: track.id }))}>
                   <img className="course-thumbnail" src={coursePreview(track.id)} alt={`${TRACKS[track.id].region} scenery`} /><span><strong>{track.name}</strong><small>{TRACKS[track.id].region} / {TRACKS[track.id].character}</small></span><span className="course-check">{setup.course === track.id && <Check size={17} />}</span>
                 </button>)}</div>}
-              <p className="course-world-description">{tournament ? 'Three distinct descents. Forest flow, quarry bursts, and pasture hops. Airborne supplies reward a good racing line.' : TRACKS[setup.course].description}</p>
+              <p className="course-world-description">{tournament ? (classicTracksEnabled() ? 'Three distinct descents. Forest flow, quarry bursts, and pasture hops. Airborne supplies reward a good racing line.' : 'Three runs down the serpent road, summit to sea. Points carry from round to round.') : TRACKS[setup.course].description}</p>
               <div className="choice-heading difficulty-heading"><span>FIELD SIZE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="Field size" onKeyDown={radioKeys}>{FIELD_SIZES.map((size) => <button role="radio" aria-checked={setup.fieldSize === size} tabIndex={setup.fieldSize === size ? 0 : -1} className={setup.fieldSize === size ? 'selected' : ''} key={size} onClick={() => setSetup((s) => ({ ...s, fieldSize: size as FieldSize }))}>{size} racers</button>)}</div>
               <p className="difficulty-description">{setup.fieldSize > QUALIFYING_REQUIRED_ABOVE

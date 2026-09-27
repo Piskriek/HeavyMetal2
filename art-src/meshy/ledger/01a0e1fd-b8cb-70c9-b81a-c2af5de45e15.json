@@ -1,0 +1,16 @@
+{
+  "name": "rock-spire",
+  "taskId": "01a0e1fd-b8cb-70c9-b81a-c2af5de45e15",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a tall eroded layered sandstone rock spire, warm ochre and tan, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2000,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:31:39.359Z"
+}

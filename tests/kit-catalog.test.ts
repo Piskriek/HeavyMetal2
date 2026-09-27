@@ -102,3 +102,24 @@ test('brightness 0..100 glows a model on its own copy of the material, and 0 put
   setKitBrightness(a, 0);
   assert.equal(meshA.material, shared, '0 is the model exactly as lit');
 });
+
+test('the Shading tab reaches a placed model: tint, roughness, metalness, unlit with glow, sides and shadows', async () => {
+  const { setKitLook } = await import('../src/game/models/kit-object');
+  const shared = new THREE.MeshStandardMaterial({ map: new THREE.Texture(), roughness: 1, metalness: 0 });
+  const g = new THREE.Group(); const mesh = new THREE.Mesh(new THREE.BoxGeometry(), shared); mesh.castShadow = true; g.add(mesh);
+  setKitLook(g, 0, { shadingMode: 'lit', color: '#ff0000', roughness: 0.2, metalness: 0.8, unlitGlow: 0, biomeTint: false, biomeTintStrength: 0, doubleSided: true, castShadow: false, receiveShadow: true });
+  const lit = mesh.material as THREE.MeshStandardMaterial;
+  assert.notEqual(lit, shared, 'its own material; the shared one is untouched');
+  assert.equal(lit.color.getHexString(), 'ff0000');
+  assert.equal(lit.roughness, 0.2); assert.equal(lit.metalness, 0.8);
+  assert.equal(lit.side, THREE.DoubleSide); assert.equal(mesh.castShadow, false);
+  assert.equal(shared.color.getHexString(), 'ffffff');
+  setKitLook(g, 0, { shadingMode: 'unlit', color: '#808080', roughness: 0.7, metalness: 0, unlitGlow: 1, biomeTint: false, biomeTintStrength: 0, doubleSided: false, castShadow: true, receiveShadow: true });
+  const unlit = mesh.material as THREE.MeshBasicMaterial;
+  assert.ok(unlit.isMeshBasicMaterial, 'unlit');
+  assert.equal(unlit.map, shared.map, 'still wears its texture');
+  assert.ok(unlit.color.r > 0.4, 'the glow brightens it');
+  setKitLook(g, 0, null);
+  assert.equal(mesh.material, shared, 'cleared: the shared original again');
+  assert.equal(mesh.castShadow, true, 'and its own shadow setting');
+});

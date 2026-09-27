@@ -4,6 +4,7 @@
    track & terrain, categorized prop palette, 3D manipulation, undo/redo,
    and JSON persistence.
    ============================================================================= */
+import { effectiveColor, normalizeDescriptor } from './materials/material-descriptor';
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 import { classifyPlacedRamp } from './track-space';
@@ -2095,6 +2096,7 @@ export class TrackBuilder3D {
             }
           }
         }
+        this.applySpriteLook(obj, prop);
       }
     }
     if (autoSync) {
@@ -2821,7 +2823,38 @@ export class TrackBuilder3D {
 
     this.scene.add(obj);
     this.propObjects.set(prop.id, obj);
+    this.applySpriteLook(obj, prop);
     return obj;
+  }
+
+  /**
+   * The Shading tab on a 2D prop (sprite, decal or fixed picture): its colour tint (with glow when
+   * unlit), double-sided and shadows. The prop gets its own material the first time it is shaded.
+   */
+  private applySpriteLook(obj: THREE.Object3D, prop: PlacedProp) {
+    const d = prop.materialDesc ? normalizeDescriptor(prop.materialDesc) : null;
+    const tint = d ? new THREE.Color().setRGB(...effectiveColor(d, 'ridge')) : null;
+    obj.traverse((o) => {
+      const holder = o as THREE.Mesh;
+      const mat = holder.material as (THREE.Material & { color?: THREE.Color }) | undefined;
+      if (!mat || Array.isArray(mat) || !mat.color) return;
+      if (!holder.userData.lookOwned) {
+        if (!d) return;
+        holder.material = mat.clone();
+        holder.userData.lookOwned = true;
+        holder.userData.baseColor = mat.color.clone();
+        holder.userData.baseSide = mat.side;
+        holder.userData.baseShadows = [holder.castShadow, holder.receiveShadow];
+      }
+      const own = holder.material as THREE.Material & { color: THREE.Color };
+      own.color.copy(holder.userData.baseColor);
+      if (tint) own.color.multiply(tint);
+      own.side = d?.doubleSided ? THREE.DoubleSide : holder.userData.baseSide;
+      const [cast, receive] = holder.userData.baseShadows as [boolean, boolean];
+      holder.castShadow = d ? d.castShadow : cast;
+      holder.receiveShadow = d ? d.receiveShadow : receive;
+      own.needsUpdate = true;
+    });
   }
 
   // ---------------------------------------------------------------------------

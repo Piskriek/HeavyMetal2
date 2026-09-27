@@ -2,6 +2,7 @@
  * A placed Meshy model: an empty group that stands in at once (so selection, the gizmo and undo work
  * straight away) and receives the model when its GLB has loaded. Copies share geometry and textures.
  */
+import { effectiveColor, normalizeDescriptor, type MaterialDescriptor } from '../materials/material-descriptor';
 import * as THREE from 'three';
 import { loadGlb } from './glb';
 import { kitModelFor, kitModelUrl, type KitModel } from './kit-catalog';
@@ -50,34 +51,63 @@ export const KIT_BRIGHTNESS_MAX_GLOW = 0.9;
 /**
  * Brightness 0..100 for one placed model, so it can be balanced against the terrain: 0 is the model
  * exactly as lit by the sun and sky; higher values let its own texture glow on top of that light.
- * Copies share materials, so a brightened copy gets its own material (made once, reused per level).
+ * Keeps whatever the Shading tab set (see setKitLook).
  */
 export function setKitBrightness(group: THREE.Object3D, value: number): void {
-  const level = Math.max(0, Math.min(100, Math.round(value || 0)));
+  setKitLook(group, value, group.userData.lookDesc ?? null);
+}
+
+/**
+ * One placed model's look: its brightness and the Shading tab's settings (colour tint, roughness,
+ * metalness, lit or unlit with glow, double-sided, shadows). Copies share materials, so a changed copy
+ * gets its own material (made once, reused); a copy with neither goes back to the shared original.
+ */
+export function setKitLook(group: THREE.Object3D, brightness: number, desc: MaterialDescriptor | null): void {
+  const level = Math.max(0, Math.min(100, Math.round(brightness || 0)));
+  const d = desc ? normalizeDescriptor(desc) : null;
   group.userData.brightness = level;
+  group.userData.lookDesc = desc ?? null;
+  const tint = d ? new THREE.Color().setRGB(...effectiveColor(d, 'ridge')) : null;
   group.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
-    const base: THREE.Material = mesh.userData.baseMaterial ?? mesh.material;
+    const base = (mesh.userData.baseMaterial ?? mesh.material) as THREE.MeshStandardMaterial;
     mesh.userData.baseMaterial = base;
-    if (level === 0) { mesh.material = base; return; }
-    let bright = mesh.userData.brightMaterial as THREE.MeshStandardMaterial | undefined;
-    if (!bright) {
-      bright = (base as THREE.MeshStandardMaterial).clone();
-      bright.emissive = new THREE.Color(0xffffff);
-      bright.emissiveMap = (base as THREE.MeshStandardMaterial).map ?? null;
-      mesh.userData.brightMaterial = bright;
+    if (mesh.userData.baseShadows === undefined) mesh.userData.baseShadows = [mesh.castShadow, mesh.receiveShadow];
+    const [cast, receive] = mesh.userData.baseShadows as [boolean, boolean];
+    mesh.castShadow = d ? d.castShadow : cast;
+    mesh.receiveShadow = d ? d.receiveShadow : receive;
+    if (level === 0 && !d) { mesh.material = base; return; }
+    const unlit = d?.shadingMode === 'unlit';
+    let look = mesh.userData.lookMaterial as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial | undefined;
+    if (!look || (look as THREE.MeshBasicMaterial).isMeshBasicMaterial !== unlit) {
+      look?.dispose();
+      look = unlit
+        ? new THREE.MeshBasicMaterial({ map: base.map ?? null, transparent: base.transparent, opacity: base.opacity, alphaTest: base.alphaTest })
+        : base.clone();
+      mesh.userData.lookMaterial = look;
     }
-    bright.emissiveIntensity = (level / 100) * KIT_BRIGHTNESS_MAX_GLOW;
-    mesh.material = bright;
+    look.color.copy(base.color);
+    if (tint) look.color.multiply(tint);
+    look.side = d?.doubleSided ? THREE.DoubleSide : base.side;
+    if (!unlit) {
+      const lit = look as THREE.MeshStandardMaterial;
+      lit.roughness = d ? d.roughness : base.roughness;
+      lit.metalness = d ? d.metalness : base.metalness;
+      lit.emissive = new THREE.Color(0xffffff);
+      lit.emissiveMap = base.map ?? null;
+      lit.emissiveIntensity = (level / 100) * KIT_BRIGHTNESS_MAX_GLOW;
+    }
+    look.needsUpdate = true;
+    mesh.material = look;
   });
 }
 
-/** Frees the per-copy brightened materials (the shared originals stay). */
+/** Frees the per-copy materials (the shared originals stay). */
 export function releaseKitBrightness(group: THREE.Object3D): void {
   group.traverse((o) => {
-    const bright = (o as THREE.Mesh).userData?.brightMaterial as THREE.Material | undefined;
-    if (bright) bright.dispose();
+    const look = (o as THREE.Mesh).userData?.lookMaterial as THREE.Material | undefined;
+    if (look) look.dispose();
   });
 }
 
@@ -96,8 +126,8 @@ export function createKitObject(type: string, propId: string, low: boolean, onLo
       const copy = fitKitModel(scene.clone(true), model.size);
       copy.name = `Kit:${model.id}`;
       group.add(copy);
-      // A brightness set before the model arrived applies to it now.
-      if (group.userData.brightness) setKitBrightness(group, group.userData.brightness);
+      // A brightness or Shading-tab look set before the model arrived applies to it now.
+      if (group.userData.brightness || group.userData.lookDesc) setKitLook(group, group.userData.brightness ?? 0, group.userData.lookDesc ?? null);
       onLoaded?.(group);
     })
     .catch((err) => console.warn(`[Kit] ${model.id} did not load`, err));

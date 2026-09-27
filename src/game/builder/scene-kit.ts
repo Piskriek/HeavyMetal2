@@ -21,7 +21,7 @@ import {
 import { applyPrimitiveTransform, isPrimitiveType, primitiveGeometry, primitiveShape } from './primitives';
 import { isKitModelType } from '../models/kit-catalog';
 import { isPowerupPiece } from '../race-pieces';
-import { createKitObject, releaseKitBrightness, setKitBrightness } from '../models/kit-object';
+import { createKitObject, releaseKitBrightness, setKitLook } from '../models/kit-object';
 import { SceneryIndex, isShown, sceneryMaterials, setPartMaterial, unwrapPivot, wrapInPivot, type SceneryPart } from './scenery-index';
 
 export const TERRAIN_EDIT_TYPE = 'terrain_edit';
@@ -124,7 +124,9 @@ export class SceneKit {
       obj.position.set(prop.x, prop.y, prop.z);
       obj.rotation.set(prop.rotX ?? 0, prop.rotY ?? 0, prop.rotZ ?? 0, 'YXZ');
       obj.scale.set((prop.flipX ? -1 : 1) * (prop.scale || 1), prop.scale || 1, prop.scale || 1);
-      if ((obj.userData.brightness ?? 0) !== (prop.brightness ?? 0)) setKitBrightness(obj, prop.brightness ?? 0);
+      // Brightness and the Shading tab's look (colour, roughness, metalness, unlit glow, sides, shadows).
+      const lookKey = `${prop.brightness ?? 0}|${prop.materialDesc ? JSON.stringify(prop.materialDesc) : ''}`;
+      if (obj.userData.lookKey !== lookKey) { obj.userData.lookKey = lookKey; setKitLook(obj, prop.brightness ?? 0, prop.materialDesc ?? null); }
       if (prop.hideModel) this.buildOnly.add(obj); else this.buildOnly.delete(obj);
       obj.visible = shown && (!prop.hideModel || this.markersShown);
     } else if (isPrimitiveType(prop.type)) {

@@ -192,7 +192,8 @@ test('the ground shader finds its places in this three.js version\'s standard sh
   };
   injectIslandGround(shader, { paintMask: { value: null } });
   assert.match(shader.vertexShader, /vGroundWorld = \(modelMatrix \* vec4\(transformed, 1\.0\)\)\.xyz;/);
-  assert.match(shader.fragmentShader, /vec4 gPebbles\(/);
+  assert.match(shader.fragmentShader, /void gDetail\(/);
+  assert.doesNotMatch(shader.fragmentShader, /for \(int/, 'no per-pixel cell searches: the pattern is a baked tile');
   assert.ok(shader.fragmentShader.indexOf('#include <map_fragment>') < shader.fragmentShader.indexOf('diffuseColor.rgb *= groundTint * groundBright;'),
     'the ground works on the base colour after the base map is applied');
   assert.doesNotMatch(shader.fragmentShader, /detailMap/, 'no tiling detail texture: the grain is computed from the world position');

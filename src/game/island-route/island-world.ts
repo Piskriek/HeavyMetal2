@@ -107,7 +107,7 @@ export function placeIslandModel(model: THREE.Object3D): void {
 
 export const ISLAND_MODEL_URL = '/models/island/serpentine-isle.obj';
 export const ISLAND_TEXTURE_URL = '/models/island/serpentine-isle.jpg';
-/** The 8K texture (Meshy's paint of the owner's optimised model, upscaled 4x with Real-ESRGAN), for the Quality setting on cards that take 8K textures. */
+/** The 8K texture (the owner's 8K texture, baked onto the optimised model's UVs by scripts/bake-island-texture.ts), for the Quality setting on cards that take 8K textures. */
 export const ISLAND_TEXTURE_8K_URL = '/models/island/serpentine-isle-8k.jpg';
 
 /** The sand base: flat under the island out to BEACH_FLAT, then shelving under the sea by BEACH_EDGE. */

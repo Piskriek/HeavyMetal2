@@ -119,63 +119,43 @@ uniform vec3 sandColor;
 uniform float sandStrength;
 uniform float sandPebbles;
 uniform float sandPits;
+uniform sampler2D groundDetail;
 varying vec3 vGroundWorld;
+varying vec3 vGroundNormal;
 
-float gHash(vec3 p) {
-  p = fract(p * 0.1031);
-  p += dot(p, p.zyx + 31.32);
-  return fract((p.x + p.y) * p.z);
+// 2D hash and value noise (the only noise still computed per pixel: 4 hashes each).
+float gHash2(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
-vec3 gHash3(vec3 p) {
-  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
-  p += dot(p, p.yxz + 33.33);
-  return fract((p.xxy + p.yxx) * p.zyx);
-}
-float gNoise(vec3 p) {
-  vec3 i = floor(p); vec3 f = fract(p);
+float gNoise2(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p);
   f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(mix(gHash(i), gHash(i + vec3(1, 0, 0)), f.x), mix(gHash(i + vec3(0, 1, 0)), gHash(i + vec3(1, 1, 0)), f.x), f.y),
-             mix(mix(gHash(i + vec3(0, 0, 1)), gHash(i + vec3(1, 0, 1)), f.x), mix(gHash(i + vec3(0, 1, 1)), gHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+  return mix(mix(gHash2(i), gHash2(i + vec2(1, 0)), f.x), mix(gHash2(i + vec2(0, 1)), gHash2(i + vec2(1, 1)), f.x), f.y);
 }
-// Pebbles: one round stone in some cells of a jittered grid. Returns (cover 0..1, tone, rim, dome).
-vec4 gPebbles(vec3 p, float size, float amount) {
-  vec3 q = p / size;
-  vec3 i = floor(q);
-  vec4 best = vec4(0.0, 0.5, 0.0, 0.0);
-  for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-    vec3 c = i + vec3(float(x), float(y), float(z));
-    vec3 h = gHash3(c);
-    if (h.x > amount) continue;
-    vec3 centre = c + 0.2 + 0.6 * gHash3(c + 17.0);
-    float r = 0.25 + 0.3 * h.y;
-    float d = length(q - centre) / r;
-    if (d < 1.0) {
-      float cover = 1.0 - smoothstep(0.7, 1.0, d);
-      if (cover > best.x) best = vec4(cover, h.z, smoothstep(0.75, 1.0, d), 1.0 - d * d);
-    }
-  }
-  return best;
+// The baked detail tile (grain, pebbles, pits), read twice with random offsets that change across the
+// ground and blended, so the tile never shows as a repeat (Inigo Quilez, "texture repetition", 3rd way).
+// The two reads and their blend weight; pebbles are resolved per read, then blended (blending the
+// pebble numbers first would bite pieces out of stones).
+vec4 gA; vec4 gB; float gW;
+void gDetail(vec2 uv, float k) {
+  vec2 ddx = dFdx(uv); vec2 ddy = dFdy(uv);
+  float l = k * 8.0; float ia = floor(l); float f = fract(l);
+  vec2 offa = sin(vec2(3.0, 7.0) * ia); vec2 offb = sin(vec2(3.0, 7.0) * (ia + 1.0));
+  gA = textureGrad(groundDetail, uv + offa, ddx, ddy);
+  gB = textureGrad(groundDetail, uv + offb, ddx, ddy);
+  gW = smoothstep(0.2, 0.8, f - 0.1 * dot(gA - gB, vec4(1.0)));
 }
-// A pebble's colour as a multiplier of the ground it lies on: darker grey, brown or a little paler,
-// lit on its dome and dark at its rim.
-vec3 gStone(vec4 s) {
-  vec3 c = s.y < 0.45 ? mix(vec3(0.62, 0.64, 0.68), vec3(0.8, 0.81, 0.83), s.y / 0.45)
-         : s.y < 0.8 ? mix(vec3(0.66, 0.58, 0.5), vec3(0.85, 0.76, 0.66), (s.y - 0.45) / 0.35)
-         : mix(vec3(1.02, 1.0, 0.97), vec3(1.12, 1.1, 1.06), (s.y - 0.8) / 0.2);
-  return c * (0.85 + 0.25 * s.w) * (1.0 - 0.35 * s.z);
+// A pebble's colour: its baked shade, warmed or cooled by its own random number.
+vec3 gStone(vec4 d) {
+  return vec3(d.g * 2.0) * mix(vec3(0.94, 0.97, 1.03), vec3(1.07, 0.98, 0.88), fract(d.b * 7.0));
 }
-// Pits: small soft hollows in the sand (no ripples).
-float gPits(vec3 p, float size) {
-  vec3 q = p / size;
-  vec3 i = floor(q);
-  float pit = 0.0;
-  for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
-    vec3 c = i + vec3(float(x), float(y), float(z));
-    vec3 centre = c + gHash3(c + 5.0);
-    float d = length(q - centre) / (0.18 + 0.2 * gHash(c + 9.0));
-    pit = max(pit, 1.0 - smoothstep(0.0, 1.0, d));
-  }
-  return pit;
+// The pebbles' colour multiplier where their number is under the amount (1 elsewhere).
+vec3 gStones(float amount) {
+  vec3 a = mix(vec3(1.0), gStone(gA), step(gA.b, amount));
+  vec3 b = mix(vec3(1.0), gStone(gB), step(gB.b, amount));
+  return mix(a, b, gW);
 }
 `;
 
@@ -190,32 +170,119 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   vec2 muv = (wp.xz + paintHalf) / (2.0 * paintHalf);
   float paint = (muv.x < 0.0 || muv.x > 1.0 || muv.y < 0.0 || muv.y > 1.0) ? 0.0 : texture2D(paintMask, muv).r * sandStrength;
   // A ragged edge: the noise eats into the soft brush rim so strokes never show as circles.
-  paint = clamp(paint * 1.25 - 0.25 * gNoise(wp / 60.0) * (1.0 - paint), 0.0, 1.0);
+  paint = clamp(paint * 1.25 - 0.25 * gNoise2(wp.xz / 60.0) * (1.0 - paint), 0.0, 1.0);
+
+  // The detail up close: projected from above, or from the side on steep faces.
+  gA = vec4(0.5, 0.5, 1.0, 0.0); gB = gA; gW = 0.0;
+  if (near > 0.0) {
+    vec3 n = abs(vGroundNormal);
+    vec2 puv = n.y > 0.55 ? wp.xz : (n.x > n.z ? wp.zy : wp.xy);
+    gDetail(puv / (DETAIL_CELLS * groundPebbleSize), gNoise2(wp.xz / 700.0));
+  }
+  vec4 d = mix(gA, gB, gW);
+  float grain = 0.8 + 0.4 * d.r;
 
   if (paint > 0.001) {
     // Plain, mottled sand: broad soft patches, never ripples.
-    float mottle = 0.9 + 0.1 * gNoise(wp / 900.0) + 0.06 * gNoise(wp / 180.0) - 0.05;
+    float mottle = 0.9 + 0.1 * gNoise2(wp.xz / 900.0) + 0.06 * gNoise2(wp.xz / 180.0) - 0.05;
     vec3 sand = sandColor * mottle;
-    if (near > 0.0) {
-      float fine = 0.88 + 0.24 * gNoise(wp / 2.5);
-      float pits = gPits(wp, 7.0) * sandPits;
-      vec4 stones = gPebbles(wp + 311.0, groundPebbleSize * 0.8, sandPebbles * 0.6);
-      vec3 grained = sand * fine * (1.0 - 0.35 * pits);
-      vec3 detailed = mix(grained, sand * gStone(stones), stones.x);
-      sand = mix(sand, detailed, near);
-    }
-    diffuseColor.rgb = mix(diffuseColor.rgb, sand, paint);
+    vec3 detailed = sand * mix(1.0, grain, 0.6) * (1.0 - 0.35 * d.a * sandPits);
+    detailed *= gStones(sandPebbles * 0.6);
+    diffuseColor.rgb = mix(diffuseColor.rgb, mix(sand, detailed, near), paint);
   }
 
   if (near > 0.0 && groundGrain > 0.0) {
-    float grain = 0.8 + 0.25 * gNoise(wp / 3.0) + 0.15 * gNoise(wp / 11.0) - 0.075;
-    vec4 stones = gPebbles(wp, groundPebbleSize, groundPebbles);
-    // Stones sit on the terrain in its own colour family.
-    vec3 g = mix(vec3(grain), gStone(stones), stones.x);
+    vec3 g = vec3(grain) * gStones(groundPebbles);
     diffuseColor.rgb *= mix(vec3(1.0), g, groundGrain * near * (1.0 - paint));
   }
 }
 `;
+
+/* ───────────── The detail tile ───────────── */
+
+/** Pixels across the tile, and pebble cells across it (a cell is one Pebble size across in the world). */
+export const DETAIL_RES = 512;
+export const DETAIL_CELLS = 48;
+
+const hash2 = (x: number, y: number, seed: number) => {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(seed, 2147483647);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
+
+/**
+ * The detail tile, seamless: R grain (two octaves of value noise), G a pebble's shade (0.5 = none;
+ * lit dome, dark rim), B that pebble's random number (1 = no pebble; a pebble shows where its number is
+ * under the Pebbles setting, so the sliders still work), A pits for the sand.
+ */
+export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Array {
+  const out = new Uint8Array(res * res * 4);
+  const wrap = (v: number, n: number) => ((v % n) + n) % n;
+  const valueNoise = (x: number, y: number, n: number, seed: number) => {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    let fx = x - ix, fy = y - iy;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    const v = (a: number, b: number) => hash2(wrap(a, n), wrap(b, n), seed);
+    const top = v(ix, iy) + (v(ix + 1, iy) - v(ix, iy)) * fx;
+    const bottom = v(ix, iy + 1) + (v(ix + 1, iy + 1) - v(ix, iy + 1)) * fx;
+    return top + (bottom - top) * fy;
+  };
+  const pitCells = cells * 2;
+  for (let py = 0; py < res; py++) {
+    for (let px = 0; px < res; px++) {
+      const u = (px + 0.5) / res, v = (py + 0.5) / res;
+      const grain = 0.6 * valueNoise(u * cells * 4, v * cells * 4, cells * 4, 1) + 0.4 * valueNoise(u * cells * 1.2, v * cells * 1.2, cells * 1.2, 2);
+      // Pebbles: the nearest stone among the 3 x 3 cells around.
+      const qx = u * cells, qy = v * cells;
+      const cx = Math.floor(qx), cy = Math.floor(qy);
+      let cover = 0, shade = 1, id = 1;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const gx = wrap(cx + dx, cells), gy = wrap(cy + dy, cells);
+        const ox = cx + dx + 0.2 + 0.6 * hash2(gx, gy, 3), oy = cy + dy + 0.2 + 0.6 * hash2(gx, gy, 4);
+        const r = 0.22 + 0.3 * hash2(gx, gy, 5);
+        const d = Math.hypot(qx - ox, qy - oy) / r;
+        if (d >= 1) continue;
+        const c = 1 - Math.min(1, Math.max(0, (d - 0.7) / 0.3));
+        if (c <= cover) continue;
+        cover = c;
+        const tone = 0.62 + 0.45 * hash2(gx, gy, 6);
+        const rim = Math.min(1, Math.max(0, (d - 0.75) / 0.25));
+        shade = 1 + c * (tone * (0.85 + 0.25 * (1 - d * d)) * (1 - 0.35 * rim) - 1);
+        id = hash2(gx, gy, 7) * 0.98;
+      }
+      // Pits: small soft hollows.
+      const rx = u * pitCells, ry = v * pitCells;
+      const kx = Math.floor(rx), ky = Math.floor(ry);
+      let pit = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const gx = wrap(kx + dx, pitCells), gy = wrap(ky + dy, pitCells);
+        const ox = kx + dx + hash2(gx, gy, 8), oy = ky + dy + hash2(gx, gy, 9);
+        const d = Math.hypot(rx - ox, ry - oy) / (0.18 + 0.2 * hash2(gx, gy, 10));
+        pit = Math.max(pit, 1 - Math.min(1, d));
+      }
+      const o = (py * res + px) * 4;
+      out[o] = Math.round(grain * 255);
+      out[o + 1] = Math.round(Math.min(1, shade / 2) * 255);
+      out[o + 2] = cover > 0.02 ? Math.round(id * 255) : 255;
+      out[o + 3] = Math.round(pit * pit * (3 - 2 * pit) * 255);
+    }
+  }
+  return out;
+}
+
+let detailTexture: THREE.DataTexture | null = null;
+/** The tile on the GPU (made once, shared). */
+export function detailTileTexture(): THREE.DataTexture {
+  if (detailTexture) return detailTexture;
+  const t = new THREE.DataTexture(makeDetailTile(), DETAIL_RES, DETAIL_RES, THREE.RGBAFormat, THREE.UnsignedByteType);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 8;
+  t.needsUpdate = true;
+  return detailTexture = t;
+}
 
 /** Inserts the ground shader into a MeshStandardMaterial's shaders (its onBeforeCompile). */
 export function injectIslandGround(
@@ -231,11 +298,12 @@ export function injectIslandGround(
   need(shader.fragmentShader, '#include <common>');
   need(shader.fragmentShader, '#include <map_fragment>');
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vGroundWorld;')
+    .replace('#include <common>', '#include <common>\nvarying vec3 vGroundWorld;\nvarying vec3 vGroundNormal;')
     .replace('#include <project_vertex>', `#include <project_vertex>
-  vGroundWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+  vGroundWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+  vGroundNormal = normalize(mat3(modelMatrix) * objectNormal);`);
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\n${GROUND_FRAGMENT_HEADER}`)
+    .replace('#include <common>', `#include <common>\n#define DETAIL_CELLS ${DETAIL_CELLS.toFixed(1)}\n${GROUND_FRAGMENT_HEADER}`)
     .replace('#include <map_fragment>', `#include <map_fragment>\n${GROUND_FRAGMENT_BODY}`);
 }
 
@@ -257,13 +325,14 @@ export class IslandGround {
       groundGrain: { value: 0.5 },
       groundPebbleSize: { value: 9 },
       groundPebbles: { value: 0.35 },
-      groundFade: { value: 7000 },
+      groundFade: { value: 6000 },
       paintMask: { value: this.maskTexture },
       paintHalf: { value: PAINT_HALF },
       sandColor: { value: new THREE.Color() },
       sandStrength: { value: 1 },
       sandPebbles: { value: 0.3 },
       sandPits: { value: 0.5 },
+      groundDetail: { value: detailTileTexture() },
     };
     material.onBeforeCompile = (shader) => injectIslandGround(shader, this.uniforms);
     material.customProgramCacheKey = () => 'island-ground';

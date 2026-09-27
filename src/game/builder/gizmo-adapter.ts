@@ -23,6 +23,24 @@ export interface LaneNodeGizmoTarget {
   onCommit?: () => void;
 }
 
+/**
+ * How an item's facing reads and writes as one rotation. The default is the builder's yaw, pitch, roll
+ * (rotY, rotX, rotZ, applied in that order: Euler 'YXZ'); items with another convention (decals, which
+ * lie flat) supply their own.
+ */
+export interface OrientationAccess<T> {
+  get(item: T, out: THREE.Quaternion): THREE.Quaternion;
+  set(item: T, q: THREE.Quaternion): void;
+}
+
+const yawPitchRoll: OrientationAccess<Transformable> = {
+  get: (item, out) => out.setFromEuler(new THREE.Euler(item.rotX ?? 0, item.rotY ?? 0, item.rotZ ?? 0, 'YXZ')),
+  set: (item, q) => {
+    const e = new THREE.Euler().setFromQuaternion(q, 'YXZ');
+    item.rotX = e.x; item.rotY = e.y; item.rotZ = e.z;
+  },
+};
+
 export class GizmoAdapter<T extends Transformable & { id: string }> {
   readonly controls: TransformControls;
   readonly helper: THREE.Object3D;
@@ -42,7 +60,10 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
   private selectedItems: T[] = [];
   private laneNodeTarget: LaneNodeGizmoTarget | null = null;
   private dragStartPivot = new THREE.Vector3();
-  private dragStartProps = new Map<string, { x: number; y: number; z: number; rotY?: number; scale: number }>();
+  private dragStartProps = new Map<string, T>();
+  private dragStartFacing = new Map<string, THREE.Quaternion>();
+  private dragStartProxy = new THREE.Quaternion();
+  private orientation: OrientationAccess<T> = yawPitchRoll as OrientationAccess<T>;
   private isDragging = false;
   private changeCallbacks: ((items: readonly T[]) => void)[] = [];
   private dragCallbacks: ((dragging: boolean) => void)[] = [];
@@ -98,15 +119,12 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
 
       if (dragging) {
         this.dragStartPivot.copy(this.proxy.position);
+        this.dragStartProxy.copy(this.proxy.quaternion);
         this.dragStartProps.clear();
+        this.dragStartFacing.clear();
         for (const item of this.selectedItems) {
-          this.dragStartProps.set(item.id, {
-            x: item.x,
-            y: item.y,
-            z: item.z,
-            rotY: item.rotY,
-            scale: item.scale,
-          });
+          this.dragStartProps.set(item.id, structuredClone(item));
+          this.dragStartFacing.set(item.id, this.orientation.get(item, new THREE.Quaternion()));
         }
         this.history.begin(this.mode, this.selectedItems);
       } else {
@@ -156,11 +174,19 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
           }
         }
       } else if (this.mode === 'rotate') {
-        const rotDelta = this.proxy.rotation.y;
+        // The turn since the drag began, on whichever ring (the X and Z rings tilt), applied to every
+        // item's own facing; a group also swings round the pivot.
+        const turn = this.proxy.quaternion.clone().multiply(this.dragStartProxy.clone().invert());
         for (const item of this.selectedItems) {
           const start = this.dragStartProps.get(item.id);
-          if (start) {
-            item.rotY = (start.rotY ?? 0) + rotDelta;
+          const facing = this.dragStartFacing.get(item.id);
+          if (!start || !facing) continue;
+          this.orientation.set(item, turn.clone().multiply(facing).normalize());
+          if (this.selectedItems.length > 1) {
+            const offset = new THREE.Vector3(start.x, start.y, start.z).sub(this.dragStartPivot).applyQuaternion(turn);
+            item.x = this.dragStartPivot.x + offset.x;
+            item.y = this.dragStartPivot.y + offset.y;
+            item.z = this.dragStartPivot.z + offset.z;
           }
         }
       } else if (this.mode === 'scale') {
@@ -208,8 +234,14 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
     return this.space;
   }
 
+  /** How items' facing reads and writes (see OrientationAccess). */
+  setOrientationAccess(access: OrientationAccess<T>): void {
+    this.orientation = access;
+  }
+
   setSnap(config: Partial<SnapConfig>): void {
     this.snap = { ...this.snap, ...config };
+    this.controls.setRotationSnap(this.snap.angleDeg > 0 ? (this.snap.angleDeg * Math.PI) / 180 : null);
   }
 
   getSnap(): SnapConfig {
@@ -241,7 +273,7 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
     this.proxy.scale.set(1, 1, 1);
 
     if (this.space === 'local' && this.selectedItems.length === 1) {
-      this.proxy.rotation.set(0, this.selectedItems[0].rotY ?? 0, 0);
+      this.orientation.get(this.selectedItems[0], this.proxy.quaternion);
     } else {
       this.proxy.rotation.set(0, 0, 0);
     }
@@ -308,13 +340,10 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
     this.history.cancel();
     for (const item of this.selectedItems) {
       const start = this.dragStartProps.get(item.id);
-      if (start) {
-        item.x = start.x;
-        item.y = start.y;
-        item.z = start.z;
-        if (start.rotY !== undefined) item.rotY = start.rotY;
-        item.scale = start.scale;
-      }
+      if (!start) continue;
+      // Back exactly as it was, keys the drag added (a first tilt) included.
+      for (const key of Object.keys(item)) if (!(key in start)) delete (item as Record<string, unknown>)[key];
+      Object.assign(item, structuredClone(start));
     }
     this.isDragging = false;
     for (const cb of this.dragCallbacks) {

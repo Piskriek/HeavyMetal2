@@ -372,9 +372,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             draggingLaneNode.current = hitNode;
             const count = builder.getSelectedLaneNodeIds().length;
             showToast(count > 1
-              ? `${count} nodes selected: drag the gizmo to move them together · arrows nudge · L whole lanes · Del delete`
-              : `Node ${hitNode}: drag the gizmo to move · Shift-click or drag a box to select more · Ctrl-click nodes to connect them · Del delete · Shift+K kind · Shift+S split · Shift+I insert`);
+              ? `${count} nodes selected: drag to move them together · arrows nudge · L whole lanes · Del delete`
+              : `Node ${hitNode}: drag to move (past its neighbours drops them) · Shift-click or drag a box to select more · Ctrl-click nodes to connect them · Del delete · Shift+K kind · Shift+S split · Shift+I insert`);
           } else {
+            // A start or finish line (see-through when hidden): select it, and its gizmo moves it.
+            const mark = builder.raycastRaceMark(e.clientX, e.clientY, canvas);
+            if (mark) {
+              builder.selectProp(mark.id);
+              showToast(`${mark.name}: drag the gizmo arrows to move it`);
+              onRequestRender?.();
+              return;
+            }
+            if (builder.getSelectedProps().some((p) => isRaceMarkType(p.type))) builder.selectProp(null);
             // Open ground: drag out a box to select every node inside it (a plain click clears the selection).
             laneMarquee.current = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, additive };
           }
@@ -903,16 +912,6 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           const delta = (stepDeg * Math.PI) / 180 * (e.code === 'BracketLeft' ? -1 : 1);
           builder.tiltSelectedProps(delta);
           showToast(`Tilt adjusted for ${selected.length} item(s)`);
-          onRequestRender?.();
-        }
-      } else if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) {
-        const selected = builder.getSelectedProps();
-        if (selected.length > 0) {
-          e.preventDefault();
-          const stepDeg = e.shiftKey ? -15 : 15;
-          builder.pushUndo();
-          builder.rotateSelectedProps((stepDeg * Math.PI) / 180);
-          showToast(`Rotated ${selected.length} item(s) (${stepDeg > 0 ? `+${stepDeg}` : stepDeg}°) [Key: R]`);
           onRequestRender?.();
         }
       } else if (e.code === 'KeyX' && !e.ctrlKey && !e.metaKey) {
@@ -2340,7 +2339,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
           {/* Group Orbit Rotation (Yaw around Centroid) */}
           <div className="flex flex-col gap-1 text-xs">
-            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid) [Key: R]:</span>
+            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid) [E: rotate gizmo]:</span>
             <div className="grid grid-cols-7 gap-1">
               {[-90, -45, -15, 15, 45, 90, 180].map((deg) => (
                 <button
@@ -2849,7 +2848,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           {/* Rotation Y */}
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex justify-between text-zinc-400">
-              <span>Rotation Y (Yaw) [Key: R]:</span>
+              <span>Rotation Y (Yaw) [E: rotate gizmo]:</span>
               <span className="text-amber-300 font-mono">{Math.round((selectedProp.rotY * 180) / Math.PI)}°</span>
             </div>
             <input
@@ -3065,7 +3064,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         </span>
                       </div>
                       <p className="text-[10px] text-zinc-400 leading-tight">
-                        Spins decal flat on the surface without detaching from slope [Key: R]:
+                        Spins decal flat on the surface without detaching from slope [E: rotate gizmo]:
                       </p>
                       <input
                         type="range"

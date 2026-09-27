@@ -30,7 +30,11 @@ import { FINISH, START_X } from './scene';
 
 export type LaneEdit =
   | { op: 'addPath'; at: { x: number; z: number }[] }
-  | { op: 'moveNode'; nodeId: string; x: number; z: number }
+  /**
+   * With `passThrough` (a drag), a node pulled past its neighbours along a lane takes their place: the
+   * nodes it passes are dropped (only ones on that one lane; a junction still stops it).
+   */
+  | { op: 'moveNode'; nodeId: string; x: number; z: number; passThrough?: boolean }
   /**
    * Joins two nodes with a lane (Ctrl-click one, then the other), always running down the hill. With
    * `extendPathId`, a lane ending at the uphill node grows by the new one (clicking on along a chain).
@@ -158,6 +162,33 @@ function describeErrors(errors: readonly LaneRefusal[]): string {
 }
 
 /** Does this node sit correctly between its neighbours in every path that contains it? */
+/**
+ * A copy of the network without the nodes a node moved to `x` would pass along its lanes, or null when
+ * one of them is shared with another lane (a junction) or a lane would be left with one node.
+ */
+function dropPassedNodes(network: LaneNetwork, nodeId: string, x: number): LaneNetwork | null {
+  const next = copyNetwork(network);
+  const lanesOf = (id: string) => next.paths.filter((p) => p.nodeIds.includes(id)).length;
+  const dropped = new Set<string>();
+  for (const path of next.paths) {
+    let index = path.nodeIds.indexOf(nodeId);
+    if (index < 0) continue;
+    while (index > 0 && nodeById(next, path.nodeIds[index - 1])!.x >= x) {
+      const id = path.nodeIds[index - 1];
+      if (lanesOf(id) !== 1) return null;
+      path.nodeIds.splice(index - 1, 1); dropped.add(id); index--;
+    }
+    while (index < path.nodeIds.length - 1 && nodeById(next, path.nodeIds[index + 1])!.x <= x) {
+      const id = path.nodeIds[index + 1];
+      if (lanesOf(id) !== 1) return null;
+      path.nodeIds.splice(index + 1, 1); dropped.add(id);
+    }
+    if (path.nodeIds.length < 2) return null;
+  }
+  next.nodes = next.nodes.filter((n) => !dropped.has(n.id));
+  return next;
+}
+
 function breaksMonotone(network: LaneNetwork, nodeId: string, x: number): boolean {
   for (const path of network.paths) {
     const index = path.nodeIds.indexOf(nodeId);
@@ -191,7 +222,7 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 export function applyLaneEdit(network: LaneNetwork, edit: LaneEdit): LaneEditResult {
   switch (edit.op) {
     case 'addPath': return addPath(network, edit.at);
-    case 'moveNode': return moveNode(network, edit.nodeId, edit.x, edit.z);
+    case 'moveNode': return moveNode(network, edit.nodeId, edit.x, edit.z, edit.passThrough);
     case 'moveNodes': return moveNodes(network, edit.moves);
     case 'connect': return connectNodes(network, edit.fromId, edit.toId, edit.extendPathId ?? null);
     case 'insertNode': return insertNode(network, edit.pathId, edit.x, edit.z);
@@ -224,13 +255,17 @@ function addPath(network: LaneNetwork, at: readonly { x: number; z: number }[]):
   return finish(next, nodeIds[nodeIds.length - 1]);
 }
 
-function moveNode(network: LaneNetwork, nodeId: string, x: number, z: number): LaneEditResult {
+function moveNode(network: LaneNetwork, nodeId: string, x: number, z: number, passThrough = false): LaneEditResult {
   const node = nodeById(network, nodeId);
   if (!node) return refuse('unknown_node', `there is no node ${nodeId}`);
   if (!inCorridor(x, z)) return refuse('out_of_corridor', 'that point is off the drivable road');
   if (node.x === x && node.z === z) return refuse('unchanged', `${nodeId} is already there`);
   if (breaksMonotone(network, nodeId, x)) {
-    return refuse('non_monotone', 'the move would put this node out of x order in one of its paths');
+    const passed = passThrough ? dropPassedNodes(network, nodeId, x) : null;
+    if (!passed) return refuse('non_monotone', 'the move would put this node out of x order in one of its paths');
+    nodeById(passed, nodeId)!.x = x;
+    nodeById(passed, nodeId)!.z = z;
+    return finish(passed, nodeId);
   }
   const next = copyNetwork(network);
   nodeById(next, nodeId)!.x = x;

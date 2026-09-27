@@ -1781,10 +1781,12 @@ export class Renderer3D {
       const hiRes = readOptions().graphics === 'quality' && this.renderer.capabilities.maxTextureSize >= 8192;
       this.island = buildIslandWorld(this.materials, { hiRes });
       this.scene.add(this.island.group);
-      this.sky.visible = false;
+      // The chosen skybox (the Sky menu) over the island, its fog in that sky's colour; the island's own
+      // plain haze dome stays hidden behind it.
+      this.island.sky.visible = false;
       this.fogNear = 18000;
       this.fogFar = 160000;
-      this.scene.fog = new THREE.Fog(this.island.fogColor.clone(), this.fogNear, this.fogFar);
+      this.scene.fog = new THREE.Fog(new THREE.Color(this.currentSkyPreset.fogColor), this.fogNear, this.fogFar);
     } else {
       const terrain = makeAlpineTerrain(this.track);
       buildTrackSurface(this.track, this.materials, this.scene);
@@ -1813,7 +1815,7 @@ export class Renderer3D {
 
   setSkybox(skyId: string) {
     const preset = SKY_PRESETS[skyId];
-    if (!preset || this.island) return;
+    if (!preset) return;
     this.currentSkyPreset = preset;
 
     const loader = new THREE.TextureLoader();
@@ -2024,7 +2026,7 @@ export class Renderer3D {
     const under = Number.isFinite(this.enterD) && Number.isFinite(this.exitD)
       ? smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d))
       : 0;
-    const dayFog = this.island ? this.island.fogColor : new THREE.Color(this.currentSkyPreset.fogColor);
+    const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
     const dayAmbient = new THREE.Color(this.currentSkyPreset.ambientColor);
     (this.scene.fog as THREE.Fog).color.copy(dayFog).lerp(SKY.fogCave, under);
     (this.scene.fog as THREE.Fog).near = lerp(this.fogNear, 1500, under);

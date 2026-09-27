@@ -473,6 +473,22 @@ export class TrackBuilder3D {
       this.scene,
       this.commandHistory,
     );
+    // Decals lie flat: their facing is their quaternion (or the flat yaw, pitch, roll it is built from).
+    this.gizmoAdapter.setOrientationAccess({
+      get: (prop, out) => this.isPropDecal(prop) ? out.copy(this.decalQuaternion(prop)) : out.setFromEuler(new THREE.Euler(prop.rotX ?? 0, prop.rotY ?? 0, prop.rotZ ?? 0, 'YXZ')),
+      set: (prop, q) => {
+        if (this.isPropDecal(prop)) {
+          prop.quaternion = [q.x, q.y, q.z, q.w];
+          const F = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+          const R = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+          prop.rotX = Math.asin(Math.max(-1, Math.min(1, F.y)));
+          prop.rotZ = Math.asin(Math.max(-1, Math.min(1, R.y)));
+          return;
+        }
+        const e = new THREE.Euler().setFromQuaternion(q, 'YXZ');
+        prop.rotX = e.x; prop.rotY = e.y; prop.rotZ = e.z;
+      },
+    });
     this.gizmoAdapter.onChange((items) => {
       for (const item of items) {
         this.updatePropTransform(item.id, {}, false);
@@ -611,6 +627,65 @@ export class TrackBuilder3D {
     const obj = this.propObjects.get(prop.id);
     const section = this.sectionOf(prop);
     if (obj && section) obj.visible = prop.visible !== false && !this.hiddenSections.has(section);
+    this.applyRaceMarkGhost(prop);
+  }
+
+  /* ───────────── Start and finish lines in the Lanes tool ───────────── */
+
+  /** A start or finish line that is hidden (by H or its shelf) while the Lanes tool is open. */
+  private isRaceMarkGhost(prop: PlacedProp): boolean {
+    if (!this.lanesVisible || !isRaceMarkType(prop.type)) return false;
+    const section = this.sectionOf(prop);
+    return prop.visible === false || Boolean(section && this.hiddenSections.has(section));
+  }
+
+  /**
+   * In the Lanes tool a hidden start or finish line shows see-through, so it can be picked and moved
+   * with the lanes; out of it, it is hidden again. Its materials are copied for the ghost, never shared.
+   */
+  private applyRaceMarkGhost(prop: PlacedProp) {
+    if (!isRaceMarkType(prop.type)) return;
+    const obj = this.propObjects.get(prop.id);
+    if (!obj) return;
+    const ghost = this.isRaceMarkGhost(prop);
+    const toGhost = (m: THREE.Material) => {
+      const copy = m.clone();
+      copy.transparent = true; copy.opacity = 0.35 * m.opacity; copy.depthWrite = false;
+      return copy;
+    };
+    obj.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const solid = mesh.userData.solidMaterial as THREE.Material | THREE.Material[] | undefined;
+      if (ghost && !solid) {
+        mesh.userData.solidMaterial = mesh.material;
+        mesh.material = Array.isArray(mesh.material) ? mesh.material.map(toGhost) : toGhost(mesh.material);
+      } else if (!ghost && solid) {
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.dispose();
+        mesh.material = solid;
+        delete mesh.userData.solidMaterial;
+      }
+    });
+    const section = this.sectionOf(prop);
+    obj.visible = ghost || (prop.visible !== false && !(section && this.hiddenSections.has(section)));
+  }
+
+  private refreshRaceMarkGhosts() {
+    for (const prop of this.placedProps) this.applyRaceMarkGhost(prop);
+  }
+
+  /** The start or finish line under the pointer (a see-through one too), or null. */
+  raycastRaceMark(clientX: number, clientY: number, canvas: HTMLCanvasElement): PlacedProp | null {
+    const marks = this.placedProps.filter((p) => isRaceMarkType(p.type) && this.propObjects.get(p.id)?.visible);
+    if (!marks.length) return null;
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const hits = this.raycaster.intersectObjects(marks.map((p) => this.propObjects.get(p.id)!), true);
+    let hit: THREE.Object3D | null = hits[0]?.object ?? null;
+    while (hit && !hit.userData?.propId) hit = hit.parent;
+    return hit ? marks.find((p) => p.id === hit!.userData.propId) ?? null : null;
   }
 
   /** Selects every shown placed item of a shelf (additive keeps what is already selected). */
@@ -1027,6 +1102,7 @@ export class TrackBuilder3D {
       if (obj) {
         obj.visible = prop.visible !== false;
       }
+      this.applyRaceMarkGhost(prop);
     }
     this.updateSelectionBox();
     this.saveToStorage();
@@ -1920,18 +1996,15 @@ export class TrackBuilder3D {
         const flip = prop.flipX ? -1 : 1;
         if (def) {
           if (def.isRamp) {
-            obj.rotation.y = prop.rotY;
-            obj.rotation.z = prop.rotZ ?? 0;
+            obj.rotation.set(prop.rotX ?? 0, prop.rotY, prop.rotZ ?? 0, 'YXZ');
             obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
           } else if (def.isSlingshot || def.is3DModel) {
-            obj.rotation.y = prop.rotY;
-            obj.rotation.z = prop.rotZ ?? 0;
+            obj.rotation.set(prop.rotX ?? 0, prop.rotY, prop.rotZ ?? 0, 'YXZ');
             obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
           } else if (newIsDecal || (obj as any).userData?.isDecal) {
             this.applyDecalTransform(obj, prop, def);
           } else if (prop.cameraFacing === false) {
-            obj.rotation.y = prop.rotY;
-            obj.rotation.z = prop.rotZ ?? 0;
+            obj.rotation.set(prop.rotX ?? 0, prop.rotY, prop.rotZ ?? 0, 'YXZ');
             obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
           } else {
             // Sprite
@@ -1961,16 +2034,17 @@ export class TrackBuilder3D {
     const flip = prop.flipX ? -1 : 1;
     obj.position.set(prop.x, prop.y + 2, prop.z);
     obj.scale.set(prop.scale * flip, prop.scale, prop.scale);
+    obj.quaternion.copy(this.decalQuaternion(prop));
+  }
 
-    if (prop.quaternion) {
-      obj.quaternion.set(prop.quaternion[0], prop.quaternion[1], prop.quaternion[2], prop.quaternion[3]);
-    } else {
-      const qFlat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
-      const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -prop.rotY);
-      const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), prop.rotX ?? 0);
-      const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotZ ?? 0);
-      obj.quaternion.copy(qFlat).multiply(qYaw).multiply(qPitch).multiply(qRoll);
-    }
+  /** A decal's facing: its stored quaternion, or the flat yaw, pitch and roll it was placed with. */
+  private decalQuaternion(prop: PlacedProp): THREE.Quaternion {
+    if (prop.quaternion) return new THREE.Quaternion(prop.quaternion[0], prop.quaternion[1], prop.quaternion[2], prop.quaternion[3]);
+    const qFlat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -prop.rotY);
+    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), prop.rotX ?? 0);
+    const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotZ ?? 0);
+    return qFlat.multiply(qYaw).multiply(qPitch).multiply(qRoll);
   }
 
   private initDecalSideHandles() {
@@ -2535,6 +2609,7 @@ export class TrackBuilder3D {
       const obj = this.kit.create(prop);
       this.propObjects.set(prop.id, obj);
       if (this.hiddenSections.size) this.applySectionVisibility(prop);
+      this.applyRaceMarkGhost(prop);
       this.refreshRidePatch(prop, 0);
       return obj;
     }
@@ -2565,8 +2640,7 @@ export class TrackBuilder3D {
       mesh.name = `PlacedProp_${prop.id}`;
       mesh.userData = { propId: prop.id, isRamp: true };
       mesh.position.set(prop.x, prop.y, prop.z);
-      mesh.rotation.y = prop.rotY;
-      mesh.rotation.z = prop.rotZ ?? 0;
+      mesh.rotation.set(prop.rotX ?? 0, prop.rotY, prop.rotZ ?? 0, 'YXZ');
       mesh.scale.set(prop.scale * flip, prop.scale, prop.scale);
       obj = mesh;
     } else if (def.isSlingshot || def.is3DModel) {
@@ -2575,8 +2649,7 @@ export class TrackBuilder3D {
       model.name = `PlacedProp_${prop.id}`;
       model.userData = { propId: prop.id, is3DModel: true, isSlingshot: true };
       model.position.set(prop.x, prop.y, prop.z);
-      model.rotation.y = prop.rotY;
-      model.rotation.z = prop.rotZ ?? 0;
+      model.rotation.set(prop.rotX ?? 0, prop.rotY, prop.rotZ ?? 0, 'YXZ');
       model.scale.set(prop.scale * flip, prop.scale, prop.scale);
       obj = model;
     } else if (isDecal) {
@@ -2639,8 +2712,7 @@ export class TrackBuilder3D {
       mesh.name = `PlacedProp_${prop.id}`;
       mesh.userData = { propId: prop.id, isMeshProp: true, ...(animState ? { anim: animState } : {}) };
       mesh.position.set(prop.x, prop.y, prop.z);
-      mesh.rotation.y = prop.rotY;
-      mesh.rotation.z = prop.rotZ ?? 0;
+      mesh.rotation.set(prop.rotX ?? 0, prop.rotY, prop.rotZ ?? 0, 'YXZ');
       mesh.scale.set(prop.scale * flip, prop.scale, prop.scale);
       obj = mesh;
     } else {
@@ -2707,6 +2779,7 @@ export class TrackBuilder3D {
   setLanesToolActive(active: boolean) {
     this.lanesVisible = active;
     this.laneGizmos.root.visible = active;
+    this.refreshRaceMarkGhosts();
     if (!active) {
       this.selectedLaneNodeId = null;
       this.setLaneGroup([]);
@@ -3029,7 +3102,7 @@ export class TrackBuilder3D {
     const dx = snapped.x - from.x, dz = snapped.z - from.z;
     const edit: LaneEdit = drag.start.size > 1
       ? { op: 'moveNodes', moves: [...drag.start].map(([nodeId, p]) => ({ nodeId, x: p.x + dx, z: p.z + dz })) }
-      : { op: 'moveNode', nodeId: drag.primary, x: snapped.x, z: snapped.z };
+      : { op: 'moveNode', nodeId: drag.primary, x: snapped.x, z: snapped.z, passThrough: true };
     const check = applyLaneEdit(this.laneDoc, edit);
     if (!check.ok) return check;
     if (!drag.undoPushed) { this.pushUndo(); drag.undoPushed = true; }

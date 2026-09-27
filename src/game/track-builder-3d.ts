@@ -1985,6 +1985,11 @@ export class TrackBuilder3D {
       roughness: 0.35,
       metalness: 0.1,
       depthTest: false,
+      // Decals are transparent, and three draws every transparent object after every opaque one
+      // whatever the render order: an opaque handle was painted over by any decal around it. In the
+      // transparent pass the render order below puts the handles after every decal.
+      transparent: true,
+      depthWrite: false,
     });
 
     const sides: DecalSide[] = ['front', 'back', 'left', 'right'];
@@ -1999,7 +2004,7 @@ export class TrackBuilder3D {
 
       // High-contrast black outline
       const edges = new THREE.EdgesGeometry(boxGeo);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2, depthTest: false });
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2, depthTest: false, transparent: true, depthWrite: false });
       const wireframe = new THREE.LineSegments(edges, lineMat);
       wireframe.renderOrder = 10003;
       mesh.add(wireframe);

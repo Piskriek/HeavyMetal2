@@ -125,3 +125,18 @@ test('a test drive starts at the ball on the nearest lane; a click on the gizmo 
   const guard = ui.indexOf('if (builder.isGizmoInteracting() || builder.isGizmoHovered()) return;');
   assert.ok(guard > 0 && guard < ui.indexOf('let hitProp = builder.raycastProp('), 'the gizmo is checked before any selection');
 });
+
+test('the decal edge handles draw over every decal (transparent pass, drawn last)', () => {
+  const b = builder();
+  const group = (b as any).decalSideHandlesGroup as THREE.Group;
+  let boxes = 0;
+  group.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+    if (!m || !((o as THREE.Mesh).isMesh || (o as THREE.LineSegments).isLineSegments)) return;
+    boxes += 1;
+    assert.equal(m.transparent, true, `${o.name} is in the transparent pass, after the decals`);
+    assert.equal(m.depthTest, false, `${o.name} is never hidden behind anything`);
+    assert.ok(o.renderOrder >= 10000, `${o.name} is drawn last`);
+  });
+  assert.ok(boxes >= 8, 'four handles and their outlines');
+});

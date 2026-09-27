@@ -35,6 +35,14 @@ export interface IslandGroundSettings {
   sandPits: number;
   /** Size of the painted dirt's cracks and stones: 1 = as made, 2 = twice as big. */
   sandScale: number;
+  /** The terrain's roughness (1 = fully matte). */
+  roughness: number;
+  /** Shine: how much glossier dark rock gets than the rest (a specular map made from the texture). */
+  shine: number;
+  /** How dark the baked sun shadows are (0 = off, 1 = no direct sun at all). */
+  shadowStrength: number;
+  /** Relief: how strongly pebbles stand up and cracks cut in, so light and shine catch them (0 = flat). */
+  bump: number;
 }
 
 export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
@@ -48,6 +56,10 @@ export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
   sandPebbles: 0.3,
   sandPits: 0.6,
   sandScale: 1,
+  roughness: 0.95,
+  shine: 0.5,
+  shadowStrength: 0.8,
+  bump: 0.6,
 };
 
 const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
@@ -68,6 +80,10 @@ export function normalizeIslandGround(raw: unknown): IslandGroundSettings {
     sandPebbles: clamp(r.sandPebbles, 0, 1, d.sandPebbles),
     sandPits: clamp(r.sandPits, 0, 1, d.sandPits),
     sandScale: clamp(r.sandScale, 0.25, 4, d.sandScale),
+    roughness: clamp(r.roughness, 0.2, 1, d.roughness),
+    shine: clamp(r.shine, 0, 1, d.shine),
+    shadowStrength: clamp(r.shadowStrength, 0, 1, d.shadowStrength),
+    bump: clamp(r.bump, 0, 2, d.bump),
   };
 }
 
@@ -126,6 +142,28 @@ uniform float sandPebbles;
 uniform float sandPits;
 uniform float sandScale;
 uniform sampler2D groundDetail;
+uniform sampler2D groundDetailHeight;
+uniform float groundRough;
+uniform float groundShine;
+uniform sampler2D sunShadow;
+uniform float sunShadowOn;
+uniform float sunShadowStrength;
+// Set in the colour pass, read by the shine and relief passes: how much of this pixel is painted dirt,
+// how much is a pebble, how deep a crack, its height (world units) and how close the camera is.
+float gPaint = 0.0;
+float gStoneCover = 0.0;
+float gCrack = 0.0;
+float gHeight = 0.0;
+float gNear = 0.0;
+uniform float groundBump;
+// A surface normal tilted by the slope of a height (screen-space derivatives; three.js's bump-map way).
+vec3 gBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy) {
+  vec3 sigmaX = dFdx(surfPos); vec3 sigmaY = dFdy(surfPos);
+  vec3 r1 = cross(sigmaY, surfNorm); vec3 r2 = cross(surfNorm, sigmaX);
+  float det = dot(sigmaX, r1);
+  vec3 grad = sign(det) * (dHdxy.x * r1 + dHdxy.y * r2);
+  return normalize(abs(det) * surfNorm - grad);
+}
 varying vec3 vGroundWorld;
 varying vec3 vGroundNormal;
 
@@ -145,12 +183,15 @@ float gNoise2(vec2 p) {
 // The two reads and their blend weight; pebbles are resolved per read, then blended (blending the
 // pebble numbers first would bite pieces out of stones).
 vec4 gA; vec4 gB; float gW;
+float gHA = 0.0; float gHB = 0.0;
 void gDetail(vec2 uv, float k) {
   vec2 ddx = dFdx(uv); vec2 ddy = dFdy(uv);
   float l = k * 8.0; float ia = floor(l); float f = fract(l);
   vec2 offa = sin(vec2(3.0, 7.0) * ia); vec2 offb = sin(vec2(3.0, 7.0) * (ia + 1.0));
   gA = textureGrad(groundDetail, uv + offa, ddx, ddy);
   gB = textureGrad(groundDetail, uv + offb, ddx, ddy);
+  gHA = textureGrad(groundDetailHeight, uv + offa, ddx, ddy).r;
+  gHB = textureGrad(groundDetailHeight, uv + offb, ddx, ddy).r;
   gW = smoothstep(0.2, 0.8, f - 0.1 * dot(gA - gB, vec4(1.0)));
 }
 // A pebble's colour: its baked shade, warmed or cooled by its own random number.
@@ -177,9 +218,10 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   float paint = (muv.x < 0.0 || muv.x > 1.0 || muv.y < 0.0 || muv.y > 1.0) ? 0.0 : texture2D(paintMask, muv).r * sandStrength;
   // A ragged edge: the noise eats into the soft brush rim so strokes never show as circles.
   paint = clamp(paint * 1.25 - 0.25 * gNoise2(wp.xz / 60.0) * (1.0 - paint), 0.0, 1.0);
+  gPaint = paint;
 
   // The detail up close: projected from above, or from the side on steep faces.
-  gA = vec4(0.5, 0.5, 1.0, 0.0); gB = gA; gW = 0.0;
+  gA = vec4(0.5, 0.5, 1.0, 0.0); gB = gA; gW = 0.0; gHA = 0.0; gHB = 0.0;
   if (near > 0.0) {
     vec3 n = abs(vGroundNormal);
     vec2 puv = n.y > 0.55 ? wp.xz : (n.x > n.z ? wp.zy : wp.xy);
@@ -188,6 +230,12 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   vec4 d = mix(gA, gB, gW);
   float grain = 0.8 + 0.4 * d.r;
   vec3 baseStones = gStones(groundPebbles);
+  gNear = near;
+  float baseCover = mix(gHA * step(gA.b, groundPebbles), gHB * step(gB.b, groundPebbles), gW) * step(0.001, near);
+  gStoneCover = baseCover;
+  // Pebbles are domes ~2 units high (0 at the rim, so no hard edge); the grain is a faint roughness.
+  float baseDome = mix(gHA * step(gA.b, groundPebbles), gHB * step(gB.b, groundPebbles), gW);
+  gHeight = baseDome * 2.0 + (grain - 1.0) * 0.8;
 
   if (paint > 0.001) {
     // Light, compacted dirt: broad soft patches, cracked into plates up close.
@@ -199,6 +247,11 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
       gDetail(puv / (DETAIL_CELLS * groundPebbleSize * sandScale), gNoise2(wp.xz / 700.0) + 0.37);
       vec4 e = mix(gA, gB, gW);
       float crack = e.a * sandPits;
+      float dirtCover = mix(gHA * step(gA.b, sandPebbles * 0.6), gHB * step(gB.b, sandPebbles * 0.6), gW);
+      gStoneCover = mix(gStoneCover, dirtCover, paint);
+      gCrack = crack * paint;
+      float dirtDome = mix(gHA * step(gA.b, sandPebbles * 0.6), gHB * step(gB.b, sandPebbles * 0.6), gW);
+      gHeight = mix(gHeight, dirtDome * 2.0 - crack * 2.5 + (e.r - 0.5) * 0.6, paint);
       // A crack is a dark line with a faint lifted lip either side (dried, curled edges).
       vec3 detailed = dirt * mix(1.0, 0.82 + 0.3 * e.r, 0.5) * (1.0 - 0.6 * crack) * (1.0 + 0.06 * sandPits * (1.0 - crack) * step(0.05, crack));
       detailed *= gStones(sandPebbles * 0.6);
@@ -232,7 +285,7 @@ const hash2 = (x: number, y: number, seed: number) => {
  * under the Pebbles setting, so the sliders still work), A cracks for the painted dirt (plates of dried,
  * compacted earth: the edges of a jittered cell pattern, wobbled, at two sizes).
  */
-export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Array {
+export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS, heightOut?: Uint8Array): Uint8Array {
   const out = new Uint8Array(res * res * 4);
   const wrap = (v: number, n: number) => ((v % n) + n) % n;
   const valueNoise = (x: number, y: number, n: number, seed: number) => {
@@ -252,7 +305,7 @@ export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Arr
       // Pebbles: the nearest stone among the 3 x 3 cells around.
       const qx = u * cells, qy = v * cells;
       const cx = Math.floor(qx), cy = Math.floor(qy);
-      let cover = 0, shade = 1, id = 1;
+      let cover = 0, shade = 1, id = 1, dome = 0;
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const gx = wrap(cx + dx, cells), gy = wrap(cy + dy, cells);
         const ox = cx + dx + 0.2 + 0.6 * hash2(gx, gy, 3), oy = cy + dy + 0.2 + 0.6 * hash2(gx, gy, 4);
@@ -266,6 +319,7 @@ export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Arr
         const rim = Math.min(1, Math.max(0, (d - 0.75) / 0.25));
         shade = 1 + c * (tone * (0.85 + 0.25 * (1 - d * d)) * (1 - 0.35 * rim) - 1);
         id = hash2(gx, gy, 7) * 0.98;
+        dome = Math.sqrt(Math.max(0, 1 - d * d));
       }
       // Cracks: the edges between plates (second-nearest minus nearest cell centre), wobbled so they wander.
       const edge = (n: number, seed: number, width: number) => {
@@ -288,16 +342,31 @@ export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Arr
       out[o + 1] = Math.round(Math.min(1, shade / 2) * 255);
       out[o + 2] = cover > 0.02 ? Math.round(id * 255) : 255;
       out[o + 3] = Math.round(pit * 255);
+      if (heightOut) heightOut[py * res + px] = Math.round(dome * 255);
     }
   }
   return out;
 }
 
 let detailTexture: THREE.DataTexture | null = null;
+let detailHeightTexture: THREE.DataTexture | null = null;
+/** The tile's pebble domes (0 outside a pebble, 1 at its crown), for the relief. Made with the tile. */
+export function detailHeightTexture_(): THREE.DataTexture {
+  detailTileTexture();
+  return detailHeightTexture!;
+}
 /** The tile on the GPU (made once, shared). */
 export function detailTileTexture(): THREE.DataTexture {
   if (detailTexture) return detailTexture;
-  const t = new THREE.DataTexture(makeDetailTile(), DETAIL_RES, DETAIL_RES, THREE.RGBAFormat, THREE.UnsignedByteType);
+  const heights = new Uint8Array(DETAIL_RES * DETAIL_RES);
+  const h = new THREE.DataTexture(heights, DETAIL_RES, DETAIL_RES, THREE.RedFormat, THREE.UnsignedByteType);
+  const t = new THREE.DataTexture(makeDetailTile(DETAIL_RES, DETAIL_CELLS, heights), DETAIL_RES, DETAIL_RES, THREE.RGBAFormat, THREE.UnsignedByteType);
+  h.wrapS = h.wrapT = THREE.RepeatWrapping;
+  h.magFilter = THREE.LinearFilter;
+  h.minFilter = THREE.LinearMipmapLinearFilter;
+  h.generateMipmaps = true;
+  h.needsUpdate = true;
+  detailHeightTexture = h;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.magFilter = THREE.LinearFilter;
   t.minFilter = THREE.LinearMipmapLinearFilter;
@@ -306,6 +375,38 @@ export function detailTileTexture(): THREE.DataTexture {
   t.needsUpdate = true;
   return detailTexture = t;
 }
+
+/** GLSL after the roughness is read: dark rock shines, painted dirt stays matte (a specular map from the texture). */
+export const GROUND_ROUGHNESS_BODY = /* glsl */ `
+{
+  float lum = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+  // Pebbles catch the light; dark rock has a little sheen; painted dirt stays matte between them.
+  float shineMask = max(gStoneCover * gNear, 0.5 * clamp(1.0 - lum * 2.2, 0.0, 1.0) * (1.0 - 0.85 * gPaint));
+  roughnessFactor = clamp(groundRough - groundShine * shineMask, 0.06, 1.0);
+  // Cracks are dull and dusty: no shine in them at all.
+  roughnessFactor = mix(roughnessFactor, 1.0, clamp(gCrack * gNear * 1.5, 0.0, 1.0));
+}
+`;
+
+/** GLSL after the normal is set up: pebbles stand up and cracks cut in (fading out with distance). */
+export const GROUND_RELIEF_BODY = /* glsl */ `
+{
+  vec2 dh = vec2(dFdx(gHeight), dFdy(gHeight)) * groundBump * gNear;
+  if (groundBump > 0.0) normal = gBump(-vViewPosition, normal, dh);
+}
+`;
+
+/** GLSL after the lights: the baked sun shadows dim direct light only (the sky still fills them). */
+export const GROUND_SHADOW_BODY = /* glsl */ `
+{
+  vec2 suv = (vGroundWorld.xz + paintHalf) / (2.0 * paintHalf);
+  if (sunShadowOn > 0.5 && suv.x >= 0.0 && suv.x <= 1.0 && suv.y >= 0.0 && suv.y <= 1.0) {
+    float vis = mix(1.0, texture2D(sunShadow, suv).r, sunShadowStrength);
+    reflectedLight.directDiffuse *= vis;
+    reflectedLight.directSpecular *= vis;
+  }
+}
+`;
 
 /** Inserts the ground shader into a MeshStandardMaterial's shaders (its onBeforeCompile). */
 export function injectIslandGround(
@@ -320,6 +421,9 @@ export function injectIslandGround(
   need(shader.vertexShader, '#include <project_vertex>');
   need(shader.fragmentShader, '#include <common>');
   need(shader.fragmentShader, '#include <map_fragment>');
+  need(shader.fragmentShader, '#include <roughnessmap_fragment>');
+  need(shader.fragmentShader, '#include <lights_fragment_end>');
+  need(shader.fragmentShader, '#include <normal_fragment_maps>');
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vGroundWorld;\nvarying vec3 vGroundNormal;')
     .replace('#include <project_vertex>', `#include <project_vertex>
@@ -327,7 +431,10 @@ export function injectIslandGround(
   vGroundNormal = normalize(mat3(modelMatrix) * objectNormal);`);
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\n#define DETAIL_CELLS ${DETAIL_CELLS.toFixed(1)}\n${GROUND_FRAGMENT_HEADER}`)
-    .replace('#include <map_fragment>', `#include <map_fragment>\n${GROUND_FRAGMENT_BODY}`);
+    .replace('#include <map_fragment>', `#include <map_fragment>\n${GROUND_FRAGMENT_BODY}`)
+    .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${GROUND_ROUGHNESS_BODY}`)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${GROUND_RELIEF_BODY}`)
+    .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${GROUND_SHADOW_BODY}`);
 }
 
 /** The live ground of one island material: its settings, and the paint mask on the GPU. */
@@ -336,6 +443,9 @@ export class IslandGround {
   readonly maskTexture: THREE.DataTexture;
   readonly uniforms: Record<string, THREE.IUniform>;
   private settings: IslandGroundSettings = { ...DEFAULT_ISLAND_GROUND };
+  /** The baked sun shadow map (0 shadow .. 255 sun), its size, and the sun it was baked for. */
+  private shadow: { map: Uint8Array; res: number; sun: [number, number, number] } | null = null;
+  private shadowTexture: THREE.DataTexture | null = null;
 
   constructor(material: THREE.MeshStandardMaterial) {
     this.maskTexture = new THREE.DataTexture(this.mask, PAINT_RES, PAINT_RES, THREE.RedFormat, THREE.UnsignedByteType);
@@ -357,6 +467,13 @@ export class IslandGround {
       sandPits: { value: 0.6 },
       sandScale: { value: 1 },
       groundDetail: { value: detailTileTexture() },
+      groundDetailHeight: { value: detailHeightTexture_() },
+      groundRough: { value: 0.95 },
+      groundShine: { value: 0.5 },
+      sunShadow: { value: null },
+      sunShadowOn: { value: 0 },
+      sunShadowStrength: { value: 0.8 },
+      groundBump: { value: 0.6 },
     };
     material.onBeforeCompile = (shader) => injectIslandGround(shader, this.uniforms);
     material.customProgramCacheKey = () => 'island-ground';
@@ -379,7 +496,27 @@ export class IslandGround {
     u.sandPebbles.value = s.sandPebbles;
     u.sandPits.value = s.sandPits;
     u.sandScale.value = s.sandScale;
+    u.groundRough.value = s.roughness;
+    u.groundShine.value = s.shine;
+    u.sunShadowStrength.value = s.shadowStrength;
+    u.groundBump.value = s.bump;
   }
+
+  /** Puts a baked shadow map on the terrain (null takes it off). */
+  setShadow(shadow: { map: Uint8Array; res: number; sun: [number, number, number] } | null) {
+    this.shadowTexture?.dispose();
+    this.shadowTexture = null;
+    this.shadow = shadow;
+    if (shadow) {
+      const t = new THREE.DataTexture(shadow.map, shadow.res, shadow.res, THREE.RedFormat, THREE.UnsignedByteType);
+      t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter; t.needsUpdate = true;
+      this.shadowTexture = t;
+    }
+    this.uniforms.sunShadow.value = this.shadowTexture;
+    this.uniforms.sunShadowOn.value = this.shadowTexture ? 1 : 0;
+  }
+
+  getShadow() { return this.shadow; }
 
   /** One brush dab; uploads the mask. */
   paint(x: number, z: number, radius: number, strength: number, erase: boolean): boolean {
@@ -408,6 +545,8 @@ export interface IslandGroundDoc {
   /** The mask as a PNG data URL (grey), or null when nothing is painted. */
   mask: string | null;
   bounds: { half: number; res: number };
+  /** The baked sun shadows (a grey PNG over the same square), or none. */
+  shadow?: { png: string; res: number; sun: [number, number, number] } | null;
 }
 
 export const ISLAND_GROUND_KEY = 'hm2-island-ground-v1';
@@ -415,13 +554,13 @@ export const islandGroundKey = (trackId: string) => trackId === 'serpentine' ? I
 export const islandGroundEndpoint = (trackId: string) => `/api/island-ground${trackId === 'serpentine' ? '' : `?track=${encodeURIComponent(trackId)}`}`;
 
 /** Encodes the mask as a grey PNG (browser only). */
-export function encodeMask(mask: Uint8Array): string | null {
-  if (typeof document === 'undefined' || !mask.some((v) => v > 0)) return null;
+export function encodeMask(mask: Uint8Array, res = PAINT_RES, always = false): string | null {
+  if (typeof document === 'undefined' || (!always && !mask.some((v) => v > 0))) return null;
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = PAINT_RES;
+  canvas.width = canvas.height = res;
   const g = canvas.getContext('2d');
   if (!g) return null;
-  const img = g.createImageData(PAINT_RES, PAINT_RES);
+  const img = g.createImageData(res, res);
   for (let i = 0; i < mask.length; i++) {
     const v = mask[i]; const o = i * 4;
     img.data[o] = v; img.data[o + 1] = v; img.data[o + 2] = v; img.data[o + 3] = 255;
@@ -431,18 +570,18 @@ export function encodeMask(mask: Uint8Array): string | null {
 }
 
 /** Decodes a saved mask (browser only). */
-export function decodeMask(url: string): Promise<Uint8Array | null> {
+export function decodeMask(url: string, res = PAINT_RES): Promise<Uint8Array | null> {
   if (typeof document === 'undefined') return Promise.resolve(null);
   return new Promise((resolve) => {
     const image = new Image();
     image.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = PAINT_RES;
+      canvas.width = canvas.height = res;
       const g = canvas.getContext('2d');
       if (!g) { resolve(null); return; }
-      g.drawImage(image, 0, 0, PAINT_RES, PAINT_RES);
-      const px = g.getImageData(0, 0, PAINT_RES, PAINT_RES).data;
-      const mask = new Uint8Array(PAINT_RES * PAINT_RES);
+      g.drawImage(image, 0, 0, res, res);
+      const px = g.getImageData(0, 0, res, res).data;
+      const mask = new Uint8Array(res * res);
       for (let i = 0; i < mask.length; i++) mask[i] = px[i * 4];
       resolve(mask);
     };
@@ -478,11 +617,19 @@ export async function loadGround(ground: IslandGround, trackId: string): Promise
     const mask = await decodeMask(doc.mask);
     if (mask) ground.setMask(mask);
   }
+  if (doc.shadow?.png) {
+    const map = await decodeMask(doc.shadow.png, doc.shadow.res);
+    if (map) ground.setShadow({ map, res: doc.shadow.res, sun: doc.shadow.sun });
+  }
 }
 
 /** Saves a track's ground to the browser and to disk. Returns false when the browser copy did not fit. */
 export function saveGround(ground: IslandGround, trackId: string): boolean {
-  const doc: IslandGroundDoc = { version: 1, settings: ground.get(), mask: encodeMask(ground.mask), bounds: { half: PAINT_HALF, res: PAINT_RES } };
+  const shadow = ground.getShadow();
+  const doc: IslandGroundDoc = {
+    version: 1, settings: ground.get(), mask: encodeMask(ground.mask), bounds: { half: PAINT_HALF, res: PAINT_RES },
+    shadow: shadow ? { png: encodeMask(shadow.map, shadow.res, true) ?? '', res: shadow.res, sun: shadow.sun } : null,
+  };
   const text = JSON.stringify(doc);
   let stored = true;
   try { localStorage.setItem(islandGroundKey(trackId), text); } catch { stored = false; }

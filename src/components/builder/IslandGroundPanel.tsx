@@ -3,7 +3,8 @@
  * brightness, the grain and tiny pebbles seen up close, and the dirt brush that paints light, compacted,
  * cracked dirt with a scatter of pebbles over the terrain texture.
  */
-import { Eraser, Mountain, Paintbrush, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
+import { useState } from 'react';
+import { Eraser, Mountain, Paintbrush, RotateCcw, Sun, Trash2, Undo2, X } from 'lucide-react';
 import type { TrackBuilder3D } from '../../game/track-builder-3d';
 import { DEFAULT_ISLAND_GROUND, type IslandGroundSettings } from '../../game/island-route/island-ground';
 
@@ -15,13 +16,17 @@ interface Props {
   onBrush: (brush: GroundBrush) => void;
   onClose: () => void;
   onRequestRender?: () => void;
+  /** Bakes the sun's shadows onto the terrain at this many texels across. */
+  onBakeSun?: (res: number) => void;
+  baking?: boolean;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="grid grid-cols-[96px_1fr] items-center gap-2 text-[11px] text-zinc-400"><span>{label}</span>{children}</label>;
 }
 
-export default function IslandGroundPanel({ builder, brush, onBrush, onClose, onRequestRender }: Props) {
+export default function IslandGroundPanel({ builder, brush, onBrush, onClose, onRequestRender, onBakeSun, baking }: Props) {
+  const [sunRes, setSunRes] = useState(1024);
   const ground = builder.getIslandGround();
   if (!ground) {
     return <p className="text-[11px] text-zinc-400">The island model is still loading.</p>;
@@ -49,7 +54,36 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
         {slider('Grain', 'grain', 0, 1, 0.01, pct)}
         {slider('Pebble size', 'pebbleSize', 3, 40, 0.5, (v) => `${v}`)}
         {slider('Pebbles', 'pebbles', 0, 1, 0.01, pct)}
-        <p className="text-[10px] leading-snug text-zinc-500">Grain and pebbles show up close and fade out with distance. They never repeat.</p>
+        {slider('Roughness', 'roughness', 0.2, 1, 0.01, (v) => v.toFixed(2))}
+        {slider('Shine', 'shine', 0, 1, 0.01, pct)}
+        {slider('Relief', 'bump', 0, 2, 0.01, (v) => v.toFixed(2))}
+        <p className="text-[10px] leading-snug text-zinc-500">Grain and pebbles show up close and fade out with distance. They never repeat. Shine makes the pebbles glossy (cracks stay dull); Relief makes pebbles stand up and cracks cut in, so the light catches them.</p>
+      </section>
+
+      <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Sun size={12} />Sun shadows</div>
+        <Row label="Detail">
+          <select value={sunRes} onChange={(e) => setSunRes(Number(e.target.value))} className="w-full rounded border border-zinc-700 bg-zinc-950 px-1 py-1 text-xs text-zinc-200">
+            <option value={512}>512 (quick look, ~6 s)</option>
+            <option value={1024}>1024 (about 30 s)</option>
+            <option value={2048}>2048 (sharpest, about 2 min)</option>
+          </select>
+        </Row>
+        <div className="grid grid-cols-2 gap-1">
+          <button disabled={baking} onClick={() => onBakeSun?.(sunRes)}
+            className="flex cursor-pointer items-center justify-center gap-1 rounded border border-amber-500/60 bg-amber-950/40 py-1 text-[11px] text-amber-200 hover:border-amber-400 disabled:cursor-default disabled:opacity-40">
+            <Sun size={12} />{ground.getShadow() ? 'Bake again' : 'Bake shadows'}
+          </button>
+          <button disabled={!ground.getShadow()} onClick={() => { builder.clearSunShadows(); onRequestRender?.(); }}
+            className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-red-500 disabled:cursor-default disabled:opacity-40">
+            <Trash2 size={12} />Remove
+          </button>
+        </div>
+        {slider('Darkness', 'shadowStrength', 0, 1, 0.01, pct)}
+        <p className="text-[10px] leading-snug text-zinc-500">
+          {ground.getShadow() ? `Baked at ${ground.getShadow()!.res} x ${ground.getShadow()!.res}. ` : 'Not baked yet. '}
+          The terrain and every placed model cast shadows on the ground. Bake again after moving models.
+        </p>
       </section>
 
       <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">

@@ -58,5 +58,5 @@ test('the editor bakes in a worker behind a progress window, each shared geometr
   assert.match(b, /new Worker\(new URL\('\.\/bake\/bake-worker\.ts', import\.meta\.url\), \{ type: 'module' \}\)/);
   assert.match(b, /const geometries = new Map<THREE\.BufferGeometry, THREE\.Mesh\[\]>\(\)/);
   const ui = readFileSync(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
-  assert.match(ui, /role="alertdialog" aria-label="Baking lights"/);
+  assert.match(ui, /role="alertdialog" aria-label=\{bakeProgress\.title \?\? 'Baking lights'\}/);
 });

@@ -83,6 +83,23 @@ export function vertexNormals(mesh: RawMesh): Float32Array {
   return nrm;
 }
 
+/** Möller–Trumbore distance along the ray to one triangle, or -1 when it misses. */
+function rayTriangleT(tri: Float64Array, i: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): number {
+  const e1x = tri[i + 3], e1y = tri[i + 4], e1z = tri[i + 5];
+  const e2x = tri[i + 6], e2y = tri[i + 7], e2z = tri[i + 8];
+  const px = dy * e2z - dz * e2y, py = dz * e2x - dx * e2z, pz = dx * e2y - dy * e2x;
+  const det = e1x * px + e1y * py + e1z * pz;
+  if (Math.abs(det) < 1e-12) return -1;
+  const inv = 1 / det;
+  const tx = ox - tri[i], ty = oy - tri[i + 1], tz = oz - tri[i + 2];
+  const u = (tx * px + ty * py + tz * pz) * inv;
+  if (u < 0 || u > 1) return -1;
+  const qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x;
+  const v = (dx * qx + dy * qy + dz * qz) * inv;
+  if (v < 0 || u + v > 1) return -1;
+  return (e2x * qx + e2y * qy + e2z * qz) * inv;
+}
+
 /** Möller–Trumbore against one triangle (offset `i` into the packed array): true when hit within (1e-3, maxT). */
 function hitsTriangle(tri: Float64Array, i: number, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number): boolean {
   const e1x = tri[i + 3], e1y = tri[i + 4], e1z = tri[i + 5];
@@ -155,6 +172,59 @@ export class TriangleGrid {
 
   private idx(v: number, axis: number): number {
     return Math.max(0, Math.min(this.n[axis] - 1, Math.floor((v - this.min[axis]) / this.cell)));
+  }
+
+  /** How far along the ray its first hit is (within maxT), or Infinity. */
+  nearest(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number): number {
+    let best = Infinity;
+    this.walk(ox, oy, oz, dx, dy, dz, maxT, (i) => {
+      const t = rayTriangleT(this.tri, i, ox, oy, oz, dx, dy, dz);
+      if (t > 1e-3 && t < maxT && t < best) best = t;
+      return false;
+    }, (cellExit) => best <= cellExit);
+    return best;
+  }
+
+  /**
+   * Walks the cells along the ray, calling `visit` for each triangle once (with the ray's exit distance
+   * from that cell); `visit` returning true stops the walk. `doneAfterCell(exit)` is asked after each cell, once every triangle in it has been checked.
+   */
+  private walk(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxT: number,
+    visit: (i: number, cellExit: number) => boolean, doneAfterCell: (cellExit: number) => boolean): void {
+    const o = [ox, oy, oz], d = [dx, dy, dz];
+    let t0 = 0, t1 = maxT;
+    for (let a = 0; a < 3; a++) {
+      const lo = this.min[a], hi = this.min[a] + this.n[a] * this.cell;
+      if (Math.abs(d[a]) < 1e-12) { if (o[a] < lo || o[a] > hi) return; continue; }
+      let ta = (lo - o[a]) / d[a], tb = (hi - o[a]) / d[a];
+      if (ta > tb) { const s = ta; ta = tb; tb = s; }
+      t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+      if (t0 > t1) return;
+    }
+    const ray = ++this.ray;
+    const c = [0, 1, 2].map((a) => this.idx(o[a] + d[a] * t0, a));
+    const step = [0, 0, 0], next = [Infinity, Infinity, Infinity], delta = [Infinity, Infinity, Infinity];
+    for (let a = 0; a < 3; a++) {
+      if (d[a] > 0) { step[a] = 1; next[a] = (this.min[a] + (c[a] + 1) * this.cell - o[a]) / d[a]; delta[a] = this.cell / d[a]; }
+      else if (d[a] < 0) { step[a] = -1; next[a] = (this.min[a] + c[a] * this.cell - o[a]) / d[a]; delta[a] = -this.cell / d[a]; }
+    }
+    for (;;) {
+      const exit = Math.min(next[0], next[1], next[2]);
+      const cellIndex = (c[0] * this.n[1] + c[1]) * this.n[2] + c[2];
+      for (let k = this.start[cellIndex]; k < this.start[cellIndex + 1]; k++) {
+        const i = this.items[k];
+        const id = i / 9;
+        if (this.stamp[id] === ray) continue;
+        this.stamp[id] = ray;
+        if (visit(i, exit)) return;
+      }
+      if (doneAfterCell(exit)) return;
+      const a = next[0] < next[1] ? (next[0] < next[2] ? 0 : 2) : (next[1] < next[2] ? 1 : 2);
+      if (next[a] > t1) return;
+      c[a] += step[a];
+      if (c[a] < 0 || c[a] >= this.n[a]) return;
+      next[a] += delta[a];
+    }
   }
 
   /** True when the ray hits a triangle within (1e-3, maxT). */

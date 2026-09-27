@@ -1449,8 +1449,27 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   };
 
   /** The light bake runs in a worker: this window shows how far along it is, and can stop it. */
-  const [bakeProgress, setBakeProgress] = useState<{ done: number; total: number; fraction: number; label: string } | null>(null);
+  const [bakeProgress, setBakeProgress] = useState<{ done: number; total: number; fraction: number; label: string; title?: string } | null>(null);
   const bakeAbort = useRef<AbortController | null>(null);
+  /** The sun bake (shadows on the island terrain), behind the same progress window. */
+  const handleBakeSun = async (res: number) => {
+    if (bakeAbort.current) return;
+    const abort = new AbortController();
+    bakeAbort.current = abort;
+    const title = 'Baking sun shadows';
+    setBakeProgress({ done: 0, total: 0, fraction: 0, label: `${res} x ${res} over the island`, title });
+    try {
+      const res2 = await builder.bakeSunShadowsAsync(res, (fraction) => setBakeProgress({ done: 0, total: 0, fraction, label: `${res} x ${res} over the island`, title }), abort.signal);
+      showToast(res2.cancelled ? 'Sun bake stopped (the terrain keeps its old shadows)' : `Sun shadows baked in ${(res2.ms / 1000).toFixed(1)} s`);
+      onRequestRender?.();
+    } catch (e) {
+      showToast(`Sun bake error: ${(e as Error).message}`);
+    } finally {
+      bakeAbort.current = null;
+      setBakeProgress(null);
+    }
+  };
+
   const handleBakeAO = async () => {
     if (bakeAbort.current) return;
     const abort = new AbortController();
@@ -1474,10 +1493,10 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     <div className="track-builder-root pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
       {bakeProgress && createPortal(
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
-          <div role="alertdialog" aria-label="Baking lights" className="w-80 rounded-lg border border-amber-500/60 bg-zinc-950/95 p-4 text-amber-100 shadow-2xl">
-            <div className="text-sm font-bold text-amber-300">Baking lights</div>
+          <div role="alertdialog" aria-label={bakeProgress.title ?? 'Baking lights'} className="w-80 rounded-lg border border-amber-500/60 bg-zinc-950/95 p-4 text-amber-100 shadow-2xl">
+            <div className="text-sm font-bold text-amber-300">{bakeProgress.title ?? 'Baking lights'}</div>
             <div className="mt-1 text-[11px] text-zinc-400">
-              {bakeProgress.total
+              {bakeProgress.title ? bakeProgress.label : bakeProgress.total
                 ? <>Model {Math.min(bakeProgress.done + 1, bakeProgress.total)} of {bakeProgress.total}{bakeProgress.label ? <>: <span className="text-zinc-300">{bakeProgress.label}</span></> : null}</>
                 : 'Getting the models ready…'}
             </div>
@@ -2218,6 +2237,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             brush={groundBrush}
             onBrush={(brush) => { setGroundBrush(brush); if (!brush.on) builder.showGroundBrush(null, 0); onRequestRender?.(); }}
             onClose={() => { builder.setIslandGroundOpen(false); setGroundBrush((b) => ({ ...b, on: false })); onRequestRender?.(); }}
+            onBakeSun={handleBakeSun}
+            baking={!!bakeProgress}
             onRequestRender={onRequestRender}
           />
         </div>

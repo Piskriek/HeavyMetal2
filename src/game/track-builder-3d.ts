@@ -46,7 +46,8 @@ import type { GizmoMode, GizmoSpace, SnapConfig } from './builder/gizmo-math';
 import { SceneKit, isKitType, isTerrainEdit } from './builder/scene-kit';
 import { isLightType, lightPreset, lightSettingsFor } from './builder/light-rig';
 import { isPrimitiveType } from './builder/primitives';
-import { DEFAULT_ISLAND_GROUND, loadGround, saveGround, type IslandGround, type IslandGroundSettings } from './island-route/island-ground';
+import { DEFAULT_ISLAND_GROUND, PAINT_HALF, loadGround, saveGround, type IslandGround, type IslandGroundSettings } from './island-route/island-ground';
+import { bakeSunShadows } from './island-route/sun-bake';
 import {
   loadShaderLibrary, mergeShadersFromProps, normalizeShader, saveShaderLibrary, type ShaderDef,
 } from './materials/shader-library';
@@ -3993,11 +3994,114 @@ export class TrackBuilder3D {
     }, 1200);
   }
 
+  /* ───────────── Sun bake: shadows on the island terrain ───────────── */
+
+  /** Towards the sun: the scene's sun light (the renderer's), from its target to it. */
+  private sunDirection(): [number, number, number] {
+    let sun: THREE.DirectionalLight | null = null;
+    this.scene.traverse((o) => { if (!sun && (o as THREE.DirectionalLight).isDirectionalLight) sun = o as THREE.DirectionalLight; });
+    const light = sun as THREE.DirectionalLight | null;
+    const dir = light
+      ? light.getWorldPosition(new THREE.Vector3()).sub(light.target.getWorldPosition(new THREE.Vector3()))
+      : new THREE.Vector3(6000, 10000, -4000);
+    dir.normalize();
+    return [dir.x, dir.y, dir.z];
+  }
+
+  /** A mesh's world triangles, packed for the ray grid (origin, edge 1, edge 2). */
+  private static packWorldTriangles(meshes: THREE.Mesh[]): Float64Array {
+    let total = 0;
+    for (const mesh of meshes) { const g = mesh.geometry; total += g.index ? g.index.count / 3 : g.attributes.position.count / 3; }
+    const out = new Float64Array(Math.floor(total) * 9);
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    let k = 0;
+    for (const mesh of meshes) {
+      mesh.updateWorldMatrix(true, false);
+      const g = mesh.geometry; const pos = g.attributes.position; const index = g.index;
+      const count = index ? index.count : pos.count;
+      for (let i = 0; i + 2 < count; i += 3) {
+        const ia = index ? index.getX(i) : i, ib = index ? index.getX(i + 1) : i + 1, ic = index ? index.getX(i + 2) : i + 2;
+        a.fromBufferAttribute(pos, ia).applyMatrix4(mesh.matrixWorld);
+        b.fromBufferAttribute(pos, ib).applyMatrix4(mesh.matrixWorld);
+        c.fromBufferAttribute(pos, ic).applyMatrix4(mesh.matrixWorld);
+        out[k++] = a.x; out[k++] = a.y; out[k++] = a.z;
+        out[k++] = b.x - a.x; out[k++] = b.y - a.y; out[k++] = b.z - a.z;
+        out[k++] = c.x - a.x; out[k++] = c.y - a.y; out[k++] = c.z - a.z;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Bakes the sun's shadows onto the island terrain (the terrain and every placed model cast them), in
+   * a worker, with progress; `res` texels across the island. Saved with the ground, per island track.
+   */
+  async bakeSunShadowsAsync(res: number, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<{ cancelled: boolean; ms: number }> {
+    const ground = this.getIslandGround();
+    const terrainMesh = this.islandGroundMesh();
+    if (!ground || !terrainMesh) throw new Error('the island model has not loaded yet');
+    const t0 = performance.now();
+    const casters: THREE.Mesh[] = [];
+    for (const [id, obj] of this.propObjects.entries()) {
+      const prop = this.placedProps.find((p) => p.id === id);
+      if (!prop || prop.visible === false || !obj.visible) continue;
+      if (obj.userData?.isLight || obj.userData?.isDecal || obj.userData?.terrainEdit || obj.userData?.orphanTerrainEdit) continue;
+      obj.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh || (mesh as unknown as THREE.Sprite).isSprite || !mesh.visible || !mesh.geometry?.attributes?.position) return;
+        const mat = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.Material | undefined;
+        if (mat?.transparent && (mat.opacity ?? 1) < 0.5) return;
+        casters.push(mesh);
+      });
+    }
+    const input = {
+      terrain: TrackBuilder3D.packWorldTriangles([terrainMesh]),
+      casters: TrackBuilder3D.packWorldTriangles(casters),
+      sunDir: this.sunDirection(), half: PAINT_HALF, res, samples: 4,
+    };
+    let map: Uint8Array;
+    if (typeof Worker === 'undefined') {
+      map = bakeSunShadows(input, (done, total) => onProgress(done / total));
+    } else {
+      const worker = new Worker(new URL('./island-route/sun-bake-worker.ts', import.meta.url), { type: 'module' });
+      try {
+        map = await new Promise<Uint8Array>((resolve, reject) => {
+          const onAbort = () => reject(new DOMException('cancelled', 'AbortError'));
+          signal?.addEventListener('abort', onAbort, { once: true });
+          worker.onerror = () => { signal?.removeEventListener('abort', onAbort); try { resolve(bakeSunShadows(input)); } catch (error) { reject(error); } };
+          worker.onmessage = (event: MessageEvent) => {
+            const reply = event.data;
+            if ('progress' in reply) onProgress(reply.progress);
+            else { signal?.removeEventListener('abort', onAbort); if ('error' in reply) reject(new Error(reply.error)); else resolve(reply.map); }
+          };
+          worker.postMessage(input);
+        });
+      } catch (error) {
+        if ((error as DOMException).name === 'AbortError') return { cancelled: true, ms: performance.now() - t0 };
+        throw error;
+      } finally {
+        worker.terminate();
+      }
+    }
+    ground.setShadow({ map, res, sun: input.sunDir });
+    this.scheduleGroundSave();
+    this.notify();
+    return { cancelled: false, ms: performance.now() - t0 };
+  }
+
+  /** Takes the baked sun shadows off the terrain. */
+  clearSunShadows() {
+    this.getIslandGround()?.setShadow(null);
+    this.scheduleGroundSave();
+    this.notify();
+  }
+
   /** Another island track opened: its own ground. */
   private reloadIslandGround() {
     const ground = this.getIslandGround();
     if (!ground) return;
     ground.clearMask();
+    ground.setShadow(null);
     ground.apply(DEFAULT_ISLAND_GROUND);
     this.groundUndo = [];
     void loadGround(ground, this.islandTrackId).then(() => this.notify());

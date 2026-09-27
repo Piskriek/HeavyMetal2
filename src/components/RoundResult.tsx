@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import FinishPicker from './FinishPicker';
+import { ISLAND_COURSE } from '../game/course-archive';
 import { biggestClimber, placesGained, splitLabel } from '../game/results';
 import { ArrowRight, Home, RotateCcw, Trophy } from 'lucide-react';
 import { COURSES, type RunRecord } from '../game/types';
-import { CUP_NAME, cupStandings, resultField, roundPointsFor, sessionComplete, type RaceSession } from '../game/session';
+import { CUP_NAME, cupStandings, resultField, roundPointsFor, sessionComplete, type RaceFinish, type RaceSession } from '../game/session';
 import { PLAYER_ID, RESULTS_MAX_ROWS, resultRows } from '../game/roster';
 import { capsuleById, riderById } from '../game/loadouts';
 import Brand from './Brand';
@@ -12,7 +14,8 @@ import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 interface RoundResultProps {
   result: RunRecord;
   session: RaceSession;
-  onContinue: () => void;
+  /** Next round (with the finish picked for it, on the island) or a fresh event. */
+  onContinue: (finish?: RaceFinish | null) => void;
   onMenu: () => void;
   onNewGame: () => void;
 }
@@ -20,6 +23,9 @@ interface RoundResultProps {
 export default function RoundResult({ result, session, onContinue, onMenu, onNewGame }: RoundResultProps) {
   const tournament = session.setup.mode === 'tournament';
   const complete = sessionComplete(session);
+  // An island cup: the player picks where the next round ends before it starts.
+  const pickNext = tournament && !complete && session.rounds[session.round + 1] === ISLAND_COURSE;
+  const [nextFinish, setNextFinish] = useState<RaceFinish | null>(session.finishes?.[session.round + 1] ?? null);
   const table = cupStandings(session);
   const partialStandings = session.results.some((record) => record.opponentsSummary);
   const fieldSize = result.fieldSize ?? session.setup.fieldSize ?? 4;
@@ -52,8 +58,9 @@ export default function RoundResult({ result, session, onContinue, onMenu, onNew
         <section><h3><img src="/art/flag-checkered.png" alt="" className="round-result-flag-img" aria-hidden="true" />{tournament ? 'This Round' : 'The Finish Line'}</h3><table className="round-table"><thead><tr><th>Place</th>{hasSplits && <th>Split</th>}<th>Racer</th><th>{tournament ? 'Points' : 'Time'}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className={row.id === PLAYER_ID ? 'is-player' : ''}><td>{row.finished ? row.position : 'DNF'}</td>{hasSplits && <td className={`split-cell ${(placesGained(row) ?? 0) > 0 ? 'gained' : (placesGained(row) ?? 0) < 0 ? 'lost' : ''}`}>{splitLabel(row)}</td>}<td><i style={{ backgroundColor: row.color }} />{row.name}{row.id === PLAYER_ID && <small>YOU</small>}</td><td>{tournament ? `+${roundPointsFor(row.position, row.finished, fieldSize)}` : row.finishTime === null ? 'DNF' : `${row.finishTime.toFixed(1)}s`}</td></tr>)}</tbody></table>{climber && <p className="biggest-climber"><strong>BIGGEST CLIMBER</strong> {climber.standing.name}{climber.standing.id === PLAYER_ID ? ' (you)' : ''}: P{climber.standing.splitPosition} at the split to P{climber.standing.position} at the flag, {climber.gained} {climber.gained === 1 ? 'rider' : 'riders'} passed down the scrap chutes.</p>}{(fieldRows.capped || result.opponentsSummary) && <p className="next-round-note">Showing {rows.length} of {fieldSize} racers, including you.{result.opponentsSummary ? ' This older result was saved as a summary.' : ' Full standings are kept in the event save.'}</p>}</section>
         {tournament ? <section><h3><Trophy size={14} />{partialStandings ? 'Partial Cup Standings' : complete ? 'Final Cup Standings' : 'Cup Standings'}</h3><table className="round-table"><thead><tr><th>Rank</th><th>Racer</th><th>Total</th></tr></thead><tbody>{cupRows.map((row) => { const rank = table.indexOf(row) + 1; return <tr key={row.id} className={row.id === PLAYER_ID ? 'is-player' : ''}><td>{rank}</td><td><i style={{ backgroundColor: row.color }} />{row.name}{row.id === PLAYER_ID && <small>YOU</small>}</td><td>{row.points} pts</td></tr>; })}</tbody></table>{cupRows.length < table.length && <p className="next-round-note">Showing {cupRows.length} of {table.length} available ranked goblins.</p>}</section> : <section className="result-loadout"><h3>Your Bad Idea</h3><strong>{riderById(session.setup.loadout.rider).name} + {capsuleById(session.setup.loadout.capsule).name}</strong><p>{result.bumps ?? 0} rival bumps<br />{result.sheep} sheep bothered<br />{result.pickups ?? 0} airborne supplies / {result.shieldsUsed ?? 0} shield blocks<br />{result.score.toLocaleString()} chaos points</p><span>{session.setup.customPhysics ? 'Practice run. Custom physics.' : 'Fixed loadout. Shared physics. No excuses.'}</span></section>}
       </div>
-      {tournament && !complete && <p className="next-round-note">Up next: <strong>{COURSES.find((course) => course.id === session.rounds[session.round + 1])?.name}</strong>. Same crew. Fresh trouble.</p>}
-      <div className="round-result-actions"><button className="fantasy-link" onClick={onMenu}><Home size={15} />Main menu</button><button className="fantasy-secondary" onClick={onNewGame}>New setup</button><button className="fantasy-primary" onClick={onContinue}>{tournament && !complete ? <>Next Race <ArrowRight size={17} /></> : <>{tournament ? 'Race the Cup Again' : 'Rematch'}<RotateCcw size={16} /></>}</button></div>
+      {tournament && !complete && !pickNext && <p className="next-round-note">Up next: <strong>{COURSES.find((course) => course.id === session.rounds[session.round + 1])?.name}</strong>. Same crew. Fresh trouble.</p>}
+      {pickNext && <section className="next-round-finish"><h3>Round {session.round + 2}: where does it end?</h3><FinishPicker value={nextFinish} onChange={setNextFinish} /></section>}
+      <div className="round-result-actions"><button className="fantasy-link" onClick={onMenu}><Home size={15} />Main menu</button><button className="fantasy-secondary" onClick={onNewGame}>New setup</button><button className="fantasy-primary" onClick={() => onContinue(pickNext ? nextFinish : undefined)}>{tournament && !complete ? <>Next Race <ArrowRight size={17} /></> : <>{tournament ? 'Race the Cup Again' : 'Rematch'}<RotateCcw size={16} /></>}</button></div>
       </div>
     </div>
   );

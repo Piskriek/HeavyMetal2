@@ -117,14 +117,16 @@ export function createSession(setup: RaceSetup): RaceSession {
   return {
     id: typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     setup: safe, rounds: safe.mode === 'tournament' ? cupRounds() : [safe.course], round: 0,
+    // A cup's first round runs to the finish picked in New Game; the others are picked between rounds.
+    ...(safe.mode === 'tournament' ? { finishes: [safe.finish ?? null, ...cupRounds().slice(1).map(() => null)] } : {}),
     roster: buildRosterLoadouts(safe.fieldSize, safe.loadout), results: [], seed: newSessionSeed(),
   };
 }
 
 export const sessionConfig = (session: RaceSession): RaceConfig => ({
   ...session.setup, course: session.rounds[session.round], sessionId: session.id,
-  // The finish picked for this round (a cup picks one per round), else the setup's own.
-  finishX: session.finishes?.[session.round]?.x ?? session.setup.finish?.x,
+  // A cup picks each round's finish (none picked: the full run); a quick race has the setup's own.
+  finishX: session.setup.mode === 'tournament' ? session.finishes?.[session.round]?.x : session.setup.finish?.x,
   round: session.round, totalRounds: session.rounds.length, roster: session.roster,
   seed: Number.isSafeInteger(session.seed) ? session.seed : DEFAULT_SEED,
 });
@@ -165,9 +167,14 @@ export function roundLabel(session: RaceSession, round: number) {
 export const recordModeLabel = (record: RunRecord) => record.mode === 'practice' ? 'Custom practice'
   : record.mode === 'tournament' ? `Cup / Round ${(record.round ?? 0) + 1}`
     : record.mode === 'quick' ? 'Quick Race' : 'Legacy run';
-export function nextRound(session: RaceSession): RaceSession {
+/** The next round of a cup; `finish` is the finish picked for it (undefined keeps any earlier pick). */
+export function nextRound(session: RaceSession, finish?: RaceFinish | null): RaceSession {
   if (!roundComplete(session) || sessionComplete(session)) return session;
-  return { ...session, round: session.round + 1 };
+  const round = session.round + 1;
+  if (finish === undefined) return { ...session, round };
+  const finishes = session.rounds.map((_, i) => session.finishes?.[i] ?? null);
+  finishes[round] = finish;
+  return { ...session, round, finishes };
 }
 
 export function resultField(record: RunRecord): RacerStanding[] {

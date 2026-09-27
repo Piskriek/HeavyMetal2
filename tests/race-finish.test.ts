@@ -11,7 +11,7 @@ import { stepRacer } from '../src/game/sim/racer-physics';
 import { HEADLESS_SIM_FX, LEGACY_RECOVERY, type RacerStepContext } from '../src/game/sim/context';
 import { FIXED_STEP } from '../src/game/contracts/timing';
 import { FINISH, RADIUS, START_X, TRACK_DISTANCE, courseY, laneZ } from '../src/game/scene';
-import { createSession, sessionConfig, type RaceSetup } from '../src/game/session';
+import { createSession, nextRound, sessionConfig, type RaceSetup } from '../src/game/session';
 import { recoverSession, sanitizeSetup } from '../src/game/save';
 
 /** Rolls one racer from `fromX` for up to `seconds`; returns it. */
@@ -65,4 +65,16 @@ test('a cup picks a finish per round, and the picks survive a save', () => {
   assert.equal(sessionConfig({ ...session, round: 1 }).finishX, undefined, 'a round with no pick runs the full course');
   const restored = recoverSession(JSON.parse(JSON.stringify(session)), 'grid');
   assert.deepEqual(restored?.session.finishes, session.finishes);
+});
+
+test('a cup races round 1 to the New Game pick, then each later round to the finish picked before it', () => {
+  const session = createSession(setup({ mode: 'tournament', finish: { x: 20000, name: 'Short' } }));
+  assert.equal(sessionConfig(session).finishX, 20000, 'round 1: the New Game pick');
+  const done = { ...session, results: [{ round: 0 } as never] };
+  const second = nextRound(done, { x: 50000, name: 'Long' });
+  assert.equal(second.round, 1);
+  assert.equal(sessionConfig(second).finishX, 50000, 'round 2: picked between rounds');
+  const third = nextRound({ ...second, results: [{ round: 0 } as never, { round: 1 } as never] }, null);
+  assert.equal(sessionConfig(third).finishX, undefined, 'round 3: the full run');
+  assert.equal(sessionConfig(createSession(setup({ mode: 'tournament' }))).finishX, undefined, 'no pick: the full run');
 });

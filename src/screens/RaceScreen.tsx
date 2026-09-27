@@ -28,7 +28,7 @@ import MergePoolOverlay from '../components/MergePoolOverlay';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
-import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../game/session';
+import { CUP_NAME, roundComplete, type RaceConfig, type RaceFinish, type RaceSession } from '../game/session';
 import { TRACK_DISTANCE } from '../game/scene';
 import { PLAYER_ID, trackbarRacers } from '../game/roster';
 import { loadAssets, type GameAssets, type SpriteName } from '../game/assets';
@@ -55,7 +55,8 @@ interface RaceScreenProps {
   config: RaceConfig;
   session: RaceSession;
   onRoundComplete: (record: RunRecord) => void;
-  onContinue: () => void;
+  /** Next round (a cup passes the finish picked for it) or a fresh event. */
+  onContinue: (finish?: RaceFinish | null) => void;
   onNewGame: () => void;
   /** Reports the explicit persisted phase while the round is live. */
   onPhase: (phase: 'grid' | 'racing') => void;

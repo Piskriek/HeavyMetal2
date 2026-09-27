@@ -10,7 +10,7 @@ import RaceScreen from './screens/RaceScreen';
 import MapEditorScreen from './screens/MapEditorScreen';
 import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, recordsForStorage, savePreference } from './game/preferences';
 import { COURSES, type RunRecord } from './game/types';
-import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
+import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceFinish, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
 import { readSave, writeSave, type SaveNotice } from './game/save';
 import './menu.css';
 import './setup.css';
@@ -105,11 +105,11 @@ export default function App() {
     setPhase(sessionComplete(next) ? 'cup-results' : 'round-results');
     setNotices([]);
   }, [session]);
-  const continueRace = useCallback(() => {
+  const continueRace = useCallback((finish?: RaceFinish | null) => {
     leaveRaceFullscreen(() => {
       if (session) {
         const complete = sessionComplete(session);
-        const next = complete ? createSession(session.setup) : nextRound(session);
+        const next = complete ? createSession(session.setup) : nextRound(session, finish);
         if (next !== session) {
           setSession(next);
           setPhase(next.round !== session.round ? 'grid' : sessionComplete(next) ? 'cup-results' : 'round-results');

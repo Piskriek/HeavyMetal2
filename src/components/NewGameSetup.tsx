@@ -7,7 +7,8 @@ import { CAPSULES, DEFAULT_LOADOUT, RIDERS, STAT_LABELS, capsuleById, loadoutSta
 import CharacterShowcase from './CharacterShowcase';
 import { capsuleArt, riderArt } from '../game/loadout-art';
 import { CUP_NAME, CUP_POINTS, DIFFICULTIES, type RaceSetup } from '../game/session';
-import { classicTracksEnabled, cupRounds, playableCourse, playableCourses } from '../game/course-archive';
+import { ISLAND_COURSE, classicTracksEnabled, cupRounds, playableCourse, playableCourses } from '../game/course-archive';
+import FinishPicker from './FinishPicker';
 import { FIELD_SIZES, QUALIFYING_REQUIRED_ABOVE, type FieldSize } from '../game/contracts/config';
 import { COURSES } from '../game/types';
 import { TRACKS } from '../game/courses';
@@ -37,6 +38,8 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
   // A draft saved on an archived classic track opens on the island.
   const [setup, setSetup] = useState<RaceSetup>(() => ({ ...initial, course: playableCourse(initial.course), loadout: { ...initial.loadout } }));
   const [step, setStep] = useState(0);
+  // The island event: a quick race on the island, or the island cup (the classic tracks archived).
+  const islandEvent = setup.mode === 'tournament' ? cupRounds().every((id) => id === ISLAND_COURSE) : setup.course === ISLAND_COURSE;
   const [confirm, setConfirm] = useState(false);
   const [starting, setStarting] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -171,6 +174,11 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
 
           {step === 2 && <div className="setup-final">
             <section className="event-selection">
+              {islandEvent ? <>
+                <div className="choice-heading"><span>{tournament ? 'ROUND 1 / CHOOSE THE FINISH' : 'CHOOSE YOUR FINISH'}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
+                <FinishPicker value={setup.finish ?? null} trackPicker onChange={(finish) => setSetup((s) => ({ ...s, finish: finish ?? undefined }))} />
+                {tournament && <p className="course-world-description">Three rounds on the island. You pick where each later round ends before it starts; points carry from round to round.</p>}
+              </> : <>
               <div className="choice-heading"><span>{tournament ? 'THE SCRAPDOME CUP / RACE ORDER' : 'CHOOSE YOUR TRACK'}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
               {tournament ? <div className="cup-itinerary">{cupRounds().map((id, index) => {
                 const track = COURSES.find((c) => c.id === id)!;
@@ -180,6 +188,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
                   <img className="course-thumbnail" src={coursePreview(track.id)} alt={`${TRACKS[track.id].region} scenery`} /><span><strong>{track.name}</strong><small>{TRACKS[track.id].region} / {TRACKS[track.id].character}</small></span><span className="course-check">{setup.course === track.id && <Check size={17} />}</span>
                 </button>)}</div>}
               <p className="course-world-description">{tournament ? (classicTracksEnabled() ? 'Three distinct descents. Forest flow, quarry bursts, and pasture hops. Airborne supplies reward a good racing line.' : 'Three runs down the serpent road, summit to sea. Points carry from round to round.') : TRACKS[setup.course].description}</p>
+              </>}
               <div className="choice-heading difficulty-heading"><span>FIELD SIZE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="Field size" onKeyDown={radioKeys}>{FIELD_SIZES.map((size) => <button role="radio" aria-checked={setup.fieldSize === size} tabIndex={setup.fieldSize === size ? 0 : -1} className={setup.fieldSize === size ? 'selected' : ''} key={size} onClick={() => setSetup((s) => ({ ...s, fieldSize: size as FieldSize }))}>{size} racers</button>)}</div>
               <p className="difficulty-description">{setup.fieldSize > QUALIFYING_REQUIRED_ABOVE

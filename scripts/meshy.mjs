@@ -190,6 +190,38 @@ async function text(name, model, polycount, prompt) {
   console.log(`${name}: done → art-src/meshy/${name}/model.glb (ledger ${spent()} / ${CEILING})`);
 }
 
+/**
+ * A new paint job on a finished model (10 credits): same shape, new texture from a prompt. Lands as
+ * art-src/meshy/<name>/ like any other model; `source` is the finished model's name.
+ */
+const RETEXTURE_COST = 10;
+async function retexture(name, source, prompt) {
+  const from = ledger().filter((t) => t.name === source && ['image-to-3d', 'text-refine', 'retexture'].includes(t.kind) && t.status === 'SUCCEEDED').at(-1);
+  if (!from) throw new Error(`No finished model named ${source}`);
+  if (spent() + RETEXTURE_COST > CEILING) throw new Error(`Refused: ${spent()} credits spent, ceiling ${CEILING}`);
+  const body = { input_task_id: from.taskId, text_style_prompt: prompt, enable_original_uv: true, enable_pbr: false, ai_model: 'meshy-6', target_formats: ['glb'] };
+  const { result: taskId } = await call('POST', '/retexture', body);
+  const entry = { name, taskId, kind: 'retexture', source: from.taskId, params: body, credits: RETEXTURE_COST, status: 'PENDING', at: new Date().toISOString() };
+  record(entry);
+  for (;;) {
+    const t = await call('GET', `/retexture/${taskId}`);
+    if (['SUCCEEDED', 'FAILED', 'CANCELED'].includes(t.status)) {
+      record({ ...entry, status: t.status, credits: t.consumed_credits ?? RETEXTURE_COST });
+      if (t.status !== 'SUCCEEDED') throw new Error(`${name}: ${t.status} ${t.task_error?.message ?? ''}`);
+      const dir = join(OUT, name);
+      mkdirSync(dir, { recursive: true });
+      for (const [file, url] of [['model.glb', t.model_urls?.glb], ['thumbnail.png', t.thumbnail_url]]) {
+        if (!url) continue;
+        const res = await fetch(url);
+        writeFileSync(join(dir, file), Buffer.from(await res.arrayBuffer()));
+      }
+      console.log(`${name}: repainted from ${source} → art-src/meshy/${name}/model.glb (ledger ${spent()} / ${CEILING})`);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 10000));
+  }
+}
+
 /** A lighter copy of a finished model (5 credits): `tier` names the file, e.g. lod → lod.glb. */
 const REMESH_COST = 5;
 async function remesh(name, tier, polycount) {
@@ -220,6 +252,7 @@ try {
   else if (cmd === 'wait') await wait(a);
   else if (cmd === 'remesh') await remesh(a, b, c);
   else if (cmd === 'text') await text(a, b, c, process.argv.slice(6).join(' '));
+  else if (cmd === 'retexture') await retexture(a, b, process.argv.slice(5).join(' '));
   else if (cmd === 'ledger') { for (const t of ledger()) console.log(`${t.name.padEnd(20)} ${t.status.padEnd(10)} ${t.credits}`); console.log(`total ${spent()} / ${CEILING}`); }
   else console.log('usage: balance | image <name> <ref.png> | wait <name> | remesh <name> <tier> <polycount> | ledger');
 } catch (e) {

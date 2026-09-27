@@ -52,3 +52,10 @@ test('the painted dirt: cracks in the tile, its own scale, old saves still load'
   assert.equal(normalizeIslandGround({ sandPits: 0.4 }).sandScale, 1, 'a save from before the scale loads at 1x');
   assert.equal(normalizeIslandGround({ sandScale: 99 }).sandScale, 4);
 });
+
+test('the attribute window scrolls instead of squashing its rows (the tab row with Animation stayed visible)', () => {
+  const ui = readFileSync(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
+  const panels = ui.match(/w-80 max-h-\[calc\(100vh-17rem\)\] overflow-y-auto[^"]*/g) ?? [];
+  assert.equal(panels.length, 3, 'single, group and island ground panels');
+  for (const panel of panels) assert.match(panel, /\[&>\*\]:shrink-0/, 'no row may shrink');
+});

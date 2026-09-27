@@ -2178,7 +2178,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
       {/* Selected Prop(s) Inspector (Floating Right) */}
       {!isZen && (groundOpen ? (
-        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin [&>*]:shrink-0 bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
           <IslandGroundPanel
             builder={builder}
             brush={groundBrush}
@@ -2188,7 +2188,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           />
         </div>
       ) : selectedProps.length > 1 ? (
-        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin [&>*]:shrink-0 bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
           <div className="sticky -top-3.5 -mx-3.5 px-3.5 pt-1 pb-2 bg-zinc-950/95 backdrop-blur-md z-10 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">
@@ -2645,7 +2645,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           </div>
         </div>
       ) : selectedProp ? (
-        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin [&>*]:shrink-0 bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
           <div className="sticky -top-3.5 -mx-3.5 px-3.5 pt-1 pb-2 bg-zinc-950/95 backdrop-blur-md z-10 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1.5">

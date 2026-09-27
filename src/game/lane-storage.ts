@@ -14,6 +14,7 @@
  *
  * Pure except for the `Storage` it is handed: no DOM assumptions, no canvas, no three.js.
  */
+import { islandLaneNetwork } from './island-route/island-lanes';
 import { COURSES, type CourseId } from './types';
 import { validateLaneNetwork, type LaneNetwork, type LaneRefusal } from './lane-network';
 
@@ -106,10 +107,13 @@ export function readLaneStorage(store?: Storage): LaneStorageDocument | null {
   return { ...parsed, version: LANE_STORAGE_VERSION, savedAt, networks } as LaneStorageDocument;
 }
 
-/** The network stored for one course, validated, or `null` (which means: the legacy lanes). */
+/**
+ * The network stored for one course, validated, or the course's own starting network (the island's
+ * groove lanes), or `null` (which means: the legacy lanes).
+ */
 export function loadLaneNetwork(course: CourseId, store?: Storage): LaneNetwork | null {
   const doc = readLaneStorage(store);
-  return doc?.networks[course] ?? null;
+  return doc?.networks[course] ?? (course === 'basalt' ? islandLaneNetwork() : null);
 }
 
 /**

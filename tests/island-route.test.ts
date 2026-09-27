@@ -1,32 +1,47 @@
 /**
- * ISLAND-ROUTE: Basalt Isle's route, maps and ground.
+ * ISLAND-ROUTE: the island course on the owner's Serpentine Isle model.
  *
  *   node --import tsx --test tests/island-route.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { TRACK_DISTANCE, START_X, courseY } from '../src/game/scene';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { TRACK_DISTANCE, courseY } from '../src/game/scene';
 import { COURSES } from '../src/game/types';
 import { TRACKS } from '../src/game/courses';
-import { D_START, getTrackSpace, type TrackSpaceMap } from '../src/game/track-space';
-import { layoutForSeed, validateRouteGraph } from '../src/game/sim/route';
-import { ISLAND_ANCHORS, ISLAND_ROUTE_GRAPH, ISLAND_SEGMENTS } from '../src/game/island-route/basalt-route';
-import {
-  CAMERA_TAIL_X, cameraTrackSpace, courseTrackSpace, islandBranchRoads, islandBranchSpace, islandRoadsAt, islandTrackSpace,
-  racerTrackSpace,
-} from '../src/game/island-route/island-space';
-import { buildClosedGates, islandBumps, type IslandMaterials } from '../src/game/island-route/island-world';
-import {
-  ROAD_BED, RoadIndex, carvedHeight, markBridges, naturalHeight, roadSamples,
-} from '../src/game/island-route/island-ground';
+import { D_START, getTrackSpace, lateralFromLaneZ } from '../src/game/track-space';
+import { validateLaneNetwork } from '../src/game/lane-network';
+import { loadLaneNetwork, readLaneStorage, writeLaneStorage, buildLaneDocument } from '../src/game/lane-storage';
+import { ISLAND_HALF_WIDTH, ISLAND_ROUTE_GRAPH } from '../src/game/island-route/serpentine-route';
+import { courseTrackSpace, islandTrackSpace, racerTrackSpace } from '../src/game/island-route/island-space';
+import { ISLAND_LANE_Z, islandLaneNetwork } from '../src/game/island-route/island-lanes';
+import { islandHeightField, prepareIslandModel, softenNormals } from '../src/game/island-route/island-world';
+import { ISLAND_DETAIL, injectDetailMap } from '../src/game/island-route/detail-map';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
 import { writeStorage, TRACK_STORAGE_KEY_V2 } from '../src/game/track-storage';
 import type { TrackData } from '../src/game/renderer-3d';
 
-const dist = (x: number) => (x - START_X) / 2;
-const gap = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) =>
-  Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+const model = new OBJLoader().parse(readFileSync(new URL('../public/models/island/serpentine-isle.obj', import.meta.url), 'utf8'));
+prepareIslandModel(model);
+model.updateMatrixWorld(true);
+const ground = islandHeightField(model);
+const ray = new THREE.Raycaster();
+/** The model's surface under (x, z) by a ray cast straight down (the truth the height map must match). */
+const surface = (x: number, z: number): number | null => {
+  ray.set(new THREE.Vector3(x, 40000, z), new THREE.Vector3(0, -1, 0));
+  return ray.intersectObject(model, true)[0]?.point.y ?? null;
+};
+
+function mockStorage() {
+  const data = new Map<string, string>();
+  const store = {
+    getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, String(v)),
+    removeItem: (k: string) => data.delete(k), clear: () => data.clear(), key: () => null, get length() { return data.size; },
+  } as unknown as Storage;
+  return { data, store };
+}
 
 test('the classic courses keep their exact engine-to-arc mapping (no knots, one linear segment)', () => {
   const map = getTrackSpace();
@@ -36,106 +51,112 @@ test('the classic courses keep their exact engine-to-arc mapping (no knots, one 
     assert.equal(map.arcPerEngineDistanceAt(d), map.ARC_PER_ENGINE_DISTANCE);
   }
   assert.equal(courseTrackSpace('ridge'), map);
-  assert.equal(racerTrackSpace('sheep', 30000, { rim: 'ledge' }), map, 'a route never changes a classic course');
+  assert.equal(racerTrackSpace('sheep', 30000, undefined), map);
 });
 
-test('every anchor lands exactly where it is pinned, on the main map and on every branch map', () => {
-  const maps: TrackSpaceMap[] = [islandTrackSpace(), ...islandBranchRoads().map((b) => b.map)];
-  for (const map of maps) {
-    for (const a of ISLAND_ANCHORS) {
-      assert.ok(Math.abs(map.trackDistFromEngineDistance(dist(a.x)) - map.distOf(a.label)) < 1e-6, a.label);
-      assert.ok(Math.abs(map.engineDistanceFromTrackDist(map.distOf(a.label)) - dist(a.x)) < 1e-6, a.label);
-    }
-    let last = -Infinity;
-    for (let d = 0; d <= TRACK_DISTANCE; d += 250) {
-      const s = map.trackDistFromEngineDistance(d);
-      assert.ok(s > last, 'the mapping only ever moves forward');
-      last = s;
-    }
+test('the island route runs the start line to the finish line down the groove, at the classic pace', () => {
+  const map = islandTrackSpace();
+  assert.equal(map.trackDistFromEngineDistance(0), map.distOf('start'));
+  assert.equal(map.trackDistFromEngineDistance(TRACK_DISTANCE), map.distOf('finish'));
+  assert.ok(map.distOf('start') > 1000, 'road behind the start line for the chase camera');
+  assert.ok(map.distOf('end') > map.distOf('finish'), 'a run-out past the finish');
+  // Close to the classic course's 4.37 arc units per unit of race distance, so racers look as fast.
+  assert.ok(map.ARC_PER_ENGINE_DISTANCE > 3.8 && map.ARC_PER_ENGINE_DISTANCE < 4.8, `${map.ARC_PER_ENGINE_DISTANCE}`);
+  assert.ok(map.frameAt(map.distOf('start')).pos.y > map.frameAt(map.distOf('finish')).pos.y + 10000, 'downhill, summit to sea');
+  assert.equal(ISLAND_ROUTE_GRAPH.sections.length, 0, 'no forks until the owner builds them');
+});
+
+test('the island track is one width and never banks (the groove floor is level across)', () => {
+  const map = islandTrackSpace();
+  for (let s = 0; s < map.length; s += 2000) {
+    const f = map.frameAt(s);
+    assert.equal(f.halfWidth, ISLAND_HALF_WIDTH);
+    assert.ok(Math.abs(f.right.y) < 0.002, `level across at ${Math.round(s)}: right.y ${f.right.y.toFixed(3)}`);
   }
 });
 
-test('a branch map is the main road outside its fork, so a racer never jumps at a split or a merge', () => {
-  const main = islandTrackSpace();
-  for (const section of ISLAND_ROUTE_GRAPH.sections) {
-    for (const b of section.branches.slice(1)) {
-      const map = islandBranchSpace(section.id, b.id);
-      for (const x of [section.x0, section.x1]) {
-        const p = map.frameAt(map.trackDistFromEngineDistance(dist(x))).pos;
-        const q = main.frameAt(main.trackDistFromEngineDistance(dist(x))).pos;
-        assert.ok(gap(p, q) < 2, `${section.id}/${b.id} at x ${x}: ${gap(p, q).toFixed(2)} units apart`);
-      }
-      for (const x of [START_X + 2000, section.x0 - 1500, section.x1 + 1500, START_X + 70000]) {
-        const p = map.frameAt(map.trackDistFromEngineDistance(dist(x))).pos;
-        const q = main.frameAt(main.trackDistFromEngineDistance(dist(x))).pos;
-        assert.ok(gap(p, q) < 2, `${section.id}/${b.id} off its fork at x ${x}: ${gap(p, q).toFixed(2)} units apart`);
-      }
-    }
-  }
-});
-
-test('branches peel off left to right in the order the split hands them out', () => {
-  const main = islandTrackSpace();
-  for (const section of ISLAND_ROUTE_GRAPH.sections) {
-    const split = main.frameAt(main.distOf(`${section.id}:split`));
-    const across = section.branches.map((b) => {
-      const map = islandBranchSpace(section.id, b.id);
-      const p = map.frameAt(map.distOf(`${section.id}:split`) + 1600).pos;
-      return (p.x - split.pos.x) * split.right.x + (p.y - split.pos.y) * split.right.y + (p.z - split.pos.z) * split.right.z;
-    });
-    for (let i = 1; i < across.length; i++) assert.ok(across[i] > across[i - 1], `${section.id}: ${across.map(Math.round).join(' < ')}`);
-  }
-});
-
-test('the route graph matches the authored forks and is valid; the first split is three ways', () => {
-  validateRouteGraph(ISLAND_ROUTE_GRAPH);
-  const forks = ISLAND_SEGMENTS.filter((s) => s.kind === 'fork');
-  assert.equal(ISLAND_ROUTE_GRAPH.sections.length, forks.length);
-  assert.equal(ISLAND_ROUTE_GRAPH.sections[0].branches.length, 3);
-  for (const section of ISLAND_ROUTE_GRAPH.sections) {
-    assert.ok(ISLAND_ANCHORS.some((a) => a.label === `${section.id}:split` && a.x === section.x0));
-    assert.ok(ISLAND_ANCHORS.some((a) => a.label === `${section.id}:merge` && a.x === section.x1));
-  }
-  assert.equal(ISLAND_ANCHORS.find((a) => a.label === 'maw')?.x, 8304, 'the Maw is the sorting gate');
-});
-
-test('a racer is drawn on its branch inside a fork and on the main road everywhere else', () => {
-  const rim = ISLAND_ROUTE_GRAPH.sections[0];
-  assert.equal(racerTrackSpace('basalt', rim.x0 + 100, { rim: 'ledge' }), islandBranchSpace('rim', 'ledge'));
-  assert.equal(racerTrackSpace('basalt', rim.x0 + 100, { rim: rim.branches[0].id }), islandTrackSpace());
-  assert.equal(racerTrackSpace('basalt', rim.x1 + 100, { rim: 'ledge' }), islandTrackSpace());
-  assert.equal(racerTrackSpace('basalt', 3000, undefined), islandTrackSpace());
-});
-
-test('the ground never pokes through a road: under every road it sits below the surface', () => {
-  const main = islandTrackSpace();
-  const roads = [{ map: main, from: 0, to: main.length }, ...islandBranchRoads()];
-  const index = new RoadIndex(roadSamples(roads, 2));
-  markBridges(index);
-  const bumps = islandBumps();
-  const worst: string[] = [];
-  for (const { map, from, to } of roads) {
-    for (let d = from; d <= to; d += 400) {
-      const f = map.frameAt(d);
-      if (f.stage === 'cavern' || f.stage === 'mine') continue;
-      for (const k of [-0.9, 0, 0.9]) {
-        const x = f.pos.x + f.right.x * f.halfWidth * k;
-        const z = f.pos.z + f.right.z * f.halfWidth * k;
-        const surface = f.pos.y + f.right.y * f.halfWidth * k;
-        const ground = carvedHeight(x, z, naturalHeight(x, z, bumps), index);
-        if (ground > surface - ROAD_BED / 2) worst.push(`${f.stage} d ${Math.round(d)} lane ${k}: ground ${Math.round(ground - surface)} above`);
-      }
+test('the height map is the model: balls placed on it rest on its surface, never inside it', () => {
+  // Where the balls roll (every lane of the route) it matches the model closely.
+  const map = islandTrackSpace();
+  for (let s = map.distOf('start'); s <= map.distOf('finish'); s += 500) {
+    const f = map.frameAt(s);
+    for (const z of [-443, 0, 443]) {
+      const lateral = lateralFromLaneZ(map, s, z);
+      const x = f.pos.x + f.right.x * lateral, zz = f.pos.z + f.right.z * lateral;
+      const h = ground.heightAt(x, zz);
+      const truth = surface(x, zz)!;
+      // Exactly the model: a ball never sinks into it or hovers over it.
+      assert.ok(h !== null && Math.abs(h - truth) < 1, `lane ${z} at ${Math.round(s)}: map ${h} vs model ${Math.round(truth)}`);
     }
   }
-  assert.deepEqual(worst.slice(0, 8), [], `${worst.length} places`);
+  // Across the whole island too.
+  const gaps: number[] = [];
+  for (let x = -44000; x <= 44000; x += 2750) {
+    for (let z = -46000; z <= 44000; z += 2750) {
+      const truth = surface(x, z);
+      if (truth === null) continue;
+      const h = ground.heightAt(x, z);
+      assert.ok(h !== null, `height map covers (${x}, ${z})`);
+      gaps.push(Math.abs(h - truth));
+    }
+  }
+  gaps.sort((a, b) => a - b);
+  assert.ok(gaps.length > 500, `${gaps.length} points on the island`);
+  assert.ok(gaps[gaps.length - 1] < 1, `every point within 1 (${gaps[gaps.length - 1]})`);
+});
+
+test('the track follows the groove: its centre lies on the groove floor and every lane stays in the groove', () => {
+  const map = islandTrackSpace();
+  const off: string[] = [];
+  const centre: number[] = [];
+  for (let s = map.distOf('start'); s <= map.distOf('finish'); s += 250) {
+    const f = map.frameAt(s);
+    for (const z of [-443, -290, 0, 290, 443]) {
+      const lateral = lateralFromLaneZ(map, s, z);
+      const x = f.pos.x + f.right.x * lateral, zz = f.pos.z + f.right.z * lateral;
+      const truth = surface(x, zz);
+      assert.ok(truth !== null, `lane ${z} at ${Math.round(s)} is over the island`);
+      const rise = truth - (f.pos.y + f.right.y * lateral);
+      if (z === 0) centre.push(Math.abs(rise));
+      // A lane further than a groove wall's height from the track would be up on the land beside it.
+      if (Math.abs(rise) > 600) off.push(`lane ${z} at ${Math.round(s)}: ${Math.round(rise)}`);
+    }
+  }
+  centre.sort((a, b) => a - b);
+  const p90 = centre[Math.floor(centre.length * 0.9)];
+  assert.ok(p90 < 60, `90% of the centre line within 60 of the floor (${Math.round(p90)})`);
+  assert.deepEqual(off, []);
+});
+
+test('the island starts with three valid lanes down the middle of the groove', () => {
+  const network = islandLaneNetwork();
+  assert.equal(validateLaneNetwork(network).ok, true);
+  assert.equal(network.course, 'basalt');
+  assert.deepEqual(network.paths.map((p) => p.name), ['Left groove', 'Centre groove', 'Right groove']);
+  for (const z of ISLAND_LANE_Z) assert.ok(Math.abs(z) <= 320, 'on the groove floor');
+  const { store } = mockStorage();
+  assert.deepEqual(loadLaneNetwork('basalt', store), network, 'used when nothing is saved for the island');
+  assert.equal(loadLaneNetwork('ridge', store), null, 'the classic courses keep their legacy lanes');
+});
+
+test('saving a course\'s lanes keeps every other course\'s saved lanes', () => {
+  const { store } = mockStorage();
+  (globalThis as any).localStorage = store;
+  const ridge = { ...islandLaneNetwork(), course: 'ridge' as const };
+  assert.equal(writeLaneStorage(store, buildLaneDocument({ ridge })).ok, true);
+  const track = { id: 't', name: 't', theme: 'ridge', points: [{ x: 0, y: 0, z: 0 }] } as unknown as TrackData;
+  const builder = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), track, undefined, false);
+  builder.setCourse('basalt');
+  builder.setLaneNetwork(islandLaneNetwork());
+  assert.equal(builder.saveLaneDoc(store).ok, true);
+  const saved = readLaneStorage(store)?.networks;
+  assert.ok(saved?.ridge, 'the ridge lanes survive');
+  assert.ok(saved?.basalt, 'the island lanes are saved');
 });
 
 test('the island builder never loads, saves or backs up the owner\'s track', async () => {
-  const data = new Map<string, string>();
-  (globalThis as any).localStorage = {
-    getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, String(v)),
-    removeItem: (k: string) => data.delete(k), clear: () => data.clear(), key: () => null, get length() { return data.size; },
-  };
+  const { data, store } = mockStorage();
+  (globalThis as any).localStorage = store;
   const saved = [{ id: 'owner-1', type: 'prop_14_scrapdome_gantry', x: 1, y: 2, z: 3, rotY: 0, scale: 1 }];
   writeStorage(saved as never, 'ridge');
   const before = data.get(TRACK_STORAGE_KEY_V2);
@@ -150,29 +171,48 @@ test('the island builder never loads, saves or backs up the owner\'s track', asy
   assert.equal(classic.getProps().length, 1, 'the classic builder still loads it');
 });
 
-test('Basalt Isle is the fourth course and rides Rustbucket Ridge\'s physics profile', () => {
+test('Serpentine Isle is the fourth course and rides Rustbucket Ridge\'s physics profile', () => {
   assert.deepEqual(COURSES.map((c) => c.id), ['ridge', 'boomtown', 'sheep', 'basalt']);
+  assert.equal(COURSES[3].name, 'Serpentine Isle');
   assert.equal(TRACKS.basalt.profile, TRACKS.ridge.profile);
   for (const x of [190, 5000, 8304, 30000, 60000, 72190]) assert.equal(courseY(x, 'basalt'), courseY(x, 'ridge'));
 });
 
-test('an obstacle inside a fork stands on every branch; the camera keeps the branch just past the merge', () => {
-  const rim = ISLAND_ROUTE_GRAPH.sections[0];
-  assert.deepEqual(islandRoadsAt(rim.x0 + 500), rim.branches.map((b) => islandBranchSpace('rim', b.id)));
-  assert.deepEqual(islandRoadsAt(rim.x0 - 500), [islandTrackSpace()]);
-  const ledge = islandBranchSpace('rim', 'ledge');
-  assert.equal(cameraTrackSpace('basalt', rim.x1 + CAMERA_TAIL_X - 1, { rim: 'ledge' }), ledge, 'the look-back stays on the ledge');
-  assert.equal(cameraTrackSpace('basalt', rim.x1 + CAMERA_TAIL_X + 1, { rim: 'ledge' }), islandTrackSpace());
-  const next = ISLAND_ROUTE_GRAPH.sections[1];
-  assert.ok(next.x0 > rim.x1 + CAMERA_TAIL_X, 'the camera tail never reaches the next split');
+test('the terrain has soft normals everywhere: one normal per position, even across texture seams', () => {
+  // Two triangles meeting at a crease, their shared edge duplicated as it is at a texture seam.
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 1, 1, 1], 3));
+  softenNormals(geo);
+  const n = geo.getAttribute('normal');
+  const at = (i: number) => [n.getX(i), n.getY(i), n.getZ(i)].map((v) => +v.toFixed(6));
+  assert.deepEqual(at(0), at(4), 'the shared corner (0,0,0) has one normal');
+  assert.deepEqual(at(1), at(3), 'the shared corner (1,0,0) has one normal');
+  // The island model itself: every copy of a position carries the same normal.
+  const seen = new Map<string, string>();
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const pos = mesh.geometry.getAttribute('position'); const nor = mesh.geometry.getAttribute('normal');
+    for (let i = 0; i < pos.count; i += 7) {
+      const key = `${pos.getX(i).toFixed(6)},${pos.getY(i).toFixed(6)},${pos.getZ(i).toFixed(6)}`;
+      const normal = `${nor.getX(i).toFixed(4)},${nor.getY(i).toFixed(4)},${nor.getZ(i).toFixed(4)}`;
+      if (seen.has(key)) assert.equal(seen.get(key), normal, `a hard edge at ${key}`);
+      else seen.set(key, normal);
+    }
+  });
 });
 
-test('every branch shut this race gets a gate, and only those', () => {
-  const layout = layoutForSeed(ISLAND_ROUTE_GRAPH, 12345);
-  const materials = { wood: new THREE.MeshStandardMaterial() } as unknown as IslandMaterials;
-  const gates = buildClosedGates(layout, materials);
-  const closed = ISLAND_ROUTE_GRAPH.sections.flatMap((s) => s.branches
-    .filter((b) => !layout.open?.[s.id]?.includes(b.id)).map((b) => `Closed: ${s.id}/${b.id}`));
-  assert.deepEqual(gates.children.map((g) => g.name), closed);
-  assert.equal(buildClosedGates(null, materials).children.length, 0);
+test('the detail map finds its places in this three.js version\'s standard shader', () => {
+  const shader = {
+    vertexShader: THREE.ShaderLib.standard.vertexShader,
+    fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+    uniforms: {} as Record<string, THREE.IUniform>,
+  };
+  injectDetailMap(shader, { detailMap: { value: null } });
+  assert.match(shader.vertexShader, /vDetailWorld = \(modelMatrix \* vec4\(transformed, 1\.0\)\)\.xyz;/);
+  assert.match(shader.fragmentShader, /float detailTriplanar\(/);
+  assert.ok(shader.fragmentShader.indexOf('#include <map_fragment>') < shader.fragmentShader.indexOf('diffuseColor.rgb *= mix(1.0, fine, kf)'),
+    'the detail multiplies the base colour after the base map is applied');
+  assert.ok('detailMap' in shader.uniforms);
+  assert.ok(ISLAND_DETAIL.fineFade < ISLAND_DETAIL.coarseFade && ISLAND_DETAIL.fineTile < ISLAND_DETAIL.coarseTile);
 });

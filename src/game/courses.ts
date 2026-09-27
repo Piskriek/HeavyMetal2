@@ -34,7 +34,7 @@ export interface CourseDefinition {
 }
 
 /**
- * Rustbucket Ridge's profile. Basalt Isle rides it too for now (ISLAND-ROUTE): the sorting pool, the
+ * Rustbucket Ridge's profile. Serpentine Isle rides it too for now (ISLAND-ROUTE): the sorting pool, the
  * start and the loops are tuned and tested on it, so the island's first version changes the world, not
  * the physics.
  */
@@ -120,15 +120,15 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     },
   },
   basalt: {
-    id: 'basalt', biome: 'island', region: 'Basalt Isle', character: 'Forks & crossings',
-    description: 'Late for the race: out of the shack on the summit, into the Maw, then down a braid of roads that split, cross and rejoin, all the way to the lagoon.',
-    stadium: 'THE LAGOON ARENA',
+    id: 'basalt', biome: 'island', region: 'Serpentine Isle', character: 'Grooves & switchbacks',
+    description: 'Out of the summit spiral and down the groove carved into the island: switchbacks, S-bends and one long serpent of a road to the sea.',
+    stadium: 'THE SEAWARD TIP',
     profile: RIDGE_PROFILE,
     sectors: [
-      'THE SUMMIT SHACK', 'THE MAW', 'THE CALDERA',
-      'OBSIDIAN SPIRAL', 'THE LAVA TUBE', 'THE CHAMBERS',
-      'WATERFALL BREAKTHROUGH', 'CLIFF ROAD', 'THE CROSSING',
-      'THE SEA ARCH', 'SEA STACK SLALOM', 'THE DRAIN'
+      'THE SUMMIT SPIRAL', 'THE SWITCHBACK', 'THE S-BENDS',
+      'THE MIDDLE REACH', 'THE LONG TRAVERSE', 'THE ELBOW',
+      'THE LOWER SERPENT', 'THE CLIFF RUN', 'THE BIG SWEEP',
+      'THE LAST BENDS', 'THE SEAWARD DROP', 'THE SEAWARD TIP'
     ],
     palette: { sky: '#6f8b94', horizon: '#b9c7c4', distant: '#7d9290', middle: '#5b5249', foreground: '#2f2a27', dirt: '#a07a4a', dirtLight: '#b68d58', bank: '#4a3f36', soil: '#3b332d', shoulder: '#6e5a42', chalk: '#e6d3a8', grass: '#8c7a4a', accent: '#e3a24f', haze: '#a9bcbd' },
     lighting: {

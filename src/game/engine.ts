@@ -31,7 +31,7 @@ import {
 import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 import { layoutForSeed, sameRoad, validateRouteGraph, type RouteGraph, type RouteLayout } from './sim/route';
-import { ISLAND_ROUTE_GRAPH } from './island-route/basalt-route';
+import { ISLAND_ROUTE_GRAPH } from './island-route/serpentine-route';
 // T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
 // The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
 import { FIXED_STEP } from './contracts/timing';
@@ -275,8 +275,8 @@ export class GameEngine {
       get paceTargetX() { return engine.player.x; },
       stagger: (racer) => racer.id * 0.023,
     };
-    // ISLAND-ROUTE: Basalt Isle races its forks; each race's layout comes from its seed (ROUTE-2).
-    if ((config?.course ?? options.course) === 'basalt') this.setRouteGraph(ISLAND_ROUTE_GRAPH);
+    // ISLAND-ROUTE: the island races its forks (once it has some); each race's layout comes from its seed (ROUTE-2).
+    if ((config?.course ?? options.course) === 'basalt' && ISLAND_ROUTE_GRAPH.sections.length) this.setRouteGraph(ISLAND_ROUTE_GRAPH);
     this.reset();
     document.addEventListener('visibilitychange', this.visibilityChanged);
   }

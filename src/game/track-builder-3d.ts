@@ -12,7 +12,7 @@ import { FINISH, START_X } from './scene';
 import { applyLaneEdit, snapNode, type LaneEdit } from './lane-path-tool';
 import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
-  buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, writeLaneStorage,
+  buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, readLaneStorage, writeLaneStorage,
 } from './lane-storage';
 import {
   readStorage,
@@ -199,7 +199,7 @@ export class TrackBuilder3D {
     private readonly track: TrackData,
     private readonly materials?: any,
     /**
-     * ISLAND-ROUTE: false for a world the owner's saved track does not belong to (Basalt Isle). The
+     * ISLAND-ROUTE: false for a world the owner's saved track does not belong to (the island course). The
      * builder then never loads the saved props, never writes them to this device and never writes a
      * disk backup, so nothing done in that world can reach the owner's track or its backups.
      */
@@ -2743,10 +2743,15 @@ export class TrackBuilder3D {
     return result.ok ? { ok: true } : result;
   }
 
-  /** Writes the network to its own storage document (validate → backup → write, in the storage module). */
+  /**
+   * Writes the network to its own storage document (validate → backup → write, in the storage module).
+   * The other courses' stored networks are kept: the document holds every course's lanes. Lanes are
+   * saved on the island too: they are keyed by course and never touch the owner's track.
+   */
   saveLaneDoc(store?: Storage) {
-    if (!this.persistent || !this.laneDoc) return { ok: false as const, reason: 'empty' as const };
-    const doc = buildLaneDocument({ [this.courseId as never]: this.laneDoc });
+    if (!this.laneDoc) return { ok: false as const, reason: 'empty' as const };
+    const stored = readLaneStorage(store)?.networks ?? {};
+    const doc = buildLaneDocument({ ...stored, [this.courseId as never]: this.laneDoc });
     const result = writeLaneStorage(store, doc);
     this.notify();
     return result;

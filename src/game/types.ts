@@ -222,7 +222,7 @@ export const COURSES: { id: CourseId; name: string; subtitle: string; number: st
   { id: 'ridge', name: 'Rustbucket Ridge', subtitle: 'Pine valleys. Flowing dirt. Questionable shortcuts.', number: '01' },
   { id: 'boomtown', name: 'Boomtown Run', subtitle: 'Copper canyons. Steep drops. Extra dynamite.', number: '02' },
   { id: 'sheep', name: 'Woolly Wasteland', subtitle: 'Open pastures. Airborne prizes. Angry locals.', number: '03' },
-  { id: 'basalt', name: 'Basalt Isle', subtitle: 'Summit to sea. Roads that split, cross and rejoin.', number: '04' },
+  { id: 'basalt', name: 'Serpentine Isle', subtitle: 'Summit to sea down the carved serpent road.', number: '04' },
 ];
 
 export const DEFAULT_OPTIONS: GameOptions = {

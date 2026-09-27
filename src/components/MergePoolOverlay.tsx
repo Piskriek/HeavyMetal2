@@ -10,7 +10,7 @@
  * no state beyond the one-shot focus latch, so the queue it shows is always the simulation's own.
  */
 import { useEffect, useRef } from 'react';
-import type { CourseId, MergeSnapshot } from '../game/types';
+import type { MergeSnapshot } from '../game/types';
 import { COCKPIT_ART } from '../game/cockpit';
 import { poolGoblinFrame, poolGoblinSheetPosition } from '../game/merge/goblin';
 import { formatSplit, poolIsWaiting } from '../game/merge/split';
@@ -32,8 +32,6 @@ export interface MergePoolOverlayProps {
   raceTime?: number;
   /** Reduced motion holds each pose instead of animating the sweep. */
   reducedMotion?: boolean;
-  /** On Basalt Isle the pool is the Maw: its drum fires the field out of the mouth. */
-  course?: CourseId;
 }
 
 /** The pool counts in physics ticks; the sim runs at 120 of them a second. */
@@ -51,9 +49,8 @@ function flagLabel(flags: readonly string[]): string | null {
 }
 
 export default function MergePoolOverlay({
-  merge, loadout, onReady, reducedMotion = false, raceTime = 0, course,
+  merge, loadout, onReady, reducedMotion = false, raceTime = 0,
 }: MergePoolOverlayProps) {
-  const maw = course === 'basalt';
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const goblinRef = useRef<HTMLDivElement | null>(null);
   const focused = useRef(false);
@@ -101,7 +98,7 @@ export default function MergePoolOverlay({
       className={`merge-pool${releasing ? ' merge-pool--releasing' : ''}`}
       data-phase={merge.phase}
       role="dialog"
-      aria-label={maw ? 'The Maw' : 'Sorting loop pool'}
+      aria-label="Sorting loop pool"
     >
       {/* The pool goblin: hold, call, count, and the sweep that sends them off. Painted art on a 2x2
           sheet, its cell chosen by the phase (see game/merge/goblin.ts). */}
@@ -157,16 +154,12 @@ export default function MergePoolOverlay({
           <div className="merge-pool__panel">
             <OrnateCorners />
             <header className="merge-pool__head">
-              <span className="merge-pool__eyebrow">{maw ? 'The crater · the Maw' : 'First loop · the sorting pool'}</span>
-              <h2>{maw ? 'The Maw' : 'The sorting loop'}</h2>
+              <span className="merge-pool__eyebrow">First loop · the sorting pool</span>
+              <h2>The sorting loop</h2>
               <p>
-                {maw
-                  ? merge.phase === 'open'
-                    ? 'Everyone drops into the drum in the order they landed. Nobody passes inside the Maw.'
-                    : 'All in. The drum fires them out of the mouth in order: first in, first out.'
-                  : merge.phase === 'open'
-                    ? 'Everyone queues in the order they arrived. Nobody passes inside the ring.'
-                    : 'All in. The ring sends them out in order: first in, first out.'}
+                {merge.phase === 'open'
+                  ? 'Everyone queues in the order they arrived. Nobody passes inside the ring.'
+                  : 'All in. The ring sends them out in order: first in, first out.'}
               </p>
               <span className="merge-pool__hold" title="Queuing time is taken off the race clock">{heldLabel(merge.holdTicks)}</span>
             </header>

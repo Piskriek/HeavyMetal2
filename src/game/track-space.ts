@@ -604,6 +604,13 @@ export interface TrackSpaceOptions {
    * to the first and last knot (author the start and the run-out as knots).
    */
   readonly knots?: readonly TrackKnot[];
+  /**
+   * A constant half-width instead of the classic stage profile (an island groove is one width all the
+   * way down). Without it the classic profile applies, byte for byte.
+   */
+  readonly halfWidth?: number;
+  /** False keeps the ribbon level across on corners (a groove floor does not bank). Default true. */
+  readonly bank?: boolean;
 }
 
 export function buildTrackSpace(
@@ -652,14 +659,16 @@ export function buildTrackSpace(
   const bridges: TrackBridgeSpan[] = bridgeLabels.map((b) =>
     Object.freeze({ start: distOf(b.start), end: distOf(b.end) }));
 
-  const halfWidthAt = (d: number): number => {
+  const fixedWidth = options.halfWidth;
+  const banking = options.bank !== false;
+  const halfWidthAt = fixedWidth !== undefined ? () => fixedWidth : (d: number): number => {
     let hw = TRACK_HALF_WIDTH;
     hw = lerpN(hw, CANYON_HALF_WIDTH, bumpN(d, stageStart.canyon, stageEnd.canyon, 700));
     bridges.forEach((b) => (hw = lerpN(hw, BRIDGE_HALF_WIDTH, bumpN(d, b.start, b.end, 300))));
     hw = lerpN(hw, STADIUM_HALF_WIDTH, smoothstepN(stageStart.stadium - 300, stageStart.stadium + 1200, d));
     return hw;
   };
-  const dHalfWidthAt = (d: number): number => {
+  const dHalfWidthAt = fixedWidth !== undefined ? () => 0 : (d: number): number => {
     // chain through the same lerp composition, differentiating each blend factor
     let hw = TRACK_HALF_WIDTH, dhw = 0;
     let k = bumpN(d, stageStart.canyon, stageEnd.canyon, 700);
@@ -695,11 +704,12 @@ export function buildTrackSpace(
     const gravUpRaw = vsub(WORLD_UP, vscale(tangent, tangent.y));
     if (vdot(gravUpRaw, gravUpRaw) > 0.04) {
       const gravUp = vunit(gravUpRaw);
-      const k = GRAVITY_LERP * clampN(transportUp.y, 0, 1);
+      // A level ribbon (no bank) takes gravity's up outright, so across the road stays exactly level.
+      const k = banking ? GRAVITY_LERP * clampN(transportUp.y, 0, 1) : 1;
       transportUp = vunit(vadd(vscale(transportUp, 1 - k), vscale(gravUp, k)));
     }
     const turn = i === 0 ? 0 : vdot(vcross(prevTangent, tangent), transportUp);
-    bank = lerpN(bank, clampN(-turn * BANK_GAIN, -BANK_CLAMP, BANK_CLAMP), BANK_LERP);
+    if (banking) bank = lerpN(bank, clampN(-turn * BANK_GAIN, -BANK_CLAMP, BANK_CLAMP), BANK_LERP);
     // rotate transported up around the tangent by bank
     const up = vunit(rotateAroundAxis(transportUp, tangent, bank));
     const right = vunit(vcross(tangent, up));

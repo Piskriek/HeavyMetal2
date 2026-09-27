@@ -19,8 +19,8 @@ import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
 import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-route/island-world';
-import { cameraTrackSpace, islandRoadsAt, islandTrackSpace, racerTrackSpace } from './island-route/island-space';
 import { readOptions } from './preferences';
+import { cameraTrackSpace, islandRoadsAt, islandTrackSpace, racerTrackSpace } from './island-route/island-space';
 import type { CourseId } from './types';
 import {
   compileRampSurfaces,
@@ -257,6 +257,11 @@ function buildTrack(space: TrackSpaceMap): TrackData {
     bridges: space.bridges.map((b) => ({ start: b.start, end: b.end })),
     sampleAt,
   };
+}
+
+/** A labelled waypoint's distance, or Infinity on a course without it (the island has no cave). */
+function labelDist(track: TrackData, label: string): number {
+  try { return track.distOf(label); } catch { return Infinity; }
 }
 
 function trackYAtX(samples: TrackSample[], x: number, pred: (s: TrackSample) => boolean) {
@@ -1717,7 +1722,7 @@ export class Renderer3D {
     };
   }
 
-  /** ISLAND-ROUTE: Basalt Isle's world, when this renderer draws the island (null on the classic courses). */
+  /** ISLAND-ROUTE: Serpentine Isle's world, when this renderer draws the island (null on the classic courses). */
   private readonly island: IslandWorld | null = null;
   /** The day fog: the sky preset's on the classic courses, the sea haze on the island. */
   /** The closed-branch gates of the race being drawn, rebuilt when its layout changes. */
@@ -1774,12 +1779,14 @@ export class Renderer3D {
     this.space = onIsland ? islandTrackSpace() : getTrackSpace();
     this.track = buildTrack(this.space);
     this.viewTracks.set(this.space, this.track);
-    this.enterD = this.track.distOf('caveEnter');
-    this.exitD = this.track.distOf('caveExit');
+    this.enterD = labelDist(this.track, 'caveEnter');
+    this.exitD = labelDist(this.track, 'caveExit');
 
     if (onIsland) {
-      // ISLAND-ROUTE: Basalt Isle is its own world: its roads, its carved ground, the sea and a haze sky.
-      this.island = buildIslandWorld(this.materials, { performance: readOptions().graphics === 'performance' });
+      // ISLAND-ROUTE: the island course is its own world: the owner's model on a sand base, the sea and a haze sky.
+      // The 8K terrain texture on the Quality setting, when the card takes 8K textures (~340 MB on the GPU).
+      const hiRes = readOptions().graphics === 'quality' && this.renderer.capabilities.maxTextureSize >= 8192;
+      this.island = buildIslandWorld(this.materials, { hiRes });
       this.scene.add(this.island.group);
       this.sky.visible = false;
       this.fogNear = 18000;
@@ -1800,6 +1807,8 @@ export class Renderer3D {
     // 3D Track Builder (handles placed props, free-fly, and surface snapping). On the island it never
     // loads or saves the owner's track: that document belongs to the classic world.
     this.trackBuilder = new TrackBuilder3D(this.scene, this.camera, this.track, this.materials, !onIsland);
+    // The island's lanes are its own: the builder loads and saves them under the island course.
+    if (onIsland) this.trackBuilder.setCourse(course);
     this.trackBuilder.setInitialSky(skyKey);
     this.trackBuilder.onSkyboxChange((newSky) => this.setSkybox(newSky));
 
@@ -1842,6 +1851,18 @@ export class Renderer3D {
     this.renderer.setSize(width, height, false);
   }
 
+  /**
+   * ISLAND-ROUTE: how far the island model's surface sits above the track's surface under a placement, so
+   * a ball rides on the model and never inside it (0 on the classic courses, or before the model loads).
+   */
+  private islandLift(placement: { frame: { pos: { x: number; y: number; z: number }; right: { x: number; y: number; z: number } }; lateral: number }): number {
+    if (!this.island) return 0;
+    const f = placement.frame; const lateral = placement.lateral;
+    const x = f.pos.x + f.right.x * lateral; const z = f.pos.z + f.right.z * lateral;
+    const ground = this.island.groundAt(x, z);
+    return ground === null ? 0 : ground - (f.pos.y + f.right.y * lateral);
+  }
+
   /** ISLAND-ROUTE: points the camera's map at the player's branch (a no-op off the island). */
   private followPlayerView(frame: SceneFrame): void {
     if (!this.island) return;
@@ -1855,8 +1876,8 @@ export class Renderer3D {
     let track = this.viewTracks.get(map);
     if (!track) { track = buildTrack(map); this.viewTracks.set(map, track); }
     this.view = { space: map, track };
-    this.enterD = track.distOf('caveEnter');
-    this.exitD = track.distOf('caveExit');
+    this.enterD = labelDist(track, 'caveEnter');
+    this.exitD = labelDist(track, 'caveExit');
   }
 
   /**
@@ -1911,13 +1932,14 @@ export class Renderer3D {
       ramps,
     );
     const frame = this.worldFrame(placement.frame);
+    const eyeY = placement.world.y + this.islandLift(placement);
     // T3 (IF-GYRO): in a loop the up points at the ring's centre; while falling it freezes at the
     // last grounded frame. Both keep the aperture from rolling over the player's head.
     const loopCentre = this.loopCentreWorld(ball, ride, course, ramps);
     const gyro = gyroFrameFor(
       frame,
       loopCentre ? { centre: loopCentre } : null,
-      [placement.world.x, placement.world.y, placement.world.z],
+      [placement.world.x, eyeY, placement.world.z],
       ball.falling === true,
       this.lastGyroFrame ?? frame,
     );
@@ -1929,7 +1951,7 @@ export class Renderer3D {
     const look = this.viewSpace.frameAt(aheadS);
     const lateral = lateralFromLaneZ(this.viewSpace, look.dist, ball.z);
     const fp = firstPersonFrame({
-      ballCentre: [placement.world.x, placement.world.y, placement.world.z],
+      ballCentre: [placement.world.x, eyeY, placement.world.z],
       gyro,
       lookPoint: [
         look.pos.x + look.right.x * lateral + look.up.x * 140,
@@ -2005,7 +2027,10 @@ export class Renderer3D {
   }
 
   private updateAtmosphere(d: number) {
-    const under = smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d));
+    // A course without a cave (the island) is never underground.
+    const under = Number.isFinite(this.enterD) && Number.isFinite(this.exitD)
+      ? smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d))
+      : 0;
     const dayFog = this.island ? this.island.fogColor : new THREE.Color(this.currentSkyPreset.fogColor);
     const dayAmbient = new THREE.Color(this.currentSkyPreset.ambientColor);
     (this.scene.fog as THREE.Fog).color.copy(dayFog).lerp(SKY.fogCave, under);
@@ -2207,7 +2232,8 @@ export class Renderer3D {
         { x: racer.x, distance: racer.distance, y: racer.y, z: racer.z, grounded: racer.grounded, course: frame.options.course },
         rampSurfaces,
       );
-      position.set(placement.world.x, placement.world.y, placement.world.z);
+      const lift = this.islandLift(placement);
+      position.set(placement.world.x, placement.world.y + lift, placement.world.z);
       // H11: a bot about to shove wobbles sideways for its tell. Presentation only; with reduced
       // motion the tell is the spark scrape alone.
       if (!frame.reducedMotion && (racer.ramTellUntil ?? -1) > frame.runTime) {
@@ -2244,8 +2270,8 @@ export class Renderer3D {
       // P5: the contact shadow lies on the road under the ball, tilted with the road (banks and
       // drops), fading and spreading as the ball leaves it.
       const f = placement.frame; const lateral = placement.lateral;
-      const groundX = f.pos.x + f.right.x * lateral; const groundY = f.pos.y + f.right.y * lateral; const groundZ = f.pos.z + f.right.z * lateral;
-      const clearance = (placement.world.x - groundX) * f.up.x + (placement.world.y - groundY) * f.up.y + (placement.world.z - groundZ) * f.up.z - BALL_DRAW_RADIUS;
+      const groundX = f.pos.x + f.right.x * lateral; const groundY = f.pos.y + f.right.y * lateral + lift; const groundZ = f.pos.z + f.right.z * lateral;
+      const clearance = (placement.world.x - groundX) * f.up.x + (placement.world.y + lift - groundY) * f.up.y + (placement.world.z - groundZ) * f.up.z - BALL_DRAW_RADIUS;
       const look = shadowAt(clearance);
       if (look.fade > 0) {
         position.set(groundX + f.up.x * SHADOW_LIFT, groundY + f.up.y * SHADOW_LIFT, groundZ + f.up.z * SHADOW_LIFT);

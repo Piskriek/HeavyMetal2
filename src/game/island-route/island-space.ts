@@ -1,49 +1,31 @@
 /**
- * ISLAND-ROUTE: Basalt Isle's track-space maps. The main map follows every fork's first (outer) branch;
- * each other branch has a map of its own that is identical outside its fork (the same anchors, knots and
- * stubs), so a racer on that branch is placed on that branch's road while the rest of the course stays
- * the main road. Maps are built once, on first use.
+ * ISLAND-ROUTE: the island course's track-space maps. The main map follows the main groove. Forks (ROUTE-1)
+ * are listed in ISLAND_ROUTE_GRAPH; a branch other than a fork's first gets a map of its own that equals the
+ * main map outside its fork. The course has no forks yet (the owner adds tracks with the 3D platforms), so
+ * today every lookup here returns the main map; the plumbing stays so forks drop straight in.
  */
 import { buildTrackSpace, getTrackSpace, type TrackSpaceMap } from '../track-space';
 import type { CourseId } from '../types';
 import type { RacerRoute } from '../sim/route';
-import { ISLAND_ROUTE_GRAPH, islandCenterline } from './basalt-route';
+import { ISLAND_ROUTE_GRAPH, islandCenterline } from './serpentine-route';
 
 let mainMap: TrackSpaceMap | null = null;
-const branchMaps = new Map<string, TrackSpaceMap>();
 
-/** The island's main map (every fork on its first branch). */
+/** The island's main map. */
 export function islandTrackSpace(): TrackSpaceMap {
   if (!mainMap) {
-    const { waypoints, knots } = islandCenterline();
-    mainMap = buildTrackSpace(waypoints, [], [], { knots });
+    const { waypoints, options } = islandCenterline();
+    mainMap = buildTrackSpace(waypoints, [], [], options);
   }
   return mainMap;
 }
 
-/** The map for one branch of one fork (the main map for a fork's first branch). */
-export function islandBranchSpace(section: string, branch: string): TrackSpaceMap {
-  const fork = ISLAND_ROUTE_GRAPH.sections.find((s) => s.id === section);
-  if (!fork || fork.branches[0].id === branch) return islandTrackSpace();
-  const key = `${section}=${branch}`;
-  let map = branchMaps.get(key);
-  if (!map) {
-    const { waypoints, knots } = islandCenterline({ [section]: branch });
-    map = buildTrackSpace(waypoints, [], [], { knots });
-    branchMaps.set(key, map);
-  }
-  return map;
+/** The map for one branch of one fork (the main map until branch geometry is authored). */
+export function islandBranchSpace(_section: string, _branch: string): TrackSpaceMap {
+  return islandTrackSpace();
 }
 
-/** Every branch that is not a fork's first, with its map and the arc range of its fork on that map. */
-export function islandBranchRoads(): { section: string; branch: string; map: TrackSpaceMap; from: number; to: number }[] {
-  return ISLAND_ROUTE_GRAPH.sections.flatMap((section) => section.branches.slice(1).map((b) => {
-    const map = islandBranchSpace(section.id, b.id);
-    return { section: section.id, branch: b.id, map, from: map.distOf(`${section.id}:split`), to: map.distOf(`${section.id}:merge`) };
-  }));
-}
-
-/** The course's main map: the island's for Basalt Isle, the classic course's for the others. */
+/** The course's main map: the island's for the island course, the classic course's for the others. */
 export function courseTrackSpace(course: CourseId | undefined): TrackSpaceMap {
   return course === 'basalt' ? islandTrackSpace() : getTrackSpace();
 }
@@ -54,16 +36,10 @@ export function islandRoadsAt(x: number): readonly TrackSpaceMap[] {
   return section ? section.branches.map((b) => islandBranchSpace(section.id, b.id)) : [islandTrackSpace()];
 }
 
-/**
- * How far past a merge (engine x) the camera keeps the branch's map: its chase rig looks back up to
- * ~3,000 arc units, and every shared stretch after a merge is longer than this.
- */
+/** How far past a merge (engine x) the camera keeps the branch's map, so it never looks back from another road. */
 export const CAMERA_TAIL_X = 900;
 
-/**
- * The map the camera follows the player on: its branch's map inside a fork and for a short tail past the
- * merge, so the point the camera looks back from never lands on another branch's road.
- */
+/** The map the camera follows the player on: its branch's inside a fork and for a short tail past the merge. */
 export function cameraTrackSpace(course: CourseId | undefined, x: number, route: RacerRoute | undefined): TrackSpaceMap {
   if (course !== 'basalt') return getTrackSpace();
   const inside = ISLAND_ROUTE_GRAPH.sections.find((s) => x >= s.x0 && x < s.x1)
@@ -72,18 +48,10 @@ export function cameraTrackSpace(course: CourseId | undefined, x: number, route:
   return inside && branch ? islandBranchSpace(inside.id, branch) : islandTrackSpace();
 }
 
-/**
- * The map a racer at engine x is drawn on: its branch's map inside a fork it has chosen, the main
- * map everywhere else. Branch maps equal the main map at every split and merge, so the switch is
- * seamless (tests/island-route.test.ts holds it).
- */
+/** The map a racer at engine x is drawn on: its branch's inside a fork it has chosen, the main map elsewhere. */
 export function racerTrackSpace(course: CourseId | undefined, x: number, route: RacerRoute | undefined): TrackSpaceMap {
   if (course !== 'basalt') return getTrackSpace();
-  for (const section of ISLAND_ROUTE_GRAPH.sections) {
-    if (x >= section.x0 && x < section.x1) {
-      const branch = route?.[section.id];
-      return branch ? islandBranchSpace(section.id, branch) : islandTrackSpace();
-    }
-  }
-  return islandTrackSpace();
+  const section = ISLAND_ROUTE_GRAPH.sections.find((s) => x >= s.x0 && x < s.x1);
+  const branch = section ? route?.[section.id] : undefined;
+  return section && branch ? islandBranchSpace(section.id, branch) : islandTrackSpace();
 }

@@ -1,264 +1,177 @@
 /**
- * ISLAND-ROUTE: Basalt Isle as the renderer draws it. The roads (the main road and every other branch's
- * road inside its fork), the tunnels through the mountain, timber trestles wherever a road flies above
- * the ground, the ground itself carved round the roads, the sea, the crater's lava lake and a sea-haze
- * sky. The terrain body is a stand-in until ISLAND-TERRAIN lands; the carving is the route's own.
+ * ISLAND-ROUTE: the island course as the renderer draws it. The owner's Serpentine Isle model (its carved
+ * grooves are the race's lanes), set on a sandy beach base, surrounded by the sea, under a sea-haze sky.
+ * Nothing else is added to the island: no road is drawn (the groove is the road) and nothing is placed
+ * that could stand inside the model.
  */
 import * as THREE from 'three';
-import type { TrackSpaceMap, TrackFrameData, TrackStageId } from '../track-space';
-import { ISLAND_ANCHORS, ISLAND_ROUTE_GRAPH } from './basalt-route';
-import { polar } from './geometry';
-import {
-  RoadIndex, carvedHeight, markBridges, naturalHeight, roadSamples, type GroundBump,
-} from './island-ground';
-import { islandBranchRoads, islandBranchSpace, islandTrackSpace } from './island-space';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { openBranches, type RouteLayout } from '../sim/route';
-import { placeIslandLandmarks } from './island-landmarks';
+import { ISLAND_BASE_Y, ISLAND_MODEL_FLOOR, ISLAND_ROUTE_GRAPH, ISLAND_SCALE, MODEL_TO_ROUTE } from './serpentine-route';
+import { islandBranchSpace } from './island-space';
+import { buildHeightField, type HeightField } from './model-heightfield';
+import { applyDetailMap } from './detail-map';
 
 export interface IslandMaterials {
   dirt: THREE.MeshStandardMaterial;
-  cliff: THREE.MeshStandardMaterial;
-  cave: THREE.MeshStandardMaterial;
   wood: THREE.MeshStandardMaterial;
-  cobble: THREE.MeshStandardMaterial;
-  caveRock: THREE.MeshStandardMaterial;
   water: THREE.MeshStandardMaterial;
-  lava: THREE.MeshStandardMaterial;
 }
 
 export interface IslandWorld {
   readonly group: THREE.Group;
-  /** The carved ground height at (x, z). */
-  readonly groundAt: (x: number, z: number) => number;
   readonly skyColor: THREE.Color;
   readonly fogColor: THREE.Color;
   /** The sky dome; the renderer keeps it centred on the camera. */
   readonly sky: THREE.Mesh;
+  /** Resolves once the island model is in the scene. */
+  readonly ready: Promise<void>;
+  /** The model's surface height at (x, z); null off the model, or before it has loaded. */
+  groundAt(x: number, z: number): number | null;
 }
 
-/** The island's extent (the heightfield) and the sea's. */
-const GROUND_HALF = 38000;
-const SEA_HALF = 160000;
+/** World units per bucket of the model's triangle index (a few triangles per bucket). */
+export const ISLAND_GROUND_CELL = 1500;
 
-/** The summit crag the shack sits on, and the basalt massif the Drain spirals down into. */
-export function islandBumps(): GroundBump[] {
-  const start = polar(ISLAND_ANCHORS[0].at);
-  const drain = polar({ theta: 700, r: 27800, y: 0 });
-  return [
-    { x: start.x, z: start.z, height: 2300, radius: 3200 },
-    // A basalt mesa the Drain's vortex is cut down into (the carving makes the funnel).
-    { x: drain.x, z: drain.z, height: 2500, radius: 4600, plateau: 0.7 },
-  ];
-}
-
-const surfaceFor = (stage: TrackStageId, M: IslandMaterials) =>
-  stage === 'cavern' || stage === 'breakthrough' ? M.cave
-    : stage === 'mine' ? M.wood
-      : stage === 'stadium' ? M.cobble
-        : M.dirt;
-
-/** A road slab across [from, to] on a map: top, lips and a thick edge, so it never reads as paper. */
-function roadMesh(rows: readonly TrackFrameData[], material: THREE.Material, texScale = 480): THREE.Mesh {
-  // (side, offset, height) across the road, left to right.
-  const profile: [number, number, number][] = [
-    [-1, -40, -150], [-1, -40, 18], [-1, -8, 18], [-1, 0, 0], [1, 0, 0], [1, 8, 18], [1, 40, 18], [1, 40, -150],
-  ];
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-  for (const s of rows) {
-    let u = 0;
-    profile.forEach(([side, offset, height], c) => {
-      const lateral = side * s.halfWidth + offset;
-      positions.push(
-        s.pos.x + s.right.x * lateral + s.up.x * height,
-        s.pos.y + s.right.y * lateral + s.up.y * height,
-        s.pos.z + s.right.z * lateral + s.up.z * height,
-      );
-      if (c > 0) {
-        const [ps, po, ph] = profile[c - 1];
-        u += Math.hypot(lateral - (ps * s.halfWidth + po), height - ph);
-      }
-      uvs.push(u / texScale, s.dist / texScale);
-    });
-  }
-  const cols = profile.length;
-  for (let r = 0; r < rows.length - 1; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const a = r * cols + c, b = a + 1, d = a + cols, e = d + 1;
-      indices.push(a, b, d, b, e, d);
+/** The height map of a placed model: every mesh's triangles in world coordinates, rasterised. */
+export function islandHeightField(model: THREE.Object3D): HeightField {
+  model.updateMatrixWorld(true);
+  const points: number[] = [];
+  const v = new THREE.Vector3();
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const pos = mesh.geometry.getAttribute('position');
+    const index = mesh.geometry.getIndex();
+    const count = index ? index.count : pos.count;
+    for (let k = 0; k < count; k++) {
+      v.fromBufferAttribute(pos, index ? index.getX(k) : k).applyMatrix4(mesh.matrixWorld);
+      points.push(v.x, v.y, v.z);
     }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  return new THREE.Mesh(geo, material);
+  });
+  return buildHeightField(points, ISLAND_GROUND_CELL);
 }
 
-/** The road over [from, to] of a map, split into runs of one surface material. */
-function buildRoad(map: TrackSpaceMap, from: number, to: number, M: IslandMaterials, group: THREE.Group, branch: boolean) {
-  const rows = map.samples.filter((s) => s.dist >= from && s.dist <= to);
-  let start = 0;
-  for (let i = 1; i <= rows.length; i++) {
-    if (i === rows.length || surfaceFor(rows[i].stage, M) !== surfaceFor(rows[start].stage, M)) {
-      const run = rows.slice(start, Math.min(i + 1, rows.length));
-      if (run.length > 1) {
-        let material: THREE.Material = surfaceFor(rows[start].stage, M);
-        if (branch) {
-          // Where a branch's road still overlaps the main road near its split and merge, it sits behind.
-          const m = (material as THREE.MeshStandardMaterial).clone();
-          m.polygonOffset = true; m.polygonOffsetFactor = 2; m.polygonOffsetUnits = 2;
-          material = m;
-        }
-        const mesh = roadMesh(run, material);
-        mesh.name = 'TrackSurface';
-        group.add(mesh);
-      }
-      start = i;
-    }
+/**
+ * Soft normals everywhere (the owner's ask: no hard edges). Vertices that share a position share one
+ * normal, the area-weighted average of every face around them, whatever their texture coordinates, so
+ * neither the mesh's creases nor its texture seams show as edges in the light.
+ */
+export function softenNormals(geometry: THREE.BufferGeometry): void {
+  const pos = geometry.getAttribute('position');
+  const index = geometry.getIndex();
+  const count = index ? index.count : pos.count;
+  const vertexAt = (k: number) => (index ? index.getX(k) : k);
+  // Weld by position (quantised finely enough to merge exact copies, never neighbours).
+  const keyOf = (i: number) => `${Math.round(pos.getX(i) * 1e6)},${Math.round(pos.getY(i) * 1e6)},${Math.round(pos.getZ(i) * 1e6)}`;
+  const slot = new Map<string, number>();
+  const weld = new Int32Array(pos.count);
+  for (let i = 0; i < pos.count; i++) {
+    const key = keyOf(i);
+    let s = slot.get(key);
+    if (s === undefined) { s = slot.size; slot.set(key, s); }
+    weld[i] = s;
   }
+  const sum = new Float64Array(slot.size * 3);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  for (let k = 0; k + 2 < count; k += 3) {
+    const i0 = vertexAt(k), i1 = vertexAt(k + 1), i2 = vertexAt(k + 2);
+    a.fromBufferAttribute(pos, i0); b.fromBufferAttribute(pos, i1); c.fromBufferAttribute(pos, i2);
+    // The cross product's length is twice the face's area: larger faces weigh more.
+    n.subVectors(c, b).cross(a.clone().sub(b));
+    for (const i of [i0, i1, i2]) { const s = weld[i] * 3; sum[s] += n.x; sum[s + 1] += n.y; sum[s + 2] += n.z; }
+  }
+  const normals = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const s = weld[i] * 3;
+    n.set(sum[s], sum[s + 1], sum[s + 2]).normalize();
+    normals[i * 3] = n.x; normals[i * 3 + 1] = n.y; normals[i * 3 + 2] = n.z;
+  }
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
 }
 
-/** An arched tube round the road inside the mountain (the lava tube and the chambers). */
-function buildTunnel(rows: readonly TrackFrameData[], material: THREE.Material): THREE.Mesh {
-  const arch = 11;
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-  for (const s of rows) {
-    const w = s.halfWidth + 320;
-    for (let k = 0; k <= arch; k++) {
-      const a = Math.PI * (k / arch);
-      const lateral = Math.cos(a) * w;
-      const height = Math.sin(a) * 1300 - 120;
-      positions.push(
-        s.pos.x + s.right.x * lateral + s.up.x * height,
-        s.pos.y + s.right.y * lateral + s.up.y * height,
-        s.pos.z + s.right.z * lateral + s.up.z * height,
-      );
-      uvs.push(k / arch * 4, s.dist / 1400);
-    }
-  }
-  for (let r = 0; r < rows.length - 1; r++) {
-    for (let c = 0; c < arch; c++) {
-      const a = r * (arch + 1) + c, b = a + 1, d = a + arch + 1, e = d + 1;
-      indices.push(a, d, b, b, d, e);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geo.setIndex(indices);
-  geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.name = 'Cave rock';
-  return mesh;
+/** Readies a loaded model: soft normals on every mesh, then placed as the game places it. */
+export function prepareIslandModel(model: THREE.Object3D): void {
+  model.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh) softenNormals(mesh.geometry); });
+  placeIslandModel(model);
 }
 
-/** Timber piers under every stretch of road that flies more than `gap` above the ground. */
-function buildTrestles(
-  roads: readonly { map: TrackSpaceMap; from: number; to: number }[],
-  groundAt: (x: number, z: number) => number,
-  material: THREE.Material,
-  gap = 420,
-  spacing = 900,
-): THREE.InstancedMesh {
-  const piers: THREE.Matrix4[] = [];
-  const q = new THREE.Quaternion();
-  for (const { map, from, to } of roads) {
-    for (let d = from + spacing / 2; d < to; d += spacing) {
-      const f = map.frameAt(d);
-      if (f.stage === 'cavern' || f.stage === 'mine' || f.inLoop) continue;
-      for (const side of [-1, 1]) {
-        const lateral = side * (f.halfWidth - 60);
-        const x = f.pos.x + f.right.x * lateral;
-        const z = f.pos.z + f.right.z * lateral;
-        const top = f.pos.y + f.right.y * lateral - 150;
-        const ground = groundAt(x, z);
-        const h = top - Math.max(ground, -200);
-        if (h < gap) continue;
-        const yaw = Math.atan2(f.tangent.x, f.tangent.z);
-        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-        piers.push(new THREE.Matrix4().compose(new THREE.Vector3(x, top - h / 2, z), q, new THREE.Vector3(90, h, 90)));
-      }
-    }
-  }
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, Math.max(1, piers.length));
-  piers.forEach((m, i) => mesh.setMatrixAt(i, m));
-  mesh.count = piers.length;
-  mesh.name = 'Trestle';
-  return mesh;
+/** Places the model as the game does: scaled, its lowest point on the sand base. */
+export function placeIslandModel(model: THREE.Object3D): void {
+  model.scale.setScalar(ISLAND_SCALE * MODEL_TO_ROUTE);
+  model.position.y = ISLAND_BASE_Y - ISLAND_MODEL_FLOOR * ISLAND_SCALE;
 }
 
-/* Ground colours (multiplied over the dirt texture's grain): sand, wet sand, ochre tops, basalt faces. */
-const SAND = new THREE.Color('#efdcb0');
-const WET_SAND = new THREE.Color('#a8946e');
-const OCHRE = new THREE.Color('#dcaa66');
-const BASALT = new THREE.Color('#5e554e');
-const SEA_FLOOR = new THREE.Color('#6f8f86');
+export const ISLAND_MODEL_URL = '/models/island/serpentine-isle.obj';
+export const ISLAND_TEXTURE_URL = '/models/island/serpentine-isle.jpg';
+/** The owner's 8K texture (same layout), for the Quality setting on cards that take 8K textures. */
+export const ISLAND_TEXTURE_8K_URL = '/models/island/serpentine-isle-8k.jpg';
+/** The rock grain the detail map lays over the island up close (a tiling texture the game already has). */
+export const ISLAND_DETAIL_URL = '/textures/cliff.png';
+
+/** The sand base: flat under the island out to BEACH_FLAT, then shelving under the sea by BEACH_EDGE. */
+const BEACH_FLAT = 58000;
+const BEACH_EDGE = 74000;
+const BEACH_TOP = ISLAND_BASE_Y - 15;
+const BEACH_DEEP = -1100;
+const SEA_HALF = 220000;
 
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
-/** The island never changes, so its heightfield is measured once a session per detail level. */
-const groundHeights = new Map<number, Float32Array>();
+/** The sand base's height at (x, z): flat, then an irregular shelf into the sea. */
+export function beachHeight(x: number, z: number): number {
+  const a = Math.atan2(x, -z);
+  const wobble = 1 + 0.05 * Math.sin(3 * a + 0.7) + 0.035 * Math.sin(7 * a + 2.2) + 0.02 * Math.sin(13 * a + 1.1);
+  const r = Math.hypot(x, z) / wobble;
+  return BEACH_TOP + (BEACH_DEEP - BEACH_TOP) * smooth(BEACH_FLAT, BEACH_EDGE, r);
+}
 
-function buildGround(groundAt: (x: number, z: number) => number, detail: number, texture: THREE.Texture | null): THREE.Mesh {
-  const n = detail;
-  const cell = (2 * GROUND_HALF) / n;
-  const positions = new Float32Array((n + 1) * (n + 1) * 3);
-  const colors = new Float32Array((n + 1) * (n + 1) * 3);
-  const uvs = new Float32Array((n + 1) * (n + 1) * 2);
-  let H = groundHeights.get(n);
-  if (!H) {
-    H = new Float32Array((n + 1) * (n + 1));
-    for (let j = 0; j <= n; j++) {
-      for (let i = 0; i <= n; i++) {
-        const x = -GROUND_HALF + i * cell, z = -GROUND_HALF + j * cell;
-        H[j * (n + 1) + i] = groundAt(x, z);
-      }
-    }
-    groundHeights.set(n, H);
-  }
-  const c = new THREE.Color();
-  for (let j = 0; j <= n; j++) {
-    for (let i = 0; i <= n; i++) {
-      const k = j * (n + 1) + i;
-      const x = -GROUND_HALF + i * cell, z = -GROUND_HALF + j * cell;
-      const h = H[k];
-      positions.set([x, h, z], k * 3);
-      uvs.set([x / 1600, z / 1600], k * 2);
-      const hx = H[j * (n + 1) + Math.min(n, i + 1)] - H[j * (n + 1) + Math.max(0, i - 1)];
-      const hz = H[Math.min(n, j + 1) * (n + 1) + i] - H[Math.max(0, j - 1) * (n + 1) + i];
-      const slope = Math.hypot(hx, hz) / (2 * cell);
-      // Height bands first (sea floor → wet sand → sand → ochre), then steep faces turn to basalt.
-      c.copy(SEA_FLOOR).lerp(WET_SAND, smooth(-500, -40, h));
-      c.lerp(SAND, smooth(-10, 90, h));
-      c.lerp(OCHRE, smooth(260, 900, h));
-      c.lerp(BASALT, smooth(0.55, 1.1, slope) * smooth(60, 400, h));
-      colors.set([c.r, c.g, c.b], k * 3);
-    }
-  }
+const DRY_SAND = new THREE.Color('#e9d3a3');
+const WET_SAND = new THREE.Color('#b59c73');
+const SHALLOWS = new THREE.Color('#8fb3a4');
+
+function buildBeach(): THREE.Mesh {
+  const rings = 48, segments = 128;
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      const a = j * (n + 1) + i, b = a + 1, d = a + n + 1, e = d + 1;
-      indices.push(a, d, b, b, d, e);
+  const c = new THREE.Color();
+  const maxR = BEACH_EDGE * 1.12;
+  for (let i = 0; i <= rings; i++) {
+    // Rings bunch up toward the shelf, where the shape changes.
+    const r = maxR * Math.sqrt(i / rings);
+    for (let j = 0; j <= segments; j++) {
+      const a = (j / segments) * Math.PI * 2;
+      const x = r * Math.sin(a), z = -r * Math.cos(a);
+      const y = beachHeight(x, z);
+      positions.push(x, y, z);
+      uvs.push(x / 1800, z / 1800);
+      c.copy(SHALLOWS).lerp(WET_SAND, smooth(-500, -20, y)).lerp(DRY_SAND, smooth(0, BEACH_TOP, y));
+      // Soft drifts in the sand, so it is not one flat colour.
+      const drift = 0.94 + 0.06 * Math.sin(x * 0.00031 + Math.sin(z * 0.00023) * 2) * Math.sin(z * 0.00027 - x * 0.00011);
+      c.multiplyScalar(drift);
+      colors.push(c.r, c.g, c.b);
+    }
+  }
+  for (let i = 0; i < rings; i++) {
+    for (let j = 0; j < segments; j++) {
+      const a = i * (segments + 1) + j, b = a + 1, d = a + segments + 1, e = d + 1;
+      // Counter-clockwise seen from above, so the sand faces up.
+      indices.push(a, b, d, b, e, d);
     }
   }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(indices);
   geo.computeVertexNormals();
-  const material = new THREE.MeshStandardMaterial({ map: texture, vertexColors: true, roughness: 0.97, metalness: 0 });
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.name = 'Terrain';
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+  mesh.name = 'Beach';
   return mesh;
 }
 
@@ -269,8 +182,7 @@ function buildSkyDome(horizon: THREE.Color, zenith: THREE.Color): THREE.Mesh {
   const pos = geo.getAttribute('position');
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
-    const t = smooth(-0.05, 0.6, pos.getY(i) / 190000);
-    c.copy(horizon).lerp(zenith, t);
+    c.copy(horizon).lerp(zenith, smooth(-0.05, 0.6, pos.getY(i) / 190000));
     colors.push(c.r, c.g, c.b);
   }
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -280,49 +192,55 @@ function buildSkyDome(horizon: THREE.Color, zenith: THREE.Color): THREE.Mesh {
   return mesh;
 }
 
+/** Loads the owner's model, scaled and lifted onto the sand base, into `group`; hands back its height map. */
+function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void, hiRes: boolean): Promise<void> {
+  const texture = new THREE.TextureLoader().load(hiRes ? ISLAND_TEXTURE_8K_URL : ISLAND_TEXTURE_URL);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95, metalness: 0 });
+  // The detail map: rock grain up close, where the island's own texture is soft.
+  const detail = applyDetailMap(material, new THREE.TextureLoader().load(ISLAND_DETAIL_URL, () => detail.measure()));
+  return new OBJLoader().loadAsync(ISLAND_MODEL_URL).then((model) => {
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.material = material;
+      mesh.name = 'Island';
+    });
+    prepareIslandModel(model);
+    model.name = 'Serpentine Isle';
+    group.add(model);
+    onGround(islandHeightField(model));
+  });
+}
+
 /**
- * ROUTE-2's closed branches, made visible: a timber barricade across the road just past the split, and a
- * rockfall piled against it, so a player reads which roads are shut this race.
+ * ROUTE-2's closed branches, made visible: a timber barricade across the road just past the split. The
+ * course has no forks yet, so this draws nothing until the owner's platform tracks add some.
  */
-export function buildClosedGates(layout: RouteLayout | null, M: IslandMaterials): THREE.Group {
+export function buildClosedGates(layout: RouteLayout | null, M: Pick<IslandMaterials, 'wood'>): THREE.Group {
   const group = new THREE.Group();
   group.name = 'Closed branches';
   if (!layout) return group;
   const beam = new THREE.BoxGeometry(1, 1, 1);
-  const rock = new THREE.DodecahedronGeometry(1, 0);
-  const rockMaterial = new THREE.MeshStandardMaterial({ color: '#4a423d', roughness: 1, flatShading: true });
   for (const section of ISLAND_ROUTE_GRAPH.sections) {
     const open = openBranches(section, layout).map((b) => b.id);
     for (const b of section.branches) {
       if (open.includes(b.id)) continue;
       const map = islandBranchSpace(section.id, b.id);
-      const f = map.frameAt(map.distOf(`${section.id}:split`) + 1500);
-      const basis = new THREE.Matrix4().makeBasis(
-        new THREE.Vector3(f.right.x, f.right.y, f.right.z),
-        new THREE.Vector3(f.up.x, f.up.y, f.up.z),
-        new THREE.Vector3(f.tangent.x, f.tangent.y, f.tangent.z),
-      );
+      const f = map.frameAt(map.trackDistFromEngineDistance((section.x0 - 190) / 2) + 1500);
       const gate = new THREE.Group();
       gate.name = `Closed: ${section.id}/${b.id}`;
       gate.position.set(f.pos.x, f.pos.y, f.pos.z);
-      gate.quaternion.setFromRotationMatrix(basis);
-      const add = (geo: THREE.BufferGeometry, material: THREE.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number, rz = 0) => {
-        const m = new THREE.Mesh(geo, material);
-        m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.rotation.z = rz;
+      gate.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+        new THREE.Vector3(f.right.x, f.right.y, f.right.z),
+        new THREE.Vector3(f.up.x, f.up.y, f.up.z),
+        new THREE.Vector3(f.tangent.x, f.tangent.y, f.tangent.z),
+      ));
+      for (const [x, y, sx, sy] of [[-f.halfWidth + 40, 260, 90, 520], [f.halfWidth - 40, 260, 90, 520], [0, 380, 2 * f.halfWidth, 70], [0, 200, 2 * f.halfWidth, 70]]) {
+        const m = new THREE.Mesh(beam, M.wood);
+        m.position.set(x, y, 0); m.scale.set(sx, sy, 50);
         gate.add(m);
-      };
-      const w = f.halfWidth;
-      // Two posts and three planks, one crooked.
-      add(beam, M.wood, -w + 40, 260, 0, 90, 520, 90);
-      add(beam, M.wood, w - 40, 260, 0, 90, 520, 90);
-      add(beam, M.wood, 0, 380, 0, 2 * w, 70, 50);
-      add(beam, M.wood, 0, 240, 0, 2 * w, 70, 50, 0.06);
-      add(beam, M.wood, 0, 110, 0, 2 * w, 70, 50, -0.04);
-      // The rockfall piled against it, irregular like nature.
-      for (let i = 0; i < 9; i++) {
-        const t = (i / 8) * 2 - 1;
-        const r = 140 + ((i * 53) % 90);
-        add(rock, rockMaterial, t * w * 0.9, r * 0.55, 180 + ((i * 37) % 120), r, r * 0.8, r);
       }
       group.add(gate);
     }
@@ -330,80 +248,43 @@ export function buildClosedGates(layout: RouteLayout | null, M: IslandMaterials)
   return group;
 }
 
-export function buildIslandWorld(M: IslandMaterials, opts: { performance?: boolean } = {}): IslandWorld {
+/** `hiRes`: use the 8K terrain texture (the Quality setting, on a card that takes 8K textures). */
+export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } = {}): IslandWorld {
   const group = new THREE.Group();
-  group.name = 'Basalt Isle';
-  const main = islandTrackSpace();
-  const branches = islandBranchRoads();
-  const roads = [{ map: main, from: 0, to: main.length }, ...branches.map(({ map, from, to }) => ({ map, from, to }))];
+  group.name = 'Island course';
 
-  // The ground, carved round every road.
-  const index = new RoadIndex(roadSamples(roads, 2));
-  markBridges(index);
-  const bumps = islandBumps();
-  const groundAt = (x: number, z: number) => carvedHeight(x, z, naturalHeight(x, z, bumps), index);
-  // Rock grain on the ground (the road keeps the dirt), so the road reads as a road.
-  group.add(buildGround(groundAt, opts.performance ? 190 : 300, M.cliff.map));
+  let ground: HeightField | null = null;
+  const ready = loadIsland(group, (g) => { ground = g; }, opts.hiRes === true);
+  group.add(buildBeach());
 
-  // The roads, the tunnels and the trestles.
-  buildRoad(main, 0, main.length, M, group, false);
-  for (const b of branches) buildRoad(b.map, b.from, b.to, M, group, true);
-  for (const { map, from, to } of roads) {
-    const inside = map.samples.filter((s) => s.dist >= from && s.dist <= to && (s.stage === 'cavern' || s.stage === 'mine'));
-    if (inside.length > 1) group.add(buildTunnel(inside, M.caveRock));
-  }
-  group.add(buildTrestles(roads, groundAt, M.wood));
-
-  // The sea: a sheet at sea level over the sea floor, so the shallows read turquoise.
+  // The sea: a sheet at sea level over a sea floor, so the shallows over the sand read turquoise.
   const water = M.water.clone();
   if (water.map) {
     water.map = water.map.clone();
-    water.map.repeat.set(SEA_HALF / 2400, SEA_HALF / 2400);
+    water.map.repeat.set(SEA_HALF / 3000, SEA_HALF / 3000);
     water.map.needsUpdate = true;
   }
   water.color = new THREE.Color('#6fc2c0');
   water.opacity = 0.8;
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(2 * SEA_HALF, 2 * SEA_HALF), water);
   sea.rotation.x = -Math.PI / 2;
-  sea.position.y = 0;
   sea.name = 'Sea';
   sea.renderOrder = 1;
   group.add(sea);
-
-  // The sea floor goes on past the island's heightfield, so its edge never shows through the water.
-  // Same rock grain and tiling as the ground (SEA_HALF / 1600 is a whole number of tiles), so they meet unseen.
-  const floorMap = M.cliff.map ? M.cliff.map.clone() : null;
-  if (floorMap) { floorMap.repeat.set((2 * SEA_HALF) / 1600, (2 * SEA_HALF) / 1600); floorMap.needsUpdate = true; }
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(2 * SEA_HALF, 2 * SEA_HALF),
-    new THREE.MeshStandardMaterial({ color: SEA_FLOOR, map: floorMap, roughness: 1 }),
-  );
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * SEA_HALF, 2 * SEA_HALF), new THREE.MeshStandardMaterial({ color: '#557f78', roughness: 1 }));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -2210;
+  floor.position.y = BEACH_DEEP - 20;
   floor.name = 'Sea floor';
   group.add(floor);
 
-  // The lava lake in the crater.
-  const lava = new THREE.Mesh(new THREE.CircleGeometry(2200, 48), M.lava);
-  lava.rotation.x = -Math.PI / 2;
-  lava.position.y = 17640;
-  lava.name = 'Lava lake';
-  group.add(lava);
-
-  const skyColor = new THREE.Color('#7d9fb3');
-  const fogColor = new THREE.Color('#b9c8c6');
-  // The Meshy kit and landmarks arrive as their models load (the race never waits for them).
-  const landmarks = new THREE.Group();
-  landmarks.name = 'Landmarks';
-  group.add(landmarks);
-  void placeIslandLandmarks(landmarks, opts);
-
-  // Sky and ground fill: the sea haze lights the shadow sides (the sun alone left them black).
+  // Sky and ground fill: the sea haze lights the shadow sides.
   const fill = new THREE.HemisphereLight('#c9dde4', '#7a6248', 1.35);
   fill.name = 'Island fill';
   group.add(fill);
 
+  const skyColor = new THREE.Color('#7d9fb3');
+  const fogColor = new THREE.Color('#b9c8c6');
   const sky = buildSkyDome(fogColor, skyColor);
   group.add(sky);
-  return { group, groundAt, skyColor, fogColor, sky };
+  return { group, skyColor, fogColor, sky, ready, groundAt: (x, z) => ground?.heightAt(x, z) ?? null };
 }

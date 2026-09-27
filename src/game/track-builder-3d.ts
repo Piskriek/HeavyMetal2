@@ -46,6 +46,7 @@ import type { GizmoMode, GizmoSpace, SnapConfig } from './builder/gizmo-math';
 import { SceneKit, isKitType, isTerrainEdit } from './builder/scene-kit';
 import { isLightType, lightPreset, lightSettingsFor } from './builder/light-rig';
 import { isPrimitiveType } from './builder/primitives';
+import { DEFAULT_ISLAND_GROUND, loadGround, saveGround, type IslandGround, type IslandGroundSettings } from './island-route/island-ground';
 import {
   loadShaderLibrary, mergeShadersFromProps, normalizeShader, saveShaderLibrary, type ShaderDef,
 } from './materials/shader-library';
@@ -377,6 +378,8 @@ export class TrackBuilder3D {
   }
 
   selectProp(id: string | null, multi = false) {
+    // Picking an item closes the island ground panel.
+    if (id && this.groundOpen) { this.groundOpen = false; this.showGroundBrush(null, 0); }
     if (!id) {
       this.selectedPropIds.clear();
     } else {
@@ -3523,6 +3526,7 @@ export class TrackBuilder3D {
     this.islandTrackId = trackId;
     this.backups.resetDiskState();
     this.loadIslandProps();
+    this.reloadIslandGround();
     this.notify();
   }
 
@@ -3738,6 +3742,130 @@ export class TrackBuilder3D {
   }
 
   getTerrainPicking(): boolean { return this.terrainPicking; }
+
+  /* ───────────── Island ground: tint, grain and painted sand ───────────── */
+
+  private groundOpen = false;
+  private groundUndo: Uint8Array[] = [];
+  private groundSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private groundBrush: THREE.Mesh | null = null;
+
+  /** The island terrain mesh (it loads after the builder opens), or null off the island. */
+  private islandGroundMesh(): THREE.Mesh | null {
+    let found: THREE.Mesh | null = null;
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!found && mesh.isMesh && (mesh.material as THREE.Material | undefined)?.userData?.islandGround) found = mesh;
+    });
+    return found;
+  }
+
+  getIslandGround(): IslandGround | null {
+    return (this.islandGroundMesh()?.material as THREE.Material | undefined)?.userData.islandGround ?? null;
+  }
+
+  /** Where the pointer meets the island terrain, or null. */
+  islandGroundPointAt(clientX: number, clientY: number, canvas: HTMLCanvasElement): THREE.Vector3 | null {
+    const mesh = this.islandGroundMesh();
+    if (!mesh) return null;
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    return this.raycaster.intersectObject(mesh, false)[0]?.point.clone() ?? null;
+  }
+
+  /** The ground panel is open (the terrain was clicked in Primitives or Custom 3D). */
+  isIslandGroundOpen(): boolean { return this.groundOpen; }
+
+  setIslandGroundOpen(open: boolean) {
+    if (this.groundOpen === open) return;
+    this.groundOpen = open;
+    if (open) this.selectProp(null);
+    else this.showGroundBrush(null, 0);
+    this.notify();
+  }
+
+  updateIslandGround(changes: Partial<IslandGroundSettings>) {
+    const ground = this.getIslandGround();
+    if (!ground) return;
+    ground.apply(changes);
+    this.scheduleGroundSave();
+    this.notify();
+  }
+
+  /** The brush ring on the ground under the pointer (null hides it). */
+  showGroundBrush(point: THREE.Vector3 | null, radius: number, erase = false) {
+    if (!point) { if (this.groundBrush) this.groundBrush.visible = false; return; }
+    if (!this.groundBrush) {
+      this.groundBrush = new THREE.Mesh(
+        new THREE.RingGeometry(0.93, 1, 64),
+        new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false, side: THREE.DoubleSide }),
+      );
+      this.groundBrush.name = 'GroundBrush';
+      this.groundBrush.rotation.x = -Math.PI / 2;
+      this.groundBrush.renderOrder = 999;
+      this.scene.add(this.groundBrush);
+    }
+    (this.groundBrush.material as THREE.MeshBasicMaterial).color.set(erase ? 0xff7a7a : 0xffd27a);
+    this.groundBrush.position.set(point.x, point.y + 4, point.z);
+    this.groundBrush.scale.setScalar(radius);
+    this.groundBrush.visible = true;
+  }
+
+  /** A paint stroke starts: one undo step for the whole stroke (the last 12 are kept). */
+  beginGroundStroke() {
+    const ground = this.getIslandGround();
+    if (!ground) return;
+    this.groundUndo.push(ground.mask.slice());
+    if (this.groundUndo.length > 12) this.groundUndo.shift();
+  }
+
+  paintGround(point: { x: number; z: number }, radius: number, strength: number, erase: boolean): boolean {
+    return this.getIslandGround()?.paint(point.x, point.z, radius, strength, erase) ?? false;
+  }
+
+  endGroundStroke() { this.scheduleGroundSave(); }
+
+  canUndoGroundStroke(): boolean { return this.groundUndo.length > 0; }
+
+  undoGroundStroke(): boolean {
+    const ground = this.getIslandGround();
+    const before = this.groundUndo.pop();
+    if (!ground || !before) return false;
+    ground.setMask(before);
+    this.scheduleGroundSave();
+    this.notify();
+    return true;
+  }
+
+  clearGroundPaint() {
+    const ground = this.getIslandGround();
+    if (!ground) return;
+    this.beginGroundStroke();
+    ground.clearMask();
+    this.scheduleGroundSave();
+    this.notify();
+  }
+
+  /** Saves the ground a moment after the last change (the mask is a 2048 x 2048 picture). */
+  private scheduleGroundSave() {
+    if (this.groundSaveTimer) clearTimeout(this.groundSaveTimer);
+    this.groundSaveTimer = setTimeout(() => {
+      this.groundSaveTimer = null;
+      const ground = this.getIslandGround();
+      if (ground && this.propStore === 'island') saveGround(ground, this.islandTrackId);
+    }, 1200);
+  }
+
+  /** Another island track opened: its own ground. */
+  private reloadIslandGround() {
+    const ground = this.getIslandGround();
+    if (!ground) return;
+    ground.clearMask();
+    ground.apply(DEFAULT_ISLAND_GROUND);
+    this.groundUndo = [];
+    void loadGround(ground, this.islandTrackId).then(() => this.notify());
+  }
 
   /** The scenery part under the pointer, as its (possibly new) scenery edit, selected. */
   pickTerrain(clientX: number, clientY: number, canvas: HTMLCanvasElement, multi = false): PlacedProp | null {

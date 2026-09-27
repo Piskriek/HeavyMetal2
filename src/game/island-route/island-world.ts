@@ -10,7 +10,8 @@ import { openBranches, type RouteLayout } from '../sim/route';
 import { ISLAND_BASE_Y, ISLAND_MODEL_FLOOR, ISLAND_ROUTE_GRAPH, ISLAND_SCALE, MODEL_TO_ROUTE } from './serpentine-route';
 import { islandBranchSpace } from './island-space';
 import { buildHeightField, type HeightField } from './model-heightfield';
-import { applyDetailMap } from './detail-map';
+import { IslandGround, loadGround } from './island-ground';
+import { readIslandTracks } from './island-props-storage';
 
 export interface IslandMaterials {
   dirt: THREE.MeshStandardMaterial;
@@ -28,6 +29,8 @@ export interface IslandWorld {
   readonly ready: Promise<void>;
   /** The model's surface height at (x, z); null off the model, or before it has loaded. */
   groundAt(x: number, z: number): number | null;
+  /** The terrain's ground shader: tint, grain, pebbles and the painted sand (build mode edits it). */
+  readonly ground: IslandGround;
 }
 
 /** World units per bucket of the model's triangle index (a few triangles per bucket). */
@@ -106,8 +109,6 @@ export const ISLAND_MODEL_URL = '/models/island/serpentine-isle.obj';
 export const ISLAND_TEXTURE_URL = '/models/island/serpentine-isle.jpg';
 /** The owner's 8K texture (same layout), for the Quality setting on cards that take 8K textures. */
 export const ISLAND_TEXTURE_8K_URL = '/models/island/serpentine-isle-8k.jpg';
-/** The rock grain the detail map lays over the island up close (a tiling texture the game already has). */
-export const ISLAND_DETAIL_URL = '/textures/cliff.png';
 
 /** The sand base: flat under the island out to BEACH_FLAT, then shelving under the sea by BEACH_EDGE. */
 const BEACH_FLAT = 58000;
@@ -193,14 +194,15 @@ function buildSkyDome(horizon: THREE.Color, zenith: THREE.Color): THREE.Mesh {
 }
 
 /** Loads the owner's model, scaled and lifted onto the sand base, into `group`; hands back its height map. */
-function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void, hiRes: boolean): Promise<void> {
+function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void, hiRes: boolean): { ready: Promise<void>; ground: IslandGround } {
   const texture = new THREE.TextureLoader().load(hiRes ? ISLAND_TEXTURE_8K_URL : ISLAND_TEXTURE_URL);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
   const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95, metalness: 0 });
-  // The detail map: rock grain up close, where the island's own texture is soft.
-  const detail = applyDetailMap(material, new THREE.TextureLoader().load(ISLAND_DETAIL_URL, () => detail.measure()));
-  return new OBJLoader().loadAsync(ISLAND_MODEL_URL).then((model) => {
+  // The ground shader: grain and tiny pebbles up close (never repeating), and the painted sand.
+  const ground = new IslandGround(material);
+  void loadGround(ground, readIslandTracks().active);
+  const ready = new OBJLoader().loadAsync(ISLAND_MODEL_URL).then((model) => {
     model.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -212,6 +214,7 @@ function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void,
     group.add(model);
     onGround(islandHeightField(model));
   });
+  return { ready, ground };
 }
 
 /**
@@ -254,7 +257,8 @@ export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } =
   group.name = 'Island course';
 
   let ground: HeightField | null = null;
-  const ready = loadIsland(group, (g) => { ground = g; }, opts.hiRes === true);
+  const island = loadIsland(group, (g) => { ground = g; }, opts.hiRes === true);
+  const ready = island.ready;
   group.add(buildBeach());
 
   // The sea: a sheet at sea level over a sea floor, so the shallows over the sand read turquoise.
@@ -286,5 +290,5 @@ export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } =
   const fogColor = new THREE.Color('#b9c8c6');
   const sky = buildSkyDome(fogColor, skyColor);
   group.add(sky);
-  return { group, skyColor, fogColor, sky, ready, groundAt: (x, z) => ground?.heightAt(x, z) ?? null };
+  return { group, skyColor, fogColor, sky, ready, ground: island.ground, groundAt: (x, z) => ground?.heightAt(x, z) ?? null };
 }

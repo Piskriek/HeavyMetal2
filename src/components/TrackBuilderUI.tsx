@@ -17,6 +17,7 @@ import BrightnessSlider from './builder/BrightnessSlider';
 import { BRUSH_SPACING_DEFAULT, BRUSH_SPACING_MAX, BRUSH_SPACING_MIN } from '../game/lane-path-tool';
 import IslandTrackBar from './builder/IslandTrackBar';
 import FloatingWindow from './builder/FloatingWindow';
+import IslandGroundPanel, { type GroundBrush } from './builder/IslandGroundPanel';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -239,6 +240,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [, setSectionRevision] = useState(0);
   const [marqueeRect, setMarqueeRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const laneDragReason = useRef<string | null>(null);
+  /** The island ground panel (click the terrain in Primitives or Custom 3D) and its sand brush. */
+  const [groundOpen, setGroundOpen] = useState(false);
+  const [groundBrush, setGroundBrush] = useState<GroundBrush>({ on: false, erase: false, radius: 800, strength: 0.5 });
+  const groundBrushRef = useRef(groundBrush);
+  groundBrushRef.current = groundBrush;
+  const groundStroke = useRef<{ x: number; z: number } | null>(null);
+  const groundPickRef = useRef(false);
+  groundPickRef.current = category === 'primitives' || (category as string) === 'custom_models';
 
   const showToast = (msg: string, stickyMs = 3500) => {
     setToast(msg);
@@ -251,6 +260,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     const update = () => {
       setSelectedProp(builder.getSelectedProp());
       setSelectedProps(builder.getSelectedProps());
+      setGroundOpen(builder.isIslandGroundOpen());
       setActivePropType(builder.getActivePropType());
       setCurrentSky(builder.getSkybox());
       setCameraFacingDefault(builder.snapping.cameraFacingDefault);
@@ -393,6 +403,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         }
         // A click on the gizmo's handles belongs to the gizmo, never to an object's box in front of it.
         if (builder.isGizmoInteracting() || builder.isGizmoHovered()) return;
+        // The sand brush: a left-drag on the terrain paints (one undo step per stroke).
+        if (groundBrushRef.current.on && builder.isIslandGroundOpen()) {
+          const point = builder.islandGroundPointAt(e.clientX, e.clientY, canvas);
+          if (point) {
+            const brush = groundBrushRef.current;
+            builder.beginGroundStroke();
+            builder.paintGround(point, brush.radius, brush.strength, brush.erase);
+            groundStroke.current = { x: point.x, z: point.z };
+            onRequestRender?.();
+          }
+          return;
+        }
         // The test ball: pick it up, or (Test Start on) put it where the road was clicked.
         if (builder.isOverTestBall(e.clientX, e.clientY, canvas) || testStartModeRef.current) {
           const point = builder.testBallPointAt(e.clientX, e.clientY, canvas);
@@ -431,6 +453,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           // Select mode: check if clicking on an existing placed prop (then, in Primitives mode, scenery)
           const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
           let hitProp = builder.raycastProp(e.clientX, e.clientY, canvas);
+          // Primitives or Custom 3D: a click on the island terrain opens its ground settings.
+          if (!hitProp && groundPickRef.current && builder.islandGroundPointAt(e.clientX, e.clientY, canvas)) {
+            builder.setIslandGroundOpen(true);
+            showToast('Island ground: tint, grain and pebbles, and the sand brush');
+            onRequestRender?.();
+            return;
+          }
           if (!hitProp && builder.getTerrainPicking()) {
             hitProp = builder.pickTerrain(e.clientX, e.clientY, canvas, isMulti);
             if (hitProp) {
@@ -476,6 +505,25 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     };
 
     const onPointerMove = (e: PointerEvent) => {
+      // The sand brush: its ring follows the pointer; a stroke lays a dab every quarter brush.
+      if (groundBrushRef.current.on && builder.isIslandGroundOpen() && !isRightMouseDown.current) {
+        const brush = groundBrushRef.current;
+        const point = builder.islandGroundPointAt(e.clientX, e.clientY, canvas);
+        builder.showGroundBrush(point, brush.radius, brush.erase);
+        const last = groundStroke.current;
+        if (point && last) {
+          const step = Math.max(20, brush.radius * 0.25);
+          const d = Math.hypot(point.x - last.x, point.z - last.z);
+          const n = Math.floor(d / step);
+          for (let i = 1; i <= n; i++) {
+            const t = (i * step) / d;
+            builder.paintGround({ x: last.x + (point.x - last.x) * t, z: last.z + (point.z - last.z) * t }, brush.radius, brush.strength, brush.erase);
+          }
+          if (n > 0) groundStroke.current = { x: last.x + (point.x - last.x) * (n * step) / d, z: last.z + (point.z - last.z) * (n * step) / d };
+        }
+        onRequestRender?.();
+        if (last) return;
+      }
       // M01 · T7 — a lane handle being dragged: pointer → track → snapNode → the tool's own moveNode.
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
@@ -602,6 +650,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (groundStroke.current) {
+          groundStroke.current = null;
+          builder.endGroundStroke();
+          setLaneRevision((revision) => revision + 1);
+          return;
+        }
         if (draggingTestBall.current) {
           draggingTestBall.current = false;
           const at = builder.getTestBall();
@@ -940,6 +994,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           builder.clearPlacementError();
           onRequestRender?.();
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && groundBrushRef.current.on && builder.isIslandGroundOpen()) {
+        // With the sand brush out, Ctrl+Z takes back the last stroke.
+        e.preventDefault();
+        showToast(builder.undoGroundStroke() ? 'Undid the last sand stroke' : 'No sand stroke to undo');
+        onRequestRender?.();
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
         e.preventDefault();
         builder.undo();
@@ -2107,7 +2166,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       )}
 
       {/* Selected Prop(s) Inspector (Floating Right) */}
-      {!isZen && (selectedProps.length > 1 ? (
+      {!isZen && (groundOpen ? (
+        <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
+          <IslandGroundPanel
+            builder={builder}
+            brush={groundBrush}
+            onBrush={(brush) => { setGroundBrush(brush); if (!brush.on) builder.showGroundBrush(null, 0); onRequestRender?.(); }}
+            onClose={() => { builder.setIslandGroundOpen(false); setGroundBrush((b) => ({ ...b, on: false })); onRequestRender?.(); }}
+            onRequestRender={onRequestRender}
+          />
+        </div>
+      ) : selectedProps.length > 1 ? (
         <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-cyan-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-cyan-100 flex flex-col gap-2.5">
           <div className="sticky -top-3.5 -mx-3.5 px-3.5 pt-1 pb-2 bg-zinc-950/95 backdrop-blur-md z-10 border-b border-zinc-800 flex items-center justify-between shrink-0">
             <div className="flex flex-col min-w-0">

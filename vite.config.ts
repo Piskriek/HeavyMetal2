@@ -282,6 +282,21 @@ function islandPropsBackupPlugin(): Plugin {
             const found = readIslandBackup(dir, data?.filename ?? "");
             if (found) json(res, 200, found); else json(res, 404, { error: "Backup file not found" });
           }, res);
+        } else if (url === "/api/island-ground" && req.method === "GET") {
+          // The island ground (terrain tint, grain and the painted-sand mask), one file per track.
+          const file = path.join(dir, "ground-latest.json");
+          if (!fs.existsSync(file)) { json(res, 200, null); return; }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(fs.readFileSync(file, "utf8"));
+        } else if (url === "/api/island-ground" && req.method === "POST") {
+          readBody(req, (data) => {
+            if (!data || data.version !== 1) { json(res, 400, { error: "not an island ground document" }); return; }
+            fs.mkdirSync(dir, { recursive: true });
+            const file = path.join(dir, "ground-latest.json");
+            if (fs.existsSync(file)) fs.copyFileSync(file, path.join(dir, "ground-previous.json"));
+            fs.writeFileSync(file, JSON.stringify(data));
+            json(res, 200, { ok: true });
+          }, res);
         } else {
           next();
         }

@@ -18,7 +18,7 @@ import { ISLAND_HALF_WIDTH, ISLAND_ROUTE_GRAPH } from '../src/game/island-route/
 import { courseTrackSpace, islandTrackSpace, racerTrackSpace } from '../src/game/island-route/island-space';
 import { ISLAND_LANE_Z, islandLaneNetwork } from '../src/game/island-route/island-lanes';
 import { islandHeightField, prepareIslandModel, softenNormals } from '../src/game/island-route/island-world';
-import { ISLAND_DETAIL, injectDetailMap } from '../src/game/island-route/detail-map';
+import { PAINT_HALF, PAINT_RES, injectIslandGround, normalizeIslandGround, paintDab, paintPixel } from '../src/game/island-route/island-ground';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
 import type { TrackData } from '../src/game/renderer-3d';
 
@@ -184,19 +184,33 @@ test('the terrain has soft normals everywhere: one normal per position, even acr
   });
 });
 
-test('the detail map finds its places in this three.js version\'s standard shader', () => {
+test('the ground shader finds its places in this three.js version\'s standard shader', () => {
   const shader = {
     vertexShader: THREE.ShaderLib.standard.vertexShader,
     fragmentShader: THREE.ShaderLib.standard.fragmentShader,
     uniforms: {} as Record<string, THREE.IUniform>,
   };
-  injectDetailMap(shader, { detailMap: { value: null } });
-  assert.match(shader.vertexShader, /vDetailWorld = \(modelMatrix \* vec4\(transformed, 1\.0\)\)\.xyz;/);
-  assert.match(shader.fragmentShader, /float detailTriplanar\(/);
-  assert.ok(shader.fragmentShader.indexOf('#include <map_fragment>') < shader.fragmentShader.indexOf('diffuseColor.rgb *= mix(1.0, fine, kf)'),
-    'the detail multiplies the base colour after the base map is applied');
-  assert.ok('detailMap' in shader.uniforms);
-  assert.ok(ISLAND_DETAIL.fineFade < ISLAND_DETAIL.coarseFade && ISLAND_DETAIL.fineTile < ISLAND_DETAIL.coarseTile);
+  injectIslandGround(shader, { paintMask: { value: null } });
+  assert.match(shader.vertexShader, /vGroundWorld = \(modelMatrix \* vec4\(transformed, 1\.0\)\)\.xyz;/);
+  assert.match(shader.fragmentShader, /vec4 gPebbles\(/);
+  assert.ok(shader.fragmentShader.indexOf('#include <map_fragment>') < shader.fragmentShader.indexOf('diffuseColor.rgb *= groundTint * groundBright;'),
+    'the ground works on the base colour after the base map is applied');
+  assert.doesNotMatch(shader.fragmentShader, /detailMap/, 'no tiling detail texture: the grain is computed from the world position');
+  assert.ok('paintMask' in shader.uniforms);
+});
+
+test('ground settings are clamped; the sand brush paints softly and erases', () => {
+  const s = normalizeIslandGround({ brightness: 9, grain: -1, tint: 'red', sandPits: 0.7 });
+  assert.equal(s.brightness, 2); assert.equal(s.grain, 0); assert.equal(s.tint, '#ffffff'); assert.equal(s.sandPits, 0.7);
+  const mask = new Uint8Array(PAINT_RES * PAINT_RES);
+  assert.ok(paintDab(mask, 1000, -2000, 400, 1, false));
+  const { u, v } = paintPixel(1000, -2000);
+  const centre = mask[Math.floor(v) * PAINT_RES + Math.floor(u)];
+  const rim = mask[Math.floor(v) * PAINT_RES + Math.floor(u + 7)];
+  assert.ok(centre > 240 && rim < centre, 'full in the middle, soft to the rim');
+  paintDab(mask, 1000, -2000, 400, 1, true);
+  assert.ok(mask[Math.floor(v) * PAINT_RES + Math.floor(u)] < 15, 'erased');
+  assert.equal(paintDab(mask, PAINT_HALF * 3, 0, 400, 1, false), null, 'off the island: nothing');
 });
 
 test('the island\'s lane handles sit on the island road, not on the classic track in the sky', () => {

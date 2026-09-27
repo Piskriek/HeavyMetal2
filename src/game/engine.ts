@@ -50,6 +50,7 @@ import { createSimWorld, type SimWorld } from './sim/world';
 import {
   canHop as canHopSim, performBoost as performBoostSim, performBounce as performBounceSim,
   stepRacer as stepRacerSim,
+  resolveSolids as resolveSolidsSim,
 } from './sim/racer-physics';
 import { driveCpu, setLane as setLaneSim, type CpuContext } from './sim/cpu-driver';
 import { resolvePickups as resolvePickupsSim } from './sim/pickups';
@@ -1274,7 +1275,10 @@ export class GameEngine {
       // A race lets the CPU see the whole field and rubber-band against the player; an isolated
       // qualifying attempt passes neither (see sim/cpu-driver.ts).
       if (racer.id && this.runTime >= racer.nextDecision) driveCpu(racer, this.cpuCtx);
+      const fromX = racer.x, fromZ = racer.z;
       stepRacerSim(racer, this.simCtx, dt);
+      // Placed models' solid parts (walls, a ramp's back, rocks) block and bounce the ball.
+      resolveSolidsSim(racer, this.world.forRoute(racer.route), fromX, fromZ);
     }
     this.stepMerge();
     this.resolveBumps();

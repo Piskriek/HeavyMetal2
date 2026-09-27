@@ -12,6 +12,7 @@ import { islandBranchSpace } from './island-space';
 import { buildHeightField, type HeightField } from './model-heightfield';
 import { IslandGround, loadGround } from './island-ground';
 import { readIslandTracks } from './island-props-storage';
+import { buildIslandSea, shoreRadiusOf } from './island-sea';
 
 export interface IslandMaterials {
   dirt: THREE.MeshStandardMaterial;
@@ -31,6 +32,8 @@ export interface IslandWorld {
   groundAt(x: number, z: number): number | null;
   /** The terrain's ground shader: tint, grain, pebbles and the painted sand (build mode edits it). */
   readonly ground: IslandGround;
+  /** Each frame: the sea's waves and foam move, its discs and the horizon haze follow the camera. */
+  update(time: number, camera: THREE.Camera, fogColor: THREE.Color): void;
 }
 
 /** World units per bucket of the model's triangle index (a few triangles per bucket). */
@@ -115,7 +118,6 @@ const BEACH_FLAT = 58000;
 const BEACH_EDGE = 74000;
 const BEACH_TOP = ISLAND_BASE_Y - 15;
 const BEACH_DEEP = -1100;
-const SEA_HALF = 220000;
 
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
@@ -261,25 +263,11 @@ export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } =
   const ready = island.ready;
   group.add(buildBeach());
 
-  // The sea: a sheet at sea level over a sea floor, so the shallows over the sand read turquoise.
-  const water = M.water.clone();
-  if (water.map) {
-    water.map = water.map.clone();
-    water.map.repeat.set(SEA_HALF / 3000, SEA_HALF / 3000);
-    water.map.needsUpdate = true;
-  }
-  water.color = new THREE.Color('#6fc2c0');
-  water.opacity = 0.8;
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(2 * SEA_HALF, 2 * SEA_HALF), water);
-  sea.rotation.x = -Math.PI / 2;
-  sea.name = 'Sea';
-  sea.renderOrder = 1;
-  group.add(sea);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * SEA_HALF, 2 * SEA_HALF), new THREE.MeshStandardMaterial({ color: '#557f78', roughness: 1 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = BEACH_DEEP - 20;
-  floor.name = 'Sea floor';
-  group.add(floor);
+  // The sea: round, waves running round the island and closing in, foam at the shore, and a haze band
+  // where it meets the sky (island-sea.ts). The shallows over the sand read turquoise.
+  const shoreRadius = shoreRadiusOf((r) => BEACH_TOP + (BEACH_DEEP - BEACH_TOP) * smooth(BEACH_FLAT, BEACH_EDGE, r), BEACH_FLAT, BEACH_EDGE);
+  const sea = buildIslandSea({ shoreRadius, floorY: BEACH_DEEP - 20, water: M.water });
+  group.add(sea.group);
 
   // Sky and ground fill: the sea haze lights the shadow sides.
   const fill = new THREE.HemisphereLight('#c9dde4', '#7a6248', 1.35);
@@ -290,5 +278,5 @@ export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } =
   const fogColor = new THREE.Color('#b9c8c6');
   const sky = buildSkyDome(fogColor, skyColor);
   group.add(sky);
-  return { group, skyColor, fogColor, sky, ready, ground: island.ground, groundAt: (x, z) => ground?.heightAt(x, z) ?? null };
+  return { group, skyColor, fogColor, sky, ready, ground: island.ground, groundAt: (x, z) => ground?.heightAt(x, z) ?? null, update: sea.update };
 }

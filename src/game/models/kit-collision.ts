@@ -74,6 +74,85 @@ export function rideMeshInEngineSpace(
   return { name, positions: new Float32Array(positions), indices: new Uint32Array(indices) };
 }
 
+/** What a placed model does to a ball: ride on it, bounce off it, or nothing. */
+export type KitCollisionRole = 'terrain' | 'barrier' | 'decoration';
+
+/** Solid by default: rocks, walls, the crate and the sea stack (things you drive round, not through). */
+const SOLID_KIT: ReadonlySet<string> = new Set(['stone-wall', 'railing-wall', 'iron-crate', 'sea-stack-tall']);
+
+/**
+ * A placed model's collision role: the one picked in the Collision tab (drivable, solid or none), else
+ * the default: models with a drive surface are drivable, rocks and walls are solid, and the rest (caves,
+ * arches, rings and portals you drive through, foliage) are decoration.
+ */
+export function collisionRoleOf(prop: { type: string; roleConfig?: { role?: string } }): KitCollisionRole {
+  const picked = prop.roleConfig?.role;
+  if (picked === 'terrain' || picked === 'barrier' || picked === 'decoration') return picked;
+  const model = kitModelFor(prop.type);
+  if (!model) return 'decoration';
+  if (RIDEABLE_KIT.has(model.id)) return 'terrain';
+  if (model.shelf === 'rocks_3d' || SOLID_KIT.has(model.id)) return 'barrier';
+  return 'decoration';
+}
+
+/**
+ * The patch a placed model adds to the road, by its role (null: decoration, or nothing of it over the
+ * road). Drivable: its drive surface where it has one (else its own shape), with its full shape as the
+ * solid sides. Solid: its own shape, sides and top, bouncing harder.
+ */
+export async function kitCollisionPatch(
+  prop: KitPlacement & { id: string; type: string; roleConfig?: { role?: string; restitution?: number } }, space: TrackSpaceMap,
+): Promise<Patch | null> {
+  const role = collisionRoleOf(prop);
+  const model = kitModelFor(prop.type);
+  if (role === 'decoration' || !model) return null;
+  const full = await loadGlb(kitModelUrl(model.id));
+  const fitted = fitKitModel(full.clone(true), model.size);
+  fitted.updateMatrix();
+  const placement = placementMatrix(prop);
+  const shape = rideMeshInEngineSpace(full.clone(true), fitted.matrix, placement, space, prop.id);
+  const solidOf = (mesh: RawMesh | null) => (mesh ? compilePatch(mesh, { fillHoles: false }).solid : undefined);
+  let patch: Patch | null = null;
+  if (role === 'terrain' && RIDEABLE_KIT.has(model.id)) {
+    const drive = await loadGlb(kitDriveUrl(model.id));
+    const surface = rideMeshInEngineSpace(drive.clone(true), fitted.matrix, placement, space, prop.id);
+    patch = surface ? compilePatch(surface, { fillHoles: true }) : null;
+    const solid = solidOf(shape);
+    if (patch && solid) {
+      // Where the model has a drive surface, that surface is its top (the full model's trim and edges
+      // sit a little above it and would read as a step): a slope stays climbable, a sheer back does not.
+      for (let i = 0; i < solid.nx; i++) {
+        for (let j = 0; j < solid.nz; j++) {
+          const di = Math.round((solid.x0 - patch.x0) / patch.cellX) + i;
+          const dj = Math.round((solid.z0 - patch.z0) / patch.cellZ) + j;
+          if (di < 0 || dj < 0 || di >= patch.nx || dj >= patch.nz) continue;
+          const h = patch.heights[di * patch.nz + dj];
+          const k = i * solid.nz + j;
+          if (!Number.isNaN(h) && !Number.isNaN(solid.top[k])) solid.top[k] = h;
+        }
+      }
+      // Past where a drive surface ends (down the road), the model's lip, kicker and frame are what a ball
+      // launches off and over, not a wall it stops dead against: not solid. Its sides and back still are.
+      for (let j = 0; j < solid.nz; j++) {
+        let seenDrive = false;
+        for (let i = 0; i < solid.nx; i++) {
+          const di = Math.round((solid.x0 - patch.x0) / patch.cellX) + i;
+          const dj = Math.round((solid.z0 - patch.z0) / patch.cellZ) + j;
+          const onDrive = di >= 0 && dj >= 0 && di < patch.nx && dj < patch.nz && !Number.isNaN(patch.heights[di * patch.nz + dj]);
+          if (onDrive) { seenDrive = true; continue; }
+          if (seenDrive) solid.top[i * solid.nz + j] = NaN;
+        }
+      }
+      patch.solid = solid;
+    }
+    else if (!patch && shape) patch = compilePatch(shape, { fillHoles: true });
+  } else if (shape) {
+    patch = compilePatch(shape, { fillHoles: true });
+  }
+  if (patch?.solid) patch.solid.restitution = role === 'barrier' ? (prop.roleConfig?.restitution ?? 0.6) : 0.35;
+  return patch;
+}
+
 /**
  * The patch a placed rideable model adds to the road, or null (not rideable, or nothing of it over
  * the road). The drive surface is fitted exactly as the full model is, so it lies on what you see.

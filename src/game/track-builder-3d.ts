@@ -15,7 +15,7 @@ const TEST_BALL_KEY = 'hm2-test-ball-v1';
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType } from './models/kit-catalog';
 import { ghostKitObject } from './models/kit-object';
-import { isRideableType, kitRidePatch } from './models/kit-collision';
+import { collisionRoleOf, kitCollisionPatch } from './models/kit-collision';
 import type { Patch } from './collision/terrain-patch';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
@@ -3688,9 +3688,14 @@ export class TrackBuilder3D {
     return this.placedProps.map((p) => this.ridePatches.get(p.id)).filter((p): p is Patch => !!p);
   }
 
+  /** A model's collision role (the Collision tab's pick, or its default): for the tab to show. */
+  collisionRoleOf(prop: PlacedProp) { return collisionRoleOf(prop); }
+
   /** Recomputes one model's surface: at once (`delayMs` 0) or once a drag settles. */
   private refreshRidePatch(prop: PlacedProp, delayMs = 150) {
-    if (!isRideableType(prop.type)) return;
+    if (!isKitModelType(prop.type)) return;
+    // Decoration (by default or picked in the Collision tab): no collision, and none left behind.
+    if (collisionRoleOf(prop) === 'decoration') { this.dropRidePatch(prop.id); return; }
     const job = this.rideJobs.get(prop.id) ?? { token: 0, timer: null };
     job.token += 1;
     if (job.timer) clearTimeout(job.timer);
@@ -3698,7 +3703,7 @@ export class TrackBuilder3D {
     const run = () => {
       job.timer = null;
       if (prop.visible === false) { this.dropRidePatch(prop.id); return; }
-      kitRidePatch({ ...prop }, courseTrackSpace(this.courseId as CourseId))
+      kitCollisionPatch({ ...prop }, courseTrackSpace(this.courseId as CourseId))
         .then((patch) => {
           if (this.rideJobs.get(prop.id)?.token !== token) return;
           if (patch) this.ridePatches.set(prop.id, patch); else this.ridePatches.delete(prop.id);

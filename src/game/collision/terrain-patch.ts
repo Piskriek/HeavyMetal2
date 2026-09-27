@@ -19,7 +19,22 @@ export const F_OUTSIDE = 16;
 export const F_LEDGE = 32;
 export const STEP_MAX = 24; // ≈ 0.77·RADIUS: taller steps are walls to a grounded marble
 
+/**
+ * The solid part of a model over the road: per cell, the highest and lowest of its surfaces (NaN where
+ * nothing of it is). A ball that meets a span taller than it can step onto, and not so high that it
+ * rolls underneath, is blocked (a model's side, a ramp's back, a rock).
+ */
+export interface SolidField {
+  x0: number; z0: number; nx: number; nz: number; cellX: number; cellZ: number;
+  top: Float32Array;
+  bottom: Float32Array;
+  /** How much of its speed a ball keeps when it bounces off (0..1). */
+  restitution: number;
+}
+
 export interface Patch {
+  /** The model's solid span (walls and sides); absent = ride-only, as before. */
+  solid?: SolidField;
   x0: number;
   z0: number;
   nx: number;
@@ -264,7 +279,20 @@ export function compilePatch(
     }
   }
 
+  // The solid span: top and bottom of every surface over each cell (inside the corridor).
+  const solidTop = new Float32Array(N).fill(NaN);
+  const solidBottom = new Float32Array(N).fill(NaN);
+  for (let k = 0; k < N; k++) {
+    if (!hits[k].length) continue;
+    const pz = z0 + ((k % nz) + 0.5) * PATCH_CELL_Z;
+    if (Math.abs(pz) > corridor - 37) continue;
+    let lo = Infinity, hi = -Infinity;
+    for (const y of hits[k]) { if (y < lo) lo = y; if (y > hi) hi = y; }
+    solidTop[k] = hi; solidBottom[k] = lo;
+  }
+
   return {
+    solid: { x0, z0, nx, nz, cellX: PATCH_CELL_X, cellZ: PATCH_CELL_Z, top: solidTop, bottom: solidBottom, restitution: 0.35 },
     x0,
     z0,
     nx,

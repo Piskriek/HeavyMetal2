@@ -48,6 +48,9 @@ export interface SurfaceSample {
  */
 export const DECK_STEP_UP = 30;
 
+/** A placed model's solid part must stand this far above the ball's underside to stop it (1.5 ball radii). */
+export const SOLID_MIN_HEIGHT = RADIUS * 1.5;
+
 export interface SimWorld {
   readonly course: CourseId;
   /** The live obstacle array. Elements are mutable (`hit`, `broken`, `hitAt`); the list is not. */
@@ -73,6 +76,13 @@ export interface SimWorld {
   configure(course: CourseId, obstacles: readonly Obstacle[], pickups?: readonly AirPickup[], patches?: readonly Patch[]): void;
   /** The rideable models' surfaces (empty on a course with none: the road alone, exactly as before). */
   readonly patches: readonly Patch[];
+  /**
+   * The bounce off a placed model's solid part at (x, z) for a ball centred at engine y, or 0 when the
+   * spot is free: nothing there, a surface low enough to roll onto, or high enough to roll under.
+   * `climb`: extra rise allowed (a probe ahead of the ball on a slope it can roll up). A ball that was on a
+   * model's drive surface at (fromX, fromZ) is riding it: that model does not block it (the ride does).
+   */
+  solidAt(x: number, z: number, y: number, climb?: number, fromX?: number, fromZ?: number): number;
   /** ROUTE-1: true when any obstacle or pickup is tagged to a branch. */
   readonly routed: boolean;
   /**
@@ -195,6 +205,31 @@ export function createSimWorld(
     },
     get routed() { return routed; },
     get patches() { return activePatches; },
+    solidAt: (x, z, y, climb = 0, fromX, fromZ) => {
+      if (!activePatches.length) return 0;
+      const road = courseY(x, activeCourse);
+      const foot = y + RADIUS, head = y - RADIUS;
+      for (const patch of activePatches) {
+        const s = patch.solid;
+        if (!s) continue;
+        if (fromX !== undefined && fromZ !== undefined) {
+          const di = Math.floor((fromX - patch.x0) / patch.cellX), dj = Math.floor((fromZ - patch.z0) / patch.cellZ);
+          if (di >= 0 && dj >= 0 && di < patch.nx && dj < patch.nz && !Number.isNaN(patch.heights[di * patch.nz + dj])) continue;
+        }
+        const i = Math.floor((x - s.x0) / s.cellX), j = Math.floor((z - s.z0) / s.cellZ);
+        if (i < 0 || j < 0 || i >= s.nx || j >= s.nz) continue;
+        const k = i * s.nz + j;
+        const top = s.top[k];
+        if (Number.isNaN(top)) continue;
+        // Engine y grows downward: the solid spans [road - top, road - bottom].
+        const topY = road - top, bottomY = road - s.bottom[k];
+        // Only what stands clearly taller than the ball can step blocks it (a thin lip or curb is rolled past).
+        const steppable = topY >= foot - SOLID_MIN_HEIGHT - climb;
+        const overhead = bottomY <= head;
+        if (!steppable && !overhead) return s.restitution;
+      }
+      return 0;
+    },
     forRoute: (route) => {
       if (!routed) return world;
       const key = routeKey(route);

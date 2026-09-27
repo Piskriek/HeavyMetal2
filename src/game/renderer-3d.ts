@@ -2363,6 +2363,8 @@ export class Renderer3D {
     const raw = frame.time;
     this.trackBuilder.updateAnimations(raw, frame.reducedMotion);
     if (this.materials.water.map) this.materials.water.map.offset.y = raw * 0.55;
+    // The island's sea: waves and foam roll in, the sea and the horizon haze follow the camera.
+    if (this.island && this.scene.fog) this.island.update(raw, this.camera, (this.scene.fog as THREE.Fog).color);
     if (this.materials.lava.map) {
       this.materials.lava.map.offset.x = raw * 0.004;
       this.materials.lava.map.offset.y = raw * 0.0025;

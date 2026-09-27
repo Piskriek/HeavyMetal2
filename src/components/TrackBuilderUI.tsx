@@ -2828,9 +2828,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
           {inspectorTab === 'collision' && (
             <CollisionPanel
-              roleConfig={selectedProp.roleConfig ?? DEFAULT_ROLE_CONFIGS.decoration}
+              roleConfig={selectedProp.roleConfig ?? DEFAULT_ROLE_CONFIGS[builder.collisionRoleOf(selectedProp)]}
               onChange={(updated) => {
-                const next = { ...(selectedProp.roleConfig ?? DEFAULT_ROLE_CONFIGS.decoration), ...updated };
+                const next = { ...(selectedProp.roleConfig ?? DEFAULT_ROLE_CONFIGS[builder.collisionRoleOf(selectedProp)]), ...updated };
                 builder.updatePropTransform(selectedProp.id, { roleConfig: next });
                 onRequestRender?.();
               }}

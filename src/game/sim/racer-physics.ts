@@ -37,6 +37,7 @@ import { DEFAULT_ROPE, ropeAt } from './rope';
 import { recordObstacleHit } from './obstacle-state';
 import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, routed, type RacerStepContext, type RecoveryReason } from './context';
 import { advanceRoute } from './route';
+import type { SimWorld } from './world';
 
 const TAU = Math.PI * 2;
 /** A grounded ball that runs off a placed deck with more than this below it falls instead of snapping down. */
@@ -396,6 +397,31 @@ export function scrapeSparks(racer: Racer, pushVz: number, ctx: RacerStepContext
   racer.scrapeFxAt = ctx.runTime;
   const scale = 0.3 + 0.5 * Math.min(1, racer.vx / 1200);
   ctx.fx.effect('sparks', racer.x, racer.y, racer.z + Math.sign(racer.z) * 26, scale, racer.id);
+}
+
+/**
+ * Placed models' solid parts (sides, walls, rocks): after a step, a ball that moved into one is put back
+ * along the axis that took it in, and bounces off with the model's restitution. Nothing to do on a
+ * course with no placed models, so every classic race is unchanged.
+ */
+/** The steepest slope a ball rolls up rather than bouncing off (tan 50°, the ride surfaces' own floor limit). */
+const CLIMB_SLOPE = 1.2;
+
+export function resolveSolids(racer: Racer, world: SimWorld, fromX: number, fromZ: number): void {
+  if (!world.patches.length || racer.loopRide || racer.falling || racer.mergeHeld) return;
+  const probe = (x: number, z: number) => {
+    // The ball's edge in the direction it is going, and its centre.
+    const ex = Math.sign(x - fromX) * RADIUS * 0.85, ez = Math.sign(z - fromZ) * RADIUS * 0.85;
+    // Ahead of the ball a slope it can roll up (up to about 50°) is not a wall.
+    const climb = RADIUS * 0.85 * CLIMB_SLOPE;
+    return Math.max(world.solidAt(x, z, racer.y, 0, fromX, fromZ), world.solidAt(x + ex, z, racer.y, climb, fromX, fromZ), world.solidAt(x, z + ez, racer.y, climb, fromX, fromZ));
+  };
+  const bounce = probe(racer.x, racer.z);
+  if (!bounce) return;
+  const blockedX = probe(racer.x, fromZ) > 0;
+  const blockedZ = probe(fromX, racer.z) > 0;
+  if (blockedX || !blockedZ) { racer.x = fromX; racer.vx = -racer.vx * bounce; }
+  if (blockedZ || !blockedX) { racer.z = fromZ; racer.vz = -racer.vz * bounce; }
 }
 
 export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace?: RacerStepTrace): void {

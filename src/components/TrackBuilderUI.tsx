@@ -2516,6 +2516,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   />
                 </label>
               )}
+              {(() => {
+                const status = builder.startLineStatus(selectedProp.id);
+                if (!status) return null;
+                return (
+                  <span className={`mt-1 text-[10px] ${status.used ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {status.used
+                      ? 'Races start here: the grid lines up on each lane at this line.'
+                      : 'Not used: a start has to stand well before the sorting pool, where the field queues. Move it up the hill.'}
+                  </span>
+                );
+              })()}
             </div>
             <button
               onClick={() => builder.selectProp(null)}

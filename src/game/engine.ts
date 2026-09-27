@@ -12,6 +12,7 @@ import { DEFAULT_ROPE, clampRope, type RopeConfig } from './sim/rope';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
 import { racePiecesFrom, rampScale } from './race-pieces';
+import { courseMarks, usableStartX } from './race-marks';
 import {
   BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, sectorAt,
@@ -572,16 +573,27 @@ export class GameEngine {
   private placeOnStartNodes() {
     const network = this.laneNetwork;
     if (!network) return;
+    // A Start Line placed on the island moves the grid there, on each racer's own lane.
+    const start = this.startLineX();
     for (const racer of this.racers) {
       const node = startNodeOf(network, racer.pathId);
       if (!node) continue;
-      racer.x = node.x + (racer.x - START_X);
-      racer.z = node.z;
+      const onLine = start !== null && start > node.x && racer.pathId ? sampleLane(network, racer.pathId, start) : null;
+      racer.x = (onLine ? start! : node.x) + (racer.x - START_X);
+      racer.z = onLine ? onLine.z : node.z;
       racer.y = this.y(racer.x) - RADIUS;
       racer.vx = racer.vy = racer.vz = 0;
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
       racer.launchOrigin = { x: racer.x, y: racer.y };
     }
+  }
+
+  /** The island's placed Start Line (engine x), when it stands well before the sorting pool. */
+  private startLineX(): number | null {
+    if (this.options.course !== 'basalt' && this.config?.course !== 'basalt') return null;
+    const builder = this.renderer?.trackBuilder;
+    const props = builder && typeof builder.getProps === 'function' ? builder.getProps() : [];
+    return usableStartX(courseMarks(props, 'basalt').start, this.mergeGateFor().x);
   }
 
   /** Puts every racer on the path nearest to them at this moment. */

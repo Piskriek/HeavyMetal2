@@ -13,6 +13,8 @@ import { FIXED_STEP } from '../src/game/contracts/timing';
 import { FINISH, RADIUS, START_X, TRACK_DISTANCE, courseY, laneZ } from '../src/game/scene';
 import { createSession, nextRound, sessionConfig, type RaceSetup } from '../src/game/session';
 import { recoverSession, sanitizeSetup } from '../src/game/save';
+import { START_BEFORE_POOL, usableStartX } from '../src/game/race-marks';
+import { readFileSync } from 'node:fs';
 
 /** Rolls one racer from `fromX` for up to `seconds`; returns it. */
 function roll(fromX: number, finishX: number | undefined, seconds = 3): Racer {
@@ -77,4 +79,20 @@ test('a cup races round 1 to the New Game pick, then each later round to the fin
   const third = nextRound({ ...second, results: [{ round: 0 } as never, { round: 1 } as never] }, null);
   assert.equal(sessionConfig(third).finishX, undefined, 'round 3: the full run');
   assert.equal(sessionConfig(createSession(setup({ mode: 'tournament' }))).finishX, undefined, 'no pick: the full run');
+});
+
+test('a Start Line counts only when it stands well before the sorting pool', () => {
+  const pool = 8304;
+  assert.equal(usableStartX(null, pool), null, 'none placed: the usual grid');
+  assert.equal(usableStartX(3000, pool), 3000, 'up the hill from the pool: used');
+  assert.equal(usableStartX(pool - START_BEFORE_POOL + 1, pool), null, 'too close to the pool: not used');
+  assert.equal(usableStartX(20000, pool), null, 'past the pool: not used');
+  assert.equal(usableStartX(START_X, pool), null, 'at the old grid: nothing to move');
+});
+
+test('the engine lines the grid up on a used Start Line, on each racer\'s own lane', () => {
+  const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
+  assert.match(engine, /const start = this\.startLineX\(\);/);
+  assert.match(engine, /racer\.x = \(onLine \? start! : node\.x\) \+ \(racer\.x - START_X\);/, 'grid rows keep their spacing behind the line');
+  assert.match(engine, /return usableStartX\(courseMarks\(props, 'basalt'\)\.start, this\.mergeGateFor\(\)\.x\);/);
 });

@@ -62,6 +62,17 @@ export function courseMarks(props: readonly PlacedProp[], course: CourseId): { s
   return { start: starts.length ? Math.min(...starts) : null, startWorld: first ? { x: first.x, z: first.z } : null, finishes };
 }
 
+/**
+ * How far before the sorting pool a Start Line must stand to be used: the field races alone to the
+ * pool (the solo first split), so a start at or past it would skip the queue altogether.
+ */
+export const START_BEFORE_POOL = 1500;
+
+/** The Start Line a race uses (engine x), or null: none placed, or placed too close to the pool. */
+export function usableStartX(start: number | null, poolX: number): number | null {
+  return start !== null && start > START_X + 50 && start < poolX - START_BEFORE_POOL ? start : null;
+}
+
 /** The world (x, z) of a point on the road's middle at engine x (the full run's end, the start line). */
 export function roadPointAt(course: CourseId, x: number): { x: number; z: number } {
   const space = course === 'basalt' ? courseTrackSpace(course) : getTrackSpace();

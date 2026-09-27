@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 import { classifyPlacedRamp } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
-import { engineXAt, isRaceMarkType, roadPoseAt } from './race-marks';
+import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } from './race-marks';
+import { passageMouthX } from './qualifying/passage';
 import { isKitModelType } from './models/kit-catalog';
 import { RAMP_PIECES } from './race-pieces';
 import type { CourseId } from './types';
@@ -3244,6 +3245,15 @@ export class TrackBuilder3D {
     this.backups.resetDiskState();
     this.loadIslandProps();
     this.notify();
+  }
+
+  /** Where a placed Start Line stands along the course, and whether races use it (it must be before the pool). */
+  startLineStatus(propId: string): { x: number; used: boolean; poolX: number } | null {
+    const prop = this.placedProps.find((p) => p.id === propId);
+    if (!prop || prop.type !== START_LINE_TYPE) return null;
+    const x = engineXAt(courseTrackSpace(this.courseId as CourseId), prop);
+    const poolX = passageMouthX();
+    return { x, used: usableStartX(x, poolX) !== null, poolX };
   }
 
   /** The file name of the store's latest disk save (shown in the backups list). */

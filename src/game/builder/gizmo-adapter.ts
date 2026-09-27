@@ -222,6 +222,9 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
     if (items.length === 0) {
       this.helper.visible = false;
       this.controls.enabled = false;
+      // A disabled TransformControls stops updating its hovered axis: clear it, or the last handle the
+      // pointer was over stays "hovered" and every later click is taken for the gizmo.
+      (this.controls as any).axis = null;
       return;
     }
 
@@ -271,12 +274,13 @@ export class GizmoAdapter<T extends Transformable & { id: string }> {
     return Boolean(this.laneNodeTarget);
   }
 
+  /** The pointer is over a handle of the gizmo that is showing (a hidden gizmo is never hovered). */
   isHovered(): boolean {
-    return Boolean((this.controls as any).axis);
+    return this.controls.enabled && this.helper.visible && Boolean((this.controls as any).axis);
   }
 
   isInteracting(): boolean {
-    return this.isDragging || Boolean((this.controls as any).axis);
+    return this.isDragging || this.isHovered();
   }
 
   detach(): void {

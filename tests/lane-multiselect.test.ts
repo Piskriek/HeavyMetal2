@@ -140,3 +140,11 @@ test('the decal edge handles draw over every decal (transparent pass, drawn last
   });
   assert.ok(boxes >= 8, 'four handles and their outlines');
 });
+
+test('a hidden gizmo never swallows clicks: a stale hovered handle is cleared when it detaches', async () => {
+  const { GizmoAdapter } = await import('../src/game/builder/gizmo-adapter');
+  const src = readFileSync(new URL('../src/game/builder/gizmo-adapter.ts', import.meta.url), 'utf8');
+  assert.match(src, /this\.controls\.enabled = false;\n\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*\(this\.controls as any\)\.axis = null;/, 'detaching clears the hovered axis');
+  assert.match(src, /return this\.controls\.enabled && this\.helper\.visible && Boolean\(\(this\.controls as any\)\.axis\);/, 'only a showing gizmo counts as hovered');
+  assert.ok(GizmoAdapter);
+});

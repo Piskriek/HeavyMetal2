@@ -31,6 +31,11 @@ import { FINISH, START_X } from './scene';
 export type LaneEdit =
   | { op: 'addPath'; at: { x: number; z: number }[] }
   | { op: 'moveNode'; nodeId: string; x: number; z: number }
+  /**
+   * Joins two nodes with a lane (Ctrl-click one, then the other), always running down the hill. With
+   * `extendPathId`, a lane ending at the uphill node grows by the new one (clicking on along a chain).
+   */
+  | { op: 'connect'; fromId: string; toId: string; extendPathId?: string | null }
   /** Several nodes at once (a group drag or nudge): all land together or none do. */
   | { op: 'moveNodes'; moves: { nodeId: string; x: number; z: number }[] }
   | { op: 'insertNode'; pathId: string; x: number; z: number }
@@ -188,6 +193,7 @@ export function applyLaneEdit(network: LaneNetwork, edit: LaneEdit): LaneEditRes
     case 'addPath': return addPath(network, edit.at);
     case 'moveNode': return moveNode(network, edit.nodeId, edit.x, edit.z);
     case 'moveNodes': return moveNodes(network, edit.moves);
+    case 'connect': return connectNodes(network, edit.fromId, edit.toId, edit.extendPathId ?? null);
     case 'insertNode': return insertNode(network, edit.pathId, edit.x, edit.z);
     case 'deleteNode': return deleteNode(network, edit.nodeId);
     case 'setKind': return setKind(network, edit.nodeId, edit.kind);
@@ -252,6 +258,26 @@ function moveNodes(network: LaneNetwork, moves: readonly { nodeId: string; x: nu
   }
   if (!changed) return refuse('unchanged', 'the nodes are already there');
   return finish(next, moves[0].nodeId);
+}
+
+function connectNodes(network: LaneNetwork, fromId: string, toId: string, extendPathId: string | null): LaneEditResult {
+  const a = nodeById(network, fromId);
+  const b = nodeById(network, toId);
+  if (!a || !b) return refuse('unknown_node', `there is no node ${!a ? fromId : toId}`);
+  if (fromId === toId) return refuse('unchanged', 'a node cannot be joined to itself');
+  const [up, down] = a.x <= b.x ? [a, b] : [b, a];
+  if (up.x === down.x) return refuse('non_monotone', 'the two nodes are level across the road: a lane has to run down the hill');
+  if (network.paths.some((p) => { const i = p.nodeIds.indexOf(up.id); return i >= 0 && p.nodeIds[i + 1] === down.id; })) {
+    return refuse('unchanged', 'those two nodes are already joined');
+  }
+  const next = copyNetwork(network);
+  const chain = extendPathId ? pathById(next, extendPathId) : undefined;
+  if (chain && chain.nodeIds[chain.nodeIds.length - 1] === up.id && !chain.nodeIds.includes(down.id)) {
+    chain.nodeIds.push(down.id);
+  } else {
+    next.paths.push({ id: uniqueId(next, 'p'), name: `Path ${next.paths.length + 1}`, nodeIds: [up.id, down.id], halfWidth: DEFAULT_HALF_WIDTH });
+  }
+  return finish(next, down.id);
 }
 
 function insertNode(network: LaneNetwork, pathId: string, x: number, z: number): LaneEditResult {

@@ -161,7 +161,7 @@ function LanePanel({
               onClick={() => onCommand?.({ op: 'newPath' })}
               aria-label="Create a new single lane path"
             >
-              + New Path [N]
+              + New Path [Shift+N]
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@ function LanePanel({
               onClick={() => onCommand?.({ op: 'newPath' })}
               aria-label="Create a new lane path"
             >
-              + Path [N]
+              + Path [Shift+N]
             </button>
             <button
               type="button"
@@ -288,11 +288,11 @@ function LanePanel({
             </div>
             <div className="lane-panel__commands" role="group" aria-label="Node commands">
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'insert' })}
-                aria-label="Insert a node on the path before the selected node">Insert [I]</button>
+                aria-label="Insert a node on the path before the selected node">Insert [Shift+I]</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'split' })}
-                aria-label="Split a new branch from the selected node">Split [S]</button>
+                aria-label="Split a new branch from the selected node">Split [Shift+S]</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'merge' })}
-                aria-label="Merge the selected path end into a clicked node">Merge [M]</button>
+                aria-label="Merge the selected path end into a clicked node">Merge [Shift+M]</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'markOob' })}
                 aria-label="Mark the selected path as the out-of-bounds branch">Mark OOB</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'delete' })}
@@ -538,8 +538,8 @@ function LanePanel({
           <div className="lane-panel__guide" role="note" aria-label="Lane editing instructions">
             <h4 className="lane-panel__subtitle">Authoring Lanes &amp; Paths</h4>
             <p className="lane-panel__hint">
-              Click <strong>+ Path [N]</strong> to add a new lane path. Click any circular handle on the track to move it with the 3D manipulator gizmo.
-              Select a node to <strong>Insert [I]</strong>, <strong>Split [S]</strong>, <strong>Merge [M]</strong>, change <strong>Kind [K]</strong>, or <strong>Delete [Del]</strong>.
+              Click <strong>+ Path [Shift+N]</strong> to add a new lane path. Click any circular handle on the track to move it with the 3D manipulator gizmo.
+              Select a node to <strong>Insert [Shift+I]</strong>, <strong>Split [Shift+S]</strong>, <strong>Merge [Shift+M]</strong>, change <strong>Kind [Shift+K]</strong>, or <strong>Delete [Del]</strong>.
             </p>
           </div>
         ) : null}

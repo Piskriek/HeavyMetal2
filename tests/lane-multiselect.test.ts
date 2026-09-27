@@ -117,7 +117,9 @@ test('the test ball: placed on the road, remembered per track, cleared back to t
 
 test('a test drive starts at the ball on the nearest lane; a click on the gizmo never selects what is in front of it', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
-  assert.match(engine, /const pathId = network \? nearestPath\(network, x, z\) : null;/, 'the nearest lane at that spot');
+  assert.match(engine, /player\.pathId = network \? nearestPath\(network, x, z\) : null;/, 'steers onto the nearest lane from that spot');
+  assert.match(engine, /player\.y = this\.world\.surfaceAt\(x, z\)\.y - RADIUS;/, 'resting on what it was put on (a ramp top or the road)');
+  assert.match(engine, /this\.player\.y = this\.world\.surfaceAt\(this\.player\.x, this\.player\.z, this\.player\.y \+ RADIUS\)\.y - RADIUS;/, 'the push keeps it on that surface');
   assert.match(engine, /racer\.y = this\.y\(racer\.x\) - RADIUS; \}\n\s*this\.placeAtTestStart\(\);/, 'applied on every reset, after the grid');
   const editor = readFileSync(new URL('../src/screens/MapEditorScreen.tsx', import.meta.url), 'utf8');
   assert.match(editor, /setTestStart\(engineRef\.current\.trackBuilder\.getTestBall\(\)\);[\s\S]{0,200}reset\(\)/, 'the editor hands the ball over before the reset');
@@ -147,4 +149,50 @@ test('a hidden gizmo never swallows clicks: a stale hovered handle is cleared wh
   assert.match(src, /this\.controls\.enabled = false;\n\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*\(this\.controls as any\)\.axis = null;/, 'detaching clears the hovered axis');
   assert.match(src, /return this\.controls\.enabled && this\.helper\.visible && Boolean\(\(this\.controls as any\)\.axis\);/, 'only a showing gizmo counts as hovered');
   assert.ok(GizmoAdapter);
+});
+
+test('Ctrl-click joins nodes into a lane down the hill, and clicking on carries the same lane on', () => {
+  const b = builder();
+  // Three free-standing nodes: a short brushed lane gives us nodes to join across.
+  const made = b.addLaneFromStroke(Array.from({ length: 40 }, (_, i) => ({ x: 20000 + i * 100, z: -400 })), 1000);
+  assert.ok(made.ok);
+  const net = () => b.getLaneNetwork()!;
+  const lanes = net().paths.length;
+  const groove = (x: number) => `groove2-x${x}`;
+  assert.deepEqual(b.connectClick(groove(20590)), { ok: true, joined: false }, 'the first click picks the node');
+  assert.deepEqual(b.connectClick(groove(21790)), { ok: true, joined: true }, 'the second joins them');
+  assert.equal(net().paths.length, lanes + 1, 'a new lane between the two');
+  assert.deepEqual(b.connectClick(groove(22990)), { ok: true, joined: true }, 'the third carries it on');
+  assert.equal(net().paths.length, lanes + 1, 'the same lane, not another');
+  const chain = net().paths[net().paths.length - 1];
+  assert.deepEqual(chain.nodeIds, [groove(20590), groove(21790), groove(22990)]);
+  b.endConnect();
+  b.connectClick(groove(25390));
+  assert.deepEqual(b.connectClick(groove(23590)), { ok: true, joined: true }, 'clicked uphill: still joined down the hill');
+  const last = net().paths[net().paths.length - 1];
+  assert.deepEqual(last.nodeIds, [groove(23590), groove(25390)]);
+  assert.equal(b.connectClick(groove(24190)).ok, false, 'two nodes already next to each other on a lane are not joined twice');
+  b.endConnect();
+  b.undo();
+  assert.equal(net().paths.some((p) => p.nodeIds.join() === [groove(23590), groove(25390)].join()), false, 'one undo removes a join');
+});
+
+test('lane nodes drag straight over the ground: the group follows, a refused move changes nothing, one undo', () => {
+  const b = builder();
+  let pointer = { x: 5590, z: -290 };
+  (b as any).lanePointAt = () => pointer;
+  const canvas = {} as HTMLCanvasElement;
+  b.selectLaneNodes(['groove1-x5590', 'groove2-x5590']);
+  b.beginLaneDrag('groove1-x5590');
+  pointer = { x: 5690, z: -250 };
+  assert.ok(b.dragLaneNodesTo(0, 0, canvas).ok);
+  assert.equal(node(b, 'groove1-x5590').x, 5700, 'grid-snapped to 50');
+  assert.equal(node(b, 'groove2-x5590').x, 5700, 'the rest of the selection moves with it');
+  pointer = { x: 9000, z: -250 };
+  assert.equal(b.dragLaneNodesTo(0, 0, canvas).ok, false, 'past the next node of the lane: refused');
+  assert.equal(node(b, 'groove1-x5590').x, 5700, 'nothing moved');
+  b.endLaneDrag();
+  b.undo();
+  assert.equal(node(b, 'groove1-x5590').x, 5590, 'one undo puts the whole drag back');
+  assert.equal(node(b, 'groove2-x5590').x, 5590);
 });

@@ -1320,7 +1320,7 @@ export class TrackBuilder3D {
       const obj = hit.object;
       // The model placement preview is never a surface (the preview would climb its own model).
       let inGhost = false;
-      for (let p: THREE.Object3D | null = obj; p; p = p.parent) if (p.userData?.isKitGhost) { inGhost = true; break; }
+      for (let p: THREE.Object3D | null = obj; p; p = p.parent) if (p.userData?.isKitGhost || p.name === 'TestBallMarker') { inGhost = true; break; }
       if (inGhost) continue;
       // three.js raycasts hit hidden objects: a hidden scenery part or prop is not a surface.
       if (!SceneKit.shown(obj) || obj.name?.startsWith('Light') || obj.name === 'BuilderLightSlot') continue;
@@ -2818,63 +2818,25 @@ export class TrackBuilder3D {
     return { x: point.x, z: point.z };
   }
 
-  attachGizmoToLaneNode(nodeId: string | null) {
-    if (!nodeId || !this.laneDoc || !this.gizmoAdapter) {
-      if (this.gizmoAdapter?.isLaneNodeAttached()) {
-        this.gizmoAdapter.detach();
-      }
-      return;
-    }
-    const node = this.laneDoc.nodes.find((n) => n.id === nodeId);
-    if (!node) {
-      if (this.gizmoAdapter?.isLaneNodeAttached()) {
-        this.gizmoAdapter.detach();
-      }
-      return;
-    }
-    this.selectedPropIds.clear();
-    const worldPos = this.laneGizmos.worldFromEngine(node.x, node.z, 0);
-    // Where every selected node stood when the drag began: a group drag offsets them all by the primary's move.
-    let groupStart = new Map<string, { x: number; z: number }>();
-    this.gizmoAdapter.attachLaneNode(
-      {
-        id: node.id,
-        onDragStart: () => {
-          this.pushUndo();
-          groupStart = new Map((this.laneDoc?.nodes ?? [])
-            .filter((n) => this.selectedLaneNodeIds.has(n.id) || n.id === node.id)
-            .map((n) => [n.id, { x: n.x, z: n.z }]));
-        },
-        onMove: (pos) => {
-          const engine = this.laneGizmos.engineFromWorld(pos);
-          const snapped = snapNode(engine.x, engine.z, { lanes: false, grid: true });
-          const start = groupStart.get(node.id);
-          if (groupStart.size > 1 && start) {
-            const dx = snapped.x - start.x, dz = snapped.z - start.z;
-            this.applyLaneEditToDoc({ op: 'moveNodes', moves: [...groupStart].map(([nodeId, p]) => ({ nodeId, x: p.x + dx, z: p.z + dz })) });
-          } else {
-            this.applyLaneEditToDoc({ op: 'moveNode', nodeId: node.id, x: snapped.x, z: snapped.z });
-          }
-        },
-        onCommit: () => {
-          const current = this.getSelectedLaneNode();
-          if (current) {
-            const finalWorld = this.laneGizmos.worldFromEngine(current.x, current.z, 0);
-            this.gizmoAdapter?.updateLaneNodePosition(finalWorld);
-          }
-          this.notify();
-        },
-      },
-      worldPos,
-    );
+  /**
+   * Lane nodes have no gizmo: they are dragged straight over the ground (dragLaneNodesTo). The gizmo
+   * moved flat at one height, so on a slope its point sank or floated and the road under it was misread.
+   * Kept so every caller simply lets go of any gizmo still on a lane node.
+   */
+  attachGizmoToLaneNode(_nodeId: string | null) {
+    if (this.gizmoAdapter?.isLaneNodeAttached()) this.gizmoAdapter.detach();
   }
 
   /* ───────────── Test ball: where a test drive starts ───────────── */
 
-  /** The test ball's spot (engine x along the road, z across it), or null: test drives use the grid. */
-  private testBall: { x: number; z: number } | null = null;
+  /**
+   * The test ball's spot (engine x along the road, z across it) and the world point it was put on (a
+   * ramp or deck top, or the road), or null: test drives start from the grid.
+   */
+  private testBall: { x: number; z: number; world?: { x: number; y: number; z: number } } | null = null;
   private testBallMarker: THREE.Group | null = null;
   private testBallLoaded = false;
+  private testBallShown = true;
 
   /** Remembered per course and island track on this device (a convenience, not part of the track). */
   private testBallKey() { return `${this.courseId}:${this.propStore === 'island' ? this.islandTrackId : 'track'}`; }
@@ -2887,13 +2849,25 @@ export class TrackBuilder3D {
         if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.z)) this.setTestBall(saved, false);
       } catch { /* none saved */ }
     }
-    return this.testBall;
+    this.refreshTestBallMarker();
+    return this.testBall ? { x: this.testBall.x, z: this.testBall.z } : null;
   }
 
-  /** Puts the test ball on the road at this spot (engine x/z), or removes it (null). */
-  setTestBall(point: { x: number; z: number } | null, remember = true) {
+  /** The spot under the pointer for the test ball: on the road or on top of a placed model. */
+  testBallPointAt(clientX: number, clientY: number, canvas: HTMLCanvasElement): { x: number; z: number; world: { x: number; y: number; z: number } } | null {
+    const hit = this.raycastSurface(clientX, clientY, canvas);
+    if (!hit) return null;
+    const point = this.laneGizmos.engineFromWorld(hit.point);
+    return { x: point.x, z: point.z, world: { x: hit.point.x, y: hit.point.y, z: hit.point.z } };
+  }
+
+  /** Puts the test ball at this spot, or removes it (null: test drives start from the grid). */
+  setTestBall(point: { x: number; z: number; world?: { x: number; y: number; z: number } } | null, remember = true) {
     this.testBallLoaded = true;
-    this.testBall = point ? { x: Math.round(point.x), z: Math.round(point.z) } : null;
+    this.testBall = point ? {
+      x: Math.round(point.x), z: Math.round(point.z),
+      ...(point.world ? { world: { x: Math.round(point.world.x), y: Math.round(point.world.y), z: Math.round(point.world.z) } } : {}),
+    } : null;
     if (remember) {
       try {
         const all = JSON.parse(localStorage.getItem(TEST_BALL_KEY) || '{}');
@@ -2901,11 +2875,19 @@ export class TrackBuilder3D {
         localStorage.setItem(TEST_BALL_KEY, JSON.stringify(all));
       } catch { /* storage unavailable: kept for this session only */ }
     }
-    if (!this.testBall) { if (this.testBallMarker) this.testBallMarker.visible = false; this.notify(); return; }
+    this.refreshTestBallMarker();
+    this.notify();
+  }
+
+  /**
+   * The marker: the test ball where it was put, or (none put) a faded ball at the grid's front, so it
+   * can always be picked up and dragged to where a test should start.
+   */
+  private refreshTestBallMarker() {
     if (!this.testBallMarker) {
       const marker = new THREE.Group();
       marker.name = 'TestBallMarker';
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0x7a4a00, roughness: 0.4, metalness: 0.3 }));
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0x7a4a00, roughness: 0.4, metalness: 0.3, transparent: true }));
       const ring = new THREE.Mesh(new THREE.RingGeometry(RADIUS * 1.5, RADIUS * 1.9, 40), new THREE.MeshBasicMaterial({ color: 0xffb020, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = -RADIUS + 3;
@@ -2913,15 +2895,27 @@ export class TrackBuilder3D {
       this.testBallMarker = marker;
       this.scene.add(marker);
     }
-    const at = this.laneGizmos.worldFromEngine(this.testBall.x, this.testBall.z, RADIUS);
-    this.testBallMarker.position.copy(at);
-    this.testBallMarker.visible = this.freeFly.active;
-    this.notify();
+    const marker = this.testBallMarker;
+    let at: THREE.Vector3 | null = null;
+    if (this.testBall?.world) at = new THREE.Vector3(this.testBall.world.x, this.testBall.world.y + RADIUS, this.testBall.world.z);
+    else if (this.testBall) at = this.laneGizmos.worldFromEngine(this.testBall.x, this.testBall.z, RADIUS);
+    else {
+      // The grid's front: the first node of the lane nearest the middle of the road.
+      const doc = this.laneDoc;
+      const starts = doc?.paths.map((p) => doc.nodes.find((n) => n.id === p.nodeIds[0])).filter((n): n is NonNullable<typeof n> => !!n) ?? [];
+      const front = starts.sort((a, b) => Math.abs(a.z) - Math.abs(b.z))[0];
+      at = this.laneGizmos.worldFromEngine(front ? front.x : START_X, front ? front.z : 0, RADIUS);
+    }
+    marker.position.copy(at);
+    const ball = marker.children[0] as THREE.Mesh;
+    (ball.material as THREE.MeshStandardMaterial).opacity = this.testBall ? 1 : 0.45;
+    marker.visible = this.testBallShown;
   }
 
   /** Shows the marker in build mode, hides it while test driving. */
   setTestBallShown(shown: boolean) {
-    if (this.testBallMarker) this.testBallMarker.visible = shown && !!this.testBall;
+    this.testBallShown = shown;
+    if (this.testBallMarker) this.testBallMarker.visible = shown;
   }
 
   /** True when the pointer is over the test ball (to pick it up and drag it). */
@@ -2971,6 +2965,82 @@ export class TrackBuilder3D {
     this.selectLaneNodes(added);
     return { ok: true, nodes: added.length };
   }
+
+  /* ───────────── Ctrl-click: join nodes into a lane ───────────── */
+
+  /** The node the next Ctrl-click joins from, and the lane the chain is growing (null: none yet). */
+  private connectAnchor: string | null = null;
+  private connectChain: string | null = null;
+
+  /**
+   * Hold Ctrl and click nodes: the first click picks a node, each next click joins the last node to
+   * the clicked one (down the hill), and further clicks carry the same lane on. One undo step each.
+   */
+  connectClick(nodeId: string): { ok: true; joined: boolean } | { ok: false; reason: string } {
+    if (!this.laneDoc) return { ok: false, reason: 'no_document: there is no lane network loaded' };
+    const anchor = this.connectAnchor;
+    this.selectLaneNode(nodeId);
+    if (!anchor || anchor === nodeId || !this.laneDoc.nodes.some((n) => n.id === anchor)) {
+      this.connectAnchor = nodeId;
+      this.connectChain = null;
+      return { ok: true, joined: false };
+    }
+    const edit: LaneEdit = { op: 'connect', fromId: anchor, toId: nodeId, extendPathId: this.connectChain };
+    // A refused join changes nothing, so it leaves no undo step behind.
+    const check = applyLaneEdit(this.laneDoc, edit);
+    if (!check.ok) return check;
+    this.pushUndo();
+    const result = this.applyLaneEditToDoc(edit);
+    if (!result.ok) return result;
+    // The lane that now ends at the downhill one of the two carries the chain on.
+    const a = this.laneDoc.nodes.find((n) => n.id === anchor)!;
+    const b = this.laneDoc.nodes.find((n) => n.id === nodeId)!;
+    const [up, down] = a.x <= b.x ? [a, b] : [b, a];
+    const lane = this.laneDoc.paths.find((p) => { const i = p.nodeIds.indexOf(up.id); return i >= 0 && p.nodeIds[i + 1] === down.id && i + 1 === p.nodeIds.length - 1; });
+    this.connectChain = lane?.id ?? null;
+    this.connectAnchor = nodeId;
+    this.selectLaneNode(nodeId);
+    return { ok: true, joined: true };
+  }
+
+  /* ───────────── Dragging lane nodes over the ground ───────────── */
+
+  private laneDrag: { primary: string; start: Map<string, { x: number; z: number }>; undoPushed: boolean } | null = null;
+
+  /** Picks up a node (and the rest of the selection with it) to drag it over the ground. */
+  beginLaneDrag(nodeId: string) {
+    if (!this.laneDoc) return;
+    const ids = this.selectedLaneNodeIds.has(nodeId) ? this.selectedLaneNodeIds : new Set([nodeId]);
+    const start = new Map(this.laneDoc.nodes.filter((n) => ids.has(n.id)).map((n) => [n.id, { x: n.x, z: n.z }]));
+    this.laneDrag = { primary: nodeId, start, undoPushed: false };
+  }
+
+  /**
+   * Moves the dragged node to the ground under the pointer (grid-snapped), the rest of the selection by
+   * the same amount. One undo step for the whole drag. A refused move leaves the nodes where they were.
+   */
+  dragLaneNodesTo(clientX: number, clientY: number, canvas: HTMLCanvasElement): { ok: true } | { ok: false; reason: string } {
+    const drag = this.laneDrag;
+    if (!drag || !this.laneDoc) return { ok: false, reason: 'no_drag' };
+    const point = this.lanePointAt(clientX, clientY, canvas);
+    if (!point) return { ok: false, reason: 'off_track: the pointer is not over the road' };
+    const snapped = snapNode(point.x, point.z, { lanes: false, grid: true });
+    const from = drag.start.get(drag.primary)!;
+    const dx = snapped.x - from.x, dz = snapped.z - from.z;
+    const edit: LaneEdit = drag.start.size > 1
+      ? { op: 'moveNodes', moves: [...drag.start].map(([nodeId, p]) => ({ nodeId, x: p.x + dx, z: p.z + dz })) }
+      : { op: 'moveNode', nodeId: drag.primary, x: snapped.x, z: snapped.z };
+    const check = applyLaneEdit(this.laneDoc, edit);
+    if (!check.ok) return check;
+    if (!drag.undoPushed) { this.pushUndo(); drag.undoPushed = true; }
+    const result = this.applyLaneEditToDoc(edit);
+    return result.ok ? { ok: true } : result;
+  }
+
+  endLaneDrag() { this.laneDrag = null; }
+
+  /** Letting go of Ctrl ends the chain. */
+  endConnect() { this.connectAnchor = null; this.connectChain = null; }
 
   /** The selected lane nodes' ids (the primary one included). */
   getSelectedLaneNodeIds(): string[] { return [...this.selectedLaneNodeIds]; }
@@ -3022,8 +3092,11 @@ export class TrackBuilder3D {
     const moves = this.laneDoc.nodes
       .filter((n) => this.selectedLaneNodeIds.has(n.id))
       .map((n) => ({ nodeId: n.id, x: n.x + dx, z: n.z + dz }));
+    const edit: LaneEdit = { op: 'moveNodes', moves };
+    const check = applyLaneEdit(this.laneDoc, edit);
+    if (!check.ok) return check;
     this.pushUndo();
-    const result = this.applyLaneEditToDoc({ op: 'moveNodes', moves });
+    const result = this.applyLaneEditToDoc(edit);
     if (this.selectedLaneNodeId && this.lanesVisible) this.attachGizmoToLaneNode(this.selectedLaneNodeId);
     return result.ok ? { ok: true } : result;
   }

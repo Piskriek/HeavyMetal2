@@ -466,7 +466,8 @@ export class GameEngine {
     // Solo first split: only the player marble starts from the pad
     applyPushTick(this.player, this.pushTick, this.pushTargets[0] ?? 240);
     this.player.x += this.player.vx * dt;
-    this.player.y = this.y(this.player.x) - RADIUS;
+    // The push follows what the ball rests on: the road, or a placed deck it starts on (the test ball).
+    this.player.y = this.world.surfaceAt(this.player.x, this.player.z, this.player.y + RADIUS).y - RADIUS;
     this.player.grounded = true;
     this.player.rotation += this.player.vx * dt / RADIUS;
     this.refreshSnapshot();
@@ -698,15 +699,12 @@ export class GameEngine {
     if (!at) return;
     const player = this.player;
     const x = clamp(at.x, START_X, FINISH - 600);
-    let z = clamp(at.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    const z = clamp(at.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    // It starts exactly where the ball was put (on a ramp or deck if it stands on one) and steers onto
+    // the nearest lane of the network from there.
     const network = this.laneNetwork;
-    const pathId = network ? nearestPath(network, x, z) : null;
-    if (network && pathId) {
-      const lane = sampleLane(network, pathId, x);
-      if (lane) z = lane.z;
-    }
-    player.pathId = pathId;
-    player.x = x; player.z = z; player.y = this.y(x) - RADIUS;
+    player.pathId = network ? nearestPath(network, x, z) : null;
+    player.x = x; player.z = z; player.y = this.world.surfaceAt(x, z).y - RADIUS;
     player.vx = player.vy = player.vz = 0;
     player.grounded = true;
     player.distance = Math.max(0, (x - START_X) / 2);

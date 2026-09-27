@@ -41,5 +41,6 @@ test('the push-start grid rests on the pad (grounded), not in the air', () => {
   assert.equal(placementFromEngine(map, { x, y, z: 0, grounded: true, course: 'ridge' }).altitude, RADIUS);
   const e = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
   assert.match(e, /for \(const racer of this\.racers\) \{ racer\.grounded = true; racer\.y = this\.y\(racer\.x\) - RADIUS; \}/);
-  assert.match(e, /this\.player\.y = this\.y\(this\.player\.x\) - RADIUS;\r?\n\s*this\.player\.grounded = true;/);
+  // The push keeps the ball on what it rests on: the pad (the road), or a placed deck a test starts on.
+  assert.match(e, /this\.player\.y = this\.world\.surfaceAt\(this\.player\.x, this\.player\.z, this\.player\.y \+ RADIUS\)\.y - RADIUS;\r?\n\s*this\.player\.grounded = true;/);
 });

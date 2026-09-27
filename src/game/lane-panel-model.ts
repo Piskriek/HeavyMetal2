@@ -127,6 +127,11 @@ export interface LaneKeyEvent {
   readonly ctrlOrMeta: boolean;
   /** True when a text field has focus: typing "n" in a name box must not start a path. */
   readonly typing: boolean;
+  /**
+   * Shift held. The lane edits are Shift+letter: a bare letter is the builder's own (M is Move, S flies
+   * back), and a bare M merging the selected lane into a node looked like lanes joining at random.
+   */
+  readonly shift?: boolean;
 }
 
 /**
@@ -141,6 +146,8 @@ export function laneKeyIntent(event: LaneKeyEvent): LaneKeyIntent | null {
     return null;
   }
   if (event.typing) return null;
+  if (key === 'delete') return 'delete';
+  if (!event.shift) return null;
   switch (key) {
     case 'n': return 'newPath';
     case 'i': return 'insert';

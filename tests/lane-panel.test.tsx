@@ -118,14 +118,16 @@ test('AC-5: the rendered panel lists errors live, disables Save while invalid, a
 });
 
 test('the key bindings are the ticket\'s list, and typing never becomes a command', () => {
-  const press = (key: string, ctrlOrMeta = false, typing = false) => laneKeyIntent({ key, ctrlOrMeta, typing });
-  assert.equal(press('n'), 'newPath');
-  assert.equal(press('i'), 'insert');
-  assert.equal(press('Delete'), 'delete');
-  assert.equal(press('k'), 'cycleKind');
-  assert.equal(press('s'), 'split');
-  assert.equal(press('m'), 'merge');
-  assert.equal(press('o'), 'markOob');
+  const press = (key: string, ctrlOrMeta = false, typing = false, shift = true) => laneKeyIntent({ key, ctrlOrMeta, typing, shift });
+  assert.equal(press('N'), 'newPath');
+  assert.equal(press('I'), 'insert');
+  assert.equal(press('Delete', false, false, false), 'delete', 'Delete needs no Shift');
+  assert.equal(press('K'), 'cycleKind');
+  assert.equal(press('S'), 'split');
+  assert.equal(press('M'), 'merge');
+  assert.equal(press('O'), 'markOob');
+  assert.equal(press('m', false, false, false), null, 'a bare M is the Move toggle of the builder, never a lane merge');
+  assert.equal(press('s', false, false, false), null, 'a bare S flies back');
   assert.equal(press('z', true), 'undo');
   assert.equal(press('y', true), 'redo');
   assert.equal(press('Z', true), 'redo', 'Ctrl+Shift+Z redoes');

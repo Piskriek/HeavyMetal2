@@ -16,6 +16,7 @@ import { isKitModelType } from '../game/models/kit-catalog';
 import BrightnessSlider from './builder/BrightnessSlider';
 import { BRUSH_SPACING_DEFAULT, BRUSH_SPACING_MAX, BRUSH_SPACING_MIN } from '../game/lane-path-tool';
 import IslandTrackBar from './builder/IslandTrackBar';
+import FloatingWindow from './builder/FloatingWindow';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -346,7 +347,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             return;
           }
           const hitNode = builder.raycastLaneNode(e.clientX, e.clientY, canvas);
-          const additive = e.shiftKey || e.ctrlKey || e.metaKey;
+          // Ctrl (Cmd) + click joins nodes into a lane; Shift + click adds to the selection.
+          if (hitNode && (e.ctrlKey || e.metaKey)) {
+            const joined = builder.connectClick(hitNode);
+            showToast(!joined.ok ? joined.reason : joined.joined
+              ? 'Joined. Keep holding Ctrl and click the next node to carry the lane on'
+              : 'Hold Ctrl and click the next node to join it to this one', joined.ok ? 3000 : 4500);
+            setLaneRevision((revision) => revision + 1);
+            onRequestRender?.();
+            return;
+          }
+          const additive = e.shiftKey;
           laneDragReason.current = null;
           if (!hitNode && laneBrushRef.current.on) {
             // The brush: this drag draws a new lane along the road.
@@ -355,11 +366,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             return;
           }
           if (hitNode) {
-            builder.selectLaneNode(hitNode, additive);
+            if (!(additive && builder.getSelectedLaneNodeIds().includes(hitNode))) builder.selectLaneNode(hitNode, additive);
+            // Press and drag: the node (and the rest of the selection) follows the ground under the pointer.
+            builder.beginLaneDrag(hitNode);
+            draggingLaneNode.current = hitNode;
             const count = builder.getSelectedLaneNodeIds().length;
             showToast(count > 1
               ? `${count} nodes selected: drag the gizmo to move them together · arrows nudge · L whole lanes · Del delete`
-              : `Node ${hitNode}: drag the gizmo to move · Shift-click or drag a box to select more · Del delete · K kind · S split · I insert`);
+              : `Node ${hitNode}: drag the gizmo to move · Shift-click or drag a box to select more · Ctrl-click nodes to connect them · Del delete · Shift+K kind · Shift+S split · Shift+I insert`);
           } else {
             // Open ground: drag out a box to select every node inside it (a plain click clears the selection).
             laneMarquee.current = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, additive };
@@ -372,8 +386,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         if (builder.isGizmoInteracting() || builder.isGizmoHovered()) return;
         // The test ball: pick it up, or (Test Start on) put it where the road was clicked.
         if (builder.isOverTestBall(e.clientX, e.clientY, canvas) || testStartModeRef.current) {
-          const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
-          if (point) { builder.setTestBall(point); setTestBallState(builder.getTestBall()); }
+          const point = builder.testBallPointAt(e.clientX, e.clientY, canvas);
+          if (point && !builder.isOverTestBall(e.clientX, e.clientY, canvas)) { builder.setTestBall(point); setTestBallState(builder.getTestBall()); }
           draggingTestBall.current = true;
           onRequestRender?.();
           return;
@@ -457,7 +471,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
       if (draggingTestBall.current && !isRightMouseDown.current) {
-        const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
+        const point = builder.testBallPointAt(e.clientX, e.clientY, canvas);
         if (point) { builder.setTestBall(point, false); onRequestRender?.(); }
         return;
       }
@@ -483,7 +497,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         return;
       }
       if (draggingLaneNode.current && !isRightMouseDown.current) {
-        const moved = builder.dragLaneNode(draggingLaneNode.current, e.clientX, e.clientY, canvas);
+        const moved = builder.dragLaneNodesTo(e.clientX, e.clientY, canvas);
         laneDragReason.current = moved.ok ? null : moved.reason;
         setLaneRevision((revision) => revision + 1);
         onRequestRender?.();
@@ -590,7 +604,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           const stroke = laneStroke.current;
           laneStroke.current = null;
           const made = builder.addLaneFromStroke(stroke, laneBrushRef.current.spacing);
-          showToast(made.ok ? `New lane with ${made.nodes} nodes (drag its nodes, K for kind, S split, M merge)` : made.reason, made.ok ? 3500 : 4500);
+          showToast(made.ok ? `New lane with ${made.nodes} nodes (drag its nodes; Shift+K kind, Shift+S split, Shift+M merge)` : made.reason, made.ok ? 3500 : 4500);
           setLaneRevision((revision) => revision + 1);
           onRequestRender?.();
         }
@@ -628,6 +642,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           // is what a drag that never left its node reports, and that is not news.
           const reason = laneDragReason.current;
           draggingLaneNode.current = null;
+          builder.endLaneDrag();
           laneDragReason.current = null;
           if (reason && !reason.startsWith('unchanged')) showToast(reason, 5000);
           setLaneRevision((revision) => revision + 1);
@@ -746,7 +761,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           return;
         }
         const isReverseFlying = (e.code === 'KeyS' || e.key === 's' || e.key === 'S') && (isRightMouseDown.current || builder.freeFly.active);
-        const intent = isReverseFlying ? null : laneKeyIntent({ key: e.key, ctrlOrMeta: e.ctrlKey || e.metaKey, typing: false });
+        const intent = isReverseFlying ? null : laneKeyIntent({ key: e.key, ctrlOrMeta: e.ctrlKey || e.metaKey, typing: false, shift: e.shiftKey });
         if (intent) {
           e.preventDefault();
           laneIntentRef.current(intent);
@@ -1019,6 +1034,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
     const onKeyUp = (e: KeyboardEvent) => {
       keysRef.current.delete(e.code);
+      // Letting go of Ctrl ends a Ctrl-click chain of joined lane nodes.
+      if (e.key === 'Control' || e.key === 'Meta') builder.endConnect();
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -3947,7 +3964,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <SceneShelfBox builder={builder} mode={category} onOpenShaders={() => setShowShaders(true)} onRequestRender={onRequestRender} showToast={showToast} />
               )}
               {category === 'lanes' ? (
-                <div className="flex flex-col gap-1 w-full">
+                <>
+                <div className="flex items-center justify-center w-full py-6 text-zinc-400 text-xs gap-2">
+                  <Route size={14} className="text-amber-400" />
+                  The lane tools are in the floating <strong className="text-amber-300">Lanes &amp; Paths</strong> window (drag it by its title).
+                </div>
+                <FloatingWindow title="Lanes & Paths" storageKey="hm2-lane-window-v1" initial={{ x: 16, y: 72 }} width={540}>
+                <div className="flex flex-col gap-1 w-full pb-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-2 text-[11px] text-zinc-400">
+                  <span><strong className="text-zinc-200">Drag</strong> a node over the ground</span>·
+                  <span><strong className="text-zinc-200">Shift-click</strong> or drag a box to select more</span>·
+                  <span><strong className="text-zinc-200">Ctrl-click</strong> nodes one after another to join them into a lane</span>
+                </div>
                 <div className="flex items-center gap-2 px-3 pt-1 text-xs">
                   <button
                     onClick={() => {
@@ -3987,6 +4015,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   {...laneHandlers}
                 />
                 </div>
+                </FloatingWindow>
+                </>
               ) : (category as string) === 'custom_models' ? (
                 <CustomModelsTab
                   onSelectModel={(assetId, name) => {

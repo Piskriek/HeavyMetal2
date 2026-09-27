@@ -9,6 +9,7 @@ import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from
 import { classifyPlacedRamp } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
 import type { CourseId } from './types';
+import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, START_X } from './scene';
 import { applyLaneEdit, snapNode, type LaneEdit } from './lane-path-tool';
@@ -222,6 +223,10 @@ export class TrackBuilder3D {
   ) {
     if (propStore === 'island') this.courseId = 'basalt';
     this.kit = new SceneKit(this.scene, this.materialCache, this.materials);
+    // The Meshy models: the low tier on the Performance setting; a model that arrives while selected
+    // gets its selection box refitted.
+    this.kit.lowTierModels = typeof window !== 'undefined' && readOptions().graphics === 'performance';
+    this.kit.onModelLoaded = (propId) => { if (this.selectedPropIds.has(propId)) this.updateSelectionBox(); };
     this.shaderLibrary = loadShaderLibrary();
     this.initDecalSideHandles();
     this.laneGizmos = new LaneGizmos(this.scene, () => courseTrackSpace(this.courseId as CourseId));

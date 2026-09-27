@@ -6,7 +6,8 @@ import {
   Users, Move, Database, History, Save, RefreshCw,
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
   Minus, Plus, Film, Route, Box, HelpCircle, Maximize2, Sparkles,
-  Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush
+  Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush,
+  Castle, Rocket, CircleDot
 } from 'lucide-react';
 import { COURSES, type CourseId } from '../game/types';
 import ZenRestore from './builder/ZenRestore';
@@ -55,6 +56,10 @@ interface TrackBuilderUIProps {
 }
 
 const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode }[] = [
+  // The Meshy models: island pieces, stunts and decorative rings (models/kit-catalog.ts).
+  { id: 'island_kit', label: 'Island Kit', icon: <Castle size={16} /> },
+  { id: 'stunts', label: 'Stunts', icon: <Rocket size={16} /> },
+  { id: 'decoration', label: 'Decoration', icon: <CircleDot size={16} /> },
   { id: 'foliage', label: 'Foliage & Nature', icon: <TreePine size={16} /> },
   { id: 'trackside', label: 'Trackside & Stunts', icon: <Compass size={16} /> },
   { id: 'cavern_mine', label: 'Cavern & Mine', icon: <Mountain size={16} /> },
@@ -98,7 +103,7 @@ function useLatestHandlers<T extends Record<string, (...args: never[]) => unknow
 }
 
 export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, onRequestRender, course, onCourseChange }: TrackBuilderUIProps) {
-  const [category, setCategory] = useState<PropCategory>('foliage');
+  const [category, setCategory] = useState<PropCategory>('island_kit');
   const [showShaders, setShowShaders] = useState(false);
   const [isZen, setIsZen] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);

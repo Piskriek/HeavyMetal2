@@ -7,6 +7,7 @@ import type { MaterialDescriptor } from '../materials/material-descriptor';
 import type { RoleConfig } from '../collision/obstacle-roles';
 import { PRIMITIVE_DEFINITIONS } from './primitives';
 import { LIGHT_DEFINITIONS } from './light-rig';
+import { KIT_DEFINITIONS } from '../models/kit-catalog';
 
 export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' | 'decals' | 'goblins' | 'powerup' | 'barrier' | 'animated'
   /** M01 · T7 — not a prop shelf: this tab shows the Lanes & Paths panel instead of a card grid. */
@@ -15,6 +16,8 @@ export type PropCategory = 'foliage' | 'trackside' | 'cavern_mine' | 'stadium' |
   | 'primitives'
   /** Placed point and spot lights. */
   | 'lights'
+  /** The Meshy models (models/kit-catalog.ts): island pieces, stunts, and decorative rings. */
+  | 'island_kit' | 'stunts' | 'decoration'
   /** Not a shelf: edits to the course's generated scenery (never shown as cards). */
   | 'scenery';
 
@@ -498,6 +501,8 @@ export const PROP_DEFINITIONS: PropDefinition[] = [
   // --- SCENE KIT: primitives, lights, and the record type for edits to generated scenery ---
   ...PRIMITIVE_DEFINITIONS,
   ...LIGHT_DEFINITIONS,
+  // --- THE MESHY MODELS (models/kit-catalog.ts) ---
+  ...KIT_DEFINITIONS,
   { type: 'terrain_edit', name: 'Scenery edit', category: 'scenery', url: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#f0b85e" stroke-width="2.5" stroke-linejoin="round"><path d="M6 50 22 24l10 14 8-10 18 22z"/></svg>'), defaultWidth: 100, defaultHeight: 100 },
 ];
 

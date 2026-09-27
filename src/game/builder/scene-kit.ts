@@ -7,7 +7,8 @@
  * save and disk backups for free:
  *   - `light_*`       → a marker the builder can click, plus a slot in the LightRig while nearby;
  *   - `prim_*`        → a mesh (unit geometry scaled to width/height/depth) wearing a shader;
- *   - `terrain_edit`  → an override on one generated scenery part: moved, hidden or re-shaded.
+ *   - `terrain_edit`  → an override on one generated scenery part: moved, hidden or re-shaded;
+ *   - `kit_*`         → a Meshy model (models/kit-catalog.ts), sized by the prop's scale.
  */
 import * as THREE from 'three';
 import { BlendMaterials, setTileRandomization } from '../materials/blend-material';
@@ -18,11 +19,14 @@ import {
   createLightMarker, disposeObject, isLightType, lightSettingsFor, setMarkerSelected, spotDirection, updateLightMarker, LightRig,
 } from './light-rig';
 import { applyPrimitiveTransform, isPrimitiveType, primitiveGeometry, primitiveShape } from './primitives';
+import { isKitModelType } from '../models/kit-catalog';
+import { createKitObject } from '../models/kit-object';
 import { SceneryIndex, isShown, sceneryMaterials, setPartMaterial, unwrapPivot, wrapInPivot, type SceneryPart } from './scenery-index';
 
 export const TERRAIN_EDIT_TYPE = 'terrain_edit';
 export const isTerrainEdit = (p: { type: string }) => p.type === TERRAIN_EDIT_TYPE;
-export const isKitType = (type: string) => isLightType(type) || isPrimitiveType(type) || type === TERRAIN_EDIT_TYPE;
+export const isKitType = (type: string) =>
+  isLightType(type) || isPrimitiveType(type) || isKitModelType(type) || type === TERRAIN_EDIT_TYPE;
 
 /** The fields the kit reads from a prop (PlacedProp is a superset). */
 export interface KitProp {
@@ -46,6 +50,10 @@ export class SceneKit {
   private readonly textureCache = new Map<string, THREE.Texture>();
   private readonly loader = new THREE.TextureLoader();
   private tileRandom = { on: false, variation: 0.7 };
+  /** Meshy models load their low tier (the Performance setting). */
+  lowTierModels = false;
+  /** Called when a placed Meshy model has finished loading (the builder refreshes its selection box). */
+  onModelLoaded?: (propId: string) => void;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -75,6 +83,9 @@ export class SceneKit {
       obj = createLightMarker(settings);
       obj.userData = { propId: prop.id, isLight: true, lightKind: settings.kind };
       this.scene.add(obj);
+    } else if (isKitModelType(prop.type)) {
+      obj = createKitObject(prop.type, prop.id, this.lowTierModels, () => this.onModelLoaded?.(prop.id));
+      this.scene.add(obj);
     } else if (isPrimitiveType(prop.type)) {
       const shape = primitiveShape(prop.type) ?? 'box';
       const mesh = new THREE.Mesh(primitiveGeometry(shape), this.primitiveMaterial(prop));
@@ -103,6 +114,11 @@ export class SceneKit {
       obj.visible = shown && this.markersShown;
       if (shown) this.lights.set(prop.id, settings, obj.position, spotDirection(prop));
       else this.lights.remove(prop.id);
+    } else if (isKitModelType(prop.type)) {
+      obj.position.set(prop.x, prop.y, prop.z);
+      obj.rotation.set(prop.rotX ?? 0, prop.rotY ?? 0, prop.rotZ ?? 0, 'YXZ');
+      obj.scale.set((prop.flipX ? -1 : 1) * (prop.scale || 1), prop.scale || 1, prop.scale || 1);
+      obj.visible = shown;
     } else if (isPrimitiveType(prop.type)) {
       applyPrimitiveTransform(obj, prop);
       const mesh = obj as THREE.Mesh;
@@ -127,6 +143,9 @@ export class SceneKit {
     if (isLightType(prop.type)) {
       this.lights.remove(prop.id);
       if (obj) { this.scene.remove(obj); disposeObject(obj); }
+    } else if (isKitModelType(prop.type)) {
+      // The geometry and textures are shared with every other copy (and the load cache): never disposed here.
+      if (obj) { obj.userData.released = true; this.scene.remove(obj); }
     } else if (isPrimitiveType(prop.type)) {
       if (obj) {
         this.scene.remove(obj);

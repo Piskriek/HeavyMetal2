@@ -96,3 +96,21 @@ test('the engine lines the grid up on a used Start Line, on each racer\'s own la
   assert.match(engine, /racer\.x = \(onLine \? start! : node\.x\) \+ \(racer\.x - START_X\);/, 'grid rows keep their spacing behind the line');
   assert.match(engine, /return usableStartX\(courseMarks\(props, 'basalt'\)\.start, this\.mergeGateFor\(\)\.x\);/);
 });
+
+test('a Start or Finish Line can hide its gate model in races and still work', async () => {
+  const THREE = await import('three');
+  const { SceneKit } = await import('../src/game/builder/scene-kit');
+  const { MaterialCache } = await import('../src/game/materials/material-cache');
+  const { courseMarks } = await import('../src/game/race-marks');
+  const scene = new THREE.Scene();
+  const kit = new SceneKit(scene, new MaterialCache());
+  const line = { id: 'f', type: 'kit_finish-line', name: 'Finish Line', x: 0, y: 0, z: 0, rotY: 0, scale: 1, hideModel: true };
+  const obj = kit.create(line);
+  kit.update(new THREE.PerspectiveCamera(), 0, true, true);
+  assert.equal(obj.visible, true, 'build mode shows it, to select and move');
+  kit.update(new THREE.PerspectiveCamera(), 0, true, false);
+  assert.equal(obj.visible, false, 'hidden in the race');
+  assert.equal(courseMarks([line as never], 'basalt').finishes.length, 1, 'the line still counts');
+  kit.applyTransform({ ...line, hideModel: false }, obj);
+  assert.equal(obj.visible, true, 'shown again when switched back on');
+});

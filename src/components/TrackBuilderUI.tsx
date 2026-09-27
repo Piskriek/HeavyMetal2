@@ -2545,6 +2545,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   />
                 </label>
               )}
+              {isRaceMarkType(selectedProp.type) && (
+                <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!selectedProp.hideModel}
+                    onChange={(e) => { builder.updatePropTransform(selectedProp.id, { hideModel: !e.target.checked }); onRequestRender?.(); }}
+                    className="accent-amber-500 cursor-pointer"
+                  />
+                  Show the gate model in races
+                  {selectedProp.hideModel && <span className="text-[10px] text-zinc-500">(the line still works; build mode shows it)</span>}
+                </label>
+              )}
               {(() => {
                 const status = builder.startLineStatus(selectedProp.id);
                 if (!status) return null;

@@ -257,6 +257,11 @@ export interface PlacedProp {
   lit?: boolean;
   /** Meshy models: 0 (off) to 100, extra glow of the model's own texture to balance it against the terrain. */
   brightness?: number;
+  /**
+   * Start and Finish Lines: the gate model is not drawn in races (the line still works), so the spot can
+   * be dressed with other props. Build mode still shows it, to select and move.
+   */
+  hideModel?: boolean;
   visible?: boolean; // T08: visibility toggle (H key)
   animate?: boolean; // Animated category: frame playback on/off (default true)
   animated?: boolean; // Still props with a twin: swap in the animated sheet (default false)

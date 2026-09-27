@@ -36,6 +36,8 @@ export interface KitProp {
   light?: unknown; shader?: unknown; materialDesc?: MaterialDescriptor;
   /** Meshy models: 0..100 extra glow of the model's own texture, to balance it against the terrain. */
   brightness?: number;
+  /** The model is drawn in build mode only (a Start or Finish Line dressed with other props). */
+  hideModel?: boolean;
   terrainKey?: string; terrainHidden?: boolean; terrainOrigin?: [number, number, number];
 }
 
@@ -123,7 +125,8 @@ export class SceneKit {
       obj.rotation.set(prop.rotX ?? 0, prop.rotY ?? 0, prop.rotZ ?? 0, 'YXZ');
       obj.scale.set((prop.flipX ? -1 : 1) * (prop.scale || 1), prop.scale || 1, prop.scale || 1);
       if ((obj.userData.brightness ?? 0) !== (prop.brightness ?? 0)) setKitBrightness(obj, prop.brightness ?? 0);
-      obj.visible = shown;
+      if (prop.hideModel) this.buildOnly.add(obj); else this.buildOnly.delete(obj);
+      obj.visible = shown && (!prop.hideModel || this.markersShown);
     } else if (isPrimitiveType(prop.type)) {
       applyPrimitiveTransform(obj, prop);
       const mesh = obj as THREE.Mesh;
@@ -150,7 +153,7 @@ export class SceneKit {
       if (obj) { this.scene.remove(obj); disposeObject(obj); }
     } else if (isKitModelType(prop.type)) {
       // The geometry and textures are shared with every other copy (and the load cache): never disposed here.
-      if (obj) { obj.userData.released = true; releaseKitBrightness(obj); this.floating.delete(obj); this.scene.remove(obj); }
+      if (obj) { obj.userData.released = true; releaseKitBrightness(obj); this.floating.delete(obj); this.buildOnly.delete(obj); this.scene.remove(obj); }
     } else if (isPrimitiveType(prop.type)) {
       if (obj) {
         this.scene.remove(obj);
@@ -310,6 +313,8 @@ export class SceneKit {
   /** Light slots and marker visibility. `building` = the builder camera is up (markers shown). */
   /** Powerups float and spin (the model inside the prop's group, so the prop's own transform is untouched). */
   private readonly floating = new Set<THREE.Object3D>();
+  /** Models shown in build mode only (hideModel): hidden the moment the builder hands over to a race. */
+  private readonly buildOnly = new Set<THREE.Object3D>();
 
   update(camera: THREE.Camera, timeSec: number, reducedMotion: boolean, building: boolean) {
     for (const group of this.floating) {
@@ -321,6 +326,7 @@ export class SceneKit {
     }
     if (building !== this.markersShown) {
       this.markersShown = building;
+      for (const obj of this.buildOnly) obj.visible = building;
       this.scene.traverse((o) => { if (o.userData?.isLight && o.parent === this.scene) o.visible = building; });
     }
     this.lights.update(camera, timeSec, reducedMotion);

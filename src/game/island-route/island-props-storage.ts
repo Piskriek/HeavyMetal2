@@ -4,6 +4,10 @@
  * The classic track lives under the `hm2-track-props-*` keys and `backups/props/`; nothing here reads
  * or writes either. The island has its own browser key (plus one backup copy of the previous save)
  * and its own disk folder, `backups/island/`, written by the dev server's island endpoints.
+ *
+ * The island can hold several tracks (each its own set of placed props on the same island): the
+ * first is Serpentine Isle, on the original key and folder; tracks made with "New" or "Duplicate" get
+ * a key and a disk folder of their own. The active track is the one build mode shows and races run.
  */
 import type { PlacedProp } from '../builder/prop-catalog';
 import { validateProps } from '../track-storage';
@@ -11,6 +15,7 @@ import { validateProps } from '../track-storage';
 export const ISLAND_PROPS_KEY = 'hm2-island-props-v1';
 export const ISLAND_PROPS_BACKUP_KEY = 'hm2-island-props-v1-backup';
 export const ISLAND_PROPS_VERSION = 1;
+export const ISLAND_TRACKS_KEY = 'hm2-island-tracks-v1';
 
 /** The dev server's island routes (vite.config.ts): save + list, and read one saved file. */
 export const ISLAND_BACKUP_ENDPOINTS = {
@@ -18,6 +23,12 @@ export const ISLAND_BACKUP_ENDPOINTS = {
   restore: '/api/restore-island-backup',
   latestFile: 'island-props-latest.json',
 } as const;
+
+export interface IslandTrack { id: string; name: string; createdAt: number }
+export interface IslandTrackIndex { active: string; tracks: IslandTrack[] }
+
+/** The island's first track: the original key, the original disk folder. */
+export const DEFAULT_ISLAND_TRACK: IslandTrack = { id: 'serpentine', name: 'Serpentine Isle', createdAt: 0 };
 
 export interface IslandPropsDoc {
   version: number;
@@ -31,6 +42,75 @@ const backend = (store?: Storage): Storage | null => {
   try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
 };
 
+/** A track's browser keys: the first track keeps the original ones. */
+export const islandPropsKey = (trackId: string) => trackId === DEFAULT_ISLAND_TRACK.id ? ISLAND_PROPS_KEY : `${ISLAND_PROPS_KEY}:${trackId}`;
+const islandBackupKey = (trackId: string) => trackId === DEFAULT_ISLAND_TRACK.id ? ISLAND_PROPS_BACKUP_KEY : `${ISLAND_PROPS_BACKUP_KEY}:${trackId}`;
+
+/** The disk routes for one track (the server keeps each track in its own folder). */
+export function islandEndpoints(trackId: string) {
+  const q = trackId === DEFAULT_ISLAND_TRACK.id ? '' : `?track=${encodeURIComponent(trackId)}`;
+  return { backup: `${ISLAND_BACKUP_ENDPOINTS.backup}${q}`, restore: `${ISLAND_BACKUP_ENDPOINTS.restore}${q}` };
+}
+
+/* ───────────── Tracks ───────────── */
+
+/** The island's tracks and which one is active. Serpentine Isle is always there. */
+export function readIslandTracks(store?: Storage): IslandTrackIndex {
+  const s = backend(store);
+  let index: IslandTrackIndex = { active: DEFAULT_ISLAND_TRACK.id, tracks: [] };
+  try {
+    const raw = s?.getItem(ISLAND_TRACKS_KEY);
+    const parsed = raw ? JSON.parse(raw) as Partial<IslandTrackIndex> : null;
+    if (parsed && Array.isArray(parsed.tracks)) {
+      index = {
+        active: typeof parsed.active === 'string' ? parsed.active : DEFAULT_ISLAND_TRACK.id,
+        tracks: parsed.tracks.filter((t): t is IslandTrack => !!t && typeof t.id === 'string' && typeof t.name === 'string'),
+      };
+    }
+  } catch { /* unreadable: the default index */ }
+  if (!index.tracks.some((t) => t.id === DEFAULT_ISLAND_TRACK.id)) index.tracks.unshift({ ...DEFAULT_ISLAND_TRACK });
+  if (!index.tracks.some((t) => t.id === index.active)) index.active = DEFAULT_ISLAND_TRACK.id;
+  return index;
+}
+
+function writeIslandTracks(index: IslandTrackIndex, store?: Storage): boolean {
+  const s = backend(store);
+  if (!s) return false;
+  try { s.setItem(ISLAND_TRACKS_KEY, JSON.stringify(index)); return true; } catch { return false; }
+}
+
+/** Makes a track the active one (build mode shows it, races run it). */
+export function setActiveIslandTrack(trackId: string, store?: Storage): boolean {
+  const index = readIslandTracks(store);
+  if (!index.tracks.some((t) => t.id === trackId)) return false;
+  return writeIslandTracks({ ...index, active: trackId }, store);
+}
+
+/** A track name trimmed to something a dropdown can show; empty names are refused. */
+export const cleanTrackName = (name: string) => name.replace(/\s+/g, ' ').trim().slice(0, 40);
+
+/**
+ * Adds a track and makes it active. With `copyFrom`, its placed props are copied from that track
+ * (the copy gets new ids, so the two never share an item); otherwise it starts empty.
+ */
+export function createIslandTrack(name: string, copyFrom?: string, store?: Storage, now = Date.now()): IslandTrack | null {
+  const clean = cleanTrackName(name);
+  if (!clean) return null;
+  const index = readIslandTracks(store);
+  const base = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'track';
+  let id = base;
+  for (let n = 2; index.tracks.some((t) => t.id === id); n++) id = `${base}-${n}`;
+  const track: IslandTrack = { id, name: clean, createdAt: now };
+  const props = copyFrom
+    ? readIslandProps(store, copyFrom).map((p, i) => ({ ...p, id: `${p.id}_c${now.toString(36)}${i}` }))
+    : [];
+  if (!writeIslandProps(props, store, now, id).ok) return null;
+  if (!writeIslandTracks({ active: id, tracks: [...index.tracks, track] }, store)) return null;
+  return track;
+}
+
+/* ───────────── Props ───────────── */
+
 function parse(raw: string | null): PlacedProp[] | null {
   if (!raw) return null;
   try {
@@ -41,31 +121,34 @@ function parse(raw: string | null): PlacedProp[] | null {
   }
 }
 
-/** The island's saved props (the previous save if the latest is unreadable), or an empty list. */
-export function readIslandProps(store?: Storage): PlacedProp[] {
+/** A track's saved props (the previous save if the latest is unreadable), or an empty list. */
+export function readIslandProps(store?: Storage, trackId = readIslandTracks(store).active): PlacedProp[] {
   const s = backend(store);
   if (!s) return [];
   try {
-    return parse(s.getItem(ISLAND_PROPS_KEY)) ?? parse(s.getItem(ISLAND_PROPS_BACKUP_KEY)) ?? [];
+    return parse(s.getItem(islandPropsKey(trackId))) ?? parse(s.getItem(islandBackupKey(trackId))) ?? [];
   } catch {
     return [];
   }
 }
 
 /**
- * Saves the island's props. The previous save moves to the backup key first. Refuses a list with
+ * Saves a track's props. The previous save moves to the backup key first. Refuses a list with
  * duplicate ids (the save would lose props on load); a full or blocked storage reports `ok: false`.
  */
-export function writeIslandProps(props: PlacedProp[], store?: Storage, now = Date.now()): { ok: boolean; error?: string } {
+export function writeIslandProps(
+  props: PlacedProp[], store?: Storage, now = Date.now(), trackId = readIslandTracks(store).active,
+): { ok: boolean; error?: string } {
   const s = backend(store);
   if (!s) return { ok: false, error: 'storage unavailable' };
   const check = validateProps(props);
   if (!check.valid) return { ok: false, error: check.errors.join('; ') };
   const doc: IslandPropsDoc = { version: ISLAND_PROPS_VERSION, course: 'basalt', timestamp: now, props };
   try {
-    const previous = s.getItem(ISLAND_PROPS_KEY);
-    if (previous) s.setItem(ISLAND_PROPS_BACKUP_KEY, previous);
-    s.setItem(ISLAND_PROPS_KEY, JSON.stringify(doc));
+    const key = islandPropsKey(trackId);
+    const previous = s.getItem(key);
+    if (previous) s.setItem(islandBackupKey(trackId), previous);
+    s.setItem(key, JSON.stringify(doc));
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'storage full' };

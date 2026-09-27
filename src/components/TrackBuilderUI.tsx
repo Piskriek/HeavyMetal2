@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   TreePine, Flag, Mountain, RotateCcw, RotateCw,
   Trash2, Copy, Download, Upload, Compass, Play, X,
@@ -7,13 +8,13 @@ import {
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
   Minus, Plus, Film, Route, Box, HelpCircle, Maximize2, Sparkles,
   Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush,
-  Castle, Rocket, CircleDot, Palmtree, Gem
+  Castle, Rocket, CircleDot, Palmtree, Gem, SquareDashedMousePointer, Eye as EyeIcon, EyeOff, ListChecks
 } from 'lucide-react';
 import { type CourseId } from '../game/types';
-import { ISLAND_COURSE, playableCourses } from '../game/course-archive';
 import { isRaceMarkType } from '../game/race-marks';
 import { isKitModelType } from '../game/models/kit-catalog';
 import BrightnessSlider from './builder/BrightnessSlider';
+import IslandTrackBar from './builder/IslandTrackBar';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -214,6 +215,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const draggingLaneNode = useRef<string | null>(null);
   /** A box selection of lane nodes, dragged out from open ground (client pixels). */
   const laneMarquee = useRef<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
+  /** Click-drag select for placed items: a box dragged out from open ground selects what is inside. */
+  const [dragSelect, setDragSelect] = useState(false);
+  const dragSelectRef = useRef(false);
+  dragSelectRef.current = dragSelect;
+  const propMarquee = useRef<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
+  const [showSections, setShowSections] = useState(false);
+  /** Where the Sections panel opens: above its button, on the page (the shelf clips anything inside it). */
+  const [sectionsAnchor, setSectionsAnchor] = useState<{ left: number; bottom: number } | null>(null);
+  const [, setSectionRevision] = useState(0);
   const [marqueeRect, setMarqueeRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   const laneDragReason = useRef<string | null>(null);
 
@@ -397,6 +407,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             }
             onRequestRender?.();
           } else {
+            if (dragSelectRef.current) {
+              // Drag Select: open ground starts a box; a plain click (no drag) still clears on release.
+              propMarquee.current = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, additive: isMulti };
+              return;
+            }
             // Clicked empty area: deselect unless holding multi modifier
             if (!isMulti) {
               if (builder.getSelectedProps().length > 0) {
@@ -413,6 +428,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // M01 · T7 — a lane handle being dragged: pointer → track → snapNode → the tool's own moveNode.
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
+      if (propMarquee.current && !isRightMouseDown.current) {
+        const m = propMarquee.current;
+        m.x1 = e.clientX; m.y1 = e.clientY;
+        setMarqueeRect({ left: Math.min(m.x0, m.x1), top: Math.min(m.y0, m.y1), width: Math.abs(m.x1 - m.x0), height: Math.abs(m.y1 - m.y0) });
+        return;
+      }
       if (laneMarquee.current && !isRightMouseDown.current) {
         const m = laneMarquee.current;
         m.x1 = e.clientX; m.y1 = e.clientY;
@@ -516,6 +537,19 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (propMarquee.current) {
+          const m = propMarquee.current;
+          propMarquee.current = null;
+          setMarqueeRect(null);
+          if (Math.abs(m.x1 - m.x0) < 5 && Math.abs(m.y1 - m.y0) < 5) {
+            if (!m.additive) builder.selectProp(null);
+          } else {
+            const found = builder.selectPropsInScreenRect(m, canvas, m.additive);
+            const total = builder.getSelectedProps().length;
+            showToast(found ? `${total} items selected [Ctrl+G group · Ctrl+D duplicate · Del delete]` : 'No placed items inside the box');
+          }
+          onRequestRender?.();
+        }
         if (laneMarquee.current) {
           const m = laneMarquee.current;
           laneMarquee.current = null;
@@ -1409,23 +1443,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               )}
             </div>
 
-            {/* Track Selector */}
-            {onCourseChange && (
-              <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-700/60 rounded px-2 py-1 text-xs">
-                <span className="text-zinc-400 font-medium text-[11px]">Track:</span>
-                <select
-                  className="bg-transparent text-amber-300 focus:outline-none cursor-pointer font-bold text-xs"
-                  value={course ?? ISLAND_COURSE}
-                  onChange={(e) => onCourseChange(e.target.value as CourseId)}
-                >
-                  {playableCourses().map((c) => (
-                    <option key={c.id} value={c.id} className="bg-zinc-900 text-amber-200">
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Track Selector: the island's tracks, with New and Duplicate */}
+            <IslandTrackBar builder={builder} course={course} onCourseChange={onCourseChange} showToast={showToast} onRequestRender={onRequestRender} />
 
             {/* Shader Manager */}
             <button
@@ -3591,6 +3610,89 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <Move size={12} />
                 <span>MOVE: {clickMoveEnabled ? 'ON' : 'OFF'} [M]</span>
               </button>
+
+              <button
+                onClick={() => {
+                  setDragSelect((prev) => {
+                    const next = !prev;
+                    if (next) builder.setActivePropType(null);
+                    showToast(next ? 'Drag Select: ON (drag a box on open ground; Shift adds)' : 'Drag Select: OFF');
+                    return next;
+                  });
+                }}
+                aria-pressed={dragSelect}
+                className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
+                  dragSelect
+                    ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
+                    : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border-zinc-700/60'
+                }`}
+                title="Click-drag select: drag a box over placed items to select them (Shift adds to the selection)"
+              >
+                <SquareDashedMousePointer size={12} />
+                <span>DRAG SELECT</span>
+              </button>
+
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setSectionsAnchor({ left: r.left, bottom: window.innerHeight - r.top + 8 });
+                    setShowSections((v) => !v);
+                  }}
+                  aria-expanded={showSections}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
+                    showSections ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-850 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
+                  }`}
+                  title="Show or hide each section's placed items, or select them all"
+                >
+                  <ListChecks size={12} />
+                  <span>SECTIONS</span>
+                </button>
+                {showSections && sectionsAnchor && createPortal((() => {
+                  const counts = builder.sectionCounts();
+                  return (
+                    <div style={{ left: sectionsAnchor.left, bottom: sectionsAnchor.bottom }} className="fixed z-[70] pointer-events-auto w-72 max-h-80 overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/50 rounded-lg p-2 shadow-2xl flex flex-col gap-0.5">
+                      <span className="px-1 pb-1 text-[11px] text-zinc-400">Placed items by section</span>
+                      {CATEGORIES.filter((cat) => cat.id !== 'lanes').map((cat) => {
+                        const count = counts.get(cat.id) ?? 0;
+                        const shown = builder.isSectionShown(cat.id);
+                        return (
+                          <div key={cat.id} className="flex items-center gap-2 px-1 py-1 rounded hover:bg-zinc-900 text-xs">
+                            <label className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={shown}
+                                onChange={(e) => {
+                                  builder.setSectionShown(cat.id, e.target.checked);
+                                  setSectionRevision((r) => r + 1);
+                                  onRequestRender?.();
+                                }}
+                                className="accent-amber-500 cursor-pointer"
+                                aria-label={`Show ${cat.label} items`}
+                              />
+                              {shown ? <EyeIcon size={12} className="text-amber-400 shrink-0" /> : <EyeOff size={12} className="text-zinc-500 shrink-0" />}
+                              <span className={`truncate ${shown ? 'text-zinc-200' : 'text-zinc-500'}`}>{cat.label}</span>
+                              <span className="text-[10px] text-zinc-500 tabular-nums">{count}</span>
+                            </label>
+                            <button
+                              disabled={!count || !shown}
+                              onClick={(e) => {
+                                const n = builder.selectSection(cat.id, e.shiftKey);
+                                showToast(`Selected ${n} ${cat.label} item${n === 1 ? '' : 's'}`);
+                                onRequestRender?.();
+                              }}
+                              className="px-1.5 py-0.5 text-[10px] rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-amber-200 cursor-pointer disabled:opacity-35 disabled:cursor-default"
+                              title="Select every placed item of this section (Shift adds)"
+                            >
+                              Select all
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })(), document.body)}
+              </div>
 
               <button
                 onClick={() => {

@@ -252,7 +252,13 @@ function islandPropsBackupPlugin(): Plugin {
   return {
     name: "island-props-backup-plugin",
     configureServer(server) {
-      const dir = path.resolve(__dirname, "backups/island");
+      const root = path.resolve(__dirname, "backups/island");
+      // Serpentine Isle keeps backups/island/; every other island track has backups/island/tracks/<id>/.
+      const dirFor = (rawUrl: string | undefined) => {
+        const track = new URL(rawUrl ?? "/", "http://local").searchParams.get("track");
+        const safe = track ? track.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 60) : "";
+        return safe && safe !== "serpentine" ? path.resolve(root, "tracks", safe) : root;
+      };
       const json = (res: any, status: number, value: unknown) => {
         res.writeHead(status, { "Content-Type": "application/json" });
         res.end(JSON.stringify(value));
@@ -266,6 +272,7 @@ function islandPropsBackupPlugin(): Plugin {
       };
       server.middlewares.use((req, res, next) => {
         const url = req.url ? req.url.split("?")[0] : "";
+        const dir = dirFor(req.url);
         if (url === "/api/backup-island-props" && req.method === "POST") {
           readBody(req, (data) => json(res, 200, saveIslandBackup(dir, data)), res);
         } else if (url === "/api/backup-island-props" && req.method === "GET") {

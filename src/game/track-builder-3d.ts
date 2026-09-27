@@ -50,7 +50,10 @@ export * from './builder/prop-catalog';
 export { propsFingerprint, stripPropsRuntimeState } from './builder/backup-service';
 import { type PropDefinition, type DecalSide, type AnimGrid, animGridFor, ANIM_SPEED_MIN, ANIM_SPEED_MAX, animSpeedFor, animEnabledFrames, animFrameAt, animSheetFor, animatedTwinDef, propHasAnimatedOption, type AnimationSettings, normalizeAnimFrames, normalizeAnimFrameDelays, animFrameUV, animPhaseFor, type PlacedProp, PROP_DEFINITIONS, DEFAULT_TRACK_PROPS, } from './builder/prop-catalog';
 import { PropBackupService, stripPropsRuntimeState, TRACK_BACKUP_ENDPOINTS } from './builder/backup-service';
-import { ISLAND_BACKUP_ENDPOINTS, readIslandProps, writeIslandProps } from './island-route/island-props-storage';
+import {
+  DEFAULT_ISLAND_TRACK, ISLAND_BACKUP_ENDPOINTS, createIslandTrack as createStoredIslandTrack, islandEndpoints,
+  readIslandProps, readIslandTracks, setActiveIslandTrack, writeIslandProps, type IslandTrack, type IslandTrackIndex,
+} from './island-route/island-props-storage';
 
 /**
  * Which saved props a builder works on: the owner's classic track, the island's own props, or none
@@ -149,7 +152,7 @@ export class TrackBuilder3D {
     props: () => this.persistableProps(),
     course: () => this.courseId,
     endpoints: () => this.propStore === 'island'
-      ? { backup: ISLAND_BACKUP_ENDPOINTS.backup, restore: ISLAND_BACKUP_ENDPOINTS.restore, browserHistory: false }
+      ? { ...islandEndpoints(this.islandTrackId), browserHistory: false }
       : TRACK_BACKUP_ENDPOINTS,
   });
 
@@ -226,7 +229,7 @@ export class TrackBuilder3D {
      */
     private readonly propStore: PropStore = 'track',
   ) {
-    if (propStore === 'island') this.courseId = 'basalt';
+    if (propStore === 'island') { this.courseId = 'basalt'; this.islandTrackId = readIslandTracks().active; }
     this.kit = new SceneKit(this.scene, this.materialCache, this.materials);
     // The Meshy models: the low tier on the Performance setting; a model that arrives while selected
     // gets its selection box refitted.
@@ -561,6 +564,86 @@ export class TrackBuilder3D {
     this.saveToStorage();
     this.updateSelectionBox();
     this.notify();
+  }
+
+  /* ───────────── Sections: show / hide and select by shelf ───────────── */
+
+  /** Shelves whose placed items are hidden in build mode (a view filter: not saved, races unaffected). */
+  private hiddenSections = new Set<string>();
+
+  /** The shelf a placed item came from ('scenery' edits and unknown types have none). */
+  sectionOf(prop: PlacedProp): string | null {
+    const category = PROP_DEFINITIONS.find((d) => d.type === prop.type)?.category;
+    return category && category !== 'scenery' ? category : null;
+  }
+
+  /** How many placed items each shelf has. */
+  sectionCounts(): Map<string, number> {
+    const counts = new Map<string, number>();
+    for (const prop of this.placedProps) {
+      const section = this.sectionOf(prop);
+      if (section) counts.set(section, (counts.get(section) ?? 0) + 1);
+    }
+    return counts;
+  }
+
+  isSectionShown(section: string): boolean { return !this.hiddenSections.has(section); }
+
+  /** Shows or hides a shelf's placed items; hidden ones leave the selection too. */
+  setSectionShown(section: string, shown: boolean) {
+    if (shown) this.hiddenSections.delete(section); else this.hiddenSections.add(section);
+    for (const prop of this.placedProps) {
+      if (this.sectionOf(prop) !== section) continue;
+      this.applySectionVisibility(prop);
+      if (!shown) this.selectedPropIds.delete(prop.id);
+    }
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  private applySectionVisibility(prop: PlacedProp) {
+    const obj = this.propObjects.get(prop.id);
+    const section = this.sectionOf(prop);
+    if (obj && section) obj.visible = prop.visible !== false && !this.hiddenSections.has(section);
+  }
+
+  /** Selects every shown placed item of a shelf (additive keeps what is already selected). */
+  selectSection(section: string, additive = false): number {
+    if (!additive) this.selectedPropIds.clear();
+    let n = 0;
+    for (const prop of this.placedProps) {
+      if (this.sectionOf(prop) === section && this.isSectionShown(section)) { this.selectedPropIds.add(prop.id); n++; }
+    }
+    this.updateSelectionBox();
+    this.notify();
+    return n;
+  }
+
+  /**
+   * Click-drag selection: every shown placed item whose centre falls inside a box on the screen
+   * (client pixels). Additive keeps the current selection.
+   */
+  selectPropsInScreenRect(rect: { x0: number; y0: number; x1: number; y1: number }, canvas: HTMLCanvasElement, additive = false): number {
+    const r = canvas.getBoundingClientRect();
+    const ndc = (px: number, py: number) => ({ x: ((px - r.left) / r.width) * 2 - 1, y: -(((py - r.top) / r.height) * 2 - 1) });
+    const a = ndc(Math.min(rect.x0, rect.x1), Math.min(rect.y0, rect.y1));
+    const b = ndc(Math.max(rect.x0, rect.x1), Math.max(rect.y0, rect.y1));
+    const v = new THREE.Vector3();
+    const box = new THREE.Box3();
+    if (!additive) this.selectedPropIds.clear();
+    let n = 0;
+    for (const prop of this.placedProps) {
+      const obj = this.propObjects.get(prop.id);
+      if (!obj || !obj.visible) continue;
+      box.setFromObject(obj);
+      if (box.isEmpty()) v.set(prop.x, prop.y, prop.z); else box.getCenter(v);
+      v.project(this.camera);
+      if (v.z < -1 || v.z > 1) continue;
+      if (v.x >= a.x && v.x <= b.x && v.y <= a.y && v.y >= b.y) { this.selectedPropIds.add(prop.id); n++; }
+    }
+    this.updateSelectionBox();
+    this.notify();
+    return n;
   }
 
   marqueeSelect(
@@ -2421,6 +2504,7 @@ export class TrackBuilder3D {
     if (isKitType(prop.type)) {
       const obj = this.kit.create(prop);
       this.propObjects.set(prop.id, obj);
+      if (this.hiddenSections.size) this.applySectionVisibility(prop);
       return obj;
     }
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
@@ -2998,7 +3082,7 @@ export class TrackBuilder3D {
   saveToStorage() {
     if (this.propStore === 'none') return;
     if (this.propStore === 'island') {
-      const result = writeIslandProps(this.stripRuntimeState(this.persistableProps()));
+      const result = writeIslandProps(this.stripRuntimeState(this.persistableProps()), undefined, Date.now(), this.islandTrackId);
       if (!result.ok) console.warn('[Island props] not saved:', result.error);
       this.backups.scheduleDebounced(2500);
       return;
@@ -3113,9 +3197,53 @@ export class TrackBuilder3D {
 
   /** The island's own props: this device's copy, then the disk's if it holds more. */
   private loadIslandProps() {
-    this.placedProps = readIslandProps();
+    this.placedProps = readIslandProps(undefined, this.islandTrackId);
     this.placedProps.forEach((p) => this.createPropSprite(p));
     this.syncLatestFromDisk();
+  }
+
+  /** The island track open in build mode (and raced): each track is its own set of placed props. */
+  private islandTrackId = DEFAULT_ISLAND_TRACK.id;
+
+  /** The island's tracks, with the open one as active; null off the island. */
+  getIslandTracks(): IslandTrackIndex | null {
+    return this.propStore === 'island' ? { ...readIslandTracks(), active: this.islandTrackId } : null;
+  }
+
+  /** Opens another island track: the current one is saved first; undo does not reach across tracks. */
+  switchIslandTrack(trackId: string): boolean {
+    if (this.propStore !== 'island' || trackId === this.islandTrackId) return false;
+    if (!readIslandTracks().tracks.some((t) => t.id === trackId)) return false;
+    this.saveToStorage();
+    setActiveIslandTrack(trackId);
+    this.openIslandTrack(trackId);
+    return true;
+  }
+
+  /**
+   * A new island track, opened at once: empty, or (`duplicate`) a copy of the open track's props.
+   * Returns null when the name is empty or storage refused it.
+   */
+  createIslandTrack(name: string, duplicate: boolean): IslandTrack | null {
+    if (this.propStore !== 'island') return null;
+    this.saveToStorage();
+    const track = createStoredIslandTrack(name, duplicate ? this.islandTrackId : undefined);
+    if (!track) return null;
+    this.openIslandTrack(track.id);
+    void this.backupToFile(true);
+    return track;
+  }
+
+  private openIslandTrack(trackId: string) {
+    this.selectProp(null);
+    for (const prop of this.placedProps) this.removePropObject(prop);
+    this.placedProps = [];
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+    this.islandTrackId = trackId;
+    this.backups.resetDiskState();
+    this.loadIslandProps();
+    this.notify();
   }
 
   /** The file name of the store's latest disk save (shown in the backups list). */
@@ -3126,7 +3254,7 @@ export class TrackBuilder3D {
   private async syncLatestFromDisk() {
     if (typeof fetch === 'undefined') return;
     try {
-      const res = await fetch(this.propStore === 'island' ? ISLAND_BACKUP_ENDPOINTS.backup : TRACK_BACKUP_ENDPOINTS.backup);
+      const res = await fetch(this.propStore === 'island' ? islandEndpoints(this.islandTrackId).backup : TRACK_BACKUP_ENDPOINTS.backup);
       if (!res.ok) return;
       const data = await res.json();
       const diskProps = data?.latest?.props;

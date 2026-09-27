@@ -111,6 +111,12 @@ export class PropBackupService {
     unref(this.debounceTimer);
   }
 
+  /** Forgets what the disk holds (another document opened: an island track switch). */
+  resetDiskState() {
+    this.lastSavedPropsHash = '';
+    this.lastBackupTimestamp = 0;
+  }
+
   /** Records what the disk holds, so an automatic save of the same props is skipped (M12). */
   markDiskState(props: PlacedProp[], course: string) {
     this.lastSavedPropsHash = propsFingerprint(props, course);

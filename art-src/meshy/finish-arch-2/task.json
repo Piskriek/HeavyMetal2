@@ -1,0 +1,19 @@
+{
+  "id": "01a0e219-51d2-7520-9e06-0293bda1c261",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2981631151,
+  "prompt": "a race finish line archway made of two tall riveted scrap-metal pillars and one crossbeam on top, the crossbeam painted with a bold black and white checkered flag pattern, a fully open archway with nothing between the pillars, wide like a road gate, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a race finish line archway made of two tall riveted scrap-metal pillars and one crossbeam on top, the crossbeam painted with a bold black and white checkered flag pattern, a fully open archway with nothing between the pillars, wide like a road gate, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790499705546,
+  "progress": 100,
+  "started_at": 1790499705553,
+  "finished_at": 1790499800018,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

@@ -632,9 +632,11 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       return;
     }
   }
-  if (racer.x >= FINISH && !racer.falling) {
-    racer.finishTime = ctx.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
-    racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
+  const finishX = ctx.finishX ?? FINISH;
+  if (racer.x >= finishX && !racer.falling) {
+    racer.finishTime = ctx.runTime - dt + dt * clamp((finishX - oldX) / Math.max(1, racer.x - oldX), 0, 1);
+    racer.finished = true; racer.distance = finishX === FINISH ? TRACK_DISTANCE : (finishX - START_X) / 2;
+    racer.x = finishX + 12; racer.vx = racer.vy = racer.vz = 0;
     if (racer.id) racer.y = world.y(racer.x) - RADIUS;
     if (trace) trace.finished = true;
   } else if (racer.x >= LAVA_ZONE_START && racer.x <= LAVA_ZONE_END && racer.y > world.y(racer.x) + LAVA_LAKE_DEPTH) {

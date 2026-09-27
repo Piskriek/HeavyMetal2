@@ -1,0 +1,16 @@
+{
+  "name": "finish-arch-2",
+  "taskId": "01a0e218-112a-761c-8545-423b22e954d1",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a race finish line archway made of two tall riveted scrap-metal pillars and one crossbeam on top, the crossbeam painted with a bold black and white checkered flag pattern, a fully open archway with nothing between the pillars, wide like a road gate, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 6000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T09:00:25.939Z"
+}

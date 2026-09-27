@@ -1,0 +1,19 @@
+{
+  "id": "01a0e219-4f03-741d-940d-3ffc806acf20",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2485937518,
+  "prompt": "a race starting line archway made of two tall timber posts and one timber crossbeam on top, the crossbeam hung with a row of red and gold pennant flags and two brass lanterns, a fully open archway with nothing between the posts, wide like a road gate, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a race starting line archway made of two tall timber posts and one timber crossbeam on top, the crossbeam hung with a row of red and gold pennant flags and two brass lanterns, a fully open archway with nothing between the posts, wide like a road gate, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790499704838,
+  "progress": 100,
+  "started_at": 1790499704844,
+  "finished_at": 1790499780605,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

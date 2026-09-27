@@ -8,7 +8,7 @@
  */
 import type { PropCategory, PropDefinition } from '../builder/prop-catalog';
 
-export type KitShelf = Extract<PropCategory, 'island_kit' | 'stunts' | 'decoration' | 'foliage_3d' | 'rocks_3d'>;
+export type KitShelf = Extract<PropCategory, 'island_kit' | 'stunts' | 'decoration' | 'foliage_3d' | 'rocks_3d' | 'race'>;
 
 export interface KitModel {
   id: string;
@@ -51,6 +51,9 @@ export const KIT_MODELS: readonly KitModel[] = [
   { id: 'stunt-giant-loop', name: 'Giant Ring', shelf: 'decoration', size: 2400 },
   { id: 'stunt-double-loop', name: 'Double Ring', shelf: 'decoration', size: 2400 },
   { id: 'stunt-hoop-tunnel', name: 'Hoop Tunnel', shelf: 'decoration', size: 3000 },
+  // Race: the start line and the finishes a race can end at (race-marks.ts). Placed on the road's middle.
+  { id: 'start-line', name: 'Start Line', shelf: 'race', size: 1500 },
+  { id: 'finish-line', name: 'Finish Line', shelf: 'race', size: 1500 },
   // Foliage (text-to-3D, art-src/meshy/foliage-rocks*.tsv).
   { id: 'palm-tall', name: 'Tall Palm', shelf: 'foliage_3d', size: 1800 },
   { id: 'palm-leaning', name: 'Leaning Palm', shelf: 'foliage_3d', size: 1500 },

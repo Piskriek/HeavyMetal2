@@ -16,7 +16,7 @@
 import { COURSES, RACER_DEFINITIONS, type CourseId, type OpponentsSummary, type RacerStanding, type RunRecord } from './types';
 import {
   CUP_ROUNDS, DEFAULT_SETUP, isSessionPhase,
-  type Difficulty, type RaceMode, type RaceSession, type RaceSetup, type SessionPhase,
+  type Difficulty, type RaceFinish, type RaceMode, type RaceSession, type RaceSetup, type SessionPhase,
 } from './session';
 import { ISLAND_COURSE, cupRounds } from './course-archive';
 import { DEFAULT_LOADOUT, isCapsule, isRider, type CapsuleId, type Loadout, type RiderId } from './loadouts';
@@ -142,6 +142,12 @@ export function storageAvailable(storage: StorageLike | null = resolveStorage())
 /* Field-level validation                                                     */
 /* -------------------------------------------------------------------------- */
 
+/** A picked finish (engine x plus its name), or undefined when the saved one is not usable. */
+export function sanitizeFinish(raw: unknown): RaceFinish | undefined {
+  if (!isPlainObject(raw) || typeof raw.x !== 'number' || !Number.isFinite(raw.x) || typeof raw.name !== 'string') return undefined;
+  return { x: raw.x, name: raw.name.slice(0, 60) };
+}
+
 export function sanitizeSetup(raw: unknown, fallbackCourse: CourseId): RaceSetup | null {
   if (!isPlainObject(raw)) return null;
   const mode: RaceMode | null = raw.mode === 'tournament' ? 'tournament' : raw.mode === 'quick' ? 'quick' : null;
@@ -157,7 +163,15 @@ export function sanitizeSetup(raw: unknown, fallbackCourse: CourseId): RaceSetup
     difficulty,
     customPhysics: mode === 'quick' && raw.customPhysics === true,
     fieldSize: isFieldSize(raw.fieldSize) ? raw.fieldSize : 4,
+    ...(sanitizeFinish(raw.finish) ? { finish: sanitizeFinish(raw.finish) } : {}),
   };
+}
+
+/** The finishes picked per round, kept only when at least one is usable (one slot per round at most). */
+function savedFinishes(raw: unknown, rounds: number): { finishes?: (RaceFinish | null)[] } {
+  if (!Array.isArray(raw)) return {};
+  const finishes = raw.slice(0, rounds).map((value) => sanitizeFinish(value) ?? null);
+  return finishes.some(Boolean) ? { finishes } : {};
 }
 
 export function sanitizeRounds(raw: unknown): CourseId[] | null {
@@ -438,7 +452,7 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   }
 
   return {
-    session: { id: raw.id, setup, rounds, round, roster, results, seed },
+    session: { id: raw.id, setup, rounds, round, roster, results, seed, ...savedFinishes(raw.finishes, rounds.length) },
     phase,
     restartedRound,
     restartNotice,

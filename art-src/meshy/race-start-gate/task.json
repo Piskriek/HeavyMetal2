@@ -1,0 +1,19 @@
+{
+  "id": "01a0e20f-c9be-73f0-b840-3abdfe98f44b",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 175637870,
+  "prompt": "a goblin-built starting gate spanning a wide dirt race road: two wooden towers with brass lanterns joined overhead by a long red banner, open underneath, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a goblin-built starting gate spanning a wide dirt race road: two wooden towers with brass lanterns joined overhead by a long red banner, open underneath, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790499081118,
+  "progress": 100,
+  "started_at": 1790499081128,
+  "finished_at": 1790499197755,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

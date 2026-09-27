@@ -1,0 +1,9 @@
+{
+  "name": "finish-gate",
+  "taskId": "01a0e215-8aac-742d-8fd0-fbb64092ecb4",
+  "kind": "text-refine",
+  "source": "01a0e214-4c4c-70ca-b6f2-b59f4d37ab12",
+  "credits": 10,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:57:38.822Z"
+}

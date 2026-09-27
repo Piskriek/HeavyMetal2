@@ -127,6 +127,8 @@ export class PropBackupService {
     const course = this.source.course();
     const now = Date.now();
     const hash = propsFingerprint(props, course);
+    // An empty scene before anything is known about the disk (a fresh island opening) has nothing to save.
+    if (!force && props.length === 0 && !this.lastSavedPropsHash) return null;
     if (!force && hash === this.lastSavedPropsHash) {
       return { success: true, count: props.length, timestamp: this.lastBackupTimestamp, unchanged: true };
     }

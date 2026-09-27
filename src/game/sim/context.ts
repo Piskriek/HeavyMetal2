@@ -208,6 +208,11 @@ export interface RacerStepContext {
    * course (the old game, exactly).
    */
   readonly route?: { readonly graph: RouteGraph; readonly layout?: RouteLayout | null } | null;
+  /**
+   * The race's finish line (engine x): a finish the player picked on the island. Absent means the
+   * course's own finish (FINISH), exactly as before.
+   */
+  readonly finishX?: number;
 }
 
 /**

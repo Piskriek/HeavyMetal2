@@ -1,0 +1,19 @@
+{
+  "id": "01a0e215-5bf7-7703-948c-f44ae4024d36",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 1198553277,
+  "prompt": "a tall goblin-built starting gate over a wide race road: two wooden towers with brass lanterns, joined at the top by a plain red cloth banner, wide open empty space underneath for racers to pass, no doors, no text, no letters, no signs, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a tall goblin-built starting gate over a wide race road: two wooden towers with brass lanterns, joined at the top by a plain red cloth banner, wide open empty space underneath for racers to pass, no doors, no text, no letters, no signs, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790499445973,
+  "progress": 100,
+  "started_at": 1790499445983,
+  "finished_at": 1790499512414,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

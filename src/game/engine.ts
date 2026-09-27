@@ -267,6 +267,8 @@ export class GameEngine {
       get rope() { return engine.ropeConfig; },
       // ROUTE-1: read live, like the lane network.
       get route() { return engine.routeSetup; },
+      // The picked finish (absent: the course's own, so the classic race is unchanged).
+      get finishX() { return engine.finishX === FINISH ? undefined : engine.finishX; },
     };
     this.cpuCtx = {
       get step() { return engine.simCtx; },
@@ -282,6 +284,20 @@ export class GameEngine {
   }
 
   private get player() { return this.racers[0]; }
+
+  /**
+   * The finish line (engine x): the finish picked for this race, when it is a sensible one (past the
+   * first stretch, not beyond the course's end), else the course's own FINISH.
+   */
+  private get finishX(): number {
+    const x = this.config?.finishX;
+    return typeof x === 'number' && Number.isFinite(x) && x >= START_X + 2000 && x <= FINISH ? x : FINISH;
+  }
+
+  /** The race's length in distance units (TRACK_DISTANCE for the full course). */
+  private get raceDistance(): number {
+    return this.finishX === FINISH ? TRACK_DISTANCE : (this.finishX - START_X) / 2;
+  }
   /**
    * M01 · T1: how the field leaves the grid. The goblin push is the only start (M5 retired the
    * slingshot); the frozen parity and qualifying sims keep their own copies of the old one.
@@ -1104,7 +1120,7 @@ export class GameEngine {
         rendered.x = racer.reel.fromX + (racer.x - racer.reel.fromX) * ease;
         rendered.z = racer.reel.fromZ + (racer.z - racer.reel.fromZ) * ease;
         rendered.y = racer.reel.fromY + (racer.y - racer.reel.fromY) * ease;
-        rendered.distance = clamp((rendered.x - START_X) / 2, 0, TRACK_DISTANCE);
+        rendered.distance = clamp((rendered.x - START_X) / 2, 0, this.raceDistance);
         rendered.grounded = t >= 1;
       } else if (rendered.reelBack) {
         rendered.reelBack = null;
@@ -1336,7 +1352,7 @@ export class GameEngine {
   private refreshSnapshot() {
     const player = this.player;
     this.cueRopeReel();
-    this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / TRACK_DISTANCE;
+    this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / this.raceDistance;
     this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : Math.hypot(player.vx, player.vy)) * 0.16);
     this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling;
     this.snapshot.grounded = player.grounded; this.snapshot.hopReady = this.canHop(player);
@@ -1383,7 +1399,7 @@ export class GameEngine {
     const count = Math.min(out.length, this.racers.length);
     for (let i = 0; i < count; i++) {
       const racer = this.racers[i];
-      out[i] = !this.splitReached && racer.id !== PLAYER_ID ? Number.NaN : clamp(racer.distance / TRACK_DISTANCE, 0, 1);
+      out[i] = !this.splitReached && racer.id !== PLAYER_ID ? Number.NaN : clamp(racer.distance / this.raceDistance, 0, 1);
     }
     return count;
   }
@@ -1394,7 +1410,7 @@ export class GameEngine {
   private standings(): RacerStanding[] {
     return [...this.racers].sort(raceOrder).map((racer, index) => ({
       id: racer.id, name: racer.name, color: racer.color, position: index + 1,
-      distance: Math.round(clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE)), lane: closestLane(racer.z),
+      distance: Math.round(clamp((racer.x - START_X) / 2, 0, this.raceDistance)), lane: closestLane(racer.z),
       finished: racer.finished, recovering: racer.falling || this.runTime < racer.recoveryUntil, finishTime: racer.finishTime,
       loadout: { ...racer.loadout },
       ...(this.splitPlaces.has(racer.id) ? { splitPosition: this.splitPlaces.get(racer.id)! } : {}),
@@ -1406,18 +1422,18 @@ export class GameEngine {
     this.snapshot.status = 'finished'; this.snapshot.speed = 0; this.snapshot.hopReady = false;
     this.snapshot.settling = false; this.snapshot.finishWait = 0;
     if (completed) {
-      this.snapshot.distance = TRACK_DISTANCE; this.snapshot.progress = 1;
+      this.snapshot.distance = this.raceDistance; this.snapshot.progress = 1;
       this.snapshot.score += 3000 + (4 - this.snapshot.position) * 500;
       // The finish burst is the one moment of a run that must never be invisible: an explosion-sized
       // painted burst over the flag, with smoke under it.
-      this.effects.push('explosion', this.player.x, this.y(FINISH) - 140, this.player.z, 2.2, this.player.id, this.tick);
-      this.effects.push('smoke', this.player.x, this.y(FINISH) - 140, this.player.z, 1.4, this.player.id, this.tick);
+      this.effects.push('explosion', this.player.x, this.y(this.finishX) - 140, this.player.z, 2.2, this.player.id, this.tick);
+      this.effects.push('smoke', this.player.x, this.y(this.finishX) - 140, this.player.z, 1.4, this.player.id, this.tick);
     }
     this.audio.play('finish');
     const { sheep, explosions, loops, bumps } = this.counts;
     this.onFinish({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, distance: this.snapshot.distance, topSpeed: this.topSpeed,
       score: this.snapshot.score + this.snapshot.distance, sheep, explosions, loops, bumps,
-      course: this.options.course, date: new Date().toISOString(), completed, trackLength: TRACK_DISTANCE,
+      course: this.options.course, date: new Date().toISOString(), completed, trackLength: this.raceDistance,
       weight: this.options.ballWeight, launchSpeed: this.options.launchSpeed, position: this.snapshot.position,
       raceTime: this.player.finishTime ?? this.runTime, opponents: this.standings(),
       sessionId: this.config?.sessionId, mode: this.config?.customPhysics ? 'practice' : this.config?.mode,

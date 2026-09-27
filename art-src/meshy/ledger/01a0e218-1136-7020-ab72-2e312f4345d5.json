@@ -1,0 +1,16 @@
+{
+  "name": "start-arch-2",
+  "taskId": "01a0e218-1136-7020-ab72-2e312f4345d5",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a race starting line archway made of two tall timber posts and one timber crossbeam on top, the crossbeam hung with a row of red and gold pennant flags and two brass lanterns, a fully open archway with nothing between the posts, wide like a road gate, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 6000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T09:00:25.856Z"
+}

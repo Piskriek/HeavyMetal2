@@ -15,8 +15,15 @@ export interface RaceSetup {
   customPhysics: boolean;
   /** T02: explicit participant count — 4 (legacy), 20, 50 or 100. */
   fieldSize: FieldSize;
+  /** The island finish picked for a quick race; absent means the full course. */
+  finish?: RaceFinish;
 }
+/** A finish the player picked (engine x along the course), with the name it was placed under. */
+export interface RaceFinish { x: number; name: string }
+
 export interface RaceConfig extends RaceSetup {
+  /** The finish line for this race (engine x); absent means the full course. */
+  finishX?: number;
   sessionId: string;
   round: number;
   totalRounds: number;
@@ -33,6 +40,8 @@ export interface RaceSession {
   results: RunRecord[];
   /** T02: seed fixed at creation so a committed round is reproducible. */
   seed: number;
+  /** The finish picked for each round (a cup picks before every round); null or absent: the full course. */
+  finishes?: (RaceFinish | null)[];
 }
 export interface CupStanding {
   id: number;
@@ -114,6 +123,8 @@ export function createSession(setup: RaceSetup): RaceSession {
 
 export const sessionConfig = (session: RaceSession): RaceConfig => ({
   ...session.setup, course: session.rounds[session.round], sessionId: session.id,
+  // The finish picked for this round (a cup picks one per round), else the setup's own.
+  finishX: session.finishes?.[session.round]?.x ?? session.setup.finish?.x,
   round: session.round, totalRounds: session.rounds.length, roster: session.roster,
   seed: Number.isSafeInteger(session.seed) ? session.seed : DEFAULT_SEED,
 });

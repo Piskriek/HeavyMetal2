@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { type CourseId } from '../game/types';
 import { ISLAND_COURSE, playableCourses } from '../game/course-archive';
+import { isRaceMarkType } from '../game/race-marks';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -62,6 +63,7 @@ const SHELF_MODE_KEY = 'hm2-builder-shelf-mode';
 
 const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode; modes: readonly ShelfMode[] }[] = [
   // The Meshy models: island pieces, stunts and decorative rings (models/kit-catalog.ts).
+  { id: 'race', label: 'Race', icon: <Flag size={16} />, modes: ['3d'] },
   { id: 'island_kit', label: 'Island Kit', icon: <Castle size={16} />, modes: ['3d'] },
   { id: 'stunts', label: 'Stunts', icon: <Rocket size={16} />, modes: ['3d'] },
   { id: 'decoration', label: 'Decoration', icon: <CircleDot size={16} />, modes: ['3d'] },
@@ -2469,6 +2471,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 )}
               </div>
               <span className="text-[10px] text-zinc-400">Position: ({selectedProp.x}, {selectedProp.y}, {selectedProp.z})</span>
+              {isRaceMarkType(selectedProp.type) && (
+                <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-300">
+                  Name
+                  <input
+                    value={selectedProp.name}
+                    maxLength={40}
+                    onChange={(e) => builder.updatePropTransform(selectedProp.id, { name: e.target.value })}
+                    className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-amber-100 focus:outline-none focus:border-amber-500"
+                    aria-label="Line name shown in New Game"
+                  />
+                </label>
+              )}
             </div>
             <button
               onClick={() => builder.selectProp(null)}

@@ -1,0 +1,16 @@
+{
+  "name": "finish-gate",
+  "taskId": "01a0e214-4c4c-70ca-b6f2-b59f4d37ab12",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a tall goblin-built finish gate over a wide race road: two riveted scrap-metal pillars with brass bands, joined at the top by a long plain black and white checkered banner, wide open empty space underneath for racers to pass, no text, no letters, no signs, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 6000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T08:56:19.696Z"
+}

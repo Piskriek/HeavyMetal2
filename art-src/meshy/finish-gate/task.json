@@ -1,0 +1,19 @@
+{
+  "id": "01a0e215-8aac-742d-8fd0-fbb64092ecb4",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 1714036457,
+  "prompt": "a tall goblin-built finish gate over a wide race road: two riveted scrap-metal pillars with brass bands, joined at the top by a long plain black and white checkered banner, wide open empty space underneath for racers to pass, no text, no letters, no signs, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a tall goblin-built finish gate over a wide race road: two riveted scrap-metal pillars with brass bands, joined at the top by a long plain black and white checkered banner, wide open empty space underneath for racers to pass, no text, no letters, no signs, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790499458010,
+  "progress": 100,
+  "started_at": 1790499458017,
+  "finished_at": 1790499531927,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

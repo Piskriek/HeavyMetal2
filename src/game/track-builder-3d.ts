@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 import { classifyPlacedRamp } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
+import { engineXAt, isRaceMarkType, roadPoseAt } from './race-marks';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
@@ -1505,6 +1506,13 @@ export class TrackBuilder3D {
         cameraFacing: false, isDecal: false, flipX: false,
       };
       if (isLightType(def.type)) kitProp.light = { ...lightPreset(def.type) };
+      // Start and finish lines stand across the middle of the road, facing down it.
+      if (isRaceMarkType(def.type)) {
+        const space = courseTrackSpace(this.courseId as CourseId);
+        const pose = roadPoseAt(space, engineXAt(space, pos));
+        kitProp.x = Math.round(pose.x); kitProp.y = Math.round(pose.y); kitProp.z = Math.round(pose.z);
+        kitProp.rotY = pose.rotY;
+      }
       if (isPrimitiveType(def.type)) {
         const shader = this.activeShaderId ? this.shaderLibrary.find((sh) => sh.id === this.activeShaderId) : undefined;
         if (shader) kitProp.shader = normalizeShader(shader);

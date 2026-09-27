@@ -1,0 +1,19 @@
+{
+  "id": "01a0e210-22a5-742b-8742-d9d45827e3ba",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2935874087,
+  "prompt": "a goblin-built finish line arch spanning a wide dirt race road: two riveted scrap-metal towers with brass trim joined overhead by a long black and white checkered banner, open underneath, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a goblin-built finish line arch spanning a wide dirt race road: two riveted scrap-metal towers with brass trim joined overhead by a long black and white checkered banner, open underneath, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790499103651,
+  "progress": 100,
+  "started_at": 1790499103658,
+  "finished_at": 1790499226353,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

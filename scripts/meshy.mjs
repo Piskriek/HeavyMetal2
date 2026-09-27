@@ -7,6 +7,9 @@
  *   node scripts/meshy.mjs text <name> <model> <polycount> <prompt…>
  *                                                       text → textured GLB: preview then texture
  *                                                       (meshy-6-lite 5+10, meshy-6 20+10 credits)
+ *   node scripts/meshy.mjs retexture-file <name> <model.obj|.glb> [--dry] <prompt…>
+ *                                                       paint the owner's own model (10 credits), keeping
+ *                                                       its UVs; --dry prints the request and sends nothing
  *   node scripts/meshy.mjs ledger                       every task this project has paid for
  *
  * The API key is read from C:\MarbleGp\.env.local (MESHY_API_KEY=…, git-ignored) and is only ever
@@ -222,6 +225,45 @@ async function retexture(name, source, prompt) {
   }
 }
 
+/**
+ * A paint job on a model file of our own (10 credits), sent as a data URI, keeping its UVs, so the
+ * texture fits the owner's unwrap. Lands in art-src/meshy/<name>/ (model.glb, texture.png, thumbnail.png).
+ */
+async function retextureFile(name, file, dry, prompt) {
+  if (!existsSync(file)) throw new Error(`No file ${file}`);
+  if (prompt.length < 3 || prompt.length > 600) throw new Error(`The prompt must be 3-600 characters (it is ${prompt.length})`);
+  const data = readFileSync(file);
+  const body = { model_url: `data:application/octet-stream;base64,${data.toString('base64')}`, text_style_prompt: prompt, enable_original_uv: true, enable_pbr: false, ai_model: 'meshy-6', target_formats: ['glb'] };
+  if (dry) {
+    console.log(JSON.stringify({ ...body, model_url: `data URI of ${file} (${(data.length / 1e6).toFixed(2)} MB)`, prompt_length: prompt.length }, null, 2));
+    console.log('balance:', (await call('GET', '/balance')).balance, '· this costs', RETEXTURE_COST);
+    return;
+  }
+  if (spent() + RETEXTURE_COST > CEILING) throw new Error(`Refused: ${spent()} credits spent, ceiling ${CEILING}`);
+  const { result: taskId } = await call('POST', '/retexture', body);
+  const entry = { name, taskId, kind: 'retexture', source: file, params: { ...body, model_url: file }, credits: RETEXTURE_COST, status: 'PENDING', at: new Date().toISOString() };
+  record(entry);
+  for (;;) {
+    const t = await call('GET', `/retexture/${taskId}`);
+    if (['SUCCEEDED', 'FAILED', 'CANCELED'].includes(t.status)) {
+      record({ ...entry, status: t.status, credits: t.consumed_credits ?? RETEXTURE_COST });
+      if (t.status !== 'SUCCEEDED') throw new Error(`${name}: ${t.status} ${t.task_error?.message ?? ''}`);
+      const dir = join(OUT, name);
+      mkdirSync(dir, { recursive: true });
+      const texture = t.texture_urls?.[0]?.base_color;
+      for (const [out, url] of [['model.glb', t.model_urls?.glb], ['texture.png', texture], ['thumbnail.png', t.thumbnail_url]]) {
+        if (!url) continue;
+        const res = await fetch(url);
+        writeFileSync(join(dir, out), Buffer.from(await res.arrayBuffer()));
+      }
+      console.log(`${name}: painted ${file} → art-src/meshy/${name}/ (ledger ${spent()} / ${CEILING})`);
+      return;
+    }
+    console.log(`${name}: ${t.status} ${t.progress ?? 0}%`);
+    await new Promise((r) => setTimeout(r, 10000));
+  }
+}
+
 /** A lighter copy of a finished model (5 credits): `tier` names the file, e.g. lod → lod.glb. */
 const REMESH_COST = 5;
 async function remesh(name, tier, polycount) {
@@ -253,6 +295,11 @@ try {
   else if (cmd === 'remesh') await remesh(a, b, c);
   else if (cmd === 'text') await text(a, b, c, process.argv.slice(6).join(' '));
   else if (cmd === 'retexture') await retexture(a, b, process.argv.slice(5).join(' '));
+  else if (cmd === 'retexture-file') {
+    const rest = process.argv.slice(5);
+    const dry = rest[0] === '--dry';
+    await retextureFile(a, b, dry, (dry ? rest.slice(1) : rest).join(' '));
+  }
   else if (cmd === 'ledger') { for (const t of ledger()) console.log(`${t.name.padEnd(20)} ${t.status.padEnd(10)} ${t.credits}`); console.log(`total ${spent()} / ${CEILING}`); }
   else console.log('usage: balance | image <name> <ref.png> | wait <name> | remesh <name> <tier> <polycount> | ledger');
 } catch (e) {

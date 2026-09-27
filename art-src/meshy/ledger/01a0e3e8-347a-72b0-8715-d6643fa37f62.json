@@ -1,0 +1,19 @@
+{
+  "name": "serpentine-isle-v2",
+  "taskId": "01a0e3e8-347a-72b0-8715-d6643fa37f62",
+  "kind": "retexture",
+  "source": "Island/Serpentine_Isle.obj",
+  "params": {
+    "model_url": "Island/Serpentine_Isle.obj",
+    "text_style_prompt": "Natural volcanic island terrain, one continuous blended landscape. Dark weathered basalt on steep slopes and cliffs, ochre and rust volcanic bands on the upper mountain, grey scree and gravel at cliff feet, warm pale sand on beaches and low flats, sparse dry grass and scrub on gentle slopes. The winding road cut into the hillsides is packed light-brown dirt with gravel shoulders. Soft gradual transitions between materials, no hard seams. Even flat lighting, no baked shadows or highlights, matte, realistic colours, fine natural detail.",
+    "enable_original_uv": true,
+    "enable_pbr": false,
+    "ai_model": "meshy-6",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 10,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T17:27:24.168Z"
+}

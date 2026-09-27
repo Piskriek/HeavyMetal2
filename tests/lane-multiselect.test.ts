@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { readFileSync } from 'node:fs';
 import { applyLaneEdit, brushStrokePoints } from '../src/game/lane-path-tool';
 import { islandLaneNetwork } from '../src/game/island-route/island-lanes';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
@@ -98,4 +99,29 @@ test('a brushed lane is added in one undo step and selected', () => {
   b.undo();
   assert.equal(b.getLaneNetwork()!.paths.length, before, 'one undo removes it');
   assert.equal(b.addLaneFromStroke([{ x: 9000, z: 0 }], 500).ok, false, 'too short: refused');
+});
+
+test('the test ball: placed on the road, remembered per track, cleared back to the grid', () => {
+  const b = builder();
+  assert.equal(b.getTestBall(), null, 'none placed: test drives use the grid');
+  b.setTestBall({ x: 12345.4, z: 99.6 });
+  assert.deepEqual(b.getTestBall(), { x: 12345, z: 100 });
+  const again = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), { id: 't', name: 't', theme: 'ridge', points: [{ x: 0, y: 0, z: 0 }] } as never, undefined, 'none');
+  again.setCourse('basalt');
+  assert.deepEqual(again.getTestBall(), { x: 12345, z: 100 }, 'remembered on this device');
+  b.setTestBall(null);
+  const third = new TrackBuilder3D(new THREE.Scene(), new THREE.PerspectiveCamera(), { id: 't', name: 't', theme: 'ridge', points: [{ x: 0, y: 0, z: 0 }] } as never, undefined, 'none');
+  third.setCourse('basalt');
+  assert.equal(third.getTestBall(), null, 'cleared');
+});
+
+test('a test drive starts at the ball on the nearest lane; a click on the gizmo never selects what is in front of it', () => {
+  const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
+  assert.match(engine, /const pathId = network \? nearestPath\(network, x, z\) : null;/, 'the nearest lane at that spot');
+  assert.match(engine, /racer\.y = this\.y\(racer\.x\) - RADIUS; \}\n\s*this\.placeAtTestStart\(\);/, 'applied on every reset, after the grid');
+  const editor = readFileSync(new URL('../src/screens/MapEditorScreen.tsx', import.meta.url), 'utf8');
+  assert.match(editor, /setTestStart\(engineRef\.current\.trackBuilder\.getTestBall\(\)\);[\s\S]{0,200}reset\(\)/, 'the editor hands the ball over before the reset');
+  const ui = readFileSync(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
+  const guard = ui.indexOf('if (builder.isGizmoInteracting() || builder.isGizmoHovered()) return;');
+  assert.ok(guard > 0 && guard < ui.indexOf('let hitProp = builder.raycastProp('), 'the gizmo is checked before any selection');
 });

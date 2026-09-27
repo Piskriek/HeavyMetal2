@@ -138,6 +138,9 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       engineRef.current.setCameraMode(cameraModeRef.current);
       engineRef.current.trackBuilder.freeFly.active = false;
       engineRef.current.inputEnabled = true;
+      // The test ball, if placed: the run starts there, on the nearest lane.
+      engineRef.current.setTestStart(engineRef.current.trackBuilder.getTestBall());
+      engineRef.current.trackBuilder.setTestBallShown(false);
       engineRef.current.reset(); // Reset to 'ready' state so user can launch
       (document.activeElement as HTMLElement)?.blur();
       canvasRef.current?.focus({ preventScroll: true });
@@ -150,6 +153,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       engineRef.current.setBuildPaused(true);
       engineRef.current.setCameraMode('follow_ball');
       engineRef.current.trackBuilder.freeFly.active = true;
+      engineRef.current.trackBuilder.setTestBallShown(true);
       engineRef.current.inputEnabled = false;
     }
   };

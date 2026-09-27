@@ -9,6 +9,9 @@ import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from
 import { classifyPlacedRamp } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
 import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } from './race-marks';
+
+/** Where each course's (and island track's) test ball stands, on this device. */
+const TEST_BALL_KEY = 'hm2-test-ball-v1';
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType } from './models/kit-catalog';
 import { ghostKitObject } from './models/kit-object';
@@ -17,7 +20,7 @@ import type { Patch } from './collision/terrain-patch';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
-import { FINISH, START_X } from './scene';
+import { FINISH, RADIUS, START_X } from './scene';
 import { applyLaneEdit, brushStrokePoints, snapNode, type LaneEdit } from './lane-path-tool';
 import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
@@ -2859,6 +2862,71 @@ export class TrackBuilder3D {
       },
       worldPos,
     );
+  }
+
+  /* ───────────── Test ball: where a test drive starts ───────────── */
+
+  /** The test ball's spot (engine x along the road, z across it), or null: test drives use the grid. */
+  private testBall: { x: number; z: number } | null = null;
+  private testBallMarker: THREE.Group | null = null;
+  private testBallLoaded = false;
+
+  /** Remembered per course and island track on this device (a convenience, not part of the track). */
+  private testBallKey() { return `${this.courseId}:${this.propStore === 'island' ? this.islandTrackId : 'track'}`; }
+
+  getTestBall(): { x: number; z: number } | null {
+    if (!this.testBallLoaded) {
+      this.testBallLoaded = true;
+      try {
+        const saved = JSON.parse(localStorage.getItem(TEST_BALL_KEY) || '{}')[this.testBallKey()];
+        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.z)) this.setTestBall(saved, false);
+      } catch { /* none saved */ }
+    }
+    return this.testBall;
+  }
+
+  /** Puts the test ball on the road at this spot (engine x/z), or removes it (null). */
+  setTestBall(point: { x: number; z: number } | null, remember = true) {
+    this.testBallLoaded = true;
+    this.testBall = point ? { x: Math.round(point.x), z: Math.round(point.z) } : null;
+    if (remember) {
+      try {
+        const all = JSON.parse(localStorage.getItem(TEST_BALL_KEY) || '{}');
+        if (this.testBall) all[this.testBallKey()] = this.testBall; else delete all[this.testBallKey()];
+        localStorage.setItem(TEST_BALL_KEY, JSON.stringify(all));
+      } catch { /* storage unavailable: kept for this session only */ }
+    }
+    if (!this.testBall) { if (this.testBallMarker) this.testBallMarker.visible = false; this.notify(); return; }
+    if (!this.testBallMarker) {
+      const marker = new THREE.Group();
+      marker.name = 'TestBallMarker';
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0x7a4a00, roughness: 0.4, metalness: 0.3 }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(RADIUS * 1.5, RADIUS * 1.9, 40), new THREE.MeshBasicMaterial({ color: 0xffb020, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -RADIUS + 3;
+      marker.add(ball, ring);
+      this.testBallMarker = marker;
+      this.scene.add(marker);
+    }
+    const at = this.laneGizmos.worldFromEngine(this.testBall.x, this.testBall.z, RADIUS);
+    this.testBallMarker.position.copy(at);
+    this.testBallMarker.visible = this.freeFly.active;
+    this.notify();
+  }
+
+  /** Shows the marker in build mode, hides it while test driving. */
+  setTestBallShown(shown: boolean) {
+    if (this.testBallMarker) this.testBallMarker.visible = shown && !!this.testBall;
+  }
+
+  /** True when the pointer is over the test ball (to pick it up and drag it). */
+  isOverTestBall(clientX: number, clientY: number, canvas: HTMLCanvasElement): boolean {
+    if (!this.testBallMarker || !this.testBallMarker.visible) return false;
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    return this.raycaster.intersectObject(this.testBallMarker, true).length > 0;
   }
 
   /* ───────────── Lane brush ───────────── */

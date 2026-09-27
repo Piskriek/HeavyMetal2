@@ -226,6 +226,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const laneBrushRef = useRef(laneBrush);
   laneBrushRef.current = laneBrush;
   const laneStroke = useRef<{ x: number; z: number }[] | null>(null);
+  /** Test Start: click the road to put the test ball there (test drives start from it); drag it to move. */
+  const [testStartMode, setTestStartMode] = useState(false);
+  const testStartModeRef = useRef(false);
+  testStartModeRef.current = testStartMode;
+  const draggingTestBall = useRef(false);
+  const [testBall, setTestBallState] = useState<{ x: number; z: number } | null>(() => builder.getTestBall());
   const [showSections, setShowSections] = useState(false);
   /** Where the Sections panel opens: above its button, on the page (the shelf clips anything inside it). */
   const [sectionsAnchor, setSectionsAnchor] = useState<{ left: number; bottom: number } | null>(null);
@@ -362,6 +368,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           onRequestRender?.();
           return;
         }
+        // A click on the gizmo's handles belongs to the gizmo, never to an object's box in front of it.
+        if (builder.isGizmoInteracting() || builder.isGizmoHovered()) return;
+        // The test ball: pick it up, or (Test Start on) put it where the road was clicked.
+        if (builder.isOverTestBall(e.clientX, e.clientY, canvas) || testStartModeRef.current) {
+          const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
+          if (point) { builder.setTestBall(point); setTestBallState(builder.getTestBall()); }
+          draggingTestBall.current = true;
+          onRequestRender?.();
+          return;
+        }
         if (builder.getActivePropType()) {
           const placed = builder.placeActiveProp(e.clientX, e.clientY, canvas);
           if (placed) {
@@ -440,6 +456,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // M01 · T7 — a lane handle being dragged: pointer → track → snapNode → the tool's own moveNode.
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
+      if (draggingTestBall.current && !isRightMouseDown.current) {
+        const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
+        if (point) { builder.setTestBall(point, false); onRequestRender?.(); }
+        return;
+      }
       if (laneStroke.current && !isRightMouseDown.current) {
         const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
         if (point) {
@@ -558,6 +579,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (draggingTestBall.current) {
+          draggingTestBall.current = false;
+          const at = builder.getTestBall();
+          if (at) { builder.setTestBall(at); setTestBallState(at); }
+          showToast('Test drives start from the ball, on the nearest lane');
+          onRequestRender?.();
+        }
         if (laneStroke.current) {
           const stroke = laneStroke.current;
           laneStroke.current = null;
@@ -3662,6 +3690,36 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <Move size={12} />
                 <span>MOVE: {clickMoveEnabled ? 'ON' : 'OFF'} [M]</span>
               </button>
+
+              <div className="flex items-center">
+                <button
+                  onClick={() => {
+                    setTestStartMode((prev) => {
+                      const next = !prev;
+                      if (next) builder.setActivePropType(null);
+                      showToast(next ? 'Test Start: click the road to put the test ball there' : 'Test Start: off (drag the ball to move it)');
+                      return next;
+                    });
+                  }}
+                  aria-pressed={testStartMode}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded-l font-bold transition-all border cursor-pointer ${
+                    testStartMode ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md' : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border-zinc-700/60'
+                  }`}
+                  title="Where a test drive starts: click the road to put the test ball there; your ball starts on the nearest lane"
+                >
+                  <Play size={12} />
+                  <span>TEST START</span>
+                </button>
+                <button
+                  onClick={() => { builder.setTestBall(null); setTestBallState(null); showToast('Test drives start from the grid again'); onRequestRender?.(); }}
+                  disabled={!testBall}
+                  className="px-1.5 py-1 text-xs rounded-r border border-l-0 border-zinc-700/60 bg-zinc-850 hover:bg-zinc-800 text-zinc-400 cursor-pointer disabled:opacity-35 disabled:cursor-default"
+                  title="Remove the test ball (test drives start from the grid)"
+                  aria-label="Remove the test ball"
+                >
+                  <X size={12} />
+                </button>
+              </div>
 
               <button
                 onClick={() => {

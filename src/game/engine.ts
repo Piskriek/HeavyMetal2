@@ -31,7 +31,7 @@ import {
   POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup, type PowerupKind,
 } from './powerups';
 
-import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
+import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, nearestPath, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
 import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
 import { layoutForSeed, sameRoad, validateRouteGraph, type RouteGraph, type RouteLayout } from './sim/route';
 import { ISLAND_ROUTE_GRAPH } from './island-route/serpentine-route';
@@ -401,6 +401,7 @@ export class GameEngine {
     // un-grounded ball's height from the old slingshot ground, ~210 units below the pad: without this
     // the whole grid hovered at the start.
     for (const racer of this.racers) { racer.grounded = true; racer.y = this.y(racer.x) - RADIUS; }
+    this.placeAtTestStart();
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
@@ -685,6 +686,33 @@ export class GameEngine {
     }
     this.accumulator = this.lastFrame = 0; this.notify();
   };
+
+  /** A test drive's start (the builder's test ball, engine x/z), or null for the usual grid. */
+  private testStart: { x: number; z: number } | null = null;
+  /** Test drives start from here: the player takes the nearest lane at this spot. Null: the grid. */
+  setTestStart(point: { x: number; z: number } | null) { this.testStart = point; }
+
+  /** Puts the player on the test ball's spot, on the nearest lane of the network, resting on the road. */
+  private placeAtTestStart() {
+    const at = this.testStart;
+    if (!at) return;
+    const player = this.player;
+    const x = clamp(at.x, START_X, FINISH - 600);
+    let z = clamp(at.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    const network = this.laneNetwork;
+    const pathId = network ? nearestPath(network, x, z) : null;
+    if (network && pathId) {
+      const lane = sampleLane(network, pathId, x);
+      if (lane) z = lane.z;
+    }
+    player.pathId = pathId;
+    player.x = x; player.z = z; player.y = this.y(x) - RADIUS;
+    player.vx = player.vy = player.vz = 0;
+    player.grounded = true;
+    player.distance = Math.max(0, (x - START_X) / 2);
+    player.previous = { x: player.x, y: player.y, z: player.z, rotation: player.rotation };
+    player.launchOrigin = { x: player.x, y: player.y };
+  }
 
   setSoloMode(solo: boolean) {
     this.soloMode = solo;

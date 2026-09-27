@@ -772,6 +772,83 @@ export class TrackBuilder3D {
     this.notify();
   }
 
+  /**
+   * The light bake, off the main thread: each model's geometry is baked once (copies of a model share
+   * it) in a worker, one after another, with `onProgress` after each step. `signal` cancels it (what is
+   * already baked stays). Falls back to baking here when workers are unavailable (tests).
+   */
+  async bakeVertexAOAsync(
+    onProgress: (p: { done: number; total: number; fraction: number; label: string }) => void,
+    signal?: AbortSignal,
+  ): Promise<{ count: number; totalVertices: number; cancelled: boolean }> {
+    const geometries = new Map<THREE.BufferGeometry, THREE.Mesh[]>();
+    const names = new Map<THREE.BufferGeometry, string>();
+    for (const [id, obj] of this.propObjects.entries()) {
+      if (obj.userData?.isPrimitive || obj.userData?.isLight || obj.userData?.terrainEdit || obj.userData?.orphanTerrainEdit) continue;
+      const name = this.placedProps.find((p) => p.id === id)?.name ?? 'model';
+      obj.traverse((child) => {
+        const mesh = child as THREE.Mesh;
+        if (!mesh.isMesh || !mesh.geometry?.attributes?.position) return;
+        const list = geometries.get(mesh.geometry);
+        if (list) list.push(mesh); else { geometries.set(mesh.geometry, [mesh]); names.set(mesh.geometry, name); }
+      });
+    }
+    const jobs = [...geometries.entries()];
+    let count = 0, totalVertices = 0;
+    const worker = typeof Worker !== 'undefined'
+      ? new Worker(new URL('./bake/bake-worker.ts', import.meta.url), { type: 'module' })
+      : null;
+    const bakeOne = (geom: THREE.BufferGeometry, step: number): Promise<Float32Array> => {
+      const posAttr = geom.attributes.position;
+      const positions = new Float32Array(posAttr.count * 3);
+      for (let i = 0; i < posAttr.count; i++) { positions[i * 3] = posAttr.getX(i); positions[i * 3 + 1] = posAttr.getY(i); positions[i * 3 + 2] = posAttr.getZ(i); }
+      const indices = geom.index ? Uint32Array.from(geom.index.array as ArrayLike<number>) : Uint32Array.from({ length: posAttr.count }, (_, i) => i);
+      const label = names.get(geom) ?? 'model';
+      if (!worker) return Promise.resolve(bakeVertexLighting({ name: label, positions, indices }, { ...DEFAULT_BAKE_OPTS, rays: 16 }).colors);
+      return new Promise((resolve, reject) => {
+        const onAbort = () => { worker.terminate(); reject(new DOMException('cancelled', 'AbortError')); };
+        signal?.addEventListener('abort', onAbort, { once: true });
+        // A worker that cannot start (its file missing from a build): bake this one here instead.
+        worker.onerror = () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve(bakeVertexLighting({ name: label, positions: positions.slice(), indices: indices.slice() }, { ...DEFAULT_BAKE_OPTS, rays: 16 }).colors);
+        };
+        worker.onmessage = (event: MessageEvent) => {
+          const reply = event.data;
+          if ('progress' in reply) onProgress({ done: step, total: jobs.length, fraction: (step + reply.progress) / jobs.length, label });
+          else {
+            signal?.removeEventListener('abort', onAbort);
+            if ('error' in reply) reject(new Error(reply.error)); else resolve(reply.colors);
+          }
+        };
+        worker.postMessage({ id: step, positions, indices, opts: { rays: 16 } });
+      });
+    };
+    try {
+      for (let step = 0; step < jobs.length; step++) {
+        if (signal?.aborted) return { count, totalVertices, cancelled: true };
+        const [geom, meshes] = jobs[step];
+        onProgress({ done: step, total: jobs.length, fraction: step / jobs.length, label: names.get(geom) ?? 'model' });
+        let colors: Float32Array;
+        try { colors = await bakeOne(geom, step); } catch (error) {
+          if ((error as DOMException).name === 'AbortError') return { count, totalVertices, cancelled: true };
+          throw error;
+        }
+        geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        for (const mesh of meshes) {
+          for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) { m.vertexColors = true; m.needsUpdate = true; }
+        }
+        count += meshes.length;
+        totalVertices += geom.attributes.position.count;
+      }
+      onProgress({ done: jobs.length, total: jobs.length, fraction: 1, label: '' });
+      return { count, totalVertices, cancelled: false };
+    } finally {
+      worker?.terminate();
+      this.notify();
+    }
+  }
+
   bakeVertexAO(): { count: number; totalVertices: number } {
     let count = 0;
     let totalVertices = 0;

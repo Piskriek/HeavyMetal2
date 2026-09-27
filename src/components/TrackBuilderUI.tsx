@@ -1448,18 +1448,52 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     }
   };
 
-  const handleBakeAO = () => {
+  /** The light bake runs in a worker: this window shows how far along it is, and can stop it. */
+  const [bakeProgress, setBakeProgress] = useState<{ done: number; total: number; fraction: number; label: string } | null>(null);
+  const bakeAbort = useRef<AbortController | null>(null);
+  const handleBakeAO = async () => {
+    if (bakeAbort.current) return;
+    const abort = new AbortController();
+    bakeAbort.current = abort;
+    setBakeProgress({ done: 0, total: 0, fraction: 0, label: '' });
     try {
-      const res = builder.bakeVertexAO();
-      showToast(`Bake complete: ${res.count} meshes, ${res.totalVertices} vertices with contact AO`);
+      const res = await builder.bakeVertexAOAsync((p) => { setBakeProgress(p); onRequestRender?.(); }, abort.signal);
+      showToast(res.cancelled
+        ? `Bake stopped: ${res.count} meshes were baked before it stopped`
+        : `Bake complete: ${res.count} meshes, ${res.totalVertices} vertices with contact AO`);
       onRequestRender?.();
     } catch (e) {
       showToast(`Bake error: ${(e as Error).message}`);
+    } finally {
+      bakeAbort.current = null;
+      setBakeProgress(null);
     }
   };
 
   return (
     <div className="track-builder-root pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
+      {bakeProgress && createPortal(
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
+          <div role="alertdialog" aria-label="Baking lights" className="w-80 rounded-lg border border-amber-500/60 bg-zinc-950/95 p-4 text-amber-100 shadow-2xl">
+            <div className="text-sm font-bold text-amber-300">Baking lights</div>
+            <div className="mt-1 text-[11px] text-zinc-400">
+              {bakeProgress.total
+                ? <>Model {Math.min(bakeProgress.done + 1, bakeProgress.total)} of {bakeProgress.total}{bakeProgress.label ? <>: <span className="text-zinc-300">{bakeProgress.label}</span></> : null}</>
+                : 'Getting the models ready…'}
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded bg-zinc-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(bakeProgress.fraction * 100)}>
+              <div className="h-full bg-amber-500 transition-[width] duration-200" style={{ width: `${Math.round(bakeProgress.fraction * 100)}%` }} />
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-[11px] tabular-nums text-zinc-400">{Math.round(bakeProgress.fraction * 100)}%</span>
+              <button onClick={() => bakeAbort.current?.abort()} className="cursor-pointer rounded border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:border-red-500 hover:text-red-200">
+                Stop
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
       {/* Toast notification */}
       {toast && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-950/90 border border-amber-500/70 text-amber-200 px-4 py-2 rounded-lg text-sm shadow-xl backdrop-blur-md transition-all">

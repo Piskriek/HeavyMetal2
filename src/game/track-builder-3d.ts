@@ -11,6 +11,7 @@ import { courseTrackSpace } from './island-route/island-space';
 import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } from './race-marks';
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType } from './models/kit-catalog';
+import { ghostKitObject } from './models/kit-object';
 import { RAMP_PIECES } from './race-pieces';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
@@ -1313,6 +1314,10 @@ export class TrackBuilder3D {
 
     for (const hit of intersects) {
       const obj = hit.object;
+      // The model placement preview is never a surface (the preview would climb its own model).
+      let inGhost = false;
+      for (let p: THREE.Object3D | null = obj; p; p = p.parent) if (p.userData?.isKitGhost) { inGhost = true; break; }
+      if (inGhost) continue;
       // three.js raycasts hit hidden objects: a hidden scenery part or prop is not a surface.
       if (!SceneKit.shown(obj) || obj.name?.startsWith('Light') || obj.name === 'BuilderLightSlot') continue;
       // Skip sky, markers, gizmos, ghosts, sprites, placed props (except primitives), and handles
@@ -1428,6 +1433,20 @@ export class TrackBuilder3D {
     if (!def) return;
 
     const isDecal = def.isDecal || this.snapping.decalDefault;
+
+    // A Meshy model previews as itself, see-through (models/kit-object.ts).
+    if (isKitModelType(def.type)) {
+      if (this.ghostSprite) this.ghostSprite.visible = false;
+      if (!this.ghostMesh || (this.ghostMesh as any)._forType !== def.type) {
+        if (this.ghostMesh) this.scene.remove(this.ghostMesh);
+        const ghost = ghostKitObject(def.type, this.kit.lowTierModels);
+        (ghost as any)._forType = def.type;
+        this.ghostMesh = ghost;
+        this.scene.add(ghost);
+      }
+      this.ghostMesh.visible = true;
+      return;
+    }
 
     if (isDecal) {
       if (this.ghostSprite) this.ghostSprite.visible = false;

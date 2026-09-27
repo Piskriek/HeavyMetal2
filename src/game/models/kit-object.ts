@@ -22,6 +22,28 @@ export function fitKitModel(model: THREE.Object3D, size: number): THREE.Object3D
   return model;
 }
 
+/**
+ * The placement preview: the model itself, see-through, so you see its real size and shape where it
+ * will land. Its materials are its own copies (the shared ones stay opaque).
+ */
+export function ghostKitObject(type: string, low: boolean): THREE.Group {
+  const ghost = createKitObject(type, '__ghost', low, (group) => {
+    group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const material = (mesh.material as THREE.Material).clone();
+      material.transparent = true;
+      material.opacity = 0.55;
+      material.depthWrite = false;
+      mesh.material = material;
+      mesh.castShadow = false;
+    });
+  });
+  ghost.name = 'GhostKitModel';
+  ghost.userData = { isKitGhost: true };
+  return ghost;
+}
+
 /** The strongest glow the slider gives (at 100): the texture shines at this share of its own colour. */
 export const KIT_BRIGHTNESS_MAX_GLOW = 0.9;
 

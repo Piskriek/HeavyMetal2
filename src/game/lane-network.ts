@@ -48,6 +48,12 @@ export interface LaneNode {
 export interface LanePath {
   id: string;
   name: string;
+  /**
+   * The lane's colour (#rrggbb; none = the first of LANE_COLORS). A ball can only change to a lane of
+   * its own colour: a split gives the new branch a colour of its own, so past the split you are
+   * committed to the branch you took.
+   */
+  color?: string;
   /** At least two node ids, with strictly increasing x. */
   nodeIds: string[];
   /** z-units, 40..240. */
@@ -232,21 +238,21 @@ function topologyOf(network: LaneNetwork, nodeId: string): NodeTopology {
 export function inferKind(network: LaneNetwork, nodeId: string): LaneNodeKind | 'orphan' {
   const { refs, starts, ends } = topologyOf(network, nodeId);
   if (refs === 0) return 'orphan';
+  // Every shape the runtime can drive has a kind: two or more lanes leaving is a split (whatever
+  // arrives; at a lane's very start, racers pick the nearest), two or more arriving into one is a
+  // merge, and lanes that end with nothing leaving are a dead end (out of bounds before the finish).
+  if (starts >= 2) return 'split';
   if (ends >= 2 && starts === 1) return 'merge';
-  if (ends === 1 && starts >= 2) return 'split';
-  if (starts <= 1 && ends <= 1) {
+  if (starts === 0 && ends >= 1) {
     const node = network.nodes.find((candidate) => candidate.id === nodeId);
-    if (starts === 0 && ends >= 1 && node !== undefined && node.x < FINISH) return 'oob';
-    return 'normal';
+    return node !== undefined && node.x < FINISH ? 'oob' : 'normal';
   }
-  return 'orphan';
+  return 'normal';
 }
 
 function impliedKind(network: LaneNetwork, nodeId: string): LaneNodeKind {
-  const { starts, ends } = topologyOf(network, nodeId);
-  if (ends === 1 && starts >= 2) return 'split';
-  if (ends >= 2) return 'merge';
-  return 'normal';
+  const kind = inferKind(network, nodeId);
+  return kind === 'orphan' ? 'normal' : kind;
 }
 
 /* -----------------------------------------------------------------------------
@@ -497,16 +503,27 @@ export function advancePaths(bearers: readonly PathBearer[], network: LaneNetwor
    4. MOVEMENT
    -------------------------------------------------------------------------- */
 
+/** The lanes' colours, in the order a split hands them out (red, amber and green mean node kinds). */
+export const LANE_COLORS: readonly string[] = ['#38bdf8', '#f472b6', '#a78bfa', '#e2e8f0', '#2dd4bf', '#f97316', '#818cf8', '#d946ef'];
+
+/** A path's colour: its own, or the default. */
+export function laneColorOf(path: LanePath | undefined | null): string {
+  return typeof path?.color === 'string' && /^#[0-9a-f]{6}$/i.test(path.color) ? path.color.toLowerCase() : LANE_COLORS[0];
+}
+
 /**
- * The nearest neighbouring path on one side, at one x. `dir` follows the game's lane convention:
+ * The nearest neighbouring path on one side, at one x, **of the same colour** (a split's branches have
+ * colours of their own, so a ball cannot hop between them). `dir` follows the game's lane convention:
  * **+1 is toward smaller z** (that is the direction `targetLane + 1` moves in), and -1 the other way.
  */
 export function adjacentPath(network: LaneNetwork, pathId: string, x: number, dir: -1 | 1): string | null {
   const current = sampleLane(network, pathId, x);
   if (!current) return null;
+  const colour = laneColorOf(pathById(network, pathId));
   let best: string | null = null; let bestDistance = Infinity;
   for (const path of network.paths) {
     if (path.id === pathId) continue;
+    if (laneColorOf(path) !== colour) continue;
     const sample = sampleLane(network, path.id, x);
     if (!sample) continue;
     const delta = sample.z - current.z;

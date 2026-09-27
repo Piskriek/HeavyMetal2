@@ -19,7 +19,7 @@
  */
 import {
   DEFAULT_HALF_WIDTH, LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_NETWORK_VERSION, LANE_Z_LIMIT,
-  inferKind, validateLaneNetwork,
+  LANE_COLORS, inferKind, laneColorOf, validateLaneNetwork,
   type LaneNetwork, type LaneNode, type LaneNodeKind, type LanePath, type LaneRefusal,
 } from './lane-network';
 import { FINISH, START_X } from './scene';
@@ -47,7 +47,15 @@ export type LaneEdit =
   | { op: 'setKind'; nodeId: string; kind: LaneNodeKind }
   | { op: 'split'; nodeId: string; to: { x: number; z: number } }
   | { op: 'merge'; fromPathId: string; intoNodeId: string }
-  | { op: 'markOob'; pathId: string };
+  | { op: 'markOob'; pathId: string }
+  /**
+   * The Split button: the lane through the node is cut there, and a second lane leaves the same node
+   * and runs parallel to the first all the way down (one lane width over, dragged into place after).
+   * The new branch gets a colour of its own, so a ball past the split cannot hop between the two.
+   */
+  | { op: 'fork'; nodeId: string }
+  /** The lanes leaving a node (or, at a lane's end, the lanes arriving) take the next colour. */
+  | { op: 'recolor'; nodeId: string };
 
 export type LaneEditResult =
   | { ok: true; network: LaneNetwork; /** Node the panel should select after the edit. */ focus?: string }
@@ -231,6 +239,8 @@ export function applyLaneEdit(network: LaneNetwork, edit: LaneEdit): LaneEditRes
     case 'split': return splitBranch(network, edit.nodeId, edit.to);
     case 'merge': return mergeInto(network, edit.fromPathId, edit.intoNodeId);
     case 'markOob': return markOob(network, edit.pathId);
+    case 'fork': return forkLane(network, edit.nodeId);
+    case 'recolor': return recolorAt(network, edit.nodeId);
   }
 }
 
@@ -306,11 +316,25 @@ function connectNodes(network: LaneNetwork, fromId: string, toId: string, extend
     return refuse('unchanged', 'those two nodes are already joined');
   }
   const next = copyNetwork(network);
-  const chain = extendPathId ? pathById(next, extendPathId) : undefined;
+  const chain = (extendPathId ? pathById(next, extendPathId) : undefined)
+    // Joining from the end of a lane carries that lane on, rather than starting a two-node lane.
+    ?? (() => {
+      const ending = next.paths.filter((path) => path.nodeIds[path.nodeIds.length - 1] === up.id);
+      const leaving = next.paths.some((path) => path.nodeIds.includes(up.id) && path.nodeIds[path.nodeIds.length - 1] !== up.id);
+      return ending.length === 1 && !leaving ? ending[0] : undefined;
+    })();
   if (chain && chain.nodeIds[chain.nodeIds.length - 1] === up.id && !chain.nodeIds.includes(down.id)) {
     chain.nodeIds.push(down.id);
+    // The target is the start of a lane nothing arrives at: the two become one lane.
+    const starting = next.paths.filter((path) => path !== chain && path.nodeIds[0] === down.id);
+    const arriving = next.paths.some((path) => path !== chain && path.nodeIds.includes(down.id) && path.nodeIds[0] !== down.id);
+    if (starting.length === 1 && !arriving && laneColorOf(starting[0]) === laneColorOf(chain)) {
+      chain.nodeIds.push(...starting[0].nodeIds.slice(1));
+      next.paths = next.paths.filter((path) => path !== starting[0]);
+    }
   } else {
-    next.paths.push({ id: uniqueId(next, 'p'), name: `Path ${next.paths.length + 1}`, nodeIds: [up.id, down.id], halfWidth: DEFAULT_HALF_WIDTH });
+    const from = network.paths.find((path) => path.nodeIds.includes(up.id));
+    next.paths.push({ id: uniqueId(next, 'p'), name: `Path ${next.paths.length + 1}`, nodeIds: [up.id, down.id], halfWidth: DEFAULT_HALF_WIDTH, ...(from?.color ? { color: from.color } : {}) });
   }
   return finish(next, down.id);
 }
@@ -381,6 +405,64 @@ function splitBranch(network: LaneNetwork, nodeId: string, to: { x: number; z: n
     id: pathId, name: `Branch ${next.paths.length + 1}`, nodeIds: [nodeId, id], halfWidth: DEFAULT_HALF_WIDTH,
   });
   return finish(next, id);
+}
+
+/** A colour no lane uses yet (or the one after `after` when every colour is taken). */
+function freshColor(network: LaneNetwork, after: string): string {
+  const used = new Set(network.paths.map((path) => laneColorOf(path)));
+  const free = LANE_COLORS.find((colour) => !used.has(colour));
+  return free ?? LANE_COLORS[(LANE_COLORS.indexOf(after) + 1) % LANE_COLORS.length];
+}
+
+/** One lane width, the gap a fork's branch starts at. */
+const FORK_OFFSET = 240;
+
+function forkLane(network: LaneNetwork, nodeId: string): LaneEditResult {
+  const node = nodeById(network, nodeId);
+  if (!node) return refuse('unknown_node', `there is no node ${nodeId}`);
+  const lane = network.paths.find((path) => path.nodeIds.includes(nodeId) && path.nodeIds[path.nodeIds.length - 1] !== nodeId);
+  if (!lane) return refuse('nothing_after', 'no lane carries on past this node: extend it first (drag, Ctrl-click or the brush), then split');
+  const index = lane.nodeIds.indexOf(nodeId);
+  const arriving = network.paths.some((path) => path.nodeIds[path.nodeIds.length - 1] === nodeId);
+  if (index === 0 && !arriving) return refuse('split_at_start', 'a lane cannot split at its very first node: pick a node further down');
+
+  const next = copyNetwork(network);
+  const cut = pathById(next, lane.id)!;
+  const tail = cut.nodeIds.slice(index + 1);
+  if (index > 0) {
+    // The lane ends here; the same colour carries on as its own lane (a split joins lanes end to start).
+    const onward = [nodeId, ...tail];
+    cut.nodeIds = cut.nodeIds.slice(0, index + 1);
+    next.paths.push({ id: uniqueId(next, 'p'), name: cut.name, nodeIds: onward, halfWidth: cut.halfWidth, ...(cut.color ? { color: cut.color } : {}) });
+  }
+  // The branch: every node of the lane after the split, copied one lane width over (towards the middle).
+  const side = node.z >= 0 ? -1 : 1;
+  const branchIds = [nodeId];
+  for (const id of tail) {
+    const source = nodeById(next, id)!;
+    let z = clamp(source.z + side * FORK_OFFSET, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    if (Math.abs(z - source.z) < FORK_OFFSET / 2) z = clamp(source.z - side * FORK_OFFSET, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    const newId = uniqueId(next, 'n');
+    next.nodes.push({ id: newId, x: source.x, z, kind: 'normal' });
+    branchIds.push(newId);
+  }
+  next.paths.push({
+    id: uniqueId(next, 'p'), name: `Branch ${next.paths.length + 1}`, nodeIds: branchIds, halfWidth: lane.halfWidth,
+    color: freshColor(next, laneColorOf(lane)),
+  });
+  return finish(next, branchIds[1]);
+}
+
+function recolorAt(network: LaneNetwork, nodeId: string): LaneEditResult {
+  if (!nodeById(network, nodeId)) return refuse('unknown_node', `there is no node ${nodeId}`);
+  const leaving = network.paths.filter((path) => path.nodeIds.includes(nodeId) && path.nodeIds[path.nodeIds.length - 1] !== nodeId);
+  const lanes = leaving.length ? leaving : network.paths.filter((path) => path.nodeIds.includes(nodeId));
+  if (!lanes.length) return refuse('no_lane', 'this node is on no lane');
+  const current = laneColorOf(lanes[0]);
+  const colour = LANE_COLORS[(LANE_COLORS.indexOf(current) + 1) % LANE_COLORS.length];
+  const next = copyNetwork(network);
+  for (const lane of lanes) pathById(next, lane.id)!.color = colour;
+  return finish(next, nodeId);
 }
 
 function mergeInto(network: LaneNetwork, fromPathId: string, intoNodeId: string): LaneEditResult {

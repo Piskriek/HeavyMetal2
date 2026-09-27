@@ -290,7 +290,9 @@ function LanePanel({
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'insert' })}
                 aria-label="Insert a node on the path before the selected node">Insert [Shift+I]</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'split' })}
-                aria-label="Split a new branch from the selected node">Split [Shift+S]</button>
+                aria-label="Split the lane in two at the selected node; the new branch gets its own colour" title="Split the lane in two here. The new branch gets its own colour: balls only change between lanes of the same colour">Split [Shift+S]</button>
+              <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'recolor' })}
+                aria-label="Give the lane leaving the selected node the next colour" title="Next colour for this lane. Balls only change between lanes of the same colour">Colour</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'merge' })}
                 aria-label="Merge the selected path end into a clicked node">Merge [Shift+M]</button>
               <button type="button" className="lane-panel__button" onClick={() => onCommand?.({ op: 'markOob' })}

@@ -145,10 +145,9 @@ test('lane-edit: the operations do what they say', () => {
   const splitAgain = applied(intoFork, { op: 'split', nodeId: 'n3', to: { x: 50000, z: laneZ(0) } });
   assert.equal(node(splitAgain, 'n3').kind, 'split', 'one path ends here and two leave');
 
-  // Branching off the very first node is *not* one of the four shapes: two paths would leave a node
-  // with nothing arriving at it, which is a second start, not a fork.
-  const secondStart = refused(base, { op: 'split', nodeId: 'n1', to: { x: 20000, z: laneZ(3) } });
-  assert.ok(secondStart.startsWith('kind_mismatch:'), secondStart);
+  // Two lanes leaving a lane's very first node is a split too (racers there pick the nearest lane).
+  const secondStart = applied(base, { op: 'split', nodeId: 'n1', to: { x: 20000, z: laneZ(3) } });
+  assert.equal(node(secondStart, 'n1').kind, 'split');
 
   // merge: a new path joined onto the sample's merge node stays a merge (still two in, one out).
   const sample = sampleLaneNetwork('ridge');
@@ -158,13 +157,13 @@ test('lane-edit: the operations do what they say', () => {
   assert.equal(merged.paths[merged.paths.length - 1].nodeIds.includes('loop'), true);
   assert.equal(node(merged, 'loop').kind, 'merge', 'two in, one out is still a merge');
   assert.equal(validateLaneNetwork(merged).ok, true);
-  // A *split* node may not take a second arrival: two in and two out is none of the four shapes.
+  // A split node may take a second arrival: two in and two out is still a split (racers take the branch on their side).
   // The sample's fork from one line into four is at x = 1200, so a feeder has to end before that.
   const shortFeed = applied(merged, { op: 'addPath', at: [{ x: 300, z: laneZ(3) }, { x: 700, z: laneZ(3) }] });
-  const intoGrid = refused(shortFeed, {
+  const intoGrid = applied(shortFeed, {
     op: 'merge', fromPathId: shortFeed.paths[shortFeed.paths.length - 1].id, intoNodeId: 'grid',
   });
-  assert.ok(intoGrid.startsWith('kind_mismatch:'), intoGrid);
+  assert.equal(node(intoGrid, 'grid').kind, 'split');
 });
 
 test('lane-edit: refusals name the code and the reason', () => {

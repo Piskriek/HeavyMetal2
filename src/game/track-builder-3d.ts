@@ -2883,7 +2883,9 @@ export class TrackBuilder3D {
     this.mouseNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.mouseNdc.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
     this.raycaster.setFromCamera(this.mouseNdc, this.camera);
-    return this.laneGizmos.raycast(this.raycaster);
+    // The handle under the pointer, else the nearest one within 16 pixels on screen.
+    return this.laneGizmos.raycast(this.raycaster)
+      ?? this.laneGizmos.pickNear(this.camera, this.mouseNdc.x, this.mouseNdc.y, rect.width, rect.height);
   }
 
   /** The pointer's position as an engine (x, z), on the road. Null when the ray missed the track. */

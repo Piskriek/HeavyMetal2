@@ -23,7 +23,7 @@ import {
   engineDistanceFromX, engineFromWorld, engineXFromDistance, getTrackSpace, worldFromCanonical, type TrackSpaceMap,
 } from './track-space';
 import type { LaneNetwork, LaneNode, LaneNodeKind } from './lane-network';
-import { inferKind } from './lane-network';
+import { inferKind, laneColorOf } from './lane-network';
 
 /** How high above the ribbon a handle floats, and how big it is. World units (a lane is 240 wide). */
 export const LANE_HANDLE_LIFT = 70;
@@ -120,7 +120,9 @@ export class LaneGizmos {
   /** Full rebuild: the document itself changed (open, import, undo, course switch). */
   setNetwork(network: LaneNetwork | null): void {
     this.network = network;
-    this.selected = null;
+    // The selection ball is kept (hidden) and reused: dropping it here left the old one in the scene,
+    // a white wireframe behind every edit that rebuilt the drawing.
+    if (this.selected) this.selected.visible = false;
     this.disposeHandles();
     for (const line of this.lines.values()) this.disposeLine(line);
     this.lines.clear();
@@ -136,7 +138,8 @@ export class LaneGizmos {
       this.stats.materialsCreated += 1;
     }
     if (!this.lineMaterial) {
-      this.lineMaterial = new THREE.LineBasicMaterial({ color: LANE_PATH_COLOR });
+      // Vertex colours: each lane its own colour, still one material.
+      this.lineMaterial = new THREE.LineBasicMaterial({ vertexColors: true });
       this.stats.materialsCreated += 1;
     }
 
@@ -199,7 +202,37 @@ export class LaneGizmos {
   /** Nodes in a group selection: their handles turn the selection colour (no new materials). */
   private group = new Set<string>();
   private colorOf(node: LaneNode): THREE.Color {
-    return new THREE.Color(this.group.has(node.id) ? LANE_GROUP_COLOR : LANE_KIND_COLORS[this.kindOf(node)]);
+    if (this.group.has(node.id)) return new THREE.Color(LANE_GROUP_COLOR);
+    const kind = this.kindOf(node);
+    // Splits, merges and out-of-bounds ends keep their kind's colour (red, amber, green); a plain node
+    // shows its lane's.
+    if (kind !== 'normal') return new THREE.Color(LANE_KIND_COLORS[kind]);
+    return new THREE.Color(laneColorOf(this.laneOf(node.id)));
+  }
+
+  /** The lane a node carries on along (or, at a lane's end, the one it ends). */
+  private laneOf(nodeId: string) {
+    const paths = this.network?.paths.filter((path) => path.nodeIds.includes(nodeId)) ?? [];
+    return paths.find((path) => path.nodeIds[path.nodeIds.length - 1] !== nodeId) ?? paths[0];
+  }
+
+  /**
+   * The node nearest the pointer on screen, within `radiusPx`: a handle far from the camera is a few
+   * pixels wide, and hitting its sphere exactly made nodes hard to pick, drag or Ctrl-click.
+   */
+  pickNear(camera: THREE.Camera, ndcX: number, ndcY: number, width: number, height: number, radiusPx = 16): string | null {
+    if (!this.network) return null;
+    let best: string | null = null; let bestDistance = radiusPx;
+    const v = new THREE.Vector3();
+    for (const node of this.network.nodes) {
+      const world = this.worldPositions.get(node.id);
+      if (!world) continue;
+      v.copy(world).project(camera);
+      if (v.z <= -1 || v.z >= 1) continue;
+      const distance = Math.hypot((v.x - ndcX) * width / 2, (v.y - ndcY) * height / 2);
+      if (distance < bestDistance) { bestDistance = distance; best = node.id; }
+    }
+    return best;
   }
 
   /** Recolours the handles for a group selection (the panel's primary node keeps its wireframe too). */
@@ -280,10 +313,17 @@ export class LaneGizmos {
     return inferred === 'orphan' ? 'normal' : inferred;
   }
 
+  /** Where each handle is drawn (for picking by screen distance). */
+  private readonly worldPositions = new Map<string, THREE.Vector3>();
+
   private writeHandle(instance: number, node: LaneNode): void {
     if (!this.handles) return;
-    this.handles.setMatrixAt(instance, new THREE.Matrix4().setPosition(this.worldFromEngine(node.x, node.z)));
+    const world = this.worldFromEngine(node.x, node.z);
+    this.worldPositions.set(node.id, world);
+    this.handles.setMatrixAt(instance, new THREE.Matrix4().setPosition(world));
     this.handles.instanceMatrix.needsUpdate = true;
+    // The pick sphere is cached from the first raycast: a moved handle must refresh it.
+    this.handles.boundingSphere = null;
     this.stats.handleWrites += 1;
   }
 
@@ -295,6 +335,8 @@ export class LaneGizmos {
       .filter((node): node is LaneNode => node !== null)
       .map((node) => this.worldFromEngine(node.x, node.z, LANE_HANDLE_LIFT * 0.4));
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const colour = new THREE.Color(laneColorOf(path));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(points.flatMap(() => [colour.r, colour.g, colour.b]), 3));
     const existing = this.lines.get(pathId);
     if (existing) {
       existing.geometry.dispose();

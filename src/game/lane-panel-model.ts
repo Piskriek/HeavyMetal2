@@ -171,7 +171,7 @@ export function laneKeyIntent(event: LaneKeyEvent): LaneKeyIntent | null {
 
 export type LanePanelCommand =
   | { op: 'newPath' } | { op: 'insert' } | { op: 'delete' } | { op: 'split' }
-  | { op: 'merge' } | { op: 'markOob' }
+  | { op: 'merge' } | { op: 'markOob' } | { op: 'recolor' }
   /** `kind` is what a kind button asks for; the K key asks for the next kind instead. */
   | { op: 'cycleKind'; kind?: LaneNodeKind }
   | { op: 'setHalfWidth'; pathId: string; halfWidth: number };
@@ -205,17 +205,6 @@ function freeLaneZ(network: LaneNetwork): number {
   return best;
 }
 
-/** The lane centre nearest `z` that is not the lane the node is already on. */
-function otherLaneZ(z: number): number {
-  let best = z;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const centre of SNAP_Z_LANES) {
-    if (Math.abs(centre - z) < SNAP_Z_RADIUS) continue;
-    const distance = Math.abs(centre - z);
-    if (distance < bestDistance) { bestDistance = distance; best = centre; }
-  }
-  return bestDistance === Number.POSITIVE_INFINITY ? z : best;
-}
 
 /** The four kinds, in the order K walks them. `orphan` is not a destination: a node is what it is. */
 function nextKind(current: LaneNodeKind | 'orphan'): LaneNodeKind {
@@ -289,10 +278,13 @@ export function laneEditForCommand(
     }
 
     case 'split': {
-      if (!node) return FAIL('no_selection: select the node the branch should leave from');
-      const x = Math.min(node.x + 4000, FINISH);
-      if (x <= node.x) return FAIL('out_of_corridor: there is no room left to branch from this node');
-      return { ok: true, action: { kind: 'edit', edit: { op: 'split', nodeId: node.id, to: { x, z: otherLaneZ(node.z) } } } };
+      if (!node) return FAIL('no_selection: select the node the lane should split at');
+      return { ok: true, action: { kind: 'edit', edit: { op: 'fork', nodeId: node.id } } };
+    }
+
+    case 'recolor': {
+      if (!node) return FAIL('no_selection: select a node on the lane to recolour');
+      return { ok: true, action: { kind: 'edit', edit: { op: 'recolor', nodeId: node.id } } };
     }
 
     case 'merge': {

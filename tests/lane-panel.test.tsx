@@ -146,7 +146,8 @@ test('the panel renders the selected node\'s inspector with labelled fields', ()
   assert.match(html, new RegExp(`aria-label="Node ${node.id} down-range x"`), 'x field is labelled');
   assert.match(html, new RegExp(`aria-label="Node ${node.id} lateral z"`), 'z field is labelled');
   assert.match(html, /aria-label="Set the selected node to Road"/, 'kind buttons are labelled');
-  assert.match(html, /aria-label="Split a new branch from the selected node"/, 'commands are labelled');
+  assert.match(html, /aria-label="Split the lane in two at the selected node; the new branch gets its own colour"/, "commands are labelled");
+  assert.match(html, /aria-label="Give the lane leaving the selected node the next colour"/, "the colour button is labelled");
   // The authored halfWidth range is the panel's float: 40..240, the validator's own bounds.
   assert.equal(DEFAULT_HALF_WIDTH, 120);
 });
@@ -258,13 +259,13 @@ test('insert lands mid-segment with the interpolated z, and merge folds one path
     assert.equal(merged.network.paths.length, network.paths.length, 'a merge adds no path');
   }
 
-  // And the refusal that matters: folding a path *through* the split node it leaves would leave that
-  // node a normal node by its shape, and T6's law says a node's authored kind must be its shape's.
+  // Folding a lane *through* the split node it leaves now makes that node a split with a merge in it:
+  // a shape the runtime drives (the racer takes the branch on its side), so it is allowed and valid.
   const through = network.paths.find((path) => path.nodeIds.includes(network.nodes.find((node) => node.id === 'grid')?.id ?? ''));
   if (through) {
-    const refused = run(network, { op: 'merge' }, { pathId: through.id, nodeId: target!.id });
-    assert.equal(refused.ok, false, 'the split node survives the refusal');
-    if (!refused.ok) assert.match(refused.reason, /^(kind_mismatch|cycle|non_monotone):/);
+    const folded = run(network, { op: 'merge' }, { pathId: through.id, nodeId: target!.id });
+    if (folded.ok) assert.equal(validateLaneNetwork(folded.network).ok, true);
+    else assert.match(folded.reason, /^(kind_mismatch|cycle|non_monotone):/);
   }
 });
 

@@ -1,0 +1,19 @@
+{
+  "name": "finish-line-paint",
+  "taskId": "01a0e2a9-f6de-752b-8ed8-c9bfcc751f5b",
+  "kind": "retexture",
+  "source": "01a0e210-22a5-742b-8742-d9d45827e3ba",
+  "params": {
+    "input_task_id": "01a0e210-22a5-742b-8742-d9d45827e3ba",
+    "text_style_prompt": "goblin-built riveted scrap-metal finish arch with brass bands and black and white checkered banners, plain checkered signboard with no writing, absolutely no text, no letters, no words",
+    "enable_original_uv": true,
+    "enable_pbr": false,
+    "ai_model": "meshy-6",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 10,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T11:39:46.130Z"
+}

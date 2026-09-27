@@ -1,0 +1,19 @@
+{
+  "name": "start-line-paint",
+  "taskId": "01a0e2a9-f5bf-72a1-b0ca-632240d1546a",
+  "kind": "retexture",
+  "source": "01a0e219-4f03-741d-940d-3ffc806acf20",
+  "params": {
+    "input_task_id": "01a0e219-4f03-741d-940d-3ffc806acf20",
+    "text_style_prompt": "goblin-built timber starting arch with brass lanterns and red and gold pennant flags, weathered wood, plain blank wooden signboard with no writing, absolutely no text, no letters, no words",
+    "enable_original_uv": true,
+    "enable_pbr": false,
+    "ai_model": "meshy-6",
+    "target_formats": [
+      "glb"
+    ]
+  },
+  "credits": 10,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T11:39:45.893Z"
+}

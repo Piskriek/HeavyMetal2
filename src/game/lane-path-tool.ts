@@ -430,3 +430,36 @@ export function blankLaneNetwork(course: LaneNetwork['course'], z = 0): LaneNetw
   };
   return network;
 }
+
+/* -----------------------------------------------------------------------------
+   LANE BRUSH
+   -------------------------------------------------------------------------- */
+
+/** The brush's node spacing (engine x between nodes): the panel's slider range and its default. */
+export const BRUSH_SPACING_MIN = 150;
+export const BRUSH_SPACING_MAX = 2000;
+export const BRUSH_SPACING_DEFAULT = 600;
+
+/**
+ * A brush stroke (the pointer's path over the road, in engine x/z) as the nodes of a new lane: one
+ * every `spacing` down the hill, the stroke's far end kept, every point pulled onto the road. A stroke
+ * drawn up the hill is read the other way round (a lane always runs down it). Fewer than two points: [].
+ */
+export function brushStrokePoints(stroke: readonly { x: number; z: number }[], spacing: number): { x: number; z: number }[] {
+  if (stroke.length < 2) return [];
+  const step = clamp(spacing, BRUSH_SPACING_MIN, BRUSH_SPACING_MAX);
+  const points = stroke[stroke.length - 1].x < stroke[0].x ? [...stroke].reverse() : [...stroke];
+  const onRoad = (p: { x: number; z: number }) => snapNode(p.x, p.z, { lanes: false, grid: false });
+  const out = [onRoad(points[0])];
+  let furthest = out[0];
+  for (const p of points) {
+    const q = onRoad(p);
+    if (q.x > furthest.x) furthest = q;
+    if (q.x >= out[out.length - 1].x + step) out.push(q);
+  }
+  // The far end of the stroke is where the lane was meant to reach: keep it (or move the last node there).
+  const last = out[out.length - 1];
+  if (furthest.x > last.x + step * 0.4) out.push(furthest);
+  else if (out.length > 1 && furthest.x > last.x) out[out.length - 1] = furthest;
+  return out.length >= 2 ? out : [];
+}

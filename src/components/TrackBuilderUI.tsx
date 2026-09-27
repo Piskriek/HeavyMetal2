@@ -14,6 +14,7 @@ import { type CourseId } from '../game/types';
 import { isRaceMarkType } from '../game/race-marks';
 import { isKitModelType } from '../game/models/kit-catalog';
 import BrightnessSlider from './builder/BrightnessSlider';
+import { BRUSH_SPACING_DEFAULT, BRUSH_SPACING_MAX, BRUSH_SPACING_MIN } from '../game/lane-path-tool';
 import IslandTrackBar from './builder/IslandTrackBar';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
@@ -220,6 +221,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const dragSelectRef = useRef(false);
   dragSelectRef.current = dragSelect;
   const propMarquee = useRef<{ x0: number; y0: number; x1: number; y1: number; additive: boolean } | null>(null);
+  /** The lane brush: drag along the road to draw a lane, one node every `spacing` down the hill. */
+  const [laneBrush, setLaneBrush] = useState({ on: false, spacing: BRUSH_SPACING_DEFAULT });
+  const laneBrushRef = useRef(laneBrush);
+  laneBrushRef.current = laneBrush;
+  const laneStroke = useRef<{ x: number; z: number }[] | null>(null);
   const [showSections, setShowSections] = useState(false);
   /** Where the Sections panel opens: above its button, on the page (the shelf clips anything inside it). */
   const [sectionsAnchor, setSectionsAnchor] = useState<{ left: number; bottom: number } | null>(null);
@@ -336,6 +342,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           const hitNode = builder.raycastLaneNode(e.clientX, e.clientY, canvas);
           const additive = e.shiftKey || e.ctrlKey || e.metaKey;
           laneDragReason.current = null;
+          if (!hitNode && laneBrushRef.current.on) {
+            // The brush: this drag draws a new lane along the road.
+            const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
+            laneStroke.current = point ? [point] : [];
+            return;
+          }
           if (hitNode) {
             builder.selectLaneNode(hitNode, additive);
             const count = builder.getSelectedLaneNodeIds().length;
@@ -428,6 +440,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // M01 · T7 — a lane handle being dragged: pointer → track → snapNode → the tool's own moveNode.
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
+      if (laneStroke.current && !isRightMouseDown.current) {
+        const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
+        if (point) {
+          laneStroke.current.push(point);
+          builder.setLaneBrushPreview(laneStroke.current, laneBrushRef.current.spacing);
+          onRequestRender?.();
+        }
+        return;
+      }
       if (propMarquee.current && !isRightMouseDown.current) {
         const m = propMarquee.current;
         m.x1 = e.clientX; m.y1 = e.clientY;
@@ -537,6 +558,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           showToast('Select Mode active');
         }
       } else if (e.button === 0) {
+        if (laneStroke.current) {
+          const stroke = laneStroke.current;
+          laneStroke.current = null;
+          const made = builder.addLaneFromStroke(stroke, laneBrushRef.current.spacing);
+          showToast(made.ok ? `New lane with ${made.nodes} nodes (drag its nodes, K for kind, S split, M merge)` : made.reason, made.ok ? 3500 : 4500);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+        }
         if (propMarquee.current) {
           const m = propMarquee.current;
           propMarquee.current = null;
@@ -3848,12 +3877,46 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <SceneShelfBox builder={builder} mode={category} onOpenShaders={() => setShowShaders(true)} onRequestRender={onRequestRender} showToast={showToast} />
               )}
               {category === 'lanes' ? (
+                <div className="flex flex-col gap-1 w-full">
+                <div className="flex items-center gap-2 px-3 pt-1 text-xs">
+                  <button
+                    onClick={() => {
+                      setLaneBrush((b) => {
+                        const next = { ...b, on: !b.on };
+                        showToast(next.on ? 'Lane brush: drag down the road to draw a lane' : 'Lane brush off');
+                        return next;
+                      });
+                    }}
+                    aria-pressed={laneBrush.on}
+                    className={`flex items-center gap-1 px-2 py-1 rounded font-bold border cursor-pointer ${
+                      laneBrush.on ? 'bg-amber-500 text-zinc-950 border-amber-400' : 'bg-zinc-900 text-amber-300 border-zinc-700 hover:bg-zinc-800'
+                    }`}
+                    title="Draw a new lane by dragging along the road"
+                  >
+                    <Paintbrush size={12} /> Lane brush
+                  </button>
+                  <label className="flex items-center gap-2 text-zinc-400">
+                    Node spacing
+                    <input
+                      type="range"
+                      min={BRUSH_SPACING_MIN}
+                      max={BRUSH_SPACING_MAX}
+                      step={50}
+                      value={laneBrush.spacing}
+                      onChange={(e) => setLaneBrush((b) => ({ ...b, spacing: Number(e.target.value) }))}
+                      className="w-32 accent-amber-500 cursor-pointer"
+                      aria-label="Lane brush node spacing"
+                    />
+                    <span className="font-mono text-amber-200 tabular-nums w-10">{laneBrush.spacing}</span>
+                  </label>
+                </div>
                 <LanePanel
                   model={laneModel}
                   status={laneStatus}
                   isDrawerOpen={laneDrawerOpen}
                   {...laneHandlers}
                 />
+                </div>
               ) : (category as string) === 'custom_models' ? (
                 <CustomModelsTab
                   onSelectModel={(assetId, name) => {

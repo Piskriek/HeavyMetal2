@@ -18,7 +18,7 @@ import type { CourseId } from './types';
 import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, START_X } from './scene';
-import { applyLaneEdit, snapNode, type LaneEdit } from './lane-path-tool';
+import { applyLaneEdit, brushStrokePoints, snapNode, type LaneEdit } from './lane-path-tool';
 import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
   buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, readLaneStorage, writeLaneStorage,
@@ -2859,6 +2859,44 @@ export class TrackBuilder3D {
       },
       worldPos,
     );
+  }
+
+  /* ───────────── Lane brush ───────────── */
+
+  private brushPreview: THREE.Line | null = null;
+
+  /** Shows the stroke being drawn (engine x/z points) as a line on the road; an empty list hides it. */
+  setLaneBrushPreview(stroke: readonly { x: number; z: number }[], spacing: number) {
+    const points = stroke.length > 1 ? brushStrokePoints(stroke, spacing) : [];
+    if (!points.length) { if (this.brushPreview) this.brushPreview.visible = false; return; }
+    const world = points.map((p) => this.laneGizmos.worldFromEngine(p.x, p.z, 30));
+    if (!this.brushPreview) {
+      this.brushPreview = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffb020, depthTest: false }));
+      this.brushPreview.name = 'LaneBrushPreview';
+      this.brushPreview.renderOrder = 999;
+      this.laneGizmos.root.add(this.brushPreview);
+    }
+    this.brushPreview.geometry.dispose();
+    this.brushPreview.geometry = new THREE.BufferGeometry().setFromPoints(world);
+    this.brushPreview.visible = true;
+  }
+
+  /**
+   * Adds a lane drawn with the brush: nodes every `spacing` down the stroke. One undo step. The new
+   * lane is selected so it can be widened, joined or tidied at once.
+   */
+  addLaneFromStroke(stroke: readonly { x: number; z: number }[], spacing: number): { ok: true; nodes: number } | { ok: false; reason: string } {
+    this.setLaneBrushPreview([], spacing);
+    const points = brushStrokePoints(stroke, spacing);
+    if (points.length < 2) return { ok: false, reason: 'too_short: drag further down the road to draw a lane' };
+    if (!this.laneDoc) return { ok: false, reason: 'no_document: there is no lane network loaded' };
+    this.pushUndo();
+    const before = new Set(this.laneDoc.nodes.map((n) => n.id));
+    const result = this.applyLaneEditToDoc({ op: 'addPath', at: points });
+    if (!result.ok) return result;
+    const added = this.laneDoc.nodes.filter((n) => !before.has(n.id)).map((n) => n.id);
+    this.selectLaneNodes(added);
+    return { ok: true, nodes: added.length };
   }
 
   /** The selected lane nodes' ids (the primary one included). */

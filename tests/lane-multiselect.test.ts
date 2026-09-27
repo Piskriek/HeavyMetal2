@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { applyLaneEdit } from '../src/game/lane-path-tool';
+import { applyLaneEdit, brushStrokePoints } from '../src/game/lane-path-tool';
 import { islandLaneNetwork } from '../src/game/island-route/island-lanes';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
 import type { TrackData } from '../src/game/renderer-3d';
@@ -73,4 +73,29 @@ test('deleting a group removes every node a lane can spare', () => {
   assert.equal(b.deleteSelectedLaneNodes(), 3);
   assert.equal(b.getLaneNetwork()!.nodes.length, total - 3);
   assert.deepEqual(b.getSelectedLaneNodeIds(), []);
+});
+
+test('the lane brush turns a stroke into nodes: spaced down the hill, far end kept, uphill strokes read downhill', () => {
+  const stroke = Array.from({ length: 50 }, (_, i) => ({ x: 5000 + i * 97, z: 100 + i * 2 }));
+  const points = brushStrokePoints(stroke, 600);
+  assert.ok(points.length >= 8);
+  for (let i = 1; i < points.length; i++) assert.ok(points[i].x > points[i - 1].x, 'always down the hill');
+  for (let i = 1; i < points.length - 1; i++) assert.ok(points[i].x - points[i - 1].x >= 600, 'at least the spacing apart');
+  assert.equal(points[points.length - 1].x, stroke[stroke.length - 1].x, 'the far end is kept');
+  assert.deepEqual(brushStrokePoints([...stroke].reverse(), 600), points, 'drawn uphill, read downhill');
+  assert.deepEqual(brushStrokePoints(stroke.slice(0, 1), 600), [], 'a click is not a lane');
+  assert.ok(brushStrokePoints(stroke, 1200).length < points.length, 'wider spacing, fewer nodes');
+});
+
+test('a brushed lane is added in one undo step and selected', () => {
+  const b = builder();
+  const before = b.getLaneNetwork()!.paths.length;
+  const stroke = Array.from({ length: 40 }, (_, i) => ({ x: 8000 + i * 100, z: -150 }));
+  const made = b.addLaneFromStroke(stroke, 500);
+  assert.ok(made.ok, made.ok ? '' : made.reason);
+  assert.equal(b.getLaneNetwork()!.paths.length, before + 1);
+  assert.equal(b.getSelectedLaneNodeIds().length, made.ok ? made.nodes : -1, 'the new lane is selected');
+  b.undo();
+  assert.equal(b.getLaneNetwork()!.paths.length, before, 'one undo removes it');
+  assert.equal(b.addLaneFromStroke([{ x: 9000, z: 0 }], 500).ok, false, 'too short: refused');
 });

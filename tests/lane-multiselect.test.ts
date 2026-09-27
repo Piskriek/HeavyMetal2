@@ -118,7 +118,7 @@ test('the test ball: placed on the road, remembered per track, cleared back to t
 test('a test drive starts at the ball on the nearest lane; a click on the gizmo never selects what is in front of it', () => {
   const engine = readFileSync(new URL('../src/game/engine.ts', import.meta.url), 'utf8');
   assert.match(engine, /player\.pathId = network \? nearestPath\(network, x, z\) : null;/, 'steers onto the nearest lane from that spot');
-  assert.match(engine, /player\.y = this\.world\.surfaceAt\(x, z\)\.y - RADIUS;/, 'resting on what it was put on (a ramp top or the road)');
+  assert.match(engine, /player\.y = this\.world\.surfaceAt\(x, z\)\.y - RADIUS - height;/, 'resting on what it was put on (a ramp top or the road), or hanging above it on the start hook');
   assert.match(engine, /this\.player\.y = this\.world\.surfaceAt\(this\.player\.x, this\.player\.z, this\.player\.y \+ RADIUS\)\.y - RADIUS;/, 'the push keeps it on that surface');
   assert.match(engine, /racer\.y = this\.y\(racer\.x\) - RADIUS; \}\n\s*this\.placeAtTestStart\(\);/, 'applied on every reset, after the grid');
   const editor = readFileSync(new URL('../src/screens/MapEditorScreen.tsx', import.meta.url), 'utf8');

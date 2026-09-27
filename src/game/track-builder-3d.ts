@@ -2911,7 +2911,9 @@ export class TrackBuilder3D {
    * The test ball's spot (engine x along the road, z across it) and the world point it was put on (a
    * ramp or deck top, or the road), or null: test drives start from the grid.
    */
-  private testBall: { x: number; z: number; world?: { x: number; y: number; z: number } } | null = null;
+  private testBall: { x: number; z: number; world?: { x: number; y: number; z: number }; height?: number } | null = null;
+  /** Highest a test ball can hang (world units above what is under it). */
+  static readonly TEST_BALL_MAX_HEIGHT = 20000;
   private testBallMarker: THREE.Group | null = null;
   private testBallLoaded = false;
   private testBallShown = true;
@@ -2919,7 +2921,7 @@ export class TrackBuilder3D {
   /** Remembered per course and island track on this device (a convenience, not part of the track). */
   private testBallKey() { return `${this.courseId}:${this.propStore === 'island' ? this.islandTrackId : 'track'}`; }
 
-  getTestBall(): { x: number; z: number } | null {
+  getTestBall(): { x: number; z: number; height?: number } | null {
     if (!this.testBallLoaded) {
       this.testBallLoaded = true;
       try {
@@ -2928,7 +2930,34 @@ export class TrackBuilder3D {
       } catch { /* none saved */ }
     }
     this.refreshTestBallMarker();
-    return this.testBall ? { x: this.testBall.x, z: this.testBall.z } : null;
+    return this.testBall ? { x: this.testBall.x, z: this.testBall.z, ...(this.testBall.height ? { height: this.testBall.height } : {}) } : null;
+  }
+
+  /** How high the test ball hangs above what is under it (0: resting on it). */
+  getTestBallHeight(): number { return this.testBall?.height ?? 0; }
+
+  /** Raises or lowers the test ball on its hook (moving it along the ground keeps the height). */
+  setTestBallHeight(height: number, remember = true) {
+    if (!this.testBall) return;
+    const h = Math.round(Math.min(TrackBuilder3D.TEST_BALL_MAX_HEIGHT, Math.max(0, height)));
+    this.setTestBall({ ...this.testBall, height: h || undefined }, remember);
+  }
+
+  /**
+   * The height the pointer asks for while the ball is lifted: where the pointer's ray crosses the
+   * upright plane through the ball that faces the camera.
+   */
+  testBallHeightAt(clientX: number, clientY: number, canvas: HTMLCanvasElement): number | null {
+    const ground = this.testBall?.world;
+    if (!ground) return null;
+    const rect = canvas.getBoundingClientRect();
+    this.mouseNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -(((clientY - rect.top) / rect.height) * 2 - 1));
+    this.raycaster.setFromCamera(this.mouseNdc, this.camera);
+    const facing = new THREE.Vector3(this.camera.position.x - ground.x, 0, this.camera.position.z - ground.z);
+    if (facing.lengthSq() < 1) facing.set(0, 0, 1);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(facing.normalize(), new THREE.Vector3(ground.x, ground.y, ground.z));
+    const hit = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    return hit ? Math.max(0, hit.y - ground.y - RADIUS) : null;
   }
 
   /** The spot under the pointer for the test ball: on the road or on top of a placed model. */
@@ -2940,11 +2969,14 @@ export class TrackBuilder3D {
   }
 
   /** Puts the test ball at this spot, or removes it (null: test drives start from the grid). */
-  setTestBall(point: { x: number; z: number; world?: { x: number; y: number; z: number } } | null, remember = true) {
+  setTestBall(point: { x: number; z: number; world?: { x: number; y: number; z: number }; height?: number } | null, remember = true) {
     this.testBallLoaded = true;
+    // Moving the ball along the ground keeps it on its hook at the same height.
+    const height = point && "height" in point ? point.height : this.testBall?.height;
     this.testBall = point ? {
       x: Math.round(point.x), z: Math.round(point.z),
       ...(point.world ? { world: { x: Math.round(point.world.x), y: Math.round(point.world.y), z: Math.round(point.world.z) } } : {}),
+      ...(height && height > 0 ? { height: Math.round(height) } : {}),
     } : null;
     if (remember) {
       try {
@@ -2969,7 +3001,22 @@ export class TrackBuilder3D {
       const ring = new THREE.Mesh(new THREE.RingGeometry(RADIUS * 1.5, RADIUS * 1.9, 40), new THREE.MeshBasicMaterial({ color: 0xffb020, side: THREE.DoubleSide, transparent: true, opacity: 0.8, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = -RADIUS + 3;
-      marker.add(ball, ring);
+      // The start hook (shown while the ball hangs): a rope up from the ball, a hook, and a dashed
+      // drop line down to where it will land.
+      const iron = new THREE.MeshStandardMaterial({ color: 0x6b6f76, roughness: 0.5, metalness: 0.8 });
+      const rope = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 260, 8), new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: 0.9 }));
+      rope.position.y = RADIUS + 28 + 130;
+      const hook = new THREE.Mesh(new THREE.TorusGeometry(22, 5, 8, 24, Math.PI * 1.4), iron);
+      hook.position.y = RADIUS + 14;
+      hook.rotation.z = Math.PI * 0.8;
+      const drop = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)]),
+        new THREE.LineDashedMaterial({ color: 0xffb020, dashSize: 40, gapSize: 30, transparent: true, opacity: 0.9, depthTest: false }),
+      );
+      const hookGroup = new THREE.Group();
+      hookGroup.name = 'TestBallHook';
+      hookGroup.add(rope, hook, drop);
+      marker.add(ball, ring, hookGroup);
       this.testBallMarker = marker;
       this.scene.add(marker);
     }
@@ -2984,6 +3031,16 @@ export class TrackBuilder3D {
       const front = starts.sort((a, b) => Math.abs(a.z) - Math.abs(b.z))[0];
       at = this.laneGizmos.worldFromEngine(front ? front.x : START_X, front ? front.z : 0, RADIUS);
     }
+    // On the hook: the ball hangs `height` above the ground point, the ring stays on the ground.
+    const height = this.testBall?.height ?? 0;
+    at.y += height;
+    const ringMesh = marker.children[1] as THREE.Mesh;
+    ringMesh.position.y = -RADIUS + 3 - height;
+    const hookGroup = marker.children[2] as THREE.Group;
+    hookGroup.visible = height > 0;
+    const drop = hookGroup.children[2] as THREE.Line;
+    drop.geometry.setFromPoints([new THREE.Vector3(0, -RADIUS, 0), new THREE.Vector3(0, -RADIUS - height, 0)]);
+    drop.computeLineDistances();
     marker.position.copy(at);
     const ball = marker.children[0] as THREE.Mesh;
     (ball.material as THREE.MeshStandardMaterial).opacity = this.testBall ? 1 : 0.45;

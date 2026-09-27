@@ -233,6 +233,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const testStartModeRef = useRef(false);
   testStartModeRef.current = testStartMode;
   const draggingTestBall = useRef(false);
+  /** How high the test ball hangs on the start hook (0: on the ground). */
+  const [testBallHeight, setTestBallHeight] = useState(() => builder.getTestBallHeight());
   const [testBall, setTestBallState] = useState<{ x: number; z: number } | null>(() => builder.getTestBall());
   const [showSections, setShowSections] = useState(false);
   /** Where the Sections panel opens: above its button, on the page (the shelf clips anything inside it). */
@@ -456,7 +458,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           // Primitives or Custom 3D: a click on the island terrain opens its ground settings.
           if (!hitProp && groundPickRef.current && builder.islandGroundPointAt(e.clientX, e.clientY, canvas)) {
             builder.setIslandGroundOpen(true);
-            showToast('Island ground: tint, grain and pebbles, and the sand brush');
+            showToast('Island ground: tint, grain and pebbles, and the dirt brush');
             onRequestRender?.();
             return;
           }
@@ -528,6 +530,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       // A refusal leaves the handle where the document says it is (so dragging along a limit works),
       // and the last reason is held back for pointer-up rather than toasted once per frame.
       if (draggingTestBall.current && !isRightMouseDown.current) {
+        // Shift: lift or lower the ball on its hook; otherwise slide it over the ground at its height.
+        if (e.shiftKey) {
+          const height = builder.testBallHeightAt(e.clientX, e.clientY, canvas);
+          if (height !== null) { builder.setTestBallHeight(height, false); setTestBallHeight(builder.getTestBallHeight()); onRequestRender?.(); }
+          return;
+        }
         const point = builder.testBallPointAt(e.clientX, e.clientY, canvas);
         if (point) { builder.setTestBall(point, false); onRequestRender?.(); }
         return;
@@ -660,7 +668,10 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           draggingTestBall.current = false;
           const at = builder.getTestBall();
           if (at) { builder.setTestBall(at); setTestBallState(at); }
-          showToast('Test drives start from the ball, on the nearest lane');
+          setTestBallHeight(builder.getTestBallHeight());
+          showToast(builder.getTestBallHeight() > 0
+            ? `The ball hangs ${builder.getTestBallHeight()} up on the start hook: a test drive drops it (Shift-drag lifts it)`
+            : 'Test drives start from the ball, on the nearest lane (Shift-drag lifts it onto a hook)');
           onRequestRender?.();
         }
         if (laneStroke.current) {
@@ -997,7 +1008,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && groundBrushRef.current.on && builder.isIslandGroundOpen()) {
         // With the sand brush out, Ctrl+Z takes back the last stroke.
         e.preventDefault();
-        showToast(builder.undoGroundStroke() ? 'Undid the last sand stroke' : 'No sand stroke to undo');
+        showToast(builder.undoGroundStroke() ? 'Undid the last dirt stroke' : 'No dirt stroke to undo');
         onRequestRender?.();
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
         e.preventDefault();
@@ -3796,7 +3807,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   <span>TEST START</span>
                 </button>
                 <button
-                  onClick={() => { builder.setTestBall(null); setTestBallState(null); showToast('Test drives start from the grid again'); onRequestRender?.(); }}
+                  onClick={() => { builder.setTestBall(null); setTestBallState(null); setTestBallHeight(0); showToast('Test drives start from the grid again'); onRequestRender?.(); }}
                   disabled={!testBall}
                   className="px-1.5 py-1 text-xs rounded-r border border-l-0 border-zinc-700/60 bg-zinc-850 hover:bg-zinc-800 text-zinc-400 cursor-pointer disabled:opacity-35 disabled:cursor-default"
                   title="Remove the test ball (test drives start from the grid)"
@@ -3804,6 +3815,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 >
                   <X size={12} />
                 </button>
+                {testBall && (
+                  <label className="ml-1 flex items-center gap-1 text-[11px] text-zinc-400" title="How high the test ball hangs on the start hook; it drops when the test drive starts (0: it rests on the ground and gets the push). Shift-drag the ball to lift it.">
+                    <span>Hook</span>
+                    <input
+                      type="number" min={0} max={20000} step={50}
+                      value={testBallHeight}
+                      onChange={(e) => { builder.setTestBallHeight(Number(e.target.value) || 0); setTestBallHeight(builder.getTestBallHeight()); onRequestRender?.(); }}
+                      className="w-16 rounded border border-zinc-700/60 bg-zinc-900 px-1 py-0.5 text-xs text-amber-200"
+                      aria-label="Test ball drop height"
+                    />
+                  </label>
+                )}
               </div>
 
               <button

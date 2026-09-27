@@ -1,7 +1,7 @@
 /**
  * Inspector for the island terrain (click the terrain in Primitives or Custom 3D): its tint and
- * brightness, the grain and tiny pebbles seen up close, and the sand brush that paints plain, pitted
- * sand with a scatter of pebbles over the terrain texture.
+ * brightness, the grain and tiny pebbles seen up close, and the dirt brush that paints light, compacted,
+ * cracked dirt with a scatter of pebbles over the terrain texture.
  */
 import { Eraser, Mountain, Paintbrush, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import type { TrackBuilder3D } from '../../game/track-builder-3d';
@@ -53,11 +53,11 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
       </section>
 
       <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
-        <div className="text-[11px] font-bold text-amber-300">Painted sand</div>
+        <div className="text-[11px] font-bold text-amber-300">Painted dirt</div>
         <div className="grid grid-cols-2 gap-1">
           <button onClick={() => onBrush({ ...brush, on: !(brush.on && !brush.erase), erase: false })}
             className={`flex cursor-pointer items-center justify-center gap-1 rounded border py-1 text-[11px] ${brush.on && !brush.erase ? 'border-amber-400 bg-amber-950/40 text-amber-200' : 'border-zinc-700 text-zinc-300'}`}>
-            <Paintbrush size={12} />Paint sand
+            <Paintbrush size={12} />Paint dirt
           </button>
           <button onClick={() => onBrush({ ...brush, on: !(brush.on && brush.erase), erase: true })}
             className={`flex cursor-pointer items-center justify-center gap-1 rounded border py-1 text-[11px] ${brush.on && brush.erase ? 'border-red-400 bg-red-950/40 text-red-200' : 'border-zinc-700 text-zinc-300'}`}>
@@ -70,22 +70,23 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
         <Row label={`Flow ${pct(brush.strength)}`}>
           <input type="range" min={0.05} max={1} step={0.05} value={brush.strength} onChange={(e) => onBrush({ ...brush, strength: Number(e.target.value) })} className="accent-amber-500" />
         </Row>
-        <Row label="Sand colour"><input type="color" value={s.sandColor} onChange={(e) => set({ sandColor: e.target.value })} className="h-6 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" /></Row>
+        <Row label="Dirt colour"><input type="color" value={s.sandColor} onChange={(e) => set({ sandColor: e.target.value })} className="h-6 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" /></Row>
+        {slider('Scale', 'sandScale', 0.25, 4, 0.05, (v) => `${v.toFixed(2)}x`)}
         {slider('Cover', 'sandStrength', 0, 1, 0.01, pct)}
         {slider('Pebbles', 'sandPebbles', 0, 1, 0.01, pct)}
-        {slider('Pitting', 'sandPits', 0, 1, 0.01, pct)}
+        {slider('Cracks', 'sandPits', 0, 1, 0.01, pct)}
         <div className="grid grid-cols-2 gap-1">
           <button disabled={!builder.canUndoGroundStroke()} onClick={() => { builder.undoGroundStroke(); onRequestRender?.(); }}
             className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-zinc-500 disabled:cursor-default disabled:opacity-40">
             <Undo2 size={12} />Undo stroke
           </button>
-          <button onClick={() => { if (window.confirm('Remove all painted sand from this island track?')) { builder.clearGroundPaint(); onRequestRender?.(); } }}
+          <button onClick={() => { if (window.confirm('Remove all painted dirt from this island track?')) { builder.clearGroundPaint(); onRequestRender?.(); } }}
             className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-red-500">
             <Trash2 size={12} />Clear paint
           </button>
         </div>
         <p className="text-[10px] leading-snug text-zinc-500">
-          {brush.on ? 'Left-drag on the terrain to paint; right-drag still moves the camera. Ctrl+Z undoes the last stroke.' : 'Pick Paint sand, then left-drag on the terrain.'}
+          {brush.on ? 'Left-drag on the terrain to paint; right-drag still moves the camera. Ctrl+Z undoes the last stroke.' : 'Pick Paint dirt, then left-drag on the terrain.'}
         </p>
       </section>
 

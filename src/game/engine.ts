@@ -447,7 +447,8 @@ export class GameEngine {
       racer.launchOrigin = { x: racer.x, y: racer.y };
     }
     this.effects.push('dust', this.player.x, this.player.y, this.player.z, 1.6, this.player.id, this.tick);
-    this.snapshot.status = 'pushing';
+    // A test ball on the hook drops straight into the race; everyone else gets the push.
+    this.snapshot.status = this.dropStart ? 'flying' : 'pushing';
     this.snapshot.speed = 0;
     this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
     this.audio.play('push');
@@ -689,9 +690,16 @@ export class GameEngine {
   };
 
   /** A test drive's start (the builder's test ball, engine x/z), or null for the usual grid. */
-  private testStart: { x: number; z: number } | null = null;
-  /** Test drives start from here: the player takes the nearest lane at this spot. Null: the grid. */
-  setTestStart(point: { x: number; z: number } | null) { this.testStart = point; }
+  private testStart: { x: number; z: number; height?: number } | null = null;
+  /**
+   * Test drives start from here: the player takes the nearest lane at this spot. Null: the grid. With a
+   * `height` the ball hangs that far above what is under it (the start hook) and drops when the test
+   * begins: no push, it falls, lands (on a ramp deck if one is under it) and rolls onto the network.
+   */
+  setTestStart(point: { x: number; z: number; height?: number } | null) { this.testStart = point; }
+
+  /** The test ball hangs from the hook: the race starts with the drop, not the push. */
+  private get dropStart(): boolean { return (this.testStart?.height ?? 0) > 0; }
 
   /** Puts the player on the test ball's spot, on the nearest lane of the network, resting on the road. */
   private placeAtTestStart() {
@@ -704,9 +712,10 @@ export class GameEngine {
     // the nearest lane of the network from there.
     const network = this.laneNetwork;
     player.pathId = network ? nearestPath(network, x, z) : null;
-    player.x = x; player.z = z; player.y = this.world.surfaceAt(x, z).y - RADIUS;
+    const height = Math.max(0, at.height ?? 0);
+    player.x = x; player.z = z; player.y = this.world.surfaceAt(x, z).y - RADIUS - height;
     player.vx = player.vy = player.vz = 0;
-    player.grounded = true;
+    player.grounded = height <= 0;
     player.distance = Math.max(0, (x - START_X) / 2);
     player.previous = { x: player.x, y: player.y, z: player.z, rotation: player.rotation };
     player.launchOrigin = { x: player.x, y: player.y };

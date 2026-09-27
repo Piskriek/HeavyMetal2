@@ -31,7 +31,10 @@ export interface IslandGroundSettings {
   sandColor: string;
   sandStrength: number;
   sandPebbles: number;
+  /** How strongly the dirt's cracks show (0 = smooth). The key keeps its old name so saves still load. */
   sandPits: number;
+  /** Size of the painted dirt's cracks and stones: 1 = as made, 2 = twice as big. */
+  sandScale: number;
 }
 
 export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
@@ -40,10 +43,11 @@ export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
   grain: 0.7,
   pebbleSize: 9,
   pebbles: 0.45,
-  sandColor: '#cdc2a8',
+  sandColor: '#c8b99c',
   sandStrength: 1,
   sandPebbles: 0.3,
-  sandPits: 0.5,
+  sandPits: 0.6,
+  sandScale: 1,
 };
 
 const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
@@ -63,6 +67,7 @@ export function normalizeIslandGround(raw: unknown): IslandGroundSettings {
     sandStrength: clamp(r.sandStrength, 0, 1, d.sandStrength),
     sandPebbles: clamp(r.sandPebbles, 0, 1, d.sandPebbles),
     sandPits: clamp(r.sandPits, 0, 1, d.sandPits),
+    sandScale: clamp(r.sandScale, 0.25, 4, d.sandScale),
   };
 }
 
@@ -119,6 +124,7 @@ uniform vec3 sandColor;
 uniform float sandStrength;
 uniform float sandPebbles;
 uniform float sandPits;
+uniform float sandScale;
 uniform sampler2D groundDetail;
 varying vec3 vGroundWorld;
 varying vec3 vGroundNormal;
@@ -134,7 +140,7 @@ float gNoise2(vec2 p) {
   f = f * f * (3.0 - 2.0 * f);
   return mix(mix(gHash2(i), gHash2(i + vec2(1, 0)), f.x), mix(gHash2(i + vec2(0, 1)), gHash2(i + vec2(1, 1)), f.x), f.y);
 }
-// The baked detail tile (grain, pebbles, pits), read twice with random offsets that change across the
+// The baked detail tile (grain, pebbles, cracks), read twice with random offsets that change across the
 // ground and blended, so the tile never shows as a repeat (Inigo Quilez, "texture repetition", 3rd way).
 // The two reads and their blend weight; pebbles are resolved per read, then blended (blending the
 // pebble numbers first would bite pieces out of stones).
@@ -181,18 +187,28 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   }
   vec4 d = mix(gA, gB, gW);
   float grain = 0.8 + 0.4 * d.r;
+  vec3 baseStones = gStones(groundPebbles);
 
   if (paint > 0.001) {
-    // Plain, mottled sand: broad soft patches, never ripples.
-    float mottle = 0.9 + 0.1 * gNoise2(wp.xz / 900.0) + 0.06 * gNoise2(wp.xz / 180.0) - 0.05;
-    vec3 sand = sandColor * mottle;
-    vec3 detailed = sand * mix(1.0, grain, 0.6) * (1.0 - 0.35 * d.a * sandPits);
-    detailed *= gStones(sandPebbles * 0.6);
-    diffuseColor.rgb = mix(diffuseColor.rgb, mix(sand, detailed, near), paint);
+    // Light, compacted dirt: broad soft patches, cracked into plates up close.
+    float mottle = 0.88 + 0.12 * gNoise2(wp.xz / 900.0) + 0.08 * gNoise2(wp.xz / 160.0) - 0.06;
+    vec3 dirt = sandColor * mottle;
+    if (near > 0.0) {
+      vec3 n = abs(vGroundNormal);
+      vec2 puv = n.y > 0.55 ? wp.xz : (n.x > n.z ? wp.zy : wp.xy);
+      gDetail(puv / (DETAIL_CELLS * groundPebbleSize * sandScale), gNoise2(wp.xz / 700.0) + 0.37);
+      vec4 e = mix(gA, gB, gW);
+      float crack = e.a * sandPits;
+      // A crack is a dark line with a faint lifted lip either side (dried, curled edges).
+      vec3 detailed = dirt * mix(1.0, 0.82 + 0.3 * e.r, 0.5) * (1.0 - 0.6 * crack) * (1.0 + 0.06 * sandPits * (1.0 - crack) * step(0.05, crack));
+      detailed *= gStones(sandPebbles * 0.6);
+      dirt = mix(dirt, detailed, near);
+    }
+    diffuseColor.rgb = mix(diffuseColor.rgb, dirt, paint);
   }
 
   if (near > 0.0 && groundGrain > 0.0) {
-    vec3 g = vec3(grain) * gStones(groundPebbles);
+    vec3 g = vec3(grain) * baseStones;
     diffuseColor.rgb *= mix(vec3(1.0), g, groundGrain * near * (1.0 - paint));
   }
 }
@@ -213,7 +229,8 @@ const hash2 = (x: number, y: number, seed: number) => {
 /**
  * The detail tile, seamless: R grain (two octaves of value noise), G a pebble's shade (0.5 = none;
  * lit dome, dark rim), B that pebble's random number (1 = no pebble; a pebble shows where its number is
- * under the Pebbles setting, so the sliders still work), A pits for the sand.
+ * under the Pebbles setting, so the sliders still work), A cracks for the painted dirt (plates of dried,
+ * compacted earth: the edges of a jittered cell pattern, wobbled, at two sizes).
  */
 export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Array {
   const out = new Uint8Array(res * res * 4);
@@ -227,7 +244,7 @@ export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Arr
     const bottom = v(ix, iy + 1) + (v(ix + 1, iy + 1) - v(ix, iy + 1)) * fx;
     return top + (bottom - top) * fy;
   };
-  const pitCells = cells * 2;
+  const crackCells = Math.max(2, Math.round(cells / 8));
   for (let py = 0; py < res; py++) {
     for (let px = 0; px < res; px++) {
       const u = (px + 0.5) / res, v = (py + 0.5) / res;
@@ -250,21 +267,27 @@ export function makeDetailTile(res = DETAIL_RES, cells = DETAIL_CELLS): Uint8Arr
         shade = 1 + c * (tone * (0.85 + 0.25 * (1 - d * d)) * (1 - 0.35 * rim) - 1);
         id = hash2(gx, gy, 7) * 0.98;
       }
-      // Pits: small soft hollows.
-      const rx = u * pitCells, ry = v * pitCells;
-      const kx = Math.floor(rx), ky = Math.floor(ry);
-      let pit = 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        const gx = wrap(kx + dx, pitCells), gy = wrap(ky + dy, pitCells);
-        const ox = kx + dx + hash2(gx, gy, 8), oy = ky + dy + hash2(gx, gy, 9);
-        const d = Math.hypot(rx - ox, ry - oy) / (0.18 + 0.2 * hash2(gx, gy, 10));
-        pit = Math.max(pit, 1 - Math.min(1, d));
-      }
+      // Cracks: the edges between plates (second-nearest minus nearest cell centre), wobbled so they wander.
+      const edge = (n: number, seed: number, width: number) => {
+        const wob = 0.18;
+        const wx = u * n + wob * (valueNoise(u * n * 3, v * n * 3, n * 3, seed + 20) - 0.5) * 2;
+        const wy = v * n + wob * (valueNoise(u * n * 3, v * n * 3, n * 3, seed + 21) - 0.5) * 2;
+        const kx = Math.floor(wx), ky = Math.floor(wy);
+        let f1 = 9, f2 = 9;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const gx = wrap(kx + dx, n), gy = wrap(ky + dy, n);
+          const d = Math.hypot(wx - (kx + dx + 0.1 + 0.8 * hash2(gx, gy, seed)), wy - (ky + dy + 0.1 + 0.8 * hash2(gx, gy, seed + 1)));
+          if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+        }
+        const t = Math.min(1, (f2 - f1) / width);
+        return 1 - t * t * (3 - 2 * t);
+      };
+      const pit = Math.max(edge(crackCells, 8, 0.07), 0.55 * edge(crackCells * 3, 12, 0.09));
       const o = (py * res + px) * 4;
       out[o] = Math.round(grain * 255);
       out[o + 1] = Math.round(Math.min(1, shade / 2) * 255);
       out[o + 2] = cover > 0.02 ? Math.round(id * 255) : 255;
-      out[o + 3] = Math.round(pit * pit * (3 - 2 * pit) * 255);
+      out[o + 3] = Math.round(pit * 255);
     }
   }
   return out;
@@ -331,7 +354,8 @@ export class IslandGround {
       sandColor: { value: new THREE.Color() },
       sandStrength: { value: 1 },
       sandPebbles: { value: 0.3 },
-      sandPits: { value: 0.5 },
+      sandPits: { value: 0.6 },
+      sandScale: { value: 1 },
       groundDetail: { value: detailTileTexture() },
     };
     material.onBeforeCompile = (shader) => injectIslandGround(shader, this.uniforms);
@@ -354,6 +378,7 @@ export class IslandGround {
     u.sandStrength.value = s.sandStrength;
     u.sandPebbles.value = s.sandPebbles;
     u.sandPits.value = s.sandPits;
+    u.sandScale.value = s.sandScale;
   }
 
   /** One brush dab; uploads the mask. */

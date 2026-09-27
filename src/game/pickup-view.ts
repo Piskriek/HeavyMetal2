@@ -157,7 +157,8 @@ export class PickupView {
       const sprite = this.spriteAt(index, material);
       const glow = this.glowAt(index, pickup.kind);
       const taken = pickup.collectedBy !== null && runTime - pickup.collectedAt < PICKUP_HIDDEN_SECONDS;
-      sprite.visible = !taken;
+      // A powerup placed in build mode is its floating 3D model; only the glow, beam and ring stay.
+      sprite.visible = !taken && !pickup.propId;
       glow.glint.visible = glow.beam.visible = glow.ring.visible = !taken;
       if (taken) { hidden += 1; continue; }
       const y = pickupY(pickup, time, reducedMotion);

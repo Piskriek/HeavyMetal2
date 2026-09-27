@@ -1,0 +1,19 @@
+{
+  "id": "01a0e275-8148-706b-9919-71e769a90a20",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 439723011,
+  "prompt": "a chunky collectible rocket fuel power-up for a racing game: a brass-banded glass canister full of glowing amber orange fuel with a small rocket fin on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a chunky collectible rocket fuel power-up for a racing game: a brass-banded glass canister full of glowing amber orange fuel with a small rocket fin on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790505747007,
+  "progress": 100,
+  "started_at": 1790505747015,
+  "finished_at": 1790505837963,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

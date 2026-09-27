@@ -9,6 +9,8 @@ import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from
 import { classifyPlacedRamp } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
 import { engineXAt, isRaceMarkType, roadPoseAt } from './race-marks';
+import { isKitModelType } from './models/kit-catalog';
+import { RAMP_PIECES } from './race-pieces';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
@@ -1902,10 +1904,36 @@ export class TrackBuilder3D {
     this.scene.add(this.decalSideHandlesGroup);
   }
 
+  /**
+   * Brightness (0..100) for every selected Meshy model. `pushUndo` once at the start of a slider drag;
+   * the drag's later steps only update, so one undo puts the whole drag back.
+   */
+  setSelectedPropsBrightness(value: number, pushUndo = false) {
+    const level = Math.max(0, Math.min(100, Math.round(value)));
+    const models = this.getSelectedProps().filter((p) => isKitModelType(p.type));
+    if (!models.length) return;
+    if (pushUndo) this.pushUndo();
+    for (const prop of models) this.updatePropTransform(prop.id, { brightness: level }, false);
+    this.saveToStorage();
+    this.notify();
+  }
+
+  /** Race pieces taken out of play this frame (collected powerups, blown-up crates); empty in build mode. */
+  private raceHidden = new Set<string>();
+  setRaceHiddenProps(ids: ReadonlySet<string>) {
+    if (ids.size === 0 && this.raceHidden.size === 0) return;
+    for (const id of new Set([...this.raceHidden, ...ids])) {
+      const obj = this.propObjects.get(id);
+      const prop = this.placedProps.find((p) => p.id === id);
+      if (obj) obj.visible = prop?.visible !== false && !ids.has(id);
+    }
+    this.raceHidden = new Set(ids);
+  }
+
   getPlacedRamps(): readonly PlacedProp[] {
     return this.placedProps.filter((p) => {
       const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
-      return def?.isRamp || p.type === 'timber_ramp' || p.type === 'rock_springboard' || p.type === 'springboard';
+      return def?.isRamp || p.type === 'timber_ramp' || p.type === 'rock_springboard' || p.type === 'springboard' || p.type in RAMP_PIECES;
     });
   }
 

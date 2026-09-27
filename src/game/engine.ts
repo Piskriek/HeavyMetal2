@@ -10,6 +10,8 @@ import { SPLIT_TIMEOUT_S, simulateSplitTicks } from './sim/split-times';
 import { withoutLoopRides } from './sim/decor-loops';
 import { DEFAULT_ROPE, clampRope, type RopeConfig } from './sim/rope';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
+import { courseTrackSpace } from './island-route/island-space';
+import { racePiecesFrom, rampScale } from './race-pieces';
 import {
   BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, sectorAt,
@@ -1020,6 +1022,8 @@ export class GameEngine {
     // M01 · T1: in push mode the start pad and the whole run-up to the first loop are empty. The
     // filter only removes a prefix — the layout itself has no RNG — so every obstacle from the
     // gate on keeps its exact identity (asserted by tests/start-zone.test.ts).
+    // The island races only what is placed on it (race-pieces.ts): no generated 2D obstacles or pickups.
+    if (this.options.course === 'basalt') { this.makeIslandTrack(); return; }
     const built = createTrackLayout(this.options.course);
     // The push run-up runs from the start zone's own boundary to the **mouth of the geometry loop**
     // (T1d), with the descent's rings kept and the jump line under the plane removed (T1c — see
@@ -1046,14 +1050,28 @@ export class GameEngine {
     this.world.configure(this.options.course, this.obstacles, this.pickups);
   }
 
+  /**
+   * The island: its race pieces are the powerups, hazards and ramps placed in build mode on it, and
+   * nothing else. The sorting pool is geometry (mergeGateFor), so it is unaffected.
+   */
+  private makeIslandTrack() {
+    const builder = this.renderer?.trackBuilder;
+    const props = builder && typeof builder.getProps === 'function' ? builder.getProps() : [];
+    const pieces = racePiecesFrom(props, courseTrackSpace(this.options.course), this.options.course);
+    this.pickups = pieces.pickups;
+    this.obstacles = [...pieces.obstacles, ...this.builderRamps()].sort((a, b) => a.x - b.x);
+    this.world.configure(this.options.course, this.obstacles, this.pickups);
+  }
+
   /** The builder's placed ramp props as engine ramp obstacles (none when no builder is attached). */
   private builderRamps() {
     const builder = this.renderer?.trackBuilder;
     if (!builder || typeof builder.getPlacedRamps !== 'function') return [];
-    const map = getTrackSpace();
+    // The course's own road: the island's for the island (a ramp is measured along the road it stands on).
+    const map = courseTrackSpace(this.options.course);
     const ramps = builder.getPlacedRamps();
     if (!ramps.length) return [];
-    const compiled = compileRampSurfaces(map, ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: r.scale, trackDist: r.trackDist })));
+    const compiled = compileRampSurfaces(map, ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: rampScale(r), trackDist: this.options.course === 'basalt' ? undefined : r.trackDist })));
     return builderRampObstacles(map, compiled.surfaces);
   }
 

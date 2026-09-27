@@ -1,0 +1,19 @@
+{
+  "id": "01a0e27f-ba51-7187-aa07-a3411bf89216",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 3207768609,
+  "prompt": "a round springy jump pad lying on the ground: a thick round brass drum top resting on one big visible coiled steel spring, short and wide, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a round springy jump pad lying on the ground: a thick round brass drum top resting on one big visible coiled steel spring, short and wide, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790506416917,
+  "progress": 100,
+  "started_at": 1790506416923,
+  "finished_at": 1790506525205,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

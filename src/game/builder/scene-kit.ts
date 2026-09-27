@@ -20,7 +20,8 @@ import {
 } from './light-rig';
 import { applyPrimitiveTransform, isPrimitiveType, primitiveGeometry, primitiveShape } from './primitives';
 import { isKitModelType } from '../models/kit-catalog';
-import { createKitObject } from '../models/kit-object';
+import { isPowerupPiece } from '../race-pieces';
+import { createKitObject, releaseKitBrightness, setKitBrightness } from '../models/kit-object';
 import { SceneryIndex, isShown, sceneryMaterials, setPartMaterial, unwrapPivot, wrapInPivot, type SceneryPart } from './scenery-index';
 
 export const TERRAIN_EDIT_TYPE = 'terrain_edit';
@@ -33,6 +34,8 @@ export interface KitProp {
   id: string; type: string; x: number; y: number; z: number; rotY: number; rotX?: number; rotZ?: number; scale: number;
   width?: number; height?: number; depth?: number; flipX?: boolean; visible?: boolean;
   light?: unknown; shader?: unknown; materialDesc?: MaterialDescriptor;
+  /** Meshy models: 0..100 extra glow of the model's own texture, to balance it against the terrain. */
+  brightness?: number;
   terrainKey?: string; terrainHidden?: boolean; terrainOrigin?: [number, number, number];
 }
 
@@ -85,6 +88,7 @@ export class SceneKit {
       this.scene.add(obj);
     } else if (isKitModelType(prop.type)) {
       obj = createKitObject(prop.type, prop.id, this.lowTierModels, () => this.onModelLoaded?.(prop.id));
+      if (isPowerupPiece(prop.type)) this.floating.add(obj);
       this.scene.add(obj);
     } else if (isPrimitiveType(prop.type)) {
       const shape = primitiveShape(prop.type) ?? 'box';
@@ -118,6 +122,7 @@ export class SceneKit {
       obj.position.set(prop.x, prop.y, prop.z);
       obj.rotation.set(prop.rotX ?? 0, prop.rotY ?? 0, prop.rotZ ?? 0, 'YXZ');
       obj.scale.set((prop.flipX ? -1 : 1) * (prop.scale || 1), prop.scale || 1, prop.scale || 1);
+      if ((obj.userData.brightness ?? 0) !== (prop.brightness ?? 0)) setKitBrightness(obj, prop.brightness ?? 0);
       obj.visible = shown;
     } else if (isPrimitiveType(prop.type)) {
       applyPrimitiveTransform(obj, prop);
@@ -145,7 +150,7 @@ export class SceneKit {
       if (obj) { this.scene.remove(obj); disposeObject(obj); }
     } else if (isKitModelType(prop.type)) {
       // The geometry and textures are shared with every other copy (and the load cache): never disposed here.
-      if (obj) { obj.userData.released = true; this.scene.remove(obj); }
+      if (obj) { obj.userData.released = true; releaseKitBrightness(obj); this.floating.delete(obj); this.scene.remove(obj); }
     } else if (isPrimitiveType(prop.type)) {
       if (obj) {
         this.scene.remove(obj);
@@ -303,7 +308,17 @@ export class SceneKit {
   private markersShown = true;
 
   /** Light slots and marker visibility. `building` = the builder camera is up (markers shown). */
+  /** Powerups float and spin (the model inside the prop's group, so the prop's own transform is untouched). */
+  private readonly floating = new Set<THREE.Object3D>();
+
   update(camera: THREE.Camera, timeSec: number, reducedMotion: boolean, building: boolean) {
+    for (const group of this.floating) {
+      const model = group.children[0];
+      if (!model) continue;
+      model.rotation.y = reducedMotion ? 0 : timeSec * 1.6;
+      model.position.y = model.userData.baseY ??= model.position.y;
+      if (!reducedMotion) model.position.y = model.userData.baseY + 30 + Math.sin(timeSec * 2.1) * 22;
+    }
     if (building !== this.markersShown) {
       this.markersShown = building;
       this.scene.traverse((o) => { if (o.userData?.isLight && o.parent === this.scene) o.visible = building; });

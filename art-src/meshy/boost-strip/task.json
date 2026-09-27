@@ -1,0 +1,19 @@
+{
+  "id": "01a0e27f-66dc-74c8-b315-3ebdf00b288f",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 3313756419,
+  "prompt": "a flat rectangular speed boost strip lying flat on the ground like a floor mat, dark riveted steel with three large glowing orange chevron arrows painted on its top surface all pointing the same way, seen lying down, very thin, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a flat rectangular speed boost strip lying flat on the ground like a floor mat, dark riveted steel with three large glowing orange chevron arrows painted on its top surface all pointing the same way, seen lying down, very thin, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790506395989,
+  "progress": 100,
+  "started_at": 1790506395996,
+  "finished_at": 1790506514038,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

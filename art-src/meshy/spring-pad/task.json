@@ -1,0 +1,18 @@
+{
+  "id": "01a0e274-f545-7184-9534-3839e3fec03e",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 1401758092,
+  "prompt": "a low wide launch spring pad for a race road: a round riveted metal plate sitting on a big coiled steel spring, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a low wide launch spring pad for a race road: a round riveted metal plate sitting on a big coiled steel spring, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790505711172,
+  "progress": 100,
+  "started_at": 1790505711178,
+  "finished_at": 1790505831068,
+  "task_error": null,
+  "consumed_credits": 10
+}

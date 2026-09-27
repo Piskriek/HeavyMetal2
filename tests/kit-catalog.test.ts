@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { KIT_MODELS, KIT_DEFINITIONS, kitModelFor, kitModelUrl, kitThumbUrl } from '../src/game/models/kit-catalog';
-import { fitKitModel } from '../src/game/models/kit-object';
+import { KIT_BRIGHTNESS_MAX_GLOW, fitKitModel, setKitBrightness } from '../src/game/models/kit-object';
 import { PROP_DEFINITIONS } from '../src/game/builder/prop-catalog';
 import { isKitType } from '../src/game/builder/scene-kit';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
@@ -83,4 +83,22 @@ test('a placed model is an ordinary prop: it is saved, moved, scaled and removed
   } finally {
     (globalThis as any).fetch = realFetch;
   }
+});
+
+test('brightness 0..100 glows a model on its own copy of the material, and 0 puts the original back', () => {
+  const shared = new THREE.MeshStandardMaterial({ map: new THREE.Texture() });
+  const a = new THREE.Group(); a.add(new THREE.Mesh(new THREE.BoxGeometry(), shared));
+  const b = new THREE.Group(); b.add(new THREE.Mesh(new THREE.BoxGeometry(), shared));
+  setKitBrightness(a, 50);
+  const meshA = a.children[0] as THREE.Mesh;
+  const bright = meshA.material as THREE.MeshStandardMaterial;
+  assert.notEqual(bright, shared, 'its own material');
+  assert.equal(bright.emissiveIntensity, 0.5 * KIT_BRIGHTNESS_MAX_GLOW);
+  assert.equal(bright.emissiveMap, shared.map, 'the texture itself glows');
+  assert.equal(shared.emissiveIntensity, 1, 'the shared material is untouched');
+  assert.equal((b.children[0] as THREE.Mesh).material, shared, 'other copies are untouched');
+  setKitBrightness(a, 100);
+  assert.equal((meshA.material as THREE.MeshStandardMaterial).emissiveIntensity, KIT_BRIGHTNESS_MAX_GLOW);
+  setKitBrightness(a, 0);
+  assert.equal(meshA.material, shared, '0 is the model exactly as lit');
 });

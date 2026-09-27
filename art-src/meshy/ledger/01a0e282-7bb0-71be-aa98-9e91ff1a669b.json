@@ -1,0 +1,16 @@
+{
+  "name": "coil-spring-pad",
+  "taskId": "01a0e282-7bb0-71be-aa98-9e91ff1a669b",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "one large upright steel coil spring with a flat round riveted metal plate on top of it, industrial, nothing else, no plants, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2500,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:56:39.936Z"
+}

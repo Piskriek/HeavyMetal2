@@ -1,0 +1,16 @@
+{
+  "name": "powerup-shield",
+  "taskId": "01a0e274-3e0a-73cf-8ef5-3700e9adb6cb",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a chunky collectible shield power-up for a racing game: a round riveted brass buckler shield with a glowing pale blue crystal set in its centre, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 4000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:41:06.684Z"
+}

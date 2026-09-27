@@ -13,7 +13,7 @@ import type { GameOptions } from './types';
 import { BALL_DRAW_RADIUS, RADIUS, courseY, loopGeometry, type LoopRide } from './scene';
 import { EffectRenderer } from './effects/renderer-fx';
 import { ObstacleView, shieldBubbleTexture } from './obstacle-view';
-import { PickupView } from './pickup-view';
+import { PICKUP_HIDDEN_SECONDS, PickupView } from './pickup-view';
 import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
 import type { GyroFrame } from './first-person';
@@ -2329,6 +2329,16 @@ export class Renderer3D {
       }
       if (this.island) this.pickupView.useMap(this.viewSpace);
       this.pickupView.update(frame.pickups, frame.time, frame.reducedMotion, frame.runTime, this.activeRampSurfaces(), frame.options.course);
+      // Placed 3D pieces: a collected powerup's model hides until it respawns; a broken crate or a
+      // bowled sheep stays gone for the race.
+      const gone = new Set<string>();
+      for (const pickup of frame.pickups) {
+        if (pickup.propId && pickup.collectedBy !== null && frame.runTime - pickup.collectedAt < PICKUP_HIDDEN_SECONDS) gone.add(pickup.propId);
+      }
+      for (const obstacle of frame.obstacles) {
+        if (obstacle.propId && obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep')) gone.add(obstacle.propId);
+      }
+      this.trackBuilder.setRaceHiddenProps(gone);
     } else {
       this.pickupView?.hideAll();
     }

@@ -1,0 +1,16 @@
+{
+  "name": "powerup-fuel",
+  "taskId": "01a0e274-3cb1-7264-96ca-80fd05e44bf7",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a chunky collectible rocket fuel power-up for a racing game: a brass-banded glass canister full of glowing amber orange fuel with a small rocket fin on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 4000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:41:06.545Z"
+}

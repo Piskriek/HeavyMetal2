@@ -255,6 +255,8 @@ export interface PlacedProp {
   isDecal?: boolean;
   groupId?: string;
   lit?: boolean;
+  /** Meshy models: 0 (off) to 100, extra glow of the model's own texture to balance it against the terrain. */
+  brightness?: number;
   visible?: boolean; // T08: visibility toggle (H key)
   animate?: boolean; // Animated category: frame playback on/off (default true)
   animated?: boolean; // Still props with a twin: swap in the animated sheet (default false)

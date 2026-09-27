@@ -1,0 +1,18 @@
+{
+  "id": "01a0e274-fc0e-7634-98ed-380390cc2877",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 3068700803,
+  "prompt": "a very flat low speed boost pad for a race road: a wide riveted metal plate with glowing orange chevron arrows pointing forward, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a very flat low speed boost pad for a race road: a wide riveted metal plate with glowing orange chevron arrows pointing forward, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790505712857,
+  "progress": 100,
+  "started_at": 1790505712864,
+  "finished_at": 1790505832233,
+  "task_error": null,
+  "consumed_credits": 10
+}

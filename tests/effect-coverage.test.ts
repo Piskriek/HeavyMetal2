@@ -62,10 +62,10 @@ test('the events that were invisible are painted now', () => {
   assert.match(engine, /this\.effects\.push\('impact', racer\.x, racer\.y, racer\.z, 0\.7, racer\.id, this\.tick\)/,
     'a shield hold is a visible impact');
 
-  // 3. The finish burst: an explosion over the flag, with smoke under it.
-  assert.match(engine, /this\.effects\.push\('explosion', this\.player\.x, this\.y\(FINISH\) - 140, this\.player\.z, 2\.2, this\.player\.id, this\.tick\)/,
+  // 3. The finish burst: an explosion over the flag (the finish raced to), with smoke under it.
+  assert.match(engine, /this\.effects\.push\('explosion', this\.player\.x, this\.y\(this\.finishX\) - 140, this\.player\.z, 2\.2, this\.player\.id, this\.tick\)/,
     'the finish is an explosion-sized burst');
-  assert.match(engine, /this\.effects\.push\('smoke', this\.player\.x, this\.y\(FINISH\) - 140, this\.player\.z, 1\.4, this\.player\.id, this\.tick\)/,
+  assert.match(engine, /this\.effects\.push\('smoke', this\.player\.x, this\.y\(this\.finishX\) - 140, this\.player\.z, 1\.4, this\.player\.id, this\.tick\)/,
     'with smoke under it');
 
   // …and the never-drawn legacy 2D particles are gone (M6): the painted effects are the only record.

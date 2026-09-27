@@ -1,0 +1,16 @@
+{
+  "name": "powerup-bounce",
+  "taskId": "01a0e274-3ed3-73d9-af03-f56dd9e14d15",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a chunky collectible air spring power-up for a racing game: a big coiled brass spring with a glowing mint green orb on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 4000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:41:06.586Z"
+}

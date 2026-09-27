@@ -1,0 +1,16 @@
+{
+  "name": "spring-pad",
+  "taskId": "01a0e274-39c5-7428-a458-fc20d2497a22",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a low wide launch spring pad for a race road: a round riveted metal plate sitting on a big coiled steel spring, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 2500,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:41:05.352Z"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "sheep",
+  "taskId": "01a0e277-b310-7045-878f-cc4c9b7a750c",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a fluffy cartoon sheep with a thick woolly white fleece, dark face and legs, standing on four legs, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6-lite",
+    "topology": "triangle",
+    "target_polycount": 3000,
+    "should_remesh": true
+  },
+  "credits": 5,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:44:53.046Z"
+}

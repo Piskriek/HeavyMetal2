@@ -54,6 +54,14 @@ export const KIT_MODELS: readonly KitModel[] = [
   // Race: the start line and the finishes a race can end at (race-marks.ts). Placed on the road's middle.
   { id: 'start-line', name: 'Start Line', shelf: 'race', size: 1500 },
   { id: 'finish-line', name: 'Finish Line', shelf: 'race', size: 1500 },
+  // Race pieces (race-pieces.ts): powerups float and spin and are real pickups; the rest are obstacles.
+  { id: 'powerup-fuel', name: 'Rocket Fuel', shelf: 'race', size: 220 },
+  { id: 'powerup-shield', name: 'Skyward Shield', shelf: 'race', size: 220 },
+  { id: 'powerup-bounce', name: 'Air Spring', shelf: 'race', size: 220 },
+  { id: 'boost-pad', name: 'Boost Pad', shelf: 'race', size: 380 },
+  { id: 'spring-pad', name: 'Spring Pad', shelf: 'race', size: 240 },
+  { id: 'tnt-crate', name: 'TNT Crate', shelf: 'race', size: 200 },
+  { id: 'sheep', name: 'Sheep', shelf: 'race', size: 230 },
   // Foliage (text-to-3D, art-src/meshy/foliage-rocks*.tsv).
   { id: 'palm-tall', name: 'Tall Palm', shelf: 'foliage_3d', size: 1800 },
   { id: 'palm-leaning', name: 'Leaning Palm', shelf: 'foliage_3d', size: 1500 },

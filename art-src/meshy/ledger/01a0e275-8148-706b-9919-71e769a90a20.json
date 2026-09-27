@@ -1,0 +1,9 @@
+{
+  "name": "powerup-fuel",
+  "taskId": "01a0e275-8148-706b-9919-71e769a90a20",
+  "kind": "text-refine",
+  "source": "01a0e274-3cb1-7264-96ca-80fd05e44bf7",
+  "credits": 10,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:42:27.833Z"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "01a0e278-4da7-75ba-a202-2744f452ea40",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 4041806773,
+  "prompt": "a fluffy cartoon sheep with a thick woolly white fleece, dark face and legs, standing on four legs, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a fluffy cartoon sheep with a thick woolly white fleece, dark face and legs, standing on four legs, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790505930449,
+  "progress": 100,
+  "started_at": 1790505930456,
+  "finished_at": 1790506094434,
+  "task_error": null,
+  "consumed_credits": 10
+}

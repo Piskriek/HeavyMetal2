@@ -294,6 +294,8 @@ export class ObstacleView {
     let drawn = 0; let skipped = 0;
     const home = this.map;
     for (const obstacle of obstacles) {
+      // A piece placed in build mode is drawn by the builder as its 3D model.
+      if (obstacle.propId) continue;
       for (const road of this.roadsAt?.(obstacle.x) ?? [home]) {
         this.map = road;
         const object = this.markerFor(obstacle);

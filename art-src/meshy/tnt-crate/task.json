@@ -1,0 +1,18 @@
+{
+  "id": "01a0e278-4b66-73d4-9cd3-3f536307baf6",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 2802890287,
+  "prompt": "a wooden crate of red dynamite sticks with a red and yellow danger stripe and bundled dynamite on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a wooden crate of red dynamite sticks with a red and yellow danger stripe and bundled dynamite on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790505929822,
+  "progress": 100,
+  "started_at": 1790505929828,
+  "finished_at": 1790506066644,
+  "task_error": null,
+  "consumed_credits": 10
+}

@@ -1,0 +1,16 @@
+{
+  "name": "boost-strip",
+  "taskId": "01a0e27d-fcbf-7262-92c5-cb2fd0b3613e",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a flat rectangular speed boost strip lying flat on the ground like a floor mat, dark riveted steel with three large glowing orange chevron arrows painted on its top surface all pointing the same way, seen lying down, very thin, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 3000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:51:45.305Z"
+}

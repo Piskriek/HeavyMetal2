@@ -1,0 +1,16 @@
+{
+  "name": "bounce-pad",
+  "taskId": "01a0e27d-fcd6-72be-bdbc-37fe3c0c5902",
+  "kind": "text-preview",
+  "params": {
+    "mode": "preview",
+    "prompt": "a round springy jump pad lying on the ground: a thick round brass drum top resting on one big visible coiled steel spring, short and wide, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+    "ai_model": "meshy-6",
+    "topology": "triangle",
+    "target_polycount": 3000,
+    "should_remesh": true
+  },
+  "credits": 20,
+  "status": "SUCCEEDED",
+  "at": "2026-09-27T10:51:45.010Z"
+}

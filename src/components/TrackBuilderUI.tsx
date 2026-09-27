@@ -12,6 +12,8 @@ import {
 import { type CourseId } from '../game/types';
 import { ISLAND_COURSE, playableCourses } from '../game/course-archive';
 import { isRaceMarkType } from '../game/race-marks';
+import { isKitModelType } from '../game/models/kit-catalog';
+import BrightnessSlider from './builder/BrightnessSlider';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -2071,6 +2073,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
           {/* Batch Atmosphere Lighting Bar */}
           <div className="bg-zinc-900/80 rounded-md p-2 border border-zinc-800 flex flex-col gap-1.5 text-xs">
+            {selectedProps.some((p) => isKitModelType(p.type)) && (
+              <BrightnessSlider
+                value={selectedProps.find((p) => isKitModelType(p.type))?.brightness ?? 0}
+                note={`${selectedProps.filter((p) => isKitModelType(p.type)).length} models`}
+                onChange={(value, start) => {
+                  builder.setSelectedPropsBrightness(value, start);
+                  onRequestRender?.();
+                }}
+              />
+            )}
+            {selectedProps.some((p) => !isKitModelType(p.type)) && (<>
             <div className="flex items-center justify-between">
               <span className="text-zinc-300 font-medium flex items-center gap-1.5">
                 <Sun size={13} className="text-amber-400" />
@@ -2104,6 +2117,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 All OFF (Unlit)
               </button>
             </div>
+            </>)}
 
             {/* Batch Animated Props Controls */}
             <div className="flex items-center justify-between pt-1.5 border-t border-zinc-800/60">
@@ -2792,7 +2806,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </div>
           </div>
 
-          {/* Flip / Mirror Button */}
+          {/* Flip / Mirror Button (pictures only: a 3D model turns with its rotation instead) */}
+          {!isKitModelType(selectedProp.type) && (
           <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">
             <span className="text-zinc-400">Flip / Mirror PNG:</span>
             <button
@@ -2813,10 +2828,23 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <span>{selectedProp.flipX ? 'Mirrored (Flipped)' : 'Normal'}</span>
             </button>
           </div>
+          )}
 
           {/* Decal Mode (Flat) Checkbox / Toggle */}
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
+            if (isKitModelType(selectedProp.type)) {
+              return (
+                <BrightnessSlider
+                  value={selectedProp.brightness ?? 0}
+                  onChange={(value, start) => {
+                    if (start) builder.pushUndo();
+                    builder.updatePropTransform(selectedProp.id, { brightness: value });
+                    onRequestRender?.();
+                  }}
+                />
+              );
+            }
             if (def?.isRamp || def?.isSlingshot || def?.is3DModel) return null;
             const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
             return (
@@ -3109,7 +3137,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           {(() => {
             const def = PROP_DEFINITIONS.find((d) => d.type === selectedProp.type);
             const isDecal = selectedProp.isDecal !== undefined ? selectedProp.isDecal : (def?.isDecal ?? false);
-            if (def?.isRamp || def?.isSlingshot || def?.is3DModel || isDecal) return null;
+            if (def?.isRamp || def?.isSlingshot || def?.is3DModel || isDecal || isKitModelType(selectedProp.type)) return null;
             const isFacing = selectedProp.cameraFacing !== false;
             return (
               <div className="flex items-center justify-between pt-1 pb-1 text-xs border-t border-zinc-800/60">

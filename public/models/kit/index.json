@@ -4,6 +4,7 @@
  "basalt-cave",
  "beach-shelf",
  "boardwalk-bridge",
+ "boost-pad",
  "bush-leafy",
  "cliff-block",
  "driftwood",
@@ -18,6 +19,9 @@
  "palm-cluster",
  "palm-leaning",
  "palm-tall",
+ "powerup-bounce",
+ "powerup-fuel",
+ "powerup-shield",
  "railing-wall",
  "road-straight",
  "rock-basalt-columns",
@@ -28,6 +32,8 @@
  "sea-arch",
  "sea-rock-mossy",
  "sea-stack-tall",
+ "sheep",
+ "spring-pad",
  "start-line",
  "stone-wall",
  "stunt-cliff-deck",
@@ -44,5 +50,6 @@
  "stunt-scaffold-tower",
  "stunt-suspension-bridge",
  "stunt-waterfall-portal",
+ "tnt-crate",
  "waterfall-cave"
 ]

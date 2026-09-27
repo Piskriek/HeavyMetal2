@@ -69,12 +69,15 @@ export const PLAYER_LANE = 2;
 export const LANE = { near: -480, far: 480 };
 export const laneZ = (lane: number) => LANE.far - LANE_WIDTH * (lane + 0.5);
 export const closestLane = (z: number) => Math.max(0, Math.min(3, Math.round((LANE.far - z) / LANE_WIDTH - 0.5)));
-export const obstacleZ = (obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) => {
+export const obstacleZ = (obstacle: Pick<Obstacle, 'lane' | 'laneSpan' | 'z'>) => {
+  if (obstacle.z !== undefined) return obstacle.z;
   if (obstacle.lane === -1) return 0;
   const lane = obstacle.lane ?? PLAYER_LANE;
   return (laneZ(lane) + laneZ(Math.min(3, lane + (obstacle.laneSpan ?? 1) - 1))) / 2;
 };
-export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) {
+export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan' | 'z'>) {
+  // A placed piece is one lane wide, centred where it stands.
+  if (obstacle.z !== undefined) return { near: obstacle.z - LANE_WIDTH / 2, far: obstacle.z + LANE_WIDTH / 2 };
   if (obstacle.lane === -1) return LANE;
   const first = obstacle.lane ?? PLAYER_LANE;
   const last = Math.min(3, first + (obstacle.laneSpan ?? 1) - 1);
@@ -218,6 +221,10 @@ export interface Obstacle {
   deflectPower?: number;
   /** ROUTE-1: the branch this obstacle stands on; absent = on every branch. */
   route?: import('./sim/route').RouteTag;
+  /** A piece placed in build mode: its exact z across the road (lane bands are the legacy layout's). */
+  z?: number;
+  /** The placed prop this obstacle came from (its 3D model is drawn by the builder, not a sprite). */
+  propId?: string;
 }
 
 import type { EffectEvent } from './effects/events';

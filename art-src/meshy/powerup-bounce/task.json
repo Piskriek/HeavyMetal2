@@ -1,0 +1,19 @@
+{
+  "id": "01a0e275-8135-7688-ba86-3dbdb15fbc32",
+  "type": "text-to-3d-refine",
+  "mode": "refine",
+  "name": "",
+  "model_type": "standard",
+  "seed": 174867648,
+  "prompt": "a chunky collectible air spring power-up for a racing game: a big coiled brass spring with a glowing mint green orb on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_prompt": "a chunky collectible air spring power-up for a racing game: a big coiled brass spring with a glowing mint green orb on top, no text, no letters, stylized hand-painted game asset for a sunny tropical island, a single object standing alone, no base, no ground plane, no background",
+  "texture_image_url": "",
+  "status": "SUCCEEDED",
+  "created_at": 1790505747026,
+  "progress": 100,
+  "started_at": 1790505747031,
+  "finished_at": 1790505824303,
+  "task_error": null,
+  "remove_lighting": true,
+  "consumed_credits": 10
+}

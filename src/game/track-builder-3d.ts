@@ -12,7 +12,8 @@ import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } 
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType } from './models/kit-catalog';
 import { ghostKitObject } from './models/kit-object';
-import { RAMP_PIECES } from './race-pieces';
+import { isRideableType, kitRidePatch } from './models/kit-collision';
+import type { Patch } from './collision/terrain-patch';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
@@ -1798,6 +1799,7 @@ export class TrackBuilder3D {
         const obj = this.propObjects.get(id);
         if (obj) this.kit.applyTransform(prop, obj);
       }
+      this.refreshRidePatch(prop);
       if (autoSync) {
         this.updateSelectionBox();
         this.saveToStorage();
@@ -2036,7 +2038,7 @@ export class TrackBuilder3D {
   getPlacedRamps(): readonly PlacedProp[] {
     return this.placedProps.filter((p) => {
       const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
-      return def?.isRamp || p.type === 'timber_ramp' || p.type === 'rock_springboard' || p.type === 'springboard' || p.type in RAMP_PIECES;
+      return def?.isRamp || p.type === 'timber_ramp' || p.type === 'rock_springboard' || p.type === 'springboard';
     });
   }
 
@@ -2525,6 +2527,7 @@ export class TrackBuilder3D {
       const obj = this.kit.create(prop);
       this.propObjects.set(prop.id, obj);
       if (this.hiddenSections.size) this.applySectionVisibility(prop);
+      this.refreshRidePatch(prop, 0);
       return obj;
     }
     const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
@@ -3275,6 +3278,46 @@ export class TrackBuilder3D {
     return { x, used: usableStartX(x, poolX) !== null, poolX };
   }
 
+  /* ───────────── Rideable models: their drive surfaces as the physics' patches ───────────── */
+
+  private readonly ridePatches = new Map<string, Patch>();
+  private readonly rideJobs = new Map<string, { token: number; timer: ReturnType<typeof setTimeout> | null }>();
+  /** Called when a rideable model's surface is ready or gone (the engine rebuilds the track before a race). */
+  onRidePatchesChanged?: () => void;
+
+  /** The rideable models' surfaces, in placement order (a stable order keeps the physics repeatable). */
+  getRidePatches(): Patch[] {
+    return this.placedProps.map((p) => this.ridePatches.get(p.id)).filter((p): p is Patch => !!p);
+  }
+
+  /** Recomputes one model's surface: at once (`delayMs` 0) or once a drag settles. */
+  private refreshRidePatch(prop: PlacedProp, delayMs = 150) {
+    if (!isRideableType(prop.type)) return;
+    const job = this.rideJobs.get(prop.id) ?? { token: 0, timer: null };
+    job.token += 1;
+    if (job.timer) clearTimeout(job.timer);
+    const token = job.token;
+    const run = () => {
+      job.timer = null;
+      if (prop.visible === false) { this.dropRidePatch(prop.id); return; }
+      kitRidePatch({ ...prop }, courseTrackSpace(this.courseId as CourseId))
+        .then((patch) => {
+          if (this.rideJobs.get(prop.id)?.token !== token) return;
+          if (patch) this.ridePatches.set(prop.id, patch); else this.ridePatches.delete(prop.id);
+          this.onRidePatchesChanged?.();
+        })
+        .catch(() => { /* no drive surface (offline, or a test): the model is scenery only */ });
+    };
+    this.rideJobs.set(prop.id, job);
+    if (delayMs <= 0) run(); else job.timer = setTimeout(run, delayMs);
+  }
+
+  private dropRidePatch(id: string) {
+    const job = this.rideJobs.get(id);
+    if (job) { job.token += 1; if (job.timer) clearTimeout(job.timer); job.timer = null; }
+    if (this.ridePatches.delete(id)) this.onRidePatchesChanged?.();
+  }
+
   /** The file name of the store's latest disk save (shown in the backups list). */
   latestBackupName(): string {
     return this.propStore === 'island' ? ISLAND_BACKUP_ENDPOINTS.latestFile : 'track-props-latest.json';
@@ -3400,6 +3443,7 @@ export class TrackBuilder3D {
     if (isKitType(prop.type)) this.kit.release(prop, obj);
     else if (obj) this.scene.remove(obj);
     this.propObjects.delete(prop.id);
+    this.dropRidePatch(prop.id);
   }
 
   /** Every prop's object rebuilt (all released first, so no scenery part is wrapped twice). */

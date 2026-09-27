@@ -11,7 +11,7 @@ import { withoutLoopRides } from './sim/decor-loops';
 import { DEFAULT_ROPE, clampRope, type RopeConfig } from './sim/rope';
 import { compileRampSurfaces, getTrackSpace } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
-import { racePiecesFrom, rampScale } from './race-pieces';
+import { racePiecesFrom } from './race-pieces';
 import { courseMarks, usableStartX } from './race-marks';
 import {
   BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
@@ -1072,7 +1072,13 @@ export class GameEngine {
     const pieces = racePiecesFrom(props, courseTrackSpace(this.options.course), this.options.course);
     this.pickups = pieces.pickups;
     this.obstacles = [...pieces.obstacles, ...this.builderRamps()].sort((a, b) => a.x - b.x);
-    this.world.configure(this.options.course, this.obstacles, this.pickups);
+    // Rideable models (decks, bridges, stunt ramps) are ridden on their drive surfaces.
+    const patches = builder && typeof builder.getRidePatches === 'function' ? builder.getRidePatches() : [];
+    this.world.configure(this.options.course, this.obstacles, this.pickups, patches);
+    // A surface that finishes loading before the start joins this race; once racing, the track is fixed.
+    if (builder && !builder.onRidePatchesChanged) {
+      builder.onRidePatchesChanged = () => { if (this.status === 'ready') this.makeTrack(); };
+    }
   }
 
   /** The builder's placed ramp props as engine ramp obstacles (none when no builder is attached). */
@@ -1083,7 +1089,7 @@ export class GameEngine {
     const map = courseTrackSpace(this.options.course);
     const ramps = builder.getPlacedRamps();
     if (!ramps.length) return [];
-    const compiled = compileRampSurfaces(map, ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: rampScale(r), trackDist: this.options.course === 'basalt' ? undefined : r.trackDist })));
+    const compiled = compileRampSurfaces(map, ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: r.scale, trackDist: this.options.course === 'basalt' ? undefined : r.trackDist })));
     return builderRampObstacles(map, compiled.surfaces);
   }
 

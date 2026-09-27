@@ -7,7 +7,7 @@
  * (for a powerup) its height above it.
  */
 import type { PlacedProp } from './builder/prop-catalog';
-import { RAMP_BASE_LENGTH, engineFromWorld, engineXFromDistance, type TrackSpaceMap } from './track-space';
+import { engineFromWorld, engineXFromDistance, type TrackSpaceMap } from './track-space';
 import { FINISH, START_X, closestLane, courseY, type Obstacle, type ObstacleKind } from './scene';
 import type { AirPickup, PowerupKind } from './powerups';
 import type { CourseId } from './types';
@@ -28,16 +28,6 @@ export const OBSTACLE_PIECES: Readonly<Record<string, ObstacleSpec>> = {
   'kit_tnt-crate': { kind: 'tnt', width: 65, height: 70 },
   'kit_sheep': { kind: 'sheep', width: 62, height: 59 },
 };
-
-/** Stunt ramp models that ride as ramps: their size at scale 1 against the ramp physics' base length. */
-export const RAMP_PIECES: Readonly<Record<string, number>> = {
-  'kit_jump-ramp': 900,
-  'kit_stunt-launch-ramp': 1600,
-};
-
-/** A placed ramp's scale for the ramp physics: a stunt ramp model's own length against the base ramp's. */
-export const rampScale = (prop: { type: string; scale: number }) =>
-  RAMP_PIECES[prop.type] ? ((prop.scale || 1) * RAMP_PIECES[prop.type]) / RAMP_BASE_LENGTH : prop.scale;
 
 export const isPowerupPiece = (type: string) => type in POWERUP_PIECES;
 export const isRacePieceType = (type: string) => type in POWERUP_PIECES || type in OBSTACLE_PIECES;

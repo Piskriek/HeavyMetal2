@@ -21,6 +21,8 @@ import { RADIUS, courseSlope, courseY, occupiesLane, rampSurface, type Obstacle 
 import type { CourseId } from '../types';
 import type { AirPickup } from '../powerups';
 import { onRoute, routeKey, type RacerRoute } from './route';
+import { surfaceWithPatches } from '../collision/patch-index';
+import type { Patch } from '../collision/terrain-patch';
 
 /** Spatial bucket width shared by the obstacle and pickup indices. */
 export const SPATIAL_BUCKET = 512;
@@ -36,7 +38,15 @@ export interface SurfaceSample {
   readonly slope: number;
   /** The ramp the sample landed on, when one is under this lateral position. */
   readonly ramp: Obstacle | null;
+  /** True when the surface is a placed rideable model's deck, not the road. */
+  readonly deck?: boolean;
 }
+
+/**
+ * How far above the ball's underside a deck may be and still be ground: a ball rolls up a ramp's
+ * slope a few units a tick, but a sheer face or a bridge overhead is not something it steps onto.
+ */
+export const DECK_STEP_UP = 30;
 
 export interface SimWorld {
   readonly course: CourseId;
@@ -45,15 +55,24 @@ export interface SimWorld {
   readonly pickups: readonly AirPickup[];
   y(x: number): number;
   slope(x: number): number;
-  surfaceAt(x: number, z: number): SurfaceSample;
+  /**
+   * The ground under (x, z). `footY` is the ball's underside (engine y): a placed deck counts only
+   * when it is no more than DECK_STEP_UP above it. Without `footY` the highest surface is taken.
+   */
+  surfaceAt(x: number, z: number, footY?: number): SurfaceSample;
   inGap(x: number, z: number): boolean;
   obstaclesNear(x: number): readonly Obstacle[];
   pickupsNear(x: number): readonly AirPickup[];
   /** Every candidate in `[fromX, toX]`, bucket by bucket in ascending order. */
   obstaclesInSpan(fromX: number, toX: number): readonly Obstacle[];
   pickupsInSpan(fromX: number, toX: number): readonly AirPickup[];
-  /** Points the world at a new course/layout and rebuilds both indices. */
-  configure(course: CourseId, obstacles: readonly Obstacle[], pickups?: readonly AirPickup[]): void;
+  /**
+   * Points the world at a new course/layout and rebuilds both indices. `patches` are the rideable
+   * models placed on the course (their drive surfaces as heightfields); absent keeps the current ones.
+   */
+  configure(course: CourseId, obstacles: readonly Obstacle[], pickups?: readonly AirPickup[], patches?: readonly Patch[]): void;
+  /** The rideable models' surfaces (empty on a course with none: the road alone, exactly as before). */
+  readonly patches: readonly Patch[];
   /** ROUTE-1: true when any obstacle or pickup is tagged to a branch. */
   readonly routed: boolean;
   /**
@@ -72,8 +91,10 @@ export function createSimWorld(
   course: CourseId,
   obstacles: readonly Obstacle[] = NO_OBSTACLES,
   pickups: readonly AirPickup[] = NO_PICKUPS,
+  patches: readonly Patch[] = [],
 ): SimWorld {
   const views = new Map<string, SimWorld>();
+  let activePatches = patches;
   let routed = false;
   const scanRouted = () => { routed = activeObstacles.some((o) => o.route) || activePickups.some((p) => p.route); };
   let activeCourse = course;
@@ -140,7 +161,7 @@ export function createSimWorld(
     },
     inGap: (x, z) => (obstacleBuckets.get(Math.floor(x / SPATIAL_BUCKET)) ?? NO_OBSTACLES)
       .some((obstacle) => obstacle.kind === 'gap' && x > obstacle.x && x < obstacle.x + obstacle.width && occupiesLane(obstacle, z, 0)),
-    surfaceAt: (x, z) => {
+    surfaceAt: (x, z, footY) => {
       let y = courseY(x, activeCourse);
       let slope = courseSlope(x, activeCourse);
       let ramp: Obstacle | null = null;
@@ -151,10 +172,20 @@ export function createSimWorld(
           ramp = obstacle;
         }
       }
+      // A placed rideable model (a deck, a bridge, a stunt ramp) is ridden where it stands above the road.
+      if (activePatches.length) {
+        const deck = surfaceWithPatches(activePatches, x, z, 0);
+        if (deck.fromPatch && deck.y > 0) {
+          const deckY = courseY(x, activeCourse) - deck.y;
+          const reachable = footY === undefined || deckY >= footY - DECK_STEP_UP;
+          if (deckY < y && reachable) return { y: deckY, slope: courseSlope(x, activeCourse) - deck.slopeX, ramp: null, deck: true };
+        }
+      }
       return { y, slope, ramp };
     },
-    configure: (nextCourse, nextObstacles, nextPickups) => {
+    configure: (nextCourse, nextObstacles, nextPickups, nextPatches) => {
       activeCourse = nextCourse;
+      if (nextPatches) activePatches = nextPatches;
       activeObstacles = nextObstacles;
       if (nextPickups) activePickups = nextPickups;
       indexObstacles();
@@ -163,6 +194,7 @@ export function createSimWorld(
       views.clear();
     },
     get routed() { return routed; },
+    get patches() { return activePatches; },
     forRoute: (route) => {
       if (!routed) return world;
       const key = routeKey(route);
@@ -174,6 +206,7 @@ export function createSimWorld(
           activeCourse,
           activeObstacles.filter((o) => onRoute(o.route, route)),
           activePickups.filter((p) => onRoute(p.route, route)),
+          activePatches,
         );
         // A view is already on its route: asking it again returns itself.
         const self = view;

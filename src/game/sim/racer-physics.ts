@@ -39,6 +39,8 @@ import { LAVA_LAKE_DEPTH, OFF_WORLD_DEPTH, routed, type RacerStepContext, type R
 import { advanceRoute } from './route';
 
 const TAU = Math.PI * 2;
+/** A grounded ball that runs off a placed deck with more than this below it falls instead of snapping down. */
+const DECK_DROP = 40;
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
 /** Section 2's steeper gravity band and the lava lake, in engine x. */
@@ -531,7 +533,8 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
     }
   } else {
     if (racer.bufferedJump >= ctx.runTime && canHop(racer, ctx.runTime)) performHop(racer, ctx);
-    const before = world.surfaceAt(racer.x, racer.z);
+    const foot = racer.y + RADIUS;
+    const before = world.surfaceAt(racer.x, racer.z, foot);
     if (racer.grounded && !world.inGap(racer.x, racer.z)) {
       const downhill = stageGravity * before.slope / (1 + before.slope * before.slope) / 1.4;
       const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
@@ -539,13 +542,18 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
       racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
       if (world.inGap(racer.x, racer.z)) { racer.grounded = false; racer.y += racer.vy * dt; }
       else {
-        const surface = world.surfaceAt(racer.x, racer.z);
+        const surface = world.surfaceAt(racer.x, racer.z, foot);
+        if (before.deck && !surface.deck && surface.y - foot > DECK_DROP) {
+          // Rolled off the end of a placed deck: fall to what is below instead of snapping down to it.
+          racer.grounded = false; racer.y += racer.vy * dt;
+        } else {
         racer.y = surface.y - RADIUS; racer.vy = surface.slope * racer.vx; racer.lastGroundedAt = ctx.runTime;
         if (surface.ramp && !racer.visited.has(surface.ramp) && (racer.x - surface.ramp.x) / surface.ramp.width > 0.94) {
           racer.vy -= 155 * weightImpulse(racer.weight); racer.y -= 2; racer.grounded = false;
           racer.visited.add(surface.ramp);
           if (trace) trace.rampLaunch = true;
           if (!racer.id) { ctx.fx.score(75); ctx.fx.audio('launch'); }
+        }
         }
       }
     } else {
@@ -587,7 +595,7 @@ export function stepRacer(racer: Racer, ctx: RacerStepContext, dt: number, trace
         }
       }
     }
-    const surface = world.surfaceAt(racer.x, racer.z); const gap = world.inGap(racer.x, racer.z);
+    const surface = world.surfaceAt(racer.x, racer.z, racer.y + RADIUS); const gap = world.inGap(racer.x, racer.z);
     if (gap && racer.y > world.y(racer.x) + RADIUS + 8) {
       racer.falling = true; racer.fallingFor = 0; racer.grounded = false;
       if (trace) trace.fell = true;

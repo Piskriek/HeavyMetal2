@@ -8,8 +8,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { islandTrackSpace } from '../src/game/island-route/island-space';
-import { worldFromCanonical, engineDistanceFromX, RAMP_BASE_LENGTH } from '../src/game/track-space';
-import { OBSTACLE_PIECES, POWERUP_PIECES, RAMP_PIECES, racePiecesFrom, rampScale } from '../src/game/race-pieces';
+import { worldFromCanonical, engineDistanceFromX } from '../src/game/track-space';
+import { OBSTACLE_PIECES, POWERUP_PIECES, racePiecesFrom } from '../src/game/race-pieces';
 import { courseY, obstacleBounds, obstacleZ } from '../src/game/scene';
 import { KIT_MODELS } from '../src/game/models/kit-catalog';
 import type { PlacedProp } from '../src/game/builder/prop-catalog';
@@ -52,14 +52,9 @@ test('hidden pieces and ordinary props are not raced', () => {
   assert.equal(pickups.length + obstacles.length, 0);
 });
 
-test('stunt ramp models ride at their own length; other ramps keep their scale', () => {
-  assert.equal(rampScale({ type: 'kit_jump-ramp', scale: 2 }), (2 * RAMP_PIECES['kit_jump-ramp']) / RAMP_BASE_LENGTH);
-  assert.equal(rampScale({ type: 'timber_ramp', scale: 1.5 }), 1.5);
-});
-
 test('every race piece has a model on the shelf', () => {
   const ids = new Set(KIT_MODELS.map((m) => `kit_${m.id}`));
-  for (const type of [...Object.keys(POWERUP_PIECES), ...Object.keys(OBSTACLE_PIECES), ...Object.keys(RAMP_PIECES)]) {
+  for (const type of [...Object.keys(POWERUP_PIECES), ...Object.keys(OBSTACLE_PIECES)]) {
     assert.ok(ids.has(type), `${type} is placeable`);
   }
 });

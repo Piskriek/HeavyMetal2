@@ -5,8 +5,9 @@
  * so a sculpt can never be "the mesh": it is a **sparse displacement layer** over the generated shape,
  * re-applied when the object exists again. Per mesh: the indices that moved (sorted, delta-varint
  * coded), their local-space offsets as int16 multiples of `quantum` (0.25 units → ±8 000 units of
- * reach at 0.125 precision; a lane is 240), and optionally the vertices that were painted with their
- * RGB. Everything base64, so it rides inside a `PlacedProp` (`prop.sculpt`) through the normal save.
+ * reach at 0.125 precision; a lane is 240), optionally the vertices that were painted with flat RGB,
+ * and optionally the vertices painted with textured island surface IDs and blend weights.
+ * Everything base64, so it rides inside a `PlacedProp` (`prop.sculpt`) through the normal save.
  *
  * Sizes: a 5 000-vertex hill sculpt is ~40 KB; the whole alpine heightfield (4 800 vertices) fully
  * reshaped is ~45 KB. localStorage is 5 MB, and the disk backups have no such limit.
@@ -31,6 +32,8 @@ export interface SculptMeshDoc {
   readonly q?: number;
   readonly shape?: { readonly idx: string; readonly d: string };
   readonly paint?: { readonly idx: string; readonly c: string };
+  /** Textured surface painting: per-vertex surface ID and blend weight (2 bytes: [id, weight] per vertex). */
+  readonly surface?: { readonly idx: string; readonly s: string };
 }
 
 export interface SculptDoc {
@@ -66,8 +69,9 @@ export function encodeIndices(sorted: ArrayLike<number>): string {
   const out: number[] = [];
   let prev = -1;
   for (let k = 0; k < sorted.length; k++) {
-    let v = sorted[k] - prev - 1;
-    prev = sorted[k];
+    const val = sorted[k] ?? 0;
+    let v = val - prev - 1;
+    prev = val;
     while (v >= 0x80) { out.push((v & 0x7f) | 0x80); v >>>= 7; }
     out.push(v);
   }
@@ -79,7 +83,7 @@ export function decodeIndices(text: string): Uint32Array {
   const out: number[] = [];
   let prev = -1, v = 0, shift = 0;
   for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i];
+    const b = bytes[i] ?? 0;
     v |= (b & 0x7f) << shift;
     if (b & 0x80) { shift += 7; continue; }
     prev = prev + v + 1;
@@ -92,7 +96,10 @@ export function decodeIndices(text: string): Uint32Array {
 export function encodeInt16(values: ArrayLike<number>): string {
   const bytes = new Uint8Array(values.length * 2);
   const view = new DataView(bytes.buffer);
-  for (let i = 0; i < values.length; i++) view.setInt16(i * 2, Math.max(-32768, Math.min(32767, Math.round(values[i]))), true);
+  for (let i = 0; i < values.length; i++) {
+    const val = values[i] ?? 0;
+    view.setInt16(i * 2, Math.max(-32768, Math.min(32767, Math.round(val))), true);
+  }
   return bytesToBase64(bytes);
 }
 
@@ -118,13 +125,14 @@ export function sculptHash(meshes: readonly SculptMeshDoc[], quantum: number): s
     feed(m.key); feed(String(m.n));
     if (m.shape) { feed(m.shape.idx); feed(m.shape.d); }
     if (m.paint) { feed(m.paint.idx); feed(m.paint.c); }
+    if (m.surface) { feed(m.surface.idx); feed(m.surface.s); }
   }
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
 /** A document from per-mesh parts, or null when nothing moved or was painted. */
 export function makeSculptDoc(meshes: readonly SculptMeshDoc[], quantum = SCULPT_QUANTUM): SculptDoc | null {
-  const kept = meshes.filter((m) => m.shape || m.paint);
+  const kept = meshes.filter((m) => m.shape || m.paint || m.surface);
   if (!kept.length) return null;
   return { version: SCULPT_DOC_VERSION, quantum, meshes: kept, hash: sculptHash(kept, quantum) };
 }
@@ -142,6 +150,7 @@ export function sculptDocBytes(doc: SculptDoc): number {
     n += m.key.length + 24;
     if (m.shape) n += m.shape.idx.length + m.shape.d.length;
     if (m.paint) n += m.paint.idx.length + m.paint.c.length;
+    if (m.surface) n += m.surface.idx.length + m.surface.s.length;
   }
   return n;
 }

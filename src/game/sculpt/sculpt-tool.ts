@@ -1,6 +1,6 @@
 /**
  * NewSculpt — mesh painting mode: sculpt the terrain and placed 3D objects with brushes, and paint
- * their vertices.
+ * their vertices with textured island surfaces or flat colours.
  *
  * **Targets.** A stroke starts on whatever mesh is under the pointer. If it belongs to a placed prop
  * (a Meshy model, a primitive) that prop owns the sculpt. If it is the course's own scenery (the
@@ -15,11 +15,7 @@
  * `sync()` notices the document changed and puts the geometry back to match.
  *
  * **Sync.** `sync()` runs on every builder change and once at construction — with no canvas at all,
- * which is how a race (where the builder exists but its UI does not) still shows the sculpts. For each
- * prop with a document whose live object exists: if the object or the document's hash is not what was
- * applied last time, reset to the generated shape and apply. For each applied entry whose prop is gone
- * or has no document any more (undo, reset, delete): reset. Kit models arrive asynchronously; the
- * builder calls `syncProp` from `onModelLoaded`.
+ * which is how a race (where the builder exists but its UI does not) still shows the sculpts.
  */
 import * as THREE from 'three';
 import type { PlacedProp } from '../builder/prop-catalog';
@@ -28,6 +24,7 @@ import {
 } from './sculpt-brushes';
 import { isSculptDoc, makeSculptDoc, sculptDocBytes, SCULPT_QUANTUM, type SculptDoc } from './sculpt-doc';
 import { SculptMesh, meshKey, sculptableMeshes } from './sculpt-mesh';
+import { surfaceDefinition } from '../surface/surface-table';
 
 /** What the tool needs from the builder. */
 export interface SculptHost {
@@ -170,6 +167,17 @@ export class SculptTool {
     this.notify();
   }
 
+  /** Focus or target a specific prop directly (e.g. from KitInspector's "Paint this model" button). */
+  focusTarget(id: string): void {
+    this.lastTargetId = id;
+    const prop = this.host.getProps().find((p) => p.id === id);
+    if (prop) {
+      this.entryFor(prop);
+      this.status = `Ready to paint: ${prop.name}`;
+    }
+    this.notify();
+  }
+
   /** The last object sculpted or hovered, described for the panel. */
   target(): SculptTargetInfo | null {
     const id = this.lastTargetId;
@@ -183,14 +191,24 @@ export class SculptTool {
     const entry = this.applied.get(id);
     const doc = isSculptDoc(prop.sculpt) ? prop.sculpt : null;
     let vertices = 0, changed = 0;
-    if (entry) for (const m of entry.meshes) { vertices += m.count; changed += m.changedCount(m.localQuantum()); }
+    if (entry) {
+      for (const m of entry.meshes) {
+        vertices += m.count;
+        changed += m.changedCount(m.localQuantum());
+      }
+    }
     return { id, name: prop.name, meshes: entry?.meshes.length ?? 0, vertices, changed, bytes: doc ? sculptDocBytes(doc) : 0 };
   }
 
   /** Every prop carrying a sculpt document. */
   sculpted(): SculptTargetInfo[] {
     const out: SculptTargetInfo[] = [];
-    for (const prop of this.host.getProps()) if (isSculptDoc(prop.sculpt)) { const d = this.describe(prop.id); if (d) out.push(d); }
+    for (const prop of this.host.getProps()) {
+      if (isSculptDoc(prop.sculpt)) {
+        const d = this.describe(prop.id);
+        if (d) out.push(d);
+      }
+    }
     return out;
   }
 
@@ -200,7 +218,9 @@ export class SculptTool {
     if (!prop) return false;
     this.host.beginSculpt();
     const entry = this.applied.get(id);
-    if (entry) for (const m of entry.meshes) m.reset();
+    if (entry) {
+      for (const m of entry.meshes) m.reset();
+    }
     this.applied.delete(id);
     this.host.commitSculpt(id, null);
     this.status = `${prop.name}: back to its generated shape.`;
@@ -230,15 +250,18 @@ export class SculptTool {
       if (!root) continue;
       const entry = this.applied.get(prop.id);
       const meshes = sculptableMeshes(root);
-      // Also stale when meshes arrived since (the island terrain model lands after the beach and sea).
       if (entry && entry.root === root && entry.hash === doc.hash && entry.meshes.length === meshes.length && entry.meshes.every((m) => m.mesh.geometry === m.geometry)) continue;
-      if (!meshes.length) continue; // a model still loading: syncProp comes when it lands
-      if (entry) for (const m of entry.meshes) m.reset();
+      if (!meshes.length) continue;
+      if (entry) {
+        for (const m of entry.meshes) m.reset();
+      }
       const wrapped = meshes.map((m) => SculptMesh.wrap(m));
       wrapped.forEach((w, i) => {
         const key = meshKey(i, w.mesh);
         const part = doc.meshes.find((d) => d.key === key);
-        if (part && !w.applyDoc(part, doc.quantum)) console.warn(`[sculpt] ${prop.name}: document for ${key} does not fit this mesh`);
+        if (part && !w.applyDoc(part, doc.quantum)) {
+          console.warn(`[sculpt] ${prop.name}: document for ${key} does not fit this mesh`);
+        }
       });
       this.applied.set(prop.id, { root, hash: doc.hash, meshes: wrapped });
     }
@@ -262,8 +285,14 @@ export class SculptTool {
   /** The prop whose object contains `object`, if any. */
   private propOf(object: THREE.Object3D): PlacedProp | null {
     const owners = new Map<THREE.Object3D, PlacedProp>();
-    for (const p of this.host.getProps()) { const o = this.host.sculptObjectFor(p.id); if (o) owners.set(o, p); }
-    for (let o: THREE.Object3D | null = object; o; o = o.parent) { const p = owners.get(o); if (p) return p; }
+    for (const p of this.host.getProps()) {
+      const o = this.host.sculptObjectFor(p.id);
+      if (o) owners.set(o, p);
+    }
+    for (let o: THREE.Object3D | null = object; o; o = o.parent) {
+      const p = owners.get(o);
+      if (p) return p;
+    }
     return null;
   }
 
@@ -290,7 +319,8 @@ export class SculptTool {
   }
 
   private stamp(point: THREE.Vector3) {
-    const stroke = this.stroke!;
+    const stroke = this.stroke;
+    if (!stroke) return;
     const params = this.effective();
     this.camera.getWorldDirection(this.viewDir);
     for (const mesh of stroke.entry.meshes) {
@@ -315,7 +345,7 @@ export class SculptTool {
     const entry = this.entryFor(prop);
     if (!entry) { this.status = `${prop.name} has no mesh to sculpt (a painted sprite?).`; this.notify(); return; }
     event.preventDefault();
-    event.stopImmediatePropagation(); // the builder listens on the same canvas: it must not also select or place
+    event.stopImmediatePropagation();
     this.host.beginSculpt();
     this.lastTargetId = prop.id;
     const point = hit.point.clone();
@@ -323,7 +353,10 @@ export class SculptTool {
     if (this.effective().tool === 'grab') {
       this.camera.getWorldDirection(this.viewDir);
       const captured: GrabCapture[] = [];
-      for (const mesh of entry.meshes) { mesh.syncMatrices(); captured.push(...captureGrab(mesh, mesh.query(point, this.brush.radius), this.effective())); }
+      for (const mesh of entry.meshes) {
+        mesh.syncMatrices();
+        captured.push(...captureGrab(mesh, mesh.query(point, this.brush.radius), this.effective()));
+      }
       this.stroke.grab = { plane: new THREE.Plane().setFromNormalAndCoplanarPoint(this.viewDir.clone().negate(), point), origin: point.clone(), captured };
     } else {
       this.stamp(point);
@@ -343,7 +376,10 @@ export class SculptTool {
       const at = this.raycaster.ray.intersectPlane(this.stroke.grab.plane, this.tmp);
       if (!at) return;
       const delta = at.clone().sub(this.stroke.grab.origin);
-      for (const [mesh, groups] of applyGrab(this.stroke.grab.captured, delta)) { mesh.recomputeNormals(groups); mesh.position.needsUpdate = true; }
+      for (const [mesh, groups] of applyGrab(this.stroke.grab.captured, delta)) {
+        mesh.recomputeNormals(groups);
+        mesh.position.needsUpdate = true;
+      }
       this.ring.position.copy(at);
       return;
     }
@@ -353,8 +389,22 @@ export class SculptTool {
     this.ring.position.copy(hit.point).addScaledVector(normal, 2);
     this.ring.quaternion.setFromUnitVectors(PLANE_NORMAL, normal);
     this.ring.scale.setScalar(this.brush.radius);
-    (this.ring.material as THREE.MeshBasicMaterial).color.set(this.effective().invert ? 0x74b9ff : this.effective().tool === 'paint' ? 0xf78fb3 : 0xff9f43);
+
+    const mat = this.ring.material as THREE.MeshBasicMaterial;
+    if (this.effective().invert) {
+      mat.color.set(0x74b9ff);
+    } else if (this.effective().tool === 'paint') {
+      if (this.brush.paintMode === 'surface') {
+        const def = surfaceDefinition(this.brush.surfaceId);
+        mat.color.set(def.swatch);
+      } else {
+        mat.color.setRGB(this.brush.color[0], this.brush.color[1], this.brush.color[2]);
+      }
+    } else {
+      mat.color.set(0xff9f43);
+    }
     this.ring.visible = true;
+
     if (!this.stroke) return;
     event.preventDefault();
     event.stopPropagation();
@@ -367,7 +417,10 @@ export class SculptTool {
     const stroke = this.stroke;
     if (!stroke) return;
     this.stroke = null;
-    const parts = stroke.entry.meshes.map((m, i) => { m.finishStroke(); return m.extractDoc(meshKey(i, m.mesh), m.localQuantum()); }).filter((d): d is NonNullable<typeof d> => d !== null);
+    const parts = stroke.entry.meshes.map((m, i) => {
+      m.finishStroke();
+      return m.extractDoc(meshKey(i, m.mesh), m.localQuantum());
+    }).filter((d): d is NonNullable<typeof d> => d !== null);
     const doc = makeSculptDoc(parts, SCULPT_QUANTUM);
     stroke.entry.hash = doc?.hash ?? '';
     if (!doc) this.applied.delete(stroke.prop.id);

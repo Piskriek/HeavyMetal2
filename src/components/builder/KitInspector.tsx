@@ -1,11 +1,13 @@
 /**
  * Inspector section for the scene kit's props: a light's colour, brightness, reach and cone; the
- * shader a primitive or scenery part wears; and a scenery part's hide / reset controls.
+ * shader a primitive or scenery part wears; a scenery part's hide / reset controls; and the
+ * "Paint this model" action to directly open sculpt and textured mesh painting on this object.
  */
-import { Eye, EyeOff, Lightbulb, Paintbrush, RotateCcw } from 'lucide-react';
-import type { PlacedProp, TrackBuilder3D } from '../../game/track-builder-3d';
-import { lightSettingsFor } from '../../game/builder/light-rig';
-import { POINT_SLOTS, SPOT_SLOTS } from '../../game/builder/light-rig';
+import React from 'react';
+import { Eye, EyeOff, Lightbulb, Paintbrush, Palette, RotateCcw } from 'lucide-react';
+import type { PlacedProp } from '../../game/builder/prop-catalog';
+import type { TrackBuilder3D } from '../../game/track-builder-3d';
+import { lightSettingsFor, POINT_SLOTS, SPOT_SLOTS } from '../../game/builder/light-rig';
 
 interface Props {
   builder: TrackBuilder3D;
@@ -13,17 +15,23 @@ interface Props {
   onRequestRender?: () => void;
   showToast: (text: string, ms?: number) => void;
   onOpenShaders: () => void;
+  onPaintModel?: () => void;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid grid-cols-[80px_1fr] items-center gap-2 text-[11px] text-zinc-400"><span>{label}</span>{children}</label>;
+  return (
+    <label className="grid grid-cols-[80px_1fr] items-center gap-2 text-[11px] text-zinc-400">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
 }
 
-export default function KitInspector({ builder, prop, onRequestRender, showToast, onOpenShaders }: Props) {
+export default function KitInspector({ builder, prop, onRequestRender, showToast, onOpenShaders, onPaintModel }: Props) {
   const isLight = prop.type.startsWith('light_');
   const isPrim = prop.type.startsWith('prim_');
   const isTerrain = prop.type === 'terrain_edit';
-  if (!isLight && !isPrim && !isTerrain) return null;
+  const isRockOrModel = !isLight;
 
   if (isLight) {
     const s = lightSettingsFor(prop);
@@ -73,6 +81,28 @@ export default function KitInspector({ builder, prop, onRequestRender, showToast
           {locked ? 'This is the road: it shows the race line, so it can take a shader but not move.' : 'Move, turn or scale it with the gizmo, Del hides it. Scenery only: the race line never changes.'}
         </div>
       )}
+
+      {/* Paint this model primary action button */}
+      {isRockOrModel && (
+        <button
+          onClick={() => {
+            if (onPaintModel) {
+              onPaintModel();
+            } else if (builder.sculpt) {
+              builder.sculpt.setEnabled(true);
+              builder.sculpt.setTool('paint');
+              builder.sculpt.focusTarget(prop.id);
+            }
+            showToast(`Painting ${prop.name} — drag to apply island surface`);
+            onRequestRender?.();
+          }}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded border border-amber-500/50 bg-gradient-to-r from-amber-600/30 via-amber-500/20 to-amber-600/30 py-2 text-xs font-semibold text-amber-200 shadow-sm transition-all hover:border-amber-400 hover:from-amber-600/40 hover:to-amber-600/40 hover:text-white"
+        >
+          <Palette size={14} className="text-amber-400" />
+          Paint this model
+        </button>
+      )}
+
       <Row label="Shader">
         <select value={current} onChange={(e) => { builder.applyShaderToSelected(e.target.value || null); onRequestRender?.(); }}
           className="w-full rounded border border-zinc-700 bg-zinc-950 px-1 py-1 text-xs text-zinc-200">

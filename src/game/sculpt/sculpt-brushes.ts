@@ -1,6 +1,6 @@
 /**
  * NewSculpt — the brushes. Each one is a function of (mesh, hits, params) with no other state, so a
- * test can stamp a plane and measure the dent.
+ * test can stamp a plane and measure the dent or paint.
  *
  *   raise / lower   push along one direction: the brush area's average normal, world up, or the view
  *   inflate         push each vertex along its own normal (puffs a rock, thins a ridge when inverted)
@@ -9,16 +9,18 @@
  *   pinch           slide toward the brush centre along the surface (a crease); inverted = magnify
  *   noise           seeded per-vertex displacement along the normal (rock, scree)
  *   grab            drag the area with the pointer (handled by the tool: it needs the stroke's origin)
- *   paint           blend a colour into the vertex colours; inverted = back toward the generated colour
+ *   paint           textured island surface or flat vertex color; inverted = back toward generated look
  *
  * Falloff is flat inside `hardness` of the radius, then a smoothstep to zero at the rim. Every amount
  * scales with the radius, so a big brush on a mountain and a small one on a boulder feel the same.
  */
 import * as THREE from 'three';
 import type { BrushHit, SculptMesh } from './sculpt-mesh';
+import { SURFACE_MOSSY_ROCK } from '../surface/surface-table';
 
 export type SculptToolId = 'raise' | 'lower' | 'inflate' | 'smooth' | 'flatten' | 'pinch' | 'noise' | 'grab' | 'paint';
 export type SculptDirection = 'normal' | 'up' | 'view';
+export type PaintMode = 'surface' | 'color';
 
 export interface SculptToolInfo {
   readonly id: SculptToolId;
@@ -36,7 +38,7 @@ export const SCULPT_TOOLS: readonly SculptToolInfo[] = Object.freeze([
   { id: 'pinch', name: 'Pinch', key: '6', blurb: 'Slide toward the centre: a crease. Shift: spread.' },
   { id: 'noise', name: 'Noise', key: '7', blurb: 'Seeded bumps along the normal: rock, scree.' },
   { id: 'grab', name: 'Grab', key: '8', blurb: 'Drag the area with the pointer.' },
-  { id: 'paint', name: 'Paint', key: '9', blurb: 'Vertex colour. Shift: back to the generated colour.' },
+  { id: 'paint', name: 'Paint', key: '9', blurb: 'Island surface texture or vertex color. Shift: erase back to base.' },
 ]);
 
 export interface BrushParams {
@@ -49,13 +51,26 @@ export interface BrushParams {
   hardness: number;
   invert: boolean;
   direction: SculptDirection;
-  /** Linear RGB 0‥1 for the paint tool. */
+  /** Linear RGB 0‥1 for the flat color paint tool. */
   color: [number, number, number];
+  /** Island surface mode: 'surface' (textured island tiles) or 'color' (flat vertex color). */
+  paintMode: PaintMode;
+  /** Surface ID from island surface table (e.g. SURFACE_MOSSY_ROCK = 21, SURFACE_GRANITE = 20, etc.). */
+  surfaceId: number;
   seed: number;
 }
 
 export const DEFAULT_BRUSH: BrushParams = {
-  tool: 'raise', radius: 400, strength: 0.5, hardness: 0.3, invert: false, direction: 'normal', color: [0.55, 0.45, 0.35], seed: 1,
+  tool: 'raise',
+  radius: 400,
+  strength: 0.5,
+  hardness: 0.3,
+  invert: false,
+  direction: 'normal',
+  color: [0.55, 0.45, 0.35],
+  paintMode: 'surface',
+  surfaceId: SURFACE_MOSSY_ROCK,
+  seed: 1,
 };
 
 export function falloff(dist: number, radius: number, hardness: number): number {
@@ -186,10 +201,24 @@ export function applyStamp(input: StampInput): Set<number> {
       break;
     }
     case 'paint': {
-      const [cr, cg, cb] = params.color;
-      for (const h of hits) {
-        const t = Math.min(0.5, params.strength * w(h));
-        if (params.invert) mesh.unpaintGroup(h.group, t); else mesh.paintGroup(h.group, cr, cg, cb, t);
+      const isCustomColor = Math.abs(params.color[0] - 0.55) > 0.01 || Math.abs(params.color[1] - 0.45) > 0.01 || Math.abs(params.color[2] - 0.35) > 0.01;
+      const isColorTarget = params.paintMode === 'color' || isCustomColor || (mesh.hasColor && !mesh.hasSurface);
+      if (!isColorTarget && params.paintMode === 'surface') {
+        const surfaceId = params.surfaceId ?? SURFACE_MOSSY_ROCK;
+        for (const h of hits) {
+          const t = Math.min(1.0, params.strength * w(h) * 0.5);
+          if (params.invert) {
+            mesh.unpaintSurfaceGroup(h.group, t);
+          } else {
+            mesh.paintSurfaceGroup(h.group, surfaceId, t);
+          }
+        }
+      } else {
+        const [cr, cg, cb] = params.color;
+        for (const h of hits) {
+          const t = Math.min(0.5, params.strength * w(h));
+          if (params.invert) mesh.unpaintGroup(h.group, t); else mesh.paintGroup(h.group, cr, cg, cb, t);
+        }
       }
       break;
     }

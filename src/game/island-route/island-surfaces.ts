@@ -58,8 +58,8 @@ export const ISLAND_SURFACES: readonly IslandSurface[] = Object.freeze([
 ]);
 
 export const ISLAND_TEXTURE_DIR = '/textures/island/';
-/** Pixels across one layer (the source tiles are 1024). */
-export const ISLAND_LAYER_SIZE = 1024;
+/** Pixels across one layer (the source tiles are 1024 or 256 default). */
+export const ISLAND_LAYER_SIZE = 256;
 
 /**
  * Array layer for each surface ID (-1: not an island tile — bare island, cracked dirt, or nothing). The
@@ -69,7 +69,7 @@ export const ISLAND_LAYER_SIZE = 1024;
 export const ISLAND_LAYER_OF: readonly number[] = (() => {
   const out = new Array<number>(SURFACE_SLOTS).fill(-1);
   ISLAND_SURFACES.forEach((s, layer) => { out[s.id] = layer; });
-  const alias = (from: number, to: number) => { out[from] = out[to]; };
+  const alias = (from: number, to: number) => { out[from] = out[to] ?? -1; };
   alias(SURFACE_ASPHALT, SURFACE_SAND);
   alias(SURFACE_CONCRETE, SURFACE_SAND);
   alias(SURFACE_COBBLE, SURFACE_DRY_MUD);
@@ -95,7 +95,9 @@ export function writeTileHeight(rgba: Uint8Array | Uint8ClampedArray, recipe: He
   const h = new Float32Array(n);
   const hist = new Uint32Array(256);
   for (let i = 0; i < n; i++) {
-    const r = rgba[i * 4] / 255, g = rgba[i * 4 + 1] / 255, b = rgba[i * 4 + 2] / 255;
+    const r = (rgba[i * 4] ?? 0) / 255;
+    const g = (rgba[i * 4 + 1] ?? 0) / 255;
+    const b = (rgba[i * 4 + 2] ?? 0) / 255;
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
     const sat = max > 0 ? (max - min) / max : 0;
@@ -104,21 +106,94 @@ export function writeTileHeight(rgba: Uint8Array | Uint8ClampedArray, recipe: He
     h[i] = v;
   }
   let lo = Infinity, hi = -Infinity;
-  for (let i = 0; i < n; i++) { if (h[i] < lo) lo = h[i]; if (h[i] > hi) hi = h[i]; }
+  for (let i = 0; i < n; i++) {
+    const val = h[i] ?? 0;
+    if (val < lo) lo = val;
+    if (val > hi) hi = val;
+  }
   const span = hi - lo || 1;
-  for (let i = 0; i < n; i++) hist[Math.min(255, Math.floor(((h[i] - lo) / span) * 255))]++;
-  const at = (q: number) => { let sum = 0; for (let k = 0; k < 256; k++) { sum += hist[k]; if (sum >= q * n) return lo + (k / 255) * span; } return hi; };
+  for (let i = 0; i < n; i++) {
+    const val = h[i] ?? 0;
+    hist[Math.min(255, Math.floor(((val - lo) / span) * 255))]++;
+  }
+  const at = (q: number) => {
+    let sum = 0;
+    for (let k = 0; k < 256; k++) {
+      sum += hist[k] ?? 0;
+      if (sum >= q * n) return lo + (k / 255) * span;
+    }
+    return hi;
+  };
   const p2 = at(0.02), p98 = at(0.98);
   const range = Math.max(1e-6, p98 - p2);
   for (let i = 0; i < n; i++) {
-    let t = (h[i] - p2) / range;
+    let t = ((h[i] ?? 0) - p2) / range;
     t = 0.5 + (t - 0.5) * recipe.contrast;
     rgba[i * 4 + 3] = Math.round(Math.min(1, Math.max(0, t)) * 255);
   }
 }
 
+/** Generate procedural high-detail pattern for a layer when loaded or offline */
+function generateProceduralTile(layer: number, size: number, out: Uint8Array): void {
+  const surface = ISLAND_SURFACES[layer];
+  if (!surface) return;
+  const def = surfaceDefinition(surface.id);
+  const hex = def.swatch;
+  const baseR = parseInt(hex.slice(1, 3), 16);
+  const baseG = parseInt(hex.slice(3, 5), 16);
+  const baseB = parseInt(hex.slice(5, 7), 16);
+
+  const offset = layer * size * size * 4;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = offset + (y * size + x) * 4;
+      // Multi-scale procedural noise
+      const n1 = Math.sin(x * 0.12 + layer * 1.7) * Math.cos(y * 0.12 + layer * 2.3);
+      const n2 = Math.sin(x * 0.35 - y * 0.28 + layer * 5.1) * 0.5;
+      const n3 = (Math.random() - 0.5) * 0.3;
+      const noise = (n1 * 0.5 + n2 + n3);
+
+      let r = Math.max(0, Math.min(255, Math.round(baseR + noise * 40)));
+      let g = Math.max(0, Math.min(255, Math.round(baseG + noise * 40)));
+      let b = Math.max(0, Math.min(255, Math.round(baseB + noise * 40)));
+
+      // Specific surface characteristics
+      if (surface.id === SURFACE_MOSSY_ROCK) {
+        if (noise > 0.1) { g = Math.min(255, g + 40); r = Math.max(0, r - 20); }
+      } else if (surface.id === SURFACE_BEACH_GRASS) {
+        const stripe = Math.sin(x * 0.8 + y * 0.2);
+        if (stripe > 0.2) { g = Math.min(255, g + 35); }
+      } else if (surface.id === SURFACE_STRATA) {
+        const band = Math.sin(y * 0.25);
+        r = Math.min(255, Math.max(0, r + Math.round(band * 30)));
+        g = Math.min(255, Math.max(0, g + Math.round(band * 20)));
+      } else if (surface.id === SURFACE_CRYSTAL) {
+        const sparkle = Math.sin(x * 0.4 + y * 0.4);
+        if (sparkle > 0.6) { r = Math.min(255, r + 70); b = Math.min(255, b + 90); }
+      }
+
+      out[idx] = r;
+      out[idx + 1] = g;
+      out[idx + 2] = b;
+      out[idx + 3] = 255;
+    }
+  }
+
+  // Compute height channel
+  const slice = out.subarray(offset, offset + size * size * 4);
+  writeTileHeight(slice, surface.height);
+}
+
 /** The loaded array on the GPU, per-layer parameters for the shader, and small thumbnails for the UI. */
 export class IslandSurfaceArray {
+  private static instance: IslandSurfaceArray | null = null;
+  static getInstance(): IslandSurfaceArray {
+    if (!IslandSurfaceArray.instance) {
+      IslandSurfaceArray.instance = new IslandSurfaceArray();
+    }
+    return IslandSurfaceArray.instance;
+  }
+
   readonly texture: THREE.DataArrayTexture;
   /** vec4 per layer: world units per repeat, roughness, height contrast, 0. */
   readonly params: THREE.Vector4[];
@@ -131,6 +206,19 @@ export class IslandSurfaceArray {
   constructor(size = ISLAND_LAYER_SIZE) {
     const layers = ISLAND_SURFACES.length;
     const data = new Uint8Array(size * size * 4 * layers);
+    this.size = size;
+    this.data = data;
+
+    // Pre-populate with high quality procedural textures so it renders immediately
+    for (let l = 0; l < layers; l++) {
+      generateProceduralTile(l, size, data);
+      const s = ISLAND_SURFACES[l];
+      if (s) {
+        // Fallback swatch thumbnail
+        this.generateThumb(s.id, l);
+      }
+    }
+
     this.texture = new THREE.DataArrayTexture(data, size, size, layers);
     this.texture.format = THREE.RGBAFormat;
     this.texture.type = THREE.UnsignedByteType;
@@ -140,9 +228,9 @@ export class IslandSurfaceArray {
     this.texture.minFilter = THREE.LinearMipmapLinearFilter;
     this.texture.generateMipmaps = true;
     this.texture.anisotropy = 8;
+    this.texture.needsUpdate = true;
+
     this.params = ISLAND_SURFACES.map((s) => new THREE.Vector4(s.repeat, surfaceDefinition(s.id).roughness, s.height.contrast, 0));
-    this.size = size;
-    this.data = data;
     this.ready = typeof document === 'undefined' ? Promise.resolve() : this.load();
   }
 
@@ -152,9 +240,37 @@ export class IslandSurfaceArray {
   /** The tile each layer shows now (its URL). */
   private readonly urls: string[] = ISLAND_SURFACES.map((s) => ISLAND_TEXTURE_DIR + s.file);
 
+  private generateThumb(surfaceId: number, layer: number) {
+    if (typeof document === 'undefined') return;
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const ctx = c.getContext('2d');
+      if (!ctx) return;
+      const size = this.size;
+      const imgData = ctx.createImageData(64, 64);
+      const offset = layer * size * size * 4;
+      for (let ty = 0; ty < 64; ty++) {
+        for (let tx = 0; tx < 64; tx++) {
+          const sx = Math.floor((tx / 64) * size);
+          const sy = Math.floor((ty / 64) * size);
+          const srcIdx = offset + (sy * size + sx) * 4;
+          const dstIdx = (ty * 64 + tx) * 4;
+          imgData.data[dstIdx] = this.data[srcIdx] ?? 0;
+          imgData.data[dstIdx + 1] = this.data[srcIdx + 1] ?? 0;
+          imgData.data[dstIdx + 2] = this.data[srcIdx + 2] ?? 0;
+          imgData.data[dstIdx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      this.thumbs.set(surfaceId, c.toDataURL('image/jpeg', 0.85));
+    } catch {
+      // Ignore in non-browser context
+    }
+  }
+
   private async load(): Promise<void> {
     let done = 0;
-    // Decode in parallel, write layer by layer (a frame between layers keeps the loading bar moving).
     const images = this.urls.map((url) => decode(url));
     for (let layer = 0; layer < ISLAND_SURFACES.length; layer++) {
       const img = await images[layer];
@@ -179,7 +295,6 @@ export class IslandSurfaceArray {
     if (!img) return false;
     this.urls[layer] = url;
     this.write(layer, img);
-    this.texture.addLayerUpdate(layer);
     this.texture.needsUpdate = true;
     return true;
   }
@@ -190,6 +305,7 @@ export class IslandSurfaceArray {
     const g = this.canvas.getContext('2d', { willReadFrequently: true });
     if (!g) return;
     const surface = ISLAND_SURFACES[layer];
+    if (!surface) return;
     g.clearRect(0, 0, size, size);
     g.drawImage(img, 0, 0, size, size);
     const px = g.getImageData(0, 0, size, size).data;
@@ -205,6 +321,7 @@ export class IslandSurfaceArray {
 }
 
 function decode(url: string): Promise<HTMLImageElement | null> {
+  if (typeof Image === 'undefined') return Promise.resolve(null);
   const img = new Image();
   img.decoding = 'async';
   img.src = url;

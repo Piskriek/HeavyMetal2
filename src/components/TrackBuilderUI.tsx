@@ -2822,7 +2822,23 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </div>
           )}
 
-          <KitInspector builder={builder} prop={selectedProp} onRequestRender={onRequestRender} showToast={showToast} onOpenShaders={() => setShowShaders(true)} />
+          <KitInspector
+            builder={builder}
+            prop={selectedProp}
+            onRequestRender={onRequestRender}
+            showToast={showToast}
+            onOpenShaders={() => setShowShaders(true)}
+            onPaintModel={() => {
+              builder.decor?.setEnabled(false);
+              if (builder.sculpt) {
+                builder.sculpt.setEnabled(true);
+                builder.sculpt.setTool('paint');
+                builder.sculpt.focusTarget(selectedProp.id);
+              }
+              setToolWindow('sculpt');
+              onRequestRender?.();
+            }}
+          />
 
           {/* Sub-tabs: Transform, Shading, Collision, Animation */}
           <div className="flex border-b border-zinc-800 bg-zinc-900/60 rounded text-xs overflow-hidden">

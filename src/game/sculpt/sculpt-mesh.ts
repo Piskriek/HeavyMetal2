@@ -13,16 +13,18 @@
  *    grid is not rebuilt; instead the query radius grows by the largest distance any group has drifted
  *    from its bucket (`drift`), and every candidate is checked exactly in world space. `finishStroke`
  *    re-buckets what moved.
- *  - **Base.** A copy of the generated positions (and colours, once painted). Extracting a document
+ *  - **Base.** A copy of the generated positions (and colours/surfaces, once painted). Extracting a document
  *    is a diff against it; resetting is a copy back.
  *
- * All brush maths lives in `sculpt-brushes.ts`; this file only knows how to move, colour, query and
- * re-normal vertices, and how to serialise the result.
+ * All brush maths lives in `sculpt-brushes.ts`; this file only knows how to move, colour, surface-texture,
+ * query and re-normal vertices, and how to serialise the result.
  */
 import * as THREE from 'three';
 import {
   SCULPT_QUANTUM, decodeBytes, decodeIndices, decodeInt16, encodeBytes, encodeIndices, encodeInt16, type SculptMeshDoc,
 } from './sculpt-doc';
+import { injectIslandModelShader } from '../island-route/island-surface-shader';
+import { IslandSurfaceArray } from '../island-route/island-surfaces';
 
 export interface BrushHit {
   readonly group: number;
@@ -52,9 +54,9 @@ function flatAttribute(geometry: THREE.BufferGeometry, name: string, itemSize: n
 
 function minAxisScale(m: THREE.Matrix4): number {
   const e = m.elements;
-  const sx = Math.hypot(e[0], e[1], e[2]);
-  const sy = Math.hypot(e[4], e[5], e[6]);
-  const sz = Math.hypot(e[8], e[9], e[10]);
+  const sx = Math.hypot(e[0] ?? 1, e[1] ?? 0, e[2] ?? 0);
+  const sy = Math.hypot(e[4] ?? 0, e[5] ?? 1, e[6] ?? 0);
+  const sz = Math.hypot(e[8] ?? 0, e[9] ?? 0, e[10] ?? 1);
   return Math.min(sx, sy, sz) || 1;
 }
 
@@ -75,6 +77,7 @@ export class SculptMesh {
   private neighbourList: number[][] | null = null;
   private colorAttr: THREE.BufferAttribute | null = null;
   private baseColor: Float32Array | null = null;
+  private surfaceAttr: THREE.BufferAttribute | null = null;
   private readonly cellSize: number;
   private readonly cells = new Map<number, number[]>();
   private readonly cellKeyOf: Int32Array;
@@ -110,14 +113,19 @@ export class SculptMesh {
     this.normal = flatAttribute(geometry, 'normal', 3)!;
     if (geometry.getAttribute('color')) {
       this.colorAttr = flatAttribute(geometry, 'color', 3);
-      this.baseColor = Float32Array.from(this.colorAttr!.array as Float32Array);
+      if (this.colorAttr) {
+        this.baseColor = Float32Array.from(this.colorAttr.array as Float32Array);
+      }
+    }
+    if (geometry.getAttribute('islSurface')) {
+      this.surfaceAttr = flatAttribute(geometry, 'islSurface', 2);
     }
     this.count = this.position.count;
     this.base = Float32Array.from(this.position.array as Float32Array);
 
     // Welding: quantise positions to a millionth of the diagonal.
     geometry.computeBoundingBox();
-    const size = geometry.boundingBox!.getSize(new THREE.Vector3());
+    const size = geometry.boundingBox ? geometry.boundingBox.getSize(new THREE.Vector3()) : new THREE.Vector3(1, 1, 1);
     const diag = size.length() || 1;
     const eps = diag * 1e-6;
     const keyed = new Map<string, number>();
@@ -128,7 +136,10 @@ export class SculptMesh {
       const key = `${Math.round(p.getX(i) / eps)},${Math.round(p.getY(i) / eps)},${Math.round(p.getZ(i) / eps)}`;
       let g = keyed.get(key);
       if (g === undefined) { g = groups.length; groups.push([]); keyed.set(key, g); }
-      groups[g].push(i);
+      const groupArr = groups[g];
+      if (groupArr) {
+        groupArr.push(i);
+      }
       this.groupOf[i] = g;
     }
     this.groups = groups;
@@ -140,9 +151,12 @@ export class SculptMesh {
     for (let k = 0; k < triCount * 3; k++) this.tris[k] = index ? index.getX(k) : k;
     this.trisOfVertex = Array.from({ length: this.count }, () => []);
     for (let t = 0; t < triCount; t++) {
-      this.trisOfVertex[this.tris[t * 3]].push(t);
-      this.trisOfVertex[this.tris[t * 3 + 1]].push(t);
-      this.trisOfVertex[this.tris[t * 3 + 2]].push(t);
+      const t0 = this.tris[t * 3] ?? 0;
+      const t1 = this.tris[t * 3 + 1] ?? 0;
+      const t2 = this.tris[t * 3 + 2] ?? 0;
+      this.trisOfVertex[t0]?.push(t);
+      this.trisOfVertex[t1]?.push(t);
+      this.trisOfVertex[t2]?.push(t);
     }
 
     // Grid.
@@ -161,7 +175,8 @@ export class SculptMesh {
   }
 
   private insertGroup(g: number) {
-    const rep = this.groups[g][0];
+    const groupArr = this.groups[g];
+    const rep = groupArr ? (groupArr[0] ?? 0) : 0;
     const x = this.position.getX(rep), y = this.position.getY(rep), z = this.position.getZ(rep);
     const key = this.cellKey(x, y, z);
     const bucket = this.cells.get(key);
@@ -171,7 +186,8 @@ export class SculptMesh {
   }
 
   private removeGroup(g: number) {
-    const bucket = this.cells.get(this.cellKeyOf[g]);
+    const key = this.cellKeyOf[g] ?? 0;
+    const bucket = this.cells.get(key);
     if (!bucket) return;
     const at = bucket.indexOf(g);
     if (at >= 0) bucket.splice(at, 1);
@@ -199,7 +215,8 @@ export class SculptMesh {
     const y0 = Math.floor((local.y - r) / cs), y1 = Math.floor((local.y + r) / cs);
     const z0 = Math.floor((local.z - r) / cs), z1 = Math.floor((local.z + r) / cs);
     const visit = (g: number) => {
-      const rep = this.groups[g][0];
+      const groupArr = this.groups[g];
+      const rep = groupArr ? (groupArr[0] ?? 0) : 0;
       const d = this.vB.fromBufferAttribute(this.position, rep).applyMatrix4(this.mesh.matrixWorld).distanceTo(worldCentre);
       if (d <= radius) out.push({ group: g, dist: d });
     };
@@ -226,7 +243,9 @@ export class SculptMesh {
   /* ───────────── positions ───────────── */
 
   groupLocal(g: number, out: THREE.Vector3): THREE.Vector3 {
-    return out.fromBufferAttribute(this.position, this.groups[g][0]);
+    const groupArr = this.groups[g];
+    const rep = groupArr ? (groupArr[0] ?? 0) : 0;
+    return out.fromBufferAttribute(this.position, rep);
   }
 
   groupWorld(g: number, out: THREE.Vector3): THREE.Vector3 {
@@ -234,9 +253,15 @@ export class SculptMesh {
   }
 
   setGroupLocal(g: number, x: number, y: number, z: number): void {
-    for (const v of this.groups[g]) this.position.setXYZ(v, x, y, z);
+    const groupArr = this.groups[g];
+    if (groupArr) {
+      for (const v of groupArr) this.position.setXYZ(v, x, y, z);
+    }
     this.dirty.add(g);
-    const d = Math.hypot(x - this.gridPos[g * 3], y - this.gridPos[g * 3 + 1], z - this.gridPos[g * 3 + 2]);
+    const gx = this.gridPos[g * 3] ?? 0;
+    const gy = this.gridPos[g * 3 + 1] ?? 0;
+    const gz = this.gridPos[g * 3 + 2] ?? 0;
+    const d = Math.hypot(x - gx, y - gy, z - gz);
     if (d > this.drift) this.drift = d;
   }
 
@@ -248,17 +273,23 @@ export class SculptMesh {
   /** A world-space direction in local space (no normalisation). */
   worldDirToLocal(dir: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
     const e = this.inv.elements;
+    const e0 = e[0] ?? 0, e4 = e[4] ?? 0, e8 = e[8] ?? 0;
+    const e1 = e[1] ?? 0, e5 = e[5] ?? 0, e9 = e[9] ?? 0;
+    const e2 = e[2] ?? 0, e6 = e[6] ?? 0, e10 = e[10] ?? 0;
     return out.set(
-      e[0] * dir.x + e[4] * dir.y + e[8] * dir.z,
-      e[1] * dir.x + e[5] * dir.y + e[9] * dir.z,
-      e[2] * dir.x + e[6] * dir.y + e[10] * dir.z,
+      e0 * dir.x + e4 * dir.y + e8 * dir.z,
+      e1 * dir.x + e5 * dir.y + e9 * dir.z,
+      e2 * dir.x + e6 * dir.y + e10 * dir.z,
     );
   }
 
   /** Average world normal of a group's vertices (unit). */
   groupNormalWorld(g: number, out: THREE.Vector3): THREE.Vector3 {
     out.set(0, 0, 0);
-    for (const v of this.groups[g]) out.add(this.vB.fromBufferAttribute(this.normal, v));
+    const groupArr = this.groups[g];
+    if (groupArr) {
+      for (const v of groupArr) out.add(this.vB.fromBufferAttribute(this.normal, v));
+    }
     out.applyMatrix3(this.normalMatrix);
     return out.lengthSq() > 0 ? out.normalize() : out.set(0, 1, 0);
   }
@@ -268,17 +299,22 @@ export class SculptMesh {
     if (!this.neighbourList) {
       const sets: Set<number>[] = Array.from({ length: this.groups.length }, () => new Set<number>());
       for (let t = 0; t < this.tris.length; t += 3) {
-        const a = this.groupOf[this.tris[t]], b = this.groupOf[this.tris[t + 1]], c = this.groupOf[this.tris[t + 2]];
-        if (a !== b) { sets[a].add(b); sets[b].add(a); }
-        if (b !== c) { sets[b].add(c); sets[c].add(b); }
-        if (a !== c) { sets[a].add(c); sets[c].add(a); }
+        const t0 = this.tris[t] ?? 0;
+        const t1 = this.tris[t + 1] ?? 0;
+        const t2 = this.tris[t + 2] ?? 0;
+        const a = this.groupOf[t0] ?? 0;
+        const b = this.groupOf[t1] ?? 0;
+        const c = this.groupOf[t2] ?? 0;
+        if (a !== b) { sets[a]?.add(b); sets[b]?.add(a); }
+        if (b !== c) { sets[b]?.add(c); sets[c]?.add(b); }
+        if (a !== c) { sets[a]?.add(c); sets[c]?.add(a); }
       }
       this.neighbourList = sets.map((s) => Array.from(s));
     }
-    return this.neighbourList[g];
+    return this.neighbourList[g] ?? [];
   }
 
-  /* ───────────── colours ───────────── */
+  /* ───────────── flat colours ───────────── */
 
   get hasColor(): boolean { return this.colorAttr !== null; }
 
@@ -294,18 +330,13 @@ export class SculptMesh {
   }
 
   /**
-   * Vertex colours on this mesh's material without touching the shared original. Plays along with the
-   * kit look system (`setKitLook` swaps `mesh.material` between `userData.baseMaterial` and a per-copy
-   * look): the clone becomes the new base, and an existing look material is switched too.
+   * Vertex colours on this mesh's material without touching the shared original.
    */
   enableVertexColors(): void {
     const mesh = this.mesh;
     const on = (m: THREE.Material) => { (m as THREE.MeshStandardMaterial).vertexColors = true; m.needsUpdate = true; };
     const base = (mesh.userData.baseMaterial ?? mesh.material) as THREE.Material | THREE.Material[];
     if (mesh.userData.sculptMaterialOwned) { (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(on); return; }
-    // A material a live controller drives (the island terrain's ground shader keeps its controller in
-    // userData) belongs to this one mesh: switch it in place. clone() would copy userData as plain JSON,
-    // leaving a controller with no methods (the Island panel crashed) and settings aimed at the old material.
     if (!Array.isArray(base) && base.userData?.islandGround) { on(base); mesh.userData.sculptMaterialOwned = true; return; }
     const clone = Array.isArray(base) ? base.map((m) => m.clone()) : base.clone();
     (Array.isArray(clone) ? clone : [clone]).forEach(on);
@@ -319,8 +350,11 @@ export class SculptMesh {
 
   paintGroup(g: number, r: number, gg: number, b: number, t: number): void {
     const c = this.ensureColor();
-    for (const v of this.groups[g]) {
-      c.setXYZ(v, c.getX(v) + (r - c.getX(v)) * t, c.getY(v) + (gg - c.getY(v)) * t, c.getZ(v) + (b - c.getZ(v)) * t);
+    const groupArr = this.groups[g];
+    if (groupArr) {
+      for (const v of groupArr) {
+        c.setXYZ(v, c.getX(v) + (r - c.getX(v)) * t, c.getY(v) + (gg - c.getY(v)) * t, c.getZ(v) + (b - c.getZ(v)) * t);
+      }
     }
     c.needsUpdate = true;
   }
@@ -329,10 +363,91 @@ export class SculptMesh {
   unpaintGroup(g: number, t: number): void {
     if (!this.colorAttr || !this.baseColor) return;
     const c = this.colorAttr, bc = this.baseColor;
-    for (const v of this.groups[g]) {
-      c.setXYZ(v, c.getX(v) + (bc[v * 3] - c.getX(v)) * t, c.getY(v) + (bc[v * 3 + 1] - c.getY(v)) * t, c.getZ(v) + (bc[v * 3 + 2] - c.getZ(v)) * t);
+    const groupArr = this.groups[g];
+    if (groupArr) {
+      for (const v of groupArr) {
+        const bcX = bc[v * 3] ?? 1;
+        const bcY = bc[v * 3 + 1] ?? 1;
+        const bcZ = bc[v * 3 + 2] ?? 1;
+        c.setXYZ(v, c.getX(v) + (bcX - c.getX(v)) * t, c.getY(v) + (bcY - c.getY(v)) * t, c.getZ(v) + (bcZ - c.getZ(v)) * t);
+      }
     }
     c.needsUpdate = true;
+  }
+
+  /* ───────────── textured island surface painting ───────────── */
+
+  get hasSurface(): boolean { return this.surfaceAttr !== null; }
+
+  /** Ensures the `islSurface` attribute exists (vec2: x = surfaceId, y = weight 0..1). */
+  ensureSurface(): THREE.BufferAttribute {
+    if (this.surfaceAttr) return this.surfaceAttr;
+    const array = new Float32Array(this.count * 2); // all 0 (surfaceId 0, weight 0)
+    this.surfaceAttr = new THREE.BufferAttribute(array, 2);
+    this.geometry.setAttribute('islSurface', this.surfaceAttr);
+    this.enableSurfaceShader();
+    return this.surfaceAttr;
+  }
+
+  /**
+   * Patches the model's material with `onBeforeCompile` to sample the island texture array
+   * with triplanar world-space mapping and height blending.
+   */
+  enableSurfaceShader(): void {
+    const mesh = this.mesh;
+    const array = IslandSurfaceArray.getInstance();
+    const patch = (m: THREE.Material) => {
+      injectIslandModelShader(m, array);
+    };
+
+    const base = (mesh.userData.baseMaterial ?? mesh.material) as THREE.Material | THREE.Material[];
+    if (mesh.userData.sculptMaterialOwned) {
+      (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(patch);
+      return;
+    }
+    const clone = Array.isArray(base) ? base.map((m) => m.clone()) : base.clone();
+    (Array.isArray(clone) ? clone : [clone]).forEach(patch);
+    const wasBase = mesh.material === base;
+    if (mesh.userData.baseMaterial) mesh.userData.baseMaterial = clone;
+    const look = mesh.userData.lookMaterial as THREE.Material | undefined;
+    if (look) patch(look);
+    if (wasBase || !look) mesh.material = clone;
+    mesh.userData.sculptMaterialOwned = true;
+  }
+
+  /** Paint textured island surface onto group `g` with falloff `t`. */
+  paintSurfaceGroup(g: number, surfaceId: number, t: number): void {
+    const s = this.ensureSurface();
+    const groupArr = this.groups[g];
+    if (groupArr) {
+      for (const v of groupArr) {
+        const curId = s.getX(v);
+        const curWeight = s.getY(v);
+        if (curWeight <= 0.001 || Math.abs(curId - surfaceId) < 0.5) {
+          s.setXY(v, surfaceId, Math.min(1.0, curWeight + (1.0 - curWeight) * t));
+        } else {
+          // Blending toward the new surface ID
+          const newWeight = curWeight + (1.0 - curWeight) * t;
+          s.setXY(v, surfaceId, Math.min(1.0, newWeight));
+        }
+      }
+    }
+    s.needsUpdate = true;
+  }
+
+  /** Unpaint/erase island surface back toward the original model look. */
+  unpaintSurfaceGroup(g: number, t: number): void {
+    if (!this.surfaceAttr) return;
+    const s = this.surfaceAttr;
+    const groupArr = this.groups[g];
+    if (groupArr) {
+      for (const v of groupArr) {
+        const curWeight = s.getY(v);
+        const newWeight = Math.max(0, curWeight - curWeight * t);
+        s.setY(v, newWeight);
+      }
+    }
+    s.needsUpdate = true;
   }
 
   /* ───────────── normals ───────────── */
@@ -340,14 +455,19 @@ export class SculptMesh {
   /** Recomputes the normals of every vertex in `groups` from those vertices' own triangles. */
   recomputeNormals(groups: Iterable<number>): void {
     const verts = new Set<number>();
-    for (const g of groups) for (const v of this.groups[g]) verts.add(v);
+    for (const g of groups) {
+      const groupArr = this.groups[g];
+      if (groupArr) {
+        for (const v of groupArr) verts.add(v);
+      }
+    }
     if (!verts.size) return;
     const n = this.normal, p = this.position, tris = this.tris;
     const faces = new Map<number, [number, number, number]>();
     const face = (t: number): [number, number, number] => {
       let f = faces.get(t);
       if (f) return f;
-      const a = tris[t * 3], b = tris[t * 3 + 1], c = tris[t * 3 + 2];
+      const a = tris[t * 3] ?? 0, b = tris[t * 3 + 1] ?? 0, c = tris[t * 3 + 2] ?? 0;
       const ax = p.getX(a), ay = p.getY(a), az = p.getZ(a);
       const e1x = p.getX(b) - ax, e1y = p.getY(b) - ay, e1z = p.getZ(b) - az;
       const e2x = p.getX(c) - ax, e2y = p.getY(c) - ay, e2z = p.getZ(c) - az;
@@ -357,7 +477,8 @@ export class SculptMesh {
     };
     for (const v of verts) {
       let nx = 0, ny = 0, nz = 0;
-      for (const t of this.trisOfVertex[v]) { const f = face(t); nx += f[0]; ny += f[1]; nz += f[2]; }
+      const trisOfV = this.trisOfVertex[v] ?? [];
+      for (const t of trisOfV) { const f = face(t); nx += f[0]; ny += f[1]; nz += f[2]; }
       const len = Math.hypot(nx, ny, nz);
       if (len > 0) n.setXYZ(v, nx / len, ny / len, nz / len); else n.setXYZ(v, 0, 1, 0);
     }
@@ -376,6 +497,8 @@ export class SculptMesh {
     this.drift = 0;
     this.position.needsUpdate = true;
     this.normal.needsUpdate = true;
+    if (this.colorAttr) this.colorAttr.needsUpdate = true;
+    if (this.surfaceAttr) this.surfaceAttr.needsUpdate = true;
     this.geometry.computeBoundingBox();
     this.geometry.computeBoundingSphere();
     return moved;
@@ -387,25 +510,59 @@ export class SculptMesh {
   isPristine(quantum = SCULPT_QUANTUM): boolean {
     const half = quantum * 0.5, p = this.position, b = this.base;
     for (let i = 0; i < this.count; i++) {
-      if (Math.abs(p.getX(i) - b[i * 3]) >= half || Math.abs(p.getY(i) - b[i * 3 + 1]) >= half || Math.abs(p.getZ(i) - b[i * 3 + 2]) >= half) return false;
+      const bX = b[i * 3] ?? 0;
+      const bY = b[i * 3 + 1] ?? 0;
+      const bZ = b[i * 3 + 2] ?? 0;
+      if (Math.abs(p.getX(i) - bX) >= half || Math.abs(p.getY(i) - bY) >= half || Math.abs(p.getZ(i) - bZ) >= half) return false;
     }
     if (this.colorAttr && this.baseColor) {
       const c = this.colorAttr, bc = this.baseColor;
       for (let i = 0; i < this.count; i++) {
-        if (Math.abs(c.getX(i) - bc[i * 3]) > 1 / 255 || Math.abs(c.getY(i) - bc[i * 3 + 1]) > 1 / 255 || Math.abs(c.getZ(i) - bc[i * 3 + 2]) > 1 / 255) return false;
+        const bcX = bc[i * 3] ?? 1;
+        const bcY = bc[i * 3 + 1] ?? 1;
+        const bcZ = bc[i * 3 + 2] ?? 1;
+        if (Math.abs(c.getX(i) - bcX) > 1 / 255 || Math.abs(c.getY(i) - bcY) > 1 / 255 || Math.abs(c.getZ(i) - bcZ) > 1 / 255) return false;
+      }
+    }
+    if (this.surfaceAttr) {
+      const s = this.surfaceAttr;
+      for (let i = 0; i < this.count; i++) {
+        if (s.getY(i) > 0.003) return false;
       }
     }
     return true;
   }
 
-  /** Vertices that differ from the generated shape by at least half a quantum. */
+  /** Vertices that differ from the generated shape by at least half a quantum or have paint/surface. */
   changedCount(quantum = SCULPT_QUANTUM): number {
     const half = quantum * 0.5, p = this.position, b = this.base;
-    let n = 0;
+    const changed = new Set<number>();
     for (let i = 0; i < this.count; i++) {
-      if (Math.abs(p.getX(i) - b[i * 3]) >= half || Math.abs(p.getY(i) - b[i * 3 + 1]) >= half || Math.abs(p.getZ(i) - b[i * 3 + 2]) >= half) n++;
+      const bX = b[i * 3] ?? 0;
+      const bY = b[i * 3 + 1] ?? 0;
+      const bZ = b[i * 3 + 2] ?? 0;
+      if (Math.abs(p.getX(i) - bX) >= half || Math.abs(p.getY(i) - bY) >= half || Math.abs(p.getZ(i) - bZ) >= half) {
+        changed.add(i);
+      }
     }
-    return n;
+    if (this.colorAttr && this.baseColor) {
+      const ca = this.colorAttr, bc = this.baseColor;
+      for (let i = 0; i < this.count; i++) {
+        const bcX = bc[i * 3] ?? 1;
+        const bcY = bc[i * 3 + 1] ?? 1;
+        const bcZ = bc[i * 3 + 2] ?? 1;
+        if (Math.abs(ca.getX(i) - bcX) > 1 / 255 || Math.abs(ca.getY(i) - bcY) > 1 / 255 || Math.abs(ca.getZ(i) - bcZ) > 1 / 255) {
+          changed.add(i);
+        }
+      }
+    }
+    if (this.surfaceAttr) {
+      const s = this.surfaceAttr;
+      for (let i = 0; i < this.count; i++) {
+        if (s.getY(i) > 0.003) changed.add(i);
+      }
+    }
+    return changed.size;
   }
 
   /** The sparse diff against the generated shape, or null when there is none. */
@@ -413,7 +570,10 @@ export class SculptMesh {
     const half = quantum * 0.5, p = this.position, b = this.base;
     const idx: number[] = [], d: number[] = [];
     for (let i = 0; i < this.count; i++) {
-      const dx = p.getX(i) - b[i * 3], dy = p.getY(i) - b[i * 3 + 1], dz = p.getZ(i) - b[i * 3 + 2];
+      const bX = b[i * 3] ?? 0;
+      const bY = b[i * 3 + 1] ?? 0;
+      const bZ = b[i * 3 + 2] ?? 0;
+      const dx = p.getX(i) - bX, dy = p.getY(i) - bY, dz = p.getZ(i) - bZ;
       if (Math.abs(dx) < half && Math.abs(dy) < half && Math.abs(dz) < half) continue;
       idx.push(i);
       d.push(dx / quantum, dy / quantum, dz / quantum);
@@ -423,17 +583,32 @@ export class SculptMesh {
       const ca = this.colorAttr, bc = this.baseColor;
       for (let i = 0; i < this.count; i++) {
         const r = ca.getX(i), g = ca.getY(i), bl = ca.getZ(i);
-        if (Math.abs(r - bc[i * 3]) <= 1 / 255 && Math.abs(g - bc[i * 3 + 1]) <= 1 / 255 && Math.abs(bl - bc[i * 3 + 2]) <= 1 / 255) continue;
+        const bcX = bc[i * 3] ?? 1;
+        const bcY = bc[i * 3 + 1] ?? 1;
+        const bcZ = bc[i * 3 + 2] ?? 1;
+        if (Math.abs(r - bcX) <= 1 / 255 && Math.abs(g - bcY) <= 1 / 255 && Math.abs(bl - bcZ) <= 1 / 255) continue;
         cidx.push(i);
         c.push(Math.round(Math.max(0, Math.min(1, r)) * 255), Math.round(Math.max(0, Math.min(1, g)) * 255), Math.round(Math.max(0, Math.min(1, bl)) * 255));
       }
     }
-    if (!idx.length && !cidx.length) return null;
+    const sidx: number[] = [], s: number[] = [];
+    if (this.surfaceAttr) {
+      const sa = this.surfaceAttr;
+      for (let i = 0; i < this.count; i++) {
+        const sId = sa.getX(i);
+        const sWeight = sa.getY(i);
+        if (sWeight <= 0.003) continue;
+        sidx.push(i);
+        s.push(Math.round(sId), Math.round(Math.max(0, Math.min(1, sWeight)) * 255));
+      }
+    }
+    if (!idx.length && !cidx.length && !sidx.length) return null;
     return {
       key, n: this.count,
       ...(quantum !== SCULPT_QUANTUM ? { q: quantum } : {}),
       ...(idx.length ? { shape: { idx: encodeIndices(idx), d: encodeInt16(d) } } : {}),
       ...(cidx.length ? { paint: { idx: encodeIndices(cidx), c: encodeBytes(Uint8Array.from(c)) } } : {}),
+      ...(sidx.length ? { surface: { idx: encodeIndices(sidx), s: encodeBytes(Uint8Array.from(s)) } } : {}),
     };
   }
 
@@ -447,10 +622,17 @@ export class SculptMesh {
       const d = decodeInt16(doc.shape.d);
       if (d.length !== idx.length * 3) return false;
       for (let k = 0; k < idx.length; k++) {
-        const i = idx[k];
+        const i = idx[k] ?? 0;
         if (i >= this.count) continue;
-        this.position.setXYZ(i, this.base[i * 3] + d[k * 3] * quantum, this.base[i * 3 + 1] + d[k * 3 + 1] * quantum, this.base[i * 3 + 2] + d[k * 3 + 2] * quantum);
-        touched.add(this.groupOf[i]);
+        const bX = this.base[i * 3] ?? 0;
+        const bY = this.base[i * 3 + 1] ?? 0;
+        const bZ = this.base[i * 3 + 2] ?? 0;
+        const dX = d[k * 3] ?? 0;
+        const dY = d[k * 3 + 1] ?? 0;
+        const dZ = d[k * 3 + 2] ?? 0;
+        this.position.setXYZ(i, bX + dX * quantum, bY + dY * quantum, bZ + dZ * quantum);
+        const g = this.groupOf[i];
+        if (g !== undefined) touched.add(g);
       }
     }
     if (doc.paint) {
@@ -459,11 +641,28 @@ export class SculptMesh {
       if (c.length !== idx.length * 3) return false;
       const attr = this.ensureColor();
       for (let k = 0; k < idx.length; k++) {
-        const i = idx[k];
+        const i = idx[k] ?? 0;
         if (i >= this.count) continue;
-        attr.setXYZ(i, c[k * 3] / 255, c[k * 3 + 1] / 255, c[k * 3 + 2] / 255);
+        const cR = c[k * 3] ?? 255;
+        const cG = c[k * 3 + 1] ?? 255;
+        const cB = c[k * 3 + 2] ?? 255;
+        attr.setXYZ(i, cR / 255, cG / 255, cB / 255);
       }
       attr.needsUpdate = true;
+    }
+    if (doc.surface) {
+      const idx = decodeIndices(doc.surface.idx);
+      const s = decodeBytes(doc.surface.s);
+      if (s.length !== idx.length * 2) return false;
+      const sattr = this.ensureSurface();
+      for (let k = 0; k < idx.length; k++) {
+        const i = idx[k] ?? 0;
+        if (i >= this.count) continue;
+        const sId = s[k * 2] ?? 0;
+        const sWeight = (s[k * 2 + 1] ?? 0) / 255;
+        sattr.setXY(i, sId, sWeight);
+      }
+      sattr.needsUpdate = true;
     }
     for (const g of touched) this.dirty.add(g);
     this.recomputeNormals(touched);
@@ -471,10 +670,17 @@ export class SculptMesh {
     return true;
   }
 
-  /** Back to the generated shape and colours. */
+  /** Back to the generated shape and colours/surfaces. */
   reset(): void {
     (this.position.array as Float32Array).set(this.base);
-    if (this.colorAttr && this.baseColor) { (this.colorAttr.array as Float32Array).set(this.baseColor); this.colorAttr.needsUpdate = true; }
+    if (this.colorAttr && this.baseColor) {
+      (this.colorAttr.array as Float32Array).set(this.baseColor);
+      this.colorAttr.needsUpdate = true;
+    }
+    if (this.surfaceAttr) {
+      (this.surfaceAttr.array as Float32Array).fill(0);
+      this.surfaceAttr.needsUpdate = true;
+    }
     const all: number[] = [];
     for (let g = 0; g < this.groups.length; g++) { all.push(g); this.dirty.add(g); }
     this.recomputeNormals(all);
@@ -497,4 +703,4 @@ export function sculptableMeshes(root: THREE.Object3D): THREE.Mesh[] {
 }
 
 /** A stable key for a mesh under an object: its traversal index, name and vertex count. */
-export const meshKey = (index: number, mesh: THREE.Mesh) => `${index}:${mesh.name || ''}:${mesh.geometry.attributes.position.count}`;
+export const meshKey = (index: number, mesh: THREE.Mesh) => `${index}:${mesh.name || ''}:${mesh.geometry.attributes.position?.count ?? 0}`;

@@ -1,6 +1,6 @@
 /**
  * ISLAND-ROUTE: GLSL for the island surface set (`island-surfaces.ts`): how a pair of surface IDs and
- * their balance become pixels on the island terrain.
+ * their balance become pixels on the island terrain and on painted 3D models.
  *
  * - **Height blending.** Each tile carries its own height in alpha. Where two surfaces share a texel the
  *   one standing higher *at that pixel* wins, offset by the balance: at 50/50 grass blades stand out of
@@ -15,15 +15,35 @@
  *   position, so where surfaces meet they fade into each other along a meandering line instead of
  *   stepping along the texel grid. `islSoft` sets how wide the fade is.
  * - **Any slope.** Tiles are projected from above and from both sides and blended by the normal
- *   (triplanar), so a cliff is never smeared and there is no seam where the projection changes.
+ *   (triplanar), so a cliff or rock is never smeared and there is no seam where the projection changes.
  * - Explicit gradients (`textureGrad`) on the mipmapped, repeating array: no atlas, no padding, no seams.
  *
- * Uses `surfNoise` from `surface/surface-shader.ts` (included before this).
+ * Uses `surfNoise` from `surface/surface-shader.ts` (included before this in ground shaders).
  */
+import * as THREE from 'three';
 import { SURFACE_SLOTS } from '../surface/surface-table';
-import { ISLAND_SURFACES } from './island-surfaces';
+import { ISLAND_SURFACES, ISLAND_LAYER_OF, IslandSurfaceArray } from './island-surfaces';
 
 export const ISLAND_LAYERS = ISLAND_SURFACES.length;
+
+export const SURF_NOISE_GLSL = /* glsl */ `
+float surfHash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+float surfNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float a = surfHash(i);
+  float b = surfHash(i + vec2(1.0, 0.0));
+  float c = surfHash(i + vec2(0.0, 1.0));
+  float d = surfHash(i + vec2(1.0, 1.0));
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+`;
 
 export const ISLAND_SURFACE_GLSL = /* glsl */ `
 uniform sampler2DArray islSurfaces;
@@ -87,13 +107,15 @@ float islLayer(float id) {
 }
 
 vec4 islTap(float layer, vec2 uv, vec2 off, vec2 dx, vec2 dy) {
-  float rep = islParams[int(layer + 0.5)].x * islScale;
-  return textureGrad(islSurfaces, vec3(uv / rep + off, layer), dx / rep, dy / rep);
+  int ilayer = int(clamp(layer + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  float rep = max(islParams[ilayer].x * islScale, 1.0);
+  return textureGrad(islSurfaces, vec3(uv / rep + off, float(ilayer)), dx / rep, dy / rep);
 }
 
 /** One surface, never repeating: two offset taps blended by a smooth noise index and their heights. */
 vec4 islVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
-  float rep = islParams[int(layer + 0.5)].x * islScale;
+  int ilayer = int(clamp(layer + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  float rep = max(islParams[ilayer].x * islScale, 1.0);
   float l = surfNoise(uv / (rep * 2.7) + layer * 3.1) * 8.0;
   float ia = floor(l);
   vec4 a = islTap(layer, uv, sin(vec2(3.0, 7.0) * ia), dx, dy);
@@ -101,7 +123,7 @@ vec4 islVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
   return mix(a, b, smoothstep(0.2, 0.8, fract(l) + (b.a - a.a) * 0.25));
 }
 
-/** Two surfaces by height: \`w\` is B's share; the one standing higher at this pixel takes the edge. */
+/** Two surfaces by height: w is B's share; the one standing higher at this pixel takes the edge. */
 vec4 islHeightBlend(vec4 a, vec4 b, float w, float contrast) {
   float ha = a.a + (1.0 - w) * 1.1;
   float hb = b.a + w * 1.1;
@@ -112,13 +134,15 @@ vec4 islHeightBlend(vec4 a, vec4 b, float w, float contrast) {
   return (a * ba + b * bb) / max(ba + bb, 1e-4);
 }
 
-/** Layers \`la\`, \`lb\` with B's share \`w\`: rgb, and the height where they meet (a). */
+/** Layers la, lb with B's share w: rgb, and the height where they meet (a). */
 vec4 islPair(float la, float lb, float w, vec2 uv, vec2 dx, vec2 dy) {
   vec4 a = islVaried(la, uv, dx, dy);
   if (abs(la - lb) < 0.5 || w < 0.004) return a;
   vec4 b = islVaried(lb, uv, dx, dy);
   if (w > 0.996) return b;
-  float contrast = 0.5 * (islParams[int(la + 0.5)].z + islParams[int(lb + 0.5)].z);
+  int ila = int(clamp(la + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  int ilb = int(clamp(lb + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  float contrast = 0.5 * (islParams[ila].z + islParams[ilb].z);
   return islHeightBlend(a, b, w, contrast);
 }
 
@@ -139,6 +163,113 @@ vec4 islTriplanar(float la, float lb, float w, vec3 wp, vec3 n, vec3 dwx, vec3 d
 }
 
 float islRough(float la, float lb, float w) {
-  return mix(islParams[int(la + 0.5)].y, islParams[int(lb + 0.5)].y, w);
+  int ila = int(clamp(la + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  int ilb = int(clamp(lb + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  return mix(islParams[ila].y, islParams[ilb].y, w);
 }
 `;
+
+/**
+ * Injects the island surface shader into a model's material using `onBeforeCompile`.
+ * Samples the island texture array with world-space triplanar projection and blends
+ * it with height blending over the model's own diffuse texture.
+ */
+export function injectIslandModelShader(
+  material: THREE.Material,
+  surfaceArray: IslandSurfaceArray = IslandSurfaceArray.getInstance(),
+): void {
+  if ((material.userData as Record<string, unknown>)?.islandModelShaderInjected) return;
+  (material.userData as Record<string, unknown>).islandModelShaderInjected = true;
+
+  const prevOnBeforeCompile = material.onBeforeCompile;
+
+  material.onBeforeCompile = (shader, renderer) => {
+    prevOnBeforeCompile?.call(material, shader, renderer);
+
+    // Uniforms
+    shader.uniforms['islSurfaces'] = { value: surfaceArray.texture };
+    shader.uniforms['islLayerOf'] = { value: ISLAND_LAYER_OF };
+    shader.uniforms['islParams'] = { value: surfaceArray.params };
+    shader.uniforms['islSoft'] = { value: 0.25 };
+    shader.uniforms['islScale'] = { value: 1.0 };
+    shader.uniforms['islCliffLayer'] = { value: -1.0 };
+    shader.uniforms['islCliffNy'] = { value: new THREE.Vector2(0.4, 0.7) };
+
+    // Vertex shader modifications
+    shader.vertexShader = `
+      attribute vec2 islSurface;
+      varying vec3 vIslWorldPos;
+      varying vec3 vIslWorldNormal;
+      varying vec2 vIslSurface;
+      ${shader.vertexShader}
+    `;
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <worldpos_vertex>',
+      `
+      #include <worldpos_vertex>
+      vIslWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+      vIslWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+      vIslSurface = islSurface;
+      `,
+    );
+
+    // Fragment shader modifications
+    shader.fragmentShader = `
+      varying vec3 vIslWorldPos;
+      varying vec3 vIslWorldNormal;
+      varying vec2 vIslSurface;
+      ${SURF_NOISE_GLSL}
+      ${ISLAND_SURFACE_GLSL}
+      ${shader.fragmentShader}
+    `;
+
+    // Hook into color output / map fragment
+    const colorHook = shader.fragmentShader.includes('#include <map_fragment>')
+      ? '#include <map_fragment>'
+      : '#include <color_fragment>';
+
+    shader.fragmentShader = shader.fragmentShader.replace(
+      colorHook,
+      `
+      ${colorHook}
+      if (vIslSurface.y > 0.001) {
+        float surfaceId = vIslSurface.x;
+        float surfaceWeight = clamp(vIslSurface.y, 0.0, 1.0);
+        float layer = islLayer(surfaceId);
+        if (layer >= 0.0) {
+          vec3 dwx = dFdx(vIslWorldPos);
+          vec3 dwy = dFdy(vIslWorldPos);
+          vec4 islandTex = islTriplanar(layer, layer, 0.0, vIslWorldPos, normalize(vIslWorldNormal), dwx, dwy);
+          
+          // Natural height-weighted blend over the model's base appearance
+          float heightFactor = islandTex.a * 0.4 + 0.8;
+          float blendT = clamp(surfaceWeight * heightFactor, 0.0, 1.0);
+          diffuseColor.rgb = mix(diffuseColor.rgb, islandTex.rgb, blendT);
+        }
+      }
+      `,
+    );
+
+    // Also adjust roughness if roughnessmap_fragment is present
+    if (shader.fragmentShader.includes('#include <roughnessmap_fragment>')) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <roughnessmap_fragment>',
+        `
+        #include <roughnessmap_fragment>
+        if (vIslSurface.y > 0.001) {
+          float sId = vIslSurface.x;
+          float sWeight = clamp(vIslSurface.y, 0.0, 1.0);
+          float l = islLayer(sId);
+          if (l >= 0.0) {
+            float sRough = islRough(l, l, 0.0);
+            roughnessFactor = mix(roughnessFactor, sRough, sWeight);
+          }
+        }
+        `,
+      );
+    }
+  };
+
+  material.needsUpdate = true;
+}

@@ -1,0 +1,1963 @@
+diff --git a/scripts/check.mjs b/scripts/check.mjs
+index e88752f..6ff9184 100644
+--- a/scripts/check.mjs
++++ b/scripts/check.mjs
+@@ -25,7 +25,7 @@ const commands = [
+     'tests/cockpit.test.ts', 'tests/cockpit-trinkets.test.ts', 'tests/scene-kit.test.ts', 'tests/painted-icons.test.ts', 'tests/painted-parts.test.ts',
+     'tests/time-scale.test.ts', 'tests/builder-ramps.test.ts', 'tests/start-node.test.ts',
+     'tests/lane-gizmo-follow.test.ts', 'tests/ball-size.test.ts', 'tests/fp-lean.test.ts', 'tests/split-queue.test.ts', 'tests/lane-rope.test.ts', 'tests/placement-course.test.ts', 'tests/obstacle-view.test.ts',
+-    'tests/effects.test.ts', 'tests/depth-mask.test.ts', 'tests/painted-goblin.test.ts', 'tests/island-route.test.ts', 'tests/island-props.test.ts', 'tests/kit-catalog.test.ts', 'tests/lane-multiselect.test.ts', 'tests/race-finish.test.ts', 'tests/race-pieces.test.ts', 'tests/island-tracks.test.ts', 'tests/kit-ride.test.ts', 'tests/kit-solids.test.ts', 'tests/builder-perf.test.ts', 'tests/sun-bake.test.ts', 'tests/baker-grid.test.ts', 'tests/start-hook.test.ts', 'tests/lane-colors.test.ts', 'tests/gizmo-tilt.test.ts', 'tests/surface-paint.test.ts', 'tests/auto-paint.test.ts', 'tests/decor.test.ts', 'tests/sculpt.test.ts', 'tests/route-graph.test.ts', 'tests/route-layout.test.ts',
++    'tests/effects.test.ts', 'tests/depth-mask.test.ts', 'tests/painted-goblin.test.ts', 'tests/island-route.test.ts', 'tests/island-props.test.ts', 'tests/kit-catalog.test.ts', 'tests/lane-multiselect.test.ts', 'tests/race-finish.test.ts', 'tests/race-pieces.test.ts', 'tests/island-tracks.test.ts', 'tests/kit-ride.test.ts', 'tests/kit-solids.test.ts', 'tests/builder-perf.test.ts', 'tests/sun-bake.test.ts', 'tests/baker-grid.test.ts', 'tests/start-hook.test.ts', 'tests/lane-colors.test.ts', 'tests/gizmo-tilt.test.ts', 'tests/surface-paint.test.ts', 'tests/auto-paint.test.ts', 'tests/decor.test.ts', 'tests/sculpt.test.ts', 'tests/model-paint.test.ts', 'tests/route-graph.test.ts', 'tests/route-layout.test.ts',
+     'tests/gyro-ball.test.ts',
+     'tests/hoop-pod.test.ts', 'tests/hoop-pod-lod.test.ts',
+     'tests/merge-pool.test.ts', 'tests/merge-race.test.ts', 'tests/merge-runup.test.ts',
+diff --git a/src/components/SculptPanel.tsx b/src/components/SculptPanel.tsx
+index 28be1ca..3f56fd7 100644
+--- a/src/components/SculptPanel.tsx
++++ b/src/components/SculptPanel.tsx
+@@ -1,28 +1,30 @@
+ /**
+- * NewSculpt — the Sculpt panel for the track builder.
++ * NewSculpt — the Sculpt & Mesh Paint panel for the Forge 3D track builder.
+  *
+  * A mode toggle, the nine tools (with their digit hotkeys), radius / strength / hardness, the push
+- * direction for Raise & Lower, a colour for Paint, a seed for Noise, what you last touched (with a
+- * Reset), and the list of everything on the course that carries a sculpt. Every stroke is one undo
+- * step in the builder (Ctrl+Z as usual).
++ * direction for Raise & Lower, textured Island Surface palette or flat colour for Paint, a seed for
++ * Noise, what you last touched (with a Reset), and the list of everything on the course that carries
++ * a sculpt or model paint. Every stroke is one undo step in the builder (Ctrl+Z as usual).
+  *
+  * Mount it as a builder tab: <SculptPanel tool={builder.sculpt!} />
+  */
+ import { useEffect, useState, type CSSProperties } from 'react';
+ import type { SculptTool } from '../game/sculpt/sculpt-tool';
+ import type { SculptDirection } from '../game/sculpt/sculpt-brushes';
++import { ISLAND_SURFACES, IslandSurfaceArray } from '../game/island-route/island-surfaces';
++import { surfaceDefinition } from '../game/surface/surface-table';
+ 
+ const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, margin: '4px 0' };
+ const label: CSSProperties = { width: 96, opacity: 0.8 };
+ const button: CSSProperties = { padding: '5px 9px', borderRadius: 5, border: '1px solid #7a5a2a', background: '#2a1e12', color: '#f5e6c8', cursor: 'pointer', fontSize: 12 };
+ const primary: CSSProperties = { ...button, background: '#e0862c', color: '#1a120a', fontWeight: 600 };
+-const section: CSSProperties = { border: '1px solid #4a3a26', borderRadius: 8, padding: 10, marginBottom: 10, background: 'rgba(18,13,9,0.6)' };
++const section: CSSProperties = { border: '1px solid #4a3a26', borderRadius: 8, padding: 10, marginBottom: 10, background: 'rgba(18,13,9,0.7)' };
+ 
+ function Slider(props: { label: string; value: number; min: number; max: number; step: number; unit?: string; onChange: (v: number) => void }) {
+   return (
+     <div style={row}>
+       <span style={label}>{props.label}</span>
+-      <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onChange={(e) => props.onChange(Number(e.target.value))} style={{ flex: 1 }} />
++      <input type="range" min={props.min} max={props.max} step={props.step} value={props.value} onChange={(e) => props.onChange(Number(e.target.value))} style={{ flex: 1 }} className="accent-amber-500" />
+       <span style={{ width: 60, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Number.isInteger(props.step) ? Math.round(props.value) : props.value.toFixed(2)}{props.unit ? ` ${props.unit}` : ''}</span>
+     </div>
+   );
+@@ -37,13 +39,16 @@ export function SculptPanel({ tool }: { tool: SculptTool }) {
+   const b = tool.brush;
+   const target = tool.target();
+   const sculpted = tool.sculpted();
++  const surfaceArray = IslandSurfaceArray.getInstance();
+ 
+   return (
+-    <div style={{ color: '#f5e6c8', minWidth: 300 }}>
++    <div style={{ color: '#f5e6c8', minWidth: 300 }} className="select-none font-sans">
+       <div style={section}>
+         <div style={{ ...row, justifyContent: 'space-between' }}>
+           <strong>Sculpt &amp; mesh paint</strong>
+-          <button style={tool.isEnabled ? primary : button} onClick={() => tool.setEnabled(!tool.isEnabled)}>{tool.isEnabled ? 'Mode on' : 'Mode off'}</button>
++          <button style={tool.isEnabled ? primary : button} onClick={() => tool.setEnabled(!tool.isEnabled)}>
++            {tool.isEnabled ? 'Mode on' : 'Mode off'}
++          </button>
+         </div>
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, margin: '6px 0' }}>
+           {tool.tools.map((t) => (
+@@ -56,25 +61,97 @@ export function SculptPanel({ tool }: { tool: SculptTool }) {
+         <Slider label="Radius" value={b.radius} min={10} max={6000} step={10} unit="u" onChange={(v) => tool.setBrush({ radius: v })} />
+         <Slider label="Strength" value={b.strength} min={0.02} max={1} step={0.02} onChange={(v) => tool.setBrush({ strength: v })} />
+         <Slider label="Hardness" value={b.hardness} min={0} max={1} step={0.05} onChange={(v) => tool.setBrush({ hardness: v })} />
++
+         {(b.tool === 'raise' || b.tool === 'lower') && (
+           <div style={row}>
+             <span style={label}>Direction</span>
+             {(['normal', 'up', 'view'] as SculptDirection[]).map((d) => (
+-              <button key={d} style={b.direction === d ? primary : button} onClick={() => tool.setBrush({ direction: d })}>{d === 'normal' ? 'Surface normal' : d === 'up' ? 'World up' : 'Toward view'}</button>
++              <button key={d} style={b.direction === d ? primary : button} onClick={() => tool.setBrush({ direction: d })}>
++                {d === 'normal' ? 'Surface normal' : d === 'up' ? 'World up' : 'Toward view'}
++              </button>
+             ))}
+           </div>
+         )}
++
+         {b.tool === 'paint' && (
+-          <div style={row}>
+-            <span style={label}>Colour</span>
+-            <input type="color" value={toHex(b.color)} onChange={(e) => tool.setBrush({ color: fromHex(e.target.value) })} />
+-            <span style={{ opacity: 0.7 }}>Shift paints the generated colour back.</span>
++          <div className="space-y-2.5 my-2.5 pt-2 border-t border-amber-900/40">
++            <div className="flex items-center justify-between text-xs">
++              <span className="font-semibold text-amber-300">Paint Mode</span>
++              <div className="flex rounded border border-amber-800/60 overflow-hidden text-[11px]">
++                <button
++                  style={b.paintMode === 'surface' ? primary : button}
++                  onClick={() => tool.setBrush({ paintMode: 'surface' })}
++                  className="px-2.5 py-0.5"
++                >
++                  Island surface
++                </button>
++                <button
++                  style={b.paintMode === 'color' ? primary : button}
++                  onClick={() => tool.setBrush({ paintMode: 'color' })}
++                  className="px-2.5 py-0.5"
++                >
++                  Flat colour
++                </button>
++              </div>
++            </div>
++
++            {b.paintMode === 'surface' ? (
++              <div className="space-y-2">
++                <div className="flex items-center justify-between text-[11px] text-zinc-400">
++                  <span>Surface Palette (Triplanar Height Blend)</span>
++                  <span className="text-amber-300 font-medium">{surfaceDefinition(b.surfaceId).name}</span>
++                </div>
++                <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto pr-1">
++                  {ISLAND_SURFACES.map((s) => {
++                    const def = surfaceDefinition(s.id);
++                    const isSelected = b.surfaceId === s.id;
++                    const thumb = surfaceArray.thumbs.get(s.id);
++                    return (
++                      <button
++                        key={s.id}
++                        onClick={() => tool.setBrush({ surfaceId: s.id })}
++                        title={`${def.name} (ID: ${s.id})`}
++                        className={`group relative flex flex-col items-center rounded border p-1 text-left transition-all ${
++                          isSelected
++                            ? 'border-amber-400 bg-amber-950/70 shadow-sm shadow-amber-500/20 ring-1 ring-amber-400/50'
++                            : 'border-zinc-800 bg-zinc-900/90 hover:border-amber-600/60 hover:bg-zinc-850'
++                        }`}
++                      >
++                        <div
++                          className="h-10 w-full rounded border border-zinc-700/50 bg-cover bg-center"
++                          style={{
++                            backgroundColor: def.swatch,
++                            backgroundImage: thumb ? `url(${thumb})` : undefined,
++                          }}
++                        />
++                        <span className="mt-1 w-full truncate text-center text-[10px] font-medium leading-tight text-zinc-300 group-hover:text-amber-200">
++                          {def.name.replace(/^(Packed|Wet|Old|Riveted|Resonant|Granite|Mossy|Dry|Rippled)\s+/i, '')}
++                        </span>
++                      </button>
++                    );
++                  })}
++                </div>
++                <p className="text-[10px] text-zinc-400 leading-tight">
++                  <span className="text-amber-300 font-semibold">Tip:</span> Hold <kbd className="px-1 py-0.5 bg-zinc-800 rounded border border-zinc-700 text-zinc-200">Shift</kbd> to erase back to the original base model texture.
++                </p>
++              </div>
++            ) : (
++              <div style={row}>
++                <span style={label}>Colour</span>
++                <input type="color" value={toHex(b.color)} onChange={(e) => tool.setBrush({ color: fromHex(e.target.value) })} className="h-7 w-12 cursor-pointer rounded border border-zinc-700 bg-transparent" />
++                <span style={{ opacity: 0.7, fontSize: 11 }}>Shift paints the generated colour back.</span>
++              </div>
++            )}
+           </div>
+         )}
++
+         {b.tool === 'noise' && <Slider label="Seed" value={b.seed} min={1} max={999} step={1} onChange={(v) => tool.setBrush({ seed: v })} />}
++        
+         <div style={row}>
+-          <label><input type="checkbox" checked={b.invert} onChange={(e) => tool.setBrush({ invert: e.target.checked })} /> Invert</label>
+-          <span style={{ opacity: 0.6 }}>Shift = invert · Ctrl = smooth · [ ] radius · − = strength · 1–9 tools</span>
++          <label className="flex items-center gap-1.5 cursor-pointer">
++            <input type="checkbox" checked={b.invert} onChange={(e) => tool.setBrush({ invert: e.target.checked })} className="accent-amber-500 rounded" /> Invert (Erase)
++          </label>
++          <span style={{ opacity: 0.6, fontSize: 10, marginLeft: 'auto' }}>Shift = invert · Ctrl = smooth · [ ] radius</span>
+         </div>
+       </div>
+ 
+@@ -85,18 +162,27 @@ export function SculptPanel({ tool }: { tool: SculptTool }) {
+         </div>
+         {target ? (
+           <p style={{ fontSize: 12, margin: 0 }}>
+-            <b>{target.name}</b> · {target.meshes} mesh{target.meshes === 1 ? '' : 'es'} · {target.vertices.toLocaleString()} vertices · {target.changed.toLocaleString()} moved · {target.bytes.toLocaleString()} bytes
++            <b>{target.name}</b> · {target.meshes} mesh{target.meshes === 1 ? '' : 'es'} · {target.vertices.toLocaleString()} vertices · {target.changed.toLocaleString()} modified · {target.bytes.toLocaleString()} bytes
+           </p>
+-        ) : <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>Drag on the terrain, a cliff, a cave wall or a placed model. The road surface is locked.</p>}
+-        {tool.status && <p style={{ fontSize: 11, opacity: 0.8, margin: '6px 0 0' }}>{tool.status}</p>}
++        ) : (
++          <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>
++            Drag on a rock, cliff, ruin or island terrain. The road surface is locked.
++          </p>
++        )}
++        {tool.status && <p style={{ fontSize: 11, opacity: 0.8, margin: '6px 0 0', color: '#ffb86c' }}>{tool.status}</p>}
+       </div>
+ 
+       <div style={section}>
+-        <div style={{ ...row, justifyContent: 'space-between' }}><strong>Sculpted on this course</strong><span style={{ opacity: 0.7 }}>{sculpted.length}</span></div>
++        <div style={{ ...row, justifyContent: 'space-between' }}>
++          <strong>Sculpted &amp; painted models</strong>
++          <span style={{ opacity: 0.7, fontSize: 11 }}>{sculpted.length}</span>
++        </div>
+         {sculpted.length === 0 && <p style={{ fontSize: 12, opacity: 0.7, margin: 0 }}>Nothing yet.</p>}
+         {sculpted.map((s) => (
+-          <div key={s.id} style={{ ...row, justifyContent: 'space-between' }}>
+-            <span>{s.name} <span style={{ opacity: 0.6 }}>· {s.changed.toLocaleString()} moved · {(s.bytes / 1024).toFixed(1)} KB</span></span>
++          <div key={s.id} style={{ ...row, justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 4 }}>
++            <span className="truncate max-w-[200px]" title={s.name}>
++              {s.name} <span style={{ opacity: 0.6, fontSize: 10 }}>· {s.changed.toLocaleString()} modified · {(s.bytes / 1024).toFixed(1)} KB</span>
++            </span>
+             <button style={button} onClick={() => tool.reset(s.id)}>Reset</button>
+           </div>
+         ))}
+diff --git a/src/components/TrackBuilderUI.tsx b/src/components/TrackBuilderUI.tsx
+index 86a812f..0f139a0 100644
+--- a/src/components/TrackBuilderUI.tsx
++++ b/src/components/TrackBuilderUI.tsx
+@@ -2822,7 +2822,23 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
+             </div>
+           )}
+ 
+-          <KitInspector builder={builder} prop={selectedProp} onRequestRender={onRequestRender} showToast={showToast} onOpenShaders={() => setShowShaders(true)} />
++          <KitInspector
++            builder={builder}
++            prop={selectedProp}
++            onRequestRender={onRequestRender}
++            showToast={showToast}
++            onOpenShaders={() => setShowShaders(true)}
++            onPaintModel={() => {
++              builder.decor?.setEnabled(false);
++              if (builder.sculpt) {
++                builder.sculpt.setEnabled(true);
++                builder.sculpt.setTool('paint');
++                builder.sculpt.focusTarget(selectedProp.id);
++              }
++              setToolWindow('sculpt');
++              onRequestRender?.();
++            }}
++          />
+ 
+           {/* Sub-tabs: Transform, Shading, Collision, Animation */}
+           <div className="flex border-b border-zinc-800 bg-zinc-900/60 rounded text-xs overflow-hidden">
+diff --git a/src/components/builder/KitInspector.tsx b/src/components/builder/KitInspector.tsx
+index d5dc2f9..48c193b 100644
+--- a/src/components/builder/KitInspector.tsx
++++ b/src/components/builder/KitInspector.tsx
+@@ -1,11 +1,13 @@
+ /**
+  * Inspector section for the scene kit's props: a light's colour, brightness, reach and cone; the
+- * shader a primitive or scenery part wears; and a scenery part's hide / reset controls.
++ * shader a primitive or scenery part wears; a scenery part's hide / reset controls; and the
++ * "Paint this model" action to directly open sculpt and textured mesh painting on this object.
+  */
+-import { Eye, EyeOff, Lightbulb, Paintbrush, RotateCcw } from 'lucide-react';
+-import type { PlacedProp, TrackBuilder3D } from '../../game/track-builder-3d';
+-import { lightSettingsFor } from '../../game/builder/light-rig';
+-import { POINT_SLOTS, SPOT_SLOTS } from '../../game/builder/light-rig';
++import React from 'react';
++import { Eye, EyeOff, Lightbulb, Paintbrush, Palette, RotateCcw } from 'lucide-react';
++import type { PlacedProp } from '../../game/builder/prop-catalog';
++import type { TrackBuilder3D } from '../../game/track-builder-3d';
++import { lightSettingsFor, POINT_SLOTS, SPOT_SLOTS } from '../../game/builder/light-rig';
+ 
+ interface Props {
+   builder: TrackBuilder3D;
+@@ -13,17 +15,23 @@ interface Props {
+   onRequestRender?: () => void;
+   showToast: (text: string, ms?: number) => void;
+   onOpenShaders: () => void;
++  onPaintModel?: () => void;
+ }
+ 
+ function Row({ label, children }: { label: string; children: React.ReactNode }) {
+-  return <label className="grid grid-cols-[80px_1fr] items-center gap-2 text-[11px] text-zinc-400"><span>{label}</span>{children}</label>;
++  return (
++    <label className="grid grid-cols-[80px_1fr] items-center gap-2 text-[11px] text-zinc-400">
++      <span>{label}</span>
++      {children}
++    </label>
++  );
+ }
+ 
+-export default function KitInspector({ builder, prop, onRequestRender, showToast, onOpenShaders }: Props) {
++export default function KitInspector({ builder, prop, onRequestRender, showToast, onOpenShaders, onPaintModel }: Props) {
+   const isLight = prop.type.startsWith('light_');
+   const isPrim = prop.type.startsWith('prim_');
+   const isTerrain = prop.type === 'terrain_edit';
+-  if (!isLight && !isPrim && !isTerrain) return null;
++  const isRockOrModel = !isLight;
+ 
+   if (isLight) {
+     const s = lightSettingsFor(prop);
+@@ -73,6 +81,28 @@ export default function KitInspector({ builder, prop, onRequestRender, showToast
+           {locked ? 'This is the road: it shows the race line, so it can take a shader but not move.' : 'Move, turn or scale it with the gizmo, Del hides it. Scenery only: the race line never changes.'}
+         </div>
+       )}
++
++      {/* Paint this model primary action button */}
++      {isRockOrModel && (
++        <button
++          onClick={() => {
++            if (onPaintModel) {
++              onPaintModel();
++            } else if (builder.sculpt) {
++              builder.sculpt.setEnabled(true);
++              builder.sculpt.setTool('paint');
++              builder.sculpt.focusTarget(prop.id);
++            }
++            showToast(`Painting ${prop.name} — drag to apply island surface`);
++            onRequestRender?.();
++          }}
++          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded border border-amber-500/50 bg-gradient-to-r from-amber-600/30 via-amber-500/20 to-amber-600/30 py-2 text-xs font-semibold text-amber-200 shadow-sm transition-all hover:border-amber-400 hover:from-amber-600/40 hover:to-amber-600/40 hover:text-white"
++        >
++          <Palette size={14} className="text-amber-400" />
++          Paint this model
++        </button>
++      )}
++
+       <Row label="Shader">
+         <select value={current} onChange={(e) => { builder.applyShaderToSelected(e.target.value || null); onRequestRender?.(); }}
+           className="w-full rounded border border-zinc-700 bg-zinc-950 px-1 py-1 text-xs text-zinc-200">
+diff --git a/src/game/island-route/island-surface-shader.ts b/src/game/island-route/island-surface-shader.ts
+index d3d201e..a1c6b4f 100644
+--- a/src/game/island-route/island-surface-shader.ts
++++ b/src/game/island-route/island-surface-shader.ts
+@@ -1,6 +1,6 @@
+ /**
+  * ISLAND-ROUTE: GLSL for the island surface set (`island-surfaces.ts`): how a pair of surface IDs and
+- * their balance become pixels on the island terrain.
++ * their balance become pixels on the island terrain and on painted 3D models.
+  *
+  * - **Height blending.** Each tile carries its own height in alpha. Where two surfaces share a texel the
+  *   one standing higher *at that pixel* wins, offset by the balance: at 50/50 grass blades stand out of
+@@ -15,16 +15,36 @@
+  *   position, so where surfaces meet they fade into each other along a meandering line instead of
+  *   stepping along the texel grid. `islSoft` sets how wide the fade is.
+  * - **Any slope.** Tiles are projected from above and from both sides and blended by the normal
+- *   (triplanar), so a cliff is never smeared and there is no seam where the projection changes.
++ *   (triplanar), so a cliff or rock is never smeared and there is no seam where the projection changes.
+  * - Explicit gradients (`textureGrad`) on the mipmapped, repeating array: no atlas, no padding, no seams.
+  *
+- * Uses `surfNoise` from `surface/surface-shader.ts` (included before this).
++ * Uses `surfNoise` from `surface/surface-shader.ts` (included before this in ground shaders).
+  */
++import * as THREE from 'three';
+ import { SURFACE_SLOTS } from '../surface/surface-table';
+-import { ISLAND_SURFACES } from './island-surfaces';
++import { ISLAND_SURFACES, ISLAND_LAYER_OF, IslandSurfaceArray } from './island-surfaces';
+ 
+ export const ISLAND_LAYERS = ISLAND_SURFACES.length;
+ 
++export const SURF_NOISE_GLSL = /* glsl */ `
++float surfHash(vec2 p) {
++  p = fract(p * vec2(123.34, 456.21));
++  p += dot(p, p + 45.32);
++  return fract(p.x * p.y);
++}
++
++float surfNoise(vec2 p) {
++  vec2 i = floor(p);
++  vec2 f = fract(p);
++  float a = surfHash(i);
++  float b = surfHash(i + vec2(1.0, 0.0));
++  float c = surfHash(i + vec2(0.0, 1.0));
++  float d = surfHash(i + vec2(1.0, 1.0));
++  vec2 u = f * f * (3.0 - 2.0 * f);
++  return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
++}
++`;
++
+ export const ISLAND_SURFACE_GLSL = /* glsl */ `
+ uniform sampler2DArray islSurfaces;
+ uniform float islLayerOf[${SURFACE_SLOTS}];
+@@ -87,13 +107,15 @@ float islLayer(float id) {
+ }
+ 
+ vec4 islTap(float layer, vec2 uv, vec2 off, vec2 dx, vec2 dy) {
+-  float rep = islParams[int(layer + 0.5)].x * islScale;
+-  return textureGrad(islSurfaces, vec3(uv / rep + off, layer), dx / rep, dy / rep);
++  int ilayer = int(clamp(layer + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
++  float rep = max(islParams[ilayer].x * islScale, 1.0);
++  return textureGrad(islSurfaces, vec3(uv / rep + off, float(ilayer)), dx / rep, dy / rep);
+ }
+ 
+ /** One surface, never repeating: two offset taps blended by a smooth noise index and their heights. */
+ vec4 islVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
+-  float rep = islParams[int(layer + 0.5)].x * islScale;
++  int ilayer = int(clamp(layer + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
++  float rep = max(islParams[ilayer].x * islScale, 1.0);
+   float l = surfNoise(uv / (rep * 2.7) + layer * 3.1) * 8.0;
+   float ia = floor(l);
+   vec4 a = islTap(layer, uv, sin(vec2(3.0, 7.0) * ia), dx, dy);
+@@ -101,7 +123,7 @@ vec4 islVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
+   return mix(a, b, smoothstep(0.2, 0.8, fract(l) + (b.a - a.a) * 0.25));
+ }
+ 
+-/** Two surfaces by height: \`w\` is B's share; the one standing higher at this pixel takes the edge. */
++/** Two surfaces by height: w is B's share; the one standing higher at this pixel takes the edge. */
+ vec4 islHeightBlend(vec4 a, vec4 b, float w, float contrast) {
+   float ha = a.a + (1.0 - w) * 1.1;
+   float hb = b.a + w * 1.1;
+@@ -112,13 +134,15 @@ vec4 islHeightBlend(vec4 a, vec4 b, float w, float contrast) {
+   return (a * ba + b * bb) / max(ba + bb, 1e-4);
+ }
+ 
+-/** Layers \`la\`, \`lb\` with B's share \`w\`: rgb, and the height where they meet (a). */
++/** Layers la, lb with B's share w: rgb, and the height where they meet (a). */
+ vec4 islPair(float la, float lb, float w, vec2 uv, vec2 dx, vec2 dy) {
+   vec4 a = islVaried(la, uv, dx, dy);
+   if (abs(la - lb) < 0.5 || w < 0.004) return a;
+   vec4 b = islVaried(lb, uv, dx, dy);
+   if (w > 0.996) return b;
+-  float contrast = 0.5 * (islParams[int(la + 0.5)].z + islParams[int(lb + 0.5)].z);
++  int ila = int(clamp(la + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
++  int ilb = int(clamp(lb + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
++  float contrast = 0.5 * (islParams[ila].z + islParams[ilb].z);
+   return islHeightBlend(a, b, w, contrast);
+ }
+ 
+@@ -139,6 +163,113 @@ vec4 islTriplanar(float la, float lb, float w, vec3 wp, vec3 n, vec3 dwx, vec3 d
+ }
+ 
+ float islRough(float la, float lb, float w) {
+-  return mix(islParams[int(la + 0.5)].y, islParams[int(lb + 0.5)].y, w);
++  int ila = int(clamp(la + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
++  int ilb = int(clamp(lb + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
++  return mix(islParams[ila].y, islParams[ilb].y, w);
+ }
+ `;
++
++/**
++ * Injects the island surface shader into a model's material using `onBeforeCompile`.
++ * Samples the island texture array with world-space triplanar projection and blends
++ * it with height blending over the model's own diffuse texture.
++ */
++export function injectIslandModelShader(
++  material: THREE.Material,
++  surfaceArray: IslandSurfaceArray = IslandSurfaceArray.getInstance(),
++): void {
++  if ((material.userData as Record<string, unknown>)?.islandModelShaderInjected) return;
++  (material.userData as Record<string, unknown>).islandModelShaderInjected = true;
++
++  const prevOnBeforeCompile = material.onBeforeCompile;
++
++  material.onBeforeCompile = (shader, renderer) => {
++    prevOnBeforeCompile?.call(material, shader, renderer);
++
++    // Uniforms
++    shader.uniforms['islSurfaces'] = { value: surfaceArray.texture };
++    shader.uniforms['islLayerOf'] = { value: ISLAND_LAYER_OF };
++    shader.uniforms['islParams'] = { value: surfaceArray.params };
++    shader.uniforms['islSoft'] = { value: 0.25 };
++    shader.uniforms['islScale'] = { value: 1.0 };
++    shader.uniforms['islCliffLayer'] = { value: -1.0 };
++    shader.uniforms['islCliffNy'] = { value: new THREE.Vector2(0.4, 0.7) };
++
++    // Vertex shader modifications
++    shader.vertexShader = `
++      attribute vec2 islSurface;
++      varying vec3 vIslWorldPos;
++      varying vec3 vIslWorldNormal;
++      varying vec2 vIslSurface;
++      ${shader.vertexShader}
++    `;
++
++    shader.vertexShader = shader.vertexShader.replace(
++      '#include <worldpos_vertex>',
++      `
++      #include <worldpos_vertex>
++      vIslWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
++      vIslWorldNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
++      vIslSurface = islSurface;
++      `,
++    );
++
++    // Fragment shader modifications
++    shader.fragmentShader = `
++      varying vec3 vIslWorldPos;
++      varying vec3 vIslWorldNormal;
++      varying vec2 vIslSurface;
++      ${SURF_NOISE_GLSL}
++      ${ISLAND_SURFACE_GLSL}
++      ${shader.fragmentShader}
++    `;
++
++    // Hook into color output / map fragment
++    const colorHook = shader.fragmentShader.includes('#include <map_fragment>')
++      ? '#include <map_fragment>'
++      : '#include <color_fragment>';
++
++    shader.fragmentShader = shader.fragmentShader.replace(
++      colorHook,
++      `
++      ${colorHook}
++      if (vIslSurface.y > 0.001) {
++        float surfaceId = vIslSurface.x;
++        float surfaceWeight = clamp(vIslSurface.y, 0.0, 1.0);
++        float layer = islLayer(surfaceId);
++        if (layer >= 0.0) {
++          vec3 dwx = dFdx(vIslWorldPos);
++          vec3 dwy = dFdy(vIslWorldPos);
++          vec4 islandTex = islTriplanar(layer, layer, 0.0, vIslWorldPos, normalize(vIslWorldNormal), dwx, dwy);
++          
++          // Natural height-weighted blend over the model's base appearance
++          float heightFactor = islandTex.a * 0.4 + 0.8;
++          float blendT = clamp(surfaceWeight * heightFactor, 0.0, 1.0);
++          diffuseColor.rgb = mix(diffuseColor.rgb, islandTex.rgb, blendT);
++        }
++      }
++      `,
++    );
++
++    // Also adjust roughness if roughnessmap_fragment is present
++    if (shader.fragmentShader.includes('#include <roughnessmap_fragment>')) {
++      shader.fragmentShader = shader.fragmentShader.replace(
++        '#include <roughnessmap_fragment>',
++        `
++        #include <roughnessmap_fragment>
++        if (vIslSurface.y > 0.001) {
++          float sId = vIslSurface.x;
++          float sWeight = clamp(vIslSurface.y, 0.0, 1.0);
++          float l = islLayer(sId);
++          if (l >= 0.0) {
++            float sRough = islRough(l, l, 0.0);
++            roughnessFactor = mix(roughnessFactor, sRough, sWeight);
++          }
++        }
++        `,
++      );
++    }
++  };
++
++  material.needsUpdate = true;
++}
+diff --git a/src/game/island-route/island-surfaces.ts b/src/game/island-route/island-surfaces.ts
+index 7c416a5..0fbd10a 100644
+--- a/src/game/island-route/island-surfaces.ts
++++ b/src/game/island-route/island-surfaces.ts
+@@ -58,8 +58,8 @@ export const ISLAND_SURFACES: readonly IslandSurface[] = Object.freeze([
+ ]);
+ 
+ export const ISLAND_TEXTURE_DIR = '/textures/island/';
+-/** Pixels across one layer (the source tiles are 1024). */
+-export const ISLAND_LAYER_SIZE = 1024;
++/** Pixels across one layer (the source tiles are 1024 or 256 default). */
++export const ISLAND_LAYER_SIZE = 256;
+ 
+ /**
+  * Array layer for each surface ID (-1: not an island tile — bare island, cracked dirt, or nothing). The
+@@ -69,7 +69,7 @@ export const ISLAND_LAYER_SIZE = 1024;
+ export const ISLAND_LAYER_OF: readonly number[] = (() => {
+   const out = new Array<number>(SURFACE_SLOTS).fill(-1);
+   ISLAND_SURFACES.forEach((s, layer) => { out[s.id] = layer; });
+-  const alias = (from: number, to: number) => { out[from] = out[to]; };
++  const alias = (from: number, to: number) => { out[from] = out[to] ?? -1; };
+   alias(SURFACE_ASPHALT, SURFACE_SAND);
+   alias(SURFACE_CONCRETE, SURFACE_SAND);
+   alias(SURFACE_COBBLE, SURFACE_DRY_MUD);
+@@ -95,7 +95,9 @@ export function writeTileHeight(rgba: Uint8Array | Uint8ClampedArray, recipe: He
+   const h = new Float32Array(n);
+   const hist = new Uint32Array(256);
+   for (let i = 0; i < n; i++) {
+-    const r = rgba[i * 4] / 255, g = rgba[i * 4 + 1] / 255, b = rgba[i * 4 + 2] / 255;
++    const r = (rgba[i * 4] ?? 0) / 255;
++    const g = (rgba[i * 4 + 1] ?? 0) / 255;
++    const b = (rgba[i * 4 + 2] ?? 0) / 255;
+     const max = Math.max(r, g, b), min = Math.min(r, g, b);
+     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+     const sat = max > 0 ? (max - min) / max : 0;
+@@ -104,21 +106,94 @@ export function writeTileHeight(rgba: Uint8Array | Uint8ClampedArray, recipe: He
+     h[i] = v;
+   }
+   let lo = Infinity, hi = -Infinity;
+-  for (let i = 0; i < n; i++) { if (h[i] < lo) lo = h[i]; if (h[i] > hi) hi = h[i]; }
++  for (let i = 0; i < n; i++) {
++    const val = h[i] ?? 0;
++    if (val < lo) lo = val;
++    if (val > hi) hi = val;
++  }
+   const span = hi - lo || 1;
+-  for (let i = 0; i < n; i++) hist[Math.min(255, Math.floor(((h[i] - lo) / span) * 255))]++;
+-  const at = (q: number) => { let sum = 0; for (let k = 0; k < 256; k++) { sum += hist[k]; if (sum >= q * n) return lo + (k / 255) * span; } return hi; };
++  for (let i = 0; i < n; i++) {
++    const val = h[i] ?? 0;
++    hist[Math.min(255, Math.floor(((val - lo) / span) * 255))]++;
++  }
++  const at = (q: number) => {
++    let sum = 0;
++    for (let k = 0; k < 256; k++) {
++      sum += hist[k] ?? 0;
++      if (sum >= q * n) return lo + (k / 255) * span;
++    }
++    return hi;
++  };
+   const p2 = at(0.02), p98 = at(0.98);
+   const range = Math.max(1e-6, p98 - p2);
+   for (let i = 0; i < n; i++) {
+-    let t = (h[i] - p2) / range;
++    let t = ((h[i] ?? 0) - p2) / range;
+     t = 0.5 + (t - 0.5) * recipe.contrast;
+     rgba[i * 4 + 3] = Math.round(Math.min(1, Math.max(0, t)) * 255);
+   }
+ }
+ 
++/** Generate procedural high-detail pattern for a layer when loaded or offline */
++function generateProceduralTile(layer: number, size: number, out: Uint8Array): void {
++  const surface = ISLAND_SURFACES[layer];
++  if (!surface) return;
++  const def = surfaceDefinition(surface.id);
++  const hex = def.swatch;
++  const baseR = parseInt(hex.slice(1, 3), 16);
++  const baseG = parseInt(hex.slice(3, 5), 16);
++  const baseB = parseInt(hex.slice(5, 7), 16);
++
++  const offset = layer * size * size * 4;
++  for (let y = 0; y < size; y++) {
++    for (let x = 0; x < size; x++) {
++      const idx = offset + (y * size + x) * 4;
++      // Multi-scale procedural noise
++      const n1 = Math.sin(x * 0.12 + layer * 1.7) * Math.cos(y * 0.12 + layer * 2.3);
++      const n2 = Math.sin(x * 0.35 - y * 0.28 + layer * 5.1) * 0.5;
++      const n3 = (Math.random() - 0.5) * 0.3;
++      const noise = (n1 * 0.5 + n2 + n3);
++
++      let r = Math.max(0, Math.min(255, Math.round(baseR + noise * 40)));
++      let g = Math.max(0, Math.min(255, Math.round(baseG + noise * 40)));
++      let b = Math.max(0, Math.min(255, Math.round(baseB + noise * 40)));
++
++      // Specific surface characteristics
++      if (surface.id === SURFACE_MOSSY_ROCK) {
++        if (noise > 0.1) { g = Math.min(255, g + 40); r = Math.max(0, r - 20); }
++      } else if (surface.id === SURFACE_BEACH_GRASS) {
++        const stripe = Math.sin(x * 0.8 + y * 0.2);
++        if (stripe > 0.2) { g = Math.min(255, g + 35); }
++      } else if (surface.id === SURFACE_STRATA) {
++        const band = Math.sin(y * 0.25);
++        r = Math.min(255, Math.max(0, r + Math.round(band * 30)));
++        g = Math.min(255, Math.max(0, g + Math.round(band * 20)));
++      } else if (surface.id === SURFACE_CRYSTAL) {
++        const sparkle = Math.sin(x * 0.4 + y * 0.4);
++        if (sparkle > 0.6) { r = Math.min(255, r + 70); b = Math.min(255, b + 90); }
++      }
++
++      out[idx] = r;
++      out[idx + 1] = g;
++      out[idx + 2] = b;
++      out[idx + 3] = 255;
++    }
++  }
++
++  // Compute height channel
++  const slice = out.subarray(offset, offset + size * size * 4);
++  writeTileHeight(slice, surface.height);
++}
++
+ /** The loaded array on the GPU, per-layer parameters for the shader, and small thumbnails for the UI. */
+ export class IslandSurfaceArray {
++  private static instance: IslandSurfaceArray | null = null;
++  static getInstance(): IslandSurfaceArray {
++    if (!IslandSurfaceArray.instance) {
++      IslandSurfaceArray.instance = new IslandSurfaceArray();
++    }
++    return IslandSurfaceArray.instance;
++  }
++
+   readonly texture: THREE.DataArrayTexture;
+   /** vec4 per layer: world units per repeat, roughness, height contrast, 0. */
+   readonly params: THREE.Vector4[];
+@@ -131,6 +206,19 @@ export class IslandSurfaceArray {
+   constructor(size = ISLAND_LAYER_SIZE) {
+     const layers = ISLAND_SURFACES.length;
+     const data = new Uint8Array(size * size * 4 * layers);
++    this.size = size;
++    this.data = data;
++
++    // Pre-populate with high quality procedural textures so it renders immediately
++    for (let l = 0; l < layers; l++) {
++      generateProceduralTile(l, size, data);
++      const s = ISLAND_SURFACES[l];
++      if (s) {
++        // Fallback swatch thumbnail
++        this.generateThumb(s.id, l);
++      }
++    }
++
+     this.texture = new THREE.DataArrayTexture(data, size, size, layers);
+     this.texture.format = THREE.RGBAFormat;
+     this.texture.type = THREE.UnsignedByteType;
+@@ -140,9 +228,9 @@ export class IslandSurfaceArray {
+     this.texture.minFilter = THREE.LinearMipmapLinearFilter;
+     this.texture.generateMipmaps = true;
+     this.texture.anisotropy = 8;
++    this.texture.needsUpdate = true;
++
+     this.params = ISLAND_SURFACES.map((s) => new THREE.Vector4(s.repeat, surfaceDefinition(s.id).roughness, s.height.contrast, 0));
+-    this.size = size;
+-    this.data = data;
+     this.ready = typeof document === 'undefined' ? Promise.resolve() : this.load();
+   }
+ 
+@@ -152,9 +240,37 @@ export class IslandSurfaceArray {
+   /** The tile each layer shows now (its URL). */
+   private readonly urls: string[] = ISLAND_SURFACES.map((s) => ISLAND_TEXTURE_DIR + s.file);
+ 
++  private generateThumb(surfaceId: number, layer: number) {
++    if (typeof document === 'undefined') return;
++    try {
++      const c = document.createElement('canvas');
++      c.width = c.height = 64;
++      const ctx = c.getContext('2d');
++      if (!ctx) return;
++      const size = this.size;
++      const imgData = ctx.createImageData(64, 64);
++      const offset = layer * size * size * 4;
++      for (let ty = 0; ty < 64; ty++) {
++        for (let tx = 0; tx < 64; tx++) {
++          const sx = Math.floor((tx / 64) * size);
++          const sy = Math.floor((ty / 64) * size);
++          const srcIdx = offset + (sy * size + sx) * 4;
++          const dstIdx = (ty * 64 + tx) * 4;
++          imgData.data[dstIdx] = this.data[srcIdx] ?? 0;
++          imgData.data[dstIdx + 1] = this.data[srcIdx + 1] ?? 0;
++          imgData.data[dstIdx + 2] = this.data[srcIdx + 2] ?? 0;
++          imgData.data[dstIdx + 3] = 255;
++        }
++      }
++      ctx.putImageData(imgData, 0, 0);
++      this.thumbs.set(surfaceId, c.toDataURL('image/jpeg', 0.85));
++    } catch {
++      // Ignore in non-browser context
++    }
++  }
++
+   private async load(): Promise<void> {
+     let done = 0;
+-    // Decode in parallel, write layer by layer (a frame between layers keeps the loading bar moving).
+     const images = this.urls.map((url) => decode(url));
+     for (let layer = 0; layer < ISLAND_SURFACES.length; layer++) {
+       const img = await images[layer];
+@@ -179,7 +295,6 @@ export class IslandSurfaceArray {
+     if (!img) return false;
+     this.urls[layer] = url;
+     this.write(layer, img);
+-    this.texture.addLayerUpdate(layer);
+     this.texture.needsUpdate = true;
+     return true;
+   }
+@@ -190,6 +305,7 @@ export class IslandSurfaceArray {
+     const g = this.canvas.getContext('2d', { willReadFrequently: true });
+     if (!g) return;
+     const surface = ISLAND_SURFACES[layer];
++    if (!surface) return;
+     g.clearRect(0, 0, size, size);
+     g.drawImage(img, 0, 0, size, size);
+     const px = g.getImageData(0, 0, size, size).data;
+@@ -205,6 +321,7 @@ export class IslandSurfaceArray {
+ }
+ 
+ function decode(url: string): Promise<HTMLImageElement | null> {
++  if (typeof Image === 'undefined') return Promise.resolve(null);
+   const img = new Image();
+   img.decoding = 'async';
+   img.src = url;
+diff --git a/src/game/sculpt/sculpt-brushes.ts b/src/game/sculpt/sculpt-brushes.ts
+index a95d33d..e17bb95 100644
+--- a/src/game/sculpt/sculpt-brushes.ts
++++ b/src/game/sculpt/sculpt-brushes.ts
+@@ -1,6 +1,6 @@
+ /**
+  * NewSculpt — the brushes. Each one is a function of (mesh, hits, params) with no other state, so a
+- * test can stamp a plane and measure the dent.
++ * test can stamp a plane and measure the dent or paint.
+  *
+  *   raise / lower   push along one direction: the brush area's average normal, world up, or the view
+  *   inflate         push each vertex along its own normal (puffs a rock, thins a ridge when inverted)
+@@ -9,16 +9,18 @@
+  *   pinch           slide toward the brush centre along the surface (a crease); inverted = magnify
+  *   noise           seeded per-vertex displacement along the normal (rock, scree)
+  *   grab            drag the area with the pointer (handled by the tool: it needs the stroke's origin)
+- *   paint           blend a colour into the vertex colours; inverted = back toward the generated colour
++ *   paint           textured island surface or flat vertex color; inverted = back toward generated look
+  *
+  * Falloff is flat inside `hardness` of the radius, then a smoothstep to zero at the rim. Every amount
+  * scales with the radius, so a big brush on a mountain and a small one on a boulder feel the same.
+  */
+ import * as THREE from 'three';
+ import type { BrushHit, SculptMesh } from './sculpt-mesh';
++import { SURFACE_MOSSY_ROCK } from '../surface/surface-table';
+ 
+ export type SculptToolId = 'raise' | 'lower' | 'inflate' | 'smooth' | 'flatten' | 'pinch' | 'noise' | 'grab' | 'paint';
+ export type SculptDirection = 'normal' | 'up' | 'view';
++export type PaintMode = 'surface' | 'color';
+ 
+ export interface SculptToolInfo {
+   readonly id: SculptToolId;
+@@ -36,7 +38,7 @@ export const SCULPT_TOOLS: readonly SculptToolInfo[] = Object.freeze([
+   { id: 'pinch', name: 'Pinch', key: '6', blurb: 'Slide toward the centre: a crease. Shift: spread.' },
+   { id: 'noise', name: 'Noise', key: '7', blurb: 'Seeded bumps along the normal: rock, scree.' },
+   { id: 'grab', name: 'Grab', key: '8', blurb: 'Drag the area with the pointer.' },
+-  { id: 'paint', name: 'Paint', key: '9', blurb: 'Vertex colour. Shift: back to the generated colour.' },
++  { id: 'paint', name: 'Paint', key: '9', blurb: 'Island surface texture or vertex color. Shift: erase back to base.' },
+ ]);
+ 
+ export interface BrushParams {
+@@ -49,13 +51,26 @@ export interface BrushParams {
+   hardness: number;
+   invert: boolean;
+   direction: SculptDirection;
+-  /** Linear RGB 0‥1 for the paint tool. */
++  /** Linear RGB 0‥1 for the flat color paint tool. */
+   color: [number, number, number];
++  /** Island surface mode: 'surface' (textured island tiles) or 'color' (flat vertex color). */
++  paintMode: PaintMode;
++  /** Surface ID from island surface table (e.g. SURFACE_MOSSY_ROCK = 21, SURFACE_GRANITE = 20, etc.). */
++  surfaceId: number;
+   seed: number;
+ }
+ 
+ export const DEFAULT_BRUSH: BrushParams = {
+-  tool: 'raise', radius: 400, strength: 0.5, hardness: 0.3, invert: false, direction: 'normal', color: [0.55, 0.45, 0.35], seed: 1,
++  tool: 'raise',
++  radius: 400,
++  strength: 0.5,
++  hardness: 0.3,
++  invert: false,
++  direction: 'normal',
++  color: [0.55, 0.45, 0.35],
++  paintMode: 'surface',
++  surfaceId: SURFACE_MOSSY_ROCK,
++  seed: 1,
+ };
+ 
+ export function falloff(dist: number, radius: number, hardness: number): number {
+@@ -186,10 +201,24 @@ export function applyStamp(input: StampInput): Set<number> {
+       break;
+     }
+     case 'paint': {
+-      const [cr, cg, cb] = params.color;
+-      for (const h of hits) {
+-        const t = Math.min(0.5, params.strength * w(h));
+-        if (params.invert) mesh.unpaintGroup(h.group, t); else mesh.paintGroup(h.group, cr, cg, cb, t);
++      const isCustomColor = Math.abs(params.color[0] - 0.55) > 0.01 || Math.abs(params.color[1] - 0.45) > 0.01 || Math.abs(params.color[2] - 0.35) > 0.01;
++      const isColorTarget = params.paintMode === 'color' || isCustomColor || (mesh.hasColor && !mesh.hasSurface);
++      if (!isColorTarget && params.paintMode === 'surface') {
++        const surfaceId = params.surfaceId ?? SURFACE_MOSSY_ROCK;
++        for (const h of hits) {
++          const t = Math.min(1.0, params.strength * w(h) * 0.5);
++          if (params.invert) {
++            mesh.unpaintSurfaceGroup(h.group, t);
++          } else {
++            mesh.paintSurfaceGroup(h.group, surfaceId, t);
++          }
++        }
++      } else {
++        const [cr, cg, cb] = params.color;
++        for (const h of hits) {
++          const t = Math.min(0.5, params.strength * w(h));
++          if (params.invert) mesh.unpaintGroup(h.group, t); else mesh.paintGroup(h.group, cr, cg, cb, t);
++        }
+       }
+       break;
+     }
+diff --git a/src/game/sculpt/sculpt-doc.ts b/src/game/sculpt/sculpt-doc.ts
+index 304c6ed..0c058ec 100644
+--- a/src/game/sculpt/sculpt-doc.ts
++++ b/src/game/sculpt/sculpt-doc.ts
+@@ -5,8 +5,9 @@
+  * so a sculpt can never be "the mesh": it is a **sparse displacement layer** over the generated shape,
+  * re-applied when the object exists again. Per mesh: the indices that moved (sorted, delta-varint
+  * coded), their local-space offsets as int16 multiples of `quantum` (0.25 units → ±8 000 units of
+- * reach at 0.125 precision; a lane is 240), and optionally the vertices that were painted with their
+- * RGB. Everything base64, so it rides inside a `PlacedProp` (`prop.sculpt`) through the normal save.
++ * reach at 0.125 precision; a lane is 240), optionally the vertices that were painted with flat RGB,
++ * and optionally the vertices painted with textured island surface IDs and blend weights.
++ * Everything base64, so it rides inside a `PlacedProp` (`prop.sculpt`) through the normal save.
+  *
+  * Sizes: a 5 000-vertex hill sculpt is ~40 KB; the whole alpine heightfield (4 800 vertices) fully
+  * reshaped is ~45 KB. localStorage is 5 MB, and the disk backups have no such limit.
+@@ -31,6 +32,8 @@ export interface SculptMeshDoc {
+   readonly q?: number;
+   readonly shape?: { readonly idx: string; readonly d: string };
+   readonly paint?: { readonly idx: string; readonly c: string };
++  /** Textured surface painting: per-vertex surface ID and blend weight (2 bytes: [id, weight] per vertex). */
++  readonly surface?: { readonly idx: string; readonly s: string };
+ }
+ 
+ export interface SculptDoc {
+@@ -66,8 +69,9 @@ export function encodeIndices(sorted: ArrayLike<number>): string {
+   const out: number[] = [];
+   let prev = -1;
+   for (let k = 0; k < sorted.length; k++) {
+-    let v = sorted[k] - prev - 1;
+-    prev = sorted[k];
++    const val = sorted[k] ?? 0;
++    let v = val - prev - 1;
++    prev = val;
+     while (v >= 0x80) { out.push((v & 0x7f) | 0x80); v >>>= 7; }
+     out.push(v);
+   }
+@@ -79,7 +83,7 @@ export function decodeIndices(text: string): Uint32Array {
+   const out: number[] = [];
+   let prev = -1, v = 0, shift = 0;
+   for (let i = 0; i < bytes.length; i++) {
+-    const b = bytes[i];
++    const b = bytes[i] ?? 0;
+     v |= (b & 0x7f) << shift;
+     if (b & 0x80) { shift += 7; continue; }
+     prev = prev + v + 1;
+@@ -92,7 +96,10 @@ export function decodeIndices(text: string): Uint32Array {
+ export function encodeInt16(values: ArrayLike<number>): string {
+   const bytes = new Uint8Array(values.length * 2);
+   const view = new DataView(bytes.buffer);
+-  for (let i = 0; i < values.length; i++) view.setInt16(i * 2, Math.max(-32768, Math.min(32767, Math.round(values[i]))), true);
++  for (let i = 0; i < values.length; i++) {
++    const val = values[i] ?? 0;
++    view.setInt16(i * 2, Math.max(-32768, Math.min(32767, Math.round(val))), true);
++  }
+   return bytesToBase64(bytes);
+ }
+ 
+@@ -118,13 +125,14 @@ export function sculptHash(meshes: readonly SculptMeshDoc[], quantum: number): s
+     feed(m.key); feed(String(m.n));
+     if (m.shape) { feed(m.shape.idx); feed(m.shape.d); }
+     if (m.paint) { feed(m.paint.idx); feed(m.paint.c); }
++    if (m.surface) { feed(m.surface.idx); feed(m.surface.s); }
+   }
+   return (h >>> 0).toString(16).padStart(8, '0');
+ }
+ 
+ /** A document from per-mesh parts, or null when nothing moved or was painted. */
+ export function makeSculptDoc(meshes: readonly SculptMeshDoc[], quantum = SCULPT_QUANTUM): SculptDoc | null {
+-  const kept = meshes.filter((m) => m.shape || m.paint);
++  const kept = meshes.filter((m) => m.shape || m.paint || m.surface);
+   if (!kept.length) return null;
+   return { version: SCULPT_DOC_VERSION, quantum, meshes: kept, hash: sculptHash(kept, quantum) };
+ }
+@@ -142,6 +150,7 @@ export function sculptDocBytes(doc: SculptDoc): number {
+     n += m.key.length + 24;
+     if (m.shape) n += m.shape.idx.length + m.shape.d.length;
+     if (m.paint) n += m.paint.idx.length + m.paint.c.length;
++    if (m.surface) n += m.surface.idx.length + m.surface.s.length;
+   }
+   return n;
+ }
+diff --git a/src/game/sculpt/sculpt-mesh.ts b/src/game/sculpt/sculpt-mesh.ts
+index cee4fa8..5629e8c 100644
+--- a/src/game/sculpt/sculpt-mesh.ts
++++ b/src/game/sculpt/sculpt-mesh.ts
+@@ -13,16 +13,18 @@
+  *    grid is not rebuilt; instead the query radius grows by the largest distance any group has drifted
+  *    from its bucket (`drift`), and every candidate is checked exactly in world space. `finishStroke`
+  *    re-buckets what moved.
+- *  - **Base.** A copy of the generated positions (and colours, once painted). Extracting a document
++ *  - **Base.** A copy of the generated positions (and colours/surfaces, once painted). Extracting a document
+  *    is a diff against it; resetting is a copy back.
+  *
+- * All brush maths lives in `sculpt-brushes.ts`; this file only knows how to move, colour, query and
+- * re-normal vertices, and how to serialise the result.
++ * All brush maths lives in `sculpt-brushes.ts`; this file only knows how to move, colour, surface-texture,
++ * query and re-normal vertices, and how to serialise the result.
+  */
+ import * as THREE from 'three';
+ import {
+   SCULPT_QUANTUM, decodeBytes, decodeIndices, decodeInt16, encodeBytes, encodeIndices, encodeInt16, type SculptMeshDoc,
+ } from './sculpt-doc';
++import { injectIslandModelShader } from '../island-route/island-surface-shader';
++import { IslandSurfaceArray } from '../island-route/island-surfaces';
+ 
+ export interface BrushHit {
+   readonly group: number;
+@@ -52,9 +54,9 @@ function flatAttribute(geometry: THREE.BufferGeometry, name: string, itemSize: n
+ 
+ function minAxisScale(m: THREE.Matrix4): number {
+   const e = m.elements;
+-  const sx = Math.hypot(e[0], e[1], e[2]);
+-  const sy = Math.hypot(e[4], e[5], e[6]);
+-  const sz = Math.hypot(e[8], e[9], e[10]);
++  const sx = Math.hypot(e[0] ?? 1, e[1] ?? 0, e[2] ?? 0);
++  const sy = Math.hypot(e[4] ?? 0, e[5] ?? 1, e[6] ?? 0);
++  const sz = Math.hypot(e[8] ?? 0, e[9] ?? 0, e[10] ?? 1);
+   return Math.min(sx, sy, sz) || 1;
+ }
+ 
+@@ -75,6 +77,7 @@ export class SculptMesh {
+   private neighbourList: number[][] | null = null;
+   private colorAttr: THREE.BufferAttribute | null = null;
+   private baseColor: Float32Array | null = null;
++  private surfaceAttr: THREE.BufferAttribute | null = null;
+   private readonly cellSize: number;
+   private readonly cells = new Map<number, number[]>();
+   private readonly cellKeyOf: Int32Array;
+@@ -110,14 +113,19 @@ export class SculptMesh {
+     this.normal = flatAttribute(geometry, 'normal', 3)!;
+     if (geometry.getAttribute('color')) {
+       this.colorAttr = flatAttribute(geometry, 'color', 3);
+-      this.baseColor = Float32Array.from(this.colorAttr!.array as Float32Array);
++      if (this.colorAttr) {
++        this.baseColor = Float32Array.from(this.colorAttr.array as Float32Array);
++      }
++    }
++    if (geometry.getAttribute('islSurface')) {
++      this.surfaceAttr = flatAttribute(geometry, 'islSurface', 2);
+     }
+     this.count = this.position.count;
+     this.base = Float32Array.from(this.position.array as Float32Array);
+ 
+     // Welding: quantise positions to a millionth of the diagonal.
+     geometry.computeBoundingBox();
+-    const size = geometry.boundingBox!.getSize(new THREE.Vector3());
++    const size = geometry.boundingBox ? geometry.boundingBox.getSize(new THREE.Vector3()) : new THREE.Vector3(1, 1, 1);
+     const diag = size.length() || 1;
+     const eps = diag * 1e-6;
+     const keyed = new Map<string, number>();
+@@ -128,7 +136,10 @@ export class SculptMesh {
+       const key = `${Math.round(p.getX(i) / eps)},${Math.round(p.getY(i) / eps)},${Math.round(p.getZ(i) / eps)}`;
+       let g = keyed.get(key);
+       if (g === undefined) { g = groups.length; groups.push([]); keyed.set(key, g); }
+-      groups[g].push(i);
++      const groupArr = groups[g];
++      if (groupArr) {
++        groupArr.push(i);
++      }
+       this.groupOf[i] = g;
+     }
+     this.groups = groups;
+@@ -140,9 +151,12 @@ export class SculptMesh {
+     for (let k = 0; k < triCount * 3; k++) this.tris[k] = index ? index.getX(k) : k;
+     this.trisOfVertex = Array.from({ length: this.count }, () => []);
+     for (let t = 0; t < triCount; t++) {
+-      this.trisOfVertex[this.tris[t * 3]].push(t);
+-      this.trisOfVertex[this.tris[t * 3 + 1]].push(t);
+-      this.trisOfVertex[this.tris[t * 3 + 2]].push(t);
++      const t0 = this.tris[t * 3] ?? 0;
++      const t1 = this.tris[t * 3 + 1] ?? 0;
++      const t2 = this.tris[t * 3 + 2] ?? 0;
++      this.trisOfVertex[t0]?.push(t);
++      this.trisOfVertex[t1]?.push(t);
++      this.trisOfVertex[t2]?.push(t);
+     }
+ 
+     // Grid.
+@@ -161,7 +175,8 @@ export class SculptMesh {
+   }
+ 
+   private insertGroup(g: number) {
+-    const rep = this.groups[g][0];
++    const groupArr = this.groups[g];
++    const rep = groupArr ? (groupArr[0] ?? 0) : 0;
+     const x = this.position.getX(rep), y = this.position.getY(rep), z = this.position.getZ(rep);
+     const key = this.cellKey(x, y, z);
+     const bucket = this.cells.get(key);
+@@ -171,7 +186,8 @@ export class SculptMesh {
+   }
+ 
+   private removeGroup(g: number) {
+-    const bucket = this.cells.get(this.cellKeyOf[g]);
++    const key = this.cellKeyOf[g] ?? 0;
++    const bucket = this.cells.get(key);
+     if (!bucket) return;
+     const at = bucket.indexOf(g);
+     if (at >= 0) bucket.splice(at, 1);
+@@ -199,7 +215,8 @@ export class SculptMesh {
+     const y0 = Math.floor((local.y - r) / cs), y1 = Math.floor((local.y + r) / cs);
+     const z0 = Math.floor((local.z - r) / cs), z1 = Math.floor((local.z + r) / cs);
+     const visit = (g: number) => {
+-      const rep = this.groups[g][0];
++      const groupArr = this.groups[g];
++      const rep = groupArr ? (groupArr[0] ?? 0) : 0;
+       const d = this.vB.fromBufferAttribute(this.position, rep).applyMatrix4(this.mesh.matrixWorld).distanceTo(worldCentre);
+       if (d <= radius) out.push({ group: g, dist: d });
+     };
+@@ -226,7 +243,9 @@ export class SculptMesh {
+   /* ───────────── positions ───────────── */
+ 
+   groupLocal(g: number, out: THREE.Vector3): THREE.Vector3 {
+-    return out.fromBufferAttribute(this.position, this.groups[g][0]);
++    const groupArr = this.groups[g];
++    const rep = groupArr ? (groupArr[0] ?? 0) : 0;
++    return out.fromBufferAttribute(this.position, rep);
+   }
+ 
+   groupWorld(g: number, out: THREE.Vector3): THREE.Vector3 {
+@@ -234,9 +253,15 @@ export class SculptMesh {
+   }
+ 
+   setGroupLocal(g: number, x: number, y: number, z: number): void {
+-    for (const v of this.groups[g]) this.position.setXYZ(v, x, y, z);
++    const groupArr = this.groups[g];
++    if (groupArr) {
++      for (const v of groupArr) this.position.setXYZ(v, x, y, z);
++    }
+     this.dirty.add(g);
+-    const d = Math.hypot(x - this.gridPos[g * 3], y - this.gridPos[g * 3 + 1], z - this.gridPos[g * 3 + 2]);
++    const gx = this.gridPos[g * 3] ?? 0;
++    const gy = this.gridPos[g * 3 + 1] ?? 0;
++    const gz = this.gridPos[g * 3 + 2] ?? 0;
++    const d = Math.hypot(x - gx, y - gy, z - gz);
+     if (d > this.drift) this.drift = d;
+   }
+ 
+@@ -248,17 +273,23 @@ export class SculptMesh {
+   /** A world-space direction in local space (no normalisation). */
+   worldDirToLocal(dir: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+     const e = this.inv.elements;
++    const e0 = e[0] ?? 0, e4 = e[4] ?? 0, e8 = e[8] ?? 0;
++    const e1 = e[1] ?? 0, e5 = e[5] ?? 0, e9 = e[9] ?? 0;
++    const e2 = e[2] ?? 0, e6 = e[6] ?? 0, e10 = e[10] ?? 0;
+     return out.set(
+-      e[0] * dir.x + e[4] * dir.y + e[8] * dir.z,
+-      e[1] * dir.x + e[5] * dir.y + e[9] * dir.z,
+-      e[2] * dir.x + e[6] * dir.y + e[10] * dir.z,
++      e0 * dir.x + e4 * dir.y + e8 * dir.z,
++      e1 * dir.x + e5 * dir.y + e9 * dir.z,
++      e2 * dir.x + e6 * dir.y + e10 * dir.z,
+     );
+   }
+ 
+   /** Average world normal of a group's vertices (unit). */
+   groupNormalWorld(g: number, out: THREE.Vector3): THREE.Vector3 {
+     out.set(0, 0, 0);
+-    for (const v of this.groups[g]) out.add(this.vB.fromBufferAttribute(this.normal, v));
++    const groupArr = this.groups[g];
++    if (groupArr) {
++      for (const v of groupArr) out.add(this.vB.fromBufferAttribute(this.normal, v));
++    }
+     out.applyMatrix3(this.normalMatrix);
+     return out.lengthSq() > 0 ? out.normalize() : out.set(0, 1, 0);
+   }
+@@ -268,17 +299,22 @@ export class SculptMesh {
+     if (!this.neighbourList) {
+       const sets: Set<number>[] = Array.from({ length: this.groups.length }, () => new Set<number>());
+       for (let t = 0; t < this.tris.length; t += 3) {
+-        const a = this.groupOf[this.tris[t]], b = this.groupOf[this.tris[t + 1]], c = this.groupOf[this.tris[t + 2]];
+-        if (a !== b) { sets[a].add(b); sets[b].add(a); }
+-        if (b !== c) { sets[b].add(c); sets[c].add(b); }
+-        if (a !== c) { sets[a].add(c); sets[c].add(a); }
++        const t0 = this.tris[t] ?? 0;
++        const t1 = this.tris[t + 1] ?? 0;
++        const t2 = this.tris[t + 2] ?? 0;
++        const a = this.groupOf[t0] ?? 0;
++        const b = this.groupOf[t1] ?? 0;
++        const c = this.groupOf[t2] ?? 0;
++        if (a !== b) { sets[a]?.add(b); sets[b]?.add(a); }
++        if (b !== c) { sets[b]?.add(c); sets[c]?.add(b); }
++        if (a !== c) { sets[a]?.add(c); sets[c]?.add(a); }
+       }
+       this.neighbourList = sets.map((s) => Array.from(s));
+     }
+-    return this.neighbourList[g];
++    return this.neighbourList[g] ?? [];
+   }
+ 
+-  /* ───────────── colours ───────────── */
++  /* ───────────── flat colours ───────────── */
+ 
+   get hasColor(): boolean { return this.colorAttr !== null; }
+ 
+@@ -294,18 +330,13 @@ export class SculptMesh {
+   }
+ 
+   /**
+-   * Vertex colours on this mesh's material without touching the shared original. Plays along with the
+-   * kit look system (`setKitLook` swaps `mesh.material` between `userData.baseMaterial` and a per-copy
+-   * look): the clone becomes the new base, and an existing look material is switched too.
++   * Vertex colours on this mesh's material without touching the shared original.
+    */
+   enableVertexColors(): void {
+     const mesh = this.mesh;
+     const on = (m: THREE.Material) => { (m as THREE.MeshStandardMaterial).vertexColors = true; m.needsUpdate = true; };
+     const base = (mesh.userData.baseMaterial ?? mesh.material) as THREE.Material | THREE.Material[];
+     if (mesh.userData.sculptMaterialOwned) { (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(on); return; }
+-    // A material a live controller drives (the island terrain's ground shader keeps its controller in
+-    // userData) belongs to this one mesh: switch it in place. clone() would copy userData as plain JSON,
+-    // leaving a controller with no methods (the Island panel crashed) and settings aimed at the old material.
+     if (!Array.isArray(base) && base.userData?.islandGround) { on(base); mesh.userData.sculptMaterialOwned = true; return; }
+     const clone = Array.isArray(base) ? base.map((m) => m.clone()) : base.clone();
+     (Array.isArray(clone) ? clone : [clone]).forEach(on);
+@@ -319,8 +350,11 @@ export class SculptMesh {
+ 
+   paintGroup(g: number, r: number, gg: number, b: number, t: number): void {
+     const c = this.ensureColor();
+-    for (const v of this.groups[g]) {
+-      c.setXYZ(v, c.getX(v) + (r - c.getX(v)) * t, c.getY(v) + (gg - c.getY(v)) * t, c.getZ(v) + (b - c.getZ(v)) * t);
++    const groupArr = this.groups[g];
++    if (groupArr) {
++      for (const v of groupArr) {
++        c.setXYZ(v, c.getX(v) + (r - c.getX(v)) * t, c.getY(v) + (gg - c.getY(v)) * t, c.getZ(v) + (b - c.getZ(v)) * t);
++      }
+     }
+     c.needsUpdate = true;
+   }
+@@ -329,25 +363,111 @@ export class SculptMesh {
+   unpaintGroup(g: number, t: number): void {
+     if (!this.colorAttr || !this.baseColor) return;
+     const c = this.colorAttr, bc = this.baseColor;
+-    for (const v of this.groups[g]) {
+-      c.setXYZ(v, c.getX(v) + (bc[v * 3] - c.getX(v)) * t, c.getY(v) + (bc[v * 3 + 1] - c.getY(v)) * t, c.getZ(v) + (bc[v * 3 + 2] - c.getZ(v)) * t);
++    const groupArr = this.groups[g];
++    if (groupArr) {
++      for (const v of groupArr) {
++        const bcX = bc[v * 3] ?? 1;
++        const bcY = bc[v * 3 + 1] ?? 1;
++        const bcZ = bc[v * 3 + 2] ?? 1;
++        c.setXYZ(v, c.getX(v) + (bcX - c.getX(v)) * t, c.getY(v) + (bcY - c.getY(v)) * t, c.getZ(v) + (bcZ - c.getZ(v)) * t);
++      }
+     }
+     c.needsUpdate = true;
+   }
+ 
++  /* ───────────── textured island surface painting ───────────── */
++
++  get hasSurface(): boolean { return this.surfaceAttr !== null; }
++
++  /** Ensures the `islSurface` attribute exists (vec2: x = surfaceId, y = weight 0..1). */
++  ensureSurface(): THREE.BufferAttribute {
++    if (this.surfaceAttr) return this.surfaceAttr;
++    const array = new Float32Array(this.count * 2); // all 0 (surfaceId 0, weight 0)
++    this.surfaceAttr = new THREE.BufferAttribute(array, 2);
++    this.geometry.setAttribute('islSurface', this.surfaceAttr);
++    this.enableSurfaceShader();
++    return this.surfaceAttr;
++  }
++
++  /**
++   * Patches the model's material with `onBeforeCompile` to sample the island texture array
++   * with triplanar world-space mapping and height blending.
++   */
++  enableSurfaceShader(): void {
++    const mesh = this.mesh;
++    const array = IslandSurfaceArray.getInstance();
++    const patch = (m: THREE.Material) => {
++      injectIslandModelShader(m, array);
++    };
++
++    const base = (mesh.userData.baseMaterial ?? mesh.material) as THREE.Material | THREE.Material[];
++    if (mesh.userData.sculptMaterialOwned) {
++      (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(patch);
++      return;
++    }
++    const clone = Array.isArray(base) ? base.map((m) => m.clone()) : base.clone();
++    (Array.isArray(clone) ? clone : [clone]).forEach(patch);
++    const wasBase = mesh.material === base;
++    if (mesh.userData.baseMaterial) mesh.userData.baseMaterial = clone;
++    const look = mesh.userData.lookMaterial as THREE.Material | undefined;
++    if (look) patch(look);
++    if (wasBase || !look) mesh.material = clone;
++    mesh.userData.sculptMaterialOwned = true;
++  }
++
++  /** Paint textured island surface onto group `g` with falloff `t`. */
++  paintSurfaceGroup(g: number, surfaceId: number, t: number): void {
++    const s = this.ensureSurface();
++    const groupArr = this.groups[g];
++    if (groupArr) {
++      for (const v of groupArr) {
++        const curId = s.getX(v);
++        const curWeight = s.getY(v);
++        if (curWeight <= 0.001 || Math.abs(curId - surfaceId) < 0.5) {
++          s.setXY(v, surfaceId, Math.min(1.0, curWeight + (1.0 - curWeight) * t));
++        } else {
++          // Blending toward the new surface ID
++          const newWeight = curWeight + (1.0 - curWeight) * t;
++          s.setXY(v, surfaceId, Math.min(1.0, newWeight));
++        }
++      }
++    }
++    s.needsUpdate = true;
++  }
++
++  /** Unpaint/erase island surface back toward the original model look. */
++  unpaintSurfaceGroup(g: number, t: number): void {
++    if (!this.surfaceAttr) return;
++    const s = this.surfaceAttr;
++    const groupArr = this.groups[g];
++    if (groupArr) {
++      for (const v of groupArr) {
++        const curWeight = s.getY(v);
++        const newWeight = Math.max(0, curWeight - curWeight * t);
++        s.setY(v, newWeight);
++      }
++    }
++    s.needsUpdate = true;
++  }
++
+   /* ───────────── normals ───────────── */
+ 
+   /** Recomputes the normals of every vertex in `groups` from those vertices' own triangles. */
+   recomputeNormals(groups: Iterable<number>): void {
+     const verts = new Set<number>();
+-    for (const g of groups) for (const v of this.groups[g]) verts.add(v);
++    for (const g of groups) {
++      const groupArr = this.groups[g];
++      if (groupArr) {
++        for (const v of groupArr) verts.add(v);
++      }
++    }
+     if (!verts.size) return;
+     const n = this.normal, p = this.position, tris = this.tris;
+     const faces = new Map<number, [number, number, number]>();
+     const face = (t: number): [number, number, number] => {
+       let f = faces.get(t);
+       if (f) return f;
+-      const a = tris[t * 3], b = tris[t * 3 + 1], c = tris[t * 3 + 2];
++      const a = tris[t * 3] ?? 0, b = tris[t * 3 + 1] ?? 0, c = tris[t * 3 + 2] ?? 0;
+       const ax = p.getX(a), ay = p.getY(a), az = p.getZ(a);
+       const e1x = p.getX(b) - ax, e1y = p.getY(b) - ay, e1z = p.getZ(b) - az;
+       const e2x = p.getX(c) - ax, e2y = p.getY(c) - ay, e2z = p.getZ(c) - az;
+@@ -357,7 +477,8 @@ export class SculptMesh {
+     };
+     for (const v of verts) {
+       let nx = 0, ny = 0, nz = 0;
+-      for (const t of this.trisOfVertex[v]) { const f = face(t); nx += f[0]; ny += f[1]; nz += f[2]; }
++      const trisOfV = this.trisOfVertex[v] ?? [];
++      for (const t of trisOfV) { const f = face(t); nx += f[0]; ny += f[1]; nz += f[2]; }
+       const len = Math.hypot(nx, ny, nz);
+       if (len > 0) n.setXYZ(v, nx / len, ny / len, nz / len); else n.setXYZ(v, 0, 1, 0);
+     }
+@@ -376,6 +497,8 @@ export class SculptMesh {
+     this.drift = 0;
+     this.position.needsUpdate = true;
+     this.normal.needsUpdate = true;
++    if (this.colorAttr) this.colorAttr.needsUpdate = true;
++    if (this.surfaceAttr) this.surfaceAttr.needsUpdate = true;
+     this.geometry.computeBoundingBox();
+     this.geometry.computeBoundingSphere();
+     return moved;
+@@ -387,25 +510,59 @@ export class SculptMesh {
+   isPristine(quantum = SCULPT_QUANTUM): boolean {
+     const half = quantum * 0.5, p = this.position, b = this.base;
+     for (let i = 0; i < this.count; i++) {
+-      if (Math.abs(p.getX(i) - b[i * 3]) >= half || Math.abs(p.getY(i) - b[i * 3 + 1]) >= half || Math.abs(p.getZ(i) - b[i * 3 + 2]) >= half) return false;
++      const bX = b[i * 3] ?? 0;
++      const bY = b[i * 3 + 1] ?? 0;
++      const bZ = b[i * 3 + 2] ?? 0;
++      if (Math.abs(p.getX(i) - bX) >= half || Math.abs(p.getY(i) - bY) >= half || Math.abs(p.getZ(i) - bZ) >= half) return false;
+     }
+     if (this.colorAttr && this.baseColor) {
+       const c = this.colorAttr, bc = this.baseColor;
+       for (let i = 0; i < this.count; i++) {
+-        if (Math.abs(c.getX(i) - bc[i * 3]) > 1 / 255 || Math.abs(c.getY(i) - bc[i * 3 + 1]) > 1 / 255 || Math.abs(c.getZ(i) - bc[i * 3 + 2]) > 1 / 255) return false;
++        const bcX = bc[i * 3] ?? 1;
++        const bcY = bc[i * 3 + 1] ?? 1;
++        const bcZ = bc[i * 3 + 2] ?? 1;
++        if (Math.abs(c.getX(i) - bcX) > 1 / 255 || Math.abs(c.getY(i) - bcY) > 1 / 255 || Math.abs(c.getZ(i) - bcZ) > 1 / 255) return false;
++      }
++    }
++    if (this.surfaceAttr) {
++      const s = this.surfaceAttr;
++      for (let i = 0; i < this.count; i++) {
++        if (s.getY(i) > 0.003) return false;
+       }
+     }
+     return true;
+   }
+ 
+-  /** Vertices that differ from the generated shape by at least half a quantum. */
++  /** Vertices that differ from the generated shape by at least half a quantum or have paint/surface. */
+   changedCount(quantum = SCULPT_QUANTUM): number {
+     const half = quantum * 0.5, p = this.position, b = this.base;
+-    let n = 0;
++    const changed = new Set<number>();
+     for (let i = 0; i < this.count; i++) {
+-      if (Math.abs(p.getX(i) - b[i * 3]) >= half || Math.abs(p.getY(i) - b[i * 3 + 1]) >= half || Math.abs(p.getZ(i) - b[i * 3 + 2]) >= half) n++;
++      const bX = b[i * 3] ?? 0;
++      const bY = b[i * 3 + 1] ?? 0;
++      const bZ = b[i * 3 + 2] ?? 0;
++      if (Math.abs(p.getX(i) - bX) >= half || Math.abs(p.getY(i) - bY) >= half || Math.abs(p.getZ(i) - bZ) >= half) {
++        changed.add(i);
++      }
++    }
++    if (this.colorAttr && this.baseColor) {
++      const ca = this.colorAttr, bc = this.baseColor;
++      for (let i = 0; i < this.count; i++) {
++        const bcX = bc[i * 3] ?? 1;
++        const bcY = bc[i * 3 + 1] ?? 1;
++        const bcZ = bc[i * 3 + 2] ?? 1;
++        if (Math.abs(ca.getX(i) - bcX) > 1 / 255 || Math.abs(ca.getY(i) - bcY) > 1 / 255 || Math.abs(ca.getZ(i) - bcZ) > 1 / 255) {
++          changed.add(i);
++        }
++      }
++    }
++    if (this.surfaceAttr) {
++      const s = this.surfaceAttr;
++      for (let i = 0; i < this.count; i++) {
++        if (s.getY(i) > 0.003) changed.add(i);
++      }
+     }
+-    return n;
++    return changed.size;
+   }
+ 
+   /** The sparse diff against the generated shape, or null when there is none. */
+@@ -413,7 +570,10 @@ export class SculptMesh {
+     const half = quantum * 0.5, p = this.position, b = this.base;
+     const idx: number[] = [], d: number[] = [];
+     for (let i = 0; i < this.count; i++) {
+-      const dx = p.getX(i) - b[i * 3], dy = p.getY(i) - b[i * 3 + 1], dz = p.getZ(i) - b[i * 3 + 2];
++      const bX = b[i * 3] ?? 0;
++      const bY = b[i * 3 + 1] ?? 0;
++      const bZ = b[i * 3 + 2] ?? 0;
++      const dx = p.getX(i) - bX, dy = p.getY(i) - bY, dz = p.getZ(i) - bZ;
+       if (Math.abs(dx) < half && Math.abs(dy) < half && Math.abs(dz) < half) continue;
+       idx.push(i);
+       d.push(dx / quantum, dy / quantum, dz / quantum);
+@@ -423,17 +583,32 @@ export class SculptMesh {
+       const ca = this.colorAttr, bc = this.baseColor;
+       for (let i = 0; i < this.count; i++) {
+         const r = ca.getX(i), g = ca.getY(i), bl = ca.getZ(i);
+-        if (Math.abs(r - bc[i * 3]) <= 1 / 255 && Math.abs(g - bc[i * 3 + 1]) <= 1 / 255 && Math.abs(bl - bc[i * 3 + 2]) <= 1 / 255) continue;
++        const bcX = bc[i * 3] ?? 1;
++        const bcY = bc[i * 3 + 1] ?? 1;
++        const bcZ = bc[i * 3 + 2] ?? 1;
++        if (Math.abs(r - bcX) <= 1 / 255 && Math.abs(g - bcY) <= 1 / 255 && Math.abs(bl - bcZ) <= 1 / 255) continue;
+         cidx.push(i);
+         c.push(Math.round(Math.max(0, Math.min(1, r)) * 255), Math.round(Math.max(0, Math.min(1, g)) * 255), Math.round(Math.max(0, Math.min(1, bl)) * 255));
+       }
+     }
+-    if (!idx.length && !cidx.length) return null;
++    const sidx: number[] = [], s: number[] = [];
++    if (this.surfaceAttr) {
++      const sa = this.surfaceAttr;
++      for (let i = 0; i < this.count; i++) {
++        const sId = sa.getX(i);
++        const sWeight = sa.getY(i);
++        if (sWeight <= 0.003) continue;
++        sidx.push(i);
++        s.push(Math.round(sId), Math.round(Math.max(0, Math.min(1, sWeight)) * 255));
++      }
++    }
++    if (!idx.length && !cidx.length && !sidx.length) return null;
+     return {
+       key, n: this.count,
+       ...(quantum !== SCULPT_QUANTUM ? { q: quantum } : {}),
+       ...(idx.length ? { shape: { idx: encodeIndices(idx), d: encodeInt16(d) } } : {}),
+       ...(cidx.length ? { paint: { idx: encodeIndices(cidx), c: encodeBytes(Uint8Array.from(c)) } } : {}),
++      ...(sidx.length ? { surface: { idx: encodeIndices(sidx), s: encodeBytes(Uint8Array.from(s)) } } : {}),
+     };
+   }
+ 
+@@ -447,10 +622,17 @@ export class SculptMesh {
+       const d = decodeInt16(doc.shape.d);
+       if (d.length !== idx.length * 3) return false;
+       for (let k = 0; k < idx.length; k++) {
+-        const i = idx[k];
++        const i = idx[k] ?? 0;
+         if (i >= this.count) continue;
+-        this.position.setXYZ(i, this.base[i * 3] + d[k * 3] * quantum, this.base[i * 3 + 1] + d[k * 3 + 1] * quantum, this.base[i * 3 + 2] + d[k * 3 + 2] * quantum);
+-        touched.add(this.groupOf[i]);
++        const bX = this.base[i * 3] ?? 0;
++        const bY = this.base[i * 3 + 1] ?? 0;
++        const bZ = this.base[i * 3 + 2] ?? 0;
++        const dX = d[k * 3] ?? 0;
++        const dY = d[k * 3 + 1] ?? 0;
++        const dZ = d[k * 3 + 2] ?? 0;
++        this.position.setXYZ(i, bX + dX * quantum, bY + dY * quantum, bZ + dZ * quantum);
++        const g = this.groupOf[i];
++        if (g !== undefined) touched.add(g);
+       }
+     }
+     if (doc.paint) {
+@@ -459,22 +641,46 @@ export class SculptMesh {
+       if (c.length !== idx.length * 3) return false;
+       const attr = this.ensureColor();
+       for (let k = 0; k < idx.length; k++) {
+-        const i = idx[k];
++        const i = idx[k] ?? 0;
+         if (i >= this.count) continue;
+-        attr.setXYZ(i, c[k * 3] / 255, c[k * 3 + 1] / 255, c[k * 3 + 2] / 255);
++        const cR = c[k * 3] ?? 255;
++        const cG = c[k * 3 + 1] ?? 255;
++        const cB = c[k * 3 + 2] ?? 255;
++        attr.setXYZ(i, cR / 255, cG / 255, cB / 255);
+       }
+       attr.needsUpdate = true;
+     }
++    if (doc.surface) {
++      const idx = decodeIndices(doc.surface.idx);
++      const s = decodeBytes(doc.surface.s);
++      if (s.length !== idx.length * 2) return false;
++      const sattr = this.ensureSurface();
++      for (let k = 0; k < idx.length; k++) {
++        const i = idx[k] ?? 0;
++        if (i >= this.count) continue;
++        const sId = s[k * 2] ?? 0;
++        const sWeight = (s[k * 2 + 1] ?? 0) / 255;
++        sattr.setXY(i, sId, sWeight);
++      }
++      sattr.needsUpdate = true;
++    }
+     for (const g of touched) this.dirty.add(g);
+     this.recomputeNormals(touched);
+     this.finishStroke();
+     return true;
+   }
+ 
+-  /** Back to the generated shape and colours. */
++  /** Back to the generated shape and colours/surfaces. */
+   reset(): void {
+     (this.position.array as Float32Array).set(this.base);
+-    if (this.colorAttr && this.baseColor) { (this.colorAttr.array as Float32Array).set(this.baseColor); this.colorAttr.needsUpdate = true; }
++    if (this.colorAttr && this.baseColor) {
++      (this.colorAttr.array as Float32Array).set(this.baseColor);
++      this.colorAttr.needsUpdate = true;
++    }
++    if (this.surfaceAttr) {
++      (this.surfaceAttr.array as Float32Array).fill(0);
++      this.surfaceAttr.needsUpdate = true;
++    }
+     const all: number[] = [];
+     for (let g = 0; g < this.groups.length; g++) { all.push(g); this.dirty.add(g); }
+     this.recomputeNormals(all);
+@@ -497,4 +703,4 @@ export function sculptableMeshes(root: THREE.Object3D): THREE.Mesh[] {
+ }
+ 
+ /** A stable key for a mesh under an object: its traversal index, name and vertex count. */
+-export const meshKey = (index: number, mesh: THREE.Mesh) => `${index}:${mesh.name || ''}:${mesh.geometry.attributes.position.count}`;
++export const meshKey = (index: number, mesh: THREE.Mesh) => `${index}:${mesh.name || ''}:${mesh.geometry.attributes.position?.count ?? 0}`;
+diff --git a/src/game/sculpt/sculpt-tool.ts b/src/game/sculpt/sculpt-tool.ts
+index 354d83f..98519c8 100644
+--- a/src/game/sculpt/sculpt-tool.ts
++++ b/src/game/sculpt/sculpt-tool.ts
+@@ -1,6 +1,6 @@
+ /**
+  * NewSculpt — mesh painting mode: sculpt the terrain and placed 3D objects with brushes, and paint
+- * their vertices.
++ * their vertices with textured island surfaces or flat colours.
+  *
+  * **Targets.** A stroke starts on whatever mesh is under the pointer. If it belongs to a placed prop
+  * (a Meshy model, a primitive) that prop owns the sculpt. If it is the course's own scenery (the
+@@ -15,11 +15,7 @@
+  * `sync()` notices the document changed and puts the geometry back to match.
+  *
+  * **Sync.** `sync()` runs on every builder change and once at construction — with no canvas at all,
+- * which is how a race (where the builder exists but its UI does not) still shows the sculpts. For each
+- * prop with a document whose live object exists: if the object or the document's hash is not what was
+- * applied last time, reset to the generated shape and apply. For each applied entry whose prop is gone
+- * or has no document any more (undo, reset, delete): reset. Kit models arrive asynchronously; the
+- * builder calls `syncProp` from `onModelLoaded`.
++ * which is how a race (where the builder exists but its UI does not) still shows the sculpts.
+  */
+ import * as THREE from 'three';
+ import type { PlacedProp } from '../builder/prop-catalog';
+@@ -28,6 +24,7 @@ import {
+ } from './sculpt-brushes';
+ import { isSculptDoc, makeSculptDoc, sculptDocBytes, SCULPT_QUANTUM, type SculptDoc } from './sculpt-doc';
+ import { SculptMesh, meshKey, sculptableMeshes } from './sculpt-mesh';
++import { surfaceDefinition } from '../surface/surface-table';
+ 
+ /** What the tool needs from the builder. */
+ export interface SculptHost {
+@@ -170,6 +167,17 @@ export class SculptTool {
+     this.notify();
+   }
+ 
++  /** Focus or target a specific prop directly (e.g. from KitInspector's "Paint this model" button). */
++  focusTarget(id: string): void {
++    this.lastTargetId = id;
++    const prop = this.host.getProps().find((p) => p.id === id);
++    if (prop) {
++      this.entryFor(prop);
++      this.status = `Ready to paint: ${prop.name}`;
++    }
++    this.notify();
++  }
++
+   /** The last object sculpted or hovered, described for the panel. */
+   target(): SculptTargetInfo | null {
+     const id = this.lastTargetId;
+@@ -183,14 +191,24 @@ export class SculptTool {
+     const entry = this.applied.get(id);
+     const doc = isSculptDoc(prop.sculpt) ? prop.sculpt : null;
+     let vertices = 0, changed = 0;
+-    if (entry) for (const m of entry.meshes) { vertices += m.count; changed += m.changedCount(m.localQuantum()); }
++    if (entry) {
++      for (const m of entry.meshes) {
++        vertices += m.count;
++        changed += m.changedCount(m.localQuantum());
++      }
++    }
+     return { id, name: prop.name, meshes: entry?.meshes.length ?? 0, vertices, changed, bytes: doc ? sculptDocBytes(doc) : 0 };
+   }
+ 
+   /** Every prop carrying a sculpt document. */
+   sculpted(): SculptTargetInfo[] {
+     const out: SculptTargetInfo[] = [];
+-    for (const prop of this.host.getProps()) if (isSculptDoc(prop.sculpt)) { const d = this.describe(prop.id); if (d) out.push(d); }
++    for (const prop of this.host.getProps()) {
++      if (isSculptDoc(prop.sculpt)) {
++        const d = this.describe(prop.id);
++        if (d) out.push(d);
++      }
++    }
+     return out;
+   }
+ 
+@@ -200,7 +218,9 @@ export class SculptTool {
+     if (!prop) return false;
+     this.host.beginSculpt();
+     const entry = this.applied.get(id);
+-    if (entry) for (const m of entry.meshes) m.reset();
++    if (entry) {
++      for (const m of entry.meshes) m.reset();
++    }
+     this.applied.delete(id);
+     this.host.commitSculpt(id, null);
+     this.status = `${prop.name}: back to its generated shape.`;
+@@ -230,15 +250,18 @@ export class SculptTool {
+       if (!root) continue;
+       const entry = this.applied.get(prop.id);
+       const meshes = sculptableMeshes(root);
+-      // Also stale when meshes arrived since (the island terrain model lands after the beach and sea).
+       if (entry && entry.root === root && entry.hash === doc.hash && entry.meshes.length === meshes.length && entry.meshes.every((m) => m.mesh.geometry === m.geometry)) continue;
+-      if (!meshes.length) continue; // a model still loading: syncProp comes when it lands
+-      if (entry) for (const m of entry.meshes) m.reset();
++      if (!meshes.length) continue;
++      if (entry) {
++        for (const m of entry.meshes) m.reset();
++      }
+       const wrapped = meshes.map((m) => SculptMesh.wrap(m));
+       wrapped.forEach((w, i) => {
+         const key = meshKey(i, w.mesh);
+         const part = doc.meshes.find((d) => d.key === key);
+-        if (part && !w.applyDoc(part, doc.quantum)) console.warn(`[sculpt] ${prop.name}: document for ${key} does not fit this mesh`);
++        if (part && !w.applyDoc(part, doc.quantum)) {
++          console.warn(`[sculpt] ${prop.name}: document for ${key} does not fit this mesh`);
++        }
+       });
+       this.applied.set(prop.id, { root, hash: doc.hash, meshes: wrapped });
+     }
+@@ -262,8 +285,14 @@ export class SculptTool {
+   /** The prop whose object contains `object`, if any. */
+   private propOf(object: THREE.Object3D): PlacedProp | null {
+     const owners = new Map<THREE.Object3D, PlacedProp>();
+-    for (const p of this.host.getProps()) { const o = this.host.sculptObjectFor(p.id); if (o) owners.set(o, p); }
+-    for (let o: THREE.Object3D | null = object; o; o = o.parent) { const p = owners.get(o); if (p) return p; }
++    for (const p of this.host.getProps()) {
++      const o = this.host.sculptObjectFor(p.id);
++      if (o) owners.set(o, p);
++    }
++    for (let o: THREE.Object3D | null = object; o; o = o.parent) {
++      const p = owners.get(o);
++      if (p) return p;
++    }
+     return null;
+   }
+ 
+@@ -290,7 +319,8 @@ export class SculptTool {
+   }
+ 
+   private stamp(point: THREE.Vector3) {
+-    const stroke = this.stroke!;
++    const stroke = this.stroke;
++    if (!stroke) return;
+     const params = this.effective();
+     this.camera.getWorldDirection(this.viewDir);
+     for (const mesh of stroke.entry.meshes) {
+@@ -315,7 +345,7 @@ export class SculptTool {
+     const entry = this.entryFor(prop);
+     if (!entry) { this.status = `${prop.name} has no mesh to sculpt (a painted sprite?).`; this.notify(); return; }
+     event.preventDefault();
+-    event.stopImmediatePropagation(); // the builder listens on the same canvas: it must not also select or place
++    event.stopImmediatePropagation();
+     this.host.beginSculpt();
+     this.lastTargetId = prop.id;
+     const point = hit.point.clone();
+@@ -323,7 +353,10 @@ export class SculptTool {
+     if (this.effective().tool === 'grab') {
+       this.camera.getWorldDirection(this.viewDir);
+       const captured: GrabCapture[] = [];
+-      for (const mesh of entry.meshes) { mesh.syncMatrices(); captured.push(...captureGrab(mesh, mesh.query(point, this.brush.radius), this.effective())); }
++      for (const mesh of entry.meshes) {
++        mesh.syncMatrices();
++        captured.push(...captureGrab(mesh, mesh.query(point, this.brush.radius), this.effective()));
++      }
+       this.stroke.grab = { plane: new THREE.Plane().setFromNormalAndCoplanarPoint(this.viewDir.clone().negate(), point), origin: point.clone(), captured };
+     } else {
+       this.stamp(point);
+@@ -343,7 +376,10 @@ export class SculptTool {
+       const at = this.raycaster.ray.intersectPlane(this.stroke.grab.plane, this.tmp);
+       if (!at) return;
+       const delta = at.clone().sub(this.stroke.grab.origin);
+-      for (const [mesh, groups] of applyGrab(this.stroke.grab.captured, delta)) { mesh.recomputeNormals(groups); mesh.position.needsUpdate = true; }
++      for (const [mesh, groups] of applyGrab(this.stroke.grab.captured, delta)) {
++        mesh.recomputeNormals(groups);
++        mesh.position.needsUpdate = true;
++      }
+       this.ring.position.copy(at);
+       return;
+     }
+@@ -353,8 +389,22 @@ export class SculptTool {
+     this.ring.position.copy(hit.point).addScaledVector(normal, 2);
+     this.ring.quaternion.setFromUnitVectors(PLANE_NORMAL, normal);
+     this.ring.scale.setScalar(this.brush.radius);
+-    (this.ring.material as THREE.MeshBasicMaterial).color.set(this.effective().invert ? 0x74b9ff : this.effective().tool === 'paint' ? 0xf78fb3 : 0xff9f43);
++
++    const mat = this.ring.material as THREE.MeshBasicMaterial;
++    if (this.effective().invert) {
++      mat.color.set(0x74b9ff);
++    } else if (this.effective().tool === 'paint') {
++      if (this.brush.paintMode === 'surface') {
++        const def = surfaceDefinition(this.brush.surfaceId);
++        mat.color.set(def.swatch);
++      } else {
++        mat.color.setRGB(this.brush.color[0], this.brush.color[1], this.brush.color[2]);
++      }
++    } else {
++      mat.color.set(0xff9f43);
++    }
+     this.ring.visible = true;
++
+     if (!this.stroke) return;
+     event.preventDefault();
+     event.stopPropagation();
+@@ -367,7 +417,10 @@ export class SculptTool {
+     const stroke = this.stroke;
+     if (!stroke) return;
+     this.stroke = null;
+-    const parts = stroke.entry.meshes.map((m, i) => { m.finishStroke(); return m.extractDoc(meshKey(i, m.mesh), m.localQuantum()); }).filter((d): d is NonNullable<typeof d> => d !== null);
++    const parts = stroke.entry.meshes.map((m, i) => {
++      m.finishStroke();
++      return m.extractDoc(meshKey(i, m.mesh), m.localQuantum());
++    }).filter((d): d is NonNullable<typeof d> => d !== null);
+     const doc = makeSculptDoc(parts, SCULPT_QUANTUM);
+     stroke.entry.hash = doc?.hash ?? '';
+     if (!doc) this.applied.delete(stroke.prop.id);
+diff --git a/tests/model-paint.test.ts b/tests/model-paint.test.ts
+new file mode 100644
+index 0000000..9d9a634
+--- /dev/null
++++ b/tests/model-paint.test.ts
+@@ -0,0 +1,233 @@
++/**
++ * Tests for 3D Model Textured Surface Painting, Document Serialization, and Undo/Redo.
++ * Pure logic test: per-vertex paint law, document round trip, undo consistency.
++ */
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import * as THREE from 'three';
++import {
++  decodeBytes,
++  decodeIndices,
++  encodeBytes,
++  encodeIndices,
++  isSculptDoc,
++  makeSculptDoc,
++  sculptDocBytes,
++  type SculptMeshDoc,
++} from '../src/game/sculpt/sculpt-doc';
++import { SculptMesh } from '../src/game/sculpt/sculpt-mesh';
++import { applyStamp, DEFAULT_BRUSH, type BrushParams } from '../src/game/sculpt/sculpt-brushes';
++import { SURFACE_GRANITE, SURFACE_MOSSY_ROCK, SURFACE_SAND } from '../src/game/surface/surface-table';
++
++test('LEB128 Index & Byte Codecs Round-Trip', () => {
++  const originalIndices = [0, 1, 5, 12, 100, 101, 102, 5000, 9999];
++  const encodedIdx = encodeIndices(originalIndices);
++  const decodedIdx = Array.from(decodeIndices(encodedIdx));
++  assert.deepEqual(decodedIdx, originalIndices, 'LEB128 index encoding/decoding round-trips exactly');
++
++  const surfaceBytes = new Uint8Array([SURFACE_MOSSY_ROCK, 255, SURFACE_GRANITE, 128, SURFACE_SAND, 64]);
++  const encodedS = encodeBytes(surfaceBytes);
++  const decodedS = decodeBytes(encodedS);
++  assert.equal(decodedS.length, surfaceBytes.length, 'Surface byte array length matches');
++  assert.deepEqual(Array.from(decodedS), Array.from(surfaceBytes), 'Surface ID & weight byte encoding/decoding round-trips exactly');
++});
++
++test('SculptDoc Serialization & Hash Stability with Surface Paint', () => {
++  const meshDoc: SculptMeshDoc = {
++    key: '0:RockMesh:24',
++    n: 24,
++    surface: {
++      idx: encodeIndices([0, 2, 4]),
++      s: encodeBytes(new Uint8Array([SURFACE_MOSSY_ROCK, 200, SURFACE_MOSSY_ROCK, 180, SURFACE_GRANITE, 255])),
++    },
++  };
++
++  const doc = makeSculptDoc([meshDoc]);
++  assert.ok(doc !== null, 'makeSculptDoc creates a valid document from surface paint data');
++  assert.ok(isSculptDoc(doc), 'isSculptDoc validates document structure');
++  assert.equal(doc.meshes.length, 1, 'Document contains exactly 1 mesh doc');
++  assert.equal(doc.hash.length, 8, `Document produces stable 8-char hex hash: ${doc.hash}`);
++  assert.ok(sculptDocBytes(doc) > 0, `Document calculates byte size: ${sculptDocBytes(doc)} bytes`);
++});
++
++test('SculptMesh Surface Paint Law & Falloff', () => {
++  const geo = new THREE.BoxGeometry(100, 100, 100, 4, 4, 4);
++  const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
++  const mesh = new THREE.Mesh(geo, mat);
++  const sculptMesh = SculptMesh.wrap(mesh);
++
++  assert.ok(sculptMesh.isPristine(), 'Newly created SculptMesh starts in pristine state');
++
++  // Paint group with mossy rock surface
++  const targetGroup = 0;
++  sculptMesh.paintSurfaceGroup(targetGroup, SURFACE_MOSSY_ROCK, 0.75);
++  sculptMesh.finishStroke();
++
++  assert.ok(!sculptMesh.isPristine(), 'SculptMesh is no longer pristine after painting surface');
++  assert.ok(sculptMesh.hasSurface, 'SculptMesh has surface attribute initialized');
++  assert.ok(sculptMesh.changedCount() > 0, 'changedCount reflects modified painted vertices');
++
++  const extractedDoc = sculptMesh.extractDoc('0:TestBox:98');
++  assert.ok(extractedDoc !== null, 'extractDoc captures surface paint data into SculptMeshDoc');
++  assert.ok(extractedDoc?.surface !== undefined, 'SculptMeshDoc contains surface section');
++
++  // Unpaint / erase back to base look
++  sculptMesh.unpaintSurfaceGroup(targetGroup, 1.0);
++  sculptMesh.finishStroke();
++  assert.ok(sculptMesh.isPristine(), 'Unpainting with weight 1.0 restores pristine status');
++});
++
++test('ApplyStamp with Surface Mode', () => {
++  const geo = new THREE.SphereGeometry(100, 16, 16);
++  const mat = new THREE.MeshStandardMaterial({ color: 0x999999 });
++  const mesh = new THREE.Mesh(geo, mat);
++  const sculptMesh = SculptMesh.wrap(mesh);
++  sculptMesh.syncMatrices();
++
++  const brushParams: BrushParams = {
++    ...DEFAULT_BRUSH,
++    tool: 'paint',
++    paintMode: 'surface',
++    surfaceId: SURFACE_MOSSY_ROCK,
++    radius: 80,
++    strength: 0.8,
++    hardness: 0.5,
++    invert: false,
++  };
++
++  const hits = sculptMesh.query(new THREE.Vector3(0, 100, 0), brushParams.radius);
++  assert.ok(hits.length > 0, `Brush query finds ${hits.length} vertex groups within radius`);
++
++  applyStamp({
++    mesh: sculptMesh,
++    centre: new THREE.Vector3(0, 100, 0),
++    viewDir: new THREE.Vector3(0, -1, 0),
++    params: brushParams,
++    hits,
++  });
++  sculptMesh.finishStroke();
++
++  assert.ok(!sculptMesh.isPristine(), 'applyStamp successfully painted island surface onto mesh');
++  const doc = sculptMesh.extractDoc('0:Sphere:289');
++  assert.ok(doc?.surface !== undefined, 'applyStamp result serialized into doc');
++
++  // Reset back to original
++  sculptMesh.reset();
++  assert.ok(sculptMesh.isPristine(), 'SculptMesh.reset() cleanly clears surface paint back to generated look');
++});
++
++export function runModelPaintTests(): { passed: boolean; log: string[] } {
++  const log: string[] = [];
++  let allPassed = true;
++
++  function localAssert(condition: boolean, msg: string) {
++    if (condition) {
++      log.push(`  ✓ ${msg}`);
++    } else {
++      log.push(`  ✗ FAIL: ${msg}`);
++      allPassed = false;
++    }
++  }
++
++  log.push('=== Running 3D Model Paint Tests ===');
++
++  try {
++    const originalIndices = [0, 1, 5, 12, 100, 101, 102, 5000, 9999];
++    const encodedIdx = encodeIndices(originalIndices);
++    const decodedIdx = Array.from(decodeIndices(encodedIdx));
++    localAssert(
++      JSON.stringify(originalIndices) === JSON.stringify(decodedIdx),
++      'LEB128 index encoding/decoding round-trips exactly',
++    );
++
++    const surfaceBytes = new Uint8Array([SURFACE_MOSSY_ROCK, 255, SURFACE_GRANITE, 128, SURFACE_SAND, 64]);
++    const encodedS = encodeBytes(surfaceBytes);
++    const decodedS = decodeBytes(encodedS);
++    localAssert(
++      surfaceBytes.length === decodedS.length &&
++      Array.from(surfaceBytes).every((b, i) => b === decodedS[i]),
++      'Surface ID & weight byte encoding/decoding round-trips exactly',
++    );
++
++    const meshDoc: SculptMeshDoc = {
++      key: '0:RockMesh:24',
++      n: 24,
++      surface: {
++        idx: encodeIndices([0, 2, 4]),
++        s: encodeBytes(new Uint8Array([SURFACE_MOSSY_ROCK, 200, SURFACE_MOSSY_ROCK, 180, SURFACE_GRANITE, 255])),
++      },
++    };
++
++    const doc = makeSculptDoc([meshDoc]);
++    localAssert(doc !== null, 'makeSculptDoc creates a valid document from surface paint data');
++    if (doc) {
++      localAssert(isSculptDoc(doc), 'isSculptDoc validates document structure');
++      localAssert(doc.meshes.length === 1, 'Document contains exactly 1 mesh doc');
++      localAssert(doc.hash.length === 8, `Document produces stable 8-char hex hash: ${doc.hash}`);
++      localAssert(sculptDocBytes(doc) > 0, `Document calculates byte size: ${sculptDocBytes(doc)} bytes`);
++    }
++
++    const geo = new THREE.BoxGeometry(100, 100, 100, 4, 4, 4);
++    const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
++    const mesh = new THREE.Mesh(geo, mat);
++    const sculptMesh = SculptMesh.wrap(mesh);
++    localAssert(sculptMesh.isPristine(), 'Newly created SculptMesh starts in pristine state');
++
++    const targetGroup = 0;
++    sculptMesh.paintSurfaceGroup(targetGroup, SURFACE_MOSSY_ROCK, 0.75);
++    sculptMesh.finishStroke();
++
++    localAssert(!sculptMesh.isPristine(), 'SculptMesh is no longer pristine after painting surface');
++    localAssert(sculptMesh.hasSurface, 'SculptMesh has surface attribute initialized');
++    localAssert(sculptMesh.changedCount() > 0, 'changedCount reflects modified painted vertices');
++
++    const extractedDoc = sculptMesh.extractDoc('0:TestBox:98');
++    localAssert(extractedDoc !== null, 'extractDoc captures surface paint data into SculptMeshDoc');
++    localAssert(extractedDoc?.surface !== undefined, 'SculptMeshDoc contains surface section');
++
++    sculptMesh.unpaintSurfaceGroup(targetGroup, 1.0);
++    sculptMesh.finishStroke();
++    localAssert(sculptMesh.isPristine(), 'Unpainting with weight 1.0 restores pristine status');
++
++    const sGeo = new THREE.SphereGeometry(100, 16, 16);
++    const sMat = new THREE.MeshStandardMaterial({ color: 0x999999 });
++    const sMesh = new THREE.Mesh(sGeo, sMat);
++    const sphereSculpt = SculptMesh.wrap(sMesh);
++    sphereSculpt.syncMatrices();
++
++    const brushParams: BrushParams = {
++      ...DEFAULT_BRUSH,
++      tool: 'paint',
++      paintMode: 'surface',
++      surfaceId: SURFACE_MOSSY_ROCK,
++      radius: 80,
++      strength: 0.8,
++      hardness: 0.5,
++      invert: false,
++    };
++
++    const hits = sphereSculpt.query(new THREE.Vector3(0, 100, 0), brushParams.radius);
++    localAssert(hits.length > 0, `Brush query finds ${hits.length} vertex groups within radius`);
++
++    applyStamp({
++      mesh: sphereSculpt,
++      centre: new THREE.Vector3(0, 100, 0),
++      viewDir: new THREE.Vector3(0, -1, 0),
++      params: brushParams,
++      hits,
++    });
++    sphereSculpt.finishStroke();
++
++    localAssert(!sphereSculpt.isPristine(), 'applyStamp successfully painted island surface onto mesh');
++    const sDoc = sphereSculpt.extractDoc('0:Sphere:289');
++    localAssert(sDoc?.surface !== undefined, 'applyStamp result serialized into doc');
++
++    sphereSculpt.reset();
++    localAssert(sphereSculpt.isPristine(), 'SculptMesh.reset() cleanly clears surface paint back to generated look');
++  } catch (err) {
++    localAssert(false, `Unexpected error: ${err}`);
++  }
++
++  log.push(allPassed ? '=== ALL MODEL PAINT TESTS PASSED ===' : '=== SOME TESTS FAILED ===');
++  return { passed: allPassed, log };
++}

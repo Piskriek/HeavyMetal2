@@ -17,6 +17,8 @@ import BrightnessSlider from './builder/BrightnessSlider';
 import { BRUSH_SPACING_DEFAULT, BRUSH_SPACING_MAX, BRUSH_SPACING_MIN } from '../game/lane-path-tool';
 import IslandTrackBar from './builder/IslandTrackBar';
 import FloatingWindow from './builder/FloatingWindow';
+import { DecorPanel } from './DecorPanel';
+import { SculptPanel } from './SculptPanel';
 import IslandGroundPanel, { type GroundBrush } from './builder/IslandGroundPanel';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
@@ -237,6 +239,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [testBallHeight, setTestBallHeight] = useState(() => builder.getTestBallHeight());
   const [testBall, setTestBallState] = useState<{ x: number; z: number } | null>(() => builder.getTestBall());
   const [showSections, setShowSections] = useState(false);
+  // The decoration brush / auto-decorate and the sculpt & mesh-paint mode: one window at a time, and the
+  // tool being left always turns its brush off, so no invisible brush keeps eating clicks.
+  const [toolWindow, setToolWindow] = useState<'decor' | 'sculpt' | null>(null);
+  const toggleToolWindow = (which: 'decor' | 'sculpt') => {
+    const next = toolWindow === which ? null : which;
+    if (next !== 'decor') builder.decor?.setEnabled(false);
+    if (next !== 'sculpt') builder.sculpt?.setEnabled(false);
+    setToolWindow(next);
+    onRequestRender?.();
+  };
   /** Where the Sections panel opens: above its button, on the page (the shelf clips anything inside it). */
   const [sectionsAnchor, setSectionsAnchor] = useState<{ left: number; bottom: number } | null>(null);
   const [, setSectionRevision] = useState(0);
@@ -3939,6 +3951,33 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <span>DRAG SELECT</span>
               </button>
 
+              {builder.decor && (
+                <button
+                  onClick={() => toggleToolWindow('decor')}
+                  aria-pressed={toolWindow === 'decor'}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
+                    toolWindow === 'decor' ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-850 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
+                  }`}
+                  title="Decorate: paint scenery with a brush, or let the rules dress the road"
+                >
+                  <TreePine size={12} />
+                  <span>DECORATE</span>
+                </button>
+              )}
+              {builder.sculpt && (
+                <button
+                  onClick={() => toggleToolWindow('sculpt')}
+                  aria-pressed={toolWindow === 'sculpt'}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
+                    toolWindow === 'sculpt' ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-850 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
+                  }`}
+                  title="Sculpt: reshape the terrain and placed models, and paint their vertices"
+                >
+                  <Mountain size={12} />
+                  <span>SCULPT</span>
+                </button>
+              )}
+
               <div className="relative">
                 <button
                   onClick={(e) => {
@@ -4503,6 +4542,18 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </div>
           </div>
         </div>
+      )}
+
+      {/* Decorate / Sculpt: the tool windows the toolbar toggles open */}
+      {toolWindow === 'decor' && builder.decor && (
+        <FloatingWindow title="Decorate" storageKey="hm2-decor-window-v1" initial={{ x: 16, y: 72 }} width={340}>
+          <div className="p-3 max-h-[70vh] overflow-y-auto scrollbar-thin"><DecorPanel tool={builder.decor} /></div>
+        </FloatingWindow>
+      )}
+      {toolWindow === 'sculpt' && builder.sculpt && (
+        <FloatingWindow title="Sculpt & mesh paint" storageKey="hm2-sculpt-window-v1" initial={{ x: 16, y: 72 }} width={340}>
+          <div className="p-3 max-h-[70vh] overflow-y-auto scrollbar-thin"><SculptPanel tool={builder.sculpt} /></div>
+        </FloatingWindow>
       )}
 
       {/* Hotkeys Cheat Sheet Modal */}

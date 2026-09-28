@@ -27,11 +27,15 @@ export function createRollingResistanceState(): RollingResistanceState {
  * Calculate rolling resistance force.
  * Opposes motion direction, bounded to prevent runaway.
  * Returns force vector in world space.
+ *
+ * `surfaceRolling` (NewRoads, plan §4) scales the coefficient by the painted surface under the
+ * contact — `surfaceRollingResistance(id)` from `surface/surface-table.ts`. 1 = the legacy dirt road.
  */
 export function calculateRollingResistance(
   velocity: { x: number; y: number; z: number },
   mass: number,
   grounded: boolean,
+  surfaceRolling: number = 1,
 ): { x: number; y: number; z: number } {
   if (!grounded) {
     return { x: 0, y: 0, z: 0 };
@@ -46,7 +50,7 @@ export function calculateRollingResistance(
   const normalForce = mass * 9.81; // N
   
   // Rolling resistance magnitude
-  let resistanceMag = ROLLING_RESISTANCE_COEFFICIENT * normalForce;
+  let resistanceMag = ROLLING_RESISTANCE_COEFFICIENT * surfaceRolling * normalForce;
   
   // Bound the force
   resistanceMag = Math.min(resistanceMag, MAX_RESISTANCE_FORCE);
@@ -147,6 +151,8 @@ export function applyRollingEffects(
   grounded: boolean,
   deltaTime: number,
   state: RollingResistanceState,
+  /** NewRoads: rolling-resistance multiplier of the surface under the contact (default: legacy road). */
+  surfaceRolling: number = 1,
 ): {
   newVelocity: { x: number; y: number; z: number };
   newState: RollingResistanceState;
@@ -159,7 +165,7 @@ export function applyRollingEffects(
   }
   
   // Calculate forces
-  const resistance = calculateRollingResistance(velocity, mass, grounded);
+  const resistance = calculateRollingResistance(velocity, mass, grounded, surfaceRolling);
   const { force: lateral, newState } = calculateLateralBias(
     velocity, mass, grounded, deltaTime, state
   );

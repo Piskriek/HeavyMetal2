@@ -42,7 +42,10 @@ import { PatchIndex } from './collision/patch-index';
 import { Keymap } from './builder/keymap';
 import { GizmoAdapter } from './builder/gizmo-adapter';
 import { CommandStack } from './builder/history';
+import { DecorTool } from './decor/decor-tool';
 import { alignProps, distributeProps, marqueeSelect2D } from './builder/selection';
+import { SculptTool } from './sculpt/sculpt-tool';
+import type { SculptDoc } from './sculpt/sculpt-doc';
 import type { GizmoMode, GizmoSpace, SnapConfig } from './builder/gizmo-math';
 import { SceneKit, isKitType, isTerrainEdit } from './builder/scene-kit';
 import { isLightType, lightPreset, lightSettingsFor } from './builder/light-rig';
@@ -123,9 +126,13 @@ export class TrackBuilder3D {
   private rotationHandle: THREE.Group | null = null;
   private gizmoAdapter: GizmoAdapter<PlacedProp> | null = null;
   private readonly commandHistory = new CommandStack<PlacedProp>();
+  /** NewDecor: the decoration brush and the auto-decorate rules. Built with the gizmo (it needs the canvas). */
+  decor: DecorTool | null = null;
   private isGizmoDragging = false;
   readonly materialCache = new MaterialCache();
   readonly patchIndex = new PatchIndex();
+  /** NewSculpt: mesh painting mode — sculpt the scenery and placed models, paint their vertices. */
+  sculpt: SculptTool | null = null;
 
   private undoStack: LaneUndoEntry[] = [];
   private redoStack: LaneUndoEntry[] = [];
@@ -259,7 +266,7 @@ export class TrackBuilder3D {
     // The Meshy models: the low tier on the Performance setting; a model that arrives while selected
     // gets its selection box refitted.
     this.kit.lowTierModels = typeof window !== 'undefined' && readOptions().graphics === 'performance';
-    this.kit.onModelLoaded = (propId) => { if (this.selectedPropIds.has(propId)) this.updateSelectionBox(); };
+    this.kit.onModelLoaded = (propId) => { if (this.selectedPropIds.has(propId)) this.updateSelectionBox(); this.sculpt?.syncProp(propId); };
     this.shaderLibrary = loadShaderLibrary();
     this.initDecalSideHandles();
     this.laneGizmos = new LaneGizmos(this.scene, () => courseTrackSpace(this.courseId as CourseId));
@@ -288,6 +295,9 @@ export class TrackBuilder3D {
     if (typeof window !== 'undefined' && this.propStore !== 'none') {
       this.startPeriodicBackupTimer(30000);
     }
+    // NewSculpt: built without a canvas so a race (which has the builder but not its UI) still shows
+    // every sculpt; initGizmo attaches the brush to the canvas.
+    this.sculpt = new SculptTool(this, this.scene, this.camera, null);
   }
 
   setCameraFacingDefault(facing: boolean) {
@@ -487,6 +497,8 @@ export class TrackBuilder3D {
   }
 
   initGizmo(canvas: HTMLElement) {
+    // NewDecor: the brush listens on the same canvas the gizmo does; the track is the renderer's own.
+    if (!this.decor && typeof window !== 'undefined') this.decor = new DecorTool(this, this.scene, this.camera, canvas, this.track);
     if (this.gizmoAdapter || typeof window === 'undefined') return;
     this.gizmoAdapter = new GizmoAdapter<PlacedProp>(
       this.camera,
@@ -494,6 +506,7 @@ export class TrackBuilder3D {
       this.scene,
       this.commandHistory,
     );
+    this.sculpt?.attach(canvas);
     // Decals lie flat: their facing is their quaternion (or the flat yaw, pitch, roll it is built from).
     this.gizmoAdapter.setOrientationAccess({
       get: (prop, out) => this.isPropDecal(prop) ? out.copy(this.decalQuaternion(prop)) : out.setFromEuler(new THREE.Euler(prop.rotX ?? 0, prop.rotY ?? 0, prop.rotZ ?? 0, 'YXZ')),
@@ -3981,7 +3994,7 @@ export class TrackBuilder3D {
   /** What is saved and backed up: everything except scenery edits that change nothing. */
   private persistableProps(): PlacedProp[] {
     if (!this.kit) return this.placedProps;
-    return this.placedProps.filter((p) => !(isTerrainEdit(p) && this.kit.isNoOpEdit(p)));
+    return this.placedProps.filter((p) => !(isTerrainEdit(p) && this.kit.isNoOpEdit(p) && !p.sculpt));
   }
 
   /** A scenery part that was clicked but never changed is dropped once it is no longer selected. */
@@ -3989,7 +4002,7 @@ export class TrackBuilder3D {
     if (!this.kit) return;
     for (let i = this.placedProps.length - 1; i >= 0; i--) {
       const p = this.placedProps[i];
-      if (!isTerrainEdit(p) || this.selectedPropIds.has(p.id) || !this.kit.isNoOpEdit(p)) continue;
+      if (!isTerrainEdit(p) || this.selectedPropIds.has(p.id) || p.sculpt || !this.kit.isNoOpEdit(p)) continue;
       this.removePropObject(p);
       const box = this.selectionBoxes.get(p.id);
       if (box) { this.scene.remove(box); this.selectionBoxes.delete(p.id); }
@@ -4252,7 +4265,7 @@ export class TrackBuilder3D {
 
   /** The scenery edits, for the Primitives panel. */
   getTerrainEdits(): { prop: PlacedProp; hidden: boolean; moved: boolean; shaded: boolean; orphan: boolean; locked: boolean }[] {
-    return this.placedProps.filter((p) => isTerrainEdit(p) && !this.kit.isNoOpEdit(p)).map((p) => {
+    return this.placedProps.filter((p) => isTerrainEdit(p) && !(this.kit.isNoOpEdit(p) && !p.sculpt)).map((p) => {
       const o = p.terrainOrigin as [number, number, number] | undefined;
       const moved = !!o && (Math.abs(p.x - o[0]) >= 1 || Math.abs(p.y - o[1]) >= 1 || Math.abs(p.z - o[2]) >= 1
         || Math.abs(p.rotY ?? 0) > 1e-4 || Math.abs(p.rotX ?? 0) > 1e-4 || Math.abs(p.rotZ ?? 0) > 1e-4 || Math.abs((p.scale || 1) - 1) > 1e-4);
@@ -4292,6 +4305,31 @@ export class TrackBuilder3D {
     this.saveToStorage();
     this.notify();
     return hidden.length;
+  }
+
+  /* ───────────── NewSculpt: the sculpt tool's view of the builder ───────────── */
+
+  /** The live object for a prop: a model group, a primitive mesh, or the pivot around a scenery part. */
+  sculptObjectFor(id: string): THREE.Object3D | null { return this.propObjects.get(id) ?? null; }
+
+  /** The road surface shows the race line: it can wear a shader but never change shape. */
+  isSculptLocked(prop: PlacedProp): boolean { return isTerrainEdit(prop) && this.kit.isLockedEdit(prop); }
+
+  /** A sculpt stroke starts: one undo step for the whole stroke. */
+  beginSculpt() { this.pushUndo(); }
+
+  /**
+   * A stroke ended: the prop keeps its sparse displacement document (null = back to the generated
+   * shape), saved at once. Scenery is decoration for physics, so a terrain sculpt changes nothing the
+   * ball feels; a sculpted kit model with a collision role keeps its unsculpted patch until the next
+   * load — rebuild it here (kitCollisionInput / patchFromWorldMeshes) when that starts to matter.
+   */
+  commitSculpt(id: string, doc: SculptDoc | null) {
+    const prop = this.placedProps.find((p) => p.id === id);
+    if (!prop) return;
+    if (doc) prop.sculpt = doc; else delete prop.sculpt;
+    this.saveToStorage();
+    this.notify();
   }
 
   /* Shaders */
@@ -4396,6 +4434,32 @@ export class TrackBuilder3D {
     return samples[best].dist;
   }
 
+  /**
+   * NewDecor: a batch from the decoration brush or an auto-decorate rule — some props removed, others
+   * added — as one undo step. `coalesce` joins the later stamps of a brush stroke to its first, so a
+   * whole drag is one Ctrl+Z. Props arrive fully formed (tagged `decor`, grouped by batch).
+   */
+  applyDecorBatch(_label: string, add: PlacedProp[], removeIds: readonly string[], coalesce = false) {
+    if (!add.length && !removeIds.length) return;
+    if (!coalesce) this.pushUndo();
+    const remove = new Set(removeIds);
+    for (const prop of this.placedProps) {
+      if (!remove.has(prop.id)) continue;
+      this.removePropObject(prop);
+      const box = this.selectionBoxes.get(prop.id);
+      if (box) { this.scene.remove(box); this.selectionBoxes.delete(prop.id); }
+      this.selectedPropIds.delete(prop.id);
+    }
+    if (remove.size) this.placedProps = this.placedProps.filter((p) => !remove.has(p.id));
+    for (const prop of add) {
+      this.placedProps.push(prop);
+      this.createPropSprite(prop);
+    }
+    this.updateSelectionBox();
+    this.saveToStorage();
+    this.notify();
+  }
+
   clearAll() {
     this.pushUndo();
     this.restorePropsState([]);
@@ -4404,6 +4468,8 @@ export class TrackBuilder3D {
 
   destroy() {
     this.backups.destroy();
+    this.decor?.dispose();
+    this.decor = null;
     if (this.ghostSprite) this.scene.remove(this.ghostSprite);
     if (this.ghostMesh) this.scene.remove(this.ghostMesh);
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
@@ -4413,6 +4479,8 @@ export class TrackBuilder3D {
     this.propObjects.forEach((s) => this.scene.remove(s));
     this.propObjects.clear();
     this.kit.dispose();
+    this.sculpt?.dispose();
+    this.sculpt = null;
     for (const id of [...this.animTextureCache.keys()]) this.disposeAnimTexture(id);
     if (this.gizmoAdapter) {
       this.gizmoAdapter.dispose();

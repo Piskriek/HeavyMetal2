@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import { RopeReelView } from './rope-reel-view';
 import { BallTexturePool, arrayBallMaterial, layerPixels } from './ball-texture-pool';
+import { RoadSurfacePaint, surfacePaintFlag } from './surface/road-surface-paint';
+import { SurfacePaintTool } from './surface/surface-paint-tool';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { GameAssets } from './assets';
 import type { SceneFrame } from './scene';
@@ -1794,6 +1796,8 @@ export class Renderer3D {
     if (onIsland) this.trackBuilder.setCourse(course);
     this.trackBuilder.setInitialSky(skyKey);
     this.trackBuilder.onSkyboxChange((newSky) => this.setSkybox(newSky));
+    // Sculpts on the island terrain can only be put back once its model has loaded.
+    if (this.island) void this.island.ready.then(() => this.trackBuilder.sculpt?.sync());
 
     // Racers
     this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
@@ -2302,6 +2306,10 @@ export class Renderer3D {
     return playerAltitude;
   }
 
+  /** NewRoads: the painted surface ribbon over the road and, with `?paint=1`, its brush. Built on the first frame. */
+  surfacePaint: RoadSurfacePaint | null = null;
+  surfacePaintTool: SurfacePaintTool | null = null;
+
   render(frame: SceneFrame, intervalMs = 16.67) {
     if (this.destroyed) return;
     const dt = intervalMs / 1000;
@@ -2384,6 +2392,19 @@ export class Renderer3D {
       this.materials.lava.map.offset.y = raw * 0.0025;
     }
 
+    // 3c. NewRoads — the painted surfaces on the road ribbon (a transparent overlay until someone paints)
+    // and the brush behind `?paint=1`. Lazily built like the obstacle view; the island's branching roads
+    // are out of scope for this slice, so it stays off there.
+    if (!this.surfacePaint && !this.island) {
+      const M = this.materials;
+      this.surfacePaint = new RoadSurfacePaint(this.scene, this.space, {
+        dirt: M.dirt.map, cobble: M.cobble.map, wood: M.wood.map, iron: M.iron.map,
+        grass: M.grass.map, cliff: M.cliff.map, cave: M.cave.map,
+      }, frame.options.course);
+      if (surfacePaintFlag()) this.surfacePaintTool = new SurfacePaintTool(this.surfacePaint, this.camera, this.renderer.domElement);
+    }
+    this.surfacePaint?.update();
+
     // 3b. M01 · T5 — painted effects: explosions, impacts, dust, smoke and sparks, drained from the
     // sim's queue and drawn as camera-facing billboards (plus one Points object for sparks).
     if (frame.effects) {
@@ -2400,6 +2421,10 @@ export class Renderer3D {
   destroy() {
     this.destroyed = true;
     this.disposeRacerPool();
+    this.surfacePaintTool?.dispose();
+    this.surfacePaintTool = null;
+    this.surfacePaint?.dispose();
+    this.surfacePaint = null;
     this.effects?.destroy();
     this.effects = null;
     this.obstacleView?.dispose();

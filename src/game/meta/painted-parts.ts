@@ -22,11 +22,20 @@ export interface RigParams { headW: number; headH: number; headTop: number }
  * wide, so the rendered height is `width·(file.height/file.width)`. On the angular head this
  * reproduces the old fixed anchors to within 1 px (guarded by the registration test).
  */
+/** Silhouette half-width per head master (rig units; the ears pivot x and all S() widths key off it). */
+const HEAD_WIDTHS: Readonly<Record<string, number>> = {
+  angular: 54, bloated: 62, scrawny: 44,
+  lantern: 48, wedge: 58, peanut: 55, jowls: 58, bigchin: 55,
+};
 export function headRig(shape: string): RigParams {
-  const headW = shape === 'bloated' ? 62 : shape === 'scrawny' ? 44 : 54;
-  const file = KEYED_PARTS[`head-${shape}`];
+  // Catalog entries are the painted ids ('painted:head-x') or the legacy twin name ('angular').
+  const id = shape.replace(/^painted:/, '').replace(/^head-/, '');
+  const headW = HEAD_WIDTHS[id] ?? 54;
+  const file = KEYED_PARTS[`head-${id}`];
   const headH = (2 * headW + 8) * (file ? file.height / file.width : 1.6);
-  return { headW, headH, headTop: 130 - 0.4 * headH };
+  // The eye-line sits at each head's own pivot fraction (new masters aren't all painted at 40%).
+  const pivotY = PAINTED_PARTS.find((p) => p.id === `head-${id}`)?.pivot[1] ?? 0.4;
+  return { headW, headH, headTop: 130 - pivotY * headH };
 }
 
 /** Rig units covered by the square a war paint was painted in (see the 'face-square' anchor). */
@@ -190,10 +199,20 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'head-angular', layer: 'head', name: 'Angular', pivot: [0.5, 0.4], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, replaces: 'angular' }),
   P({ id: 'head-bloated', layer: 'head', name: 'Bloated', pivot: [0.5, 0.4], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, replaces: 'bloated' }),
   P({ id: 'head-scrawny', layer: 'head', name: 'Scrawny', pivot: [0.5, 0.4], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, replaces: 'scrawny' }),
+  // Round 9 heads (DNA v5's final five slots): pivot y is the measured socket-centre fraction of each
+  // master — NOT a flat 0.4 (lantern/peanut/bigchin paint their eye line a little lower); headRig reads
+  // it back, so the eye line still pins to anchor 'eye-mid' on every rig datum.
+  P({ id: 'head-lantern', layer: 'head', name: 'Lantern', pivot: [0.5, 0.41], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, prompt: 'Chunky hand-painted cartoon game asset for a goblin kart racer avatar, bold inky painterly heavy-metal comic style: a single bald goblin head seen straight on, front view: a tall narrow lantern head, long tapering face with high cheekbones, small pointed chin. Toxic-green skin #7fb24a, heavy brow ridge, two deep dark EMPTY eye sockets, muted mouth shadow. NO EARS, NO EYES, no hair or neck. Eye sockets at 40% down the head. Flat #FF00FF background.' }),
+  P({ id: 'head-wedge', layer: 'head', name: 'Wedge', pivot: [0.5, 0.4], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, prompt: 'Chunky hand-painted cartoon game asset for a goblin kart racer avatar, bold inky painterly heavy-metal comic style: a single bald goblin head seen straight on, front view: a wide flat-topped wedge head, flat slab skull, blunt square jaw, chiseled blocky silhouette. Toxic-green skin #7fb24a, heavy brow ridge, two deep dark EMPTY eye sockets, muted mouth shadow. NO EARS, NO EYES, no hair or neck. Eye sockets at 40% down the head. Flat #FF00FF background.' }),
+  P({ id: 'head-peanut', layer: 'head', name: 'Peanut', pivot: [0.5, 0.44], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, prompt: 'Chunky hand-painted cartoon game asset for a goblin kart racer avatar, bold inky painterly heavy-metal comic style: a single bald goblin head seen straight on, front view: a peanut head, huge round bulbous forehead ballooning above a small narrow lower face with a little tucked chin. Toxic-green skin #7fb24a, heavy brow ridge, two deep dark EMPTY eye sockets, muted mouth shadow. NO EARS, NO EYES, no hair or neck. Eye sockets at 40% down the head. Flat #FF00FF background.' }),
+  P({ id: 'head-jowls', layer: 'head', name: 'Jowls', pivot: [0.5, 0.4], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, prompt: 'Chunky hand-painted cartoon game asset for a goblin kart racer avatar, bold inky painterly heavy-metal comic style: a single bald goblin head seen straight on, front view: a heavy jowled head, sagging bulldog jowls hanging wide below the cheeks, bottom of the face wider than the forehead. Toxic-green skin #7fb24a, heavy brow ridge, two deep dark EMPTY eye sockets, muted mouth shadow. NO EARS, NO EYES, no hair or neck. Eye sockets at 40% down the head. Flat #FF00FF background.' }),
+  P({ id: 'head-bigchin', layer: 'head', name: 'Big chin', pivot: [0.5, 0.41], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, prompt: 'Chunky hand-painted cartoon game asset for a goblin kart racer avatar, bold inky painterly heavy-metal comic style: a single bald goblin head seen straight on, front view: a pugnacious underbite head, massive protruding square chin and heavy lower jaw pushed forward under a sloping low forehead, small ivory underbite tusks. Toxic-green skin #7fb24a, heavy brow ridge, two deep dark EMPTY eye sockets, muted mouth shadow. NO EARS, NO EYES, no hair or neck. Eye sockets at 40% down the head. Flat #FF00FF background.' }),
   P({ id: 'eyes-cyborg-lens', layer: 'eyes', name: 'Cyborg lens', pivot: [0.5, 0.5], anchor: 'eye-mid', width: S(100) }),
   P({ id: 'eyes-furnace-glow', layer: 'eyes', name: 'Furnace glow', pivot: [0.5, 0.5], anchor: 'eye-mid', width: S(100) }),
   P({ id: 'eyes-dizzy-swirls', layer: 'eyes', name: 'Dizzy swirls', pivot: [0.5, 0.5], anchor: 'eye-mid', width: () => 100, prompt: 'Mesmer spinning spiral pupils, watery lids.' }),
   P({ id: 'eyes-rivet-socket', layer: 'eyes', name: 'Rivet sockets', pivot: [0.5, 0.5], anchor: 'eye-mid', width: () => 100, prompt: 'Deep dark hollow sockets, one tiny hot rivet glint in each.' }),
+  P({ id: 'eyes-button-doll', layer: 'eyes', name: 'Button eyes', pivot: [0.5, 0.5], anchor: 'eye-mid', width: () => 100, prompt: 'Stitched black button doll eyes with four little thread crosses.' }),
+  P({ id: 'eyes-puppy-sad', layer: 'eyes', name: 'Puppy eyes', pivot: [0.5, 0.5], anchor: 'eye-mid', width: () => 100, prompt: 'Big glossy sad puppy eyes, giant wet highlights.' }),
   P({ id: 'eyewear-goggles-up', layer: 'eyewear', name: 'Goggles up', pivot: [0.5, 0.75], anchor: 'brow-line', width: S(112), replaces: 'goggles-up' }),
   P({ id: 'eyewear-aviator-shades', layer: 'eyewear', name: 'Aviator shades', pivot: [0.5, 0.5], anchor: 'eye-mid', width: S(114) }),
   P({ id: 'eyewear-triple-loupe', layer: 'eyewear', name: 'Triple loupe', pivot: [0.4, 0.45], anchor: 'eye-left', width: S(84) }),
@@ -246,6 +265,11 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'ears-long-ragged', layer: 'ears', name: 'Long ragged ears', pivot: [0.92, 0.55], anchor: 'ear-left', width: (c) => Math.min(Math.round((96 / 54) * c.headW), 78), mirrorPair: true }),
   P({ id: 'ears-shredded-flag', layer: 'ears', name: 'Shredded ears', pivot: [0.92, 0.6], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Very long ear with its end shredded like a battle-torn flag.' }),
   P({ id: 'ears-moth-round', layer: 'ears', name: 'Moth ears', pivot: [0.92, 0.69], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Big round cupped moth-wing ear, ribbed fanned inner grooves.' }),
+  // The v5 vault returns (round 6's holdback, keyed and QA'd then): same ear-rack pivots, width 84.
+  P({ id: 'ears-gauge-lobes', layer: 'ears', name: 'Gauge lobes', pivot: [0.92, 0.53], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Stretched gauged lobes, big dark tunnel rings through the soft flesh.' }),
+  P({ id: 'ears-bolted-flat', layer: 'ears', name: 'Bolted flat', pivot: [0.92, 0.56], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Ear edges clamped flat to the skull with heavy hex bolts.' }),
+  P({ id: 'ears-spear-ring', layer: 'ears', name: 'Spear ring', pivot: [0.92, 0.64], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Long pointed ear with a single brass spear-ring through the tip.' }),
+  P({ id: 'ears-patch-stitched', layer: 'ears', name: 'Patched ears', pivot: [0.92, 0.62], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Torn ear with a crude cloth patch sewn over the rip in big stitches.' }),
   P({ id: 'neck-wool-scarf', layer: 'neck', name: 'Wool scarf', pivot: [0.5, 0.3], anchor: 'chin', width: S(150) }),
   P({ id: 'neck-padlock-collar', layer: 'neck', name: 'Padlock collar', pivot: [0.5, 0.35], anchor: 'chin', width: S(120) }),
   P({ id: 'neck-trophy-medal', layer: 'neck', name: "Winner's medal", pivot: [0.5, 0.42], anchor: 'chin', width: S(58) }),

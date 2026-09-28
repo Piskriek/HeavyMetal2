@@ -11,7 +11,7 @@ import { PART_MASKS } from '../src/game/meta/painted-masks.generated';
 import { composeGoblinSvg, maskUrl } from '../src/game/meta/goblin-compositor';
 import type { AvatarLayerId, GoblinAvatarConfig } from '../src/game/meta/interfaces';
 
-const SHAPES = ['angular', 'bloated', 'scrawny'] as const;
+const SHAPES = ['angular', 'bloated', 'scrawny', 'lantern', 'wedge', 'peanut', 'jowls', 'bigchin'] as const;
 const HEADS = SHAPES.map((shape) => ({ shape, ...headRig(shape) }));
 const onDisk = (url: string) => existsSync(`public${url}`);
 
@@ -119,16 +119,22 @@ test('ART-I1: the structural bust draws right after the background and re-tints 
   assert.match(ash, /body-racer-bust-skin\.png/, 'its neck stump follows the skin swatch through the tint mask');
 });
 
-test('ART-I1: v3 holds every painted part; the catalog has room left in v3', () => {
-  for (const layer of Object.keys(V3_CAPACITY) as AvatarLayerId[]) {
-    assert.ok(AVATAR_CATALOG[layer].length <= V3_CAPACITY[layer]);
+test('ART-I1: the newest catalog radix holds every painted part; every last index round-trips', () => {
+  // v3 was the roomiest codec when this suite was written; features have since outgrown it. The
+  // premise that survives every wave: the NEWEST radix holds the catalog, and every layer's last
+  // index round-trips through whichever version picks it up.
+  for (const layer of Object.keys(V5_CAPACITY) as AvatarLayerId[]) {
+    assert.ok(AVATAR_CATALOG[layer].length <= V5_CAPACITY[layer]);
     const last = AVATAR_CATALOG[layer].length - 1;
     const g = generateRandomGoblin(9, 3);
     const config: GoblinAvatarConfig = { ...g, layers: { ...g.layers, [layer]: last } };
     const dna = encodeGoblinDna(config);
     assert.deepEqual(decodeGoblinDna(dna).layers, config.layers, `${layer} #${last} round-trips (${dna})`);
   }
-  const v3 = encodeGoblinDna({ ...generateRandomGoblin(1, 3), layers: { ...generateRandomGoblin(1, 3).layers, neck: AVATAR_CATALOG.neck.length - 1 } });
+  // v3 codes are still their own shape: a config inside every v3 radix keeps the four-group form
+  // (built off a gen-1 goblin so no feature roll can wander past the v3 radix).
+  const g1 = generateRandomGoblin(1, 1);
+  const v3 = encodeGoblinDna({ ...g1, layers: { ...g1.layers, neck: AVATAR_CATALOG.neck.length - 1 } });
   assert.match(v3, /^GOB-3[0-9A-F]{3}(-[0-9A-F]{4}){3}$/, 'v3 is four hex groups');
 });
 
@@ -136,7 +142,11 @@ test('ART-I2: DNA v4 carries the body as the twelfth layer; heads gain a slot', 
   assert.equal(V4_CAPACITY.head, 8, 'heads gain a slot (v3 had 4)');
   assert.equal(V4_CAPACITY.body, 16, 'the body enters the codec with a full nibble');
   for (const layer of Object.keys(V4_CAPACITY) as AvatarLayerId[]) {
-    assert.ok(AVATAR_CATALOG[layer].length <= V4_CAPACITY[layer], `the ${layer} catalog fits v4`);
+    if (AVATAR_CATALOG[layer].length > V4_CAPACITY[layer]) {
+      // Features that outgrew v4 (ears, eyes) exist only under v5's wider radix — v4's numbers themselves stay frozen, and the catalog must fit the newer room.
+    } else {
+      assert.ok(AVATAR_CATALOG[layer].length <= V4_CAPACITY[layer], `the ${layer} catalog fits v4`);
+    }
   }
   // Round-trip through the real codec, one body drop into the future: a second body in the catalog
   // is all it takes for v4 codes to appear (the game's shortest-form logic stays untouched).
@@ -152,12 +162,15 @@ test('ART-I2: DNA v4 carries the body as the twelfth layer; heads gain a slot', 
         ? { ...g, layers: { ...g.layers, body: 1 } }
         : g;
       const dna = encodeGoblinDna(config);
+      // Every goblin round-trips, whatever version picks it up.
+      assert.deepEqual(decodeGoblinDna(dna), config, `seed ${seed} round-trips (${dna})`);
+      assert.equal(encodeGoblinDna(decodeGoblinDna(dna)), dna);
       if (config.layers.body === 0) {
-        assert.match(dna, /^GOB-[123][0-9A-F]{3}-/, `seed ${seed}: body 0 keeps the shortest form`);
+        // A body-0 goblin still takes the shortest fitting form: v1–v3 when everything is small,
+        // v4 for head slots 4–7, v5 only when a feature index reaches 12–15.
+        assert.match(dna, /^GOB-[1-5][0-9A-F]{3}-/, `seed ${seed}: body 0 keeps the shortest fitting form`);
       } else {
-        assert.match(dna, /^GOB-4[0-9A-F]{3}(?:-[0-9A-F]{4}){4}$/, `seed ${seed}: ${dna}`);
-        assert.deepEqual(decodeGoblinDna(dna), config, `seed ${seed} round-trips (${dna})`);
-        assert.equal(encodeGoblinDna(decodeGoblinDna(dna)), dna);
+        assert.match(dna, /^GOB-[45][0-9A-F]{3}(?:-[0-9A-F]{4}){4}$/, `seed ${seed}: ${dna}`);
       }
     }
     // v4 + nudge: the fine-tune block appends as before (five head groups, then three).

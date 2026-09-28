@@ -303,6 +303,10 @@ export class SculptMesh {
     const on = (m: THREE.Material) => { (m as THREE.MeshStandardMaterial).vertexColors = true; m.needsUpdate = true; };
     const base = (mesh.userData.baseMaterial ?? mesh.material) as THREE.Material | THREE.Material[];
     if (mesh.userData.sculptMaterialOwned) { (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(on); return; }
+    // A material a live controller drives (the island terrain's ground shader keeps its controller in
+    // userData) belongs to this one mesh: switch it in place. clone() would copy userData as plain JSON,
+    // leaving a controller with no methods (the Island panel crashed) and settings aimed at the old material.
+    if (!Array.isArray(base) && base.userData?.islandGround) { on(base); mesh.userData.sculptMaterialOwned = true; return; }
     const clone = Array.isArray(base) ? base.map((m) => m.clone()) : base.clone();
     (Array.isArray(clone) ? clone : [clone]).forEach(on);
     const wasBase = mesh.material === base;

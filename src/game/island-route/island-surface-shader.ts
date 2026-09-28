@@ -45,7 +45,8 @@ float surfNoise(vec2 p) {
 }
 `;
 
-export const ISLAND_SURFACE_GLSL = /* glsl */ `
+/** The uniforms every island-tile shader needs (ground and painted models alike). */
+const ISLAND_UNIFORMS_GLSL = /* glsl */ `
 uniform sampler2DArray islSurfaces;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 // Per layer: world units per repeat, roughness, height contrast, 0.
@@ -58,7 +59,10 @@ uniform float islScale;
 // the mask says: the top-down mask barely sees a near-vertical wall. Layer -1: off.
 uniform float islCliffLayer;
 uniform vec2 islCliffNy; // normal.y where the rock starts, and where it is complete
+`;
 
+/** Reading the ground's paint mask. Needs `surfTexel` from `surface/surface-shader.ts`: ground only. */
+const ISLAND_GATHER_GLSL = /* glsl */ `
 /**
  * (id0, id1, weight of id1) at coord (texel units of a size-wide mask): every surface of the four texels
  * around it, weighted by bilinear distance and by its share, and the two strongest of them.
@@ -99,7 +103,10 @@ vec3 islGather(sampler2D mask, vec2 size, vec2 coord) {
   if (ib < 0) return vec3(cid[ia], cid[ia], 0.0);
   return vec3(cid[ia], cid[ib], cw[ib] / max(cw[ia] + cw[ib], 1e-5));
 }
+`;
 
+/** Tiles by layer: sampling, height blending, triplanar projection. Needs only `surfNoise`. */
+const ISLAND_TILE_GLSL = /* glsl */ `
 /** The array layer of a surface ID, or -1 when it is not an island tile. */
 float islLayer(float id) {
   int i = int(id + 0.5);
@@ -169,6 +176,20 @@ float islRough(float la, float lb, float w) {
 }
 `;
 
+/** Everything the island ground shader uses (after `surface/surface-shader.ts`). */
+export const ISLAND_SURFACE_GLSL = ISLAND_UNIFORMS_GLSL + ISLAND_GATHER_GLSL + ISLAND_TILE_GLSL;
+
+/**
+ * What a painted model needs: no paint mask, so no `islGather` (its `surfTexel` lives in the ground's
+ * surface shader, and a model shader that called it failed to compile: the model vanished).
+ */
+export const ISLAND_MODEL_GLSL = SURF_NOISE_GLSL + ISLAND_UNIFORMS_GLSL + ISLAND_TILE_GLSL;
+
+const islandModelPatched = new WeakSet<THREE.Material>();
+
+/** Whether `injectIslandModelShader` has patched this material. */
+export const hasIslandModelShader = (material: THREE.Material) => islandModelPatched.has(material);
+
 /**
  * Injects the island surface shader into a model's material using `onBeforeCompile`.
  * Samples the island texture array with world-space triplanar projection and blends
@@ -178,10 +199,15 @@ export function injectIslandModelShader(
   material: THREE.Material,
   surfaceArray: IslandSurfaceArray = IslandSurfaceArray.getInstance(),
 ): void {
-  if ((material.userData as Record<string, unknown>)?.islandModelShaderInjected) return;
-  (material.userData as Record<string, unknown>).islandModelShaderInjected = true;
+  // A WeakSet, not a userData flag: clone() copies userData, so a clone of a patched material (the kit
+  // look's copy) read as patched while it had no hook, and never showed the paint.
+  if (islandModelPatched.has(material)) return;
+  islandModelPatched.add(material);
 
   const prevOnBeforeCompile = material.onBeforeCompile;
+  const prevCacheKey = material.customProgramCacheKey.bind(material);
+  // The default key is onBeforeCompile's source, the same for every patched material whatever it wraps.
+  material.customProgramCacheKey = () => `islModel|${prevCacheKey()}|${prevOnBeforeCompile.toString()}`;
 
   material.onBeforeCompile = (shader, renderer) => {
     prevOnBeforeCompile?.call(material, shader, renderer);
@@ -219,8 +245,7 @@ export function injectIslandModelShader(
       varying vec3 vIslWorldPos;
       varying vec3 vIslWorldNormal;
       varying vec2 vIslSurface;
-      ${SURF_NOISE_GLSL}
-      ${ISLAND_SURFACE_GLSL}
+      ${ISLAND_MODEL_GLSL}
       ${shader.fragmentShader}
     `;
 

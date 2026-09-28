@@ -4,6 +4,7 @@
  */
 import { effectiveColor, normalizeDescriptor, type MaterialDescriptor } from '../materials/material-descriptor';
 import * as THREE from 'three';
+import { injectIslandModelShader } from '../island-route/island-surface-shader';
 import { loadGlb } from './glb';
 import { kitModelFor, kitModelUrl, type KitModel } from './kit-catalog';
 
@@ -87,6 +88,8 @@ export function setKitLook(group: THREE.Object3D, brightness: number, desc: Mate
         : base.clone();
       mesh.userData.lookMaterial = look;
     }
+    // A model painted with island surfaces keeps them under any look (lit or unlit).
+    if (mesh.geometry.getAttribute('islSurface')) injectIslandModelShader(look);
     look.color.copy(base.color);
     if (tint) look.color.multiply(tint);
     look.side = d?.doubleSided ? THREE.DoubleSide : base.side;

@@ -10,9 +10,10 @@
  * - **Painted surfaces**: a layered surface mask over the island (the NewRoads format: two surface IDs
  *   and a blend weight per texel, `surface/surface-mask.ts`). ID 0 is the island as it is; the island's
  *   own cracked dirt (`SURFACE_CRACKED`) is drawn procedurally here, tuned by the dirt sliders; every
- *   other ID is a tile from the shared surface atlas, drawn by the same sampler as the road ribbon
- *   (`surface/surface-shader.ts`). The brush paints the mask; auto paint paints the island road's own
- *   mask, which is laid over it along the route (`island-road-paint.ts`).
+ *   other ID is a tile of the island surface set (`island-surfaces.ts`), height-blended with its
+ *   neighbour (`island-surface-shader.ts`). Three layers make the mask the GPU shows, bottom to top:
+ *   island auto paint (a recipe painted over the terrain, `island-autopaint.ts`), the brush, and the
+ *   island road's auto paint laid along the route (`island-road-paint.ts`).
  *
  * The owner tunes both in build mode (Primitives or Custom 3D: click the terrain). The settings and the
  * mask are saved per island track, in the browser and on disk (backups/island/), and are keyed by
@@ -20,13 +21,17 @@
  */
 import * as THREE from 'three';
 import { SurfaceMask, type MaskRect, type MaskSnapshot } from '../surface/surface-mask';
-import { SurfaceAtlas, type SurfaceSources } from '../surface/surface-atlas';
 import { SURFACE_SAMPLING_GLSL } from '../surface/surface-shader';
-import { SURFACE_CRACKED } from '../surface/surface-table';
+import { SURFACE_BARE, SURFACE_CRACKED } from '../surface/surface-table';
 import { RoadMask, type RoadMaskDoc } from '../surface/road-mask';
 import { AutoPaint, jobsFromDoc, jobsToDoc, trackPaintField } from '../surface/auto-paint';
 import { islandTrackSpace } from './island-space';
-import { buildRoadFootprint, composeTexel, projectFootprint, type PackedTexel, type RoadFootprint } from './island-road-paint';
+import { buildRoadFootprint, composeLayers, projectFootprint, type PackedTexel, type RoadFootprint } from './island-road-paint';
+import { ISLAND_LAYER_OF, ISLAND_SURFACES, ISLAND_TEXTURE_DIR, IslandSurfaceArray } from './island-surfaces';
+import { libraryTexture } from './island-texture-library';
+import { ISLAND_SURFACE_GLSL } from './island-surface-shader';
+import { TERRAIN_RES, analyseIslandTerrain, type IslandTerrain, type TerrainTriangles } from './island-terrain';
+import { effectiveLayers, normalizeRecipe, paintIsland, upsampleMask, type IslandRecipe, type PaintIslandResult } from './island-autopaint';
 
 export interface IslandGroundSettings {
   /** Multiplied into the island texture, #rrggbb. */
@@ -55,6 +60,12 @@ export interface IslandGroundSettings {
   shadowStrength: number;
   /** Relief: how strongly pebbles stand up and cracks cut in, so light and shine catch them (0 = flat). */
   bump: number;
+  /** How softly painted surfaces fade into each other (0 = crisp, height-led; 1 = long, soft fades). */
+  blendSoft: number;
+  /** Every surface tile's size, × (bigger reads calmer). */
+  tileScale: number;
+  /** A surface's tile swapped for a library one: surface ID → library key (`island-texture-library.ts`). */
+  textures: Record<string, string>;
 }
 
 export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
@@ -72,6 +83,9 @@ export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
   shine: 0.5,
   shadowStrength: 0.8,
   bump: 0.6,
+  blendSoft: 0.6,
+  tileScale: 1.2,
+  textures: {},
 };
 
 const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
@@ -96,6 +110,11 @@ export function normalizeIslandGround(raw: unknown): IslandGroundSettings {
     shine: clamp(r.shine, 0, 1, d.shine),
     shadowStrength: clamp(r.shadowStrength, 0, 1, d.shadowStrength),
     bump: clamp(r.bump, 0, 2, d.bump),
+    blendSoft: clamp(r.blendSoft, 0, 1, d.blendSoft),
+    tileScale: clamp(r.tileScale, 0.4, 4, d.tileScale),
+    textures: r.textures && typeof r.textures === 'object'
+      ? Object.fromEntries(Object.entries(r.textures as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'))
+      : {},
   };
 }
 
@@ -151,9 +170,6 @@ uniform float groundFade;
 uniform sampler2D paintMask;
 uniform float paintHalf;
 uniform float paintRes;
-uniform sampler2D surfAtlas;
-uniform sampler2D surfParams;
-uniform float surfRepeat;
 uniform vec3 sandColor;
 uniform float sandStrength;
 uniform float sandPebbles;
@@ -173,9 +189,11 @@ float gStoneCover = 0.0;
 float gCrack = 0.0;
 float gHeight = 0.0;
 float gNear = 0.0;
-// How much of this pixel is an atlas surface (not bare island, not cracked dirt), and its roughness.
+// How much of this pixel is an island surface tile (not bare island, not cracked dirt), its roughness,
+// and how wet the waterline makes it.
 float gAtlas = 0.0;
 float gAtlasRough = 1.0;
+float gWet = 0.0;
 uniform float groundBump;
 // A surface normal tilted by the slope of a height (screen-space derivatives; three.js's bump-map way).
 vec3 gBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy) {
@@ -188,6 +206,7 @@ vec3 gBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy) {
 varying vec3 vGroundWorld;
 varying vec3 vGroundNormal;
 ${SURFACE_SAMPLING_GLSL}
+${ISLAND_SURFACE_GLSL}
 // 2D hash and value noise (the only noise still computed per pixel: 4 hashes each).
 float gHash2(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -235,27 +254,27 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   float near = 1.0 - smoothstep(groundFade * 0.35, groundFade, dist);
   diffuseColor.rgb *= groundTint * groundBright;
 
-  // The layered mask: (id0, id1, weight) at this pixel. ID 0 is the bare island, SURF_CRACKED the
-  // procedural dirt below, anything else an atlas tile (drawn after it).
+  // The layered mask: (id0, id1, weight) at this pixel. ID 0 (and SURF_BARE) is the bare island,
+  // SURF_CRACKED the procedural dirt below, an island surface a tile of the array (drawn after it).
   vec2 muv = (wp.xz + paintHalf) / (2.0 * paintHalf);
-  // Atlas tiles are projected from above, or from the side on steep faces (as the pebble detail is), so a
-  // cliff painted with grass does not smear into streaks.
-  vec3 sn = abs(vGroundNormal);
-  vec2 suv = sn.y > 0.55 ? wp.xz : (sn.x > sn.z ? wp.zy : wp.xy);
-  vec2 sdx = dFdx(suv);
-  vec2 sdy = dFdy(suv);
-  vec3 sm = (muv.x < 0.0 || muv.x > 1.0 || muv.y < 0.0 || muv.y > 1.0) ? vec3(0.0) : surfSample(paintMask, vec2(paintRes), muv * paintRes);
+  // Tiles are projected from above, or from the side on steep faces (as the pebble detail is), so a
+  // cliff painted with rock does not smear into streaks.
+  vec3 dwx = dFdx(wp);
+  vec3 dwy = dFdy(wp);
+  // Read at a gently warped position (about a texel), so borders meander instead of following the grid.
+  vec2 mwarp = vec2(gNoise2(wp.xz / 170.0), gNoise2(wp.xz / 170.0 + 19.7)) - 0.5;
+  vec3 sm = (muv.x < 0.0 || muv.x > 1.0 || muv.y < 0.0 || muv.y > 1.0) ? vec3(0.0) : islGather(paintMask, vec2(paintRes), muv * paintRes + mwarp * 1.4);
   bool sSolid = surfIs(sm.x, sm.y);
   float shareA = sSolid ? 1.0 : 1.0 - sm.z;
   float shareB = sSolid ? 0.0 : sm.z;
   float shareCracked = (surfIs(sm.x, SURF_CRACKED) ? shareA : 0.0) + (surfIs(sm.y, SURF_CRACKED) ? shareB : 0.0);
-  float shareBare = (surfIs(sm.x, 0.0) ? shareA : 0.0) + (surfIs(sm.y, 0.0) ? shareB : 0.0);
-  float shareAtlas = clamp(1.0 - shareCracked - shareBare, 0.0, 1.0);
+  float isl0 = islLayer(sm.x);
+  float isl1 = islLayer(sm.y);
+  float shareAtlas = (isl0 >= 0.0 ? shareA : 0.0) + (isl1 >= 0.0 ? shareB : 0.0);
   float rag = gNoise2(wp.xz / 60.0);
   float paint = shareCracked * sandStrength;
   // A ragged edge: the noise eats into the soft brush rim so strokes never show as circles.
   paint = clamp(paint * 1.25 - 0.25 * rag * (1.0 - paint), 0.0, 1.0);
-  shareAtlas = shareAtlas >= 0.999 ? 1.0 : clamp(shareAtlas * 1.25 - 0.25 * rag * (1.0 - shareAtlas), 0.0, 1.0);
   gPaint = max(paint, shareAtlas);
 
   // The detail up close: projected from above, or from the side on steep faces.
@@ -299,17 +318,32 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   }
 
   if (shareAtlas > 0.002) {
-    // The atlas surfaces in this texel: a slot holding bare island or cracked dirt defers to the other.
-    float a0 = sm.x, a1 = sm.y, aw = sm.z;
-    if (surfIs(a0, 0.0) || surfIs(a0, SURF_CRACKED)) { a0 = a1; aw = 0.0; }
-    if (surfIs(a1, 0.0) || surfIs(a1, SURF_CRACKED)) { a1 = a0; aw = 0.0; }
-    vec3 tile = surfPair(surfAtlas, a0, a1, aw, suv, surfRepeat, sdx, sdy);
+    // The island tiles in this texel: a slot holding bare island or cracked dirt defers to the other.
+    float l0 = isl0, l1 = isl1, lw = sSolid ? 0.0 : sm.z;
+    if (l0 < 0.0) { l0 = l1; lw = 1.0; }
+    if (l1 < 0.0) { l1 = l0; lw = 0.0; }
+    vec3 gnrm = normalize(vGroundNormal);
+    vec4 tile = islTriplanar(l0, l1, lw, wp, gnrm, dwx, dwy);
+    // Walls and near-vertical faces wear the look's cliff tile (the top-down mask barely sees them).
+    float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
+    if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
     // Broad, soft mottling so a big fill never reads as one flat print.
-    tile *= 0.9 + 0.2 * gNoise2(wp.xz / 1400.0);
-    diffuseColor.rgb = mix(diffuseColor.rgb, tile * groundTint * groundBright, shareAtlas);
-    gAtlas = shareAtlas;
-    gAtlasRough = mix(surfParamsOf(surfParams, a0).r, surfParamsOf(surfParams, a1).r, aw);
+    tile.rgb *= 0.9 + 0.2 * gNoise2(wp.xz / 1400.0 + 3.7);
+    // The rim against the bare island or dirt is decided by height too: the paint ends along the tile's
+    // own shapes (a clump of grass, the edge of a rock), not along a soft circle.
+    float under = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114)) * 1.6;
+    float rimK = mix(4.5, 1.15, islSoft);
+    float cover = shareAtlas >= 0.999 ? 1.0 : clamp((shareAtlas - 0.5) * rimK + (tile.a - under) * mix(0.9, 0.35, islSoft) + 0.5, 0.0, 1.0) * smoothstep(0.0, 0.05, shareAtlas);
+    diffuseColor.rgb = mix(diffuseColor.rgb, tile.rgb * groundTint * groundBright, cover);
+    gAtlas = cover;
+    gAtlasRough = islRough(l0, l1, lw);
+    // The tile's height lifts the relief, so light and shine catch grass blades and rock edges.
+    gHeight = mix(gHeight, tile.a * 5.0, cover);
   }
+
+  // The waterline: every surface darkens and glosses as it nears the sea.
+  gWet = 1.0 - smoothstep(25.0, 240.0, wp.y);
+  diffuseColor.rgb *= 1.0 - 0.3 * gWet;
 
   if (near > 0.0 && groundGrain > 0.0) {
     vec3 g = vec3(grain) * baseStones;
@@ -436,8 +470,9 @@ export const GROUND_ROUGHNESS_BODY = /* glsl */ `
   roughnessFactor = clamp(groundRough - groundShine * shineMask, 0.06, 1.0);
   // Cracks are dull and dusty: no shine in them at all.
   roughnessFactor = mix(roughnessFactor, 1.0, clamp(gCrack * gNear * 1.5, 0.0, 1.0));
-  // Atlas surfaces bring their own roughness (asphalt is smoother than gravel).
+  // Island surfaces bring their own roughness (wet sand is glossier than grass), and the waterline wets them.
   roughnessFactor = mix(roughnessFactor, gAtlasRough, gAtlas);
+  roughnessFactor = mix(roughnessFactor, 0.32, gWet * 0.85);
 }
 `;
 
@@ -483,7 +518,7 @@ export function injectIslandGround(
   vGroundWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
   vGroundNormal = normalize(mat3(modelMatrix) * objectNormal);`);
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\n#define DETAIL_CELLS ${DETAIL_CELLS.toFixed(1)}\n#define SURF_CRACKED ${SURFACE_CRACKED.toFixed(1)}\n${GROUND_FRAGMENT_HEADER}`)
+    .replace('#include <common>', `#include <common>\n#define DETAIL_CELLS ${DETAIL_CELLS.toFixed(1)}\n#define SURF_CRACKED ${SURFACE_CRACKED.toFixed(1)}\n#define SURF_BARE ${SURFACE_BARE.toFixed(1)}\n${GROUND_FRAGMENT_HEADER}`)
     .replace('#include <map_fragment>', `#include <map_fragment>\n${GROUND_FRAGMENT_BODY}`)
     .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${GROUND_ROUGHNESS_BODY}`)
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${GROUND_RELIEF_BODY}`)
@@ -493,23 +528,25 @@ export function injectIslandGround(
 /** Brush undo keeps whole 64 × 64 tiles of the hand mask, snapshotted the first time a stroke touches one. */
 const UNDO_TILE = 64;
 const UNDO_DEPTH = 12;
-/** World units per atlas tile repeat on the island (the road's own 480, so a surface reads the same size). */
-export const ISLAND_SURFACE_REPEAT = 480;
 
 /**
  * The live ground of one island material: its settings, the paint, and the paint on the GPU.
  *
- * Two masks of the same square: `hand` is what the brush paints (and what old dirt saves migrate into);
- * `view` is what the GPU shows, the hand paint with the island road's auto paint laid over it
- * (`island-road-paint.ts`). Only changed rows are uploaded.
+ * `hand` is what the brush paints (and what old dirt saves migrate into); `view` is what the GPU shows:
+ * the island auto paint (a 1024² mask painted from a recipe, in a worker), the brush over it, the island
+ * road's auto paint over both (`island-road-paint.ts`). Only changed rows are uploaded.
  */
 export class IslandGround {
   readonly hand = new SurfaceMask(PAINT_RES, PAINT_RES);
   readonly view = new SurfaceMask(PAINT_RES, PAINT_RES);
   readonly maskTexture: THREE.DataTexture;
   readonly uniforms: Record<string, THREE.IUniform>;
-  /** The surface tiles (null in node tests, or before the renderer hands over its textures). */
-  readonly atlas: SurfaceAtlas | null;
+  /** The island surface tiles (null in node tests). */
+  readonly surfaces: IslandSurfaceArray | null;
+  /** 0..1 while the island is being auto-painted, null when idle (the panel's progress bar). */
+  onAutoProgress: ((t: number | null) => void) | null = null;
+  /** How the last island auto paint went, for the panel's readout. */
+  lastAuto: { ms: number; coverage: Record<number, number> } | null = null;
   /** Runs after any paint change worth saving (the builder schedules the save). */
   onPainted: (() => void) | null = null;
   /** Runs after an auto pass on the road (saving only: the panel redraws itself; defaults to onPainted). */
@@ -526,16 +563,29 @@ export class IslandGround {
   /** Where the island road lies on the ground (built once per terrain: the costly part of a projection). */
   private footprint: RoadFootprint | null = null;
   private strokeTiles: Map<number, MaskSnapshot> | null = null;
+  /** Library tiles still loading (swapped by the settings). */
+  private textureLoads: Promise<void> = Promise.resolve();
   private undoStack: MaskSnapshot[][] = [];
+  /** Island auto paint: the recipe, its mask (PAINT_RES², smoothly upsampled, under the brush), and the terrain it reads. */
+  private autoRecipe: IslandRecipe | null = null;
+  private autoMask: Uint8Array | null = null;
+  private terrainMap: IslandTerrain | null = null;
+  private autoWorker: Worker | null = null;
+  private autoRunning: Promise<void> | null = null;
+  /** A recipe asked for while one was painting (the latest wins; undefined = none). */
+  private autoPending: IslandRecipe | null | undefined = undefined;
+  private autoBusy: number | null = null;
+  private autoId = 0;
+  private autoWaiters: (() => void)[] = [];
 
-  constructor(material: THREE.MeshStandardMaterial, sources?: SurfaceSources) {
+  constructor(material: THREE.MeshStandardMaterial) {
     this.maskTexture = new THREE.DataTexture(this.view.data, PAINT_RES, PAINT_RES, THREE.RGBAFormat, THREE.UnsignedByteType);
     // IDs are never interpolated: the sampler reads four texels and blends the weights itself.
     this.maskTexture.magFilter = THREE.NearestFilter;
     this.maskTexture.minFilter = THREE.NearestFilter;
     this.maskTexture.generateMipmaps = false;
     this.maskTexture.needsUpdate = true;
-    this.atlas = sources && typeof document !== 'undefined' ? new SurfaceAtlas(sources) : null;
+    this.surfaces = typeof document !== 'undefined' ? new IslandSurfaceArray() : null;
     this.uniforms = {
       groundTint: { value: new THREE.Color(1, 1, 1) },
       groundBright: { value: 1 },
@@ -546,9 +596,13 @@ export class IslandGround {
       paintMask: { value: this.maskTexture },
       paintHalf: { value: PAINT_HALF },
       paintRes: { value: PAINT_RES },
-      surfAtlas: { value: this.atlas?.texture ?? null },
-      surfParams: { value: this.atlas?.params ?? null },
-      surfRepeat: { value: ISLAND_SURFACE_REPEAT },
+      islSurfaces: { value: this.surfaces?.texture ?? null },
+      islLayerOf: { value: Float32Array.from(ISLAND_LAYER_OF) },
+      islParams: { value: this.surfaces?.params ?? [] },
+      islSoft: { value: 0.6 },
+      islScale: { value: 1.2 },
+      islCliffLayer: { value: -1 },
+      islCliffNy: { value: new THREE.Vector2(0.5, 0.35) },
       sandColor: { value: new THREE.Color() },
       sandStrength: { value: 1 },
       sandPebbles: { value: 0.3 },
@@ -569,8 +623,8 @@ export class IslandGround {
     this.apply(DEFAULT_ISLAND_GROUND);
   }
 
-  /** Resolves once every surface tile is in the atlas; the loading bar waits on it. */
-  whenReady(): Promise<void> { return this.atlas ? this.atlas.whenComplete() : Promise.resolve(); }
+  /** Resolves once every island surface tile is loaded; the loading bar waits on it. */
+  whenReady(): Promise<void> { return this.surfaces ? Promise.all([this.surfaces.ready, this.textureLoads]).then(() => undefined) : Promise.resolve(); }
 
   get(): IslandGroundSettings { return { ...this.settings }; }
 
@@ -591,6 +645,29 @@ export class IslandGround {
     u.groundShine.value = s.shine;
     u.sunShadowStrength.value = s.shadowStrength;
     u.groundBump.value = s.bump;
+    u.islSoft.value = s.blendSoft;
+    u.islScale.value = s.tileScale;
+    this.swapTextures();
+  }
+
+  /** The tile a surface wears: the owner's own pick, else the auto paint look's, else the shipped one. */
+  textureKeyOf(surface: number): string | undefined {
+    return this.settings.textures[surface] ?? this.autoRecipe?.tiles?.[surface];
+  }
+
+  /** The tile a surface wears when the owner has not picked one (the look's, or undefined: the shipped one). */
+  defaultTextureKeyOf(surface: number): string | undefined { return this.autoRecipe?.tiles?.[surface]; }
+
+  /** Loads the tiles the surfaces should wear now (owner's picks over the look's over the shipped ones). */
+  private swapTextures() {
+    const surfaces = this.surfaces;
+    if (!surfaces) return;
+    const jobs: Promise<boolean>[] = [];
+    ISLAND_SURFACES.forEach((surface, layer) => {
+      const url = libraryTexture(this.textureKeyOf(surface.id))?.url ?? ISLAND_TEXTURE_DIR + surface.file;
+      if (surfaces.urlOf(layer) !== url) jobs.push(surfaces.setLayerImage(layer, url));
+    });
+    if (jobs.length) this.textureLoads = Promise.all([this.textureLoads, ...jobs]).then(() => undefined);
   }
 
   /** Puts a baked shadow map on the terrain (null takes it off). */
@@ -678,6 +755,10 @@ export class IslandGround {
     this.undoStack = [];
     this.road = null;
     this.projection = new Map();
+    this.autoRecipe = null;
+    this.autoMask = null;
+    this.autoPending = undefined;
+    this.lastAuto = null;
     this.recompose({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
   }
 
@@ -685,6 +766,129 @@ export class IslandGround {
     const d = this.hand.data;
     for (let i = 0; i < d.length; i += 4) if (d[i] !== 0 || d[i + 1] !== 0) return true;
     return false;
+  }
+
+  /* ───────────── Island auto paint ───────────── */
+
+  /** What the island's ground is like everywhere (null until the island model has loaded). */
+  get terrain(): IslandTerrain | null { return this.terrainMap; }
+
+  /** The recipe the island is auto-painted with, or null. */
+  getAutoRecipe(): IslandRecipe | null { return this.autoRecipe; }
+
+  /** 0..1 while the island is being auto-painted, null when idle. */
+  get autoProgress(): number | null { return this.autoBusy; }
+
+  /**
+   * Reads the island's shape (the model's triangles, world space) for auto paint, after the road
+   * footprint (`setHeightField`) so distance-from-road is known; starts any paint waiting for it.
+   */
+  setTerrain(tris: TerrainTriangles) {
+    const fp = this.footprint;
+    this.terrainMap = analyseIslandTerrain(tris, { half: PAINT_HALF, res: TERRAIN_RES, roadCells: fp?.index, roadRes: PAINT_RES });
+    this.autoWorker?.postMessage({ type: 'terrain', terrain: this.terrainMap });
+    if (this.autoRecipe) void this.paintAuto(this.autoRecipe);
+  }
+
+  /**
+   * Paints the island from `recipe` (null takes the auto paint off) in a worker, reporting progress, then
+   * shows it and saves. Asking again while painting queues the newest recipe (a dragged slider paints
+   * its last value, not every value). Resolves once the island shows the paint.
+   */
+  paintAuto(recipe: IslandRecipe | null): Promise<void> {
+    this.autoRecipe = recipe;
+    this.swapTextures(); // the look's own tiles
+    this.setCliffRule(recipe);
+    if (this.autoRunning) { this.autoPending = recipe; return this.whenAutoPainted(); }
+    if (!recipe) {
+      this.autoMask = null;
+      this.lastAuto = null;
+      this.recompose({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
+      this.onPainted?.();
+      this.flushAutoWaiters();
+      return Promise.resolve();
+    }
+    if (!this.terrainMap) return this.whenAutoPainted(); // painted as soon as the model has loaded
+    const run = this.runAuto(recipe).catch((error) => console.warn('[island auto paint]', error));
+    this.autoRunning = run.finally(() => {
+      this.autoRunning = null;
+      const next = this.autoPending;
+      this.autoPending = undefined;
+      if (next !== undefined) void this.paintAuto(next);
+      else { this.setBusy(null); this.flushAutoWaiters(); }
+    });
+    return this.whenAutoPainted();
+  }
+
+  /**
+   * The shader's rule for walls: faces steeper than the look's cliff layer (its slope, as the macros set
+   * it, plus 12°) wear that layer's tile; off without a look or a cliff layer.
+   */
+  private setCliffRule(recipe: IslandRecipe | null) {
+    const cliff = recipe ? effectiveLayers(recipe).find((l) => l.role === 'cliff' && l.slope) : undefined;
+    const layer = cliff ? ISLAND_LAYER_OF[cliff.surface] ?? -1 : -1;
+    this.uniforms.islCliffLayer.value = layer;
+    if (cliff?.slope) {
+      const start = Math.min(80, cliff.slope.min + 12), full = Math.min(85, start + 14);
+      (this.uniforms.islCliffNy.value as THREE.Vector2).set(Math.cos((start * Math.PI) / 180), Math.cos((full * Math.PI) / 180));
+    }
+  }
+
+  /** Resolves when no island auto paint is pending (at once when there is none to do). */
+  whenAutoPainted(): Promise<void> {
+    const idle = !this.autoRunning && (!this.autoRecipe || !this.terrainMap || !!this.autoMask);
+    return idle ? Promise.resolve() : new Promise((resolve) => this.autoWaiters.push(resolve));
+  }
+
+  hasAutoPaint(): boolean { return !!this.autoMask; }
+
+  private flushAutoWaiters() { const w = this.autoWaiters.splice(0); for (const r of w) r(); }
+
+  private setBusy(t: number | null) { this.autoBusy = t; this.onAutoProgress?.(t); }
+
+  private async runAuto(recipe: IslandRecipe): Promise<void> {
+    const terrain = this.terrainMap;
+    if (!terrain) return;
+    this.setBusy(0);
+    const result = await this.paintOffThread(terrain, recipe);
+    if (this.autoRecipe !== recipe && this.autoPending !== undefined) return; // superseded
+    this.autoMask = result.mask;
+    this.lastAuto = { ms: result.ms, coverage: result.coverage };
+    this.setBusy(1);
+    this.recompose({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
+    this.onPainted?.();
+  }
+
+  /** The paint in a worker when there is one (the page keeps running), else here. */
+  private paintOffThread(terrain: IslandTerrain, recipe: IslandRecipe): Promise<PaintIslandResult> {
+    if (!this.autoWorker && typeof Worker !== 'undefined') {
+      try {
+        this.autoWorker = new Worker(new URL('./island-autopaint-worker.ts', import.meta.url), { type: 'module' });
+        this.autoWorker.postMessage({ type: 'terrain', terrain });
+      } catch { this.autoWorker = null; }
+    }
+    const worker = this.autoWorker;
+    const here = (progress?: (t: number) => void): PaintIslandResult => {
+      const r = paintIsland(terrain, recipe, progress);
+      return { ...r, mask: upsampleMask(r.mask, terrain.res, PAINT_RES / terrain.res) };
+    };
+    if (!worker) return Promise.resolve(here((t) => this.setBusy(t)));
+    const id = ++this.autoId;
+    return new Promise((resolve) => {
+      const done = (result: PaintIslandResult) => { worker.removeEventListener('message', onMessage); worker.removeEventListener('error', onError); resolve(result); };
+      const onMessage = (event: MessageEvent) => {
+        const m = event.data as { id: number; progress?: number; error?: string } & Partial<PaintIslandResult>;
+        if (m.id !== id) return;
+        if (typeof m.progress === 'number') { this.setBusy(m.progress * 0.95); return; }
+        if (m.error || !m.mask) { done(here()); return; }
+        done({ mask: m.mask, coverage: m.coverage ?? {}, ms: m.ms ?? 0 });
+      };
+      // A worker that cannot start (an old browser, a blocked script) paints here instead.
+      const onError = () => { this.autoWorker?.terminate(); this.autoWorker = null; done(here()); };
+      worker.addEventListener('message', onMessage);
+      worker.addEventListener('error', onError);
+      worker.postMessage({ type: 'paint', id, recipe, upsample: PAINT_RES / terrain.res });
+    });
   }
 
   /* ───────────── The road ───────────── */
@@ -744,9 +948,10 @@ export class IslandGround {
     const prev = this.projection;
     this.projection = next;
     let x0 = PAINT_RES, y0 = PAINT_RES, x1 = -1, y1 = -1;
+    const auto = this.autoMask;
     const touch = (index: number) => {
       const x = index % PAINT_RES, y = (index - x) / PAINT_RES;
-      composeTexel(this.hand.data, this.view.data, index * 4, next.get(index));
+      composeLayers(auto, index * 4, this.hand.data, this.view.data, index * 4, next.get(index));
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
     };
     // Only the texels whose road paint changed: a pass near the camera uploads a patch, not the island.
@@ -762,10 +967,11 @@ export class IslandGround {
     const x1 = Math.min(PAINT_RES, rect.x1), y1 = Math.min(PAINT_RES, rect.y1);
     if (x1 <= x0 || y1 <= y0) return;
     const road = this.projection.size ? this.projection : null;
+    const auto = this.autoMask;
     for (let y = y0; y < y1; y++) {
       for (let x = x0; x < x1; x++) {
         const index = y * PAINT_RES + x;
-        composeTexel(this.hand.data, this.view.data, index * 4, road?.get(index));
+        composeLayers(auto, index * 4, this.hand.data, this.view.data, index * 4, road?.get(index));
       }
     }
     this.upload({ x0, y0, x1, y1 });
@@ -811,6 +1017,8 @@ export interface IslandGroundDoc {
   mask: string | null;
   /** v2: the island road's auto paint, or none. */
   road?: RoadMaskDoc | null;
+  /** v2: the island auto paint recipe (repainted at load, behind the loading bar), or none. */
+  auto?: IslandRecipe | null;
   bounds: { half: number; res: number };
   /** The baked sun shadows (a grey PNG over the same square), or none. */
   shadow?: { png: string; res: number; sun: [number, number, number] } | null;
@@ -899,6 +1107,9 @@ export async function loadGround(ground: IslandGround, trackId: string): Promise
   const paint = await decodeGroundPaint(doc);
   if (paint) ground.setHand(paint);
   if (doc.version === 2 && doc.road) ground.loadRoad(doc.road);
+  // The island auto paint is repainted from its recipe (as soon as the terrain is known).
+  const recipe = doc.version === 2 ? normalizeRecipe(doc.auto) : null;
+  if (recipe) void ground.paintAuto(recipe);
   if (doc.shadow?.png) {
     const map = await decodeMask(doc.shadow.png, doc.shadow.res);
     if (map) ground.setShadow({ map, res: doc.shadow.res, sun: doc.shadow.sun });
@@ -910,7 +1121,7 @@ export function saveGround(ground: IslandGround, trackId: string): boolean {
   const shadow = ground.getShadow();
   const doc: IslandGroundDoc = {
     version: 2, settings: ground.get(), mask: ground.isPainted() ? ground.hand.encode() : null,
-    road: ground.roadDoc(trackId), bounds: { half: PAINT_HALF, res: PAINT_RES },
+    road: ground.roadDoc(trackId), auto: ground.getAutoRecipe(), bounds: { half: PAINT_HALF, res: PAINT_RES },
     shadow: shadow ? { png: ground.shadowPngForSave() ?? '', res: shadow.res, sun: shadow.sun } : null,
   };
   const text = JSON.stringify(doc);

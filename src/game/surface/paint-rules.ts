@@ -25,6 +25,8 @@
 import type { TrackStageId } from '../track-space';
 import type { SurfaceMask } from './surface-mask';
 import {
+  SURFACE_BEACH_GRASS, SURFACE_CORAL_SAND, SURFACE_DARK_ROCK, SURFACE_DRY_MUD, SURFACE_DUNES, SURFACE_MOSSY_ROCK, SURFACE_SAND,
+  SURFACE_STRATA, SURFACE_WET_SAND,
   MARK_CENTRE_DOUBLE, MARK_EDGE_LINES, MARK_LANE_DASHES, MARK_NONE, SURFACE_ASPHALT, SURFACE_CAVEROCK, SURFACE_CONCRETE,
   SURFACE_COBBLE, SURFACE_DIRT, SURFACE_GRAVEL, SURFACE_PLANK, SURFACE_ROCK, surfaceDefinition,
 } from './surface-table';
@@ -462,6 +464,8 @@ export interface PaintPreset {
   readonly name: string;
   readonly blurb: string;
   readonly steps: readonly PresetStep[];
+  /** Where the preset belongs: a course's road ribbon (default) or the island road (island surfaces only). */
+  readonly scope?: 'course' | 'island';
 }
 
 export const PAINT_PRESETS: readonly PaintPreset[] = Object.freeze([
@@ -511,6 +515,55 @@ export const PAINT_PRESETS: readonly PaintPreset[] = Object.freeze([
       { rule: 'ruts', params: { surface: SURFACE_DIRT, depth: 0.55, breakup: 0.5 } },
       { rule: 'corners', params: { surface: SURFACE_GRAVEL, width: 0.2 } },
       { rule: 'patches', params: { surface: SURFACE_DIRT, cover: 0.5, span: 0.7, strength: 0.5 } },
+    ],
+  },
+  /* The island road: island surfaces only, and never asphalt. */
+  {
+    id: 'island-sandy-track', name: 'Sandy track', scope: 'island',
+    blurb: 'Packed sand worn into the island, soft rippled-sand shoulders, dry mud in the tyre lines, scree on the bends.',
+    steps: [
+      { rule: 'carriageway', params: { surface: SURFACE_SAND, width: 0.92, edge: 0.4, wobble: 0.55 } },
+      { rule: 'shoulders', params: { surface: SURFACE_DUNES, width: 300, taper: 0.8 } },
+      { rule: 'ruts', params: { surface: SURFACE_DRY_MUD, depth: 0.45, breakup: 0.5 } },
+      { rule: 'corners', params: { surface: SURFACE_DUNES, width: 0.22 } },
+    ],
+  },
+  {
+    id: 'island-jungle-trail', name: 'Jungle trail', scope: 'island',
+    blurb: 'A narrower sand trail with beach grass crowding the edges, moss on the corners and mud where it stays wet.',
+    steps: [
+      { rule: 'carriageway', params: { surface: SURFACE_SAND, width: 0.74, edge: 0.55, wobble: 0.75 } },
+      { rule: 'shoulders', params: { surface: SURFACE_BEACH_GRASS, width: 340, taper: 0.9 } },
+      { rule: 'corners', params: { surface: SURFACE_MOSSY_ROCK, width: 0.16 } },
+      { rule: 'patches', params: { surface: SURFACE_DRY_MUD, cover: 0.3, length: 600, strength: 0.7 } },
+    ],
+  },
+  {
+    id: 'island-rocky-pass', name: 'Rocky pass', scope: 'island',
+    blurb: 'Hard dry mud between dark rock shoulders, strata scree washed across every bend.',
+    steps: [
+      { rule: 'carriageway', params: { surface: SURFACE_DRY_MUD, width: 0.9, edge: 0.3, wobble: 0.4 } },
+      { rule: 'shoulders', params: { surface: SURFACE_DARK_ROCK, width: 240, taper: 0.6 } },
+      { rule: 'corners', params: { surface: SURFACE_STRATA, width: 0.26, threshold: 0.00015 } },
+      { rule: 'ruts', params: { surface: SURFACE_SAND, depth: 0.4, breakup: 0.45 } },
+    ],
+  },
+  {
+    id: 'island-coastal', name: 'Coastal causeway', scope: 'island',
+    blurb: 'Wet sand packed hard by the tide, coral grit along the edges and dry patches where the sun gets it.',
+    steps: [
+      { rule: 'carriageway', params: { surface: SURFACE_WET_SAND, width: 0.86, edge: 0.4, wobble: 0.5 } },
+      { rule: 'shoulders', params: { surface: SURFACE_CORAL_SAND, width: 260, taper: 0.75 } },
+      { rule: 'patches', params: { surface: SURFACE_SAND, cover: 0.4, length: 900, strength: 0.8 } },
+    ],
+  },
+  {
+    id: 'island-wear', name: 'Wear only', scope: 'island',
+    blurb: 'Leaves the ground as it is and adds what racing does to it: ruts, scree on the bends, scuffed patches.',
+    steps: [
+      { rule: 'ruts', params: { surface: SURFACE_DRY_MUD, depth: 0.5, breakup: 0.5 } },
+      { rule: 'corners', params: { surface: SURFACE_DUNES, width: 0.2 } },
+      { rule: 'patches', params: { surface: SURFACE_SAND, cover: 0.45, span: 0.7, strength: 0.6 } },
     ],
   },
 ]);

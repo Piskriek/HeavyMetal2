@@ -33,13 +33,19 @@ interface Props {
   linesAvailable?: boolean;
   /** Surfaces offered in the rule's surface pickers (default: all of them). */
   surfaces?: readonly number[];
+  /** Which presets show: a course's road ribbon (default) or the island road's own set. */
+  scope?: 'course' | 'island';
+  /** Rules left out of the Rule list (the island has no use for stage themes). */
+  hideRules?: readonly string[];
+  /** A rule's surface when its own default is not offered here (e.g. asphalt on the island). */
+  surfaceDefaults?: Readonly<Record<string, number>>;
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return <label title={hint} className="grid grid-cols-[96px_1fr] items-center gap-2 text-[11px] text-zinc-400"><span className="truncate">{label}</span>{children}</label>;
 }
 
-export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false, surfaces }: Props) {
+export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false, surfaces, scope = 'course', hideRules = [], surfaceDefaults = {} }: Props) {
   const [ruleId, setRuleId] = useState('carriageway');
   const [spanChoice, setSpanChoice] = useState<SpanChoice>('track');
   const [stored, setStored] = useState<Record<string, Record<string, number>>>({});
@@ -50,9 +56,13 @@ export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false
   useEffect(() => auto.onChange(() => bump((n) => n + 1)), [auto]);
 
   // Road lines are opt-in: the Markings rule only appears once they are switched on.
-  const rules = auto.rules().filter((r) => auto.lines || r.id !== 'markings');
+  const rules = auto.rules().filter((r) => (auto.lines || r.id !== 'markings') && !hideRules.includes(r.id));
   const rule = rules.find((r) => r.id === ruleId) ?? rules[0];
-  const params = { ...defaultsOf(rule), ...stored[rule.id] };
+  const defaults = defaultsOf(rule);
+  // A default surface that is not offered here (asphalt on the island) becomes this scope's own choice.
+  if (surfaces && 'surface' in defaults && !surfaces.includes(defaults.surface)) defaults.surface = surfaceDefaults[rule.id] ?? surfaces[0];
+  const params = { ...defaults, ...stored[rule.id] };
+  const presets = PAINT_PRESETS.filter((p) => (scope === 'island' ? p.scope === 'island' : p.scope !== 'island'));
   const here = spanChoice === 'track' ? null : locate?.() ?? null;
   const span: PaintSpan = !here
     ? { s0: 0, s1: auto.field.length }
@@ -78,14 +88,14 @@ export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false
     }));
   };
   const setParam = (key: string, value: number) =>
-    setStored((all) => ({ ...all, [rule.id]: { ...defaultsOf(rule), ...all[rule.id], [key]: value } }));
+    setStored((all) => ({ ...all, [rule.id]: { ...defaults, ...all[rule.id], [key]: value } }));
   const offered = SURFACE_TABLE.filter((s) => !surfaces || surfaces.includes(s.id));
   const button = 'flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-zinc-500 disabled:cursor-default disabled:opacity-40';
 
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-1">
-        {PAINT_PRESETS.map((p) => (
+        {presets.map((p) => (
           <button key={p.id} title={p.blurb} disabled={!!busy} onClick={() => work(`Painting ${p.name.toLowerCase()}…`, () => auto.runPreset(p.id, span))}
             className="cursor-pointer rounded border border-zinc-700 px-1.5 py-1 text-left text-[11px] text-zinc-200 hover:border-amber-400 hover:text-amber-100 disabled:cursor-default disabled:opacity-40">
             {p.name}

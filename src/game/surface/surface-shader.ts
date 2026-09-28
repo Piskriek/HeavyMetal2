@@ -18,11 +18,12 @@
  * keeps its own uniform names.
  */
 import { ATLAS_GRID, ATLAS_PAD, ATLAS_TILE } from './surface-atlas';
+import { SURFACE_SLOTS } from './surface-table';
 
 export const SURFACE_SAMPLING_GLSL = /* glsl */ `
 const float SURF_GRID = ${ATLAS_GRID.toFixed(1)};
 const float SURF_PAD = ${ATLAS_PAD.toFixed(6)};
-const float SURF_SLOTS = 16.0;
+const float SURF_SLOTS = ${SURFACE_SLOTS.toFixed(1)};
 // Largest gradient (atlas uv per pixel) the padding still holds: mip 4 of a ${ATLAS_TILE}-pixel cell.
 const float SURF_GRAD_CAP = 16.0 / (SURF_GRID * ${ATLAS_TILE.toFixed(1)});
 

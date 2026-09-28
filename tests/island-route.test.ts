@@ -18,7 +18,7 @@ import { ISLAND_HALF_WIDTH, ISLAND_ROUTE_GRAPH } from '../src/game/island-route/
 import { courseTrackSpace, islandTrackSpace, racerTrackSpace } from '../src/game/island-route/island-space';
 import { ISLAND_LANE_Z, islandLaneNetwork } from '../src/game/island-route/island-lanes';
 import { islandHeightField, prepareIslandModel, softenNormals } from '../src/game/island-route/island-world';
-import { PAINT_HALF, PAINT_RES, injectIslandGround, migrateDirtCoverage, normalizeIslandGround, paintDab, paintPixel } from '../src/game/island-route/island-ground';
+import { GROUND_FRAGMENT_BODY, PAINT_HALF, PAINT_RES, injectIslandGround, migrateDirtCoverage, normalizeIslandGround, paintDab, paintPixel } from '../src/game/island-route/island-ground';
 import { composeTexel, packTexel, projectRoadMask } from '../src/game/island-route/island-road-paint';
 import { SurfaceMask } from '../src/game/surface/surface-mask';
 import { RoadMask } from '../src/game/surface/road-mask';
@@ -198,7 +198,9 @@ test('the ground shader finds its places in this three.js version\'s standard sh
   injectIslandGround(shader, { paintMask: { value: null } });
   assert.match(shader.vertexShader, /vGroundWorld = \(modelMatrix \* vec4\(transformed, 1\.0\)\)\.xyz;/);
   assert.match(shader.fragmentShader, /void gDetail\(/);
-  assert.doesNotMatch(shader.fragmentShader, /for \(int/, 'no per-pixel cell searches: the pattern is a baked tile');
+  // The pebble and crack pattern is a baked tile: the ground's own code searches no cells per pixel (the
+  // surface gather's fixed loops over four mask texels live in the shared island surface GLSL).
+  assert.doesNotMatch(GROUND_FRAGMENT_BODY, /for \(int/,'no per-pixel cell searches: the pattern is a baked tile');
   assert.ok(shader.fragmentShader.indexOf('#include <map_fragment>') < shader.fragmentShader.indexOf('diffuseColor.rgb *= groundTint * groundBright;'),
     'the ground works on the base colour after the base map is applied');
   assert.doesNotMatch(shader.fragmentShader, /detailMap/, 'no tiling detail texture: the grain is computed from the world position');

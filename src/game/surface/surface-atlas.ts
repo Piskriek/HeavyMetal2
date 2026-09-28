@@ -14,7 +14,7 @@
  * renders), so `update()` fills cells as their images become available and reports completion.
  */
 import * as THREE from 'three';
-import { SURFACE_SLOTS, SURFACE_TABLE, type SurfaceDefinition } from './surface-table';
+import { ATLAS_SURFACES, SURFACE_SLOTS, SURFACE_TABLE, type SurfaceDefinition } from './surface-table';
 
 export const ATLAS_GRID = 4;
 export const ATLAS_TILE = 512;
@@ -179,8 +179,9 @@ export class SurfaceAtlas {
     this.params.needsUpdate = true;
 
     for (const def of SURFACE_TABLE) {
-      if (def.id >= SURFACE_SLOTS) continue;
+      if (def.id >= ATLAS_SURFACES) continue;
       if (def.source.kind === 'procedural') this.drawCell(def.id, GENERATORS[def.source.generator]);
+      else if (def.source.kind === 'island') { const swatch = def.swatch; this.drawCell(def.id, (c, size) => { c.fillStyle = swatch; c.fillRect(0, 0, size, size); }); }
       else this.pending.add(def.id);
     }
     this.update();

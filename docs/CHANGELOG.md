@@ -70,6 +70,20 @@ history; this file is for what a player or a reviewer can see.
 - 9/9 key-art QA pass, zero re-rolls (the part-only prompt guard from round 3 did its job);
   contact sheets `docs/art-rounds/goggles-1.png` and `docs/art-rounds/necks-2.png`.
 
+### Round 5: the last grin and the last hat (avatar art)
+
+- Mouth tray full (20/20): a steam whistle clamped at the corner of the fangs, a threaded bolt
+  bitten across the whole grin with hex nuts at both ends, and a lazy oil-drooling open grin for
+  the goblin who just kissed the sump.
+- Headgear rack full (24/24): riveted ear defenders with team-tinted cups, a grease-black newsboy
+  flatcap, a turbocharger snail shell worn as a helmet, the checkered flag cap with its brass "1"
+  wreath, and a lucky horseshoe magnet bristling with stuck nuts and bolts (yes, the magnet takes
+  the racing accent).
+- 8/8 key-art QA pass, no re-rolls; contact sheets `docs/art-rounds/mouths-2.png` and
+  `docs/art-rounds/hats-2.png`. With eyewear, neck, mouth, headgear and hair all at capacity, every
+  fashion catalog is now full — only ears/eyes/nose/background spare slots and the big one, head
+  shapes, remain.
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

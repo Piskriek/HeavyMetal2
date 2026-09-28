@@ -582,3 +582,30 @@ strip stay neutral. Contact sheets: `docs/art-rounds/goggles-1.png` (13 tiles), 
 | eyewear-retro-shades | 512×220 | [0.50, 0.45] | eye-mid |
 | neck-fur-mantle | 510×288 | [0.50, 0.12] | chin |
 | neck-plug-cables | 510×502 | [0.50, 0.06] | chin |
+
+### 11.6 Round 5 — the last grin and the last hat (2026-09-28)
+
+Eight pieces close the mouth and headgear catalogs at their DNA v4 caps (20/20 and 24/24):
+three mouth-anchored grins and five hats (part-only guarded prompts, zero re-rolls, 8/8 key PASS,
+residual ≤ 8 px). Mouths: the steam whistle and bolt bite sit off-centre/centre at the measured
+bite row; the oil drip grins wide with its drool hanging off the lip corner. Hats: ear defenders
+use the crown anchor with the band underside at 0.22 (cups land on the ears at 2·headW+36), the
+flatcap and checkered cap ride `brow-line` like the oil beret (0.75), the turbo snail shell opens
+at 0.72 on the brow line with a slight x-drift, and the horseshoe magnet perches on the crown at
+0.88 like the scrap crown. hidesHair: the defenders hide top hair only, both caps and the turbo
+take the full-cover list plus the brow fringe, the magnet hides just the topknots and ponytail like
+the other open crowns. Masks: ear-defender panels and the magnet answered the accent (team-colour
+magnet, by design); the whistle's brass is the only tinted channel on it — its lips stay painted
+toxic green on every skin, an accepted quirk (the skin mask band missed the brighter green).
+Contact sheets: `docs/art-rounds/mouths-2.png`, `docs/art-rounds/hats-2.png`.
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| mouth-exhaust-whistle | 512×269 | [0.47, 0.46] | mouth |
+| mouth-bolt-bite | 512×297 | [0.50, 0.49] | mouth |
+| mouth-oil-drip | 510×336 | [0.51, 0.45] | mouth |
+| headgear-ear-defenders | 512×402 | [0.50, 0.22] | crown |
+| headgear-grease-flatcap | 512×389 | [0.50, 0.75] | brow-line |
+| headgear-turbo-helm | 446×512 | [0.46, 0.72] | brow-line |
+| headgear-checkered-cap | 511×350 | [0.50, 0.75] | brow-line |
+| headgear-horseshoe-magnet | 504×510 | [0.48, 0.88] | crown |

@@ -1,0 +1,70 @@
+# Changelog
+
+All notable user-facing changes to Goblin Rally, newest first. Ticket-fix detail lives in the git
+history; this file is for what a player or a reviewer can see.
+
+## Unreleased
+
+### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
+
+- New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now
+  encodes `body` — the rig gained its twelfth layer in Phase 0 — and heads grow room for 8 shapes
+  (v3 held 4). Everything else keeps its v3 budget. `body` carries a full nibble, sixteen drops.
+- Backwards- and forwards-safe, by construction rather than by fate: v1–v3 codes decode and
+  re-encode byte-identically (700-fixture corpus); any goblin on the structural racer bust (body 0)
+  still encodes in its shortest old form, so today's codes don't change a character. v4 codes appear
+  by themselves the day a second body (or a fifth head) lands: one catalog `push`, no codec work.
+- Codes from the future are refused honestly (`"uses a body item this game doesn't have yet"`), and
+  `GOB-5…` reports an unsupported version, as v4 did before it.
+- The codec packs v4's 68-bit payload with BigInt (past exact float space); v1–v3 produce the same
+  strings as before — the golden re-encode corpus is the proof, not a promise.
+- The creator's "Random face" rolls with generator 4 (frozen: generators 1–3 never spend a roll on
+  the body, so persisted lobby faces don't move).
+
+### The proportional rig, and the goblin gets a body (avatar art Phase 0)
+
+**User-visible**
+
+- The Goblin Creator avatar is no longer a floating head on a backdrop: every painted goblin now
+  sits on a chunky hand-painted racer bust — stub leather kart jacket, brass studs, worn open
+  collar framing the neck. Original generated part like every other avatar part, keyed and
+  despilled through the same pipeline (`art-src/avatar-parts/raw` → `public/avatar-parts/keyed`),
+  registered to a new `neck-top` rig anchor off its real collar pixels.
+- The bust follows the head: wider shoulders under a bloated head, narrower under a scrawny one,
+  and the neck stump always hides under the chin (guard: the stump top stays ≥ 8 px above the chin
+  anchor on every head). The head really sits on it with no visible seam, at any rig size.
+- The whole avatar rig is now proportional: anchors and part sizes are derived from the head that
+  is actually on the goblin (measured off the keyed head PNGs on all three shapes), so parts that
+  used to float or overhang on the bloated and scrawny heads — wide jaws misplacing mouths, wide
+  heads overflowing ears — land where they belong. On the canonical angular head every anchor stays
+  within 1 px of the old hand-tuned constants (pinned by a regression test).
+- Three ears that pre-date the rig overflowed the canvas on the widest head (bloated): bat −16 px,
+  torn brass ring −13 px, long ragged −29 px (already bleeding on main). Their widths are now
+  capped so the whole ear is in frame on every head while the angular head keeps its hand-tuned
+  width: bat ≤ 0 px and torn ≤ 6 px bleed at the ear tip, long ragged fully inside. Every ear now
+  passes the 12 px silhouette rule like hair and backgrounds.
+
+**Compatibility**
+
+- No data migration: `GOB-…` codes of versions 1–3 decode and re-encode byte-identically (the
+  700-fixture golden corpus is unchanged). Those codes render with the racer bust automatically,
+  like every newly built goblin. The body layer is structural (not pickable, not nudgeable) and is
+  only encoded from DNA v4 on — v1/v2/v3 stay at their current capacities.
+
+**Under the hood**
+
+- `painted-parts.ts`: rig anchors are `headH` fractions off the eye line via `headRig(shape)`
+  (head height measured off the keyed PNG, never guessed); fixed widths became `S(n) = n/54·headW`;
+  headgear widths are `2·headW + gap`; `eye-mid` is a measured catalogue token per head (128 on
+  angular); new anchors `ear-left`, `scalp`, `neck-top` (shoulder, frame, face-square existed).
+- The compositor draws `body` between `background` and `ears`; scaled heads stay symmetric (the old
+  hair-front ↔ ears+back reorder is gone — backs splice right behind the body).
+- The creator shows a **Body** chip (backdrop row) with the bust card; click-picking and
+  position-dragging skip the structural `body` layer.
+- `scripts/goblin-sheet.mjs` renders real creator-UI contact sheets (rig guides on) from a DNA
+  spec — the eyeball tool for every art round (`docs/art-rounds/rig-check.png` is Phase 0's).
+- Registration tests now pin per-layer, per-axis bleed tolerances (documented in
+  `tests/painted-parts.test.ts`): everything sits strictly inside the 256² frame except hair and
+  backgrounds (≤ 12 px anywhere) and, for now, three ears that pre-date the rig and bled on main —
+  they are re-registered in the follow-up commit. Crown headgear may rise off the top edge and
+  neck-wear may run to the shoulder line (framing, like shoulders off the bottom), both documented.

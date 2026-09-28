@@ -17,6 +17,7 @@ type View = 'parts' | 'position' | 'crew';
 
 const LAYERS: { id: AvatarLayerId; label: string; uses: Channel[] }[] = [
   { id: 'background', label: 'Backdrop', uses: ['accent'] },
+  { id: 'body', label: 'Body', uses: ['skin', 'leather', 'metal', 'accent'] },
   { id: 'head', label: 'Head', uses: ['skin'] },
   { id: 'ears', label: 'Ears', uses: ['skin', 'metal'] },
   { id: 'eyes', label: 'Eyes', uses: ['accent', 'skin'] },
@@ -34,7 +35,7 @@ const LAYERS: { id: AvatarLayerId; label: string; uses: Channel[] }[] = [
  * the right part of the face. Measured from the default rig, in the 256-unit portrait space.
  */
 const LAYER_FALLBACK: Record<AvatarLayerId, [number, number, number, number]> = {
-  background: [0, 0, 256, 256], head: [91, 70, 74, 148], ears: [55, 110, 147, 70], eyes: [90, 110, 79, 40],
+  background: [0, 0, 256, 256], body: [4, 148, 248, 108], head: [91, 70, 74, 148], ears: [55, 110, 147, 70], eyes: [90, 110, 79, 40],
   eyewear: [84, 104, 90, 52], nose: [102, 136, 52, 44], mouth: [91, 164, 74, 48], hair: [78, 27, 100, 60],
   headgear: [80, 20, 96, 96], neck: [70, 206, 116, 50], warpaint: [84, 140, 88, 40],
 };
@@ -161,7 +162,7 @@ export default function CharacterCreatorStudio() {
   }, [commit]);
 
   const randomize = useCallback((colorsOnly = false) => {
-    const fresh = generateRandomGoblin((Math.random() * 2 ** 31) >>> 0, 3); // the whole catalog, painted parts included
+    const fresh = generateRandomGoblin((Math.random() * 2 ** 31) >>> 0, 4); // DNA v4: the whole catalog, bodies included when they arrive
     commit((c) => {
       if (colorsOnly) return { ...c, skin: fresh.skin, accent: fresh.accent, leather: fresh.leather, metal: fresh.metal };
       const layers = { ...avoidMissing(fresh.layers, missingArt) };
@@ -209,7 +210,8 @@ export default function CharacterCreatorStudio() {
     const target = (e.target as Element).closest('[data-layer]');
     const hit = target?.getAttribute('data-layer') as AvatarLayerId | null;
     let active = layer;
-    if (hit && hit !== 'background' && hit !== 'head' && hit !== 'neck') { active = hit; setLayer(hit); }
+    // Structural layers hold the rig together; they are picked from the chip strip, not by clicking the mirror.
+    if (hit && hit !== 'background' && hit !== 'body' && hit !== 'head' && hit !== 'neck') { active = hit; setLayer(hit); }
     stageRef.current?.focus();
     if (!isNudgeLayer(active)) return;
     const o = config.nudge?.offset[active] ?? { x: 0, y: 0 };

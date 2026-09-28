@@ -430,3 +430,28 @@ Run automated QA checks before accepting any generated animation:
 | Pairwise Check | $\min_{i \ne j} \Delta(f_i, f_j)$ | $> 0.080$ | All 6 frame pairs must differ so duplicate pairs cannot hide behind a moving pair. |
 | `npm run check:edges` | Runtime Audit | **0 failures** | Audits transparent fringe bleed, edge taint, and AA steps. |
 
+
+## 11. Avatar parts: the body layer and rig-relative registration
+
+The avatar compositor gained a structural twelfth layer, `body`, drawn between `background` and
+`ears` (Z-order in `AVATAR_LAYER_ORDER`). It is not a catalogue choice for the players: one part,
+`painted:body-racer-bust`, jacket, studs and collar authentic to the garage paint scheme.
+
+- **Source**: `art-src/avatar-parts/raw/body-racer-bust.png` (1376×768, flat `#FF00FF`), prompt in
+  `art-src/avatar-parts/prompts/body-racer-bust.txt`.
+- **Keying**: `node --import tsx scripts/key-art.ts --set avatar-parts --only body-racer-bust` —
+  flood-key + despill, trimmed to 512×279, key 249,1,245, magenta residual 14 px (0.005%), zero QA
+  failures.
+- **Tint masks**: `scripts/build-part-masks.mjs` detected the `skin` (the green neck — follows the
+  skin swatch) and `leather` (jacket → the leather swatch) channels and wrote
+  `public/avatar-parts/masks/body-racer-bust-{skin,leather}.png`.
+- **Registration**: pivot `[0.5, 0.265]` = the centre band of the collar's neck opening measured off
+  the keyed PNG (the green stump's plateau runs rows ~5–143 of 279), pinned to the new `neck-top`
+  anchor (the chin, tucked 14 units up under the jaw). Width `2·headW + 140` puts jacket shoulders
+  to the frame edges on the angular head; the bottom edge — a flat horizontal cut above the belt —
+  frames off the bottom like shoulders on a portrait.
+- **Rig**: anchors and widths derive from the placed head (`headRig` in `painted-parts.ts`), so the
+  bust (and every part) sits right on angular, bloated and scrawny heads alike. The angular head
+  reproduces the legacy fixed anchors to ≤ 1 px; that is a regression test, not a wish.
+- **Sheets**: `scripts/goblin-sheet.mjs` renders labelled contact sheets off the real creator UI for
+  the per-round eyeball pass (`docs/art-rounds/`). DNA v1–3 codes are untouched by all of this.

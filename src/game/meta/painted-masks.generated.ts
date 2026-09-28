@@ -2,6 +2,7 @@
 export type MaskChannel = 'skin' | 'leather' | 'metal' | 'accent';
 /** Which tint masks exist for each keyed part (public/avatar-parts/masks/<id>-<channel>.png). */
 export const PART_MASKS: Record<string, readonly MaskChannel[]> = {
+  'body-racer-bust': ['skin', 'leather'],
   'ears-bat-pointed': ['skin'],
   'ears-cauliflower-studs': ['skin'],
   'ears-droopy-hound': ['skin'],

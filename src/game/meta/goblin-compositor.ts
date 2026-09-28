@@ -12,7 +12,7 @@ import {
   ACCENT_PALETTE, AVATAR_CATALOG, LEATHER_PALETTE, METAL_PALETTE, NUDGE_LAYERS, NUDGE_PARENT, NUDGE_STEP_PX,
   SKIN_TONES, SPREAD_LAYERS, SPREAD_STEP_PX,
 } from './goblin-dna';
-import { PAINTED_PARTS, drawnItem, paintedPlacement, rigAnchor, type RigAnchorId } from './painted-parts';
+import { PAINTED_PARTS, drawnItem, headRig, paintedPlacement, rigAnchor, type RigAnchorId } from './painted-parts';
 import { PART_MASKS, type MaskChannel } from './painted-masks.generated';
 import { PART_DEPTH } from './painted-depth.generated';
 
@@ -30,6 +30,7 @@ interface Ctx {
   metal: string;
   item: string;
   headW: number; // half-width of head, depends on head shape
+  headH: number; // rendered height of the head, measured off its keyed PNG (headRig)
   headTop: number;
   id: (name: string) => string; // namespaced ids so many inline SVGs can share one DOM
 }
@@ -39,8 +40,9 @@ interface Ctx {
  * decode, but each one draws as its painted twin (painted-parts.ts `replaces`).
  */
 
-/** Render order (back → front). Neck sits last so collars overlap the chin line. */
-export const RENDER_ORDER: readonly AvatarLayerId[] = ['background', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck'];
+/** Render order (back → front). The body goes right after the background so ears, head and every
+ * head-worn layer cover its neck stump; neck sits last so collars overlap the chin line. */
+export const RENDER_ORDER: readonly AvatarLayerId[] = ['background', 'body', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck'];
 
 export interface ComposeOptions {
   size?: number;
@@ -141,7 +143,7 @@ function paintedFragment(item: string, c: Ctx, resolve: (u: string) => string, p
   return defs + depthDefs + (place.def.mirrorPair ? `${part}<g transform="translate(256 0) scale(-1 1)">${part}</g>` : part);
 }
 
-const GUIDE_ANCHORS: readonly RigAnchorId[] = ['eye-left', 'eye-mid', 'eye-right', 'brow-line', 'crown', 'nose', 'mouth', 'chin'];
+const GUIDE_ANCHORS: readonly RigAnchorId[] = ['eye-left', 'eye-mid', 'eye-right', 'brow-line', 'crown', 'scalp', 'ear-left', 'nose', 'mouth', 'chin', 'neck-top', 'shoulder'];
 
 export function composeGoblinSvg(config: GoblinAvatarConfig, options: ComposeOptions = {}): string {
   const skin = SKIN_TONES.find((s) => s.id === config.skin) ?? SKIN_TONES[0];
@@ -150,14 +152,13 @@ export function composeGoblinSvg(config: GoblinAvatarConfig, options: ComposeOpt
   const resolve = options.resolveImage ?? ((u: string) => u);
   const base: Omit<Ctx, 'item'> = {
     skin, accent: ACCENT_PALETTE[config.accent], leather: LEATHER_PALETTE[config.leather], metal: METAL_PALETTE[config.metal],
-    headW: headShape === 'bloated' ? 62 : headShape === 'scrawny' ? 44 : 54,
-    headTop: headShape === 'bloated' ? 78 : 70,
+    ...headRig(headShape),
     id: (name) => `${prefix}-${name}`,
   };
   const shown = (layer: AvatarLayerId) => {
     if (layer === 'background' && options.transparentBackground) return '';
     if (layer === 'hair' && hairHidden(config)) return '';
-    const item = AVATAR_CATALOG[layer][config.layers[layer]];
+    const item = AVATAR_CATALOG[layer][config.layers[layer] ?? 0];
     return item ? drawnItem(layer, item) : '';
   };
   const dimmed = (layer: AvatarLayerId) => (options.focusLayer && options.focusLayer !== layer && layer !== 'background' ? ' opacity="0.35"' : '');
@@ -187,10 +188,11 @@ export function composeGoblinSvg(config: GoblinAvatarConfig, options: ComposeOpt
     const ctx: Ctx = { ...base, item };
     const inner = paintedFragment(item, ctx, resolve, hasDepth(item) ? 'front' : 'whole', layer === 'warpaint' ? skinClip : undefined);
     if (!inner) return '';
-    return (layer === 'ears' ? back : '') + wrap(layer, item, inner);
+    return wrap(layer, item, inner);
   });
-  // No ears: the back pass still goes right after the background.
-  if (!shown('ears').startsWith('painted:')) fragments.splice(1, 0, back);
+  // The back pass (the hidden halves of wrap-around parts) goes right after the background:
+  // the body's bust, the ears and the head all cover it.
+  if (back) fragments.splice(1, 0, back);
   let guides = '';
   if (options.guides) {
     guides = `<g data-guides="1" pointer-events="none" font-family="monospace" font-size="6">${GUIDE_ANCHORS.map((a) => {
@@ -217,8 +219,8 @@ export function toDataUri(url: string): Promise<string> {
 }
 
 export async function rasterizeGoblin(config: GoblinAvatarConfig, size = 256, transparentBackground = false): Promise<HTMLCanvasElement> {
-  const urls = RENDER_ORDER.map((l) => drawnItem(l, AVATAR_CATALOG[l][config.layers[l]] ?? '')).filter((i) => i.startsWith('painted:')).flatMap((i) => {
-    const place = paintedPlacement(i, { headW: 54, headTop: 70 });
+  const urls = RENDER_ORDER.map((l) => drawnItem(l, AVATAR_CATALOG[l][config.layers[l] ?? 0] ?? '')).filter((i) => i.startsWith('painted:')).flatMap((i) => {
+    const place = paintedPlacement(i, headRig('angular')); // URLs only; the rig values don't matter here
     if (!place) return [];
     return [place.file.file, ...(PART_MASKS[place.def.id] ?? []).map((ch) => maskUrl(place.def.id, ch)), ...(PART_DEPTH.has(place.def.id) ? [depthUrl(place.def.id)] : [])];
   });

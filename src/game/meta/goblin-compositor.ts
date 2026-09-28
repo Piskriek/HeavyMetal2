@@ -12,7 +12,7 @@ import {
   ACCENT_PALETTE, AVATAR_CATALOG, LEATHER_PALETTE, METAL_PALETTE, NUDGE_LAYERS, NUDGE_PARENT, NUDGE_STEP_PX,
   SKIN_TONES, SPREAD_LAYERS, SPREAD_STEP_PX,
 } from './goblin-dna';
-import { PAINTED_PARTS, drawnItem, paintedPlacement, rigAnchor, type RigAnchorId } from './painted-parts';
+import { PAINTED_PARTS, drawnItem, paintedPlacement, rigAnchor, headRig, type RigAnchorId } from './painted-parts';
 import { PART_MASKS, type MaskChannel } from './painted-masks.generated';
 import { PART_DEPTH } from './painted-depth.generated';
 
@@ -40,7 +40,7 @@ interface Ctx {
  */
 
 /** Render order (back → front). Neck sits last so collars overlap the chin line. */
-export const RENDER_ORDER: readonly AvatarLayerId[] = ['background', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck'];
+export const RENDER_ORDER: readonly AvatarLayerId[] = ['background', 'body', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck'];
 
 export interface ComposeOptions {
   size?: number;
@@ -151,7 +151,7 @@ export function composeGoblinSvg(config: GoblinAvatarConfig, options: ComposeOpt
   const base: Omit<Ctx, 'item'> = {
     skin, accent: ACCENT_PALETTE[config.accent], leather: LEATHER_PALETTE[config.leather], metal: METAL_PALETTE[config.metal],
     headW: headShape === 'bloated' ? 62 : headShape === 'scrawny' ? 44 : 54,
-    headTop: headShape === 'bloated' ? 78 : 70,
+    headTop: headRig(headShape).headTop,
     id: (name) => `${prefix}-${name}`,
   };
   const shown = (layer: AvatarLayerId) => {

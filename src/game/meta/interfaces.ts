@@ -136,11 +136,11 @@ export interface LoadoutPreset {
 
 export type AvatarLayerId =
   | 'background' | 'ears' | 'head' | 'mouth' | 'nose' | 'eyes' | 'eyewear'
-  | 'hair' | 'headgear' | 'neck' | 'warpaint';
+  | 'hair' | 'headgear' | 'neck' | 'warpaint' | 'body';
 
 /** Z-order is the array order. Skin tone is a parameter of `head`/`ears`, not its own layer. */
 export const AVATAR_LAYER_ORDER: readonly AvatarLayerId[] = [
-  'background', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck',
+  'background', 'body', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck',
 ] as const;
 
 export type SkinToneId = 'toxic-green' | 'sallow-ochre' | 'ash-grey' | 'mottled-olive';

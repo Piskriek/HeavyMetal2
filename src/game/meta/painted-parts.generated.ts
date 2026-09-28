@@ -4,6 +4,7 @@ export interface KeyedPartFile {
   qa: { verdict: 'pass' | 'warn' | 'fail'; key: number[]; keyDeviation: number; coverage: number; residualMagenta: number; borderTouch: number; notes: string[] };
 }
 export const KEYED_PARTS: Record<string, KeyedPartFile> = {
+  'body-racer-bust': { file: '/avatar-parts/keyed/body-racer-bust.png', raw: 'art-src/avatar-parts/raw/body-racer-bust.png', sourceFormat: 'png', width: 512, height: 421, qa: {"verdict":"pass","key":[255,0,255],"keyDeviation":0,"coverage":0.732,"residualMagenta":0,"borderTouch":0,"notes":[]} },
   'ears-bat-pointed': { file: '/avatar-parts/keyed/ears-bat-pointed.png', raw: 'art-src/avatar-parts/raw/ears-bat-pointed.png', sourceFormat: 'png', width: 512, height: 269, qa: {"verdict":"pass","key":[250,1,247],"keyDeviation":9,"coverage":0.516,"residualMagenta":42,"borderTouch":0,"notes":[]} },
   'ears-cauliflower-studs': { file: '/avatar-parts/keyed/ears-cauliflower-studs.png', raw: 'art-src/avatar-parts/raw/ears-cauliflower-studs.png', sourceFormat: 'png', width: 460, height: 512, qa: {"verdict":"pass","key":[253,12,254],"keyDeviation":12,"coverage":0.673,"residualMagenta":59,"borderTouch":0,"notes":[]} },
   'ears-droopy-hound': { file: '/avatar-parts/keyed/ears-droopy-hound.png', raw: 'art-src/avatar-parts/raw/ears-droopy-hound.png', sourceFormat: 'png', width: 512, height: 357, qa: {"verdict":"pass","key":[253,5,251],"keyDeviation":7,"coverage":0.496,"residualMagenta":69,"borderTouch":0,"notes":[]} },

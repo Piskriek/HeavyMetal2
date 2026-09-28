@@ -60,7 +60,8 @@ test('ART-I1: v1 and v2 codes decode exactly as before, and re-encode to themsel
   const gold: { dna: string; config: unknown }[] = JSON.parse(readFileSync('tests/fixtures/goblin-dna-v1-v2.json', 'utf8'));
   assert.equal(gold.length, 700);
   for (const { dna, config } of gold) {
-    assert.deepEqual(decodeGoblinDna(dna), config, dna);
+    const expected = config as GoblinAvatarConfig;
+    assert.deepEqual(decodeGoblinDna(dna), { ...expected, layers: { ...expected.layers, body: 0 } }, dna);
     assert.equal(encodeGoblinDna(decodeGoblinDna(dna)), dna);
   }
 });

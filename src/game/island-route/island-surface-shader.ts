@@ -211,6 +211,8 @@ export function injectIslandModelShader(
 
   material.onBeforeCompile = (shader, renderer) => {
     prevOnBeforeCompile?.call(material, shader, renderer);
+    // Already in (a clone that kept a patched material's hook, then was patched itself): once is enough.
+    if (shader.vertexShader.includes('vIslSurface')) return;
 
     // Uniforms
     shader.uniforms['islSurfaces'] = { value: surfaceArray.texture };

@@ -52,6 +52,21 @@ function flatAttribute(geometry: THREE.BufferGeometry, name: string, itemSize: n
   return flat;
 }
 
+/**
+ * A material's own copy that still renders the same: clone() drops `onBeforeCompile` (a model's shader
+ * hooks) and JSON-copies userData (slow or throwing when it holds live objects), so both carry over as is.
+ */
+function cloneKeepingHooks(material: THREE.Material): THREE.Material {
+  const userData = material.userData;
+  material.userData = {};
+  let clone: THREE.Material;
+  try { clone = material.clone(); } finally { material.userData = userData; }
+  clone.userData = { ...userData };
+  if (Object.prototype.hasOwnProperty.call(material, 'onBeforeCompile')) clone.onBeforeCompile = material.onBeforeCompile;
+  if (Object.prototype.hasOwnProperty.call(material, 'customProgramCacheKey')) clone.customProgramCacheKey = material.customProgramCacheKey;
+  return clone;
+}
+
 function minAxisScale(m: THREE.Matrix4): number {
   const e = m.elements;
   const sx = Math.hypot(e[0] ?? 1, e[1] ?? 0, e[2] ?? 0);
@@ -405,7 +420,10 @@ export class SculptMesh {
       (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach(patch);
       return;
     }
-    const clone = Array.isArray(base) ? base.map((m) => m.clone()) : base.clone();
+    // The island ground paints surfaces into its own mask (the sculpt tool routes there). Never clone
+    // its material: clone() JSON-copies userData, which holds the whole ground controller.
+    if (!Array.isArray(base) && base.userData?.islandGround) return;
+    const clone = Array.isArray(base) ? base.map(cloneKeepingHooks) : cloneKeepingHooks(base);
     (Array.isArray(clone) ? clone : [clone]).forEach(patch);
     const wasBase = mesh.material === base;
     if (mesh.userData.baseMaterial) mesh.userData.baseMaterial = clone;

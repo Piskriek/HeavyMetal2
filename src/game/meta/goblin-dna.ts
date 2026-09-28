@@ -21,6 +21,7 @@ import { mulberry32 } from './economy-sim';
 export const AVATAR_CATALOG: Readonly<Record<AvatarLayerId, readonly string[]>> = {
   // Art wave 1 (ART-B1/B2) appended the painted parts after each layer's v2 items; art wave 2 appended more.
   // Every vector item now draws as its painted twin (painted-parts.ts `replaces`), so none is ever drawn.
+  body: ['painted:body-racer-bust'],
   background: ['workshop-wall', 'furnace-glow', 'racing-pennants', 'smog-sky', 'painted:background-workshop-wall', 'painted:background-furnace-glow', 'painted:background-racing-pennants', 'painted:background-smog-sky'],
   ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound', 'painted:ears-bat-pointed', 'painted:ears-notched-fins', 'painted:ears-torn-brass-ring', 'painted:ears-droopy-hound', 'painted:ears-cauliflower-studs', 'painted:ears-long-ragged'],
   head: ['angular', 'bloated', 'scrawny'],
@@ -44,16 +45,17 @@ export const ACCENT_PALETTE = ['#c8372d', '#e58a2b', '#e8c547', '#3fa7a0', '#4f6
 export const LEATHER_PALETTE = ['#5a3a22', '#7b4a2a', '#2e2621', '#8c6b45'] as const;
 export const METAL_PALETTE = ['#c08a2e', '#9aa0a8', '#b86b3a', '#5b5f66'] as const;
 
-const LAYER_KEYS: readonly AvatarLayerId[] = ['background', 'ears', 'head', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck', 'warpaint'];
+const LEGACY_LAYER_KEYS: readonly AvatarLayerId[] = ['background', 'ears', 'head', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck', 'warpaint'];
+const LAYER_KEYS: readonly AvatarLayerId[] = [...LEGACY_LAYER_KEYS, 'body'];
 
 /** FROZEN: catalog sizes at the time v1 shipped. Never edit — v1 codes in the wild depend on it. */
 const V1_SIZES: Readonly<Record<AvatarLayerId, number>> = {
-  background: 4, ears: 4, head: 3, mouth: 4, nose: 3, eyes: 4, eyewear: 5, hair: 5, headgear: 5, neck: 5, warpaint: 5,
+  background: 4, ears: 4, head: 3, mouth: 4, nose: 3, eyes: 4, eyewear: 5, hair: 5, headgear: 5, neck: 5, warpaint: 5, body: 1,
 };
 
 /** FROZEN: catalog sizes when v2 shipped (before art wave 1). Never edit — v2 codes depend on it. */
 const V2_SIZES: Readonly<Record<AvatarLayerId, number>> = {
-  background: 4, ears: 4, head: 3, mouth: 5, nose: 3, eyes: 4, eyewear: 7, hair: 5, headgear: 7, neck: 6, warpaint: 5,
+  background: 4, ears: 4, head: 3, mouth: 5, nose: 3, eyes: 4, eyewear: 7, hair: 5, headgear: 7, neck: 6, warpaint: 5, body: 1,
 };
 
 /**
@@ -72,24 +74,27 @@ export function isDuplicateItem(layer: AvatarLayerId, index: number): boolean {
 }
 
 export const V3_CAPACITY: Readonly<Record<AvatarLayerId, number>> = {
-  background: 12, ears: 12, head: 4, mouth: 20, nose: 12, eyes: 12, eyewear: 20, hair: 16, headgear: 24, neck: 20, warpaint: 12,
+  background: 12, ears: 12, head: 4, mouth: 20, nose: 12, eyes: 12, eyewear: 20, hair: 16, headgear: 24, neck: 20, warpaint: 12, body: 16,
 };
+
+export const V4_CAPACITY: Readonly<Record<AvatarLayerId, number>> = { ...V3_CAPACITY, body: 16 };
 
 type Radix = readonly { key: string; size: number }[];
 const paletteRadix = [
   { key: 'skin', size: SKIN_TONES.length }, { key: 'accent', size: ACCENT_PALETTE.length },
   { key: 'leather', size: LEATHER_PALETTE.length }, { key: 'metal', size: METAL_PALETTE.length },
 ];
-type Version = 1 | 2 | 3;
+type Version = 1 | 2 | 3 | 4;
 const RADIX_BY_VERSION: Readonly<Record<Version, Radix>> = {
-  1: [...LAYER_KEYS.map((k) => ({ key: k, size: V1_SIZES[k] })), ...paletteRadix],
-  2: [...LAYER_KEYS.map((k) => ({ key: k, size: V2_SIZES[k] })), ...paletteRadix],
-  3: [...LAYER_KEYS.map((k) => ({ key: k, size: V3_CAPACITY[k] })), ...paletteRadix],
+  1: [...LEGACY_LAYER_KEYS.map((k) => ({ key: k, size: V1_SIZES[k] })), ...paletteRadix],
+  2: [...LEGACY_LAYER_KEYS.map((k) => ({ key: k, size: V2_SIZES[k] })), ...paletteRadix],
+  3: [...LEGACY_LAYER_KEYS.map((k) => ({ key: k, size: V3_CAPACITY[k] })), ...paletteRadix],
+  4: [...LAYER_KEYS.map((k) => ({ key: k, size: V4_CAPACITY[k] })), ...paletteRadix],
 };
 const space = (v: Version) => RADIX_BY_VERSION[v].reduce((p, r) => p * r.size, 1);
-export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3) } as const;
+export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3), 4: space(4) } as const;
 /** Hex digits of payload per version (v1/v2: 9, v3: 13). */
-const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13 };
+const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13, 4: 13 };
 if (PAYLOAD_SPACE[2] >= 16 ** 9) throw new Error('DNA v2 payload no longer fits 36 bits');
 if (PAYLOAD_SPACE[3] >= 16 ** 13) throw new Error('DNA v3 payload no longer fits 52 bits');
 for (const k of LAYER_KEYS) {
@@ -152,10 +157,11 @@ function packHead(version: Version, digits: number[]): string {
 }
 
 export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
-  const fitsV1 = LAYER_KEYS.every((k) => config.layers[k] < V1_SIZES[k]);
-  const fitsV2 = LAYER_KEYS.every((k) => config.layers[k] < V2_SIZES[k]);
+  const fitsV1 = LEGACY_LAYER_KEYS.every((k) => config.layers[k] < V1_SIZES[k]);
+  const fitsV2 = LEGACY_LAYER_KEYS.every((k) => config.layers[k] < V2_SIZES[k]);
   const nudged = isNudged(config.nudge);
-  const version: Version = fitsV1 && !nudged ? 1 : fitsV2 ? 2 : 3;
+  const body = config.layers.body ?? 0;
+  const version: Version = body === 0 && fitsV1 && !nudged ? 1 : body === 0 && fitsV2 ? 2 : body === 0 ? 3 : 4;
   const hex = packHead(version, configDigits(config, RADIX_BY_VERSION[version]));
   let dna = hex.match(/.{4}/g)!.reduce((out, group) => `${out}-${group}`, 'GOB');
   if (nudged) {
@@ -175,11 +181,11 @@ export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
   const groups = dna.trim().toUpperCase().split('-');
   if (groups[0] !== 'GOB' || !groups.slice(1).every((g) => /^[0-9A-Z]{4}$/.test(g))) throw new SyntaxError('Malformed goblin DNA');
   const version = parseInt(groups[1]?.[0] ?? '', 16);
-  if (version !== 1 && version !== 2 && version !== 3) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4) {
     if (/^[0-9A-F]$/.test(groups[1]?.[0] ?? '')) throw new RangeError(`Unsupported DNA version ${version}`);
     throw new SyntaxError('Malformed goblin DNA');
   }
-  const headGroups = version === 3 ? 4 : 3;
+  const headGroups = version >= 3 ? 4 : 3;
   if (groups.length !== 1 + headGroups && groups.length !== 1 + headGroups + 3) throw new SyntaxError('Malformed goblin DNA');
   const hex = groups.slice(1, 1 + headGroups).join('');
   if (!/^[0-9A-F]+$/.test(hex)) throw new SyntaxError('Malformed goblin DNA');
@@ -194,6 +200,7 @@ export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
   for (const r of radix) { digits.push(payload % r.size); payload = Math.floor(payload / r.size); }
   const layers = {} as Record<AvatarLayerId, number>;
   radix.forEach((r, i) => { if (r.key in AVATAR_CATALOG) layers[r.key as AvatarLayerId] = digits[i]; });
+  layers.body = layers.body ?? 0;
   const at = (key: string) => digits[radix.findIndex((r) => r.key === key)];
   const config: GoblinAvatarConfig = { version: 1, layers, skin: SKIN_TONES[at('skin')].id, accent: at('accent'), leather: at('leather'), metal: at('metal') };
   // A layer index past what the catalog holds (a v3 code from a newer build) can't be drawn here.
@@ -217,11 +224,12 @@ export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
 /* ───────────── Deterministic generation (versioned) ───────────── */
 
 /** v1 weights are frozen alongside V1_SIZES so `generateRandomGoblin(seed, 1)` never changes. */
-const WEIGHTS: Readonly<Record<1 | 2 | 3, Partial<Record<AvatarLayerId, readonly number[]>>>> = {
+const WEIGHTS: Readonly<Record<1 | 2 | 3 | 4, Partial<Record<AvatarLayerId, readonly number[]>>>> = {
   1: { eyewear: [4, 3, 2, 1, 1], hair: [2, 3, 2, 2, 3], headgear: [4, 2, 2, 1, 2], neck: [3, 2, 2, 2, 1], warpaint: [5, 2, 1, 1, 2] },
   2: { eyewear: [4, 3, 2, 1, 1, 2, 1], hair: [2, 3, 2, 2, 3], headgear: [4, 2, 2, 1, 2, 2, 2], neck: [3, 2, 2, 2, 1, 2], warpaint: [5, 2, 1, 1, 2], mouth: [3, 3, 2, 2, 1] },
   // v3 draws from the live catalog; layers not listed are uniform. "none" stays the likeliest single pick.
   3: {},
+  4: {},
 };
 const noneWeighted = (size: number, noneWeight: number) => Array.from({ length: size }, (_, i) => (i === 0 ? noneWeight : 1));
 
@@ -238,20 +246,23 @@ function pickWeighted(rand: () => number, size: number, weights?: readonly numbe
  * Lobbies persist the generator version they were created with, so AI faces never change mid-season
  * when the catalog grows (a question the first draft of the plan didn't ask).
  */
-export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3 = 2): GoblinAvatarConfig {
+export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3 | 4 = 2): GoblinAvatarConfig {
   const rand = mulberry32(typeof seed === 'number' ? seed : checksum32(seed));
   const layers = {} as Record<AvatarLayerId, number>;
-  for (const layer of LAYER_KEYS) {
-    if (generator === 3) {
+  const generatorLayers = generator === 4 ? LAYER_KEYS : LEGACY_LAYER_KEYS;
+  for (const layer of generatorLayers) {
+    if (generator >= 3) {
       const items = AVATAR_CATALOG[layer];
       const optional = items[0] === 'none';
       const live = items.map((_, i) => i).filter((i) => !isDuplicateItem(layer, i));
       const weights = optional ? noneWeighted(live.length, Math.max(2, Math.round(live.length / 4))) : undefined;
       layers[layer] = live[pickWeighted(rand, live.length, weights)];
     } else {
-      layers[layer] = pickWeighted(rand, RADIX_BY_VERSION[generator].find((r) => r.key === layer)!.size, WEIGHTS[generator][layer]);
+      layers[layer] = pickWeighted(rand, RADIX_BY_VERSION[generator].find((r) => r.key === layer)!.size, WEIGHTS[generator as 1 | 2 | 3][layer]);
     }
   }
+  if (generator < 4) layers.body = 0;
+  else layers.body = Math.floor(rand() * AVATAR_CATALOG.body.length);
   if (layers.headgear === 3 && layers.hair === 1) layers.hair = 4;
   if (layers.eyewear === 2 && layers.headgear === 2) layers.eyewear = 1;
   return {
@@ -263,4 +274,4 @@ export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3
   };
 }
 
-export const DNA_VERSION = 2;
+export const DNA_VERSION = 4;

@@ -1362,6 +1362,9 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
 
         vec3 color = mix(horizonColor, tex.rgb, groundBlend);
         color = mix(color, zenithColor, zenithBlend * (isPanorama > 0.5 ? 0.0 : 0.22));
+        // Horizon haze: the sky fades into the fog's colour just above the horizon, where the sea's own
+        // haze meets it, so sea and sky blend with no line.
+        color = mix(color, horizonColor, 1.0 - smoothstep(0.0, 0.16, max(h, 0.0)));
 
         if (hasTexture < 0.5) {
           color = mix(horizonColor, zenithColor, smoothstep(-0.1, 0.7, h));
@@ -1774,6 +1777,26 @@ export class Renderer3D {
     this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
 
     this.placeCamera(this.D_START, 0.1, 'follow_ball', 0);
+  }
+
+  /** Resolves once the island model (and its ground) is in the scene; at once off the island. */
+  islandReady(): Promise<void> { return this.island ? this.island.ready : Promise.resolve(); }
+
+  /**
+   * Compiles every shader the scene uses and draws a few frames, so the first frames the player sees do
+   * not hitch while the GPU builds programs and uploads textures.
+   */
+  async warmUp(frames = 3): Promise<void> {
+    const r = this.renderer as THREE.WebGLRenderer & { compileAsync?: (s: THREE.Object3D, c: THREE.Camera) => Promise<unknown> };
+    try {
+      if (r.compileAsync) await Promise.race([r.compileAsync(this.scene, this.camera), new Promise((resolve) => setTimeout(resolve, 20000))]);
+      else r.compile(this.scene, this.camera);
+    } catch { /* compile on first draw */ }
+    for (let i = 0; i < frames; i++) {
+      this.renderer.render(this.scene, this.camera);
+      // A hidden tab pauses animation frames: never wait on one for long.
+      await new Promise((resolve) => { requestAnimationFrame(() => resolve(null)); setTimeout(() => resolve(null), 100); });
+    }
   }
 
   setSkybox(skyId: string) {

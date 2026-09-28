@@ -115,12 +115,18 @@ export function releaseKitBrightness(group: THREE.Object3D): void {
  * The group for a kit prop. `low` picks the low tier (the Performance setting). `onLoaded` runs once
  * the model is in (the builder refreshes the selection box); a failed load leaves the group empty.
  */
+/** Placed models still loading (build mode waits for them behind its loading bar). */
+let kitLoadsPending = 0;
+export const pendingKitLoads = () => kitLoadsPending;
+
 export function createKitObject(type: string, propId: string, low: boolean, onLoaded?: (group: THREE.Group) => void): THREE.Group {
   const group = new THREE.Group();
   group.userData = { propId, isKitModel: true };
   const model: KitModel | undefined = kitModelFor(type);
   if (!model) return group;
+  kitLoadsPending += 1;
   loadGlb(kitModelUrl(model.id, low))
+    .finally(() => { kitLoadsPending -= 1; })
     .then((scene) => {
       if (group.userData.released) return;
       const copy = fitKitModel(scene.clone(true), model.size);

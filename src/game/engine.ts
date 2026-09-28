@@ -1,3 +1,4 @@
+import { pendingKitLoads } from './models/kit-object';
 import type { GameAssets } from './assets';
 import { GameAudio } from './audio';
 import { RangeRenderer } from './renderer';
@@ -720,6 +721,31 @@ export class GameEngine {
     player.distance = Math.max(0, (x - START_X) / 2);
     player.previous = { x: player.x, y: player.y, z: player.z, rotation: player.rotation };
     player.launchOrigin = { x: player.x, y: player.y };
+  }
+
+  /**
+   * Build mode's preload: the island model, every placed model, their collision, then the shaders compiled
+   * and a few frames drawn. `onProgress(0..1, what)` drives the loading bar; the editor shows only when this
+   * resolves, so it never starts choppy.
+   */
+  async prepareBuildMode(onProgress: (fraction: number, label: string) => void): Promise<void> {
+    const builder = this.renderer.trackBuilder;
+    onProgress(0, 'Island');
+    await this.renderer.islandReady();
+    let peak = 1;
+    const started = performance.now();
+    for (;;) {
+      const models = pendingKitLoads();
+      const collision = builder && typeof builder.getCollisionPending === 'function' ? builder.getCollisionPending() : 0;
+      const left = models + collision;
+      peak = Math.max(peak, left);
+      onProgress(0.1 + 0.75 * (1 - left / peak), models ? `Models (${models} to go)` : collision ? `Collision (${collision} to go)` : 'Models');
+      if (left === 0 || performance.now() - started > 90000) break;
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    onProgress(0.88, 'Shaders');
+    await this.renderer.warmUp();
+    onProgress(1, 'Ready');
   }
 
   setSoloMode(solo: boolean) {

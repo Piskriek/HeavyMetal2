@@ -56,12 +56,12 @@ test('the ball: stopped and bounced along the axis that took it in', () => {
   assert.equal(clear.x, 4700, 'nothing there: untouched');
 });
 
-test('the sea: a disc following the camera, waves in rings round the shore, foam, and a horizon band', () => {
+test('the sea: a disc following the camera, waves in rings round the shore, foam, and a horizon haze', () => {
   const sea = readFileSync(new URL('../src/game/island-route/island-sea.ts', import.meta.url), 'utf8');
   assert.match(sea, /new THREE\.CircleGeometry\(SEA_RADIUS/);
   assert.match(sea, /float v = \(rn \+ seaTime \* 160\.0\) \/ 3000\.0;/, 'rings close in on the island over time');
   assert.match(sea, /name = 'Shore foam'/);
-  assert.match(sea, /name = 'Horizon haze'/);
+  assert.match(sea, /float haze = 1\.0 - smoothstep\(0\.0, 0\.07, -viewDir\.y\);/, 'the sea fades into the fog colour near the horizon (by view angle)');
   const world = readFileSync(new URL('../src/game/island-route/island-world.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(world, /PlaneGeometry\(2 \* SEA_HALF/, 'no square sea');
 });

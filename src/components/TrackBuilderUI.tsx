@@ -1448,6 +1448,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     }
   };
 
+  /** Selects the island: its attribute window (terrain, painted dirt, sun shadows). */
+  const openIslandGround = () => {
+    if (!builder.getIslandGround()) { showToast('The island model is still loading'); return; }
+    builder.setIslandGroundOpen(true);
+    setGroundOpen(true);
+    showToast('Island: terrain, painted dirt and sun shadows');
+    onRequestRender?.();
+  };
+
   /** The light bake runs in a worker: this window shows how far along it is, and can stop it. */
   const [bakeProgress, setBakeProgress] = useState<{ done: number; total: number; fraction: number; label: string; title?: string } | null>(null);
   const bakeAbort = useRef<AbortController | null>(null);
@@ -1597,6 +1606,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     </div>
                   </button>
                   <button
+                    onClick={() => { setShowFileMenu(false); openIslandGround(); }}
+                    className="builder-dropdown-item"
+                  >
+                    <Mountain size={14} className="text-amber-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-amber-300">Island</span>
+                      <span className="text-[10px] text-zinc-400">Terrain, painted dirt and sun shadows</span>
+                    </div>
+                  </button>
+                  <button
                     onClick={() => { setShowFileMenu(false); setShowBackupsModal(true); }}
                     className="builder-dropdown-item"
                   >
@@ -1720,6 +1739,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             >
               <Layers size={13} />
               <span className="text-[11px]">Props ({placedProps.length})</span>
+            </button>
+
+            {/* The island itself: its ground settings, paint and sun shadows in the attribute window */}
+            <button
+              onClick={openIslandGround}
+              className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded border transition-colors cursor-pointer ${
+                groundOpen
+                  ? 'bg-amber-500/25 text-amber-300 border-amber-500/80 font-bold'
+                  : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700/50'
+              }`}
+              title="Select the island: its terrain, painted dirt and sun shadows in the attribute window"
+            >
+              <Mountain size={13} />
+              <span className="text-[11px]">Island</span>
             </button>
           </div>
 

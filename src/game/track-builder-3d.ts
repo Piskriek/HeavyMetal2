@@ -16,7 +16,7 @@ const TEST_BALL_KEY = 'hm2-test-ball-v1';
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType } from './models/kit-catalog';
 import { ghostKitObject } from './models/kit-object';
-import { collisionRoleOf, kitCollisionPatch } from './models/kit-collision';
+import { collisionRoleOf, kitCollisionInput, patchFromWorldMeshes } from './models/kit-collision';
 import type { Patch } from './collision/terrain-patch';
 import type { CourseId } from './types';
 import { readOptions } from './preferences';
@@ -3736,22 +3736,88 @@ export class TrackBuilder3D {
     const run = () => {
       job.timer = null;
       if (prop.visible === false) { this.dropRidePatch(prop.id); return; }
-      kitCollisionPatch({ ...prop }, courseTrackSpace(this.courseId as CourseId))
+      // The same model in the same place with the same role: the collision it had (undo, redo, reload).
+      const key = this.collisionKey(prop);
+      const cached = this.collisionCache.get(key);
+      if (cached !== undefined) {
+        if (cached) this.ridePatches.set(prop.id, cached); else this.ridePatches.delete(prop.id);
+        this.ridePatchesChanged();
+        return;
+      }
+      this.collisionPending += 1;
+      this.computeCollision(prop)
         .then((patch) => {
+          this.collisionCache.set(key, patch);
           if (this.rideJobs.get(prop.id)?.token !== token) return;
           if (patch) this.ridePatches.set(prop.id, patch); else this.ridePatches.delete(prop.id);
-          this.onRidePatchesChanged?.();
+          this.ridePatchesChanged();
         })
-        .catch(() => { /* no drive surface (offline, or a test): the model is scenery only */ });
+        .catch(() => { /* no drive surface (offline, or a test): the model is scenery only */ })
+        .finally(() => { this.collisionPending -= 1; });
     };
     this.rideJobs.set(prop.id, job);
     if (delayMs <= 0) run(); else job.timer = setTimeout(run, delayMs);
   }
 
+  /* ───────────── Collision: cached, and built off the main thread ───────────── */
+
+  /** Built collision by model, placement and role (a patch, or null for none). */
+  private readonly collisionCache = new Map<string, Patch | null>();
+  /** Collision still being built (build mode waits for it behind its loading bar). */
+  private collisionPending = 0;
+  private collisionWorker: Worker | null = null;
+  private collisionJobs = new Map<number, (result: { patch?: Patch | null; error?: string }) => void>();
+  private collisionJobId = 0;
+  private ridePatchesTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private collisionKey(prop: PlacedProp): string {
+    const r = (v: number | undefined) => Math.round((v ?? 0) * 1000) / 1000;
+    return [this.courseId, prop.type, r(prop.x), r(prop.y), r(prop.z), r(prop.rotX), r(prop.rotY), r(prop.rotZ), r(prop.scale), prop.flipX ? 1 : 0,
+      collisionRoleOf(prop), prop.roleConfig?.restitution ?? ''].join('|');
+  }
+
+  /** How much collision is still being built. */
+  getCollisionPending(): number { return this.collisionPending; }
+
+  /** One model's collision: its shapes loaded here (cached), the heavy part in the collision worker. */
+  private async computeCollision(prop: PlacedProp): Promise<Patch | null> {
+    const input = await kitCollisionInput({ ...prop });
+    if (!input) return null;
+    const course = this.courseId as CourseId;
+    if (typeof Worker === 'undefined') return patchFromWorldMeshes(input.full, input.drive, courseTrackSpace(course), input.role, input.restitution);
+    if (!this.collisionWorker) {
+      this.collisionWorker = new Worker(new URL('./models/collision-worker.ts', import.meta.url), { type: 'module' });
+      this.collisionWorker.onmessage = (event: MessageEvent) => {
+        const done = this.collisionJobs.get(event.data.id);
+        this.collisionJobs.delete(event.data.id);
+        done?.(event.data);
+      };
+      // A worker that cannot start: every job still waiting is built here instead.
+      this.collisionWorker.onerror = () => {
+        this.collisionWorker = null;
+        for (const [, done] of this.collisionJobs) done({ error: 'worker' });
+        this.collisionJobs.clear();
+      };
+    }
+    const id = ++this.collisionJobId;
+    const reply = await new Promise<{ patch?: Patch | null; error?: string }>((resolve) => {
+      this.collisionJobs.set(id, resolve);
+      this.collisionWorker!.postMessage({ id, course, ...input });
+    });
+    if (reply.error) return patchFromWorldMeshes(input.full, input.drive, courseTrackSpace(course), input.role, input.restitution);
+    return reply.patch ?? null;
+  }
+
+  /** Tells the engine once a burst of collision changes settles (not once per model). */
+  private ridePatchesChanged() {
+    if (this.ridePatchesTimer) clearTimeout(this.ridePatchesTimer);
+    this.ridePatchesTimer = setTimeout(() => { this.ridePatchesTimer = null; this.onRidePatchesChanged?.(); }, 60);
+  }
+
   private dropRidePatch(id: string) {
     const job = this.rideJobs.get(id);
     if (job) { job.token += 1; if (job.timer) clearTimeout(job.timer); job.timer = null; }
-    if (this.ridePatches.delete(id)) this.onRidePatchesChanged?.();
+    if (this.ridePatches.delete(id)) this.ridePatchesChanged();
   }
 
   /** The file name of the store's latest disk save (shown in the backups list). */

@@ -26,6 +26,8 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
   const [course, setCourse] = useState<CourseId>(ISLAND_COURSE);
   const [assets, setAssets] = useState<GameAssets | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  /** After the assets: build mode's own preload (island, models, collision, shaders), 0..1 and what. */
+  const [prepare, setPrepare] = useState<{ fraction: number; label: string } | null>({ fraction: 0, label: 'Assets' });
   const [isTesting, setIsTesting] = useState(false);
   // Test-drive view and slow motion. Changed live on the engine: switching must not rebuild the race.
   const [cameraMode, setCameraMode] = useState<GameOptions['cameraMode']>('follow_ball');
@@ -103,6 +105,12 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     // Start in builder mode: paused race, free-fly active
     createdEngine.setBuildPaused(true);
     createdEngine.trackBuilder.freeFly.active = true;
+    // Everything the editor needs loads behind the cover first (a hard rule: never start choppy).
+    let preparing = true;
+    setPrepare({ fraction: 0, label: 'Island' });
+    createdEngine.prepareBuildMode((fraction, label) => { if (preparing) setPrepare({ fraction, label }); })
+      .catch((err) => console.warn('[editor] preload', err))
+      .finally(() => { if (preparing) setPrepare(null); preparing = false; });
 
     const resize = () => {
       const rect = stageRef.current?.getBoundingClientRect();
@@ -113,6 +121,7 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
     observer.observe(stageRef.current);
 
     return () => {
+      preparing = false;
       observer.disconnect();
       createdEngine.destroy();
       engineRef.current = null;
@@ -236,20 +245,22 @@ export default function MapEditorScreen({ options, onMainMenu }: MapEditorScreen
       </div>
 
       {/* Loading Cover */}
-      {!assets && (
+      {(!assets || prepare) && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-zinc-950 text-amber-200">
           <h2 className="text-xl font-bold tracking-widest text-amber-400 mb-3">LOADING 3D TRACK EDITOR...</h2>
-          <div className="w-64 h-2.5 bg-zinc-800 rounded-full overflow-hidden border border-amber-500/40">
+          <div className="w-64 h-2.5 bg-zinc-800 rounded-full overflow-hidden border border-amber-500/40" role="progressbar" aria-label="Loading the editor"
+            aria-valuenow={Math.round(!assets ? loadingProgress * 0.5 : 50 + (prepare?.fraction ?? 1) * 50)} aria-valuemin={0} aria-valuemax={100}>
             <div
               className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-              style={{ width: `${Math.max(8, loadingProgress)}%` }}
+              style={{ width: `${Math.max(4, !assets ? loadingProgress * 0.5 : 50 + (prepare?.fraction ?? 1) * 50)}%` }}
             />
           </div>
+          <p className="mt-2 text-xs text-zinc-400">{!assets ? 'Art and sounds' : prepare?.label}</p>
         </div>
       )}
 
       {/* Editor UI when editing */}
-      {assets && !isTesting && engine && canvasRef.current && (
+      {assets && !prepare && !isTesting && engine && canvasRef.current && (
         <TrackBuilderUI
           builder={engine.trackBuilder}
           canvas={canvasRef.current}

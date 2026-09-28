@@ -7,8 +7,9 @@
  *   wobbly outline (not straight across), and the rings slowly close in on the island.
  * - **Foam**: a lace of foam at the waterline and bands of it rolling in towards the shore, broken up by
  *   the water texture so they never read as clean stripes.
- * - **A horizon band**: one see-through cylinder around the camera in the fog's colour, solid at the
- *   waterline and fading up into the sky, so sea and sky meet in a soft haze (one draw call).
+ * - **Horizon haze**: the sea fades into the fog's colour the nearer it lies to the horizon line (by view
+ *   angle, not distance, so it reads at every height), and the sky fades to the same colour just above it
+ *   (renderer-3d's sky shader): sea and sky meet in a soft haze, no line.
  */
 import * as THREE from 'three';
 
@@ -37,9 +38,8 @@ export interface IslandSeaOptions {
   water: THREE.MeshStandardMaterial;
 }
 
-/** Sea and floor reach this far from the camera; the horizon band stands just inside. */
+/** Sea and floor reach this far from the camera. */
 export const SEA_RADIUS = 165000;
-export const HORIZON_RADIUS = 150000;
 
 export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   const group = new THREE.Group();
@@ -61,6 +61,17 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
       .replace('#include <project_vertex>', '#include <project_vertex>\n  vSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\n${SHORE_GLSL}`)
+      .replace('#include <fog_fragment>', /* glsl */ `#include <fog_fragment>
+#ifdef USE_FOG
+{
+  // Horizon haze: within ~4° below the horizon the water fades into the fog's colour (and goes opaque).
+  vec3 viewDir = normalize(vSeaWorld - cameraPosition);
+  float haze = 1.0 - smoothstep(0.0, 0.07, -viewDir.y);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, haze);
+  gl_FragColor.a = mix(gl_FragColor.a, 1.0, haze);
+}
+#endif
+`)
       .replace('#include <map_fragment>', /* glsl */ `
 #ifdef USE_MAP
 {
@@ -80,7 +91,7 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
 #endif
 `);
   };
-  water.customProgramCacheKey = () => 'island-sea-rings';
+  water.customProgramCacheKey = () => 'island-sea-rings-haze';
   const sea = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 160), water);
   sea.rotation.x = -Math.PI / 2;
   sea.name = 'Sea';
@@ -126,33 +137,12 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   foam.renderOrder = 2;
   group.add(foam);
 
-  /* The horizon band: fog colour, solid at the waterline, fading up into the sky. */
-  const bandH = 36000, bandBottom = -3000;
-  const band = new THREE.CylinderGeometry(HORIZON_RADIUS, HORIZON_RADIUS, bandH, 96, 12, true);
-  const pos = band.getAttribute('position');
-  const colors = new Float32Array(pos.count * 4);
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i) + bandH / 2 + bandBottom;
-    const up = Math.max(0, y) / (bandH + bandBottom);
-    const alpha = y <= 0 ? 1 : Math.pow(1 - Math.min(1, up), 2.2);
-    colors.set([1, 1, 1, alpha], i * 4);
-  }
-  band.setAttribute('color', new THREE.BufferAttribute(colors, 4));
-  const bandMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, fog: false, side: THREE.DoubleSide });
-  const horizon = new THREE.Mesh(band, bandMat);
-  horizon.name = 'Horizon haze';
-  horizon.renderOrder = 5;
-  horizon.frustumCulled = false;
-  group.add(horizon);
-
   return {
     group,
-    update(t, camera, fogColor) {
+    update(t, camera) {
       time.value = t;
       sea.position.x = floor.position.x = camera.position.x;
       sea.position.z = floor.position.z = camera.position.z;
-      horizon.position.set(camera.position.x, bandH / 2 + bandBottom, camera.position.z);
-      bandMat.color.copy(fogColor);
     },
   };
 }

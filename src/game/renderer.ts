@@ -40,6 +40,9 @@ export class RangeRenderer {
     this.renderer3d.setRacerCount(count);
   }
 
+  islandReady() { return this.renderer3d.islandReady(); }
+  warmUp() { return this.renderer3d.warmUp(); }
+
   get renderer3D() {
     return this.renderer3d;
   }

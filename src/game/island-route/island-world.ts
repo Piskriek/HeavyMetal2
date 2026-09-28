@@ -12,7 +12,7 @@ import { islandBranchSpace } from './island-space';
 import { buildHeightField, type HeightField } from './model-heightfield';
 import { IslandGround, loadGround } from './island-ground';
 import { readIslandTracks } from './island-props-storage';
-import { buildIslandSea, shoreRadiusOf } from './island-sea';
+import { buildIslandSea, shoreRadiusOf, type SeaLookInput } from './island-sea';
 
 export interface IslandMaterials {
   dirt: THREE.MeshStandardMaterial;
@@ -34,6 +34,8 @@ export interface IslandWorld {
   readonly ground: IslandGround;
   /** Each frame: the sea's waves and foam move, its discs and the horizon haze follow the camera. */
   update(time: number, camera: THREE.Camera, fogColor: THREE.Color): void;
+  /** The ocean's look (the Sky window's Ocean section). */
+  setSea(look: SeaLookInput): void;
 }
 
 /** World units per bucket of the model's triangle index (a few triangles per bucket). */
@@ -313,5 +315,5 @@ export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } =
   const fogColor = new THREE.Color('#b9c8c6');
   const sky = buildSkyDome(fogColor, skyColor);
   group.add(sky);
-  return { group, skyColor, fogColor, sky, ready, ground: island.ground, groundAt: (x, z) => ground?.heightAt(x, z) ?? null, update: sea.update };
+  return { group, skyColor, fogColor, sky, ready, ground: island.ground, groundAt: (x, z) => ground?.heightAt(x, z) ?? null, update: sea.update, setSea: sea.setLook };
 }

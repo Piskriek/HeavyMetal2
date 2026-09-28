@@ -213,7 +213,7 @@ test('paint creates vertex colours, switches the material, and round-trips throu
   const shared = mesh.material as THREE.MeshStandardMaterial;
   const sm = SculptMesh.wrap(mesh);
   assert.equal(sm.hasColor, false);
-  stamp(sm, new THREE.Vector3(0, 0, 0), brush({ tool: 'paint', hardness: 1, color: [1, 0, 0] }));
+  stamp(sm, new THREE.Vector3(0, 0, 0), brush({ tool: 'paint', paintMode: 'color', hardness: 1, color: [1, 0, 0] }));
   assert.equal(sm.hasColor, true);
   const colour = sm.geometry.getAttribute('color');
   const v = vertexAt(sm, 0, 0);
@@ -229,7 +229,7 @@ test('paint creates vertex colours, switches the material, and round-trips throu
   assert.equal(dst.applyDoc(part), true);
   const c2 = dst.geometry.getAttribute('color');
   assert.ok(Math.abs(c2.getY(v) - 0.5) <= 1 / 255);
-  stamp(sm, new THREE.Vector3(0, 0, 0), brush({ tool: 'paint', hardness: 1, invert: true }), 40);
+  stamp(sm, new THREE.Vector3(0, 0, 0), brush({ tool: 'paint', paintMode: 'color', hardness: 1, invert: true }), 40);
   assert.ok(colour.getY(v) > 0.99, 'inverted paint returns to the generated colour');
 });
 

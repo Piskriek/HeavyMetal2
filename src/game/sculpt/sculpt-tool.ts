@@ -40,6 +40,13 @@ export interface SculptHost {
   /** A stroke ended: store (or clear) the prop's document and save. */
   commitSculpt(id: string, doc: SculptDoc | null): void;
   onChange(cb: () => void): () => void;
+  /**
+   * The island ground's own surface brush (the Island window's): surface paint on the island terrain
+   * goes into its paint mask, not the vertices. Absent: the terrain takes vertex paint like any mesh.
+   */
+  beginGroundStroke?(): void;
+  paintGround?(point: { x: number; z: number }, radius: number, strength: number, erase: boolean, surface?: number): boolean;
+  endGroundStroke?(): void;
 }
 
 interface Applied {
@@ -68,6 +75,13 @@ export interface SculptTargetInfo {
 const SKIP_NAMES = new Set(['Sky', 'MistZone', 'DebugMarkers', 'GizmoPivotProxy', 'LaneGizmos', 'LaneHandles', 'DecalSideHandlesGroup', 'RotationHandleGroup', 'LanePaint', 'RoadSurfacePaint', 'GroundBrush', 'DecorBrush', 'SculptBrush', 'GhostKitModel']);
 const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 
+/** The island terrain: its ground material keeps its controller in userData (under any kit look). */
+function isIslandGround(object: THREE.Object3D): boolean {
+  const mesh = object as THREE.Mesh;
+  const base = (mesh.userData?.baseMaterial ?? mesh.material) as THREE.Material | THREE.Material[] | undefined;
+  return !!base && !Array.isArray(base) && !!base.userData?.islandGround;
+}
+
 function excluded(object: THREE.Object3D): boolean {
   for (let o: THREE.Object3D | null = object; o; o = o.parent) {
     if (!o.visible || SKIP_NAMES.has(o.name) || o.name.startsWith('TransformControls') || o.userData?.isKitGhost) return true;
@@ -82,6 +96,10 @@ export class SculptTool {
   private enabled = false;
   private dom: HTMLElement | null = null;
   private stroke: Stroke | null = null;
+  /** A surface stroke on the island terrain, painted through the ground's own brush. */
+  private groundStroke: { x: number; z: number } | null = null;
+  /** What each finished stroke was: ground strokes undo on the ground's own stack, the rest in the builder's. */
+  private readonly strokeKinds: ('ground' | 'sculpt')[] = [];
   private shiftHeld = false;
   private ctrlHeld = false;
   private lastTargetId: string | null = null;
@@ -152,6 +170,7 @@ export class SculptTool {
     if (this.enabled === on) return;
     this.enabled = on;
     this.stroke = null;
+    if (this.groundStroke) { this.groundStroke = null; this.host.endGroundStroke?.(); }
     this.ring.visible = false;
     this.status = on ? 'Drag on terrain or a 3D object. Shift inverts, Ctrl smooths, [ ] radius.' : '';
     this.notify();
@@ -323,7 +342,10 @@ export class SculptTool {
     if (!stroke) return;
     const params = this.effective();
     this.camera.getWorldDirection(this.viewDir);
+    const surfacePaint = params.tool === 'paint' && params.paintMode === 'surface';
     for (const mesh of stroke.entry.meshes) {
+      // The island ground wears surfaces through its own mask (a ground stroke), never per vertex.
+      if (surfacePaint && isIslandGround(mesh.mesh)) continue;
       mesh.syncMatrices();
       const hits = mesh.query(point, params.radius);
       if (!hits.length) continue;
@@ -334,10 +356,59 @@ export class SculptTool {
     stroke.stamps++;
   }
 
+  /**
+   * Surface paint on the island terrain: the ground's own paint mask (the same brush as the Island
+   * window, same undo and save). Per-vertex paint there would clone the ground's material, and its
+   * userData holds the whole ground controller (masks, textures): the stroke froze or threw, and the
+   * clone dropped the ground shader anyway.
+   */
+  private startGroundStroke(event: PointerEvent, hit: THREE.Intersection): boolean {
+    const params = this.effective();
+    if (params.tool !== 'paint' || params.paintMode !== 'surface' || !this.host.paintGround || !isIslandGround(hit.object)) return false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.host.beginGroundStroke?.();
+    this.groundStroke = { x: hit.point.x, z: hit.point.z };
+    this.host.paintGround(this.groundStroke, params.radius, params.strength, params.invert, params.surfaceId);
+    this.status = `${params.invert ? 'Erasing' : 'Painting'} the island ground · ${surfaceDefinition(params.surfaceId).name}`;
+    this.notify();
+    return true;
+  }
+
+  /** A dab every quarter brush along the drag, as the Island window's brush does. */
+  private continueGroundStroke(point: THREE.Vector3) {
+    const last = this.groundStroke;
+    if (!last || !this.host.paintGround) return;
+    const params = this.effective();
+    const step = Math.max(20, params.radius * 0.25);
+    const d = Math.hypot(point.x - last.x, point.z - last.z);
+    const n = Math.floor(d / step);
+    if (n === 0) return;
+    const dx = (point.x - last.x) / d, dz = (point.z - last.z) / d;
+    for (let i = 1; i <= n; i++) {
+      this.host.paintGround({ x: last.x + dx * step * i, z: last.z + dz * step * i }, params.radius, params.strength, params.invert, params.surfaceId);
+    }
+    this.groundStroke = { x: last.x + dx * step * n, z: last.z + dz * step * n };
+  }
+
+  private pushStrokeKind(kind: 'ground' | 'sculpt') {
+    this.strokeKinds.push(kind);
+    if (this.strokeKinds.length > 64) this.strokeKinds.shift();
+  }
+
+  /**
+   * Ctrl+Z while sculpting: true when the latest stroke was island ground paint (the caller undoes it on
+   * the ground's stack); false for the builder's own undo.
+   */
+  takeGroundUndo(): boolean {
+    return this.strokeKinds.pop() === 'ground';
+  }
+
   private readonly onDown = (event: PointerEvent) => {
     if (!this.enabled || event.button !== 0 || !this.dom) return;
     const hit = this.hit(event);
     if (!hit) return;
+    if (this.startGroundStroke(event, hit)) return;
     let prop = this.propOf(hit.object);
     if (!prop) prop = this.host.pickTerrain(event.clientX, event.clientY, this.dom as HTMLCanvasElement);
     if (!prop) { this.status = 'Nothing sculptable there.'; this.notify(); return; }
@@ -405,6 +476,12 @@ export class SculptTool {
     }
     this.ring.visible = true;
 
+    if (this.groundStroke) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.continueGroundStroke(hit.point);
+      return;
+    }
     if (!this.stroke) return;
     event.preventDefault();
     event.stopPropagation();
@@ -414,6 +491,13 @@ export class SculptTool {
   };
 
   private readonly onUp = () => {
+    if (this.groundStroke) {
+      this.groundStroke = null;
+      this.host.endGroundStroke?.();
+      this.pushStrokeKind('ground');
+      this.notify();
+      return;
+    }
     const stroke = this.stroke;
     if (!stroke) return;
     this.stroke = null;
@@ -425,6 +509,7 @@ export class SculptTool {
     stroke.entry.hash = doc?.hash ?? '';
     if (!doc) this.applied.delete(stroke.prop.id);
     this.host.commitSculpt(stroke.prop.id, doc);
+    this.pushStrokeKind('sculpt');
     this.status = doc ? `${stroke.prop.name}: ${parts.length} mesh${parts.length === 1 ? '' : 'es'}, ${sculptDocBytes(doc)} bytes saved.` : `${stroke.prop.name}: back to its generated shape.`;
     this.notify();
   };

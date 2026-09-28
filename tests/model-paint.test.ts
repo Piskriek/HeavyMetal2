@@ -17,6 +17,8 @@ import {
 } from '../src/game/sculpt/sculpt-doc';
 import { SculptMesh } from '../src/game/sculpt/sculpt-mesh';
 import { applyStamp, DEFAULT_BRUSH, type BrushParams } from '../src/game/sculpt/sculpt-brushes';
+import { SculptTool, type SculptHost } from '../src/game/sculpt/sculpt-tool';
+import type { PlacedProp } from '../src/game/builder/prop-catalog';
 import { SURFACE_GRANITE, SURFACE_MOSSY_ROCK, SURFACE_SAND } from '../src/game/surface/surface-table';
 
 test('LEB128 Index & Byte Codecs Round-Trip', () => {
@@ -114,6 +116,93 @@ test('ApplyStamp with Surface Mode', () => {
   // Reset back to original
   sculptMesh.reset();
   assert.ok(sculptMesh.isPristine(), 'SculptMesh.reset() cleanly clears surface paint back to generated look');
+});
+
+test('surface paint on the island terrain goes through the ground brush, not the vertices or a material clone', () => {
+  const scene = new THREE.Scene();
+  const groundMaterial = new THREE.MeshStandardMaterial();
+  groundMaterial.userData.islandGround = { masks: new Uint8Array(16) }; // stands in for the live controller
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000, 8, 8).rotateX(-Math.PI / 2), groundMaterial);
+  scene.add(ground);
+  scene.updateMatrixWorld(true);
+  const camera = new THREE.PerspectiveCamera(60, 1, 1, 10000);
+  camera.position.set(0, 1000, 0);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld(true);
+
+  const dabs: { x: number; z: number; surface?: number; erase: boolean }[] = [];
+  const calls: string[] = [];
+  const terrain: PlacedProp = { id: 't', type: 'terrain_edit', name: 'Island', x: 0, y: 0, z: 0, rotY: 0, scale: 1, alignToTrack: false };
+  const host: SculptHost = {
+    getProps: () => [terrain],
+    sculptObjectFor: (id) => (id === 't' ? ground : null),
+    isSculptLocked: () => false,
+    pickTerrain: () => terrain,
+    beginSculpt: () => { calls.push('beginSculpt'); },
+    commitSculpt: () => { calls.push('commitSculpt'); },
+    onChange: () => () => {},
+    beginGroundStroke: () => { calls.push('begin'); },
+    paintGround: (point, _radius, _strength, erase, surface) => { dabs.push({ x: point.x, z: point.z, surface, erase }); return true; },
+    endGroundStroke: () => { calls.push('end'); },
+  };
+  const handlers = new Map<string, (e: PointerEvent) => void>();
+  const dom = {
+    addEventListener: (type: string, fn: (e: PointerEvent) => void) => { handlers.set(type, fn); },
+    removeEventListener: () => {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+  } as unknown as HTMLElement;
+  const tool = new SculptTool(host, scene, camera, dom);
+  tool.setEnabled(true);
+  tool.setTool('paint');
+  tool.setBrush({ paintMode: 'surface', surfaceId: SURFACE_GRANITE, radius: 100 });
+  const event = (x: number, y: number) => ({ button: 0, clientX: x, clientY: y, preventDefault() {}, stopPropagation() {}, stopImmediatePropagation() {} }) as unknown as PointerEvent;
+
+  handlers.get('pointerdown')!(event(50, 50));
+  handlers.get('pointermove')!(event(70, 50));
+  (tool as unknown as { onUp: () => void }).onUp();
+
+  assert.deepEqual(calls, ['begin', 'end'], 'one ground stroke; no sculpt undo step or document');
+  assert.ok(dabs.length > 1, 'dabs along the drag');
+  assert.ok(dabs.every((d) => d.surface === SURFACE_GRANITE && !d.erase));
+  assert.equal(ground.material, groundMaterial, 'the ground keeps its own material');
+  assert.equal(ground.geometry.getAttribute('islSurface'), undefined, 'no per-vertex surface on the ground');
+  assert.equal(tool.takeGroundUndo(), true, 'Ctrl+Z takes the ground stroke back on the ground stack');
+  assert.equal(tool.takeGroundUndo(), false, 'and then falls through to the builder undo');
+  tool.dispose();
+});
+
+test("the panel's paint mode decides: a model with vertex colours still takes island surfaces", () => {
+  const geo = new THREE.SphereGeometry(100, 16, 16);
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
+  const sm = SculptMesh.wrap(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true })));
+  sm.syncMatrices();
+  const centre = new THREE.Vector3(0, 100, 0);
+  const params: BrushParams = { ...DEFAULT_BRUSH, tool: 'paint', paintMode: 'surface', surfaceId: SURFACE_SAND, color: [1, 0, 0], radius: 80 };
+  applyStamp({ mesh: sm, centre, viewDir: new THREE.Vector3(0, -1, 0), params, hits: sm.query(centre, 80) });
+  assert.ok(sm.hasSurface, 'surface painted');
+  const colour = sm.geometry.getAttribute('color');
+  for (let i = 0; i < colour.count; i++) assert.equal(colour.getY(i), 1, 'vertex colours untouched');
+});
+
+test('surface paint gives a model its own material that keeps its shader hooks and live userData', () => {
+  let hookRan = 0;
+  const shared = new THREE.MeshStandardMaterial();
+  const live = { self: null as unknown };
+  live.self = live; // not JSON-able: clone() used to throw here
+  shared.userData.controller = live;
+  shared.onBeforeCompile = () => { hookRan++; };
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(100, 8, 8), shared);
+  const sm = SculptMesh.wrap(mesh);
+  sm.syncMatrices();
+  sm.paintSurfaceGroup(0, SURFACE_SAND, 1);
+  const own = mesh.material as THREE.MeshStandardMaterial;
+  assert.notEqual(own, shared, 'the shared material is not touched');
+  assert.equal(own.userData.controller, live, 'userData carried over as is');
+  const shader = { uniforms: {}, vertexShader: '#include <worldpos_vertex>', fragmentShader: '#include <map_fragment>' } as unknown as THREE.WebGLProgramParametersWithUniforms;
+  own.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+  assert.equal(hookRan, 1, "the model's own hook still runs");
+  assert.match(shader.vertexShader, /vIslSurface = islSurface/);
+  assert.equal(shader.vertexShader.match(/attribute vec2 islSurface/g)!.length, 1, 'patched once');
 });
 
 export function runModelPaintTests(): { passed: boolean; log: string[] } {

@@ -201,9 +201,9 @@ export function applyStamp(input: StampInput): Set<number> {
       break;
     }
     case 'paint': {
-      const isCustomColor = Math.abs(params.color[0] - 0.55) > 0.01 || Math.abs(params.color[1] - 0.45) > 0.01 || Math.abs(params.color[2] - 0.35) > 0.01;
-      const isColorTarget = params.paintMode === 'color' || isCustomColor || (mesh.hasColor && !mesh.hasSurface);
-      if (!isColorTarget && params.paintMode === 'surface') {
+      // The panel's Island surface / Flat colour toggle decides. (It used to be second-guessed: a colour
+      // ever picked, or a model that ships vertex colours, silently painted flat colour in surface mode.)
+      if (params.paintMode === 'surface') {
         const surfaceId = params.surfaceId ?? SURFACE_MOSSY_ROCK;
         for (const h of hits) {
           const t = Math.min(1.0, params.strength * w(h) * 0.5);

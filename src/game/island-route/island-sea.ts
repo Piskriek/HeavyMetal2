@@ -27,6 +27,62 @@ export interface IslandSea {
   readonly group: THREE.Group;
   /** Each frame: the time (seconds), the camera (the discs and the band follow it), the fog colour. */
   update(time: number, camera: THREE.Camera, fogColor: THREE.Color): void;
+  /** The ocean's look (the Sky window): colours, how much of the deep shows through, the pattern. */
+  setLook(look: SeaLookInput): void;
+}
+
+export interface SeaLookInput {
+  water: string;
+  deep: string;
+  seeThrough: number;
+  texture: 'waves' | 'ripples' | 'shallows' | 'flat';
+  tileSize: number;
+  waveSpeed: number;
+}
+
+export const SEA_SHALLOWS_URL = '/textures/island/shallows.jpg';
+
+/** The rings' repeats round the shore: whole, so they close without a seam. */
+export const seaRepeatsAround = (shoreRadius: number, tileSize: number) => Math.max(1, Math.round((2 * Math.PI * shoreRadius) / tileSize));
+
+/**
+ * Painted ripples, tileable: pale crescents and soft blotches on a near-white ground, so the water colour
+ * alone decides the hue. Browser only.
+ */
+export function paintRippleCanvas(size = 512): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  if (!g) return c;
+  let s = 20260928;
+  const rand = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  g.fillStyle = '#dfeaea';
+  g.fillRect(0, 0, size, size);
+  // Every mark is drawn at its eight wrapped copies too, so the tile's edges meet.
+  const wrapped = (draw: (x: number, y: number) => void, x: number, y: number) => {
+    for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) draw(x + ox, y + oy);
+  };
+  for (let k = 0; k < 26; k++) {
+    const x = rand() * size, y = rand() * size, r = size * (0.08 + rand() * 0.14);
+    const tone = rand() < 0.5 ? 'rgba(150, 178, 180, 0.22)' : 'rgba(255, 255, 255, 0.28)';
+    wrapped((px, py) => {
+      const grad = g.createRadialGradient(px, py, 0, px, py, r);
+      grad.addColorStop(0, tone); grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      g.fillStyle = grad; g.beginPath(); g.arc(px, py, r, 0, Math.PI * 2); g.fill();
+    }, x, y);
+  }
+  g.lineCap = 'round';
+  for (let k = 0; k < 90; k++) {
+    const x = rand() * size, y = rand() * size, r = size * (0.03 + rand() * 0.05), w = size * (0.004 + rand() * 0.006);
+    const a0 = Math.PI * (1.15 + rand() * 0.2), a1 = a0 + Math.PI * (0.35 + rand() * 0.25);
+    wrapped((px, py) => {
+      g.strokeStyle = 'rgba(120, 150, 156, 0.35)'; g.lineWidth = w * 1.4;
+      g.beginPath(); g.arc(px, py + w * 1.2, r, a0, a1); g.stroke();
+      g.strokeStyle = `rgba(255, 255, 255, ${0.55 + rand() * 0.35})`; g.lineWidth = w;
+      g.beginPath(); g.arc(px, py, r, a0, a1); g.stroke();
+    }, x, y);
+  }
+  return c;
 }
 
 export interface IslandSeaOptions {
@@ -47,20 +103,38 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   const time = { value: 0 };
   const shore = { value: opts.shoreRadius };
   // Texture repeats round the island at the shore (a whole number, so the rings close without a seam).
-  const around = { value: Math.round((2 * Math.PI * opts.shoreRadius) / 3000) };
+  const tile = { value: 3000 };
+  const speed = { value: 1 };
+  const around = { value: seaRepeatsAround(opts.shoreRadius, tile.value) };
 
   /* The water: rings that follow the shore and close in slowly. */
   const water = opts.water.clone();
   if (water.map) { water.map = water.map.clone(); water.map.wrapS = water.map.wrapT = THREE.RepeatWrapping; water.map.needsUpdate = true; }
+  // The foam breaks up on the painted waves whatever pattern the water wears.
+  const foamNoise = water.map;
+  const foamAround = { value: around.value };
+  const patterns: Partial<Record<SeaLookInput['texture'], THREE.Texture | null>> = { waves: water.map, flat: null };
+  const pattern = (id: SeaLookInput['texture']): THREE.Texture | null => {
+    if (id in patterns) return patterns[id] ?? null;
+    if (typeof document === 'undefined') return water.map;
+    let t: THREE.Texture;
+    if (id === 'ripples') t = new THREE.CanvasTexture(paintRippleCanvas());
+    else t = new THREE.TextureLoader().load(SEA_SHALLOWS_URL);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    patterns[id] = t;
+    return t;
+  };
   water.color = new THREE.Color('#6fc2c0');
   water.opacity = 0.8;
   water.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS } });
+    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS }, seaTile: tile, seaSpeed: speed });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vSeaWorld;')
       .replace('#include <project_vertex>', '#include <project_vertex>\n  vSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\n${SHORE_GLSL}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\nuniform float seaTile;\nuniform float seaSpeed;\n${SHORE_GLSL}`)
       .replace('#include <fog_fragment>', /* glsl */ `#include <fog_fragment>
 #ifdef USE_FOG
 {
@@ -85,7 +159,7 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   float u2 = mod(ang + 6.2831853, 6.2831853) / 6.2831853 * seaAround;
   vec2 dx = vec2(abs(dFdx(u1)) < abs(dFdx(u2)) ? dFdx(u1) : dFdx(u2), 0.0);
   vec2 dy = vec2(abs(dFdy(u1)) < abs(dFdy(u2)) ? dFdy(u1) : dFdy(u2), 0.0);
-  float v = (rn + seaTime * 160.0) / 3000.0;
+  float v = (rn + seaTime * 160.0 * seaSpeed) / seaTile;
   dx.y = dFdx(v); dy.y = dFdy(v);
   vec4 a = textureGrad(map, vec2(u1, v), dx, dy);
   vec4 b = textureGrad(map, vec2(u1 * 1.7 + 0.37, v * 0.61 + 0.11), dx * vec2(1.7, 0.61), dy * vec2(1.7, 0.61));
@@ -94,14 +168,15 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
 #endif
 `);
   };
-  water.customProgramCacheKey = () => 'island-sea-rings-haze-2';
+  water.customProgramCacheKey = () => 'island-sea-rings-haze-3';
   const sea = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 160), water);
   sea.rotation.x = -Math.PI / 2;
   sea.name = 'Sea';
   sea.renderOrder = 1;
   group.add(sea);
 
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 96), new THREE.MeshStandardMaterial({ color: '#557f78', roughness: 1 }));
+  const floorMat = new THREE.MeshStandardMaterial({ color: '#557f78', roughness: 1 });
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 96), floorMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = opts.floorY;
   floor.name = 'Sea floor';
@@ -110,29 +185,29 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   /* The foam: a lace at the waterline and bands rolling in, broken up by the water texture. */
   const foamMat = new THREE.MeshBasicMaterial({ color: '#f4fbfb', transparent: true, depthWrite: false });
   foamMat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, shoreR: shore, foamNoise: { value: water.map } });
+    Object.assign(shader.uniforms, { seaTime: time, seaAround: foamAround, shoreR: shore, foamNoise: { value: foamNoise }, seaSpeed: speed });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vFoamWorld;')
       .replace('#include <project_vertex>', '#include <project_vertex>\n  vFoamWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vFoamWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float shoreR;\nuniform sampler2D foamNoise;\n${SHORE_GLSL}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vFoamWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float shoreR;\nuniform float seaSpeed;\nuniform sampler2D foamNoise;\n${SHORE_GLSL}`)
       .replace('#include <alphamap_fragment>', /* glsl */ `#include <alphamap_fragment>
 {
   float ang = atan(vFoamWorld.x, -vFoamWorld.z);
   float rn = length(vFoamWorld.xz) / seaWobble(ang);
   float d = rn - shoreR;                                    // + out to sea, - up the sand
   float u = mod(ang + 6.2831853, 6.2831853) / 6.2831853 * seaAround * 2.0;
-  float n = texture2D(foamNoise, vec2(u, (rn + seaTime * 110.0) / 1400.0)).r;
-  float n2 = texture2D(foamNoise, vec2(u * 0.43 + 0.3, (rn + seaTime * 70.0) / 2600.0)).g;
+  float n = texture2D(foamNoise, vec2(u, (rn + seaTime * 110.0 * seaSpeed) / 1400.0)).r;
+  float n2 = texture2D(foamNoise, vec2(u * 0.43 + 0.3, (rn + seaTime * 70.0 * seaSpeed) / 2600.0)).g;
   // The lace where water meets sand.
   float lace = smoothstep(-450.0, -50.0, d) * (1.0 - smoothstep(150.0, 900.0, d)) * (0.55 + 0.45 * n);
   // Bands rolling in to the shore (the same pace as the rings in the water), fading out to sea.
-  float wave = pow(0.5 + 0.5 * sin((rn + seaTime * 160.0) / 1500.0 * 6.2831853 + n2 * 2.5), 5.0);
+  float wave = pow(0.5 + 0.5 * sin((rn + seaTime * 160.0 * seaSpeed) / 1500.0 * 6.2831853 + n2 * 2.5), 5.0);
   float bands = wave * (1.0 - smoothstep(0.0, 5200.0, d)) * smoothstep(-100.0, 300.0, d) * smoothstep(0.3, 0.7, n * 0.7 + wave * 0.5);
   diffuseColor.a *= clamp(max(lace, bands) * 0.9, 0.0, 1.0);
 }`);
   };
-  foamMat.customProgramCacheKey = () => 'island-sea-foam';
+  foamMat.customProgramCacheKey = () => 'island-sea-foam-2';
   const foam = new THREE.Mesh(new THREE.RingGeometry(opts.shoreRadius * 0.82, opts.shoreRadius * 1.28, 512, 12), foamMat);
   foam.rotation.x = -Math.PI / 2;
   foam.position.y = 4;
@@ -146,6 +221,20 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
       time.value = t;
       sea.position.x = floor.position.x = camera.position.x;
       sea.position.z = floor.position.z = camera.position.z;
+    },
+    setLook(look) {
+      water.color.set(look.water);
+      floorMat.color.set(look.deep);
+      water.opacity = 1 - look.seeThrough;
+      tile.value = look.tileSize;
+      around.value = seaRepeatsAround(opts.shoreRadius, look.tileSize);
+      speed.value = look.waveSpeed;
+      const map = pattern(look.texture);
+      if (map !== water.map) {
+        // With or without a map is another program (USE_MAP).
+        if (!map !== !water.map) water.needsUpdate = true;
+        water.map = map;
+      }
     },
   };
 }

@@ -5,6 +5,20 @@ history; this file is for what a player or a reviewer can see.
 
 ## Unreleased
 
+### Round 1: six more wardrobes for the bust (avatar art)
+
+- New pickable bodies in the creator's **Body** tray: mechanic overalls, pilot bomber, junkknight
+  plate, warlord pauldron, pit-crew vest, engineer apron — same headless-bust recipe as the racer
+  bust, each registered to the neck-top anchor off its measured stump and collar pixels. All
+  original generated art, keyed and despilled in-repo (key-art QA 6/6 pass), tint-mapped
+  (skin + leather; the whistle follows the metal swatch).
+- This is also DNA v4's first live payload: goblins wearing these encode as `GOB-4…`, decode on
+  this build, and are refused honestly on older ones. Old codes on the racer bust still render
+  unchanged.
+- Contact sheet `docs/art-rounds/bodies-1.png` (all bodies on all three head shapes via real
+  creator-UI renders). Three further wardrobe prompts (champion cape, scavenger poncho, captain
+  coat) are written and queued for Round 1b.
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

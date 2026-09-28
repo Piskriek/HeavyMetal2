@@ -455,3 +455,24 @@ The avatar compositor gained a structural twelfth layer, `body`, drawn between `
   reproduces the legacy fixed anchors to ≤ 1 px; that is a regression test, not a wish.
 - **Sheets**: `scripts/goblin-sheet.mjs` renders labelled contact sheets off the real creator UI for
   the per-round eyeball pass (`docs/art-rounds/`). DNA v1–3 codes are untouched by all of this.
+
+### 11.1 Round 1 — six wardrobe bodies (2026-09-28)
+
+Six more busts on the same recipe (headless flat-top green stump, no wardrobe over the stump's
+front, shoulders to the frame edges, one clean horizontal bottom cut). Prompts
+`art-src/avatar-parts/prompts/body-*.txt`; raws 1536×1024 / 1254²; keyed
+`node --import tsx scripts/key-art.ts --set avatar-parts --only <ids>` — 6/6 PASS, magenta residual
+≤ 1 px except 42/59 px on fringed fabric (below the 0.3 % remnant gate). Registration: pivot
+centre = stump centre (measured, 0.486–0.506), pivot y = (stump flat-top row + 70 px collar datum)
+÷ trim height; `neck-top` anchor, width 2·headW+140 — the same shoulder line as the racer bust on
+every head. Tint masks from `build-part-masks.mjs`: all bodies skin+leather, pit-crew vest also
+metal (the whistle). Contact sheet `docs/art-rounds/bodies-1.png`.
+
+| part | trim | key (RGB) | residual px | pivot |
+|---|---|---|---|---|
+| body-mechanic-overalls | 512×266 | 251,2,249 | 1 | [0.489, 0.274] |
+| body-pilot-bomber | 512×245 | 249,3,248 | 0 | [0.500, 0.302] |
+| body-junkknight-plate | 512×261 | 250,2,249 | 0 | [0.499, 0.280] |
+| body-warlord-pauldron | 512×275 | 251,2,250 | 0 | [0.486, 0.269] |
+| body-pit-crew-vest | 512×256 | 249,3,249 | 1 | [0.506, 0.289] |
+| body-engineer-apron | 512×302 | 251,2,250 | 0 | [0.496, 0.245] |

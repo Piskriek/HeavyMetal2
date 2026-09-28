@@ -84,6 +84,22 @@ history; this file is for what a player or a reviewer can see.
   fashion catalog is now full — only ears/eyes/nose/background spare slots and the big one, head
   shapes, remain.
 
+### Round 8: noses out, wardrobes full (avatar art)
+
+- Nose catalog full (12/12): **boxer flat** (squashed prize-fighter nose with tape and an old
+  scar), **square pug** (pushed-in bulldog nose) and **bandage wrap** (a nose lost in first-aid
+  tape, nostrils nosing out).
+- Body catalog full (16/16): six new race-day wardrobes — **welder leathers** (throat guard,
+  spark scars), **roadie denim** (patched, spiked, chain-snagged), **flag wrap** (victory
+  chequer slung over a bare shoulder), **pinstripe suit** (paddock-mob double-breasted with a
+  knuckle-duster tie pin), **fur coat** (champion shag with goggles on a strap) and **oilskin
+  slicker** (tar-black storm collar with brass snaps).
+- Filling the catalog to the last body slot made ART-I2's "future body" assumptions true: v4's
+  body radix is full, so encode refuses a 17th body honestly; the tests now gate that scenario
+  on radix room.
+- Contact sheet `docs/art-rounds/noses-bodies-1.png`. Every painted layer except heads (3/8,
+  structural) now sits at its codec-v4 capacity — painted-room is exhausted until DNA v5.
+
 ### Round 7: faces war-ready, walls everywhere (avatar art)
 
 - Warpaint catalog full (12/12): **carbon scorch** (soot splash with an ember core), **grease

@@ -140,8 +140,11 @@ test('ART-I2: DNA v4 carries the body as the twelfth layer; heads gain a slot', 
   }
   // Round-trip through the real codec, one body drop into the future: a second body in the catalog
   // is all it takes for v4 codes to appear (the game's shortest-form logic stays untouched).
+  // With the catalog already at the radix (16/16), no future body can be pushed — v4 cannot even
+  // write digit 16 — so the extra-entry scenario only runs while the radix has a slot left.
   const bodies = AVATAR_CATALOG.body as string[];
-  bodies.push('painted:test-future-body');
+  const radixFull = bodies.length >= V4_CAPACITY.body;
+  if (!radixFull) bodies.push('painted:test-future-body');
   try {
     for (let seed = 0; seed < 500; seed++) {
       const g = generateRandomGoblin(seed, 4);
@@ -166,7 +169,7 @@ test('ART-I2: DNA v4 carries the body as the twelfth layer; heads gain a slot', 
     const ninth: GoblinAvatarConfig = { ...generateRandomGoblin(2, 3), layers: { ...generateRandomGoblin(2, 3).layers, head: 7 } };
     assert.match(encodeGoblinDna(ninth), /^GOB-4[0-9A-F-]/, 'the 8th head encodes as v4');
   } finally {
-    bodies.pop();
+    if (!radixFull) bodies.pop();
   }
 });
 
@@ -183,9 +186,14 @@ test('ART-I2: v4 codes fail honestly: shape, checksum, versions above 4, overflo
   broken('GOB-4' + 'FFF-FFFF-FFFF-FFFF-FFFE', /checksum mismatch|out of range/, 'an all-F payload never decodes');
   // A v4 code written by the future (a body newer than this build) is refused, never guessed.
   const beyond = AVATAR_CATALOG.body.length;
-  const future = encodeGoblinDna({ ...g, layers: { ...g.layers, body: beyond } });
-  assert.match(future, /^GOB-4/);
-  assert.throws(() => decodeGoblinDna(future), /uses a body item this game doesn't have yet/);
+  if (beyond >= V4_CAPACITY.body) {
+    // Catalog at the radix: the future body digit overflows v4, so encode itself fails honestly.
+    assert.throws(() => encodeGoblinDna({ ...g, layers: { ...g.layers, body: beyond } }), /out of range for v4/, 'a body digit past the radix is refused at encode time');
+  } else {
+    const future = encodeGoblinDna({ ...g, layers: { ...g.layers, body: beyond } });
+    assert.match(future, /^GOB-4/);
+    assert.throws(() => decodeGoblinDna(future), /uses a body item this game doesn't have yet/);
+  }
 });
 
 test('ART-I2: generators 1–3 freeze: no roll is spent on the body layer', () => {

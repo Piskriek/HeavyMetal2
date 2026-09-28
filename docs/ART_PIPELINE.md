@@ -665,3 +665,37 @@ Only noses (9/12), bodies (10/16) and heads (3/8) still have painted-room under 
 | background-desert-canyon | 512² opaque | frame def (fixedFile) |
 | background-night-garage | 512² opaque | frame def (fixedFile) |
 | background-podium-lights | 512² opaque | frame def (fixedFile) |
+### 11.9 Round 8 — noses out, wardrobes full (2026-09-28)
+
+Nine parts: three noses (catalog 9/12 → 12/12 FULL — noses never had prompt files before; their
+older six predate the folder convention) and six wardrobe bodies (10/16 → 16/16 FULL; after this
+round every painted layer except heads sits at its codec-v4 radix — heads stay structural at 3/8
+and are the DNA-v5 project together with the six vault parts). Keying 9/9 PASS, residual ≤ 2 px.
+Body pivots measured with the round-1 rule (stump flat-top + 70 px collar datum ÷ trim height),
+with one new wrinkle: the **oilskin storm collar and fur collar rise above the neck stump in the
+trim**, so their "stump flat-top row" is not the trim top (oilskin's stump top sits 34 rows down);
+measure the skin island, don't assume. Noses kept the standard `nose` anchor at [0.5, 0.5].
+Masks via `build-part-masks.mjs`: every new part got its skin channel (the fur coat also leather
++ metal, roadie leather + accent, welder leather).
+
+**Codec edge of the round:** filling body to 16/16 broke two ART-I2 tests that assumed a free
+body slot — the future-body push scenario produced roll 16, which v4's radix-16 nibbles cannot
+hold (honest `RangeError: out of range for v4`). Correct behaviour, stale premise: both tests now
+run their future-body branches only while `catalog.length < V4_CAPACITY.body`, and when the radix
+is full they assert the *encode-time* refusal instead. Rule of thumb: any test that pushes a
+hypothetical catalog entry must gate on radix room.
+
+Contact sheet: `docs/art-rounds/noses-bodies-1.png`.
+
+| part | keyed trim | pivot | anchor / width |
+|---|---|---|---|
+| nose-boxer-flat | 512×390 | [0.50, 0.50] | nose, S(52) |
+| nose-square-pug | 512×373 | [0.50, 0.50] | nose, S(48) |
+| nose-bandage-wrap | 451×512 | [0.50, 0.50] | nose, S(46) |
+| body-welder-leathers | 512×284 | [0.500, 0.261] | neck-top, 2·headW+140 |
+| body-rocker-denim | 512×249 | [0.503, 0.297] | neck-top, 2·headW+140 |
+| body-flag-wrap | 512×281 | [0.498, 0.263] | neck-top, 2·headW+140 |
+| body-pinstripe-suit | 512×263 | [0.495, 0.278] | neck-top, 2·headW+140 |
+| body-fur-coat | 512×259 | [0.500, 0.282] | neck-top, 2·headW+140 |
+| body-oilskin-slicker | 512×270 | [0.510, 0.385] | neck-top, 2·headW+140 |
+

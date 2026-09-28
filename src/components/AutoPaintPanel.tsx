@@ -44,6 +44,8 @@ export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false
   const [spanChoice, setSpanChoice] = useState<SpanChoice>('track');
   const [stored, setStored] = useState<Record<string, Record<string, number>>>({});
   const [version, bump] = useState(0);
+  /** What is being painted right now (null when idle). The bar shows before the work starts. */
+  const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => auto.onChange(() => bump((n) => n + 1)), [auto]);
 
@@ -64,7 +66,17 @@ export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false
   );
   const stats = useMemo(() => auto.stats(), [auto, version]);
   const painted = stats.reduce((n, c) => n + c.texels, 0);
-  const done = () => onPainted?.();
+  /**
+   * Runs a pass behind a visible "Painting…" bar: the bar is drawn first (two frames), then the pass
+   * runs, then the bar clears. A pass is a fraction of a second, but it is never a silent freeze.
+   */
+  const work = (label: string, pass: () => void) => {
+    if (busy) return;
+    setBusy(label);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      try { pass(); onPainted?.(); } finally { setBusy(null); }
+    }));
+  };
   const setParam = (key: string, value: number) =>
     setStored((all) => ({ ...all, [rule.id]: { ...defaultsOf(rule), ...all[rule.id], [key]: value } }));
   const offered = SURFACE_TABLE.filter((s) => !surfaces || surfaces.includes(s.id));
@@ -74,8 +86,8 @@ export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-1">
         {PAINT_PRESETS.map((p) => (
-          <button key={p.id} title={p.blurb} onClick={() => { auto.runPreset(p.id, span); done(); }}
-            className="cursor-pointer rounded border border-zinc-700 px-1.5 py-1 text-left text-[11px] text-zinc-200 hover:border-amber-400 hover:text-amber-100">
+          <button key={p.id} title={p.blurb} disabled={!!busy} onClick={() => work(`Painting ${p.name.toLowerCase()}…`, () => auto.runPreset(p.id, span))}
+            className="cursor-pointer rounded border border-zinc-700 px-1.5 py-1 text-left text-[11px] text-zinc-200 hover:border-amber-400 hover:text-amber-100 disabled:cursor-default disabled:opacity-40">
             {p.name}
           </button>
         ))}
@@ -118,16 +130,23 @@ export function AutoPaintPanel({ auto, locate, onPainted, linesAvailable = false
         <p className="text-[10px] text-zinc-500">
           {preview.rows ? `This pass paints ${(preview.rows * auto.field.step).toLocaleString()} of ${Math.round(span.s1 - span.s0).toLocaleString()} units of road.` : 'This pass would paint nothing here.'}
         </p>
-        <button onClick={() => { auto.runRule(rule, params, span); done(); }}
-          className="flex w-full cursor-pointer items-center justify-center gap-1 rounded border border-amber-500/60 bg-amber-950/40 py-1 text-[11px] text-amber-200 hover:border-amber-400">
-          <Paintbrush size={12} />Paint {rule.name.toLowerCase()}
-        </button>
+        {busy ? (
+          <div role="status" aria-live="polite" className="space-y-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full w-full animate-pulse rounded-full bg-amber-400" /></div>
+            <p className="text-center text-[11px] text-amber-200">{busy}</p>
+          </div>
+        ) : (
+          <button onClick={() => work(`Painting ${rule.name.toLowerCase()}…`, () => auto.runRule(rule, params, span))}
+            className="flex w-full cursor-pointer items-center justify-center gap-1 rounded border border-amber-500/60 bg-amber-950/40 py-1 text-[11px] text-amber-200 hover:border-amber-400">
+            <Paintbrush size={12} />Paint {rule.name.toLowerCase()}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-1">
-        <button className={button} disabled={!auto.canUndo()} onClick={() => { auto.undo(); done(); }}><Undo2 size={12} />Undo</button>
-        <button className={button} disabled={!auto.jobs.length} title="Paint every recorded pass again (after the road has changed)" onClick={() => { auto.replay(); done(); }}><RefreshCw size={12} />Re-run</button>
-        <button className={`${button} hover:border-red-500`} disabled={!painted && !auto.jobs.length} onClick={() => { if (confirm('Take all auto paint off this road? Undo brings it back.')) { auto.resetToFactory(); done(); } }}><Trash2 size={12} />Clear</button>
+        <button className={button} disabled={!!busy || !auto.canUndo()} onClick={() => work('Undoing the last pass…', () => auto.undo())}><Undo2 size={12} />Undo</button>
+        <button className={button} disabled={!!busy || !auto.jobs.length} title="Paint every recorded pass again (after the road has changed)" onClick={() => work('Painting every pass again…', () => auto.replay())}><RefreshCw size={12} />Re-run</button>
+        <button className={`${button} hover:border-red-500`} disabled={!!busy || (!painted && !auto.jobs.length)} onClick={() => { if (confirm('Take all auto paint off this road? Undo brings it back.')) work('Clearing the road paint…', () => auto.resetToFactory()); }}><Trash2 size={12} />Clear</button>
       </div>
       <p className="text-[10px] leading-snug text-zinc-500">
         {auto.jobs.length ? `${auto.jobs.length} pass${auto.jobs.length === 1 ? '' : 'es'} on this road. ` : 'No passes yet. '}

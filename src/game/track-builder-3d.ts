@@ -4038,7 +4038,11 @@ export class TrackBuilder3D {
   getIslandGround(): IslandGround | null {
     const ground = ((this.islandGroundMesh()?.material as THREE.Material | undefined)?.userData.islandGround ?? null) as IslandGround | null;
     // Auto paint on the road and every brush stroke save the same way.
-    if (ground && !ground.onPainted) ground.onPainted = () => { this.scheduleGroundSave(); this.notify(); };
+    if (ground && !ground.onPainted) {
+      ground.onPainted = () => { this.scheduleGroundSave(); this.notify(); };
+      // An auto pass only saves: a full builder refresh is ~0.2 s and the road panel redraws itself.
+      ground.onRoadPainted = () => this.scheduleGroundSave();
+    }
     return ground;
   }
 

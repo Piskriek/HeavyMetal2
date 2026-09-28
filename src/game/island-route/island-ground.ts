@@ -512,10 +512,14 @@ export class IslandGround {
   readonly atlas: SurfaceAtlas | null;
   /** Runs after any paint change worth saving (the builder schedules the save). */
   onPainted: (() => void) | null = null;
+  /** Runs after an auto pass on the road (saving only: the panel redraws itself; defaults to onPainted). */
+  onRoadPainted: (() => void) | null = null;
   private settings: IslandGroundSettings = { ...DEFAULT_ISLAND_GROUND };
   /** The baked sun shadow map (0 shadow .. 255 sun), its size, and the sun it was baked for. */
   private shadow: { map: Uint8Array; res: number; sun: [number, number, number] } | null = null;
   private shadowTexture: THREE.DataTexture | null = null;
+  /** The shadow map as saved (a PNG), encoded once per bake rather than on every save. */
+  private shadowPng: string | null = null;
   /** The island road's own mask and its auto-paint runner, made on first use (the route map is not free). */
   private road: { mask: RoadMask; auto: AutoPaint } | null = null;
   private projection = new Map<number, PackedTexel>();
@@ -594,6 +598,7 @@ export class IslandGround {
     this.shadowTexture?.dispose();
     this.shadowTexture = null;
     this.shadow = shadow;
+    this.shadowPng = null;
     if (shadow) {
       const t = new THREE.DataTexture(shadow.map, shadow.res, shadow.res, THREE.RedFormat, THREE.UnsignedByteType);
       t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter; t.needsUpdate = true;
@@ -604,6 +609,13 @@ export class IslandGround {
   }
 
   getShadow() { return this.shadow; }
+
+  /** The shadow map as a PNG for the save (browser only), encoded the first time it is asked for. */
+  shadowPngForSave(): string | null {
+    if (!this.shadow) return null;
+    if (this.shadowPng === null) this.shadowPng = encodeMask(this.shadow.map, this.shadow.res, true) ?? '';
+    return this.shadowPng;
+  }
 
   /* ───────────── The brush ───────────── */
 
@@ -721,7 +733,7 @@ export class IslandGround {
   private makeRoad(mask: RoadMask) {
     const road = { mask, auto: null as unknown as AutoPaint };
     road.auto = new AutoPaint(trackPaintField(mask, islandTrackSpace()), () => {
-      if (this.road === road) { this.reproject(); this.onPainted?.(); }
+      if (this.road === road) { this.reproject(); (this.onRoadPainted ?? this.onPainted)?.(); }
     });
     return road;
   }
@@ -737,8 +749,9 @@ export class IslandGround {
       composeTexel(this.hand.data, this.view.data, index * 4, next.get(index));
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
     };
-    for (const index of prev.keys()) touch(index);
-    for (const index of next.keys()) if (!prev.has(index)) touch(index);
+    // Only the texels whose road paint changed: a pass near the camera uploads a patch, not the island.
+    for (const [index, packed] of next) if (prev.get(index) !== packed) touch(index);
+    for (const index of prev.keys()) if (!next.has(index)) touch(index);
     if (x1 >= x0) this.upload({ x0, y0, x1: x1 + 1, y1: y1 + 1 });
   }
 
@@ -898,7 +911,7 @@ export function saveGround(ground: IslandGround, trackId: string): boolean {
   const doc: IslandGroundDoc = {
     version: 2, settings: ground.get(), mask: ground.isPainted() ? ground.hand.encode() : null,
     road: ground.roadDoc(trackId), bounds: { half: PAINT_HALF, res: PAINT_RES },
-    shadow: shadow ? { png: encodeMask(shadow.map, shadow.res, true) ?? '', res: shadow.res, sun: shadow.sun } : null,
+    shadow: shadow ? { png: ground.shadowPngForSave() ?? '', res: shadow.res, sun: shadow.sun } : null,
   };
   const text = JSON.stringify(doc);
   let stored = true;

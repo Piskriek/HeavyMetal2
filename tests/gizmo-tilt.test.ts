@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { CommandStack } from '../src/game/builder/history';
+import { BuilderKeys } from '../src/game/builder/builder-keys';
 import { GizmoAdapter } from '../src/game/builder/gizmo-adapter';
 import { applyLaneEdit } from '../src/game/lane-path-tool';
 import type { LaneNetwork } from '../src/game/lane-network';
@@ -53,10 +54,15 @@ test('the Y ring turns the heading only; a group swings round its middle', () =>
   adapter.dispose();
 });
 
-test('R is the scale gizmo (no old R = turn 15 degrees handler ahead of it)', () => {
+test('the gizmo keys come from the bindings: G moves, R rotates, T scales (no old R = turn 15 degrees handler)', () => {
+  const keys = new BuilderKeys();
+  assert.equal(keys.match({ code: 'KeyG' }, 'pro'), 'gizmo.move');
+  assert.equal(keys.match({ code: 'KeyR' }, 'pro'), 'gizmo.rotate');
+  assert.equal(keys.match({ code: 'KeyT' }, 'pro'), 'gizmo.scale');
   const ui = readFileSync(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(ui, /\[Key: R\]/);
-  assert.match(ui, /e\.code === 'KeyR'[^\n]*\n\s*e\.preventDefault\(\);\n\s*builder\.setGizmoMode\('scale'\)/);
+  assert.doesNotMatch(ui, /e\.code === 'KeyR'/, 'no hard-wired R left in the editor');
+  assert.match(ui, /case 'gizmo\.scale': gizmo\('scale'/);
 });
 
 test('standing items show their pitch too (yaw, pitch, roll)', () => {

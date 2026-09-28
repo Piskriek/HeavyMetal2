@@ -473,3 +473,119 @@
   cursor: not-allowed;
 }
 
+
+/* ==========================================================================
+   Forge theme: the builder in the game's own colours.
+   The builder's markup is written in Tailwind's zinc/amber/orange. Tailwind v4 colours are CSS
+   variables, so redefining them on the builder's roots (the root and every portal it opens) turns
+   neutral grey into the menus' green iron and orange-amber into their brass, with no markup change.
+   ========================================================================== */
+.forge-theme {
+  --color-zinc-50: #f6f4e8;
+  --color-zinc-100: #ece8d4;
+  --color-zinc-200: #dcd6bb;
+  --color-zinc-300: #c3c1a3;
+  --color-zinc-400: #9ba48a;
+  --color-zinc-500: #6f7a63;
+  --color-zinc-600: #4b5745;
+  --color-zinc-700: #34422f;
+  --color-zinc-800: #223024;
+  --color-zinc-850: #1a261d;
+  --color-zinc-900: #142019;
+  --color-zinc-950: #0c1510;
+  --color-amber-50: #fdf8ec;
+  --color-amber-100: #faf0da;
+  --color-amber-200: #f5e3bd;
+  --color-amber-300: #f0d59f;
+  --color-amber-400: #e5c27f;
+  --color-amber-500: #d6ad5c;
+  --color-amber-600: #b8904a;
+  --color-amber-700: #8e682d;
+  --color-amber-800: #664a20;
+  --color-amber-900: #43301a;
+  --color-amber-950: #2a1d0e;
+  --color-orange-400: #e5c27f;
+  --color-orange-500: #d6ad5c;
+  --color-orange-600: #b8904a;
+  --color-yellow-300: #f3dd9a;
+  --color-yellow-400: #ecc96b;
+  --fantasy: 'Cinzel', Georgia, serif;
+  font-size: 12px;
+}
+
+/* index.css gives every button `font: inherit` outside any layer, which beats Tailwind's text-xs /
+   font-bold utilities, so builder buttons all came out at the page's 16 px. Inside the builder the
+   buttons take their utilities again. */
+.forge-theme button { font: revert-layer; }
+
+/* Section headings, menu titles and the builder's name in the game's display face. */
+.forge-theme .forge-title,
+.forge-theme .builder-dropdown-menu > span:first-child {
+  font-family: var(--fantasy);
+  letter-spacing: 0.08em;
+}
+
+/* The two bars: stone and brass like the menu frames, not flat black. */
+.forge-bar {
+  background:
+    linear-gradient(180deg, rgba(26, 38, 29, 0.97) 0%, rgba(12, 21, 16, 0.97) 100%),
+    url('/ui/stone-tile.png') 0 0 / 256px 256px repeat;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+.forge-bar--top { border-bottom: 1px solid #8e682d; box-shadow: inset 0 -1px 0 #3a2a14, 0 6px 18px rgba(0, 0, 0, 0.55); }
+.forge-bar--bottom { border-top: 1px solid #8e682d; box-shadow: inset 0 1px 0 #3a2a14, 0 -6px 18px rgba(0, 0, 0, 0.45); }
+
+/* Compact icon tool buttons with a tooltip label (the title) and a key badge. */
+.forge-tool {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  height: 28px; min-width: 28px; padding: 0 8px;
+  border-radius: 5px; border: 1px solid #34422f;
+  background: linear-gradient(180deg, #1d2b21 0%, #121c16 100%);
+  color: #e5c27f; font: 700 11px/1 'DM Sans', sans-serif; letter-spacing: 0.02em;
+  box-shadow: inset 0 1px 0 rgba(240, 213, 159, 0.08);
+  cursor: pointer; white-space: nowrap;
+}
+.forge-tool:hover { border-color: #8e682d; color: #f5e3bd; background: linear-gradient(180deg, #26372a 0%, #17231b 100%); }
+.forge-tool[aria-pressed='true'], .forge-tool.is-on {
+  border-color: #e5c27f; color: #1a1208;
+  background: linear-gradient(180deg, #f0d59f 0%, #c79a4c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 10px rgba(214, 173, 92, 0.35);
+}
+.forge-tool:disabled { opacity: 0.4; cursor: default; }
+.forge-tool .forge-key {
+  font: 700 9px/1 'Space Mono', monospace; padding: 2px 3px; border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35); color: inherit; opacity: 0.75;
+}
+.forge-tool.is-on .forge-key, .forge-tool[aria-pressed='true'] .forge-key { background: rgba(0, 0, 0, 0.18); }
+.forge-tool-group { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; background: rgba(0, 0, 0, 0.28); border: 1px solid #223024; }
+.forge-tool-group .forge-tool { border-color: transparent; background: none; box-shadow: none; }
+.forge-tool-group .forge-tool:hover { border-color: #34422f; }
+.forge-tool-group .forge-tool.is-on, .forge-tool-group .forge-tool[aria-pressed='true'] { background: linear-gradient(180deg, #f0d59f 0%, #c79a4c 100%); border-color: #e5c27f; }
+.forge-sep { width: 1px; height: 20px; background: #34422f; margin: 0 3px; }
+
+/* Shelf cards: parchment-dark cards with a brass edge when picked. */
+.forge-theme .builder-shelf-scroll > button.group {
+  background: radial-gradient(circle at 50% 35%, #223024 0%, #121c16 75%);
+}
+
+/* Category tabs: Cinzel labels, brass underline. */
+.forge-cat {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 5px;
+  font: 700 11px/1 var(--fantasy); letter-spacing: 0.05em; color: #9ba48a;
+  border-bottom: 2px solid transparent; white-space: nowrap; cursor: pointer;
+}
+.forge-cat:hover { color: #f0d59f; }
+.forge-cat.is-active { color: #f0d59f; border-bottom-color: #e5c27f; text-shadow: 0 0 10px rgba(214, 173, 92, 0.35); }
+
+/* The one big call to action. */
+.forge-cta {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; border-radius: 6px;
+  font: 700 12px/1 var(--fantasy); letter-spacing: 0.08em; color: #1a1208;
+  background: linear-gradient(180deg, #f5e3bd 0%, #d6ad5c 55%, #a57b39 100%);
+  border: 1px solid #f0d59f; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 10px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.forge-cta:hover { filter: brightness(1.08); }
+.forge-theme kbd { font: 700 10.5px/1.25 'Space Mono', ui-monospace, monospace; }
+.forge-theme .forge-tool .forge-key { font: 700 9.5px/1 'Space Mono', ui-monospace, monospace; }

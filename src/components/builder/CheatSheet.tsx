@@ -1,137 +1,143 @@
-import React from 'react';
-import { X, Keyboard, Compass, Move, Layers, Eye } from 'lucide-react';
+/**
+ * The editor's key sheet (? or F1): every action with its keys, straight from the bindings, and a
+ * Change button on each to set your own key. Taking a key another action uses moves it (that action
+ * loses it) and the sheet says which. Mouse controls are listed at the end; they are fixed.
+ */
+import { useEffect, useState } from 'react';
+import { Keyboard, RotateCcw, X } from 'lucide-react';
+import {
+  BUILDER_ACTIONS, BUILDER_KEY_GROUPS, chordOf, prettyChord, reservedChord,
+  type BuilderKeys, type EditorMode, type KeyOverrides,
+} from '../../game/builder/builder-keys';
 
 interface CheatSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  bindings: BuilderKeys;
+  mode: EditorMode;
+  onChange: (overrides: KeyOverrides) => void;
 }
 
-interface ShortcutSection {
-  title: string;
-  icon: React.ReactNode;
-  shortcuts: { key: string; description: string }[];
-}
-
-const SHORTCUT_SECTIONS: ShortcutSection[] = [
-  {
-    title: 'Transform Gizmo & Tools',
-    icon: <Move size={16} className="text-amber-400" />,
-    shortcuts: [
-      { key: 'W', description: 'Translate mode (move handles)' },
-      { key: 'E', description: 'Rotate mode (ring handles)' },
-      { key: 'R', description: 'Scale mode (box handles)' },
-      { key: 'Q', description: 'Cycle space (World → Local → Track)' },
-      { key: 'Esc', description: 'Cancel ongoing drag / deselect' },
-    ],
-  },
-  {
-    title: 'Camera & Navigation',
-    icon: <Compass size={16} className="text-emerald-400" />,
-    shortcuts: [
-      { key: 'RMB + Drag', description: 'Look around (free-fly pitch & yaw)' },
-      { key: 'WASD', description: 'Fly forward / left / back / right' },
-      { key: 'Space / Z', description: 'Fly up / down' },
-      { key: 'Shift', description: 'Turbo flight speed (×4)' },
-      { key: 'Alt + LMB Drag', description: 'Orbit camera around selection / pivot' },
-      { key: 'Mouse Wheel', description: 'Orbit camera zoom in / out' },
-      { key: 'F', description: 'Focus camera on selected object' },
-      { key: 'Numpad 7 / 1 / 3', description: 'Ortho views: Top / Front / Side' },
-    ],
-  },
-  {
-    title: 'Selection & Grouping',
-    icon: <Layers size={16} className="text-sky-400" />,
-    shortcuts: [
-      { key: 'LMB Click', description: 'Select prop (or track node)' },
-      { key: 'Shift + Click', description: 'Multi-select additional props' },
-      { key: 'Ctrl + G', description: 'Group selected props together' },
-      { key: 'Ctrl + Shift + G', description: 'Ungroup selected props' },
-      { key: 'Ctrl + D', description: 'Duplicate selected props' },
-      { key: 'Delete / Backspace', description: 'Delete selected props' },
-      { key: 'Ctrl + Z', description: 'Undo last change' },
-      { key: 'Ctrl + Y', description: 'Redo last change' },
-    ],
-  },
-  {
-    title: 'Workspace & View',
-    icon: <Eye size={16} className="text-purple-400" />,
-    shortcuts: [
-      { key: 'H', description: 'Zen Mode (toggle all panels)' },
-      { key: 'B', description: 'Test Drive (run solo marble test run)' },
-      { key: 'V', description: 'Select / Inspect tool' },
-      { key: '?', description: 'Toggle this Shortcuts Cheat Sheet' },
-    ],
-  },
+const MOUSE: [string, string][] = [
+  ['Right-drag', 'Look around'],
+  ['Wheel', 'Zoom in / out'],
+  ['Click', 'Pick a piece (Shift adds more)'],
+  ['Drag a handle', 'Move / rotate / scale the picked piece'],
+  ['Arrows', 'Nudge the picked piece (Shift: bigger steps)'],
 ];
 
-export default function CheatSheet({ isOpen, onClose }: CheatSheetProps) {
+const MODIFIERS = new Set(['ControlLeft', 'ControlRight', 'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight', 'ShiftLeft', 'ShiftRight']);
+
+export default function CheatSheet({ isOpen, onClose, bindings, mode, onChange }: CheatSheetProps) {
+  const [capturing, setCapturing] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const action = BUILDER_ACTIONS.find((a) => a.id === capturing);
+      if (!action) { setCapturing(null); return; }
+      // Held (fly) keys take a bare key; a lone modifier only binds to them.
+      if (MODIFIERS.has(e.code) && !action.held) return;
+      if (e.code === 'Escape' && capturing !== 'edit.cancel') { setCapturing(null); setNote(null); return; }
+      const chord = action.held ? e.code : chordOf(e);
+      const refused = reservedChord(chord);
+      if (refused) { setNote(`${prettyChord(chord)}: ${refused} Pick another key.`); return; }
+      const { overrides, moved } = bindings.rebind(action.id, chord);
+      onChange(overrides);
+      setNote(moved.length
+        ? `${action.label} is now ${prettyChord(chord)}. Taken from: ${moved.join(', ')} (set it a new key if you still want one).`
+        : `${action.label} is now ${prettyChord(chord)}.`);
+      setCapturing(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [capturing, bindings, onChange]);
+
   if (!isOpen) return null;
+  const changed = Object.keys(bindings.overrides).length;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 select-none"
-      onClick={onClose}
+      className="forge-theme fixed inset-0 z-[85] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 select-none pointer-events-auto"
+      onClick={() => { if (!capturing) onClose(); }}
     >
       <div
-        className="builder-forged-panel w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
+        className="builder-forged-panel w-full max-w-3xl max-h-[86vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard Shortcuts Cheat Sheet"
+        aria-label="Keys"
       >
-        {/* Header */}
-        <div className="builder-forged-header flex items-center justify-between">
+        <div className="builder-forged-header flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Keyboard size={18} className="text-amber-400" />
-            <span className="builder-forged-title">FORGE KEYBOARD SHORTCUTS</span>
+            <Keyboard size={17} className="text-amber-400" />
+            <span className="builder-forged-title">Keys</span>
+            <span className="text-[11px] text-zinc-400">{mode === 'easy' ? 'Easy Build' : 'Pro'} mode · click Change to set your own key</span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-amber-200 hover:text-white rounded hover:bg-black/30 cursor-pointer"
-            aria-label="Close Cheat Sheet"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {SHORTCUT_SECTIONS.map((sec) => (
-              <div
-                key={sec.title}
-                className="bg-black/40 border border-amber-900/40 rounded-lg p-3.5 space-y-2.5"
-              >
-                <div className="flex items-center gap-2 border-b border-amber-800/30 pb-2">
-                  {sec.icon}
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300">
-                    {sec.title}
-                  </h3>
-                </div>
-
-                <div className="space-y-1.5">
-                  {sec.shortcuts.map((sc) => (
-                    <div
-                      key={sc.key}
-                      className="flex items-center justify-between text-xs py-0.5 gap-2"
-                    >
-                      <span className="text-zinc-300 font-normal">{sc.description}</span>
-                      <kbd className="px-2 py-0.5 rounded bg-zinc-900/90 border border-amber-500/30 font-mono text-[11px] font-bold text-amber-200 shadow-sm whitespace-nowrap">
-                        {sc.key}
-                      </kbd>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center gap-1.5">
+            {changed > 0 && (
+              <button className="forge-tool" onClick={() => { onChange({}); setNote('All keys are back to the defaults.'); }} title="Put every key back to its default">
+                <RotateCcw size={13} /> Defaults
+              </button>
+            )}
+            <button onClick={onClose} className="forge-tool" aria-label="Close"><X size={15} /></button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-3 bg-black/60 border-t border-amber-900/40 flex justify-end">
-          <button onClick={onClose} className="builder-btn px-4 py-1.5">
-            DONE
-          </button>
+        {note && <div role="status" className="px-4 py-2 text-[12px] text-amber-200 bg-amber-950/40 border-b border-amber-900/50">{note}</div>}
+
+        <div className="p-4 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-3 builder-scroll">
+          {BUILDER_KEY_GROUPS.map((group) => {
+            const actions = BUILDER_ACTIONS.filter((a) => a.group === group.id && (!a.mode || a.mode === mode));
+            if (!actions.length) return null;
+            return (
+              <section key={group.id} className="bg-black/30 border border-zinc-800 rounded-lg p-3">
+                <h3 className="forge-title text-[11px] font-bold uppercase text-amber-300 pb-1.5 mb-1.5 border-b border-zinc-800">{group.label}</h3>
+                <ul className="flex flex-col gap-0.5">
+                  {actions.map((action) => {
+                    const keys = bindings.keysOf(action.id);
+                    const custom = Boolean(bindings.overrides[action.id]);
+                    const listening = capturing === action.id;
+                    return (
+                      <li key={action.id} className="flex items-center gap-2 text-[12px] py-0.5">
+                        <span className={`flex-1 min-w-0 truncate ${custom ? 'text-amber-200' : 'text-zinc-300'}`}>{action.label}</span>
+                        {listening
+                          ? <kbd className="px-2 py-0.5 rounded bg-amber-500 text-zinc-950 font-mono text-[11px] font-bold animate-pulse">press a key…</kbd>
+                          : keys.length
+                            ? keys.slice(0, 2).map((k) => <kbd key={k} className="px-1.5 py-0.5 rounded bg-zinc-900 border border-amber-700/40 font-mono text-[11px] font-bold text-amber-200 whitespace-nowrap">{prettyChord(k)}</kbd>)
+                            : <span className="text-[11px] text-zinc-500 italic">no key</span>}
+                        <button
+                          className="text-[11px] text-zinc-400 hover:text-amber-200 underline-offset-2 hover:underline"
+                          onClick={() => { setNote(listening ? null : `Press the new key for “${action.label}” (Esc to cancel).`); setCapturing(listening ? null : action.id); }}
+                        >
+                          {listening ? 'Cancel' : 'Change'}
+                        </button>
+                        {custom && !listening && (
+                          <button className="text-zinc-500 hover:text-amber-200" title="Back to the default" aria-label={`Reset ${action.label}`} onClick={() => onChange(bindings.reset(action.id))}>
+                            <RotateCcw size={11} />
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            );
+          })}
+          <section className="bg-black/30 border border-zinc-800 rounded-lg p-3">
+            <h3 className="forge-title text-[11px] font-bold uppercase text-amber-300 pb-1.5 mb-1.5 border-b border-zinc-800">Mouse</h3>
+            <ul className="flex flex-col gap-0.5">
+              {MOUSE.map(([k, d]) => (
+                <li key={k} className="flex items-center justify-between gap-2 text-[12px] py-0.5">
+                  <span className="text-zinc-300">{d}</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 font-mono text-[11px] text-zinc-300">{k}</kbd>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
       </div>
     </div>

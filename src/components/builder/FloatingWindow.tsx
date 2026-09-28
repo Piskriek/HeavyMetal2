@@ -47,7 +47,7 @@ export default function FloatingWindow({ title, storageKey, initial, width = 460
       role="dialog"
       aria-label={title}
       style={{ left: pos.x, top: pos.y, width }}
-      className="fixed z-[60] pointer-events-auto max-w-[calc(100vw-1rem)] bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl backdrop-blur-md text-amber-100 flex flex-col"
+      className="forge-theme fixed z-[60] pointer-events-auto max-w-[calc(100vw-1rem)] bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl backdrop-blur-md text-amber-100 flex flex-col"
     >
       <div
         className="flex items-center gap-2 px-2.5 py-1.5 border-b border-zinc-800 cursor-move select-none touch-none"

@@ -6,9 +6,9 @@ import {
   Layers, Eye, MousePointer, Camera, Sun, ChevronDown,
   Users, Move, Database, History, Save, RefreshCw,
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
-  Minus, Plus, Film, Route, Box, HelpCircle, Maximize2, Sparkles,
+  Minus, Plus, Film, Route, Box, Maximize2, Sparkles,
   Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush,
-  Castle, Rocket, CircleDot, Palmtree, Gem, SquareDashedMousePointer, Eye as EyeIcon, EyeOff, ListChecks
+  Castle, Rocket, CircleDot, Palmtree, Gem, SquareDashedMousePointer, Eye as EyeIcon, EyeOff, ListChecks, Keyboard, LogOut, Wand2, Wrench
 } from 'lucide-react';
 import { type CourseId } from '../game/types';
 import { isRaceMarkType } from '../game/race-marks';
@@ -23,6 +23,7 @@ import IslandGroundPanel, { type GroundBrush } from './builder/IslandGroundPanel
 import { SURFACE_CRACKED } from '../game/surface/surface-table';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
+import { BuilderKeys, readKeyOverrides, writeKeyOverrides, type EditorMode } from '../game/builder/builder-keys';
 import CustomModelsTab from './builder/CustomModelsTab';
 import ShadingPanel from './builder/ShadingPanel';
 import CollisionPanel from './builder/CollisionPanel';
@@ -73,6 +74,16 @@ interface TrackBuilderUIProps {
 /** The shelf's two sets: 3D models and shapes, or the painted 2D sprites. Lanes & Paths is a tool, in both. */
 type ShelfMode = '3d' | '2d';
 const SHELF_MODE_KEY = 'hm2-builder-shelf-mode';
+const EDITOR_MODE_KEY = 'hm2-builder-mode-v1';
+
+/** The held keys as the fly camera reads them (W/S/A/D, Space, Z, Shift), from the player's bindings. */
+function flyKeys(bindings: BuilderKeys, down: ReadonlySet<string>): Set<string> {
+  const out = new Set<string>();
+  for (const code of down) if (code.startsWith('Control') || code.startsWith('Meta')) out.add(code);
+  const map: [string, string][] = [['fly.forward', 'KeyW'], ['fly.back', 'KeyS'], ['fly.left', 'KeyA'], ['fly.right', 'KeyD'], ['fly.up', 'Space'], ['fly.down', 'KeyZ'], ['fly.fast', 'ShiftLeft']];
+  for (const [id, code] of map) if (bindings.held(id, down)) out.add(code);
+  return out;
+}
 
 const CATEGORIES: { id: PropCategory; label: string; icon: React.ReactNode; modes: readonly ShelfMode[] }[] = [
   // The Meshy models: island pieces, stunts and decorative rings (models/kit-catalog.ts).
@@ -143,6 +154,30 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [showShaders, setShowShaders] = useState(false);
   const [isZen, setIsZen] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const [keyOverrides, setKeyOverrides] = useState(() => readKeyOverrides());
+  const bindings = useMemo(() => new BuilderKeys(keyOverrides), [keyOverrides]);
+  const bindingsRef = useRef(bindings);
+  bindingsRef.current = bindings;
+  const keyLabel = (id: string) => bindings.label(id);
+  const [editorMode, setEditorModeState] = useState<EditorMode>(() => {
+    try { return localStorage.getItem(EDITOR_MODE_KEY) === 'easy' ? 'easy' : 'pro'; } catch { return 'pro'; }
+  });
+  const modeRef = useRef(editorMode);
+  modeRef.current = editorMode;
+  const setEditorMode = (mode: EditorMode) => {
+    setEditorModeState(mode);
+    try { localStorage.setItem(EDITOR_MODE_KEY, mode); } catch { /* the choice lasts this visit */ }
+  };
+  const toggleModeRef = useRef<() => void>(() => {});
+  toggleModeRef.current = () => {
+    const next = modeRef.current === 'easy' ? 'pro' : 'easy';
+    setEditorMode(next);
+    showToast(next === 'easy' ? 'Easy Build' : 'Pro mode');
+  };
+  /** Easy Build's keys go to its toolbar (set by EasyBuildBar). */
+  const easyKeyRef = useRef<(action: string) => void>(() => {});
+  const testRaceRef = useRef<(() => void) | undefined>(undefined);
+  testRaceRef.current = onTestRace;
   const [inspectorTab, setInspectorTab] = useState<'transform' | 'shading' | 'collision' | 'animation'>('transform');
   const [gizmoMode, setGizmoMode] = useState<GizmoMode>(builder.getGizmoMode());
   const [gizmoSpace, setGizmoSpace] = useState<GizmoSpace>(builder.getGizmoSpace());
@@ -358,7 +393,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       lastTimeRef.current = now;
 
       // Always update fly camera each frame
-      builder.updateFlyCamera(dt, keysRef.current);
+      builder.updateFlyCamera(dt, flyKeys(bindingsRef.current, keysRef.current));
       onRequestRender?.();
       animFrameRef.current = requestAnimationFrame(loop);
     };
@@ -915,221 +950,177 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         }
       }
 
-      // Keyboard shortcuts
-      // 1. Cycle active axis with Numpad 5 or Digit 5
-      if ((e.code === 'Numpad5' || e.code === 'Digit5') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        const current = nudgeAxisRef.current;
-        const nextAxis: 'y' | 'x' | 'z' = current === 'y' ? 'x' : current === 'x' ? 'z' : 'y';
-        setNudgeAxis(nextAxis);
-        showToast(`Nudge Axis: ${nextAxis.toUpperCase()} [Numpad/Arrows to move, 5 to cycle]`);
-        return;
-      }
-
-      // 2. Toggle Click Move with KeyM
-      if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setClickMoveEnabled((prev) => {
-          const next = !prev;
-          showToast(next ? 'Click Move: ON (Click & drag to move)' : 'Click Move: OFF (Clicking selects only)');
-          return next;
-        });
-        return;
-      }
-
-
-      // 3. Group / Ungroup with Ctrl+G / Ctrl+Shift+G
-      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyG') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          const success = builder.ungroupSelected();
-          if (success) {
-            showToast('Ungrouped selection');
-            onRequestRender?.();
-          }
-        } else {
-          const gid = builder.groupSelected();
-          if (gid) {
-            showToast(`Grouped ${builder.getSelectedProps().length} decorations [Ctrl+Shift+G to ungroup]`);
-            onRequestRender?.();
-          } else {
-            showToast('Select 2 or more decorations to group');
-          }
-        }
-        return;
-      }
-
-      // 4. Directional movement along active axis via Arrow or Numpad keys
+      // Arrow / numpad nudges move the picked pieces along the nudge axis (fixed keys).
       const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code);
       const isNumpad = ['Numpad8', 'Numpad2', 'Numpad4', 'Numpad6'].includes(e.code);
-      if (isArrow || isNumpad) {
-        const selected = builder.getSelectedProps();
-        if (selected.length > 0) {
+      if ((isArrow || isNumpad) && !e.ctrlKey && !e.metaKey && !e.altKey && builder.getSelectedProps().length > 0) {
+        e.preventDefault();
+        const step = e.shiftKey ? 100 : 25;
+        const up = e.code === 'ArrowUp' || e.code === 'Numpad8' || e.code === 'ArrowRight' || e.code === 'Numpad6';
+        const amount = up ? step : -step;
+        const axis = modeRef.current === 'easy' ? 'y' : nudgeAxisRef.current;
+        builder.moveSelectedProps(axis === 'x' ? amount : 0, axis === 'y' ? amount : 0, axis === 'z' ? amount : 0);
+        onRequestRender?.();
+        return;
+      }
+
+      const action = bindingsRef.current.match(e, modeRef.current);
+      if (!action) return;
+      const rmbFree = isRightMouseDown.current === false;
+      const selected = builder.getSelectedProps();
+      const gizmo = (mode: GizmoMode, label: string) => {
+        if (!rmbFree) return;
+        e.preventDefault();
+        builder.setGizmoMode(mode);
+        setGizmoMode(mode);
+        showToast(`${label} [${bindingsRef.current.label(`gizmo.${mode === 'translate' ? 'move' : mode}`)}]`);
+      };
+      const camera = (preset: 'top' | 'front' | 'side' | 'iso', label: string) => {
+        e.preventDefault();
+        builder.setCameraPreset(preset);
+        setCameraPreset(preset);
+        showToast(`Camera: ${label}`);
+        onRequestRender?.();
+      };
+      if (action.startsWith('easy.') || action === 'edit.turnLeft' || action === 'edit.turnRight') {
+        e.preventDefault();
+        easyKeyRef.current(action);
+        return;
+      }
+      switch (action) {
+        case 'edit.nudgeAxis': {
           e.preventDefault();
-          const step = e.shiftKey ? 100 : 25;
-          let dx = 0;
-          let dy = 0;
-          let dz = 0;
-          const axis = nudgeAxisRef.current;
-
-          if (axis === 'y') {
-            // Y axis: Up/Right raises, Down/Left lowers
-            if (e.code === 'ArrowUp' || e.code === 'Numpad8') dy = step;
-            else if (e.code === 'ArrowDown' || e.code === 'Numpad2') dy = -step;
-            else if (e.code === 'ArrowRight' || e.code === 'Numpad6') dy = step;
-            else if (e.code === 'ArrowLeft' || e.code === 'Numpad4') dy = -step;
-          } else if (axis === 'x') {
-            // X axis: Right/Up moves +X, Left/Down moves -X
-            if (e.code === 'ArrowRight' || e.code === 'Numpad6') dx = step;
-            else if (e.code === 'ArrowLeft' || e.code === 'Numpad4') dx = -step;
-            else if (e.code === 'ArrowUp' || e.code === 'Numpad8') dx = step;
-            else if (e.code === 'ArrowDown' || e.code === 'Numpad2') dx = -step;
-          } else if (axis === 'z') {
-            // Z axis: Up/Right moves +Z (forward along track), Down/Left moves -Z (backward)
-            if (e.code === 'ArrowUp' || e.code === 'Numpad8') dz = step;
-            else if (e.code === 'ArrowDown' || e.code === 'Numpad2') dz = -step;
-            else if (e.code === 'ArrowRight' || e.code === 'Numpad6') dz = step;
-            else if (e.code === 'ArrowLeft' || e.code === 'Numpad4') dz = -step;
-          }
-
-          builder.moveSelectedProps(dx, dy, dz);
-          onRequestRender?.();
+          const current = nudgeAxisRef.current;
+          const nextAxis: 'y' | 'x' | 'z' = current === 'y' ? 'x' : current === 'x' ? 'z' : 'y';
+          setNudgeAxis(nextAxis);
+          showToast(`Arrow keys nudge along ${nextAxis.toUpperCase()}`);
           return;
         }
-      } else if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
-        const selected = builder.getSelectedProps();
-        if (selected.length > 0) {
+        case 'tool.clickMove':
           e.preventDefault();
-          const stepDeg = e.shiftKey ? 10 : 2;
-          const delta = (stepDeg * Math.PI) / 180 * (e.code === 'BracketLeft' ? -1 : 1);
-          builder.tiltSelectedProps(delta);
-          showToast(`Tilt adjusted for ${selected.length} item(s)`);
+          setClickMoveEnabled((prev) => {
+            const next = !prev;
+            showToast(next ? 'Drag-move on: drag a picked piece over the ground' : 'Drag-move off: clicking only picks');
+            return next;
+          });
+          return;
+        case 'edit.group':
+          e.preventDefault();
+          if (builder.groupSelected()) { showToast(`Grouped ${builder.getSelectedProps().length} pieces`); onRequestRender?.(); }
+          else showToast('Pick 2 or more pieces to group them');
+          return;
+        case 'edit.ungroup':
+          e.preventDefault();
+          if (builder.ungroupSelected()) { showToast('Ungrouped'); onRequestRender?.(); }
+          return;
+        case 'edit.tiltLeft':
+        case 'edit.tiltRight':
+          if (!selected.length) return;
+          e.preventDefault();
+          builder.tiltSelectedProps(((e.shiftKey ? 10 : 2) * Math.PI) / 180 * (action === 'edit.tiltLeft' ? -1 : 1));
           onRequestRender?.();
-        }
-      } else if (e.code === 'KeyX' && !e.ctrlKey && !e.metaKey) {
-        const selected = builder.getSelectedProps();
-        if (selected.length > 0) {
+          return;
+        case 'edit.flip':
+          if (!selected.length) return;
           e.preventDefault();
           builder.flipSelectedProps();
-          showToast(`Flipped/mirrored ${selected.length} item(s)`);
+          showToast(`Mirrored ${selected.length} piece${selected.length === 1 ? '' : 's'}`);
           onRequestRender?.();
+          return;
+        case 'edit.duplicate': {
+          e.preventDefault();
+          const dups = builder.duplicateSelected();
+          if (dups.length > 0) { showToast(`Duplicated ${dups.length} piece${dups.length === 1 ? '' : 's'}`); onRequestRender?.(); }
+          return;
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') {
-        e.preventDefault();
-        const dups = builder.duplicateSelected();
-        if (dups.length > 0) {
-          showToast(`Duplicated ${dups.length} item(s) as group`);
+        case 'edit.delete': {
+          e.preventDefault();
+          const count = selected.length;
+          if (count > 0) {
+            const scenery = selected.filter((p) => p.type === 'terrain_edit').length;
+            builder.deleteSelected();
+            const error = builder.getPlacementError();
+            showToast(error ?? (scenery === count ? `Hid ${count} scenery part(s) (Show hidden on the Primitives shelf brings them back)` : `Deleted ${count} piece${count === 1 ? '' : 's'}`), error ? 4000 : undefined);
+            builder.clearPlacementError();
+            onRequestRender?.();
+          }
+          return;
+        }
+        case 'edit.undo':
+          e.preventDefault();
+          if (groundBrushRef.current.on && builder.isIslandGroundOpen()) {
+            // With the sand brush out, undo takes back the last stroke.
+            showToast(builder.undoGroundStroke() ? 'Undid the last dirt stroke' : 'No dirt stroke to undo');
+          } else if (builder.sculpt?.isEnabled && builder.sculpt.takeGroundUndo()) {
+            // Sculpt & mesh paint: island surface paint on the terrain lives on the ground's own undo stack.
+            showToast(builder.undoGroundStroke() ? 'Undid the last island ground stroke' : 'No ground stroke to undo');
+          } else {
+            builder.undo();
+            showToast('Undo');
+          }
           onRequestRender?.();
-        }
-      } else if (e.code === 'Delete' || e.code === 'Backspace') {
-        e.preventDefault();
-        const count = builder.getSelectedProps().length;
-        if (count > 0) {
-          const scenery = builder.getSelectedProps().filter((p) => p.type === 'terrain_edit').length;
-          builder.deleteSelected();
-          const error = builder.getPlacementError();
-          showToast(error ?? (scenery === count ? `Hid ${count} scenery part(s) (Show hidden on the Primitives shelf brings them back)` : `Deleted ${count} item(s)`), error ? 4000 : undefined);
-          builder.clearPlacementError();
-          onRequestRender?.();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && groundBrushRef.current.on && builder.isIslandGroundOpen()) {
-        // With the sand brush out, Ctrl+Z takes back the last stroke.
-        e.preventDefault();
-        showToast(builder.undoGroundStroke() ? 'Undid the last dirt stroke' : 'No dirt stroke to undo');
-        onRequestRender?.();
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && builder.sculpt?.isEnabled && builder.sculpt.takeGroundUndo()) {
-        // Sculpt & mesh paint: island surface paint on the terrain lives on the ground's own undo stack.
-        e.preventDefault();
-        showToast(builder.undoGroundStroke() ? 'Undid the last island ground stroke' : 'No ground stroke to undo');
-        onRequestRender?.();
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
-        e.preventDefault();
-        builder.undo();
-        showToast('Undo');
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyY') {
-        e.preventDefault();
-        builder.redo();
-        showToast('Redo');
-      } else if (e.code === 'KeyF') {
-        const selected = builder.getSelectedProps();
-        if (selected.length > 0) {
+          return;
+        case 'edit.redo':
+          e.preventDefault();
+          builder.redo();
+          showToast('Redo');
+          return;
+        case 'camera.focus':
+          if (!selected.length || !rmbFree) return;
           e.preventDefault();
           builder.focusProp(selected[0].id);
-          showToast(`Focused camera on ${selected[0].name}`);
-        }
-      } else if (e.code === 'KeyW' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
-        e.preventDefault();
-        builder.setGizmoMode('translate');
-        showToast('Gizmo: Translate [W]');
-      } else if (e.code === 'KeyE' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
-        e.preventDefault();
-        builder.setGizmoMode('rotate');
-        showToast('Gizmo: Rotate [E]');
-      } else if (e.code === 'KeyR' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
-        e.preventDefault();
-        builder.setGizmoMode('scale');
-        showToast('Gizmo: Scale [R]');
-      } else if (e.code === 'KeyQ' && !(e.ctrlKey || e.metaKey || e.altKey) && isRightMouseDown.current === false) {
-        e.preventDefault();
-        const next = builder.cycleGizmoSpace();
-        showToast(`Gizmo Space: ${next.toUpperCase()} [Q]`);
-      } else if (e.code === 'KeyG' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          if (builder.ungroupSelected()) showToast('Ungrouped selection');
-        } else {
-          if (builder.groupSelected()) showToast('Grouped selection');
-        }
-      } else if (e.code === 'KeyV') {
-        e.preventDefault();
-        builder.setActivePropType(null);
-        showToast('Select / Inspect Tool Active');
-      } else if (e.code === 'Tab' || (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !e.altKey)) {
-        e.preventDefault();
-        setIsZen((prev) => !prev);
-      } else if ((e.key === '?' || (e.code === 'Slash' && e.shiftKey)) && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        setShowCheatSheet((prev) => !prev);
-      } else if (e.code === 'Numpad7') {
-        e.preventDefault();
-        builder.setCameraPreset('top');
-        setCameraPreset('top');
-        showToast('Camera: Top Ortho View [Num 7]');
-        onRequestRender?.();
-      } else if (e.code === 'Numpad1') {
-        e.preventDefault();
-        builder.setCameraPreset('front');
-        setCameraPreset('front');
-        showToast('Camera: Front Ortho View [Num 1]');
-        onRequestRender?.();
-      } else if (e.code === 'Numpad3') {
-        e.preventDefault();
-        builder.setCameraPreset('side');
-        setCameraPreset('side');
-        showToast('Camera: Side Ortho View [Num 3]');
-        onRequestRender?.();
-      } else if (e.code === 'Numpad0') {
-        e.preventDefault();
-        builder.setCameraPreset('iso');
-        setCameraPreset('iso');
-        showToast('Camera: Isometric View [Num 0]');
-        onRequestRender?.();
-      } else if (e.code === 'Escape') {
-        e.preventDefault();
-        if (builder.isDraggingGizmo()) {
-          builder.cancelGizmoDrag();
-          showToast('Transform cancelled');
-        } else if (builder.getActivePropType()) {
+          showToast(`Framed ${selected[0].name}`);
+          return;
+        case 'gizmo.move': gizmo('translate', 'Move handles'); return;
+        case 'gizmo.rotate': gizmo('rotate', 'Rotate handles'); return;
+        case 'gizmo.scale': gizmo('scale', 'Scale handles'); return;
+        case 'gizmo.space':
+          if (!rmbFree) return;
+          e.preventDefault();
+          showToast(`Handle space: ${builder.cycleGizmoSpace()}`);
+          return;
+        case 'tool.select':
+          e.preventDefault();
           builder.setActivePropType(null);
-          showToast('Select Tool Active');
-        } else if (builder.getSelectedProps().length > 0) {
-          builder.selectProp(null);
-        } else {
+          showToast('Select: click a piece to pick it');
+          return;
+        case 'mode.toggle':
+          e.preventDefault();
+          toggleModeRef.current();
+          return;
+        case 'race.test':
+          e.preventDefault();
+          testRaceRef.current?.();
+          return;
+        case 'view.zen':
+          e.preventDefault();
+          setIsZen((prev) => !prev);
+          return;
+        case 'view.help':
+          e.preventDefault();
+          setShowCheatSheet((prev) => !prev);
+          return;
+        case 'camera.top': camera('top', 'top view'); return;
+        case 'camera.front': camera('front', 'front view'); return;
+        case 'camera.side': camera('side', 'side view'); return;
+        case 'camera.iso': camera('iso', 'three-quarter view'); return;
+        case 'edit.cancel':
+          // Escape never leaves the editor: it cancels a drag, puts the piece down, or deselects.
+          e.preventDefault();
+          if (builder.isDraggingGizmo()) {
+            builder.cancelGizmoDrag();
+            showToast('Transform cancelled');
+          } else if (builder.getActivePropType()) {
+            builder.setActivePropType(null);
+            showToast('Select: click a piece to pick it');
+          } else if (selected.length > 0) {
+            builder.selectProp(null);
+          }
+          return;
+        case 'view.exit':
+          e.preventDefault();
           onClose();
-        }
-      } else if (e.code === 'KeyB') {
-        e.preventDefault();
-        onClose();
+          return;
       }
     };
 
@@ -1531,9 +1522,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   };
 
   return (
-    <div className="track-builder-root pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
+    <div className="track-builder-root forge-theme pointer-events-none fixed inset-0 z-50 flex flex-col justify-between select-none">
       {bakeProgress && createPortal(
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
+        <div className="forge-theme fixed inset-0 z-[90] flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
           <div role="alertdialog" aria-label={bakeProgress.title ?? 'Baking lights'} className="w-80 rounded-lg border border-amber-500/60 bg-zinc-950/95 p-4 text-amber-100 shadow-2xl">
             <div className="text-sm font-bold text-amber-300">{bakeProgress.title ?? 'Baking lights'}</div>
             <div className="mt-1 text-[11px] text-zinc-400">
@@ -1563,12 +1554,29 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
       {/* Top Bar */}
       {!isZen && (
-        <header className="pointer-events-auto relative z-30 bg-zinc-950/90 border-b border-amber-500/40 px-3 py-1.5 backdrop-blur-md text-amber-100 flex items-center justify-between gap-2 shadow-lg select-none">
+        <header className="forge-bar forge-bar--top pointer-events-auto relative z-30 px-2 py-1 text-amber-100 flex items-center justify-between gap-2 shadow-lg select-none">
           {/* Left Zone: Brand + File Menu + Track/Sky + Props Hierarchy */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <div className="flex items-center gap-1.5 font-bold tracking-wider text-amber-400 text-xs px-2 py-1 bg-amber-950/50 border border-amber-600/40 rounded shadow-inner">
-              <Compass size={15} className="text-amber-400" />
-              <span className="hidden sm:inline font-mono">FORGE 3D</span>
+            <div className="flex items-center gap-1.5 pl-1 pr-1.5">
+              <Compass size={16} className="text-amber-400" />
+              <span className="forge-title hidden sm:inline text-[13px] font-bold text-amber-300">Forge</span>
+            </div>
+            <div className="forge-tool-group" role="radiogroup" aria-label="Editor mode">
+              {(['easy', 'pro'] as const).map((m) => (
+                <button
+                  key={m}
+                  role="radio"
+                  aria-checked={editorMode === m}
+                  onClick={() => setEditorMode(m)}
+                  className={`forge-tool ${editorMode === m ? 'is-on' : ''}`}
+                  title={m === 'easy'
+                    ? `Easy Build: walk down the road and drop pieces from one toolbar [${keyLabel('mode.toggle')}]`
+                    : `Pro: every shelf, handle and tool [${keyLabel('mode.toggle')}]`}
+                >
+                  {m === 'easy' ? <Wand2 size={13} /> : <Wrench size={13} />}
+                  <span>{m === 'easy' ? 'Easy' : 'Pro'}</span>
+                </button>
+              ))}
             </div>
 
             {/* File & Project Dropdown */}
@@ -1716,7 +1724,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="Shader Manager: blend three textures with cloud noise, and dress primitives and scenery"
             >
               <Paintbrush size={12} />
-              <span className="hidden md:inline text-[11px]">Shaders</span>
+              <span className="hidden 2xl:inline text-[11px]">Shaders</span>
             </button>
 
             {/* Skybox Selector */}
@@ -1733,7 +1741,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Choose Skydome Environment & Atmosphere"
               >
                 <Sun size={12} />
-                <span className="hidden md:inline text-[11px]">Sky: {skyMode === 'gradient' ? 'Gradient' : SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
+                <span className="hidden 2xl:inline text-[11px]">Sky: {skyMode === 'gradient' ? 'Gradient' : SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
                 <ChevronDown size={10} />
               </button>
 
@@ -1792,7 +1800,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="View placed props hierarchy in scene"
             >
               <Layers size={13} />
-              <span className="text-[11px]">Props ({placedProps.length})</span>
+              <span className="text-[11px]"><span className="hidden 2xl:inline">Props </span>{placedProps.length}</span>
             </button>
 
             {/* The island itself: its ground settings, paint and sun shadows in the attribute window */}
@@ -1806,64 +1814,42 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="Select the island: its terrain, paint and sun shadows in the attribute window"
             >
               <Mountain size={13} />
-              <span className="text-[11px]">Island</span>
+              <span className="hidden 2xl:inline text-[11px]">Island</span>
             </button>
           </div>
 
           {/* Center Zone: DCC Gizmo Bar + Camera Dropdown + Snapping Dropdown */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {/* DCC Gizmo Toolbar */}
-            <div className="flex items-center bg-zinc-900/95 rounded border border-zinc-700/60 p-0.5 text-xs shadow-inner">
-              <button
-                onClick={() => {
-                  builder.setGizmoMode('translate');
-                  setGizmoMode('translate');
-                  showToast('Gizmo: Translate [W]');
-                }}
-                className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                  gizmoMode === 'translate' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Translate Gizmo [W]"
-              >
-                W: Move
-              </button>
-              <button
-                onClick={() => {
-                  builder.setGizmoMode('rotate');
-                  setGizmoMode('rotate');
-                  showToast('Gizmo: Rotate [E]');
-                }}
-                className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                  gizmoMode === 'rotate' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Rotate Gizmo [E]"
-              >
-                E: Rotate
-              </button>
-              <button
-                onClick={() => {
-                  builder.setGizmoMode('scale');
-                  setGizmoMode('scale');
-                  showToast('Gizmo: Scale [R]');
-                }}
-                className={`px-2 py-0.5 rounded text-xs font-bold transition-all cursor-pointer ${
-                  gizmoMode === 'scale' ? 'bg-amber-500 text-zinc-950 shadow' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Scale Gizmo [R]"
-              >
-                R: Scale
-              </button>
-              <button
-                onClick={() => {
-                  const next = builder.cycleGizmoSpace();
-                  setGizmoSpace(next);
-                  showToast(`Gizmo Space: ${next.toUpperCase()} [Q]`);
-                }}
-                className="px-1.5 py-0.5 text-amber-300 hover:text-amber-200 font-mono text-[10px] cursor-pointer"
-                title="Cycle Space (World / Local / Track) [Q]"
-              >
-                [{gizmoSpace.toUpperCase().slice(0, 4)}]
-              </button>
+            {/* Gizmo: move / rotate / scale handles and their space */}
+            <div className="forge-tool-group" role="group" aria-label="Handles">
+              {([
+                ['translate', 'gizmo.move', 'Move', <Move key="m" size={14} />],
+                ['rotate', 'gizmo.rotate', 'Rotate', <RotateCw key="r" size={14} />],
+                ['scale', 'gizmo.scale', 'Scale', <Maximize2 key="s" size={14} />],
+              ] as const).map(([mode, action, label, icon]) => (
+                <button
+                  key={mode}
+                  onClick={() => { builder.setGizmoMode(mode); setGizmoMode(mode); }}
+                  className={`forge-tool ${gizmoMode === mode ? 'is-on' : ''}`}
+                  title={`${label} handles [${keyLabel(action)}]`}
+                  aria-pressed={gizmoMode === mode}
+                >
+                  {icon}<kbd className="forge-key">{keyLabel(action)}</kbd>
+                </button>
+              ))}
+              {editorMode === 'pro' && (
+                <button
+                  onClick={() => {
+                    const next = builder.cycleGizmoSpace();
+                    setGizmoSpace(next);
+                    showToast(`Handle space: ${next}`);
+                  }}
+                  className="forge-tool !px-1.5 font-mono text-[10px]"
+                  title={`Handle space: world, the piece's own, or along the track [${keyLabel('gizmo.space')}]`}
+                >
+                  {gizmoSpace.slice(0, 5).toUpperCase()}
+                </button>
+              )}
             </div>
 
             {/* Camera Views Dropdown */}
@@ -1877,10 +1863,10 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   setShowSkyMenu(false);
                 }}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
-                title="Camera Rigs & Orthographic Views [0, 1, 3, 7]"
+                title="Camera views"
               >
                 <Camera size={12} className="text-amber-400" />
-                <span className="text-[11px] capitalize">{cameraPreset} View</span>
+                <span className="hidden 2xl:inline text-[11px] capitalize">{cameraPreset} View</span>
                 <ChevronDown size={10} />
               </button>
 
@@ -1906,14 +1892,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       builder.setCameraPreset('top');
                       setCameraPreset('top');
                       setShowCameraMenu(false);
-                      showToast('Camera: Top Ortho View [Num 7]');
+                      showToast('Camera: Top Ortho View');
                       onRequestRender?.();
                     }}
                     className={`builder-dropdown-item ${cameraPreset === 'top' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span>Top Ortho</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">[Num 7]</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">{keyLabel('camera.top')}</span>
                     </div>
                   </button>
                   <button
@@ -1921,14 +1907,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       builder.setCameraPreset('front');
                       setCameraPreset('front');
                       setShowCameraMenu(false);
-                      showToast('Camera: Front Ortho View [Num 1]');
+                      showToast('Camera: Front Ortho View');
                       onRequestRender?.();
                     }}
                     className={`builder-dropdown-item ${cameraPreset === 'front' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span>Front Ortho</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">[Num 1]</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">{keyLabel('camera.front')}</span>
                     </div>
                   </button>
                   <button
@@ -1936,14 +1922,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       builder.setCameraPreset('side');
                       setCameraPreset('side');
                       setShowCameraMenu(false);
-                      showToast('Camera: Side Ortho View [Num 3]');
+                      showToast('Camera: Side Ortho View');
                       onRequestRender?.();
                     }}
                     className={`builder-dropdown-item ${cameraPreset === 'side' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span>Side Ortho</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">[Num 3]</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">{keyLabel('camera.side')}</span>
                     </div>
                   </button>
                   <button
@@ -1951,14 +1937,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       builder.setCameraPreset('iso');
                       setCameraPreset('iso');
                       setShowCameraMenu(false);
-                      showToast('Camera: Isometric View [Num 0]');
+                      showToast('Camera: Isometric View');
                       onRequestRender?.();
                     }}
                     className={`builder-dropdown-item ${cameraPreset === 'iso' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span>Isometric</span>
-                      <span className="text-[10px] text-zinc-500 font-mono">[Num 0]</span>
+                      <span className="text-[10px] text-zinc-500 font-mono">{keyLabel('camera.iso')}</span>
                     </div>
                   </button>
                 </div>
@@ -1983,7 +1969,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Surface alignment, snapping, billboard & decal placement options"
               >
                 <Magnet size={12} className={alignToTrack || snapToCenterline ? 'text-amber-400' : 'text-zinc-400'} />
-                <span className="text-[11px]">Snapping</span>
+                <span className="hidden 2xl:inline text-[11px]">Snapping</span>
                 <ChevronDown size={10} />
               </button>
 
@@ -2078,17 +2064,17 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             </button>
             <button
               onClick={() => setShowCheatSheet(true)}
-              className="p-1 text-amber-300 hover:text-white bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50 cursor-pointer"
-              title="Hotkeys & Cheat Sheet [?]"
+              className="forge-tool !px-1.5"
+              title={`Keys: every shortcut, and set your own [${keyLabel('view.help')}]`}
             >
-              <HelpCircle size={13} />
+              <Keyboard size={14} />
             </button>
             <button
               onClick={() => setIsZen(true)}
-              className="p-1 text-zinc-400 hover:text-amber-300 bg-zinc-900/80 hover:bg-zinc-800 rounded border border-zinc-700/50 cursor-pointer"
-              title="Enter Zen Mode [H / Tab]"
+              className="forge-tool !px-1.5"
+              title={`Hide the panels [${keyLabel('view.zen')}]`}
             >
-              <Maximize2 size={13} />
+              <EyeOff size={14} />
             </button>
 
             {onTestRace && (
@@ -2098,18 +2084,19 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   (document.activeElement as HTMLElement)?.blur();
                   onTestRace();
                 }}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded transition-colors shadow-md shadow-emerald-700/30 cursor-pointer ml-1"
-                title="Test drive on this track!"
+                className="forge-cta ml-1"
+                title={`Race this track now [${keyLabel('race.test')}]`}
               >
-                <Play size={12} fill="currentColor" /> TEST RACE
+                <Play size={13} fill="currentColor" /> Test race
               </button>
             )}
 
             <button
               onClick={onClose}
-              className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-zinc-950 rounded transition-colors cursor-pointer"
+              className="forge-tool"
+              title={`Leave the editor (your work is saved) [${keyLabel('view.exit')}]`}
             >
-              {onTestRace ? 'MENU' : 'EXIT [B]'}
+              <LogOut size={14} /><span className="hidden lg:inline">{onTestRace ? 'Menu' : 'Exit'}</span>
             </button>
           </div>
         </header>
@@ -3906,24 +3893,21 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
       {/* Bottom Prop Palette */}
       {!isZen && (
-        <div className="pointer-events-auto bg-zinc-950/95 border-t border-amber-500/40 backdrop-blur-md flex flex-col shadow-2xl transition-all select-none">
+        <div className="forge-bar forge-bar--bottom pointer-events-auto flex flex-col transition-all select-none">
           {/* Top Control Bar: Mode Toggles + Search Box + Shelf Expand/Collapse */}
-          <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900/90 border-b border-zinc-800/80 gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center justify-between px-2 py-1 border-b border-zinc-800/80 gap-2">
+            <div className="flex items-center gap-1 flex-wrap">
               <button
                 onClick={() => {
                   builder.setActivePropType(null);
                   showToast('Select Tool Active: Click any prop in 3D to select or delete it');
                 }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded font-bold transition-all cursor-pointer ${
-                  !activePropType
-                    ? 'bg-amber-600 text-zinc-950 shadow'
-                    : 'bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700/50'
-                }`}
-                title="Select / Inspect mode [V]"
+                className={`forge-tool ${!activePropType ? 'is-on' : ''}`}
+                title={`Select: click a piece to pick it [${keyLabel('tool.select')}]`}
               >
-                <MousePointer size={13} />
-                <span>SELECT [V]</span>
+                <MousePointer size={14} />
+                <span className="hidden xl:inline">Select</span>
+                <kbd className="forge-key">{keyLabel('tool.select')}</kbd>
               </button>
 
               <button
@@ -3934,15 +3918,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     return next;
                   });
                 }}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
-                  clickMoveEnabled
-                    ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
-                    : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border-zinc-700/60'
-                }`}
-                title="Toggle click-move mode [M]"
+                aria-pressed={clickMoveEnabled}
+                className="forge-tool"
+                title={`Click-move: drag a picked piece over the ground [${keyLabel('tool.clickMove')}]`}
               >
-                <Move size={12} />
-                <span>MOVE: {clickMoveEnabled ? 'ON' : 'OFF'} [M]</span>
+                <Move size={14} />
+                <span className="hidden xl:inline">Drag move</span>
+                <kbd className="forge-key">{keyLabel('tool.clickMove')}</kbd>
               </button>
 
               <div className="flex items-center">
@@ -3956,18 +3938,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     });
                   }}
                   aria-pressed={testStartMode}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded-l font-bold transition-all border cursor-pointer ${
-                    testStartMode ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md' : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border-zinc-700/60'
-                  }`}
-                  title="Where a test drive starts: click the road to put the test ball there; your ball starts on the nearest lane"
+                  className="forge-tool rounded-r-none"
+                  title="Test start: click the road to put the test ball there; test drives start from it"
                 >
-                  <Play size={12} />
-                  <span>TEST START</span>
+                  <Play size={14} />
+                  <span className="hidden xl:inline">Test start</span>
                 </button>
                 <button
                   onClick={() => { builder.setTestBall(null); setTestBallState(null); setTestBallHeight(0); showToast('Test drives start from the grid again'); onRequestRender?.(); }}
                   disabled={!testBall}
-                  className="px-1.5 py-1 text-xs rounded-r border border-l-0 border-zinc-700/60 bg-zinc-850 hover:bg-zinc-800 text-zinc-400 cursor-pointer disabled:opacity-35 disabled:cursor-default"
+                  className="forge-tool rounded-l-none border-l-0 !min-w-0 !px-1.5"
                   title="Remove the test ball (test drives start from the grid)"
                   aria-label="Remove the test ball"
                 >
@@ -3997,41 +3977,33 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   });
                 }}
                 aria-pressed={dragSelect}
-                className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
-                  dragSelect
-                    ? 'bg-amber-500 text-zinc-950 border-amber-400 shadow-md'
-                    : 'bg-zinc-850 hover:bg-zinc-800 text-zinc-400 border-zinc-700/60'
-                }`}
-                title="Click-drag select: drag a box over placed items to select them (Shift adds to the selection)"
+                className="forge-tool"
+                title="Box select: drag a box over placed pieces to select them (Shift adds)"
               >
-                <SquareDashedMousePointer size={12} />
-                <span>DRAG SELECT</span>
+                <SquareDashedMousePointer size={14} />
+                <span className="hidden xl:inline">Box select</span>
               </button>
 
               {builder.decor && (
                 <button
                   onClick={() => toggleToolWindow('decor')}
                   aria-pressed={toolWindow === 'decor'}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
-                    toolWindow === 'decor' ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-850 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
-                  }`}
+                  className="forge-tool"
                   title="Decorate: paint scenery with a brush, or let the rules dress the road"
                 >
-                  <TreePine size={12} />
-                  <span>DECORATE</span>
+                  <TreePine size={14} />
+                  <span className="hidden lg:inline">Decorate</span>
                 </button>
               )}
               {builder.sculpt && (
                 <button
                   onClick={() => toggleToolWindow('sculpt')}
                   aria-pressed={toolWindow === 'sculpt'}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
-                    toolWindow === 'sculpt' ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-850 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
-                  }`}
+                  className="forge-tool"
                   title="Sculpt: reshape the terrain and placed models, and paint their vertices"
                 >
-                  <Mountain size={12} />
-                  <span>SCULPT</span>
+                  <Mountain size={14} />
+                  <span className="hidden lg:inline">Sculpt</span>
                 </button>
               )}
 
@@ -4043,18 +4015,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     setShowSections((v) => !v);
                   }}
                   aria-expanded={showSections}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-bold transition-all border cursor-pointer ${
-                    showSections ? 'bg-amber-950/60 text-amber-200 border-amber-500/60' : 'bg-zinc-850 hover:bg-zinc-800 text-amber-300 border-zinc-700/60'
-                  }`}
-                  title="Show or hide each section's placed items, or select them all"
+                  className={`forge-tool ${showSections ? 'is-on' : ''}`}
+                  title="Sections: show or hide each shelf's placed pieces, or select them all"
                 >
-                  <ListChecks size={12} />
-                  <span>SECTIONS</span>
+                  <ListChecks size={14} />
+                  <span className="hidden xl:inline">Sections</span>
                 </button>
                 {showSections && sectionsAnchor && createPortal((() => {
                   const counts = builder.sectionCounts();
                   return (
-                    <div style={{ left: sectionsAnchor.left, bottom: sectionsAnchor.bottom }} className="fixed z-[70] pointer-events-auto w-72 max-h-80 overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/50 rounded-lg p-2 shadow-2xl flex flex-col gap-0.5">
+                    <div style={{ left: sectionsAnchor.left, bottom: sectionsAnchor.bottom }} className="forge-theme fixed z-[70] pointer-events-auto w-72 max-h-80 overflow-y-auto scrollbar-thin bg-zinc-950/95 border border-amber-500/50 rounded-lg p-2 shadow-2xl flex flex-col gap-0.5">
                       <span className="px-1 pb-1 text-[11px] text-zinc-400">Placed items by section</span>
                       {CATEGORIES.filter((cat) => cat.id !== 'lanes').map((cat) => {
                         const count = counts.get(cat.id) ?? 0;
@@ -4101,14 +4071,14 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 onClick={() => {
                   const nextAxis: 'y' | 'x' | 'z' = nudgeAxis === 'y' ? 'x' : nudgeAxis === 'x' ? 'z' : 'y';
                   setNudgeAxis(nextAxis);
-                  showToast(`Nudge Axis: ${nextAxis.toUpperCase()} [5]`);
+                  showToast(`Arrow keys nudge along ${nextAxis.toUpperCase()} [${keyLabel('edit.nudgeAxis')}]`);
                 }}
-                className="flex items-center gap-1 px-2 py-1 text-xs rounded font-bold bg-zinc-850 hover:bg-zinc-800 text-amber-300 border border-zinc-700/60 transition-all cursor-pointer"
-                title="Nudge axis [5]"
+                className="forge-tool"
+                title={`The axis the arrow keys nudge a picked piece along [${keyLabel('edit.nudgeAxis')}]`}
               >
-                <span className="text-zinc-400 text-[10px]">AXIS:</span>
-                <span className="font-mono bg-zinc-800 px-1 rounded text-amber-400">{nudgeAxis.toUpperCase()}</span>
-                <span className="text-[10px] text-zinc-500">[5]</span>
+                <span className="text-zinc-400 text-[10px]">Nudge</span>
+                <span className="font-mono text-amber-300">{nudgeAxis.toUpperCase()}</span>
+                <kbd className="forge-key">{keyLabel('edit.nudgeAxis')}</kbd>
               </button>
 
               {selectedProps.length > 1 && (
@@ -4123,7 +4093,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     }
                     onRequestRender?.();
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs rounded font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/60 transition-all cursor-pointer hover:bg-cyan-900/60"
+                  className="forge-tool"
                   title="Group/Ungroup selected decorations [Ctrl+G / Ctrl+Shift+G]"
                 >
                   <Users size={12} />
@@ -4157,7 +4127,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               {/* Shelf Expand/Collapse button */}
               <button
                 onClick={() => setShelfExpanded(!shelfExpanded)}
-                className="flex items-center gap-1 px-2 py-0.5 text-xs bg-zinc-850 hover:bg-zinc-800 text-zinc-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
+                className="forge-tool"
                 title={shelfExpanded ? 'Compact Shelf (Single Row)' : 'Expand Shelf (Multi-Row View)'}
               >
                 {shelfExpanded ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
@@ -4176,8 +4146,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           )}
 
           {/* Category Tabs Strip */}
-          <div className="flex items-center gap-0.5 px-3 pt-1 overflow-x-auto border-b border-zinc-800/80 scrollbar-none bg-zinc-950/70">
-            <div role="radiogroup" aria-label="Asset type" className="flex items-center shrink-0 mr-2 mb-1 p-0.5 rounded-md bg-zinc-900 border border-zinc-700/70">
+          <div className="flex items-center gap-0.5 px-2 overflow-x-auto border-b border-zinc-800/80 scrollbar-none bg-black/20">
+            <div role="radiogroup" aria-label="Asset type" className="flex items-center shrink-0 mr-2 my-1 p-0.5 rounded-md bg-zinc-900 border border-zinc-700/70">
               {(['3d', '2d'] as const).map((mode) => (
                 <button
                   key={mode}
@@ -4197,11 +4167,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <button
                 key={cat.id}
                 onClick={() => setCategory(cat.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-t font-medium transition-all whitespace-nowrap cursor-pointer ${
-                  category === cat.id
-                    ? 'bg-zinc-900 text-amber-400 border-t-2 border-x border-amber-500 font-bold shadow-sm'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60'
-                }`}
+                className={`forge-cat ${category === cat.id ? 'is-active' : ''}`}
               >
                 {cat.icon}
                 <span>{cat.label}</span>
@@ -4628,7 +4594,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       )}
 
       {/* Hotkeys Cheat Sheet Modal */}
-      <CheatSheet isOpen={showCheatSheet} onClose={() => setShowCheatSheet(false)} />
+      <CheatSheet isOpen={showCheatSheet} onClose={() => setShowCheatSheet(false)} bindings={bindings} mode={editorMode} onChange={(o) => { setKeyOverrides(o); writeKeyOverrides(o); }} />
 
       {/* Zen Mode Restore Floating Button */}
       {isZen && <ZenRestore onRestore={() => setIsZen(false)} />}

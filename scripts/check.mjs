@@ -50,6 +50,7 @@ const commands = [
     'tests/dent-rolling.test.ts',
     'tests/animated-props.test.ts',
     'tests/keymap.test.ts',
+    'tests/builder-keys.test.ts',
     'tests/history.test.ts',
     'tests/storage-v2.test.ts',
     'tests/gizmo-math.test.ts',

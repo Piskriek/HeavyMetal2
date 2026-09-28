@@ -45,7 +45,7 @@ export default function IslandTrackBar({ builder, course, onCourseChange, showTo
   return (
     <>
       <div className="flex items-center gap-1 bg-zinc-900/90 border border-zinc-700/60 rounded px-2 py-1 text-xs">
-        <span className="text-zinc-400 font-medium text-[11px]">Track:</span>
+        <span className="hidden 2xl:inline text-zinc-400 font-medium text-[11px]">Track:</span>
         {courses.length > 1 && onCourseChange && (
           <select
             className="bg-transparent text-amber-300 focus:outline-none cursor-pointer font-bold text-xs"
@@ -82,21 +82,21 @@ export default function IslandTrackBar({ builder, course, onCourseChange, showTo
             className="flex items-center gap-1 px-2 py-1 text-xs rounded border font-medium cursor-pointer bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 border-zinc-700/50"
             title="Create a new empty track on the island"
           >
-            <FilePlus2 size={13} /> New
+            <FilePlus2 size={13} /><span className="hidden 2xl:inline">New</span>
           </button>
           <button
             onClick={() => setDialog({ mode: 'duplicate', name: `${open?.name ?? 'Track'} copy` })}
             className="flex items-center gap-1 px-2 py-1 text-xs rounded border font-medium cursor-pointer bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 border-zinc-700/50"
             title="Make a copy of the open track under a new name"
           >
-            <CopyPlus size={13} /> Duplicate
+            <CopyPlus size={13} /><span className="hidden 2xl:inline">Duplicate</span>
           </button>
         </div>
       )}
 
       {/* On the page itself: the toolbar's blur would otherwise pin a fixed dialog inside the toolbar. */}
       {dialog && createPortal(
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 pointer-events-auto" onMouseDown={(e) => { if (e.target === e.currentTarget) setDialog(null); }}>
+        <div className="forge-theme fixed inset-0 z-[80] flex items-center justify-center bg-black/55 pointer-events-auto" onMouseDown={(e) => { if (e.target === e.currentTarget) setDialog(null); }}>
           <form
             role="dialog"
             aria-modal="true"

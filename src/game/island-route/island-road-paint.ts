@@ -139,15 +139,29 @@ function raiseShare(data: Uint8Array, i: number, surface: number, t: number): vo
   else { data[i] = surface; data[i + 2] = 255 - target; }
 }
 
-/**
- * One ground texel as shown: the hand-painted bytes at `i` (copied into `out`), with the projected road
- * texel laid over them. Surface 0 in the road texel is "nothing painted here" and leaves the hand paint.
- */
-export function composeTexel(hand: Uint8Array, out: Uint8Array, i: number, road: PackedTexel | undefined): void {
-  out[i] = hand[i]; out[i + 1] = hand[i + 1]; out[i + 2] = hand[i + 2]; out[i + 3] = hand[i + 3];
-  if (road === undefined) return;
-  const id0 = road & 255, id1 = (road >> 8) & 255, w = (road >> 16) & 255;
+/** Lays one texel (id0, id1, weight) over `out[i..]`: surface 0 is "nothing here" and leaves what is under. */
+function overlay(out: Uint8Array, i: number, id0: number, id1: number, w: number): void {
   if (id0 === id1) { if (id0 !== 0) raiseShare(out, i, id0, 1); return; }
+  // Painted through with two surfaces: it covers whatever is under it completely.
+  if (id0 !== 0 && id1 !== 0) { out[i] = id0; out[i + 1] = id1; out[i + 2] = w; return; }
   if (id0 !== 0) raiseShare(out, i, id0, (255 - w) / 255);
   if (id1 !== 0) raiseShare(out, i, id1, w / 255);
+}
+
+/**
+ * One ground texel as shown, bottom to top: the island auto paint (`auto` at byte `autoIndex`, or none),
+ * the brush's paint over it (`hand` at `i`), the projected road over both. Each layer only raises the
+ * shares of what it paints, so an unpainted brush texel shows the auto paint and re-composing is stable.
+ */
+export function composeLayers(auto: Uint8Array | null, autoIndex: number, hand: Uint8Array, out: Uint8Array, i: number, road: PackedTexel | undefined): void {
+  if (auto) { out[i] = auto[autoIndex]; out[i + 1] = auto[autoIndex + 1]; out[i + 2] = auto[autoIndex + 2]; out[i + 3] = 0; }
+  else { out[i] = 0; out[i + 1] = 0; out[i + 2] = 0; out[i + 3] = 0; }
+  overlay(out, i, hand[i], hand[i + 1], hand[i + 2]);
+  out[i + 3] = hand[i + 3];
+  if (road !== undefined) overlay(out, i, road & 255, (road >> 8) & 255, (road >> 16) & 255);
+}
+
+/** The brush's paint with the road over it (no auto paint): `composeLayers` without the bottom layer. */
+export function composeTexel(hand: Uint8Array, out: Uint8Array, i: number, road: PackedTexel | undefined): void {
+  composeLayers(null, 0, hand, out, i, road);
 }

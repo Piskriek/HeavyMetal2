@@ -16,7 +16,9 @@
 /** How a surface gets its pixels: a painted tile the renderer already loads, or a tile generated once on a canvas. */
 export type SurfaceSource =
   | { readonly kind: 'texture'; readonly texKey: 'dirt' | 'cobble' | 'wood' | 'iron' | 'grass' | 'cliff' | 'cave' }
-  | { readonly kind: 'procedural'; readonly generator: 'asphalt' | 'gravel' | 'concrete' | 'cracked' };
+  | { readonly kind: 'procedural'; readonly generator: 'asphalt' | 'gravel' | 'concrete' | 'cracked' }
+  /** An island surface: a tile of the island surface array (`island-route/island-surfaces.ts`), island ground only. */
+  | { readonly kind: 'island' };
 
 export interface SurfaceDefinition {
   readonly id: number;
@@ -54,9 +56,31 @@ export const SURFACE_CONCRETE = 9;
  * holds a plain stand-in tile.
  */
 export const SURFACE_CRACKED = 10;
+/*
+ * The island surface set (Scrapwind Isle tiles, `public/textures/island`). Drawn by the island ground from
+ * its own texture array with height-based blending; the road ribbon's atlas shows them as flat swatches.
+ */
+export const SURFACE_SAND = 11;
+export const SURFACE_WET_SAND = 12;
+export const SURFACE_SHALLOWS = 13;
+export const SURFACE_DARK_ROCK = 14;
+export const SURFACE_OLD_PLANKS = 15;
+export const SURFACE_RIVETED_IRON = 16;
+export const SURFACE_CRYSTAL = 17;
+export const SURFACE_BEACH_GRASS = 18;
+export const SURFACE_CORAL_SAND = 19;
+export const SURFACE_GRANITE = 20;
+export const SURFACE_MOSSY_ROCK = 21;
+export const SURFACE_DRY_MUD = 22;
+export const SURFACE_DUNES = 23;
+export const SURFACE_STRATA = 24;
+/** Paints the island's own texture back over auto paint (the brush's "Island" swatch). */
+export const SURFACE_BARE = 25;
 
-/** Slots the atlas/shader currently supports; the mask format itself allows 256. */
-export const SURFACE_SLOTS = 16;
+/** IDs with a parameter slot (roughness, wet response); the mask format itself allows 256. */
+export const SURFACE_SLOTS = 32;
+/** IDs the road ribbon's 4×4 atlas has cells for. */
+export const ATLAS_SURFACES = 16;
 
 export const SURFACE_TABLE: readonly SurfaceDefinition[] = Object.freeze([
   { id: SURFACE_DIRT, name: 'Dirt (base road)', source: { kind: 'texture', texKey: 'dirt' }, roughness: 0.95, wetResponse: 0.6, grip: 1, rollingResistance: 1, dustFX: 1, tireSound: 'dirt', swatch: '#6f5436' },
@@ -70,6 +94,21 @@ export const SURFACE_TABLE: readonly SurfaceDefinition[] = Object.freeze([
   { id: SURFACE_CAVEROCK, name: 'Cave rock', source: { kind: 'texture', texKey: 'cave' }, roughness: 0.9, wetResponse: 0.7, grip: 0.9, rollingResistance: 1.15, dustFX: 0.5, tireSound: 'rock', swatch: '#4f4a44' },
   { id: SURFACE_CONCRETE, name: 'Concrete', source: { kind: 'procedural', generator: 'concrete' }, roughness: 0.78, wetResponse: 0.9, grip: 1.1, rollingResistance: 0.6, dustFX: 0.15, tireSound: 'tarmac', swatch: '#9c9a93' },
   { id: SURFACE_CRACKED, name: 'Cracked dirt', source: { kind: 'procedural', generator: 'cracked' }, roughness: 0.96, wetResponse: 0.6, grip: 0.95, rollingResistance: 1.1, dustFX: 0.9, tireSound: 'dirt', swatch: '#c8b99c' },
+  { id: SURFACE_SAND, name: 'Packed sand', source: { kind: 'island' }, roughness: 0.93, wetResponse: 0.6, grip: 1, rollingResistance: 1.05, dustFX: 0.9, tireSound: 'dirt', swatch: '#b98a3e' },
+  { id: SURFACE_WET_SAND, name: 'Wet sand', source: { kind: 'island' }, roughness: 0.62, wetResponse: 1, grip: 0.9, rollingResistance: 1.25, dustFX: 0.1, tireSound: 'dirt', swatch: '#8a6a3c' },
+  { id: SURFACE_SHALLOWS, name: 'Shallows', source: { kind: 'island' }, roughness: 0.15, wetResponse: 1, grip: 0.7, rollingResistance: 2.2, dustFX: 0, tireSound: 'dirt', swatch: '#2f9a9a' },
+  { id: SURFACE_DARK_ROCK, name: 'Dark rock', source: { kind: 'island' }, roughness: 0.85, wetResponse: 0.7, grip: 0.95, rollingResistance: 0.9, dustFX: 0.3, tireSound: 'rock', swatch: '#4a3a30' },
+  { id: SURFACE_OLD_PLANKS, name: 'Old planks', source: { kind: 'island' }, roughness: 0.82, wetResponse: 0.8, grip: 0.92, rollingResistance: 0.7, dustFX: 0.05, tireSound: 'plank', swatch: '#7a5634' },
+  { id: SURFACE_RIVETED_IRON, name: 'Riveted iron', source: { kind: 'island' }, roughness: 0.5, wetResponse: 1, grip: 0.85, rollingResistance: 0.5, dustFX: 0, tireSound: 'metal', swatch: '#6a6258' },
+  { id: SURFACE_CRYSTAL, name: 'Crystal', source: { kind: 'island' }, roughness: 0.25, wetResponse: 0.9, grip: 0.8, rollingResistance: 0.45, dustFX: 0, tireSound: 'rock', swatch: '#2c3f7a' },
+  { id: SURFACE_BEACH_GRASS, name: 'Beach grass', source: { kind: 'island' }, roughness: 0.97, wetResponse: 0.5, grip: 0.75, rollingResistance: 1.6, dustFX: 0.3, tireSound: 'grass', swatch: '#6f9a2e' },
+  { id: SURFACE_CORAL_SAND, name: 'Coral sand', source: { kind: 'island' }, roughness: 0.95, wetResponse: 0.6, grip: 0.88, rollingResistance: 1.3, dustFX: 0.5, tireSound: 'gravel', swatch: '#c9a049' },
+  { id: SURFACE_GRANITE, name: 'Granite cliff', source: { kind: 'island' }, roughness: 0.88, wetResponse: 0.7, grip: 0.95, rollingResistance: 1, dustFX: 0.3, tireSound: 'rock', swatch: '#7c7a86' },
+  { id: SURFACE_MOSSY_ROCK, name: 'Mossy rock', source: { kind: 'island' }, roughness: 0.9, wetResponse: 0.6, grip: 0.8, rollingResistance: 1.2, dustFX: 0.2, tireSound: 'rock', swatch: '#4c5a2a' },
+  { id: SURFACE_DRY_MUD, name: 'Dry mud', source: { kind: 'island' }, roughness: 0.95, wetResponse: 0.6, grip: 1, rollingResistance: 1, dustFX: 0.8, tireSound: 'dirt', swatch: '#8f6830' },
+  { id: SURFACE_DUNES, name: 'Rippled sand', source: { kind: 'island' }, roughness: 0.95, wetResponse: 0.5, grip: 0.9, rollingResistance: 1.35, dustFX: 1, tireSound: 'dirt', swatch: '#d6ad4f' },
+  { id: SURFACE_STRATA, name: 'Cliff strata', source: { kind: 'island' }, roughness: 0.9, wetResponse: 0.7, grip: 0.95, rollingResistance: 1, dustFX: 0.3, tireSound: 'rock', swatch: '#86745a' },
+  { id: SURFACE_BARE, name: 'Island', source: { kind: 'island' }, roughness: 0.95, wetResponse: 0.6, grip: 1, rollingResistance: 1, dustFX: 1, tireSound: 'dirt', swatch: '#8a7a5a' },
 ]);
 
 /** The table row for an ID; unknown IDs fall back to the base road so a corrupt mask can never crash physics. */

@@ -1,22 +1,30 @@
 /**
- * Inspector for the island terrain (click the terrain in Primitives or Custom 3D): its tint and
- * brightness, the grain and tiny pebbles seen up close, the surface brush (the island's cracked dirt or
- * any tile from the shared surface atlas: asphalt, cobbles, gravel, grass...) and auto paint for the
- * island road, which dresses the whole route in one click and is drawn by the terrain itself.
+ * Inspector for the island terrain (click the terrain in Primitives or Custom 3D), top to bottom in the
+ * order you reach for them: island auto paint (one click paints the whole island from its shape), the
+ * surface brush (the island surface set, the island's own cracked dirt, and "Island" to paint the
+ * original ground back), road auto paint along the island route, then the terrain's tint, grain and
+ * sun shadows.
  */
-import { useMemo, useState } from 'react';
-import { Eraser, Mountain, Paintbrush, Route, RotateCcw, Sun, Trash2, Undo2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Eraser, Mountain, Paintbrush, Replace, Route, RotateCcw, Sparkles, Sun, Trash2, Undo2, X } from 'lucide-react';
 import type { TrackBuilder3D } from '../../game/track-builder-3d';
 import { DEFAULT_ISLAND_GROUND, type IslandGroundSettings } from '../../game/island-route/island-ground';
-import { SURFACE_CRACKED, SURFACE_DIRT, SURFACE_TABLE } from '../../game/surface/surface-table';
+import { ISLAND_PALETTE } from '../../game/island-route/island-surfaces';
+import { SURFACE_BARE, SURFACE_CRACKED, SURFACE_DARK_ROCK, SURFACE_DRY_MUD, SURFACE_DUNES, SURFACE_SAND, SURFACE_TABLE } from '../../game/surface/surface-table';
 import { AutoPaintPanel } from '../AutoPaintPanel';
+import IslandAutoPaintPanel from './IslandAutoPaintPanel';
+import IslandTexturePicker from './IslandTexturePicker';
 
 export interface GroundBrush { on: boolean; erase: boolean; radius: number; strength: number; surface: number }
 
-/** What the island brush offers: its own cracked dirt first, then every atlas surface (0 is the bare island). */
+/** What the island brush offers: the island surface set, the island's own cracked dirt, and the island itself. */
+const ISLAND_SURFACES = [...ISLAND_PALETTE, SURFACE_CRACKED, SURFACE_BARE];
 /** Palette labels short enough for a swatch. */
-const SHORT_NAMES: Record<number, string> = { 2: 'Cobbles', 3: 'Planks', 4: 'Iron', 5: 'Gravel', 7: 'Cliff', 8: 'Cave', 10: 'Dirt' };
-const ISLAND_SURFACES = [SURFACE_CRACKED, ...SURFACE_TABLE.map((d) => d.id).filter((id) => id !== SURFACE_DIRT && id !== SURFACE_CRACKED)];
+const SHORT_NAMES: Record<number, string> = {
+  [SURFACE_CRACKED]: 'Dirt', 12: 'Wet sand', 14: 'Dark rock', 15: 'Planks', 16: 'Iron', 18: 'Grass', 19: 'Coral', 20: 'Granite', 21: 'Moss rock', 22: 'Dry mud', 23: 'Ripples', 24: 'Strata',
+};
+/** Road rules' surfaces on the island, where their own defaults (asphalt, gravel) are not offered. */
+const ROAD_SURFACE_DEFAULTS = { carriageway: SURFACE_SAND, shoulders: SURFACE_DUNES, corners: SURFACE_DARK_ROCK, ruts: SURFACE_DRY_MUD, patches: SURFACE_SAND };
 
 interface Props {
   builder: TrackBuilder3D;
@@ -36,13 +44,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function IslandGroundPanel({ builder, brush, onBrush, onClose, onRequestRender, onBakeSun, baking }: Props) {
   const [sunRes, setSunRes] = useState(1024);
   const ground = builder.getIslandGround();
-  // Swatches cut from the atlas the terrain samples, so the button shows exactly what paints.
-  const atlasDone = ground?.atlas?.complete ?? false;
-  const thumbs = useMemo(() => {
-    const out: Record<number, string> = {};
-    if (ground?.atlas && atlasDone) for (const id of ISLAND_SURFACES) out[id] = ground.atlas.thumbnail(id);
-    return out;
-  }, [ground, atlasDone]);
+  // Swatches are the tiles the terrain samples, so a button shows exactly what paints.
+  const [, thumbsLoaded] = useState(0);
+  useEffect(() => {
+    let live = true;
+    void ground?.surfaces?.ready.then(() => { if (live) thumbsLoaded((n) => n + 1); });
+    return () => { live = false; };
+  }, [ground]);
+  const thumbs: Record<number, string | undefined> = {};
+  for (const id of ISLAND_SURFACES) thumbs[id] = ground?.surfaces?.thumbs.get(id);
+  /** The surface whose tile picker is open under the palette, or null. */
+  const [swapFor, setSwapFor] = useState<number | null>(null);
   if (!ground) {
     return <p className="text-[11px] text-zinc-400">The island model is still loading.</p>;
   }
@@ -54,6 +66,16 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
     </Row>
   );
   const pct = (v: number) => `${Math.round(v * 100)}%`;
+  /** Puts a library tile on a surface (null: its original), saved with the ground; waits until it shows. */
+  const setTexture = async (surface: number, key: string | null) => {
+    const textures = { ...s.textures };
+    if (key) textures[surface] = key; else delete textures[surface];
+    builder.updateIslandGround({ textures });
+    await ground.whenReady();
+    thumbsLoaded((n) => n + 1);
+    onRequestRender?.();
+  };
+  const swappable = (id: number) => ISLAND_PALETTE.includes(id);
 
   return (
     <div className="flex flex-col gap-2.5 text-xs">
@@ -63,42 +85,10 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
       </div>
 
       <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
-        <div className="text-[11px] font-bold text-amber-300">Terrain</div>
-        <Row label="Tint"><input type="color" value={s.tint} onChange={(e) => set({ tint: e.target.value })} className="h-6 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" /></Row>
-        {slider('Brightness', 'brightness', 0.3, 2, 0.01, (v) => v.toFixed(2))}
-        {slider('Grain', 'grain', 0, 1, 0.01, pct)}
-        {slider('Pebble size', 'pebbleSize', 3, 40, 0.5, (v) => `${v}`)}
-        {slider('Pebbles', 'pebbles', 0, 1, 0.01, pct)}
-        {slider('Roughness', 'roughness', 0.2, 1, 0.01, (v) => v.toFixed(2))}
-        {slider('Shine', 'shine', 0, 1, 0.01, pct)}
-        {slider('Relief', 'bump', 0, 2, 0.01, (v) => v.toFixed(2))}
-        <p className="text-[10px] leading-snug text-zinc-500">Grain and pebbles show up close and fade out with distance. They never repeat. Shine makes the pebbles glossy (cracks stay dull); Relief makes pebbles stand up and cracks cut in, so the light catches them.</p>
-      </section>
-
-      <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Sun size={12} />Sun shadows</div>
-        <Row label="Detail">
-          <select value={sunRes} onChange={(e) => setSunRes(Number(e.target.value))} className="w-full rounded border border-zinc-700 bg-zinc-950 px-1 py-1 text-xs text-zinc-200">
-            <option value={512}>512 (quick look, ~6 s)</option>
-            <option value={1024}>1024 (about 30 s)</option>
-            <option value={2048}>2048 (sharpest, about 2 min)</option>
-          </select>
-        </Row>
-        <div className="grid grid-cols-2 gap-1">
-          <button disabled={baking} onClick={() => onBakeSun?.(sunRes)}
-            className="flex cursor-pointer items-center justify-center gap-1 rounded border border-amber-500/60 bg-amber-950/40 py-1 text-[11px] text-amber-200 hover:border-amber-400 disabled:cursor-default disabled:opacity-40">
-            <Sun size={12} />{ground.getShadow() ? 'Bake again' : 'Bake shadows'}
-          </button>
-          <button disabled={!ground.getShadow()} onClick={() => { builder.clearSunShadows(); onRequestRender?.(); }}
-            className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-red-500 disabled:cursor-default disabled:opacity-40">
-            <Trash2 size={12} />Remove
-          </button>
-        </div>
-        {slider('Darkness', 'shadowStrength', 0, 1, 0.01, pct)}
-        <p className="text-[10px] leading-snug text-zinc-500">
-          {ground.getShadow() ? `Baked at ${ground.getShadow()!.res} x ${ground.getShadow()!.res}. ` : 'Not baked yet. '}
-          The terrain and every placed model cast shadows on the ground. Bake again after moving models.
-        </p>
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Sparkles size={12} />Island auto paint</div>
+        <IslandAutoPaintPanel ground={ground} onRequestRender={onRequestRender}
+          textures={s.textures} onSetTexture={setTexture}
+          look={{ blendSoft: s.blendSoft, tileScale: s.tileScale }} onLook={(changes) => set(changes)} />
       </section>
 
       <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
@@ -109,15 +99,25 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
             const picked = brush.surface === id;
             return (
               <button key={id} role="radio" aria-checked={picked} title={def.name}
-                onClick={() => onBrush({ ...brush, surface: id, on: true, erase: false })}
+                onClick={() => { if (picked && swappable(id)) setSwapFor(swapFor === id ? null : id); else { setSwapFor(null); onBrush({ ...brush, surface: id, on: true, erase: false }); } }}
                 className={`flex cursor-pointer flex-col items-center gap-0.5 rounded border p-0.5 text-[9px] leading-tight ${picked ? 'border-amber-400 bg-amber-950/40 text-amber-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
                 <span className="block h-7 w-full rounded-sm bg-cover bg-center"
-                  style={{ backgroundColor: id === SURFACE_CRACKED ? s.sandColor : def.swatch, backgroundImage: id !== SURFACE_CRACKED && thumbs[id] ? `url(${thumbs[id]})` : undefined }} />
+                  style={{ backgroundColor: id === SURFACE_CRACKED ? s.sandColor : def.swatch, backgroundImage: thumbs[id] ? `url(${thumbs[id]})` : undefined }} />
                 <span className="w-full truncate text-center">{SHORT_NAMES[id] ?? def.name}</span>
               </button>
             );
           })}
         </div>
+        {swappable(brush.surface) && swapFor !== brush.surface && (
+          <button onClick={() => setSwapFor(brush.surface)}
+            className="flex w-full cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-zinc-500">
+            <Replace size={12} />Swap the {SURFACE_TABLE[brush.surface].name.toLowerCase()} tile
+          </button>
+        )}
+        {swapFor !== null && (
+          <IslandTexturePicker surface={swapFor} current={s.textures[swapFor]}
+            onPick={(key) => setTexture(swapFor, key)} onClose={() => setSwapFor(null)} />
+        )}
         <div className="grid grid-cols-2 gap-1">
           <button onClick={() => onBrush({ ...brush, on: !(brush.on && !brush.erase), erase: false })}
             className={`flex cursor-pointer items-center justify-center gap-1 rounded border py-1 text-[11px] ${brush.on && !brush.erase ? 'border-amber-400 bg-amber-950/40 text-amber-200' : 'border-zinc-700 text-zinc-300'}`}>
@@ -160,8 +160,48 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Route size={12} />Road auto paint</div>
         <p className="text-[10px] leading-snug text-zinc-500">Dresses the island road along the route: a preset in one click, or one rule at a time. Paint lands only on ground the road runs on, never under a bridge.</p>
         <AutoPaintPanel auto={ground.autoPaint} locate={() => builder.islandRoadNearCamera()} onPainted={onRequestRender}
-          surfaces={ISLAND_SURFACES} />
+          surfaces={ISLAND_PALETTE} scope="island" hideRules={["stage-theme", "markings"]} surfaceDefaults={ROAD_SURFACE_DEFAULTS} />
       </section>
+
+      <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
+        <div className="text-[11px] font-bold text-amber-300">Terrain</div>
+        <Row label="Tint"><input type="color" value={s.tint} onChange={(e) => set({ tint: e.target.value })} className="h-6 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" /></Row>
+        {slider('Brightness', 'brightness', 0.3, 2, 0.01, (v) => v.toFixed(2))}
+        {slider('Grain', 'grain', 0, 1, 0.01, pct)}
+        {slider('Pebble size', 'pebbleSize', 3, 40, 0.5, (v) => `${v}`)}
+        {slider('Pebbles', 'pebbles', 0, 1, 0.01, pct)}
+        {slider('Roughness', 'roughness', 0.2, 1, 0.01, (v) => v.toFixed(2))}
+        {slider('Shine', 'shine', 0, 1, 0.01, pct)}
+        {slider('Relief', 'bump', 0, 2, 0.01, (v) => v.toFixed(2))}
+        <p className="text-[10px] leading-snug text-zinc-500">Grain and pebbles show up close and fade out with distance. They never repeat. Shine makes the pebbles glossy (cracks stay dull); Relief makes pebbles stand up and cracks cut in, so the light catches them.</p>
+      </section>
+
+      <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Sun size={12} />Sun shadows</div>
+        <Row label="Detail">
+          <select value={sunRes} onChange={(e) => setSunRes(Number(e.target.value))} className="w-full rounded border border-zinc-700 bg-zinc-950 px-1 py-1 text-xs text-zinc-200">
+            <option value={512}>512 (quick look, ~6 s)</option>
+            <option value={1024}>1024 (about 30 s)</option>
+            <option value={2048}>2048 (sharpest, about 2 min)</option>
+          </select>
+        </Row>
+        <div className="grid grid-cols-2 gap-1">
+          <button disabled={baking} onClick={() => onBakeSun?.(sunRes)}
+            className="flex cursor-pointer items-center justify-center gap-1 rounded border border-amber-500/60 bg-amber-950/40 py-1 text-[11px] text-amber-200 hover:border-amber-400 disabled:cursor-default disabled:opacity-40">
+            <Sun size={12} />{ground.getShadow() ? 'Bake again' : 'Bake shadows'}
+          </button>
+          <button disabled={!ground.getShadow()} onClick={() => { builder.clearSunShadows(); onRequestRender?.(); }}
+            className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-red-500 disabled:cursor-default disabled:opacity-40">
+            <Trash2 size={12} />Remove
+          </button>
+        </div>
+        {slider('Darkness', 'shadowStrength', 0, 1, 0.01, pct)}
+        <p className="text-[10px] leading-snug text-zinc-500">
+          {ground.getShadow() ? `Baked at ${ground.getShadow()!.res} x ${ground.getShadow()!.res}. ` : 'Not baked yet. '}
+          The terrain and every placed model cast shadows on the ground. Bake again after moving models.
+        </p>
+      </section>
+
 
       <button onClick={() => set({ ...DEFAULT_ISLAND_GROUND, sandColor: s.sandColor })}
         className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-400 hover:border-zinc-500">

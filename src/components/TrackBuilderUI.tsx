@@ -58,6 +58,7 @@ import { laneEditForCommand, laneKeyIntent, lanePanelModel, type LaneKeyIntent }
 import { snapNode } from '../game/lane-path-tool';
 import { sampleLaneNetwork, createDefaultLaneNetwork, createBlankLaneNetwork } from '../game/lane-network';
 import { rebase } from '../platform/asset-base';
+import { publishIsland } from '../game/publish-course';
 
 interface TrackBuilderUIProps {
   builder: TrackBuilder3D;
@@ -1623,6 +1624,22 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     <div className="flex flex-col text-left">
                       <span className="font-semibold text-emerald-300">Export .hmt Track Package</span>
                       <span className="text-[10px] text-zinc-400">Standalone bundle with 3D models</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowFileMenu(false);
+                      void publishIsland().then((r) => showToast(r.ok
+                        ? `Published ${r.tracks} island track${r.tracks === 1 ? '' : 's'} (${Math.round(r.bytes / 1024)} KB) to public/courses/island.json. Commit it to ship.`
+                        : r.error, 6000));
+                    }}
+                    className="builder-dropdown-item"
+                    title="Ship this island (every island track, its ground paint, the lanes and the sky) to every player"
+                  >
+                    <Upload size={14} className="text-emerald-400 shrink-0" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-emerald-300">Publish island to the game</span>
+                      <span className="text-[10px] text-zinc-400">What new players race on (public/courses)</span>
                     </div>
                   </button>
                   <div className="my-1 border-t border-zinc-800/80" />

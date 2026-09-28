@@ -66,7 +66,8 @@ try {
     report(!menu.overflow, `${viewport.width}×${viewport.height}: menu has no horizontal overflow`);
     if (viewport.width === 578) { await page.waitForTimeout(900); await page.screenshot({ path: join(artifacts, 'ui-menu-578x760.png') }); }
 
-    await page.getByRole('button', { name: 'New Game' }).click();
+    await page.getByRole('button', { name: 'Quick Races', exact: true }).click();
+    await page.locator('.quick-modes .mode-option', { hasText: 'Quick Race' }).first().click();
     await page.waitForSelector('.setup-dialog');
     const frame = await page.evaluate(() => {
       const frame = document.querySelector('.setup-dialog').getBoundingClientRect();

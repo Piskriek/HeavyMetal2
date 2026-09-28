@@ -10,7 +10,15 @@ import RaceScreen from './screens/RaceScreen';
 import MapEditorScreen from './screens/MapEditorScreen';
 import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, recordsForStorage, savePreference } from './game/preferences';
 import { COURSES, type RunRecord } from './game/types';
-import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceFinish, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
+import { SETUP_KEY, commitRound, createSession, eventTitle, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, sessionTrackId, type RaceFinish, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
+import { setActiveIslandTrack } from './game/island-route/island-props-storage';
+import { payRacePurse, placeBet, settleRound, updateWallet, voidRound } from './game/meta/wallet';
+import type { CustomEvent } from './game/custom-events';
+import type { GoblinProfile } from './game/meta/goblin-profiles';
+import type { SlipBet } from './components/bets/BetSlip';
+import QuickRacesPanel from './components/quick/QuickRacesPanel';
+import MultiplayerHub from './components/multiplayer/MultiplayerHub';
+import { toggleFullscreen } from './platform/platform';
 import { readSave, writeSave, type SaveNotice } from './game/save';
 import './menu.css';
 import './setup.css';
@@ -18,18 +26,29 @@ import './frames.css';
 import './hud.css';
 import './creator.css';
 import './garage.css';
+import './hub.css';
 
 // MP-T06: the goblin creator loads when it is opened.
 const BallCustomizer = lazy(() => import('./components/garage/BallCustomizer'));
 const CharacterCreatorStudio = lazy(() => import('./components/creator/CharacterCreatorStudio'));
 
-type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | 'creator' | 'garage' | null;
+type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | 'creator' | 'garage' | 'quick-races' | 'multiplayer' | null;
+
+/** A custom event races each round on its own island track: make it the active one before the round loads. */
+function applyRoundTrack(session: RaceSession | null) {
+  const track = session ? sessionTrackId(session) : null;
+  if (track) setActiveIslandTrack(track);
+}
+
+/** "Serpentine Cup · round 2 of 3" / "Quick Race" */
+const roundBetLabel = (session: RaceSession, round: number) =>
+  session.rounds.length > 1 ? `${eventTitle(session)} · round ${round + 1} of ${session.rounds.length}` : eventTitle(session);
 
 const WRITE_FAILED = 'Progress could not be saved on this device. Your current event keeps running in this tab.';
 
 export default function App() {
   // Read the durable event once, before the first paint, so a reload lands on a coherent flow.
-  const hydration = useMemo(() => readSave(), []);
+  const hydration = useMemo(() => { const saved = readSave(); applyRoundTrack(saved.session); return saved; }, []);
   const [options, setOptions] = useState(readOptions);
   const [records, setRecords] = useState(readRecords);
   const [screen, setScreen] = useState<'menu' | 'race' | 'editor'>('menu');
@@ -42,6 +61,12 @@ export default function App() {
   const [persistWarning, setPersistWarning] = useState<string | null>(hydration.storageBlocked ? hydration.notices[0]?.text ?? WRITE_FAILED : null);
   const [clearRecords, setClearRecords] = useState(false);
   const [fullscreenFallback, setFullscreenFallback] = useState(false);
+  // Quick Races hands the setup a mode (skip its first step) or a custom event.
+  const [setupEvent, setSetupEvent] = useState<CustomEvent | null>(null);
+  const [setupSkipMode, setSetupSkipMode] = useState(false);
+  // The Goblin Creator / Ball Garage opened from Profile go back to it on close.
+  const [creatorStart, setCreatorStart] = useState<GoblinProfile | null>(null);
+  const [returnToProfile, setReturnToProfile] = useState(false);
   const shell = useRef<HTMLDivElement>(null);
   const config = useMemo(() => session ? sessionConfig(session) : null, [session?.id, session?.round]);
   const recoveryNotes = useMemo(() => [...(restartNote ? [restartNote] : []), ...notices.map((notice) => notice.text)], [restartNote, notices]);
@@ -64,7 +89,21 @@ export default function App() {
     return () => { document.documentElement.classList.remove('high-contrast-game', 'reduced-motion-game'); };
   }, [options.highContrast, options.reducedMotion]);
 
-  const closePanel = useCallback(() => { setPanel(null); setClearRecords(false); }, []);
+  const closePanel = useCallback(() => {
+    setClearRecords(false);
+    // The creator or garage opened from Profile: back to the Profile.
+    if (returnToProfile && (panel === 'creator' || panel === 'garage')) { setPanel('multiplayer'); return; }
+    setPanel(null);
+    setReturnToProfile(false);
+  }, [returnToProfile, panel]);
+  const quickRaces = useCallback(() => { setReturnToProfile(false); setPanel('quick-races'); }, []);
+  const multiplayer = useCallback(() => { setReturnToProfile(false); setPanel('multiplayer'); }, []);
+  const openSetup = useCallback((mode: RaceSetup['mode'] | null, event: CustomEvent | null = null) => {
+    if (mode) setLastSetup((s) => ({ ...s, mode, customPhysics: mode === 'quick' && s.customPhysics }));
+    setSetupEvent(event);
+    setSetupSkipMode(Boolean(mode || event));
+    setPanel('new-game');
+  }, []);
   const resume = useCallback(() => { setPanel(null); setScreen('race'); }, []);
   const leaveRaceFullscreen = useCallback((action: () => void) => {
     if (document.fullscreenElement && document.fullscreenElement !== shell.current) {
@@ -78,19 +117,29 @@ export default function App() {
     } else showMenu();
   }, []);
   const settings = useCallback(() => setPanel('settings'), []);
-  const newGame = useCallback(() => setPanel('new-game'), []);
+  const newGame = quickRaces;
   const mapEditor = useCallback(() => { setPanel(null); setScreen('editor'); }, []);
-  const startRace = useCallback((setup: RaceSetup) => {
+  const startRace = useCallback((setup: RaceSetup, bets: SlipBet[] = []) => {
     leaveRaceFullscreen(() => {
       setLastSetup(setup);
-      setSession(createSession(setup));
+      const next = createSession(setup);
+      // The event being replaced will never race its open rounds: their stakes go back.
+      const replaced = session;
+      updateWallet((doc) => {
+        let d = doc;
+        if (replaced) replaced.rounds.forEach((_, r) => { d = voidRound(d, replaced.id, r); });
+        for (const b of bets) d = placeBet(d, { sessionId: next.id, round: 0, market: b.market, stake: b.stake, odds: b.odds, label: roundBetLabel(next, 0), fieldSize: next.setup.fieldSize }).doc;
+        return d;
+      });
+      applyRoundTrack(next);
+      setSession(next);
       setPhase('grid');
       setNotices([]);
       setRestartNote(null);
       setScreen('race');
       setPanel(null);
     });
-  }, [leaveRaceFullscreen]);
+  }, [leaveRaceFullscreen, session]);
 
   useEffect(() => {
     (window as any).__startRace = (setup?: RaceSetup) => startRace(setup ?? lastSetup);
@@ -101,6 +150,11 @@ export default function App() {
     if (!session) return;
     const next = commitRound(session, record);
     if (next === session) return;
+    // Race purse and the bookie: settled from the committed result, once (idempotent keys).
+    const round = record.round ?? session.round;
+    updateWallet((doc) => payRacePurse(
+      settleRound(doc, session.id, round, { finished: record.completed, position: record.position }),
+      session.id, round, record.completed, record.position, record.fieldSize ?? session.setup.fieldSize, roundBetLabel(session, round)));
     setSession(next);
     setPhase(sessionComplete(next) ? 'cup-results' : 'round-results');
     setNotices([]);
@@ -111,6 +165,7 @@ export default function App() {
         const complete = sessionComplete(session);
         const next = complete ? createSession(session.setup) : nextRound(session, finish);
         if (next !== session) {
+          applyRoundTrack(next);
           setSession(next);
           setPhase(next.round !== session.round ? 'grid' : sessionComplete(next) ? 'cup-results' : 'round-results');
         }
@@ -128,19 +183,16 @@ export default function App() {
       setRestartNote(null);
     }
   }, []);
+  // RUN.world owns fullscreen when hosted; the browser's own otherwise (a CSS fallback if refused).
   const fullscreen = async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else if (shell.current?.requestFullscreen) await shell.current.requestFullscreen();
-      else setFullscreenFallback((previous) => !previous);
-    } catch { setFullscreenFallback((previous) => !previous); }
+    if (!(await toggleFullscreen(shell.current))) setFullscreenFallback((previous) => !previous);
   };
 
   return (
     <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
       <div ref={shell} className={`game-application ${fullscreenFallback ? 'menu-fullscreen' : ''}`}>
-        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onNewGame={newGame} onResume={resume} onMapEditor={mapEditor}
-          onSettings={settings} onGuide={() => setPanel('guide')} onRecords={() => setPanel('records')} onCreator={() => setPanel('creator')} onGarage={() => setPanel('garage')}
+        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onQuickRaces={quickRaces} onMultiplayer={multiplayer} onResume={resume} onMapEditor={mapEditor}
+          onSettings={settings} onGuide={() => setPanel('guide')}
           onCredits={() => setPanel('credits')} onSound={() => setOptions((previous) => ({ ...previous, sound: !previous.sound }))} onFullscreen={() => void fullscreen()} />}
 
         {screen === 'editor' && (
@@ -159,7 +211,18 @@ export default function App() {
 
         <AnimatePresence>
           {panel === 'settings' && <SettingsPanel key="settings" options={options} onChange={setOptions} onClose={closePanel} />}
-          {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={Boolean(session)} finishedSession={session ? sessionComplete(session) : false} onStart={startRace} onClose={closePanel} />}
+          {panel === 'new-game' && <NewGameSetup key={`new-game:${setupEvent?.id ?? lastSetup.mode}`} initial={lastSetup} hasSession={Boolean(session)} finishedSession={session ? sessionComplete(session) : false} onStart={startRace}
+            onClose={setupSkipMode ? quickRaces : closePanel} skipModeStep={setupSkipMode} event={setupEvent} />}
+
+          {panel === 'quick-races' && <Modal key="quick-races" title="Quick Races" eyebrow="THE ISLAND, YOUR WAY" onClose={closePanel} className="fantasy-dialog quick-races-dialog" wide backdrop="arena">
+            <QuickRacesPanel onQuickRace={() => openSetup('quick')} onTournament={() => openSetup('tournament')} onRaceEvent={(event) => openSetup(null, event)} />
+          </Modal>}
+
+          {panel === 'multiplayer' && <Modal key="multiplayer" title="Multiplayer" eyebrow="YOUR GOBLIN GOES WHERE YOU RACE" onClose={closePanel} className="fantasy-dialog multiplayer-dialog" wide backdrop="vault">
+            <MultiplayerHub records={records} startOnProfile={returnToProfile} onQuickRaces={quickRaces}
+              onOpenCreator={(start) => { setCreatorStart(start); setReturnToProfile(true); setPanel('creator'); }}
+              onOpenGarage={() => { setReturnToProfile(true); setPanel('garage'); }} />
+          </Modal>}
 
           {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop">
             <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the rival riders. Falling costs time, not the whole race.</p>
@@ -171,7 +234,7 @@ export default function App() {
             <div className="fantasy-dialog-actions"><span className="subtle-note">No brakes. No refunds. Now you know.</span><button className="fantasy-primary" onClick={closePanel}>I Feel Qualified <Check size={16} /></button></div>
           </Modal>}
 
-          {panel === 'creator' && <Modal key="creator" title="Goblin Creator" eyebrow="EVERY FACE A BAD IDEA" onClose={closePanel} className="fantasy-dialog creator-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Warming up the workshop…</p>}><CharacterCreatorStudio /></Suspense></Modal>}
+          {panel === 'creator' && <Modal key="creator" title="Goblin Creator" eyebrow="EVERY FACE A BAD IDEA" onClose={closePanel} className="fantasy-dialog creator-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Warming up the workshop…</p>}><CharacterCreatorStudio key={creatorStart?.id ?? 'new'} startWith={creatorStart} /></Suspense></Modal>}
 
           {panel === 'garage' && <Modal key="garage" title="Ball Garage" eyebrow="PAINT IT, THEN ROLL IT" onClose={closePanel} className="fantasy-dialog garage-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Opening the garage…</p>}><BallCustomizer /></Suspense></Modal>}
 

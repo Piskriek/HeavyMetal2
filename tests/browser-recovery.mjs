@@ -111,12 +111,11 @@ try {
     const { page } = await openPage(context);
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('goblin-rally-session-v1') ?? 'null'));
     report(Boolean(stored) && stored.phase === 'setup' && stored.session === null, 'fresh load stores an explicit setup phase', JSON.stringify(stored && { phase: stored.phase, session: stored.session }));
-    report(await page.getByRole('button', { name: 'New Game', exact: true }).count() === 1, 'fresh load offers New Game');
+    report(await page.getByRole('button', { name: 'Quick Races', exact: true }).count() === 1, 'fresh load offers Quick Races');
 
     // Start a real cup through the UI.
-    await page.getByRole('button', { name: 'New Game', exact: true }).click();
-    await page.getByRole('radio', { name: /Tournament/ }).click();
-    await page.getByRole('button', { name: /Choose Your Crew/ }).click();
+    await page.getByRole('button', { name: 'Quick Races', exact: true }).click();
+    await page.locator('.quick-modes .mode-option', { hasText: 'Tournament' }).click();
     await page.getByRole('button', { name: /Set the Race/ }).click();
     await page.getByRole('button', { name: /Enter the Cup/ }).click();
     await page.waitForSelector('.game-stage', { timeout: 20000 });
@@ -217,7 +216,7 @@ try {
     await page.waitForTimeout(400);
     const warning = await page.locator('.menu-storage-warning').textContent().catch(() => '');
     report(/could not be saved|blocking local storage/.test(warning ?? ''), 'denied storage is announced on the menu', warning ?? '');
-    report(await page.getByRole('button', { name: 'New Game', exact: true }).count() === 1, 'the game stays playable when storage is denied');
+    report(await page.getByRole('button', { name: 'Quick Races', exact: true }).count() === 1, 'the game stays playable when storage is denied');
     await page.screenshot({ path: join(artifacts, 'browser-6-storage-denied.png') });
     await context.close();
   }

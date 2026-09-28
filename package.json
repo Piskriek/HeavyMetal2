@@ -25,7 +25,8 @@
     "seamless:sky": "node scripts/make-skybox-seamless.mjs",
     "check:parity-fixture": "node scripts/build-parity-fixture.mjs --check",
     "check:qualifying": "node --import tsx --test tests/physics-parity.test.ts tests/qualifying-gate.test.ts tests/qualifying-attempt.test.ts tests/qualifying-session.test.ts",
-    "qualifying": "node --import tsx scripts/qualifying-harness.ts"
+    "qualifying": "node --import tsx scripts/qualifying-harness.ts",
+    "build:run": "vite build --mode run"
   },
   "dependencies": {
     "@series-inc/rundot-game-sdk": "5.29.0",

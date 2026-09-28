@@ -11,6 +11,7 @@
  */
 import type { PlacedProp } from '../builder/prop-catalog';
 import { validateProps } from '../track-storage';
+import { shippedCourses, shippedTrack } from '../shipped-courses';
 
 export const ISLAND_PROPS_KEY = 'hm2-island-props-v1';
 export const ISLAND_PROPS_BACKUP_KEY = 'hm2-island-props-v1-backup';
@@ -58,8 +59,10 @@ export function islandEndpoints(trackId: string) {
 export function readIslandTracks(store?: Storage): IslandTrackIndex {
   const s = backend(store);
   let index: IslandTrackIndex = { active: DEFAULT_ISLAND_TRACK.id, tracks: [] };
+  let saved = false;
   try {
     const raw = s?.getItem(ISLAND_TRACKS_KEY);
+    saved = !!raw;
     const parsed = raw ? JSON.parse(raw) as Partial<IslandTrackIndex> : null;
     if (parsed && Array.isArray(parsed.tracks)) {
       index = {
@@ -68,6 +71,13 @@ export function readIslandTracks(store?: Storage): IslandTrackIndex {
       };
     }
   } catch { /* unreadable: the default index */ }
+  // The owner's published island (shipped-courses.ts): its tracks join the list, and a new player
+  // starts on its chosen track.
+  const published = shippedCourses();
+  if (published) {
+    for (const t of published.tracks) if (!index.tracks.some((x) => x.id === t.id)) index.tracks.push({ id: t.id, name: t.name, createdAt: 0 });
+    if (!saved) index.active = published.active;
+  }
   if (!index.tracks.some((t) => t.id === DEFAULT_ISLAND_TRACK.id)) index.tracks.unshift({ ...DEFAULT_ISLAND_TRACK });
   if (!index.tracks.some((t) => t.id === index.active)) index.active = DEFAULT_ISLAND_TRACK.id;
   return index;
@@ -121,12 +131,20 @@ function parse(raw: string | null): PlacedProp[] | null {
   }
 }
 
-/** A track's saved props (the previous save if the latest is unreadable), or an empty list. */
+/** The published island's props for a track (valid ones only), or null. */
+function shippedProps(trackId: string): PlacedProp[] | null {
+  const t = shippedTrack(trackId);
+  if (!t) return null;
+  const props = t.props as PlacedProp[];
+  return validateProps(props).valid ? props : null;
+}
+
+/** A track's saved props (the previous save if the latest is unreadable), else the published copy, or an empty list. */
 export function readIslandProps(store?: Storage, trackId = readIslandTracks(store).active): PlacedProp[] {
   const s = backend(store);
   if (!s) return [];
   try {
-    return parse(s.getItem(islandPropsKey(trackId))) ?? parse(s.getItem(islandBackupKey(trackId))) ?? [];
+    return parse(s.getItem(islandPropsKey(trackId))) ?? parse(s.getItem(islandBackupKey(trackId))) ?? shippedProps(trackId) ?? [];
   } catch {
     return [];
   }

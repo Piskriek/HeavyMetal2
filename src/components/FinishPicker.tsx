@@ -26,6 +26,8 @@ interface FinishPickerProps {
   trackPicker?: boolean;
   /** Called after the island track changed (the finishes are that track's own). */
   onTrackChange?: () => void;
+  /** Show this island track's finishes instead of the active track's (the event designer's rounds). */
+  trackId?: string;
 }
 
 /** A race's share of the full run, as the player reads it. */
@@ -42,9 +44,10 @@ function radioKeys(event: KeyboardEvent<HTMLDivElement>) {
   items[next].click(); items[next].focus();
 }
 
-export default function FinishPicker({ value, onChange, trackPicker = false, onTrackChange }: FinishPickerProps) {
+export default function FinishPicker({ value, onChange, trackPicker = false, onTrackChange, trackId }: FinishPickerProps) {
   const tracks = readIslandTracks();
-  const marks = useMemo(() => courseMarks(readIslandProps(), 'basalt'), [tracks.active]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shown = trackId ?? tracks.active;
+  const marks = useMemo(() => courseMarks(readIslandProps(undefined, shown), 'basalt'), [shown]);
   const seaEnd = useMemo(() => roadPointAt('basalt', FINISH), []);
   const start = marks.startWorld ?? roadPointAt('basalt', START_X);
   const options: (CourseFinish | null)[] = [...marks.finishes, null];

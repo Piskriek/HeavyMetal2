@@ -71,7 +71,8 @@ async function waitForProfile(api: RunApi, timeoutMs = 10000): Promise<void> {
 
 /** Boots the host integration. Never throws: a failed RUN boot leaves the game in browser mode. */
 export async function bootPlatform(): Promise<PlatformKind> {
-  if (!RUN_BUILD || typeof window === 'undefined') return state.kind;
+  // Spelled out here (not via RUN_BUILD) so a plain build folds it to `return` and drops the SDK.
+  if ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_RUN !== '1' || typeof window === 'undefined') return state.kind;
   try {
     const mod = await import('@series-inc/rundot-game-sdk/api');
     const api = ((mod as { default?: unknown }).default ?? mod) as RunApi;

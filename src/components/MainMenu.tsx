@@ -1,9 +1,10 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Compass, Maximize2, Paintbrush, Play, Settings, Trophy, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, Maximize2, Play, Settings, Users, Volume2, VolumeX } from 'lucide-react';
 import Brand from './Brand';
 import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 import type { GameOptions } from '../game/types';
+import { isRunHosted } from '../platform/platform';
 
 interface MainMenuProps {
   options: GameOptions;
@@ -13,16 +14,14 @@ interface MainMenuProps {
   resumeNote?: string | null;
   /** Set when this browser refuses to store progress; never claim otherwise. */
   storageWarning?: string | null;
-  onNewGame: () => void;
+  /** Quick Races: a quick race, the tournament, or an event of your own. */
+  onQuickRaces: () => void;
+  /** Multiplayer: your Profile (goblin, ball, items, gold, bets) and online racing. */
+  onMultiplayer: () => void;
   onResume: () => void;
   onMapEditor: () => void;
   onSettings: () => void;
   onGuide: () => void;
-  onRecords: () => void;
-  /** MP-T06: the goblin creator. */
-  onCreator?: () => void;
-  /** MP-T04: the ball garage. */
-  onGarage?: () => void;
   onCredits: () => void;
   onSound: () => void;
   onFullscreen: () => void;
@@ -59,13 +58,11 @@ export default function MainMenu(props: MainMenuProps) {
 
   const entries = [
     ...(props.hasRace ? [{ label: props.resumeLabel ?? 'Resume Race', sub: 'Your goblin is waiting.', icon: Play, action: props.onResume, primary: true }] : []),
-    { label: 'New Game', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A fresh start. The same bad judgment.', icon: FlagIcon, action: props.onNewGame, primary: !props.hasRace },
+    { label: 'Quick Races', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A race, a tournament, or one of your own.', icon: FlagIcon, action: props.onQuickRaces, primary: !props.hasRace },
+    { label: 'Multiplayer', sub: 'Your goblin, ball, gold and bets. Online racing on RUN.world.', icon: Users, action: props.onMultiplayer, primary: false },
     { label: '3D Map Editor', sub: 'Design custom tracks, place props, and test drive.', icon: Compass, action: props.onMapEditor, primary: false },
     { label: 'Settings', sub: 'A little fine-tuning never hurt.', icon: Settings, action: props.onSettings, primary: false },
     { label: 'How to Play', sub: 'The very optional instruction manual.', icon: BookOpen, action: props.onGuide, primary: false },
-    ...(props.onCreator ? [{ label: 'Goblin Creator', sub: 'Build your racer, face and all. Save it to your crew.', icon: UserRound, action: props.onCreator, primary: false }] : []),
-    ...(props.onGarage ? [{ label: 'Ball Garage', sub: 'Paint your ball: metal, pin-lines and up to twelve decals.', icon: Paintbrush, action: props.onGarage, primary: false }] : []),
-    { label: 'Hall of Chaos', sub: 'Some things deserve to be remembered.', icon: Trophy, action: props.onRecords, primary: false },
   ];
 
   return (
@@ -104,7 +101,7 @@ export default function MainMenu(props: MainMenuProps) {
       <footer className="menu-footer">
         {props.storageWarning ? <p className="menu-storage-warning" role="status">{props.storageWarning}</p> : null}
         <div className="menu-input-hints"><span><kbd>Enter</kbd> Select</span><span><kbd>Tab</kbd> Navigate</span>{props.hasRace && <span><kbd>Esc</kbd> Resume</span>}</div>
-        <span className="menu-build">LOCAL PLAY <i /> BUILD 0.4.3</span>
+        <span className="menu-build">{isRunHosted() ? 'RUN.WORLD' : 'LOCAL PLAY'} <i /> BUILD 0.5.0</span>
       </footer>
     </main>
   );

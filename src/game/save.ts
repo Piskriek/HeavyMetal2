@@ -19,6 +19,7 @@ import {
   type Difficulty, type RaceFinish, type RaceMode, type RaceSession, type RaceSetup, type SessionPhase,
 } from './session';
 import { ISLAND_COURSE, cupRounds } from './course-archive';
+import { sanitizeEventRef } from './custom-events';
 import { DEFAULT_LOADOUT, isCapsule, isRider, type CapsuleId, type Loadout, type RiderId } from './loadouts';
 // T02: field sizes, seeds and the summary policy for persisted standings.
 import { DEFAULT_SEED, isFieldSize } from './contracts/config';
@@ -164,6 +165,7 @@ export function sanitizeSetup(raw: unknown, fallbackCourse: CourseId): RaceSetup
     customPhysics: mode === 'quick' && raw.customPhysics === true,
     fieldSize: isFieldSize(raw.fieldSize) ? raw.fieldSize : 4,
     ...(sanitizeFinish(raw.finish) ? { finish: sanitizeFinish(raw.finish) } : {}),
+    ...(sanitizeEventRef(raw.event) ? { event: sanitizeEventRef(raw.event) } : {}),
   };
 }
 
@@ -375,7 +377,13 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   const mode: RaceMode = isPlainObject(raw.setup) && raw.setup.mode === 'tournament' ? 'tournament' : 'quick';
   const tournament = mode === 'tournament';
   let rounds = rawRounds;
-  if (tournament) {
+  // A custom event decides its own round list: one island round per event round.
+  const event = isPlainObject(raw.setup) ? sanitizeEventRef(raw.setup.event) : undefined;
+  const eventRounds = event && event.rounds.length === rounds.length && rounds.every((id) => id === ISLAND_COURSE)
+    && (event.rounds.length > 1) === tournament;
+  if (eventRounds) {
+    // Kept as saved.
+  } else if (tournament) {
     // The classic cup (archived, still restorable) and the island cup are both official orders.
     const canonical = [CUP_ROUNDS.join(), cupRounds().join(), [ISLAND_COURSE, ISLAND_COURSE, ISLAND_COURSE].join()].includes(rounds.join());
     if (!canonical) {
@@ -390,6 +398,8 @@ export function recoverSession(raw: unknown, requestedPhase: SessionPhase): Reco
   const rawSetup = isPlainObject(raw.setup) ? raw.setup : null;
   const setup = sanitizeSetup(raw.setup, rounds[0]);
   if (!setup) return null;
+  // An event whose rounds no longer match the round list is dropped (the repaired order decides).
+  if (!eventRounds) delete setup.event;
   setup.customPhysics = !tournament && setup.customPhysics;
   const loadoutRaw = rawSetup && isPlainObject(rawSetup.loadout) ? rawSetup.loadout : null;
   if (!loadoutRaw || !isRider(loadoutRaw.rider) || !isCapsule(loadoutRaw.capsule)) {

@@ -9,13 +9,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Lock, Move, Redo2, Save, Trash2, Undo2 } from 'lucide-react';
 import { BASE_MATERIALS, bakeBall, type RgbaImage } from '../../game/meta/sphere-decal-baker';
 import {
-  BASE_PRICES, DECAL_CATALOG, addDecal, decalArtUrl, decalImage, decalSources, edit, listDesigns, loadPaintedDecals, ownedCosmetics,
+  BASE_PRICES, DECAL_CATALOG, addDecal, grantCosmetic, decalArtUrl, decalImage, decalSources, edit, listDesigns, loadPaintedDecals, ownedCosmetics,
   paintedDecal, redo, removeDecal, saveDesign, startHistory, undo, unownedItems, updateDecal, withBakeKey, type DesignFields,
 } from '../../game/meta/ball-design';
 import { MAX_DECALS_PER_BALL, type BaseMaterialId, type DecalTextureId, type HexColor } from '../../game/meta/interfaces';
 import { ACCENT_PALETTE } from '../../game/meta/goblin-dna';
 import BallShowroom, { CAP_FINISHES, type CapFinish } from './BallShowroom';
 import { rebase } from '../../platform/asset-base';
+import { balance, buyItem, readWallet, writeWallet } from '../../game/meta/wallet';
 
 const MAP_W = 512;
 type Tab = 'metal' | 'paint' | 'decals' | 'saved';
@@ -107,8 +108,25 @@ export default function BallCustomizer() {
   const change = (next: DesignFields, coalesce: string | null = null) => setHistory((h) => edit(h, next, coalesce));
   const current = design.decals.find((d) => d.uid === selected) ?? null;
   const pickerTint = current?.tintColor ?? PICKER_TINT;
+  // The shop: owned items are read fresh each render; a purchase bumps this to show them.
+  const [, setShopTick] = useState(0);
   const missing = unownedItems(design, ownedCosmetics());
   const owned = ownedCosmetics();
+  const gold = balance(readWallet());
+  const missingCost = missing.reduce((sum, m) => sum + m.price, 0);
+  const buyMissing = () => {
+    let doc = readWallet();
+    if (balance(doc) < missingCost) { say(`That costs ${missingCost} gold and you have ${balance(doc)}. Race and bet to earn more.`); return; }
+    for (const m of missing) {
+      const r = buyItem(doc, m.id, m.price, itemName(m.id));
+      if (r.error) { say(r.error); return; }
+      doc = r.doc;
+    }
+    if (!writeWallet(doc)) { say('This device would not save the purchase.'); return; }
+    for (const m of missing) grantCosmetic(m.id);
+    setShopTick((t) => t + 1);
+    say(`Bought ${missing.map((m) => itemName(m.id)).join(', ')}.`, true);
+  };
 
   const onSurface = (u: number, v: number) => {
     if (moving && current) {
@@ -286,7 +304,8 @@ export default function BallCustomizer() {
           )}
 
           {missing.length > 0 && (
-            <p className="garage-locked"><Lock size={12} />You can try these, but saving waits until they are bought: {missing.map((m) => `${itemName(m.id)} (${m.price} gold)`).join(', ')}. The gold shop opens with online play.</p>
+            <div className="garage-locked"><Lock size={12} /><span>Saving waits until these are bought: {missing.map((m) => `${itemName(m.id)} (${m.price} gold)`).join(', ')}.</span>
+              <button className="fantasy-secondary garage-buy" onClick={buyMissing} disabled={missingCost > gold}>Buy for {missingCost} gold</button><small>You have {gold.toLocaleString()} gold.</small></div>
           )}
         </section>
       </div>

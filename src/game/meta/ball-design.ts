@@ -4,7 +4,7 @@
  * the optional storage argument; the Garage UI (src/components/garage/BallCustomizer.tsx) drives it.
  */
 import { MAX_DECALS_PER_BALL, type BaseMaterialId, type CustomBallConfig, type DecalStamp, type DecalTextureId, type HexColor } from './interfaces';
-import { computeBakeKey, type DecalSource, type RgbaImage } from './sphere-decal-baker';
+import { BASE_MATERIALS, computeBakeKey, type DecalSource, type RgbaImage } from './sphere-decal-baker';
 
 export interface CatalogDecal { id: DecalTextureId; name: string; projection: 'gnomonic' | 'band'; price: number }
 
@@ -217,4 +217,25 @@ export function saveDesign(name: string, design: DesignFields, store = storage()
   const list = [{ name: label, config: withBakeKey(design) }, ...listDesigns(store).filter((d) => d.name !== label)].slice(0, 20);
   try { store?.setItem(DESIGNS_KEY, JSON.stringify(list)); } catch { return { ok: false, reason: 'This device would not save the design.' }; }
   return { ok: true };
+}
+
+/* ───────────── the gold shop (Profile → Items, the garage's Buy) ───────────── */
+
+export interface ShopItem { id: string; name: string; price: number; kind: 'finish' | 'decal' }
+
+/** Everything that costs gold: the premium ball finishes and decals, cheapest first. */
+export function shopCatalog(): ShopItem[] {
+  const finishes = (Object.keys(BASE_PRICES) as BaseMaterialId[])
+    .filter((id) => BASE_PRICES[id] > 0)
+    .map((id) => ({ id, name: BASE_MATERIALS[id].name, price: BASE_PRICES[id], kind: 'finish' as const }));
+  const decals = DECAL_CATALOG.filter((d) => d.price > 0).map((d) => ({ id: d.id, name: d.name, price: d.price, kind: 'decal' as const }));
+  return [...finishes, ...decals].sort((a, b) => a.price - b.price || a.name.localeCompare(b.name));
+}
+
+/** Adds a bought item to the owned set (the wallet has already taken the gold). */
+export function grantCosmetic(id: string, store = storage()): boolean {
+  const owned = ownedCosmetics(store);
+  if (owned.has(id)) return true;
+  owned.add(id);
+  try { store?.setItem(OWNED_KEY, JSON.stringify([...owned])); return !!store; } catch { return false; }
 }

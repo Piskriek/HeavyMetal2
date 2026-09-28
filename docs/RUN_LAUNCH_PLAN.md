@@ -79,6 +79,9 @@ likes, weekly voting), **Purchases/Shop** (RUN Bits hard currency; only if we ev
   `public/courses/`, and a fresh player loads it. **The owner must run it once and commit the files**:
   today the island exists only in the owner's browser.
 
+**How to test on RUN.world, and the tickets:** [docs/tickets/run/README.md](tickets/run/README.md).
+Build for RUN with `npm run build:run` (`vite build --mode run`); a plain `npm run build` never contains the SDK.
+
 **Next tickets** (`docs/tickets/run/`)
 
 | Ticket | What |

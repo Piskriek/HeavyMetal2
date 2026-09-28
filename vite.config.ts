@@ -306,14 +306,46 @@ function islandPropsBackupPlugin(): Plugin {
 }
 
 // https://vite.dev/config/
-// A RUN.world build (VITE_RUN=1) is served from a subdirectory, so its base is relative; the runtime
-// rebases the game's root paths (src/platform/asset-base.ts). VITE_RELATIVE_BASE=1 builds the same
-// layout without the RUN SDK (tests: the game served from a subfolder).
-const relativeBase = process.env.VITE_RUN === "1" || process.env.VITE_RELATIVE_BASE === "1";
+/**
+ * Builder → File → "Publish island to the game": writes the owner's island (all island tracks, ground
+ * paint, lanes, sky) to public/courses/island.json, which the game loads at boot
+ * (src/game/shipped-courses.ts). Commit that file to ship it.
+ */
+function publishCoursePlugin(): Plugin {
+  return {
+    name: "publish-course-plugin",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url !== "/api/publish-course" || req.method !== "POST") { next(); return; }
+        let body = "";
+        req.on("data", (chunk) => { body += chunk; });
+        req.on("end", () => {
+          try {
+            const doc = JSON.parse(body);
+            if (!doc || doc.version !== 1 || !Array.isArray(doc.tracks) || !doc.tracks.length) throw new Error("not an island document");
+            const dir = path.resolve(__dirname, "public/courses");
+            fs.mkdirSync(dir, { recursive: true });
+            const file = path.join(dir, "island.json");
+            fs.writeFileSync(file, JSON.stringify(doc));
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify({ success: true, file: "public/courses/island.json", bytes: fs.statSync(file).size }));
+          } catch (err) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ success: false, error: String(err) }));
+          }
+        });
+      });
+    },
+  };
+}
 
-export default defineConfig({
-  base: relativeBase ? "./" : "/",
-  plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin(), lanePathsBackupPlugin(), islandPropsBackupPlugin()],
+// A RUN.world build (`npm run build:run`, i.e. `vite build --mode run`, which loads .env.run with
+// VITE_RUN=1) is served from a subdirectory, so its base is relative; the runtime rebases the game's root
+// paths (src/platform/asset-base.ts). VITE_RELATIVE_BASE=1 builds the same layout without the RUN SDK
+// (tests: the game served from a subfolder).
+export default defineConfig(({ mode }) => ({
+  base: mode === "run" || process.env.VITE_RUN === "1" || process.env.VITE_RELATIVE_BASE === "1" ? "./" : "/",
+  plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin(), lanePathsBackupPlugin(), islandPropsBackupPlugin(), publishCoursePlugin()],
   // Dev server: allow the sandbox preview proxy host (e.g. 5173-<id>.e2b.app).
   server: {
     host: '0.0.0.0',
@@ -325,6 +357,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      // Only a RUN.world build carries the RUN SDK; every other build gets a stub (src/platform).
+      ...(mode === "run" || process.env.VITE_RUN === "1" ? {} : { "@series-inc/rundot-game-sdk/api": path.resolve(__dirname, "src/platform/run-sdk-stub.ts") }),
     },
   },
-});
+}));

@@ -108,9 +108,9 @@ try {
   await page.waitForSelector('main.main-menu', { timeout: 20000 });
 
   // Setup: riders, capsules and course previews are the screens with the most art.
-  await page.getByRole('button', { name: 'New Game', exact: true }).click();
-  await page.getByRole('radio', { name: /Tournament/ }).click();
-  await page.getByRole('button', { name: /Choose Your Crew/ }).click();
+  // Main menu → Quick Races → Tournament opens the setup on the crew step.
+  await page.getByRole('button', { name: 'Quick Races', exact: true }).click();
+  await page.locator('.quick-modes .mode-option', { hasText: 'Tournament' }).click();
   await page.waitForSelector('.rider-deck img', { timeout: 15000 });
   await page.waitForTimeout(600);
   const riders = await page.evaluate(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
 import Modal from './Modal';
 import BlizzardGauge from './ui/BlizzardGauge';
@@ -9,6 +9,9 @@ import { capsuleArt, riderArt } from '../game/loadout-art';
 import { CUP_NAME, CUP_POINTS, DIFFICULTIES, type RaceSetup } from '../game/session';
 import { ISLAND_COURSE, classicTracksEnabled, cupRounds, playableCourse, playableCourses } from '../game/course-archive';
 import FinishPicker from './FinishPicker';
+import BetSlip, { type SlipBet } from './bets/BetSlip';
+import { MIN_STAKE, balance, readWallet } from '../game/meta/wallet';
+import { eventRef, eventSummary, isTournamentEvent, type CustomEvent } from '../game/custom-events';
 import { FIELD_SIZES, QUALIFYING_REQUIRED_ABOVE, type FieldSize } from '../game/contracts/config';
 import { COURSES } from '../game/types';
 import { TRACKS } from '../game/courses';
@@ -19,8 +22,13 @@ interface NewGameSetupProps {
   hasSession: boolean;
   /** A completed event still holds its standings view and needs confirmation to replace. */
   finishedSession: boolean;
-  onStart: (setup: RaceSetup) => void;
+  /** Bets placed on round 1 here are placed on the event when it starts. */
+  onStart: (setup: RaceSetup, bets: SlipBet[]) => void;
   onClose: () => void;
+  /** Quick Races already chose the mode (or the event): the setup opens on the crew step. */
+  skipModeStep?: boolean;
+  /** A custom event from Quick Races → My Events: its rounds, field and CPU challenge are fixed. */
+  event?: CustomEvent | null;
 }
 
 function radioKeys(event: KeyboardEvent<HTMLElement>) {
@@ -34,10 +42,21 @@ function radioKeys(event: KeyboardEvent<HTMLElement>) {
   items[next].click(); items[next].focus();
 }
 
-export default function NewGameSetup({ initial, hasSession, finishedSession, onStart, onClose }: NewGameSetupProps) {
+export default function NewGameSetup({ initial, hasSession, finishedSession, onStart, onClose, skipModeStep = false, event = null }: NewGameSetupProps) {
   // A draft saved on an archived classic track opens on the island.
-  const [setup, setSetup] = useState<RaceSetup>(() => ({ ...initial, course: playableCourse(initial.course), loadout: { ...initial.loadout } }));
-  const [step, setStep] = useState(0);
+  const [setup, setSetup] = useState<RaceSetup>(() => {
+    const base: RaceSetup = { ...initial, course: playableCourse(initial.course), loadout: { ...initial.loadout } };
+    delete base.event;
+    if (!event) return base;
+    const { finish: _finish, ...rest } = base;
+    return { ...rest, mode: isTournamentEvent(event) ? 'tournament' : 'quick', course: ISLAND_COURSE, fieldSize: event.fieldSize, difficulty: event.difficulty, customPhysics: false, event: eventRef(event) };
+  });
+  const firstStep = skipModeStep || event ? 1 : 0;
+  const [step, setStep] = useState(firstStep);
+  // The Goblin Bookie: bets on round 1, placed on the event once it starts.
+  const [bets, setBets] = useState<SlipBet[]>([]);
+  const wallet = useMemo(() => balance(readWallet()), []);
+  const staked = bets.reduce((sum, b) => sum + b.stake, 0);
   // The island event: a quick race on the island, or the island cup (the classic tracks archived).
   const islandEvent = setup.mode === 'tournament' ? cupRounds().every((id) => id === ISLAND_COURSE) : setup.course === ISLAND_COURSE;
   const [confirm, setConfirm] = useState(false);
@@ -64,7 +83,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
     if (startGuard.current) return;
     startGuard.current = true;
     setStarting(true);
-    onStart({ ...setup, customPhysics: !tournament && setup.customPhysics });
+    onStart({ ...setup, customPhysics: !tournament && setup.customPhysics }, setup.customPhysics && !tournament ? [] : bets);
   };
 
   return (
@@ -75,7 +94,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
           <p>{finishedSession ? 'This event is already finished, but its final standings have not been filed away yet. Starting a new event clears that results screen. Every committed round stays in the Hall of Chaos, and your settings are kept.' : 'This replaces the current race or cup, including its unfinished rounds. Completed race records and your settings will be kept.'}</p>
           <div className="fantasy-dialog-actions"><button className="fantasy-secondary" onClick={() => setConfirm(false)}><ArrowLeft size={16} />Keep choosing</button><button className="fantasy-primary" onClick={start} disabled={starting}>Start the New Event <img src="/art/flag-checkered.png" alt="" className="button-flag-img" aria-hidden="true" /></button></div>
         </div> : <>
-          <nav className="setup-steps" aria-label="Race setup steps">{names.map((name, index) => <button key={name} className={step === index ? 'active' : index < step ? 'complete' : ''} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span>{index < step ? <Check size={12} /> : index + 1}</span>{name}{index < 2 && <ChevronRight size={13} />}</button>)}</nav>
+          <nav className="setup-steps" aria-label="Race setup steps">{names.map((name, index) => index < firstStep ? null : <button key={name} className={step === index ? 'active' : index < step ? 'complete' : ''} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span>{index < step ? <Check size={12} /> : index + 1}</span>{name}{index < 2 && <ChevronRight size={13} />}</button>)}</nav>
 
           {step === 0 && <div className="setup-mode-step">
             <p className="fantasy-lead">A quick shot at glory, or three races to prove it wasn't an accident.</p>
@@ -174,7 +193,11 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
 
           {step === 2 && <div className="setup-final">
             <section className="event-selection">
-              {islandEvent ? <>
+              {event ? <>
+                <div className="choice-heading"><span>{event.name.toUpperCase()} / {eventSummary(event).toUpperCase()}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
+                <ol className="event-rounds event-rounds-summary">{event.rounds.map((r, i) => <li key={i} className="event-round"><div className="event-round-head"><span className="event-round-title"><span className="event-round-no">{String(i + 1).padStart(2, '0')}</span><strong>{r.trackName}</strong><small>{r.finish ? `Finish: ${r.finish.name}` : 'Down to the sea'}</small></span></div></li>)}</ol>
+                <p className="course-world-description">{isTournamentEvent(event) ? 'Every round is set. Points carry from round to round; the bookie opens before each one.' : 'One round of your own design.'} Edit the event in Quick Races → My Events.</p>
+              </> : islandEvent ? <>
                 <div className="choice-heading"><span>{tournament ? 'ROUND 1 / CHOOSE THE FINISH' : 'CHOOSE YOUR FINISH'}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
                 <FinishPicker value={setup.finish ?? null} trackPicker onChange={(finish) => setSetup((s) => ({ ...s, finish: finish ?? undefined }))} />
                 {tournament && <p className="course-world-description">Three rounds on the island. You pick where each later round ends before it starts; points carry from round to round.</p>}
@@ -189,6 +212,7 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
                 </button>)}</div>}
               <p className="course-world-description">{tournament ? (classicTracksEnabled() ? 'Three distinct descents. Forest flow, quarry bursts, and pasture hops. Airborne supplies reward a good racing line.' : 'Three runs down the serpent road, summit to sea. Points carry from round to round.') : TRACKS[setup.course].description}</p>
               </>}
+              {!event && <>
               <div className="choice-heading difficulty-heading"><span>FIELD SIZE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="Field size" onKeyDown={radioKeys}>{FIELD_SIZES.map((size) => <button role="radio" aria-checked={setup.fieldSize === size} tabIndex={setup.fieldSize === size ? 0 : -1} className={setup.fieldSize === size ? 'selected' : ''} key={size} onClick={() => setSetup((s) => ({ ...s, fieldSize: size as FieldSize }))}>{size} racers</button>)}</div>
               <p className="difficulty-description">{setup.fieldSize > QUALIFYING_REQUIRED_ABOVE
@@ -197,17 +221,27 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
               <div className="choice-heading difficulty-heading"><span>CPU CHALLENGE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="CPU difficulty" onKeyDown={radioKeys}>{DIFFICULTIES.map((level) => <button role="radio" aria-checked={setup.difficulty === level.id} tabIndex={setup.difficulty === level.id ? 0 : -1} className={setup.difficulty === level.id ? 'selected' : ''} key={level.id} onClick={() => setSetup((s) => ({ ...s, difficulty: level.id }))}>{level.name}</button>)}</div>
               <p className="difficulty-description">{DIFFICULTIES.find((d) => d.id === setup.difficulty)?.description} Difficulty changes decisions, not the laws of physics.</p>
-              {!tournament && <label className="practice-option"><input type="checkbox" checked={setup.customPhysics} onChange={(event) => setSetup((s) => ({ ...s, customPhysics: event.target.checked }))} /><span>Custom physics practice<small>Enable the live speed and weight sliders. Recorded as practice, not a preset race.</small></span></label>}
+              </>}
+              {!tournament && !event && <label className="practice-option"><input type="checkbox" checked={setup.customPhysics} onChange={(event) => setSetup((s) => ({ ...s, customPhysics: event.target.checked }))} /><span>Custom physics practice<small>Enable the live speed and weight sliders. Recorded as practice, not a preset race.</small></span></label>}
             </section>
             <aside className="event-summary"><CharacterShowcase loadout={setup.loadout} variant="summary" decorative /><span className="mode-kicker">YOUR STARTING LINEUP</span><h3>{rider.name}</h3><p>{capsule.name} / {capsule.title}</p>
-              <div className="event-summary-rule"><LockKeyhole size={17} /><span>{setup.customPhysics && !tournament ? 'Custom tuning enabled for this practice run.' : tournament ? 'Your loadout stays locked for all three rounds.' : 'Preset stats stay fixed for this race.'}</span></div>
-              <div className="event-summary-rule"><Trophy size={17} /><span>{tournament ? CUP_NAME : `One race. ${setup.fieldSize} goblins. One finish.`}</span></div>
+              <div className="event-summary-rule"><LockKeyhole size={17} /><span>{setup.customPhysics && !tournament ? 'Custom tuning enabled for this practice run.' : tournament ? `Your loadout stays locked for all ${event ? event.rounds.length : 'three'} rounds.` : 'Preset stats stay fixed for this race.'}</span></div>
+              <div className="event-summary-rule"><Trophy size={17} /><span>{event ? event.name : tournament ? CUP_NAME : `One race. ${setup.fieldSize} goblins. One finish.`}</span></div>
               <p className="finish-window-note">Rivals get a 10-second finish window after you. Ties in the cup break by wins, then final-round placement.</p>
+              {!(setup.customPhysics && !tournament) && <BetSlip title={tournament ? 'The Goblin Bookie · round 1' : 'The Goblin Bookie'} fieldSize={setup.fieldSize} difficulty={setup.difficulty} gold={wallet - staked} bets={bets}
+                onPlace={(market, stake, odds) => {
+                  if (stake < MIN_STAKE) return `The bookie takes at least ${MIN_STAKE} gold.`;
+                  if (stake > wallet - staked) return 'Not enough gold.';
+                  if (bets.some((b) => b.market === market)) return 'You already have that bet.';
+                  setBets((list) => [...list, { market, stake, odds }]);
+                  return null;
+                }}
+                onCancel={(market) => setBets((list) => list.filter((b) => b.market !== market))} />}
             </aside>
           </div>}
 
           <div className="fantasy-dialog-actions setup-actions">
-            <button className="fantasy-link" onClick={() => step === 0 ? onClose() : setStep(step - 1)}><ArrowLeft size={15} />{step === 0 ? 'Main menu' : 'Back'}</button>
+            <button className="fantasy-link" onClick={() => step === firstStep ? onClose() : setStep(step - 1)}><ArrowLeft size={15} />{step === firstStep ? (firstStep ? 'Quick Races' : 'Main menu') : 'Back'}</button>
             <span className="setup-progress-note">{step === 0 ? <><Users size={14} />{setup.fieldSize} racers. All local.</> : <><Sparkles size={14} />{rider.name} + {capsule.name}</>}</span>
             <button className="fantasy-primary" onClick={() => step < 2 ? setStep(step + 1) : start()} disabled={starting}>{step === 0 ? 'Choose Your Crew' : step === 1 ? 'Set the Race' : tournament ? 'Enter the Cup' : 'To the Starting Line'}<ArrowRight size={16} /></button>
           </div>

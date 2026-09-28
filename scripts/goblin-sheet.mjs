@@ -67,7 +67,10 @@ try {
   await page.addStyleTag({ content: '.mirror-note{display:none !important}' });
   await page.goto(baseUrl, { waitUntil: 'load' });
   await page.waitForSelector('main.main-menu', { timeout: 20000 });
-  await page.getByRole('button', { name: 'Goblin Creator', exact: true }).click();
+  // Main menu → Multiplayer → Profile → the Goblin Creator.
+  await page.getByRole('button', { name: 'Multiplayer', exact: true }).click();
+  await page.locator('.mp-card-primary').click();
+  await page.locator('.profile-panel button', { hasText: /Goblin Creator|New goblin/ }).first().click();
   await page.waitForSelector('.studio .stage-frame', { timeout: 20000 });
   // Rig guides live in the Fine-tune view; the DNA loader lives in the crew view.
   await page.getByRole('tab', { name: 'Fine-tune' }).click();

@@ -40,7 +40,8 @@ async function run() {
 
   // Navigate through Menu into the Race
   console.log('Navigating through Menu into Race...');
-  await page.getByRole('button', { name: /New Game/i }).click();
+  await page.getByRole('button', { name: /Quick Races/i }).click();
+  await page.locator('.quick-modes .mode-option', { hasText: 'Quick Race' }).first().click();
   await page.waitForTimeout(400);
 
   if (await page.getByRole('radio', { name: /Tournament/i }).count()) {

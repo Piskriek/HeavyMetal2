@@ -102,11 +102,11 @@ test('rebase: url(…) inside CSS values, quoted or not, other urls untouched', 
   assert.equal(rebaseCssUrls('url(data:image/png;base64,AAA)', sub), 'url(data:image/png;base64,AAA)');
 });
 
-test('plain browser defaults: no RUN build, no dev server, asset paths unchanged', () => {
+test('plain defaults (node): no RUN build, dev-server routes allowed (tests stub fetch), asset paths unchanged', () => {
   assert.equal(RUN_BUILD, false);
   assert.equal(isRunHosted(), false);
   assert.equal(platformKind(), 'browser');
-  assert.equal(hasDevServer(), false);
+  assert.equal(hasDevServer(), true, 'only a production build skips the dev-server routes');
   assert.equal(asset('/art/x.png'), '/art/x.png');
   assert.equal(rebase('/art/x.png'), '/art/x.png', 'default base: rebase is the identity');
 });

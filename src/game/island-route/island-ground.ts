@@ -33,6 +33,7 @@ import { ISLAND_SURFACE_GLSL } from './island-surface-shader';
 import { TERRAIN_RES, analyseIslandTerrain, type IslandTerrain, type TerrainTriangles } from './island-terrain';
 import { effectiveLayers, normalizeRecipe, paintIsland, upsampleMask, type IslandRecipe, type PaintIslandResult } from './island-autopaint';
 import { hasDevServer } from '../../platform/dev-server';
+import { shippedTrack } from '../shipped-courses';
 
 export interface IslandGroundSettings {
   /** Multiplied into the island texture, #rrggbb. */
@@ -1076,13 +1077,14 @@ export function decodeMask(url: string, res = PAINT_RES): Promise<Uint8Array | n
 const isGroundDoc = (doc: unknown): doc is IslandGroundDoc =>
   !!doc && typeof doc === 'object' && ((doc as IslandGroundDoc).version === 1 || (doc as IslandGroundDoc).version === 2);
 
+/** A track's saved ground, else the published island's (shipped-courses.ts), or null. */
 export function readGroundDoc(trackId: string): IslandGroundDoc | null {
+  let doc: unknown = null;
   try {
     const raw = localStorage.getItem(islandGroundKey(trackId));
-    if (!raw) return null;
-    const doc = JSON.parse(raw) as unknown;
-    return isGroundDoc(doc) ? { ...doc, settings: normalizeIslandGround(doc.settings) } : null;
-  } catch { return null; }
+    doc = raw ? JSON.parse(raw) as unknown : shippedTrack(trackId)?.ground ?? null;
+  } catch { doc = shippedTrack(trackId)?.ground ?? null; }
+  return isGroundDoc(doc) ? { ...doc, settings: normalizeIslandGround(doc.settings) } : null;
 }
 
 /** The brush paint from either version of the document (browser only for v1's PNG). */

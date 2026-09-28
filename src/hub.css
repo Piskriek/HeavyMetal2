@@ -1,0 +1,180 @@
+/*
+ * Quick Races, the event designer, the Goblin Bookie, Multiplayer and Profile.
+ * Same painted-iron language as setup.css / menu.css: dark green panels, brass lines, Cinzel titles.
+ */
+
+/* ───────── Quick Races ───────── */
+.quick-races .quick-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; gap: 18px; }
+.quick-modes .mode-option { cursor: pointer; padding: 26px 18px 22px; }
+.quick-modes .mode-option h3 { font-size: 24px; }
+.quick-modes .mode-icon { width: 78px; height: 78px; margin-bottom: 14px; }
+.quick-modes .mode-flag-img { width: 54px; }
+.mode-option-create { background: radial-gradient(ellipse at 50% 10%, #d4a24a1f, transparent 65%), linear-gradient(150deg, #2d3526, #16231a); border-color: #9c8a55; }
+.mode-option-create .mode-icon { color: #f0c77a; }
+.my-events-heading { margin-top: 26px; }
+.my-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.my-event { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid #4b5a3a; border-radius: 4px; background: linear-gradient(90deg, #1d2a1f, #141e17); }
+.my-event:hover { border-color: #8e8150; }
+.my-event-icon { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; color: #e3bf72; background: radial-gradient(#b4953526, transparent 70%); }
+.my-event-icon img { width: 24px; }
+.my-event-text strong { display: block; font: 700 15px 'Cinzel', Georgia, serif; color: #ecd6ad; }
+.my-event-text small { display: block; margin-top: 2px; color: #93a383; font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.my-event-actions { display: flex; align-items: center; gap: 12px; }
+.my-event-actions .fantasy-secondary { min-height: 34px; padding: 4px 16px; }
+.my-events-empty { color: #a6b395; font-size: 12px; padding: 14px; border: 1px dashed #4b5a3a; border-radius: 4px; text-align: center; }
+
+/* ───────── Event designer ───────── */
+.event-designer-top { display: grid; grid-template-columns: minmax(0, 1.2fr) auto auto; gap: 18px; align-items: end; margin-bottom: 20px; }
+.event-name span, .event-choice > span { display: block; margin-bottom: 7px; color: #c4b184; font: 8px 'Space Mono', monospace; letter-spacing: .65px; text-transform: uppercase; }
+.event-name input { width: 100%; padding: 9px 12px; font: 700 18px 'Cinzel', Georgia, serif; color: #f1ddb4; background: #0e1611; border: 1px solid #5d6b44; border-radius: 3px; }
+.event-name input:focus { outline: none; border-color: #e0bd78; box-shadow: 0 0 0 2px #e0bd7826; }
+.event-choice .difficulty-options { display: flex; gap: 6px; margin: 0; }
+.event-choice .difficulty-options button { min-width: 46px; padding: 10px 12px; }
+.event-choice .difficulty-options button.selected { color: #1a120a; background: linear-gradient(#f0c877, #c9964a); border-color: #f6dd9c; box-shadow: 0 0 0 1px #e0bd7855, 0 3px 10px #0006; }
+.event-rounds { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 6px; }
+.event-round { border: 1px solid #45533a; border-radius: 4px; background: #111b15; }
+.event-round.open { border-color: #9d8b58; background: linear-gradient(180deg, #1a2619, #111b15 60%); }
+.event-round-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.event-round-title { flex: 1; display: grid; grid-template-columns: 34px auto 1fr; align-items: baseline; gap: 10px; padding: 10px 12px; text-align: left; background: none; color: inherit; }
+.event-round-no { font: 700 13px 'Space Mono', monospace; color: #e0bd78; }
+.event-round-title strong { font: 700 14px 'Cinzel', Georgia, serif; color: #ead3a8; }
+.event-round-title small { color: #95a585; font-size: 11px; }
+.event-round-tools { display: flex; gap: 2px; padding-right: 8px; }
+.event-round-tools button { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: #a9b99a; background: none; border-radius: 3px; }
+.event-round-tools button:hover:not(:disabled) { color: #f3d797; background: #ffffff0d; }
+.event-round-tools button:disabled { opacity: .3; }
+.event-round-body { padding: 4px 14px 14px; border-top: 1px solid #2f3b2a; }
+.event-round-body .finish-track { margin: 10px 0; }
+.event-rounds-summary .event-round-title { cursor: default; }
+
+/* ───────── The Goblin Bookie ───────── */
+.bet-slip { margin-top: 16px; padding: 12px; text-align: left; border: 1px solid #6f6340; border-radius: 4px; background: radial-gradient(ellipse at 20% 0%, #c39a4b14, transparent 60%), #0f1712; }
+.bet-slip-head { display: flex; align-items: center; gap: 8px; color: #e4c27d; font: 700 12px 'Cinzel', Georgia, serif; margin-bottom: 10px; }
+.bet-slip-head .bet-gold { margin-left: auto; font: 700 11px 'Space Mono', monospace; color: #f1d58f; }
+.bet-markets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.bet-market { display: grid; grid-template-columns: 1fr auto; gap: 2px 6px; padding: 8px; text-align: left; color: #d7dfc8; background: #16211a; border: 1px solid #3f4c35; border-radius: 3px; }
+.bet-market:hover { border-color: #8e8150; }
+.bet-market.selected { border-color: #e0bd78; background: #1f2a1c; box-shadow: inset 0 0 0 1px #e0bd7822; }
+.bet-market.placed { border-style: dashed; }
+.bet-market-name { font-weight: 700; font-size: 11.5px; }
+.bet-market-odds { font: 700 11px 'Space Mono', monospace; color: #f0cf85; }
+.bet-market small { grid-column: 1 / -1; color: #8d9c80; font-size: 9.5px; line-height: 1.35; }
+.bet-stake-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.bet-stake { display: flex; align-items: center; gap: 6px; color: #b8c4a8; font-size: 11px; }
+.bet-stake input { width: 72px; padding: 5px 7px; color: #f3dfb5; background: #0b120e; border: 1px solid #56633f; border-radius: 3px; font: 700 12px 'Space Mono', monospace; }
+.bet-chips { display: flex; gap: 3px; }
+.bet-chips button { padding: 4px 7px; font: 700 10px 'Space Mono', monospace; color: #cdb98a; background: #1a241c; border: 1px solid #3f4c35; border-radius: 3px; }
+.bet-chips button:hover { color: #f3d797; border-color: #8e8150; }
+.bet-return { color: #a9b69a; font-size: 11px; }
+.bet-return b { color: #f1d58f; }
+.bet-place { margin-left: auto; min-height: 34px !important; padding: 4px 14px !important; }
+.bet-taken { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; color: #cfe0b8; font-size: 11.5px; }
+.bet-taken svg { color: #9fd07a; }
+.bet-error { margin: 8px 0 0; color: #f09a7a; font-size: 11.5px; }
+.bet-note { margin: 9px 0 0; color: #7f8d72; font-size: 9.5px; line-height: 1.5; }
+.next-round-bets { max-width: 760px; margin: 14px auto 0; }
+
+/* ───────── Multiplayer ───────── */
+.mp-hub { position: relative; }
+.mp-back { margin: -8px 0 6px; }
+.mp-cards { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 18px; }
+.mp-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 22px 18px 18px; border: 1px solid #606744; border-radius: 4px; background: linear-gradient(150deg, #283628, #14231b); box-shadow: inset 0 1px #e6ce8e12, 0 7px 15px #0002; color: inherit; }
+.mp-card::before { content: ''; position: absolute; inset: 5px; border: 1px solid #b2944924; pointer-events: none; }
+.mp-card h3 { font: 700 26px 'Cinzel', Georgia, serif; color: #ebd7b0; margin: 8px 0 10px; }
+.mp-card > p { font-size: 12px; line-height: 1.7; color: #b1c0a5; margin: 0; min-height: 60px; }
+.mp-card .mode-facts { margin-top: 14px; padding-top: 12px; flex-wrap: wrap; gap: 10px 16px; }
+.mp-card .mode-facts span { display: inline-flex; align-items: center; gap: 5px; }
+.mp-card-art { height: 132px; display: flex; align-items: center; justify-content: center; color: #cab078; margin-bottom: 8px; }
+.mp-card-art svg { filter: drop-shadow(0 6px 10px #0008); }
+.mp-card-primary { cursor: pointer; border-color: #b3a063; background: radial-gradient(ellipse at 50% 15%, #d4a24a24, transparent 65%), linear-gradient(150deg, #313d2b, #16251b); }
+.mp-card-primary:hover { transform: translateY(-2px); border-color: #e0bd78; }
+.mp-card-go { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; font: 700 12px 'Cinzel', Georgia, serif; color: #f0cf85; }
+.mp-card-muted { opacity: .86; }
+.mp-card-muted .mp-card-art { color: #8d9a7a; }
+.mp-state { padding: 2px 8px; border: 1px solid #7a6d44; border-radius: 10px; color: #e2c47f; font: 700 9px 'Space Mono', monospace; letter-spacing: .5px; text-transform: uppercase; }
+.mp-card .fantasy-link { margin-top: 8px; font-size: 10.5px; }
+
+/* ───────── Profile ───────── */
+.profile-panel { text-align: left; }
+.profile-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid #3c4a33; }
+.profile-kicker { display: block; color: #b4a47d; font: 8px 'Space Mono', monospace; letter-spacing: 1.4px; }
+.profile-name { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font: 700 30px 'Cinzel', Georgia, serif; color: #f0dcb2; }
+.profile-edit { color: #a9b69a; background: none; padding: 4px; }
+.profile-edit:hover { color: #f3d797; }
+.profile-id small { color: #8b997e; font-size: 10.5px; }
+.profile-rename { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.profile-rename input, .profile-goblin-name input { padding: 6px 10px; font: 700 18px 'Cinzel', Georgia, serif; color: #f1ddb4; background: #0e1611; border: 1px solid #5d6b44; border-radius: 3px; }
+.profile-gold { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid #8a7443; border-radius: 4px; background: radial-gradient(ellipse at 30% 0%, #e2b85a26, transparent 70%), #121a14; color: #e8c476; }
+.profile-gold strong { font: 700 22px 'Space Mono', monospace; color: #f7dc98; }
+.profile-gold span { font-size: 10px; color: #b4a47d; }
+.profile-tabs { display: flex; gap: 4px; margin: 14px 0 16px; border-bottom: 1px solid #2f3b2a; }
+.profile-tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; color: #a6b596; background: none; border-bottom: 2px solid transparent; font: 700 12px 'Cinzel', Georgia, serif; }
+.profile-tabs button:hover { color: #f0d59f; }
+.profile-tabs button.active { color: #f3d797; border-bottom-color: #e0bd78; }
+.profile-note { margin: 0 0 12px; padding: 7px 10px; border-radius: 3px; font-size: 11.5px; }
+.profile-note.ok { color: #cfe8b6; background: #2a3d2233; border: 1px solid #4f6e3c; }
+.profile-note.err { color: #f4b49a; background: #4a221a33; border: 1px solid #7a3c2c; }
+.profile-racer { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: center; }
+.profile-portrait { border: 2px solid #9c8752; border-radius: 6px; overflow: hidden; box-shadow: 0 10px 24px #0009, inset 0 0 0 1px #f3d79a33; background: #0c130f; line-height: 0; }
+.profile-portrait-empty { display: flex; align-items: center; justify-content: center; color: #6f7c63; background: #101812; }
+.profile-goblin-name { display: flex; gap: 8px; align-items: center; margin: 6px 0 2px; }
+.profile-goblin-name input { flex: 1; min-width: 0; font-size: 22px; }
+.profile-goblin-name .fantasy-secondary { min-height: 38px; }
+.profile-title { margin: 4px 0 10px; color: #c7b58a; font-style: italic; }
+.profile-dna { display: inline-block; padding: 4px 8px; color: #b9c8a8; background: #0b120e; border: 1px solid #334030; border-radius: 3px; font-size: 10.5px; }
+.profile-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.profile-subhead { margin: 22px 0 10px; font: 700 14px 'Cinzel', Georgia, serif; color: #e2c98f; }
+.profile-subhead small { margin-left: 8px; color: #8b997e; font: 400 10.5px 'DM Sans', sans-serif; }
+.profile-crew { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.profile-crew-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; color: #d8e0cb; background: #121b15; border: 1px solid #3c4a33; border-radius: 4px; }
+.profile-crew-card:hover { border-color: #8e8150; }
+.profile-crew-card.active { border-color: #e0bd78; background: #1d2819; }
+.profile-crew-card span { font: 700 11px 'Cinzel', Georgia, serif; }
+.profile-crew-card small { color: #8b997e; font-size: 9.5px; }
+.profile-ball-now { padding: 14px 16px; border: 1px solid #5b6a41; border-radius: 4px; background: linear-gradient(135deg, #1d2a1c, #111a14); }
+.profile-ball-now h3 { margin: 4px 0; font: 700 22px 'Cinzel', Georgia, serif; color: #ecd6ad; }
+.profile-ball-now p { margin: 0 0 12px; color: #a8b799; font-size: 12px; }
+.profile-designs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.profile-design { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center; padding: 8px 10px; text-align: left; color: #d8e0cb; background: #121b15; border: 1px solid #3c4a33; border-radius: 4px; }
+.profile-design.active { border-color: #e0bd78; background: #1d2819; }
+.profile-design-swatch { grid-row: 1 / 3; width: 34px; height: 34px; border-radius: 50%; border: 2px solid #c9a760; box-shadow: inset -4px -5px 8px #0007; }
+.profile-design span:not(.profile-design-swatch) { font-weight: 700; font-size: 12px; }
+.profile-design small { color: #8b997e; font-size: 10px; }
+.profile-empty-line { color: #8e9c81; font-size: 11.5px; }
+.profile-shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.profile-item { display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; border: 1px solid #3c4a33; border-radius: 4px; background: #121b15; }
+.profile-item.owned { border-color: #587a43; background: #16221a; }
+.profile-item-kind { color: #8e9c81; font: 8px 'Space Mono', monospace; letter-spacing: 1px; text-transform: uppercase; }
+.profile-item strong { color: #ebd7b0; font: 700 13px 'Cinzel', Georgia, serif; }
+.profile-item .fantasy-secondary { align-self: flex-start; min-height: 30px; padding: 2px 12px; gap: 6px; }
+.profile-item-owned { display: inline-flex; align-items: center; gap: 5px; color: #a6d383; font-size: 11px; }
+.profile-bet-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.profile-bet-stats div { padding: 10px; border: 1px solid #3c4a33; border-radius: 4px; background: #121b15; }
+.profile-bet-stats span { display: block; color: #8e9c81; font: 8px 'Space Mono', monospace; letter-spacing: 1px; text-transform: uppercase; }
+.profile-bet-stats strong { display: block; margin-top: 4px; color: #f1d58f; font: 700 18px 'Space Mono', monospace; }
+.profile-bets .up, .profile-ledger .up { color: #a6d383 !important; }
+.profile-bets .down, .profile-ledger .down { color: #f09a7a !important; }
+.profile-bet-table tr.bet-won td:last-child { color: #a6d383; }
+.profile-bet-table tr.bet-lost td:last-child { color: #d98c73; }
+.profile-bet-table tr.bet-open td:last-child { color: #f0cf85; }
+.profile-ledger { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.profile-ledger li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-bottom: 1px solid #243022; font-size: 11.5px; color: #c3cdb6; }
+.profile-ledger strong { font: 700 11.5px 'Space Mono', monospace; }
+.garage-locked { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.garage-locked .garage-buy { min-height: 32px; padding: 2px 14px; }
+.garage-locked small { color: #9aa98c; }
+
+@media (max-width: 900px) {
+  .quick-races .quick-modes, .mp-cards { grid-template-columns: 1fr; }
+  .event-designer-top { grid-template-columns: 1fr; }
+  .profile-racer { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .profile-bet-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bet-markets { grid-template-columns: 1fr; }
+  .my-event { grid-template-columns: 30px minmax(0, 1fr); }
+  .my-event-actions { grid-column: 1 / -1; justify-content: flex-end; }
+}
+
+/* Painted card art (ART-MENU-CARDS), when present. */
+.mode-icon .card-art { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 6px 8px #000a); }
+.quick-modes .mode-icon:has(.card-art) { width: 132px; height: 112px; }
+.mp-card-art .card-art { height: 132px; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 8px 12px #000a); }

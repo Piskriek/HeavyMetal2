@@ -17,6 +17,7 @@
 import { islandLaneNetwork } from './island-route/island-lanes';
 import { COURSES, type CourseId } from './types';
 import { validateLaneNetwork, type LaneNetwork, type LaneRefusal } from './lane-network';
+import { shippedCourses } from './shipped-courses';
 
 export const LANE_STORAGE_VERSION = 1 as const;
 export const LANE_STORAGE_KEY = 'hm2-lane-paths-v1';
@@ -113,7 +114,11 @@ export function readLaneStorage(store?: Storage): LaneStorageDocument | null {
  */
 export function loadLaneNetwork(course: CourseId, store?: Storage): LaneNetwork | null {
   const doc = readLaneStorage(store);
-  return doc?.networks[course] ?? (course === 'basalt' ? islandLaneNetwork() : null);
+  if (doc?.networks[course]) return doc.networks[course]!;
+  if (course !== 'basalt') return null;
+  // The owner's published lanes (shipped-courses.ts), else the island's own groove lanes.
+  const published = shippedCourses()?.lanes as LaneNetwork | undefined;
+  return published && !validateLaneDocument({ version: LANE_STORAGE_VERSION, savedAt: '', networks: { basalt: published } }).length ? published : islandLaneNetwork();
 }
 
 /**

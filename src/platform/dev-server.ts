@@ -1,13 +1,13 @@
 /**
- * PLATFORM: true only under `vite dev`, where vite.config.ts serves the builder's disk-backup routes
- * (`/api/backup-*`, `/api/island-ground`). A built game (a static deploy, RUN.world) has no such
- * server: calling those routes there is only noise, and on RUN.world a request to anything but the
- * game's own files is blocked. Node tests (no Vite) count as no dev server.
+ * PLATFORM: false in a production build (a static deploy, RUN.world), where there is no dev server
+ * behind the builder's disk-backup routes (`/api/backup-*`, `/api/island-ground`): calling them there is
+ * only noise, and on RUN.world a request to anything but the game's own files is blocked. `vite dev`
+ * serves those routes (vite.config.ts); node tests stub `fetch` and count as having them.
  */
 export function hasDevServer(): boolean {
   try {
-    return (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV === true;
+    return (import.meta as unknown as { env?: { PROD?: boolean } }).env?.PROD !== true;
   } catch {
-    return false;
+    return true;
   }
 }

@@ -13,6 +13,7 @@
  *
  * Pure data and a tiny store: no THREE, no DOM, so tests can load it headless.
  */
+import { shippedCourses } from '../shipped-courses';
 
 export type SkyMode = 'painted' | 'gradient';
 
@@ -187,7 +188,8 @@ export function getSkySettings(): SkySettings {
   if (current) return current;
   let raw: unknown = null;
   try { raw = typeof localStorage !== 'undefined' ? JSON.parse(localStorage.getItem(SKY_SETTINGS_KEY) ?? 'null') : null; } catch { raw = null; }
-  current = normalizeSkySettings(raw);
+  // Never set on this device: the owner's published look (shipped-courses.ts), else the defaults.
+  current = normalizeSkySettings(raw ?? shippedCourses()?.sky ?? null);
   return current;
 }
 

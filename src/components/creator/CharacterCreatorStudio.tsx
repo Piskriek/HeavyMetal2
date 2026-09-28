@@ -107,8 +107,10 @@ function cropBox(layer: AvatarLayerId, [x, y, w, h]: readonly number[]): string 
   return `${Math.round(x + w / 2 - side / 2)} ${Math.round(y + h / 2 - side / 2)} ${side} ${side}`;
 }
 
-export default function CharacterCreatorStudio() {
+export default function CharacterCreatorStudio({ startWith }: { startWith?: { dna: string; name: string; title: string } | null } = {}) {
   const [hist, setHist] = useState<{ past: GoblinAvatarConfig[]; present: GoblinAvatarConfig; future: GoblinAvatarConfig[] }>(() => {
+    // Opened from Profile: the racing goblin is on the bench.
+    if (startWith) { try { return { past: [], present: decodeGoblinDna(startWith.dna), future: [] }; } catch { /* a bad code: the default goblin */ } }
     const g = generateRandomGoblin(20260);
     // Goggles down, grease bowler, boiler suit: drawn items, so the first look never waits on painted art.
     return { past: [], present: { ...g, layers: { ...g.layers, eyewear: 2, headgear: 4, neck: 3 } }, future: [] };
@@ -124,8 +126,8 @@ export default function CharacterCreatorStudio() {
   const [focus, setFocus] = useState(false);
   const [paste, setPaste] = useState('');
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string; at: number } | null>(null);
-  const [name, setName] = useState('Rivet-8');
-  const [title, setTitle] = useState(TITLES[1]);
+  const [name, setName] = useState(startWith?.name ?? 'Rivet-8');
+  const [title, setTitle] = useState(startWith && TITLES.includes(startWith.title) ? startWith.title : TITLES[1]);
   const [crew, setCrew] = useState<Saved[]>([]);
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);

@@ -520,7 +520,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     {gearOpen && <motion.div key="gear-scrim" className="gear-scrim" onClick={() => setGearOpen(false)} aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />}
                     {gearOpen && (
                       <motion.div key="gear-menu" className="gear-menu" role="menu" aria-label="Race menu" initial={{ opacity: 0, y: -7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: 0.16 }}>
-                        <span className="gear-menu-event">{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${CUP_NAME.toUpperCase()} · R${config.round + 1}/${config.totalRounds}` : 'QUICK RACE'}<small>{course.name} · {config.difficulty}</small></span>
+                        <span className="gear-menu-event">{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${(config.event?.name ?? CUP_NAME).toUpperCase()} · R${config.round + 1}/${config.totalRounds}` : config.event ? config.event.name.toUpperCase() : 'QUICK RACE'}<small>{course.name} · {config.difficulty}</small></span>
                         <button role="menuitem" onClick={gearAction(() => setBuildMode((prev) => !prev))}><Hammer size={15} />{buildMode ? 'Exit 3D builder' : '3D Track builder (B)'}</button>
                         {(playing || paused) && <button role="menuitem" onClick={gearAction(togglePause)}>{paused ? <Play size={15} /> : <Pause size={15} />}{paused ? 'Resume race' : 'Pause race'}</button>}
                         <button role="menuitem" onClick={gearAction(() => retry())} disabled={!assets}><RotateCcw size={15} />Restart round</button>

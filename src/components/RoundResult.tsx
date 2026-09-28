@@ -4,12 +4,14 @@ import { ISLAND_COURSE } from '../game/course-archive';
 import { biggestClimber, placesGained, splitLabel } from '../game/results';
 import { ArrowRight, Home, RotateCcw, Trophy } from 'lucide-react';
 import { COURSES, type RunRecord } from '../game/types';
-import { CUP_NAME, cupStandings, resultField, roundPointsFor, sessionComplete, type RaceFinish, type RaceSession } from '../game/session';
+import { cupStandings, eventTitle, resultField, roundPointsFor, sessionComplete, type RaceFinish, type RaceSession } from '../game/session';
 import { PLAYER_ID, RESULTS_MAX_ROWS, resultRows } from '../game/roster';
 import { capsuleById, riderById } from '../game/loadouts';
 import Brand from './Brand';
 import OrnateCorners from './OrnateCorners';
 import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
+import BetSlip from './bets/BetSlip';
+import { balance, placeBet, readWallet, writeWallet } from '../game/meta/wallet';
 
 interface RoundResultProps {
   result: RunRecord;
@@ -24,7 +26,8 @@ export default function RoundResult({ result, session, onContinue, onMenu, onNew
   const tournament = session.setup.mode === 'tournament';
   const complete = sessionComplete(session);
   // An island cup: the player picks where the next round ends before it starts.
-  const pickNext = tournament && !complete && session.rounds[session.round + 1] === ISLAND_COURSE;
+  // (A custom event fixed every round's finish when it was designed.)
+  const pickNext = tournament && !complete && !session.setup.event && session.rounds[session.round + 1] === ISLAND_COURSE;
   const [nextFinish, setNextFinish] = useState<RaceFinish | null>(session.finishes?.[session.round + 1] ?? null);
   const table = cupStandings(session);
   const partialStandings = session.results.some((record) => record.opponentsSummary);
@@ -52,7 +55,7 @@ export default function RoundResult({ result, session, onContinue, onMenu, onNew
     <div ref={container} tabIndex={-1} className="round-result-wrap" data-painted-backdrop="true">
       <AnimatedMenuBackground preset="vault" />
       <div className="round-result" role="region" aria-label={tournament ? 'Tournament round results' : 'Race results'}>
-      <OrnateCorners /><div className="round-result-heading"><Brand variant="compact" decorative /><Trophy size={35} strokeWidth={1.3} /><span>{tournament ? `${CUP_NAME.toUpperCase()} / ${complete ? 'CUP COMPLETE' : `ROUND ${session.round + 1} OF ${session.rounds.length}`}` : session.setup.customPhysics ? 'CUSTOM PHYSICS / PRACTICE RESULTS' : 'QUICK RACE / RESULTS'}</span><h2>{won ? 'A Gloriously Bad Idea.' : complete && tournament ? 'A Cup Well Contested.' : 'Another One for the Scrapbook.'}</h2><p>{tournament && complete ? partialStandings ? 'This older save has partial cup standings; final rank is unavailable.' : `You placed ${playerCup} of ${table.length} with ${table.find((row) => row.id === PLAYER_ID)?.points ?? 0} points.` : `${result.completed ? `Finished ${result.position} of ${fieldSize}` : 'Did not finish'} / ${result.raceTime?.toFixed(1) ?? '0'} s / ${COURSES.find((course) => course.id === result.course)?.name}`}</p></div>
+      <OrnateCorners /><div className="round-result-heading"><Brand variant="compact" decorative /><Trophy size={35} strokeWidth={1.3} /><span>{tournament ? `${eventTitle(session).toUpperCase()} / ${complete ? 'CUP COMPLETE' : `ROUND ${session.round + 1} OF ${session.rounds.length}`}` : session.setup.customPhysics ? 'CUSTOM PHYSICS / PRACTICE RESULTS' : 'QUICK RACE / RESULTS'}</span><h2>{won ? 'A Gloriously Bad Idea.' : complete && tournament ? 'A Cup Well Contested.' : 'Another One for the Scrapbook.'}</h2><p>{tournament && complete ? partialStandings ? 'This older save has partial cup standings; final rank is unavailable.' : `You placed ${playerCup} of ${table.length} with ${table.find((row) => row.id === PLAYER_ID)?.points ?? 0} points.` : `${result.completed ? `Finished ${result.position} of ${fieldSize}` : 'Did not finish'} / ${result.raceTime?.toFixed(1) ?? '0'} s / ${COURSES.find((course) => course.id === result.course)?.name}`}</p></div>
       {partialStandings && <p className="next-round-note" role="status">An older save summarized this event. Missing racer rows cannot be recovered; the tables below are partial.</p>}
       <div className="round-results-columns">
         <section><h3><img src="/art/flag-checkered.png" alt="" className="round-result-flag-img" aria-hidden="true" />{tournament ? 'This Round' : 'The Finish Line'}</h3><table className="round-table"><thead><tr><th>Place</th>{hasSplits && <th>Split</th>}<th>Racer</th><th>{tournament ? 'Points' : 'Time'}</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id} className={row.id === PLAYER_ID ? 'is-player' : ''}><td>{row.finished ? row.position : 'DNF'}</td>{hasSplits && <td className={`split-cell ${(placesGained(row) ?? 0) > 0 ? 'gained' : (placesGained(row) ?? 0) < 0 ? 'lost' : ''}`}>{splitLabel(row)}</td>}<td><i style={{ backgroundColor: row.color }} />{row.name}{row.id === PLAYER_ID && <small>YOU</small>}</td><td>{tournament ? `+${roundPointsFor(row.position, row.finished, fieldSize)}` : row.finishTime === null ? 'DNF' : `${row.finishTime.toFixed(1)}s`}</td></tr>)}</tbody></table>{climber && <p className="biggest-climber"><strong>BIGGEST CLIMBER</strong> {climber.standing.name}{climber.standing.id === PLAYER_ID ? ' (you)' : ''}: P{climber.standing.splitPosition} at the split to P{climber.standing.position} at the flag, {climber.gained} {climber.gained === 1 ? 'rider' : 'riders'} passed down the scrap chutes.</p>}{(fieldRows.capped || result.opponentsSummary) && <p className="next-round-note">Showing {rows.length} of {fieldSize} racers, including you.{result.opponentsSummary ? ' This older result was saved as a summary.' : ' Full standings are kept in the event save.'}</p>}</section>
@@ -60,8 +63,29 @@ export default function RoundResult({ result, session, onContinue, onMenu, onNew
       </div>
       {tournament && !complete && !pickNext && <p className="next-round-note">Up next: <strong>{COURSES.find((course) => course.id === session.rounds[session.round + 1])?.name}</strong>. Same crew. Fresh trouble.</p>}
       {pickNext && <section className="next-round-finish"><h3>Round {session.round + 2}: where does it end?</h3><FinishPicker value={nextFinish} onChange={setNextFinish} /></section>}
+      {tournament && !complete && <NextRoundBets session={session} fieldSize={fieldSize} />}
       <div className="round-result-actions"><button className="fantasy-link" onClick={onMenu}><Home size={15} />Main menu</button><button className="fantasy-secondary" onClick={onNewGame}>New setup</button><button className="fantasy-primary" onClick={() => onContinue(pickNext ? nextFinish : undefined)}>{tournament && !complete ? <>Next Race <ArrowRight size={17} /></> : <>{tournament ? 'Race the Cup Again' : 'Rematch'}<RotateCcw size={16} /></>}</button></div>
       </div>
     </div>
   );
 }
+
+/** The bookie between rounds: bets on the next round go straight into the wallet. */
+function NextRoundBets({ session, fieldSize }: { session: RaceSession; fieldSize: number }) {
+  const round = session.round + 1;
+  const [wallet, setWallet] = useState(() => readWallet());
+  const bets = wallet.bets.filter((b) => b.sessionId === session.id && b.round === round);
+  return (
+    <section className="next-round-bets">
+      <BetSlip title={`The Goblin Bookie · round ${round + 1}`} fieldSize={fieldSize} difficulty={session.setup.difficulty} gold={balance(wallet)} bets={bets}
+        onPlace={(market, stake, odds) => {
+          const r = placeBet(readWallet(), { sessionId: session.id, round, market, stake, odds, label: `${eventTitle(session)} · round ${round + 1}`, fieldSize });
+          if (r.error) return r.error;
+          if (!writeWallet(r.doc)) return 'This device would not save the bet.';
+          setWallet(r.doc);
+          return null;
+        }} />
+    </section>
+  );
+}
+

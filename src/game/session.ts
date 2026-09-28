@@ -4,6 +4,7 @@ import { DEFAULT_LOADOUT, isCapsule, isRider, type Loadout } from './loadouts';
 // T02: field sizes, seeds and the qualifying rule come from the frozen config contract.
 import { DEFAULT_SEED, QUALIFYING_REQUIRED_ABOVE, isFieldSize, type FieldSize } from './contracts/config';
 import { buildRosterLoadouts } from './roster';
+import type { EventRef } from './custom-events';
 
 export type RaceMode = 'quick' | 'tournament';
 export type Difficulty = 'rookie' | 'racer' | 'veteran';
@@ -17,6 +18,11 @@ export interface RaceSetup {
   fieldSize: FieldSize;
   /** The island finish picked for a quick race; absent means the full course. */
   finish?: RaceFinish;
+  /**
+   * A custom event (Quick Races → Create your own): its rounds fix each round's island track and
+   * finish. One round races as a Quick Race, more as a tournament.
+   */
+  event?: EventRef;
 }
 /** A finish the player picked (engine x along the course), with the name it was placed under. */
 export interface RaceFinish { x: number; name: string }
@@ -112,6 +118,7 @@ export function readSetup(): RaceSetup {
 }
 
 export function createSession(setup: RaceSetup): RaceSession {
+  if (setup.event?.rounds.length) return createEventSession(setup);
   const safe = { ...setup, loadout: { ...setup.loadout }, customPhysics: setup.mode === 'quick' && setup.customPhysics,
     fieldSize: isFieldSize(setup.fieldSize) ? setup.fieldSize : 4 };
   return {
@@ -123,10 +130,34 @@ export function createSession(setup: RaceSetup): RaceSession {
   };
 }
 
+/** A custom event: every round on the island, each with the event's own finish (and track). */
+function createEventSession(setup: RaceSetup): RaceSession {
+  const event = setup.event!;
+  const mode: RaceMode = event.rounds.length > 1 ? 'tournament' : 'quick';
+  const safe: RaceSetup = { ...setup, mode, course: ISLAND_COURSE, loadout: { ...setup.loadout }, customPhysics: false,
+    fieldSize: isFieldSize(setup.fieldSize) ? setup.fieldSize : 4, event: { ...event, rounds: event.rounds.map((r) => ({ ...r })) } };
+  delete safe.finish;
+  return {
+    id: typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    setup: safe, rounds: event.rounds.map(() => ISLAND_COURSE), round: 0,
+    finishes: event.rounds.map((r) => r.finish ?? null),
+    roster: buildRosterLoadouts(safe.fieldSize, safe.loadout), results: [], seed: newSessionSeed(),
+  };
+}
+
+/** The island track a round races on: the event's pick, or null (whatever track is active). */
+export const sessionTrackId = (session: RaceSession, round = session.round): string | null =>
+  session.setup.event?.rounds[round]?.trackId ?? null;
+
+/** What the event is called: a custom event's name, the cup, or a Quick Race. */
+export const eventTitle = (session: RaceSession): string =>
+  session.setup.event?.name ?? (session.setup.mode === 'tournament' ? CUP_NAME : 'Quick Race');
+
 export const sessionConfig = (session: RaceSession): RaceConfig => ({
   ...session.setup, course: session.rounds[session.round], sessionId: session.id,
   // A cup picks each round's finish (none picked: the full run); a quick race has the setup's own.
-  finishX: session.setup.mode === 'tournament' ? session.finishes?.[session.round]?.x : session.setup.finish?.x,
+  finishX: session.setup.event ? session.setup.event.rounds[session.round]?.finish?.x
+    : session.setup.mode === 'tournament' ? session.finishes?.[session.round]?.x : session.setup.finish?.x,
   round: session.round, totalRounds: session.rounds.length, roster: session.roster,
   seed: Number.isSafeInteger(session.seed) ? session.seed : DEFAULT_SEED,
 });

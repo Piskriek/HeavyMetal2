@@ -1,0 +1,170 @@
+/* =============================================================================
+   The Paint Shop — Hoop-Pod livery (docs/HOOP_POD.md §Paint Shop)
+   Tokens follow src/menu.css (.game-application): Cinzel display, gold on iron,
+   parchment text, forest-teal depth, one restrained crimson primary action.
+   Ornament lives at the edges; the pod is the focal point.
+   ============================================================================= */
+.pod-shop {
+  --ps-fantasy: var(--fantasy, 'Cinzel', Georgia, serif);
+  --ps-gold: var(--gold, #d8b779);
+  --ps-bright: var(--bright-gold, #f3d49b);
+  --ps-parch: var(--parchment, #e9dfc9);
+  --ps-iron: var(--iron, #141d19);
+  --ps-teal: #1f3b35;
+  --ps-line: #8a6f3a;
+  --ps-muted: #a5b2a1;
+  --ps-crimson: #8e2a1f;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 26px clamp(16px, 3vw, 36px) 22px;
+  color: var(--ps-parch);
+  background:
+    radial-gradient(120% 90% at 30% 20%, #1f3b3540, transparent 60%),
+    linear-gradient(180deg, #121a16f2, #0c110ef7),
+    #101612 url('/ui/stone-tile.png') center / 180px;
+  border: 1px solid var(--ps-line);
+  border-radius: 4px;
+  box-shadow: inset 0 1px #ffe0a01f, inset 0 0 120px #0307077a, 0 18px 50px #000a;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  isolation: isolate;
+}
+.pod-shop__corner { position: absolute; width: 64px; height: 64px; pointer-events: none; opacity: .55; }
+.pod-shop__corner--tl { top: 10px; left: 10px; border-left: 1px solid #b89d65; border-top: 1px solid #b89d65; }
+.pod-shop__corner--br { bottom: 10px; right: 10px; border-right: 1px solid #b89d65; border-bottom: 1px solid #b89d65; }
+
+/* header ------------------------------------------------------------------ */
+.pod-shop__header { text-align: center; }
+.pod-shop__flourish { display: flex; align-items: center; justify-content: center; gap: 12px; width: 220px; margin: 0 auto 8px; }
+.pod-shop__flourish > span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #b69854); }
+.pod-shop__flourish > span:last-child { transform: scaleX(-1); }
+.pod-shop__flourish > i { width: 6px; height: 6px; border: 1px solid #aa8c4f; transform: rotate(45deg); }
+.pod-shop__title {
+  margin: 0;
+  font: 900 clamp(28px, 3.4vw, 40px)/1 var(--ps-fantasy);
+  letter-spacing: 1px;
+  color: #dfbc70;
+  text-shadow: 0 1px 0 #fff0b66b, 0 3px 0 #85542e, 0 5px 10px #000d;
+}
+.pod-shop__subtitle { margin: 10px 0 0; font: 600 11px var(--ps-fantasy); letter-spacing: 2px; color: #d3bd8b; text-transform: uppercase; }
+
+/* layout ------------------------------------------------------------------ */
+.pod-shop__body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 28px); }
+@media (max-width: 860px) { .pod-shop__body { grid-template-columns: 1fr; } }
+
+/* stage (focal point) --------------------------------------------------- */
+.pod-shop__stage { display: flex; flex-direction: column; gap: 12px; }
+.pod-preview {
+  position: relative;
+  aspect-ratio: 4 / 3.2;
+  border: 1px solid var(--ps-line);
+  border-radius: 3px;
+  background:
+    radial-gradient(60% 55% at 50% 58%, #2a4a40 0%, #16241f 55%, #0a0f0c 100%);
+  box-shadow: inset 0 0 90px #000c, inset 0 1px #ffe0a01a;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.pod-preview::after { /* plinth glow + vignette keep attention on the pod */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(38% 10% at 50% 84%, #f3d49b2e, transparent 70%), radial-gradient(ellipse at center, transparent 55%, #000a 100%);
+}
+.pod-preview canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pod-preview:active { cursor: grabbing; }
+.pod-preview:focus-visible { outline: 2px solid var(--ps-bright); outline-offset: 4px; }
+.pod-preview[data-failed='true']::before { content: '3D preview unavailable in this browser.'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--ps-muted); font-size: 13px; }
+.pod-preview__hint { position: absolute; z-index: 1; left: 12px; bottom: 10px; font: 600 9px var(--ps-fantasy); letter-spacing: 1.6px; color: #c5ba97b3; text-transform: uppercase; }
+.pod-shop__describe { margin: 0; font: italic 14px/1.5 Georgia, serif; color: var(--ps-muted); text-align: center; min-height: 1.5em; }
+
+.pod-shop__presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .pod-shop__presets { grid-template-columns: repeat(2, 1fr); } }
+.pod-plate {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 54px; padding: 9px 11px;
+  color: var(--ps-parch); text-align: left;
+  background: linear-gradient(180deg, #1c2621, #111814);
+  border: 1px solid #5f4e2c; border-radius: 3px;
+  box-shadow: inset 0 1px #ffe0a014, 0 2px 5px #0006;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+.pod-plate__name { font: 700 12px/1.2 var(--ps-fantasy); letter-spacing: .5px; }
+.pod-plate__meta { font-size: 11px; color: var(--ps-muted); }
+.pod-plate[data-rarity='rare'] .pod-plate__meta { color: #7fb2e5; }
+.pod-plate[data-rarity='epic'] .pod-plate__meta { color: #c7a4f0; }
+.pod-plate:hover { border-color: var(--ps-gold); }
+.pod-plate[data-active] { border-color: var(--ps-bright); box-shadow: inset 0 0 0 1px #f3d49b55, 0 0 14px #e0b05e33; }
+.pod-plate:focus-visible { outline: 2px solid var(--ps-bright); outline-offset: 3px; }
+
+/* workbench ---------------------------------------------------------------- */
+.pod-shop__workbench { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 12px; align-content: start; }
+@media (max-width: 560px) { .pod-shop__workbench { grid-template-columns: 1fr; } }
+.pod-tabs { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 560px) { .pod-tabs { flex-direction: row; flex-wrap: wrap; } }
+.pod-tab {
+  position: relative;
+  min-height: 42px; padding: 8px 14px;
+  color: #c9bb93; text-align: left;
+  font: 600 12px var(--ps-fantasy); letter-spacing: .8px;
+  background: #141811e8; border: 1px solid #4d4128; border-radius: 3px;
+  box-shadow: inset 0 1px #ffe0a012;
+  cursor: pointer;
+}
+.pod-tab:hover { color: #ffe9ad; border-color: var(--ps-line); }
+.pod-tab[aria-selected='true'] { color: #fff3cf; border-color: var(--ps-gold); background: linear-gradient(90deg, #3a2e17, #19201b); }
+.pod-tab[aria-selected='true']::before { content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 3px; background: var(--ps-bright); }
+.pod-tab:focus-visible { outline: 2px solid var(--ps-bright); outline-offset: 3px; }
+
+.pod-shop__panel { padding: 14px; background: #0d130fd9; border: 1px solid #3d3522; border-radius: 3px; box-shadow: inset 0 0 40px #000a; }
+.pod-shop__hint { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--ps-muted); }
+.pod-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pod-options[data-dense] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pod-option {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 46px; padding: 8px 10px;
+  color: var(--ps-parch); text-align: left; font-size: 13px; font-weight: 600;
+  background: linear-gradient(180deg, #19221e, #101612);
+  border: 1px solid #4a3f27; border-radius: 3px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pod-option:hover { border-color: var(--ps-line); }
+.pod-option[aria-checked='true'] { border-color: var(--ps-bright); background: linear-gradient(180deg, #33291a, #19160f); box-shadow: inset 0 0 0 1px #f3d49b44; }
+.pod-option[aria-checked='true'] .pod-option__label::after { content: ' ◆'; color: var(--ps-bright); font-size: 10px; }
+.pod-option:focus-visible { outline: 2px solid var(--ps-bright); outline-offset: 3px; }
+.pod-option__swatch { flex-shrink: 0; width: 22px; height: 22px; border-radius: 2px; border: 1px solid #000; box-shadow: inset 0 1px #ffffff40, 0 0 0 1px #8a6f3a80; }
+.pod-option__label { min-width: 0; overflow-wrap: anywhere; }
+
+/* footer ------------------------------------------------------------------- */
+.pod-shop__footer { display: flex; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid #77683955; }
+.pod-shop__status { flex: 1; margin: 0; font-size: 13px; color: #c8bd93; }
+@media (max-width: 560px) { .pod-shop__footer { flex-wrap: wrap; } .pod-shop__status { flex-basis: 100%; order: -1; } }
+.pod-btn {
+  min-height: 48px; padding: 0 22px;
+  font: 600 13px var(--ps-fantasy); letter-spacing: 1px; color: #e3d3a4;
+  background: #141811e8 url('/ui/stone-tile.png') center / 110px;
+  border: 1px solid var(--ps-line); border-radius: 3px;
+  box-shadow: inset 0 1px #ffe0a01f, 0 2px 5px #0006;
+  cursor: pointer;
+}
+.pod-btn:hover { color: #ffe9ad; border-color: #d9b96f; box-shadow: inset 0 1px #ffe0a030, 0 0 13px #e0b05e3d; }
+.pod-btn:focus-visible { outline: 2px solid var(--ps-bright); outline-offset: 4px; }
+.pod-btn:active { transform: translateY(2px); }
+.pod-btn--primary { color: #fff3dc; background: linear-gradient(180deg, #a8392a, var(--ps-crimson) 55%, #5e1a12); border-color: var(--ps-gold); text-shadow: 0 1px 1px #000a; }
+.pod-btn--primary:hover { color: #fff; box-shadow: 0 0 18px #d9533b55, inset 0 1px #ffd9a040; }
+.pod-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* accessibility overrides ------------------------------------------------- */
+.high-contrast-game .pod-shop { background: #050807; border-color: #f3d49b; }
+.high-contrast-game .pod-shop__hint, .high-contrast-game .pod-shop__describe,
+.high-contrast-game .pod-plate__meta, .high-contrast-game .pod-shop__status { color: #f0e8d2; }
+.high-contrast-game .pod-option, .high-contrast-game .pod-tab, .high-contrast-game .pod-plate { border-color: #c9b27a; background: #0b0f0d; color: #fff; }
+.pod-shop[data-reduced-motion] *, .pod-shop[data-reduced-motion] *::before { transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .pod-shop * { transition: none !important; } }

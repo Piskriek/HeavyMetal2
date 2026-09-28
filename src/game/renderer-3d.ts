@@ -18,6 +18,7 @@ import { ObstacleView, shieldBubbleTexture } from './obstacle-view';
 import { PICKUP_HIDDEN_SECONDS, PickupView } from './pickup-view';
 import { cameraKick, cameraShake } from './camera-shake';
 import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro-ball';
+import { HoopPodFleet } from './pod'; /* hoop-pod:v2 */
 import type { GyroFrame } from './first-person';
 import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-route/island-world';
 import { readOptions } from './preferences';
@@ -55,8 +56,6 @@ const TERRAIN_DROP = 100;
 const RIVER_X = -7000;
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
-/** A PlaneGeometry faces +Z. */
-const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const ZERO = new THREE.Vector3();
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -1611,14 +1610,7 @@ export class Renderer3D {
   private racerResources: RacerMeshResources | null = null;
   /** Core batches keyed by canvas (null = untextured), so identical loadout/rim combos share one draw. */
   private readonly racerTextures = new Map<HTMLCanvasElement | null, CoreBatch>();
-  private readonly racerMatrix = new THREE.Matrix4();
-  private readonly racerScale = new THREE.Vector3(1, 1, 1);
   private readonly racerOffset = new THREE.Vector3();
-  private readonly shadowQuat = new THREE.Quaternion();
-  private readonly shadowUp = new THREE.Vector3();
-  private readonly shadowScale = new THREE.Vector3();
-  private readonly shadowFade = new THREE.Color();
-  private readonly shieldQuat = new THREE.Quaternion();
   private storedAssets: GameAssets;
   private readonly camUp = new THREE.Vector3(0, 1, 0);
   readonly trackBuilder: TrackBuilder3D;
@@ -1665,9 +1657,10 @@ export class Renderer3D {
   private readonly shakeRight = new THREE.Vector3(1, 0, 0);
   private readonly shakeUp = new THREE.Vector3(0, 1, 0);
   private readonly shakeForward = new THREE.Vector3(0, 0, -1);
-  /** M01 · T3 — reused pose quaternions: the render loop never constructs a THREE object. */
-  private readonly coreQuat = new THREE.Quaternion();
+  /** M01 · T3 — a reused pose quaternion: the render loop never constructs a THREE object. */
   private readonly gyroQuat = new THREE.Quaternion();
+  /** Hoop-Pod racers: one instanced fleet draws the whole field, LOD by screen size (docs/HOOP_POD.md). */
+  private readonly pods: HoopPodFleet;
   /** Last frame the gyro was not falling, so a drop freezes the view instead of tumbling it. */
   private lastGyroFrame: GyroFrame | null = null;
 
@@ -1803,6 +1796,7 @@ export class Renderer3D {
     if (this.island) void this.island.ready.then(() => this.trackBuilder.sculpt?.sync());
 
     // Racers
+    this.pods = new HoopPodFleet(this.scene);
     this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
 
     this.placeCamera(this.D_START, 0.1, 'follow_ball', 0);
@@ -2106,6 +2100,7 @@ export class Renderer3D {
     this.growRacerBatches(count);
     while (this.racers3D.length < count) this.racers3D.push(this.buildRacerSlot(this.racers3D.length));
     while (this.racers3D.length > count) this.releaseRacerMesh();
+    this.pods.setCount(count);
   }
 
   /** Rebuilds every instanced mesh with room for `count` racers (capacity only ever grows). */
@@ -2233,7 +2228,7 @@ export class Renderer3D {
     for (const batch of this.racerTextures.values()) batch.mesh.count = 0;
     shared.caps.count = shared.shadows.count = shared.shields.count = 0;
     let playerAltitude = 0;
-    const m = this.racerMatrix; const one = this.racerScale; const position = this.racerOffset;
+    const position = this.racerOffset;
     for (let i = 0; i < frame.racers.length; i++) {
       const racer = frame.racers[i];
       const slot = this.racers3D[i];
@@ -2261,41 +2256,14 @@ export class Renderer3D {
       // The tight chase rig needs the player's own altitude (see placeCamera).
       if (i === 0) playerAltitude = placement.world.y - (this.viewTrack.sampleAt(playerDist).pos.y + RADIUS);
 
-      const shielded = (racer.shieldUntil ?? 0) > frame.runTime;
-      // A slow spin on the bubble, held still under reduced motion.
-      if (shielded && !frame.reducedMotion) slot.shieldSpin += dt * 0.9;
-      // T0/T3: the eye sits inside the player's own ball, so the ball is not drawn in first person.
-      if ((firstPerson && i === 0) || racer.hidden) continue;
-
-      // T3 (IF-GYRO): the shell rolls, the caps and the rider do not. The pose is arithmetic from
-      // the sim's own roll phase (no renderer-side integration), copied into the reused quaternions.
+      // Hoop-Pod (IF-GYRO): the fleet draws the racer, its shield and its blob shadow; the legacy
+      // batches stay empty. The hoops take the shell roll, the inner ball and caps the level basis;
+      // the fleet copies numbers the sim already owns and writes nothing back. hoop-pod:v2
+      // T0/T3: the eye sits inside the player's own pod, so it is not drawn in first person.
       const gyro = gyroPose(racer.rollPhase ?? 0, this.worldFrame(placement.frame));
-      this.coreQuat.set(gyro.core[0], gyro.core[1], gyro.core[2], gyro.core[3]);
       this.gyroQuat.set(gyro.gyro[0], gyro.gyro[1], gyro.gyro[2], gyro.gyro[3]);
-
-      const core = slot.core.mesh;
-      core.setMatrixAt(core.count, m.compose(position, this.coreQuat, one));
-      if (!slot.canvas) core.setColorAt(core.count, slot.color);
-      if (slot.layer !== null) slot.core.layers?.setX(core.count, slot.layer);
-      core.count++;
-      shared.caps.setMatrixAt(shared.caps.count++, m.compose(position, this.gyroQuat, one));
-      if (shielded) {
-        this.shieldQuat.setFromAxisAngle(WORLD_UP, slot.shieldSpin);
-        shared.shields.setMatrixAt(shared.shields.count++, m.compose(position, this.shieldQuat, one));
-      }
-      // P5: the contact shadow lies on the road under the ball, tilted with the road (banks and
-      // drops), fading and spreading as the ball leaves it.
-      const f = placement.frame; const lateral = placement.lateral;
-      const groundX = f.pos.x + f.right.x * lateral; const groundY = f.pos.y + f.right.y * lateral + lift; const groundZ = f.pos.z + f.right.z * lateral;
-      const clearance = (placement.world.x - groundX) * f.up.x + (placement.world.y + lift - groundY) * f.up.y + (placement.world.z - groundZ) * f.up.z - BALL_DRAW_RADIUS;
-      const look = shadowAt(clearance);
-      if (look.fade > 0) {
-        position.set(groundX + f.up.x * SHADOW_LIFT, groundY + f.up.y * SHADOW_LIFT, groundZ + f.up.z * SHADOW_LIFT);
-        this.shadowQuat.setFromUnitVectors(PLANE_NORMAL, this.shadowUp.set(f.up.x, f.up.y, f.up.z).normalize());
-        const n = shared.shadows.count++;
-        shared.shadows.setMatrixAt(n, m.compose(position, this.shadowQuat, this.shadowScale.setScalar(look.scale)));
-        shared.shadows.setColorAt(n, this.shadowFade.setRGB(look.fade, look.fade, look.fade));
-      }
+      const shown = !((firstPerson && i === 0) || racer.hidden);
+      this.pods.setRacer(i, racer, position, this.gyroQuat, racer.rollPhase ?? 0, shown, frame.runTime, dt);
     }
     const batches = [shared.caps, shared.shadows, shared.shields];
     for (const batch of this.racerTextures.values()) batches.push(batch.mesh);
@@ -2380,6 +2348,8 @@ export class Renderer3D {
       // The builder: the underground is as dark as in a race around the camera (so placed lights read true), unless turned off.
       this.updateAtmosphere(this.trackBuilder.previewAtmosphere ? this.trackBuilder.cameraTrackDistance() : 0);
     }
+    // Hoop-Pod: pack after the camera is placed, so LOD and culling use this frame's view.
+    this.pods.commit(this.camera, dt, frame.reducedMotion, this.renderer.domElement.clientHeight || 720);
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;
     this.island?.sky.position.copy(this.camera.position);
@@ -2424,6 +2394,7 @@ export class Renderer3D {
   destroy() {
     this.destroyed = true;
     this.disposeRacerPool();
+    this.pods.dispose();
     this.surfacePaintTool?.dispose();
     this.surfacePaintTool = null;
     this.surfacePaint?.dispose();

@@ -44,7 +44,11 @@ function paint(canvas: HTMLCanvasElement, img: RgbaImage) {
   canvas.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
 }
 
-export default function BallShowroom({ baked, capFinish, onSurface, onCap, label }: Props) {
+// Hoop-Pod: the garage shows the race pod, painted by the same bake (PodShowroom.tsx). hoop-pod:v2
+export { default } from './PodShowroom';
+
+/** The original sphere showroom, kept for comparison and fallback. */
+export function SphereShowroom({ baked, capFinish, onSurface, onCap, label }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cradleRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene | null>(null);

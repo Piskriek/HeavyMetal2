@@ -23,6 +23,7 @@ import IslandGroundPanel, { type GroundBrush } from './builder/IslandGroundPanel
 import { SURFACE_CRACKED } from '../game/surface/surface-table';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
+import EasyBuildBar from './builder/EasyBuildBar';
 import { BuilderKeys, readKeyOverrides, writeKeyOverrides, type EditorMode } from '../game/builder/builder-keys';
 import CustomModelsTab from './builder/CustomModelsTab';
 import ShadingPanel from './builder/ShadingPanel';
@@ -160,11 +161,19 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   bindingsRef.current = bindings;
   const keyLabel = (id: string) => bindings.label(id);
   const [editorMode, setEditorModeState] = useState<EditorMode>(() => {
-    try { return localStorage.getItem(EDITOR_MODE_KEY) === 'easy' ? 'easy' : 'pro'; } catch { return 'pro'; }
+    try { return localStorage.getItem(EDITOR_MODE_KEY) === 'pro' ? 'pro' : 'easy'; } catch { return 'easy'; }
   });
   const modeRef = useRef(editorMode);
   modeRef.current = editorMode;
   const setEditorMode = (mode: EditorMode) => {
+    if (mode === 'easy') {
+      // Easy Build drops pieces itself: put down any held piece and leave the Pro-only tools.
+      builder.setActivePropType(null);
+      setToolWindow(null);
+      setDragSelect(false);
+      setTestStartMode(false);
+      setCategory((c) => (c === 'lanes' ? 'island_kit' : c));
+    }
     setEditorModeState(mode);
     try { localStorage.setItem(EDITOR_MODE_KEY, mode); } catch { /* the choice lasts this visit */ }
   };
@@ -230,7 +239,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     localHistory: [],
   });
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
-  const [toast, setToast] = useState<string | null>('3D Track Builder Active: WASD to fly (Space: up, Z: down), Right-Drag to look, Click props to select');
+  const [toast, setToast] = useState<string | null>(() => {
+    let easy = true;
+    try { easy = localStorage.getItem(EDITOR_MODE_KEY) !== 'pro'; } catch { /* default */ }
+    return easy
+      ? 'Easy Build: pick a piece and it drops at the ring. , and . walk down the road. ? shows every key.'
+      : 'WASD to fly (Space up, Z down), right-drag to look, click a piece to pick it. ? shows every key.';
+  });
 
   // WIRE-4: warm the shelves' painted icons as the builder opens, so the tiles never pop in.
   useEffect(() => {
@@ -1717,6 +1732,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             {/* Track Selector: the island's tracks, with New and Duplicate */}
             <IslandTrackBar builder={builder} course={course} onCourseChange={onCourseChange} showToast={showToast} onRequestRender={onRequestRender} />
 
+            {editorMode === 'pro' && (<>
             {/* Shader Manager */}
             <button
               onClick={() => setShowShaders((v) => !v)}
@@ -1726,6 +1742,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <Paintbrush size={12} />
               <span className="hidden 2xl:inline text-[11px]">Shaders</span>
             </button>
+            </>)}
 
             {/* Skybox Selector */}
             <div className="relative">
@@ -1789,6 +1806,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               )}
             </div>
 
+            {editorMode === 'pro' && (<>
             {/* Placed Props Drawer Toggle */}
             <button
               onClick={() => setShowPropsDrawer(!showPropsDrawer)}
@@ -1816,6 +1834,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <Mountain size={13} />
               <span className="hidden 2xl:inline text-[11px]">Island</span>
             </button>
+            </>)}
           </div>
 
           {/* Center Zone: DCC Gizmo Bar + Camera Dropdown + Snapping Dropdown */}
@@ -1951,6 +1970,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               )}
             </div>
 
+            {editorMode === 'pro' && (<>
             {/* Snapping & Placement Dropdown */}
             <div className="relative">
               <button
@@ -2044,6 +2064,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 </div>
               )}
             </div>
+            </>)}
           </div>
 
           {/* Right Zone: Undo/Redo + Help + Zen + Test Race + Exit */}
@@ -2303,8 +2324,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         </div>
       )}
 
-      {/* Selected Prop(s) Inspector (Floating Right) */}
-      {!isZen && (groundOpen ? (
+      {/* Selected Prop(s) Inspector (Floating Right): Pro mode; Easy Build has its own quick actions */}
+      {!isZen && editorMode === 'pro' && (groundOpen ? (
         <div className="pointer-events-auto self-end mr-4 mb-auto mt-4 w-80 max-h-[calc(100vh-17rem)] overflow-y-auto scrollbar-thin [&>*]:shrink-0 bg-zinc-950/95 border border-amber-500/60 rounded-lg p-3.5 shadow-2xl backdrop-blur-md text-amber-100 flex flex-col gap-2.5">
           <IslandGroundPanel
             builder={builder}
@@ -3891,8 +3912,22 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         </div>
       ) : null)}
 
-      {/* Bottom Prop Palette */}
-      {!isZen && (
+      {/* Easy Build: walk down the road and drop pieces */}
+      {!isZen && editorMode === 'easy' && (
+        <EasyBuildBar
+          builder={builder}
+          props={placedProps}
+          selectedCount={selectedProps.length}
+          keyLabel={keyLabel}
+          keyRef={easyKeyRef}
+          showToast={showToast}
+          onRequestRender={onRequestRender}
+          onTestRace={onTestRace}
+        />
+      )}
+
+      {/* Bottom Prop Palette (Pro) */}
+      {!isZen && editorMode === 'pro' && (
         <div className="forge-bar forge-bar--bottom pointer-events-auto flex flex-col transition-all select-none">
           {/* Top Control Bar: Mode Toggles + Search Box + Shelf Expand/Collapse */}
           <div className="flex items-center justify-between px-2 py-1 border-b border-zinc-800/80 gap-2">

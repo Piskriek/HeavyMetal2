@@ -14,7 +14,8 @@ import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } 
 /** Where each course's (and island track's) test ball stands, on this device. */
 const TEST_BALL_KEY = 'hm2-test-ball-v1';
 import { passageMouthX } from './qualifying/passage';
-import { isKitModelType } from './models/kit-catalog';
+import { isKitModelType, kitModelFor } from './models/kit-catalog';
+import { chaseCamera, engineXOfShare, roadPose, shareOfEngineX, type RoadPose, type RoadSpot } from './builder/easy-build';
 import { ghostKitObject } from './models/kit-object';
 import { collisionRoleOf, kitCollisionInput, patchFromWorldMeshes } from './models/kit-collision';
 import type { Patch } from './collision/terrain-patch';
@@ -1353,6 +1354,21 @@ export class TrackBuilder3D {
   // --- FREE FLY CAMERA UPDATE ---
   updateFlyCamera(dt: number, keys: Set<string>) {
     if (!this.freeFly.active) return;
+    if (this.flyTween) {
+      // Wall-clock, not frame time: a slow frame still lands the glide in 0.45 s.
+      const tw = this.flyTween;
+      const t = Math.min(1, (performance.now() - tw.start) / 450);
+      const k = t * t * (3 - 2 * t);
+      const f = this.freeFly;
+      f.x = tw.from.x + (tw.to.x - tw.from.x) * k;
+      f.y = tw.from.y + (tw.to.y - tw.from.y) * k;
+      f.z = tw.from.z + (tw.to.z - tw.from.z) * k;
+      f.yaw = tw.from.yaw + (tw.to.yaw - tw.from.yaw) * k;
+      f.pitch = tw.from.pitch + (tw.to.pitch - tw.from.pitch) * k;
+      if (t >= 1) this.flyTween = null;
+      // Flying by hand takes the camera back.
+      if (['KeyW', 'KeyS', 'KeyA', 'KeyD', 'Space', 'KeyZ'].some((k2) => keys.has(k2))) this.flyTween = null;
+    }
 
     const speed = this.freeFly.speed * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 3.0 : 1.0);
     const move = new THREE.Vector3();
@@ -1504,32 +1520,7 @@ export class TrackBuilder3D {
     const intersects = this.raycaster.intersectObjects(this.scene.children, true);
 
     for (const hit of intersects) {
-      const obj = hit.object;
-      // The model placement preview is never a surface (the preview would climb its own model).
-      let inGhost = false;
-      for (let p: THREE.Object3D | null = obj; p; p = p.parent) if (p.userData?.isKitGhost || p.name === 'TestBallMarker') { inGhost = true; break; }
-      if (inGhost) continue;
-      // three.js raycasts hit hidden objects: a hidden scenery part or prop is not a surface.
-      if (!SceneKit.shown(obj) || obj.name?.startsWith('Light') || obj.name === 'BuilderLightSlot') continue;
-      // Skip sky, markers, gizmos, ghosts, sprites, placed props (except primitives), and handles
-      if (
-        obj.name === 'Sky' ||
-        obj.name === 'Ghost' ||
-        obj.name === 'GhostMesh' ||
-        obj.name === 'GhostDecalMesh' ||
-        obj.name === 'GhostSlingshotMesh' ||
-        (obj as any).isSprite ||
-        obj.name === 'DebugMarkers' ||
-        (obj.name?.startsWith('PlacedProp_') && !obj.userData?.isPrimitive) ||
-        obj.name?.startsWith('DecalSide') ||
-        obj.name?.startsWith('DecalHandle') ||
-        obj.name === 'RotationHandleGroup' ||
-        obj.name === 'DecalSideHandlesGroup' ||
-        obj.name === 'LaneHandles' ||
-        obj.name === 'LaneGizmos' ||
-        obj.name === 'GizmoPivotProxy' ||
-        obj.name?.startsWith('TransformControls')
-      ) continue;
+      if (!this.isSurfaceObject(hit.object)) continue;
 
       // Find closest track sample
       let closestSample: TrackSample | undefined;
@@ -1551,6 +1542,36 @@ export class TrackBuilder3D {
     }
 
     return null;
+  }
+
+  /** Is a raycast hit something a piece can stand on (not the sky, a ghost, a handle or a placed model)? */
+  private isSurfaceObject(obj: THREE.Object3D): boolean {
+    {
+      // The model placement preview is never a surface (the preview would climb its own model).
+      for (let p: THREE.Object3D | null = obj; p; p = p.parent) if (p.userData?.isKitGhost || p.name === 'TestBallMarker') return false;
+      // three.js raycasts hit hidden objects: a hidden scenery part or prop is not a surface.
+      if (!SceneKit.shown(obj) || obj.name?.startsWith('Light') || obj.name === 'BuilderLightSlot') return false;
+      // Skip sky, markers, gizmos, ghosts, sprites, placed props (except primitives), and handles
+      if (
+        obj.name === 'Sky' ||
+        obj.name === 'Ghost' ||
+        obj.name === 'GhostMesh' ||
+        obj.name === 'GhostDecalMesh' ||
+        obj.name === 'GhostSlingshotMesh' ||
+        (obj as any).isSprite ||
+        obj.name === 'DebugMarkers' ||
+        (obj.name?.startsWith('PlacedProp_') && !obj.userData?.isPrimitive) ||
+        obj.name?.startsWith('DecalSide') ||
+        obj.name?.startsWith('DecalHandle') ||
+        obj.name === 'RotationHandleGroup' ||
+        obj.name === 'DecalSideHandlesGroup' ||
+        obj.name === 'LaneHandles' ||
+        obj.name === 'LaneGizmos' ||
+        obj.name === 'GizmoPivotProxy' ||
+        obj.name?.startsWith('TransformControls')
+      ) return false;
+      return true;
+    }
   }
 
   // --- GHOST PREVIEW ---
@@ -4433,6 +4454,146 @@ export class TrackBuilder3D {
       if (d < bestD) { bestD = d; best = i; }
     }
     return samples[best].dist;
+  }
+
+  // --- EASY BUILD ---------------------------------------------------------------------------------
+
+  /** A glide the camera is making to a new stretch (Easy Build), read by updateFlyCamera. */
+  private flyTween: { from: { x: number; y: number; z: number; yaw: number; pitch: number }; to: { x: number; y: number; z: number; yaw: number; pitch: number }; start: number } | null = null;
+  private easyCursor: THREE.Group | null = null;
+
+  /** The height of whatever a piece would stand on under (x, z), searching down from y. */
+  surfaceBelow(x: number, fromY: number, z: number): number | null {
+    this.raycaster.set(new THREE.Vector3(x, fromY, z), new THREE.Vector3(0, -1, 0));
+    const hits = this.raycaster.intersectObjects(this.scene.children, true);
+    for (const hit of hits) if (this.isSurfaceObject(hit.object)) return hit.point.y;
+    return null;
+  }
+
+  /** Where a piece dropped at `share` on `spot` stands, on the ground there. */
+  easyRoadPose(share: number, spot: RoadSpot, side: 1 | -1 = 1, type?: string): RoadPose {
+    const space = courseTrackSpace(this.courseId as CourseId);
+    const size = type ? kitModelFor(type)?.size ?? 600 : 600;
+    const pose = roadPose(space, share, spot, side, Math.min(1600, size * 0.5 + 180));
+    const ground = this.surfaceBelow(pose.x, pose.y + 700, pose.z);
+    if (ground !== null && Math.abs(ground - pose.y) < 4000) pose.y = ground;
+    return pose;
+  }
+
+  /** The share of the course the camera is over (for starting Easy Build where the player looks). */
+  easyShareAtCamera(): number {
+    const space = courseTrackSpace(this.courseId as CourseId);
+    return shareOfEngineX(engineXAt(space, { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z }));
+  }
+
+  /** Glide the camera behind the cursor, looking down the road, and show the cursor on `spot`. */
+  easyLookAt(share: number, spot: RoadSpot, side: 1 | -1, type?: string) {
+    const road = this.easyRoadPose(share, 'middle');
+    let cam = chaseCamera(road);
+    // Never inside a hill: lift the camera clear of the ground behind the cursor, still looking at it.
+    const ground = this.surfaceBelow(cam.eye.x, cam.eye.y + 8000, cam.eye.z);
+    if (ground !== null && cam.eye.y < ground + 700) cam = chaseCamera(road, 2200, 1500 + (ground + 700 - cam.eye.y));
+    const to = { ...cam.eye, yaw: cam.yaw, pitch: cam.pitch };
+    const f = this.freeFly;
+    const from = { x: f.x, y: f.y, z: f.z, yaw: f.yaw, pitch: f.pitch };
+    // Turn the short way round.
+    while (to.yaw - from.yaw > Math.PI) to.yaw -= Math.PI * 2;
+    while (to.yaw - from.yaw < -Math.PI) to.yaw += Math.PI * 2;
+    if (f.active) this.flyTween = { from, to, start: performance.now() };
+    else { Object.assign(f, to); this.camera.position.set(f.x, f.y, f.z); }
+    this.showEasyCursor(road, this.easyRoadPose(share, spot, side, type));
+    this.notify();
+  }
+
+  /** The brass bar across the road at the cursor and a ring where the next piece lands. */
+  showEasyCursor(road: RoadPose | null, spot?: RoadPose) {
+    if (!road) {
+      if (this.easyCursor) this.easyCursor.visible = false;
+      return;
+    }
+    if (!this.easyCursor) {
+      const group = new THREE.Group();
+      group.name = 'EasyCursor';
+      group.userData.isKitGhost = true;
+      // Drawn over the ground so the cursor never sinks into a slope.
+      const brass = new THREE.MeshBasicMaterial({ color: 0xe5c27f, transparent: true, opacity: 0.7, depthWrite: false, depthTest: false });
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(1, 14, 46), brass);
+      bar.name = 'EasyCursorBar';
+      const ring = new THREE.Mesh(new THREE.RingGeometry(150, 205, 40), new THREE.MeshBasicMaterial({ color: 0xf5e3bd, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, depthTest: false }));
+      ring.name = 'EasyCursorRing';
+      ring.rotation.x = -Math.PI / 2;
+      const arrow = new THREE.Mesh(new THREE.ConeGeometry(70, 160, 3), brass);
+      arrow.name = 'EasyCursorArrow';
+      arrow.rotation.x = Math.PI / 2;
+      group.add(bar, ring, arrow);
+      for (const child of group.children) child.renderOrder = 20;
+      this.scene.add(group);
+      this.easyCursor = group;
+    }
+    const [bar, ring, arrow] = this.easyCursor.children;
+    this.easyCursor.visible = true;
+    bar.position.set(road.x, road.y + 10, road.z);
+    // The box's length is its x: at the road's heading, x is the road's right, so it spans the road.
+    bar.rotation.set(0, road.rotY, 0);
+    bar.scale.set(road.halfWidth * 2 + 200, 1, 1);
+    const at = spot ?? road;
+    ring.position.set(at.x, at.y + 14, at.z);
+    arrow.position.set(at.x + at.forward.x * 260, at.y + 30, at.z + at.forward.z * 260);
+    arrow.lookAt(at.x + at.forward.x * 600, at.y + 30, at.z + at.forward.z * 600);
+    arrow.rotateX(Math.PI / 2);
+  }
+
+  /**
+   * Easy Build: drop a kit piece at `share` on `spot`, facing down the road. Start and finish lines
+   * snap across the road's middle like a hand-placed one. Scenery beside the road gets a little turn
+   * of its own so a row does not look stamped. One undo step; the piece comes back selected.
+   */
+  easyDrop(type: string, share: number, spot: RoadSpot, side: 1 | -1 = 1): PlacedProp | null {
+    const def = PROP_DEFINITIONS.find((p) => p.type === type);
+    if (!def || !isKitType(type)) return null;
+    const pose = this.easyRoadPose(share, spot, side, type);
+    const rampRejection = this.validateRampSupport(type, { x: pose.x, y: pose.y, z: pose.z, scale: 1, trackDist: pose.trackDist });
+    if (rampRejection) {
+      this.placementErrorState = rampRejection;
+      this.notify();
+      return null;
+    }
+    this.pushUndo();
+    const id = `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    let rotY = pose.rotY;
+    const model = kitModelFor(type);
+    const scenery = model && (model.shelf === 'foliage_3d' || model.shelf === 'rocks_3d');
+    if (spot === 'roadside' && scenery) {
+      let h = 0;
+      for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+      rotY += ((h % 360) / 360) * Math.PI * 2;
+    }
+    const prop: PlacedProp = {
+      id, type, name: def.name,
+      x: Math.round(pose.x), y: Math.round(pose.y), z: Math.round(pose.z),
+      rotY, rotX: 0, rotZ: 0, scale: 1,
+      alignToTrack: true, trackDist: Math.round(pose.trackDist),
+      cameraFacing: false, isDecal: false, flipX: false,
+    };
+    if (isRaceMarkType(type)) {
+      const line = roadPoseAt(courseTrackSpace(this.courseId as CourseId), engineXOfShare(share));
+      prop.x = Math.round(line.x); prop.y = Math.round(line.y); prop.z = Math.round(line.z);
+      prop.rotY = line.rotY;
+    }
+    this.placedProps.push(prop);
+    this.createPropSprite(prop);
+    this.selectProp(prop.id);
+    this.saveToStorage();
+    this.notify();
+    return prop;
+  }
+
+  /** Where the race pieces and stunts stand along the course (0..1), for Easy Build's road strip. */
+  easyMarkers(types: ReadonlySet<string>): { id: string; type: string; share: number }[] {
+    const space = courseTrackSpace(this.courseId as CourseId);
+    return this.placedProps
+      .filter((p) => types.has(p.type) && p.visible !== false)
+      .map((p) => ({ id: p.id, type: p.type, share: shareOfEngineX(engineXAt(space, p)) }));
   }
 
   /**

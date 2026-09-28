@@ -1725,9 +1725,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   <button
                     onClick={() => { setShowSkyWindow(true); setShowSkyMenu(false); }}
                     className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-bold bg-amber-950/60 border border-amber-500/60 text-amber-200 hover:bg-amber-900/60 cursor-pointer"
-                    title="Gradient skydome, its colours, and the clouds round the island"
+                    title="Gradient skydome, the ocean's colour and pattern, and the clouds round the island"
                   >
-                    <Sun size={12} /> Sky &amp; clouds…
+                    <Sun size={12} /> Sky, sea &amp; clouds…
                   </button>
                   <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider">
                     Skydome Atmosphere
@@ -4596,7 +4596,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       )}
 
       {showSkyWindow && (
-        <FloatingWindow title="Sky & clouds" storageKey="hm2-sky-window-v1" initial={{ x: 16, y: 72 }} width={330}>
+        <FloatingWindow title="Sky, sea & clouds" storageKey="hm2-sky-window-v1" initial={{ x: 16, y: 72 }} width={330}>
           <div className="p-3 max-h-[75vh] overflow-y-auto scrollbar-thin">
             <SkyPanel
               paintedSkies={Object.values(SKY_PRESETS).map((p) => ({ id: p.id, name: p.name, url: p.url }))}

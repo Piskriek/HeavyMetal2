@@ -59,7 +59,9 @@ test('the ball: stopped and bounced along the axis that took it in', () => {
 test('the sea: a disc following the camera, waves in rings round the shore, foam, and a horizon haze', () => {
   const sea = readFileSync(new URL('../src/game/island-route/island-sea.ts', import.meta.url), 'utf8');
   assert.match(sea, /new THREE\.CircleGeometry\(SEA_RADIUS/);
-  assert.match(sea, /float v = \(rn \+ seaTime \* 160\.0\) \/ 3000\.0;/, 'rings close in on the island over time');
+  // The Sky window sets the pace (seaSpeed, 1 by default) and the pattern's size (seaTile, 3000 by default).
+  assert.match(sea, /float v = \(rn \+ seaTime \* 160\.0 \* seaSpeed\) \/ seaTile;/, 'rings close in on the island over time');
+  assert.match(sea, /const tile = \{ value: 3000 \};/, 'the default pattern size is unchanged');
   assert.match(sea, /name = 'Shore foam'/);
   assert.match(sea, /float haze = max\(1\.0 - smoothstep\(0\.0, 0\.07, -viewDir\.y\), edge\);/, 'the sea fades into the fog colour near the horizon line and near its own far edge (seen from high up)');
   const world = readFileSync(new URL('../src/game/island-route/island-world.ts', import.meta.url), 'utf8');

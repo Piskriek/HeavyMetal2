@@ -2,9 +2,12 @@
  * SKY: the builder's Sky & Clouds window and what it sets. Global like the Sky menu's pick (the race
  * reads the same storage), so a race shows the sky the builder last showed.
  *
- *  - **mode**: `painted` keeps the Sky menu's panorama; `gradient` swaps it for a crisp three-stop
- *    gradient (horizon → middle → top) whose colours the window edits. The fog and the sea's haze take
- *    the horizon colour, so sea and sky still meet with no line.
+ *  - **mode**: `painted` keeps the Sky menu's panorama; `gradient` lays a crisp three-stop gradient
+ *    (horizon → middle → top) over it, as opaque as `gradient.opacity` (0 shows the painting through).
+ *    The fog and the sea's haze take the horizon colour (blended the same way), so sea and sky still
+ *    meet with no line.
+ *  - **sea**: the island ocean's colour: the water's own tint, the deep colour under it, and how much of
+ *    the deep shows through (island-sea.ts).
  *  - **clouds**: painted billboard clouds floating round the island in three rings, smaller and lower
  *    toward the horizon (`sky-clouds.ts`).
  *
@@ -24,6 +27,8 @@ export interface SkyGradient {
   readonly crispness: number;
   /** Where the middle colour sits, 0 (at the horizon) to 1 (overhead). */
   readonly midHeight: number;
+  /** How much of the gradient covers the painted skybox: 1 = gradient only, 0 = the painting only. */
+  readonly opacity: number;
 }
 
 export interface SkyClouds {
@@ -43,27 +48,64 @@ export interface SkyClouds {
   readonly seed: number;
 }
 
+/** The water's pattern: the painted waves, painted ripples, the lagoon shallows tile, or none (flat). */
+export type SeaTexture = 'waves' | 'ripples' | 'shallows' | 'flat';
+export const SEA_TEXTURES: readonly { id: SeaTexture; name: string }[] = Object.freeze([
+  { id: 'waves', name: 'Painted waves' },
+  { id: 'ripples', name: 'Painted ripples' },
+  { id: 'shallows', name: 'Lagoon shallows' },
+  { id: 'flat', name: 'Flat (no pattern)' },
+]);
+
+export interface SeaLook {
+  /** The water surface's tint (multiplies the water texture). */
+  readonly water: string;
+  /** The deep under the water (the sea floor), showing through it. */
+  readonly deep: string;
+  /** 0 = solid water, 0.6 = very clear (the deep shows through). */
+  readonly seeThrough: number;
+  readonly texture: SeaTexture;
+  /** World units per repeat of the pattern (the ball is 62 across). */
+  readonly tileSize: number;
+  /** × how fast the rings roll in to the shore (0: still). */
+  readonly waveSpeed: number;
+}
+
 export interface SkySettings {
   readonly mode: SkyMode;
   readonly gradient: SkyGradient;
+  readonly sea: SeaLook;
   readonly clouds: SkyClouds;
 }
+
+export interface SeaPreset { readonly id: string; readonly name: string; readonly sea: SeaLook }
+
+/** Ready-made oceans; the first is the island's own turquoise. */
+export const SEA_PRESETS: readonly SeaPreset[] = Object.freeze([
+  { id: 'turquoise', name: 'Turquoise', sea: { water: '#6fc2c0', deep: '#557f78', seeThrough: 0.2, texture: 'waves', tileSize: 3000, waveSpeed: 1 } },
+  { id: 'tropical', name: 'Tropical', sea: { water: '#9ff0e8', deep: '#2a9d9a', seeThrough: 0.25, texture: 'shallows', tileSize: 4000, waveSpeed: 0.8 } },
+  { id: 'deep_blue', name: 'Deep blue', sea: { water: '#3a78c0', deep: '#1d3b63', seeThrough: 0.12, texture: 'ripples', tileSize: 3500, waveSpeed: 1 } },
+  { id: 'emerald', name: 'Emerald', sea: { water: '#48b184', deep: '#2c6a52', seeThrough: 0.2, texture: 'ripples', tileSize: 3000, waveSpeed: 1 } },
+  { id: 'stormy', name: 'Stormy', sea: { water: '#6d8a93', deep: '#3e5158', seeThrough: 0.1, texture: 'waves', tileSize: 2200, waveSpeed: 2 } },
+  { id: 'twilight', name: 'Twilight', sea: { water: '#7d86d6', deep: '#3f3f7a', seeThrough: 0.15, texture: 'ripples', tileSize: 3000, waveSpeed: 0.6 } },
+]);
 
 export interface GradientPreset { readonly id: string; readonly name: string; readonly gradient: SkyGradient }
 
 /** Ready-made gradients; the first is the default: a clean, crisp blue. */
 export const GRADIENT_PRESETS: readonly GradientPreset[] = Object.freeze([
-  { id: 'crisp_blue', name: 'Crisp blue', gradient: { top: '#2d6fd8', middle: '#6cb4f2', horizon: '#dcf1ff', crispness: 0.65, midHeight: 0.28 } },
-  { id: 'frost_morning', name: 'Frost morning', gradient: { top: '#3a5fb8', middle: '#8fc3ec', horizon: '#f2f7ff', crispness: 0.7, midHeight: 0.22 } },
-  { id: 'candy_dusk', name: 'Candy dusk', gradient: { top: '#3b3f9e', middle: '#c77fc9', horizon: '#ffd2a1', crispness: 0.6, midHeight: 0.3 } },
-  { id: 'golden_hour', name: 'Golden hour', gradient: { top: '#4a78c8', middle: '#f3c77a', horizon: '#ffe8c2', crispness: 0.55, midHeight: 0.18 } },
-  { id: 'mint_isles', name: 'Mint isles', gradient: { top: '#1f7fa8', middle: '#7fd6d0', horizon: '#e6fff4', crispness: 0.65, midHeight: 0.26 } },
-  { id: 'storm_teal', name: 'Storm teal', gradient: { top: '#23405a', middle: '#4f8a98', horizon: '#b9d4d0', crispness: 0.5, midHeight: 0.35 } },
+  { id: 'crisp_blue', name: 'Crisp blue', gradient: { top: '#2d6fd8', middle: '#6cb4f2', horizon: '#dcf1ff', crispness: 0.65, midHeight: 0.28, opacity: 1 } },
+  { id: 'frost_morning', name: 'Frost morning', gradient: { top: '#3a5fb8', middle: '#8fc3ec', horizon: '#f2f7ff', crispness: 0.7, midHeight: 0.22, opacity: 1 } },
+  { id: 'candy_dusk', name: 'Candy dusk', gradient: { top: '#3b3f9e', middle: '#c77fc9', horizon: '#ffd2a1', crispness: 0.6, midHeight: 0.3, opacity: 1 } },
+  { id: 'golden_hour', name: 'Golden hour', gradient: { top: '#4a78c8', middle: '#f3c77a', horizon: '#ffe8c2', crispness: 0.55, midHeight: 0.18, opacity: 1 } },
+  { id: 'mint_isles', name: 'Mint isles', gradient: { top: '#1f7fa8', middle: '#7fd6d0', horizon: '#e6fff4', crispness: 0.65, midHeight: 0.26, opacity: 1 } },
+  { id: 'storm_teal', name: 'Storm teal', gradient: { top: '#23405a', middle: '#4f8a98', horizon: '#b9d4d0', crispness: 0.5, midHeight: 0.35, opacity: 1 } },
 ]);
 
 export const DEFAULT_SKY_SETTINGS: SkySettings = Object.freeze({
   mode: 'painted',
   gradient: GRADIENT_PRESETS[0]!.gradient,
+  sea: SEA_PRESETS[0]!.sea,
   clouds: { enabled: true, count: 36, size: 1, height: 1, drift: 1, opacity: 1, tint: '#ffffff', seed: 1 },
 });
 
@@ -82,7 +124,8 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const g = (r.gradient && typeof r.gradient === 'object' ? r.gradient : {}) as Record<string, unknown>;
   const c = (r.clouds && typeof r.clouds === 'object' ? r.clouds : {}) as Record<string, unknown>;
-  const dg = DEFAULT_SKY_SETTINGS.gradient, dc = DEFAULT_SKY_SETTINGS.clouds;
+  const w = (r.sea && typeof r.sea === 'object' ? r.sea : {}) as Record<string, unknown>;
+  const dg = DEFAULT_SKY_SETTINGS.gradient, dc = DEFAULT_SKY_SETTINGS.clouds, dw = DEFAULT_SKY_SETTINGS.sea;
   return {
     mode: r.mode === 'gradient' ? 'gradient' : 'painted',
     gradient: {
@@ -91,6 +134,15 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
       horizon: hex(g.horizon, dg.horizon),
       crispness: clamp(g.crispness, 0, 1, dg.crispness),
       midHeight: clamp(g.midHeight, 0.05, 0.9, dg.midHeight),
+      opacity: clamp(g.opacity, 0, 1, dg.opacity),
+    },
+    sea: {
+      water: hex(w.water, dw.water),
+      deep: hex(w.deep, dw.deep),
+      seeThrough: clamp(w.seeThrough, 0, 0.6, dw.seeThrough),
+      texture: SEA_TEXTURES.some((t) => t.id === w.texture) ? (w.texture as SeaTexture) : dw.texture,
+      tileSize: Math.round(clamp(w.tileSize, 800, 10000, dw.tileSize)),
+      waveSpeed: clamp(w.waveSpeed, 0, 4, dw.waveSpeed),
     },
     clouds: {
       enabled: typeof c.enabled === 'boolean' ? c.enabled : dc.enabled,
@@ -140,11 +192,12 @@ export function getSkySettings(): SkySettings {
 }
 
 /** Merges a change (gradient and clouds merge field by field), saves, and tells every listener. */
-export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyGradient>; clouds?: Partial<SkyClouds> }): SkySettings {
+export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyGradient>; sea?: Partial<SeaLook>; clouds?: Partial<SkyClouds> }): SkySettings {
   const now = getSkySettings();
   current = normalizeSkySettings({
     mode: change.mode ?? now.mode,
     gradient: { ...now.gradient, ...change.gradient },
+    sea: { ...now.sea, ...change.sea },
     clouds: { ...now.clouds, ...change.clouds },
   });
   try { if (typeof localStorage !== 'undefined') localStorage.setItem(SKY_SETTINGS_KEY, JSON.stringify(current)); } catch { /* storage full or blocked: this session keeps it */ }
@@ -153,7 +206,7 @@ export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyG
 }
 
 export function resetSkySettings(): SkySettings {
-  return setSkySettings({ mode: DEFAULT_SKY_SETTINGS.mode, gradient: DEFAULT_SKY_SETTINGS.gradient, clouds: DEFAULT_SKY_SETTINGS.clouds });
+  return setSkySettings({ mode: DEFAULT_SKY_SETTINGS.mode, gradient: DEFAULT_SKY_SETTINGS.gradient, sea: DEFAULT_SKY_SETTINGS.sea, clouds: DEFAULT_SKY_SETTINGS.clouds });
 }
 
 export function onSkySettings(cb: (s: SkySettings) => void): () => void {

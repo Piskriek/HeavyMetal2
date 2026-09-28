@@ -1,11 +1,12 @@
 /**
- * The Sky & Clouds window: the painted skybox or a crisp gradient (its three colours, how crisp, where
- * the middle band sits), and the painted clouds floating round the island. Changes show at once and are
- * kept for the race (sky-settings.ts).
+ * The Sky, sea & clouds window: the painted skybox, or a crisp gradient over it (its three colours, how
+ * crisp, where the middle band sits, how opaque); the ocean (colours, how clear, its pattern, the pattern's
+ * size and the waves' pace); and the painted clouds floating round the island. Changes show at once and
+ * are kept for the race (sky-settings.ts).
  */
 import { useEffect, useState } from 'react';
 import {
-  CLOUD_COUNT_MAX, GRADIENT_PRESETS, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
+  CLOUD_COUNT_MAX, GRADIENT_PRESETS, SEA_PRESETS, SEA_TEXTURES, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
   type SkyGradient, type SkySettings,
 } from '../../game/sky/sky-settings';
 
@@ -52,7 +53,7 @@ function ColorRow(props: { label: string; value: string; onChange: (v: string) =
 export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, onChange, onClose }: Props) {
   const [s, setS] = useState<SkySettings>(() => getSkySettings());
   useEffect(() => onSkySettings((next) => { setS(next); onChange?.(); }), [onChange]);
-  const g = s.gradient, c = s.clouds;
+  const g = s.gradient, c = s.clouds, w = s.sea;
   const tab = (active: boolean) => `flex-1 px-2 py-1 text-[11px] font-bold rounded border cursor-pointer ${active ? 'bg-amber-950/70 border-amber-500/80 text-amber-200' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`;
 
   return (
@@ -64,14 +65,14 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
           <button className={tab(s.mode === 'gradient')} onClick={() => setSkySettings({ mode: 'gradient' })}>Gradient</button>
         </div>
 
-        {s.mode === 'gradient' ? (
+        {s.mode === 'gradient' && (
           <>
             <div className="h-20 rounded border border-zinc-700" style={{ background: gradientCss(g) }} title="Horizon at the bottom, straight up at the top" />
             <div className="grid grid-cols-3 gap-1">
               {GRADIENT_PRESETS.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => setSkySettings({ gradient: p.gradient })}
+                  onClick={() => setSkySettings({ gradient: { ...p.gradient, opacity: g.opacity } })}
                   className="flex flex-col items-center gap-1 rounded border border-zinc-800 bg-zinc-900 p-1 hover:border-amber-600/60 cursor-pointer"
                 >
                   <span className="h-6 w-full rounded" style={{ background: gradientCss(p.gradient) }} />
@@ -84,8 +85,11 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
             <ColorRow label="Horizon (and fog)" value={g.horizon} onChange={(v) => setSkySettings({ gradient: { horizon: v } })} />
             <Slider label="Crispness" value={g.crispness} min={0} max={1} step={0.01} onChange={(v) => setSkySettings({ gradient: { crispness: v } })} />
             <Slider label="Middle height" value={g.midHeight} min={0.05} max={0.9} step={0.01} onChange={(v) => setSkySettings({ gradient: { midHeight: v } })} />
+            <Slider label="Opacity" value={g.opacity} min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ gradient: { opacity: v } })} />
+            <div className="text-[10px] text-zinc-500">Below 100% the painted sky shows through; pick it here:</div>
           </>
-        ) : (
+        )}
+        {(s.mode === 'painted' || g.opacity < 1) && (
           <div className="grid grid-cols-2 gap-1 max-h-44 overflow-y-auto pr-1 scrollbar-thin">
             {paintedSkies.map((p) => (
               <button
@@ -99,6 +103,38 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
             ))}
           </div>
         )}
+      </section>
+
+      <section className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Ocean</div>
+        <div className="grid grid-cols-3 gap-1">
+          {SEA_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setSkySettings({ sea: p.sea })}
+              className="flex flex-col items-center gap-1 rounded border border-zinc-800 bg-zinc-900 p-1 hover:border-amber-600/60 cursor-pointer"
+            >
+              <span className="h-5 w-full rounded" style={{ background: `linear-gradient(to bottom, ${p.sea.water}, ${p.sea.deep})` }} />
+              <span className="text-[10px] text-zinc-300 truncate w-full text-center">{p.name}</span>
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center justify-between gap-2 text-[11px] text-zinc-300">
+          <span>Pattern</span>
+          <select
+            value={w.texture}
+            onChange={(e) => setSkySettings({ sea: { texture: e.target.value as typeof w.texture } })}
+            className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[11px] text-zinc-200 cursor-pointer"
+          >
+            {SEA_TEXTURES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        <ColorRow label="Water colour" value={w.water} onChange={(v) => setSkySettings({ sea: { water: v } })} />
+        <ColorRow label="Deep colour" value={w.deep} onChange={(v) => setSkySettings({ sea: { deep: v } })} />
+        <Slider label="See-through" value={w.seeThrough} min={0} max={0.6} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ sea: { seeThrough: v } })} />
+        <Slider label="Pattern size" value={w.tileSize} min={800} max={10000} step={100} format={(v) => `${(v / 1000).toFixed(1)}k`} onChange={(v) => setSkySettings({ sea: { tileSize: v } })} />
+        <Slider label="Wave speed" value={w.waveSpeed} min={0} max={4} step={0.1} format={(v) => (v === 0 ? 'still' : `${v.toFixed(1)}×`)} onChange={(v) => setSkySettings({ sea: { waveSpeed: v } })} />
+        <div className="text-[10px] text-zinc-500">The water colour tints the pattern: white shows a pattern's own colours (try it with Lagoon shallows).</div>
       </section>
 
       <section className="flex flex-col gap-2 border-t border-zinc-800 pt-3">

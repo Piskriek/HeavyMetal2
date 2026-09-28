@@ -148,3 +148,34 @@ test('clouds: the layer builds its sprites, takes no raycasts, drifts only when 
   assert.equal(layer.group.children.length, 5, 'a new amount rebuilds the layout');
   layer.dispose();
 });
+
+test('sea: normalises colours, pattern, size and speed; presets are all valid', async () => {
+  const { SEA_PRESETS, SEA_TEXTURES } = await import('../src/game/sky/sky-settings');
+  const s = normalizeSkySettings({ sea: { water: '#FFFFFF', deep: 'blue', seeThrough: 3, texture: 'lava', tileSize: 5, waveSpeed: -2 } });
+  assert.equal(s.sea.water, '#ffffff');
+  assert.equal(s.sea.deep, DEFAULT_SKY_SETTINGS.sea.deep);
+  assert.equal(s.sea.seeThrough, 0.6);
+  assert.equal(s.sea.texture, DEFAULT_SKY_SETTINGS.sea.texture, 'an unknown pattern takes the default');
+  assert.equal(s.sea.tileSize, 800);
+  assert.equal(s.sea.waveSpeed, 0);
+  for (const p of SEA_PRESETS) assert.deepEqual(normalizeSkySettings({ sea: p.sea }).sea, p.sea, `${p.id} is already normal`);
+  assert.deepEqual(SEA_TEXTURES.map((t) => t.id), ['waves', 'ripples', 'shallows', 'flat']);
+  assert.equal(normalizeSkySettings({}).sea.texture, 'waves', 'an old save keeps the painted waves');
+});
+
+test('sea: the pattern closes round the shore at any size (a whole number of repeats)', async () => {
+  const { seaRepeatsAround } = await import('../src/game/island-route/island-sea');
+  for (const size of [800, 3000, 4321, 10000]) {
+    const n = seaRepeatsAround(66000, size);
+    assert.ok(Number.isInteger(n) && n >= 1);
+    assert.ok(Math.abs((2 * Math.PI * 66000) / n - size) / size < 0.02, 'close to the asked size');
+  }
+  assert.equal(seaRepeatsAround(66000, 3000), Math.round((2 * Math.PI * 66000) / 3000), 'the default is the old repeat count');
+});
+
+test('gradient opacity: defaults to fully opaque, clamps, and a preset keeps what the owner set', () => {
+  assert.equal(DEFAULT_SKY_SETTINGS.gradient.opacity, 1);
+  assert.equal(normalizeSkySettings({ gradient: { opacity: -1 } }).gradient.opacity, 0);
+  assert.equal(normalizeSkySettings({ gradient: {} }).gradient.opacity, 1, 'an old save stays fully opaque');
+  for (const p of GRADIENT_PRESETS) assert.equal(p.gradient.opacity, 1);
+});

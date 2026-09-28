@@ -1356,6 +1356,8 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
       zenithColor: { value: new THREE.Color(preset.zenithColor) },
       // The Sky & Clouds window's gradient (sky-settings.ts): on when gradMode is 1.
       gradMode: { value: 0 },
+      gradOpacity: { value: 1 },
+      gradHorizon: { value: new THREE.Color('#dcf1ff') },
       gradTop: { value: new THREE.Color('#2d6fd8') },
       gradMiddle: { value: new THREE.Color('#6cb4f2') },
       gradMidHeight: { value: 0.28 },
@@ -1377,6 +1379,8 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
       uniform vec3 horizonColor;
       uniform vec3 zenithColor;
       uniform float gradMode;
+      uniform float gradOpacity;
+      uniform vec3 gradHorizon;
       uniform vec3 gradTop;
       uniform vec3 gradMiddle;
       uniform float gradMidHeight;
@@ -1409,7 +1413,8 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
           float y = max(h, 0.0);
           float a = smoothstep(0.5 - gradBlend, 0.5 + gradBlend, min(1.0, y / gradMidHeight));
           float b = smoothstep(0.5 - gradBlend, 0.5 + gradBlend, clamp((y - gradMidHeight) / (1.0 - gradMidHeight), 0.0, 1.0));
-          color = mix(mix(horizonColor, gradMiddle, a), gradTop, b);
+          // Over the painting as opaque as asked (0: the painting shows through untouched).
+          color = mix(color, mix(mix(gradHorizon, gradMiddle, a), gradTop, b), gradOpacity);
         }
 
         gl_FragColor = vec4(color, 1.0);
@@ -1893,7 +1898,8 @@ export class Renderer3D {
   /** The day's fog and horizon colour: the gradient's horizon when the gradient sky is on, else the sky preset's. */
   private dayFogColor(): THREE.Color {
     const s = this.skySettings;
-    return s?.mode === 'gradient' ? new THREE.Color(s.gradient.horizon) : new THREE.Color(this.currentSkyPreset.fogColor);
+    const painted = new THREE.Color(this.currentSkyPreset.fogColor);
+    return s?.mode === 'gradient' ? painted.lerp(new THREE.Color(s.gradient.horizon), s.gradient.opacity) : painted;
   }
 
   /** The Sky & Clouds window: the gradient on the dome (or back to the painting), the fog, the clouds. */
@@ -1904,6 +1910,8 @@ export class Renderer3D {
     if (u?.gradMode) {
       const g = settings.gradient;
       u.gradMode.value = settings.mode === 'gradient' ? 1 : 0;
+      u.gradOpacity.value = g.opacity;
+      (u.gradHorizon.value as THREE.Color).set(g.horizon);
       (u.gradTop.value as THREE.Color).set(g.top);
       (u.gradMiddle.value as THREE.Color).set(g.middle);
       u.gradMidHeight.value = g.midHeight;
@@ -1911,6 +1919,7 @@ export class Renderer3D {
       (u.horizonColor.value as THREE.Color).copy(this.dayFogColor());
     }
     (this.scene.fog as THREE.Fog | null)?.color.copy(this.dayFogColor());
+    this.island?.setSea(settings.sea);
     this.clouds?.apply(settings.clouds);
   }
 

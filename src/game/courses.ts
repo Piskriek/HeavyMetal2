@@ -59,7 +59,7 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     ],
     palette: { sky: '#234b49', horizon: '#9cbd9e', distant: '#658c76', middle: '#3e6651', foreground: '#203e31', dirt: '#8b7651', dirtLight: '#a28b61', bank: '#544732', soil: '#2f4432', shoulder: '#526343', chalk: '#d9cc9e', grass: '#657449', accent: '#d8a15e', haze: '#789878' },
     lighting: {
-      skyboxUrl: '/art/tracks/sky_copperwood_ridge.png',
+      skyboxUrl: '/art/tracks/sky_copperwood_ridge.jpg',
       fogColor: '#b8a77a',
       ambientLight: '#6b5f3f',
       sunbeamIntensity: 0.45,
@@ -85,7 +85,7 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     ],
     palette: { sky: '#655142', horizon: '#d8b884', distant: '#aa8661', middle: '#805c41', foreground: '#4a382b', dirt: '#a57c57', dirtLight: '#b99065', bank: '#72503c', soil: '#624a36', shoulder: '#84704b', chalk: '#e2cda0', grass: '#837b49', accent: '#e7aa56', haze: '#ad8861' },
     lighting: {
-      skyboxUrl: '/art/tracks/sky_boomtown_quarry.png',
+      skyboxUrl: '/art/tracks/sky_boomtown_quarry.jpg',
       fogColor: '#c98855',
       ambientLight: '#4a2e1e',
       sunbeamIntensity: 0.55,
@@ -111,7 +111,7 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     ],
     palette: { sky: '#42656b', horizon: '#c3d6ad', distant: '#87a993', middle: '#5c8661', foreground: '#355237', dirt: '#a79b70', dirtLight: '#b9ac80', bank: '#71674b', soil: '#4a6940', shoulder: '#6c8249', chalk: '#eee0ba', grass: '#91a359', accent: '#b9ca78', haze: '#a5be99' },
     lighting: {
-      skyboxUrl: '/art/tracks/sky_woolly_wasteland.png',
+      skyboxUrl: '/art/tracks/sky_woolly_wasteland.jpg',
       fogColor: '#9eb0a8',
       ambientLight: '#5b7282',
       sunbeamIntensity: 0.35,
@@ -132,7 +132,7 @@ export const TRACKS: Record<CourseId, CourseDefinition> = {
     ],
     palette: { sky: '#6f8b94', horizon: '#b9c7c4', distant: '#7d9290', middle: '#5b5249', foreground: '#2f2a27', dirt: '#a07a4a', dirtLight: '#b68d58', bank: '#4a3f36', soil: '#3b332d', shoulder: '#6e5a42', chalk: '#e6d3a8', grass: '#8c7a4a', accent: '#e3a24f', haze: '#a9bcbd' },
     lighting: {
-      skyboxUrl: '/art/tracks/sky_copperwood_misty_dawn.png',
+      skyboxUrl: '/art/tracks/sky_copperwood_misty_dawn.jpg',
       fogColor: '#aebfbf',
       ambientLight: '#5d6566',
       sunbeamIntensity: 0.4,

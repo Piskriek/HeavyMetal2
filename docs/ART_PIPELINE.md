@@ -521,3 +521,36 @@ Contact sheets: `docs/art-rounds/necks-1.png` (five necks × angular + cross-hea
 | headgear-jewel-crown | 512×402 | [0.5, 0.88] | crown |
 | headgear-valve-cap | 451×512 | [0.5, 0.85] | crown |
 | headgear-oil-beret | 512×331 | [0.5, 0.75] | brow-line |
+
+### 11.4 Round 3 — iron grins and greasy hair (2026-09-28)
+
+Nine pieces: five mouth-anchored grins and four hair pieces (prompts
+`art-src/avatar-parts/prompts/{mouth,hair}-*.txt`). First-pass Subjects that named a "goblin
+mouth/hairdo" drew full heads, so the prompts all carry the part-only guard ("draw ONLY the …,
+NO head, NO face"); the re-rolled raws key 9/9 PASS, residual ≤ 33 px (`hair-stud-buzz`'s chrome
+studs catch magenta bleed worse than cloth does).
+
+Registration: mouths pin their bite/teeth line to the `mouth` anchor with measured off-centre
+pivots for the blowtorch (bite at 0.39) and spanner (bite at 0.56). Pigtails use the long-braids
+recipe (scalp anchor, full head width); the copper ponytail pins its cinch coil to `scalp`; the
+rivet fringe rides `brow-line` like the oil beret; the stud buzz is a scalp ridge. The new hair
+indices (12–15) joined every headgear `hidesHair` list by coverage: brow-anchored full-cover hats
+hide ponytail+fringe+buzz, crown-riders (top hat, smokestack) hide ponytail+buzz, the open crowns
+hide only the ponytail, and the pigtails stay visible everywhere like the long braids. Mouth masks
+tint lips to skin and tools to metal where detected; hair stays untinted. Hair catalog is now
+exactly full (16/16); mouth 17/20 — both inside DNA v4.
+
+Contact sheets: `docs/art-rounds/mouths-1.png` and `docs/art-rounds/hair-1.png` (each piece on all
+three head shapes).
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| mouth-rivet-gnashers | 510×218 | [0.50, 0.46] | mouth |
+| mouth-beartrap-jaw | 512×267 | [0.50, 0.45] | mouth |
+| mouth-blowtorch-grin | 509×291 | [0.39, 0.47] | mouth |
+| mouth-zipper-lips | 512×308 | [0.47, 0.45] | mouth |
+| mouth-clamped-spanner | 510×224 | [0.56, 0.46] | mouth |
+| hair-greasy-pigtails | 510×445 | [0.51, 0.06] | scalp |
+| hair-copper-ponytail | 511×366 | [0.33, 0.93] | scalp |
+| hair-rivet-fringe | 511×221 | [0.50, 0.78] | brow-line |
+| hair-stud-buzz | 511×271 | [0.50, 0.97] | scalp |

@@ -42,6 +42,22 @@ history; this file is for what a player or a reviewer can see.
 - 9/9 key-art QA pass, residual ≤ 4 px; contact sheets `docs/art-rounds/necks-1.png` and
   `docs/art-rounds/crowns-1.png`. Neck catalog 18/20, headgear 19/24 — still inside DNA v4.
 
+### Round 3: iron grins and greasy hair (avatar art)
+
+- Five mouths join the tray: rivet gnashers (bolted iron tooth plates), a cast-iron bear-trap
+  jaw, a blowtorch grin with its little blue flame, zipper lips with a dangling pull tab, and a
+  spanner clamped hard in the teeth (registered at the measured bite, off-centre like the pipe).
+- Four hair pieces: greasy copper-wired pigtails that hang past the jaw, a swept-back ponytail
+  cinched in copper wire, a rivet-studded beetle fringe on the brow line, and a stud-traced buzz
+  ridge. Every hat's hide-hair list learned the four new cuts, so nothing clips through a helmet.
+- Hair catalog full (16/16), mouth 17/20 — DNA v4 untouched. 9/9 key-art QA pass after the
+  part-only prompt re-roll; contact sheets `docs/art-rounds/mouths-1.png` and
+  `docs/art-rounds/hair-1.png`.
+- public/ size-budget rescue (it was 28 MB over since before this round): the six legacy 4K track
+  skies superseded by the CC0 island set moved to `art-src/unreferenced/`, five concept-art JPGs
+  joined them, and the four live course skyboxes became q90 JPEGs (`courses.ts` updated) — public/
+  is 587 MB with 13 MB of headroom, and M2 is green again.
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

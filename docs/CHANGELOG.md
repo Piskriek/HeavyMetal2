@@ -19,6 +19,16 @@ history; this file is for what a player or a reviewer can see.
   creator-UI renders). Three further wardrobe prompts (champion cape, scavenger poncho, captain
   coat) are written and queued for Round 1b.
 
+### Round 1b: champion cape, scavenger poncho, captain coat
+
+- Three more pickable bodies, completing the first wardrobe drop: a golden championship cape with
+  laurel brooch (the gold follows the leather swatch, so a team's cape matches its kart trim), a
+  ragged scrap poncho, and a crimson race-captain frock coat (the crimson follows the racing
+  accent — the captain parades in team colours).
+- Same recipe, same registration law, 3/3 key-art QA zero-residual; contact sheet
+  `docs/art-rounds/bodies-1b.png` per head shape. The body catalog holds ten wardrobes (of the v4
+  budget of sixteen).
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

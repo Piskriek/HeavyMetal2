@@ -34,7 +34,7 @@ export const AVATAR_CATALOG: Readonly<Record<AvatarLayerId, readonly string[]>> 
   warpaint: ['none', 'mud-stripes', 'red-handprint', 'cog-tattoo', 'soot-smudges', 'painted:warpaint-tribal-stripes', 'painted:warpaint-bone-skull'],
   // The bust the head sits on. Structural while there is exactly one: DNA v1–v3 know nothing about
   // bodies and decode with body 0; DNA v4 encodes it (V4_CAPACITY room for 16). APPEND-ONLY.
-  body: ['painted:body-racer-bust', 'painted:body-mechanic-overalls', 'painted:body-pilot-bomber', 'painted:body-junkknight-plate', 'painted:body-warlord-pauldron', 'painted:body-pit-crew-vest', 'painted:body-engineer-apron'],
+  body: ['painted:body-racer-bust', 'painted:body-mechanic-overalls', 'painted:body-pilot-bomber', 'painted:body-junkknight-plate', 'painted:body-warlord-pauldron', 'painted:body-pit-crew-vest', 'painted:body-engineer-apron', 'painted:body-champion-cape', 'painted:body-scavenger-poncho', 'painted:body-captain-coat'],
 };
 
 export const SKIN_TONES: readonly { id: SkinToneId; name: string; base: string; shade: string; light: string }[] = [

@@ -476,3 +476,19 @@ metal (the whistle). Contact sheet `docs/art-rounds/bodies-1.png`.
 | body-warlord-pauldron | 512×275 | 251,2,250 | 0 | [0.486, 0.269] |
 | body-pit-crew-vest | 512×256 | 249,3,249 | 1 | [0.506, 0.289] |
 | body-engineer-apron | 512×302 | 251,2,250 | 0 | [0.496, 0.245] |
+
+### 11.2 Round 1b — cape, poncho, captain coat (2026-09-28)
+
+Three more busts on the headless-stump recipe (prompts `art-src/avatar-parts/prompts/body-*.txt`;
+raws 1536×1024). Keying 3/3 PASS, residual 0 px. Pivots measured off the keyed PNGs as before.
+Mask channels: champion cape skin/leather/metal (the gold follows the leather swatch — a team's
+cape matches its kart trim), scavenger poncho skin/leather, captain coat
+skin/leather/metal/**accent** (the crimson frock follows the racing accent by design, so the
+captain parades in team colours). Contact sheet `docs/art-rounds/bodies-1b.png` (each body on all
+three head shapes).
+
+| part | trim | pivot | masks |
+|---|---|---|---|
+| body-champion-cape | 512×272 | [0.494, 0.268] | skin, leather, metal |
+| body-scavenger-poncho | 512×249 | [0.500, 0.293] | skin, leather |
+| body-captain-coat | 512×258 | [0.496, 0.326] | skin, leather, metal, accent |

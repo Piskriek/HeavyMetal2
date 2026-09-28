@@ -1,14 +1,22 @@
 /**
  * Inspector for the island terrain (click the terrain in Primitives or Custom 3D): its tint and
- * brightness, the grain and tiny pebbles seen up close, and the dirt brush that paints light, compacted,
- * cracked dirt with a scatter of pebbles over the terrain texture.
+ * brightness, the grain and tiny pebbles seen up close, the surface brush (the island's cracked dirt or
+ * any tile from the shared surface atlas: asphalt, cobbles, gravel, grass...) and auto paint for the
+ * island road, which dresses the whole route in one click and is drawn by the terrain itself.
  */
-import { useState } from 'react';
-import { Eraser, Mountain, Paintbrush, RotateCcw, Sun, Trash2, Undo2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Eraser, Mountain, Paintbrush, Route, RotateCcw, Sun, Trash2, Undo2, X } from 'lucide-react';
 import type { TrackBuilder3D } from '../../game/track-builder-3d';
 import { DEFAULT_ISLAND_GROUND, type IslandGroundSettings } from '../../game/island-route/island-ground';
+import { SURFACE_CRACKED, SURFACE_DIRT, SURFACE_TABLE } from '../../game/surface/surface-table';
+import { AutoPaintPanel } from '../AutoPaintPanel';
 
-export interface GroundBrush { on: boolean; erase: boolean; radius: number; strength: number }
+export interface GroundBrush { on: boolean; erase: boolean; radius: number; strength: number; surface: number }
+
+/** What the island brush offers: its own cracked dirt first, then every atlas surface (0 is the bare island). */
+/** Palette labels short enough for a swatch. */
+const SHORT_NAMES: Record<number, string> = { 2: 'Cobbles', 3: 'Planks', 4: 'Iron', 5: 'Gravel', 7: 'Cliff', 8: 'Cave', 10: 'Dirt' };
+const ISLAND_SURFACES = [SURFACE_CRACKED, ...SURFACE_TABLE.map((d) => d.id).filter((id) => id !== SURFACE_DIRT && id !== SURFACE_CRACKED)];
 
 interface Props {
   builder: TrackBuilder3D;
@@ -28,6 +36,13 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function IslandGroundPanel({ builder, brush, onBrush, onClose, onRequestRender, onBakeSun, baking }: Props) {
   const [sunRes, setSunRes] = useState(1024);
   const ground = builder.getIslandGround();
+  // Swatches cut from the atlas the terrain samples, so the button shows exactly what paints.
+  const atlasDone = ground?.atlas?.complete ?? false;
+  const thumbs = useMemo(() => {
+    const out: Record<number, string> = {};
+    if (ground?.atlas && atlasDone) for (const id of ISLAND_SURFACES) out[id] = ground.atlas.thumbnail(id);
+    return out;
+  }, [ground, atlasDone]);
   if (!ground) {
     return <p className="text-[11px] text-zinc-400">The island model is still loading.</p>;
   }
@@ -87,11 +102,26 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
       </section>
 
       <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
-        <div className="text-[11px] font-bold text-amber-300">Painted dirt</div>
+        <div className="text-[11px] font-bold text-amber-300">Paint</div>
+        <div className="grid grid-cols-5 gap-1" role="radiogroup" aria-label="Surface to paint">
+          {ISLAND_SURFACES.map((id) => {
+            const def = SURFACE_TABLE[id];
+            const picked = brush.surface === id;
+            return (
+              <button key={id} role="radio" aria-checked={picked} title={def.name}
+                onClick={() => onBrush({ ...brush, surface: id, on: true, erase: false })}
+                className={`flex cursor-pointer flex-col items-center gap-0.5 rounded border p-0.5 text-[9px] leading-tight ${picked ? 'border-amber-400 bg-amber-950/40 text-amber-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
+                <span className="block h-7 w-full rounded-sm bg-cover bg-center"
+                  style={{ backgroundColor: id === SURFACE_CRACKED ? s.sandColor : def.swatch, backgroundImage: id !== SURFACE_CRACKED && thumbs[id] ? `url(${thumbs[id]})` : undefined }} />
+                <span className="w-full truncate text-center">{SHORT_NAMES[id] ?? def.name}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="grid grid-cols-2 gap-1">
           <button onClick={() => onBrush({ ...brush, on: !(brush.on && !brush.erase), erase: false })}
             className={`flex cursor-pointer items-center justify-center gap-1 rounded border py-1 text-[11px] ${brush.on && !brush.erase ? 'border-amber-400 bg-amber-950/40 text-amber-200' : 'border-zinc-700 text-zinc-300'}`}>
-            <Paintbrush size={12} />Paint dirt
+            <Paintbrush size={12} />Paint
           </button>
           <button onClick={() => onBrush({ ...brush, on: !(brush.on && brush.erase), erase: true })}
             className={`flex cursor-pointer items-center justify-center gap-1 rounded border py-1 text-[11px] ${brush.on && brush.erase ? 'border-red-400 bg-red-950/40 text-red-200' : 'border-zinc-700 text-zinc-300'}`}>
@@ -104,24 +134,33 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
         <Row label={`Flow ${pct(brush.strength)}`}>
           <input type="range" min={0.05} max={1} step={0.05} value={brush.strength} onChange={(e) => onBrush({ ...brush, strength: Number(e.target.value) })} className="accent-amber-500" />
         </Row>
-        <Row label="Dirt colour"><input type="color" value={s.sandColor} onChange={(e) => set({ sandColor: e.target.value })} className="h-6 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" /></Row>
-        {slider('Scale', 'sandScale', 0.25, 4, 0.05, (v) => `${v.toFixed(2)}x`)}
-        {slider('Cover', 'sandStrength', 0, 1, 0.01, pct)}
-        {slider('Pebbles', 'sandPebbles', 0, 1, 0.01, pct)}
-        {slider('Cracks', 'sandPits', 0, 1, 0.01, pct)}
+        {brush.surface === SURFACE_CRACKED && <>
+          <Row label="Dirt colour"><input type="color" value={s.sandColor} onChange={(e) => set({ sandColor: e.target.value })} className="h-6 w-full cursor-pointer rounded border border-zinc-700 bg-transparent" /></Row>
+          {slider('Scale', 'sandScale', 0.25, 4, 0.05, (v) => `${v.toFixed(2)}x`)}
+          {slider('Cover', 'sandStrength', 0, 1, 0.01, pct)}
+          {slider('Pebbles', 'sandPebbles', 0, 1, 0.01, pct)}
+          {slider('Cracks', 'sandPits', 0, 1, 0.01, pct)}
+        </>}
         <div className="grid grid-cols-2 gap-1">
           <button disabled={!builder.canUndoGroundStroke()} onClick={() => { builder.undoGroundStroke(); onRequestRender?.(); }}
             className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-zinc-500 disabled:cursor-default disabled:opacity-40">
             <Undo2 size={12} />Undo stroke
           </button>
-          <button onClick={() => { if (window.confirm('Remove all painted dirt from this island track?')) { builder.clearGroundPaint(); onRequestRender?.(); } }}
+          <button onClick={() => { if (window.confirm('Remove all brush paint from this island track? Undo stroke brings it back.')) { builder.clearGroundPaint(); onRequestRender?.(); } }}
             className="flex cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-red-500">
             <Trash2 size={12} />Clear paint
           </button>
         </div>
         <p className="text-[10px] leading-snug text-zinc-500">
-          {brush.on ? 'Left-drag on the terrain to paint; right-drag still moves the camera. Ctrl+Z undoes the last stroke.' : 'Pick Paint dirt, then left-drag on the terrain.'}
+          {brush.on ? 'Left-drag on the terrain to paint; right-drag still moves the camera. Ctrl+Z undoes the last stroke.' : 'Pick a surface, then left-drag on the terrain.'}
         </p>
+      </section>
+
+      <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Route size={12} />Road auto paint</div>
+        <p className="text-[10px] leading-snug text-zinc-500">Dresses the island road along the route: a preset in one click, or one rule at a time. Paint lands only on ground the road runs on, never under a bridge.</p>
+        <AutoPaintPanel auto={ground.autoPaint} locate={() => builder.islandRoadNearCamera()} onPainted={onRequestRender}
+          surfaces={ISLAND_SURFACES} />
       </section>
 
       <button onClick={() => set({ ...DEFAULT_ISLAND_GROUND, sandColor: s.sandColor })}

@@ -11,6 +11,7 @@ import { ISLAND_BASE_Y, ISLAND_MODEL_FLOOR, ISLAND_ROUTE_GRAPH, ISLAND_SCALE, MO
 import { islandBranchSpace } from './island-space';
 import { buildHeightField, type HeightField } from './model-heightfield';
 import { IslandGround, loadGround } from './island-ground';
+import type { SurfaceSources } from '../surface/surface-atlas';
 import { readIslandTracks } from './island-props-storage';
 import { buildIslandSea, shoreRadiusOf } from './island-sea';
 
@@ -196,15 +197,15 @@ function buildSkyDome(horizon: THREE.Color, zenith: THREE.Color): THREE.Mesh {
 }
 
 /** Loads the owner's model, scaled and lifted onto the sand base, into `group`; hands back its height map. */
-function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void, hiRes: boolean): { ready: Promise<void>; ground: IslandGround } {
+function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void, hiRes: boolean, surfaces?: SurfaceSources): { ready: Promise<void>; ground: IslandGround } {
   const texture = new THREE.TextureLoader().load(hiRes ? ISLAND_TEXTURE_8K_URL : ISLAND_TEXTURE_URL);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
   const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95, metalness: 0 });
   // The ground shader: grain and tiny pebbles up close (never repeating), and the painted sand.
-  const ground = new IslandGround(material);
+  const ground = new IslandGround(material, surfaces);
   void loadGround(ground, readIslandTracks().active);
-  const ready = new OBJLoader().loadAsync(ISLAND_MODEL_URL).then((model) => {
+  const model = new OBJLoader().loadAsync(ISLAND_MODEL_URL).then((model) => {
     model.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
@@ -214,8 +215,13 @@ function loadIsland(group: THREE.Group, onGround: (ground: HeightField) => void,
     prepareIslandModel(model);
     model.name = 'Serpentine Isle';
     group.add(model);
-    onGround(islandHeightField(model));
+    const heights = islandHeightField(model);
+    onGround(heights);
+    // Road auto paint is laid on the terrain only where the road runs on it (never under a bridge).
+    ground.setHeightField((x, z) => heights.heightAt(x, z));
   });
+  // The loading bar also waits for the surface tiles, so painted ground never pops in magenta.
+  const ready = Promise.all([model, ground.whenReady()]).then(() => undefined);
   return { ready, ground };
 }
 
@@ -254,12 +260,13 @@ export function buildClosedGates(layout: RouteLayout | null, M: Pick<IslandMater
 }
 
 /** `hiRes`: use the 8K terrain texture (the Quality setting, on a card that takes 8K textures). */
-export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean } = {}): IslandWorld {
+/** `surfaces`: the textures the painted surfaces are cut from (the renderer's own tiles). */
+export function buildIslandWorld(M: IslandMaterials, opts: { hiRes?: boolean; surfaces?: SurfaceSources } = {}): IslandWorld {
   const group = new THREE.Group();
   group.name = 'Island course';
 
   let ground: HeightField | null = null;
-  const island = loadIsland(group, (g) => { ground = g; }, opts.hiRes === true);
+  const island = loadIsland(group, (g) => { ground = g; }, opts.hiRes === true, opts.surfaces);
   const ready = island.ready;
   group.add(buildBeach());
 

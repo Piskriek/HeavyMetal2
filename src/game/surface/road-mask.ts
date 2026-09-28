@@ -37,6 +37,12 @@ export interface RoadMaskDoc {
   readonly length: number;
   readonly hash: string;
   readonly rle: string;
+  /**
+   * Auto-paint pass records (see `auto-paint.ts`): which rule made this paint, with what numbers, over
+   * which span. The mask is still the thing that renders; this is what makes the paint re-runnable.
+   * Unknown to the v2 track document, so it round-trips without a schema change.
+   */
+  readonly jobs?: readonly Record<string, unknown>[];
 }
 
 export class RoadMask {
@@ -59,6 +65,12 @@ export class RoadMask {
     }
     this.shoulderColumns = new Set([0, across - 1]);
   }
+
+  /**
+   * Auto-paint pass records that produced (or could re-produce) this mask. Owned by `AutoPaint`,
+   * stored here so it rides through the save, and never interpreted by the mask itself.
+   */
+  jobs: Record<string, unknown>[] = [];
 
   // ---------------------------------------------------------------------------
   // Coordinates
@@ -157,6 +169,7 @@ export class RoadMask {
       version: ROAD_MASK_DOC_VERSION, kind: 'road', courseId,
       across: this.across, step: this.step, length: this.length,
       hash: this.mask.hash(), rle: this.mask.encode(),
+      ...(this.jobs.length ? { jobs: this.jobs.slice() } : {}),
     };
   }
 
@@ -174,7 +187,10 @@ export class RoadMask {
     try {
       const mask = SurfaceMask.decode(d.across, rows, d.rle);
       if (typeof d.hash === 'string' && d.hash !== mask.hash()) return null;
-      return new RoadMask(d.length, d.across, d.step, mask);
+      const road = new RoadMask(d.length, d.across, d.step, mask);
+      // Carry the auto-paint records through, tolerating anything that is not a record we understand.
+      if (Array.isArray(d.jobs)) road.jobs = d.jobs.filter((j): j is Record<string, unknown> => !!j && typeof j === 'object').slice();
+      return road;
     } catch {
       return null;
     }

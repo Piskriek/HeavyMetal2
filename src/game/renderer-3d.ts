@@ -1769,7 +1769,10 @@ export class Renderer3D {
       // ISLAND-ROUTE: the island course is its own world: the owner's model on a sand base, the sea and a haze sky.
       // The 8K terrain texture on the Quality setting, when the card takes 8K textures (~340 MB on the GPU).
       const hiRes = readOptions().graphics === 'quality' && this.renderer.capabilities.maxTextureSize >= 8192;
-      this.island = buildIslandWorld(this.materials, { hiRes });
+      const M = this.materials;
+      this.island = buildIslandWorld(M, { hiRes, surfaces: {
+        dirt: M.dirt.map, cobble: M.cobble.map, wood: M.wood.map, iron: M.iron.map, grass: M.grass.map, cliff: M.cliff.map, cave: M.cave.map,
+      } });
       this.scene.add(this.island.group);
       // The chosen skybox (the Sky menu) over the island, its fog in that sky's colour; the island's own
       // plain haze dome stays hidden behind it.

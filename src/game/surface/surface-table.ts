@@ -16,7 +16,7 @@
 /** How a surface gets its pixels: a painted tile the renderer already loads, or a tile generated once on a canvas. */
 export type SurfaceSource =
   | { readonly kind: 'texture'; readonly texKey: 'dirt' | 'cobble' | 'wood' | 'iron' | 'grass' | 'cliff' | 'cave' }
-  | { readonly kind: 'procedural'; readonly generator: 'asphalt' | 'gravel' | 'concrete' };
+  | { readonly kind: 'procedural'; readonly generator: 'asphalt' | 'gravel' | 'concrete' | 'cracked' };
 
 export interface SurfaceDefinition {
   readonly id: number;
@@ -34,6 +34,8 @@ export interface SurfaceDefinition {
   readonly dustFX: number;
   /** Which tyre loop the audio picks. */
   readonly tireSound: 'dirt' | 'tarmac' | 'gravel' | 'plank' | 'metal' | 'grass' | 'rock';
+  /** A flat colour for palettes and swatches (the tile itself is in the atlas). */
+  readonly swatch: string;
 }
 
 export const SURFACE_DIRT = 0;
@@ -46,21 +48,28 @@ export const SURFACE_GRASS = 6;
 export const SURFACE_ROCK = 7;
 export const SURFACE_CAVEROCK = 8;
 export const SURFACE_CONCRETE = 9;
+/**
+ * The island's own light, compacted, cracked dirt (the old "painted dirt" brush). On the island ground its
+ * pixels come from the ground shader's procedural dirt, tuned in the Island panel; elsewhere the atlas
+ * holds a plain stand-in tile.
+ */
+export const SURFACE_CRACKED = 10;
 
 /** Slots the atlas/shader currently supports; the mask format itself allows 256. */
 export const SURFACE_SLOTS = 16;
 
 export const SURFACE_TABLE: readonly SurfaceDefinition[] = Object.freeze([
-  { id: SURFACE_DIRT, name: 'Dirt (base road)', source: { kind: 'texture', texKey: 'dirt' }, roughness: 0.95, wetResponse: 0.6, grip: 1, rollingResistance: 1, dustFX: 1, tireSound: 'dirt' },
-  { id: SURFACE_ASPHALT, name: 'Asphalt', source: { kind: 'procedural', generator: 'asphalt' }, roughness: 0.72, wetResponse: 1, grip: 1.18, rollingResistance: 0.55, dustFX: 0.1, tireSound: 'tarmac' },
-  { id: SURFACE_COBBLE, name: 'Cobblestone', source: { kind: 'texture', texKey: 'cobble' }, roughness: 0.85, wetResponse: 0.9, grip: 1.05, rollingResistance: 0.85, dustFX: 0.25, tireSound: 'rock' },
-  { id: SURFACE_PLANK, name: 'Timber planks', source: { kind: 'texture', texKey: 'wood' }, roughness: 0.8, wetResponse: 0.8, grip: 0.92, rollingResistance: 0.7, dustFX: 0.05, tireSound: 'plank' },
-  { id: SURFACE_IRON, name: 'Iron plate', source: { kind: 'texture', texKey: 'iron' }, roughness: 0.55, wetResponse: 1, grip: 0.85, rollingResistance: 0.5, dustFX: 0, tireSound: 'metal' },
-  { id: SURFACE_GRAVEL, name: 'Gravel (shoulder)', source: { kind: 'procedural', generator: 'gravel' }, roughness: 0.98, wetResponse: 0.4, grip: 0.82, rollingResistance: 1.45, dustFX: 1, tireSound: 'gravel' },
-  { id: SURFACE_GRASS, name: 'Grass', source: { kind: 'texture', texKey: 'grass' }, roughness: 0.97, wetResponse: 0.5, grip: 0.7, rollingResistance: 1.8, dustFX: 0.3, tireSound: 'grass' },
-  { id: SURFACE_ROCK, name: 'Cliff rock', source: { kind: 'texture', texKey: 'cliff' }, roughness: 0.92, wetResponse: 0.7, grip: 0.95, rollingResistance: 1.1, dustFX: 0.4, tireSound: 'rock' },
-  { id: SURFACE_CAVEROCK, name: 'Cave rock', source: { kind: 'texture', texKey: 'cave' }, roughness: 0.9, wetResponse: 0.7, grip: 0.9, rollingResistance: 1.15, dustFX: 0.5, tireSound: 'rock' },
-  { id: SURFACE_CONCRETE, name: 'Concrete', source: { kind: 'procedural', generator: 'concrete' }, roughness: 0.78, wetResponse: 0.9, grip: 1.1, rollingResistance: 0.6, dustFX: 0.15, tireSound: 'tarmac' },
+  { id: SURFACE_DIRT, name: 'Dirt (base road)', source: { kind: 'texture', texKey: 'dirt' }, roughness: 0.95, wetResponse: 0.6, grip: 1, rollingResistance: 1, dustFX: 1, tireSound: 'dirt', swatch: '#6f5436' },
+  { id: SURFACE_ASPHALT, name: 'Asphalt', source: { kind: 'procedural', generator: 'asphalt' }, roughness: 0.72, wetResponse: 1, grip: 1.18, rollingResistance: 0.55, dustFX: 0.1, tireSound: 'tarmac', swatch: '#34353a' },
+  { id: SURFACE_COBBLE, name: 'Cobblestone', source: { kind: 'texture', texKey: 'cobble' }, roughness: 0.85, wetResponse: 0.9, grip: 1.05, rollingResistance: 0.85, dustFX: 0.25, tireSound: 'rock', swatch: '#7a7167' },
+  { id: SURFACE_PLANK, name: 'Timber planks', source: { kind: 'texture', texKey: 'wood' }, roughness: 0.8, wetResponse: 0.8, grip: 0.92, rollingResistance: 0.7, dustFX: 0.05, tireSound: 'plank', swatch: '#7a4f2c' },
+  { id: SURFACE_IRON, name: 'Iron plate', source: { kind: 'texture', texKey: 'iron' }, roughness: 0.55, wetResponse: 1, grip: 0.85, rollingResistance: 0.5, dustFX: 0, tireSound: 'metal', swatch: '#6b6357' },
+  { id: SURFACE_GRAVEL, name: 'Gravel (shoulder)', source: { kind: 'procedural', generator: 'gravel' }, roughness: 0.98, wetResponse: 0.4, grip: 0.82, rollingResistance: 1.45, dustFX: 1, tireSound: 'gravel', swatch: '#8b8172' },
+  { id: SURFACE_GRASS, name: 'Grass', source: { kind: 'texture', texKey: 'grass' }, roughness: 0.97, wetResponse: 0.5, grip: 0.7, rollingResistance: 1.8, dustFX: 0.3, tireSound: 'grass', swatch: '#4d7a33' },
+  { id: SURFACE_ROCK, name: 'Cliff rock', source: { kind: 'texture', texKey: 'cliff' }, roughness: 0.92, wetResponse: 0.7, grip: 0.95, rollingResistance: 1.1, dustFX: 0.4, tireSound: 'rock', swatch: '#6d6a66' },
+  { id: SURFACE_CAVEROCK, name: 'Cave rock', source: { kind: 'texture', texKey: 'cave' }, roughness: 0.9, wetResponse: 0.7, grip: 0.9, rollingResistance: 1.15, dustFX: 0.5, tireSound: 'rock', swatch: '#4f4a44' },
+  { id: SURFACE_CONCRETE, name: 'Concrete', source: { kind: 'procedural', generator: 'concrete' }, roughness: 0.78, wetResponse: 0.9, grip: 1.1, rollingResistance: 0.6, dustFX: 0.15, tireSound: 'tarmac', swatch: '#9c9a93' },
+  { id: SURFACE_CRACKED, name: 'Cracked dirt', source: { kind: 'procedural', generator: 'cracked' }, roughness: 0.96, wetResponse: 0.6, grip: 0.95, rollingResistance: 1.1, dustFX: 0.9, tireSound: 'dirt', swatch: '#c8b99c' },
 ]);
 
 /** The table row for an ID; unknown IDs fall back to the base road so a corrupt mask can never crash physics. */

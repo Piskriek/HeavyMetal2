@@ -48,6 +48,8 @@ export class SurfacePaintTool {
   private lastHit: { u: number; s: number; halfWidth: number } | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private markingIndex = 0;
+  /** What the last auto-paint pass did, shown in the hint so a key press is never a silent mystery. */
+  private lastAuto = '';
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
   private readonly ring: THREE.Mesh;
@@ -199,11 +201,31 @@ export class SurfacePaintTool {
       case 'x': case 'X':
         if (typeof confirm !== 'function' || confirm('Clear every painted surface on this course?')) this.recordWhole(() => this.paint.mask.clear());
         break;
+      // AutoPaint: the easy passes, on the same one-key logic as everything else here.
+      case 'a': case 'A': this.autoRun('carriageway'); break;
+      case 't': case 'T': this.autoRun('stage-theme'); break;
+      case 'r': case 'R': this.autoRun('shoulders'); break;
+      case 'q': case 'Q': if (this.paint.auto.undo()) { this.scheduleSave(); this.refreshHint(); } break;
+      // Road lines are off by default; L lets the auto passes (presets, stage theme) add them.
+      case 'l': case 'L': this.paint.auto.lines = !this.paint.auto.lines; this.lastAuto = `Road lines ${this.paint.auto.lines ? 'on' : 'off'} for auto passes`; break;
       default: return;
     }
     event.preventDefault();
     this.refreshHint();
   };
+
+  /**
+   * One auto pass over the whole road with the currently selected surface (the stage-theme pass ignores
+   * `surface`, having its own table), then the same autosave a hand stroke gets. Rules take no other
+   * parameters by default, so a key press always does something predictable.
+   */
+  private autoRun(rule: string) {
+    const name = rule === 'stage-theme' ? 'stage theme' : rule;
+    const label = rule === 'stage-theme' ? 'Auto: stage theme' : `Auto: ${name} (${surfaceDefinition(this.brush.surface).name})`;
+    const result = this.paint.auto.run(rule, rule === 'stage-theme' ? {} : { surface: this.brush.surface }, {}, { label });
+    this.lastAuto = result.rows > 0 ? `${label}: ${result.changed.toLocaleString()} texels` : `${label}: nothing to change here`;
+    this.scheduleSave();
+  }
 
   private readonly onKeyUp = (event: KeyboardEvent) => {
     if (event.key === 'Shift') this.overrideShoulders = false;
@@ -248,6 +270,9 @@ export class SurfacePaintTool {
       `radius ${Math.round(this.brush.radius)}  opacity ${this.brush.opacity.toFixed(2)}  hardness ${this.brush.hardness.toFixed(1)}\n` +
       `0-9 surface · [ ] radius · - = opacity · , . hardness\n` +
       `Shift: paint shoulders · M markings · G gravel shoulders\n` +
-      `Z undo · S save · X clear · P hide\n\n${palette}`;
+      `A carriageway · T stage theme · R shoulders · Q undo auto · L road lines\n` +
+      `Z undo · S save · X clear · P hide\n` +
+      (this.lastAuto ? `\n${this.lastAuto}\n` : '') +
+      `\n${palette}`;
   }
 }

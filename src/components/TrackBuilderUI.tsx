@@ -20,6 +20,7 @@ import FloatingWindow from './builder/FloatingWindow';
 import { DecorPanel } from './DecorPanel';
 import { SculptPanel } from './SculptPanel';
 import IslandGroundPanel, { type GroundBrush } from './builder/IslandGroundPanel';
+import { SURFACE_CRACKED } from '../game/surface/surface-table';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import CustomModelsTab from './builder/CustomModelsTab';
@@ -256,7 +257,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const laneDragReason = useRef<string | null>(null);
   /** The island ground panel (click the terrain in Primitives or Custom 3D) and its sand brush. */
   const [groundOpen, setGroundOpen] = useState(false);
-  const [groundBrush, setGroundBrush] = useState<GroundBrush>({ on: false, erase: false, radius: 800, strength: 0.5 });
+  const [groundBrush, setGroundBrush] = useState<GroundBrush>({ on: false, erase: false, radius: 800, strength: 0.5, surface: SURFACE_CRACKED });
   const groundBrushRef = useRef(groundBrush);
   groundBrushRef.current = groundBrush;
   const groundStroke = useRef<{ x: number; z: number } | null>(null);
@@ -423,7 +424,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           if (point) {
             const brush = groundBrushRef.current;
             builder.beginGroundStroke();
-            builder.paintGround(point, brush.radius, brush.strength, brush.erase);
+            builder.paintGround(point, brush.radius, brush.strength, brush.erase, brush.surface);
             groundStroke.current = { x: point.x, z: point.z };
             onRequestRender?.();
           }
@@ -531,7 +532,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           const n = Math.floor(d / step);
           for (let i = 1; i <= n; i++) {
             const t = (i * step) / d;
-            builder.paintGround({ x: last.x + (point.x - last.x) * t, z: last.z + (point.z - last.z) * t }, brush.radius, brush.strength, brush.erase);
+            builder.paintGround({ x: last.x + (point.x - last.x) * t, z: last.z + (point.z - last.z) * t }, brush.radius, brush.strength, brush.erase, brush.surface);
           }
           if (n > 0) groundStroke.current = { x: last.x + (point.x - last.x) * (n * step) / d, z: last.z + (point.z - last.z) * (n * step) / d };
         }
@@ -1460,12 +1461,12 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
     }
   };
 
-  /** Selects the island: its attribute window (terrain, painted dirt, sun shadows). */
+  /** Selects the island: its attribute window (terrain, surface paint, road auto paint, sun shadows). */
   const openIslandGround = () => {
     if (!builder.getIslandGround()) { showToast('The island model is still loading'); return; }
     builder.setIslandGroundOpen(true);
     setGroundOpen(true);
-    showToast('Island: terrain, painted dirt and sun shadows');
+    showToast('Island: terrain, paint and sun shadows');
     onRequestRender?.();
   };
 
@@ -1624,7 +1625,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                     <Mountain size={14} className="text-amber-400 shrink-0" />
                     <div className="flex flex-col text-left">
                       <span className="font-semibold text-amber-300">Island</span>
-                      <span className="text-[10px] text-zinc-400">Terrain, painted dirt and sun shadows</span>
+                      <span className="text-[10px] text-zinc-400">Terrain, paint and sun shadows</span>
                     </div>
                   </button>
                   <button
@@ -1762,7 +1763,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   ? 'bg-amber-500/25 text-amber-300 border-amber-500/80 font-bold'
                   : 'bg-zinc-900/80 hover:bg-zinc-800 text-zinc-300 border-zinc-700/50'
               }`}
-              title="Select the island: its terrain, painted dirt and sun shadows in the attribute window"
+              title="Select the island: its terrain, paint and sun shadows in the attribute window"
             >
               <Mountain size={13} />
               <span className="text-[11px]">Island</span>

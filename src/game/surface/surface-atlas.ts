@@ -19,8 +19,15 @@ import { SURFACE_SLOTS, SURFACE_TABLE, type SurfaceDefinition } from './surface-
 export const ATLAS_GRID = 4;
 export const ATLAS_TILE = 512;
 export const ATLAS_SIZE = ATLAS_GRID * ATLAS_TILE;
-/** Padding, as a fraction of a cell, kept clear of the cell edge on every side. */
-export const ATLAS_PAD = 4 / ATLAS_TILE;
+/**
+ * Padding, as a fraction of a cell, on every side. Each tile is drawn into the inner square and wrapped
+ * into the padding (its own opposite edge), so a tap near the edge of a tile reads the tile's continuation
+ * and the mip chain can blend inside a cell without bleeding into its neighbour. 32 of 512 pixels holds
+ * up to mip 4; the samplers clamp their gradients there (`surface-shader.ts`).
+ */
+export const ATLAS_PAD = 32 / ATLAS_TILE;
+/** Pixels of one tile's repeat inside its cell. */
+export const ATLAS_INNER = ATLAS_TILE - 2 * 32;
 
 export type SurfaceTexKey = Extract<SurfaceDefinition['source'], { kind: 'texture' }>['texKey'];
 export type SurfaceSources = Partial<Record<SurfaceTexKey, THREE.Texture | null | undefined>>;
@@ -110,7 +117,24 @@ export function drawConcrete(c: CanvasRenderingContext2D, size: number) {
   }
 }
 
-const GENERATORS = { asphalt: drawAsphalt, gravel: drawGravel, concrete: drawConcrete } as const;
+/** The atlas stand-in for the island's cracked dirt (the island ground draws its own, procedurally). */
+export function drawCracked(c: CanvasRenderingContext2D, size: number) {
+  const rnd = seeded(0xc4ac3d);
+  c.fillStyle = '#b9a88a'; c.fillRect(0, 0, size, size);
+  for (let i = 0; i < size * 3; i++) {
+    const v = 150 + Math.floor(rnd() * 50);
+    fleck(c, size, rnd() * size, rnd() * size, 1 + rnd() * 3, `rgba(${v},${v - 14},${v - 34},${0.2 + rnd() * 0.25})`);
+  }
+  c.strokeStyle = 'rgba(90,74,54,0.5)'; c.lineWidth = 2;
+  for (let i = 0; i < 18; i++) {
+    let x = rnd() * size, y = rnd() * size;
+    c.beginPath(); c.moveTo(x, y);
+    for (let k = 0; k < 5; k++) { x += (rnd() - 0.5) * size * 0.18; y += (rnd() - 0.5) * size * 0.18; c.lineTo(x, y); }
+    c.stroke();
+  }
+}
+
+const GENERATORS = { asphalt: drawAsphalt, gravel: drawGravel, concrete: drawConcrete, cracked: drawCracked } as const;
 
 /* -----------------------------------------------------------------------------
    The atlas
@@ -136,9 +160,11 @@ export class SurfaceAtlas {
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.texture.flipY = false;
     this.texture.wrapS = this.texture.wrapT = THREE.ClampToEdgeWrapping;
-    this.texture.minFilter = THREE.LinearFilter;
+    // Mipmapped: the samplers pass their own gradients (textureGrad), so distant paint filters instead
+    // of shimmering. The padding keeps each cell's mips to itself.
+    this.texture.minFilter = THREE.LinearMipmapLinearFilter;
     this.texture.magFilter = THREE.LinearFilter;
-    this.texture.generateMipmaps = false;
+    this.texture.generateMipmaps = true;
     this.texture.anisotropy = 4;
 
     const params = new Uint8Array(SURFACE_SLOTS * 4);
@@ -162,6 +188,23 @@ export class SurfaceAtlas {
 
   get complete(): boolean { return this.pending.size === 0; }
 
+  /**
+   * Resolves once every cell is filled (the PNG sources decode after construction), polling on a timer so
+   * it also settles in a hidden tab. Gives up after `timeoutMs` and resolves anyway: a missing tile shows
+   * magenta, it never holds the loading bar forever.
+   */
+  whenComplete(timeoutMs = 20000): Promise<void> {
+    const t0 = Date.now();
+    return new Promise((resolve) => {
+      const tick = () => {
+        this.update();
+        if (this.complete || Date.now() - t0 > timeoutMs) resolve();
+        else setTimeout(tick, 50);
+      };
+      tick();
+    });
+  }
+
   /** Fill any cell whose PNG has decoded since the last call. Returns true when something was drawn. */
   update(): boolean {
     let drawn = false;
@@ -170,8 +213,7 @@ export class SurfaceAtlas {
       if (def.source.kind !== 'texture') { this.pending.delete(id); continue; }
       const image = imageReady(this.sources[def.source.texKey]);
       if (!image) continue;
-      const { x, y } = this.cellOrigin(id);
-      this.context.drawImage(image, x, y, ATLAS_TILE, ATLAS_TILE);
+      this.drawWrapped(id, image);
       this.pending.delete(id);
       drawn = true;
     }
@@ -184,12 +226,35 @@ export class SurfaceAtlas {
   }
 
   private drawCell(id: number, draw: (c: CanvasRenderingContext2D, size: number) => void) {
-    const { x, y } = this.cellOrigin(id);
     const tile = document.createElement('canvas');
     tile.width = tile.height = ATLAS_TILE;
     draw(tile.getContext('2d')!, ATLAS_TILE);
-    this.context.drawImage(tile, x, y);
+    this.drawWrapped(id, tile);
     this.texture.needsUpdate = true;
+  }
+
+  /** One tile into its cell: scaled to the inner square, with its wrapped neighbours filling the padding. */
+  private drawWrapped(id: number, image: CanvasImageSource) {
+    const { x, y } = this.cellOrigin(id);
+    const pad = (ATLAS_TILE - ATLAS_INNER) / 2;
+    this.context.save();
+    this.context.beginPath();
+    this.context.rect(x, y, ATLAS_TILE, ATLAS_TILE);
+    this.context.clip();
+    for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -1; ox <= 1; ox++) this.context.drawImage(image, x + pad + ox * ATLAS_INNER, y + pad + oy * ATLAS_INNER, ATLAS_INNER, ATLAS_INNER);
+    }
+    this.context.restore();
+  }
+
+  /** A small picture of one surface for a palette button (browser only). */
+  thumbnail(id: number, size = 48): string {
+    const { x, y } = this.cellOrigin(id);
+    const pad = (ATLAS_TILE - ATLAS_INNER) / 2;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    c.getContext('2d')?.drawImage(this.canvas, x + pad, y + pad, ATLAS_INNER / 2, ATLAS_INNER / 2, 0, 0, size, size);
+    return c.toDataURL('image/png');
   }
 
   dispose() {

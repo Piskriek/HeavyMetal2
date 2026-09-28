@@ -7,8 +7,8 @@
 import { effectiveColor, normalizeDescriptor } from './materials/material-descriptor';
 import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
-import { classifyPlacedRamp } from './track-space';
-import { courseTrackSpace } from './island-route/island-space';
+import { classifyPlacedRamp, type TrackStageId } from './track-space';
+import { courseTrackSpace, islandTrackSpace } from './island-route/island-space';
 import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } from './race-marks';
 
 /** Where each course's (and island track's) test ball stands, on this device. */
@@ -4022,7 +4022,6 @@ export class TrackBuilder3D {
   /* ───────────── Island ground: tint, grain and painted sand ───────────── */
 
   private groundOpen = false;
-  private groundUndo: Uint8Array[] = [];
   private groundSaveTimer: ReturnType<typeof setTimeout> | null = null;
   private groundBrush: THREE.Mesh | null = null;
 
@@ -4037,7 +4036,23 @@ export class TrackBuilder3D {
   }
 
   getIslandGround(): IslandGround | null {
-    return (this.islandGroundMesh()?.material as THREE.Material | undefined)?.userData.islandGround ?? null;
+    const ground = ((this.islandGroundMesh()?.material as THREE.Material | undefined)?.userData.islandGround ?? null) as IslandGround | null;
+    // Auto paint on the road and every brush stroke save the same way.
+    if (ground && !ground.onPainted) ground.onPainted = () => { this.scheduleGroundSave(); this.notify(); };
+    return ground;
+  }
+
+  /** Where the camera is along the island road (its nearest route sample), for auto paint's "near the camera". */
+  islandRoadNearCamera(): { s: number; stage: TrackStageId } | null {
+    const map = islandTrackSpace();
+    const c = this.camera.position;
+    let best: (typeof map.samples)[number] | null = null, bestD = Infinity;
+    for (let i = 0; i < map.samples.length; i += 4) {
+      const p = map.samples[i].pos;
+      const d = (p.x - c.x) ** 2 + (p.z - c.z) ** 2;
+      if (d < bestD) { bestD = d; best = map.samples[i]; }
+    }
+    return best ? { s: best.dist, stage: best.stage } : null;
   }
 
   /** Where the pointer meets the island terrain, or null. */
@@ -4089,41 +4104,23 @@ export class TrackBuilder3D {
   }
 
   /** A paint stroke starts: one undo step for the whole stroke (the last 12 are kept). */
-  beginGroundStroke() {
-    const ground = this.getIslandGround();
-    if (!ground) return;
-    this.groundUndo.push(ground.mask.slice());
-    if (this.groundUndo.length > 12) this.groundUndo.shift();
+  beginGroundStroke() { this.getIslandGround()?.beginStroke(); }
+
+  /** One dab of `surface` (a surface-table ID; erasing goes back to the bare island). */
+  paintGround(point: { x: number; z: number }, radius: number, strength: number, erase: boolean, surface?: number): boolean {
+    return this.getIslandGround()?.paint(point.x, point.z, radius, strength, erase, surface) ?? false;
   }
 
-  paintGround(point: { x: number; z: number }, radius: number, strength: number, erase: boolean): boolean {
-    return this.getIslandGround()?.paint(point.x, point.z, radius, strength, erase) ?? false;
-  }
+  /** The stroke ends: its undo step is kept and the ground saves (through `onPainted`). */
+  endGroundStroke() { this.getIslandGround()?.endStroke(); }
 
-  endGroundStroke() { this.scheduleGroundSave(); }
+  canUndoGroundStroke(): boolean { return this.getIslandGround()?.canUndo() ?? false; }
 
-  canUndoGroundStroke(): boolean { return this.groundUndo.length > 0; }
+  undoGroundStroke(): boolean { return this.getIslandGround()?.undo() ?? false; }
 
-  undoGroundStroke(): boolean {
-    const ground = this.getIslandGround();
-    const before = this.groundUndo.pop();
-    if (!ground || !before) return false;
-    ground.setMask(before);
-    this.scheduleGroundSave();
-    this.notify();
-    return true;
-  }
+  clearGroundPaint() { this.getIslandGround()?.clearHand(); }
 
-  clearGroundPaint() {
-    const ground = this.getIslandGround();
-    if (!ground) return;
-    this.beginGroundStroke();
-    ground.clearMask();
-    this.scheduleGroundSave();
-    this.notify();
-  }
-
-  /** Saves the ground a moment after the last change (the mask is a 2048 x 2048 picture). */
+  /** Saves the ground a moment after the last change (the mask is a 2048 x 2048 layered picture). */
   private scheduleGroundSave() {
     if (this.groundSaveTimer) clearTimeout(this.groundSaveTimer);
     this.groundSaveTimer = setTimeout(() => {
@@ -4239,10 +4236,9 @@ export class TrackBuilder3D {
   private reloadIslandGround() {
     const ground = this.getIslandGround();
     if (!ground) return;
-    ground.clearMask();
+    ground.reset();
     ground.setShadow(null);
     ground.apply(DEFAULT_ISLAND_GROUND);
-    this.groundUndo = [];
     void loadGround(ground, this.islandTrackId).then(() => this.notify());
   }
 

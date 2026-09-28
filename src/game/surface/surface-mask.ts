@@ -109,6 +109,16 @@ export class SurfaceMask {
     this.touch(x, y);
   }
 
+  /**
+   * Flag one texel as changed for the GPU upload, for a writer that goes straight at `data` (a solid
+   * fill skips the per-texel blend, so it must report its own dirty rect). `stamp` and `set` do this
+   * themselves; a caller that writes bytes directly must not forget it, or the paint never reaches
+   * the screen until something else dirties the mask.
+   */
+  markDirty(x: number, y: number): void {
+    this.touch(x, y);
+  }
+
   // ---------------------------------------------------------------------------
   // Brush
   // ---------------------------------------------------------------------------

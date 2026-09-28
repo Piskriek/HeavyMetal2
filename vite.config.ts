@@ -290,7 +290,7 @@ function islandPropsBackupPlugin(): Plugin {
           res.end(fs.readFileSync(file, "utf8"));
         } else if (url === "/api/island-ground" && req.method === "POST") {
           readBody(req, (data) => {
-            if (!data || data.version !== 1) { json(res, 400, { error: "not an island ground document" }); return; }
+            if (!data || (data.version !== 1 && data.version !== 2)) { json(res, 400, { error: "not an island ground document" }); return; }
             fs.mkdirSync(dir, { recursive: true });
             const file = path.join(dir, "ground-latest.json");
             if (fs.existsSync(file)) fs.copyFileSync(file, path.join(dir, "ground-previous.json"));

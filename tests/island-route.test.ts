@@ -11,14 +11,19 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { TRACK_DISTANCE, courseY } from '../src/game/scene';
 import { COURSES } from '../src/game/types';
 import { TRACKS } from '../src/game/courses';
-import { D_START, engineDistanceFromX, getTrackSpace, lateralFromLaneZ, worldFromCanonical } from '../src/game/track-space';
+import { D_START, engineDistanceFromX, getTrackSpace, lateralFromLaneZ, worldFromCanonical, type TrackSpaceMap } from '../src/game/track-space';
 import { validateLaneNetwork } from '../src/game/lane-network';
 import { loadLaneNetwork, readLaneStorage, writeLaneStorage, buildLaneDocument } from '../src/game/lane-storage';
 import { ISLAND_HALF_WIDTH, ISLAND_ROUTE_GRAPH } from '../src/game/island-route/serpentine-route';
 import { courseTrackSpace, islandTrackSpace, racerTrackSpace } from '../src/game/island-route/island-space';
 import { ISLAND_LANE_Z, islandLaneNetwork } from '../src/game/island-route/island-lanes';
 import { islandHeightField, prepareIslandModel, softenNormals } from '../src/game/island-route/island-world';
-import { PAINT_HALF, PAINT_RES, injectIslandGround, normalizeIslandGround, paintDab, paintPixel } from '../src/game/island-route/island-ground';
+import { PAINT_HALF, PAINT_RES, injectIslandGround, migrateDirtCoverage, normalizeIslandGround, paintDab, paintPixel } from '../src/game/island-route/island-ground';
+import { composeTexel, packTexel, projectRoadMask } from '../src/game/island-route/island-road-paint';
+import { SurfaceMask } from '../src/game/surface/surface-mask';
+import { RoadMask } from '../src/game/surface/road-mask';
+import { AutoPaint, flatPaintField } from '../src/game/surface/auto-paint';
+import { SURFACE_ASPHALT, SURFACE_CRACKED, SURFACE_GRAVEL } from '../src/game/surface/surface-table';
 import { TrackBuilder3D } from '../src/game/track-builder-3d';
 import type { TrackData } from '../src/game/renderer-3d';
 
@@ -200,18 +205,66 @@ test('the ground shader finds its places in this three.js version\'s standard sh
   assert.ok('paintMask' in shader.uniforms);
 });
 
-test('ground settings are clamped; the sand brush paints softly and erases', () => {
+test('ground settings are clamped; the brush paints a layered surface softly and erases it', () => {
   const s = normalizeIslandGround({ brightness: 9, grain: -1, tint: 'red', sandPits: 0.7 });
   assert.equal(s.brightness, 2); assert.equal(s.grain, 0); assert.equal(s.tint, '#ffffff'); assert.equal(s.sandPits, 0.7);
-  const mask = new Uint8Array(PAINT_RES * PAINT_RES);
-  assert.ok(paintDab(mask, 1000, -2000, 400, 1, false));
+  const mask = new SurfaceMask(PAINT_RES, PAINT_RES);
+  const share = (x: number, y: number, id: number) => {
+    const t = mask.get(x, y);
+    return t.id0 === t.id1 ? (t.id0 === id ? 255 : 0) : (t.id0 === id ? 255 - t.weight : 0) + (t.id1 === id ? t.weight : 0);
+  };
+  assert.ok(paintDab(mask, 1000, -2000, 400, 1, SURFACE_ASPHALT, false));
   const { u, v } = paintPixel(1000, -2000);
-  const centre = mask[Math.floor(v) * PAINT_RES + Math.floor(u)];
-  const rim = mask[Math.floor(v) * PAINT_RES + Math.floor(u + 7)];
-  assert.ok(centre > 240 && rim < centre, 'full in the middle, soft to the rim');
-  paintDab(mask, 1000, -2000, 400, 1, true);
-  assert.ok(mask[Math.floor(v) * PAINT_RES + Math.floor(u)] < 15, 'erased');
-  assert.equal(paintDab(mask, PAINT_HALF * 3, 0, 400, 1, false), null, 'off the island: nothing');
+  const cx = Math.floor(u), cy = Math.floor(v);
+  assert.ok(share(cx, cy, SURFACE_ASPHALT) > 240 && share(cx + 7, cy, SURFACE_ASPHALT) < share(cx, cy, SURFACE_ASPHALT), 'full in the middle, soft to the rim');
+  assert.equal(share(cx + 40, cy, 0), 255, 'the island outside the dab is untouched (surface 0)');
+  paintDab(mask, 1000, -2000, 400, 1, SURFACE_ASPHALT, true);
+  assert.ok(share(cx, cy, SURFACE_ASPHALT) < 15, 'erased back to the bare island');
+  assert.equal(paintDab(mask, PAINT_HALF * 3, 0, 400, 1, SURFACE_ASPHALT, false), null, 'off the island: nothing');
+});
+
+test('old dirt saves become cracked dirt, rendering the way the grey mask did', () => {
+  const coverage = new Uint8Array(PAINT_RES * PAINT_RES);
+  coverage[5] = 255; coverage[6] = 100;
+  const mask = new SurfaceMask(PAINT_RES, PAINT_RES);
+  migrateDirtCoverage(coverage, mask);
+  assert.deepEqual(mask.get(5, 0), { id0: SURFACE_CRACKED, id1: SURFACE_CRACKED, weight: 0, flags: 0 }, 'full cover: solid dirt');
+  assert.deepEqual(mask.get(6, 0), { id0: 0, id1: SURFACE_CRACKED, weight: 100, flags: 0 }, 'partial cover: the same share over the bare island');
+  assert.equal(mask.isPainted(7, 0), false, 'unpainted stays unpainted');
+});
+
+test('island road auto paint lands on the ground along the route, never under a bridge, and composes over the brush', () => {
+  // A straight road along +z at y = 0, 960 wide, 12,000 long.
+  const length = 12000;
+  const map = {
+    length,
+    frameAt: (s: number) => ({ pos: { x: 0, y: 0, z: s }, right: { x: 1, y: 0, z: 0 }, halfWidth: 480 }),
+  } as unknown as TrackSpaceMap;
+  const road = new RoadMask(length);
+  const auto = new AutoPaint(flatPaintField(road));
+  auto.run('carriageway', { surface: SURFACE_ASPHALT, width: 1, edge: 0, wobble: 0, spareBridges: 0, spareLoops: 0 });
+  // The terrain meets the road except for a bridge over a valley between s = 6000 and 8000.
+  const heightAt = (_x: number, z: number) => (z > 6000 && z < 8000 ? -900 : 0);
+  const square = { res: PAINT_RES, half: PAINT_HALF };
+  const projected = projectRoadMask(road, map, heightAt, square);
+  const at = (x: number, z: number) => { const { u, v } = paintPixel(x, z); return projected.get(Math.floor(v) * PAINT_RES + Math.floor(u)); };
+  assert.equal(at(0, 3000), packTexel(SURFACE_ASPHALT, SURFACE_ASPHALT, 0), 'asphalt on the road centre');
+  assert.equal(at(300, 3000), packTexel(SURFACE_ASPHALT, SURFACE_ASPHALT, 0), 'and across the carriageway');
+  assert.equal(at(900, 3000), undefined, 'but not off the road');
+  assert.equal(at(0, 7000), undefined, 'nothing lands in the valley under the bridge');
+  assert.equal(projectRoadMask(new RoadMask(length), map, heightAt, square).size, 0, 'an unpainted road projects nothing');
+  // Composition: the road over the brush's paint, the brush's paint where the road leaves it alone.
+  const hand = new Uint8Array([SURFACE_CRACKED, SURFACE_CRACKED, 0, 0]);
+  const out = new Uint8Array(4);
+  composeTexel(hand, out, 0, packTexel(SURFACE_ASPHALT, SURFACE_ASPHALT, 0));
+  assert.deepEqual(Array.from(out), [SURFACE_ASPHALT, SURFACE_ASPHALT, 0, 0], 'solid road paint covers the brush');
+  composeTexel(hand, out, 0, undefined);
+  assert.deepEqual(Array.from(out), [SURFACE_CRACKED, SURFACE_CRACKED, 0, 0], 'no road paint: the brush shows');
+  composeTexel(hand, out, 0, packTexel(0, SURFACE_GRAVEL, 128));
+  const again = out.slice();
+  composeTexel(hand, out, 0, packTexel(0, SURFACE_GRAVEL, 128));
+  assert.deepEqual(Array.from(out), Array.from(again), 'a feathered road edge composes the same every time');
+  assert.equal(out[1], SURFACE_GRAVEL, 'and blends the gravel in over the dirt');
 });
 
 test('the island\'s lane handles sit on the island road, not on the classic track in the sky', () => {

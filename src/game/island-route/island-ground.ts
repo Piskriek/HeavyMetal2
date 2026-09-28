@@ -7,14 +7,26 @@
  *
  * - **Grain**: fine noise and tiny pebbles multiplied into the base colour, fading out with distance
  *   (from afar the base texture has enough detail of its own).
- * - **Painted sand**: a paint mask over the island (painted in build mode) lays sand over the
- *   texture: a plain, mottled sand with pitting and a scatter of pebbles, no ripples.
+ * - **Painted surfaces**: a layered surface mask over the island (the NewRoads format: two surface IDs
+ *   and a blend weight per texel, `surface/surface-mask.ts`). ID 0 is the island as it is; the island's
+ *   own cracked dirt (`SURFACE_CRACKED`) is drawn procedurally here, tuned by the dirt sliders; every
+ *   other ID is a tile from the shared surface atlas, drawn by the same sampler as the road ribbon
+ *   (`surface/surface-shader.ts`). The brush paints the mask; auto paint paints the island road's own
+ *   mask, which is laid over it along the route (`island-road-paint.ts`).
  *
  * The owner tunes both in build mode (Primitives or Custom 3D: click the terrain). The settings and the
  * mask are saved per island track, in the browser and on disk (backups/island/), and are keyed by
  * world position, so they survive a re-exported island model.
  */
 import * as THREE from 'three';
+import { SurfaceMask, type MaskRect, type MaskSnapshot } from '../surface/surface-mask';
+import { SurfaceAtlas, type SurfaceSources } from '../surface/surface-atlas';
+import { SURFACE_SAMPLING_GLSL } from '../surface/surface-shader';
+import { SURFACE_CRACKED } from '../surface/surface-table';
+import { RoadMask, type RoadMaskDoc } from '../surface/road-mask';
+import { AutoPaint, jobsFromDoc, jobsToDoc, trackPaintField } from '../surface/auto-paint';
+import { islandTrackSpace } from './island-space';
+import { buildRoadFootprint, composeTexel, projectFootprint, type PackedTexel, type RoadFootprint } from './island-road-paint';
 
 export interface IslandGroundSettings {
   /** Multiplied into the island texture, #rrggbb. */
@@ -91,7 +103,7 @@ export function normalizeIslandGround(raw: unknown): IslandGroundSettings {
 
 /** The painted square: centred on the island, a little wider than the model (world units). */
 export const PAINT_HALF = 48000;
-/** Mask pixels across (about 47 world units a pixel; the sand's own detail is procedural). */
+/** Mask texels across (about 47 world units a texel; each surface's own detail comes from its tile). */
 export const PAINT_RES = 2048;
 
 /** World (x, z) to mask pixel (fractional). */
@@ -100,28 +112,30 @@ export function paintPixel(x: number, z: number): { u: number; v: number } {
 }
 
 /**
- * Paints (or erases) a soft round dab into the mask. `radius` in world units, `strength` 0..1 per dab.
- * Returns the touched pixel rows (for a partial upload), or null when the dab is off the mask.
+ * Paints `surface` (or, erasing, the bare island: surface 0) as one soft round dab into the layered mask.
+ * `radius` in world units, `strength` 0..1 per dab. Returns the touched texel rectangle, or null when the
+ * dab is off the mask or changed nothing.
  */
-export function paintDab(mask: Uint8Array, x: number, z: number, radius: number, strength: number, erase: boolean): { y0: number; y1: number } | null {
+export function paintDab(mask: SurfaceMask, x: number, z: number, radius: number, strength: number, surface: number, erase: boolean): MaskRect | null {
   const { u, v } = paintPixel(x, z);
   const r = (radius / (2 * PAINT_HALF)) * PAINT_RES;
-  const x0 = Math.max(0, Math.floor(u - r)), x1 = Math.min(PAINT_RES - 1, Math.ceil(u + r));
-  const y0 = Math.max(0, Math.floor(v - r)), y1 = Math.min(PAINT_RES - 1, Math.ceil(v + r));
-  if (x0 > x1 || y0 > y1) return null;
-  for (let py = y0; py <= y1; py++) {
-    for (let px = x0; px <= x1; px++) {
-      const d = Math.hypot(px + 0.5 - u, py + 0.5 - v) / Math.max(r, 0.5);
-      if (d >= 1) continue;
-      // Soft falloff: full in the middle, nothing at the rim.
-      const k = strength * (1 - d * d) * (1 - d * d);
-      const i = py * PAINT_RES + px;
-      const now = mask[i] / 255;
-      const next = erase ? now * (1 - k) : now + (1 - now) * k;
-      mask[i] = Math.round(Math.min(1, Math.max(0, next)) * 255);
-    }
+  return mask.stamp({ cx: u, cy: v, radius: Math.max(0.75, r), hardness: 0.15, opacity: strength, surface: erase ? 0 : surface });
+}
+
+/**
+ * Old saves (version 1) kept one grey coverage mask of painted dirt. It becomes the cracked-dirt surface,
+ * which renders the way that mask always did.
+ */
+export function migrateDirtCoverage(coverage: Uint8Array, mask: SurfaceMask): void {
+  const n = Math.min(coverage.length, mask.width * mask.height);
+  for (let i = 0; i < n; i++) {
+    const c = coverage[i];
+    const o = i * 4;
+    if (c === 0) { mask.data[o] = 0; mask.data[o + 1] = 0; mask.data[o + 2] = 0; }
+    else if (c === 255) { mask.data[o] = SURFACE_CRACKED; mask.data[o + 1] = SURFACE_CRACKED; mask.data[o + 2] = 0; }
+    else { mask.data[o] = 0; mask.data[o + 1] = SURFACE_CRACKED; mask.data[o + 2] = c; }
+    mask.data[o + 3] = 0;
   }
-  return { y0, y1 };
 }
 
 /* ───────────── The shader ───────────── */
@@ -136,6 +150,10 @@ uniform float groundPebbles;
 uniform float groundFade;
 uniform sampler2D paintMask;
 uniform float paintHalf;
+uniform float paintRes;
+uniform sampler2D surfAtlas;
+uniform sampler2D surfParams;
+uniform float surfRepeat;
 uniform vec3 sandColor;
 uniform float sandStrength;
 uniform float sandPebbles;
@@ -155,6 +173,9 @@ float gStoneCover = 0.0;
 float gCrack = 0.0;
 float gHeight = 0.0;
 float gNear = 0.0;
+// How much of this pixel is an atlas surface (not bare island, not cracked dirt), and its roughness.
+float gAtlas = 0.0;
+float gAtlasRough = 1.0;
 uniform float groundBump;
 // A surface normal tilted by the slope of a height (screen-space derivatives; three.js's bump-map way).
 vec3 gBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy) {
@@ -166,7 +187,7 @@ vec3 gBump(vec3 surfPos, vec3 surfNorm, vec2 dHdxy) {
 }
 varying vec3 vGroundWorld;
 varying vec3 vGroundNormal;
-
+${SURFACE_SAMPLING_GLSL}
 // 2D hash and value noise (the only noise still computed per pixel: 4 hashes each).
 float gHash2(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -214,11 +235,28 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
   float near = 1.0 - smoothstep(groundFade * 0.35, groundFade, dist);
   diffuseColor.rgb *= groundTint * groundBright;
 
+  // The layered mask: (id0, id1, weight) at this pixel. ID 0 is the bare island, SURF_CRACKED the
+  // procedural dirt below, anything else an atlas tile (drawn after it).
   vec2 muv = (wp.xz + paintHalf) / (2.0 * paintHalf);
-  float paint = (muv.x < 0.0 || muv.x > 1.0 || muv.y < 0.0 || muv.y > 1.0) ? 0.0 : texture2D(paintMask, muv).r * sandStrength;
+  // Atlas tiles are projected from above, or from the side on steep faces (as the pebble detail is), so a
+  // cliff painted with grass does not smear into streaks.
+  vec3 sn = abs(vGroundNormal);
+  vec2 suv = sn.y > 0.55 ? wp.xz : (sn.x > sn.z ? wp.zy : wp.xy);
+  vec2 sdx = dFdx(suv);
+  vec2 sdy = dFdy(suv);
+  vec3 sm = (muv.x < 0.0 || muv.x > 1.0 || muv.y < 0.0 || muv.y > 1.0) ? vec3(0.0) : surfSample(paintMask, vec2(paintRes), muv * paintRes);
+  bool sSolid = surfIs(sm.x, sm.y);
+  float shareA = sSolid ? 1.0 : 1.0 - sm.z;
+  float shareB = sSolid ? 0.0 : sm.z;
+  float shareCracked = (surfIs(sm.x, SURF_CRACKED) ? shareA : 0.0) + (surfIs(sm.y, SURF_CRACKED) ? shareB : 0.0);
+  float shareBare = (surfIs(sm.x, 0.0) ? shareA : 0.0) + (surfIs(sm.y, 0.0) ? shareB : 0.0);
+  float shareAtlas = clamp(1.0 - shareCracked - shareBare, 0.0, 1.0);
+  float rag = gNoise2(wp.xz / 60.0);
+  float paint = shareCracked * sandStrength;
   // A ragged edge: the noise eats into the soft brush rim so strokes never show as circles.
-  paint = clamp(paint * 1.25 - 0.25 * gNoise2(wp.xz / 60.0) * (1.0 - paint), 0.0, 1.0);
-  gPaint = paint;
+  paint = clamp(paint * 1.25 - 0.25 * rag * (1.0 - paint), 0.0, 1.0);
+  shareAtlas = shareAtlas >= 0.999 ? 1.0 : clamp(shareAtlas * 1.25 - 0.25 * rag * (1.0 - shareAtlas), 0.0, 1.0);
+  gPaint = max(paint, shareAtlas);
 
   // The detail up close: projected from above, or from the side on steep faces.
   gA = vec4(0.5, 0.5, 1.0, 0.0); gB = gA; gW = 0.0; gHA = 0.0; gHB = 0.0;
@@ -260,9 +298,22 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
     diffuseColor.rgb = mix(diffuseColor.rgb, dirt, paint);
   }
 
+  if (shareAtlas > 0.002) {
+    // The atlas surfaces in this texel: a slot holding bare island or cracked dirt defers to the other.
+    float a0 = sm.x, a1 = sm.y, aw = sm.z;
+    if (surfIs(a0, 0.0) || surfIs(a0, SURF_CRACKED)) { a0 = a1; aw = 0.0; }
+    if (surfIs(a1, 0.0) || surfIs(a1, SURF_CRACKED)) { a1 = a0; aw = 0.0; }
+    vec3 tile = surfPair(surfAtlas, a0, a1, aw, suv, surfRepeat, sdx, sdy);
+    // Broad, soft mottling so a big fill never reads as one flat print.
+    tile *= 0.9 + 0.2 * gNoise2(wp.xz / 1400.0);
+    diffuseColor.rgb = mix(diffuseColor.rgb, tile * groundTint * groundBright, shareAtlas);
+    gAtlas = shareAtlas;
+    gAtlasRough = mix(surfParamsOf(surfParams, a0).r, surfParamsOf(surfParams, a1).r, aw);
+  }
+
   if (near > 0.0 && groundGrain > 0.0) {
     vec3 g = vec3(grain) * baseStones;
-    diffuseColor.rgb *= mix(vec3(1.0), g, groundGrain * near * (1.0 - paint));
+    diffuseColor.rgb *= mix(vec3(1.0), g, groundGrain * near * clamp(1.0 - paint - 0.6 * gAtlas, 0.0, 1.0));
   }
 }
 `;
@@ -385,6 +436,8 @@ export const GROUND_ROUGHNESS_BODY = /* glsl */ `
   roughnessFactor = clamp(groundRough - groundShine * shineMask, 0.06, 1.0);
   // Cracks are dull and dusty: no shine in them at all.
   roughnessFactor = mix(roughnessFactor, 1.0, clamp(gCrack * gNear * 1.5, 0.0, 1.0));
+  // Atlas surfaces bring their own roughness (asphalt is smoother than gravel).
+  roughnessFactor = mix(roughnessFactor, gAtlasRough, gAtlas);
 }
 `;
 
@@ -430,28 +483,55 @@ export function injectIslandGround(
   vGroundWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
   vGroundNormal = normalize(mat3(modelMatrix) * objectNormal);`);
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\n#define DETAIL_CELLS ${DETAIL_CELLS.toFixed(1)}\n${GROUND_FRAGMENT_HEADER}`)
+    .replace('#include <common>', `#include <common>\n#define DETAIL_CELLS ${DETAIL_CELLS.toFixed(1)}\n#define SURF_CRACKED ${SURFACE_CRACKED.toFixed(1)}\n${GROUND_FRAGMENT_HEADER}`)
     .replace('#include <map_fragment>', `#include <map_fragment>\n${GROUND_FRAGMENT_BODY}`)
     .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${GROUND_ROUGHNESS_BODY}`)
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${GROUND_RELIEF_BODY}`)
     .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>\n${GROUND_SHADOW_BODY}`);
 }
 
-/** The live ground of one island material: its settings, and the paint mask on the GPU. */
+/** Brush undo keeps whole 64 × 64 tiles of the hand mask, snapshotted the first time a stroke touches one. */
+const UNDO_TILE = 64;
+const UNDO_DEPTH = 12;
+/** World units per atlas tile repeat on the island (the road's own 480, so a surface reads the same size). */
+export const ISLAND_SURFACE_REPEAT = 480;
+
+/**
+ * The live ground of one island material: its settings, the paint, and the paint on the GPU.
+ *
+ * Two masks of the same square: `hand` is what the brush paints (and what old dirt saves migrate into);
+ * `view` is what the GPU shows, the hand paint with the island road's auto paint laid over it
+ * (`island-road-paint.ts`). Only changed rows are uploaded.
+ */
 export class IslandGround {
-  readonly mask = new Uint8Array(PAINT_RES * PAINT_RES);
+  readonly hand = new SurfaceMask(PAINT_RES, PAINT_RES);
+  readonly view = new SurfaceMask(PAINT_RES, PAINT_RES);
   readonly maskTexture: THREE.DataTexture;
   readonly uniforms: Record<string, THREE.IUniform>;
+  /** The surface tiles (null in node tests, or before the renderer hands over its textures). */
+  readonly atlas: SurfaceAtlas | null;
+  /** Runs after any paint change worth saving (the builder schedules the save). */
+  onPainted: (() => void) | null = null;
   private settings: IslandGroundSettings = { ...DEFAULT_ISLAND_GROUND };
   /** The baked sun shadow map (0 shadow .. 255 sun), its size, and the sun it was baked for. */
   private shadow: { map: Uint8Array; res: number; sun: [number, number, number] } | null = null;
   private shadowTexture: THREE.DataTexture | null = null;
+  /** The island road's own mask and its auto-paint runner, made on first use (the route map is not free). */
+  private road: { mask: RoadMask; auto: AutoPaint } | null = null;
+  private projection = new Map<number, PackedTexel>();
+  /** Where the island road lies on the ground (built once per terrain: the costly part of a projection). */
+  private footprint: RoadFootprint | null = null;
+  private strokeTiles: Map<number, MaskSnapshot> | null = null;
+  private undoStack: MaskSnapshot[][] = [];
 
-  constructor(material: THREE.MeshStandardMaterial) {
-    this.maskTexture = new THREE.DataTexture(this.mask, PAINT_RES, PAINT_RES, THREE.RedFormat, THREE.UnsignedByteType);
-    this.maskTexture.magFilter = THREE.LinearFilter;
-    this.maskTexture.minFilter = THREE.LinearFilter;
+  constructor(material: THREE.MeshStandardMaterial, sources?: SurfaceSources) {
+    this.maskTexture = new THREE.DataTexture(this.view.data, PAINT_RES, PAINT_RES, THREE.RGBAFormat, THREE.UnsignedByteType);
+    // IDs are never interpolated: the sampler reads four texels and blends the weights itself.
+    this.maskTexture.magFilter = THREE.NearestFilter;
+    this.maskTexture.minFilter = THREE.NearestFilter;
+    this.maskTexture.generateMipmaps = false;
     this.maskTexture.needsUpdate = true;
+    this.atlas = sources && typeof document !== 'undefined' ? new SurfaceAtlas(sources) : null;
     this.uniforms = {
       groundTint: { value: new THREE.Color(1, 1, 1) },
       groundBright: { value: 1 },
@@ -461,6 +541,10 @@ export class IslandGround {
       groundFade: { value: 6000 },
       paintMask: { value: this.maskTexture },
       paintHalf: { value: PAINT_HALF },
+      paintRes: { value: PAINT_RES },
+      surfAtlas: { value: this.atlas?.texture ?? null },
+      surfParams: { value: this.atlas?.params ?? null },
+      surfRepeat: { value: ISLAND_SURFACE_REPEAT },
       sandColor: { value: new THREE.Color() },
       sandStrength: { value: 1 },
       sandPebbles: { value: 0.3 },
@@ -476,10 +560,13 @@ export class IslandGround {
       groundBump: { value: 0.6 },
     };
     material.onBeforeCompile = (shader) => injectIslandGround(shader, this.uniforms);
-    material.customProgramCacheKey = () => 'island-ground';
+    material.customProgramCacheKey = () => 'island-ground-surfaces';
     material.userData.islandGround = this;
     this.apply(DEFAULT_ISLAND_GROUND);
   }
+
+  /** Resolves once every surface tile is in the atlas; the loading bar waits on it. */
+  whenReady(): Promise<void> { return this.atlas ? this.atlas.whenComplete() : Promise.resolve(); }
 
   get(): IslandGroundSettings { return { ...this.settings }; }
 
@@ -518,32 +605,199 @@ export class IslandGround {
 
   getShadow() { return this.shadow; }
 
-  /** One brush dab; uploads the mask. */
-  paint(x: number, z: number, radius: number, strength: number, erase: boolean): boolean {
-    const touched = paintDab(this.mask, x, z, radius, strength, erase);
+  /* ───────────── The brush ───────────── */
+
+  /** A stroke starts: everything it paints undoes as one step. */
+  beginStroke() { this.strokeTiles = new Map(); }
+
+  /** One brush dab of `surface` (erasing: back to the bare island); uploads the rows it changed. */
+  paint(x: number, z: number, radius: number, strength: number, erase: boolean, surface = SURFACE_CRACKED): boolean {
+    const { u, v } = paintPixel(x, z);
+    const r = Math.max(0.75, (radius / (2 * PAINT_HALF)) * PAINT_RES);
+    this.saveTiles({ x0: Math.floor(u - r), y0: Math.floor(v - r), x1: Math.ceil(u + r) + 1, y1: Math.ceil(v + r) + 1 });
+    const touched = paintDab(this.hand, x, z, radius, strength, surface, erase);
+    this.hand.takeDirty();
     if (!touched) return false;
-    this.maskTexture.needsUpdate = true;
+    this.recompose(touched);
     return true;
   }
 
-  setMask(data: Uint8Array) {
-    if (data.length !== this.mask.length) return;
-    this.mask.set(data);
-    this.maskTexture.needsUpdate = true;
+  endStroke() {
+    const tiles = this.strokeTiles;
+    this.strokeTiles = null;
+    if (!tiles || tiles.size === 0) return;
+    this.undoStack.push(Array.from(tiles.values()));
+    if (this.undoStack.length > UNDO_DEPTH) this.undoStack.shift();
+    this.onPainted?.();
   }
 
-  clearMask() { this.mask.fill(0); this.maskTexture.needsUpdate = true; }
+  canUndo(): boolean { return this.undoStack.length > 0; }
 
-  isPainted(): boolean { return this.mask.some((v) => v > 0); }
+  /** Undoes the last brush stroke (or clear). Auto passes undo on the road's own runner (`autoPaint.undo`). */
+  undo(): boolean {
+    const tiles = this.undoStack.pop();
+    if (!tiles) return false;
+    for (const snap of tiles) { this.hand.restore(snap); this.recompose(snap.rect); }
+    this.hand.takeDirty();
+    this.onPainted?.();
+    return true;
+  }
+
+  /** Removes all brush paint (one undo step). The road's auto paint stays; it has its own reset. */
+  clearHand() {
+    this.beginStroke();
+    this.saveTiles({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
+    this.hand.data.fill(0);
+    this.recompose({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
+    this.endStroke();
+  }
+
+  /** Replaces the brush paint (a loaded save); not undoable. */
+  setHand(data: Uint8Array) {
+    if (data.length !== this.hand.data.length) return;
+    this.hand.data.set(data);
+    this.undoStack = [];
+    this.recompose({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
+  }
+
+  /** Back to an unpainted island: brush paint, road paint and history all gone (another track opened). */
+  reset() {
+    this.hand.data.fill(0);
+    this.undoStack = [];
+    this.road = null;
+    this.projection = new Map();
+    this.recompose({ x0: 0, y0: 0, x1: PAINT_RES, y1: PAINT_RES });
+  }
+
+  isPainted(): boolean {
+    const d = this.hand.data;
+    for (let i = 0; i < d.length; i += 4) if (d[i] !== 0 || d[i + 1] !== 0) return true;
+    return false;
+  }
+
+  /* ───────────── The road ───────────── */
+
+  /** The auto-paint runner over the island road's mask (made on first use). */
+  get autoPaint(): AutoPaint { return this.roadPaint().auto; }
+
+  /** Whether the island road has any auto paint or recorded passes. */
+  hasRoadPaint(): boolean { return !!this.road && (this.road.auto.jobs.length > 0 || this.projection.size > 0); }
+
+  /** The terrain's height (highest surface under a point), so road paint never lands under a bridge. */
+  setHeightField(heightAt: ((x: number, z: number) => number | null) | null) {
+    // Built here, while the island loads behind its bar, so the first auto-paint click is instant.
+    const map = islandTrackSpace();
+    this.footprint = heightAt ? buildRoadFootprint(new RoadMask(map.length), map, heightAt, { res: PAINT_RES, half: PAINT_HALF }) : null;
+    this.reproject();
+  }
+
+  /** Loads a saved road mask; when it no longer fits the route (the road changed), re-runs its recorded passes. */
+  loadRoad(doc: unknown) {
+    const map = islandTrackSpace();
+    const mask = RoadMask.fromDoc(doc, map.length);
+    const jobs = jobsFromDoc(mask ? mask.jobs : (doc as { jobs?: unknown } | null)?.jobs);
+    const road = this.makeRoad(mask ?? new RoadMask(map.length));
+    road.auto.jobs.push(...(mask ? jobs : []));
+    this.road = road;
+    if (!mask && jobs.length) road.auto.replay(jobs);
+    this.reproject();
+  }
+
+  /** The road's mask as a document (with its passes), or null when the road was never auto-painted. */
+  roadDoc(trackId: string) {
+    if (!this.road) return null;
+    const { mask, auto } = this.road;
+    mask.jobs = jobsToDoc(auto.jobs) as Record<string, unknown>[];
+    let painted = mask.jobs.length > 0;
+    for (let row = 0; row < mask.rows && !painted; row++) for (let c = 0; c < mask.across && !painted; c++) painted = mask.mask.isPainted(c, row);
+    return painted ? mask.toDoc(trackId) : null;
+  }
+
+  private roadPaint() {
+    if (!this.road) this.road = this.makeRoad(new RoadMask(islandTrackSpace().length));
+    return this.road;
+  }
+
+  private makeRoad(mask: RoadMask) {
+    const road = { mask, auto: null as unknown as AutoPaint };
+    road.auto = new AutoPaint(trackPaintField(mask, islandTrackSpace()), () => {
+      if (this.road === road) { this.reproject(); this.onPainted?.(); }
+    });
+    return road;
+  }
+
+  /** Lays the road mask onto the ground again and uploads the texels that changed. */
+  private reproject() {
+    const next = this.road && this.footprint ? projectFootprint(this.road.mask, this.footprint) : new Map<number, PackedTexel>();
+    const prev = this.projection;
+    this.projection = next;
+    let x0 = PAINT_RES, y0 = PAINT_RES, x1 = -1, y1 = -1;
+    const touch = (index: number) => {
+      const x = index % PAINT_RES, y = (index - x) / PAINT_RES;
+      composeTexel(this.hand.data, this.view.data, index * 4, next.get(index));
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    };
+    for (const index of prev.keys()) touch(index);
+    for (const index of next.keys()) if (!prev.has(index)) touch(index);
+    if (x1 >= x0) this.upload({ x0, y0, x1: x1 + 1, y1: y1 + 1 });
+  }
+
+  /* ───────────── Masks → GPU ───────────── */
+
+  private recompose(rect: MaskRect) {
+    const x0 = Math.max(0, rect.x0), y0 = Math.max(0, rect.y0);
+    const x1 = Math.min(PAINT_RES, rect.x1), y1 = Math.min(PAINT_RES, rect.y1);
+    if (x1 <= x0 || y1 <= y0) return;
+    const road = this.projection.size ? this.projection : null;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const index = y * PAINT_RES + x;
+        composeTexel(this.hand.data, this.view.data, index * 4, road?.get(index));
+      }
+    }
+    this.upload({ x0, y0, x1, y1 });
+  }
+
+  /** Queues the rows of `rect` for upload (the whole texture when that is most of it). */
+  private upload(rect: MaskRect) {
+    const t = this.maskTexture;
+    if (rect.y1 - rect.y0 > PAINT_RES / 2) t.clearUpdateRanges();
+    else {
+      const width = (rect.x1 - rect.x0) * 4;
+      for (let y = rect.y0; y < rect.y1; y++) t.addUpdateRange((y * PAINT_RES + rect.x0) * 4, width);
+    }
+    t.needsUpdate = true;
+  }
+
+  private saveTiles(rect: MaskRect) {
+    if (!this.strokeTiles) return;
+    const tx0 = Math.max(0, Math.floor(rect.x0 / UNDO_TILE)), ty0 = Math.max(0, Math.floor(rect.y0 / UNDO_TILE));
+    const tx1 = Math.min(PAINT_RES / UNDO_TILE - 1, Math.floor((rect.x1 - 1) / UNDO_TILE));
+    const ty1 = Math.min(PAINT_RES / UNDO_TILE - 1, Math.floor((rect.y1 - 1) / UNDO_TILE));
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const key = ty * (PAINT_RES / UNDO_TILE) + tx;
+        if (this.strokeTiles.has(key)) continue;
+        this.strokeTiles.set(key, this.hand.snapshot({ x0: tx * UNDO_TILE, y0: ty * UNDO_TILE, x1: (tx + 1) * UNDO_TILE, y1: (ty + 1) * UNDO_TILE }));
+      }
+    }
+  }
 }
 
 /* ───────────── Saving ───────────── */
 
+/**
+ * Version 2: the layered mask (run-length + base64, `SurfaceMask.encode`) and the island road's auto
+ * paint (a road-mask document with its passes). Version 1 held one grey PNG of painted dirt; it still
+ * loads, as cracked dirt.
+ */
 export interface IslandGroundDoc {
-  version: 1;
+  version: 1 | 2;
   settings: IslandGroundSettings;
-  /** The mask as a PNG data URL (grey), or null when nothing is painted. */
+  /** v2: the brush paint, encoded; v1: a grey PNG data URL of dirt. Null when nothing is painted. */
   mask: string | null;
+  /** v2: the island road's auto paint, or none. */
+  road?: RoadMaskDoc | null;
   bounds: { half: number; res: number };
   /** The baked sun shadows (a grey PNG over the same square), or none. */
   shadow?: { png: string; res: number; sun: [number, number, number] } | null;
@@ -553,7 +807,7 @@ export const ISLAND_GROUND_KEY = 'hm2-island-ground-v1';
 export const islandGroundKey = (trackId: string) => trackId === 'serpentine' ? ISLAND_GROUND_KEY : `${ISLAND_GROUND_KEY}:${trackId}`;
 export const islandGroundEndpoint = (trackId: string) => `/api/island-ground${trackId === 'serpentine' ? '' : `?track=${encodeURIComponent(trackId)}`}`;
 
-/** Encodes the mask as a grey PNG (browser only). */
+/** Encodes a grey map (the sun shadows) as a PNG (browser only). */
 export function encodeMask(mask: Uint8Array, res = PAINT_RES, always = false): string | null {
   if (typeof document === 'undefined' || (!always && !mask.some((v) => v > 0))) return null;
   const canvas = document.createElement('canvas');
@@ -569,7 +823,7 @@ export function encodeMask(mask: Uint8Array, res = PAINT_RES, always = false): s
   return canvas.toDataURL('image/png');
 }
 
-/** Decodes a saved mask (browser only). */
+/** Decodes a saved grey map (browser only). */
 export function decodeMask(url: string, res = PAINT_RES): Promise<Uint8Array | null> {
   if (typeof document === 'undefined') return Promise.resolve(null);
   return new Promise((resolve) => {
@@ -590,13 +844,29 @@ export function decodeMask(url: string, res = PAINT_RES): Promise<Uint8Array | n
   });
 }
 
+const isGroundDoc = (doc: unknown): doc is IslandGroundDoc =>
+  !!doc && typeof doc === 'object' && ((doc as IslandGroundDoc).version === 1 || (doc as IslandGroundDoc).version === 2);
+
 export function readGroundDoc(trackId: string): IslandGroundDoc | null {
   try {
     const raw = localStorage.getItem(islandGroundKey(trackId));
     if (!raw) return null;
-    const doc = JSON.parse(raw) as IslandGroundDoc;
-    return doc && doc.version === 1 ? { ...doc, settings: normalizeIslandGround(doc.settings) } : null;
+    const doc = JSON.parse(raw) as unknown;
+    return isGroundDoc(doc) ? { ...doc, settings: normalizeIslandGround(doc.settings) } : null;
   } catch { return null; }
+}
+
+/** The brush paint from either version of the document (browser only for v1's PNG). */
+export async function decodeGroundPaint(doc: IslandGroundDoc): Promise<Uint8Array | null> {
+  if (!doc.mask) return null;
+  if (doc.version === 2) {
+    try { return SurfaceMask.decode(PAINT_RES, PAINT_RES, doc.mask).data; } catch { return null; }
+  }
+  const coverage = await decodeMask(doc.mask);
+  if (!coverage) return null;
+  const mask = new SurfaceMask(PAINT_RES, PAINT_RES);
+  migrateDirtCoverage(coverage, mask);
+  return mask.data;
 }
 
 /** Loads a track's ground into `ground`: the browser copy, else the disk copy. */
@@ -606,17 +876,16 @@ export async function loadGround(ground: IslandGround, trackId: string): Promise
     try {
       const res = await fetch(islandGroundEndpoint(trackId));
       if (res.ok) {
-        const found = await res.json() as IslandGroundDoc | null;
-        if (found && found.version === 1) doc = { ...found, settings: normalizeIslandGround(found.settings) };
+        const found = await res.json() as unknown;
+        if (isGroundDoc(found)) doc = { ...found, settings: normalizeIslandGround(found.settings) };
       }
     } catch { /* no dev server: defaults */ }
   }
   if (!doc) return;
   ground.apply(doc.settings);
-  if (doc.mask) {
-    const mask = await decodeMask(doc.mask);
-    if (mask) ground.setMask(mask);
-  }
+  const paint = await decodeGroundPaint(doc);
+  if (paint) ground.setHand(paint);
+  if (doc.version === 2 && doc.road) ground.loadRoad(doc.road);
   if (doc.shadow?.png) {
     const map = await decodeMask(doc.shadow.png, doc.shadow.res);
     if (map) ground.setShadow({ map, res: doc.shadow.res, sun: doc.shadow.sun });
@@ -627,7 +896,8 @@ export async function loadGround(ground: IslandGround, trackId: string): Promise
 export function saveGround(ground: IslandGround, trackId: string): boolean {
   const shadow = ground.getShadow();
   const doc: IslandGroundDoc = {
-    version: 1, settings: ground.get(), mask: encodeMask(ground.mask), bounds: { half: PAINT_HALF, res: PAINT_RES },
+    version: 2, settings: ground.get(), mask: ground.isPainted() ? ground.hand.encode() : null,
+    road: ground.roadDoc(trackId), bounds: { half: PAINT_HALF, res: PAINT_RES },
     shadow: shadow ? { png: encodeMask(shadow.map, shadow.res, true) ?? '', res: shadow.res, sun: shadow.sun } : null,
   };
   const text = JSON.stringify(doc);

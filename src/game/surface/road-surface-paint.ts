@@ -26,9 +26,11 @@
  */
 import * as THREE from 'three';
 import { lateralFromLaneZ, type TrackSpaceMap } from '../track-space';
-import { ATLAS_GRID, ATLAS_PAD, SurfaceAtlas, type SurfaceSources } from './surface-atlas';
+import { SurfaceAtlas, type SurfaceSources } from './surface-atlas';
+import { SURFACE_SAMPLING_GLSL } from './surface-shader';
 import { RoadMask, ROAD_MASK_ACROSS, ROAD_MASK_STEP } from './road-mask';
 import { readRoadMask, writeRoadMask, type SurfaceWriteResult } from './surface-storage';
+import { AutoPaint, jobsFromDoc, jobsToDoc, trackPaintField } from './auto-paint';
 
 /** How far above the road the paint floats. Below the lane paint (8) so lane paint stays on top. */
 export const SURFACE_PAINT_LIFT = 3;
@@ -142,33 +144,8 @@ uniform vec3 uCentreColor;
 varying vec2 vSurfUv;
 varying float vSurfHalf;
 
-const float SURF_GRID = ${ATLAS_GRID}.0;
-const float SURF_PAD = ${ATLAS_PAD};
-const float SURF_SLOTS = 16.0;
-
-bool surfIs(float a, float b) { return abs(a - b) < 0.5; }
-vec4 maskTexel(vec2 cell) {
-  cell = clamp(cell, vec2(0.0), uMaskSize - 1.0);
-  return texture2D(uSurfMask, (cell + 0.5) / uMaskSize);
-}
-/** How much of surface \`id\` a texel holds: its id1 share, its id0 share, or both when solid. */
-float surfPresence(vec4 t, float id) {
-  float p = 0.0;
-  if (surfIs(t.g * 255.0, id)) p += t.b;
-  if (surfIs(t.r * 255.0, id)) p += 1.0 - t.b;
-  return p;
-}
-/** One function for every surface: an atlas cell today, a texture-array layer in Phase 5. */
-vec3 sampleSurface(float id, vec2 world) {
-  float col = mod(id, SURF_GRID);
-  float row = floor(id / SURF_GRID);
-  vec2 t = fract(world / uSurfRepeat);
-  vec2 uv = (vec2(col, row) + SURF_PAD + t * (1.0 - 2.0 * SURF_PAD)) / SURF_GRID;
-  return texture2D(uSurfAtlas, uv).rgb;
-}
-vec4 surfaceParams(float id) { return texture2D(uSurfParams, vec2((id + 0.5) / SURF_SLOTS, 0.5)); }
+${SURFACE_SAMPLING_GLSL}
 float surfBit(float flags, float k) { return mod(floor(flags / pow(2.0, k)), 2.0); }
-float surfHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float surfGauss(float x) { return exp(-x * x / (2.0 * 0.014 * 0.014)); }
 /** Tyre tracks: two gaussians per lane, four lanes. Zero textures (plan §2.3). */
 float surfWear(float u) {
@@ -189,24 +166,17 @@ float surfLine(float u, float c, float halfW, float roadHalf) {
 export const SURFACE_FRAGMENT_BODY = /* glsl */`
 // ---- NewRoads: mask → two surfaces → one blend --------------------------------
 vec2 mcoord = vec2(vSurfUv.x * uMaskSize.x, vSurfUv.y * uMaskStepInv);
-vec4 mc = maskTexel(floor(mcoord));
-float id0 = mc.r * 255.0;
-float id1 = mc.g * 255.0;
-// Weight: bilinear over the four nearest texels' share of id1, so a 60-unit texel does not show as a
-// step while the IDs themselves are never interpolated.
-vec2 mp = mcoord - 0.5;
-vec2 mi = floor(mp);
-vec2 mf = mp - mi;
-float w = mix(
-  mix(surfPresence(maskTexel(mi), id1), surfPresence(maskTexel(mi + vec2(1.0, 0.0)), id1), mf.x),
-  mix(surfPresence(maskTexel(mi + vec2(0.0, 1.0)), id1), surfPresence(maskTexel(mi + vec2(1.0, 1.0)), id1), mf.x),
-  mf.y);
-if (surfIs(id0, id1)) w = 1.0;
-
 vec2 surfWorld = vec2(vSurfUv.x * 2.0 * vSurfHalf, vSurfUv.y);
-vec3 surfAlbedo = mix(sampleSurface(id0, surfWorld), sampleSurface(id1, surfWorld), w);
-vec4 sp0 = surfaceParams(id0);
-vec4 sp1 = surfaceParams(id1);
+vec2 surfDx = dFdx(surfWorld);
+vec2 surfDy = dFdy(surfWorld);
+vec3 sm = surfSample(uSurfMask, uMaskSize, mcoord);
+float id0 = sm.x;
+float id1 = sm.y;
+float w = sm.z;
+vec4 mc = surfTexel(uSurfMask, uMaskSize, floor(mcoord));
+vec3 surfAlbedo = surfPair(uSurfAtlas, id0, id1, w, surfWorld, uSurfRepeat, surfDx, surfDy);
+vec4 sp0 = surfParamsOf(uSurfParams, id0);
+vec4 sp1 = surfParamsOf(uSurfParams, id1);
 float surfRough = mix(sp0.r, sp1.r, w);
 float surfWet = mix(sp0.g, sp1.g, w);
 // Surface 0 is the road underneath: wherever it dominates, the overlay lets it through.
@@ -292,6 +262,12 @@ export class RoadSurfacePaint {
     uMarkColor: THREE.IUniform<THREE.Color>;
     uCentreColor: THREE.IUniform<THREE.Color>;
   };
+  /**
+   * The auto-paint runner over this road's mask (rules, presets, undo, job records). It writes the same
+   * `RoadMask` the brush paints, so `update()` uploads one dirty rectangle either way and a save carries
+   * both together.
+   */
+  readonly auto: AutoPaint;
   private readonly maskTexture: THREE.DataTexture;
   private readonly atlas: SurfaceAtlas | null;
   private readonly storage?: Storage;
@@ -379,6 +355,12 @@ export class RoadSurfacePaint {
     }
     this.stats.chunks = this.meshes.length;
     parent.add(this.root);
+
+    // AutoPaint: the easy passes write the same mask the brush does, so there is one paint, one dirty
+    // rect and one save path. Any jobs recorded on the saved mask come back with it, which is what
+    // lets an author re-run a course's paint after changing the road under it.
+    this.auto = new AutoPaint(trackPaintField(this.mask, map));
+    for (const job of jobsFromDoc(this.mask.jobs)) this.auto.jobs.push(job);
   }
 
   /** Once per frame. Uploads the mask if the brush touched it; fills atlas cells as PNGs decode. */
@@ -407,8 +389,9 @@ export class RoadSurfacePaint {
     return this.mask.surfaceIdAt(sc, u);
   }
 
-  /** Persist the mask (content-hashed; a no-op when nothing changed). */
+  /** Persist the mask (content-hashed; a no-op when nothing changed) and the auto-paint job records. */
   save(): SurfaceWriteResult {
+    this.mask.jobs = this.auto ? jobsToDoc(this.auto.jobs) : [];
     return writeRoadMask(this.courseId, this.mask, this.storage);
   }
 

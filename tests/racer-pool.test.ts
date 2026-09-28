@@ -6,12 +6,19 @@ import { Renderer3D } from '../src/game/renderer-3d';
 import { getTrackSpace } from '../src/game/track-space';
 import { RADIUS, START_X, courseY } from '../src/game/scene';
 
+/** The Hoop-Pod fleet needs WebGL textures; the pool tests only need to see what it was handed. */
+function stubPods() {
+  const shown: boolean[] = [];
+  return { shown, count: 0, setCount(n: number) { this.count = n; }, setRacer(i: number, _r: unknown, _p: unknown, _q: unknown, _roll: number, visible: boolean) { shown[i] = visible; }, commit() {}, dispose() {} };
+}
+
 // Only bypass the DOM/WebGL constructor. Exercise the production pool methods and
 // observe real Material/Texture/Geometry dispose events, not a replica of the pool.
 function pool(canvases: HTMLCanvasElement[]) {
   return Object.assign(Object.create(Renderer3D.prototype), {
     scene: new THREE.Scene(), storedAssets: { raceBalls: canvases },
-    racers3D: [], racerResources: null, racerTextures: new Map(), destroyed: false,
+    racers3D: [], racerResources: null, racerTextures: new Map(), destroyed: false, pods: stubPods(),
+    shieldScale: new THREE.Vector3(1, 1, 1),
     racerMatrix: new THREE.Matrix4(), racerScale: new THREE.Vector3(1, 1, 1), racerOffset: new THREE.Vector3(),
     shadowQuat: new THREE.Quaternion(), shieldQuat: new THREE.Quaternion(),
     shadowUp: new THREE.Vector3(), shadowScale: new THREE.Vector3(), shadowFade: new THREE.Color(),
@@ -35,6 +42,7 @@ type Pool = {
     caps: THREE.InstancedMesh; shadows: THREE.InstancedMesh; shields: THREE.InstancedMesh;
   };
   scene: THREE.Scene;
+  pods: ReturnType<typeof stubPods>;
   disposeRacerPool(): void;
   drawRacers(frame: unknown, dt: number, firstPerson: boolean, ramps: readonly unknown[], playerDist: number): number;
 };
@@ -93,7 +101,7 @@ for (const count of [20, 50, 100]) {
   });
 }
 
-test('M7: 100 racers draw in a handful of instanced calls, not ~400 meshes', () => {
+test('M7: 100 racers draw in a handful of instanced calls, not ~400 meshes (Hoop-Pod bodies, ball shadows and shields)', () => {
   // 13 distinct painted balls, as a 100-racer roster bakes them.
   const looks = Array.from({ length: 13 }, () => ({}) as HTMLCanvasElement);
   const p = pool(Array.from({ length: 100 }, (_, i) => looks[i % looks.length]));
@@ -106,14 +114,19 @@ test('M7: 100 racers draw in a handful of instanced calls, not ~400 meshes', () 
   const drawn = (p.scene.children as THREE.InstancedMesh[]).filter((mesh) => mesh.count > 0);
   assert.ok(drawn.length <= 16, `${drawn.length} draw calls`);
   const cores = [...p.racerTextures.values()].reduce((sum, batch) => sum + batch.mesh.count, 0);
-  // First person hides the player's own ball; racer 9 is hidden.
-  assert.equal(cores, 98);
-  assert.equal(p.racerResources.caps.count, 98);
+  // The Hoop-Pod fleet draws every body: the ball's core and cap batches stay empty.
+  assert.equal(cores, 0);
+  assert.equal(p.racerResources.caps.count, 0);
+  assert.equal(p.pods.count, 100, 'the fleet is sized to the field');
+  // First person hides the player's own pod; racer 9 is hidden.
+  assert.equal(p.pods.shown.filter(Boolean).length, 98);
+  assert.equal(p.pods.shown[0], false); assert.equal(p.pods.shown[9], false);
+  // The approved contact shadow and shield bubble still come from the renderer.
   assert.equal(p.racerResources.shadows.count, 98);
   assert.equal(p.racerResources.shields.count, 1, 'only the shielded racer draws a bubble');
-  // Each instance sits where placement puts its racer.
+  // Each shadow sits where placement puts its racer.
   const m = new THREE.Matrix4(); const at = new THREE.Vector3();
-  p.racers3D[1].core.mesh.getMatrixAt(0, m);
+  p.racerResources.shadows.getMatrixAt(0, m);
   at.setFromMatrixPosition(m);
   assert.ok(Number.isFinite(at.x) && at.lengthSq() > 0);
   p.disposeRacerPool();

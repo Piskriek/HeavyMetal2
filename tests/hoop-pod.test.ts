@@ -121,3 +121,14 @@ test('descriptions never rely on colour alone', () => {
   }
   assert.equal(POD_PATTERNS.length, 7);
 });
+
+test('races draw the pod at the ball size, with the approved shadow and shield (never a wire cage)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const fleet = readFileSync(new URL('../src/game/pod/pod-fleet.ts', import.meta.url), 'utf8');
+  const renderer = readFileSync(new URL('../src/game/renderer-3d.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(fleet, /wireframe/, 'the fleet draws no wireframe shield');
+  assert.doesNotMatch(fleet, /HoopPods_Shadow|HoopPods_Shield/, 'shadow and shield are the renderer\'s approved ones');
+  assert.match(renderer, /new HoopPodFleet\(this\.scene, \{ radius: BALL_DRAW_RADIUS \}\)/, 'the pod fills the ball it replaces');
+  assert.match(renderer, /shared\.shadows\.setMatrixAt/, 'the contact shadow stays on the road');
+  assert.match(renderer, /shared\.shields\.setMatrixAt/, 'the shield bubble is the approved one');
+});

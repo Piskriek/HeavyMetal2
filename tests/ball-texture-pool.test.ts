@@ -33,11 +33,17 @@ test('MP-T03: 100 layers fit in 25 MB and the material samples the array', () =>
   assert.match(shader.vertexShader, /attribute float aBallLayer/);
 });
 
-test('MP-T03: 100 distinct balls draw their cores in one call', () => {
+/** The Hoop-Pod fleet needs WebGL textures; the pool tests only need to see what it was handed. */
+function stubPods() {
+  const shown: boolean[] = [];
+  return { shown, count: 0, setCount(n: number) { this.count = n; }, setRacer(i: number, _r: unknown, _p: unknown, _q: unknown, _roll: number, visible: boolean) { shown[i] = visible; }, commit() {}, dispose() {} };
+}
+
+test('MP-T03: 100 distinct balls share one texture array, and in races the Hoop-Pod fleet draws their bodies', () => {
   const canvases = Array.from({ length: 100 }, () => ({}) as HTMLCanvasElement);
   const p = Object.assign(Object.create(Renderer3D.prototype), {
     scene: new THREE.Scene(), storedAssets: { raceBalls: canvases },
-    racers3D: [], racerResources: null, racerTextures: new Map(), destroyed: false, ballPool: new BallTexturePool(128),
+    racers3D: [], racerResources: null, racerTextures: new Map(), destroyed: false, ballPool: new BallTexturePool(128), pods: stubPods(), shieldScale: new THREE.Vector3(1, 1, 1),
     racerMatrix: new THREE.Matrix4(), racerScale: new THREE.Vector3(1, 1, 1), racerOffset: new THREE.Vector3(),
     shadowQuat: new THREE.Quaternion(), shieldQuat: new THREE.Quaternion(), coreQuat: new THREE.Quaternion(), gyroQuat: new THREE.Quaternion(),
     shadowUp: new THREE.Vector3(), shadowScale: new THREE.Vector3(), shadowFade: new THREE.Color(),
@@ -46,10 +52,9 @@ test('MP-T03: 100 distinct balls draw their cores in one call', () => {
   p.setRacerCount(100);
   const racers = Array.from({ length: 100 }, (_, i) => ({ x: START_X + 500 + i * 60, y: courseY(START_X + 500 + i * 60, 'ridge') - RADIUS, z: 0, grounded: true, shieldUntil: 0 }));
   p.drawRacers({ racers, runTime: 1, options: { course: 'ridge' } }, 1 / 60, false, [], 0);
-  const cores = (p.scene.children as THREE.InstancedMesh[]).filter((m) => m.count > 0 && /RacerCores/.test(m.name));
-  assert.equal(cores.length, 1, 'one core draw');
-  assert.equal(cores[0].count, 100);
-  const layers = cores[0].geometry.getAttribute('aBallLayer');
-  assert.equal(new Set(Array.from({ length: 100 }, (_, i) => layers.getX(i))).size, 100, 'each ball its own layer');
+  const cores = (p.scene.children as THREE.InstancedMesh[]).filter((m) => /RacerCores/.test(m.name));
+  assert.equal(cores.length, 1, 'one core batch for all 100 looks');
+  assert.equal(cores[0].count, 0, 'the fleet draws the bodies, not the core batch');
+  assert.equal(p.pods.shown.filter(Boolean).length, 100, 'every racer is handed to the fleet');
   p.disposeRacerPool();
 });

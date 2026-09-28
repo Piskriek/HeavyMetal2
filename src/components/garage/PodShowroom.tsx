@@ -178,10 +178,10 @@ export default function PodShowroom({ baked, capFinish, onSurface, onCap, onPort
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       if (!down && !reduced?.matches && now - lastTouch > 2500) rollPhase = (rollPhase + dt * 0.35) % (Math.PI * 2);
       pose();
-      fleet.setRacer(0, racer, origin, yawQuat, rollPhase, true, 0, dt);
+      fleet.setRacer(0, racer, origin, yawQuat, rollPhase, true, dt);
       const stage = stageRef.current;
       if (stage?.pending) { fleet.setLivery(0, stage.pending, 0); stage.pending = null; }
-      fleet.commit(camera, dt, reduced?.matches ?? false, canvas.clientHeight);
+      fleet.commit(camera, canvas.clientHeight);
       renderer.render(scene, camera);
       frame = requestAnimationFrame(tick);
     };

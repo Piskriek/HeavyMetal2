@@ -313,12 +313,12 @@ function PodPreview({ livery, still, label }: { livery: PodLivery; still: boolea
         roll = (roll + dt * 1.6) % (Math.PI * 2);
       }
       yaw.setFromAxisAngle(up, yawRef.current);
-      fleet.setRacer(0, racer, pos, yaw, roll, true, 0, dt);
+      fleet.setRacer(0, racer, pos, yaw, roll, true, dt);
       if (dirtyRef.current) {
         fleet.setLivery(0, liveryRef.current);
         dirtyRef.current = false;
       }
-      fleet.commit(camera, dt, stillRef.current, host.clientHeight);
+      fleet.commit(camera, host.clientHeight);
       renderer.render(scene, camera);
     };
     raf = requestAnimationFrame(tick);

@@ -56,6 +56,8 @@ const TERRAIN_DROP = 100;
 const RIVER_X = -7000;
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+/** A PlaneGeometry faces +Z. */
+const PLANE_NORMAL = new THREE.Vector3(0, 0, 1);
 const ZERO = new THREE.Vector3();
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -1611,6 +1613,13 @@ export class Renderer3D {
   /** Core batches keyed by canvas (null = untextured), so identical loadout/rim combos share one draw. */
   private readonly racerTextures = new Map<HTMLCanvasElement | null, CoreBatch>();
   private readonly racerOffset = new THREE.Vector3();
+  private readonly racerMatrix = new THREE.Matrix4();
+  private readonly shadowQuat = new THREE.Quaternion();
+  private readonly shadowUp = new THREE.Vector3();
+  private readonly shadowScale = new THREE.Vector3();
+  private readonly shadowFade = new THREE.Color();
+  private readonly shieldQuat = new THREE.Quaternion();
+  private readonly shieldScale = new THREE.Vector3(1, 1, 1);
   private storedAssets: GameAssets;
   private readonly camUp = new THREE.Vector3(0, 1, 0);
   readonly trackBuilder: TrackBuilder3D;
@@ -1796,7 +1805,8 @@ export class Renderer3D {
     if (this.island) void this.island.ready.then(() => this.trackBuilder.sculpt?.sync());
 
     // Racers
-    this.pods = new HoopPodFleet(this.scene);
+    // Drawn at the ball's own size, so the pod fills the ball's shadow and shield and sits on the road.
+    this.pods = new HoopPodFleet(this.scene, { radius: BALL_DRAW_RADIUS });
     this.ensureRacerMeshes(4); // default field; the engine resizes via setRacerCount
 
     this.placeCamera(this.D_START, 0.1, 'follow_ball', 0);
@@ -2228,7 +2238,7 @@ export class Renderer3D {
     for (const batch of this.racerTextures.values()) batch.mesh.count = 0;
     shared.caps.count = shared.shadows.count = shared.shields.count = 0;
     let playerAltitude = 0;
-    const position = this.racerOffset;
+    const position = this.racerOffset; const m = this.racerMatrix;
     for (let i = 0; i < frame.racers.length; i++) {
       const racer = frame.racers[i];
       const slot = this.racers3D[i];
@@ -2256,14 +2266,38 @@ export class Renderer3D {
       // The tight chase rig needs the player's own altitude (see placeCamera).
       if (i === 0) playerAltitude = placement.world.y - (this.viewTrack.sampleAt(playerDist).pos.y + RADIUS);
 
-      // Hoop-Pod (IF-GYRO): the fleet draws the racer, its shield and its blob shadow; the legacy
-      // batches stay empty. The hoops take the shell roll, the inner ball and caps the level basis;
-      // the fleet copies numbers the sim already owns and writes nothing back. hoop-pod:v2
+      const shielded = (racer.shieldUntil ?? 0) > frame.runTime;
+      // A slow spin on the bubble, held still under reduced motion.
+      if (shielded && !frame.reducedMotion) slot.shieldSpin += dt * 0.9;
+
+      // Hoop-Pod (IF-GYRO): the fleet draws the pod body (the ball's core and caps batches stay empty).
+      // The hoops take the shell roll, the inner ball and caps the level basis; the fleet copies numbers
+      // the sim already owns and writes nothing back. hoop-pod:v2
       // T0/T3: the eye sits inside the player's own pod, so it is not drawn in first person.
       const gyro = gyroPose(racer.rollPhase ?? 0, this.worldFrame(placement.frame));
       this.gyroQuat.set(gyro.gyro[0], gyro.gyro[1], gyro.gyro[2], gyro.gyro[3]);
       const shown = !((firstPerson && i === 0) || racer.hidden);
-      this.pods.setRacer(i, racer, position, this.gyroQuat, racer.rollPhase ?? 0, shown, frame.runTime, dt);
+      this.pods.setRacer(i, racer, position, this.gyroQuat, racer.rollPhase ?? 0, shown, dt);
+      if (!shown) continue;
+
+      // The approved shield bubble and contact shadow, as for the ball.
+      if (shielded) {
+        this.shieldQuat.setFromAxisAngle(WORLD_UP, slot.shieldSpin);
+        shared.shields.setMatrixAt(shared.shields.count++, m.compose(position, this.shieldQuat, this.shieldScale));
+      }
+      // P5: the contact shadow lies on the road under the racer, tilted with the road (banks and
+      // drops), fading and spreading as it leaves the road.
+      const f = placement.frame; const lateral = placement.lateral;
+      const groundX = f.pos.x + f.right.x * lateral; const groundY = f.pos.y + f.right.y * lateral + lift; const groundZ = f.pos.z + f.right.z * lateral;
+      const clearance = (placement.world.x - groundX) * f.up.x + (placement.world.y + lift - groundY) * f.up.y + (placement.world.z - groundZ) * f.up.z - BALL_DRAW_RADIUS;
+      const look = shadowAt(clearance);
+      if (look.fade > 0) {
+        position.set(groundX + f.up.x * SHADOW_LIFT, groundY + f.up.y * SHADOW_LIFT, groundZ + f.up.z * SHADOW_LIFT);
+        this.shadowQuat.setFromUnitVectors(PLANE_NORMAL, this.shadowUp.set(f.up.x, f.up.y, f.up.z).normalize());
+        const n = shared.shadows.count++;
+        shared.shadows.setMatrixAt(n, m.compose(position, this.shadowQuat, this.shadowScale.setScalar(look.scale)));
+        shared.shadows.setColorAt(n, this.shadowFade.setRGB(look.fade, look.fade, look.fade));
+      }
     }
     const batches = [shared.caps, shared.shadows, shared.shields];
     for (const batch of this.racerTextures.values()) batches.push(batch.mesh);
@@ -2349,7 +2383,7 @@ export class Renderer3D {
       this.updateAtmosphere(this.trackBuilder.previewAtmosphere ? this.trackBuilder.cameraTrackDistance() : 0);
     }
     // Hoop-Pod: pack after the camera is placed, so LOD and culling use this frame's view.
-    this.pods.commit(this.camera, dt, frame.reducedMotion, this.renderer.domElement.clientHeight || 720);
+    this.pods.commit(this.camera, this.renderer.domElement.clientHeight || 720);
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;
     this.island?.sky.position.copy(this.camera.position);

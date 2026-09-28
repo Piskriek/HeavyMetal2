@@ -7,7 +7,9 @@
  *   band 0  standard ≈2k tris   projected radius ≥ 56 px
  *   band 1  lite     ≈1k tris   ≥ 16 px
  *   band 2  far      ≈170 tris  below that — crowns only, the "very low poly at a distance" mesh
- *   + instanced blob shadows and shields
+ *
+ * The fleet draws the pod body only. In races the renderer keeps drawing the approved contact shadow
+ * (on the road, tilting with it and fading as the racer leaves it) and the approved shield bubble.
  *
  * LOD is chosen in SCREEN SPACE (camera FOV and viewport height), with hysteresis so a pod on a
  * threshold never flickers. Pods outside the frustum or beyond `cullDistance` are not drawn at all.
@@ -42,7 +44,7 @@ export interface PodBakeInput { readonly albedo: RgbaImage; readonly emissive: R
 export interface HoopPodFleetOptions {
   /** Instance capacity. Defaults to MAX_RACERS (100). */
   readonly capacity?: number;
-  /** Collision radius the contact hoops are fitted to. Defaults to scene RADIUS. */
+  /** Radius the pod is drawn at (its contact hoops ride this high). Races pass BALL_DRAW_RADIUS. */
   readonly radius?: number;
   /** Meshes for bands 0/1/2. Defaults to standard/lite/far; the garage uses hero for all three. */
   readonly lods?: readonly [PodLod, PodLod, PodLod];
@@ -61,8 +63,6 @@ export interface HoopPodFleetOptions {
 }
 
 const TAU = Math.PI * 2;
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
-const X_AXIS = new THREE.Vector3(1, 0, 0);
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 const LIV = 19; // prim3 sec3 trim3 glass3 decal3 style4
 const COLOR_KEYS = ['iPrim', 'iSec', 'iTrim', 'iGlass', 'iDecal'] as const;
@@ -91,15 +91,11 @@ export class HoopPodFleet {
   private readonly bakeLayers: number;
   private readonly materials: PodMaterials;
   private readonly bands: readonly [Band, Band, Band];
-  private readonly shadow: THREE.InstancedMesh;
-  private readonly shield: THREE.InstancedMesh;
-  private readonly shadowTexture: THREE.CanvasTexture;
 
   private count = 0;
   private readonly pos: Float32Array;
   private readonly quat: Float32Array;
   private readonly visible: Uint8Array;
-  private readonly shieldOn: Uint8Array;
   private readonly band: Int8Array;
   private readonly roll: Float32Array;
   private readonly diff: Float32Array;
@@ -117,20 +113,16 @@ export class HoopPodFleet {
   private designLivery: PodLivery | null = null;
   private designToken = 0;
   private designTimer: ReturnType<typeof setTimeout> | null = null;
-  private shieldSpin = 0;
   private disposed = false;
 
   private readonly m4 = new THREE.Matrix4();
   private readonly p = new THREE.Vector3();
   private readonly q = new THREE.Quaternion();
-  private readonly q2 = new THREE.Quaternion();
-  private readonly up = new THREE.Vector3();
   private readonly s = new THREE.Vector3();
   private readonly color = new THREE.Color();
   private readonly frustum = new THREE.Frustum();
   private readonly projScreen = new THREE.Matrix4();
   private readonly sphere = new THREE.Sphere();
-  private readonly flatQuat = new THREE.Quaternion().setFromAxisAngle(X_AXIS, -Math.PI / 2);
 
   private readonly onLivery = (event: Event) => {
     const detail = (event as CustomEvent<unknown>).detail;
@@ -185,29 +177,9 @@ export class HoopPodFleet {
     this.bands = [band(lods[0], 'HoopPods_Near'), band(lods[1], 'HoopPods_Mid'), band(lods[2], 'HoopPods_Far')];
     this.triangles = [podGeometry(lods[0]).triangles, podGeometry(lods[1]).triangles, podGeometry(lods[2]).triangles];
 
-    this.shadowTexture = blobTexture();
-    this.shadow = new THREE.InstancedMesh(
-      new THREE.PlaneGeometry(this.radius * 2.5, this.radius * 2.5),
-      new THREE.MeshBasicMaterial({ map: this.shadowTexture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
-      cap,
-    );
-    this.shadow.name = 'HoopPods_Shadow';
-    this.shield = new THREE.InstancedMesh(
-      new THREE.SphereGeometry(this.radius * 1.35, 16, 12),
-      new THREE.MeshBasicMaterial({ color: 0x44ddff, transparent: true, opacity: 0.45, wireframe: true }),
-      cap,
-    );
-    this.shield.name = 'HoopPods_Shield';
-    for (const m of [this.shadow, this.shield]) {
-      m.frustumCulled = false;
-      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      m.count = 0;
-    }
-
     this.pos = new Float32Array(cap * 3);
     this.quat = new Float32Array(cap * 4);
     this.visible = new Uint8Array(cap);
-    this.shieldOn = new Uint8Array(cap);
     this.band = new Int8Array(cap).fill(-1);
     this.roll = new Float32Array(cap);
     this.diff = new Float32Array(cap);
@@ -220,7 +192,7 @@ export class HoopPodFleet {
     this.liveryId = new Array<number | undefined | null>(cap).fill(null);
     for (let i = 0; i < cap; i++) this.quat[i * 4 + 3] = 1;
 
-    scene.add(this.bands[0].mesh, this.bands[1].mesh, this.bands[2].mesh, this.shadow, this.shield);
+    scene.add(this.bands[0].mesh, this.bands[1].mesh, this.bands[2].mesh);
     if ((options.listen ?? true) && typeof window !== 'undefined') {
       window.addEventListener(POD_LIVERY_EVENT, this.onLivery);
       window.addEventListener(POD_DESIGN_EVENT, this.onDesign);
@@ -235,7 +207,7 @@ export class HoopPodFleet {
     const next = clamp(Math.floor(Number.isFinite(count) ? count : 0), 0, this.capacity);
     for (let i = this.count; i < next; i++) {
       this.roll[i] = this.diff[i] = this.pitch[i] = this.lean[i] = this.prevRate[i] = 0;
-      this.visible[i] = this.shieldOn[i] = 0;
+      this.visible[i] = 0;
       this.band[i] = -1;
       this.liveryLoadout[i] = this.liveryColor[i] = undefined;
       this.liveryId[i] = null;
@@ -249,7 +221,7 @@ export class HoopPodFleet {
    * Copies one racer's frame. `gyro` is the level basis from `gyroPose(...).gyro`; the hoops take
    * −rollPhase about local X exactly like the legacy `core` mesh did.
    */
-  setRacer(index: number, racer: PodRacerInput, world: PodVec3, gyro: THREE.Quaternion, rollPhase: number, visible: boolean, runTime: number, dt: number): void {
+  setRacer(index: number, racer: PodRacerInput, world: PodVec3, gyro: THREE.Quaternion, rollPhase: number, visible: boolean, dt: number): void {
     if (this.disposed || index < 0 || index >= this.count) return;
     const i = index;
     this.pos[i * 3] = world.x;
@@ -274,7 +246,6 @@ export class HoopPodFleet {
       this.diff[i] = (this.diff[i] + rate * clamp(vz / 600, -1, 1) * step) % (TAU * 1000);
     }
     this.prevRate[i] = rate;
-    this.shieldOn[i] = (racer.shieldUntil ?? -Infinity) > runTime ? 1 : 0;
 
     if (racer.loadout !== this.liveryLoadout[i] || racer.color !== this.liveryColor[i] || racer.id !== this.liveryId[i]) {
       this.liveryLoadout[i] = racer.loadout;
@@ -290,9 +261,8 @@ export class HoopPodFleet {
    * Packs the frame. Call AFTER the camera is placed for this frame.
    * @param viewportHeight CSS pixels of the canvas (screen-space LOD); defaults to 720.
    */
-  commit(camera?: THREE.Camera, dt = 1 / 60, reducedMotion = false, viewportHeight = 720): void {
+  commit(camera?: THREE.Camera, viewportHeight = 720): void {
     if (this.disposed) return;
-    if (!reducedMotion) this.shieldSpin = (this.shieldSpin + dt * 4) % TAU;
     const persp = camera && (camera as THREE.PerspectiveCamera).isPerspectiveCamera ? (camera as THREE.PerspectiveCamera) : null;
     if (camera) {
       camera.updateMatrixWorld();
@@ -303,8 +273,6 @@ export class HoopPodFleet {
     const fov = persp ? persp.fov : 60;
     const vh = viewportHeight > 0 ? viewportHeight : 720;
     for (const b of this.bands) b.count = 0;
-    let shadows = 0;
-    let shields = 0;
 
     for (let i = 0; i < this.count; i++) {
       if (!this.visible[i]) continue;
@@ -327,19 +295,6 @@ export class HoopPodFleet {
       for (let c = 0; c < 5; c++) b.colors[c].setXYZ(k, this.livery[o + c * 3], this.livery[o + c * 3 + 1], this.livery[o + c * 3 + 2]);
       b.style.setXYZW(k, this.livery[o + 15], this.livery[o + 16], this.livery[o + 17], this.livery[o + 18]);
 
-      // Blob shadow, flat on the road under the contact hoops.
-      this.up.copy(Y_AXIS).applyQuaternion(this.q);
-      this.p.addScaledVector(this.up, -(this.radius - 2));
-      this.q2.copy(this.q).multiply(this.flatQuat);
-      this.m4.compose(this.p, this.q2, this.s.set(1, 1, 1));
-      this.shadow.setMatrixAt(shadows++, this.m4);
-
-      if (this.shieldOn[i]) {
-        this.p.addScaledVector(this.up, this.radius - 2);
-        this.q2.setFromAxisAngle(Y_AXIS, this.shieldSpin).premultiply(this.q);
-        this.m4.compose(this.p, this.q2, this.s.set(1, 1, 1));
-        this.shield.setMatrixAt(shields++, this.m4);
-      }
     }
 
     for (const b of this.bands) {
@@ -349,10 +304,6 @@ export class HoopPodFleet {
       flush(b.style, b.count);
       b.colors.forEach((a) => flush(a, b.count));
     }
-    this.shadow.count = shadows;
-    this.shield.count = shields;
-    flush(this.shadow.instanceMatrix, shadows);
-    flush(this.shield.instanceMatrix, shields);
   }
 
   /** How many pods each band drew last frame (diagnostics / data attributes). */
@@ -423,16 +374,10 @@ export class HoopPodFleet {
       this.scene.remove(b.mesh);
       b.mesh.geometry.dispose();
     }
-    this.scene.remove(this.shadow, this.shield);
     this.materials.surface.dispose();
     this.materials.depth.dispose();
     this.bake.albedo.dispose();
     this.bake.glow.dispose();
-    this.shadow.geometry.dispose();
-    (this.shadow.material as THREE.Material).dispose();
-    this.shadowTexture.dispose();
-    this.shield.geometry.dispose();
-    (this.shield.material as THREE.Material).dispose();
     releasePodTextures();
   }
 
@@ -503,19 +448,3 @@ function writeLayer(tex: THREE.DataArrayTexture, layer: number, img: RgbaImage |
   tex.needsUpdate = true;
 }
 
-function blobTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d');
-  if (g) {
-    const gr = g.createRadialGradient(64, 64, 4, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(8,10,9,.62)');
-    gr.addColorStop(0.55, 'rgba(8,10,9,.3)');
-    gr.addColorStop(1, 'rgba(8,10,9,0)');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 128, 128);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}

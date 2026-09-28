@@ -51,6 +51,27 @@ export const ACTIONS: ActionMeta[] = [
 
 export type KeyBindings = Record<ActionId, string[]>;
 
+/**
+ * H10: gamepad buttons per action, by index in the browser's standard mapping. The left stick
+ * also steers (src/game/input/gamepad.ts). Not rebindable yet.
+ */
+export const GAMEPAD_BINDINGS: Readonly<Record<ActionId, readonly number[]>> = {
+  steerLeft: [14], // d-pad left
+  steerRight: [15], // d-pad right
+  bounce: [0, 6], // A / Cross, left trigger
+  boost: [2, 5, 7], // X / Square, right bumper, right trigger
+  pause: [9], // Start / Options
+};
+
+/** H10: how each action reads on a pad, for the controls screens. */
+export const GAMEPAD_LABELS: Readonly<Record<ActionId, string>> = {
+  steerLeft: 'Left stick / D-pad left',
+  steerRight: 'Left stick / D-pad right',
+  bounce: 'A / Cross, or left trigger',
+  boost: 'X / Square, right bumper or right trigger',
+  pause: 'Start / Options',
+};
+
 function cloneDefaults(): KeyBindings {
   const out = {} as KeyBindings;
   for (const action of ACTIONS) {

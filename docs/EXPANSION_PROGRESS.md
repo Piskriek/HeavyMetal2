@@ -73,16 +73,6 @@ Section 4 is implemented in four installments, one per user prompt.
 
 Results/cup/progression presentation and persistent cup history; then empirical balance, end-to-end QA, frame pacing and release verification. A successful build is not proof of FPS, balance or accessibility.
 
-## Phase 3 Track Expansion
-
-### TICKET-08: Waterfall Cliff Zigzag & Pinball Chasm — Implemented
-
-- `src/game/scene.ts` now exposes a 36,000 m three-stage circuit: 12,000 m Alpine Ridge, 12,000 m Waterfall Cliff, and a 12,000 m mine-tunnel/stadium approach. Course profiles are precomputed through the 72,000 world-unit finish, with cliff gravity scaling and `wet_wood` / `moss_rock` traction.
-- `createStage2WaterfallSection()` deterministically places the downhill's full-width rock wall and the waterfall pinball contract; the normalized drop layout drives staggered rocks, ramps, tubes, rebounds, and water-flow slowdowns after the wall. The generated objects are spatially bucketed with the rest of the course, so the extension does not create a per-frame full-track scan.
-- The physics engine visibly enters the wall, locks the active camera head-on during the vertical fall, redirects racers with lateral rock/tube impulses, resolves bottom-rock impact, and hands the race to `createStage3MineSection()` with multiple rails, branch splits, gaps, and cavern obstacles.
-- PreGame bumper, spring, crate, skull-box, and surface-strip assets plus the generated head-on waterfall backdrop are shipped under `public/art/track-parts/` and preloaded before the grid. The renderer uses the wood/moss strips for the active surface, procedural waterfall motion, dark cliff fade, mine arches, branch mouths, and multi-rail tunnel network.
-- The 36 km finish, progress bar, race help, course itinerary, README, and world rules now describe the expanded waterfall-to-mine circuit. `TICKET-09` can still cover later end-cavern polish without deferring this playable handoff.
-
 ## Phase 1 Ticket Suite
 
 The ticket suite in `docs/tickets/` is implemented one issue at a time. `TICKET-01` (ornate frame system) shipped earlier; `TICKET-02` is implemented here.
@@ -105,6 +95,576 @@ The ticket suite in `docs/tickets/` is implemented one issue at a time. `TICKET-
 - `NewGameSetup` step 2 is now a stage: left rider deck (portrait, name, class tag), centre lit pedestal (`CharacterShowcase`) with the full-body rider beside the ball (ground shadows, faint reflection, gleam sweep that respects reduced motion), bottom ball deck with metallic previews, right stat deck with the TICKET-02 gauges. Swaps crossfade per figure.
 - In the race the ball rolls cleanly with a rider-colour rim; the rider's head crop now appears in the off-screen pointer badge.
 - The Sprite Lab catalogues full-body riders, badge portraits and racing balls; `tests/art-check.mjs` (20 checks) asserts the composite is retired, both stage figures decode and swap, and the race still paints; screenshots reviewed as images.
+
+### TICKET-09 Asset Generation Manifest — Generated
+
+- Five Section-3 track-part assets were generated into `public/art/track-parts/` per the ticket's asset generation manifest (issue #11 comment): `mine-rails.png` (512x512 alpha, vertically tileable iron-rail/wooden-sleeper segment), `mine-gate.png` (1024x512 alpha rock-archway cavern mouth with lantern posts, skull warning signs and iron chains), `lava-sheet.png` (512x512 seamless molten lava tile with basalt crust and fire veins), `cauldron-molten.png` (512x512 alpha swinging cast-iron smelting cauldron pouring molten slag), and `stadium-gantry.png` (1024x512 alpha brass-and-iron Scrapdome finish gantry with gears, checkered victory flags and victory horns).
+- Pipeline: painted in the established hand-painted goblin-mine style matching `public/art/concepts/section3-mine-rollercoaster-concept.jpg`; sprites keyed on flat magenta `#FF00FF` (the repo keying convention from `docs/ART_PIPELINE.md`) with ImageMagick, trimmed and aspect-fit onto the exact manifest canvases; the lava sheet was made seamless with a half-roll pyramid-mask blend; tileability verified with 2x2 and 2x1 tile montages inspected as images, and alpha verified with corner probes plus contrasting-backdrop flatten checks. Integration into the track renderer belongs to the TICKET-09 implementation work packages.
+
+### TICKET-09 Extended Asset Sets — Generated
+
+On top of the five manifest assets, three generation batches extended
+`public/art/track-parts/` into a full Section-3 kit (35 sprites). All new art was
+painted on flat magenta, processed by `scripts/process-track-parts.mjs` (key →
+fringe-only despill → trim → aspect-fit onto the exact runtime canvas, plus per-asset
+transparent/opaque pixel probes that fail the run when wrong), and verified with
+green-backdrop contact sheets and tile montages inspected as images.
+
+**Rock/wall cutouts that frame track sections as tunnels or walls** (composited
+corridor mock verified):
+- `rock-tunnel-frame-a/b/c.png` 1024x1024 alpha — full-slab rock walls with a clean
+  keyhole tunnel opening punched through (a/b brown rock with timber shoring, c dark
+  rock veined with blue-green crystals); layer over a section to frame it as a tunnel mouth.
+- `rock-ceiling-cutout.png` 1024x512 alpha — top-anchored stalactite ceiling strip.
+- `rock-floor-ledge.png` 1024x512 alpha — bottom-anchored rocky floor strip.
+- `rock-wall-left.png` / `rock-wall-right.png` 512x1024 alpha — edge-anchored cavern
+  wall panels for framing a corridor from the sides.
+- `rock-boulder-a/b.png` 512x512 alpha — standalone boulder clusters to place under
+  platforms or along track edges.
+
+**Platforms that sit on rocks with cheering goblins** (five variations):
+- `goblin-bleacher-a/b.png` 1024x512 — boulder-base platforms with wooden bleachers,
+  flag-waving crowds, drums, horns and torches.
+- `goblin-bleacher-c.png` 512x512 — small rock perch, three goblins with a checkered flag.
+- `goblin-bleacher-d.png` 512x512 — drum podium with skull banner.
+- `goblin-bleacher-e.png` 1024x512 — broad two-row terrace carved into a cavern wall.
+
+**Variant sets B and C of the five manifest assets** (multiple sets as requested):
+- `mine-rails-b/c.png` 512x512 alpha, vertically tileable (rope-lashed weathered
+  sleepers / blackened ember-cracked rails); vertical 2-tile montages verified.
+- `mine-gate-b/c.png` 1024x512 alpha (low wide mushroom-lit mouth / crystal cavern mouth).
+- `lava-sheet-b/c.png` 512x512 seamless (golden-veined / spectral emerald slag), made
+  seamless with the half-roll cosine-mask blend; 2x2 montages verified seam-free.
+- `cauldron-molten-b/c.png` 512x512 alpha (chain-hung pouring / boiling tripod cauldron).
+- `stadium-gantry-b/c.png` 1024x512 alpha (stone towers with goblin walkway / night
+  floodlights and fireworks).
+
+**Section-3 hazards and dressing:** `rail-switch.png` (forking rails with lever),
+`ore-cart.png`, `ore-bucket.png` (chain-hung swinging bucket), `tnt-crate.png`,
+`lantern-post.png`, and `waterfall-curtain.png` 512x1024 alpha (translucent cascade
+for the breakthrough moment).
+
+Renderer integration of all track-parts remains part of the TICKET-09 implementation
+work packages; this deliverable is the asset library plus the reproducible processing
+script.
+
+### Decoration Prop Variations (Batch 1 — 10 Variations with Magenta Key Transparency)
+
+Generated 10 variations of roadside and track decoration props based on the original props (`lantern-post`, `ore-cart`, `tnt-crate`, `ore-bucket`, `rail-switch`, `rock-deflector`, `cauldron-molten`, `landmark-windmill`, `landmark-pines`, and `blimp`):
+
+1. `public/art/props/prop-01-lantern-post-triple.png` (1024x1024) — Triple-lantern timber watchpost with chains, skull emblem, and cobblestone base.
+2. `public/art/props/prop-02-ore-cart-spilling.png` (1024x1024) — Tilted minecart spilling glowing magma rocks, gold ore, and embers on rails.
+3. `public/art/props/prop-03-tnt-powder-kegs.png` (1024x1024) — Gunpowder keg pyramid with dynamite bundles, skull TNT stencils, and sizzling fuse.
+4. `public/art/props/prop-04-smelting-crucible.png` (1024x1024) — Spiked iron smelting bucket with goblin gear crest and dripping molten gold.
+5. `public/art/props/prop-05-rail-turntable-switch.png` (1024x1024) — Railway switch tracks with dual-lever control box and signal lantern.
+6. `public/art/props/prop-06-crystal-rock-deflector.png` (1024x1024) — Rugged granite boulder deflector embedded with glowing amber crystal clusters.
+7. `public/art/props/prop-07-tripod-cauldron-molten.png` (1024x1024) — A-frame tripod smelting cauldron pouring molten metal onto glowing coals.
+8. `public/art/props/prop-08-goblin-windmill-gears.png` (912x1146) — Wooden windmill with patched sails, exposed brass cogs, and smoking chimney.
+9. `public/art/props/prop-09-pine-lookout-outcrop.png` (896x1197) — Mountain pine cluster with wooden goblin scout platform, hanging lantern, and ladder.
+10. `public/art/props/prop-10-scout-blimp-zeppelin.png` (1264x843) — Goblin scout airship with brass ribs, spinning propellers, and hanging gondola.
+
+- All 10 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet on magenta key background generated in `public/art/sheets/props-sheet.png`.
+
+### Decoration Prop Variations (Batch 2 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of trackside and decoration props (Props 11 to 20) based on the original props (`bridge-wooden-broken`, `cliff-scaffolding`, `mine-gate`, `stadium-gantry`, `goblin-bleacher`, `rock-arch-wide`, `rock-platform-drums`, `slingshot`, `grandstand`, and `rock-platform-springboard`):
+
+11. `public/art/props/prop-11-broken-rope-bridge.png` (1408x768) — Broken wooden suspension rope bridge with snapped planks, fraying thick hemp ropes, and bolted timber anchor posts.
+12. `public/art/props/prop-12-goblin-scaffold-tower.png` (768x1376) — Rickety multi-level goblin timber watchtower with thatched roof, ladder, iron brackets, red skull flag, and lantern.
+13. `public/art/props/prop-13-cavern-mine-gate.png` (1408x768) — Heavy cavern mine entrance archway with jagged stone frame, timber beams, burning iron torches, and skull keystone.
+14. `public/art/props/prop-14-scrapdome-finish-gantry.png` (1408x768) — Racetrack finish line gantry arch with riveted iron trusses, brass cogs, checkered flag banner, and brass horns.
+15. `public/art/props/prop-15-goblin-spectator-terrace.png` (1408x768) — Tiered wooden bleacher terrace on mossy stone outcrop with spiked railings, skull banner, and flaming brazier.
+16. `public/art/props/prop-16-molten-rock-natural-arch.png` (1408x768) — Jagged basalt rock arch bridge with glowing orange lava fissures and dripping molten slag stalactites.
+17. `public/art/props/prop-17-goblin-war-drums.png` (1408x768) — Giant goblin war drum with stretched hide skin, spiked bronze rims, iron brackets, skull charms, and mallets.
+18. `public/art/props/prop-18-goblin-slingshot-launcher.png` (1408x768) — Heavy mechanical track slingshot catapult launcher with torsion winch, brass cog gear, and spiked anchor sled.
+19. `public/art/props/prop-19-racetrack-grandstand.png` (1408x768) — Covered wooden racetrack grandstand with tiered bench seating, corrugated rusty tin roof, and festive goblin pennant bunting.
+20. `public/art/props/prop-20-goblin-springboard-platform.png` (1024x1024) — Goblin springboard catapult ledge on craggy stone outcrop with torch brazier, checkered flag, and cheering goblin spectators.
+
+- All 20 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet for Batch 2 generated in `public/art/sheets/props-sheet-b.png`.
+- Full composite 5x4 sprite sheet of all 20 variations generated in `public/art/sheets/props-sheet.png`.
+
+### Decoration Prop Variations (Batch 3 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of trackside and decoration props (Props 21 to 30) based on the original props (`landmark-quarry`, `landmark-pasture`, `sign-sheep`, `sign-tnt`, `timber-loop`, `tunnel-mouth-stone`, `rock-platform-spire`, `waterfall-curtain`, `rock-boulder-a`, and `slingshot-downrange`):
+
+21. `public/art/props/prop-21-quarry-excavation-crane.png` (1224x864) — Heavy timber A-frame goblin quarry crane with steam boiler, brass gears, pulleys, and suspended iron claw gripping a chiseled sandstone boulder.
+22. `public/art/props/prop-22-armored-sheep-pen.png` (1502x704) — Armored goblin racing ram in a weathered wooden paddock pen with barbed wire, glowing mushroom feed trough, and horned skull gatepost.
+23. `public/art/props/prop-23-hazard-sign-sheep.png` (768x1024) — Rustic timber roadside caution signpost on cobblestone base with painted yellow warning diamond depicting explosive racing sheep, wooden arrow, and lantern.
+24. `public/art/props/prop-24-hazard-sign-explosives.png` (1024x1024) — Roadside hazard signpost on cobblestone base with stenciled "BOOM-TOWN TNT", red dynamite bundle, sparking fuse, and hanging skull warning plate.
+25. `public/art/props/prop-25-timber-coaster-loop.png` (1024x1024) — Spiral vertical timber roller coaster loop-de-loop with heavy notched pine beams, iron tie brackets, hanging amber lanterns, and guide rails.
+26. `public/art/props/prop-26-granite-tunnel-portal.png` (1024x1024) — Heavy chiseled granite mountain tunnel entrance archway with reinforced timber lintels, beast skull trophy keystone, and burning iron sconces.
+27. `public/art/props/prop-27-rock-spire-lookout.png` (720x1440) — Towering jagged rock needle pinnacle with goblin lookout crow's nest, hanging brass gong, rope ladder, and fluttering pennant.
+28. `public/art/props/prop-28-cavern-waterwheel-cascade.png` (720x1440) — Roaring alpine waterfall tumbling over stepped slate rocks with a heavy mossy wooden goblin waterwheel, brass scoops, and splash trough.
+29. `public/art/props/prop-29-spiked-boulder-barricade.png` (1024x1024) — Cluster of rugged sandstone boulders fortified with sharpened wooden palisade spikes, chains, glowing green mushrooms, goblin shield, and war horn.
+30. `public/art/props/prop-30-goblin-slingshot-downrange.png` (1024x1536) — Mechanical track slingshot catapult launcher with steam boiler, brass gear winch, and heavy timber forks viewed downrange.
+
+- All 30 variations generated with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`.
+- Composite 5x2 sprite sheet for Batch 3 generated in `public/art/sheets/props-sheet-c.png`.
+- Full composite 5x6 sprite sheet of all 30 variations generated in `public/art/sheets/props-sheet.png`.
+
+### Decoration Prop Variations (Batch 4 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of seam-hiding dressing and trackside structures (Props 31 to 40) based on the original props (`grass-fringe`, `rock-floor-ledge`, `rock-boulder-b`, `wall-timber-braced`, `wall-granite-strata`, `stadium-gantry` ironwork, `goblin-bleacher-a` timberwork, and `tunnel-mouth-timber`):
+
+31. `public/art/props/prop-31-grass-seam-fringe-wide.png` (1584x672) — Wide dense grass fringe seam patch with tall blades, clover tufts, wildflowers, dirt clumps, and pebbles.
+32. `public/art/props/prop-32-mossy-embankment-skirt.png` (1584x672) — Mossy dirt embankment skirt wedge with grass lip, hanging moss sheets, exposed roots, and embedded stones.
+33. `public/art/props/prop-33-rubble-gravel-seam-strip.png` (1584x672) — Loose rubble and gravel seam strip with crushed granite chunks, cracked slabs, dirt clumps, and pebbles.
+34. `public/art/props/prop-34-timber-crib-retaining-wall.png` (1376x768) — Timber crib retaining wall of stacked notched logs with iron spikes, corner brackets, moss, and dirt footing.
+35. `public/art/props/prop-35-granite-strata-seam-wall.png` (1376x768) — Layered granite strata seam wall with chiseled bands, iron pitons, hanging moss, ferns, and rubble footing.
+36. `public/art/props/prop-36-glowcap-mushroom-thicket.png` (1376x768) — Glowing green-capped mushroom thicket cluster with mossy fallen logs, drifting spores, and ferns.
+37. `public/art/props/prop-37-fern-bramble-undergrowth.png` (1376x768) — Dense fern and bramble undergrowth patch with curled fronds, thorny vines, red berries, and leaf litter.
+38. `public/art/props/prop-38-scrap-iron-barricade.png` (1376x768) — Scrap-iron junk barricade of leaning riveted plates, brass gears, chains, timber posts, and warning lantern.
+39. `public/art/props/prop-39-goblin-pit-canopy-tent.png` (1408x768) — Goblin pit-crew canopy tent with patched canvas awning, timber poles, tool crates, tire stack, and pennant bunting.
+40. `public/art/props/prop-40-timber-arch-gate-lanterns.png` (1408x768) — Heavy timber arch gate with crossed beams, iron brackets, hanging amber lanterns, and carved skull totem.
+
+- All 40 variations stored with pure magenta `#FF00FF` chroma key background in `public/art/props/` (the script flood-normalises the connected backdrop; Batch 1 raws were standardised from shaded to pure magenta).
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/`, now with fringe unmix-despill: each boundary pixel's magenta excess `e = min(R-G, B-G)` becomes coverage `c = 1-e`, colour `(R-e,G,B-e)/c` and alpha `c`, dissolving anti-aliased fringe and baked pink rim-light into smooth neutral edges while leaving interiors bit-identical. All 40 alphas were re-processed; opaque magenta-ish remnants now measure 0–0.14% per sprite (residuals are interior paint such as glow-mushroom neon, verified on remnant maps).
+- `scripts/process-props.mjs` now also rebuilds the sprite sheets automatically and documents the 7-step batch protocol in its header for the next agent.
+- Composite 5x2 sprite sheet for Batch 4 generated in `public/art/sheets/props-sheet-d.png`.
+- Full composite 5x8 sprite sheet of all 40 variations generated in `public/art/sheets/props-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`): seam-hiding foliage (31, 32, 33, 36, 37), trackside walls/structures (34, 38, 40), cavern rockwork (35), stadium pit tent (39).
+
+### Decoration Prop Variations (Batch 5 — 10 Variations with Magenta Key Transparency)
+
+Generated an additional 10 variations of cavern and stunt dressing (Props 41 to 50) based on the original props (`lava-sheet`, `waterfall-splash-b`, `mine-rails-b`, `ore-bucket`, `goblin-bleacher-b`, `rock-wall-left`, `rock-wall-right`, `rock-ceiling-cutout`, `tnt-crate`, and `flag-checkered`):
+
+41. `public/art/props/prop-41-molten-slag-channel.png` (1376x768) — Molten slag runnel channel with glowing lava stream, black basalt crust banks, embers, and smoke wisps.
+42. `public/art/props/prop-42-waterfall-plunge-basin.png` (1408x768) — Waterfall plunge basin with foaming splash pool, falling curtain, mist, and wet mossy boulders.
+43. `public/art/props/prop-43-mine-rail-buffer-junction.png` (1376x768) — Mine rail junction with forking rails, red timber buffer stop, lever, lantern, and gravel bed.
+44. `public/art/props/prop-44-chain-hoist-gantry.png` (1408x768) — Timber A-frame chain hoist gantry with iron brackets, hanging chains, hook block, ore bucket, and brass pulley.
+45. `public/art/props/prop-45-goblin-cheer-platform-horn.png` (1376x768) — Goblin cheer platform with railing, giant brass war horn, pennant bunting, torch, and skull decoration.
+46. `public/art/props/prop-46-cavern-wall-curtain-left.png` (768x1376) — Tall cavern rock wall curtain slab with green crystal clusters, hanging moss, ferns, and iron lantern.
+47. `public/art/props/prop-47-cavern-wall-curtain-right.png` (848x1264) — Tall layered slate wall curtain slab with waterfall seep, amber crystal veins, mushrooms, and piton rope.
+48. `public/art/props/prop-48-stalactite-ceiling-cluster.png` (1376x768) — Stalactite cave ceiling cluster with limestone spikes, green crystals, and hanging lanterns on chains.
+49. `public/art/props/prop-49-blast-crater-scorched.png` (1376x768) — Scorched TNT blast crater bowl with blackened marks, cracked rim, debris, smoke wisps, and ember cracks.
+50. `public/art/props/prop-50-pennant-flag-pole-row.png` (1376x768) — Checkered racing flag pole row with three tattered flags, skull finials, rope ties, brass bells, and cobblestone footings.
+
+- All 50 variations stored with pure magenta `#FF00FF` chroma key background in `public/art/props/`.
+- Processed into true alpha-channel sprites via `scripts/process-props.mjs` in `public/art/props/alpha/` (flood-normalise + fuzz-key + unmix-despill). Batch 5 remnants measure 0–0.05% per sprite; residuals verified as interior paint (torch flame, smoke shading) on remnant maps.
+- Defect fix: the prop-42 generator render carried a magenta mist blob (~24% off-key, too big for the boundary ring); it was seed flood-filled to pure magenta in the raw (1.85% of pixels, rock untouched) and re-processed — blob eliminated (0.63% → 0.004%), mist now dissolves softly. Future agents: catch these on the remnant-map inspection step and seed-fill the raw the same way.
+- Composite 5x2 sprite sheet for Batch 5 generated in `public/art/sheets/props-sheet-e.png`.
+- Full composite 5x10 sprite sheet of all 50 variations generated in `public/art/sheets/props-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`): cavern/mine rockwork and rails (41, 43, 44, 46, 47, 48), trackside water/crater dressing (42, 49), stadium cheer platform and flag poles (45, 50).
+
+### Loose Goblin Cutouts (Batch 1 — 10 Working & Cheering Goblins with Magenta Key Transparency)
+
+Generated 10 loose full-body goblin decoration cutouts (5 cheering fans, 5 working crew) in the game's painted identity (olive skin, weathered charcoal iron, warm brass, teal shadows):
+
+1. `public/art/goblins/goblin-01-flag-waver.png` (848x1264) — Cheering goblin waving a large checkered racing flag overhead, shouting with joy.
+2. `public/art/goblins/goblin-02-war-drummer.png` (768x1376) — Goblin drummer mid-beat with two mallets over a spiked war drum strapped at the waist.
+3. `public/art/goblins/goblin-03-pit-mechanic.png` (848x1264) — Pit-crew mechanic goblin with an oversized brass wrench on the shoulder, oil-stained apron, goggles.
+4. `public/art/goblins/goblin-04-torchbearer.png` (848x1264) — Cheering goblin thrusting a flaming iron torch high, other fist pumped.
+5. `public/art/goblins/goblin-05-ore-miner.png` (768x1376) — Miner goblin with pickaxe over shoulder, lantern helmet, ore sack and rope at belt.
+6. `public/art/goblins/goblin-06-horn-blower.png` (768x1376) — Goblin blowing a giant curved brass war horn with skull engraving, cheeks puffed.
+7. `public/art/goblins/goblin-07-tnt-handler.png` (848x1264) — Grinning goblin hugging a wooden crate of sparking red dynamite with skull stencil.
+8. `public/art/goblins/goblin-08-track-marshal.png` (768x1376) — Track marshal goblin with crossed yellow signal flags, striped vest, brass whistle.
+9. `public/art/goblins/goblin-09-blacksmith.png` (848x1264) — Burly blacksmith goblin resting a huge forging hammer on one shoulder, leather apron.
+10. `public/art/goblins/goblin-10-tankard-celebrant.png` (768x1376) — Celebrating goblin raising a foaming iron tankard high, other fist pumping.
+
+- All 10 generated with near-magenta chroma key backgrounds in `public/art/goblins/`, flood-normalised to pure `#FF00FF` by the script.
+- Processed into true alpha-channel sprites via the new `scripts/process-goblins.mjs` in `public/art/goblins/alpha/` (flood-normalise + fuzz-key + unmix-despill, same protocol as `process-props.mjs`). Remnants measure 0–0.027% per sprite; residuals verified as interior glow paint (torch flame, fuse spark) on remnant maps and 2x checkerboard edge crops.
+- Composite 5x2 sprite sheet for Batch 1 generated in `public/art/sheets/goblins-sheet-a.png`; full composite sheet in `public/art/sheets/goblins-sheet.png`.
+- New `goblins` category added to `PropCategory` with a "Goblins & Crew" palette tab in the Track Builder; all 10 registered in `PROP_DEFINITIONS` (`src/game/track-builder-3d.ts`).
+- Next agent: follow the 7-step batch protocol in the `process-goblins.mjs` header (goblins 11–20 → `goblins-sheet-b.png`, etc.), then commit to this branch and update the open goblins PR — never open a second PR.
+
+### Loose Goblin Cutouts (Batch 2 — 10 New Roles & Group Cutouts with Magenta Key Transparency)
+
+Generated 10 more goblin decoration cutouts (5 new single roles, 5 duo/trio groups) in the same painted identity:
+
+11. `public/art/goblins/goblin-11-lantern-warden.png` (848x1264) — Hooded night warden holding a tall lantern pole with a glowing amber lamp, signaling.
+12. `public/art/goblins/goblin-12-ball-loader.png` (848x1264) — Track worker straining to push and roll a giant riveted iron racing ball.
+13. `public/art/goblins/goblin-13-bell-ringer.png` (768x1376) — Cheering goblin ringing a big brass handbell overhead, horned helmet.
+14. `public/art/goblins/goblin-14-scarf-fan.png` (848x1264) — Superfan cheering with a checkered racing scarf stretched wide overhead.
+15. `public/art/goblins/goblin-15-track-sweeper.png` (848x1264) — Track sweeper with a big straw broom, bandana, goggles, oil can at belt.
+16. `public/art/goblins/goblin-16-rope-heave-trio.png` (1376x768) — Three goblins heaving a thick hemp slingshot rope together in unison.
+17. `public/art/goblins/goblin-17-shoulder-ride-duo.png` (768x1376) — Cheering duo: goblin kid riding on a big goblin's shoulders, arms triumphantly high.
+18. `public/art/goblins/goblin-18-firework-crew.png` (1408x768) — Two celebrating goblins, one waving a fizzing sparkler, the other laughing with covered ears.
+19. `public/art/goblins/goblin-19-tire-carry-duo.png` (1376x768) — Two pit mechanics carrying a big spiked iron racing tire together between them.
+20. `public/art/goblins/goblin-20-victory-huddle.png` (1408x768) — Three goblins in a victory huddle, middle one thrusting a golden gear trophy cup high.
+
+- Near-magenta backdrops flood-normalised to pure `#FF00FF`; keyed via `scripts/process-goblins.mjs` into `public/art/goblins/alpha/`.
+- Defect fix: the goblin-11 render carried a magenta glow disc around the lamp (~1.73% opaque-pink, too big for the boundary ring); it was seed flood-filled to pure magenta in the raw (3.79% of pixels over two passes — outer halo, then the inner transition ring — lamp glass verified still amber) and re-processed — remnant eliminated (1.73% → 0.0045%), glow now dissolves softly. Same procedure as the Batch 5 prop-42 fix.
+- Remaining Batch 2 remnants: 0–0.0045% except goblin-18 at 0.118% (sparkler flash core, verified interior glow paint on the remnant map, within the 0.14% props precedent).
+- Composite 5x2 sprite sheet for Batch 2 generated in `public/art/sheets/goblins-sheet-b.png`; full 5x4 sheet of all 20 in `public/art/sheets/goblins-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` under `goblins` (singles at 560px height, landscape groups at 600px height).
+- Next agent: goblins 21–30 → `goblins-sheet-c.png`, then commit to this branch and update the open goblins PR — never open a second PR.
+
+### Loose Goblin Cutouts (Batch 3 — 10 Stands & Big Cheering Crowds with Magenta Key Transparency)
+
+Generated 10 more goblin decoration cutouts (7 crowd stands, 3 pure cheering mobs) in the same painted identity:
+
+21. `public/art/goblins/goblin-21-grandstand-roar.png` (1376x768) — Covered timber grandstand packed with fans, checkered flags, skull banner, bunting, drums.
+22. `public/art/goblins/goblin-22-drum-podium-mob.png` (1376x768) — Round war-drum podium ringed by eight dancing goblins with mallets and torch braziers.
+23. `public/art/goblins/goblin-23-flag-terrace.png` (1376x768) — Timber spectator terrace with spiked railings crowded with flag-waving fans and braziers.
+24. `public/art/goblins/goblin-24-torch-crowd.png` (1376x768) — Dense night crowd of twelve cheering fans thrusting flaming torches high.
+25. `public/art/goblins/goblin-25-horn-riser.png` (1376x768) — Two-tier scaffold riser with three war-horn blowers and three drummers, hanging lantern.
+26. `public/art/goblins/goblin-26-mosh-pit.png` (1376x768) — Rowdy circle of nine jumping fans, one crowd-surfing aloft, flying tankards and scarves.
+27. `public/art/goblins/goblin-27-fence-fans.png` (1376x768) — Trackside barrier fence crowded with eleven fans leaning over, blank banner, pennants.
+28. `public/art/goblins/goblin-28-cheer-tower.png` (848x1264) — Tall two-level timber cheer tower with ten fans, drummer and horn on top deck, skull flag.
+29. `public/art/goblins/goblin-29-victory-stage.png` (1376x768) — Champion victory stage with three racers on a podium, trophy cup, confetti, drummers, crowd.
+30. `public/art/goblins/goblin-30-fan-aisle.png` (1376x768) — Two facing rows of cheering fans forming a victory aisle with flags, tankards, torch posts.
+
+- Near-magenta backdrops flood-normalised to pure `#FF00FF`; keyed via `scripts/process-goblins.mjs` into `public/art/goblins/alpha/`. No defects: all 10 renders passed inspection first try (complete structures, blank banners, no ground planes, no text).
+- Batch 3 remnants: 0.0007–0.0217% (interior paint only), verified on remnant metrics + 1.5x checkerboard edge crops (torch flames, grandstand railings/flags) + grey contact sheet — no halos or blocks.
+- Composite 5x2 sprite sheet for Batch 3 generated in `public/art/sheets/goblins-sheet-c.png`; full 5x6 sheet of all 30 in `public/art/sheets/goblins-sheet.png`.
+- All 10 registered in `PROP_DEFINITIONS` under `goblins` (stands at 700px height, pure crowds at 600px, tower portrait at 650px).
+- Next agent: goblins 31–40 → `goblins-sheet-d.png`, then commit to this branch and update the open goblins PR — never open a second PR.
+
+### Animated Decorations (Batch 1 — 10 Fire & Water 4-Frame Sheets with Magenta Key Transparency)
+
+Built 10 animated decoration twins from the shipped alpha cutouts: each source keeps its body pixel-static while its fire/water element cycles 4 frames on a 2x2 sheet (TL=f0, TR=f1, BL=f2, BR=f3 — one horizontal + one vertical centre cut yields the frames). Frames derive travelling brightness bands through an element mask (fire: R>150, R>=G, R-B>38; spark adds a pink-burst branch; water: B>150, G>110, B>=R plus a foam-white branch), rising for fire and falling for water, with a per-frame flicker lift:
+
+1. `public/art/animated/anim-01-torchbearer-flame.png` (1032x1536, frame 516x768) — Torchbearer flame licks upward @ 7fps.
+2. `public/art/animated/anim-02-firework-sparkler.png` (1536x840, frame 768x420) — Sparkler burst strobes @ 9fps.
+3. `public/art/animated/anim-03-torch-crowd.png` (1536x860, frame 768x430) — Torch-crowd flames ripple @ 7fps.
+4. `public/art/animated/anim-04-lantern-warden.png` (1032x1536, frame 516x768) — Lantern lamp breathes @ 6fps.
+5. `public/art/animated/anim-05-smelting-crucible.png` (1536x1536, frame 768x768) — Crucible slag surface roils @ 6fps.
+6. `public/art/animated/anim-06-molten-cauldron.png` (1536x1536, frame 768x768) — Cauldron pour shimmers @ 6fps.
+7. `public/art/animated/anim-07-slag-channel.png` (1536x860, frame 768x430) — Slag-channel lava pulses @ 5fps.
+8. `public/art/animated/anim-08-waterwheel-cascade.png` (768x1536, frame 384x768) — Cascade rushes, foam churns @ 5fps.
+9. `public/art/animated/anim-09-plunge-basin.png` (1536x840, frame 768x420) — Plunge spray churns @ 5fps.
+10. `public/art/animated/anim-10-waterfall-curtain.png` (768x1536, frame 384x768) — Falls sheet ripples down @ 5fps.
+
+- Frames are flattened onto pure `#FF00FF`, sheeted 2x2, then keyed via `scripts/process-animated.mjs` (flood-normalise, 20% fuzz key, 6px unmix-despill ring — identical to `scripts/process-goblins.mjs`) into `public/art/animated/alpha/`. Review contact sheet: `public/art/animated/animated-contact-sheet.png`.
+- Remnants 0.000–0.068% (anim-02's 0.068% is the pink sparkler-burst paint itself, verified interior glow — same precedent as goblin-18's 0.118%). Frame deltas verified numerically (RMSE 0.017–0.040 between frames in element zones, ~0.002 on bodies) and the contact sheet inspected as an image: no halos, no black bands, flames/lava/water vibrant.
+- Runtime: `PropDefinition.isAnimated` + `animCols/Rows/Fps`, `PlacedProp.animate` (default true), per-prop cloned textures showing one quadrant (`repeat` 1/cols × 1/rows, row-major UVs), `TrackBuilder3D.updateAnimations()` driven by the race loop (`Renderer3D.render`, frozen on frame 0 under reduced motion) and a gated 120ms editor preview tick. Twins desync via id-hash phase.
+- Build menu: new `Animated` category tab (Clapperboard icon), `4-FRAME` badge on palette cards (cards preview the full sheet), `Animate` toggle in the single-select attribute window (ON/Playing vs OFF/Frame 1) plus an All PLAY/All PAUSE batch row for multi-select.
+- All 10 registered in `PROP_DEFINITIONS` under `animated`, mirroring their source twins' world sizes.
+- Tests: `tests/animated-props.test.ts` (15 checks: frame math, UVs, registry, sheet files + even dims, headless playback/freeze/batch/static paths), registered in `scripts/check.mjs`. `npm run check` 435/435 green; `npm run build` green.
+- Next agent: anim 11–20 → append to `ANIMATED_VARIATIONS`, run the script, register under `animated`, then commit to this branch and update the open animated-decorations PR — never open a second PR.
+
+### Animated Decorations (Batch 2 — 10 More Fire & Splash-Water 4-Frame Sheets)
+
+Built 10 more animated twins with the same masked travelling-band pipeline (`scripts/process-animated.mjs`, unchanged algorithm — Batch 2 only appends entries):
+
+11. `public/art/animated/anim-11-tnt-fuse-spark.png` (1032x1536, frame 516x768) — TNT-handler fuse spark strobes @ 9fps.
+12. `public/art/animated/anim-12-drum-podium-braziers.png` (1536x860, frame 768x430) — Podium torch braziers flicker @ 7fps.
+13. `public/art/animated/anim-13-horn-riser-lantern.png` (1536x860, frame 768x430) — Riser lantern breathes @ 6fps.
+14. `public/art/animated/anim-14-fan-aisle-torches.png` (1536x860, frame 768x430) — Aisle torch posts ripple @ 7fps.
+15. `public/art/animated/anim-15-triple-lantern-post.png` (1536x1536, frame 768x768) — Lantern-post lamps breathe @ 6fps.
+16. `public/art/animated/anim-16-molten-rock-arch.png` (1536x840, frame 768x420) — Arch lava veins pulse @ 5fps.
+17. `public/art/animated/anim-17-arch-gate-lanterns.png` (1536x840, frame 768x420) — Gate lanterns breathe @ 6fps.
+18. `public/art/animated/anim-18-torch-sconce.png` (1536x1536, frame 768x768) — Wall sconce flame licks @ 7fps.
+19. `public/art/animated/anim-19-waterfall-splash.png` (1024x1024, frame 512x512) — Splash burst churns @ 6fps.
+20. `public/art/animated/anim-20-waterfall-splash-b.png` (1024x1024, frame 512x512) — Splash burst variant churns @ 6fps.
+
+- Candidate masks probed before building (fire cover 2.6–8.6%, water 25.9–27.1% on the splashes); fully-opaque track-parts (`lava-sheet*`, `waterfall-sheet`) were skipped — the script requires real source transparency.
+- Remnants 0.000–0.073%: anim-17's 0.073% is interior lantern-glow paint (zero edge-touching remnant pixels on the edge-overlap check — same precedent as anim-02's 0.068% / goblin-18's 0.118%).
+- Frame deltas verified numerically on the keyed sheets (whole-quadrant RMSE f0–f1 / f0–f2: anim-11 0.015/0.021, anim-16 0.012/0.017, anim-17 0.009/0.013, anim-19 0.034/0.047 — clearly visible motion, bodies static).
+- Reproducibility: re-running the script rebuilds Batch 1 sheets pixel-identical (RMSE=0 vs committed), so the Batch 1 raw files were left untouched — only metadata bytes differ. Contact sheet is now 5x4 (`animated-contact-sheet.png`, 1960x1568).
+- All 10 registered in `PROP_DEFINITIONS` under `animated`, mirroring static-twin world sizes (anim-19/20 mirror `waterfall_splash` at 650x450); the Animated palette tab, 4-FRAME badges, Animate toggle and batch PLAY/PAUSE pick them up automatically. Test count bumped 10 → 20.
+
+### Animated Decorations (Batch 1 Rebuild — 10 AI-Generated Sheets Replacing the Travelling-Band Frames)
+
+The Batch 1/2 frames were derived by pushing travelling brightness bands through an
+element mask. That produced four near-identical frames (RMSE between frames ≈ 0.015) —
+technically a spritesheet, visually a still image. Batch 1 (anim 01–10) has been rebuilt
+with the image generator; **anim 11–20 still ship the old band frames and are next.**
+
+New pipeline (`scripts/`, all vision-free so it is verifiable without eyeballing art):
+
+1. `scripts/build-anim-reference.mjs` — builds a 2x2 template (four copies of the still
+   art on magenta, wide gutters) for every `ANIMATED_SOURCE` entry. Handing the model a
+   sheet that already has the layout is what fixed the slicing: asking it to *invent* a
+   2x2 grid made it fill the canvas, so the centre cut sliced the subject.
+2. Generate with that template; raw output lands in `art-src/animated/<name>-src.png`.
+3. `scripts/analyze-animated-sheets.mjs` — QA gate. Reports the magenta fraction of the
+   exact cut lines (layout), per-quadrant coverage, and RMSE between consecutive frames
+   (motion). `STATIC` (< 0.045) or `LAYOUT` (< 97% clean cut) = regenerate.
+4. `scripts/process-generated-animated.mjs` — production build:
+   - detects the panel grid from the magenta gutters (handles 2x2 and the 4x2 the model
+     sometimes returns; merges gutters broken by splashes),
+   - shaves 4px off gutter-adjacent edges so separator lines never enter a frame,
+   - crops all four panels to the **union** of their content boxes so the subject is
+     framed identically in every frame (no loop jitter),
+   - pads the frame to the still artwork's aspect ratio, then runs the standard key
+     pipeline (flood-normalise, 20% fuzz key, 6px unmix-despill) into
+     `public/art/animated/alpha/`, refusing sheets whose backdrop is not magenta.
+
+Rebuilt sheets (frame size, aspect matches the still art exactly):
+
+| sheet | frame | fps | min frame Δ | remnant |
+|---|---|---|---|---|
+| anim-01 torchbearer flame | 328x488 | 7 | 0.270 | 0.000% |
+| anim-02 firework sparkler | 918x500 | 9 | 0.133 | 0.012% |
+| anim-03 torch crowd | 534x298 | 7 | 0.128 | 0.021% |
+| anim-04 lantern warden | 298x444 | 6 | 0.266 | 0.042% |
+| anim-05 smelting crucible | 482x482 | 6 | 0.183 | 0.002% |
+| anim-06 molten cauldron | 340x340 | 6 | 0.217 | 0.000% |
+| anim-07 slag channel | 950x530 | 5 | 0.073 | 0.000% |
+| anim-08 waterwheel cascade | 330x660 | 5 | 0.259 | 0.040% |
+| anim-09 plunge basin | 810x442 | 5 | 0.109 | 0.015% |
+| anim-10 waterfall curtain | 494x986 | 5 | 0.148 | 0.004% |
+
+Frame Δ is RMSE between consecutive frames; the replaced band frames sat at ≈0.015.
+
+**anim 11–20 rebuilt** (the same ten sheets that shipped as band frames):
+
+| sheet | frame | min frame Δ | remnant | source |
+|---|---|---|---|---|
+| anim-11 tnt fuse spark | 348x520 | 0.196 | 0.083% | 4x2 |
+| anim-12 drum podium braziers | 634x354 | 0.146 | 0.163% | 2x2 |
+| anim-13 horn riser lantern | 504x282 | 0.109 | 0.061% | 2x2 |
+| anim-14 fan aisle torches | 530x296 | 0.139 | 0.004% | 4x2 |
+| anim-15 triple lantern post | 454x454 | 0.105 | 0.024% | 2x2 |
+| anim-16 molten rock arch | 600x328 | 0.125 | 0.000% | 2x2 |
+| anim-17 arch gate lanterns | 476x260 | 0.156 | 0.032% | 2x2 |
+| anim-18 torch sconce | 454x454 | 0.130 | 0.214% | 2x2 |
+| anim-19 waterfall splash | 500x500 | 0.165 | 0.000% | 2x2 |
+| anim-20 waterfall splash b | 446x446 | 0.155 | 0.004% | 2x2 |
+
+All 20 sheets were additionally checked **pairwise** (all six frame pairs, not just
+consecutive ones) so a duplicated pair cannot hide behind a healthy consecutive
+delta — every sheet's minimum pair is 0.079–0.242.
+
+`anim-14` and `anim-06` come back from the model as a **4x2** grid (eight panels)
+rather than 2x2. The pipeline's `pickCuts()` detects the four evenly spaced
+columns and salvages them; both were confirmed to hold four *distinct* frames
+rather than a repeated pair, so neither needs regenerating. `anim-14` does trip
+the `LAYOUT` gate in `scripts/analyze-animated-sheets.mjs` (96.6% clean cut) —
+that gate assumes a 2x2 layout and reads the centre cut, which on a genuine 4x2
+lands inside a panel, so the flag is expected there. Judge a 4x2 sheet on the
+pairwise check and the shipped sheet instead.
+
+`anim-19`'s alpha/content gap (0.082) is its bright foam reading as near-white,
+not an opaque backdrop — its raw sheet is 65% magenta with the whites belonging
+to the splash itself. Same check that caught the old `anim-05` white-studio
+background.
+
+### Frame registration — why the sheets used to look like they jumped
+
+The first rebuilt sheets passed every gate that existed (clean cut, four distinct
+frames, magenta backdrop) and still looked wrong in play. Two causes, neither of
+which a frame-delta check can see:
+
+1. **The union-bbox crop normalises the frame, not the subject.** When an
+   animated element is drawn much larger in one panel than the others, the union
+   box grows to fit it and every other frame's subject ends up looking smaller
+   inside that box. The sprite appears to swell and shrink as it loops.
+2. **Aligning centroids is not aligning outlines.** Registering on the body's
+   centre of mass can be spot-on while the body around it sits several pixels
+   out, whenever the common silhouette is small and off-centre.
+
+Both are now fixed in `scripts/process-generated-animated.mjs`:
+
+- **`registerFrames()`** stages the four panels on a padded canvas and aligns
+  them on their **common silhouette** — the pixels opaque in *every* frame, i.e.
+  the static body. A coarse pass aligns each frame's own centroid, then a
+  refinement pass aligns the common silhouette, then a final cross-correlation
+  pass searches ±8px and keeps whichever shift maximises silhouette overlap
+  against frame 1. The body holds still; only the element moves.
+- The generated prompts now also demand that the animated element keep a
+  **consistent size across all four panels**, which is what stops the swelling.
+
+**`scripts/onion-skin-check.mjs`** is the verification. For every sheet it
+cross-correlates each consecutive pair and reports:
+
+- `maxShift` — the largest shift that would align a pair better than zero shift
+  does. Gated at 6px, but **only when shifting actually helps** (`gain` > 0.02):
+  on a sheet whose element changes shape completely the correlator can always
+  find some far-off shift that wins by a hair, which is noise, not
+  misregistration.
+- `fillSpread` — the ratio between the largest and smallest per-frame subject
+  area. Gated at 1.6x; this is the number that catches the swelling.
+
+It also writes an onion-skin overlay per sheet to
+`art-src/animated/onion/<name>.png` — all four frames stacked, frame 1 white and
+frames 2–4 tinted, so misalignment shows up as coloured fringing around the
+silhouette and a size pop as a coloured halo.
+
+Results after the fix: `maxShift` is **0.0px on 18 of 20 sheets** (the two
+exceptions, anim-14 and anim-20, have zero overlap gain — noise), and
+`fillSpread` is **1.04–1.37x** across all twenty, down from 1.10–2.15x.
+
+### The STATIC gate had to be re-based
+
+Once the bodies were registered, the plain whole-frame delta dropped on every
+sheet — a perfectly registered sheet differs only where the element animates, so
+the old `MIN_FRAME_DELTA` of 0.045 started failing sheets that were animating
+perfectly well (anim-04 fell to 0.041, anim-15 to 0.033). The gate now measures
+an **animation-only delta**: pixels are classed as the static body when they are
+opaque in all four frames, and only the remaining element pixels are compared,
+normalised over the element's own area. Element deltas are now 0.120–0.515,
+versus ~0.015 for the band frames these replace.
+
+Animated sheets are no longer a separate island: every sheet is wired to the still
+decoration it was cut from.
+
+- `ANIMATED_SOURCE_ART` (in `src/game/track-builder-3d.ts`) maps each animated type to
+  the still art it came from; `linkAnimatedTwins()` runs at module load and sets
+  `stillType` / `animatedTwin` on both sides. 19 of 20 link up; `anim_20` (source art has
+  no still decoration) stays animated-only. Powerups/barriers that merely reuse prop art
+  never claim a twin (test-enforced).
+- **Animated toggle on the still version**: selecting a still decoration with a twin shows
+  an *Animation* panel with an `ANIMATED / STILL` swap button — flipping it swaps the prop
+  over to the 4-frame sheet in place, keeping its position, size and rotation. Frames are
+  padded to the still art's aspect, so the swap is a like-for-like (no squash).
+- **Speed −/+**: per-prop multiplier (`animSpeed`, 0.25–4.00 in 0.25 steps, with a RESET),
+  displayed as effective fps. Group selection nudges every selected prop at once.
+- **4 frame checkboxes**: `animFrames[4]`; unchecked frames are skipped by the loop rather
+  than shown as blank holds. At least one frame is always kept, and a paused prop holds
+  its first *enabled* frame.
+- Palette cards for still decorations with a twin carry an `ANIM` badge; animated-category
+  cards keep the `4-FRAME` badge and now show which still decoration they came from.
+- State lives on `PlacedProp` (`animated`, `animSpeed`, `animFrames`), so it round-trips
+  through save/load, undo/redo and duplication.
+- Tests: `tests/animated-props.test.ts` grew 15 → 29 checks (twin links, aspect parity,
+  frame skipping, speed, persistence, batch controls). `npm run check` 449/449 green;
+  `npm run build` green.
+- **All 20 fire/water sheets now carry real motion, and they are registered so the body holds still across the loop.** See "Frame registration" above.
+
+### Animated Goblins (anim 21–28 — first batch of character animations)
+
+The 30 goblin cutouts were stills only. Ten reference templates were built and
+the first eight characters have been animated, each wired to its still twin the
+same way the fire/water sheets are:
+
+| sheet | still twin | frame | fps | min element Δ | remnant |
+|---|---|---|---|---|---|
+| anim-21 flag waver | goblin-01-flag-waver | 358x534 | 8 | 0.471 | 0.001% |
+| anim-22 war drummer | goblin-02-war-drummer | 272x488 | 9 | 0.137 | 0.001% |
+| anim-23 pit mechanic | goblin-03-pit-mechanic | 510x760 | 8 | 0.340 | 0.019% |
+| anim-24 ore miner | goblin-05-ore-miner | 510x914 | 6 | 0.414 | 0.002% |
+| anim-25 horn blower | goblin-06-horn-blower | 340x608 | 6 | 0.224 | 0.020% |
+| anim-26 track marshal | goblin-08-track-marshal | 426x764 | 8 | 0.500 | 0.001% |
+| anim-27 blacksmith | goblin-09-blacksmith | 500x744 | 9 | 0.339 | 0.024% |
+| anim-28 tankard celebrant | goblin-10-tankard-celebrant | 298x532 | 6 | 0.334 | 0.000% |
+| anim-29 ball loader | goblin-12-ball-loader | 408x608 | 7 | 0.475 | 0.087% |
+| anim-30 bell ringer | goblin-13-bell-ringer | 486x870 | 7 | 0.340 | 0.004% |
+
+The prompts carry the same two constraints that fixed the fire/water sheets:
+the body must stay put and the same size in every panel, and the animated
+element must keep a consistent size across panels.
+
+**All ten goblins now pass both gates.** Full results across all 30 sheets:
+`maxShift` is 0.0px on 24 of 30 (the six exceptions have zero overlap gain, so
+they are correlator noise rather than misregistration), and `fillSpread` is
+1.04-1.51x everywhere.
+
+`anim-25-horn-blower` took three attempts. The sound rings are exactly the kind
+of element a model scales freely: the first sheet came back at `fillSpread`
+1.67x, the second at 1.95x (worse), and the third - after rewriting the prompt to
+lead with "trace the goblin once and reuse that tracing in all four panels" -
+landed at 1.34x. **The lesson for future prompts: state the size constraint as
+reusing one tracing, not as "keep the same size", which the model reads as
+advice.**
+
+The prompts carry the same two constraints that fixed the fire/water sheets: the
+body must stay put and the same size in every panel, and the animated element
+must keep a consistent size across panels. Seven of the eight come back at
+`maxShift` 0.0–2.2px and `fillSpread` 1.10–1.29x.
+
+## Update 3 — goblins 14-27 (anim-31 to anim-40)
+
+| sheet | still twin | frame | fps | min elem Δ | maxShift | fillSpread |
+|---|---|---|---|---|---|---|
+| anim-31 scarf fan | goblin-14-scarf-fan | 412x614 | 8 | 0.270 | 0.0px | 1.04x |
+| anim-32 track sweeper | goblin-15-track-sweeper | 530x790 | 6 | 0.342 | 10.0px | 1.30x |
+| anim-33 rope heave trio | goblin-16-rope-heave-trio | 458x256 | 6 | 0.157 | 1.4px | 1.05x |
+| anim-34 shoulder ride duo | goblin-17-shoulder-ride-duo | 460x822 | 5 | 0.305 | 0.0px | 1.53x |
+| anim-35 tire carry duo | goblin-19-tire-carry-duo | 422x236 | 5 | 0.176 | 1.0px | 1.04x |
+| anim-36 victory huddle | goblin-20-victory-huddle | 434x236 | 6 | 0.250 | 0.0px | 1.17x |
+| anim-37 grandstand roar | goblin-21-grandstand-roar | 478x268 | 8 | 0.240 | 0.0px | 1.09x |
+| anim-38 flag terrace | goblin-23-flag-terrace | 904x504 | 6 | 0.408 | 24.3px | 1.30x |
+| anim-39 mosh pit | goblin-26-mosh-pit | 892x498 | 9 | 0.336 | 25.3px | **3.61x** |
+| anim-40 fence fans | goblin-27-fence-fans | 444x248 | 8 | 0.371 | 1.0px | 1.28x |
+
+`maxShift` of 10-25px with `gain` 0.000-0.001 is correlator noise, not
+misregistration — the crowd sheets have no single dominant silhouette for the
+cross-correlation to lock onto, so it drifts to an arbitrary far offset. The
+overlap-gain guard is what keeps these from being false positives.
+
+### anim-39-mosh-pit, regenerated
+
+The first anim-39 came back with magenta remnant 3.775% (gate: 0.5%) **and**
+fillSpread 3.61x (gate: 1.6x) - the crowd changed size between panels and the
+gutter had bleed, two independent generation faults in one sheet. The fix was to
+carry both wordings at once: the gutter paragraph (declared the most important
+part of the image, forbidding any glow/halo/arm/elbow from touching it, and
+telling the model to shrink the whole crowd rather than let it overflow) *and*
+the "reuse one tracing" paragraph. **When a sheet fails for two reasons, both
+warnings must appear in the regeneration prompt - fixing one leaves the other.**
+
+That also completes the still-goblin set: all 30 characters now have animated
+twins. Two more sheets were added to finish it:
+
+| sheet | still twin | frame | fps | min elem Δ | maxShift | fillSpread |
+|---|---|---|---|---|---|---|
+| anim-39 mosh pit | goblin-26-mosh-pit | 838x468 | 9 | 0.406 | 27.3px | 1.18x |
+| anim-41 cheer tower | goblin-28-cheer-tower | 292x436 | 7 | 0.209 | 0.0px | 1.14x |
+| anim-42 victory stage | goblin-29-victory-stage | 416x232 | 7 | 0.149 | 0.0px | 1.08x |
+
+**All 30 goblins are now animated.** Next: explosion sprites and general-play
+sprites, which are a separate requirement and may need a different sheet
+structure than the 4-frame 2x2 pattern.
+
+## Update 4 — ten effect sheets (anim-43 to anim-52)
+
+Ten effects, same 4-frame 2x2 structure, registered in the `animated` build-menu
+category. They have no still counterpart, so they follow the `anim_20`
+precedent: a prop definition with no `stillType` and no entry in
+`ANIMATED_SOURCE_ART`. Because there is no still art to pad to, the pipeline
+skips aspect padding for them and they keep their own freeform shape.
+
+| sheet | frame | fps | min elem Δ | remnant | centroid drift |
+|---|---|---|---|---|---|
+| anim-43 explosion fire | 486x476 | 16 | 0.492 | 0.009% | 9.5px |
+| anim-44 spark burst | 450x450 | 14 | 0.404 | 0.287% | 11.8px |
+| anim-45 smoke puff | 464x442 | 10 | 0.179 | 1.008% | 6.9px |
+| anim-46 gore burst | 468x456 | 14 | 0.506 | 0.015% | 21.7px |
+| anim-47 gore green burst | 726x388 | 14 | 0.527 | 0.009% | **70.5px** |
+| anim-48 ground impact | 504x504 | 14 | **0.059** | 0.945% | 8.2px |
+| anim-49 dust puff | 500x456 | 10 | 0.364 | 1.123% | **93.5px** |
+| anim-50 firework red | 450x450 | 14 | 0.396 | 0.031% | 7.7px |
+| anim-51 firework blue | 454x454 | 14 | **0.032** | 0.019% | 1.9px |
+| anim-52 firework green | 454x454 | 14 | **0.098** | 0.441% | 1.0px |
+
+### The size-consistency gate does not apply to effects
+
+This is the important finding. `onion-skin-check.mjs` flags `fillSpread` above
+1.6x as a size pop, and it flags anim-43 (11.4x), anim-44 (80x), anim-46 (5.5x),
+anim-47 (10.6x), anim-49 (3.4x) and anim-50 (12x). **Those are false alarms.**
+An explosion that does not grow is not an explosion - the growth *is* the
+animation. The gate was written for sheets with a static subject (a goblin, a
+lantern) where the body must hold still and only a sub-element moves. Effects
+have no static subject, so measuring the subject's size across frames measures
+the animation itself.
+
+Judging effects needs different gates, and the raw numbers show which:
+
+- **centroid drift** - the burst must stay anchored to one point. This is the
+  effect equivalent of "the body must not slide". anim-47 (70.5px) and anim-49
+  (93.5px) genuinely fail it: the gore and the dust slide across the panel
+  between frames. anim-43, 50, 51 and 52 are all under 10px.
+- **element delta** - the four frames must actually differ. anim-51 (0.032) and
+  anim-52 (0.098) are near-static: the model drew essentially the same burst
+  four times, which is not an animation at all. anim-48 (0.059) barely animates
+  too, and also carries 0.945% remnant.
+- **remnant / corner transparency** - anim-45 (1.008%) and anim-48 (0.945%) have
+  magenta haze in the keyed background.
+
+The corner failure on anim-44 was self-inflicted: the effect reference templates
+were drawn with faint guide crosshairs to anchor size, and the model reproduced
+the crosshair as subject matter, leaving dark pixels reaching the panel edge.
+**The guides have been removed** and the templates rebuilt as plain empty
+magenta panels, so the prompt carries the size constraint alone.
+
+**Three sheets are clean and trustworthy: anim-43 (fire explosion), anim-46 (red
+gore) and anim-50 (red firework).** Seven need a regeneration pass, with prompts
+prepared. The pipeline and the build-menu registration are all in place and the
+tree is green.
+
+The registry test no longer hardcodes a sheet count (`exactly 20 animated
+decorations` and `19 of the 20 sheets have a still counterpart`); it now derives
+both from the sheets on disk and from `ANIMATED_SOURCE_ART`, so a new batch
+cannot fail a green build on a stale literal.
+  sheets into `art-src/animated/`, then `scripts/analyze-animated-sheets.mjs --all`
+  (regenerate any `STATIC`/`LAYOUT` rows) and `scripts/process-generated-animated.mjs`.
 
 ## Verification Boundary
 

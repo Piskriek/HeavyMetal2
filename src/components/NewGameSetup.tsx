@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, Flag, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronRight, FlaskConical, Info, LockKeyhole, RotateCcw, Scale, ScrollText, Shield, Sparkles, Trophy, Users } from 'lucide-react';
 import Modal from './Modal';
 import BlizzardGauge from './ui/BlizzardGauge';
 import Drawer from './ui/Drawer';
@@ -7,6 +7,7 @@ import { CAPSULES, DEFAULT_LOADOUT, RIDERS, STAT_LABELS, capsuleById, loadoutSta
 import CharacterShowcase from './CharacterShowcase';
 import { capsuleArt, riderArt } from '../game/loadout-art';
 import { CUP_NAME, CUP_POINTS, CUP_ROUNDS, DIFFICULTIES, type RaceSetup } from '../game/session';
+import { FIELD_SIZES, QUALIFYING_REQUIRED_ABOVE, type FieldSize } from '../game/contracts/config';
 import { COURSES } from '../game/types';
 import { TRACKS } from '../game/courses';
 import { coursePreview } from '../game/world-art';
@@ -65,9 +66,9 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
     <Modal title={confirm ? 'Leave the Current Event?' : titles[step]} eyebrow="HEAVY METAL GP 2 / NEW GAME" onClose={onClose} wide className="fantasy-dialog setup-dialog" backdrop={step === 1 ? 'workshop' : 'arena'}>
       <div ref={body} tabIndex={-1} className="setup-body">
         {confirm ? <div className="setup-confirm">
-          <Flag size={40} strokeWidth={1.3} /><h3>New crew. Fresh trouble.</h3>
+          <img src="/art/flag-checkered.png" alt="" className="setup-confirm-flag-img" aria-hidden="true" /><h3>New crew. Fresh trouble.</h3>
           <p>{finishedSession ? 'This event is already finished, but its final standings have not been filed away yet. Starting a new event clears that results screen. Every committed round stays in the Hall of Chaos, and your settings are kept.' : 'This replaces the current race or cup, including its unfinished rounds. Completed race records and your settings will be kept.'}</p>
-          <div className="fantasy-dialog-actions"><button className="fantasy-secondary" onClick={() => setConfirm(false)}><ArrowLeft size={16} />Keep choosing</button><button className="fantasy-primary" onClick={start} disabled={starting}>Start the New Event <Flag size={16} /></button></div>
+          <div className="fantasy-dialog-actions"><button className="fantasy-secondary" onClick={() => setConfirm(false)}><ArrowLeft size={16} />Keep choosing</button><button className="fantasy-primary" onClick={start} disabled={starting}>Start the New Event <img src="/art/flag-checkered.png" alt="" className="button-flag-img" aria-hidden="true" /></button></div>
         </div> : <>
           <nav className="setup-steps" aria-label="Race setup steps">{names.map((name, index) => <button key={name} className={step === index ? 'active' : index < step ? 'complete' : ''} aria-current={step === index ? 'step' : undefined} onClick={() => setStep(index)}><span>{index < step ? <Check size={12} /> : index + 1}</span>{name}{index < 2 && <ChevronRight size={13} />}</button>)}</nav>
 
@@ -75,8 +76,8 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
             <p className="fantasy-lead">A quick shot at glory, or three races to prove it wasn't an accident.</p>
             <div className="mode-options" role="radiogroup" aria-label="Race mode" onKeyDown={radioKeys}>
               <button className={`mode-option ${!tournament ? 'selected' : ''}`} role="radio" aria-checked={!tournament} tabIndex={!tournament ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, mode: 'quick' }))}>
-                <div className="mode-icon"><Flag size={47} strokeWidth={1.15} /></div><span className="mode-kicker">ONE RACE. ALL THE CHAOS.</span><h3>Quick Race</h3><p>Choose a track, build your capsule, and challenge three rivals.</p>
-                <div className="mode-facts"><span>1 track</span><span>4 racers</span><span>Your rules</span></div><span className="selection-mark">{!tournament && <Check size={15} />}</span>
+                <div className="mode-icon"><img src="/art/flag-checkered.png" alt="" className="mode-flag-img" aria-hidden="true" /></div><span className="mode-kicker">ONE RACE. ALL THE CHAOS.</span><h3>Quick Race</h3><p>Choose a track, build your capsule, and challenge three rivals.</p>
+                <div className="mode-facts"><span>1 track</span><span>{setup.fieldSize} racers</span><span>Your rules</span></div><span className="selection-mark">{!tournament && <Check size={15} />}</span>
               </button>
               <button className={`mode-option ${tournament ? 'selected' : ''}`} role="radio" aria-checked={tournament} tabIndex={tournament ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, mode: 'tournament', customPhysics: false }))}>
                 <div className="mode-icon"><Trophy size={47} strokeWidth={1.15} /></div><span className="mode-kicker">CONSISTENCY. QUESTIONABLE INTENT.</span><h3>Tournament</h3><p>Race the whole circuit. Carry your points and your crew through all three rounds.</p>
@@ -168,15 +169,20 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
 
           {step === 2 && <div className="setup-final">
             <section className="event-selection">
-              <div className="choice-heading"><span>{tournament ? 'THE SCRAPDOME CUP / RACE ORDER' : 'CHOOSE YOUR TRACK'}</span><Flag size={15} /></div>
+              <div className="choice-heading"><span>{tournament ? 'THE SCRAPDOME CUP / RACE ORDER' : 'CHOOSE YOUR TRACK'}</span><img src="/art/flag-checkered.png" alt="" className="heading-flag-img" aria-hidden="true" /></div>
               {tournament ? <div className="cup-itinerary">{CUP_ROUNDS.map((id, index) => {
                 const track = COURSES.find((c) => c.id === id)!;
-                return <div className="itinerary-stop" key={id}><img className="course-thumbnail" src={coursePreview(id)} alt={`${TRACKS[id].region} scenery`} /><span>{String(index + 1).padStart(2, '0')}</span><div><h3>{track.name}</h3><p>{TRACKS[id].region} / {TRACKS[id].character}</p></div><small>36 km</small></div>;
-              })}<div className="cup-scoring"><Trophy size={18} /><div><strong>Every finish matters.</strong><p>1st: {CUP_POINTS[0]} pts / 2nd: {CUP_POINTS[1]} / 3rd: {CUP_POINTS[2]} / 4th: {CUP_POINTS[3]}. DNF: 0.</p></div></div></div> :
+                return <div className="itinerary-stop" key={id}><img className="course-thumbnail" src={coursePreview(id)} alt={`${TRACKS[id].region} scenery`} /><span>{String(index + 1).padStart(2, '0')}</span><div><h3>{track.name}</h3><p>{TRACKS[id].region} / {TRACKS[id].character}</p></div><small>15 km</small></div>;
+              })}<div className="cup-scoring"><Trophy size={18} /><div><strong>Every finish matters.</strong><p>{setup.fieldSize === 4 ? `1st: ${CUP_POINTS[0]} pts / 2nd: ${CUP_POINTS[1]} / 3rd: ${CUP_POINTS[2]} / 4th: ${CUP_POINTS[3]}. DNF: 0.` : '1st–9th: 9–1 pts. Remaining places and DNF: 0.'}</p></div></div></div> :
                 <div className="new-race-courses" role="radiogroup" aria-label="Choose a track" onKeyDown={radioKeys}>{COURSES.map((track) => <button key={track.id} className={`new-race-course ${setup.course === track.id ? 'selected' : ''}`} role="radio" aria-checked={setup.course === track.id} tabIndex={setup.course === track.id ? 0 : -1} onClick={() => setSetup((s) => ({ ...s, course: track.id }))}>
                   <img className="course-thumbnail" src={coursePreview(track.id)} alt={`${TRACKS[track.id].region} scenery`} /><span><strong>{track.name}</strong><small>{TRACKS[track.id].region} / {TRACKS[track.id].character}</small></span><span className="course-check">{setup.course === track.id && <Check size={17} />}</span>
                 </button>)}</div>}
               <p className="course-world-description">{tournament ? 'Three distinct descents. Forest flow, quarry bursts, and pasture hops. Airborne supplies reward a good racing line.' : TRACKS[setup.course].description}</p>
+              <div className="choice-heading difficulty-heading"><span>FIELD SIZE</span><Users size={15} /></div>
+              <div className="difficulty-options" role="radiogroup" aria-label="Field size" onKeyDown={radioKeys}>{FIELD_SIZES.map((size) => <button role="radio" aria-checked={setup.fieldSize === size} tabIndex={setup.fieldSize === size ? 0 : -1} className={setup.fieldSize === size ? 'selected' : ''} key={size} onClick={() => setSetup((s) => ({ ...s, fieldSize: size as FieldSize }))}>{size} racers</button>)}</div>
+              <p className="difficulty-description">{setup.fieldSize > QUALIFYING_REQUIRED_ABOVE
+                ? `Experimental ${setup.fieldSize}-racer field. Qualifying is required by the event rules, but qualifying heats are not implemented yet.`
+                : 'The classic four-lane grid. No qualifying required.'}</p>
               <div className="choice-heading difficulty-heading"><span>CPU CHALLENGE</span><Users size={15} /></div>
               <div className="difficulty-options" role="radiogroup" aria-label="CPU difficulty" onKeyDown={radioKeys}>{DIFFICULTIES.map((level) => <button role="radio" aria-checked={setup.difficulty === level.id} tabIndex={setup.difficulty === level.id ? 0 : -1} className={setup.difficulty === level.id ? 'selected' : ''} key={level.id} onClick={() => setSetup((s) => ({ ...s, difficulty: level.id }))}>{level.name}</button>)}</div>
               <p className="difficulty-description">{DIFFICULTIES.find((d) => d.id === setup.difficulty)?.description} Difficulty changes decisions, not the laws of physics.</p>
@@ -184,14 +190,14 @@ export default function NewGameSetup({ initial, hasSession, finishedSession, onS
             </section>
             <aside className="event-summary"><CharacterShowcase loadout={setup.loadout} variant="summary" decorative /><span className="mode-kicker">YOUR STARTING LINEUP</span><h3>{rider.name}</h3><p>{capsule.name} / {capsule.title}</p>
               <div className="event-summary-rule"><LockKeyhole size={17} /><span>{setup.customPhysics && !tournament ? 'Custom tuning enabled for this practice run.' : tournament ? 'Your loadout stays locked for all three rounds.' : 'Preset stats stay fixed for this race.'}</span></div>
-              <div className="event-summary-rule"><Trophy size={17} /><span>{tournament ? CUP_NAME : 'One race. Four goblins. One finish.'}</span></div>
+              <div className="event-summary-rule"><Trophy size={17} /><span>{tournament ? CUP_NAME : `One race. ${setup.fieldSize} goblins. One finish.`}</span></div>
               <p className="finish-window-note">Rivals get a 10-second finish window after you. Ties in the cup break by wins, then final-round placement.</p>
             </aside>
           </div>}
 
           <div className="fantasy-dialog-actions setup-actions">
             <button className="fantasy-link" onClick={() => step === 0 ? onClose() : setStep(step - 1)}><ArrowLeft size={15} />{step === 0 ? 'Main menu' : 'Back'}</button>
-            <span className="setup-progress-note">{step === 0 ? <><Users size={14} />Four racers. All local.</> : <><Sparkles size={14} />{rider.name} + {capsule.name}</>}</span>
+            <span className="setup-progress-note">{step === 0 ? <><Users size={14} />{setup.fieldSize} racers. All local.</> : <><Sparkles size={14} />{rider.name} + {capsule.name}</>}</span>
             <button className="fantasy-primary" onClick={() => step < 2 ? setStep(step + 1) : start()} disabled={starting}>{step === 0 ? 'Choose Your Crew' : step === 1 ? 'Set the Race' : tournament ? 'Enter the Cup' : 'To the Starting Line'}<ArrowRight size={16} /></button>
           </div>
         </>}

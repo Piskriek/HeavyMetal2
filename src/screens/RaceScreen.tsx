@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import {
   ArrowDownToLine, ArrowRight, ArrowUpFromLine, ArrowUpRight, Check,
-  CircleHelp, Crosshair, Flag, Hammer, Home, Image as ImageIcon,
-  Maximize2, Minimize2, MousePointer2, Pause, Play, RotateCcw, Settings2,
+  CircleHelp, Crosshair, Hammer, Home, Image as ImageIcon,
+  Maximize2, Minimize2, Pause, Play, RotateCcw, Settings2,
   ShieldCheck, Trophy, Volume2, X, Zap,
 } from 'lucide-react';
 import Modal from '../components/Modal';
@@ -15,16 +15,29 @@ import BlizzardGauge from '../components/ui/BlizzardGauge';
 import PositionMedallion from '../components/ui/PositionMedallion';
 import { mergeRunRecord } from '../game/preferences';
 import { prepareRaceBalls, prepareRosterArt } from '../game/loadout-art';
+import CockpitHud from '../components/CockpitHud';
+import TestDriveBar from '../components/TestDriveBar';
+import { DEFAULT_ROPE, type RopeConfig } from '../game/sim/rope';
+import { TouchRaceControls } from '../components/RaceControls';
+import TrackStripMap from '../components/TrackStripMap';
+import { createCockpitState, preloadCockpitArt, type CockpitState } from '../game/cockpit';
+import { EFFECT_ART_PATHS } from '../game/effects/renderer-fx';
+import { preloadTrackArt } from '../game/obstacle-view';
+import { ROPE_REEL_ART } from '../game/rope-reel-view';
+import MergePoolOverlay from '../components/MergePoolOverlay';
 import { loadArtImage, riderCell } from '../game/art-assets';
 import { preloadRaceAssets } from '../game/preloader';
 import { loadoutStats, riderById, capsuleById } from '../game/loadouts';
 import { CUP_NAME, roundComplete, type RaceConfig, type RaceSession } from '../game/session';
 import { TRACK_DISTANCE } from '../game/scene';
+import { PLAYER_ID, trackbarRacers } from '../game/roster';
 import { loadAssets, type GameAssets, type SpriteName } from '../game/assets';
 import { preparePowerupSprites } from '../game/powerups';
 import { GameEngine } from '../game/engine';
+import { GameDebugController } from '../game/debug';
 import { COURSES, INITIAL_SNAPSHOT, type GameOptions, type RunRecord } from '../game/types';
 import RaceLoadingScreen from '../components/RaceLoadingScreen';
+import TrackBuilderUI from '../components/TrackBuilderUI';
 import { formatKey, loadBindings, type KeyBindings } from '../game/controls';
 
 type ModalName = 'help' | 'workshop' | 'records' | null;
@@ -73,8 +86,6 @@ async function downloadSourcePng(url: string, filename: string) {
 
 const HAZARDS: { sprite: SpriteName; name: string; description: string }[] = [
   { sprite: 'spring', name: 'Spring loaded', description: 'A big bounce, a little airtime, and one bounce charge back.' },
-  { sprite: 'bumperCrown', name: 'Crown bumper', description: 'A pinball-style crown peg redirects your line without killing momentum.' },
-  { sprite: 'bumperSpiked', name: 'Spiked bumper', description: 'The red rockfield peg kicks hard and rewards a clean lane choice.' },
   { sprite: 'boost', name: 'Full throttle', description: 'Hit the chevrons for instant speed and a fresh boost charge.' },
   { sprite: 'tnt', name: 'Explosive potential', description: 'Run into it. Seriously. The blast sends you further.' },
   { sprite: 'sheep', name: 'The local wildlife', description: 'Soft landings. Loud complaints. No sheep are harmed.' },
@@ -99,6 +110,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   const [bindings, setBindings] = useState<KeyBindings>(() => loadBindings());
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingDismissed, setLoadingDismissed] = useState(() => session.results.some((record) => record.round === config.round));
+  const [buildMode, setBuildMode] = useState(false);
   // TICKET-02: the consolidated gear menu and its auto-hide-while-racing behavior.
   const [gearOpen, setGearOpen] = useState(false);
   const [hudIdle, setHudIdle] = useState(false);
@@ -113,6 +125,28 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     ballWeight: config.customPhysics ? options.ballWeight : stats.weight,
   }), [options, config, stats]);
   const optionsRef = useRef(raceOptions);
+  // M01 · T4: one reused cockpit channel, filled by the engine each frame and read by the HUD's rAF.
+  const cockpitRef = useRef<CockpitState>(createCockpitState());
+  const readCockpit = useCallback((state: CockpitState) => {
+    engineRef.current?.getCockpitState(state);
+  }, []);
+  const firstPerson = options.cameraMode === 'first_person';
+  // Quick-race test tools: live camera switch and slow motion (never in a tournament).
+  const [timeScale, setTimeScale] = useState(1);
+  const changeTimeScale = useCallback((scale: number) => {
+    engineRef.current?.setTimeScale(scale);
+    setTimeScale(engineRef.current?.getTimeScale() ?? scale);
+  }, []);
+  // H7b: the rope timings the dev test drive tunes (defaults until someone moves a slider).
+  const [rope, setRope] = useState<RopeConfig>(DEFAULT_ROPE);
+  const changeRope = useCallback((change: Partial<RopeConfig>) => {
+    const next = engineRef.current?.setRopeConfig(change);
+    if (next) setRope(next);
+  }, []);
+  const changeCamera = useCallback((cameraMode: GameOptions['cameraMode']) => {
+    setOptions((previous) => ({ ...previous, cameraMode }));
+    engineRef.current?.setCameraMode(cameraMode);
+  }, [setOptions]);
   const finishRef = useRef(onRoundComplete);
   finishRef.current = onRoundComplete;
   const modalRef = useRef<ModalName>(null);
@@ -131,6 +165,21 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       window.removeEventListener('storage', handler);
     };
   }, []);
+  useEffect(() => {
+    const handleToggle = (e: any) => {
+      setBuildMode(e.detail.active);
+    };
+    window.addEventListener('toggle-3d-build-mode' as any, handleToggle);
+    return () => window.removeEventListener('toggle-3d-build-mode' as any, handleToggle);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('sync-3d-build-mode', { detail: { active: buildMode } }));
+    if (engineRef.current) {
+      engineRef.current.setBuildPaused(buildMode);
+    }
+  }, [buildMode]);
+
   // Reset loading cover when config changes (new round)
   useEffect(() => { setLoadingDismissed(session.results.some((r) => r.round === config.round)); setLoadingProgress(0); }, [config.round, config.course]);
   // TICKET-06: Real progress comes from preloadRaceAssets(); but bump to 8% while
@@ -143,8 +192,14 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   const best = useMemo(() => Math.max(0, ...records.map((record) => record.distance)), [records]);
   const course = COURSES.find((item) => item.id === config.course) ?? COURSES[0];
-  const playing = snapshot.status === 'flying';
+  // M01 · T2: while the pool holds the field nobody is racing, but the player is still in the seat —
+  // held riders glide in the ring's shadow, so the world keeps drawing and the cockpit stays live.
+  const pooled = snapshot.status === 'checkpoint' || snapshot.status === 'countdown';
+  const playing = snapshot.status === 'flying' || pooled;
   const ready = snapshot.status === 'ready';
+  // M01 · T1: the 0.4 s shove is part of the run — the HUD has to be live for it, so the notice
+  // that explains what just happened is not swallowed by the grid state.
+  const onCourse = playing || snapshot.status === 'pushing';
   const paused = snapshot.status === 'paused';
   // The gear button is the single always-available race menu; it fades away
   // during active play and returns on any pointer or key activity.
@@ -168,7 +223,10 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
   }, [playing]);
   useEffect(() => { if (!playing && !paused) setGearOpen(false); }, [playing, paused]);
   const gearHidden = playing && hudIdle && !gearOpen;
-  const playerDistance = snapshot.racers.find((racer) => racer.id === 0)?.distance ?? snapshot.distance;
+  // T02: the player is a stable ID, never "whatever happens to be index 0".
+  const playerDistance = snapshot.racers.find((racer) => racer.id === PLAYER_ID)?.distance ?? snapshot.distance;
+  // T02: the trackbar budget is bounded at every field size (player + leaders + nearest rivals).
+  const trackbarPips = useMemo(() => trackbarRacers(snapshot.racers, PLAYER_ID), [snapshot.racers]);
   const trackPct = (distance: number) => Math.min(100, Math.max(0, (distance / TRACK_DISTANCE) * 100));
   const toggleGear = () => {
     setGearOpen((open) => {
@@ -194,6 +252,12 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         loadAssets(), prepareRaceBalls(config.roster), preparePowerupSprites(), prepareRosterArt(config.roster),
         // The off-screen pointer badge shows the player's portrait, not the ball.
         loadArtImage(riderCell(config.loadout.rider).pilot ?? riderCell(config.loadout.rider).image).catch(() => null),
+        // M01 · T4: the cockpit is painted art; every file is decoded before the grid, never in-race.
+        preloadCockpitArt(),
+        // M01 · T5: the effect sheets too — an explosion must not hitch on its first frame.
+        Promise.all([...EFFECT_ART_PATHS, ROPE_REEL_ART.url].map((path) => loadArtImage(path).catch(() => null))),
+        // WIRE-2: the road textures, obstacle sprites and effect sheets the race draws with.
+        preloadTrackArt(),
       ]))
       .then(([loaded, raceBalls, pickupSprites, art, playerBadge]) => {
         if (!active) return;
@@ -213,6 +277,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     if (resumeOnly || !assets || !canvasRef.current || !stageRef.current) return;
     const engine = new GameEngine(canvasRef.current, assets, optionsRef.current, setSnapshot, handleFinish, config);
     engineRef.current = engine;
+    const debug = new GameDebugController(engine);
     engine.inputEnabled = activeRef.current && !modalRef.current;
     engine.setVisible(activeRef.current);
     const resize = () => {
@@ -227,6 +292,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     return () => {
       observer.disconnect();
       visibilityObserver.disconnect();
+      debug.destroy();
       engine.destroy();
       engineRef.current = null;
     };
@@ -287,11 +353,25 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
     setModal(name);
   }, []);
 
+  // H5: a touch screen (coarse pointer, or the first touch on a hybrid) gets the thumb controls.
+  const [touchControls, setTouchControls] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true);
+  useEffect(() => {
+    const query = window.matchMedia?.('(pointer: coarse)');
+    const changed = () => { if (query?.matches) setTouchControls(true); };
+    const touched = () => setTouchControls(true);
+    query?.addEventListener?.('change', changed);
+    window.addEventListener('touchstart', touched, { once: true, passive: true });
+    return () => { query?.removeEventListener?.('change', changed); window.removeEventListener('touchstart', touched); };
+  }, []);
+  // H9: the strip map reads the engine directly each frame; the colours only change with the field.
+  const fillStrip = useCallback((out: Float32Array) => engineRef.current?.fillStripProgress(out) ?? 0, []);
+  const stripColors = useCallback(() => engineRef.current?.racerColors() ?? [], []);
   const retry = useCallback((autoLaunch = false) => {
     if (roundComplete(session)) { onContinue(); return; }
     engineRef.current?.reset();
     setResult(null);
-    if (autoLaunch) engineRef.current?.launch();
+    // "Race again" is the starter goblin again.
+    if (autoLaunch) engineRef.current?.start();
     canvasRef.current?.focus({ preventScroll: true });
   }, [session, onContinue]);
 
@@ -325,7 +405,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
 
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (!activeRef.current || event.defaultPrevented || modalRef.current || (event.repeat && !event.code.startsWith('Arrow')) || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!activeRef.current || event.defaultPrevented || modalRef.current || buildMode || engineRef.current?.trackBuilder.keymap.hasScope('builder') || (event.repeat && !event.code.startsWith('Arrow')) || event.ctrlKey || event.metaKey || event.altKey) return;
       const target = event.target as HTMLElement;
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
       if (['BUTTON', 'A'].includes(target.tagName) && ['Space', 'Enter'].includes(event.code)) return;
@@ -339,25 +419,35 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
       if (!engine) return;
       const code = event.code;
       const b = bindingsRef.current;
-      // Aim adjustments while on the grid (ready) keep arrow keys for fine-tuning regardless of remaps
-      if (engine.status === 'ready' && code === 'ArrowUp') { event.preventDefault(); engine.adjustAim(0, 3); return; }
-      if (engine.status === 'ready' && code === 'ArrowDown') { event.preventDefault(); engine.adjustAim(0, -3); return; }
-      if (engine.status === 'ready' && code === 'ArrowLeft') { event.preventDefault(); engine.adjustAim(-0.05, 0); return; }
-      if (engine.status === 'ready' && code === 'ArrowRight') { event.preventDefault(); engine.adjustAim(0.05, 0); return; }
+      // M01 · T2: while the first-loop pool holds the field, Space or Enter is "ready up" and the
+      // pool is the only thing it can mean — so it is handled before the grid/staging keys, or the
+      // "start the run" branch below would swallow Enter during the countdown.
+      // M9: player input goes through engine.dispatch, which checks it against the command gate.
+      if (engine.inMerge && (code === 'Space' || code === 'Enter')) {
+        event.preventDefault();
+        engine.dispatch({ type: 'ready' });
+        return;
+      }
+      // On the grid, Space or Enter begins the run
+      if (engine.status === 'ready' && (code === 'Space' || code === 'Enter')) {
+        event.preventDefault();
+        engine.dispatch({ type: 'start' });
+        return;
+      }
       // Fixed non-remappable actions
-      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.launch(); return; }
+      if (code === 'Enter') { event.preventDefault(); if (engine.status === 'finished') retry(true); else engine.dispatch({ type: 'start' }); return; }
       if (code === 'KeyR') { event.preventDefault(); retry(); return; }
       if (code === 'KeyM') { setOptions((previous) => ({ ...previous, sound: !previous.sound })); return; }
       if (code === 'KeyF') { event.preventDefault(); void toggleFullscreen(); return; }
       // Customizable bindings
-      if ((b.steerLeft ?? []).includes(code)) { event.preventDefault(); engine.changeLane(-1); return; }
-      if ((b.steerRight ?? []).includes(code)) { event.preventDefault(); engine.changeLane(1); return; }
-      if ((b.bounce ?? []).includes(code)) { event.preventDefault(); engine.bounce(); return; }
-      if ((b.boost ?? []).includes(code)) { event.preventDefault(); engine.boost(); return; }
+      if ((b.steerLeft ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'steer', direction: -1 }); return; }
+      if ((b.steerRight ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'steer', direction: 1 }); return; }
+      if ((b.bounce ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'bounce' }); return; }
+      if ((b.boost ?? []).includes(code)) { event.preventDefault(); engine.dispatch({ type: 'boost' }); return; }
       if ((b.pause ?? []).includes(code)) {
         event.preventDefault();
         if (code === 'Escape' && theater) setTheater(false);
-        else { engine.togglePause(); canvasRef.current?.focus({ preventScroll: true }); }
+        else { engine.dispatch({ type: 'toggle-pause' }); canvasRef.current?.focus({ preventScroll: true }); }
         return;
       }
       // Fallback: Escape should also close theater even if not bound to pause (defensive)
@@ -390,9 +480,39 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
           {artFailures.length > 0 && <p className="race-storage-warning" role="status"><ImageIcon size={15} />{artFailures.length} painted sprite{artFailures.length === 1 ? '' : 's'} could not be loaded, so a stand-in is shown. The race is unaffected.</p>}
 
           <motion.div ref={shellRef} className={`game-shell ${theater ? 'theater-mode' : ''}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.65, delay: 0.1 }}>
-            <div ref={stageRef} className={`game-stage status-${snapshot.status}`}>
-              <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label="Four-lane Heavy Metal GP 2. Drag your orange ball to launch all four goblins. A and D change lanes and bump rivals. Space to air bounce, Shift to boost, P to pause, R to restart.">Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
-              <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
+            <div ref={stageRef} className={`game-stage status-${snapshot.status} ${firstPerson ? 'is-first-person' : ''}`}>
+              <canvas ref={canvasRef} className="game-canvas" tabIndex={0} aria-label={`Heavy Metal GP 2 race with ${config.fieldSize} goblins. Press Space and the starter goblin pushes you off the pad. A and D change lanes and shove rivals. Space to air bounce, Shift to boost, P to pause, R to restart, V to change the camera, the bracket keys for slow motion.`}>Your browser needs HTML canvas support to play Heavy Metal GP 2.</canvas>
+              {buildMode && engineRef.current && canvasRef.current && (
+                <TrackBuilderUI
+                  builder={engineRef.current.trackBuilder}
+                  canvas={canvasRef.current}
+                  onClose={() => setBuildMode(false)}
+                  onRequestRender={() => engineRef.current?.requestRender()}
+                  onTestRace={() => {
+                    // M01 · T7 — "Test drive": the engine adopts the document the builder is holding
+                    // (saved or not, that is what the author is looking at), the builder closes, and
+                    // the next frame paints those lanes on the road the balls will drive.
+                    const engine = engineRef.current;
+                    if (!engine) return;
+                    engine.setLaneNetwork(engine.trackBuilder.getLaneNetwork());
+                    setBuildMode(false);
+                    engine.requestRender();
+                  }}
+                />
+              )}
+              {config.fieldSize > 4 && assets && !buildMode && engineRef.current && (snapshot.status === 'flying' || snapshot.status === 'paused' || snapshot.status === 'checkpoint' || snapshot.status === 'countdown') && (
+                <TrackStripMap fill={fillStrip} colors={stripColors} />
+              )}
+              {touchControls && assets && !buildMode && engineRef.current && (
+                <TouchRaceControls
+                  snapshot={snapshot}
+                  onLane={(direction) => engineRef.current?.dispatch({ type: 'steer', direction })}
+                  onBounce={() => engineRef.current?.dispatch({ type: 'bounce' })}
+                  onBoost={() => engineRef.current?.dispatch({ type: 'boost' })}
+                  onPrimary={() => engineRef.current?.dispatch({ type: snapshot.status === 'ready' ? 'start' : 'toggle-pause' })}
+                />
+              )}
+              {!firstPerson && <div className={`game-hud ${gearOpen ? 'hud-menu-open' : ''}`}>
                 <div className={`hud-gear ${gearHidden ? 'gear-hidden' : ''}`}>
                   <button className="gear-button" onClick={toggleGear} aria-haspopup="menu" aria-expanded={gearOpen} aria-label="Race menu" title="Race menu"><Settings2 size={17} /></button>
                   <AnimatePresence>
@@ -400,6 +520,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     {gearOpen && (
                       <motion.div key="gear-menu" className="gear-menu" role="menu" aria-label="Race menu" initial={{ opacity: 0, y: -7 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -7 }} transition={{ duration: 0.16 }}>
                         <span className="gear-menu-event">{config.customPhysics ? 'CUSTOM PRACTICE' : config.mode === 'tournament' ? `${CUP_NAME.toUpperCase()} · R${config.round + 1}/${config.totalRounds}` : 'QUICK RACE'}<small>{course.name} · {config.difficulty}</small></span>
+                        <button role="menuitem" onClick={gearAction(() => setBuildMode((prev) => !prev))}><Hammer size={15} />{buildMode ? 'Exit 3D builder' : '3D Track builder (B)'}</button>
                         {(playing || paused) && <button role="menuitem" onClick={gearAction(togglePause)}>{paused ? <Play size={15} /> : <Pause size={15} />}{paused ? 'Resume race' : 'Pause race'}</button>}
                         <button role="menuitem" onClick={gearAction(() => retry())} disabled={!assets}><RotateCcw size={15} />Restart round</button>
                         <button role="menuitem" onClick={gearAction(toggleSound)}><Volume2 size={15} />{options.sound ? 'Sound: on' : 'Sound: off'}</button>
@@ -419,20 +540,42 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                     <BlizzardGauge variant="dial" value={snapshot.speed} max={360} unit="km/h" label="SPEED" title={`Speed: ${snapshot.speed} km/h`} />
                   </div>
                 </div>
-              </div>
+              </div>}
+              {config.mode === 'quick' && assets && !loadError && (
+                <TestDriveBar cameraMode={options.cameraMode} onCameraMode={changeCamera} timeScale={timeScale} onTimeScale={changeTimeScale} rope={rope} onRope={changeRope} style={{ top: firstPerson ? 52 : 12 }} />
+              )}
+              {firstPerson && assets && !loadError && (
+                <CockpitHud
+                  state={cockpitRef.current}
+                  readState={readCockpit}
+                  reducedMotion={options.reducedMotion}
+                  active={playing || paused || snapshot.status === 'pushing'}
+                />
+              )}
+              {/* M01 · T2: the first-loop pool. While it owns the status the queue panel is up; once
+                  the releases start only GO! is left, and never over a rider who is already racing. */}
+              {snapshot.merge && (snapshot.merge.phase !== 'releasing' || snapshot.merge.countdownLabel) && (
+                <MergePoolOverlay
+                  merge={snapshot.merge}
+                  loadout={config.loadout}
+                  reducedMotion={options.reducedMotion}
+                  raceTime={snapshot.raceTime}
+                  onReady={() => engineRef.current?.dispatch({ type: 'ready' })}
+                />
+              )}
               <AnimatePresence>
-                {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Flag size={16} /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
-                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Pull back the orange goblin to launch the grid.</p><img className="aim-arrow" src="/art/aim-arrow.png" alt="" aria-hidden="true" draggable={false} /></motion.div>}
-                {snapshot.notice && playing && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
+                {gridNotes.length > 0 && (ready || resumeOnly) && <motion.div className="grid-recovery" role="status" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="grid-flag-img" aria-hidden="true" /><div><strong>Saved event restored</strong>{gridNotes.map((note) => <p key={note}>{note}</p>)}</div></motion.div>}
+                {ready && <motion.div className="aim-hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: 0.5, duration: 0.5 }}><p>Starter goblin is ready — {touchControls ? <>tap <kbd>GO</kbd></> : <>press <kbd>Space</kbd></>} to launch. <span style={{ color: '#f0a15b', display: 'block', fontSize: '0.85em', marginTop: 3 }}>⏱ Note: The first split time is taken alone — rivals join after the split!</span></p></motion.div>}
+                {snapshot.notice && onCourse && <motion.div key={snapshot.notice} className="game-notice" role="status" initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }}>{snapshot.notice}</motion.div>}
               </AnimatePresence>
               <AirSupplies snapshot={snapshot} />
               <div className="mini-trackbar" aria-label={`Race progress: ${Math.round(trackPct(playerDistance))} percent`}>
                 <span className="trackbar-sector">{snapshot.sector}</span>
                 <div className="trackbar-rail">
                   <div className="trackbar-fill" style={{ width: `${trackPct(playerDistance)}%` }} />
-                  {snapshot.racers.map((racer) => <span key={racer.id} className={`trackbar-pip ${racer.id === 0 ? 'player' : ''}`} style={{ left: `${trackPct(racer.distance)}%`, backgroundColor: racer.color }} title={racer.id === 0 ? 'You' : racer.name} aria-hidden="true" />)}
+                  {trackbarPips.map((racer) => <span key={racer.id} className={`trackbar-pip ${racer.id === PLAYER_ID ? 'player' : ''}`} style={{ left: `${trackPct(racer.distance)}%`, backgroundColor: racer.color }} title={racer.id === PLAYER_ID ? 'You' : racer.name} aria-hidden="true" />)}
                 </div>
-                <span className="trackbar-remaining">{number(Math.max(0, TRACK_DISTANCE - playerDistance))} m <span className="checkered-flag" /></span>
+                <span className="trackbar-remaining">{number(Math.max(0, TRACK_DISTANCE - playerDistance))} m <img src="/art/flag-checkered.png" alt="" className="trackbar-flag-img" aria-hidden="true" /></span>
               </div>
               <AnimatePresence>
                 {loadError && !assets && !resumeOnly && (
@@ -451,7 +594,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                   </motion.div>
                 )}
                 {paused && !modal && <motion.div className="game-overlay pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><span className="eyebrow orange-text">A MOMENT OF UNCHARACTERISTIC CAUTION</span><h2>CHAOS ON HOLD.</h2><p>Your goblin is enjoying the peace and quiet.</p><button className="primary-button" onClick={() => { engineRef.current?.togglePause(); canvasRef.current?.focus({ preventScroll: true }); }}><Play size={18} fill="currentColor" /> RESUME RACE</button><div className="pause-menu-actions"><button className="text-button" onClick={onSettings}><Settings2 size={16} /> SETTINGS</button><button className="text-button" onClick={onMainMenu}>MAIN MENU <ArrowUpRight size={16} /></button></div><span className="overlay-shortcut">OR PRESS <kbd>P</kbd></span></motion.div>}
-                {snapshot.settling && playing && <motion.div className="finish-wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Flag size={23} /><strong>You crossed the line.</strong><span>Rivals finishing: {snapshot.finishWait}s remaining</span></motion.div>}
+                {snapshot.settling && playing && <motion.div className="finish-wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><img src="/art/flag-checkered.png" alt="" className="finish-flag-img" aria-hidden="true" /><strong>You crossed the line.</strong><span>Rivals finishing: {snapshot.finishWait}s remaining</span></motion.div>}
                 {result && (snapshot.status === 'finished' || resumeOnly) && <motion.div className="round-result-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><RoundResult result={result} session={session} onContinue={onContinue} onMenu={onMainMenu} onNewGame={onNewGame} /></motion.div>}
               </AnimatePresence>
             </div>
@@ -462,14 +605,14 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
         <AnimatePresence>
           {modal === 'help' && <Modal key="help" title="A Crash Course. Literally." eyebrow="THE VERY OPTIONAL INSTRUCTION MANUAL" onClose={closeModal} className="fantasy-dialog">
             <div className="modal-tabs" role="tablist" aria-label="Instructions"><button role="tab" aria-selected={helpTab === 'basics'} className={helpTab === 'basics' ? 'selected' : ''} onClick={() => setHelpTab('basics')}>THE BASICS</button><button role="tab" aria-selected={helpTab === 'hazards'} className={helpTab === 'hazards' ? 'selected' : ''} onClick={() => setHelpTab('hazards')}>MEET THE BAD IDEAS</button></div>
-            {helpTab === 'basics' ? <div className="help-basics"><p className="modal-lead">You are racing as {riderById(config.loadout.rider).name} in the {capsuleById(config.loadout.capsule).name}. Four loaded slingshots, four lanes, and 36 km to the stadium. Your orange goblin starts in lane 3.</p>
-              <div className="instruction-row"><span className="instruction-number">01</span><MousePointer2 size={24} /><div><h3>Pull back. Let it rip.</h3><p>Drag the glowing ball left and down, then release. Or use arrow keys to adjust power and angle, then Enter to launch.</p></div><kbd>DRAG</kbd></div>
-              <div className="instruction-row"><span className="instruction-number">02</span><ArrowRight size={25} /><div><h3>Pick a lane. Borrow theirs.</h3><p>A moves left, D moves right. Touch the steering arrows on a phone. Contact shoves rivals toward adjacent lanes; heavier capsules push harder. Steering locks briefly after a bump and during loops.</p></div><kbd>A / D</kbd></div>
+            {helpTab === 'basics' ? <div className="help-basics"><p className="modal-lead">You are racing as {riderById(config.loadout.rider).name} in the {capsuleById(config.loadout.capsule).name}. Four lanes, {config.fieldSize} loaded goblins, and 15 km to the stadium. Your orange goblin starts in lane 3.</p>
+              <div className="instruction-row"><span className="instruction-number">01</span><Play size={24} /><div><h3>One shove. Then it's downhill.</h3><p>Press Space or Enter (tap GO on a phone) and the starter goblin pushes you off the pad. The first split is yours alone: the rivals join at the merge gate, queued by their own split times.</p></div><kbd>SPACE</kbd></div>
+              <div className="instruction-row"><span className="instruction-number">02</span><ArrowRight size={25} /><div><h3>Pick a lane. Borrow theirs.</h3><p>A moves left, D moves right. Touch the steering arrows on a phone. Contact shoves rivals sideways; heavier capsules push harder. A hit throws your lane rope out, maybe as far as the road edge, then reels you back in. Steer and you take up the slack yourself.</p></div><kbd>A / D</kbd></div>
               <div className="instruction-row"><span className="instruction-number">03</span><ArrowUpFromLine size={25} /><div><h3>Give gravity a day off.</h3><p>Space uses one of your midair bounces. Spring pads refill charges automatically. Each racer has their own charges; sheep and TNT are first-come, first-chaos.</p></div><kbd>SPACE</kbd></div>
-              <div className="instruction-row"><span className="instruction-number">04</span><Zap size={25} /><div><h3>Less thinking. More throttle.</h3><p>Shift uses a boost. The CPU goblins use the same physics, seek boost pads, dodge gaps, and occasionally pick a fight. Live standings show your position and their gaps.</p></div><kbd>SHIFT</kbd></div>
-              <div className="keyboard-reference"><span><kbd>R</kbd> Retry</span><span><kbd>{formatKey(bindings.pause[0] ?? 'KeyP')}</kbd> Pause</span><span><kbd>M</kbd> Sound</span><span><kbd>F</kbd> Fullscreen</span></div>
+              <div className="instruction-row"><span className="instruction-number">04</span><Zap size={25} /><div><h3>Less thinking. More throttle.</h3><p>Shift uses a boost. The CPU goblins use the same physics, seek boost pads and dodge gaps. A heavier rival picks its fights: it wobbles for a moment before it shoves, which is your cue to steer away or shield up. Live standings show your position and their gaps.</p></div><kbd>SHIFT</kbd></div>
+              <div className="keyboard-reference"><span><kbd>R</kbd> Retry</span><span><kbd>{formatKey(bindings.pause[0] ?? 'KeyP')}</kbd> Pause</span><span><kbd>M</kbd> Sound</span><span><kbd>F</kbd> Fullscreen</span><span><kbd>V</kbd> Camera</span><span><kbd>[</kbd> <kbd>]</kbd> Slow motion</span></div>
               <div className="controls-live-hint" style={{ marginTop: 10, padding: '10px 12px', background: '#0f1814', border: '1px solid #2e3827', borderRadius: 6, fontSize: 10, color: '#9aa68d' }}><strong style={{ color: '#f0a15b', fontSize: 9, letterSpacing: .6, display: 'block', marginBottom: 4 }}>YOUR CURRENT BINDINGS</strong> <span style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}><span><kbd>{(bindings.steerLeft ?? []).map(formatKey).join(' / ') || 'A'}</kbd> Left</span><span><kbd>{(bindings.steerRight ?? []).map(formatKey).join(' / ') || 'D'}</kbd> Right</span><span><kbd>{(bindings.bounce ?? []).map(formatKey).join(' / ') || 'SPACE'}</kbd> Bounce</span><span><kbd>{(bindings.boost ?? []).map(formatKey).join(' / ') || 'SHIFT'}</kbd> Boost</span></span></div>
-              <p className="touch-note">On a phone? Drag your orange ball, then use the lane arrows, Jump, Bounce, and Boost. Competitive loadouts stay fixed. Live physics sliders are available in custom Quick Race practice. Rebind everything in Settings → Controls.</p></div> : <div className="hazard-guide">{HAZARDS.map((hazard) => <div className="hazard-row" key={hazard.sprite}>{assets && <img src={assets[hazard.sprite].url} alt={hazard.name} />}<div><h3>{hazard.name}</h3><p>{hazard.description}</p></div></div>)}<div className="hazard-row">{assets && <img src={assets.loop.url} alt="Timber loop" />}<div><h3>Loop-de-loop, hold the logic</h3><p>Approach a loop with speed to ride the full circle and earn 350 chaos points. Ramps launch you across the gaps ahead.</p></div></div></div>}
+              <p className="touch-note">On a phone? Tap GO to start, the arrows under your left thumb to change lanes, and Bounce and Boost under your right. Competitive loadouts stay fixed. Live physics sliders are available in custom Quick Race practice. Rebind everything in Settings → Controls.</p></div> : <div className="hazard-guide">{HAZARDS.map((hazard) => <div className="hazard-row" key={hazard.sprite}>{assets && <img src={assets[hazard.sprite].url} alt={hazard.name} />}<div><h3>{hazard.name}</h3><p>{hazard.description}</p></div></div>)}<div className="hazard-row">{assets && <img src={assets.loop.url} alt="Timber loop" />}<div><h3>Loop-de-loops: look, don't ride</h3><p>The timber loops are scenery now: your ball rolls on past them. Ramps launch you across the gaps ahead.</p></div></div></div>}
             {helpTab === 'hazards' && <AirSupplyGuide />}
             <div className="modal-bottom"><span><ShieldCheck size={16} /> Safety briefing complete. Allegedly.</span><button className="primary-button" onClick={closeModal}>I FEEL QUALIFIED <Check size={17} /></button></div>
           </Modal>}
@@ -499,7 +642,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
                 <div><h3><label htmlFor="race-camera-mode">Ball camera</label></h3><p>Follow ball chases your capsule so it stays framed. Fixed course holds the classic wide view; an edge arrow points when the ball leaves the screen.</p></div>
                 <select id="race-camera-mode" className="graphics-select" value={options.cameraMode} onChange={(event) => {
                   const cameraMode = event.target.value;
-                  if (cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
+                  if (cameraMode === 'first_person' || cameraMode === 'follow_ball' || cameraMode === 'fixed') setOptions((previous) => ({ ...previous, cameraMode }));
                 }}>
                   <option value="follow_ball">Follow ball</option>
                   <option value="fixed">Fixed course</option>
@@ -511,7 +654,7 @@ export default function RaceScreen({ active, options, setOptions, records, setRe
           </Modal>}
 
           {modal === 'records' && <Modal key="records" title="The Hall of Chaos" eyebrow="LEGENDS ARE MEASURED IN METERS" onClose={closeModal} className="fantasy-dialog">
-            {records.length === 0 ? <div className="empty-records"><Trophy size={55} strokeWidth={1.1} /><h3>YOUR LEGEND STARTS HERE.</h3><p>No runs. No regrets. Yet.<br />Launch a goblin and give the crowd something to talk about.</p><button className="primary-button" onClick={() => { closeModal(); retry(true); canvasRef.current?.focus({ preventScroll: true }); }}>MAKE A BAD IDEA HISTORY <ArrowUpRight size={19} /></button></div> : <><div className="records-summary"><Trophy size={29} /><div><span>YOUR PERSONAL BEST</span><strong>{number(best)} <small>m</small></strong></div><p>Locally legendary.<br />Saved on this device.</p></div><div className="records-table-wrap"><table className="records-table"><thead><tr><th>RANK</th><th>THE BAD IDEA</th><th>DISTANCE</th><th>CHAOS</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td><span className={index === 0 ? 'rank rank-first' : 'rank'}>{String(index + 1).padStart(2, '0')}</span></td><td><strong>{COURSES.find((item) => item.id === record.course)?.name ?? 'Rustbucket Ridge'} {record.completed && <Flag size={11} />}</strong><small>{new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} / {record.topSpeed} km/h</small></td><td>{number(record.distance)} <span>m</span></td><td>{number(record.score)}</td></tr>)}</tbody></table></div><div className="modal-bottom records-bottom"><button className="clear-records" onClick={() => { if (clearConfirm) { setRecords([]); setClearConfirm(false); } else setClearConfirm(true); }}>{clearConfirm ? 'YES, WIPE THE EVIDENCE' : 'Clear local records'}</button>{clearConfirm ? <button className="text-button" onClick={() => setClearConfirm(false)}>KEEP MY SHAME <X size={15} /></button> : <button className="primary-button" onClick={() => { closeModal(); retry(true); canvasRef.current?.focus({ preventScroll: true }); }}>BEAT THAT <ArrowRight size={17} /></button>}</div></>}
+            {records.length === 0 ? <div className="empty-records"><Trophy size={55} strokeWidth={1.1} /><h3>YOUR LEGEND STARTS HERE.</h3><p>No runs. No regrets. Yet.<br />Launch a goblin and give the crowd something to talk about.</p><button className="primary-button" onClick={() => { closeModal(); retry(true); canvasRef.current?.focus({ preventScroll: true }); }}>MAKE A BAD IDEA HISTORY <ArrowUpRight size={19} /></button></div> : <><div className="records-summary"><Trophy size={29} /><div><span>YOUR PERSONAL BEST</span><strong>{number(best)} <small>m</small></strong></div><p>Locally legendary.<br />Saved on this device.</p></div><div className="records-table-wrap"><table className="records-table"><thead><tr><th>RANK</th><th>THE BAD IDEA</th><th>DISTANCE</th><th>CHAOS</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td><span className={index === 0 ? 'rank rank-first' : 'rank'}>{String(index + 1).padStart(2, '0')}</span></td><td><strong>{COURSES.find((item) => item.id === record.course)?.name ?? 'Rustbucket Ridge'} {record.completed && <img src="/art/flag-checkered.png" alt="" className="record-flag-img" aria-hidden="true" />}</strong><small>{new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} / {record.topSpeed} km/h</small></td><td>{number(record.distance)} <span>m</span></td><td>{number(record.score)}</td></tr>)}</tbody></table></div><div className="modal-bottom records-bottom"><button className="clear-records" onClick={() => { if (clearConfirm) { setRecords([]); setClearConfirm(false); } else setClearConfirm(true); }}>{clearConfirm ? 'YES, WIPE THE EVIDENCE' : 'Clear local records'}</button>{clearConfirm ? <button className="text-button" onClick={() => setClearConfirm(false)}>KEEP MY SHAME <X size={15} /></button> : <button className="primary-button" onClick={() => { closeModal(); retry(true); canvasRef.current?.focus({ preventScroll: true }); }}>BEAT THAT <ArrowRight size={17} /></button>}</div></>}
           </Modal>}
         </AnimatePresence>
       </div>

@@ -1,0 +1,58 @@
+{
+  "schema": "hm2.baseline-manifest/v1",
+  "tool": {
+    "name": "scripts/protect-baseline.mjs",
+    "version": "1.0.0",
+    "node": "v24.19.0"
+  },
+  "created_at": "2026-09-25T15:35:19.441Z",
+  "protected_roots": [
+    "backups/props"
+  ],
+  "source": {
+    "path": "backups/props/track-props-latest.json",
+    "kind": "original-bytes",
+    "sha256": "ef96419da435e5886b58cf69b9de6f55b386437a655fe593c0776a38ef0881e1",
+    "bytes": 296180,
+    "mtime": "2026-09-25T15:34:57.722Z",
+    "symlinks": []
+  },
+  "snapshot": {
+    "directory": "baseline/snapshots/track-props-latest-2026-09-25T15-35-19-441Z",
+    "file": "baseline/snapshots/track-props-latest-2026-09-25T15-35-19-441Z/track-props-latest.json",
+    "sha256": "ef96419da435e5886b58cf69b9de6f55b386437a655fe593c0776a38ef0881e1",
+    "bytes": 296180,
+    "matches_source": true
+  },
+  "recovery": {
+    "requested": [],
+    "checks": [
+      {
+        "path": "backups/props/user_safety_backup/track-props-522-props-safeguard.json",
+        "status": "match",
+        "sha256": "ef96419da435e5886b58cf69b9de6f55b386437a655fe593c0776a38ef0881e1",
+        "bytes": 296180,
+        "matchesBytes": true,
+        "autoSelected": true,
+        "considered": 39
+      }
+    ],
+    "verifiedMatches": 1,
+    "note": "A copy on the same disk/tree is not an independent backup; verify a second authorised medium separately."
+  },
+  "observation": {
+    "advisory": true,
+    "note": "Observation only. Counts and IDs describe the bytes at hash time; never hard-code them as runtime constants.",
+    "container": "props",
+    "count": 522,
+    "uniqueIds": 522,
+    "missingIds": 0,
+    "duplicateIds": [],
+    "propTypeCount": 83,
+    "course": "ridge",
+    "updatedAt": "2026-09-25T15:34:57.688Z",
+    "timestamp": 1790350497688,
+    "idDigest": "69c7f4c3bd0a06ef77d9eaad4ea5bf3c516200481090448a627ce1be45f852f5",
+    "observedAt": "2026-09-25T15:35:19.436Z"
+  }
+}

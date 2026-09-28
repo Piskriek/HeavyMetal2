@@ -71,11 +71,11 @@ export function loadoutStats(loadout: Loadout) {
   const hopFactor = 1 + (ratings.handling - 6) * 0.025;
   return {
     ratings, weight,
-    launchSpeed: 160 + (ratings.launch - 6) * 4,
+    launchSpeed: (160 + (ratings.launch - 6) * 4),
     handling: 1 + (ratings.handling - 6) * 0.08,
     boostFactor, hopFactor,
     bumpRecovery: 1 - (ratings.stability - 6) * 0.045,
-    maximumSpeed: 2100 + (ratings.launch - 6) * 35,
+    maximumSpeed: (2100 + (ratings.launch - 6) * 35),
     boostKmh: Math.round(430 * impulse * boostFactor * 0.16),
     hopMeters: Math.round(Math.pow(290 * impulse * hopFactor, 2) / (2 * 860) / 2),
     budget: Object.values(ratings).reduce((sum, value) => sum + value, 0),

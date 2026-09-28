@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig } from 'framer-motion';
-import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Image as ImageIcon, Keyboard, MousePointer2, Play, Settings2, Trophy } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, Hammer, Image as ImageIcon, Keyboard, Play, Settings2, Trophy } from 'lucide-react';
 import MainMenu from './components/MainMenu';
 import SettingsPanel from './components/SettingsPanel';
 import Modal from './components/Modal';
 import NewGameSetup from './components/NewGameSetup';
 import { AirSupplyGuide } from './components/AirSupplies';
 import RaceScreen from './screens/RaceScreen';
-import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, savePreference } from './game/preferences';
+import MapEditorScreen from './screens/MapEditorScreen';
+import { OPTIONS_KEY, RECORDS_KEY, readOptions, readRecords, recordsForStorage, savePreference } from './game/preferences';
 import { COURSES, type RunRecord } from './game/types';
 import { SETUP_KEY, commitRound, createSession, nextRound, recordModeLabel, resumeLabel, sessionComplete, sessionConfig, type RaceSession, type RaceSetup, type SessionPhase } from './game/session';
 import { readSave, writeSave, type SaveNotice } from './game/save';
@@ -15,8 +16,14 @@ import './menu.css';
 import './setup.css';
 import './frames.css';
 import './hud.css';
+import './creator.css';
+import './garage.css';
 
-type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | null;
+// MP-T06: the goblin creator loads when it is opened.
+const BallCustomizer = lazy(() => import('./components/garage/BallCustomizer'));
+const CharacterCreatorStudio = lazy(() => import('./components/creator/CharacterCreatorStudio'));
+
+type Panel = 'settings' | 'guide' | 'records' | 'credits' | 'new-game' | 'creator' | 'garage' | null;
 
 const WRITE_FAILED = 'Progress could not be saved on this device. Your current event keeps running in this tab.';
 
@@ -25,7 +32,7 @@ export default function App() {
   const hydration = useMemo(() => readSave(), []);
   const [options, setOptions] = useState(readOptions);
   const [records, setRecords] = useState(readRecords);
-  const [screen, setScreen] = useState<'menu' | 'race'>('menu');
+  const [screen, setScreen] = useState<'menu' | 'race' | 'editor'>('menu');
   const [panel, setPanel] = useState<Panel>(null);
   const [session, setSession] = useState<RaceSession | null>(hydration.session);
   const [phase, setPhase] = useState<SessionPhase>(hydration.phase);
@@ -40,7 +47,8 @@ export default function App() {
   const recoveryNotes = useMemo(() => [...(restartNote ? [restartNote] : []), ...notices.map((notice) => notice.text)], [restartNote, notices]);
 
   useEffect(() => { if (!savePreference(OPTIONS_KEY, options)) setPersistWarning(WRITE_FAILED); }, [options]);
-  useEffect(() => { if (!savePreference(RECORDS_KEY, records)) setPersistWarning(WRITE_FAILED); }, [records]);
+  // T02: stored under the explicit summary policy; the in-memory list keeps every row.
+  useEffect(() => { if (!savePreference(RECORDS_KEY, recordsForStorage(records))) setPersistWarning(WRITE_FAILED); }, [records]);
   useEffect(() => { savePreference(SETUP_KEY, lastSetup); }, [lastSetup]);
   // Atomic, idempotent persistence of the event phase. Identical payloads are not rewritten.
   useEffect(() => {
@@ -71,6 +79,7 @@ export default function App() {
   }, []);
   const settings = useCallback(() => setPanel('settings'), []);
   const newGame = useCallback(() => setPanel('new-game'), []);
+  const mapEditor = useCallback(() => { setPanel(null); setScreen('editor'); }, []);
   const startRace = useCallback((setup: RaceSetup) => {
     leaveRaceFullscreen(() => {
       setLastSetup(setup);
@@ -82,6 +91,11 @@ export default function App() {
       setPanel(null);
     });
   }, [leaveRaceFullscreen]);
+
+  useEffect(() => {
+    (window as any).__startRace = (setup?: RaceSetup) => startRace(setup ?? lastSetup);
+    return () => { delete (window as any).__startRace; };
+  }, [startRace, lastSetup]);
   // Commits are idempotent: a duplicate round record is ignored, never scored twice.
   const finishRound = useCallback((record: RunRecord) => {
     if (!session) return;
@@ -125,9 +139,16 @@ export default function App() {
   return (
     <MotionConfig reducedMotion={options.reducedMotion ? 'always' : 'user'}>
       <div ref={shell} className={`game-application ${fullscreenFallback ? 'menu-fullscreen' : ''}`}>
-        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onNewGame={newGame} onResume={resume}
-          onSettings={settings} onGuide={() => setPanel('guide')} onRecords={() => setPanel('records')}
+        {screen === 'menu' && <MainMenu options={options} hasRace={Boolean(session)} resumeLabel={resumeLabel(session, phase)} resumeNote={recoveryNotes[0] ?? null} storageWarning={persistWarning} onNewGame={newGame} onResume={resume} onMapEditor={mapEditor}
+          onSettings={settings} onGuide={() => setPanel('guide')} onRecords={() => setPanel('records')} onCreator={() => setPanel('creator')} onGarage={() => setPanel('garage')}
           onCredits={() => setPanel('credits')} onSound={() => setOptions((previous) => ({ ...previous, sound: !previous.sound }))} onFullscreen={() => void fullscreen()} />}
+
+        {screen === 'editor' && (
+          <MapEditorScreen
+            options={options}
+            onMainMenu={mainMenu}
+          />
+        )}
 
         {session && config && <div className="race-screen-host" hidden={screen !== 'race'} aria-hidden={screen !== 'race'} inert={screen !== 'race'}>
           <RaceScreen key={`${session.id}:${session.round}`} active={screen === 'race' && panel === null} options={options} setOptions={setOptions}
@@ -141,19 +162,23 @@ export default function App() {
           {panel === 'new-game' && <NewGameSetup key="new-game" initial={lastSetup} hasSession={Boolean(session)} finishedSession={session ? sessionComplete(session) : false} onStart={startRace} onClose={closePanel} />}
 
           {panel === 'guide' && <Modal key="guide" title="The Driver's Handbook" eyebrow="READING THIS COUNTS AS SAFETY TRAINING" onClose={closePanel} className="fantasy-dialog" wide backdrop="workshop">
-            <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the other three riders. Falling costs time, not the whole race.</p>
-            <div className="handbook-row"><MousePointer2 size={23} /><div><h3>Launch all four goblins</h3><p>Pull your glowing ball back and release. Or adjust power and angle with the arrow keys, then press Enter.</p></div><kbd>Drag</kbd></div>
+            <p className="fantasy-lead">Pick your rider and capsule before the race. Your orange goblin starts in lane 3 against the rival riders. Falling costs time, not the whole race.</p>
+            <div className="handbook-row"><Play size={23} /><div><h3>One shove off the pad</h3><p>Press Space or Enter (tap GO on a phone) and the starter goblin pushes you off. Your first split is a solo run; the rivals join at the merge gate.</p></div><kbd>Space</kbd></div>
             <div className="handbook-row"><ArrowRight size={23} /><div><h3>Take the racing line. Or theirs.</h3><p>A and D change lanes. Contact shoves rivals sideways. Heavy balls push harder, but light balls jump higher.</p></div><kbd>A / D</kbd></div>
-            <div className="handbook-row"><Play size={22} /><div><h3>A little hop, a lot of trouble</h3><p>W or J bunny-hops from the ground. Space spends an air-bounce charge. Shift boosts; chevron pads refill a charge.</p></div><kbd>W / Space / Shift</kbd></div>
-            <div className="handbook-row"><Settings2 size={23} /><div><h3>Keep the chaos under control</h3><p>P pauses. R restarts the current unfinished race. M toggles sound. Presets are fixed during competition; Quick Race custom practice enables the tuning sliders.</p></div><Keyboard size={25} /></div>
+            <div className="handbook-row"><ArrowUpRight size={22} /><div><h3>A little air, a lot of trouble</h3><p>Space spends an air-bounce charge; spring pads refill them. Shift boosts; chevron pads refill a charge.</p></div><kbd>Space / Shift</kbd></div>
+            <div className="handbook-row"><Settings2 size={23} /><div><h3>Keep the chaos under control</h3><p>P pauses. R restarts the current unfinished race. M toggles sound. V changes the camera, and [ and ] slow the race down or speed it back up. Presets are fixed during competition; Quick Race custom practice enables the tuning sliders.</p></div><Keyboard size={25} /></div>
             <AirSupplyGuide />
             <div className="fantasy-dialog-actions"><span className="subtle-note">No brakes. No refunds. Now you know.</span><button className="fantasy-primary" onClick={closePanel}>I Feel Qualified <Check size={16} /></button></div>
           </Modal>}
 
+          {panel === 'creator' && <Modal key="creator" title="Goblin Creator" eyebrow="EVERY FACE A BAD IDEA" onClose={closePanel} className="fantasy-dialog creator-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Warming up the workshop…</p>}><CharacterCreatorStudio /></Suspense></Modal>}
+
+          {panel === 'garage' && <Modal key="garage" title="Ball Garage" eyebrow="PAINT IT, THEN ROLL IT" onClose={closePanel} className="fantasy-dialog garage-dialog" wide backdrop="workshop"><Suspense fallback={<p className="fantasy-lead">Opening the garage…</p>}><BallCustomizer /></Suspense></Modal>}
+
           {panel === 'records' && <Modal key="records" title="Hall of Chaos" eyebrow="SOME BAD IDEAS BECOME LEGENDS" onClose={closePanel} className="fantasy-dialog" wide backdrop="vault">
             {records.length ? <>
               <p className="fantasy-lead">Your best runs, saved on this device. No account. No witnesses required.</p>
-              <div className="fantasy-records-wrap"><table className="fantasy-records"><thead><tr><th>Rank</th><th>Track</th><th>Finish</th><th>Distance</th><th>Chaos</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td>{String(index + 1).padStart(2, '0')}</td><td>{COURSES.find((track) => track.id === record.course)?.name ?? 'Rustbucket Ridge'}<small>{recordModeLabel(record)} / {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></td><td>{record.completed ? `${record.position ?? 1} / 4` : 'DNF'}</td><td>{record.distance.toLocaleString()} m</td><td>{record.score.toLocaleString()}</td></tr>)}</tbody></table></div>
+              <div className="fantasy-records-wrap"><table className="fantasy-records"><thead><tr><th>Rank</th><th>Track</th><th>Finish</th><th>Distance</th><th>Chaos</th></tr></thead><tbody>{records.map((record, index) => <tr key={record.id}><td>{String(index + 1).padStart(2, '0')}</td><td>{COURSES.find((track) => track.id === record.course)?.name ?? 'Rustbucket Ridge'}<small>{recordModeLabel(record)} / {new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small></td><td>{record.completed ? `${record.position ?? 1} / ${record.fieldSize ?? 4}` : 'DNF'}</td><td>{record.distance.toLocaleString()} m</td><td>{record.score.toLocaleString()}</td></tr>)}</tbody></table></div>
               <div className="fantasy-dialog-actions"><button className="fantasy-link" onClick={() => { if (clearRecords) { setRecords([]); setClearRecords(false); } else setClearRecords(true); }}>{clearRecords ? 'Confirm: clear local records' : 'Clear local records'}</button>{clearRecords && <button className="fantasy-link" onClick={() => setClearRecords(false)}>Cancel</button>}<button className="fantasy-primary" onClick={closePanel}>Back <ArrowLeft size={15} /></button></div>
             </> : <div className="menu-empty-state"><Trophy size={53} strokeWidth={1.15} /><h3>A Legend in the Making</h3><p>The record book is empty.<br />The track is not going to wreck itself.</p><button className="fantasy-primary" onClick={newGame}>Make Some History <ArrowRight size={16} /></button></div>}
           </Modal>}

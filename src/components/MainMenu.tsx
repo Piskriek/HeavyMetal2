@@ -1,6 +1,6 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Flag, Maximize2, Play, Settings, Trophy, Volume2, VolumeX } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, Maximize2, Paintbrush, Play, Settings, Trophy, UserRound, Volume2, VolumeX } from 'lucide-react';
 import Brand from './Brand';
 import AnimatedMenuBackground from './ui/AnimatedMenuBackground';
 import type { GameOptions } from '../game/types';
@@ -15,9 +15,14 @@ interface MainMenuProps {
   storageWarning?: string | null;
   onNewGame: () => void;
   onResume: () => void;
+  onMapEditor: () => void;
   onSettings: () => void;
   onGuide: () => void;
   onRecords: () => void;
+  /** MP-T06: the goblin creator. */
+  onCreator?: () => void;
+  /** MP-T04: the ball garage. */
+  onGarage?: () => void;
   onCredits: () => void;
   onSound: () => void;
   onFullscreen: () => void;
@@ -50,11 +55,16 @@ export default function MainMenu(props: MainMenuProps) {
     return () => window.removeEventListener('keydown', keydown);
   }, [props.hasRace, props.onResume]);
 
+  const FlagIcon = () => <img src="/art/flag-checkered.png" alt="" className="menu-flag-icon" aria-hidden="true" />;
+
   const entries = [
     ...(props.hasRace ? [{ label: props.resumeLabel ?? 'Resume Race', sub: 'Your goblin is waiting.', icon: Play, action: props.onResume, primary: true }] : []),
-    { label: 'New Game', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A fresh start. The same bad judgment.', icon: Flag, action: props.onNewGame, primary: !props.hasRace },
+    { label: 'New Game', sub: props.hasRace ? 'Start a new event. The current one is replaced.' : 'A fresh start. The same bad judgment.', icon: FlagIcon, action: props.onNewGame, primary: !props.hasRace },
+    { label: '3D Map Editor', sub: 'Design custom tracks, place props, and test drive.', icon: Compass, action: props.onMapEditor, primary: false },
     { label: 'Settings', sub: 'A little fine-tuning never hurt.', icon: Settings, action: props.onSettings, primary: false },
     { label: 'How to Play', sub: 'The very optional instruction manual.', icon: BookOpen, action: props.onGuide, primary: false },
+    ...(props.onCreator ? [{ label: 'Goblin Creator', sub: 'Build your racer, face and all. Save it to your crew.', icon: UserRound, action: props.onCreator, primary: false }] : []),
+    ...(props.onGarage ? [{ label: 'Ball Garage', sub: 'Paint your ball: metal, pin-lines and up to twelve decals.', icon: Paintbrush, action: props.onGarage, primary: false }] : []),
     { label: 'Hall of Chaos', sub: 'Some things deserve to be remembered.', icon: Trophy, action: props.onRecords, primary: false },
   ];
 
@@ -77,7 +87,7 @@ export default function MainMenu(props: MainMenuProps) {
           <p>Glory at the bottom. Trouble all the way down.</p>
         </div>
 
-        {props.hasRace && props.resumeNote && <p className="menu-resume-note" role="status"><Flag size={13} />{props.resumeNote}</p>}
+        {props.hasRace && props.resumeNote && <p className="menu-resume-note" role="status"><img src="/art/flag-checkered.png" alt="" className="menu-resume-flag-img" aria-hidden="true" />{props.resumeNote}</p>}
         <nav ref={navigation} className="main-menu-actions" aria-label="Main menu" onKeyDown={moveFocus}>
           {entries.map(({ label, icon: Icon, action, primary }, index) => (
             <motion.button key={label} className={`forged-menu-button ${primary ? 'forged-primary' : ''}`} onClick={action}

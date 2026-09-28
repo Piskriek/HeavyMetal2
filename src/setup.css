@@ -29,7 +29,11 @@
 .setup-actions { margin-top: 24px; padding-top: 19px; }
 .setup-actions .fantasy-primary { min-width: 187px; }
 .setup-confirm { padding: 23px 15px 12px; text-align: center; }
-.setup-confirm > svg { margin: 0 auto 17px; color: #cfb576; }
+.setup-confirm > svg, .setup-confirm > img, .setup-confirm-flag-img { margin: 0 auto 17px; display: block; width: 44px; height: 44px; object-fit: contain; }
+.button-flag-img { width: 16px; height: 16px; object-fit: contain; vertical-align: -2px; margin-left: 6px; display: inline-block; }
+.mode-flag-img { width: 44px; height: 44px; object-fit: contain; display: block; margin: 0 auto; }
+.heading-flag-img { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; }
+.loading-flag-img { width: 14px; height: 14px; object-fit: contain; vertical-align: -1px; margin-right: 4px; display: inline-block; }
 .setup-confirm > h3 { font: 600 25px 'Cinzel', Georgia, serif; color: #e8cfa1; margin-bottom: 15px; }
 .setup-confirm > p { font-size: 13px; line-height: 1.8; max-width: 580px; margin: auto; color: #bbc7ac; }
 .loadout-builder { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, 1fr); gap: 31px; }
@@ -109,6 +113,8 @@
 .garage-event h3 { font: 600 23px 'Cinzel', Georgia, serif; color: #deca9f; }
 .garage-event p { margin: 9px 0 16px; color: #abbf99; font-size: 12px; }
 .finish-wait { position: absolute; z-index: 5; left: 50%; top: 46%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 11px; color: #e1ca93; background: #102017e8; border: 1px solid #a88d565e; padding: 25px 38px; border-radius: 4px; text-align: center; min-width: 260px; }
+.finish-flag-img { width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 2px 4px #000a); }
+.round-result-flag-img { width: 15px; height: 15px; object-fit: contain; vertical-align: -2px; margin-right: 6px; display: inline-block; }
 .finish-wait strong { font: 600 19px 'Cinzel', Georgia, serif; }
 .finish-wait span { font-size: 11px; color: #a9c194; }
 /* TICKET-05: the round-result overlay is now the painted vault backdrop.

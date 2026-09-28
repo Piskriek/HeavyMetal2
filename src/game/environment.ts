@@ -1,10 +1,11 @@
 import type { GameAssets, Sprite } from './assets';
 import type { RangeCamera } from './projection';
-import { FINISH, HEIGHT, LANE, LANE_COUNT, LANE_WIDTH, STADIUM_START, START_X, STAGE_2_END, STAGE_2_START, STAGE_3_START, courseY, laneZ, obstacleBounds, occupiesLane, terrainY, type Obstacle, type SceneFrame } from './scene';
+import { FINISH, HEIGHT, LANE, LANE_COUNT, LANE_WIDTH, STADIUM_START, START_X, courseY, laneZ, obstacleBounds, occupiesLane, terrainY, type Obstacle, type SceneFrame } from './scene';
 import { polygon, texturedQuad, type Quad } from './texture';
 import { TRACKS } from './courses';
-import { buildCourseArt, type CourseArt } from './world-art';
+import { buildCourseArt, getTrackTextures, type CourseArt } from './world-art';
 import type { CourseId } from './types';
+import type { TrackTexKey } from './track-3d-data';
 
 const TAU = Math.PI * 2;
 const mod = (x: number, n: number) => ((x % n) + n) % n;
@@ -16,9 +17,6 @@ export class ArenaEnvironment {
   private lowDetail = false;
   private deck: HTMLCanvasElement;
   private wall: HTMLCanvasElement;
-  private wetDeck: HTMLCanvasElement;
-  private mossDeck: HTMLCanvasElement;
-  private readonly waterfallBackdrop: HTMLCanvasElement;
   private art: CourseArt;
   private readonly stadium = document.createElement('canvas');
   private readonly torch = document.createElement('canvas');
@@ -27,16 +25,23 @@ export class ArenaEnvironment {
     this.art = buildCourseArt(course, assets);
     this.deck = this.art.dirt;
     this.wall = this.art.bank;
-    this.wetDeck = this.makeTrackMaterial(assets.stripWood, '#3d5d5a');
-    this.mossDeck = this.makeTrackMaterial(assets.stripMoss, '#526b59');
-    this.waterfallBackdrop = this.makeWaterfallBackdrop();
     this.makeStadium();
     this.makeTorch();
+    this.refreshBlizzardTextures();
+  }
+
+  /** Loaded Blizzard-style seamless textures from Arena AI (null = not yet loaded). */
+  private blizzardTex: Record<TrackTexKey, { image: CanvasImageSource; width: number; height: number }> | null = null;
+
+  /** Try to grab the decoded Blizzard textures. Called once per begin() if not yet loaded. */
+  private refreshBlizzardTextures() {
+    if (!this.blizzardTex) this.blizzardTex = getTrackTextures();
   }
 
   begin(frame: SceneFrame, lowDetail = false) {
     this.frame = frame;
     this.lowDetail = lowDetail;
+    this.refreshBlizzardTextures();
     if (this.course !== frame.options.course) {
       this.course = frame.options.course;
       this.art = buildCourseArt(this.course, this.assets); this.deck = this.art.dirt; this.wall = this.art.bank;
@@ -89,7 +94,44 @@ export class ArenaEnvironment {
     const lighting = TRACKS[this.course].lighting;
     const parallax = this.frame.options.parallax;
 
-    // ---- Layer 1: Far Sky (painted skybox if available, else procedural gradient) ----
+    // ---- Section 3: Subterranean Cavern Atmosphere (48000..68400) ----
+    if (this.frame.camera >= 48000 && this.frame.camera < 68400) {
+      // Dark cavern vault ceiling with warm volcanic glow from below
+      const cavernGrad = context.createLinearGradient(0, 0, 0, HEIGHT);
+      cavernGrad.addColorStop(0, '#0a080e');
+      cavernGrad.addColorStop(0.5, '#16101c');
+      cavernGrad.addColorStop(1, '#2c1208');
+      context.fillStyle = cavernGrad;
+      context.fillRect(0, 0, this.view.width, HEIGHT);
+
+      // Searing magma uplight glow
+      const lavaGlow = context.createLinearGradient(0, HEIGHT * 0.6, 0, HEIGHT);
+      lavaGlow.addColorStop(0, '#ff3b0000');
+      lavaGlow.addColorStop(1, '#ff440055');
+      context.fillStyle = lavaGlow;
+      context.fillRect(0, HEIGHT * 0.6, this.view.width, HEIGHT * 0.4);
+      return;
+    }
+
+    // ---- Section 2: Waterfall Canyon Chasm Atmosphere (24000..48000) ----
+    if (this.frame.camera >= 24000 && this.frame.camera < 48000) {
+      const canyonGrad = context.createLinearGradient(0, 0, 0, HEIGHT);
+      canyonGrad.addColorStop(0, '#102028');
+      canyonGrad.addColorStop(0.6, '#183844');
+      canyonGrad.addColorStop(1, '#2c5364');
+      context.fillStyle = canyonGrad;
+      context.fillRect(0, 0, this.view.width, HEIGHT);
+
+      // Frothing waterfall mist rising from below
+      const mistGrad = context.createLinearGradient(0, HEIGHT * 0.55, 0, HEIGHT);
+      mistGrad.addColorStop(0, '#8ec5fc00');
+      mistGrad.addColorStop(1, '#e0c3fc44');
+      context.fillStyle = mistGrad;
+      context.fillRect(0, HEIGHT * 0.55, this.view.width, HEIGHT * 0.45);
+      return;
+    }
+
+    // ---- Section 1 & Stadium: Alpine Open Sky ----
     const skyImage = this.art.skyboxImage ?? this.art.sky;
     this.drawTiledLayer(skyImage, HEIGHT + 55, this.frame.camera * (parallax ? 0.05 : 0.15) + this.frame.drift * 0.1, -35);
 
@@ -99,14 +141,6 @@ export class ArenaEnvironment {
     fogGrad.addColorStop(1, `${lighting.fogColor}22`);
     context.fillStyle = fogGrad;
     context.fillRect(0, HEIGHT * 0.35, this.view.width, HEIGHT * 0.35);
-
-    // ---- Layer 2: Distant mountains / city silhouettes (0.15x parallax) ----
-    this.drawTiledLayerTransparent(this.art.farMountains, HEIGHT + 35, this.frame.camera * (parallax ? 0.15 : 0.35) + this.frame.drift * 0.15, 100);
-
-    // ---- Section 2: opposite granite wall, primary falls, and canyon mist ----
-    this.drawWaterfallBackdrop();
-    // Mine tunnel ribs are composited after the track geometry, in the same
-    // depth slot as the cave ceiling, so stadium scenery cannot wash them out.
 
     // ---- Sunbeam / god-ray overlay ----
     if (lighting.sunbeamIntensity > 0) {
@@ -162,75 +196,11 @@ export class ArenaEnvironment {
     }
   }
 
-  private drawMineTunnels() {
-    const context = this.context;
-    const camera = this.frame.camera;
-    const enter = Math.max(0, Math.min(1, (camera - (STAGE_3_START - 2200)) / 2600));
-    const leave = Math.max(0, Math.min(1, (STADIUM_START + 1700 - camera) / 3000));
-    const alpha = Math.min(enter, leave);
-    if (alpha <= 0.01) return;
-    context.save(); context.globalAlpha = alpha;
-
-    const ceiling = context.createLinearGradient(0, 0, 0, HEIGHT * 0.72);
-    ceiling.addColorStop(0, '#030709'); ceiling.addColorStop(0.52, '#081312'); ceiling.addColorStop(1, '#10201c00');
-    context.fillStyle = ceiling; context.fillRect(0, 0, this.view.width, HEIGHT * 0.78);
-    const side = context.createLinearGradient(0, 0, this.view.width, 0);
-    side.addColorStop(0, '#020506d8'); side.addColorStop(0.22, '#02050600'); side.addColorStop(0.78, '#02050600'); side.addColorStop(1, '#020506d8');
-    context.fillStyle = side; context.fillRect(0, 0, this.view.width, HEIGHT);
-
-    // Repeating timber rings sell a tunnel at speed; the alternating offsets
-    // make the passage read as deep rather than a flat cave texture.
-    const spacing = 210;
-    const offset = mod(camera * 0.22, spacing);
-    for (let x = -spacing - offset; x < this.view.width + spacing; x += spacing) {
-      const width = 112 + ((Math.floor((x + offset) / spacing) % 3 + 3) % 3) * 18;
-      const archTop = 42 + Math.abs(Math.sin((x + camera) * 0.01)) * 26;
-      context.strokeStyle = '#6d5c3e'; context.lineWidth = 8;
-      context.beginPath(); context.moveTo(x, HEIGHT * 0.76); context.lineTo(x + 16, archTop + 108); context.quadraticCurveTo(x + width, archTop - 20, x + width * 2, archTop + 108); context.lineTo(x + width * 2 + 16, HEIGHT * 0.76); context.stroke();
-      context.strokeStyle = '#b28b58'; context.lineWidth = 2;
-      context.beginPath(); context.moveTo(x + 6, HEIGHT * 0.75); context.lineTo(x + 22, archTop + 112); context.quadraticCurveTo(x + width, archTop - 12, x + width * 2 - 10, archTop + 112); context.lineTo(x + width * 2 + 10, HEIGHT * 0.75); context.stroke();
-    }
-
-    // Branch mouths: black openings with a warm ore glint and a visible rail
-    // pair, so the choice of left/right tunnel remains legible while racing.
-    const branchSpacing = 740;
-    const branchOffset = mod(camera * 0.36, branchSpacing);
-    for (let index = -2; index < 5; index++) {
-      const x = index * branchSpacing - branchOffset + 260;
-      const right = index % 2 === 0;
-      const centerX = right ? x + 50 : x - 50;
-      const centerY = 300 + (index % 3) * 26;
-      const radiusX = 150 + (index % 2) * 28;
-      const radiusY = 125;
-      context.fillStyle = '#010304'; context.strokeStyle = '#394640'; context.lineWidth = 5;
-      context.beginPath(); context.ellipse(centerX, centerY, radiusX, radiusY, 0, Math.PI, TAU); context.lineTo(centerX - radiusX, centerY + 145); context.lineTo(centerX + radiusX, centerY + 145); context.closePath(); context.fill(); context.stroke();
-      context.fillStyle = '#d59b55'; context.globalAlpha = alpha * 0.45;
-      context.beginPath(); context.arc(centerX + (right ? 48 : -48), centerY - 36, 8, 0, TAU); context.fill();
-      context.globalAlpha = alpha;
-      for (const railOffset of [-22, 22]) {
-        context.strokeStyle = '#83c7b8'; context.lineWidth = 3;
-        context.beginPath(); context.moveTo(centerX + railOffset, centerY + 105); context.lineTo(centerX + railOffset * 0.3, centerY + 18); context.stroke();
-      }
-      context.strokeStyle = '#98774d'; context.lineWidth = 2;
-      context.beginPath(); context.moveTo(centerX - radiusX * 0.55, centerY + 65); context.lineTo(centerX + radiusX * 0.55, centerY + 65); context.stroke();
-    }
-
-    const depthLight = context.createRadialGradient(this.view.width * 0.52, 255, 6, this.view.width * 0.52, 255, 240);
-    depthLight.addColorStop(0, '#f2c57a66'); depthLight.addColorStop(1, '#f2c57a00');
-    context.fillStyle = depthLight; context.fillRect(0, 0, this.view.width, HEIGHT * 0.72);
-    context.globalAlpha = alpha * 0.8;
-    context.fillStyle = '#d6b878'; context.font = '900 17px "Barlow Condensed", sans-serif'; context.textAlign = 'left';
-    context.fillText('SECTION 3 // MINE TUNNELS', 28, 38);
-    context.fillStyle = '#8ed8c8'; context.font = '700 10px "Space Mono", monospace';
-    context.fillText('MULTIPLE RAILS  /  SPLIT LEFT OR RIGHT', 30, 56);
-    context.restore();
-  }
-
   private drawBlimps() {
+    if (this.frame.camera >= 24000 && this.frame.camera <= 68400) return;
     const context = this.context;
     const spacing = 1450;
     const movement = this.frame.reducedMotion ? 0 : this.frame.time * 7;
-    // TICKET-06: Layer 3 midground — watchtowers/blimps at 0.4x parallax.
     const offset = this.frame.camera * (this.frame.options.parallax ? 0.4 : 0.5) - movement;
     const first = Math.floor((offset - 950) / spacing) - 1;
     for (let index = first; index < first + Math.ceil(this.view.width / spacing) + 3; index++) {
@@ -240,22 +210,38 @@ export class ArenaEnvironment {
       const y = 100 + Math.abs(index % 3) * 27 + (this.frame.reducedMotion ? 0 : Math.sin(this.frame.time * 0.35 + index) * 4);
       const blimp = this.art.blimp;
       context.save(); context.globalAlpha = 0.66;
-      // Uses the sprite's own aspect ratio: the painted airship is not 520x270.
       context.drawImage(blimp, x, y, w, w * blimp.height / blimp.width); context.restore();
     }
-  }
-
-  drawMineOverlay() {
-    this.drawMineTunnels();
   }
 
   drawTerrain() {
     const range = this.view.visibleSpan(LANE.near - 850, LANE.far + 1500, 250);
     const step = 256;
+    const understory = this.course === 'boomtown' ? '#18120d' : this.course === 'sheep' ? '#1f2b15' : '#111c14';
+    const bTex = this.blizzardTex;
     for (let x = Math.floor(range.start / step) * step; x < range.end; x += step) {
+      // In Section 2 (Waterfall Cliff) and Section 3 (Cavern Mine / Lava), NO flat soil or grass terrain!
+      if (x >= 24000 && x < 68400) continue;
       const stadium = x >= STADIUM_START;
-      this.fill(this.quad(x, x + step, LANE.near - 850, LANE.far + 1500, 153), stadium ? this.palette.grass : this.palette.soil);
-      this.fill(this.quad(x, x + step, LANE.far + 6, LANE.far + 380, 153), this.palette.shoulder);
+      const terrainQuad = this.quad(x, x + step, LANE.near - 850, LANE.far + 1500, 153);
+      if (bTex) {
+        // Use the hand-painted Blizzard grass texture for terrain
+        const grassImg = stadium ? bTex.cobble.image : bTex.grass.image;
+        texturedQuad(this.context, grassImg, { x: mod(x, 1024), y: 0, width: step, height: 1024 }, terrainQuad);
+      } else {
+        this.fill(terrainQuad, stadium ? this.palette.grass : this.palette.soil);
+      }
+      // Rich shaded undergrowth mulch directly beneath the midground tree wall
+      if (!stadium) {
+        this.fill(this.quad(x, x + step, LANE.far + 340, LANE.far + 820, 153), understory);
+      }
+      // Shoulder strip between track edge and tree wall
+      if (bTex) {
+        const shoulderQuad = this.quad(x, x + step, LANE.far + 6, LANE.far + 380, 153);
+        texturedQuad(this.context, bTex.dirt.image, { x: mod(x, 1024), y: 0, width: step, height: 1024 }, shoulderQuad);
+      } else {
+        this.fill(this.quad(x, x + step, LANE.far + 6, LANE.far + 380, 153), this.palette.shoulder);
+      }
     }
   }
 
@@ -290,10 +276,19 @@ export class ArenaEnvironment {
     const z = LANE.far + 240;
     const range = this.view.visibleSpan(z - 25, z + 30, 330);
     this.drawStadium();
+    this.drawWaterfallRiver();
+    this.drawSplashdownPool();
+    this.drawLavaChamber();
+    this.drawTreeWall();
     this.drawLandmarks();
-    this.drawCliffScaffolding(false);
+    this.drawLipTransitionCutouts();
+    this.drawWaterfallCliffStage();
+    this.drawCavernMawStage();
+    this.drawMineCoasterStage();
+    this.drawBreakthroughStage();
     const step = 256;
     for (let x = Math.floor(range.start / step) * step; x < range.end; x += step) {
+      if (x >= 24000 && x <= 68400) continue; // Section 2 & 3 have bespoke cliff & mine spectator sets
       const y = this.y(x);
       const ny = this.y(x + step);
       this.fill([this.p(x, y + 67, z), this.p(x + step, ny + 67, z), this.p(x + step, ny + 155, z), this.p(x, y + 155, z)], '#2a301d');
@@ -302,8 +297,401 @@ export class ArenaEnvironment {
       const a = this.p(x + 16, y + 146, z - 1); const b = this.p(x + step - 12, ny + 72, z - 1);
       context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
     }
-    this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86);
+    this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86, 0, 24000);
+    this.crowdStrip(this.assets.grandstand, z, 68, 200, 0.86, STADIUM_START, FINISH + 2000);
     this.drawFence(LANE.far + 65, 142, 114);
+  }
+
+  private drawLipTransitionCutouts() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const cam = this.view.offset;
+    if (cam < 22500 || cam > 27000) return;
+
+    const context = this.context;
+
+    // 1. Theatrical Proscenium Arch framing the canyon entrance
+    if (parts.rockArchWide) {
+      const p = this.p(24020, this.y(24020) - 40, 0);
+      const w = 1450 * p.scale;
+      const h = 980 * p.scale;
+      context.drawImage(parts.rockArchWide.image, p.x - w / 2, p.y - h * 0.95, w, h);
+    }
+
+    // 2. Far-side mountain boulder anchoring the back cliff
+    if (parts.rockBoulderA) {
+      const p = this.p(24080, this.y(24080) + 20, LANE.far + 100);
+      const w = 680 * p.scale;
+      const h = 560 * p.scale;
+      context.drawImage(parts.rockBoulderA.image, p.x - w / 2, p.y - h * 0.95, w, h);
+    }
+
+    // 3. Foreground proscenium wing boulder completely masking the 90° track geometry junction!
+    if (parts.rockBoulderB) {
+      const p = this.p(23950, this.y(23950) + 20, LANE.near - 80);
+      const w = 820 * p.scale;
+      const h = 680 * p.scale;
+      context.drawImage(parts.rockBoulderB.image, p.x - w * 0.4, p.y - h * 0.85, w, h);
+    }
+
+    // 4. Heavy timber threshold framing the road-to-flume transition
+    const y24k = this.y(24000);
+    const threshold: Quad = [
+      this.p(23950, y24k - 4, LANE.far + 20),
+      this.p(24050, y24k - 4, LANE.far + 20),
+      this.p(24050, y24k - 4, LANE.near - 20),
+      this.p(23950, y24k - 4, LANE.near - 20),
+    ];
+    this.fill(threshold, '#332014');
+
+    // 5. Track end-cap wall capping the dirt road edge
+    const endCap: Quad = [
+      this.p(24000, y24k, LANE.near),
+      this.p(24000, y24k, LANE.far),
+      this.p(24000, y24k + 154, LANE.far),
+      this.p(24000, y24k + 154, LANE.near),
+    ];
+    this.fill(endCap, '#1c1008');
+
+    if (parts.rockTunnelFrameA) {
+      const p = this.p(24800, this.y(24800), 0);
+      const w = 1100 * p.scale;
+      const h = 850 * p.scale;
+      context.drawImage(parts.rockTunnelFrameA.image, p.x - w / 2, p.y - h * 0.98, w, h);
+    }
+  }
+
+  private drawWaterfallCliffStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const range = this.view.visibleSpan(LANE.near - 350, LANE.far + 350, 400);
+    const start = Math.max(24800, range.start);
+    const end = Math.min(48200, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const step = 950;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const y = this.y(x);
+      const idx = Math.abs(Math.floor(x / step));
+
+      if (parts.cliffScaffolding) {
+        const pLeft = this.p(x, y - 40, LANE.far + 140);
+        const sw = 360 * pLeft.scale;
+        const sh = 420 * pLeft.scale;
+        context.drawImage(parts.cliffScaffolding.image, pLeft.x - sw / 2, pLeft.y - sh * 0.95, sw, sh);
+
+        const bleacher = idx % 2 === 0 ? parts.goblinBleacherA : parts.goblinBleacherB;
+        if (bleacher) {
+          const bw = 240 * pLeft.scale;
+          const bh = 150 * pLeft.scale;
+          context.drawImage(bleacher.image, pLeft.x - bw / 2, pLeft.y - sh * 0.65, bw, bh);
+        }
+      }
+
+      if (parts.rockPlatformSpire) {
+        const pRight = this.p(x + 450, this.y(x + 450) - 20, LANE.near - 140);
+        const sw = 340 * pRight.scale;
+        const sh = 460 * pRight.scale;
+        context.drawImage(parts.rockPlatformSpire.image, pRight.x - sw / 2, pRight.y - sh * 0.95, sw, sh);
+
+        const bleacherRight = idx % 2 === 0 ? parts.goblinBleacherC : parts.goblinBleacherD;
+        if (bleacherRight) {
+          const bw = 220 * pRight.scale;
+          const bh = 140 * pRight.scale;
+          context.drawImage(bleacherRight.image, pRight.x - bw / 2, pRight.y - sh * 0.55, bw, bh);
+        }
+      }
+    }
+  }
+
+  private drawCavernMawStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const cam = this.view.offset;
+    if (cam < 46500 || cam > 51500) return;
+
+    const context = this.context;
+    if (parts.tunnelMouthStone) {
+      const p = this.p(48200, this.y(48200), 0);
+      const w = 1200 * p.scale;
+      const h = 850 * p.scale;
+      context.drawImage(parts.tunnelMouthStone.image, p.x - w / 2, p.y - h * 0.98, w, h);
+    }
+    if (parts.rockCeilingCutout) {
+      // Stalactite cavern ceiling hangs from the TOP of the screen!
+      context.drawImage(parts.rockCeilingCutout.image, 0, 0, this.view.width, 240);
+    }
+  }
+
+  private drawMineCoasterStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const range = this.view.visibleSpan(LANE.near - 300, LANE.far + 300, 350);
+    const start = Math.max(50500, range.start);
+    const end = Math.min(68000, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const step = 1100;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const y = this.y(x);
+      const idx = Math.abs(Math.floor(x / step));
+
+      if (parts.wallTimberBraced) {
+        const pWall = this.p(x, y - 60, LANE.far + 180);
+        const w = 450 * pWall.scale;
+        const h = 380 * pWall.scale;
+        context.drawImage(parts.wallTimberBraced.image, pWall.x - w / 2, pWall.y - h * 0.95, w, h);
+      }
+
+      // Overhead hanging ore bucket with grounded iron suspension cables and timber beam
+      if (parts.oreBucket && idx % 2 === 1) {
+        const bucketX = x + 300;
+        const pBucket = this.p(bucketX, y - 280, 0);
+        const bw = 160 * pBucket.scale;
+        const bh = 180 * pBucket.scale;
+
+        // 1. Overhead timber crossbeam anchored to cavern ceiling
+        const pCeilL = this.p(bucketX - 180, y - 560, LANE.far + 120);
+        const pCeilR = this.p(bucketX + 180, y - 560, LANE.near - 120);
+        context.save();
+        context.strokeStyle = '#22140a';
+        context.lineWidth = 14 * pBucket.scale;
+        context.beginPath();
+        context.moveTo(pCeilL.x, pCeilL.y);
+        context.lineTo(pCeilR.x, pCeilR.y);
+        context.stroke();
+
+        // 2. Heavy twisted iron suspension cable from crossbeam down to ore bucket mount
+        context.strokeStyle = '#151515';
+        context.lineWidth = 3.5 * pBucket.scale;
+        context.beginPath();
+        context.moveTo((pCeilL.x + pCeilR.x) / 2, (pCeilL.y + pCeilR.y) / 2);
+        context.lineTo(pBucket.x, pBucket.y - bh * 0.45);
+        context.stroke();
+
+        // Cable highlight
+        context.strokeStyle = '#555555';
+        context.lineWidth = 1.2 * pBucket.scale;
+        context.stroke();
+
+        // 3. The Ore Bucket itself
+        context.drawImage(parts.oreBucket.image, pBucket.x - bw / 2, pBucket.y - bh / 2, bw, bh);
+        context.restore();
+      }
+
+      const bleacher = idx % 2 === 0 ? parts.goblinBleacherE : parts.goblinBleacherC;
+      if (bleacher) {
+        const pBleach = this.p(x + 550, y - 50, LANE.near - 150);
+        const bw = 240 * pBleach.scale;
+        const bh = 150 * pBleach.scale;
+        context.drawImage(bleacher.image, pBleach.x - bw / 2, pBleach.y - bh * 0.85, bw, bh);
+      }
+    }
+  }
+
+  private drawBreakthroughStage() {
+    const parts = this.assets.trackParts;
+    if (!parts) return;
+    const cam = this.view.offset;
+    if (cam < 67000 || cam > 72000) return;
+
+    const context = this.context;
+    if (parts.waterfallCurtain) {
+      const p = this.p(68400, this.y(68400), 0);
+      const w = 1150 * p.scale;
+      const h = 820 * p.scale;
+      context.drawImage(parts.waterfallCurtain.image, p.x - w / 2, p.y - h * 0.98, w, h);
+    }
+    if (parts.stadiumGantry) {
+      const p1 = this.p(69200, this.y(69200), 0);
+      const w1 = 980 * p1.scale;
+      const h1 = 580 * p1.scale;
+      context.drawImage(parts.stadiumGantry.image, p1.x - w1 / 2, p1.y - h1 * 0.98, w1, h1);
+    }
+  }
+
+  private drawWaterfallRiver() {
+    const sheet = this.assets.trackParts?.waterfallSheet;
+    if (!sheet) return;
+    const range = this.view.visibleSpan(-950, 950, 400);
+    const start = Math.max(23600, range.start);
+    const end = Math.min(48500, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const scrollY = (this.frame.time * 950) % 1024;
+    const splashA = this.assets.trackParts?.waterfallSplash;
+    const splashB = this.assets.trackParts?.waterfallSplashB;
+    const splash = Math.floor(this.frame.time * 9) % 2 === 0 ? splashA : splashB;
+
+    const step = 512;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const right = x + step;
+      const y = this.y(x);
+      const ny = this.y(right);
+      
+      // In Section 2 (Waterfall Cliff):
+      // The towering waterfall sheet spans behind the full 4-lane flume chute across z in [-950, 950].
+      // Passing [p0, p3, p2, p1] maps the texture's vertical Y axis down the waterfall (p0->p1)
+      // and horizontal X axis across the width (p0->p3), perfectly matching gravity!
+      const p0 = this.p(x, y - 60, -950);
+      const p1 = this.p(right, ny - 60, -950);
+      const p2 = this.p(right, ny - 60, 950);
+      const p3 = this.p(x, y - 60, 950);
+
+      texturedQuad(context, sheet.image, { x: 0, y: mod(scrollY + x, 1024), width: 512, height: 512 }, [p0, p3, p2, p1]);
+
+      // Wet slate rock walls framing the outer cliff edges (beyond z = ±480)
+      if (this.assets.trackParts?.wallSlateWet) {
+        const leftWall: Quad = [
+          this.p(x, y, -1020),
+          this.p(right, ny, -1020),
+          this.p(right, ny, -480),
+          this.p(x, y, -480),
+        ];
+        const rightWall: Quad = [
+          this.p(x, y, 480),
+          this.p(right, ny, 480),
+          this.p(right, ny, 1020),
+          this.p(x, y, 1020),
+        ];
+        texturedQuad(context, this.assets.trackParts.wallSlateWet.image, { x: 0, y: 0, width: 512, height: 512 }, leftWall);
+        texturedQuad(context, this.assets.trackParts.wallSlateWet.image, { x: 0, y: 0, width: 512, height: 512 }, rightWall);
+      }
+
+      if (splash && x % 1024 === 0) {
+        const point = this.p(x + step / 2, y + 40, 0);
+        const sw = 320 * point.scale;
+        const sh = 320 * point.scale;
+        context.drawImage(splash.image, point.x - sw / 2, point.y - sh * 0.85, sw, sh);
+      }
+    }
+  }
+
+  private drawSplashdownPool() {
+    const range = this.view.visibleSpan(-600, 600, 400);
+    const start = Math.max(48000, range.start);
+    const end = Math.min(50400, range.end);
+    if (start >= end) return;
+
+    const context = this.context;
+    const step = 256;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const right = x + step;
+      const y = this.y(x) + 40;
+      const ny = this.y(right) + 40;
+
+      // Foaming water basin where waterfall plunges before entering the cavern gate
+      const poolQuad: Quad = [
+        this.p(x, y, 600),
+        this.p(right, ny, 600),
+        this.p(right, ny, -600),
+        this.p(x, y, -600),
+      ];
+      this.fill(poolQuad, '#0f2b38');
+
+      // Water surface churn
+      const churnQuad: Quad = [
+        this.p(x, y - 2, 450),
+        this.p(right, ny - 2, 450),
+        this.p(right, ny - 2, -450),
+        this.p(x, y - 2, -450),
+      ];
+      context.save();
+      context.globalAlpha = 0.45;
+      this.fill(churnQuad, '#38bdf8');
+      context.restore();
+    }
+  }
+
+  private drawLavaChamber() {
+    const lavaA = this.assets.trackParts?.lavaSheet;
+    const lavaB = this.assets.trackParts?.lavaSheetB;
+    const lavaC = this.assets.trackParts?.lavaSheetC;
+    const lava = Math.floor(this.frame.time * 2) % 3 === 0 ? lavaA : Math.floor(this.frame.time * 2) % 3 === 1 ? lavaB : lavaC;
+    if (!lava) return;
+    const range = this.view.visibleSpan(LANE.near - 900, LANE.far + 900, 450);
+    // Molten lava chamber ONLY exists inside the volcanic mine (50,400 to 68,400m)!
+    const start = Math.max(50400, range.start);
+    const end = Math.min(68400, range.end);
+    if (start >= end) return;
+    const step = 512;
+    const scrollX = (this.frame.time * 70) % 512;
+    for (let x = Math.floor(start / step) * step; x < end; x += step) {
+      const right = x + step;
+      // Magma lake elevation at y + 140 beneath the trestles
+      const y = this.y(x) + 140;
+      const ny = this.y(right) + 140;
+      const quad: Quad = [
+        this.p(x, y, LANE.far + 900),
+        this.p(right, ny, LANE.far + 900),
+        this.p(right, ny, LANE.near - 900),
+        this.p(x, y, LANE.near - 900),
+      ];
+      // Continuous UV coordinates mapped to absolute world X to eliminate step seams!
+      const uvX = mod(x + scrollX, 512);
+      texturedQuad(this.context, lava.image, { x: uvX, y: 0, width: step, height: 512 }, quad);
+      this.fill(quad, '#ff44001c');
+    }
+  }
+
+  /**
+   * TICKET-06.2: Midground Environmental Depth Layer — Dense Wall of Trees & Theme Scenery.
+   * Eliminates the bare ground void behind the spectator crowd and racetrack wall by rendering
+   * two overlapping 3D depth tiers anchored to track elevation with height/flip variations.
+   * Section 1 only (0..24000m).
+   */
+  private drawTreeWall() {
+    const context = this.context;
+    const sprite = this.course === 'boomtown'
+      ? this.assets.treeWallBoomtown
+      : this.course === 'sheep'
+        ? this.assets.treeWallSheep
+        : this.assets.treeWallPines;
+
+    if (!sprite || !sprite.image) return;
+
+    const tiers = [
+      { z: LANE.far + 580, step: 240, baseHeight: 530, alpha: 0.82, offset: 120 },
+      { z: LANE.far + 390, step: 175, baseHeight: 470, alpha: 0.98, offset: 0 },
+    ];
+
+    for (const tier of tiers) {
+      const z = tier.z;
+      const range = this.view.visibleSpan(z, z, 350);
+      const start = Math.floor((range.start - tier.offset) / tier.step) * tier.step + tier.offset;
+      const end = Math.min(range.end + tier.step, 24000);
+      if (start >= end) continue;
+
+      context.save();
+      context.globalAlpha = tier.alpha;
+
+      for (let x = start; x < end; x += tier.step) {
+        const seed = Math.sin(x * 0.013 + tier.z * 0.007) * 43758.5453;
+        const rand = seed - Math.floor(seed);
+        const flip = Math.abs(Math.floor(x / tier.step)) % 2 === 1;
+        const scaleMod = 0.88 + rand * 0.26;
+        const height = tier.baseHeight * scaleMod;
+        const width = height * (sprite.width / sprite.height);
+
+        const baseY = this.y(x) + 130 + Math.sin(x * 0.004) * 12;
+        const point = this.p(x, baseY, z);
+
+        const screenW = width * point.scale;
+        const screenH = height * point.scale;
+
+        if (point.x + screenW / 2 < -60 || point.x - screenW / 2 > this.view.width + 60) continue;
+
+        context.save();
+        context.translate(point.x, point.y);
+        if (flip) context.scale(-1, 1);
+        context.drawImage(sprite.image, -screenW / 2, -screenH, screenW, screenH);
+        context.restore();
+      }
+      context.restore();
+    }
   }
 
   private drawLandmarks() {
@@ -311,6 +699,7 @@ export class ArenaEnvironment {
     const range = this.view.visibleSpan(z, z, 230);
     const step = this.course === 'sheep' ? 1800 : 1170;
     for (let x = Math.floor(range.start / step) * step; x < Math.min(range.end, STADIUM_START - 300); x += step) {
+      if (x >= 24000) continue; // Landmarks belong only to Section 1 alpine grasslands!
       const point = this.p(x + 270, this.terrain(x + 270), z);
       const image = this.art.landmarks[Math.abs(Math.round(x / step)) % 2];
       const height = (this.course === 'sheep' ? 230 : 250) * point.scale;
@@ -321,11 +710,15 @@ export class ArenaEnvironment {
   }
 
   drawTrack() {
-    const range = this.view.visibleSpan(LANE.near, LANE.far, 240);
+    const range = this.view.visibleSpan(LANE.near - 200, LANE.far + 200, 240);
     const start = Math.floor(range.start / 256) * 256;
     const end = Math.ceil(range.end / 256) * 256;
     const cuts: number[] = [];
     for (let x = start; x <= end; x += 256) cuts.push(x);
+    // Explicitly add key transition boundaries to cuts so geometry aligns perfectly:
+    for (const tx of [24000, 25600, 48000, 50400, 68400, 70500]) {
+      if (tx > start && tx < end) cuts.push(tx);
+    }
     const gaps = this.gaps.filter((gap) => gap.x + gap.width >= start && gap.x <= end);
     for (const gap of gaps) {
       if (gap.x > start && gap.x < end) cuts.push(gap.x);
@@ -344,25 +737,212 @@ export class ArenaEnvironment {
       const front: Quad = [this.p(x, y, LANE.near), this.p(right, ny, LANE.near), this.p(right, ny + 154, LANE.near), this.p(x, y + 154, LANE.near)];
       const middle = (x + right) / 2;
       const crop = { x: mod(x, 512), y: 0, width: right - x, height: 128 };
-      if (!this.inGap(middle)) texturedQuad(this.context, this.wall, crop, front);
       const hasGap = gaps.some((gap) => middle > gap.x && middle < gap.x + gap.width);
-      const trackMaterial = this.materialForTrack(middle);
-      if (!hasGap) texturedQuad(this.context, trackMaterial, { ...crop, height: 512 }, top);
-      else {
-        let lane = 0;
-        while (lane < LANE_COUNT) {
-          if (this.inGap(middle, laneZ(lane))) { lane++; continue; }
-          const first = lane;
-          while (lane + 1 < LANE_COUNT && !this.inGap(middle, laneZ(lane + 1))) lane++;
-          const near = laneZ(lane) - LANE_WIDTH / 2;
-          const far = laneZ(first) + LANE_WIDTH / 2;
-          texturedQuad(this.context, trackMaterial, { ...crop, y: first * 128, height: (lane - first + 1) * 128 }, this.quad(x, right, near, far));
-          lane++;
+
+      if (middle >= 50400 && middle < 68400) {
+        // SECTION 3: 4 INDIVIDUAL SEPARATED ROLLER-COASTER RAILS OVER BUBBLING LAVA
+        // NO continuous road deck or front wall!
+        const railsImg = this.assets.trackParts?.mineRails?.image;
+        for (let lane = 0; lane < LANE_COUNT; lane++) {
+          const lz = laneZ(lane);
+          const railHalf = 32;
+          // Lane 0 is elevated high trestle (-65), Lane 1 (-10), Lane 2 (+35), Lane 3 (+75)
+          const laneYOffset = lane === 0 ? -65 : lane === 1 ? -10 : lane === 2 ? 35 : 75;
+          const yL = y + laneYOffset;
+          const nyL = ny + laneYOffset;
+
+          // 1. Trestle timber bents (pairs of vertical posts at lz - 24 and lz + 24) plunging down into lava
+          const trestle1: Quad = [
+            this.p(x, yL, lz - 24),
+            this.p(right, nyL, lz - 24),
+            this.p(right, nyL + 280, lz - 24),
+            this.p(x, yL + 280, lz - 24),
+          ];
+          const trestle2: Quad = [
+            this.p(x, yL, lz + 24),
+            this.p(right, nyL, lz + 24),
+            this.p(right, nyL + 280, lz + 24),
+            this.p(x, yL + 280, lz + 24),
+          ];
+          this.fill(trestle1, '#23150b');
+          this.fill(trestle2, '#1c1008');
+
+          // Diagonal 'X' cross-brace struts on trestles
+          const pTopL = this.p(x, yL + 40, lz - 24);
+          const pBotR = this.p(right, nyL + 240, lz - 24);
+          const pTopR = this.p(right, nyL + 40, lz - 24);
+          const pBotL = this.p(x, yL + 240, lz - 24);
+          this.context.strokeStyle = '#2d1b0e';
+          this.context.lineWidth = 4 * pTopL.scale;
+          this.context.beginPath();
+          this.context.moveTo(pTopL.x, pTopL.y); this.context.lineTo(pBotR.x, pBotR.y);
+          this.context.moveTo(pTopR.x, pTopR.y); this.context.lineTo(pBotL.x, pBotL.y);
+          this.context.stroke();
+
+          // 2. Wooden railway ties / sleepers
+          const sleeperQuad: Quad = [
+            this.p(x, yL, lz + railHalf),
+            this.p(right, nyL, lz + railHalf),
+            this.p(right, nyL, lz - railHalf),
+            this.p(x, yL, lz - railHalf),
+          ];
+          if (this.blizzardTex) {
+            texturedQuad(this.context, this.blizzardTex.wood.image, { x: mod(x, 1024), y: 0, width: right - x, height: 1024 }, sleeperQuad);
+          } else {
+            this.fill(sleeperQuad, '#3d2615');
+          }
+
+          // 3. Twin iron/steel rails with metallic sheen
+          if (railsImg) {
+            texturedQuad(this.context, railsImg, { x: 0, y: 0, width: 512, height: 512 }, sleeperQuad);
+          } else {
+            const rail1: Quad = [
+              this.p(x, yL - 4, lz - railHalf + 6),
+              this.p(right, nyL - 4, lz - railHalf + 6),
+              this.p(right, nyL - 4, lz - railHalf + 14),
+              this.p(x, yL - 4, lz - railHalf + 14),
+            ];
+            const rail2: Quad = [
+              this.p(x, yL - 4, lz + railHalf - 14),
+              this.p(right, nyL - 4, lz + railHalf - 14),
+              this.p(right, nyL - 4, lz + railHalf - 6),
+              this.p(x, yL - 4, lz + railHalf - 6),
+            ];
+            this.fill(rail1, '#8c9aa6');
+            this.fill(rail2, '#8c9aa6');
+          }
+        }
+      } else if (middle >= 48000 && middle < 50400) {
+        // MASTER GEOMETRY JUNCTION: FLUME-TO-RAILS TRANSITION (48,000 to 50,400m)
+        // Flume floor gradually narrows/drains, while 4 rails emerge seamlessly from the deck!
+        const t0 = (x - 48000) / 2400;
+        const t1 = (right - 48000) / 2400;
+
+        // Drain grate bed beneath the emerging rails
+        const flumeBed = this.quad(x, right, -180 * (1 - t0 * 0.3), 180 * (1 - t0 * 0.3));
+        this.fill(flumeBed, '#1a1f1a');
+
+        // Iron drainage grate cross-bars
+        for (let gx = Math.floor(x / 48) * 48; gx < right; gx += 48) {
+          if (gx >= x) {
+            const grateQuad = this.quad(gx, gx + 8, -170 * (1 - t0 * 0.3), 170 * (1 - t0 * 0.3));
+            this.fill(grateQuad, '#0f140f');
+          }
+        }
+
+        // Emerging rails rising from y to target lane heights
+        const railsImg = this.assets.trackParts?.mineRails?.image;
+        for (let lane = 0; lane < LANE_COUNT; lane++) {
+          const lz = laneZ(lane);
+          const railHalf = 32;
+          const targetOffset = lane === 0 ? -65 : lane === 1 ? -10 : lane === 2 ? 35 : 75;
+          const yL = y + targetOffset * t0;
+          const nyL = ny + targetOffset * t1;
+
+          const sleeperQuad: Quad = [
+            this.p(x, yL, lz + railHalf),
+            this.p(right, nyL, lz + railHalf),
+            this.p(right, nyL, lz - railHalf),
+            this.p(x, yL, lz - railHalf),
+          ];
+          this.fill(sleeperQuad, '#3d2615');
+
+          if (railsImg) {
+            texturedQuad(this.context, railsImg, { x: 0, y: 0, width: 512, height: 512 }, sleeperQuad);
+          }
+        }
+      } else if (middle >= 24000 && middle < 48000) {
+        // SECTION 2: WOODEN FLUME / CHUTE DOWN THE WATERFALL CLIFF
+        // Chute bed: dark wet timber planks spanning the full 4 lanes (LANE.near to LANE.far)
+        const flumeQuad = this.quad(x, right, LANE.near, LANE.far);
+        if (this.blizzardTex) {
+          texturedQuad(this.context, this.blizzardTex.wood.image, { x: mod(x, 1024), y: 0, width: right - x, height: 1024 }, flumeQuad);
+          // Dark wet overlay
+          this.context.save(); this.context.globalAlpha = 0.35;
+          this.fill(flumeQuad, '#0a1810');
+          this.context.restore();
+        } else {
+          this.fill(flumeQuad, '#16221c');
+        }
+
+        // Wooden cross-ribs / plank joints every 64m
+        for (let ribX = Math.floor(x / 64) * 64; ribX < right; ribX += 64) {
+          if (ribX >= x) {
+            const ribQuad = this.quad(ribX, ribX + 12, LANE.near, LANE.far);
+            this.fill(ribQuad, '#28362e');
+          }
+        }
+
+        // Rushing water overlay (translucent cyan)
+        this.context.save();
+        this.context.globalAlpha = 0.40;
+        this.fill(flumeQuad, '#38bdf8');
+        this.context.restore();
+
+        // White foam rapids streaks
+        const foamQuad = this.quad(x, right, LANE.near + 20, LANE.far - 20);
+        this.context.save();
+        this.context.globalAlpha = 0.22;
+        this.fill(foamQuad, '#ffffff');
+        this.context.restore();
+
+        // Timber guide rails along outer edges (LANE.near and LANE.far)
+        const leftGuide: Quad = [
+          this.p(x, y - 24, LANE.near),
+          this.p(right, ny - 24, LANE.near),
+          this.p(right, ny + 20, LANE.near),
+          this.p(x, y + 20, LANE.near),
+        ];
+        const rightGuide: Quad = [
+          this.p(x, y - 24, LANE.far),
+          this.p(right, ny - 24, LANE.far),
+          this.p(right, ny + 20, LANE.far),
+          this.p(x, y + 20, LANE.far),
+        ];
+        this.fill(leftGuide, '#3d2b1c');
+        this.fill(rightGuide, '#2e2015');
+
+        // 3 Lane divider lines separating the 4 marble lanes (-240, 0, 240)
+        for (const dz of [-240, 0, 240]) {
+          const p1 = this.p(x, y - 2, dz);
+          const p2 = this.p(right, ny - 2, dz);
+          this.context.strokeStyle = '#67e8f988';
+          this.context.lineWidth = 2.5 * p1.scale;
+          this.context.beginPath();
+          this.context.moveTo(p1.x, p1.y);
+          this.context.lineTo(p2.x, p2.y);
+          this.context.stroke();
+        }
+      } else {
+        // Section 1 & Stadium: dirt/grass track with front wall
+        // Use Blizzard seamless textures when available
+        const bTex = this.blizzardTex;
+        const isStadium = middle >= STADIUM_START;
+        const deckSource = bTex ? (isStadium ? bTex.cobble.image : bTex.dirt.image) : this.deck;
+        const wallSource = bTex ? bTex.cliff.image : this.wall;
+        const deckCrop = bTex ? { x: mod(x, 1024), y: 0, width: right - x, height: 1024 } : { ...crop, height: 512 };
+        const wallCrop = bTex ? { x: mod(x, 1024), y: 0, width: right - x, height: 1024 } : crop;
+        if (!this.inGap(middle)) texturedQuad(this.context, wallSource, wallCrop, front);
+        if (!hasGap) {
+          texturedQuad(this.context, deckSource, deckCrop, top);
+        } else {
+          let lane = 0;
+          while (lane < LANE_COUNT) {
+            if (this.inGap(middle, laneZ(lane))) { lane++; continue; }
+            const first = lane;
+            while (lane + 1 < LANE_COUNT && !this.inGap(middle, laneZ(lane + 1))) lane++;
+            const near = laneZ(lane) - LANE_WIDTH / 2;
+            const far = laneZ(first) + LANE_WIDTH / 2;
+            const laneCrop = bTex
+              ? { x: mod(x, 1024), y: first * 256, width: right - x, height: (lane - first + 1) * 256 }
+              : { ...crop, y: first * 128, height: (lane - first + 1) * 128 };
+            texturedQuad(this.context, deckSource, laneCrop, this.quad(x, right, near, far));
+            lane++;
+          }
         }
       }
     }
     for (const gap of gaps) this.drawGapTrim(gap);
-    this.drawSwitchbackBerms();
     this.drawCheckers(START_X + 220);
     this.drawCheckers(FINISH);
     this.drawGridNumbers();
@@ -425,6 +1005,7 @@ export class ArenaEnvironment {
     const range = this.view.visibleSpan(z, z, 230);
     const context = this.context;
     for (let x = Math.floor(range.start / 256) * 256; x < range.end; x += 256) {
+      if (x >= 24000 && x < STADIUM_START) continue;
       const bottom = this.p(x, this.y(x) + base, z);
       const top = this.p(x, this.y(x) + base - height, z);
       const next = this.p(x + 256, this.y(x + 256) + base - height + 5, z);
@@ -432,150 +1013,6 @@ export class ArenaEnvironment {
       context.beginPath(); context.moveTo(bottom.x, bottom.y); context.lineTo(top.x, top.y); context.stroke();
       context.lineWidth = 1.2 * top.scale; context.strokeStyle = '#b397586b';
       context.beginPath(); context.moveTo(top.x, top.y + 5); context.quadraticCurveTo((top.x + next.x) / 2, (top.y + next.y) / 2 + 13, next.x, next.y); context.stroke();
-    }
-  }
-
-  private drawSwitchbackBerms() {
-    const range = this.view.visibleSpan(LANE.near - 80, LANE.far + 80, 260);
-    const start = Math.max(range.start, STAGE_2_START - 700);
-    const end = Math.min(range.end, STAGE_2_END + 300);
-    if (start >= end) return;
-    const step = 2100;
-    for (let index = Math.floor(start / step); index * step < end; index++) {
-      const x = index * step;
-      if (x < start - step || x > end) continue;
-      const right = Math.min(x + 980, end);
-      const near = index % 2 === 0;
-      const z = near ? LANE.near - 34 : LANE.far + 34;
-      const height = 62 + (index % 3) * 14;
-      const a = this.p(x, this.y(x) + 18, z);
-      const b = this.p(right, this.y(right) + 18, z);
-      const c = this.p(right, this.y(right) - height, z);
-      const d = this.p(x, this.y(x) - height, z);
-      this.context.save();
-      polygon(this.context, [a, b, c, d]); this.context.fillStyle = near ? '#55351fdd' : '#70472ad9'; this.context.fill();
-      this.context.strokeStyle = '#b27a4499'; this.context.lineWidth = Math.max(1, 3 * a.scale);
-      this.context.beginPath(); this.context.moveTo(d.x, d.y); this.context.lineTo(c.x, c.y); this.context.stroke();
-      for (let post = 0; post < 5; post++) {
-        const t = post / 4; const px = x + (right - x) * t; const bottom = this.p(px, this.y(px) + 22, z); const top = this.p(px, this.y(px) - height - 4, z);
-        this.context.strokeStyle = '#2b1a10cc'; this.context.lineWidth = Math.max(2, 6 * top.scale);
-        this.context.beginPath(); this.context.moveTo(bottom.x, bottom.y); this.context.lineTo(top.x, top.y); this.context.stroke();
-      }
-      this.context.restore();
-    }
-  }
-
-  private materialForTrack(x: number) {
-    if (x >= STAGE_2_START && x < STAGE_2_END) return x < STAGE_2_START + 7800 ? this.wetDeck : this.mossDeck;
-    return this.deck;
-  }
-
-  private makeTrackMaterial(sprite: Sprite, tint: string) {
-    const target = document.createElement('canvas'); target.width = target.height = 512;
-    const context = target.getContext('2d')!;
-    context.fillStyle = tint; context.fillRect(0, 0, 512, 512);
-    const height = Math.max(52, 512 * sprite.height / Math.max(1, sprite.width));
-    for (let y = 0; y < 512; y += height - 1) context.drawImage(sprite.image, 0, y, 512, height);
-    context.fillStyle = '#122d2d38'; context.fillRect(0, 0, 512, 512);
-    for (const y of [0, 128, 256, 384, 508]) { context.fillStyle = '#e6d29b78'; context.fillRect(0, y, 512, 3); }
-    for (let lane = 0; lane < 4; lane++) {
-      context.strokeStyle = lane % 2 ? '#172c2b52' : '#f5e4af3a'; context.lineWidth = 3; context.setLineDash([34, 28]);
-      context.beginPath(); context.moveTo(0, lane * 128 + 64); context.lineTo(512, lane * 128 + 64); context.stroke();
-    }
-    context.setLineDash([]);
-    return target;
-  }
-
-  private makeWaterfallBackdrop() {
-    const target = document.createElement('canvas'); target.width = 1800; target.height = 620;
-    const context = target.getContext('2d')!;
-    const rock = context.createLinearGradient(0, 0, 0, 620);
-    rock.addColorStop(0, '#1c3440'); rock.addColorStop(0.52, '#29464a'); rock.addColorStop(1, '#10282c');
-    context.fillStyle = rock; context.fillRect(0, 0, target.width, target.height);
-    context.fillStyle = '#12252b';
-    context.beginPath(); context.moveTo(0, 0); context.lineTo(360, 0); context.lineTo(300, 110); context.lineTo(380, 190); context.lineTo(260, 286); context.lineTo(335, 388); context.lineTo(220, 620); context.lineTo(0, 620); context.closePath(); context.fill();
-    context.beginPath(); context.moveTo(1800, 0); context.lineTo(1440, 0); context.lineTo(1510, 115); context.lineTo(1415, 214); context.lineTo(1535, 300); context.lineTo(1450, 430); context.lineTo(1580, 620); context.lineTo(1800, 620); context.closePath(); context.fill();
-    for (let i = 0; i < 13; i++) {
-      const x = 90 + i * 137;
-      const width = 34 + (i % 4) * 13;
-      const start = 95 + (i % 3) * 28;
-      const water = context.createLinearGradient(0, start, 0, 590);
-      water.addColorStop(0, '#b8e8e58a'); water.addColorStop(0.24, '#7ec9d080'); water.addColorStop(0.72, '#4a9dab60'); water.addColorStop(1, '#d6f5e52e');
-      context.fillStyle = water;
-      context.beginPath(); context.moveTo(x, start); context.quadraticCurveTo(x + width * 0.7, start + 40, x + width * 0.48, 590); context.lineTo(x + width * 1.25, 590); context.quadraticCurveTo(x + width * 1.05, start + 30, x + width, start); context.closePath(); context.fill();
-      context.fillStyle = '#e7fff0a0';
-      for (let y = start + 54; y < 570; y += 74) { context.fillRect(x + (y * 0.13 + i * 11) % Math.max(8, width), y, Math.max(3, width * 0.25), 4); }
-    }
-    const mist = context.createLinearGradient(0, 360, 0, 620);
-    mist.addColorStop(0, '#a8e7dd00'); mist.addColorStop(0.55, '#a8e7dd38'); mist.addColorStop(1, '#d8fff040');
-    context.fillStyle = mist; context.fillRect(0, 300, 1800, 320);
-    return target;
-  }
-
-  private drawWaterfallBackdrop() {
-    const center = this.frame.camera + START_X + 1500;
-    const fadeIn = Math.max(0, Math.min(1, (center - (STAGE_2_START - 3600)) / 4200));
-    const fadeOut = Math.max(0, Math.min(1, ((STAGE_2_END + 3600) - center) / 4200));
-    const alpha = Math.min(fadeIn, fadeOut);
-    if (alpha <= 0.01) return;
-    const context = this.context;
-    const width = this.waterfallBackdrop.width;
-    const offset = ((this.frame.camera * 0.18) % width + width) % width;
-    context.save(); context.globalAlpha = alpha * 0.9;
-    for (let x = -offset - width; x < this.view.width + width; x += width) context.drawImage(this.waterfallBackdrop, x, 0, width, HEIGHT + 40);
-    // Animated spray threads are intentionally bounded; they sit between the
-    // distant falls and the active track, not in the physics particle list.
-    context.globalAlpha = alpha * (this.lowDetail ? 0.16 : 0.3);
-    for (let i = 0; i < (this.lowDetail ? 18 : 34); i++) {
-      const x = (i * 97 + this.frame.camera * 0.11) % (this.view.width + 80) - 40;
-      const y = 265 + ((i * 47 + this.frame.time * (18 + i % 4 * 5)) % 280);
-      context.fillStyle = i % 3 ? '#d7fff0' : '#a4e5da';
-      context.fillRect(x, y, 1.5 + (i % 3), 8 + (i % 5) * 3);
-    }
-    context.restore();
-  }
-
-  private drawCliffScaffolding(near: boolean) {
-    const z = near ? LANE.near - 250 : LANE.far + 270;
-    const range = this.view.visibleSpan(z - 30, z + 30, 260);
-    const start = Math.max(range.start, STAGE_2_START - 700);
-    const end = Math.min(range.end, STAGE_2_END + 700);
-    if (start >= end) return;
-    const context = this.context;
-    const step = near ? 920 : 1120;
-    for (let x = Math.floor(start / step) * step; x < end; x += step) {
-      const y = this.y(x);
-      const platformOffset = near ? 184 : 150;
-      const a = this.p(x, y + platformOffset, z);
-      const b = this.p(x + step * 0.82, this.y(x + step * 0.82) + platformOffset, z);
-      const scale = (a.scale + b.scale) / 2;
-      context.save();
-      context.strokeStyle = '#24170e'; context.lineWidth = Math.max(2, 7 * scale);
-      context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke();
-      context.strokeStyle = '#9a6238'; context.lineWidth = Math.max(1, 3 * scale);
-      context.beginPath(); context.moveTo(a.x, a.y - 5 * scale); context.lineTo(b.x, b.y - 5 * scale); context.stroke();
-      for (const post of [0.08, 0.43, 0.78]) {
-        const px = x + step * 0.82 * post;
-        const bottom = this.p(px, this.y(px) + platformOffset + 26, z);
-        const top = this.p(px, this.y(px) + 22, z);
-        context.strokeStyle = '#332015'; context.lineWidth = Math.max(2, 5 * top.scale);
-        context.beginPath(); context.moveTo(bottom.x, bottom.y); context.lineTo(top.x, top.y); context.stroke();
-      }
-      // A tiny row of goblin silhouettes and clan pennants gives the shelves
-      // scale without adding four more full-resolution crowd layers.
-      for (let i = 0; i < 4; i++) {
-        const px = x + 95 + i * 132;
-        const person = this.p(px, this.y(px) + platformOffset - 22 - (i % 2) * 5, z - (near ? 8 : -8));
-        context.fillStyle = i % 2 ? '#d08b54' : '#79b39a';
-        context.beginPath(); context.arc(person.x, person.y - 13 * person.scale, 5 * person.scale, 0, TAU); context.fill();
-        context.fillRect(person.x - 5 * person.scale, person.y - 10 * person.scale, 10 * person.scale, 13 * person.scale);
-        context.strokeStyle = '#e5bb70'; context.lineWidth = Math.max(1, 1.5 * person.scale);
-        context.beginPath(); context.moveTo(person.x + 5 * person.scale, person.y - 8 * person.scale); context.lineTo(person.x + 15 * person.scale, person.y - 20 * person.scale); context.stroke();
-      }
-      const flag = this.p(x + 42, y + platformOffset - 62, z);
-      context.strokeStyle = '#51351f'; context.lineWidth = Math.max(1, 2 * flag.scale); context.beginPath(); context.moveTo(flag.x, flag.y); context.lineTo(flag.x, flag.y + 45 * flag.scale); context.stroke();
-      context.fillStyle = near ? '#e9804e' : '#78bfa0'; context.beginPath(); context.moveTo(flag.x, flag.y); context.lineTo(flag.x + 25 * flag.scale, flag.y + 7 * flag.scale); context.lineTo(flag.x, flag.y + 15 * flag.scale); context.closePath(); context.fill();
-      context.restore();
     }
   }
 
@@ -594,6 +1031,7 @@ export class ArenaEnvironment {
     const z = LANE.near - 62;
     const range = this.view.visibleSpan(z, z, 150);
     for (let x = Math.floor((range.start - 430) / 1250) * 1250 + 430; x < range.end; x += 1250) {
+      if (x >= 24000 && x < STADIUM_START) continue;
       const tip = this.p(x, this.y(x) - 27, z);
       const base = this.p(x, this.terrain(x), z);
       this.context.strokeStyle = '#1b2b1f'; this.context.lineWidth = 5 * tip.scale;
@@ -620,7 +1058,6 @@ export class ArenaEnvironment {
     for (let x = 16; x < 1400; x += 228) {
       context.fillStyle = '#283a2a'; context.fillRect(x, 36, 15, 440);
       context.fillStyle = '#b99962'; context.fillRect(x + 1, 30, 3, 435);
-      context.fillStyle = this.palette.accent; context.beginPath(); context.moveTo(x + 3, 10); context.lineTo(x + 76, 25); context.lineTo(x + 3, 46); context.fill();
     }
     context.fillStyle = '#14231b'; context.fillRect(441, 2, 518, 56);
     context.strokeStyle = '#b39055'; context.lineWidth = 3; context.strokeRect(441, 2, 518, 56);
@@ -648,10 +1085,29 @@ export class ArenaEnvironment {
   }
 
   drawForeground() {
-    this.drawCliffScaffolding(true);
     this.drawFence(LANE.near - 55, 154, 87);
-    this.crowdStrip(this.assets.crowd, LANE.near - 172, 196, 320, 0.96);
+    this.crowdStrip(this.assets.crowd, LANE.near - 172, 196, 320, 0.96, 0, 24000);
+    this.crowdStrip(this.assets.crowd, LANE.near - 172, 196, 320, 0.96, STADIUM_START, FINISH + 2000);
     if (!this.lowDetail) this.crowdStrip(this.assets.crowd, LANE.near - 310, 245, 360, 0.94, STADIUM_START - 420, FINISH + 1000);
+
+    // Theatrical Proscenium Cutouts (Foreground framing wings that mask geometry transitions)
+    const cam = this.view.offset;
+    const parts = this.assets.trackParts;
+    if (parts) {
+      // 1. Canyon Lip Turn: foreground rock wing masks the 90° track corner
+      if (cam >= 22500 && cam <= 26500 && parts.rockBoulderB) {
+        const p = this.p(23950, this.y(23950) + 40, LANE.near - 80);
+        const w = 840 * p.scale;
+        const h = 700 * p.scale;
+        this.context.drawImage(parts.rockBoulderB.image, p.x - w * 0.45, p.y - h * 0.75, w, h);
+      }
+
+      // 2. Cavern Maw Entrance: hanging stalactite ceiling cutout in foreground
+      if (cam >= 47500 && cam <= 51500 && parts.rockCeilingCutout) {
+        this.context.drawImage(parts.rockCeilingCutout.image, 0, 0, this.view.width, 240);
+      }
+    }
+
     const context = this.context;
     const fade = context.createLinearGradient(0, HEIGHT * 0.79, 0, HEIGHT);
     fade.addColorStop(0, '#080f0a00'); fade.addColorStop(1, '#080f0af7');
@@ -662,6 +1118,6 @@ export class ArenaEnvironment {
   }
 
   destroy() {
-    this.stadium.width = this.torch.width = this.wetDeck.width = this.mossDeck.width = this.waterfallBackdrop.width = 1;
+    this.stadium.width = this.torch.width = 1;
   }
 }

@@ -1,0 +1,66 @@
+{
+  "schema": "hm2.baseline-manifest/v1",
+  "tool": {
+    "name": "scripts/protect-baseline.mjs",
+    "version": "1.0.0",
+    "node": "v22.22.3"
+  },
+  "created_at": "2026-09-22T13:38:44.625Z",
+  "protected_roots": [
+    "backups/props"
+  ],
+  "source": {
+    "path": "backups/props/track-props-latest.json",
+    "kind": "original-bytes",
+    "sha256": "0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5",
+    "bytes": 94867,
+    "mtime": "2026-09-22T13:38:38.586Z",
+    "symlinks": []
+  },
+  "snapshot": {
+    "directory": "baseline/snapshots/track-props-latest-2026-09-22T13-38-44-625Z",
+    "file": "baseline/snapshots/track-props-latest-2026-09-22T13-38-44-625Z/track-props-latest.json",
+    "sha256": "0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5",
+    "bytes": 94867,
+    "matches_source": true
+  },
+  "recovery": {
+    "requested": [
+      "backups/props/user_safety_backup/track-props-237-props-safeguard.json",
+      "backups/props/history/props-ridge-1790060522733.json"
+    ],
+    "checks": [
+      {
+        "path": "backups/props/user_safety_backup/track-props-237-props-safeguard.json",
+        "status": "match",
+        "sha256": "0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5",
+        "bytes": 94867,
+        "matchesBytes": true
+      },
+      {
+        "path": "backups/props/history/props-ridge-1790060522733.json",
+        "status": "match",
+        "sha256": "0721aa4b1e0e37f273cf0782fc643ff891455ba6f712c36ea851cd9d4f38a7a5",
+        "bytes": 94867,
+        "matchesBytes": true
+      }
+    ],
+    "verifiedMatches": 2,
+    "note": "A copy on the same disk/tree is not an independent backup; verify a second authorised medium separately."
+  },
+  "observation": {
+    "advisory": true,
+    "note": "Observation only. Counts and IDs describe the bytes at hash time; never hard-code them as runtime constants.",
+    "container": "props",
+    "count": 237,
+    "uniqueIds": 237,
+    "missingIds": 0,
+    "duplicateIds": [],
+    "propTypeCount": 45,
+    "course": "ridge",
+    "updatedAt": "2026-09-22T07:02:02.733Z",
+    "timestamp": 1790060522733,
+    "idDigest": "e7e94a055b2ecbbf02e1de08ad9668bd6213eabadf2c1278f2d0eae9a900a53f",
+    "observedAt": "2026-09-22T13:38:44.624Z"
+  }
+}

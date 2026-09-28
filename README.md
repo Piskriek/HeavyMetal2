@@ -34,7 +34,7 @@ See `docs/GAME_DESIGN.md` for the research and delivery contract, `docs/LOADOUT_
 - R: restart. P: pause or resume. M: toggle sound. F: fullscreen.
 - During a run, the main action button pauses instead of discarding progress. Bounce is locked while riding a loop; boost remains available.
 - Touch players can drag the capsule and use lane steering, Jump, Bounce, and Boost buttons.
-- Reach the 36,000-meter finish in The Scrapdome stadium. The course descends through Alpine Ridge, crashes into a full-width wall, drops through a 12 km head-on waterfall pinball run, then hands off to branching mine tunnels with multiple rails before the stadium.
+- Reach the 15,000-meter finish in The Scrapdome stadium. The course descends through several different grades, with flatter recovery sections, ramps, loops, gaps, TNT, and helmet-wearing sheep.
 - Competitive events lock the selected preset. Quick Race's **Custom physics practice** option enables the earlier 80-240 km/h and 40-240 kg sliders. These runs are labeled as practice; tournaments cannot enable custom tuning.
 
 The workshop contains three circuits, sound and visual settings, the original concept art, and downloadable transparent PNG sprites. The Hall of Chaos saves the top 20 runs locally on the current device. There is no account or server dependency.
@@ -70,7 +70,7 @@ The mountains drift slowly, while grounded scenery derives its parallax from rea
 - Machinery is baked into a small reusable atlas during loading, for both camera angles. There are no camera-distance-triggered mesh rebuilds, per-frame face rasterization, or per-obstacle model generation during a race.
 - Course backgrounds, dirt, banks, landmarks, and blimps are a bounded three-entry art cache. Pickup icons are rasterized once. Normal road strips are 256 units long, reducing road texture mapping compared with the earlier 128-unit subdivision.
 - The track and audience use lightweight projected texture strips. Torch, boost, stadium, and glow textures are prepared once. Stationary scenery and foregrounds retain full-layer caches.
-- A spatial bucket index restricts physics checks to nearby obstacles. Off-screen scenery and particles are culled. The fixed atlas does not grow with the 36 km track; Section 2 waterfall spray is bounded and cached.
+- A spatial bucket index restricts physics checks to nearby obstacles. Off-screen scenery and particles are culled. The fixed atlas does not grow with the 15 km track.
 - Air supplies have a separate spatial bucket index and reuse a candidate set. Swept segment/sphere collection prevents fast racers from tunneling through a supply; same-step claims are resolved by earliest contact.
 - Terrain visibility is calculated over both lateral extremes of each layer, not at the track center. A screen-space overscan margin and full extra tiles keep the right edge filled at speed. Stadium tiles are prepared at load time and enter from beyond the viewport without a camera-distance toggle.
 - The four slingshots reuse the same atlas. Capsule colors are prepared once. All four positions, rotations, and lateral motion are interpolated, and the race HUD updates independently of the render rate.
@@ -117,7 +117,7 @@ Choose **The Workshop > The Garage > Graphics performance** for Auto, Performanc
 - `src/game/previews.ts`: transparent, camera-matched assembly previews for the sprite workshop.
 - `src/game/projection.ts`: shared world-to-screen camera and inverse pointer mapping.
 - `src/game/texture.ts`: triangle-based texture mapping for the track and grandstands.
-- `src/game/scene.ts`: 36 km three-stage profile, waterfall-cliff gravity/surface lookup, course sectors, and shared physics constants.
+- `src/game/scene.ts`: 15 km hill profile, slope/elevation lookup, course sectors, and shared physics constants.
 - `src/game/assets.ts`: image loading and transparent PNG processing.
 - `src/game/audio.ts`: locally synthesized Web Audio sound effects.
 - `src/game/types.ts`: courses, settings, and shared types.
@@ -137,4 +137,4 @@ Install dependencies, then use `npm run dev`. The production build is `npm run b
 
 No API keys or third-party game services are required. Sound is muted initially and can be enabled from the header or workshop. Settings, records and the active event remain optional when browser storage is unavailable; the game runs either way and reports the failure.
 
-Verification: `npm run check` type-checks the app and runs the focused persistence/recovery tests; `npm run check:browser` builds the app and drives the reload-recovery flow in headless Chromium (start a cup, launch, reload mid-race, resume, restored standings, corrupt save, denied storage); `npm run check:art` builds the app and runs 25 checks that the drawn art really is the PNG library in headless Chromium (decoded sprites, the pilot seated square inside the measured port with its alpha box clear of the brass ring, layer swaps, no inline vectors, no broken images, painted pixels in the race frame, a complete Sprite Lab); the same suite can be pointed at a running server with `node tests/art-check.mjs http://127.0.0.1:5173`. Compilation, unit tests and the scripted browser runs are not a substitute for playtesting.
+Verification: `npm run check` type-checks the app and runs the focused persistence/recovery tests (including the track-backup safeguards, accessibility, pool, roster-scale and benchmark suites); `npm run check:slow` runs the memory soak test (`tests/soak.test.ts`, with `--expose-gc` so heap growth is measured after collection); `npm run check:browser` builds the app and drives the reload-recovery flow in headless Chromium (start a cup, launch, reload mid-race, resume, restored standings, corrupt save, denied storage); `npm run check:art` builds the app and runs 25 checks that the drawn art really is the PNG library in headless Chromium (decoded sprites, the pilot seated square inside the measured port with its alpha box clear of the brass ring, layer swaps, no inline vectors, no broken images, painted pixels in the race frame, a complete Sprite Lab); the same suite can be pointed at a running server with `node tests/art-check.mjs http://127.0.0.1:5173`. Compilation, unit tests and the scripted browser runs are not a substitute for playtesting.

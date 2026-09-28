@@ -1,0 +1,268 @@
+/* =============================================================================
+   M01 · T4 — FIRST-PERSON COCKPIT
+   Painted bevel art over the live WebGL canvas, with live SVG needles and a
+   yoke/arm rig driven from `src/game/cockpit.ts` (all geometry measured off the
+   finished PNGs by scripts/cut-cockpit-art.mjs).
+   ============================================================================= */
+
+.cockpit-root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;          /* the arms leave through the bottom edge, never scroll it */
+  pointer-events: none;      /* the canvas keeps focus and key events */
+  z-index: 3;
+}
+
+.cockpit-bob {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.cockpit-bezel {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;          /* the aperture's fractions are measured against this exact stretch */
+  user-select: none;
+}
+
+.cockpit-cluster {
+  position: absolute;
+  height: auto;
+  user-select: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+}
+
+/* ---- dials ----------------------------------------------------------------- */
+
+.cockpit-dial {
+  position: absolute;
+  pointer-events: none;
+}
+
+.cockpit-dial > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.cockpit-needle-img {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.65));
+}
+
+.cockpit-dial-tag {
+  position: absolute;
+  left: 50%;
+  bottom: -1.1em;
+  transform: translateX(-50%);
+  font: 600 11px/1 'Trebuchet MS', system-ui, sans-serif;
+  letter-spacing: 0.14em;
+  color: #ffdfae;
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+/* ---- the yoke and the arms -------------------------------------------------- */
+
+.cockpit-yoke {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform;
+  z-index: 5;
+}
+
+.cockpit-yoke > img {
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.cockpit-arm {
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  will-change: transform;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+  z-index: 4;
+}
+
+/* ---- the starter goblin (4 frames, 12 fps) ---------------------------------- */
+
+.cockpit-starter {
+  position: absolute;
+  left: 8%;
+  bottom: 6%;
+  width: 16%;
+  aspect-ratio: 1 / 1;
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  opacity: 0;
+  transition: opacity 120ms linear;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+.cockpit-strip {
+  display: none;
+}
+
+.cockpit-center-readout {
+  position: absolute;
+  left: 50%;
+  top: 34%;                 /* the aperture's horizon line */
+  transform: translate(-50%, -50%);
+  font: 700 34px/1 'Trebuchet MS', system-ui, sans-serif;
+  letter-spacing: 0.18em;
+  color: #ffe7bd;
+  text-shadow: 0 2px 0 #4a2d10, 0 0 18px rgba(0, 0, 0, 0.85);
+}
+
+/* ---- the text chips (aria + high contrast / readability) -------------------- */
+
+.cockpit-readouts {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  bottom: auto;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font: 600 12px/1 'Trebuchet MS', system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  color: #f7d9a6;
+  z-index: 10;
+}
+
+.cockpit-chip {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(24, 15, 8, 0.6);
+  border: 1px solid rgba(207, 167, 82, 0.5);
+  text-shadow: 0 1px 2px #000;
+}
+
+.cockpit-chip-speed {
+  font-size: 15px;
+  color: #ffeccd;
+}
+
+/* ---- accessibility variants ------------------------------------------------- */
+
+.cockpit-root[data-reduced-motion='true'] .cockpit-bob {
+  transition: none;
+}
+
+.cockpit-root[data-contrast='high'] .cockpit-readouts {
+  font-size: 15px;
+  color: #fffdf6;
+}
+
+.cockpit-root[data-contrast='high'] .cockpit-chip {
+  background: #000;
+  border-color: #ffe7bd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-starter { transition: none; }
+}
+
+/* H9: the gap to the rider ahead: green while closing, amber when steady, red when falling back. */
+.cockpit-chip-gap { color: #f3c77a; }
+.cockpit-chip-gap[data-trend='closing'] { color: #9fe39a; border-color: rgba(120, 200, 110, 0.6); }
+.cockpit-chip-gap[data-trend='falling'] { color: #f08a6e; border-color: rgba(220, 110, 80, 0.6); }
+.cockpit-chip-gap[hidden] { display: none; }
+
+/* P2 & WIRE-3: painted glass, grime, cracks, and speed lines */
+.cockpit-glass {
+  position: absolute;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.cockpit-glass-grime {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cockpit-glass-crack {
+  position: absolute;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.7));
+  will-change: transform, opacity;
+}
+
+.cockpit-speed-lines {
+  position: absolute;
+  inset: 0;
+  background-image: url('/art/animated/alpha/anim-61-speed-lines.png');
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+  will-change: opacity, background-position;
+}
+
+/* WIRE-3 / X12: dashboard trinkets */
+.cockpit-trinket {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+  z-index: 4;
+}
+
+.cockpit-trinket img {
+  user-select: none;
+  pointer-events: none;
+}
+
+.cockpit-trinket-sheep-body {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.cockpit-trinket-sheep-head {
+  position: absolute;
+  bottom: 24%;
+  left: 50%;
+  width: 90%;
+  height: auto;
+  transform: translateX(-50%);
+  transform-origin: 50% 85%;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.cockpit-root[data-reduced-motion='true'] .cockpit-speed-lines {
+  display: none !important;
+}
+
+.cockpit-root[data-reduced-motion='true'] .cockpit-glass-crack {
+  display: none !important;
+}

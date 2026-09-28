@@ -8,9 +8,24 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "node scripts/check.mjs",
+    "check:slow": "node --expose-gc --import tsx --test tests/soak.test.ts",
+    "report:art": "node scripts/art-size-report.mjs",
+    "check:determinism": "node scripts/check-transcendentals.mjs",
+    "check:edges": "node scripts/check-edge-magenta.mjs",
+    "fix:edges": "node scripts/fix-edge-magenta.mjs",
     "check:browser": "node scripts/browser-check.mjs",
     "check:art": "node scripts/browser-check.mjs art",
-    "check:ui": "npm run build && node tests/ui-frame-check.mjs"
+    "inventory:baseline": "node scripts/protect-baseline.mjs inventory",
+    "protect:baseline": "node scripts/protect-baseline.mjs snapshot",
+    "verify:baseline": "node scripts/protect-baseline.mjs verify",
+    "check:ui": "npm run build && node tests/ui-frame-check.mjs",
+    "art:textures": "node scripts/generate-stylized-track-textures.mjs",
+    "check:textures": "node scripts/generate-stylized-track-textures.mjs --check",
+    "balance:art": "node scripts/balance-asset-color.mjs",
+    "seamless:sky": "node scripts/make-skybox-seamless.mjs",
+    "check:parity-fixture": "node scripts/build-parity-fixture.mjs --check",
+    "check:qualifying": "node --import tsx --test tests/physics-parity.test.ts tests/qualifying-gate.test.ts tests/qualifying-attempt.test.ts tests/qualifying-session.test.ts",
+    "qualifying": "node --import tsx scripts/qualifying-harness.ts"
   },
   "dependencies": {
     "clsx": "2.1.1",
@@ -18,7 +33,8 @@
     "lucide-react": "^1.46.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "tailwind-merge": "3.4.0"
+    "tailwind-merge": "3.4.0",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@sparticuz/chromium": "^153.0.0",
@@ -26,6 +42,7 @@
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "5.1.1",
     "playwright-core": "^1.63.0",
     "tailwindcss": "4.1.17",

@@ -263,3 +263,170 @@ backing plate are all painted PNGs, and the only remaining `<svg>` elements are 
 PreGame minimap's live data overlay (course geometry, racer dots, camera window) and the
 standard `lucide-react` icon set, which are data, not art.
 
+## 8. Skybox / skydome panoramas (TICKET-06)
+
+The painted panoramas in `public/art/tracks/sky_*.png` are mapped onto the race
+skydome (`buildSky()` in `src/game/renderer-3d.ts`) and double as the far parallax
+layer of the 2D renderer (`src/game/world-art.ts`). The dome shader stretches the
+painting from just below the horizon up to the zenith, so any landscape painted
+above the bottom of the image towers into the sky during a race. The composition
+standard for every skybox is therefore:
+
+- **Sky dominates**: clouds, light shafts, smoke columns, airships and atmosphere
+  fill the top ~85% of the frame.
+- **Landscape is a silhouette strip only**: treetops / ridge crests / smelter
+  silhouettes form a single narrow line of foliage or skyline inside the bottom
+  ~15% of the image. No valleys, roads, foreground terrain or sprawling vistas.
+- **Format**: 2048x1024 PNG, left and right edges painted to blend seamlessly
+  (the texture wraps 360 degrees around the dome with `RepeatWrapping`).
+- **Lighting values are sampled from the art**: each `SKY_PRESETS` entry derives
+  `fogColor` from the horizon band, `zenithColor` from the top band and
+  `ambientColor` from a darkened mid-sky average, so dome fog and lighting always
+  match the painting.
+
+Ten variations ship with the game, grouped by course biome; the three canonical
+files are the ones referenced by `TRACKS[...].lighting.skyboxUrl`, the rest are
+selectable in the Track Builder's Skydome Atmosphere menu:
+
+| File | Preset id | Biome / mood |
+| --- | --- | --- |
+| `sky_copperwood_ridge.png` | `ridge` | golden-hour sunburst over a pine treetop line |
+| `sky_copperwood_misty_dawn.png` | `copperwood_dawn` | cool fog banks at first light |
+| `sky_copperwood_autumn_dusk.png` | `copperwood_dusk` | copper sunset over silhouetted canopy |
+| `sky_copperwood_frost_morning.png` | `copperwood_frost` | crisp frosty blue morning, snow spires |
+| `sky_boomtown_quarry.png` | `boomtown` | crimson forge dusk, smoke columns from smelter silhouettes |
+| `sky_boomtown_ember_storm.png` | `boomtown_embers` | churning ember storm lit from below |
+| `sky_boomtown_night_furnace.png` | `boomtown_night` | night sky, furnace glow underlighting cloud |
+| `sky_woolly_wasteland.png` | `sheep` | slate-emerald highland storm, sunbeams, wool zeppelins |
+| `sky_woolly_sunbeam_break.png` | `woolly_sunbeams` | storm breaking into golden-green light shafts |
+| `sky_woolly_dusk_zeppelins.png` | `woolly_dusk` | violet dusk with silhouetted zeppelins |
+
+## 9. Edge & magenta-bleed audit (`npm run check:edges`)
+
+`scripts/check-edge-magenta.mjs` audits **every PNG in the project** (Node +
+ImageMagick only, no browser) and exits non-zero when a runtime sprite breaks
+the contract. `scripts/fix-edge-magenta.mjs` repairs violations; run the
+checker after it to confirm zero failures. Both share the pixel tests in
+`scripts/edge-magenta-lib.mjs`.
+
+File classes:
+
+- **source** (`public/art/sheets/**`, raw `public/art/props/prop-*.png`):
+  matte-backed scans the pipeline reads. Magenta is expected and only counted.
+- **legacy** (`PreGame/**`): archived predecessor art, reported but never
+  failed or rewritten.
+- **runtime** (everything else the game draws): must pass all gates below.
+
+Runtime gates:
+
+1. **No matte holes** — zero opaque/semi pixels near `#FF00FF`
+   (`r,b>150`, `min(r-g,b-g)>=120`, `|r-b|<=45`). The symmetry test keeps
+   painted purples (glowcap mushrooms, violet UI) safe: they are blue-shifted.
+2. **No fringe spill** — zero semi or boundary pixels with
+   `min(r-g,b-g)>=90` and symmetric channels, and zero opaque *shaded-matte*
+   fringe (`dom>=60`, symmetric) hugging transparency.
+3. **No stored-matte bleed** — transparent pixels within 2px of the silhouette
+   must not carry matte RGB; scalers that interpolate non-premultiplied
+   channels would otherwise resurface pink speckle. The fixer bleeds edge
+   colour into the transparent fringe (alpha stays 0).
+4. **No stale-colour fringe** — any transparent pixel next to visible art
+   (alpha >= 16 within one ring) must carry the bled edge colour, i.e. be
+   within 16/channel of the mean of its filled 3x3 neighbourhood — exactly
+   what the fixer's bleed pass writes. Catches generator leftovers the matte
+   test cannot: a canvas `clearRect` black (the Warcraft grass-fringe strips
+   shipped with `(0,0,0,0)` fringes) tints dark when a non-premultiplied
+   scaler interpolates across the edge.
+5. **Clean edges** — at most half of the silhouette boundary may be hard
+   255-vs-0 steps; the fixer feathers offenders with one premultiplied 3x3
+   alpha blur.
+6. **Raw-scan proof (props, goblins, and animated sprites)** — for `public/art/props/alpha/*`,
+   `public/art/goblins/alpha/*`, and `public/art/animated/alpha/*` the raw scan's
+   background (saturated-matte components touching the sheet border, or >=80%
+   saturated pockets) is ground truth: any opaque matte-tinted pixel inside it
+   is leftover backdrop and fails the audit.
+
+The repair passes, in order: key residual holes and raw-proven backdrop;
+despill opaque boundary fringe toward green+40; soften rims around freshly
+keyed holes; unmix matte out of semi fringe (`C = t*A + (1-t)*M` solved for
+the art colour `A`); feather hard silhouettes; bleed edge colour into the
+transparent fringe. Every pass is idempotent and leaves asymmetric painted
+purples/violets untouched.
+
+## 10. Animated Spritesheets: Generation Directives, Registration, and QA Gates
+
+The game supports 4-frame animated spritesheets stored in a 2x2 grid (TL = Frame 0, TR = Frame 1, BL = Frame 2, BR = Frame 3). Each sheet runs on a loop (configurable fps) with runtime controls for playback, speed multiplier (0.25x–4.00x), and individual frame enablement.
+
+All animated assets follow a strict vision-free automated pipeline established in PR #56 (`scripts/process-generated-animated.mjs`, `scripts/analyze-animated-sheets.mjs`, `scripts/onion-skin-check.mjs`).
+
+### 10.1 Asset Categories & File Conventions
+
+1. **Character / Prop Twins (`anim-01` to `anim-42`)**:
+   - Animated counterparts of existing still cutouts (`goblins/alpha/goblin-*.png` or `props/alpha/prop-*.png`).
+   - Have a static anchor body and an animated sub-element (e.g. waving flag, flickering lantern, swinging hammer).
+   - Linked in `src/game/track-builder-3d.ts` (`ANIMATED_SOURCE_ART`) and `scripts/process-generated-animated.mjs` (`SOURCE_ART`) so each frame is automatically padded to the still art's aspect ratio (ensuring a 1:1 in-place swap without distortion).
+2. **Standalone Effects (`anim-43` to `anim-52`)**:
+   - Explosions, bursts, dust puffs, gore splatters, fireworks.
+   - Have **no** still counterpart and no static body (`anim_20` precedent: no `stillType`, no `ANIMATED_SOURCE_ART` entry). Aspect padding is skipped and they maintain their native frame shape.
+
+**File Paths**:
+* Generator raw output: `art-src/animated/<name>-src.png` (committed to git).
+* Layout reference templates: `art-src/animated/<name>-reference.png` (generated by `scripts/build-anim-reference.mjs`, git-ignored).
+* Recomposed 2x2 source sheets: `public/art/animated/<name>.png` (source class, solid magenta gutters).
+* Production keyed runtime sprites: `public/art/animated/alpha/<name>.png` (runtime class, transparent alpha).
+* Contact sheet: `art-src/animated/animated-contact-sheet.png`.
+* Onion-skin debug stacks: `art-src/animated/onion/<name>-onion.png`.
+
+### 10.2 Generation Rules & Prompting Directives
+
+Diffusion models frequently slice subjects, hallucinate panel counts, drift sizes between frames, or bleed into gutters. Every prompt and generation must strictly adhere to the following rules:
+
+1. **Use Layout Reference Templates (`scripts/build-anim-reference.mjs`)**:
+   - Always supply the model with a 2x2 template consisting of 4 panels divided by wide pure `#FF00FF` gutters. Never ask a model to create a 2x2 grid from scratch.
+   - **No Crosshairs or Guides**: Never draw guide lines, tick marks, or crosshairs into the template. Diffusion models interpret them as subject matter, creating dark border artifacts that fail corner alpha checks (as seen on `anim-44`).
+2. **"Reuse One Tracing" (The Subject Size Invariant)**:
+   - For any character, prop, or subject with rings, halos, or bursts, lead the prompt with:
+     > *"Trace the character/prop once and reuse that exact tracing across all four panels."*
+   - Avoid vague phrases like *"keep the same size"* — models treat "keep size" as advisory and freely rescale subjects (e.g. `anim-25` horn blower scaled up to 1.95× with "keep size", but dropped to a clean 1.34× with "reuse one tracing").
+3. **The Gutter Prime Directive**:
+   - Explicitly instruct the model that the magenta gutters are the most critical element of the image:
+     > *"The bright magenta `#FF00FF` separator gutters must remain completely clean and pure. No glow, halo, mist, limb, weapon, or shadow may touch or bleed into the gutters. Shrink the entire character/subject rather than letting any pixel touch the gutter boundary."*
+4. **Fixing Bad Poses & Regaining Layout Control**:
+   - When regenerating an asset to correct a bad pose (e.g. `anim-40` fence fans facing away), **NEVER pass the bad-pose sheet as an image input**. The model's vision prior will anchor to the old pose and ignore the text instruction.
+   - Pass **only** the clean layout template and the still reference art.
+   - Explicitly declare the panel count: *"Four panels in a 2x2 grid: top-left, top-right, bottom-left, bottom-right"*. Without this, multi-image conditioning often causes models to hallucinate 3x2 or 4x2 grids (as observed in `anim-06`, `anim-14`, and `anim-40`).
+5. **Silhouette Height Consistency**:
+   - Demand that the tallest element and bottom boundary cut off at the exact same vertical pixel coordinate in every panel to eliminate vertical bobbing.
+
+### 10.3 Processing Pipeline (`scripts/process-generated-animated.mjs`)
+
+When a new source lands in `art-src/animated/<name>-src.png`, the automated pipeline performs:
+1. **Backdrop Validation**: Asserts magenta fraction > 25% (instantly rejects white studio or dark background hallucinations).
+2. **Gutter Detection & Shave**: Identifies the 2x2 cut coordinates (with fallback salvage for 4x2 grids) and shaves 4px off gutter-adjacent edges to prevent divider lines from leaking into frames.
+3. **Common Silhouette Registration (`registerFrames`)**:
+   - Coarse centroid alignment.
+   - Refinement on the **common silhouette** (pixels opaque across all 4 frames).
+   - $\pm 8\text{px}$ cross-correlation search against Frame 0 to maximize silhouette overlap. This prevents looping body jitter.
+4. **Union Bounding Box**: Crops all 4 frames to the union of their bounding boxes, keeping subject framing static.
+5. **Aspect Padding**: Pads the cropped frame with `#FF00FF` to match the still art's aspect ratio.
+6. **Sheet Recomposition & Normalization**: Rebuilds the 2x2 sheet and flood-normalizes borders and centers with pure `#FF00FF` at 12% fuzz.
+7. **Keying & Mathematical Unmix-Despill**: Keys `#FF00FF` at 20% fuzz and runs a 6px boundary dilation unmix pass:
+   $$e = \min(R - G, B - G), \quad c = 1 - e, \quad (R', G', B') = \left(\frac{R - e}{c}, G, \frac{B - e}{c}\right)$$
+   producing the finished runtime sprite in `public/art/animated/alpha/`.
+
+### 10.4 Quality Gates & Automated Verification
+
+Run automated QA checks before accepting any generated animation:
+
+| QA Tool / Command | Gate Metric | Threshold / Target | Meaning & Notes |
+|---|---|---|---|
+| `scripts/analyze-animated-sheets.mjs` | `LAYOUT` | $\ge 97\%$ clean cut | Gutter cut lines must be clean magenta. (4x2 grids trip this gate on the center line and must be verified pairwise instead). |
+| `scripts/analyze-animated-sheets.mjs` | `STATIC` (whole frame) | $\text{RMSE} > 0.045$ | Whole-frame delta must demonstrate real motion (old band frames sat at ~0.015). |
+| `scripts/onion-skin-check.mjs` | `maxShift` (alignment) | $\le 2.5\text{px}$ | Body misregistration. On crowd scenes, shifts with `gain < 0.002` are correlator noise, not defects. |
+| `scripts/onion-skin-check.mjs` | `fillSpread` (characters/props) | $1.04\times \le \text{spread} \le 1.55\times$ | Subject area ratio between min and max frames. Values $> 1.6\times$ cause visible subject swelling/popping. |
+| **Effect-Specific Gate** | `fillSpread` (explosions/bursts) | **N/A (Ignored)** | **Do NOT apply fillSpread to effects!** An explosion must grow; size changes are the animation itself. |
+| **Effect-Specific Gate** | `drift` (centroid drift) | $\le 20\text{px}$ | Effect center of mass must not slide across the frame between steps (`anim-47`/`anim-49` failed at 70–93px). |
+| **Effect-Specific Gate** | `min elem Δ` (motion) | $> 0.150$ | Rejects sheets where the generator drew identical frames (`anim-48`/`anim-51` failed at <0.06). |
+| Pipeline Remnant Check | `remnant` | $< 0.3\%$ | Opaque magenta residual pixels. ($>0.5\%$ indicates background haze or mist bleed). |
+| Pairwise Check | $\min_{i \ne j} \Delta(f_i, f_j)$ | $> 0.080$ | All 6 frame pairs must differ so duplicate pairs cannot hide behind a moving pair. |
+| `npm run check:edges` | Runtime Audit | **0 failures** | Audits transparent fringe bleed, edge taint, and AA steps. |
+

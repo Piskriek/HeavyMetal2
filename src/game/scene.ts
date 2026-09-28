@@ -3,100 +3,72 @@ import { TRACKS } from './courses';
 import type { AirPickup } from './powerups';
 
 export const HEIGHT = 620;
+export const RADIUS = 31;
+/**
+ * The ball as drawn and as it touches other balls: twice the physics radius. The road, gap, loop and
+ * track-space maths keep `RADIUS` (their tests and the parity fixture are built on it). The renderer
+ * already places a grounded ball's centre 2·RADIUS above the road (the legacy +RADIUS lift), so a
+ * ball drawn at this radius sits exactly on the road instead of floating one radius above it.
+ */
+export const BALL_DRAW_RADIUS = RADIUS * 2;
 export const GROUND = 478;
 export const START_X = 190;
-export const START_Y = 325;
-export const RADIUS = 31;
+/* -----------------------------------------------------------------------------
+   M01 · T1 — START PAD (the hill the goblin pushes you down)
+   -----------------------------------------------------------------------------
+   Authored courses all begin `[0, 0], [1400, 0]`: a dead-flat run-up. The pad
+   replaces that span in the *elevation table only* (the authored `TRACKS`
+   profiles and every rendered ribbon are untouched) with:
+
+     profile x:  0 … 240   pad, flat at −START_DROP       (engine x 190 … 430)
+                240 … 870   smooth descent back to 0       (engine x 430 … 1060)
+                870 … 1400  flat run-in at the original 0  (engine x 1060 … 1590)
+
+   The final pad knot sits exactly where the authored `[1400, 0]` knot sat, and
+   the spline tangent there is unchanged (both neighbours are 0-slope), so every
+   sample at profile x ≥ 1400 — and therefore every downstream obstacle, record
+   distance and `courseY(1370) = 478` — is bit-identical to the flat opening.
+   `tests/start-zone.test.ts` asserts that against a locally reconstructed table.
+
+   START_DROP is the smallest candidate that clears AC-3 with 10 % headroom
+   (measured with scratch/m01-start-drop.mjs: 220 was the smallest clean pass,
+   240 = 220 · 1.09 rounded).
+*/
+export const START_DROP = 240;
+/** Pad is flat from engine START_X to here. */
+export const START_PAD_END_X = START_X + 240;
+/** Descent rejoins the authored line here. */
+export const START_DESCENT_END_X = START_X + 870;
+/** Flat run-in ends here; the first loop's reach begins at x = 1184.44. */
+export const START_RUNIN_END_X = START_X + 1180;
+const START_PAD_PROFILE: readonly (readonly [number, number])[] = [
+  [0, -START_DROP], [240, -START_DROP], [870, 0], [1400, 0],
+];
+
 
 /**
- * World X is deliberately twice the race distance.  That leaves enough room for
- * the perspective camera to show the road, the canyon wall, and the next feature
- * without making the physics units awkwardly large.
+ * M01 · T1: the grid sits on the pad, a ball radius above its surface. The pad is START_DROP
+ * above the authored road, so the old absolute 325 would bury the field in the dirt.
  */
-export const METERS_TO_WORLD = 2;
-export const STAGE_1_DISTANCE = 12000;
-export const STAGE_2_DISTANCE = 12000;
-export const STAGE_3_DISTANCE = 12000;
-export const TRACK_DISTANCE = STAGE_1_DISTANCE + STAGE_2_DISTANCE + STAGE_3_DISTANCE;
-export const TRACK_LENGTH = TRACK_DISTANCE * METERS_TO_WORLD;
-export const STAGE_1_END = START_X + STAGE_1_DISTANCE * METERS_TO_WORLD;
-export const STAGE_2_START = STAGE_1_END;
-export const STAGE_2_END = STAGE_2_START + STAGE_2_DISTANCE * METERS_TO_WORLD;
-export const STAGE_3_START = STAGE_2_END;
-/** The last downhill shelf ends at this wall; it is deliberately before the river lip. */
-export const WATERFALL_WALL_DISTANCE = 11800;
-export const WATERFALL_WALL_X = START_X + WATERFALL_WALL_DISTANCE * METERS_TO_WORLD;
-export const WATERFALL_START_X = STAGE_2_START;
-export const WATERFALL_EXIT_X = STAGE_3_START;
-export const STADIUM_START_DISTANCE = 34500;
-export const STADIUM_START = START_X + STADIUM_START_DISTANCE * METERS_TO_WORLD;
+export const START_Y = GROUND - START_DROP - RADIUS;
+export const TRACK_DISTANCE = 36000;
+export const TRACK_LENGTH = TRACK_DISTANCE * 2;
 export const FINISH = START_X + TRACK_LENGTH;
+export const STADIUM_START = START_X + 68400;
+export const SECTION_LIP_START = START_X + 24000;
+export const SECTION_LIP_END = START_X + 25600;
+export const SECTION_2_START = START_X + 25600;
+export const SECTION_2_END = START_X + 48000;
+export const SECTION_3_START = START_X + 48000;
+export const SECTION_3_END = START_X + 68400;
+export const SECTION_BREAKTHROUGH = START_X + 68400;
 export const GRAVITY = 2400;
-export const CLIFF_GRAVITY_MULTIPLIER = 1.45;
-export const CLIFF_ANGLE = 40 * Math.PI / 180;
 export const LANE_COUNT = 4;
 export const LANE_WIDTH = 240;
 export const PLAYER_LANE = 2;
 export const LANE = { near: -480, far: 480 };
 export const laneZ = (lane: number) => LANE.far - LANE_WIDTH * (lane + 0.5);
 export const closestLane = (z: number) => Math.max(0, Math.min(3, Math.round((LANE.far - z) / LANE_WIDTH - 0.5)));
-
-export type TrackSection = 'stage1' | 'stage2' | 'stage3';
-export type SurfaceType = 'normal' | 'wet_wood' | 'moss_rock';
-export type WaterfallPhase = 'wall-impact' | 'river' | 'vertical-drop' | 'bottom-impact';
-export type WaterfallFeatureKind = 'rock' | 'ramp' | 'tube';
-
-export interface WaterfallFeature {
-  id: number;
-  kind: WaterfallFeatureKind;
-  /** Normalised distance down the head-on waterfall, 0 at the lip and 1 at the rocks below. */
-  depth: number;
-  /** Normalised lateral position: -1 left, 0 centre, 1 right. */
-  lateral: number;
-  width: number;
-  height: number;
-  hitMask: number;
-  hitAt: number;
-}
-
-export interface WaterfallRide {
-  phase: WaterfallPhase;
-  progress: number;
-  depth: number;
-  lateral: number;
-  targetLateral: number;
-  velocity: number;
-  hitCount: number;
-  impact: number;
-  startedAt: number;
-}
-
-export interface WaterfallFrame {
-  phase: WaterfallPhase;
-  progress: number;
-  depth: number;
-  lateral: number;
-  impact: number;
-  hitCount: number;
-}
-
-export function trackSectionAt(x: number): TrackSection {
-  if (x < STAGE_2_START) return 'stage1';
-  if (x < STAGE_3_START) return 'stage2';
-  return 'stage3';
-}
-
-export function surfaceTypeAt(x: number): SurfaceType {
-  if (x < STAGE_2_START || x >= STAGE_3_START) return 'normal';
-  // The upper shelves are timber berms; the lower foam run is slick mossy slate.
-  return x < STAGE_2_START + 7800 ? 'wet_wood' : 'moss_rock';
-}
-
-/** A steep cliff face gets a controlled arcade gravity boost without changing all tracks. */
-export function gravityScaleForSlope(slope: number) {
-  return Math.abs(Math.atan(slope)) >= CLIFF_ANGLE ? CLIFF_GRAVITY_MULTIPLIER : 1;
-}
-
 export const obstacleZ = (obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) => {
   if (obstacle.lane === -1) return 0;
   const lane = obstacle.lane ?? PLAYER_LANE;
@@ -108,8 +80,14 @@ export function obstacleBounds(obstacle: Pick<Obstacle, 'lane' | 'laneSpan'>) {
   const last = Math.min(3, first + (obstacle.laneSpan ?? 1) - 1);
   return { near: laneZ(last) - LANE_WIDTH / 2, far: laneZ(first) + LANE_WIDTH / 2 };
 }
-export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0.7) {
-  if (obstacle.kind === 'gap' || obstacle.kind === 'sign') {
+export function occupiesLane(obstacle: Obstacle, z: number, padding = BALL_DRAW_RADIUS * 0.7) {
+  if (
+    obstacle.kind === 'gap' ||
+    obstacle.kind === 'sign' ||
+    obstacle.kind === 'rock_gate' ||
+    obstacle.kind === 'break_bridge' ||
+    obstacle.kind === 'waterfall_splash'
+  ) {
     const bounds = obstacleBounds(obstacle);
     return z > bounds.near + 5 && z < bounds.far - 5;
   }
@@ -117,22 +95,29 @@ export function occupiesLane(obstacle: Obstacle, z: number, padding = RADIUS * 0
     const bounds = obstacleBounds(obstacle);
     return z > bounds.near - 40 && z < bounds.far + 40;
   }
-  const halfWidth = obstacle.kind === 'ramp' || obstacle.kind === 'loop' ? 66
-    : obstacle.kind === 'boost' ? 45
-      : obstacle.kind === 'fire-ring' ? 62
-        : obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock' || obstacle.kind === 'crate' || obstacle.kind === 'skull-box' ? 52 : 37;
+  const halfWidth =
+    obstacle.kind === 'ramp' || obstacle.kind === 'loop' || obstacle.kind === 'lava_loop'
+      ? 66
+      : obstacle.kind === 'boost'
+      ? 45
+      : obstacle.kind === 'water_rock'
+      ? 55
+      : 37;
   return Math.abs(z - obstacleZ(obstacle)) < halfWidth + padding;
 }
 export const TERRAIN = GROUND + 154;
 export const GRANDSTAND = { z: 350, base: GROUND + 64, height: 217, foundation: TERRAIN, depth: 138 };
 export const LAUNCHER = { x: START_X + 128, tipY: GROUND - 241, halfWidth: 91, baseRear: START_X - 95, baseFront: START_X + 165 };
+
 export const AIM_ANCHOR = { x: LAUNCHER.x + 4, y: LAUNCHER.tipY - 7, maxDraw: 220, fullPowerDraw: 200 };
 
 const SAMPLE_STEP = 16;
 const elevations = {} as Record<CourseId, Float32Array>;
 for (const id of Object.keys(TRACKS) as CourseId[]) {
-  const profile = TRACKS[id].profile;
-  const table = new Float32Array(Math.ceil((TRACK_LENGTH + 1024) / SAMPLE_STEP) + 1);
+  // M01 · T1: the authored profile with its flat 0…1400 opening replaced by the start pad.
+  const authored = TRACKS[id].profile;
+  const profile = [...START_PAD_PROFILE, ...authored.slice(2)];
+  const table = new Float32Array(Math.ceil(78000 / SAMPLE_STEP) + 1);
   const slopes = profile.slice(0, -1).map((point, i) => (profile[i + 1][1] - point[1]) / (profile[i + 1][0] - point[0]));
   const tangents = profile.map((_, i) => !i || i === profile.length - 1 || !slopes[i - 1] || !slopes[i] ? 0 : 2 / (1 / slopes[i - 1] + 1 / slopes[i]));
   for (let i = 0, section = 0; i < table.length; i++) {
@@ -146,7 +131,7 @@ for (const id of Object.keys(TRACKS) as CourseId[]) {
   elevations[id] = table;
 }
 
-// A precomputed, monotone-enough odyssey profile keeps collision and drawing queries cheap.
+// A precomputed, monotone hill profile keeps collision and drawing queries cheap.
 export function courseY(x: number, course: CourseId = 'ridge') {
   const elevation = elevations[course];
   const sample = Math.max(0, Math.min(elevation.length - 1.001, (x - START_X) / SAMPLE_STEP));
@@ -168,12 +153,12 @@ export const decalRadius = (altitude: number) => RADIUS * 1.1 * (1 + Math.max(0,
 /** Opacity = clamp(0.85 - Z / Z_max x 0.45, 0.25, 0.85) — it softens as the ball climbs. */
 export const decalOpacity = (altitude: number) => Math.max(0.25, Math.min(0.85, 0.85 - Math.max(0, altitude) / AIRBORNE_CEILING * 0.45));
 
-const SECTOR_ENDS = [1400, 5400, 10000, 13600, 18600, 23000, 24000, 26400, 30000, 33600, 37200, 42000, 46800, 52000, 60000, 69000];
 export function sectorAt(x: number, course: CourseId = 'ridge') {
   const distance = x - START_X;
   const sectors = TRACKS[course].sectors;
-  const index = SECTOR_ENDS.findIndex((end) => distance < end);
-  return sectors[Math.min(index < 0 ? sectors.length - 1 : index, sectors.length - 1)];
+  const thresholds = [4000, 12000, 20000, 25000, 32000, 42000, 48000, 52000, 59000, 65000, 70000];
+  const index = thresholds.findIndex((end) => distance < end);
+  return sectors[index < 0 ? sectors.length - 1 : index];
 }
 
 export function loopGeometry(obstacle: Pick<Obstacle, 'x' | 'height'>, course: CourseId = 'ridge') {
@@ -186,8 +171,27 @@ export function rampSurface(obstacle: Pick<Obstacle, 'x' | 'width' | 'height'>, 
   return courseY(x, course) - Math.pow(t, 1.6) * obstacle.height;
 }
 
-export type ObstacleKind = 'ramp' | 'loop' | 'sheep' | 'tnt' | 'spring' | 'boost' | 'gap' | 'blimp' | 'sign'
-  | 'rock-bumper' | 'spiked-rock' | 'fire-ring' | 'crate' | 'skull-box' | 'rock-wall' | 'mine-rail' | 'mine-split';
+export type ObstacleKind =
+  | 'ramp'
+  | 'loop'
+  | 'sheep'
+  | 'tnt'
+  | 'spring'
+  | 'boost'
+  | 'gap'
+  | 'blimp'
+  | 'sign'
+  | 'water_rock'
+  | 'break_bridge'
+  | 'lane_tube'
+  | 'pinball_spinner'
+  | 'rock_gate'
+  | 'cave_torch'
+  | 'stalactite'
+  | 'waterfall_splash'
+  | 'roller_rails'
+  | 'cauldron'
+  | 'lava_loop';
 
 export interface Obstacle {
   kind: ObstacleKind;
@@ -198,36 +202,25 @@ export interface Obstacle {
   hitAt: number;
   lane?: number;
   laneSpan?: number;
+  /**
+   * Legacy four-racer bitmask (`1 << racerId`). It wraps past racer 30, so it is only written
+   * inside its safe range and nothing reads it for gameplay; `hitBy` is the scalable ledger.
+   */
   hitMask?: number;
+  /** Every racer ID that has touched this obstacle. A Set, so 100 participants cannot alias. */
+  hitBy?: Set<number>;
   altitude?: number;
   signType?: 'sheep' | 'tnt' | 'parts';
-  variant?: 'crown' | 'spiked';
-  ring?: 'spiked' | 'steel';
-  section?: TrackSection;
-  surface?: SurfaceType;
+  broken?: boolean;
+  health?: number;
+  variant?: string;
+  spinAngle?: number;
+  deflectPower?: number;
 }
 
-export interface Particle {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  size: number;
-  color: string;
-}
-
-export interface AirSheep {
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  rotation: number;
-  life: number;
-}
+import type { EffectEvent } from './effects/events';
+// Type-only, so the runtime cycle `lane-network → scene` stays a one-way street: erased at build time.
+import type { LaneNetwork } from './lane-network';
 
 export interface LoopRide {
   obstacle: Obstacle;
@@ -252,19 +245,25 @@ export interface RacerFrame {
   vy: number;
   rotation: number;
   falling: boolean;
+  grounded?: boolean;
+  distance?: number;
   finished: boolean;
   bumpAt: number;
   immuneUntil: number;
   shieldUntil: number;
   shieldHitAt: number;
   pickupAt: number;
-  fireUntil: number;
-  waterfallPhase: WaterfallPhase | null;
-  waterfallProgress: number;
-  waterfallDepth: number;
-  waterfallLateral: number;
-  waterfallHits: number;
   launchOrigin: { x: number; y: number };
+  /** M01 · T3: the shell's roll phase, in radians. Presentation only — never in the fingerprint. */
+  rollPhase?: number;
+  /** Lateral speed (engine units/s), for the cockpit lean. */
+  vz?: number;
+  /** Not in the race yet (a rival waiting for the player's solo first split): draw nothing. */
+  hidden?: boolean;
+  /** H11: a bot's shove tell ends at this race time; until then the renderer wobbles the ball. */
+  ramTellUntil?: number;
+  /** H6: being hauled back by the rope goblins: where it goes back to, and how far along (0..1). */
+  reelBack?: { toX: number; toY: number; toZ: number; t: number } | null;
 }
 
 export interface SceneFrame {
@@ -274,6 +273,8 @@ export interface SceneFrame {
   cameraY: number;
   drift: number;
   shake: number;
+  /** H8: the player's last hit: when (frame `time`), from which side, how hard (0..1). */
+  impact?: { readonly at: number; readonly side: -1 | 0 | 1; readonly strength: number };
   rotation: number;
   dragging: boolean;
   launchOrigin: { x: number; y: number };
@@ -282,12 +283,23 @@ export interface SceneFrame {
   loopRide: LoopRide | null;
   obstacles: Obstacle[];
   pickups: AirPickup[];
-  particles: Particle[];
-  sheep: AirSheep[];
-  trail: { x: number; y: number; z: number }[];
-  waterfall: WaterfallFrame | null;
-  waterfallFeatures: WaterfallFeature[];
   snapshot: GameSnapshot;
   options: GameOptions;
   reducedMotion: boolean;
+  /**
+   * M01 · T5 — the typed effect queue the sim fills and the 3D renderer drains. Optional so the
+   * builder, the audit and every headless preview keep working without a renderer to feed.
+   */
+  effects?: EffectHandoff;
+  /**
+   * M01 · T6/T7 dressing — the authored lane network the physics is steering by, so the road the ball
+   * obeys is the road the player sees painted. Optional: a scene with no authored network (and every
+   * headless preview) simply has no lane paint to draw.
+   */
+  laneNetwork?: LaneNetwork | null;
+}
+
+/** The narrow slice of `EffectQueue` a renderer needs: a cursor and a drain. */
+export interface EffectHandoff {
+  readSince(cursor: number, out: EffectEvent[]): number;
 }

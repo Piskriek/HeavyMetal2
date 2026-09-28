@@ -98,7 +98,8 @@ h1, h2, h3, p, figure { margin: 0; }
 .aim-hint > svg, .aim-hint .aim-arrow { display: block; width: 158px; height: 96px; margin: 2px 0 0 -64px; object-fit: contain; opacity: .88; filter: drop-shadow(0 2px 4px #071e13c8); }
 .game-stage[data-aiming='true'] .aim-hint { opacity: 0 !important; transition: opacity 140ms ease; }
 .grid-recovery { position: absolute; z-index: 3; top: 96px; left: 28px; max-width: min(440px, 56%); display: flex; gap: 11px; padding: 12px 15px; background: #14210fd9; border: 1px solid #b08a4d5c; border-left: 3px solid #d6a765; border-radius: 5px; color: #ded0ab; pointer-events: none; }
-.grid-recovery > svg { color: #e0b271; flex-shrink: 0; margin-top: 1px; }
+.grid-recovery > svg, .grid-recovery > img, .grid-flag-img { width: 16px; height: 16px; object-fit: contain; flex-shrink: 0; margin-top: 1px; }
+.record-flag-img { width: 14px; height: 14px; object-fit: contain; vertical-align: -2px; margin-left: 5px; }
 .grid-recovery strong { display: block; margin-bottom: 5px; font: 600 11px var(--display); letter-spacing: .8px; text-transform: uppercase; color: #eddcb4; }
 .grid-recovery p { font-size: 10px; line-height: 1.65; color: #b6c19d; }
 .grid-recovery p + p { margin-top: 4px; }

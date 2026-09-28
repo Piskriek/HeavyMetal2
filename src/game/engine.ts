@@ -3,24 +3,103 @@ import { GameAudio } from './audio';
 import { RangeRenderer } from './renderer';
 import { chaseLerp, clampCameraTarget } from './projection';
 import { createRacers, raceOrder, type Racer } from './racers';
+import { PLAYER_ID } from './roster';
+import { scaledDt, snapTimeScale, type TimeScale } from './time-scale';
+import { builderRampObstacles } from './sim/builder-ramps';
+import { SPLIT_TIMEOUT_S, simulateSplitTicks } from './sim/split-times';
+import { withoutLoopRides } from './sim/decor-loops';
+import { DEFAULT_ROPE, clampRope, type RopeConfig } from './sim/rope';
+import { compileRampSurfaces, getTrackSpace } from './track-space';
 import {
-  AIM_ANCHOR, FINISH, GROUND, GRAVITY, HEIGHT, LANE, LANE_COUNT, PLAYER_LANE,
-  RADIUS, STADIUM_START, START_X, START_Y, STAGE_2_START, STAGE_3_START, TRACK_DISTANCE,
-  WATERFALL_EXIT_X, WATERFALL_START_X, WATERFALL_WALL_X, closestLane, courseY, courseSlope, gravityScaleForSlope,
-  laneZ, launchVelocity, loopGeometry, obstacleZ, occupiesLane, rampSurface, sectorAt, surfaceTypeAt, weightImpulse,
-  type AirSheep, type Obstacle, type Particle, type RacerFrame, type WaterfallFeature, type WaterfallFrame,
+  BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
+  TRACK_DISTANCE, closestLane, courseY, courseSlope, sectorAt,
+  type Obstacle, type RacerFrame,
 } from './scene';
-import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord } from './types';
+import { INITIAL_SNAPSHOT, type GameOptions, type GameSnapshot, type GameStatus, type RacerStanding, type RunRecord, type StartMode } from './types';
 import type { RaceConfig } from './session';
-import { createTrackLayout, createWaterfallDropLayout } from './track-layout';
-import { POWERUPS, SHIELD_DURATION, createAirPickups, hopTiming, pickupIntercept, pickupY, type AirPickup } from './powerups';
+import { createTrackLayout } from './track-layout';
+import {
+  DEFAULT_SEGMENT_PROVIDER, createQualifyingGate, evaluateCrossing, segmentAtX, segmentForStep,
+} from './qualifying/gate';
+import {
+  QUALIFYING_GATE_ALTITUDE_TOLERANCE, QUALIFYING_GATE_ID, type QualifyingGate,
+} from './contracts/qualifying';
+import {
+  POWERUPS, createAirPickups, layoutPickupsForNetwork, type AirPickup, type PowerupKind,
+} from './powerups';
 
-const TAU = Math.PI * 2;
-const STEP = 1 / 120;
-const BUCKET = 512;
-const EMPTY: Obstacle[] = [];
+import { LANE_Z_LIMIT, adjacentPath, adoptNearestPaths, assignNearestPaths, sampleLane, startNodeOf, type LaneNetwork } from './lane-network';
+import { loadLaneNetwork, readLaneStorage, validateLaneDocument, type LaneStorageDocument } from './lane-storage';
+// T04: the simulation now lives in `src/game/sim`, shared with isolated qualifying attempts.
+// The engine keeps rendering, input, bumps, particles and the HUD; it asks the sim to step.
+import { FIXED_STEP } from './contracts/timing';
+import { validateCommand, type CommandGate, type CommandVerdict, type GameCommand } from './contracts/commands';
+import type { HeatPhase } from './contracts/heat';
+import { MERGE_GATE_HALF_WIDTH, MERGE_LINEUP, MERGE_RELEASE_VX, MergePool, queueRows, releaseOccupancy } from './merge/pool';
+import {
+  PASSAGE_CENTRE_Z, PASSAGE_GHOST_TAIL_S, insidePassage,
+  passageExitX, passageMouthX,
+} from './qualifying/passage';
+import { LEGACY_RECOVERY, type RacerStepContext, type SimFx } from './sim/context';
+import { createSimWorld, type SimWorld } from './sim/world';
+import {
+  canHop as canHopSim, performBoost as performBoostSim, performBounce as performBounceSim,
+  stepRacer as stepRacerSim,
+} from './sim/racer-physics';
+import { driveCpu, setLane as setLaneSim, type CpuContext } from './sim/cpu-driver';
+import { resolvePickups as resolvePickupsSim } from './sim/pickups';
+// M01 · T1: the goblin push start. The engine owns the clock and the surface query; the ramp math
+// lives in a pure module so a headless test can reproduce the launch without a canvas.
+import { DEFAULT_PUSH_SEED, PUSH_TICKS, applyPushTick, pushRampVx, startPushVelocity } from './sim/start-push';
+import { fillCockpitState, yokeSteer, type CockpitState } from './cockpit';
+import { EffectQueue } from './effects/events';
+import { GamepadController } from './input/gamepad';
+import { impactEnvelope } from './camera-shake';
+import { gapSeconds, gapTrend } from './gap';
+
+/** A supply's painted colour as 0xRRGGBB, so its collect burst wears it. */
+function powerupTint(kind: PowerupKind): number {
+  return Number.parseInt(POWERUPS[kind].color.slice(1), 16);
+}
+
+const STEP = FIXED_STEP;
+
+/**
+ * M9: the race's gameplay randomness, a hash of (seed, tick, racer id) in [0, 1). Stable for a given
+ * moment and racer, independent of how many other draws happened first.
+ */
+export function raceRandom01(seed: number, tick: number, racerId: number): number {
+  let h = Math.imul((seed | 0) ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= Math.imul((tick | 0) + 0x632be5ab, 0xc2b2ae35);
+  h ^= Math.imul((racerId | 0) + 0x27d4eb2f, 0x165667b1);
+  h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12; h = Math.imul(h, 0x297a2d39);
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+
+/** M9: the heat phase a live-race status belongs to, for the T01 command gate. */
+export function heatPhaseOf(status: GameStatus): HeatPhase {
+  switch (status) {
+    case 'ready': return 'staging';
+    case 'pushing': case 'checkpoint': case 'countdown': return 'release';
+    case 'finished': return 'results';
+    default: return 'racing'; // flying, paused
+  }
+}
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
-const randomAt = (id: number, time: number) => { const value = Math.sin(id * 91.37 + Math.floor(time * 3) * 17.23) * 13791.73; return value - Math.floor(value); };
+
+/**
+ * The statuses in which the simulation keeps stepping.
+ *
+ * The pool's own two are in here on purpose (M01 · T2): while the field is queued the physics still
+ * has to run — held riders glide into their slot and released riders ride the ring — and it is
+ * `stepRace` that drives the pool's own clock, so a status that stops stepping would stop the merge
+ * from ever finishing.
+ */
+export function statusSimulates(status: GameStatus): boolean {
+  return status === 'flying' || status === 'pushing' || status === 'checkpoint' || status === 'countdown';
+}
 
 export class GameEngine {
   private readonly renderer: RangeRenderer;
@@ -37,36 +116,88 @@ export class GameEngine {
   private readonly systemReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   private get reducedMotion() { return this.systemReducedMotion || this.options.reducedMotion; }
   private time = 0;
+  /** Slow motion (test drive): simulated seconds per real second. The physics step never changes. */
+  private timeScale: TimeScale = 1;
   private runTime = 0;
   private camera = 0;
   private cameraY = 0;
-  private pointerDrift = 0;
   private drift = 0;
   private shake = 0;
-  private isDragging = false;
-  private grabOffset = { x: 0, y: 0 };
+  /** H7b: the lane rope's timings. The defaults unless the test drive's dev sliders change them. */
+  private ropeConfig: RopeConfig = DEFAULT_ROPE;
+  /** H8: the player's last hit (this.time), its side (+1 from the right) and strength (0..1). */
+  private readonly impact = { at: -100, side: 0 as -1 | 0 | 1, strength: 0 };
   private topSpeed = 0;
   private noticeUntil = 0;
   private counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
   private racers = createRacers();
   private renderRacers: RacerFrame[] = [];
-  private readonly collisionTimes = new Float64Array(16).fill(-100);
+  private readonly collisionTimes = new Map<number, number>();
+  /** True once the player reaches the first split passage; rivals join at the merge gate. */
+  private splitReached = false;
+  /** Rivals' first-split ticks (headless, computed at reset): how they queue in the pool. */
+  private rivalSplits = new Map<number, number | null>();
+  /** P11: each rider's place at the first split (1-based), once the pool has everyone. */
+  private readonly splitPlaces = new Map<number, number>();
+  /** True once the rivals have been queued behind (or ahead of) the player at the split. */
+  private rivalsQueued = false;
+  /** Last steering press for the cockpit yoke: direction (−1 left, +1 right) and when (this.time). */
+  private steerPress = 0;
+  private steerPressAt = -100;
   private obstacles: Obstacle[] = [];
-  private waterfallFeatures: WaterfallFeature[] = [];
-  private waterfallCamera: WaterfallFrame | null = null;
   private pickups: AirPickup[] = [];
-  private readonly pickupBuckets = new Map<number, AirPickup[]>();
   private pickupCount = 0;
   private shieldBlocks = 0;
   private readonly pickupCandidates = new Set<AirPickup>();
-  private readonly buckets = new Map<number, Obstacle[]>();
-  private particles: Particle[] = [];
-  private airSheep: AirSheep[] = [];
-  private trail: { x: number; y: number; z: number }[] = [];
-  private trailSample = 0;
+  /** Spatial index and surface queries, shared with the headless qualifying attempts. */
+  private readonly world: SimWorld;
+  private readonly simFx: SimFx;
+  private readonly simCtx: RacerStepContext;
+  private readonly cpuCtx: CpuContext;
   private snapshot: GameSnapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
   private lastSnapshot: GameSnapshot | null = null;
   private standingsKey = '';
+
+  /** H10: the connected gamepad, polled once per frame; its commands go through `dispatch`. */
+  private readonly gamepad = new GamepadController((name) => {
+    this.say(`CONTROLLER READY: ${name.replace(/\s*\(.*$/, '').slice(0, 28).toUpperCase() || 'GAMEPAD'}`);
+    this.notify(); this.invalidate();
+  });
+
+  /** M01 · T5 — typed effect events for the render runtime. Written by the sim and by the engine. */
+  private readonly effects = new EffectQueue();
+  /** Physics ticks since the run began. Effects are stamped with it so a replay lines up. */
+  private tick = 0;
+
+  /** M01 · T1: push cursor (0 while not pushing) and the per-racer targets for this run. */
+  private pushTick = 0;
+  private pushTargets: number[] = [];
+  /**
+   * M01 · T2 — the first-loop merge pool. Built on the first gate crossing, driven from `stepRace`
+   * and retired once every rider has been released. The legacy checkpoint (a fixed x at 17000 with a
+   * `setInterval` countdown and teleporting release) is gone: the pool replaces it entirely.
+   */
+  private merge: MergePool | null = null;
+  private mergeGate: QualifyingGate | null = null;
+  /** The last rider the pool released, for the occupancy check on the next one. */
+  private mergeLastReleased: number | null = null;
+  /** True once the pool has released everyone: the merge happens once per run, and only once. */
+  private mergeDone = false;
+  /**
+   * M01 · T6 (IF-LANES) — the authored lane network this course runs on, or `null` for the legacy
+   * lanes. Loaded once per course from `lane-storage`; the builder's "test drive" can replace it
+   * through `setLaneNetwork`. With `null` the physics is bit-identical to the legacy game.
+   */
+  private laneNetwork: LaneNetwork | null = null;
+  /**
+   * The status a pause was taken from, so resuming puts the game back where it was. Pausing during
+   * the pool has to come back to the pool: a resumed field that jumped straight to `flying` would
+   * leave the queued riders held with nothing left to release them.
+   */
+  private pausedFrom: GameStatus | null = null;
+
+  // Solo test mode: only the player marble
+  private soloMode = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -77,24 +208,110 @@ export class GameEngine {
     private readonly config?: RaceConfig,
   ) {
     this.renderer = new RangeRenderer(canvas, assets, config?.course ?? options.course);
+    this.racers = createRacers(config);
+    this.renderer.setRacerCount(this.racers.length);
     this.audio.setEnabled(options.sound);
     this.audio.setVolume(options.masterVolume);
+    const engine = this;
+    this.world = createSimWorld(config?.course ?? options.course);
+    this.laneNetwork = loadLaneNetwork(config?.course ?? options.course);
+    this.simFx = {
+      // The legacy 2D particles, flying sheep and ball trail are not drawn by the 3D renderer: the sim
+      // still reports them (the parity recordings read them), and the painted `effect` queue below is
+      // what the player sees.
+      emit: () => {},
+      effect: (kind, x, y, z, scale, racerId) => engine.effects.push(kind, x, y, z, scale, racerId, engine.tick),
+      airSheep: () => {},
+      say: (text) => engine.say(text),
+      audio: (cue) => engine.audio.play(cue),
+      // Chaos points never go below zero; the legacy recovery was the only negative delta.
+      score: (delta) => { engine.snapshot.score = Math.max(0, engine.snapshot.score + delta); },
+      // Only the player's events shake. From 3 up it is a hit (TNT, a wall, lava), not a boost.
+      shake: (amount) => { engine.shake = amount; if (amount >= 3) engine.playerImpact(Math.min(1, amount / 9), 0); },
+      tally: (kind) => { engine.counts[kind]++; },
+      refreshHud: () => { engine.refreshSnapshot(); engine.notify(); },
+      notifyHud: () => { engine.notify(); },
+      setHopReady: (ready) => { engine.snapshot.hopReady = ready; },
+      clearTrail: () => {},
+      pickupCollected: (kind) => {
+        engine.pickupCount++;
+        engine.snapshot.lastPickup = kind;
+        engine.snapshot.pickupNoticeUntil = engine.runTime + 2.5;
+        // The painted collect burst, wearing the supply's own colour.
+        engine.effects.push(
+          'pickup', engine.player.x, engine.player.y, engine.player.z, 1, engine.player.id, engine.tick,
+          powerupTint(kind),
+        );
+      },
+    };
+    this.simCtx = {
+      world: this.world,
+      fx: this.simFx,
+      // The race keeps the legacy timed recovery, bit for bit (see sim/context.ts).
+      recovery: LEGACY_RECOVERY,
+      // M9: seeded, not Math.random: the same seed and the same inputs give the same race.
+      random: (racerId = 0) => raceRandom01(engine.pushSeed, engine.tick, racerId),
+      get runTime() { return engine.runTime; },
+      get wallTime() { return engine.time; },
+      // M01 · T6: read live, so the builder's "test drive" can swap the network without rebuilding
+      // the context, and so a course with no authored network stays exactly the legacy game.
+      get laneNetwork() { return engine.laneNetwork; },
+      // H7b: the test drive's rope sliders; the defaults unless someone is tuning.
+      get rope() { return engine.ropeConfig; },
+    };
+    this.cpuCtx = {
+      get step() { return engine.simCtx; },
+      get difficulty() { return engine.config?.difficulty ?? 'racer'; },
+      get others() { return engine.racers; },
+      get paceTargetX() { return engine.player.x; },
+      stagger: (racer) => racer.id * 0.023,
+    };
     this.reset();
-    canvas.addEventListener('pointerdown', this.pointerDown);
-    canvas.addEventListener('pointermove', this.pointerMove);
-    canvas.addEventListener('pointerup', this.pointerUp);
-    canvas.addEventListener('pointercancel', this.pointerCancel);
-    canvas.addEventListener('pointerleave', this.pointerLeave);
     document.addEventListener('visibilitychange', this.visibilityChanged);
   }
 
   private get player() { return this.racers[0]; }
+  /**
+   * M01 · T1: how the field leaves the grid. The goblin push is the only start (M5 retired the
+   * slingshot); the frozen parity and qualifying sims keep their own copies of the old one.
+   */
+  get startMode(): StartMode { return 'push'; }
+  private get pushSeed(): number { return this.config?.seed ?? DEFAULT_PUSH_SEED; }
   private y(x: number) { return courseY(x, this.options.course); }
   private slope(x: number) { return courseSlope(x, this.options.course); }
   private get customPhysics() { return !this.config || this.config.customPhysics; }
   get status(): GameStatus { return this.snapshot.status; }
   get inputEnabled() { return this.controlsEnabled; }
   set inputEnabled(value: boolean) { this.controlsEnabled = value; this.lastFrame = 0; this.invalidate(); }
+  get view() { return this.renderer.view; }
+  get trackRenderer() { return this.renderer; }
+  get trackBuilder() { return this.renderer.trackBuilder; }
+  getTrackY(x: number) { return this.y(x); }
+  get trackObstacles(): Obstacle[] { return this.obstacles; }
+  private pausedForBuild = false;
+  get isBuildPaused() { return this.pausedForBuild; }
+  /** Slow motion for the test drive: one of TIME_SCALES (anything else snaps to the nearest). */
+  setTimeScale(scale: number) { this.timeScale = snapTimeScale(scale); this.audio.setTimeScale(this.timeScale); }
+  getTimeScale(): TimeScale { return this.timeScale; }
+
+  /** Switch camera live (cockpit / chase / fixed) without rebuilding the race. */
+  setCameraMode(mode: GameOptions['cameraMode']) {
+    if (this.options.cameraMode === mode) return;
+    this.options = { ...this.options, cameraMode: mode };
+    this.invalidate();
+  }
+
+  setBuildPaused(paused: boolean) {
+    this.pausedForBuild = paused;
+    this.accumulator = this.lastFrame = 0;
+    this.invalidate();
+  }
+  setTrackObstacles(newObstacles: Obstacle[]) {
+    this.obstacles = newObstacles;
+    this.world.configure(this.options.course, this.obstacles, this.pickups);
+    this.invalidate();
+  }
+  requestRender() { this.invalidate(); }
 
   resize(width: number, height: number) {
     this.renderer.resize(width, height);
@@ -129,121 +346,616 @@ export class GameEngine {
 
   reset = () => {
     this.snapshot = { ...INITIAL_SNAPSHOT, status: 'ready' };
+    this.pushTick = 0;
+    this.pushTargets = [];
+    this.tick = 0;
+    this.effects.reset();
+    this.merge = null;
+    this.mergeGate = null;
+    this.mergeDone = false;
+    this.queueRow.clear(); this.queueOffset.clear(); this.splitPlaces.clear();
+    this.mergeLastReleased = null;
+    this.pausedFrom = null;
+    this.splitReached = false;
+    this.collisionTimes.clear();
     this.racers = createRacers(this.config);
+    this.renderer.setRacerCount(this.racers.length);
+    if (this.laneNetwork) this.assignPaths();
+    // Solo mode: keep only the player, remove all AI racers
+    if (this.soloMode) {
+      const player = this.racers.find(r => r.isPlayer) ?? this.racers[0];
+      this.racers = [player];
+    }
+    this.placeOnStartNodes();
+    // Everyone begins resting on the pad. Racers are created un-grounded, and the renderer measures an
+    // un-grounded ball's height from the old slingshot ground, ~210 units below the pad: without this
+    // the whole grid hovered at the start.
+    for (const racer of this.racers) { racer.grounded = true; racer.y = this.y(racer.x) - RADIUS; }
     if (this.customPhysics) { this.player.weight = this.options.ballWeight; this.player.launchSpeed = this.options.launchSpeed; }
     else this.options = { ...this.options, course: this.config!.course, launchSpeed: this.player.launchSpeed, ballWeight: this.player.weight };
     this.renderRacers = this.racers.map((racer) => ({ ...racer }));
     this.camera = this.cameraY = this.runTime = 0;
     this.accumulator = this.lastFrame = this.lastRender = 0;
     this.topSpeed = this.shake = 0;
-    this.isDragging = false;
     this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
-    this.waterfallCamera = null;
-    this.waterfallFeatures = [];
     this.pickupCount = this.shieldBlocks = 0;
     this.snapshot.sector = sectorAt(START_X, this.options.course);
-    this.collisionTimes.fill(-100);
-    this.particles.length = this.airSheep.length = this.trail.length = 0;
+    this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
     this.canvas.style.cursor = '';
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
     this.makeTrack();
+    this.rivalsQueued = false;
+    this.rivalSplits = this.racers.length > 1
+      ? simulateSplitTicks(this.racers.filter((racer) => racer.id !== PLAYER_ID), {
+        course: this.options.course, obstacles: this.obstacles, pickups: this.pickups,
+        network: this.laneNetwork, gateX: this.mergeGateFor().x, pushSeed: this.pushSeed,
+      })
+      : new Map();
     this.standingsKey = '';
     this.notify(); this.invalidate();
   };
 
-  launch = () => {
+  /**
+   * M01 · T1 — begin the run.
+   *
+   * Every racer is standing on the pad; the starter goblin shoves the whole field at once and the
+   * downhill does the rest.
+   */
+  start = () => {
     if (this.status !== 'ready') return;
+    this.pushTick = 0;
+    this.pushTargets = this.racers.map((racer) => startPushVelocity(racer.pace, this.pushSeed, racer.id));
     for (const racer of this.racers) {
-      const velocity = launchVelocity(this.snapshot.power, racer.launchSpeed);
-      const angle = clamp(this.snapshot.angle + (racer.id ? (racer.id - 2) * 1.2 : 0), 12, 68) * Math.PI / 180;
-      racer.launchOrigin = { x: racer.x, y: racer.y };
-      racer.vx = Math.cos(angle) * velocity * racer.pace;
-      racer.vy = -Math.sin(angle) * velocity * racer.pace;
       racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
-      this.emit(racer.x, racer.y, racer.z, 7, racer.color, 100);
+      racer.launchOrigin = { x: racer.x, y: racer.y };
     }
-    this.snapshot.status = 'flying';
-    this.lastFrame = this.accumulator = 0;
-    this.isDragging = false;
-    this.canvas.style.cursor = '';
-    this.audio.play('launch');
-    this.say('FOUR GOBLINS. ZERO RIGHT OF WAY.'); this.notify();
+    this.effects.push('dust', this.player.x, this.player.y, this.player.z, 1.6, this.player.id, this.tick);
+    this.snapshot.status = 'pushing';
+    this.snapshot.speed = 0;
+    this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
+    this.audio.play('push');
+    this.audio.play('go', 0.8); // P9: and the horn for the start
+    this.notify(); this.invalidate();
   };
+
+  /**
+   * One push tick: the ramp owns vx (and locks vy/vz), and the pad owns the height. No obstacle is
+   * scanned here — the pad is empty by construction (`createTrackLayout({ skipBeforeX })`), which is
+   * also what keeps the layout fingerprint past the gate byte-identical.
+   */
+  private stepPush(dt: number) {
+    this.runTime += dt;
+    this.pushTick += 1;
+    // Solo first split: only the player marble starts from the pad
+    applyPushTick(this.player, this.pushTick, this.pushTargets[0] ?? 240);
+    this.player.x += this.player.vx * dt;
+    this.player.y = this.y(this.player.x) - RADIUS;
+    this.player.grounded = true;
+    this.player.rotation += this.player.vx * dt / RADIUS;
+    this.refreshSnapshot();
+    if (this.pushTick >= PUSH_TICKS) this.snapshot.status = 'flying';
+  }
+
+  /** The next ramp speed for a racer at tick `k` — exposed for the start-zone harness. */
+  static pushVelocityAt(target: number, k: number) { return pushRampVx(target, k); }
+
+  /**
+   * M01 · T4 — fill the cockpit channel for this frame.
+   *
+   * One reused object, no allocation: the HUD's rAF loop calls this and writes CSS. Everything is
+   * read from the same state the physics stepped — `steer` comes from the player's own `vz`, so the
+   * yoke leads the lane change rather than replaying it, and the speed is the HUD's own km/h.
+   */
+  getCockpitState(state: CockpitState): CockpitState {
+    // The mapping itself lives in `cockpit.ts` (pure, and asserted against literals in
+    // tests/cockpit-channel.test.ts); this method's only job is to hand it live telemetry — the
+    // snapshot the physics just stepped, and the player's own last steering press for the yoke.
+    // H8: and the hit still being felt, which the HUD turns into the yoke's jolt.
+    return fillCockpitState(state, this.snapshot, yokeSteer(this.steerPress, this.steerPressAt, this.time),
+      { amount: impactEnvelope(this.time - this.impact.at) * this.impact.strength, side: this.impact.side, boostAge: this.runTime - this.player.lastBoostAt });
+  }
 
   changeLane = (direction: number) => {
     const racer = this.player;
+    // The yoke answers every press, even one the race refuses (inside the loop, mid-hit).
+    if (this.status === 'flying' || this.status === 'pushing') { this.steerPress = Math.sign(direction); this.steerPressAt = this.time; }
     if (this.status !== 'flying' || racer.falling || racer.loopRide || racer.finished || this.runTime < racer.steerLockedUntil) return;
-    this.setLane(racer, racer.targetLane + Math.sign(direction));
+    // A (changeLane(-1)) steps to lane + 1, i.e. toward −z, which is screen-left in both cameras.
+    const step = -Math.sign(direction) as -1 | 1;
+    // Steering yourself takes up the rope's slack: after a knock you can drive straight back to a lane
+    // instead of drifting until the rope reels you in.
+    // (Only the slack phase is cut short — the reel-in still plays — so tapping a key can't shrug off a hit.)
+    if (racer.ropeSince !== undefined && this.runTime - racer.ropeSince < this.ropeConfig.payoutS) racer.ropeSince = this.runTime - this.ropeConfig.payoutS;
+    const network = this.laneNetwork;
+    // M01 · T6: on an authored network a lane change is a *path* change, at this x. With no network
+    // (or no path) it is the legacy lane change, unchanged.
+    if (network && racer.pathId) {
+      const next = adjacentPath(network, racer.pathId, racer.x, step);
+      if (next) {
+        racer.pathId = next;
+        const sample = sampleLane(network, next, racer.x);
+        if (sample) {
+          racer.targetLane = closestLane(sample.z);
+          racer.lastLaneChange = this.runTime;
+        }
+      }
+    } else {
+      this.setLane(racer, racer.targetLane - Math.sign(direction));
+    }
+    // P9: a lane change that took is an iron clunk.
+    if (racer.lastLaneChange === this.runTime) this.audio.play('lane_clunk', 0.7);
     this.refreshSnapshot(); this.notify();
   };
 
-  private setLane(racer: Racer, lane: number) {
-    const next = clamp(Math.round(lane), 0, LANE_COUNT - 1);
-    if (next === racer.targetLane) return;
-    racer.targetLane = next; racer.lastLaneChange = this.runTime;
+  private setLane(racer: Racer, lane: number) { setLaneSim(racer, lane, this.runTime); }
+
+  /**
+   * M01 · T6 — the authored network this race is running on, or `null` for the legacy lanes.
+   * `setLaneNetwork` is the builder's "test drive": the next run (and the current context, which
+   * reads it live) uses the network that was just authored.
+   */
+  get lanePaths(): LaneNetwork | null { return this.laneNetwork; }
+  setLaneNetwork(network: LaneNetwork | null) {
+    this.laneNetwork = network;
+    if (network) {
+      this.assignPaths();
+      // The pickups follow the road: the builder's "Test drive" hands over a document that may move
+      // every lane, so the powerups are re-laid on it here rather than left where the old road was.
+      this.pickups = layoutPickupsForNetwork(this.pickups, network);
+      this.world.configure(this.options.course, this.obstacles, this.pickups);
+    }
   }
 
-  adjustAim = (powerDelta: number, angleDelta: number) => {
-    if (this.status !== 'ready' || this.isDragging) return;
-    this.snapshot.power = clamp(this.snapshot.power + powerDelta, 0.18, 1);
-    this.snapshot.angle = clamp(this.snapshot.angle + angleDelta, 12, 68);
-    const angle = this.snapshot.angle * Math.PI / 180;
-    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
-    this.player.y = AIM_ANCHOR.y + Math.sin(angle) * this.snapshot.power * AIM_ANCHOR.fullPowerDraw;
-    this.notify();
-  };
+  /**
+   * Adopts a racer who is not on a path yet. The grid sits at x = 190 and an authored network may
+   * begin further down the hill (or a racer may be put back by the crew outside every path's x
+   * range), so this runs each tick and costs one scan per *unassigned* racer.
+   */
+  private adoptPaths() {
+    adoptNearestPaths(this.racers, this.laneNetwork);
+  }
 
-  private canHop(racer: Racer) {
-    return !racer.falling && !racer.loopRide && !racer.waterfall && !racer.finished && this.runTime - racer.lastHopAt >= 0.25
-      && (racer.grounded || this.runTime - racer.lastGroundedAt < 0.085);
+  /**
+   * Before the start, every racer sits on the first node of the path they were given, resting on the
+   * road (grid rows keep their spacing behind it). Without this the ball waited at the legacy grid
+   * spot, which is off the road — in the air — whenever the authored start node has been moved.
+   */
+  private placeOnStartNodes() {
+    const network = this.laneNetwork;
+    if (!network) return;
+    for (const racer of this.racers) {
+      const node = startNodeOf(network, racer.pathId);
+      if (!node) continue;
+      racer.x = node.x + (racer.x - START_X);
+      racer.z = node.z;
+      racer.y = this.y(racer.x) - RADIUS;
+      racer.vx = racer.vy = racer.vz = 0;
+      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
+      racer.launchOrigin = { x: racer.x, y: racer.y };
+    }
+  }
+
+  /** Puts every racer on the path nearest to them at this moment. */
+  private assignPaths() {
+    assignNearestPaths(this.racers, this.laneNetwork);
+  }
+
+  /** The stored document, for the builder. Never throws: an unreadable store is simply empty. */
+  laneDocument(): LaneStorageDocument {
+    return readLaneStorage() ?? { version: 1, savedAt: new Date(0).toISOString(), networks: {} };
+  }
+
+  /** True when the stored document would validate — the builder's Save button asks this. */
+  laneDocumentValid(document_: LaneStorageDocument): boolean {
+    return validateLaneDocument(document_).length === 0;
+  }
+
+  private canHop(racer: Racer) { return canHopSim(racer, this.runTime); }
+
+  /**
+   * Can a pause be taken right now? Racing, and — since M01 · T2 — the first-loop pool as well: a
+   * queued player who has to look away should be able to stop the clock without the merge getting
+   * ahead of them. The push is deliberately not pausable (it is 0.4 s of the starter goblin's work).
+   */
+  private get pausable(): boolean {
+    const status = this.status;
+    return status === 'flying' || status === 'checkpoint' || status === 'countdown';
   }
 
   jump = () => {};
 
-  private performHop(racer: Racer) {
-    racer.vy = racer.vx * this.surfaceAt(racer.x, racer.z).slope - 290 * weightImpulse(racer.weight) * racer.hopFactor;
-    racer.grounded = false; racer.lastHopAt = this.runTime;
-    racer.lastGroundedAt = racer.bufferedJump = -100;
-    this.emit(racer.x, racer.y + RADIUS, racer.z, 5, '#dbc294', 85);
-    if (!racer.id) { this.snapshot.hopReady = false; this.audio.play('hop'); this.notify(); }
+  /** H7b: the rope timings in use. */
+  getRopeConfig(): RopeConfig { return this.ropeConfig; }
+
+  /** H7b: tune the rope live (dev test drive). Values are clamped to their ranges. */
+  setRopeConfig(partial: Partial<RopeConfig>): RopeConfig {
+    this.ropeConfig = clampRope(partial, this.ropeConfig);
+    return this.ropeConfig;
+  }
+
+  /** M9: the T01 gate the player's commands are validated against. */
+  commandGate(): CommandGate {
+    return { status: this.status, phase: heatPhaseOf(this.status), inputEnabled: this.inputEnabled, racerId: PLAYER_ID, startMode: 'push' };
+  }
+
+  /**
+   * M9: the one door player input comes through (keyboard, touch, gamepad). The command is checked
+   * against the T01 gate first; a refused command changes nothing and comes back with its reason.
+   */
+  dispatch(command: GameCommand): CommandVerdict {
+    const verdict = validateCommand(command, this.commandGate());
+    if (!verdict.ok) return verdict;
+    switch (command.type) {
+      case 'steer': this.changeLane(command.direction); break;
+      case 'bounce': this.bounce(); break;
+      case 'boost': this.boost(); break;
+      case 'start': this.start(); break;
+      case 'ready': this.ready(); break;
+      case 'toggle-pause': this.togglePause(); break;
+      default: break; // the live race has no player-facing handler for the rest
+    }
+    return verdict;
   }
 
   bounce = () => {
-    if (this.status === 'ready') { this.launch(); return; }
+    // Space on the grid starts the run (the goblin push).
+    if (this.status === 'ready') { this.start(); return; }
     if (this.status === 'flying') this.performBounce(this.player);
   };
 
-  private performBounce(racer: Racer) {
-    if (!racer.bounces || racer.falling || racer.loopRide || racer.waterfall || racer.finished) return;
-    racer.bounces--; racer.vy = -760 * weightImpulse(racer.weight) * racer.hopFactor;
-    racer.vx = Math.max(320, racer.vx + 65 * weightImpulse(racer.weight));
-    racer.grounded = false; racer.lastGroundedAt = -100;
-    this.emit(racer.x, racer.y + RADIUS, racer.z, 10, '#a7dec1', 160);
-    if (!racer.id) { this.audio.play('bounce'); this.say('GRAVITY IS A SUGGESTION.'); this.refreshSnapshot(); this.notify(); }
-  }
+  private performBounce(racer: Racer) { performBounceSim(racer, this.simCtx); }
 
-  boost = () => { if (this.status === 'flying') this.performBoost(this.player); };
+  boost = () => {
+    if (this.status !== 'flying' || this.player.reel) return; // H6: no boosting on the end of a rope
+    const before = this.player.boosts;
+    this.performBoost(this.player);
+    if (this.player.boosts < before && !this.reducedMotion) this.gamepad.rumble('boost');
+  };
 
-  private performBoost(racer: Racer) {
-    if (!racer.boosts || racer.falling || racer.waterfall || racer.finished) return;
-    const impulse = 430 * weightImpulse(racer.weight) * racer.boostFactor;
-    racer.boosts--; racer.lastBoostAt = this.runTime;
-    if (racer.loopRide) racer.loopRide.speed = Math.min(racer.maximumSpeed, racer.loopRide.speed + impulse);
-    racer.vx = Math.min(racer.maximumSpeed, racer.vx + impulse);
-    if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
-    this.emit(racer.x - RADIUS, racer.y, racer.z, 12, racer.color, 210);
-    if (!racer.id) { this.audio.play('boost'); this.say('MORE SPEED. LESS THINKING.'); this.shake = 2; this.refreshSnapshot(); this.notify(); }
-  }
+  private performBoost(racer: Racer) { performBoostSim(racer, this.simCtx); }
 
   togglePause = () => {
-    if (this.status === 'flying') this.snapshot.status = 'paused';
-    else if (this.status === 'paused') this.snapshot.status = 'flying';
+    if (this.status === 'paused') {
+      this.snapshot.status = this.pausedFrom ?? 'flying';
+      this.pausedFrom = null;
+    } else if (this.pausable) {
+      this.pausedFrom = this.status;
+      this.snapshot.status = 'paused';
+    }
     this.accumulator = this.lastFrame = 0; this.notify();
   };
+
+  setSoloMode(solo: boolean) {
+    this.soloMode = solo;
+  }
+
+  get isSoloMode() { return this.soloMode; }
+
+  /**
+   * M01 · T2 / T1d — the sorting-loop merge pool (IF-MERGE).
+   *
+   * The plane is the **mouth of the track's own 360° geometry loop** — the giant loop, with the granite
+   * tunnel portal standing at its mouth — not a ring decoration's outer reach (`passageMouthX`). The
+   * containment is still the whole corridor: everyone queues, whatever lane they crossed in, or they
+   * would bypass the order entirely. The altitude band is the qualifying gate's own, so a rider who
+   * leaves the ground short of the mouth is held at the plane (the `hold` snap) rather than flying
+   * through the order.
+   */
+  private mergeGateFor(): QualifyingGate {
+    if (!this.mergeGate) {
+      const x = passageMouthX();
+      // Built from the contract, not from an obstacle: the plane is geometry (T1d), so a document with
+      // no rings on it still has a sorting plane. The tolerance is the qualifying gate's own, and the
+      // containment is the whole corridor — a rider in the outermost lane queues like everyone else.
+      this.mergeGate = {
+        id: QUALIFYING_GATE_ID,
+        x,
+        z: PASSAGE_CENTRE_Z,
+        halfWidth: MERGE_GATE_HALF_WIDTH,
+        altitude: 0,
+        altitudeTolerance: QUALIFYING_GATE_ALTITUDE_TOLERANCE,
+        segment: segmentAtX(x),
+      };
+    }
+    return this.mergeGate;
+  }
+
+  /** The pool, if it is still doing something. Drives the overlay and the HUD's countdown. */
+  get mergePool(): MergePool | null {
+    return this.merge && this.merge.phase !== 'done' ? this.merge : null;
+  }
+
+  /** True while the first-loop pool owns the race status. */
+  get inMerge(): boolean { return this.mergePool !== null; }
+
+  /**
+   * The player readies up: Space, Enter or the overlay's READY button. Refused outside the pool and
+   * when they have already readied — the pool answers, and the refusal is a no-op, not an error.
+   */
+  ready = () => {
+    const pool = this.merge;
+    if (!pool || pool.phase === 'done') return;
+    const result = pool.ready(this.player.id, this.tick);
+    if (result.ok) {
+      this.snapshot.notice = 'READY. WAITING FOR THE REST OF THEM.';
+      this.audio.play('pickup');
+      this.refreshMergeSnapshot();
+      this.notify();
+      this.invalidate();
+    }
+  };
+
+  /** One tick of the pool: crossing detection, holds, the state machine and the ordered release. */
+  private stepMerge() {
+    if (this.mergeDone) return;
+    const gate = this.mergeGateFor();
+    const world = this.world;
+
+    // 1. Does anyone cross the gate plane on this tick? The swept validation from gate.ts decides
+    //    (forward motion, plane crossing inside the tick, altitude band, segment identity). The pool
+    //    itself is built by the first crossing, so a race that never reaches the loop never pays for
+    //    a pool it does not use.
+    for (const racer of this.racers) {
+      if (racer.mergeHeld || racer.finished) continue;
+      if (this.merge?.entries.some((entry) => entry.racerId === racer.id)) continue;
+      const from = racer.previous;
+      if (!(from.x < gate.x && racer.x >= gate.x)) continue;
+      const segment = segmentForStep(
+        DEFAULT_SEGMENT_PROVIDER,
+        { x: from.x, loop: null },
+        { x: racer.x, loop: racer.loopRide?.obstacle ?? null },
+      );
+      const outcome = evaluateCrossing(world, gate, from, racer, segment);
+      if (!outcome.ok) continue;
+      if (!this.merge) {
+        this.merge = new MergePool({
+          gateX: gate.x,
+          loopZ: gate.z,
+          racerIds: this.racers.map((candidate) => candidate.id),
+          playerId: this.player.id,
+        });
+        this.onMergeNotice('SORTING LOOP AHEAD. EVERYONE QUEUES. HOLD YOUR LINE.');
+      }
+      const entered = this.merge.enter(racer.id, this.tick, outcome.fraction, gate.x);
+      if (!entered.ok) continue;
+      this.hold(racer, entered.value.slotZ);
+      if (racer.id === PLAYER_ID) this.queueRivals(this.merge);
+    }
+
+    const pool = this.merge;
+    if (!pool) return;
+    if (pool.phase === 'done') {
+      this.mergeDone = true;
+      this.merge = null;
+      this.mergeLastReleased = null;
+      this.applyMergeStatus();
+      this.refreshMergeSnapshot();
+      return;
+    }
+
+    // 2. The next few riders to go slide over to the loop's lane (held riders are intangible, so they
+    //    can line up there together); everyone else waits in their slot. Lining up only the very next
+    //    rider made every release wait for a fresh slide across the road.
+    const next = pool.next;
+    let upcoming = 0;
+    for (const entry of pool.entries) {
+      if (entry.releaseTick !== null) continue;
+      const racer = this.racersById.get(entry.racerId);
+      if (!racer) continue;
+      racer.mergeSlotZ = upcoming < MERGE_LINEUP ? pool.loopZ : entry.slotZ;
+      upcoming += 1;
+    }
+    // P7: and where each one is drawn in the queue (a row per ball up the hill, per lane).
+    this.queueRow = queueRows(pool.entries);
+
+    // 3. Advance the state machine. The occupancy input is the previous release's own progress.
+    const previousRacer = this.mergeLastReleased === null
+      ? null
+      : this.racers.find((racer) => racer.id === this.mergeLastReleased) ?? null;
+    const candidate = next ? this.racers.find((racer) => racer.id === next.racerId) ?? null : null;
+    const released = pool.step(this.tick, {
+      // Release spacing is a distance behind the rider ahead (MERGE_RELEASE_SPACING), expressed on the
+      // pool's own scale where 0.25 means "clear". It used to be a quarter of the whole geometry loop,
+      // ~1.45 s per rider: a 100-ball field took minutes to leave the pool.
+      previousProgress: previousRacer ? releaseOccupancy(previousRacer.x, gate.x) : 1,
+      candidateAligned: candidate !== null
+        && Math.abs(candidate.z - pool.loopZ) <= 6
+        && Math.abs(candidate.vz) <= 30,
+      expected: this.racers.filter((racer) => !racer.finished).length,
+    });
+    for (const racerId of released) {
+      const racer = this.racers.find((candidateRacer) => candidateRacer.id === racerId);
+      if (!racer) continue;
+      this.release(racer);
+      this.mergeLastReleased = racerId;
+    }
+
+    // 3b. The barrel carries the field, single file. A released rider inside the 360° geometry loop runs
+    //     the tube at exactly the release speed, on the ribbon, with nothing able to stop them: no gaps,
+    //     no falls, no recovery, and no closing the gap on the rider ahead. That is what makes the exit
+    //     order the entry order by construction rather than by hope — measured without it, a recovery
+    //     inside the barrel pulls a rider 198 units back and a later rider passes them. (The riders are
+    //     intangible in there too: a barrel is not two dimensions, so two racers at one engine x are not
+    //     in contact in the world.) A racer riding one of the course's own rings keeps that ride — the
+    //     ring owns its arc and its speed floor — and the carrier takes over when they come off it.
+    for (const racer of this.racers) {
+      if (!racer.mergeGhost || racer.loopRide !== null || !insidePassage(racer.x)) continue;
+      racer.vx = MERGE_RELEASE_VX;
+      racer.vy = 0;
+      racer.falling = false;
+      racer.grounded = true;
+      racer.y = this.world.y(racer.x) - RADIUS;
+    }
+
+    // 4. The ghost tail: contact racing resumes once a released rider is **clear of the geometry
+    //    loop** — there is no ring ride to key on any more, because the sorting plane is the loop's
+    //    own mouth (T1d). The cap keeps a rider stopped inside the barrel from staying a ghost for
+    //    ever, and the player is excluded from contact while intangible as before.
+    for (const racer of this.racers) {
+      if (!racer.mergeGhost) continue;
+      if (this.runTime < racer.mergeGhostUntil) continue;
+      // Ghost until the rider is fully out of the giant loop — never cut short inside it (the old
+      // time cap could drop a slow rider back into contact mid-barrel). A rider somehow sent back
+      // behind the mouth (a recovery) is not in the barrel either, so the ghost ends there too.
+      if (racer.x >= passageExitX() || racer.x < this.mergeGateFor().x - 1) {
+        racer.mergeGhost = false;
+      }
+    }
+
+    this.applyMergeStatus();
+    this.refreshMergeSnapshot();
+  }
+
+  /**
+   * The player has reached the split: every rival joins the pool with the split time their own
+   * (headless) run set, so the queue — and the release order — is the field sorted by split time,
+   * and the overlay shows every rider's time. Rivals are ready at once; the player's ready starts it.
+   */
+  private queueRivals(pool: MergePool) {
+    if (this.rivalsQueued) return;
+    this.rivalsQueued = true;
+    const fallback = this.tick + Math.round(SPLIT_TIMEOUT_S * 120);
+    for (const racer of this.racers) {
+      if (racer.id === PLAYER_ID || racer.finished) continue;
+      const split = this.rivalSplits.get(racer.id) ?? fallback + racer.id;
+      const tick = Math.floor(split);
+      const entered = pool.enter(racer.id, tick, split - tick, pool.gateX);
+      if (!entered.ok) continue;
+      racer.z = entered.value.slotZ;
+      this.hold(racer, entered.value.slotZ, false);
+      racer.previous = { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation };
+      pool.ready(racer.id, this.tick);
+    }
+    // Slots are handed out by rank, which only settles once everyone is in.
+    for (const entry of pool.entries) {
+      const racer = this.racersById.get(entry.racerId);
+      if (racer && racer.id !== PLAYER_ID) { racer.mergeSlotZ = entry.slotZ; racer.z = entry.slotZ; racer.previous.z = racer.z; }
+      // P11: and the queue is the field by split time: that is each rider's split place.
+      this.splitPlaces.set(entry.racerId, entry.rank + 1);
+    }
+  }
+
+  private get racersById(): Map<number, Racer> {
+    if (this.racerIndex.size !== this.racers.length || this.racerIndexOf !== this.racers) {
+      this.racerIndex = new Map(this.racers.map((racer) => [racer.id, racer]));
+      this.racerIndexOf = this.racers;
+    }
+    return this.racerIndex;
+  }
+  private racerIndex = new Map<number, Racer>();
+  /** P7: each held rider's row in the pool queue, and the drawn offset easing toward it. */
+  private queueRow = new Map<number, number>();
+  private readonly queueOffset = new Map<number, number>();
+  private queueSpacing = 0;
+  /** P7: engine x between queue rows: two drawn balls (one ball of air between them) of world arc. */
+  private get queueSpacingX(): number {
+    if (!this.queueSpacing) this.queueSpacing = (2 * 4 * BALL_DRAW_RADIUS) / getTrackSpace().ARC_PER_ENGINE_DISTANCE;
+    return this.queueSpacing;
+  }
+  private racerIndexOf: Racer[] | null = null;
+
+  /** Freezes a rider at the gate plane and points them at their pool slot. */
+  private hold(racer: Racer, slotZ: number, dust = true) {
+    racer.mergeHeld = true;
+    racer.mergeGhost = false;
+    racer.mergeSlotZ = slotZ;
+    racer.x = this.mergeGateFor().x;
+    racer.vx = 0; racer.vy = 0; racer.vz = 0;
+    racer.falling = false; racer.grounded = true;
+    racer.y = this.world.y(racer.x) - RADIUS;
+    if (dust) this.effects.push('dust', racer.x, racer.y, racer.z, 1.2, racer.id, this.tick);
+  }
+
+  /**
+   * Lets a rider go: a common speed for everyone (D9), and intangible into the loop.
+   *
+   * The lane is pinned to the mouth's own centre — the sorting plane is the mouth of the geometry loop
+   * (T1d), and the tunnel portal stands across the corridor there, so a rider released anywhere but the
+   * centre would fly the arch. The intangibility runs from here to the loop's exit (`passageExitX`),
+   * with a cap: inside a barrel, two racers at the same engine x are not in contact in the world, and
+   * the ordering law needs them not to be.
+   */
+  private release(racer: Racer) {
+    racer.mergeHeld = false;
+    racer.mergeGhost = true;
+    racer.vx = MERGE_RELEASE_VX; racer.vy = 0; racer.vz = 0;
+    racer.grounded = false; racer.falling = false;
+    racer.steerLockedUntil = -100;
+    racer.lastGroundedAt = this.runTime;
+    racer.loopExitTime = -100;
+    racer.mergeGhostUntil = this.runTime + PASSAGE_GHOST_TAIL_S;
+    racer.targetLane = closestLane(PASSAGE_CENTRE_Z);
+    this.effects.push('dust', racer.x, racer.y, racer.z, 1.4, racer.id, this.tick);
+    if (racer.id === this.player.id) { this.audio.play('boost'); this.say('GO! HOLD THE LINE INTO THE LOOP.'); }
+  }
+
+  private onMergeNotice(text: string) {
+    this.snapshot.notice = text;
+    this.noticeUntil = this.time + 2.4;
+    this.audio.play('pickup');
+  }
+
+  /** The pool owns the game status while it is doing something: pooled, then counting down. */
+  private applyMergeStatus() {
+    const pool = this.merge;
+    if (!pool) return;
+    if (this.snapshot.status === 'paused' || this.snapshot.status === 'finished') return;
+    if (pool.phase === 'done') {
+      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') { this.snapshot.status = 'flying'; this.audio.play('go'); }
+      return;
+    }
+    // Once the player is out of the pool they are racing, even while the rest of the field is still
+    // being let go behind them. Holding 'countdown' until the *last* rider left (≈35 s with 100 balls)
+    // refused every lane change, boost and bounce for that whole stretch.
+    if (pool.phase === 'releasing' && pool.entries.some((entry) => entry.isPlayer && entry.releaseTick !== null)) {
+      // P9: the horn goes as the player leaves the pool.
+      if (this.snapshot.status === 'checkpoint' || this.snapshot.status === 'countdown') { this.snapshot.status = 'flying'; this.audio.play('go'); }
+      return;
+    }
+    this.snapshot.status = pool.phase === 'open' || pool.phase === 'closed' ? 'checkpoint' : 'countdown';
+  }
+
+  /** One reused object per frame: the overlay reads this and allocates nothing. */
+  private refreshMergeSnapshot() {
+    const pool = this.merge;
+    if (!pool || pool.phase === 'done') { this.snapshot.merge = undefined; return; }
+    const previous = this.snapshot.merge;
+    const entries = pool.entries.map((entry) => {
+      const racer = this.racers.find((candidate) => candidate.id === entry.racerId);
+      return {
+        id: entry.racerId,
+        name: racer?.name ?? `RACER ${entry.racerId}`,
+        color: racer?.color ?? '#ffffff',
+        isPlayer: entry.isPlayer,
+        position: entry.rank + 1,
+        entryTime: Math.round(entry.entryTime * 100) / 100,
+        ready: entry.readyTick !== null,
+        released: entry.releaseTick !== null,
+        // A fresh array: the pool's own entry record stays private to the pool.
+        flags: [...entry.flags],
+      };
+    });
+    // Reuse the array and the entry objects when nothing changed, so a steady pool is allocation-free.
+    const same = previous !== undefined
+      && previous.entries.length === entries.length
+      && previous.entries.every((entry, index) => {
+        const nextEntry = entries[index];
+        return entry.id === nextEntry.id && entry.ready === nextEntry.ready
+          && entry.released === nextEntry.released && entry.position === nextEntry.position;
+      });
+    this.snapshot.merge = {
+      phase: pool.phase,
+      entries: same ? previous!.entries : entries,
+      countdownLabel: pool.countdownLabel(this.tick),
+      playerReady: pool.entries.some((entry) => entry.isPlayer && entry.readyTick !== null),
+      holdTicks: pool.holdTicks(),
+    };
+  }
+
   setVisible(visible: boolean) {
     this.visible = visible;
     if (!visible) {
-      if (this.status === 'flying') this.togglePause();
+      if (this.pausable) this.togglePause();
       cancelAnimationFrame(this.frameId); this.frameId = 0;
     } else { this.lastFrame = 0; this.invalidate(); }
   }
@@ -252,295 +964,202 @@ export class GameEngine {
   private visibilityChanged = () => {
     this.lastFrame = this.lastRender = this.accumulator = 0;
     if (document.hidden) {
-      if (this.status === 'flying') this.togglePause();
+      if (this.pausable) this.togglePause();
       cancelAnimationFrame(this.frameId); this.frameId = 0;
     } else this.invalidate();
   };
 
   private makeTrack() {
-    this.obstacles = createTrackLayout(this.options.course);
-    this.waterfallFeatures = createWaterfallDropLayout(this.options.course);
-    this.buckets.clear(); this.pickupBuckets.clear();
-    for (const obstacle of this.obstacles) {
-      const left = obstacle.kind === 'loop' ? obstacle.x - obstacle.width / 2 : obstacle.x;
-      const right = obstacle.kind === 'loop' ? obstacle.x + obstacle.width / 2 : obstacle.x + obstacle.width;
-      for (let key = Math.floor((left - RADIUS * 2) / BUCKET); key <= Math.floor((right + RADIUS * 2) / BUCKET); key++) {
-        const bucket = this.buckets.get(key);
-        if (bucket) bucket.push(obstacle); else this.buckets.set(key, [obstacle]);
-      }
-    }
-    this.pickups = createAirPickups(this.options.course, this.obstacles);
-    for (const pickup of this.pickups) {
-      for (let key = Math.floor((pickup.x - 65) / BUCKET); key <= Math.floor((pickup.x + 65) / BUCKET); key++) {
-        const bucket = this.pickupBuckets.get(key);
-        if (bucket) bucket.push(pickup); else this.pickupBuckets.set(key, [pickup]);
-      }
-    }
+    // M01 · T1: in push mode the start pad and the whole run-up to the first loop are empty. The
+    // filter only removes a prefix — the layout itself has no RNG — so every obstacle from the
+    // gate on keeps its exact identity (asserted by tests/start-zone.test.ts).
+    const built = createTrackLayout(this.options.course);
+    // The push run-up runs from the start zone's own boundary to the **mouth of the geometry loop**
+    // (T1d), with the descent's rings kept and the jump line under the plane removed (T1c — see
+    // `TrackLayoutOptions.keepLoopsFromX`).
+    const startZoneEndX = createQualifyingGate(this.options.course, built).x;
+    this.obstacles = createTrackLayout(this.options.course, {
+      skipBeforeX: passageMouthX(),
+      keepLoopsFromX: startZoneEndX,
+    });
+    // M01 · T6/T7: with an authored network the pickups are laid out on *it*, not on the legacy four
+    // lanes — otherwise a pickup can hang beside the drivable road where nobody can reach it.
+    this.pickups = layoutPickupsForNetwork(
+      createAirPickups(this.options.course, this.obstacles),
+      this.laneNetwork,
+    );
+    // Builder-placed ramps are physics too: without this the renderer lifted the ball up the ramp
+    // and dropped it back on the road at the crest, which read as the run being reset.
+    const placed = this.builderRamps();
+    if (placed.length) this.obstacles = [...this.obstacles, ...placed].sort((a, b) => a.x - b.x);
+    // The course's loops are decorations: the ball rolls past them. Riding their rings grabbed the
+    // ball on the opening descent (the hang-up at the start) and, on ridge, inside the giant loop
+    // (the stop-and-hop). The pickups were laid out above with the loops in place, so they are unchanged.
+    this.obstacles = withoutLoopRides(this.obstacles);
+    this.world.configure(this.options.course, this.obstacles, this.pickups);
   }
 
-  private nearby(x: number) { return this.buckets.get(Math.floor(x / BUCKET)) ?? EMPTY; }
-  private inGap(x: number, z: number) { return this.nearby(x).some((o) => o.kind === 'gap' && x > o.x && x < o.x + o.width && occupiesLane(o, z, 0)); }
-  private surfaceAt(x: number, z: number) {
-    let y = this.y(x); let slope = this.slope(x); let ramp: Obstacle | null = null;
-    let surface = surfaceTypeAt(x);
-    for (const o of this.nearby(x)) if (o.kind === 'ramp' && x >= o.x && x <= o.x + o.width && occupiesLane(o, z, 5)) {
-      y = rampSurface(o, x, this.options.course); slope -= 1.6 * o.height / o.width * Math.pow((x - o.x) / o.width, 0.6); ramp = o;
-      surface = o.surface ?? surface;
-    }
-    return { y, slope, ramp, surface };
+  /** The builder's placed ramp props as engine ramp obstacles (none when no builder is attached). */
+  private builderRamps() {
+    const builder = this.renderer?.trackBuilder;
+    if (!builder || typeof builder.getPlacedRamps !== 'function') return [];
+    const map = getTrackSpace();
+    const ramps = builder.getPlacedRamps();
+    if (!ramps.length) return [];
+    const compiled = compileRampSurfaces(map, ramps.map((r) => ({ id: r.id, x: r.x, y: r.y, z: r.z, rotY: r.rotY, scale: r.scale, trackDist: r.trackDist })));
+    return builderRampObstacles(map, compiled.surfaces);
   }
 
-  private inCliffSection(x: number) { return x >= STAGE_2_START && x < STAGE_3_START; }
-  private gravityAt(x: number, slope = this.slope(x)) {
-    return GRAVITY * (this.inCliffSection(x) ? Math.max(1.45, gravityScaleForSlope(slope)) : gravityScaleForSlope(slope));
-  }
-
-  private coordinates(event: PointerEvent) {
-    const rect = this.canvas.getBoundingClientRect();
-    return this.renderer.view.unproject((event.clientX - rect.left) / rect.width * this.renderer.view.width,
-      (event.clientY - rect.top) / rect.height * HEIGHT, this.player.z);
-  }
-  private pointerDown = (event: PointerEvent) => {
-    if (!this.inputEnabled || this.status !== 'ready' || !event.isPrimary || event.button !== 0) return;
-    const point = this.coordinates(event);
-    if (Math.hypot(point.x - this.player.x, point.y - this.player.y) > RADIUS * 1.75) return;
-    this.audio.unlock(); this.isDragging = true;
-    this.grabOffset = { x: this.player.x - point.x, y: this.player.y - point.y };
-    this.canvas.setPointerCapture(event.pointerId); this.canvas.focus({ preventScroll: true }); this.invalidate();
-  };
-  private pointerMove = (event: PointerEvent) => {
-    if (!this.inputEnabled) return;
-    const point = this.coordinates(event); const rect = this.canvas.getBoundingClientRect();
-    this.pointerDrift = ((event.clientX - rect.left) / rect.width - 0.5) * 10;
-    if (this.status === 'ready') this.canvas.style.cursor = this.isDragging ? 'grabbing' : Math.hypot(point.x - this.player.x, point.y - this.player.y) < 55 ? 'grab' : 'default';
-    if (!this.isDragging) return;
-    const dx = Math.max(16, AIM_ANCHOR.x - point.x - this.grabOffset.x);
-    const dy = Math.max(6, point.y + this.grabOffset.y - AIM_ANCHOR.y);
-    const distance = clamp(Math.hypot(dx, dy), 36, AIM_ANCHOR.maxDraw);
-    this.snapshot.power = clamp(distance / AIM_ANCHOR.fullPowerDraw, 0.18, 1);
-    this.snapshot.angle = clamp(Math.atan2(dy, dx) * 180 / Math.PI, 12, 68);
-    const angle = this.snapshot.angle * Math.PI / 180;
-    this.player.x = AIM_ANCHOR.x - Math.cos(angle) * distance; this.player.y = AIM_ANCHOR.y + Math.sin(angle) * distance;
-    this.notify(false);
-  };
-  private pointerUp = (event: PointerEvent) => {
-    if (!this.isDragging) return;
-    if (this.canvas.hasPointerCapture(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
-    this.launch();
-  };
-  private pointerCancel = () => {
-    if (this.isDragging) {
-      this.isDragging = false; this.player.x = START_X; this.player.y = START_Y;
-      this.snapshot.power = 0.8; this.snapshot.angle = 36; this.notify(); this.invalidate();
-    }
-  };
-  private pointerLeave = () => { this.pointerDrift = 0; if (!this.isDragging) this.canvas.style.cursor = ''; };
+  private surfaceAt(x: number, z: number) { return this.world.surfaceAt(x, z); }
 
   private frame = (now: number) => {
     this.frameId = 0;
     if (this.destroyed || !this.visible || document.hidden) return;
-    const dt = Math.min(this.lastFrame ? (now - this.lastFrame) / 1000 : 1 / 60, 0.1);
+    // H10: the pad speaks the keyboard's commands. In the first-loop pool, bounce means "ready".
+    if (this.inputEnabled) {
+      for (const command of this.gamepad.poll()) {
+        this.dispatch(this.inMerge && command.type === 'bounce' ? { type: 'ready' } : command);
+      }
+    }
+    const realDt = Math.min(this.lastFrame ? (now - this.lastFrame) / 1000 : 1 / 60, 0.1);
     this.lastFrame = now;
+    // Everything the race does (physics, particles, the notice timer, shake decay) runs on game time,
+    // so slow motion slows all of it together. Rendering still happens every real frame.
+    const dt = scaledDt(realDt, this.timeScale);
     if (this.status !== 'paused' && this.inputEnabled) {
       this.time += dt; this.shake *= Math.exp(-9 * dt);
-      if (this.status === 'flying') {
+      const simulating = statusSimulates(this.status);
+      if (simulating && !this.pausedForBuild) {
         this.accumulator = Math.min(0.1, this.accumulator + dt);
-        while (this.accumulator >= STEP && this.status === 'flying') {
+        while (this.accumulator >= STEP && statusSimulates(this.status) && !this.pausedForBuild) {
           for (const racer of this.racers) {
             racer.previous.x = racer.x; racer.previous.y = racer.y;
             racer.previous.z = racer.z; racer.previous.rotation = racer.rotation;
           }
-          this.stepRace(STEP); this.accumulator -= STEP;
+          this.tick += 1;
+          if (this.status === 'pushing') this.stepPush(STEP); else this.stepRace(STEP);
+          this.accumulator -= STEP;
         }
       }
-      this.updateParticles(dt);
       if (this.time > this.noticeUntil) this.snapshot.notice = '';
     }
-    const alpha = this.status === 'flying' ? clamp(this.accumulator / STEP, 0, 1) : 1;
+    const alpha = statusSimulates(this.status) ? clamp(this.accumulator / STEP, 0, 1) : 1;
     for (let i = 0; i < this.racers.length; i++) {
       const racer = this.racers[i]; const rendered = this.renderRacers[i];
+      // A rival waiting for the player's solo first split is simply not drawn (it used to be parked
+      // at x = −999999, which the 3D placement clamps to the start line, high in the sky).
+      rendered.hidden = !this.splitReached && racer.id !== PLAYER_ID;
+      if (rendered.hidden) continue;
       rendered.x = racer.previous.x + (racer.x - racer.previous.x) * alpha;
       rendered.y = racer.previous.y + (racer.y - racer.previous.y) * alpha;
       rendered.z = racer.previous.z + (racer.z - racer.previous.z) * alpha;
       rendered.rotation = racer.previous.rotation + (racer.rotation - racer.previous.rotation) * alpha;
-      rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.lane = racer.targetLane;
-      rendered.falling = racer.falling; rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
+      // M01 · T3 (IF-GYRO): the roll phase is sampled, not interpolated — a shell that snaps to a
+      // slightly stale phase is invisible, while interpolating it would need a second wrapped field.
+      rendered.rollPhase = racer.rollPhase;
+      rendered.vx = racer.vx; rendered.vy = racer.vy; rendered.vz = racer.vz; rendered.lane = racer.targetLane;
+      rendered.falling = racer.falling; rendered.grounded = racer.grounded; rendered.distance = racer.distance;
+      rendered.finished = racer.finished; rendered.bumpAt = racer.bumpAt;
       rendered.immuneUntil = racer.immuneUntil; rendered.launchOrigin = racer.launchOrigin;
-      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt; rendered.fireUntil = racer.fireUntil;
-      rendered.waterfallPhase = racer.waterfallPhase; rendered.waterfallProgress = racer.waterfallProgress;
-      rendered.waterfallDepth = racer.waterfallDepth; rendered.waterfallLateral = racer.waterfallLateral; rendered.waterfallHits = racer.waterfallHits;
-    }
-    const player = this.player; const rendered = this.renderRacers[0];
-    if (this.status === 'flying' && this.inputEnabled) {
-      const view = this.renderer.view;
-      if (player.waterfall) {
-        // The waterfall renderer is deliberately camera-locked and head-on. Keep
-        // the world camera parked at the lip so the handoff back to the mine rail
-        // network has no sideways snap when the bottom impact releases the racer.
-        const target = clampCameraTarget(view.followOffset(WATERFALL_START_X, 0));
-        this.camera = chaseLerp(this.camera, target, 12, dt);
-        this.cameraY = chaseLerp(this.cameraY, 0, 12, dt);
-      } else {
-        const focus = player.loopRide?.obstacle.x ?? rendered.x;
-        // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
-        // keeps the ball framed; the fixed course camera pans slower with a longer look-ahead
-        // for the classic broad overview, letting the ball wander (the edge pointer covers it).
-        const follow = this.options.cameraMode === 'follow_ball';
-        const target = clampCameraTarget(view.followOffset(focus + (follow ? 0 : view.width * 0.06), rendered.z));
-        this.camera = chaseLerp(this.camera, target, follow ? 6 : 2.4, dt);
-        // Camera Y tracks the terrain, and in follow mode pans up softly on big air so the
-        // ball stays framed through hops, springs, and catapult launches.
-        const altitude = Math.max(0, this.y(rendered.x) - RADIUS - rendered.y);
-        const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
-        this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
+      rendered.shieldUntil = racer.shieldUntil; rendered.shieldHitAt = racer.shieldHitAt; rendered.pickupAt = racer.pickupAt;
+      rendered.ramTellUntil = racer.ramTellUntil;
+      // H6: a ball the rope goblins are hauling back is drawn easing from where it went out to its lane.
+      if (racer.reel) {
+        const span = Math.max(1e-6, racer.reel.until - racer.reel.startedAt);
+        const t = clamp((this.runTime - racer.reel.startedAt) / span, 0, 1);
+        const ease = t * t * (3 - 2 * t);
+        rendered.reelBack = { toX: racer.x, toY: racer.y, toZ: racer.z, t };
+        rendered.x = racer.reel.fromX + (racer.x - racer.reel.fromX) * ease;
+        rendered.z = racer.reel.fromZ + (racer.z - racer.reel.fromZ) * ease;
+        rendered.y = racer.reel.fromY + (racer.y - racer.reel.fromY) * ease;
+        rendered.distance = clamp((rendered.x - START_X) / 2, 0, TRACK_DISTANCE);
+        rendered.grounded = t >= 1;
+      } else if (rendered.reelBack) {
+        rendered.reelBack = null;
+      }
+      // P7: a held rider is drawn in its queue row, up the hill behind the gate, not on the gate plane
+      // with the rest of its lane. The offset eases as the queue moves up (snaps with reduced motion);
+      // the physics never sees it.
+      const target = racer.mergeHeld ? (this.queueRow.get(racer.id) ?? 0) * this.queueSpacingX : 0;
+      let offset = this.queueOffset.get(racer.id) ?? target;
+      offset = this.reducedMotion ? target : offset + (target - offset) * Math.min(1, dt * 7);
+      if (Math.abs(offset) < 0.05) offset = 0;
+      if (offset !== 0 || this.queueOffset.has(racer.id)) this.queueOffset.set(racer.id, offset);
+      if (offset) {
+        rendered.y += this.y(rendered.x - offset) - this.y(rendered.x);
+        rendered.x -= offset;
+        rendered.distance = racer.distance - offset / 2;
       }
     }
-    this.drift += (this.pointerDrift - this.drift) * Math.min(1, dt * 2);
-    const active = this.status === 'flying' || this.isDragging;
+    const player = this.player; const rendered = this.renderRacers[0];
+    // M01 · T1: the shove moves the whole field, so the legacy camera state tracks it too — the ball
+    // is already sliding down the descent by the time the push hands over to 'flying'.
+    if (statusSimulates(this.status) && this.inputEnabled && !this.pausedForBuild) {
+      const focus = player.loopRide?.obstacle.x ?? rendered.x;
+      const view = this.renderer.view;
+      // TICKET-07 ball-chase camera: a tight exponential follow (lerp(camX, ballX, dt * 6))
+      // keeps the ball framed; the fixed course camera pans slower with a longer look-ahead
+      // for the classic broad overview, letting the ball wander (the edge pointer covers it).
+      const follow = this.options.cameraMode === 'follow_ball';
+      const target = clampCameraTarget(view.followOffset(focus + (follow ? 0 : view.width * 0.06), rendered.z));
+      this.camera = chaseLerp(this.camera, target, follow ? 6 : 2.4, dt);
+      // Camera Y tracks the terrain, and in follow mode pans up softly on big air so the
+      // ball stays framed through hops, springs, and catapult launches.
+      const altitude = Math.max(0, this.y(rendered.x) - RADIUS - rendered.y);
+      const airPan = follow ? clamp(altitude - 96, 0, 320) * 0.34 : 0;
+      this.cameraY = chaseLerp(this.cameraY, this.y(focus + player.vx * 0.09) - GROUND - airPan, follow ? 10 : 7, dt);
+    }
+    const active = (statusSimulates(this.status) && !this.pausedForBuild) ;
     const due = active || this.needsRender || !this.lastRender || now - this.lastRender >= 1000 / 30 - 0.5;
     if (due && (this.status !== 'paused' || this.needsRender)) {
       const interval = this.lastRender ? now - this.lastRender : 16.67;
       this.lastRender = now; this.needsRender = false;
-      if (this.status === 'flying' && now - this.trailSample > 16) {
-        this.trailSample = now; this.trail.push({ x: rendered.x, y: rendered.y, z: rendered.z });
-        if (this.trail.length > 9) this.trail.shift();
-      }
       this.renderer.render({ time: this.time, runTime: this.runTime, camera: this.camera, cameraY: this.cameraY,
-        drift: this.drift, shake: this.shake, rotation: rendered.rotation, dragging: this.isDragging,
+        drift: this.drift, shake: this.shake, impact: this.impact, rotation: rendered.rotation, dragging: false,
         launchOrigin: player.launchOrigin, ball: rendered, racers: this.renderRacers, loopRide: player.loopRide,
-        obstacles: this.obstacles, pickups: this.pickups, particles: this.particles, sheep: this.airSheep, trail: this.trail,
-        waterfall: this.waterfallCamera, waterfallFeatures: this.waterfallFeatures,
-        snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion }, interval);
+        obstacles: this.obstacles, pickups: this.pickups,
+        snapshot: this.snapshot, options: this.options, reducedMotion: this.reducedMotion,
+        effects: this.effects, laneNetwork: this.laneNetwork }, interval);
     }
     if (now - this.lastNotify > 100) this.notify(false);
-    const ambient = this.status === 'ready' && !this.reducedMotion || this.particles.length > 0 || this.airSheep.length > 0;
-    if (this.needsRender || this.inputEnabled && this.status !== 'paused' && (active || ambient)) this.schedule();
+    const ambient = this.status === 'ready' && !this.reducedMotion;
+    // While the pool holds the field the overlay is DOM, but the riders are still moving behind it,
+    // so the loop keeps its own frames coming rather than waiting for a redraw request.
+    const poolActive = this.status === 'checkpoint' || this.status === 'countdown';
+    // H10: with a pad connected the loop keeps polling it, so Start can resume a paused race.
+    const padListening = this.gamepad.connected && this.inputEnabled && this.status !== 'finished';
+    if (this.needsRender || poolActive || padListening || this.inputEnabled && this.status !== 'paused' && (active || ambient || this.pausedForBuild)) this.schedule();
   };
 
-  private enterWaterfall(racer: Racer) {
-    if (racer.waterfall || racer.finished) return;
-    const lateral = clamp(-racer.z / (LANE.far + 70), -0.78, 0.78);
-    racer.waterfall = {
-      phase: 'wall-impact', progress: 0, depth: 0, lateral, targetLateral: lateral,
-      velocity: 0, hitCount: 0, impact: 1, startedAt: this.runTime,
-    };
-    racer.waterfallPhase = 'wall-impact'; racer.waterfallProgress = 0;
-    racer.waterfallDepth = 0; racer.waterfallLateral = lateral; racer.waterfallHits = 0;
-    racer.x = WATERFALL_WALL_X; racer.y = this.y(WATERFALL_WALL_X) - RADIUS;
-    racer.z = -lateral * (LANE.far + 70); racer.vx = 0; racer.vy = 0; racer.vz = 0;
-    racer.grounded = false; racer.loopRide = null; racer.falling = false;
-    this.emit(WATERFALL_WALL_X, racer.y - 95, racer.z, 26, '#d2b582', 230);
-    if (!racer.id) {
-      this.shake = 7;
-      this.snapshot.score += 120;
-      this.audio.play('bump');
-      this.say('THE WALL WON. TAKE THE WATERFALL.');
-    }
-  }
-
-  private hitWaterfallFeature(racer: Racer, feature: WaterfallFeature) {
-    const ride = racer.waterfall;
-    if (!ride || (feature.hitMask & (1 << racer.id)) || this.runTime - feature.hitAt < 0.08) return;
-    const lateralDistance = Math.abs(ride.lateral - feature.lateral);
-    if (lateralDistance > feature.width * 0.62 + 0.085) return;
-    feature.hitMask |= 1 << racer.id;
-    feature.hitAt = this.runTime;
-    ride.hitCount++;
-    racer.waterfallHits = ride.hitCount;
-    const side = ride.lateral >= feature.lateral ? 1 : -1;
-    const strength = feature.kind === 'rock' ? 0.26 : feature.kind === 'tube' ? 0.34 : 0.2;
-    ride.lateral = clamp(ride.lateral + side * strength, -0.84, 0.84);
-    ride.targetLateral = clamp(ride.lateral + side * (feature.kind === 'tube' ? 0.16 : 0.1), -0.84, 0.84);
-    racer.vz = side * (feature.kind === 'rock' ? 1.55 : feature.kind === 'tube' ? 2.2 : 1.15);
-    ride.velocity *= feature.kind === 'rock' ? 0.54 : feature.kind === 'tube' ? 0.43 : 0.7;
-    ride.impact = 1;
-    this.emit(racer.x, racer.y, racer.z, feature.kind === 'rock' ? 15 : 10, feature.kind === 'tube' ? '#8be7e0' : '#d9c49b', 180);
-    if (!racer.id) {
-      this.snapshot.score += feature.kind === 'rock' ? 95 : feature.kind === 'tube' ? 140 : 70;
-      this.shake = feature.kind === 'rock' ? 3.8 : 2.2;
-      this.audio.play(feature.kind === 'tube' ? 'boost' : 'bump');
-      this.say(feature.kind === 'tube' ? 'TUBE SHOT! AIM FOR THE NEXT REBOUND.' : feature.kind === 'ramp' ? 'RAMP REBOUND! KEEP IT PINNED.' : 'ROCK SPLIT! LEFT OR RIGHT.');
-    }
-  }
-
-  private leaveWaterfall(racer: Racer) {
-    const exitX = WATERFALL_EXIT_X + 100;
-    racer.x = exitX; racer.z = clamp(-racer.waterfallLateral * (LANE.far + 70), LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-    const surface = this.surfaceAt(racer.x, racer.z);
-    racer.y = surface.y - RADIUS; racer.vx = Math.max(390, racer.launchSpeed / 0.16 * 0.82);
-    racer.vy = surface.slope * racer.vx; racer.vz = 0; racer.grounded = true;
-    racer.waterfall = null; racer.waterfallPhase = null; racer.waterfallProgress = 0;
-    racer.waterfallDepth = 0; racer.waterfallLateral = 0; racer.waterfallHits = 0;
-    racer.lastGroundedAt = this.runTime; racer.recoveryUntil = this.runTime + 0.35;
-    if (!racer.id) { this.say('BOTTOM ROCKS. WELCOME TO THE MINE TUNNELS.'); this.audio.play('land'); this.shake = 4; }
-  }
-
-  private stepWaterfall(racer: Racer, dt: number) {
-    const ride = racer.waterfall;
-    if (!ride) return;
-    const phaseDuration = ride.phase === 'wall-impact' ? 0.78 : ride.phase === 'river' ? 1.08 : ride.phase === 'bottom-impact' ? 0.82 : 1;
-    ride.progress += dt / phaseDuration;
-    ride.impact = Math.max(0, ride.impact - dt * (ride.phase === 'wall-impact' ? 1.8 : 2.8));
-    racer.waterfallPhase = ride.phase; racer.waterfallProgress = clamp(ride.progress, 0, 1);
-    if (ride.phase === 'wall-impact') {
-      racer.x = WATERFALL_WALL_X; racer.y = this.y(WATERFALL_WALL_X) - RADIUS;
-      if (ride.progress >= 1) { ride.phase = 'river'; ride.progress = 0; ride.velocity = 0.11; }
-    } else if (ride.phase === 'river') {
-      const t = clamp(ride.progress, 0, 1);
-      racer.x = WATERFALL_WALL_X + (WATERFALL_START_X - WATERFALL_WALL_X) * t;
-      racer.y = this.y(racer.x) - RADIUS - 28 - Math.sin(t * Math.PI) * 24;
-      ride.lateral += (ride.targetLateral - ride.lateral) * Math.min(1, dt * 3);
-      racer.z = -ride.lateral * (LANE.far + 70); racer.vz = 0;
-      if (ride.progress >= 1) { ride.phase = 'vertical-drop'; ride.progress = 0; ride.velocity = 0.135; ride.impact = 0; }
-    } else if (ride.phase === 'vertical-drop') {
-      const target = clamp(-laneZ(racer.targetLane) / (LANE.far + 70), -0.82, 0.82);
-      const lateralAcceleration = (target - ride.lateral) * 8.5 - racer.vz * 4.6;
-      racer.vz = clamp(racer.vz + lateralAcceleration * dt, -3.5, 3.5);
-      ride.lateral = clamp(ride.lateral + racer.vz * dt, -0.86, 0.86);
-      ride.targetLateral = target;
-      ride.velocity = Math.min(0.205, ride.velocity + dt * 0.006);
-      const previousDepth = ride.depth;
-      ride.depth = clamp(ride.depth + ride.velocity * dt, 0, 1);
-      ride.progress = ride.depth;
-      racer.x = WATERFALL_START_X + (WATERFALL_EXIT_X - WATERFALL_START_X) * ride.depth;
-      racer.y = GROUND + ride.depth * 720;
-      racer.z = -ride.lateral * (LANE.far + 70);
-      for (const feature of this.waterfallFeatures) {
-        if (previousDepth < feature.depth && ride.depth >= feature.depth) this.hitWaterfallFeature(racer, feature);
-      }
-      if (ride.depth >= 1) { ride.phase = 'bottom-impact'; ride.progress = 0; ride.impact = 1; }
-    } else if (ride.phase === 'bottom-impact') {
-      racer.x = WATERFALL_EXIT_X; racer.y = this.y(WATERFALL_EXIT_X) - RADIUS - Math.max(0, 1 - ride.progress) * 90;
-      racer.z = -ride.lateral * (LANE.far + 70);
-      if (ride.progress >= 1) this.leaveWaterfall(racer);
-    }
-    racer.waterfallDepth = ride.depth; racer.waterfallLateral = ride.lateral; racer.waterfallHits = ride.hitCount;
-    racer.rotation += dt * (ride.phase === 'vertical-drop' ? 16 : 7);
-    racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
-    if (racer.waterfall) {
-      racer.vx = ride.phase === 'vertical-drop' ? ride.velocity * (WATERFALL_EXIT_X - WATERFALL_START_X) : 0;
-      racer.vy = ride.phase === 'vertical-drop' ? ride.velocity * 720 : 0;
-    }
-  }
-
-  private updateWaterfallFrame() {
-    const ride = this.player.waterfall;
-    this.waterfallCamera = ride ? {
-      phase: ride.phase, progress: clamp(ride.progress, 0, 1), depth: ride.depth,
-      lateral: ride.lateral, impact: ride.impact, hitCount: ride.hitCount,
-    } : null;
-  }
-
   private stepRace(dt: number) {
-    this.runTime += dt;
+    // M01 · T2: while the first-loop pool is filling or counting down, the race clock is stopped for
+    // the whole field — nobody is racing, so nobody's timers should run. Released riders race again
+    // as soon as the pool reaches the release phase.
+    const pool = this.merge;
+    const clockStopped = pool !== null && pool.phase !== 'done' && pool.phase !== 'releasing';
+    if (!clockStopped) this.runTime += dt;
+
+    if (!this.splitReached && this.player.x >= passageMouthX()) {
+      this.splitReached = true;
+      this.say('FIRST SPLIT COMPLETE! RIVALS JOIN THE RUN!');
+    }
+
+    this.adoptPaths();
     for (const racer of this.racers) {
       if (racer.finished) continue;
-      if (racer.id && this.runTime >= racer.nextDecision) this.driveCPU(racer);
-      this.stepRacer(racer, dt);
+      // Solo first split: the rivals are not on the course yet. Their own split was run headlessly at
+      // reset; they join the pool, in split-time order, the moment the player reaches it.
+      if (!this.splitReached && racer.id !== PLAYER_ID) continue;
+      // A held rider is out of the race: no CPU decisions, and the physics only glides their slot.
+      if (racer.mergeHeld) { stepRacerSim(racer, this.simCtx, dt); continue; }
+      // A race lets the CPU see the whole field and rubber-band against the player; an isolated
+      // qualifying attempt passes neither (see sim/cpu-driver.ts).
+      if (racer.id && this.runTime >= racer.nextDecision) driveCpu(racer, this.cpuCtx);
+      stepRacerSim(racer, this.simCtx, dt);
     }
+    this.stepMerge();
     this.resolveBumps();
-    this.resolvePickups();
-    this.updateWaterfallFrame();
+    resolvePickupsSim(this.racers, this.simCtx, { reducedMotion: this.reducedMotion, candidates: this.pickupCandidates });
     this.refreshSnapshot();
     if (this.player.finished) {
       this.snapshot.settling = true;
@@ -550,275 +1169,88 @@ export class GameEngine {
     else if (this.runTime > 300) this.finish(false);
   }
 
-  private driveCPU(racer: Racer) {
-    const difficulty = this.config?.difficulty ?? 'racer';
-    const reaction = difficulty === 'rookie' ? 0.43 : difficulty === 'veteran' ? 0.13 : 0.19;
-    racer.nextDecision = this.runTime + reaction + racer.id * 0.023;
-    if (racer.falling || racer.loopRide || racer.waterfall || racer.finished || this.runTime < racer.steerLockedUntil) return;
-    const lookAhead = clamp(racer.vx * (difficulty === 'rookie' ? 0.54 : difficulty === 'veteran' ? 0.92 : 0.75), 360, 1350);
-    const current = racer.targetLane;
-    let bestLane = current; let bestScore = -Infinity;
-    const seen = new Set<Obstacle>();
-    const supplies = new Set<AirPickup>();
-    for (let key = Math.floor(racer.x / BUCKET); key <= Math.floor((racer.x + lookAhead) / BUCKET); key++) {
-      for (const obstacle of this.buckets.get(key) ?? EMPTY) seen.add(obstacle);
-      for (const pickup of this.pickupBuckets.get(key) ?? []) if (pickup.collectedBy === null) supplies.add(pickup);
-    }
-    for (let lane = Math.max(0, current - 1); lane <= Math.min(3, current + 1); lane++) {
-      let score = lane === current ? 1.1 : -0.25;
-      for (const obstacle of seen) {
-        const distance = obstacle.x - racer.x;
-        if (distance < -obstacle.width || distance > lookAhead || !occupiesLane(obstacle, laneZ(lane), 0)) continue;
-        if (obstacle.kind === 'gap') score -= distance < racer.vx * 0.45 ? 13 : 7;
-        else if (!racer.visited.has(obstacle) && !(obstacle.hit && (obstacle.kind === 'tnt' || obstacle.kind === 'sheep'))) {
-          const proximity = 1 - clamp(distance / lookAhead, 0, 1);
-          score += (obstacle.kind === 'boost' ? 6 : obstacle.kind === 'fire-ring' ? 4.6 : obstacle.kind === 'tnt' ? 3 : obstacle.kind === 'spring' ? 2.5
-            : obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock' ? -1.8 : obstacle.kind === 'crate' || obstacle.kind === 'skull-box' ? -1.2
-              : obstacle.kind === 'sheep' ? -0.8 : 0.4) * proximity;
-        }
-      }
-      for (const pickup of supplies) {
-        const distance = pickup.x - racer.x;
-        if (pickup.lane !== lane || distance < 45 || distance > lookAhead) continue;
-        const needed = pickup.kind === 'shield' ? racer.shieldUntil <= this.runTime : pickup.kind === 'fuel' ? racer.boosts < 2 : racer.bounces < 3;
-        score += (needed ? 4.8 : 0.8) * (1 - distance / lookAhead) * (this.y(pickup.x) - pickup.y > 160 ? 0.35 : 1);
-      }
-      for (const other of this.racers) {
-        if (other.id === racer.id || other.finished || other.falling) continue;
-        if (Math.abs(other.x - racer.x) < 125 && Math.abs(other.z - laneZ(lane)) < 90) {
-          score += racer.weight > other.weight * 1.05 && randomAt(racer.id, this.runTime) > 0.43 ? 3.8 : -2.8;
-        }
-      }
-      if (score > bestScore) { bestScore = score; bestLane = lane; }
-    }
-    if (this.runTime - racer.lastLaneChange > (difficulty === 'rookie' ? 0.9 : difficulty === 'veteran' ? 0.48 : 0.66)) this.setLane(racer, bestLane);
-    const soon = racer.x + racer.vx * 0.22;
-    if (this.canHop(racer) && (this.inGap(soon, racer.z) || this.inGap(soon, laneZ(racer.targetLane)))) this.performHop(racer);
-    if (this.canHop(racer) && racer.bounces) {
-      for (const obstacle of seen) {
-        if (obstacle.kind !== 'fire-ring' || obstacle.lane !== racer.targetLane || obstacle.x < racer.x + 90 || obstacle.x > racer.x + racer.vx * 0.46) continue;
-        this.performBounce(racer);
-        break;
-      }
-    }
-    if (this.canHop(racer)) {
-      const timing = hopTiming(racer.vx, 290 * weightImpulse(racer.weight) * racer.hopFactor);
-      for (const pickup of supplies) {
-        const distance = pickup.x - racer.x;
-        if (Math.abs(racer.z - pickup.z) < 52 && this.y(pickup.x) - pickup.y < 145 && distance > timing - 65 && distance < timing + 65 && !this.inGap(pickup.x, racer.z)) {
-          this.performHop(racer); break;
-        }
-      }
-    }
-    if (!racer.grounded && racer.bounces && this.inGap(racer.x + racer.vx * 0.1, racer.z)
-      && racer.y > this.y(racer.x) - 105 && racer.vy > 90) this.performBounce(racer);
-    if (racer.boosts && this.runTime - racer.lastBoostAt > (difficulty === 'rookie' ? 5.5 : difficulty === 'veteran' ? 2.8 : 3.4) && this.runTime > 1.6
-      && (racer.vx < racer.launchSpeed / 0.16 * 0.92 || racer.x < this.player.x - 85)) this.performBoost(racer);
-  }
-
-  private stepRacer(racer: Racer, dt: number) {
-    const oldX = racer.x;
-    if (racer.waterfall) {
-      this.stepWaterfall(racer, dt);
-      return;
-    }
-    if (racer.falling) {
-      racer.fallingFor += dt; racer.vy += this.gravityAt(racer.x) * (this.inCliffSection(racer.x) ? 1.1 : 1) * dt;
-      racer.x += racer.vx * dt * 0.45; racer.y += racer.vy * dt; racer.rotation += 9 * dt;
-      if (racer.fallingFor > 0.72) this.recover(racer);
-      return;
-    }
-    if (!racer.loopRide) {
-      const steeringSurface = surfaceTypeAt(racer.x);
-      const lateralTraction = steeringSurface === 'wet_wood' ? 0.6 : steeringSurface === 'moss_rock' ? 0.72 : 1;
-      const response = (this.runTime < racer.steerLockedUntil ? 7 : 33) * racer.handling * lateralTraction;
-      const steering = (laneZ(racer.targetLane) - racer.z) * response - racer.vz * 9.5 * Math.sqrt(racer.handling) * lateralTraction;
-      racer.vz = clamp(racer.vz + steering * dt, -650 * racer.handling, 650 * racer.handling);
-      const previousZ = racer.z;
-      racer.z = clamp(racer.z + racer.vz * dt, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-      if (racer.z === previousZ && Math.abs(racer.vz) > 1) racer.vz *= -0.25;
-      racer.lane = closestLane(racer.z);
-    }
-    const dragFactor = 120 / racer.weight;
-    if (racer.loopRide) {
-      const ride = racer.loopRide; const loop = loopGeometry(ride.obstacle, this.options.course);
-      racer.z += (obstacleZ(ride.obstacle) - racer.z) * Math.min(1, dt * 16); racer.vz = 0;
-      if (ride.entryProgress < 1) {
-        ride.entryProgress = Math.min(1, ride.entryProgress + dt * 7);
-        const t = ride.entryProgress; const ease = t * t * (3 - 2 * t);
-        const x = loop.x + Math.sin(ride.entryAngle) * loop.ballRadius;
-        const y = loop.y + Math.cos(ride.entryAngle) * loop.ballRadius + this.y(x) - this.y(loop.x);
-        racer.x = ride.entry.x + (x - ride.entry.x) * ease; racer.y = ride.entry.y + (y - ride.entry.y) * ease;
-      } else {
-        ride.angle += Math.min(ride.speed, 760) / loop.ballRadius * dt;
-        racer.x = loop.x + Math.sin(ride.angle) * loop.ballRadius;
-        racer.y = loop.y + Math.cos(ride.angle) * loop.ballRadius + this.y(racer.x) - this.y(loop.x);
-      }
-      racer.rotation += Math.min(ride.speed, 760) / RADIUS * dt;
-      if (ride.angle >= ride.exitAngle) {
-        racer.x = loop.x + 3; racer.y = loop.y + loop.ballRadius + this.y(racer.x) - this.y(loop.x);
-        racer.vx = Math.min(racer.maximumSpeed, ride.speed * 1.08); racer.vy = this.slope(racer.x) * racer.vx;
-        racer.loopRide = null; racer.grounded = false;
-        if (!racer.id) { this.snapshot.score += 350; this.counts.loops++; this.say('A WELL-ROUNDED BAD IDEA.'); this.audio.play('loop'); }
-      }
-    } else {
-      if (racer.bufferedJump >= this.runTime && this.canHop(racer)) this.performHop(racer);
-      const before = this.surfaceAt(racer.x, racer.z);
-      if (racer.grounded && !this.inGap(racer.x, racer.z)) {
-        const downhill = this.gravityAt(racer.x, before.slope) * before.slope / (1 + before.slope * before.slope) / 1.4;
-        const resistance = 7 + racer.vx * 0.025 * Math.sqrt(dragFactor) + racer.vx * racer.vx * 0.000009 * dragFactor;
-        racer.vx = Math.max(0, racer.vx + (downhill - resistance) * dt);
-        racer.vy = before.slope * racer.vx; racer.x += racer.vx * dt;
-        if (this.inGap(racer.x, racer.z)) { racer.grounded = false; racer.y += racer.vy * dt; }
-        else {
-          const surface = this.surfaceAt(racer.x, racer.z);
-          racer.y = surface.y - RADIUS; racer.vy = surface.slope * racer.vx; racer.lastGroundedAt = this.runTime;
-          if (surface.ramp && !racer.visited.has(surface.ramp) && (racer.x - surface.ramp.x) / surface.ramp.width > 0.94) {
-            racer.vy -= 155 * weightImpulse(racer.weight); racer.y -= 2; racer.grounded = false;
-            racer.visited.add(surface.ramp);
-            if (!racer.id) { this.snapshot.score += 75; this.audio.play('launch'); }
-          }
-        }
-      } else {
-        racer.grounded = false;
-        const airDrag = this.inCliffSection(racer.x) ? 0.007 : 0.009;
-        racer.vx *= Math.exp(-airDrag * dragFactor * dt);
-        racer.vy += this.gravityAt(racer.x) * dt; racer.x += racer.vx * dt; racer.y += racer.vy * dt;
-      }
-      for (const obstacle of this.nearby(racer.x)) {
-        const repeatableRock = obstacle.kind === 'rock-bumper' || obstacle.kind === 'spiked-rock';
-        if ((!repeatableRock && racer.visited.has(obstacle)) || obstacle.kind === 'gap' || obstacle.kind === 'ramp'
-          || obstacle.kind === 'rock-wall' || obstacle.kind === 'mine-rail' || obstacle.kind === 'mine-split'
-          || (obstacle.section === 'stage2' && obstacle.x >= WATERFALL_WALL_X) || !occupiesLane(obstacle, racer.z)) continue;
-        if ((obstacle.kind === 'tnt' || obstacle.kind === 'sheep' || obstacle.kind === 'blimp' || obstacle.kind === 'sign') && obstacle.hit) continue;
-        if (repeatableRock) {
-          this.hitRock(racer, obstacle);
-          continue;
-        }
-        if (obstacle.kind === 'fire-ring') {
-          const center = obstacle.x + obstacle.width / 2;
-          const ringY = this.y(center) - (obstacle.altitude ?? 130);
-          const ringRadius = obstacle.width * 0.42;
-          if (Math.abs(racer.x - center) < ringRadius + RADIUS && Math.hypot(racer.x - center, racer.y - ringY) < ringRadius + RADIUS) {
-            this.hitObstacle(racer, obstacle);
-          }
-          continue;
-        }
-        if (obstacle.kind === 'loop') {
-          const loop = loopGeometry(obstacle, this.options.course); const dx = racer.x - loop.x;
-          const dy = racer.y - (this.y(racer.x) - this.y(loop.x)) - loop.y;
-          if (Math.abs(dx) <= loop.radius + RADIUS && Math.abs(Math.hypot(dx, dy) - loop.ballRadius) < RADIUS * 1.12 && racer.vx > 245) {
-            const angle = (Math.atan2(dx, dy) + TAU) % TAU;
-            racer.visited.add(obstacle); racer.grounded = false; racer.targetLane = obstacle.lane ?? PLAYER_LANE;
-            const loopSpan = obstacle.section === 'stage2' ? TAU : TAU * 0.65;
-            racer.loopRide = { obstacle, angle, entryAngle: angle, exitAngle: angle + loopSpan,
-              speed: Math.max(650, racer.vx), entry: { x: racer.x, y: racer.y }, entryProgress: 0 };
-            if (!racer.id) { this.say('HOLD ON TO YOUR GOBLIN.'); this.audio.play('boost'); }
-            break;
-          }
-        } else {
-          const center = obstacle.x + obstacle.width / 2; const base = this.y(center);
-          if (obstacle.kind === 'blimp' || obstacle.kind === 'sign') {
-            const alt = obstacle.altitude ?? (obstacle.kind === 'blimp' ? 540 : 315);
-            const obsBottom = base - alt + 20;
-            const obsTop = base - alt - obstacle.height - 20;
-            if (Math.abs(racer.x - center) < obstacle.width / 2 + RADIUS && racer.y + RADIUS > obsTop && racer.y - RADIUS < obsBottom) {
-              this.hitObstacle(racer, obstacle);
-            }
-          } else {
-            if (Math.abs(racer.x - center) < obstacle.width / 2 + RADIUS && racer.y + RADIUS > base - obstacle.height && racer.y - RADIUS < base + 10) this.hitObstacle(racer, obstacle);
-          }
-        }
-      }
-      const surface = this.surfaceAt(racer.x, racer.z); const gap = this.inGap(racer.x, racer.z);
-      if (gap && racer.y > this.y(racer.x) + RADIUS + 8) { racer.falling = true; racer.fallingFor = 0; racer.grounded = false; }
-      const normalSpeed = racer.vy - surface.slope * racer.vx;
-      if (!gap && !racer.falling && !racer.loopRide && !racer.grounded && racer.y + RADIUS >= surface.y && normalSpeed >= 0) {
-        racer.y = surface.y - RADIUS;
-        const restitution = clamp(0.28 * Math.sqrt(dragFactor), 0.17, 0.38);
-        if (normalSpeed > 260) {
-          racer.vy = surface.slope * racer.vx - normalSpeed * restitution;
-          this.emit(racer.x, surface.y, racer.z, 3, '#b8a77b', 70);
-          if (!racer.id) {
-            this.audio.play('land');
-            if (normalSpeed > 360) this.shake = Math.min(4.5, normalSpeed / 160);
-          }
-        } else { racer.grounded = true; racer.lastGroundedAt = this.runTime; racer.vy = surface.slope * racer.vx; }
-      }
-      racer.rotation += (racer.x - oldX) * (racer.grounded ? Math.sqrt(1 + surface.slope * surface.slope) : 1) / RADIUS;
-    }
-    racer.vx = clamp(racer.vx, 0, racer.maximumSpeed);
-    racer.distance = Math.max(racer.distance, clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE));
-    racer.stoppedFor = racer.vx < 40 && !racer.loopRide ? racer.stoppedFor + dt : 0;
-    if (racer.x >= WATERFALL_WALL_X && racer.x < WATERFALL_START_X && oldX < WATERFALL_START_X && !racer.falling && !racer.waterfall) {
-      this.enterWaterfall(racer);
-      return;
-    }
-    if (racer.x >= FINISH && !racer.falling) {
-      racer.finishTime = this.runTime - dt + dt * clamp((FINISH - oldX) / Math.max(1, racer.x - oldX), 0, 1);
-      racer.finished = true; racer.distance = TRACK_DISTANCE; racer.x = FINISH + 12; racer.vx = racer.vy = racer.vz = 0;
-      if (racer.id) racer.y = this.y(racer.x) - RADIUS;
-    } else if (racer.y > this.y(racer.x) + 360 || racer.stoppedFor > 3) this.recover(racer);
-  }
-
-  private recover(racer: Racer) {
-    racer.x = Math.max(START_X + 440, racer.x - 200);
-    let lane = racer.targetLane;
-    for (let i = 0; i < 4; i++) {
-      const candidate = (lane + i) % 4;
-      if (!this.inGap(racer.x, laneZ(candidate)) && !this.inGap(racer.x + 110, laneZ(candidate))) { lane = candidate; break; }
-    }
-    racer.targetLane = racer.lane = lane; racer.z = laneZ(lane); racer.vz = 0;
-    racer.y = this.surfaceAt(racer.x, racer.z).y - RADIUS;
-    racer.vx = 390; racer.vy = this.slope(racer.x) * racer.vx;
-    racer.falling = false; racer.grounded = true; racer.loopRide = null;
-    racer.fallingFor = racer.stoppedFor = 0; racer.immuneUntil = this.runTime + 1.5;
-    racer.recoveryUntil = this.runTime + 1; racer.steerLockedUntil = this.runTime + 0.15;
-    racer.boosts = Math.max(1, racer.boosts);
-    racer.shieldUntil = -100;
-    Object.assign(racer.previous, { x: racer.x, y: racer.y, z: racer.z, rotation: racer.rotation });
-    if (!racer.id) { this.snapshot.score = Math.max(0, this.snapshot.score - 100); this.trail.length = 0; this.say('PIT CREW TO THE RESCUE. KEEP RACING.'); }
-  }
-
   private resolveBumps() {
     for (let i = 0; i < this.racers.length - 1; i++) for (let j = i + 1; j < this.racers.length; j++) {
       const a = this.racers[i]; const b = this.racers[j];
-      if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide || a.waterfall || b.waterfall
+      // M01 · T2: a held rider is not in the race yet and a ghost has just left the loop — neither
+      // can be touched, which is what keeps the ordered release from being spoiled by contact.
+      if (a.finished || b.finished || a.falling || b.falling || a.loopRide || b.loopRide
+        || a.mergeHeld || b.mergeHeld || a.mergeGhost || b.mergeGhost
+        // Nobody touches anybody inside the giant loop, pooled or not.
+        || insidePassage(a.x) || insidePassage(b.x)
+        || (!this.splitReached && (a.id !== PLAYER_ID || b.id !== PLAYER_ID))
         || this.runTime < a.immuneUntil || this.runTime < b.immuneUntil) continue;
-      const dx = b.x - a.x; const dz = b.z - a.z; const dy = b.y - a.y;
-      const diameter = RADIUS * 2 + 4;
-      const distance = Math.hypot(dx, dz, dy);
-      if (distance >= diameter || Math.abs(dy) > RADIUS * 1.55) continue;
+      // Balls touch at the size they are drawn (BALL_DRAW_RADIUS = 2 × the road-physics RADIUS).
+      // Cheap rejects first: with 100 balls the all-pairs Math.hypot cost ~0.45 ms a tick; squared
+      // distances behind an x test make the same check ~20× cheaper with identical results.
+      const diameter = BALL_DRAW_RADIUS * 2 + 4;
+      const dx = b.x - a.x;
+      if (dx >= diameter || dx <= -diameter) continue;
+      const dz = b.z - a.z; const dy = b.y - a.y;
+      const distanceSq = dx * dx + dz * dz + dy * dy;
+      if (distanceSq >= diameter * diameter || Math.abs(dy) > BALL_DRAW_RADIUS * 1.55) continue;
+      const distance = Math.sqrt(distanceSq);
       const planar = Math.hypot(dx, dz) || 1;
       const nx = dx / planar; const nz = dz / planar;
       const sum = a.weight + b.weight;
       const penetration = (diameter - distance + 1) * 0.55;
       a.x -= nx * penetration * b.weight / sum; b.x += nx * penetration * a.weight / sum;
       a.z -= nz * penetration * b.weight / sum; b.z += nz * penetration * a.weight / sum;
-      a.z = clamp(a.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-      b.z = clamp(b.z, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-      const pair = i * 4 + j;
-      if (this.runTime - this.collisionTimes[pair] < 0.38) continue;
-      this.collisionTimes[pair] = this.runTime;
+      a.z = clamp(a.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+      b.z = clamp(b.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+      const pair = (i << 10) | j;
+      const lastCollision = this.collisionTimes.get(pair) ?? -100;
+      if (this.runTime - lastCollision < 0.38) continue;
+      this.collisionTimes.set(pair, this.runTime);
       const shieldA = this.absorbShield(a);
       const shieldB = this.absorbShield(b);
       const relative = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (relative < 0) {
-        const impulse = -(1.38 * relative) / (1 / a.weight + 1 / b.weight);
-        if (!shieldA) a.vx = clamp(a.vx - impulse * nx / a.weight, 100, a.maximumSpeed);
-        if (!shieldB) b.vx = clamp(b.vx + impulse * nx / b.weight, 100, b.maximumSpeed);
+        const impulse = -(0.8 * relative) / (1 / a.weight + 1 / b.weight);
+        if (!shieldA) a.vx = clamp(a.vx - impulse * nx * 0.25 / a.weight, a.vx * 0.92, a.maximumSpeed);
+        if (!shieldB) b.vx = clamp(b.vx + impulse * nx * 0.25 / b.weight, b.vx * 0.92, b.maximumSpeed);
       }
       // A rear-end hit also has a sideways component: heavy capsules shove the
       // lighter target toward an adjacent lane, rather than stacking in place.
       let side = Math.abs(dz) > 8 ? Math.sign(dz) : (closestLane(b.z) === 0 ? -1 : closestLane(b.z) === 3 ? 1 : ((i + j) % 2 ? 1 : -1));
       if (!side) side = 1;
       const closing = Math.min(380, Math.abs(a.vx - b.vx) + Math.abs(a.vz - b.vz));
-      const kick = 270 + closing * 0.22;
-      if (!shieldA) this.shove(a, -side, kick * Math.min(1.65, b.weight / a.weight));
-      if (!shieldB) this.shove(b, side, kick * Math.min(1.65, a.weight / b.weight));
+      const kick = 220 + closing * 0.18;
+      
+      // Heavy impacts cause more dramatic lane changes
+      const isHeavyImpact = closing > 200 || Math.abs(a.vx - b.vx) > 150;
+      const kickMultiplier = isHeavyImpact ? 2.0 : 1;
+      
+      if (!shieldA) {
+        this.shove(a, -side, kick * kickMultiplier * Math.min(1.5, b.weight / a.weight));
+        a.rollRate += (side > 0 ? -1 : 1) * 16;
+      }
+      if (!shieldB) {
+        this.shove(b, side, kick * kickMultiplier * Math.min(1.5, a.weight / b.weight));
+        b.rollRate += (side > 0 ? 1 : -1) * 16;
+      }
+      
       const x = (a.x + b.x) / 2; const z = (a.z + b.z) / 2;
-      this.emit(x, (a.y + b.y) / 2, z, 10, '#ffe0a0', 140);
+      const y = (a.y + b.y) / 2;
+      
+      // M01 · T5: every collision is an impact; a heavy one also throws sparks and smoke.
+      this.effects.push('impact', x, y, z, isHeavyImpact ? 1.4 : 0.8, a.id ? a.id : b.id, this.tick);
+      this.effects.push('sparks', x, y, z, isHeavyImpact ? 1.2 : 0.6, a.id ? a.id : b.id, this.tick);
+      if (isHeavyImpact) this.effects.push('smoke', x, y, z, 0.8, a.id ? a.id : b.id, this.tick);
+      
+      if (isHeavyImpact) {
+        // Screen shake and audio for heavy impacts
+        if (!a.id || !b.id) { // Only if player is involved
+          this.shake = Math.min(15, closing * 0.05);
+          this.audio.play('bump');
+        }
+      }
       if (!a.id || !b.id) {
+        // H10: the pad thuds with the hit, harder the faster the two closed (off with reduced motion).
+        if (!this.reducedMotion) this.gamepad.rumble('bump', closing / 380);
+        // H8: the camera kicks away from the rival, the yoke jolts and the hull thuds, all by closing.
+        const player = a.id ? b : a; const rival = a.id ? a : b;
+        this.playerImpact(Math.max(0.25, closing / 380), Math.sign(rival.z - player.z) as -1 | 0 | 1);
         if ((!a.id && shieldA) || (!b.id && shieldB)) { this.audio.play('shield'); this.say('SKYWARD SHIELD ABSORBED THE SHOVE.'); }
         else if ((!a.id && shieldB) || (!b.id && shieldA)) {
           this.audio.play('shield'); this.shake = 2;
@@ -833,10 +1265,12 @@ export class GameEngine {
   }
 
   private shove(racer: Racer, direction: number, speed: number) {
-    const lane = closestLane(racer.z);
-    racer.targetLane = clamp(lane - Math.sign(direction), 0, 3);
+    // A hit shoots the ball's lane rope out (sim/rope.ts): it keeps its own lane/path — a bump never
+    // re-assigns it to the neighbouring one — takes the sideways speed, may be knocked as far as the
+    // road edge, and is then reeled back in.
     racer.vz = clamp(racer.vz + direction * speed, -650, 650);
-    racer.z = clamp(racer.z + direction * 5, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
+    racer.z = clamp(racer.z + direction * 5, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    racer.ropeSince = this.runTime;
     racer.steerLockedUntil = this.runTime + 0.28 * racer.bumpRecovery; racer.bumpAt = this.runTime;
     racer.lastLaneChange = this.runTime;
   }
@@ -846,199 +1280,31 @@ export class GameEngine {
     racer.shieldUntil = -100;
     racer.shieldHitAt = this.runTime;
     racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.3);
-    this.emit(racer.x, racer.y, racer.z, 9, POWERUPS.shield.color, 155);
+    // Painted sibling: the shield holding is a *hit that did not land*, which is the impact read.
+    this.effects.push('impact', racer.x, racer.y, racer.z, 0.7, racer.id, this.tick);
+    // …and the bubble itself shattering as it spends the save.
+    this.effects.push('shield-break', racer.x, racer.y, racer.z, 1, racer.id, this.tick);
     if (!racer.id) this.shieldBlocks++;
     return true;
   }
 
-  private resolvePickups() {
-    this.pickupCandidates.clear();
-    for (const racer of this.racers) {
-      if (racer.falling || racer.finished || racer.loopRide || racer.waterfall) continue;
-      const first = Math.floor(Math.min(racer.previous.x, racer.x) / BUCKET);
-      const last = Math.floor(Math.max(racer.previous.x, racer.x) / BUCKET);
-      for (let key = first; key <= last; key++) for (const pickup of this.pickupBuckets.get(key) ?? []) {
-        if (pickup.collectedBy === null) this.pickupCandidates.add(pickup);
-      }
-    }
-    for (const pickup of this.pickupCandidates) {
-      let winner: Racer | null = null;
-      let earliest = Infinity;
-      const y = pickupY(pickup, this.runTime, this.reducedMotion);
-      for (const racer of this.racers) {
-        if (racer.falling || racer.finished || racer.loopRide || racer.waterfall || Math.abs(racer.z - pickup.z) > 110 || Math.abs(racer.x - pickup.x) > 160) continue;
-        const time = pickupIntercept(racer.previous, racer, pickup, y);
-        if (time !== null && time < earliest) { earliest = time; winner = racer; }
-      }
-      if (winner) this.collectPickup(winner, pickup);
-    }
-  }
-
-  private collectPickup(racer: Racer, pickup: AirPickup) {
-    pickup.collectedBy = racer.id;
-    pickup.collectedAt = this.runTime;
-    racer.pickupAt = this.runTime;
-    let notice = '';
-    if (pickup.kind === 'fuel') {
-      const full = racer.boosts >= 2;
-      racer.boosts = Math.min(2, racer.boosts + 1);
-      racer.vx = Math.min(racer.maximumSpeed, racer.vx + 115 * weightImpulse(racer.weight) * racer.boostFactor);
-      if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
-      notice = full ? 'FUEL SURGE. BOOST TANK ALREADY FULL.' : 'ROCKET FUEL! +1 BOOST';
-    } else if (pickup.kind === 'shield') {
-      racer.shieldUntil = this.runTime + SHIELD_DURATION;
-      notice = 'SKYWARD SHIELD! ONE SHOVE. SIX SECONDS.';
-    } else {
-      const full = racer.bounces >= 3;
-      racer.bounces = Math.min(3, racer.bounces + 1);
-      notice = full ? 'AIR BOUNCES FULL. +75 CHAOS.' : 'AIR SPRING! +1 AIR BOUNCE';
-    }
-    this.emit(pickup.x, pickup.y, pickup.z, 13, POWERUPS[pickup.kind].color, 120);
-    if (!racer.id) {
-      this.pickupCount++; this.snapshot.score += 75;
-      this.snapshot.lastPickup = pickup.kind;
-      this.snapshot.pickupNoticeUntil = this.runTime + 2.5;
-      this.audio.play('pickup'); this.say(notice);
-    }
-  }
-
-  private hitRock(racer: Racer, obstacle: Obstacle) {
-    const bit = 1 << racer.id;
-    if ((obstacle.hitMask ?? 0) & bit && this.time - obstacle.hitAt < 0.16) return;
-    const centerX = obstacle.x + obstacle.width / 2;
-    const centerZ = obstacleZ(obstacle);
-    const base = this.y(centerX);
-    const centerY = base - obstacle.height * 0.52;
-    const radius = obstacle.width * 0.43;
-    const dx = racer.x - centerX;
-    const dz = (racer.z - centerZ) * 0.72;
-    const distance = Math.hypot(dx, dz);
-    if (distance > radius + RADIUS || Math.abs(racer.y - centerY) > radius + RADIUS) return;
-    const planar = distance || 1;
-    const nx = dx / planar;
-    const nz = dz / planar;
-    const normalSpeed = racer.vx * nx + racer.vz * nz;
-    const restitution = obstacle.kind === 'rock-bumper' ? 1.45 : 0.92;
-    if (normalSpeed < 0) {
-      racer.vx -= (1 + restitution) * normalSpeed * nx;
-      racer.vz -= (1 + restitution) * normalSpeed * nz / 0.72;
-    }
-    const push = radius + RADIUS - distance + 2;
-    racer.x += nx * push; racer.z = clamp(racer.z + nz * push / 0.72, LANE.near + RADIUS + 6, LANE.far - RADIUS - 6);
-    racer.vx = clamp(Math.max(150, racer.vx + (obstacle.kind === 'rock-bumper' ? 70 : 25)), 0, racer.maximumSpeed);
-    racer.vz = clamp(racer.vz, -720, 720);
-    racer.grounded = false; racer.lastGroundedAt = -100;
-    obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | bit;
-    this.emit(centerX, centerY, centerZ, obstacle.kind === 'rock-bumper' ? 12 : 18, obstacle.kind === 'rock-bumper' ? '#c7b18a' : '#d7d0b4', obstacle.kind === 'rock-bumper' ? 135 : 180);
-    if (!racer.id) {
-      this.snapshot.score += obstacle.kind === 'rock-bumper' ? 90 : 45;
-      this.shake = obstacle.kind === 'spiked-rock' ? 4.5 : 2.4;
-      this.audio.play('bump');
-      this.say(obstacle.kind === 'rock-bumper' ? 'CROWN BUMPER! KEEP THE MOMENTUM.' : 'SPIKED ROCK! PICK A CLEANER LINE.');
-    }
-  }
-
-  private hitObstacle(racer: Racer, obstacle: Obstacle) {
-    racer.visited.add(obstacle); obstacle.hitAt = this.time; obstacle.hitMask = (obstacle.hitMask ?? 0) | (1 << racer.id);
-    const impulse = weightImpulse(racer.weight);
-    const x = obstacle.x + obstacle.width / 2; const y = this.y(x); const z = obstacleZ(obstacle);
-    if (obstacle.kind !== 'boost') racer.lastGroundedAt = -100;
-    switch (obstacle.kind) {
-      case 'boost':
-        racer.vx += 400 * impulse * racer.boostFactor;
-        if (racer.grounded) racer.vy = this.surfaceAt(racer.x, racer.z).slope * racer.vx;
-        racer.boosts = Math.min(2, racer.boosts + 1); this.emit(x, y - 6, z, 8, '#ffbd6a', 135);
-        if (!racer.id) { this.snapshot.score += 100; this.audio.play('boost'); this.say('THROTTLE REFILLED. TRY NOT TO SHARE.'); }
-        break;
-      case 'spring':
-        racer.vy = -660 * impulse * racer.hopFactor; racer.vx += 90 * impulse; racer.grounded = false;
-        racer.bounces = Math.min(3, racer.bounces + 1); this.emit(x, y - 24, z, 10, '#a1e1bd', 160);
-        if (!racer.id) { this.snapshot.score += 100; this.audio.play('bounce'); this.say('SPRING BREAK! +1 BOUNCE'); }
-        break;
-      case 'fire-ring':
-        // +50 km/h in the HUD's 0.16 velocity-to-km/h conversion.
-        racer.vx = Math.min(racer.maximumSpeed, racer.vx + 312.5 * impulse);
-        racer.fireUntil = this.runTime + 1.35;
-        racer.immuneUntil = Math.max(racer.immuneUntil, this.runTime + 0.72);
-        this.emit(x, y - (obstacle.altitude ?? 130), z, 22, '#ff8b3d', 240);
-        this.emit(x, y - (obstacle.altitude ?? 130), z, 10, '#ffe0a0', 155);
-        if (!racer.id) {
-          this.snapshot.score += 250;
-          this.shake = 3.2;
-          this.audio.play('boost');
-          this.say('FIRE RING! HYPER-SPEED ENGAGED.');
-        }
-        break;
-      case 'crate':
-        racer.vx = Math.min(racer.maximumSpeed, racer.vx + 45 * impulse);
-        racer.vy -= 100 * impulse; racer.grounded = false;
-        this.emit(x, y - 35, z, 8, '#c38b51', 100);
-        if (!racer.id) { this.snapshot.score += 40; this.audio.play('bump'); this.say('TIMBER IN THE FAST LINE.'); }
-        break;
-      case 'skull-box':
-        racer.vx = Math.max(130, racer.vx * 0.72);
-        racer.vy -= 155 * impulse; racer.vz += (racer.z <= z ? -1 : 1) * 180;
-        racer.grounded = false;
-        this.emit(x, y - 38, z, 13, '#c7d0ad', 125);
-        if (!racer.id) { this.snapshot.score += 80; this.shake = 2.6; this.audio.play('bump'); this.say('SKULL BOX! THE SHORTCUT BIT BACK.'); }
-        break;
-      case 'tnt':
-        obstacle.hit = true; racer.vx += 300 * impulse; racer.vy = -450 * impulse; racer.grounded = false;
-        this.emit(x, y - 30, z, 25, '#ffb25e', 245);
-        if (!racer.id) { this.snapshot.score += 200; this.counts.explosions++; this.shake = 9; this.audio.play('boom'); this.say('THAT WAS PROBABLY LOAD-BEARING.'); }
-        break;
-      case 'sheep':
-        obstacle.hit = true; racer.vx += 75 * impulse; racer.vy = -290 * impulse; racer.grounded = false;
-        this.airSheep.push({ x, y: y - 40, z, vx: racer.vx * 0.51, vy: -520, rotation: 0, life: 3.1 });
-        this.emit(x, y - 35, z, 8, '#e9e1c6', 115);
-        if (!racer.id) { this.snapshot.score += 125; this.counts.sheep++; this.audio.play('sheep'); this.say('BAA-D DECISIONS.'); }
-        break;
-      case 'blimp':
-        obstacle.hit = true;
-        racer.vy = Math.max(950, 1200 * impulse);
-        racer.vx = Math.max(120, racer.vx * 0.72);
-        racer.grounded = false;
-        this.emit(x, y - (obstacle.altitude ?? 540), z, 35, '#ff4400', 320);
-        this.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#ffbb00', 250);
-        this.emit(x, y - (obstacle.altitude ?? 540), z, 20, '#333333', 180);
-        for (const o of this.nearby(x)) {
-          if (o.kind === 'sign' && !o.hit && Math.abs((o.x + o.width / 2) - x) < 90) {
-            o.hit = true;
-            o.hitAt = this.time;
-          }
-        }
-        if (!racer.id) {
-          this.snapshot.score += 250;
-          this.counts.explosions++;
-          this.shake = 6.0;
-          this.audio.play('boom');
-          this.say('AIRSPACE RESTRICTED! DOWN YOU GO!');
-        }
-        break;
-      case 'sign':
-        obstacle.hit = true;
-        racer.vx = Math.max(90, racer.vx * 0.52);
-        racer.vy = Math.max(90, racer.vy + 140);
-        const signY = y - (obstacle.altitude ?? 315);
-        this.emit(x, signY, z, 24, '#8b5a2b', 210);
-        this.emit(x, signY, z, 16, '#c29a64', 170);
-        this.emit(x, signY, z, 12, '#ffffff', 130);
-        if (!racer.id) {
-          this.snapshot.score += 150;
-          this.shake = 3.2;
-          this.audio.play('land');
-          this.say('WATCH THE ROAD SIGNS! SPEED REDUCED.');
-        }
-        break;
-      default: break;
-    }
+  /** P9: the ratchet as the player's rope stops paying out and starts reeling in (once per hit). */
+  private reelCuedFor: number | undefined = undefined;
+  private cueRopeReel() {
+    const since = this.player.ropeSince;
+    if (since === undefined || since === this.reelCuedFor) return;
+    const age = this.runTime - since;
+    if (age < this.ropeConfig.payoutS || age >= this.ropeConfig.reelS) return;
+    this.reelCuedFor = since;
+    this.audio.play('rope_reel');
   }
 
   private refreshSnapshot() {
     const player = this.player;
+    this.cueRopeReel();
     this.snapshot.distance = Math.round(player.distance); this.snapshot.progress = player.distance / TRACK_DISTANCE;
     this.snapshot.speed = player.finished ? 0 : Math.round((player.loopRide ? Math.min(760, player.loopRide.speed) : Math.hypot(player.vx, player.vy)) * 0.16);
-    this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling || !!player.waterfall;
+    this.snapshot.inLoop = !!player.loopRide; this.snapshot.falling = player.falling;
     this.snapshot.grounded = player.grounded; this.snapshot.hopReady = this.canHop(player);
     this.snapshot.bounces = player.bounces; this.snapshot.boosts = player.boosts;
     this.snapshot.grade = Math.round(this.slope(player.x) * 100);
@@ -1046,8 +1312,15 @@ export class GameEngine {
     this.snapshot.laneLocked = this.runTime < player.steerLockedUntil;
     this.snapshot.bumps = this.counts.bumps; this.snapshot.raceTime = Math.floor(this.runTime * 10) / 10;
     let position = 1;
-    for (const racer of this.racers) if (racer.id && raceOrder(racer, player) < 0) position++;
+    let ahead: Racer | null = null;
+    for (const racer of this.racers) {
+      if (!racer.id || raceOrder(racer, player) >= 0) continue;
+      position++;
+      // H9: of everyone ahead, the one nearest the player.
+      if (!ahead || raceOrder(ahead, racer) < 0) ahead = racer;
+    }
     this.snapshot.position = position;
+    this.refreshGap(ahead, position);
     const sector = sectorAt(START_X + player.distance * 2, this.options.course);
     if (sector !== this.snapshot.sector && player.x >= STADIUM_START) { this.say('FINAL STRAIGHT. NO MORE MANNERS.'); this.audio.play('finish'); }
     this.snapshot.sector = sector; this.topSpeed = Math.max(this.topSpeed, this.snapshot.speed);
@@ -1055,12 +1328,42 @@ export class GameEngine {
     this.snapshot.shieldSeconds = Math.max(0, Math.ceil((player.shieldUntil - this.runTime) * 10) / 10);
   }
 
+  /** H9: the gap to the rider directly ahead, and its trend since the last refresh. */
+  private gapAt = 0;
+  private refreshGap(ahead: Racer | null, position: number) {
+    const player = this.player;
+    if (!ahead || !this.splitReached || player.finished) { this.snapshot.gapAhead = null; return; }
+    const place = position - 1;
+    const seconds = gapSeconds(ahead.x, player.x, player.vx, ahead.finishTime, this.runTime);
+    const previous = this.snapshot.gapAhead;
+    const trend = gapTrend(previous, place, seconds, this.runTime - this.gapAt);
+    this.gapAt = this.runTime;
+    this.snapshot.gapAhead = { place, seconds, name: ahead.name, trend };
+  }
+
+  /**
+   * H9: each racer's course progress (0..1), in racer order (the player first), into a reused buffer
+   * for the strip map; NaN for a rider not in the race yet. Returns how many were written.
+   */
+  fillStripProgress(out: Float32Array): number {
+    const count = Math.min(out.length, this.racers.length);
+    for (let i = 0; i < count; i++) {
+      const racer = this.racers[i];
+      out[i] = !this.splitReached && racer.id !== PLAYER_ID ? Number.NaN : clamp(racer.distance / TRACK_DISTANCE, 0, 1);
+    }
+    return count;
+  }
+
+  /** H9: racer colours in racer order (the strip map's dots). */
+  racerColors(): string[] { return this.racers.map((racer) => racer.color); }
+
   private standings(): RacerStanding[] {
     return [...this.racers].sort(raceOrder).map((racer, index) => ({
       id: racer.id, name: racer.name, color: racer.color, position: index + 1,
       distance: Math.round(clamp((racer.x - START_X) / 2, 0, TRACK_DISTANCE)), lane: closestLane(racer.z),
       finished: racer.finished, recovering: racer.falling || this.runTime < racer.recoveryUntil, finishTime: racer.finishTime,
       loadout: { ...racer.loadout },
+      ...(this.splitPlaces.has(racer.id) ? { splitPosition: this.splitPlaces.get(racer.id)! } : {}),
     }));
   }
 
@@ -1071,7 +1374,10 @@ export class GameEngine {
     if (completed) {
       this.snapshot.distance = TRACK_DISTANCE; this.snapshot.progress = 1;
       this.snapshot.score += 3000 + (4 - this.snapshot.position) * 500;
-      this.emit(this.player.x, this.y(FINISH) - 140, this.player.z, 42, this.player.color, 250);
+      // The finish burst is the one moment of a run that must never be invisible: an explosion-sized
+      // painted burst over the flag, with smoke under it.
+      this.effects.push('explosion', this.player.x, this.y(FINISH) - 140, this.player.z, 2.2, this.player.id, this.tick);
+      this.effects.push('smoke', this.player.x, this.y(FINISH) - 140, this.player.z, 1.4, this.player.id, this.tick);
     }
     this.audio.play('finish');
     const { sheep, explosions, loops, bumps } = this.counts;
@@ -1086,31 +1392,16 @@ export class GameEngine {
     this.notify();
   }
 
+  /** H8: records a hit on the player's ball for the camera kick and the yoke, and thuds. */
+  private playerImpact(strength: number, side: -1 | 0 | 1) {
+    const now = this.time;
+    // A second knock inside the same kick adds to it rather than restarting a weaker one.
+    const still = impactEnvelope(now - this.impact.at) * this.impact.strength;
+    this.impact.at = now; this.impact.side = side; this.impact.strength = Math.min(1, Math.max(strength, still));
+    this.audio.play('thud', 0.35 + 0.65 * this.impact.strength);
+  }
+
   private say(text: string) { this.snapshot.notice = text; this.noticeUntil = this.time + 2; }
-  private emit(x: number, y: number, z: number, count: number, color: string, speed: number) {
-    if (Math.abs(x - this.player.x) > this.renderer.view.width + 650) return;
-    if (this.renderer.lowDetail) count = Math.ceil(count * 0.65);
-    for (let i = 0; i < count; i++) {
-      const angle = Math.random() * TAU; const v = speed * (0.2 + Math.random() * 0.8); const life = 0.35 + Math.random() * 0.6;
-      this.particles.push({ x, y, z, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 50, life, maxLife: life, size: 2 + Math.random() * 4, color });
-    }
-    if (this.particles.length > 160) this.particles.splice(0, this.particles.length - 160);
-  }
-  private updateParticles(dt: number) {
-    let alive = 0;
-    for (const particle of this.particles) if (particle.life > dt) {
-      particle.x += particle.vx * dt; particle.y += particle.vy * dt; particle.vy += 310 * dt; particle.life -= dt;
-      this.particles[alive++] = particle;
-    }
-    this.particles.length = alive; alive = 0;
-    for (const sheep of this.airSheep) if (sheep.life > dt) {
-      sheep.x += sheep.vx * dt; sheep.y += sheep.vy * dt; sheep.vy += 570 * dt; sheep.rotation += dt * 3; sheep.life -= dt;
-      const ground = this.y(sheep.x);
-      if (sheep.y > ground - 36 && !this.inGap(sheep.x, sheep.z)) { sheep.y = ground - 36; sheep.vy = -Math.abs(sheep.vy) * 0.4; sheep.vx *= 0.74; }
-      this.airSheep[alive++] = sheep;
-    }
-    this.airSheep.length = alive;
-  }
   private notify(force = true) {
     const now = performance.now();
     if (!force && now - this.lastNotify < 100) { this.invalidate(); return; }
@@ -1122,10 +1413,8 @@ export class GameEngine {
     this.lastNotify = now; this.lastSnapshot = { ...this.snapshot }; this.onUpdate({ ...this.snapshot }); this.invalidate();
   }
   destroy() {
-    this.destroyed = true; cancelAnimationFrame(this.frameId);
+    this.destroyed = true; cancelAnimationFrame(this.frameId); this.gamepad.destroy();
     document.removeEventListener('visibilitychange', this.visibilityChanged);
-    this.canvas.removeEventListener('pointerdown', this.pointerDown); this.canvas.removeEventListener('pointermove', this.pointerMove);
-    this.canvas.removeEventListener('pointerup', this.pointerUp); this.canvas.removeEventListener('pointercancel', this.pointerCancel); this.canvas.removeEventListener('pointerleave', this.pointerLeave);
-    this.renderer.destroy(); this.audio.destroy(); this.buckets.clear(); this.pickupBuckets.clear(); this.pickupCandidates.clear();
+    this.renderer.destroy(); this.audio.destroy(); this.pickupCandidates.clear();
   }
 }

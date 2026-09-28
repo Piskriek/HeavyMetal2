@@ -1,5 +1,6 @@
 import { COURSES, DEFAULT_OPTIONS, type GameOptions, type RunRecord } from './types';
 import { runRecordKey } from './session';
+import { summarizeRecord } from './save';
 
 export const OPTIONS_KEY = 'goblin-rally-options-v1';
 export const RECORDS_KEY = 'goblin-rally-records-v1';
@@ -28,7 +29,11 @@ export function readOptions(): GameOptions {
     }
     if (COURSES.some((course) => course.id === saved.course)) options.course = saved.course!;
     if (saved.graphics === 'auto' || saved.graphics === 'performance' || saved.graphics === 'quality') options.graphics = saved.graphics;
-    if (saved.cameraMode === 'follow_ball' || saved.cameraMode === 'fixed') options.cameraMode = saved.cameraMode;
+    // M01 · T3: 'first_person' joins the list; an unknown stored value still degrades to the default
+    // rather than throwing (AC-8: a stored 'banana' must not break the race).
+    if (saved.cameraMode === 'first_person' || saved.cameraMode === 'third_person'
+      || saved.cameraMode === 'follow_ball' || saved.cameraMode === 'fixed') options.cameraMode = saved.cameraMode;
+    // M5: the slingshot start is gone, so a saved 'sling' (or anything else) is the push default.
     for (const [key, min, max] of [['launchSpeed', 80, 240], ['ballWeight', 40, 240], ['masterVolume', 0, 100]] as const) {
       if (typeof saved[key] === 'number' && Number.isFinite(saved[key])) options[key] = Math.max(min, Math.min(max, saved[key]!));
     }
@@ -61,6 +66,14 @@ export function mergeRunRecord(records: RunRecord[], record: RunRecord): RunReco
   const key = runRecordKey(record);
   return [record, ...records.filter((item) => runRecordKey(item) !== key)]
     .sort((a, b) => b.distance - a.distance || b.score - a.score).slice(0, MAX_RECORDS);
+}
+
+/**
+ * T02: storage copy of the Hall of Chaos. Applies the explicit versioned summary
+ * policy so 100-racer records stay bounded on disk; in-memory records keep every row.
+ */
+export function recordsForStorage(records: RunRecord[]): RunRecord[] {
+  return records.map(summarizeRecord);
 }
 
 /** Returns false when the browser denied the write, so the UI can say so honestly. */

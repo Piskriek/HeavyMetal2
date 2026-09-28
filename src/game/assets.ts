@@ -21,16 +21,62 @@ export type SpriteName =
   | 'signSheep'
   | 'signTnt'
   | 'signParts'
-  | 'springPart'
-  | 'bumperCrown'
-  | 'bumperSpiked'
-  | 'crate'
-  | 'skullBox'
-  | 'stripWood'
-  | 'stripMoss'
-  | 'stripHazard'
-  | 'stripMetal'
-  | 'waterfallHeadon';
+  | 'treeWallPines'
+  | 'treeWallBoomtown'
+  | 'treeWallSheep';
+
+export type TrackPartName =
+  | 'waterfallSheet'
+  | 'waterfallSplash'
+  | 'waterfallSplashB'
+  | 'waterfallCurtain'
+  | 'rockDeflector'
+  | 'bridgeWoodenBroken'
+  | 'cliffScaffolding'
+  | 'mineRails'
+  | 'mineRailsB'
+  | 'mineRailsC'
+  | 'mineGate'
+  | 'mineGateB'
+  | 'mineGateC'
+  | 'lavaSheet'
+  | 'lavaSheetB'
+  | 'lavaSheetC'
+  | 'cauldronMolten'
+  | 'cauldronMoltenB'
+  | 'cauldronMoltenC'
+  | 'lanternPost'
+  | 'oreBucket'
+  | 'oreCart'
+  | 'railSwitch'
+  | 'rockArchWide'
+  | 'rockBoulderA'
+  | 'rockBoulderB'
+  | 'rockCeilingCutout'
+  | 'rockFloorLedge'
+  | 'rockPlatformDeck'
+  | 'rockPlatformDrums'
+  | 'rockPlatformSpire'
+  | 'rockPlatformSpringboard'
+  | 'rockTunnelFrameA'
+  | 'rockTunnelFrameB'
+  | 'rockTunnelFrameC'
+  | 'rockWallLeft'
+  | 'rockWallRight'
+  | 'stadiumGantry'
+  | 'stadiumGantryB'
+  | 'stadiumGantryC'
+  | 'tntCrate'
+  | 'tunnelMouthStone'
+  | 'tunnelMouthTimber'
+  | 'wallGraniteStrata'
+  | 'wallSlateWet'
+  | 'wallTimberBraced'
+  | 'goblinBleacherA'
+  | 'goblinBleacherB'
+  | 'goblinBleacherC'
+  | 'goblinBleacherD'
+  | 'goblinBleacherE';
 
 export interface Sprite {
   image: HTMLImageElement;
@@ -46,6 +92,8 @@ export type GameAssets = Record<SpriteName, Sprite> & {
   pickupSprites?: Record<PowerupKind, HTMLCanvasElement>;
   /** The player's head-crop portrait, drawn in the off-screen pointer badge. */
   playerBadge?: CanvasImageSource;
+  /** TICKET-08 / TICKET-09: multi-section track-parts kit */
+  trackParts?: Partial<Record<TrackPartName, Sprite>>;
 };
 
 const readImage = (url: string): Promise<HTMLImageElement> =>
@@ -161,24 +209,14 @@ export function loadAssets(): Promise<GameAssets> {
       ['signSheep', 'sign-sheep.png?v=3'],
       ['signTnt', 'sign-tnt.png?v=3'],
       ['signParts', 'sign-parts.png?v=3'],
-      ['springPart', 'track-parts/spring.webp'],
-      ['bumperCrown', 'track-parts/bumper-crown.webp'],
-      ['bumperSpiked', 'track-parts/bumper-spiked.webp'],
-      ['crate', 'track-parts/crate.webp'],
-      ['skullBox', 'track-parts/skull-box.webp'],
-      ['stripWood', 'track-parts/strip-wood.webp'],
-      ['stripMoss', 'track-parts/strip-moss.webp'],
-      ['stripHazard', 'track-parts/strip-hazard.webp'],
-      ['stripMetal', 'track-parts/strip-metal.webp'],
-      ['waterfallHeadon', 'track-parts/waterfall-headon.png'],
+      ['treeWallPines', 'treewall-pines.png'],
+      ['treeWallBoomtown', 'treewall-boomtown.png'],
+      ['treeWallSheep', 'treewall-sheep.png'],
     ];
     const result = {} as GameAssets;
     await Promise.all(files.map(async ([name, filename]) => {
       const image = await readImage(`/art/${filename}`);
-      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts'
-        || name === 'springPart' || name === 'bumperCrown' || name === 'bumperSpiked' || name === 'crate' || name === 'skullBox'
-        || name === 'stripWood' || name === 'stripMoss' || name === 'stripHazard' || name === 'stripMetal' || name === 'waterfallHeadon'
-        ? asSprite(image) : await cutout(image);
+      result[name] = name === 'mountains' || name === 'deck' || name === 'dirtArt' || name === 'blimp' || name === 'signSheep' || name === 'signTnt' || name === 'signParts' || name === 'treeWallPines' || name === 'treeWallBoomtown' || name === 'treeWallSheep' ? asSprite(image) : await cutout(image);
     }));
     const sheet = await readImage('/art/track-sprites.png');
     const names: SpriteName[] = ['ball', 'sheep', 'tnt', 'spring', 'boost', 'ramp'];
@@ -196,6 +234,70 @@ export function loadAssets(): Promise<GameAssets> {
     await Promise.all((Object.keys(previews) as (keyof typeof previews)[]).map(async (name) => {
       result[name] = asSprite(await readImage(previews[name]));
     }));
+    const trackPartFiles: [TrackPartName, string][] = [
+      ['waterfallSheet', 'waterfall-sheet.png'],
+      ['waterfallSplash', 'waterfall-splash.png'],
+      ['waterfallSplashB', 'waterfall-splash-b.png'],
+      ['waterfallCurtain', 'waterfall-curtain.png'],
+      ['rockDeflector', 'rock-deflector.png'],
+      ['bridgeWoodenBroken', 'bridge-wooden-broken.png'],
+      ['cliffScaffolding', 'cliff-scaffolding.png'],
+      ['mineRails', 'mine-rails.png'],
+      ['mineRailsB', 'mine-rails-b.png'],
+      ['mineRailsC', 'mine-rails-c.png'],
+      ['mineGate', 'mine-gate.png'],
+      ['mineGateB', 'mine-gate-b.png'],
+      ['mineGateC', 'mine-gate-c.png'],
+      ['lavaSheet', 'lava-sheet.png'],
+      ['lavaSheetB', 'lava-sheet-b.png'],
+      ['lavaSheetC', 'lava-sheet-c.png'],
+      ['cauldronMolten', 'cauldron-molten.png'],
+      ['cauldronMoltenB', 'cauldron-molten-b.png'],
+      ['cauldronMoltenC', 'cauldron-molten-c.png'],
+      ['lanternPost', 'lantern-post.png'],
+      ['oreBucket', 'ore-bucket.png'],
+      ['oreCart', 'ore-cart.png'],
+      ['railSwitch', 'rail-switch.png'],
+      ['rockArchWide', 'rock-arch-wide.png'],
+      ['rockBoulderA', 'rock-boulder-a.png'],
+      ['rockBoulderB', 'rock-boulder-b.png'],
+      ['rockCeilingCutout', 'rock-ceiling-cutout.png'],
+      ['rockFloorLedge', 'rock-floor-ledge.png'],
+      ['rockPlatformDeck', 'rock-platform-deck.png'],
+      ['rockPlatformDrums', 'rock-platform-drums.png'],
+      ['rockPlatformSpire', 'rock-platform-spire.png'],
+      ['rockPlatformSpringboard', 'rock-platform-springboard.png'],
+      ['rockTunnelFrameA', 'rock-tunnel-frame-a.png'],
+      ['rockTunnelFrameB', 'rock-tunnel-frame-b.png'],
+      ['rockTunnelFrameC', 'rock-tunnel-frame-c.png'],
+      ['rockWallLeft', 'rock-wall-left.png'],
+      ['rockWallRight', 'rock-wall-right.png'],
+      ['stadiumGantry', 'stadium-gantry.png'],
+      ['stadiumGantryB', 'stadium-gantry-b.png'],
+      ['stadiumGantryC', 'stadium-gantry-c.png'],
+      ['tntCrate', 'tnt-crate.png'],
+      ['tunnelMouthStone', 'tunnel-mouth-stone.png'],
+      ['tunnelMouthTimber', 'tunnel-mouth-timber.png'],
+      ['wallGraniteStrata', 'wall-granite-strata.png'],
+      ['wallSlateWet', 'wall-slate-wet.png'],
+      ['wallTimberBraced', 'wall-timber-braced.png'],
+      ['goblinBleacherA', 'goblin-bleacher-a.png'],
+      ['goblinBleacherB', 'goblin-bleacher-b.png'],
+      ['goblinBleacherC', 'goblin-bleacher-c.png'],
+      ['goblinBleacherD', 'goblin-bleacher-d.png'],
+      ['goblinBleacherE', 'goblin-bleacher-e.png'],
+    ];
+    result.trackParts = {};
+    await Promise.allSettled(
+      trackPartFiles.map(async ([name, file]) => {
+        try {
+          const img = await readImage(`/art/track-parts/${file}`);
+          result.trackParts![name] = asSprite(img);
+        } catch {
+          // Gracefully omit missing track parts
+        }
+      })
+    );
     buildModelAtlas(result);
     return result;
   })().catch((error: unknown) => {

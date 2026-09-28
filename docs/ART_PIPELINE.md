@@ -609,3 +609,27 @@ Contact sheets: `docs/art-rounds/mouths-2.png`, `docs/art-rounds/hats-2.png`.
 | headgear-turbo-helm | 446×512 | [0.46, 0.72] | brow-line |
 | headgear-checkered-cap | 511×350 | [0.50, 0.75] | brow-line |
 | headgear-horseshoe-magnet | 504×510 | [0.48, 0.88] | crown |
+
+### 11.7 Round 6 — a feature at every cap (2026-09-28)
+
+Ten parts were generated (six ears, four eyes; part-only guarded prompts plus a "ONE single LEFT
+ear, base to the RIGHT" block — the ear pipeline paints one ear and mirrors it). Keying 10/10
+PASS, residual 0. **The catalog caps bit mid-round:** ears and eyes sat at 10/12 already (four
+legacy entries plus six painted), not 6/12, so only two slots per layer were free. Registered
+2+2 to close both catalogs at the v4 cap; the other six (gauge-lobes, bolted-flat, spear-ring,
+patch-stitched ears; button-doll, puppy-sad eyes) moved to `art-src/avatar-parts/vault/` with
+their prompts, ready to key-and-register when a codec v5 widens the feature fields.
+
+Registration: ears pin the skull-side attachment at the measured base rows (pivot x 0.92 like the
+rest of the rack, y per silhouette); the shredded ear needed its width clamped 96→84 after the
+registration test caught it spilling off-canvas on the bloated head. Eyes stay on the standard
+`eye-mid` [0.5, 0.5] pair canvas. All feature masks are skin-only (rings, bolts and brass stay
+painted brass on every goblin, like the torn-ring ears always have). Contact sheet:
+`docs/art-rounds/features-1.png`.
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| ears-moth-round | 512×343 | [0.92, 0.69] | ear-left (mirrored) |
+| ears-shredded-flag | 512×228 | [0.92, 0.60] | ear-left (mirrored) |
+| eyes-dizzy-swirls | 512×146 | [0.50, 0.50] | eye-mid |
+| eyes-rivet-socket | 512×160 | [0.50, 0.50] | eye-mid |

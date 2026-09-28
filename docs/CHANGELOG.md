@@ -84,6 +84,18 @@ history; this file is for what a player or a reviewer can see.
   fashion catalog is now full — only ears/eyes/nose/background spare slots and the big one, head
   shapes, remain.
 
+### Round 6: a feature at every cap (avatar art)
+
+- Ears catalog full (12/12): big cupped **moth ears** with ribbed fan grooves, and long
+  **shredded ears** with battle-torn flag tips (width-clamped after the bloated-head frame test).
+- Eyes catalog full (12/12): **dizzy swirls** (spinning hypnotic spirals) and **rivet sockets**
+  (deep dark hollows with one hot rivet glint each).
+- The caps bit mid-round: ears/eyes were 10/12, not 6/12 — so six more keyed-and-QA'd parts
+  (gauge-lobe, bolted-flat, spear-ring and patched ears; button-doll and puppy eyes) went into
+  `art-src/avatar-parts/vault/`, ready to ship when a codec v5 widens the feature fields.
+- Contact sheet `docs/art-rounds/features-1.png`. With this, every catalog except
+  backgrounds (4/12), warpaint (7/12), bodies (10/16) and heads (3/8) is at capacity.
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

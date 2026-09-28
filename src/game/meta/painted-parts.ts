@@ -226,7 +226,7 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'nose-long-droop', layer: 'nose', name: 'Long droop', pivot: [0.5, 0.35], anchor: 'nose', width: S(50) }),
   P({ id: 'ears-cauliflower-studs', layer: 'ears', name: 'Cauliflower ears', pivot: [0.9, 0.5], anchor: 'ear-left', width: S(60), mirrorPair: true }),
   P({ id: 'ears-long-ragged', layer: 'ears', name: 'Long ragged ears', pivot: [0.92, 0.55], anchor: 'ear-left', width: (c) => Math.min(Math.round((96 / 54) * c.headW), 78), mirrorPair: true }),
-  P({ id: 'ears-shredded-flag', layer: 'ears', name: 'Shredded ears', pivot: [0.92, 0.6], anchor: 'ear-left', width: () => 92, mirrorPair: true, prompt: 'Very long ear with its end shredded like a battle-torn flag.' }),
+  P({ id: 'ears-shredded-flag', layer: 'ears', name: 'Shredded ears', pivot: [0.92, 0.6], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Very long ear with its end shredded like a battle-torn flag.' }),
   P({ id: 'ears-moth-round', layer: 'ears', name: 'Moth ears', pivot: [0.92, 0.69], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Big round cupped moth-wing ear, ribbed fanned inner grooves.' }),
   P({ id: 'neck-wool-scarf', layer: 'neck', name: 'Wool scarf', pivot: [0.5, 0.3], anchor: 'chin', width: S(150) }),
   P({ id: 'neck-padlock-collar', layer: 'neck', name: 'Padlock collar', pivot: [0.5, 0.35], anchor: 'chin', width: S(120) }),

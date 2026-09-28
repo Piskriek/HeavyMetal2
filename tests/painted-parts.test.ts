@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { AVATAR_CATALOG, V3_CAPACITY, V4_CAPACITY, decodeGoblinDna, encodeGoblinDna, generateRandomGoblin } from '../src/game/meta/goblin-dna';
+import { AVATAR_CATALOG, V3_CAPACITY, V4_CAPACITY, V5_CAPACITY, decodeGoblinDna, encodeGoblinDna, generateRandomGoblin } from '../src/game/meta/goblin-dna';
 import { KEYED_PARTS, PAINTED_PARTS, headRig, paintedPlacement, rigAnchor, type PaintedPartDef, type RigAnchorId } from '../src/game/meta/painted-parts';
 import { PART_MASKS } from '../src/game/meta/painted-masks.generated';
 import { composeGoblinSvg, maskUrl } from '../src/game/meta/goblin-compositor';
@@ -177,10 +177,10 @@ test('ART-I2: v4 codes fail honestly: shape, checksum, versions above 4, overflo
   const broken = (dna: string, re: RegExp, label: string) => assert.throws(() => decodeGoblinDna(dna), re, label);
   broken('GOB-4000-1D92-BF3E-97FC', /Malformed/, 'a v3-shaped code with a 4 nibble is malformed');
   broken('GOB-4000-1D92-BF3E-97FC-EA08', /checksum mismatch/, 'one flipped nibble trips the checksum');
-  broken('GOB-5FFF-FFFF-FFFF-FFFF-FFFF-FFFF', /Unsupported DNA version 5/, 'v5 is refused, not parsed as junk');
+  broken('GOB-6FFF-FFFF-FFFF-FFFF-FFFF-FFFF', /Unsupported DNA version 6/, 'v6 is refused, not parsed as junk');
   // The largest encodable digit out-of-range: force a body digit the radix can't hold.
   const g = generateRandomGoblin(3, 3);
-  assert.throws(() => encodeGoblinDna({ ...g, layers: { ...g.layers, body: 16 } }), /out of range for v4/, 'body ≥ 16 cannot be written');
+  assert.throws(() => encodeGoblinDna({ ...g, layers: { ...g.layers, body: 16 } }), /out of range for v/, 'body ≥ 16 cannot be written');
   // ... nor read: a v4 payload with every digit maxed is past the payload space.
   broken('GOB-4' + 'F'.repeat(19) + '.', /Malformed/, 'garbage is malformed');
   broken('GOB-4' + 'FFF-FFFF-FFFF-FFFF-FFFE', /checksum mismatch|out of range/, 'an all-F payload never decodes');
@@ -188,7 +188,7 @@ test('ART-I2: v4 codes fail honestly: shape, checksum, versions above 4, overflo
   const beyond = AVATAR_CATALOG.body.length;
   if (beyond >= V4_CAPACITY.body) {
     // Catalog at the radix: the future body digit overflows v4, so encode itself fails honestly.
-    assert.throws(() => encodeGoblinDna({ ...g, layers: { ...g.layers, body: beyond } }), /out of range for v4/, 'a body digit past the radix is refused at encode time');
+    assert.throws(() => encodeGoblinDna({ ...g, layers: { ...g.layers, body: beyond } }), /out of range for v/, 'a body digit past the radix is refused at encode time');
   } else {
     const future = encodeGoblinDna({ ...g, layers: { ...g.layers, body: beyond } });
     assert.match(future, /^GOB-4/);
@@ -208,8 +208,23 @@ test('ART-I2: generators 1–3 freeze: no roll is spent on the body layer', () =
     assert.ok(g.layers.body >= 0 && g.layers.body < AVATAR_CATALOG.body.length, `gen-4 body roll inside the catalog (seed ${seed})`);
     const dna = encodeGoblinDna(g);
     assert.deepEqual(decodeGoblinDna(dna), g, `seed ${seed} round-trips (${dna})`);
-    if (g.layers.body > 0) assert.match(dna, /^GOB-4/, 'nonzero bodies encode as v4');
+    if (g.layers.body > 0) assert.match(dna, /^GOB-[45]/, 'nonzero bodies encode as v4 or v5');
   }
+});
+
+test('ART-I3: DNA v5 widens ears and eyes to sixteen; the wire shape stays v4-sized', () => {
+  assert.equal(V5_CAPACITY.ears, 16, 'ears gain four slots (the round-6 vault exactly)');
+  assert.equal(V5_CAPACITY.eyes, 16, 'eyes gain four slots');
+  for (const layer of Object.keys(V5_CAPACITY) as AvatarLayerId[]) {
+    assert.ok(AVATAR_CATALOG[layer].length <= V5_CAPACITY[layer], `the ${layer} catalog fits v5`);
+  }
+  // A feature index past the v4 radix encodes as GOB-5 in the same five-group shape as v4.
+  const g = generateRandomGoblin(5, 4);
+  const five: GoblinAvatarConfig = { ...g, layers: { ...g.layers, ears: 12 } };
+  const dna = encodeGoblinDna(five);
+  assert.match(dna, /^GOB-5[0-9A-F]{3}(-[0-9A-F]{4}){4}$/, dna);
+  // Inside the v4 radix everything keeps its v4 form; nothing shortens to v5 and nothing lengthens.
+  assert.match(encodeGoblinDna({ ...g, layers: { ...g.layers, ears: 0, eyes: 0 } }), /^GOB-[1-4]/);
 });
 
 test('ART-I1: a v3 code from a newer catalog is refused honestly, not drawn as the wrong part', () => {

@@ -89,28 +89,37 @@ export const V3_CAPACITY: Readonly<Record<BaseLayerId, number>> = {
  */
 export const V4_CAPACITY: Readonly<Record<AvatarLayerId, number>> = { ...V3_CAPACITY, head: 8, body: 16 };
 
+/**
+ * FROZEN: v5's fixed room per layer. Ears and eyes widen 12 → 16 — the feature slots exhausted in
+ * the round-6 art wave (four ears and two eyes were vaulted when v4 filled; v5 is their landing).
+ * The payload grows to ~56.9 bits, still under 2^68, so the wire shape stays v4's five groups.
+ */
+export const V5_CAPACITY: Readonly<Record<AvatarLayerId, number>> = { ...V4_CAPACITY, ears: 16, eyes: 16 };
+
 type Radix = readonly { key: string; size: number }[];
 const paletteRadix = [
   { key: 'skin', size: SKIN_TONES.length }, { key: 'accent', size: ACCENT_PALETTE.length },
   { key: 'leather', size: LEATHER_PALETTE.length }, { key: 'metal', size: METAL_PALETTE.length },
 ];
-type Version = 1 | 2 | 3 | 4;
+type Version = 1 | 2 | 3 | 4 | 5;
 const RADIX_BY_VERSION: Readonly<Record<Version, Radix>> = {
   1: [...BASE_LAYER_KEYS.map((k) => ({ key: k, size: V1_SIZES[k] })), ...paletteRadix],
   2: [...BASE_LAYER_KEYS.map((k) => ({ key: k, size: V2_SIZES[k] })), ...paletteRadix],
   3: [...BASE_LAYER_KEYS.map((k) => ({ key: k, size: V3_CAPACITY[k] })), ...paletteRadix],
   4: [...LAYER_KEYS.map((k) => ({ key: k, size: V4_CAPACITY[k] })), ...paletteRadix],
+  5: [...LAYER_KEYS.map((k) => ({ key: k, size: V5_CAPACITY[k] })), ...paletteRadix],
 };
 const space = (v: Version) => RADIX_BY_VERSION[v].reduce((p, r) => p * r.size, 1);
 const spaceBig = (v: Version) => RADIX_BY_VERSION[v].reduce((p, r) => p * BigInt(r.size), 1n);
-export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3), 4: space(4) } as const;
-/** Hex digits of payload per version (v1/v2: 9, v3: 13, v4: 17 — v4 exceeds 52 bits, so the codec packs with BigInt). */
-const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13, 4: 17 };
+export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3), 4: space(4), 5: space(5) } as const;
+/** Hex digits of payload per version (v1/v2: 9, v3: 13, v4/v5: 17 — v4+ exceed 52 bits, so the codec packs with BigInt; v5 still fits 68 bits). */
+const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13, 4: 17, 5: 17 };
 if (PAYLOAD_SPACE[2] >= 16 ** 9) throw new Error('DNA v2 payload no longer fits 36 bits');
 if (PAYLOAD_SPACE[3] >= 16 ** 13) throw new Error('DNA v3 payload no longer fits 52 bits');
 if (spaceBig(4) >= 16n ** 17n) throw new Error('DNA v4 payload no longer fits 68 bits');
+if (spaceBig(5) >= 16n ** 17n) throw new Error('DNA v5 payload no longer fits 68 bits');
 for (const k of LAYER_KEYS) {
-  if (AVATAR_CATALOG[k].length > V4_CAPACITY[k]) throw new Error(`The ${k} catalog outgrew DNA v4 (${AVATAR_CATALOG[k].length} > ${V4_CAPACITY[k]}): add a v5`);
+  if (AVATAR_CATALOG[k].length > V5_CAPACITY[k]) throw new Error(`The ${k} catalog outgrew DNA v5 (${AVATAR_CATALOG[k].length} > ${V5_CAPACITY[k]}): add a v6`);
 }
 
 /* ───────────── Nudge block ───────────── */
@@ -178,8 +187,9 @@ export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
   const fitsV1 = body === 0 && BASE_LAYER_KEYS.every((k) => config.layers[k] < V1_SIZES[k]);
   const fitsV2 = body === 0 && BASE_LAYER_KEYS.every((k) => config.layers[k] < V2_SIZES[k]);
   const fitsV3 = body === 0 && BASE_LAYER_KEYS.every((k) => config.layers[k] < V3_CAPACITY[k]);
+  const fitsV4 = LAYER_KEYS.every((k) => config.layers[k] < V4_CAPACITY[k]);
   const nudged = isNudged(config.nudge);
-  const version: Version = fitsV1 && !nudged ? 1 : fitsV2 ? 2 : fitsV3 ? 3 : 4;
+  const version: Version = fitsV1 && !nudged ? 1 : fitsV2 ? 2 : fitsV3 ? 3 : fitsV4 ? 4 : 5;
   const hex = packHead(version, configDigits(normalized, RADIX_BY_VERSION[version]));
   let dna = hex.match(/.{4}/g)!.reduce((out, group) => `${out}-${group}`, 'GOB');
   if (nudged) {
@@ -195,13 +205,13 @@ export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
 }
 
 /** Groups after the `GOB-` marker per DNA version, before the optional 3-group nudge block. */
-const HEAD_GROUPS: Readonly<Record<Version, number>> = { 1: 3, 2: 3, 3: 4, 4: 5 };
+const HEAD_GROUPS: Readonly<Record<Version, number>> = { 1: 3, 2: 3, 3: 4, 4: 5, 5: 5 };
 
 export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
   const groups = dna.trim().toUpperCase().split('-');
   if (groups[0] !== 'GOB' || !groups.slice(1).every((g) => /^[0-9A-Z]{4}$/.test(g))) throw new SyntaxError('Malformed goblin DNA');
   const version = parseInt(groups[1]?.[0] ?? '', 16);
-  if (version !== 1 && version !== 2 && version !== 3 && version !== 4) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5) {
     if (/^[0-9A-F]$/.test(groups[1]?.[0] ?? '')) throw new RangeError(`Unsupported DNA version ${version}`);
     throw new SyntaxError('Malformed goblin DNA');
   }

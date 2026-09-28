@@ -166,6 +166,8 @@ test('surface paint on the island terrain goes through the ground brush, not the
   assert.ok(dabs.every((d) => d.surface === SURFACE_GRANITE && !d.erase));
   assert.equal(ground.material, groundMaterial, 'the ground keeps its own material');
   assert.equal(ground.geometry.getAttribute('islSurface'), undefined, 'no per-vertex surface on the ground');
+  assert.equal(tool.takeGroundUndo(), true, 'Ctrl+Z takes the ground stroke back on the ground stack');
+  assert.equal(tool.takeGroundUndo(), false, 'and then falls through to the builder undo');
   tool.dispose();
 });
 

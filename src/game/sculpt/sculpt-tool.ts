@@ -98,6 +98,8 @@ export class SculptTool {
   private stroke: Stroke | null = null;
   /** A surface stroke on the island terrain, painted through the ground's own brush. */
   private groundStroke: { x: number; z: number } | null = null;
+  /** What each finished stroke was: ground strokes undo on the ground's own stack, the rest in the builder's. */
+  private readonly strokeKinds: ('ground' | 'sculpt')[] = [];
   private shiftHeld = false;
   private ctrlHeld = false;
   private lastTargetId: string | null = null;
@@ -389,6 +391,19 @@ export class SculptTool {
     this.groundStroke = { x: last.x + dx * step * n, z: last.z + dz * step * n };
   }
 
+  private pushStrokeKind(kind: 'ground' | 'sculpt') {
+    this.strokeKinds.push(kind);
+    if (this.strokeKinds.length > 64) this.strokeKinds.shift();
+  }
+
+  /**
+   * Ctrl+Z while sculpting: true when the latest stroke was island ground paint (the caller undoes it on
+   * the ground's stack); false for the builder's own undo.
+   */
+  takeGroundUndo(): boolean {
+    return this.strokeKinds.pop() === 'ground';
+  }
+
   private readonly onDown = (event: PointerEvent) => {
     if (!this.enabled || event.button !== 0 || !this.dom) return;
     const hit = this.hit(event);
@@ -479,6 +494,7 @@ export class SculptTool {
     if (this.groundStroke) {
       this.groundStroke = null;
       this.host.endGroundStroke?.();
+      this.pushStrokeKind('ground');
       this.notify();
       return;
     }
@@ -493,6 +509,7 @@ export class SculptTool {
     stroke.entry.hash = doc?.hash ?? '';
     if (!doc) this.applied.delete(stroke.prop.id);
     this.host.commitSculpt(stroke.prop.id, doc);
+    this.pushStrokeKind('sculpt');
     this.status = doc ? `${stroke.prop.name}: ${parts.length} mesh${parts.length === 1 ? '' : 'es'}, ${sculptDocBytes(doc)} bytes saved.` : `${stroke.prop.name}: back to its generated shape.`;
     this.notify();
   };

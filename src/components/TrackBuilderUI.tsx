@@ -1023,6 +1023,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         e.preventDefault();
         showToast(builder.undoGroundStroke() ? 'Undid the last dirt stroke' : 'No dirt stroke to undo');
         onRequestRender?.();
+      } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && builder.sculpt?.isEnabled && builder.sculpt.takeGroundUndo()) {
+        // Sculpt & mesh paint: island surface paint on the terrain lives on the ground's own undo stack.
+        e.preventDefault();
+        showToast(builder.undoGroundStroke() ? 'Undid the last island ground stroke' : 'No ground stroke to undo');
+        onRequestRender?.();
       } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
         e.preventDefault();
         builder.undo();

@@ -32,6 +32,7 @@ import { libraryTexture } from './island-texture-library';
 import { ISLAND_SURFACE_GLSL } from './island-surface-shader';
 import { TERRAIN_RES, analyseIslandTerrain, type IslandTerrain, type TerrainTriangles } from './island-terrain';
 import { effectiveLayers, normalizeRecipe, paintIsland, upsampleMask, type IslandRecipe, type PaintIslandResult } from './island-autopaint';
+import { hasDevServer } from '../../platform/dev-server';
 
 export interface IslandGroundSettings {
   /** Multiplied into the island texture, #rrggbb. */
@@ -1100,7 +1101,7 @@ export async function decodeGroundPaint(doc: IslandGroundDoc): Promise<Uint8Arra
 /** Loads a track's ground into `ground`: the browser copy, else the disk copy. */
 export async function loadGround(ground: IslandGround, trackId: string): Promise<void> {
   let doc = readGroundDoc(trackId);
-  if (!doc && typeof fetch !== 'undefined') {
+  if (!doc && typeof fetch !== 'undefined' && hasDevServer()) {
     try {
       const res = await fetch(islandGroundEndpoint(trackId));
       if (res.ok) {
@@ -1134,7 +1135,7 @@ export function saveGround(ground: IslandGround, trackId: string): boolean {
   const text = JSON.stringify(doc);
   let stored = true;
   try { localStorage.setItem(islandGroundKey(trackId), text); } catch { stored = false; }
-  if (typeof fetch !== 'undefined') {
+  if (typeof fetch !== 'undefined' && hasDevServer()) {
     fetch(islandGroundEndpoint(trackId), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: text }).catch(() => { /* no dev server */ });
   }
   return stored;

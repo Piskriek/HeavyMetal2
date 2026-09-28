@@ -12,6 +12,7 @@ import {
   ACCENT_PALETTE, AVATAR_CATALOG, LEATHER_PALETTE, METAL_PALETTE, NUDGE_LAYERS, NUDGE_PARENT, NUDGE_STEP_PX,
   SKIN_TONES, SPREAD_LAYERS, SPREAD_STEP_PX,
 } from './goblin-dna';
+import { rebase } from '../../platform/asset-base';
 import { PAINTED_PARTS, drawnItem, headRig, paintedPlacement, rigAnchor, type RigAnchorId } from './painted-parts';
 import { PART_MASKS, type MaskChannel } from './painted-masks.generated';
 import { PART_DEPTH } from './painted-depth.generated';
@@ -149,7 +150,8 @@ export function composeGoblinSvg(config: GoblinAvatarConfig, options: ComposeOpt
   const skin = SKIN_TONES.find((s) => s.id === config.skin) ?? SKIN_TONES[0];
   const headShape = AVATAR_CATALOG.head[config.layers.head];
   const prefix = options.idPrefix ?? 'gob';
-  const resolve = options.resolveImage ?? ((u: string) => u);
+  // The part files are root paths; a RUN build (served from a subfolder) rebases them.
+  const resolve = options.resolveImage ?? ((u: string) => rebase(u));
   const base: Omit<Ctx, 'item'> = {
     skin, accent: ACCENT_PALETTE[config.accent], leather: LEATHER_PALETTE[config.leather], metal: METAL_PALETTE[config.metal],
     ...headRig(headShape),

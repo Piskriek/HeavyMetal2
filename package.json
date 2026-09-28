@@ -28,6 +28,7 @@
     "qualifying": "node --import tsx scripts/qualifying-harness.ts"
   },
   "dependencies": {
+    "@series-inc/rundot-game-sdk": "5.29.0",
     "clsx": "2.1.1",
     "framer-motion": "^13.4.0",
     "lucide-react": "^1.46.0",

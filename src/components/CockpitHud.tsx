@@ -25,6 +25,7 @@ import {
 } from '../game/cockpit-trinkets';
 import { readRecords } from '../game/preferences';
 import '../cockpit.css';
+import { rebase } from '../platform/asset-base';
 
 interface CockpitHudProps {
   /** Fills `state` for this frame. The HUD never allocates a state object of its own. */
@@ -404,10 +405,10 @@ export default function CockpitHud({ readState, state, reducedMotion, active }: 
 
         <div className="cockpit-center-readout" ref={readouts.center} role="status" />
 
-        <div className="cockpit-starter" ref={starterRef} style={{ backgroundImage: `url(${COCKPIT_ART.starter})` }} aria-hidden="true" />
+        <div className="cockpit-starter" ref={starterRef} style={{ backgroundImage: `url(${rebase(COCKPIT_ART.starter)})` }} aria-hidden="true" />
 
-        <div className="cockpit-arm" ref={armLeftRef} style={{ backgroundImage: `url(${COCKPIT_ART.arm})` }} aria-hidden="true" />
-        <div className="cockpit-arm" ref={armRightRef} style={{ backgroundImage: `url(${COCKPIT_ART.arm})` }} aria-hidden="true" />
+        <div className="cockpit-arm" ref={armLeftRef} style={{ backgroundImage: `url(${rebase(COCKPIT_ART.arm)})` }} aria-hidden="true" />
+        <div className="cockpit-arm" ref={armRightRef} style={{ backgroundImage: `url(${rebase(COCKPIT_ART.arm)})` }} aria-hidden="true" />
 
         <div className="cockpit-yoke" ref={yokeRef} style={{ left: '50%', top: layout.yoke.hub.y, width: layout.yoke.w, height: layout.yoke.h }}>
           <img src={COCKPIT_ART.yoke} alt="" aria-hidden="true" draggable={false} />

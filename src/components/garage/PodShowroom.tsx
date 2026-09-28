@@ -21,6 +21,7 @@ import { authoredFromLocal, bakeUvForPoint, podGeometry } from '../../game/pod/p
 import { accentFromBake, liveryFromBake } from '../../game/pod/pod-design';
 import type { PodLivery } from '../../game/pod/pod-livery';
 import type { CapFinish } from './BallShowroom';
+import { rebase } from '../../platform/asset-base';
 
 interface Props {
   baked: BakeResult;
@@ -219,7 +220,7 @@ export default function PodShowroom({ baked, capFinish, onSurface, onCap, onPort
     <div className="garage-ball-3d" role="img" aria-label={label}>
       <div className={`garage-cradle${failed ? ' flat' : ''}`} ref={cradleRef} aria-hidden="true" />
       {failed
-        ? <div className="garage-ball-fallback" style={{ backgroundImage: fallback ? `url(${fallback})` : undefined }} />
+        ? <div className="garage-ball-fallback" style={{ backgroundImage: fallback ? `url(${rebase(fallback)})` : undefined }} />
         : <canvas ref={canvasRef} />}
     </div>
   );

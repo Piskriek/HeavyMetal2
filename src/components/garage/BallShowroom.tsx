@@ -12,6 +12,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { CAP_RADIUS_SCALE, CAP_THETA } from '../../game/gyro-ball';
 import type { CustomBallConfig } from '../../game/meta/interfaces';
 import type { BakeResult, RgbaImage } from '../../game/meta/sphere-decal-baker';
+import { rebase } from '../../platform/asset-base';
 
 export type CapFinish = CustomBallConfig['capFinish'];
 
@@ -224,7 +225,7 @@ export function SphereShowroom({ baked, capFinish, onSurface, onCap, label }: Pr
     <div className="garage-ball-3d" role="img" aria-label={label}>
       <div className={`garage-cradle${failed ? ' flat' : ''}`} ref={cradleRef} aria-hidden="true" />
       {failed
-        ? <div className="garage-ball-fallback" style={{ backgroundImage: fallback ? `url(${fallback})` : undefined }} />
+        ? <div className="garage-ball-fallback" style={{ backgroundImage: fallback ? `url(${rebase(fallback)})` : undefined }} />
         : <canvas ref={canvasRef} />}
     </div>
   );

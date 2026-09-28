@@ -15,6 +15,7 @@ import {
 import { MAX_DECALS_PER_BALL, type BaseMaterialId, type DecalTextureId, type HexColor } from '../../game/meta/interfaces';
 import { ACCENT_PALETTE } from '../../game/meta/goblin-dna';
 import BallShowroom, { CAP_FINISHES, type CapFinish } from './BallShowroom';
+import { rebase } from '../../platform/asset-base';
 
 const MAP_W = 512;
 type Tab = 'metal' | 'paint' | 'decals' | 'saved';
@@ -75,9 +76,9 @@ const decalColumns = () => {
  */
 const maskArt = (url: string | undefined, tint: string) => (url
   ? {
-    backgroundImage: `linear-gradient(${tint}, ${tint}), url(${url})`,
+    backgroundImage: `linear-gradient(${tint}, ${tint}), url(${rebase(url)})`,
     backgroundBlendMode: 'multiply',
-    WebkitMaskImage: `url(${url})`, maskImage: `url(${url})`,
+    WebkitMaskImage: `url(${rebase(url)})`, maskImage: `url(${rebase(url)})`,
   }
   : undefined);
 
@@ -203,7 +204,7 @@ export default function BallCustomizer() {
                 const locked = price > 0 && !owned.has(id);
                 return (
                   <button key={id} type="button" role="radio" aria-checked={design.base === id} className="garage-card" onClick={() => change({ ...design, base: id })}>
-                    <span className="garage-orb" style={{ backgroundImage: art.bases[id] ? `url(${art.bases[id]})` : undefined }} />
+                    <span className="garage-orb" style={{ backgroundImage: art.bases[id] ? `url(${rebase(art.bases[id])})` : undefined }} />
                     <span className="garage-card-name">{BASE_MATERIALS[id].name}</span>
                     <span className={`garage-price ${locked ? 'locked' : ''}`}>{locked ? <><Lock size={10} />{price} gold</> : 'Owned'}</span>
                   </button>
@@ -275,7 +276,7 @@ export default function BallCustomizer() {
                 <div className="garage-cards" aria-label="Saved designs">
                   {saved.map((s) => (
                     <button key={s.name} type="button" className="garage-card" onClick={() => load(s.config, s.name)}>
-                      <span className="garage-orb" style={{ backgroundImage: art.bases[s.config.base] ? `url(${art.bases[s.config.base]})` : undefined }} />
+                      <span className="garage-orb" style={{ backgroundImage: art.bases[s.config.base] ? `url(${rebase(art.bases[s.config.base])})` : undefined }} />
                       <span className="garage-card-name">{s.name}</span>
                       <span className="garage-price">{s.config.decals.length} decals</span>
                     </button>

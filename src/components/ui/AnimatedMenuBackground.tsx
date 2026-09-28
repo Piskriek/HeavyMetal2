@@ -22,6 +22,7 @@ import {
   resolveBackdrop,
 } from './ambient-motion';
 import './animated-background.css';
+import { rebase } from '../../platform/asset-base';
 
 interface AnimatedMenuBackgroundProps {
   /** Which preset to render. Falls back to `main`. */
@@ -202,7 +203,7 @@ export default function AnimatedMenuBackground({
   }, []);
 
   const planeStyle: CSSProperties = {
-    backgroundImage: `url(${backdrop.url})`,
+    backgroundImage: `url(${rebase(backdrop.url)})`,
     backgroundSize: 'cover',
     backgroundPosition: backdrop.position,
     backgroundRepeat: 'no-repeat',

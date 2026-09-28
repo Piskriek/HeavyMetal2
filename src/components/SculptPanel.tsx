@@ -13,6 +13,7 @@ import type { SculptTool } from '../game/sculpt/sculpt-tool';
 import type { SculptDirection } from '../game/sculpt/sculpt-brushes';
 import { ISLAND_SURFACES, IslandSurfaceArray } from '../game/island-route/island-surfaces';
 import { surfaceDefinition } from '../game/surface/surface-table';
+import { rebase } from '../platform/asset-base';
 
 const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, margin: '4px 0' };
 const label: CSSProperties = { width: 96, opacity: 0.8 };
@@ -121,7 +122,7 @@ export function SculptPanel({ tool }: { tool: SculptTool }) {
                           className="h-10 w-full rounded border border-zinc-700/50 bg-cover bg-center"
                           style={{
                             backgroundColor: def.swatch,
-                            backgroundImage: thumb ? `url(${thumb})` : undefined,
+                            backgroundImage: thumb ? `url(${rebase(thumb)})` : undefined,
                           }}
                         />
                         <span className="mt-1 w-full truncate text-center text-[10px] font-medium leading-tight text-zinc-300 group-hover:text-amber-200">

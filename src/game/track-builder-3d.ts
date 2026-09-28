@@ -66,6 +66,7 @@ import {
   DEFAULT_ISLAND_TRACK, ISLAND_BACKUP_ENDPOINTS, createIslandTrack as createStoredIslandTrack, islandEndpoints,
   readIslandProps, readIslandTracks, setActiveIslandTrack, writeIslandProps, type IslandTrack, type IslandTrackIndex,
 } from './island-route/island-props-storage';
+import { hasDevServer } from '../platform/dev-server';
 
 /**
  * Which saved props a builder works on: the owner's classic track, the island's own props, or none
@@ -3861,7 +3862,7 @@ export class TrackBuilder3D {
   }
 
   private async syncLatestFromDisk() {
-    if (typeof fetch === 'undefined') return;
+    if (typeof fetch === 'undefined' || !hasDevServer()) return;
     try {
       const res = await fetch(this.propStore === 'island' ? islandEndpoints(this.islandTrackId).backup : TRACK_BACKUP_ENDPOINTS.backup);
       if (!res.ok) return;

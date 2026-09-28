@@ -14,6 +14,7 @@
  * the document.
  */
 import type { PlacedProp } from './prop-catalog';
+import { hasDevServer } from '../../platform/dev-server';
 
 export type BackupStatus = 'idle' | 'saving' | 'saved' | 'error';
 export interface BackupInfo { status: BackupStatus; timestamp: number; count: number }
@@ -142,6 +143,7 @@ export class PropBackupService {
       return null;
     }
 
+    if (!hasDevServer()) return null;
     this.notify('saving');
     try {
       const payload = { course, timestamp: now, props };
@@ -173,7 +175,7 @@ export class PropBackupService {
     let history: any[] = [];
     const localHistory: any[] = [];
 
-    if (typeof fetch !== 'undefined') {
+    if (typeof fetch !== 'undefined' && hasDevServer()) {
       try {
         const res = await fetch(this.endpoints.backup);
         if (res.ok) {
@@ -218,7 +220,7 @@ export class PropBackupService {
 
   /** The props of one disk history file, or null. */
   async fetchHistoryFile(filename: string): Promise<PlacedProp[] | null> {
-    if (typeof fetch === 'undefined') return null;
+    if (typeof fetch === 'undefined' || !hasDevServer()) return null;
     const res = await fetch(this.endpoints.restore, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

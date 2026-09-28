@@ -9,6 +9,7 @@ import {
   CLOUD_COUNT_MAX, GRADIENT_PRESETS, SEA_PRESETS, SEA_TEXTURES, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
   type SkyGradient, type SkySettings,
 } from '../../game/sky/sky-settings';
+import { rebase } from '../../platform/asset-base';
 
 interface Props {
   /** The Sky menu's painted skies, to pick one right here. */
@@ -97,7 +98,7 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
                 onClick={() => onPickPainted(p.id)}
                 className={`flex items-center gap-2 rounded border p-1 text-left cursor-pointer ${currentPainted === p.id ? 'border-amber-500/80 bg-amber-950/60 text-amber-200' : 'border-zinc-800 bg-zinc-900 text-zinc-300 hover:border-amber-600/60'}`}
               >
-                <span className="h-7 w-7 shrink-0 rounded bg-cover bg-center border border-zinc-700" style={{ backgroundImage: `url(${p.url})` }} />
+                <span className="h-7 w-7 shrink-0 rounded bg-cover bg-center border border-zinc-700" style={{ backgroundImage: `url(${rebase(p.url)})` }} />
                 <span className="truncate text-[10px]">{p.name}</span>
               </button>
             ))}

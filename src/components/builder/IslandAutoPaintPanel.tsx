@@ -15,6 +15,7 @@ import {
 import { ISLAND_PALETTE } from '../../game/island-route/island-surfaces';
 import { surfaceDefinition } from '../../game/surface/surface-table';
 import IslandTexturePicker from './IslandTexturePicker';
+import { rebase } from '../../platform/asset-base';
 
 interface Props {
   ground: IslandGround;
@@ -123,7 +124,7 @@ export default function IslandAutoPaintPanel({ ground, onRequestRender, textures
               <span className="flex h-9 w-full">
                 {(strips.get(p.id) ?? []).map((id) => (
                   <span key={id} className="h-full flex-1 bg-cover bg-center"
-                    style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumbsReady && thumb(id) ? `url(${thumb(id)})` : undefined }} />
+                    style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumbsReady && thumb(id) ? `url(${rebase(thumb(id))})` : undefined }} />
                 ))}
               </span>
               <span className={`block px-1.5 py-1 text-[11px] font-semibold ${picked ? 'text-amber-200' : 'text-zinc-200'}`}>{p.name}</span>
@@ -154,7 +155,7 @@ export default function IslandAutoPaintPanel({ ground, onRequestRender, textures
                 {[...new Set(recipe.layers.map((l) => l.surface))].map((id) => (
                   <button key={id} onClick={() => setEditSurface(editSurface === id ? null : id)} title={surfaceDefinition(id).name}
                     className={`flex cursor-pointer flex-col items-center gap-0.5 rounded border p-0.5 text-[9px] ${editSurface === id ? 'border-amber-400 text-amber-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
-                    <span className="block h-7 w-full rounded-sm bg-cover bg-center" style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumb(id) ? `url(${thumb(id)})` : undefined }} />
+                    <span className="block h-7 w-full rounded-sm bg-cover bg-center" style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumb(id) ? `url(${rebase(thumb(id))})` : undefined }} />
                     <span className="w-full truncate text-center">{surfaceDefinition(id).name}</span>
                   </button>
                 ))}
@@ -217,7 +218,7 @@ export default function IslandAutoPaintPanel({ ground, onRequestRender, textures
                   <div className="grid grid-cols-[16px_22px_1fr_70px_16px] items-center gap-1.5 px-1.5 py-1">
                     <input type="checkbox" checked={l.on} onChange={(e) => setLayer(l.key, { on: e.target.checked })} aria-label={`Paint ${l.name}`} className="h-3.5 w-3.5 accent-amber-500" />
                     <button onClick={() => onSetTexture && setSwapFor(swapFor === l.surface ? null : l.surface)} title={onSetTexture ? `Swap the ${surfaceDefinition(l.surface).name.toLowerCase()} tile` : surfaceDefinition(l.surface).name}
-                      className="h-5 w-5 cursor-pointer rounded-sm border border-transparent bg-cover bg-center hover:border-amber-400" style={{ backgroundColor: surfaceDefinition(l.surface).swatch, backgroundImage: thumb(l.surface) ? `url(${thumb(l.surface)})` : undefined }} />
+                      className="h-5 w-5 cursor-pointer rounded-sm border border-transparent bg-cover bg-center hover:border-amber-400" style={{ backgroundColor: surfaceDefinition(l.surface).swatch, backgroundImage: thumb(l.surface) ? `url(${rebase(thumb(l.surface))})` : undefined }} />
                     <span className={`truncate text-[11px] ${l.on ? 'text-zinc-200' : 'text-zinc-500'}`}>{l.name}</span>
                     <input type="range" min={0} max={1} step={0.05} value={l.strength} onChange={(e) => setLayer(l.key, { strength: Number(e.target.value) })} title={`Strength ${Math.round(l.strength * 100)}%`} className="accent-amber-500" />
                     <button onClick={() => setOpen(open === l.key ? null : l.key)} aria-label={`Settings for ${l.name}`} className="cursor-pointer text-zinc-500 hover:text-amber-200">
@@ -272,7 +273,7 @@ function LayerSettings({ layer, thumb, onChange }: { layer: IslandLayer; thumb: 
         {ISLAND_PALETTE.map((id) => (
           <button key={id} role="radio" aria-checked={layer.surface === id} title={surfaceDefinition(id).name} onClick={() => onChange({ surface: id })}
             className={`h-6 cursor-pointer rounded-sm border bg-cover bg-center ${layer.surface === id ? 'border-amber-400' : 'border-transparent hover:border-zinc-500'}`}
-            style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumb(id) ? `url(${thumb(id)})` : undefined }} />
+            style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumb(id) ? `url(${rebase(thumb(id))})` : undefined }} />
         ))}
       </div>
       {layer.altitude && bandRow('Altitude (% of the peak)', layer.altitude, 'altitude', 0, 100, 1, '%')}

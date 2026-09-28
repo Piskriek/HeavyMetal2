@@ -306,7 +306,13 @@ function islandPropsBackupPlugin(): Plugin {
 }
 
 // https://vite.dev/config/
+// A RUN.world build (VITE_RUN=1) is served from a subdirectory, so its base is relative; the runtime
+// rebases the game's root paths (src/platform/asset-base.ts). VITE_RELATIVE_BASE=1 builds the same
+// layout without the RUN SDK (tests: the game served from a subfolder).
+const relativeBase = process.env.VITE_RUN === "1" || process.env.VITE_RELATIVE_BASE === "1";
+
 export default defineConfig({
+  base: relativeBase ? "./" : "/",
   plugins: [react(), tailwindcss(), viteSingleFile(), trackPropsBackupPlugin(), lanePathsBackupPlugin(), islandPropsBackupPlugin()],
   // Dev server: allow the sandbox preview proxy host (e.g. 5173-<id>.e2b.app).
   server: {

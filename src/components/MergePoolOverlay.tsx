@@ -17,6 +17,7 @@ import { formatSplit, poolIsWaiting } from '../game/merge/split';
 import { capsuleById, riderById, type Loadout } from '../game/loadouts';
 import OrnateCorners from './OrnateCorners';
 import '../merge-pool-overlay.css';
+import { rebase } from '../platform/asset-base';
 
 export interface MergePoolOverlayProps {
   /** Present from the first gate crossing until the last rider is released. */
@@ -105,7 +106,7 @@ export default function MergePoolOverlay({
       <div
         className="merge-pool__goblin"
         ref={goblinRef}
-        style={{ backgroundImage: `url(${COCKPIT_ART.poolGoblin})` }}
+        style={{ backgroundImage: `url(${rebase(COCKPIT_ART.poolGoblin)})` }}
         aria-hidden="true"
       />
       {releasing ? (

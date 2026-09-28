@@ -57,6 +57,7 @@ import '../builder-theme.css';
 import { laneEditForCommand, laneKeyIntent, lanePanelModel, type LaneKeyIntent } from '../game/lane-panel-model';
 import { snapNode } from '../game/lane-path-tool';
 import { sampleLaneNetwork, createDefaultLaneNetwork, createBlankLaneNetwork } from '../game/lane-network';
+import { rebase } from '../platform/asset-base';
 
 interface TrackBuilderUIProps {
   builder: TrackBuilder3D;
@@ -1750,7 +1751,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       >
                         <div
                           className="w-8 h-8 rounded border border-zinc-700 overflow-hidden shrink-0 bg-cover bg-center"
-                          style={{ backgroundImage: `url(${p.url})` }}
+                          style={{ backgroundImage: `url(${rebase(p.url)})` }}
                         />
                         <div className="flex flex-col min-w-0">
                           <span className="truncate font-medium">{p.name}</span>

@@ -14,6 +14,7 @@ import { SURFACE_BARE, SURFACE_CRACKED, SURFACE_DARK_ROCK, SURFACE_DRY_MUD, SURF
 import { AutoPaintPanel } from '../AutoPaintPanel';
 import IslandAutoPaintPanel from './IslandAutoPaintPanel';
 import IslandTexturePicker from './IslandTexturePicker';
+import { rebase } from '../../platform/asset-base';
 
 export interface GroundBrush { on: boolean; erase: boolean; radius: number; strength: number; surface: number }
 
@@ -107,7 +108,7 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
                 onClick={() => { if (picked && swappable(id)) setSwapFor(swapFor === id ? null : id); else { setSwapFor(null); onBrush({ ...brush, surface: id, on: true, erase: false }); } }}
                 className={`flex cursor-pointer flex-col items-center gap-0.5 rounded border p-0.5 text-[9px] leading-tight ${picked ? 'border-amber-400 bg-amber-950/40 text-amber-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
                 <span className="block h-7 w-full rounded-sm bg-cover bg-center"
-                  style={{ backgroundColor: id === SURFACE_CRACKED ? s.sandColor : def.swatch, backgroundImage: thumbs[id] ? `url(${thumbs[id]})` : undefined }} />
+                  style={{ backgroundColor: id === SURFACE_CRACKED ? s.sandColor : def.swatch, backgroundImage: thumbs[id] ? `url(${rebase(thumbs[id])})` : undefined }} />
                 <span className="w-full truncate text-center">{SHORT_NAMES[id] ?? def.name}</span>
               </button>
             );

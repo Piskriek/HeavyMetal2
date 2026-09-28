@@ -22,6 +22,8 @@ import { HoopPodFleet } from './pod'; /* hoop-pod:v2 */
 import type { GyroFrame } from './first-person';
 import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-route/island-world';
 import { readOptions } from './preferences';
+import { CloudLayer } from './sky/sky-clouds';
+import { gradientBlendWidth, getSkySettings, onSkySettings, type SkySettings } from './sky/sky-settings';
 import { cameraTrackSpace, islandRoadsAt, islandTrackSpace, racerTrackSpace } from './island-route/island-space';
 import type { CourseId } from './types';
 import {
@@ -1352,6 +1354,12 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
       isPanorama: { value: preset.panorama ? 1.0 : 0.0 },
       horizonColor: { value: new THREE.Color(preset.fogColor) },
       zenithColor: { value: new THREE.Color(preset.zenithColor) },
+      // The Sky & Clouds window's gradient (sky-settings.ts): on when gradMode is 1.
+      gradMode: { value: 0 },
+      gradTop: { value: new THREE.Color('#2d6fd8') },
+      gradMiddle: { value: new THREE.Color('#6cb4f2') },
+      gradMidHeight: { value: 0.28 },
+      gradBlend: { value: 0.2 },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -1368,6 +1376,11 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
       uniform float isPanorama;
       uniform vec3 horizonColor;
       uniform vec3 zenithColor;
+      uniform float gradMode;
+      uniform vec3 gradTop;
+      uniform vec3 gradMiddle;
+      uniform float gradMidHeight;
+      uniform float gradBlend;
       varying vec2 vUv;
       varying vec3 vDir;
 
@@ -1390,6 +1403,13 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
 
         if (hasTexture < 0.5) {
           color = mix(horizonColor, zenithColor, smoothstep(-0.1, 0.7, h));
+        }
+        if (gradMode > 0.5) {
+          // Horizon → middle → top, each blend as wide as the crispness allows (gradientColorAt's twin).
+          float y = max(h, 0.0);
+          float a = smoothstep(0.5 - gradBlend, 0.5 + gradBlend, min(1.0, y / gradMidHeight));
+          float b = smoothstep(0.5 - gradBlend, 0.5 + gradBlend, clamp((y - gradMidHeight) / (1.0 - gradMidHeight), 0.0, 1.0));
+          color = mix(mix(horizonColor, gradMiddle, a), gradTop, b);
         }
 
         gl_FragColor = vec4(color, 1.0);
@@ -1712,6 +1732,11 @@ export class Renderer3D {
   private islandGates: { layout: SceneFrame['routeLayout']; group: THREE.Group } | null = null;
   private fogNear = 6000;
   private fogFar = 48000;
+  /** The Sky & Clouds window's settings (the gradient sky, the clouds), live. */
+  private skySettings: SkySettings = getSkySettings();
+  private readonly offSkySettings: () => void;
+  /** Painted clouds floating round the island (null off the island). */
+  private readonly clouds: CloudLayer | null = null;
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge', course: CourseId = 'ridge') {
     this.storedAssets = assets;
@@ -1736,7 +1761,7 @@ export class Renderer3D {
     this.currentSkyPreset = SKY_PRESETS[skyKey] ?? SKY_PRESETS.azure_isles;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(new THREE.Color(this.currentSkyPreset.fogColor), 6000, 48000);
+    this.scene.fog = new THREE.Fog(this.dayFogColor(), 6000, 48000);
 
     const aspect = (canvas.clientWidth || 1440) / (canvas.clientHeight || 620);
     this.camera = new THREE.PerspectiveCamera(62, aspect, 30, 200000);
@@ -1778,7 +1803,9 @@ export class Renderer3D {
       this.island.sky.visible = false;
       this.fogNear = 18000;
       this.fogFar = 160000;
-      this.scene.fog = new THREE.Fog(new THREE.Color(this.currentSkyPreset.fogColor), this.fogNear, this.fogFar);
+      this.scene.fog = new THREE.Fog(this.dayFogColor(), this.fogNear, this.fogFar);
+      this.clouds = new CloudLayer();
+      this.scene.add(this.clouds.group);
     } else {
       const terrain = makeAlpineTerrain(this.track);
       buildTrackSurface(this.track, this.materials, this.scene);
@@ -1798,6 +1825,8 @@ export class Renderer3D {
     if (onIsland) this.trackBuilder.setCourse(course);
     this.trackBuilder.setInitialSky(skyKey);
     this.trackBuilder.onSkyboxChange((newSky) => this.setSkybox(newSky));
+    this.offSkySettings = onSkySettings((settings) => { this.applySkySettings(settings); this.onSkyChanged?.(); });
+    this.applySkySettings(this.skySettings);
     // Sculpts on the island terrain can only be put back once its model has loaded.
     if (this.island) void this.island.ready.then(() => this.trackBuilder.sculpt?.sync());
 
@@ -1849,7 +1878,7 @@ export class Renderer3D {
     const mat = this.sky.material as THREE.ShaderMaterial;
     if (mat && mat.uniforms) {
       if (mat.uniforms.skyMap) mat.uniforms.skyMap.value = tex;
-      if (mat.uniforms.horizonColor) mat.uniforms.horizonColor.value.setHex(preset.fogColor);
+      if (mat.uniforms.horizonColor) mat.uniforms.horizonColor.value.copy(this.dayFogColor());
       if (mat.uniforms.zenithColor) mat.uniforms.zenithColor.value.setHex(preset.zenithColor);
       if (mat.uniforms.hasTexture) mat.uniforms.hasTexture.value = 1.0;
       if (mat.uniforms.isPanorama) mat.uniforms.isPanorama.value = preset.panorama ? 1.0 : 0.0;
@@ -1858,7 +1887,31 @@ export class Renderer3D {
     this.sun.color.setHex(preset.sunColor);
     this.sun.intensity = preset.sunIntensity;
     this.ambient.color.setHex(preset.ambientColor);
-    (this.scene.fog as THREE.Fog).color.setHex(preset.fogColor);
+    (this.scene.fog as THREE.Fog).color.copy(this.dayFogColor());
+  }
+
+  /** The day's fog and horizon colour: the gradient's horizon when the gradient sky is on, else the sky preset's. */
+  private dayFogColor(): THREE.Color {
+    const s = this.skySettings;
+    return s?.mode === 'gradient' ? new THREE.Color(s.gradient.horizon) : new THREE.Color(this.currentSkyPreset.fogColor);
+  }
+
+  /** The Sky & Clouds window: the gradient on the dome (or back to the painting), the fog, the clouds. */
+  private applySkySettings(settings: SkySettings) {
+    this.skySettings = settings;
+    const mat = this.sky.material as THREE.ShaderMaterial;
+    const u = mat.uniforms;
+    if (u?.gradMode) {
+      const g = settings.gradient;
+      u.gradMode.value = settings.mode === 'gradient' ? 1 : 0;
+      (u.gradTop.value as THREE.Color).set(g.top);
+      (u.gradMiddle.value as THREE.Color).set(g.middle);
+      u.gradMidHeight.value = g.midHeight;
+      u.gradBlend.value = gradientBlendWidth(g.crispness);
+      (u.horizonColor.value as THREE.Color).copy(this.dayFogColor());
+    }
+    (this.scene.fog as THREE.Fog | null)?.color.copy(this.dayFogColor());
+    this.clouds?.apply(settings.clouds);
   }
 
   resize(width: number, height: number) {
@@ -2048,7 +2101,7 @@ export class Renderer3D {
     const under = Number.isFinite(this.enterD) && Number.isFinite(this.exitD)
       ? smoothstep(this.enterD - 900, this.enterD + 700, d) * (1 - smoothstep(this.exitD - 600, this.exitD + 900, d))
       : 0;
-    const dayFog = new THREE.Color(this.currentSkyPreset.fogColor);
+    const dayFog = this.dayFogColor();
     const dayAmbient = new THREE.Color(this.currentSkyPreset.ambientColor);
     (this.scene.fog as THREE.Fog).color.copy(dayFog).lerp(SKY.fogCave, under);
     (this.scene.fog as THREE.Fog).near = lerp(this.fogNear, 1500, under);
@@ -2384,6 +2437,8 @@ export class Renderer3D {
     this.sky.position.copy(this.camera.position);
     this.sky.rotation.y += dt * 0.0012;
     this.island?.sky.position.copy(this.camera.position);
+    // Clouds drift round the island (held still for reduced motion).
+    this.clouds?.update(frame.time, frame.reducedMotion ? 0 : this.skySettings.clouds.drift);
 
     // 3. Texture scrolls + animated decoration frames (frozen on frame 0 for reduced motion)
     const raw = frame.time;
@@ -2424,6 +2479,8 @@ export class Renderer3D {
 
   destroy() {
     this.destroyed = true;
+    this.offSkySettings();
+    this.clouds?.dispose();
     this.disposeRacerPool();
     this.pods.dispose();
     this.surfacePaintTool?.dispose();

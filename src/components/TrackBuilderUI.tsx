@@ -27,6 +27,8 @@ import CustomModelsTab from './builder/CustomModelsTab';
 import ShadingPanel from './builder/ShadingPanel';
 import CollisionPanel from './builder/CollisionPanel';
 import ShaderManager from './builder/ShaderManager';
+import SkyPanel from './builder/SkyPanel';
+import { getSkySettings, onSkySettings, setSkySettings } from '../game/sky/sky-settings';
 import KitInspector from './builder/KitInspector';
 import SceneShelfBox from './builder/SceneShelfBox';
 import { DEFAULT_MATERIAL_DESCRIPTOR } from '../game/materials/material-descriptor';
@@ -163,6 +165,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [animDelayTargetFrame, setAnimDelayTargetFrame] = useState<number | 'all'>(0);
   const [delayInputStr, setDelayInputStr] = useState<string>('0');
   const [showSkyMenu, setShowSkyMenu] = useState(false);
+  // The Sky & Clouds window (gradient skydome, clouds round the island).
+  const [showSkyWindow, setShowSkyWindow] = useState(false);
+  const [skyMode, setSkyMode] = useState(() => getSkySettings().mode);
+  useEffect(() => onSkySettings((s) => setSkyMode(s.mode)), []);
+  const pickPaintedSky = (id: string) => {
+    builder.setSkybox(id);
+    setCurrentSky(id);
+    setSkySettings({ mode: 'painted' });
+    onRequestRender?.();
+  };
   const [showFileMenu, setShowFileMenu] = useState(false);
   const [showCameraMenu, setShowCameraMenu] = useState(false);
   const [showSnappingMenu, setShowSnappingMenu] = useState(false);
@@ -1703,27 +1715,32 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Choose Skydome Environment & Atmosphere"
               >
                 <Sun size={12} />
-                <span className="hidden md:inline text-[11px]">Sky: {SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
+                <span className="hidden md:inline text-[11px]">Sky: {skyMode === 'gradient' ? 'Gradient' : SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
                 <ChevronDown size={10} />
               </button>
 
               {showSkyMenu && (
                 <div className="builder-dropdown-menu left-0 w-64 flex flex-col gap-1 p-2 text-xs">
                   {/* builder-dropdown-menu: the click-outside listener leaves it open, so a pick lands (it closed on press before). */}
+                  <button
+                    onClick={() => { setShowSkyWindow(true); setShowSkyMenu(false); }}
+                    className="flex items-center justify-center gap-1.5 px-2 py-1.5 rounded text-xs font-bold bg-amber-950/60 border border-amber-500/60 text-amber-200 hover:bg-amber-900/60 cursor-pointer"
+                    title="Gradient skydome, its colours, and the clouds round the island"
+                  >
+                    <Sun size={12} /> Sky &amp; clouds…
+                  </button>
                   <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider">
                     Skydome Atmosphere
                   </span>
                   {Object.values(SKY_PRESETS).map((p) => {
-                    const isActive = currentSky === p.id;
+                    const isActive = skyMode === 'painted' && currentSky === p.id;
                     return (
                       <button
                         key={p.id}
                         onClick={() => {
-                          builder.setSkybox(p.id);
-                          setCurrentSky(p.id);
+                          pickPaintedSky(p.id);
                           setShowSkyMenu(false);
                           showToast(`Atmosphere: ${p.name}`);
-                          onRequestRender?.();
                         }}
                         className={`flex items-center gap-2.5 px-2 py-1.5 rounded text-xs text-left transition-colors cursor-pointer ${
                           isActive
@@ -4575,6 +4592,20 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       {toolWindow === 'sculpt' && builder.sculpt && (
         <FloatingWindow title="Sculpt & mesh paint" storageKey="hm2-sculpt-window-v1" initial={{ x: 16, y: 72 }} width={340}>
           <div className="p-3 max-h-[70vh] overflow-y-auto scrollbar-thin"><SculptPanel tool={builder.sculpt} /></div>
+        </FloatingWindow>
+      )}
+
+      {showSkyWindow && (
+        <FloatingWindow title="Sky & clouds" storageKey="hm2-sky-window-v1" initial={{ x: 16, y: 72 }} width={330}>
+          <div className="p-3 max-h-[75vh] overflow-y-auto scrollbar-thin">
+            <SkyPanel
+              paintedSkies={Object.values(SKY_PRESETS).map((p) => ({ id: p.id, name: p.name, url: p.url }))}
+              currentPainted={currentSky}
+              onPickPainted={pickPaintedSky}
+              onChange={onRequestRender}
+              onClose={() => setShowSkyWindow(false)}
+            />
+          </div>
         </FloatingWindow>
       )}
 

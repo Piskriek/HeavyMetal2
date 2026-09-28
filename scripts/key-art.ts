@@ -4,6 +4,7 @@
  *   node --import tsx scripts/key-art.ts --set avatar-parts [--only id1,id2]
  *   node --import tsx scripts/key-art.ts --set garage-decals
  *   node --import tsx scripts/key-art.ts --set track-sprites
+ *   node --import tsx scripts/key-art.ts --set sky-clouds
  *
  * Reads the set's raw folder under `art-src/` (raws never ship: see tests/art-budget.test.ts),
  * runs `src/game/meta/chroma-key.ts` (detect key → matte → decontaminate → despill → choke → trim →
@@ -30,6 +31,8 @@ const SETS: Record<string, SetConfig> = {
   'cockpit': { raw: 'art-src/cockpit/raw', out: 'public/art/cockpit', publicPrefix: '/art/cockpit', master: 1024 },
   'cockpit-trinkets': { raw: 'art-src/cockpit/trinkets-raw', out: 'public/art/cockpit/trinkets', publicPrefix: '/art/cockpit/trinkets', master: 256 },
   'ui-icons': { raw: 'art-src/ui/raw', out: 'public/art/ui/icons', publicPrefix: '/art/ui/icons', master: 256 },
+  // Billboard clouds round the island (docs/tickets/art/ART-CLOUDS.md): 512 wide is plenty at sky distance.
+  'sky-clouds': { raw: 'art-src/clouds/raw', out: 'public/art/clouds', publicPrefix: '/art/clouds', master: 512 },
 };
 
 const args = process.argv.slice(2);

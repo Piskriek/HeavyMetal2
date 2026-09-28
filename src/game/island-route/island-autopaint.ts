@@ -76,6 +76,8 @@ export interface IslandRecipe {
   readonly preset: string;
   readonly macros: IslandMacros;
   readonly layers: readonly IslandLayer[];
+  /** The tile each surface wears in this look: surface ID → texture library key (`island-texture-library.ts`). */
+  readonly tiles?: Readonly<Record<string, string>>;
 }
 
 export interface IslandPreset {
@@ -83,7 +85,28 @@ export interface IslandPreset {
   readonly name: string;
   readonly blurb: string;
   readonly layers: readonly IslandLayer[];
+  /** This look's own tiles, over the calm set every preset starts from (`CALM_TILES`). */
+  readonly tiles?: Readonly<Record<number, string>>;
 }
+
+/**
+ * The calm tile set every preset starts from (`src/assets/island-textures`): even, low-noise tiles that
+ * read well across the whole island from the air. The painterly originals stay in the tile picker.
+ */
+const lib = (file: string) => `library/${file}`;
+export const CALM_TILES: Readonly<Record<number, string>> = Object.freeze({
+  [SURFACE_SAND]: lib('sand-soft-packed-01.jpg'),
+  [SURFACE_WET_SAND]: lib('wetsand-tideline-01.jpg'),
+  [SURFACE_SHALLOWS]: lib('shallows-turquoise-01.jpg'),
+  [SURFACE_DARK_ROCK]: lib('rock-smooth-basalt-01.jpg'),
+  [SURFACE_BEACH_GRASS]: lib('grass-lush-meadow-01.jpg'),
+  [SURFACE_CORAL_SAND]: lib('coral-subtle-fragments-01.jpg'),
+  [SURFACE_GRANITE]: lib('cliff-granite-soft-01.jpg'),
+  [SURFACE_MOSSY_ROCK]: lib('moss-patchy-stone-02.jpg'),
+  [SURFACE_DRY_MUD]: lib('mud-dry-plates-01.jpg'),
+  [SURFACE_DUNES]: lib('dunes-soft-ripples-01.jpg'),
+  [SURFACE_STRATA]: lib('cliff-strata-layers-02.jpg'),
+});
 
 /* ───────────── Presets ───────────── */
 
@@ -103,7 +126,7 @@ const CLIFF_LAYERS = (angle: number, strata: number): IslandLayer[] => [
   L({ key: 'ridges', name: 'Dark rock ridges', role: 'rock', surface: SURFACE_DARK_ROCK, strength: 0.85, slope: B(angle - 6, 90, 6), hollow: { scale: 'small', amount: -0.9, depth: 60 } }),
 ];
 
-export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze([
+export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze<IslandPreset[]>([
   {
     id: 'tropical', name: 'Tropical isle',
     blurb: 'Golden beaches and turquoise shallows, beach grass on every gentle slope, moss in the damp creases, granite and strata on the cliffs.',
@@ -122,6 +145,7 @@ export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze([
   {
     id: 'lush', name: 'Lush green isle',
     blurb: 'Grass right down to a narrow beach, moss climbing every slope, bare stone only where it is too steep to hold on.',
+    tiles: { [SURFACE_BEACH_GRASS]: lib('grass-mossy-lawn-04.jpg'), [SURFACE_MOSSY_ROCK]: lib('moss-carpet-01.jpg'), [SURFACE_DRY_MUD]: lib('mud-dark-earth-02.jpg') },
     layers: [
       L({ key: 'base', name: 'Packed sand', role: 'base', surface: SURFACE_SAND, strength: 1, shore: B(-120, INF, 80) }),
       ...SHORE_LAYERS,
@@ -135,6 +159,7 @@ export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze([
   {
     id: 'dunes', name: 'Windswept dunes',
     blurb: 'Rippled sand everywhere the wind can reach, grass hiding in the hollows, stone ribs through the dunes.',
+    tiles: { [SURFACE_DUNES]: lib('dunes-broad-swells-02.jpg'), [SURFACE_SAND]: lib('sand-wind-streaked-02.jpg'), [SURFACE_BEACH_GRASS]: lib('grass-sparse-sand-03.jpg'), [SURFACE_DARK_ROCK]: lib('rock-sandstone-slabs-03.jpg') },
     layers: [
       L({ key: 'base', name: 'Rippled sand', role: 'base', surface: SURFACE_DUNES, strength: 1, shore: B(-120, INF, 80) }),
       L({ key: 'packed', name: 'Packed sand', role: 'dune', surface: SURFACE_SAND, strength: 0.8, slope: B(8, 30, 6), noise: { scale: 1900, amount: 0.6, bias: 0, seed: 3 } }),
@@ -147,6 +172,7 @@ export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze([
   {
     id: 'coast', name: 'Rocky coast',
     blurb: 'Dark rock headlands dropping into the sea, strata cliffs above, coral in the shallows and tough grass in the sheltered dips.',
+    tiles: { [SURFACE_DARK_ROCK]: lib('cliff-volcanic-03.jpg'), [SURFACE_WET_SAND]: lib('wetsand-glassy-02.jpg'), [SURFACE_CORAL_SAND]: lib('sand-pale-coral-03.jpg'), [SURFACE_BEACH_GRASS]: lib('grass-dry-golden-02.jpg'), [SURFACE_SHALLOWS]: lib('shallows-teal-caustics-02.jpg') },
     layers: [
       L({ key: 'base', name: 'Packed sand', role: 'base', surface: SURFACE_SAND, strength: 1, shore: B(-120, INF, 80) }),
       ...SHORE_LAYERS,
@@ -161,6 +187,7 @@ export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze([
   {
     id: 'badlands', name: 'Sun-baked badlands',
     blurb: 'Cracked mud pans and packed sand, sun-bleached strata on every rise, a few tufts of grass holding on in the dips.',
+    tiles: { [SURFACE_SAND]: lib('path-compacted-dirt-01.jpg'), [SURFACE_BEACH_GRASS]: lib('grass-dry-golden-02.jpg'), [SURFACE_DARK_ROCK]: lib('rock-sandstone-slabs-03.jpg'), [SURFACE_DUNES]: lib('dunes-broad-swells-02.jpg') },
     layers: [
       L({ key: 'base', name: 'Dry mud', role: 'base', surface: SURFACE_DRY_MUD, strength: 1, shore: B(-120, INF, 80) }),
       L({ key: 'packed', name: 'Packed sand', role: 'dune', surface: SURFACE_SAND, strength: 0.85, noise: { scale: 2000, amount: 0.9, bias: 0, seed: 3 } }),
@@ -175,6 +202,7 @@ export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze([
   {
     id: 'crystal', name: 'Crystal highlands',
     blurb: 'The tropical isle with its high ridges broken open: blue crystal seams on the peaks, moss thick below them.',
+    tiles: { [SURFACE_MOSSY_ROCK]: lib('moss-carpet-01.jpg'), [SURFACE_GRANITE]: lib('cliff-limestone-04.jpg'), [SURFACE_BEACH_GRASS]: lib('grass-fern-groundcover-05.jpg') },
     layers: [
       L({ key: 'base', name: 'Packed sand', role: 'base', surface: SURFACE_SAND, strength: 1, shore: B(-120, INF, 80) }),
       L({ key: 'dunes', name: 'Rippled sand', role: 'dune', surface: SURFACE_DUNES, strength: 0.9, shore: B(150, 2400, 700), slope: B(0, 14, 5), noise: { scale: 2400, amount: 0.55, bias: 0.2, seed: 3 } }),
@@ -193,7 +221,9 @@ export const islandPreset = (id: string) => ISLAND_PRESETS.find((p) => p.id === 
 /** A fresh recipe for a preset (macros at 1×). */
 export function recipeFor(presetId: string, macros: Partial<IslandMacros> = {}): IslandRecipe {
   const preset = islandPreset(presetId) ?? ISLAND_PRESETS[0];
-  return { version: 1, preset: preset.id, macros: { ...DEFAULT_MACROS, ...macros }, layers: preset.layers.map((l) => ({ ...l })) };
+  const tiles: Record<string, string> = {};
+  for (const [id, key] of Object.entries({ ...CALM_TILES, ...preset.tiles })) tiles[id] = key;
+  return { version: 1, preset: preset.id, macros: { ...DEFAULT_MACROS, ...macros }, layers: preset.layers.map((l) => ({ ...l })), tiles };
 }
 
 /** Reads a saved recipe back, dropping anything malformed (a bad recipe paints nothing, never throws). */
@@ -208,7 +238,9 @@ export function normalizeRecipe(raw: unknown): IslandRecipe | null {
     patchy: num(m.patchy, 0, 3, 1), verge: num(m.verge, 0, 4, 1), seed: Math.round(num(m.seed, 0, 1e6, 0)),
   };
   const layers = r.layers.filter((l): l is IslandLayer => !!l && typeof l === 'object' && typeof (l as IslandLayer).surface === 'number' && typeof (l as IslandLayer).key === 'string');
-  return { version: 1, preset: typeof r.preset === 'string' ? r.preset : 'custom', macros, layers };
+  const tiles: Record<string, string> = {};
+  if (r.tiles && typeof r.tiles === 'object') for (const [id, key] of Object.entries(r.tiles)) if (typeof key === 'string') tiles[id] = key;
+  return { version: 1, preset: typeof r.preset === 'string' ? r.preset : 'custom', macros, layers, tiles };
 }
 
 /* ───────────── Macros → effective layers ───────────── */

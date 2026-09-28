@@ -34,6 +34,10 @@ uniform vec4 islParams[${ISLAND_LAYERS}];
 uniform float islSoft;
 // Every tile's repeat, × (bigger tiles read calmer from the air).
 uniform float islScale;
+// Faces steeper than this (cos of the angle from level: normal.y) wear the look's cliff tile whatever
+// the mask says: the top-down mask barely sees a near-vertical wall. Layer -1: off.
+uniform float islCliffLayer;
+uniform vec2 islCliffNy; // normal.y where the rock starts, and where it is complete
 
 /**
  * (id0, id1, weight of id1) at coord (texel units of a size-wide mask): every surface of the four texels
@@ -123,9 +127,9 @@ vec4 islPair(float la, float lb, float w, vec2 uv, vec2 dx, vec2 dy) {
  * under 8% are skipped (most of the island needs one, steep ground two).
  */
 vec4 islTriplanar(float la, float lb, float w, vec3 wp, vec3 n, vec3 dwx, vec3 dwy) {
-  vec3 bw = pow(abs(n), vec3(6.0));
+  vec3 bw = pow(abs(n), vec3(4.0));
   bw /= max(bw.x + bw.y + bw.z, 1e-5);
-  bw = max(bw - 0.08, 0.0);
+  bw = max(bw - 0.06, 0.0);
   float total = max(bw.x + bw.y + bw.z, 1e-5);
   vec4 acc = vec4(0.0);
   if (bw.y > 0.0) acc += islPair(la, lb, w, wp.xz, dwx.xz, dwy.xz) * bw.y;

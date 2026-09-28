@@ -31,7 +31,7 @@ import { ISLAND_LAYER_OF, ISLAND_SURFACES, ISLAND_TEXTURE_DIR, IslandSurfaceArra
 import { libraryTexture } from './island-texture-library';
 import { ISLAND_SURFACE_GLSL } from './island-surface-shader';
 import { TERRAIN_RES, analyseIslandTerrain, type IslandTerrain, type TerrainTriangles } from './island-terrain';
-import { normalizeRecipe, paintIsland, upsampleMask, type IslandRecipe, type PaintIslandResult } from './island-autopaint';
+import { effectiveLayers, normalizeRecipe, paintIsland, upsampleMask, type IslandRecipe, type PaintIslandResult } from './island-autopaint';
 
 export interface IslandGroundSettings {
   /** Multiplied into the island texture, #rrggbb. */
@@ -322,7 +322,11 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
     float l0 = isl0, l1 = isl1, lw = sSolid ? 0.0 : sm.z;
     if (l0 < 0.0) { l0 = l1; lw = 1.0; }
     if (l1 < 0.0) { l1 = l0; lw = 0.0; }
-    vec4 tile = islTriplanar(l0, l1, lw, wp, normalize(vGroundNormal), dwx, dwy);
+    vec3 gnrm = normalize(vGroundNormal);
+    vec4 tile = islTriplanar(l0, l1, lw, wp, gnrm, dwx, dwy);
+    // Walls and near-vertical faces wear the look's cliff tile (the top-down mask barely sees them).
+    float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
+    if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
     // Broad, soft mottling so a big fill never reads as one flat print.
     tile.rgb *= 0.9 + 0.2 * gNoise2(wp.xz / 1400.0 + 3.7);
     // The rim against the bare island or dirt is decided by height too: the paint ends along the tile's
@@ -597,6 +601,8 @@ export class IslandGround {
       islParams: { value: this.surfaces?.params ?? [] },
       islSoft: { value: 0.6 },
       islScale: { value: 1.2 },
+      islCliffLayer: { value: -1 },
+      islCliffNy: { value: new THREE.Vector2(0.5, 0.35) },
       sandColor: { value: new THREE.Color() },
       sandStrength: { value: 1 },
       sandPebbles: { value: 0.3 },
@@ -641,16 +647,24 @@ export class IslandGround {
     u.groundBump.value = s.bump;
     u.islSoft.value = s.blendSoft;
     u.islScale.value = s.tileScale;
-    this.swapTextures(s.textures);
+    this.swapTextures();
   }
 
-  /** Loads any surface tiles the settings swap (and puts back the originals of those no longer swapped). */
-  private swapTextures(textures: Record<string, string>) {
+  /** The tile a surface wears: the owner's own pick, else the auto paint look's, else the shipped one. */
+  textureKeyOf(surface: number): string | undefined {
+    return this.settings.textures[surface] ?? this.autoRecipe?.tiles?.[surface];
+  }
+
+  /** The tile a surface wears when the owner has not picked one (the look's, or undefined: the shipped one). */
+  defaultTextureKeyOf(surface: number): string | undefined { return this.autoRecipe?.tiles?.[surface]; }
+
+  /** Loads the tiles the surfaces should wear now (owner's picks over the look's over the shipped ones). */
+  private swapTextures() {
     const surfaces = this.surfaces;
     if (!surfaces) return;
     const jobs: Promise<boolean>[] = [];
     ISLAND_SURFACES.forEach((surface, layer) => {
-      const url = libraryTexture(textures[surface.id])?.url ?? ISLAND_TEXTURE_DIR + surface.file;
+      const url = libraryTexture(this.textureKeyOf(surface.id))?.url ?? ISLAND_TEXTURE_DIR + surface.file;
       if (surfaces.urlOf(layer) !== url) jobs.push(surfaces.setLayerImage(layer, url));
     });
     if (jobs.length) this.textureLoads = Promise.all([this.textureLoads, ...jobs]).then(() => undefined);
@@ -783,6 +797,8 @@ export class IslandGround {
    */
   paintAuto(recipe: IslandRecipe | null): Promise<void> {
     this.autoRecipe = recipe;
+    this.swapTextures(); // the look's own tiles
+    this.setCliffRule(recipe);
     if (this.autoRunning) { this.autoPending = recipe; return this.whenAutoPainted(); }
     if (!recipe) {
       this.autoMask = null;
@@ -802,6 +818,20 @@ export class IslandGround {
       else { this.setBusy(null); this.flushAutoWaiters(); }
     });
     return this.whenAutoPainted();
+  }
+
+  /**
+   * The shader's rule for walls: faces steeper than the look's cliff layer (its slope, as the macros set
+   * it, plus 12°) wear that layer's tile; off without a look or a cliff layer.
+   */
+  private setCliffRule(recipe: IslandRecipe | null) {
+    const cliff = recipe ? effectiveLayers(recipe).find((l) => l.role === 'cliff' && l.slope) : undefined;
+    const layer = cliff ? ISLAND_LAYER_OF[cliff.surface] ?? -1 : -1;
+    this.uniforms.islCliffLayer.value = layer;
+    if (cliff?.slope) {
+      const start = Math.min(80, cliff.slope.min + 12), full = Math.min(85, start + 14);
+      (this.uniforms.islCliffNy.value as THREE.Vector2).set(Math.cos((start * Math.PI) / 180), Math.cos((full * Math.PI) / 180));
+    }
   }
 
   /** Resolves when no island auto paint is pending (at once when there is none to do). */

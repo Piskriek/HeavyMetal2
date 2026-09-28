@@ -1,7 +1,7 @@
 /**
  * Swap a surface's tile: every tile in the island texture library (the originals, plus whatever is in
  * src/assets/island-textures), the ones meant for this surface first. Picking one repaints that surface
- * everywhere it is used at once; "Original" puts the shipped tile back.
+ * everywhere it is used at once; the reset button goes back to the auto paint look's tile (or the shipped one).
  */
 import { useState } from 'react';
 import { Check, RotateCcw, X } from 'lucide-react';
@@ -13,16 +13,18 @@ interface Props {
   surface: number;
   /** The library key the surface wears now (undefined: its original). */
   current?: string;
+  /** What it wears when nothing is picked (the look's tile; undefined: its original). */
+  fallback?: string;
   onPick: (key: string | null) => Promise<void> | void;
   onClose: () => void;
 }
 
-export default function IslandTexturePicker({ surface, current, onPick, onClose }: Props) {
+export default function IslandTexturePicker({ surface, current, fallback, onPick, onClose }: Props) {
   const { suggested, others } = texturesFor(surface);
   const [loading, setLoading] = useState<string | null>(null);
   // The surface's own shipped tile: wearing it is "no swap".
   const file = ISLAND_SURFACES.find((s) => s.id === surface)?.file;
-  const ownKey = file ? `original/${file}` : undefined;
+  const ownKey = fallback ?? (file ? `original/${file}` : undefined);
   const wearing = current ?? ownKey;
   const pick = async (t: LibraryTexture | null) => {
     setLoading(t?.key ?? 'original');
@@ -54,9 +56,9 @@ export default function IslandTexturePicker({ surface, current, onPick, onClose 
       )}
       <div className="flex items-center justify-between gap-2 pt-0.5">
         <p className="text-[10px] leading-snug text-zinc-500">New tiles: drop JPGs named like grass-meadow-01.jpg into src/assets/island-textures.</p>
-        <button onClick={() => void pick(null)} disabled={!current || !!loading}
+        <button onClick={() => void pick(null)} disabled={!current || current === ownKey || !!loading}
           className="flex shrink-0 cursor-pointer items-center gap-1 rounded border border-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300 hover:border-zinc-500 disabled:opacity-40">
-          <RotateCcw size={10} />Original
+          <RotateCcw size={10} />{fallback ? 'Look default' : 'Original'}
         </button>
       </div>
     </div>

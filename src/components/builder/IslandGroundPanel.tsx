@@ -115,7 +115,7 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
           </button>
         )}
         {swapFor !== null && (
-          <IslandTexturePicker surface={swapFor} current={s.textures[swapFor]}
+          <IslandTexturePicker surface={swapFor} current={ground.textureKeyOf(swapFor)} fallback={ground.defaultTextureKeyOf(swapFor)}
             onPick={(key) => setTexture(swapFor, key)} onClose={() => setSwapFor(null)} />
         )}
         <div className="grid grid-cols-2 gap-1">

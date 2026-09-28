@@ -52,9 +52,10 @@ const ORIGINALS: LibraryTexture[] = ISLAND_SURFACES.map((s) => ({
 
 /** Tiles dropped into src/assets/island-textures (Vite finds them; none in a node test). */
 const DROPPED: LibraryTexture[] = (() => {
-  const glob = (import.meta as unknown as { glob?: (p: string, o: object) => Record<string, string> }).glob;
-  if (typeof glob !== 'function') return [];
-  const files = import.meta.glob('../../assets/island-textures/*.{jpg,jpeg,png,webp}', { query: '?url', import: 'default', eager: true }) as Record<string, string>;
+  let files: Record<string, string>;
+  // Vite rewrites this call at build time; outside Vite (node tests) there is no glob and no library.
+  try { files = import.meta.glob('../../assets/island-textures/*.{jpg,jpeg,png,webp}', { query: '?url', import: 'default', eager: true }) as Record<string, string>; }
+  catch { return []; }
   return Object.entries(files).map(([path, url]) => {
     const file = path.split('/').pop() ?? path;
     return { key: `library/${file}`, url, kind: kindOf(file), name: nameOf(file) };

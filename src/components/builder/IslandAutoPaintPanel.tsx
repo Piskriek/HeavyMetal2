@@ -178,7 +178,7 @@ export default function IslandAutoPaintPanel({ ground, onRequestRender, textures
                     </button>
                   </div>
                   {swapFor === l.surface && onSetTexture && (
-                    <div className="p-1"><IslandTexturePicker surface={l.surface} current={textures[l.surface]}
+                    <div className="p-1"><IslandTexturePicker surface={l.surface} current={textures[l.surface] ?? ground.defaultTextureKeyOf(l.surface)} fallback={ground.defaultTextureKeyOf(l.surface)}
                       onPick={async (key) => { await onSetTexture(l.surface, key); onRequestRender?.(); }} onClose={() => setSwapFor(null)} /></div>
                   )}
                   {open === l.key && <LayerSettings layer={l} thumb={thumb} onChange={(c) => setLayer(l.key, c)} />}

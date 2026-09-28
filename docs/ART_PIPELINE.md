@@ -554,3 +554,31 @@ three head shapes).
 | hair-copper-ponytail | 511×366 | [0.33, 0.93] | scalp |
 | hair-rivet-fringe | 511×221 | [0.50, 0.78] | brow-line |
 | hair-stud-buzz | 511×271 | [0.50, 0.97] | scalp |
+
+### 11.5 Round 4 — eyes front and collars full (2026-09-28)
+
+Nine pieces: seven eyewear (prompts `art-src/avatar-parts/prompts/eyewear-*.txt`) and two neck
+collars, filling both catalogs to their DNA v4 caps (eyewear 20/20, neck 20/20). Every prompt
+carries the round-3 part-only guard from the start; no re-rolls were needed. Keying 9/9 PASS
+(residual 0 except the clear safety specs at 560 px — transparent frames keep a faint painted
+magenta inside the plastic, invisible on the sprite).
+
+Registration: eyewear pins the lens band to `eye-mid` at the measured row (steam 0.56, pilot 0.53,
+safety 0.47 x-drift), except the welder visor, which uses the goggles-up recipe — strap to
+`brow-line` at 0.78, shield raised above. The visor strip follows at full 120 width. The fur
+mantle hangs off the chin anchor at the measured throat (0.12), the plug-cable loop at the loop
+top (0.06) like the gear chain. Masks: straps → leather, gauge/pilot bodies → metal, plug-cable
+braid → accent (team colours on the cables, like the captain coat); safety specs and the visor
+strip stay neutral. Contact sheets: `docs/art-rounds/goggles-1.png` (13 tiles), `docs/art-rounds/necks-2.png`.
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| eyewear-welder-visor | 512×419 | [0.50, 0.78] | brow-line |
+| eyewear-steam-goggles | 512×303 | [0.50, 0.56] | eye-mid |
+| eyewear-fur-pilot-goggles | 512×294 | [0.50, 0.53] | eye-mid |
+| eyewear-gauge-eyes | 512×238 | [0.50, 0.50] | eye-mid |
+| eyewear-safety-specs | 512×270 | [0.47, 0.50] | eye-mid |
+| eyewear-visor-strip | 512×179 | [0.50, 0.47] | eye-mid |
+| eyewear-retro-shades | 512×220 | [0.50, 0.45] | eye-mid |
+| neck-fur-mantle | 510×288 | [0.50, 0.12] | chin |
+| neck-plug-cables | 510×502 | [0.50, 0.06] | chin |

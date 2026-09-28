@@ -58,6 +58,18 @@ history; this file is for what a player or a reviewer can see.
   joined them, and the four live course skyboxes became q90 JPEGs (`courses.ts` updated) — public/
   is 587 MB with 13 MB of headroom, and M2 is green again.
 
+### Round 4: eyes front and collars full (avatar art)
+
+- Seven eyewear pieces complete the rack (20/20): a raised welder visor on its brow strap,
+  riveted steam goggles with one green and one amber lens, fur-lined pilot goggles, pressure-gauge
+  eyes with red needles, chunky workshop safety specs, a dark full-width visor strip with a
+  glowing slit, and big amber retro shades — lens bands pinned to the measured eye line, straps
+  follow the leather swatch, gauge bodies the metal.
+- Two neck fills close the collar tray (20/20): a shaggy fur mantle for the winter circuit and a
+  loop of spark-plug cables whose braided jackets take the racing accent like the captain's coat.
+- 9/9 key-art QA pass, zero re-rolls (the part-only prompt guard from round 3 did its job);
+  contact sheets `docs/art-rounds/goggles-1.png` and `docs/art-rounds/necks-2.png`.
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

@@ -181,6 +181,13 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'eyewear-goggles-up', layer: 'eyewear', name: 'Goggles up', pivot: [0.5, 0.75], anchor: 'brow-line', width: S(112), replaces: 'goggles-up' }),
   P({ id: 'eyewear-aviator-shades', layer: 'eyewear', name: 'Aviator shades', pivot: [0.5, 0.5], anchor: 'eye-mid', width: S(114) }),
   P({ id: 'eyewear-triple-loupe', layer: 'eyewear', name: 'Triple loupe', pivot: [0.4, 0.45], anchor: 'eye-left', width: S(84) }),
+  P({ id: 'eyewear-welder-visor', layer: 'eyewear', name: 'Welder visor', pivot: [0.5, 0.78], anchor: 'brow-line', width: () => 118, prompt: 'Raised flip-up welding shield on a leather brow strap, brass hinge bolts.' }),
+  P({ id: 'eyewear-steam-goggles', layer: 'eyewear', name: 'Steam goggles', pivot: [0.5, 0.56], anchor: 'eye-mid', width: () => 116, prompt: 'Riveted brass steampunk goggles, one green lens one amber, leather strap.' }),
+  P({ id: 'eyewear-fur-pilot-goggles', layer: 'eyewear', name: 'Pilot goggles', pivot: [0.5, 0.53], anchor: 'eye-mid', width: () => 118, prompt: 'Fur-lined leather pilot goggles with amber lenses and shearling rims.' }),
+  P({ id: 'eyewear-gauge-eyes', layer: 'eyewear', name: 'Gauge eyes', pivot: [0.5, 0.5], anchor: 'eye-mid', width: () => 110, prompt: 'Two mismatched brass pressure gauges strapped over the eyes, red needles.' }),
+  P({ id: 'eyewear-safety-specs', layer: 'eyewear', name: 'Safety specs', pivot: [0.47, 0.5], anchor: 'eye-mid', width: () => 112, prompt: 'Chunky clear workshop safety glasses, side shields, one scuffed lens.' }),
+  P({ id: 'eyewear-visor-strip', layer: 'eyewear', name: 'Visor strip', pivot: [0.5, 0.47], anchor: 'eye-mid', width: () => 120, prompt: 'Sleek dark full-width visor strip with a faintly glowing sight slit.' }),
+  P({ id: 'eyewear-retro-shades', layer: 'eyewear', name: 'Retro shades', pivot: [0.5, 0.45], anchor: 'eye-mid', width: () => 112, prompt: 'Big square amber retro racing shades with white riveted frames.' }),
   P({ id: 'hair-slicked-quiff', layer: 'hair', name: 'Slicked quiff', pivot: [0.5, 0.85], anchor: 'scalp', width: S(88) }),
   P({ id: 'hair-long-braids', layer: 'hair', name: 'Long braids', pivot: [0.5, 0.08], anchor: 'scalp', width: (c) => 2 * c.headW + 34 }),
   P({ id: 'hair-wild-flame', layer: 'hair', name: 'Wild flame', pivot: [0.5, 0.95], anchor: 'scalp', width: S(58) }),
@@ -226,6 +233,8 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'neck-wire-torc', layer: 'neck', name: 'Wire torc', pivot: [0.5, 0.3], anchor: 'chin', width: S(112), prompt: 'Thick braided copper-and-steel wire torc necklace, kinked strands, hex-nut clasp at the front.' }),
   P({ id: 'neck-check-scarf', layer: 'neck', name: 'Checkered bandana', pivot: [0.5, 0.28], anchor: 'chin', width: S(126), prompt: 'Racing checkered black-and-white bandana knotted at the side of the neck, short tails.' }),
   P({ id: 'neck-wrench-pendant', layer: 'neck', name: 'Wrench pendant', pivot: [0.5, 0.12], anchor: 'chin', width: S(44), prompt: 'Big chunky tuning wrench hung as a pendant from a short dark cord, pointing down at the chest.' }),
+  P({ id: 'neck-fur-mantle', layer: 'neck', name: 'Fur mantle', pivot: [0.5, 0.12], anchor: 'chin', width: S(160), prompt: 'Shaggy dark-brown fur mantle collar on the shoulders, leather strap buckle front.' }),
+  P({ id: 'neck-plug-cables', layer: 'neck', name: 'Plug cables', pivot: [0.5, 0.06], anchor: 'chin', width: S(112), prompt: 'Loop of braided spark-plug cables around the neck, ceramic plug ends dangling.' }),
 ];
 
 export const paintedById = new Map(PAINTED_PARTS.map((p) => [`painted:${p.id}`, p]));

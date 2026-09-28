@@ -61,7 +61,7 @@ test('the sea: a disc following the camera, waves in rings round the shore, foam
   assert.match(sea, /new THREE\.CircleGeometry\(SEA_RADIUS/);
   assert.match(sea, /float v = \(rn \+ seaTime \* 160\.0\) \/ 3000\.0;/, 'rings close in on the island over time');
   assert.match(sea, /name = 'Shore foam'/);
-  assert.match(sea, /float haze = 1\.0 - smoothstep\(0\.0, 0\.07, -viewDir\.y\);/, 'the sea fades into the fog colour near the horizon (by view angle)');
+  assert.match(sea, /float haze = max\(1\.0 - smoothstep\(0\.0, 0\.07, -viewDir\.y\), edge\);/, 'the sea fades into the fog colour near the horizon line and near its own far edge (seen from high up)');
   const world = readFileSync(new URL('../src/game/island-route/island-world.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(world, /PlaneGeometry\(2 \* SEA_HALF/, 'no square sea');
 });
@@ -77,4 +77,8 @@ test('the island skies: six CC0 panoramas in the Sky menu, mapped as 360° panor
   assert.match(r, /float uvY = isPanorama > 0\.5 \? vUv\.y :/, 'a panorama maps straight');
   assert.match(r, /const fallbackSky = SKY_PRESETS\[initialSky\] \? initialSky : 'azure_isles';/);
   assert.doesNotMatch(r, /sky_copperwood|Golden Hour/, 'the old skies are gone from the menu');
+  assert.match(r, /gl_FragColor = vec4\(color, 1\.0\);[^`]*#include <colorspace_fragment>/, 'the sky is in the screen colour space, so its horizon matches the sea haze (no hard line)');
+  assert.match(r, /export function preloadSkies\(\)/, 'build mode preloads every sky, so a swap is instant');
+  const ui = readFileSync(new URL('../src/components/TrackBuilderUI.tsx', import.meta.url), 'utf8');
+  assert.match(ui, /\{showSkyMenu && \(\s*<div className="builder-dropdown-menu/, 'the Sky menu survives the click-outside listener, so a pick lands');
 });

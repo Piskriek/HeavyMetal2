@@ -1690,7 +1690,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               </button>
 
               {showSkyMenu && (
-                <div className="absolute top-8 left-0 z-50 w-64 bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl p-2 flex flex-col gap-1 backdrop-blur-md">
+                <div className="builder-dropdown-menu left-0 w-64 flex flex-col gap-1 p-2 text-xs">
+                  {/* builder-dropdown-menu: the click-outside listener leaves it open, so a pick lands (it closed on press before). */}
                   <span className="text-[10px] font-bold text-amber-400 px-2 py-1 uppercase tracking-wider">
                     Skydome Atmosphere
                   </span>

@@ -1313,12 +1313,31 @@ const SKY = {
   ambientDay: new THREE.Color(0x6b5f3f), ambientCave: new THREE.Color(0x3a1c0c),
 };
 
+/** Every sky's texture, loaded once (build mode preloads them all, so a swap is instant). */
+const skyTextures = new Map<string, { texture: THREE.Texture; ready: Promise<void> }>();
+function skyTexture(preset: SkyPreset, loader: THREE.TextureLoader = new THREE.TextureLoader()) {
+  let entry = skyTextures.get(preset.url);
+  if (!entry) {
+    let done: () => void = () => {};
+    const ready = new Promise<void>((resolve) => { done = resolve; });
+    const texture = loader.load(preset.url, () => done(), undefined, () => done());
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    entry = { texture, ready };
+    skyTextures.set(preset.url, entry);
+  }
+  return entry;
+}
+
+/** Loads every sky (for build mode's loading bar). */
+export function preloadSkies(): Promise<void> {
+  return Promise.all(Object.values(SKY_PRESETS).map((preset) => skyTexture(preset).ready)).then(() => undefined);
+}
+
 function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
-  const tex = loader.load(preset.url);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  const tex = skyTexture(preset, loader).texture;
 
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
@@ -1371,6 +1390,9 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
         }
 
         gl_FragColor = vec4(color, 1.0);
+        // To the screen's colour space, as every lit material and the fog are: the pictures show as painted
+        // and the horizon matches the sea's haze exactly (without it the sky sat darker: a hard line).
+        #include <colorspace_fragment>
       }
     `,
   });
@@ -1779,6 +1801,9 @@ export class Renderer3D {
     this.placeCamera(this.D_START, 0.1, 'follow_ball', 0);
   }
 
+  /** Called when a picked sky's picture is ready, so the view is redrawn at once. */
+  onSkyChanged?: () => void;
+
   /** Resolves once the island model (and its ground) is in the scene; at once off the island. */
   islandReady(): Promise<void> { return this.island ? this.island.ready : Promise.resolve(); }
 
@@ -1792,6 +1817,11 @@ export class Renderer3D {
       if (r.compileAsync) await Promise.race([r.compileAsync(this.scene, this.camera), new Promise((resolve) => setTimeout(resolve, 20000))]);
       else r.compile(this.scene, this.camera);
     } catch { /* compile on first draw */ }
+    // One frame with nothing culled: every model's geometry and textures go up to the GPU now, behind the
+    // loading bar, not the first time the camera turns towards them (a dressed island hitched ~1 s).
+    const culled: THREE.Object3D[] = [];
+    this.scene.traverse((o) => { if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); } });
+    try { this.renderer.render(this.scene, this.camera); } finally { for (const o of culled) o.frustumCulled = true; }
     for (let i = 0; i < frames; i++) {
       this.renderer.render(this.scene, this.camera);
       // A hidden tab pauses animation frames: never wait on one for long.
@@ -1804,12 +1834,9 @@ export class Renderer3D {
     if (!preset) return;
     this.currentSkyPreset = preset;
 
-    const loader = new THREE.TextureLoader();
-    const tex = loader.load(preset.url);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    // Preloaded in build mode (instant); otherwise the dome is redrawn the moment the picture arrives.
+    const { texture: tex, ready } = skyTexture(preset);
+    void ready.then(() => this.onSkyChanged?.());
 
     const mat = this.sky.material as THREE.ShaderMaterial;
     if (mat && mat.uniforms) {

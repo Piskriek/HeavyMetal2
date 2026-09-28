@@ -55,18 +55,21 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   water.color = new THREE.Color('#6fc2c0');
   water.opacity = 0.8;
   water.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { seaTime: time, seaAround: around });
+    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vSeaWorld;')
       .replace('#include <project_vertex>', '#include <project_vertex>\n  vSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\n${SHORE_GLSL}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\n${SHORE_GLSL}`)
       .replace('#include <fog_fragment>', /* glsl */ `#include <fog_fragment>
 #ifdef USE_FOG
 {
   // Horizon haze: within ~4° below the horizon the water fades into the fog's colour (and goes opaque).
   vec3 viewDir = normalize(vSeaWorld - cameraPosition);
-  float haze = 1.0 - smoothstep(0.0, 0.07, -viewDir.y);
+  // Near the horizon line, and (seen from high up, where the sea's edge lies well below it) near the
+  // sea's far edge: either way the water melts into the fog colour the sky shows at its horizon.
+  float edge = smoothstep(0.5, 0.97, length(vSeaWorld.xz - cameraPosition.xz) / seaRadius);
+  float haze = max(1.0 - smoothstep(0.0, 0.07, -viewDir.y), edge);
   gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, haze);
   gl_FragColor.a = mix(gl_FragColor.a, 1.0, haze);
 }
@@ -91,7 +94,7 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
 #endif
 `);
   };
-  water.customProgramCacheKey = () => 'island-sea-rings-haze';
+  water.customProgramCacheKey = () => 'island-sea-rings-haze-2';
   const sea = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 160), water);
   sea.rotation.x = -Math.PI / 2;
   sea.name = 'Sea';

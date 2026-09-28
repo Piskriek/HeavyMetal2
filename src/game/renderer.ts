@@ -41,6 +41,7 @@ export class RangeRenderer {
   }
 
   islandReady() { return this.renderer3d.islandReady(); }
+  set onSkyChanged(fn: (() => void) | undefined) { this.renderer3d.onSkyChanged = fn; }
   warmUp() { return this.renderer3d.warmUp(); }
 
   get renderer3D() {

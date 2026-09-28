@@ -87,6 +87,22 @@ export interface LaneUndoEntry {
   readonly lanes: string | null;
 }
 
+/**
+ * A prop type's definition by lookup, not a scan: the race loop asks for every placed prop every frame
+ * (slingshots, ramps), and a scan of the whole catalogue per prop was ~20 ms a frame on a dressed island.
+ * Rebuilt when the catalogue grows (imported models are added at runtime).
+ */
+let definitionIndex: Map<string, PropDefinition> | null = null;
+let definitionCount = -1;
+function propDefinition(type: string): PropDefinition | undefined {
+  if (!definitionIndex || definitionCount !== PROP_DEFINITIONS.length) {
+    definitionIndex = new Map();
+    for (const d of PROP_DEFINITIONS) if (!definitionIndex.has(d.type)) definitionIndex.set(d.type, d); // the first, as find() gave
+    definitionCount = PROP_DEFINITIONS.length;
+  }
+  return definitionIndex.get(type);
+}
+
 export class TrackBuilder3D {
   readonly keymap = new Keymap();
   private placedProps: PlacedProp[] = [];
@@ -1146,8 +1162,7 @@ export class TrackBuilder3D {
 
   /** True for the slingshot launcher prop (the one model the retired start used to own). */
   private isSlingshotProp(prop: PlacedProp): boolean {
-    const def = PROP_DEFINITIONS.find((definition) => definition.type === prop.type);
-    return Boolean(def?.isSlingshot);
+    return Boolean(propDefinition(prop.type)?.isSlingshot);
   }
 
   /**
@@ -2202,7 +2217,7 @@ export class TrackBuilder3D {
 
   getPlacedRamps(): readonly PlacedProp[] {
     return this.placedProps.filter((p) => {
-      const def = PROP_DEFINITIONS.find((d) => d.type === p.type);
+      const def = propDefinition(p.type);
       return def?.isRamp || p.type === 'timber_ramp' || p.type === 'rock_springboard' || p.type === 'springboard';
     });
   }
@@ -2747,6 +2762,10 @@ export class TrackBuilder3D {
             roughness: 0.95,
             metalness: 0.0,
             side: THREE.DoubleSide,
+            // One pass: three draws a see-through two-sided material twice and flags it for a shader rebuild
+            // both times, every frame; a flat card cut out by its alpha needs neither (hundreds of grass cards were
+            // ~45 ms a frame).
+            forceSinglePass: true,
             depthWrite: false,
             polygonOffset: true,
             polygonOffsetFactor: -3,
@@ -2756,6 +2775,7 @@ export class TrackBuilder3D {
             map: tex,
             transparent: true,
             side: THREE.DoubleSide,
+            forceSinglePass: true,
             depthWrite: false,
             polygonOffset: true,
             polygonOffsetFactor: -3,
@@ -2781,6 +2801,7 @@ export class TrackBuilder3D {
             roughness: 0.95,
             metalness: 0.0,
             side: THREE.DoubleSide,
+            forceSinglePass: true,
             depthWrite: true,
             alphaTest: 0.2,
           })
@@ -2788,6 +2809,7 @@ export class TrackBuilder3D {
             map: tex,
             transparent: true,
             side: THREE.DoubleSide,
+            forceSinglePass: true,
             depthWrite: true,
             alphaTest: 0.2,
           });

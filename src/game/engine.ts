@@ -1,3 +1,4 @@
+import { preloadSkies } from './renderer-3d';
 import { pendingKitLoads } from './models/kit-object';
 import type { GameAssets } from './assets';
 import { GameAudio } from './audio';
@@ -743,7 +744,10 @@ export class GameEngine {
       if (left === 0 || performance.now() - started > 90000) break;
       await new Promise((resolve) => setTimeout(resolve, 120));
     }
-    onProgress(0.88, 'Shaders');
+    onProgress(0.85, 'Skies');
+    await preloadSkies();
+    this.renderer.onSkyChanged = () => this.invalidate();
+    onProgress(0.9, 'Shaders');
     await this.renderer.warmUp();
     onProgress(1, 'Ready');
   }

@@ -84,6 +84,20 @@ history; this file is for what a player or a reviewer can see.
   fashion catalog is now full — only ears/eyes/nose/background spare slots and the big one, head
   shapes, remain.
 
+### Round 9: every goblin, every shape — DNA v5 and the last five heads (avatar art finale)
+
+- Heads catalog full (8/8): **lantern** (tall gaunt), **wedge** (flat slab skull), **peanut**
+  (giant brow dome), **jowls** (sagging bulldog bags) and **bigchin** (underbite with tusks) —
+  five silhouettes, rigged per-head so their eye lines sit where their sockets are painted.
+- **DNA v5 unlocks the round-6 vault**: ears radix 12 → 16 (gauge lobes, bolted flat, spear
+  ring, stitched patch) and eyes 12 → 16 (**button doll** and **puppy eyes** return). v5 codes
+  are the same five-group shape as v4 — old codes everywhere keep working unchanged.
+- Harness upgrades as the catalogs filled: capacity loops now key off the newest radix, the
+  registration rack covers all eight heads, and \"shortest form\" assertions span the whole
+  version ladder (GOB-1…5).
+- Contact sheet `docs/art-rounds/heads-v5-1.png`. Ears/eyes land at 16/16 and 14/16; every
+  other catalog is at its radix. The painted-avatar program is complete.
+
 ### Round 8: noses out, wardrobes full (avatar art)
 
 - Nose catalog full (12/12): **boxer flat** (squashed prize-fighter nose with tape and an old

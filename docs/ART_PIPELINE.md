@@ -698,4 +698,45 @@ Contact sheet: `docs/art-rounds/noses-bodies-1.png`.
 | body-pinstripe-suit | 512×263 | [0.495, 0.278] | neck-top, 2·headW+140 |
 | body-fur-coat | 512×259 | [0.500, 0.282] | neck-top, 2·headW+140 |
 | body-oilskin-slicker | 512×270 | [0.510, 0.385] | neck-top, 2·headW+140 |
+### 11.10 Round 9 — the vault empties; every catalog is born (2026-09-28)
+
+**DNA v5** landed to unblock the round-6 vault: ears and eyes radix 12 → 16, payload ~56.9 bits —
+still under the 2^68 that the five-group v4 wire shape holds, so `HEAD_GROUPS[5] = 5` and v5 codes
+are exactly v4-shaped (`GOB-5…`). The encoder ladder extends (`fitsV4 ? 4 : 5`); the decode gate,
+payload-space check, and the "catalog outgrew" assertion all move one rung. Test rules from the
+round: any capacity loop keys off the NEWEST radix (V5_CAPACITY), and gen-4 goblins now encode as
+`GOB-[1-5]` — the "shortest form" assertion is a ladder, not a version list.
+
+**Vault return**: the six round-6 holdbacks re-keyed 6/6 PASS (residual 0) and registered with the
+round-6 measurements (ears pivot [0.92, .53/.56/.64/.62] width 84; eyes `eye-mid` [0.5, 0.5] width
+100, skin-only masks). Ears 16/16 FULL; eyes 14/16 — two slots left for a future wave.
+
+**Five new heads** (3/8 → 8/8 FULL — structural and painted-only, no legacy twin):
+lantern (tall narrow gaunt), wedge (flat slab, square jaw), peanut (huge dome, tucked chin),
+jowls (sagging bulldog bags), bigchin (underbite with ivory tusks). Head rigging got data-driven:
+`HEAD_WIDTHS` replaces the bloated/scrawny ternary, and `headRig` reads each head's eye-line
+fraction back from its own def pivot — the new masters do NOT all paint sockets at 40% (lantern
+and bigchin sit at 0.41, peanut at 0.44), so `pivot: [0.5, measured]` per head and `headTop`
+follows. Registration test's SHAPES rack extends to all eight heads, so ART-I1 now places every
+feature on every skull — the ten-feature × eight-head cross product is the round's real verifier.
+
+Catalogs: all twelve are present and encodable; capacity reached on eleven (eyes at 14/16 spare).
+The painted-avatar art program closes here; DNA v6 is the next codec whenever a thirteenth catalog
+outgrows room.
+
+| part | keyed trim | pivot | rig |
+|---|---|---|---|
+| head-lantern | 253×512 | [0.5, 0.41] | headW 48 |
+| head-wedge | 460×512 | [0.5, 0.40] | headW 58 |
+| head-peanut | 374×512 | [0.5, 0.44] | headW 55 |
+| head-jowls | 465×512 | [0.5, 0.40] | headW 58 |
+| head-bigchin | 437×512 | [0.5, 0.41] | headW 55 |
+| ears-gauge-lobes | 512×356 | [0.92, 0.53] | ear-left, 84 |
+| ears-bolted-flat | 512×291 | [0.92, 0.56] | ear-left, 84 |
+| ears-spear-ring | 512×297 | [0.92, 0.64] | ear-left, 84 |
+| ears-patch-stitched | 512×302 | [0.92, 0.62] | ear-left, 84 |
+| eyes-button-doll | 512×198 | [0.5, 0.5] | eye-mid, 100 |
+| eyes-puppy-sad | 512×185 | [0.5, 0.5] | eye-mid, 100 |
+
+Contact sheet: `docs/art-rounds/heads-v5-1.png`.
 

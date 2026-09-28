@@ -492,3 +492,32 @@ three head shapes).
 | body-champion-cape | 512×272 | [0.494, 0.268] | skin, leather, metal |
 | body-scavenger-poncho | 512×249 | [0.500, 0.293] | skin, leather |
 | body-captain-coat | 512×258 | [0.496, 0.326] | skin, leather, metal, accent |
+
+### 11.3 Round 2 — neck collars and crown headgear (2026-09-28)
+
+Nine pieces: five chin-anchored neck items (prompts `art-src/avatar-parts/prompts/neck-*.txt`) and
+four hats (crown-anchored stovepipe, jeweled crown, valve cap; brow-anchored oil beret; prompts
+`art-src/avatar-parts/prompts/headgear-*.txt`). All raws 1254², keying 9/9 PASS, residual ≤ 4 px.
+
+Registration: neck pieces sit at the chin anchor with measured pivots (scarf knot / collar V / torc
+top inner edge / wrench hang-point — the wrench's first pass landed too high and was re-registered
+from the measured profile). Hats: brim line at crown or brow anchors, widths 2·headW+gap; the
+stovepipe and valve wheel may frame off the top like the pickelhaube and gear top hat (documented
+tolerance). Masks: jewel crown leather/metal/accent, valve cap leather/metal/accent, oil beret
+leather/accent, sergeant collar leather/metal/accent, others leather-only (check bandana brand-new
+checkered print stays untinted by design).
+
+Contact sheets: `docs/art-rounds/necks-1.png` (five necks × angular + cross-head tiles),
+`docs/art-rounds/crowns-1.png` (two crown hats × three heads).
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| neck-aviator-scarf | 512×291 | [0.5, 0.28] | chin |
+| neck-sergeant-collar | 494×512 | [0.5, 0.30] | chin |
+| neck-wire-torc | 512×417 | [0.5, 0.30] | chin |
+| neck-check-scarf | 512×381 | [0.5, 0.28] | chin |
+| neck-wrench-pendant | 185×512 | [0.5, 0.12] | chin |
+| headgear-smokestack | 400×512 | [0.5, 0.92] | crown |
+| headgear-jewel-crown | 512×402 | [0.5, 0.88] | crown |
+| headgear-valve-cap | 451×512 | [0.5, 0.85] | crown |
+| headgear-oil-beret | 512×331 | [0.5, 0.75] | brow-line |

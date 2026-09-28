@@ -188,6 +188,10 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'headgear-bandana-knot', layer: 'headgear', name: 'Bandana', pivot: [0.5, 0.75], anchor: 'brow-line', width: (c) => 2 * c.headW + 30, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11] }),
   P({ id: 'headgear-propeller-beanie', layer: 'headgear', name: 'Propeller beanie', pivot: [0.5, 0.9], anchor: 'brow-line', width: (c) => 2 * c.headW + 12, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11] }),
   P({ id: 'headgear-bucket-pot', layer: 'headgear', name: 'Cooking pot', pivot: [0.5, 0.9], anchor: 'brow-line', width: (c) => 2 * c.headW + 44, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11] }),
+  P({ id: 'headgear-smokestack', layer: 'headgear', name: 'Smokestack', pivot: [0.5, 0.92], anchor: 'crown', width: (c) => 2 * c.headW + 34, hidesHair: [1, 3, 5, 7, 9, 11], prompt: 'Riveted sooty stovepipe smokestack hat, rivet bands and scorched glowing rim.' }),
+  P({ id: 'headgear-jewel-crown', layer: 'headgear', name: 'Jeweled crown', pivot: [0.5, 0.88], anchor: 'crown', width: (c) => 2 * c.headW + 30, hidesHair: [3, 7], prompt: 'Chunky golden crown with thick pointed merlons and square-cut ruby and emerald gems.' }),
+  P({ id: 'headgear-valve-cap', layer: 'headgear', name: 'Valve cap', pivot: [0.5, 0.85], anchor: 'crown', width: (c) => 2 * c.headW + 26, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11], prompt: 'Riveted brass skull cap with a red-bronze steam valve wheel on top and dark chin straps.' }),
+  P({ id: 'headgear-oil-beret', layer: 'headgear', name: 'Oil beret', pivot: [0.5, 0.75], anchor: 'brow-line', width: (c) => 2 * c.headW + 34, hidesHair: [1, 3, 5, 7, 9, 11], prompt: 'Oil-stained slouched crimson-black racing beret with a brass piston pin, low on the forehead.' }),
   P({ id: 'mouth-rusty-grille', layer: 'mouth', name: 'Rusty grille', pivot: [0.5, 0.5], anchor: 'mouth', width: S(84) }),
   P({ id: 'mouth-buck-teeth', layer: 'mouth', name: 'Buck teeth', pivot: [0.5, 0.5], anchor: 'mouth', width: S(72) }),
   P({ id: 'mouth-corncob-pipe', layer: 'mouth', name: 'Corncob pipe', pivot: [0.35, 0.6], anchor: 'mouth', width: S(100) }),
@@ -206,6 +210,13 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   W('warpaint-tribal-stripes', 'Tribal stripes', [0.05, 0.041, 0.885, 0.878]),
   W('warpaint-bone-skull', 'Bone skull', [0.069, 0.117, 0.857, 0.808]),
   P({ id: 'neck-tool-bandolier', layer: 'neck', name: 'Tool bandolier', pivot: [0.5, 0.15], anchor: 'chin', width: S(170), replaces: 'tool-bandolier' }),
+  // Round 2 neck-wear: everything chin-anchored, collars hug the jaw (registration test: sides
+  // must stay inside the canvas; tails may hang to the shoulder line like the other neck pieces).
+  P({ id: 'neck-aviator-scarf', layer: 'neck', name: 'Aviator scarf', pivot: [0.5, 0.28], anchor: 'chin', width: S(130), prompt: 'Knotted cream-white aviator silk scarf, fat tidy knot at the front and two short tails, one flowing.' }),
+  P({ id: 'neck-sergeant-collar', layer: 'neck', name: 'Sergeant collar', pivot: [0.5, 0.3], anchor: 'chin', width: S(160), prompt: 'High stiff crimson parade collar with brass piping and a brass number 5 pin, framing the jaw.' }),
+  P({ id: 'neck-wire-torc', layer: 'neck', name: 'Wire torc', pivot: [0.5, 0.3], anchor: 'chin', width: S(112), prompt: 'Thick braided copper-and-steel wire torc necklace, kinked strands, hex-nut clasp at the front.' }),
+  P({ id: 'neck-check-scarf', layer: 'neck', name: 'Checkered bandana', pivot: [0.5, 0.28], anchor: 'chin', width: S(126), prompt: 'Racing checkered black-and-white bandana knotted at the side of the neck, short tails.' }),
+  P({ id: 'neck-wrench-pendant', layer: 'neck', name: 'Wrench pendant', pivot: [0.5, 0.12], anchor: 'chin', width: S(44), prompt: 'Big chunky tuning wrench hung as a pendant from a short dark cord, pointing down at the chest.' }),
 ];
 
 export const paintedById = new Map(PAINTED_PARTS.map((p) => [`painted:${p.id}`, p]));

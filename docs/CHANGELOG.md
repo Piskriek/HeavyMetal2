@@ -29,6 +29,19 @@ history; this file is for what a player or a reviewer can see.
   `docs/art-rounds/bodies-1b.png` per head shape. The body catalog holds ten wardrobes (of the v4
   budget of sixteen).
 
+### Round 2: the neck and the crown (avatar art)
+
+- Five chin-anchored neck pieces join the tray: cream aviator scarf, crimson sergeant collar
+  (brass-piped, with the number 5), braided copper wire torc, racing checkered bandana, and a
+  tuning-wrench pendant that hangs down the chest (registered from the measured hang-point, not
+  guessed).
+- Four hats: the sooty riveted smokestack and the valve-wheel skull cap rise off the crown like the
+  gear top hat does (documented top-frame tolerance), the jeweled crown perches regally at it, and
+  the slouched oil beret grips the brow — every one on the measured per-head widths, so they sit
+  the same on angular, bloated and scrawny heads.
+- 9/9 key-art QA pass, residual ≤ 4 px; contact sheets `docs/art-rounds/necks-1.png` and
+  `docs/art-rounds/crowns-1.png`. Neck catalog 18/20, headgear 19/24 — still inside DNA v4.
+
 ### DNA v4: the body becomes the twelfth encoded layer (avatar art Phase 1)
 
 - New `GOB-4…` code shape (five hex groups, optional fine-tune block as before). The codec now

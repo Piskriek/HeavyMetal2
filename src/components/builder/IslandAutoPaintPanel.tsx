@@ -7,7 +7,7 @@
  * repaints once it settles, and a newer request always replaces an older one.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Dices, Sparkles, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Dices, Pencil, Sparkles, Trash2 } from 'lucide-react';
 import type { IslandGround } from '../../game/island-route/island-ground';
 import {
   DEFAULT_MACROS, ISLAND_PRESETS, recipeFor, type Band, type IslandLayer, type IslandMacros, type IslandPreset, type IslandRecipe,
@@ -25,6 +25,9 @@ interface Props {
   /** The look every surface shares: border softness and tile size (island ground settings). */
   look?: { blendSoft: number; tileScale: number };
   onLook?: (changes: { blendSoft?: number; tileScale?: number }) => void;
+  /** The owner's own tiles per preset (preset → surface → library key), and a setter (null: the preset's own). */
+  presetTiles?: Record<string, Record<string, string>>;
+  onPresetTile?: (preset: string, surface: number, key: string | null) => void;
 }
 
 /** A preset's look in four tiles, from the waterline up: what its card shows. */
@@ -47,7 +50,9 @@ const MACROS: readonly { key: keyof Omit<IslandMacros, 'seed'>; label: string; m
   { key: 'verge', label: 'Road verges', min: 0, max: 3, hint: 'Width of the worn sand along the road (0: none)' },
 ];
 
-export default function IslandAutoPaintPanel({ ground, onRequestRender, textures = {}, onSetTexture, look, onLook }: Props) {
+export default function IslandAutoPaintPanel({ ground, onRequestRender, textures = {}, onSetTexture, look, onLook, presetTiles = {}, onPresetTile }: Props) {
+  const [editTiles, setEditTiles] = useState(false);
+  const [editSurface, setEditSurface] = useState<number | null>(null);
   const [recipe, setRecipe] = useState<IslandRecipe | null>(() => ground.getAutoRecipe());
   const [progress, setProgress] = useState<number | null>(() => ground.autoProgress);
   const [open, setOpen] = useState<string | null>(null);
@@ -77,7 +82,22 @@ export default function IslandAutoPaintPanel({ ground, onRequestRender, textures
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { timer.current = null; void ground.paintAuto(next); }, delay);
   };
-  const choose = (preset: IslandPreset) => apply(recipeFor(preset.id, recipe?.macros ?? DEFAULT_MACROS), 0);
+  /** A preset's recipe with the owner's own tiles for it on top. */
+  const withOwnTiles = (r: IslandRecipe): IslandRecipe => ({ ...r, tiles: { ...r.tiles, ...presetTiles[r.preset] } });
+  const choose = (preset: IslandPreset) => apply(withOwnTiles(recipeFor(preset.id, recipe?.macros ?? DEFAULT_MACROS)), 0);
+  /** The owner picks a tile for a surface of the current preset: saved for the preset, shown at once. */
+  const pickPresetTile = async (surface: number, key: string | null) => {
+    if (!recipe || !onPresetTile) return;
+    onPresetTile(recipe.preset, surface, key);
+    const base = recipeFor(recipe.preset).tiles ?? {};
+    const own = { ...presetTiles[recipe.preset] };
+    if (key) own[surface] = key; else delete own[surface];
+    const next = { ...recipe, tiles: { ...base, ...own } };
+    setRecipe(next);
+    await ground.paintAuto(next);
+    await ground.whenReady();
+    onRequestRender?.();
+  };
   const setMacro = (key: keyof IslandMacros, value: number) => recipe && apply({ ...recipe, macros: { ...recipe.macros, [key]: value } });
   const setLayer = (key: string, change: Partial<IslandLayer>) =>
     recipe && apply({ ...recipe, preset: recipe.preset, layers: recipe.layers.map((l) => (l.key === key ? { ...l, ...change } : l)) });
@@ -118,6 +138,33 @@ export default function IslandAutoPaintPanel({ ground, onRequestRender, textures
             <div className="h-full rounded-full bg-amber-400 transition-[width] duration-150" style={{ width: `${Math.round((progress ?? 0) * 100)}%` }} />
           </div>
           <p className="text-center text-[11px] text-amber-200">Painting the island… {Math.round((progress ?? 0) * 100)}%</p>
+        </div>
+      )}
+
+      {recipe && onPresetTile && (
+        <div className="space-y-1">
+          <button onClick={() => { setEditTiles((v) => !v); setEditSurface(null); }} aria-expanded={editTiles} disabled={busy}
+            className="flex w-full cursor-pointer items-center justify-center gap-1 rounded border border-zinc-700 py-1 text-[11px] text-zinc-300 hover:border-amber-400 disabled:opacity-40">
+            <Pencil size={12} />{editTiles ? 'Done editing tiles' : `Edit the tiles of ${ISLAND_PRESETS.find((p) => p.id === recipe.preset)?.name ?? 'this look'}`}
+          </button>
+          {editTiles && (
+            <div className="space-y-1 rounded-md border border-zinc-800 bg-zinc-950/50 p-1.5">
+              <p className="text-[10px] text-zinc-500">Click a surface to choose its tile for this preset: the calm set, the painterly originals or the game's textures. Kept whenever you run the preset.</p>
+              <div className="grid grid-cols-4 gap-1">
+                {[...new Set(recipe.layers.map((l) => l.surface))].map((id) => (
+                  <button key={id} onClick={() => setEditSurface(editSurface === id ? null : id)} title={surfaceDefinition(id).name}
+                    className={`flex cursor-pointer flex-col items-center gap-0.5 rounded border p-0.5 text-[9px] ${editSurface === id ? 'border-amber-400 text-amber-200' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
+                    <span className="block h-7 w-full rounded-sm bg-cover bg-center" style={{ backgroundColor: surfaceDefinition(id).swatch, backgroundImage: thumb(id) ? `url(${thumb(id)})` : undefined }} />
+                    <span className="w-full truncate text-center">{surfaceDefinition(id).name}</span>
+                  </button>
+                ))}
+              </div>
+              {editSurface !== null && (
+                <IslandTexturePicker surface={editSurface} current={recipe.tiles?.[editSurface]} fallback={recipeFor(recipe.preset).tiles?.[editSurface]}
+                  onPick={(key) => pickPresetTile(editSurface, key)} onClose={() => setEditSurface(null)} />
+              )}
+            </div>
+          )}
         </div>
       )}
 

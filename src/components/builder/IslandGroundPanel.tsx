@@ -88,7 +88,12 @@ export default function IslandGroundPanel({ builder, brush, onBrush, onClose, on
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300"><Sparkles size={12} />Island auto paint</div>
         <IslandAutoPaintPanel ground={ground} onRequestRender={onRequestRender}
           textures={s.textures} onSetTexture={setTexture}
-          look={{ blendSoft: s.blendSoft, tileScale: s.tileScale }} onLook={(changes) => set(changes)} />
+          look={{ blendSoft: s.blendSoft, tileScale: s.tileScale }} onLook={(changes) => set(changes)}
+          presetTiles={s.presetTiles} onPresetTile={(preset, surface, key) => {
+            const mine = { ...s.presetTiles[preset] };
+            if (key) mine[surface] = key; else delete mine[surface];
+            set({ presetTiles: { ...s.presetTiles, [preset]: mine } });
+          }} />
       </section>
 
       <section className="space-y-2 rounded-md border border-amber-500/30 bg-zinc-900/80 p-2">

@@ -66,6 +66,8 @@ export interface IslandGroundSettings {
   tileScale: number;
   /** A surface's tile swapped for a library one: surface ID → library key (`island-texture-library.ts`). */
   textures: Record<string, string>;
+  /** Tiles the owner chose for a preset: preset ID → surface ID → library key (applied whenever it runs). */
+  presetTiles: Record<string, Record<string, string>>;
 }
 
 export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
@@ -86,6 +88,7 @@ export const DEFAULT_ISLAND_GROUND: IslandGroundSettings = {
   blendSoft: 0.6,
   tileScale: 1.2,
   textures: {},
+  presetTiles: {},
 };
 
 const clamp = (v: unknown, lo: number, hi: number, fallback: number) =>
@@ -114,6 +117,10 @@ export function normalizeIslandGround(raw: unknown): IslandGroundSettings {
     tileScale: clamp(r.tileScale, 0.4, 4, d.tileScale),
     textures: r.textures && typeof r.textures === 'object'
       ? Object.fromEntries(Object.entries(r.textures as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'))
+      : {},
+    presetTiles: r.presetTiles && typeof r.presetTiles === 'object'
+      ? Object.fromEntries(Object.entries(r.presetTiles as Record<string, unknown>).filter((e): e is [string, Record<string, string>] => !!e[1] && typeof e[1] === 'object')
+        .map(([k, v]) => [k, Object.fromEntries(Object.entries(v).filter((t) => typeof t[1] === 'string'))]))
       : {},
   };
 }

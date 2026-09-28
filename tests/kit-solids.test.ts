@@ -65,3 +65,16 @@ test('the sea: a disc following the camera, waves in rings round the shore, foam
   const world = readFileSync(new URL('../src/game/island-route/island-world.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(world, /PlaneGeometry\(2 \* SEA_HALF/, 'no square sea');
 });
+
+test('the island skies: six CC0 panoramas in the Sky menu, mapped as 360° panoramas; the island opens under one', async () => {
+  const { existsSync } = await import('node:fs');
+  const r = readFileSync(new URL('../src/game/renderer-3d.ts', import.meta.url), 'utf8');
+  for (const file of ['azure-isles', 'cloud-sea', 'deep-blue', 'lilac-daydream', 'violet-twilight', 'stormpeak-puffs']) {
+    assert.match(r, new RegExp(`url: '/art/skies/sky-${file}\.jpg'`));
+    assert.ok(existsSync(new URL(`../public/art/skies/sky-${file}.jpg`, import.meta.url)), `${file} is in the game`);
+  }
+  assert.ok(existsSync(new URL('../public/art/skies/LICENSE-skies.txt', import.meta.url)), 'the licence travels with them');
+  assert.match(r, /float uvY = isPanorama > 0\.5 \? vUv\.y :/, 'a panorama maps straight');
+  assert.match(r, /const fallbackSky = SKY_PRESETS\[initialSky\] \? initialSky : 'azure_isles';/);
+  assert.doesNotMatch(r, /sky_copperwood|Golden Hour/, 'the old skies are gone from the menu');
+});

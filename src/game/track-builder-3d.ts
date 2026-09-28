@@ -179,7 +179,7 @@ export class TrackBuilder3D {
   private courseId = 'ridge';
 
   private listeners: (() => void)[] = [];
-  private currentSkyId = 'ridge';
+  private currentSkyId = 'azure_isles';
   private onSkyboxChangeCb?: (skyId: string) => void;
 
   onSkyboxChange(cb: (skyId: string) => void) {

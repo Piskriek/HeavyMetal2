@@ -1666,7 +1666,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Choose Skydome Environment & Atmosphere"
               >
                 <Sun size={12} />
-                <span className="hidden md:inline text-[11px]">Sky: {SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Ridge'}</span>
+                <span className="hidden md:inline text-[11px]">Sky: {SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
                 <ChevronDown size={10} />
               </button>
 

@@ -1233,118 +1233,77 @@ export interface SkyPreset {
   sunColor: number;
   sunIntensity: number;
   zenithColor: number;
+  /** A true 360° panorama (horizon at mid-height, the top edge straight up), not a painted backdrop. */
+  panorama?: boolean;
 }
 
+/** The skies: 360° panoramas, "Cloudy Skyboxes" by Screaming Brain Studios (CC0, public/art/skies). */
 export const SKY_PRESETS: Record<string, SkyPreset> = {
-  ridge: {
-    id: 'ridge',
-    name: 'Copperwood Golden Hour',
-    url: '/art/tracks/sky_copperwood_ridge.png',
-    fogColor: 0xd3a459,
-    ambientColor: 0x715d31,
-    sunColor: 0xf8c860,
-    sunIntensity: 2.4,
-    zenithColor: 0xb08040,
-  },
-  copperwood_dawn: {
-    id: 'copperwood_dawn',
-    name: 'Copperwood Misty Dawn',
-    url: '/art/tracks/sky_copperwood_misty_dawn.png',
-    fogColor: 0xccc995,
-    ambientColor: 0x646245,
-    sunColor: 0xf0e0a0,
-    sunIntensity: 2.0,
-    zenithColor: 0x798d6d,
-  },
-  copperwood_dusk: {
-    id: 'copperwood_dusk',
-    name: 'Copperwood Autumn Dusk',
-    url: '/art/tracks/sky_copperwood_autumn_dusk.png',
-    fogColor: 0xbf6d45,
-    ambientColor: 0x4a2f29,
-    sunColor: 0xff9950,
-    sunIntensity: 2.4,
-    zenithColor: 0x263340,
-  },
-  copperwood_frost: {
-    id: 'copperwood_frost',
-    name: 'Copperwood Frost Morning',
-    url: '/art/tracks/sky_copperwood_frost_morning.png',
-    fogColor: 0xa7c5de,
-    ambientColor: 0x405468,
-    sunColor: 0xe8f0f8,
-    sunIntensity: 2.2,
-    zenithColor: 0x4c7cb6,
-  },
-  boomtown: {
-    id: 'boomtown',
-    name: 'Boomtown Forge Dusk',
-    url: '/art/tracks/sky_boomtown_quarry.png',
-    fogColor: 0xa8402a,
-    ambientColor: 0x40171a,
-    sunColor: 0xff8833,
+  azure_isles: {
+    id: 'azure_isles',
+    name: 'Azure Isles',
+    url: '/art/skies/sky-azure-isles.jpg',
+    fogColor: 0xb9d6ec,
+    ambientColor: 0x5a6c86,
+    sunColor: 0xfff4e2,
     sunIntensity: 2.6,
-    zenithColor: 0x451d34,
+    zenithColor: 0x5373a9,
+    panorama: true,
   },
-  boomtown_embers: {
-    id: 'boomtown_embers',
-    name: 'Boomtown Ember Storm',
-    url: '/art/tracks/sky_boomtown_ember_storm.png',
-    fogColor: 0x7a2a14,
-    ambientColor: 0x250d07,
-    sunColor: 0xff6622,
-    sunIntensity: 2.6,
-    zenithColor: 0x341812,
-  },
-  boomtown_night: {
-    id: 'boomtown_night',
-    name: 'Boomtown Night Furnace',
-    url: '/art/tracks/sky_boomtown_night_furnace.png',
-    fogColor: 0x29242d,
-    ambientColor: 0x0d131f,
-    sunColor: 0xff8844,
-    sunIntensity: 1.6,
-    zenithColor: 0x0a1323,
-  },
-  sheep: {
-    id: 'sheep',
-    name: 'Woolly Storm Downs',
-    url: '/art/tracks/sky_woolly_wasteland.png',
-    fogColor: 0x8aa294,
-    ambientColor: 0x41504a,
-    sunColor: 0xd8e8c8,
-    sunIntensity: 2.1,
-    zenithColor: 0x304346,
-  },
-  woolly_sunbeams: {
-    id: 'woolly_sunbeams',
-    name: 'Woolly Sunbeam Break',
-    url: '/art/tracks/sky_woolly_sunbeam_break.png',
-    fogColor: 0x7f9a68,
-    ambientColor: 0x3c4630,
-    sunColor: 0xe4f0c0,
-    sunIntensity: 2.3,
-    zenithColor: 0x39403c,
-  },
-  woolly_dusk: {
-    id: 'woolly_dusk',
-    name: 'Woolly Dusk Zeppelins',
-    url: '/art/tracks/sky_woolly_dusk_zeppelins.png',
-    fogColor: 0x865787,
-    ambientColor: 0x2f2545,
-    sunColor: 0xffb070,
-    sunIntensity: 1.9,
-    zenithColor: 0x1f183f,
-  },
-  vista: {
-    id: 'vista',
-    name: 'Scrapdome Golden Sunset',
-    url: '/art/menu-vista.png',
-    fogColor: 0xb07040,
-    ambientColor: 0x503025,
-    sunColor: 0xffa050,
+  cloud_sea: {
+    id: 'cloud_sea',
+    name: 'Cloud Sea Morning',
+    url: '/art/skies/sky-cloud-sea.jpg',
+    fogColor: 0xb4d2ea,
+    ambientColor: 0x566a86,
+    sunColor: 0xfff1dc,
     sunIntensity: 2.5,
-    zenithColor: 0x382848,
+    zenithColor: 0x5777ad,
+    panorama: true,
+  },
+  deep_blue: {
+    id: 'deep_blue',
+    name: 'Deep Blue Clear',
+    url: '/art/skies/sky-deep-blue.jpg',
+    fogColor: 0xa9cdef,
+    ambientColor: 0x4b5f86,
+    sunColor: 0xfffaf0,
+    sunIntensity: 2.8,
+    zenithColor: 0x445b8e,
+    panorama: true,
+  },
+  lilac_daydream: {
+    id: 'lilac_daydream',
+    name: 'Lilac Daydream',
+    url: '/art/skies/sky-lilac-daydream.jpg',
+    fogColor: 0xc2b4d2,
+    ambientColor: 0x5f5670,
+    sunColor: 0xffe6ea,
+    sunIntensity: 2.3,
+    zenithColor: 0x69698e,
+    panorama: true,
+  },
+  violet_twilight: {
+    id: 'violet_twilight',
+    name: 'Violet Twilight',
+    url: '/art/skies/sky-violet-twilight.jpg',
+    fogColor: 0x5e4a99,
+    ambientColor: 0x2c2742,
+    sunColor: 0xd8ccff,
+    sunIntensity: 1.3,
+    zenithColor: 0x3a344f,
+    panorama: true,
+  },
+  stormpeak_puffs: {
+    id: 'stormpeak_puffs',
+    name: 'Stormpeak Puffs',
+    url: '/art/skies/sky-stormpeak-puffs.jpg',
+    fogColor: 0x9ea2d6,
+    ambientColor: 0x4a4d72,
+    sunColor: 0xf4f0ff,
+    sunIntensity: 2.4,
+    zenithColor: 0x474b7c,
+    panorama: true,
   },
 };
 
@@ -1368,6 +1327,7 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
     uniforms: {
       skyMap: { value: tex },
       hasTexture: { value: 1.0 },
+      isPanorama: { value: preset.panorama ? 1.0 : 0.0 },
       horizonColor: { value: new THREE.Color(preset.fogColor) },
       zenithColor: { value: new THREE.Color(preset.zenithColor) },
     },
@@ -1383,6 +1343,7 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
     fragmentShader: `
       uniform sampler2D skyMap;
       uniform float hasTexture;
+      uniform float isPanorama;
       uniform vec3 horizonColor;
       uniform vec3 zenithColor;
       varying vec2 vUv;
@@ -1390,7 +1351,7 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
 
       void main() {
         // Map uvY so the painting spans from just below the horizon up to the zenith
-        float uvY = clamp((vUv.y - 0.32) / 0.68, 0.0, 1.0);
+        float uvY = isPanorama > 0.5 ? vUv.y : clamp((vUv.y - 0.32) / 0.68, 0.0, 1.0);
         vec2 uv = vec2(1.0 - vUv.x, uvY);
         vec4 tex = texture2D(skyMap, uv);
 
@@ -1400,7 +1361,7 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
         float zenithBlend = smoothstep(0.40, 0.95, h);
 
         vec3 color = mix(horizonColor, tex.rgb, groundBlend);
-        color = mix(color, zenithColor, zenithBlend * 0.22);
+        color = mix(color, zenithColor, zenithBlend * (isPanorama > 0.5 ? 0.0 : 0.22));
 
         if (hasTexture < 0.5) {
           color = mix(horizonColor, zenithColor, smoothstep(-0.1, 0.7, h));
@@ -1740,8 +1701,10 @@ export class Renderer3D {
     this.renderer.toneMappingExposure = 1.05;
 
     const storedSky = typeof localStorage !== 'undefined' ? localStorage.getItem('hm2-3d-track-sky') : null;
-    const skyKey = (storedSky && SKY_PRESETS[storedSky]) ? storedSky : (SKY_PRESETS[initialSky] ? initialSky : 'ridge');
-    this.currentSkyPreset = SKY_PRESETS[skyKey] ?? SKY_PRESETS.ridge;
+    // A blue island sky until one is picked from the Sky menu (an old saved pick falls back to it too).
+    const fallbackSky = SKY_PRESETS[initialSky] ? initialSky : 'azure_isles';
+    const skyKey = (storedSky && SKY_PRESETS[storedSky]) ? storedSky : fallbackSky;
+    this.currentSkyPreset = SKY_PRESETS[skyKey] ?? SKY_PRESETS.azure_isles;
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(new THREE.Color(this.currentSkyPreset.fogColor), 6000, 48000);
@@ -1831,6 +1794,7 @@ export class Renderer3D {
       if (mat.uniforms.horizonColor) mat.uniforms.horizonColor.value.setHex(preset.fogColor);
       if (mat.uniforms.zenithColor) mat.uniforms.zenithColor.value.setHex(preset.zenithColor);
       if (mat.uniforms.hasTexture) mat.uniforms.hasTexture.value = 1.0;
+      if (mat.uniforms.isPanorama) mat.uniforms.isPanorama.value = preset.panorama ? 1.0 : 0.0;
     }
 
     this.sun.color.setHex(preset.sunColor);

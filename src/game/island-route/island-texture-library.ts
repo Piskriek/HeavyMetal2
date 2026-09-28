@@ -62,7 +62,13 @@ const DROPPED: LibraryTexture[] = (() => {
   }).sort((a, b) => a.key.localeCompare(b.key));
 })();
 
-export const ISLAND_TEXTURE_LIBRARY: readonly LibraryTexture[] = Object.freeze([...ORIGINALS, ...DROPPED]);
+/** The game's own ground textures (public/textures), usable on the island too. */
+const GAME: LibraryTexture[] = ([
+  ['dirt.png', 'path'], ['grass.png', 'grass'], ['cliff.png', 'cliff'], ['caverock.png', 'rock'], ['cobble.png', 'path'],
+  ['wood.png', 'planks'], ['iron.png', 'iron'], ['water.png', 'shallows'], ['lava.png', 'lava'], ['bark.png', 'bark'],
+] as const).map(([file, kind]) => ({ key: `game/${file}`, url: `/textures/${file}`, kind, name: `${nameOf(file)} (game)` }));
+
+export const ISLAND_TEXTURE_LIBRARY: readonly LibraryTexture[] = Object.freeze([...ORIGINALS, ...DROPPED, ...GAME]);
 
 export const libraryTexture = (key: string | undefined) => (key ? ISLAND_TEXTURE_LIBRARY.find((t) => t.key === key) : undefined);
 

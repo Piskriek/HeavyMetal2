@@ -8,14 +8,14 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const SKY_FILES = [
   'public/art/tracks/sky_copperwood_ridge.png',
   'public/art/tracks/sky_copperwood_misty_dawn.png',
-  'public/art/tracks/sky_copperwood_autumn_dusk.png',
-  'public/art/tracks/sky_copperwood_frost_morning.png',
+  'art-src/unreferenced/art/tracks/sky_copperwood_autumn_dusk.png',
+  'art-src/unreferenced/art/tracks/sky_copperwood_frost_morning.png',
   'public/art/tracks/sky_boomtown_quarry.png',
-  'public/art/tracks/sky_boomtown_ember_storm.png',
-  'public/art/tracks/sky_boomtown_night_furnace.png',
+  'art-src/unreferenced/art/tracks/sky_boomtown_ember_storm.png',
+  'art-src/unreferenced/art/tracks/sky_boomtown_night_furnace.png',
   'public/art/tracks/sky_woolly_wasteland.png',
-  'public/art/tracks/sky_woolly_sunbeam_break.png',
-  'public/art/tracks/sky_woolly_dusk_zeppelins.png',
+  'art-src/unreferenced/art/tracks/sky_woolly_sunbeam_break.png',
+  'art-src/unreferenced/art/tracks/sky_woolly_dusk_zeppelins.png',
   'public/art/menu-vista.png',
 ];
 

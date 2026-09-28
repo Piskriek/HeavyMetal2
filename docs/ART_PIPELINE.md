@@ -430,3 +430,313 @@ Run automated QA checks before accepting any generated animation:
 | Pairwise Check | $\min_{i \ne j} \Delta(f_i, f_j)$ | $> 0.080$ | All 6 frame pairs must differ so duplicate pairs cannot hide behind a moving pair. |
 | `npm run check:edges` | Runtime Audit | **0 failures** | Audits transparent fringe bleed, edge taint, and AA steps. |
 
+
+## 11. Avatar parts: the body layer and rig-relative registration
+
+The avatar compositor gained a structural twelfth layer, `body`, drawn between `background` and
+`ears` (Z-order in `AVATAR_LAYER_ORDER`). It is not a catalogue choice for the players: one part,
+`painted:body-racer-bust`, jacket, studs and collar authentic to the garage paint scheme.
+
+- **Source**: `art-src/avatar-parts/raw/body-racer-bust.png` (1376×768, flat `#FF00FF`), prompt in
+  `art-src/avatar-parts/prompts/body-racer-bust.txt`.
+- **Keying**: `node --import tsx scripts/key-art.ts --set avatar-parts --only body-racer-bust` —
+  flood-key + despill, trimmed to 512×279, key 249,1,245, magenta residual 14 px (0.005%), zero QA
+  failures.
+- **Tint masks**: `scripts/build-part-masks.mjs` detected the `skin` (the green neck — follows the
+  skin swatch) and `leather` (jacket → the leather swatch) channels and wrote
+  `public/avatar-parts/masks/body-racer-bust-{skin,leather}.png`.
+- **Registration**: pivot `[0.5, 0.265]` = the centre band of the collar's neck opening measured off
+  the keyed PNG (the green stump's plateau runs rows ~5–143 of 279), pinned to the new `neck-top`
+  anchor (the chin, tucked 14 units up under the jaw). Width `2·headW + 140` puts jacket shoulders
+  to the frame edges on the angular head; the bottom edge — a flat horizontal cut above the belt —
+  frames off the bottom like shoulders on a portrait.
+- **Rig**: anchors and widths derive from the placed head (`headRig` in `painted-parts.ts`), so the
+  bust (and every part) sits right on angular, bloated and scrawny heads alike. The angular head
+  reproduces the legacy fixed anchors to ≤ 1 px; that is a regression test, not a wish.
+- **Sheets**: `scripts/goblin-sheet.mjs` renders labelled contact sheets off the real creator UI for
+  the per-round eyeball pass (`docs/art-rounds/`). DNA v1–3 codes are untouched by all of this.
+
+### 11.1 Round 1 — six wardrobe bodies (2026-09-28)
+
+Six more busts on the same recipe (headless flat-top green stump, no wardrobe over the stump's
+front, shoulders to the frame edges, one clean horizontal bottom cut). Prompts
+`art-src/avatar-parts/prompts/body-*.txt`; raws 1536×1024 / 1254²; keyed
+`node --import tsx scripts/key-art.ts --set avatar-parts --only <ids>` — 6/6 PASS, magenta residual
+≤ 1 px except 42/59 px on fringed fabric (below the 0.3 % remnant gate). Registration: pivot
+centre = stump centre (measured, 0.486–0.506), pivot y = (stump flat-top row + 70 px collar datum)
+÷ trim height; `neck-top` anchor, width 2·headW+140 — the same shoulder line as the racer bust on
+every head. Tint masks from `build-part-masks.mjs`: all bodies skin+leather, pit-crew vest also
+metal (the whistle). Contact sheet `docs/art-rounds/bodies-1.png`.
+
+| part | trim | key (RGB) | residual px | pivot |
+|---|---|---|---|---|
+| body-mechanic-overalls | 512×266 | 251,2,249 | 1 | [0.489, 0.274] |
+| body-pilot-bomber | 512×245 | 249,3,248 | 0 | [0.500, 0.302] |
+| body-junkknight-plate | 512×261 | 250,2,249 | 0 | [0.499, 0.280] |
+| body-warlord-pauldron | 512×275 | 251,2,250 | 0 | [0.486, 0.269] |
+| body-pit-crew-vest | 512×256 | 249,3,249 | 1 | [0.506, 0.289] |
+| body-engineer-apron | 512×302 | 251,2,250 | 0 | [0.496, 0.245] |
+
+### 11.2 Round 1b — cape, poncho, captain coat (2026-09-28)
+
+Three more busts on the headless-stump recipe (prompts `art-src/avatar-parts/prompts/body-*.txt`;
+raws 1536×1024). Keying 3/3 PASS, residual 0 px. Pivots measured off the keyed PNGs as before.
+Mask channels: champion cape skin/leather/metal (the gold follows the leather swatch — a team's
+cape matches its kart trim), scavenger poncho skin/leather, captain coat
+skin/leather/metal/**accent** (the crimson frock follows the racing accent by design, so the
+captain parades in team colours). Contact sheet `docs/art-rounds/bodies-1b.png` (each body on all
+three head shapes).
+
+| part | trim | pivot | masks |
+|---|---|---|---|
+| body-champion-cape | 512×272 | [0.494, 0.268] | skin, leather, metal |
+| body-scavenger-poncho | 512×249 | [0.500, 0.293] | skin, leather |
+| body-captain-coat | 512×258 | [0.496, 0.326] | skin, leather, metal, accent |
+
+### 11.3 Round 2 — neck collars and crown headgear (2026-09-28)
+
+Nine pieces: five chin-anchored neck items (prompts `art-src/avatar-parts/prompts/neck-*.txt`) and
+four hats (crown-anchored stovepipe, jeweled crown, valve cap; brow-anchored oil beret; prompts
+`art-src/avatar-parts/prompts/headgear-*.txt`). All raws 1254², keying 9/9 PASS, residual ≤ 4 px.
+
+Registration: neck pieces sit at the chin anchor with measured pivots (scarf knot / collar V / torc
+top inner edge / wrench hang-point — the wrench's first pass landed too high and was re-registered
+from the measured profile). Hats: brim line at crown or brow anchors, widths 2·headW+gap; the
+stovepipe and valve wheel may frame off the top like the pickelhaube and gear top hat (documented
+tolerance). Masks: jewel crown leather/metal/accent, valve cap leather/metal/accent, oil beret
+leather/accent, sergeant collar leather/metal/accent, others leather-only (check bandana brand-new
+checkered print stays untinted by design).
+
+Contact sheets: `docs/art-rounds/necks-1.png` (five necks × angular + cross-head tiles),
+`docs/art-rounds/crowns-1.png` (two crown hats × three heads).
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| neck-aviator-scarf | 512×291 | [0.5, 0.28] | chin |
+| neck-sergeant-collar | 494×512 | [0.5, 0.30] | chin |
+| neck-wire-torc | 512×417 | [0.5, 0.30] | chin |
+| neck-check-scarf | 512×381 | [0.5, 0.28] | chin |
+| neck-wrench-pendant | 185×512 | [0.5, 0.12] | chin |
+| headgear-smokestack | 400×512 | [0.5, 0.92] | crown |
+| headgear-jewel-crown | 512×402 | [0.5, 0.88] | crown |
+| headgear-valve-cap | 451×512 | [0.5, 0.85] | crown |
+| headgear-oil-beret | 512×331 | [0.5, 0.75] | brow-line |
+
+### 11.4 Round 3 — iron grins and greasy hair (2026-09-28)
+
+Nine pieces: five mouth-anchored grins and four hair pieces (prompts
+`art-src/avatar-parts/prompts/{mouth,hair}-*.txt`). First-pass Subjects that named a "goblin
+mouth/hairdo" drew full heads, so the prompts all carry the part-only guard ("draw ONLY the …,
+NO head, NO face"); the re-rolled raws key 9/9 PASS, residual ≤ 33 px (`hair-stud-buzz`'s chrome
+studs catch magenta bleed worse than cloth does).
+
+Registration: mouths pin their bite/teeth line to the `mouth` anchor with measured off-centre
+pivots for the blowtorch (bite at 0.39) and spanner (bite at 0.56). Pigtails use the long-braids
+recipe (scalp anchor, full head width); the copper ponytail pins its cinch coil to `scalp`; the
+rivet fringe rides `brow-line` like the oil beret; the stud buzz is a scalp ridge. The new hair
+indices (12–15) joined every headgear `hidesHair` list by coverage: brow-anchored full-cover hats
+hide ponytail+fringe+buzz, crown-riders (top hat, smokestack) hide ponytail+buzz, the open crowns
+hide only the ponytail, and the pigtails stay visible everywhere like the long braids. Mouth masks
+tint lips to skin and tools to metal where detected; hair stays untinted. Hair catalog is now
+exactly full (16/16); mouth 17/20 — both inside DNA v4.
+
+Contact sheets: `docs/art-rounds/mouths-1.png` and `docs/art-rounds/hair-1.png` (each piece on all
+three head shapes).
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| mouth-rivet-gnashers | 510×218 | [0.50, 0.46] | mouth |
+| mouth-beartrap-jaw | 512×267 | [0.50, 0.45] | mouth |
+| mouth-blowtorch-grin | 509×291 | [0.39, 0.47] | mouth |
+| mouth-zipper-lips | 512×308 | [0.47, 0.45] | mouth |
+| mouth-clamped-spanner | 510×224 | [0.56, 0.46] | mouth |
+| hair-greasy-pigtails | 510×445 | [0.51, 0.06] | scalp |
+| hair-copper-ponytail | 511×366 | [0.33, 0.93] | scalp |
+| hair-rivet-fringe | 511×221 | [0.50, 0.78] | brow-line |
+| hair-stud-buzz | 511×271 | [0.50, 0.97] | scalp |
+
+### 11.5 Round 4 — eyes front and collars full (2026-09-28)
+
+Nine pieces: seven eyewear (prompts `art-src/avatar-parts/prompts/eyewear-*.txt`) and two neck
+collars, filling both catalogs to their DNA v4 caps (eyewear 20/20, neck 20/20). Every prompt
+carries the round-3 part-only guard from the start; no re-rolls were needed. Keying 9/9 PASS
+(residual 0 except the clear safety specs at 560 px — transparent frames keep a faint painted
+magenta inside the plastic, invisible on the sprite).
+
+Registration: eyewear pins the lens band to `eye-mid` at the measured row (steam 0.56, pilot 0.53,
+safety 0.47 x-drift), except the welder visor, which uses the goggles-up recipe — strap to
+`brow-line` at 0.78, shield raised above. The visor strip follows at full 120 width. The fur
+mantle hangs off the chin anchor at the measured throat (0.12), the plug-cable loop at the loop
+top (0.06) like the gear chain. Masks: straps → leather, gauge/pilot bodies → metal, plug-cable
+braid → accent (team colours on the cables, like the captain coat); safety specs and the visor
+strip stay neutral. Contact sheets: `docs/art-rounds/goggles-1.png` (13 tiles), `docs/art-rounds/necks-2.png`.
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| eyewear-welder-visor | 512×419 | [0.50, 0.78] | brow-line |
+| eyewear-steam-goggles | 512×303 | [0.50, 0.56] | eye-mid |
+| eyewear-fur-pilot-goggles | 512×294 | [0.50, 0.53] | eye-mid |
+| eyewear-gauge-eyes | 512×238 | [0.50, 0.50] | eye-mid |
+| eyewear-safety-specs | 512×270 | [0.47, 0.50] | eye-mid |
+| eyewear-visor-strip | 512×179 | [0.50, 0.47] | eye-mid |
+| eyewear-retro-shades | 512×220 | [0.50, 0.45] | eye-mid |
+| neck-fur-mantle | 510×288 | [0.50, 0.12] | chin |
+| neck-plug-cables | 510×502 | [0.50, 0.06] | chin |
+
+### 11.6 Round 5 — the last grin and the last hat (2026-09-28)
+
+Eight pieces close the mouth and headgear catalogs at their DNA v4 caps (20/20 and 24/24):
+three mouth-anchored grins and five hats (part-only guarded prompts, zero re-rolls, 8/8 key PASS,
+residual ≤ 8 px). Mouths: the steam whistle and bolt bite sit off-centre/centre at the measured
+bite row; the oil drip grins wide with its drool hanging off the lip corner. Hats: ear defenders
+use the crown anchor with the band underside at 0.22 (cups land on the ears at 2·headW+36), the
+flatcap and checkered cap ride `brow-line` like the oil beret (0.75), the turbo snail shell opens
+at 0.72 on the brow line with a slight x-drift, and the horseshoe magnet perches on the crown at
+0.88 like the scrap crown. hidesHair: the defenders hide top hair only, both caps and the turbo
+take the full-cover list plus the brow fringe, the magnet hides just the topknots and ponytail like
+the other open crowns. Masks: ear-defender panels and the magnet answered the accent (team-colour
+magnet, by design); the whistle's brass is the only tinted channel on it — its lips stay painted
+toxic green on every skin, an accepted quirk (the skin mask band missed the brighter green).
+Contact sheets: `docs/art-rounds/mouths-2.png`, `docs/art-rounds/hats-2.png`.
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| mouth-exhaust-whistle | 512×269 | [0.47, 0.46] | mouth |
+| mouth-bolt-bite | 512×297 | [0.50, 0.49] | mouth |
+| mouth-oil-drip | 510×336 | [0.51, 0.45] | mouth |
+| headgear-ear-defenders | 512×402 | [0.50, 0.22] | crown |
+| headgear-grease-flatcap | 512×389 | [0.50, 0.75] | brow-line |
+| headgear-turbo-helm | 446×512 | [0.46, 0.72] | brow-line |
+| headgear-checkered-cap | 511×350 | [0.50, 0.75] | brow-line |
+| headgear-horseshoe-magnet | 504×510 | [0.48, 0.88] | crown |
+
+### 11.7 Round 6 — a feature at every cap (2026-09-28)
+
+Ten parts were generated (six ears, four eyes; part-only guarded prompts plus a "ONE single LEFT
+ear, base to the RIGHT" block — the ear pipeline paints one ear and mirrors it). Keying 10/10
+PASS, residual 0. **The catalog caps bit mid-round:** ears and eyes sat at 10/12 already (four
+legacy entries plus six painted), not 6/12, so only two slots per layer were free. Registered
+2+2 to close both catalogs at the v4 cap; the other six (gauge-lobes, bolted-flat, spear-ring,
+patch-stitched ears; button-doll, puppy-sad eyes) moved to `art-src/avatar-parts/vault/` with
+their prompts, ready to key-and-register when a codec v5 widens the feature fields.
+
+Registration: ears pin the skull-side attachment at the measured base rows (pivot x 0.92 like the
+rest of the rack, y per silhouette); the shredded ear needed its width clamped 96→84 after the
+registration test caught it spilling off-canvas on the bloated head. Eyes stay on the standard
+`eye-mid` [0.5, 0.5] pair canvas. All feature masks are skin-only (rings, bolts and brass stay
+painted brass on every goblin, like the torn-ring ears always have). Contact sheet:
+`docs/art-rounds/features-1.png`.
+
+| part | trim | pivot | anchor |
+|---|---|---|---|
+| ears-moth-round | 512×343 | [0.92, 0.69] | ear-left (mirrored) |
+| ears-shredded-flag | 512×228 | [0.92, 0.60] | ear-left (mirrored) |
+| eyes-dizzy-swirls | 512×146 | [0.50, 0.50] | eye-mid |
+| eyes-rivet-socket | 512×160 | [0.50, 0.50] | eye-mid |
+
+### 11.8 Round 7 — faces war-ready, walls everywhere (2026-09-28)
+
+Nine parts: five warpaint marks plus four full-bleed backdrops (the round's second track).
+Warpaints keyed 5/5 PASS through the normal magenta pipeline; **the backdrops must NOT go
+through chroma-key** — key-art detects the scene's dominant sky colour as the "key", mattes
+most of the painting away (coverage 5–36 %) and fails QA ("key drifted ~300 from #FF00FF").
+Backdrops are instead downscaled to opaque 512² masters (`convert raw -resize 512x512^
+-gravity center -extent 512x512`) exactly like the four originals, and stay OUT of
+`painted-parts.generated.ts` (they ride `fixedFile`, so the manifest entry key-art writes for
+them must be deleted). Registration: warpaint boxes are measured off the untrimmed raw squares
+with the same `-fuzz 10% -trim` method that produced the tribal/bone numbers (verified against
+their committed boxes); backdrops share the stock frame def (`anchor 'frame', pivot [0,0],
+width 256, fixedFile 512×512`). Checker stripes is named for what the painter actually did —
+racing stripes riding the jawline, not under-eye tears. Contact sheet:
+`docs/art-rounds/warpaint-bg-1.png`.
+
+Catalogs after this round: **warpaint 12/12 FULL, backgrounds 12/12 FULL** — that is nine of
+eleven layers capped (eyewear, neck, hair, mouth, headgear, ears, eyes, warpaint, background).
+Only noses (9/12), bodies (10/16) and heads (3/8) still have painted-room under codec v4.
+
+| part | keyed trim | W box (raw fractions) |
+|---|---|---|
+| warpaint-carbon-scorch | 472×512 | [0.097, 0.033, 0.826, 0.899] |
+| warpaint-grease-star | 443×512 | [0.401, 0.151, 0.494, 0.573] |
+| warpaint-checker-tears | 512×378 | [0.157, 0.258, 0.685, 0.505] |
+| warpaint-ash-bandit | 512×178 | [0.100, 0.308, 0.809, 0.278] |
+| warpaint-spark-bolt | 512×508 | [0.082, 0.091, 0.821, 0.813] |
+| background-scrapyard-dusk | 512² opaque | frame def (fixedFile) |
+| background-desert-canyon | 512² opaque | frame def (fixedFile) |
+| background-night-garage | 512² opaque | frame def (fixedFile) |
+| background-podium-lights | 512² opaque | frame def (fixedFile) |
+### 11.9 Round 8 — noses out, wardrobes full (2026-09-28)
+
+Nine parts: three noses (catalog 9/12 → 12/12 FULL — noses never had prompt files before; their
+older six predate the folder convention) and six wardrobe bodies (10/16 → 16/16 FULL; after this
+round every painted layer except heads sits at its codec-v4 radix — heads stay structural at 3/8
+and are the DNA-v5 project together with the six vault parts). Keying 9/9 PASS, residual ≤ 2 px.
+Body pivots measured with the round-1 rule (stump flat-top + 70 px collar datum ÷ trim height),
+with one new wrinkle: the **oilskin storm collar and fur collar rise above the neck stump in the
+trim**, so their "stump flat-top row" is not the trim top (oilskin's stump top sits 34 rows down);
+measure the skin island, don't assume. Noses kept the standard `nose` anchor at [0.5, 0.5].
+Masks via `build-part-masks.mjs`: every new part got its skin channel (the fur coat also leather
++ metal, roadie leather + accent, welder leather).
+
+**Codec edge of the round:** filling body to 16/16 broke two ART-I2 tests that assumed a free
+body slot — the future-body push scenario produced roll 16, which v4's radix-16 nibbles cannot
+hold (honest `RangeError: out of range for v4`). Correct behaviour, stale premise: both tests now
+run their future-body branches only while `catalog.length < V4_CAPACITY.body`, and when the radix
+is full they assert the *encode-time* refusal instead. Rule of thumb: any test that pushes a
+hypothetical catalog entry must gate on radix room.
+
+Contact sheet: `docs/art-rounds/noses-bodies-1.png`.
+
+| part | keyed trim | pivot | anchor / width |
+|---|---|---|---|
+| nose-boxer-flat | 512×390 | [0.50, 0.50] | nose, S(52) |
+| nose-square-pug | 512×373 | [0.50, 0.50] | nose, S(48) |
+| nose-bandage-wrap | 451×512 | [0.50, 0.50] | nose, S(46) |
+| body-welder-leathers | 512×284 | [0.500, 0.261] | neck-top, 2·headW+140 |
+| body-rocker-denim | 512×249 | [0.503, 0.297] | neck-top, 2·headW+140 |
+| body-flag-wrap | 512×281 | [0.498, 0.263] | neck-top, 2·headW+140 |
+| body-pinstripe-suit | 512×263 | [0.495, 0.278] | neck-top, 2·headW+140 |
+| body-fur-coat | 512×259 | [0.500, 0.282] | neck-top, 2·headW+140 |
+| body-oilskin-slicker | 512×270 | [0.510, 0.385] | neck-top, 2·headW+140 |
+### 11.10 Round 9 — the vault empties; every catalog is born (2026-09-28)
+
+**DNA v5** landed to unblock the round-6 vault: ears and eyes radix 12 → 16, payload ~56.9 bits —
+still under the 2^68 that the five-group v4 wire shape holds, so `HEAD_GROUPS[5] = 5` and v5 codes
+are exactly v4-shaped (`GOB-5…`). The encoder ladder extends (`fitsV4 ? 4 : 5`); the decode gate,
+payload-space check, and the "catalog outgrew" assertion all move one rung. Test rules from the
+round: any capacity loop keys off the NEWEST radix (V5_CAPACITY), and gen-4 goblins now encode as
+`GOB-[1-5]` — the "shortest form" assertion is a ladder, not a version list.
+
+**Vault return**: the six round-6 holdbacks re-keyed 6/6 PASS (residual 0) and registered with the
+round-6 measurements (ears pivot [0.92, .53/.56/.64/.62] width 84; eyes `eye-mid` [0.5, 0.5] width
+100, skin-only masks). Ears 16/16 FULL; eyes 14/16 — two slots left for a future wave.
+
+**Five new heads** (3/8 → 8/8 FULL — structural and painted-only, no legacy twin):
+lantern (tall narrow gaunt), wedge (flat slab, square jaw), peanut (huge dome, tucked chin),
+jowls (sagging bulldog bags), bigchin (underbite with ivory tusks). Head rigging got data-driven:
+`HEAD_WIDTHS` replaces the bloated/scrawny ternary, and `headRig` reads each head's eye-line
+fraction back from its own def pivot — the new masters do NOT all paint sockets at 40% (lantern
+and bigchin sit at 0.41, peanut at 0.44), so `pivot: [0.5, measured]` per head and `headTop`
+follows. Registration test's SHAPES rack extends to all eight heads, so ART-I1 now places every
+feature on every skull — the ten-feature × eight-head cross product is the round's real verifier.
+
+Catalogs: all twelve are present and encodable; capacity reached on eleven (eyes at 14/16 spare).
+The painted-avatar art program closes here; DNA v6 is the next codec whenever a thirteenth catalog
+outgrows room.
+
+| part | keyed trim | pivot | rig |
+|---|---|---|---|
+| head-lantern | 253×512 | [0.5, 0.41] | headW 48 |
+| head-wedge | 460×512 | [0.5, 0.40] | headW 58 |
+| head-peanut | 374×512 | [0.5, 0.44] | headW 55 |
+| head-jowls | 465×512 | [0.5, 0.40] | headW 58 |
+| head-bigchin | 437×512 | [0.5, 0.41] | headW 55 |
+| ears-gauge-lobes | 512×356 | [0.92, 0.53] | ear-left, 84 |
+| ears-bolted-flat | 512×291 | [0.92, 0.56] | ear-left, 84 |
+| ears-spear-ring | 512×297 | [0.92, 0.64] | ear-left, 84 |
+| ears-patch-stitched | 512×302 | [0.92, 0.62] | ear-left, 84 |
+| eyes-button-doll | 512×198 | [0.5, 0.5] | eye-mid, 100 |
+| eyes-puppy-sad | 512×185 | [0.5, 0.5] | eye-mid, 100 |
+
+Contact sheet: `docs/art-rounds/heads-v5-1.png`.
+

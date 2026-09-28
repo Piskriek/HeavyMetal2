@@ -44,3 +44,6 @@ src/dev-kit-viewer.ts
 # Local secrets (API keys); never committed
 .env.local
 *.local.env
+
+# art-round scratch tiles (contact sheets are committed, the tiles are not)
+docs/art-rounds/*-tiles/

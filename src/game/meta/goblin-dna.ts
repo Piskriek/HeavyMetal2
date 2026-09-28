@@ -21,17 +21,20 @@ import { mulberry32 } from './economy-sim';
 export const AVATAR_CATALOG: Readonly<Record<AvatarLayerId, readonly string[]>> = {
   // Art wave 1 (ART-B1/B2) appended the painted parts after each layer's v2 items; art wave 2 appended more.
   // Every vector item now draws as its painted twin (painted-parts.ts `replaces`), so none is ever drawn.
-  background: ['workshop-wall', 'furnace-glow', 'racing-pennants', 'smog-sky', 'painted:background-workshop-wall', 'painted:background-furnace-glow', 'painted:background-racing-pennants', 'painted:background-smog-sky'],
-  ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound', 'painted:ears-bat-pointed', 'painted:ears-notched-fins', 'painted:ears-torn-brass-ring', 'painted:ears-droopy-hound', 'painted:ears-cauliflower-studs', 'painted:ears-long-ragged'],
-  head: ['angular', 'bloated', 'scrawny'],
-  mouth: ['lower-tusks', 'gold-jags', 'cigar-stub', 'stitched-scar', 'painted:mouth-gold-tusk-grin', 'painted:mouth-lower-tusks', 'painted:mouth-gold-jag-teeth', 'painted:mouth-cigar-stub', 'painted:mouth-stitched-scar', 'painted:mouth-rusty-grille', 'painted:mouth-buck-teeth', 'painted:mouth-corncob-pipe'],
-  nose: ['hooked-beak', 'warted-bulb', 'prosthetic-plate', 'painted:nose-hooked-beak', 'painted:nose-warted-bulb', 'painted:nose-brass-prosthetic', 'painted:nose-pierced-ring', 'painted:nose-snub-button', 'painted:nose-long-droop'],
-  eyes: ['bloodshot-crazy', 'narrow-squint', 'wide-mismatched', 'sleepy-lidded', 'painted:eyes-bloodshot-crazy', 'painted:eyes-narrow-squint', 'painted:eyes-wide-mismatched', 'painted:eyes-sleepy-lidded', 'painted:eyes-cyborg-lens', 'painted:eyes-furnace-glow'],
-  eyewear: ['none', 'goggles-up', 'goggles-down', 'brass-monocle', 'leather-eyepatch', 'painted:eyewear-welding-goggles', 'painted:eyewear-clockwork-monocle', 'painted:eyewear-racing-goggles', 'painted:eyewear-leather-eyepatch', 'painted:eyewear-cracked-spectacles', 'painted:eyewear-cyclops-lens-rig', 'painted:eyewear-aviator-shades', 'painted:eyewear-triple-loupe'],
-  hair: ['none', 'grease-mohawk', 'mutton-chops', 'singed-topknot', 'wire-tufts', 'painted:hair-grease-mohawk', 'painted:hair-mutton-chops', 'painted:hair-singed-topknot', 'painted:hair-wire-tufts', 'painted:hair-slicked-quiff', 'painted:hair-long-braids', 'painted:hair-wild-flame'],
-  headgear: ['none', 'aviator-cap', 'miner-headlamp', 'pickelhaube', 'grease-bowler', 'painted:headgear-aviator-helmet', 'painted:headgear-gear-tophat', 'painted:headgear-miner-headlamp', 'painted:headgear-spiked-pickelhaube', 'painted:headgear-grease-bowler', 'painted:headgear-scrap-crown', 'painted:headgear-horned-scrap-helm', 'painted:headgear-bandana-knot', 'painted:headgear-propeller-beanie', 'painted:headgear-bucket-pot'],
-  neck: ['none', 'spiked-collar', 'gear-chain', 'boiler-suit', 'tool-bandolier', 'painted:neck-brass-gorget', 'painted:neck-spiked-collar', 'painted:neck-gear-chain', 'painted:neck-boiler-suit-collar', 'painted:neck-tool-bandolier', 'painted:neck-wool-scarf', 'painted:neck-padlock-collar', 'painted:neck-trophy-medal'],
-  warpaint: ['none', 'mud-stripes', 'red-handprint', 'cog-tattoo', 'soot-smudges', 'painted:warpaint-tribal-stripes', 'painted:warpaint-bone-skull'],
+  background: ['workshop-wall', 'furnace-glow', 'racing-pennants', 'smog-sky', 'painted:background-workshop-wall', 'painted:background-furnace-glow', 'painted:background-racing-pennants', 'painted:background-smog-sky', 'painted:background-scrapyard-dusk', 'painted:background-desert-canyon', 'painted:background-night-garage', 'painted:background-podium-lights'],
+  ears: ['bat-pointed', 'notched-fins', 'torn-brass-ring', 'droopy-hound', 'painted:ears-bat-pointed', 'painted:ears-notched-fins', 'painted:ears-torn-brass-ring', 'painted:ears-droopy-hound', 'painted:ears-cauliflower-studs', 'painted:ears-long-ragged', 'painted:ears-shredded-flag', 'painted:ears-moth-round', 'painted:ears-gauge-lobes', 'painted:ears-bolted-flat', 'painted:ears-spear-ring', 'painted:ears-patch-stitched'],
+  head: ['angular', 'bloated', 'scrawny', 'painted:head-lantern', 'painted:head-wedge', 'painted:head-peanut', 'painted:head-jowls', 'painted:head-bigchin'],
+  mouth: ['lower-tusks', 'gold-jags', 'cigar-stub', 'stitched-scar', 'painted:mouth-gold-tusk-grin', 'painted:mouth-lower-tusks', 'painted:mouth-gold-jag-teeth', 'painted:mouth-cigar-stub', 'painted:mouth-stitched-scar', 'painted:mouth-rusty-grille', 'painted:mouth-buck-teeth', 'painted:mouth-corncob-pipe', 'painted:mouth-rivet-gnashers', 'painted:mouth-beartrap-jaw', 'painted:mouth-blowtorch-grin', 'painted:mouth-zipper-lips', 'painted:mouth-clamped-spanner', 'painted:mouth-exhaust-whistle', 'painted:mouth-bolt-bite', 'painted:mouth-oil-drip'],
+  nose: ['hooked-beak', 'warted-bulb', 'prosthetic-plate', 'painted:nose-hooked-beak', 'painted:nose-warted-bulb', 'painted:nose-brass-prosthetic', 'painted:nose-pierced-ring', 'painted:nose-snub-button', 'painted:nose-long-droop', 'painted:nose-boxer-flat', 'painted:nose-square-pug', 'painted:nose-bandage-wrap'],
+  eyes: ['bloodshot-crazy', 'narrow-squint', 'wide-mismatched', 'sleepy-lidded', 'painted:eyes-bloodshot-crazy', 'painted:eyes-narrow-squint', 'painted:eyes-wide-mismatched', 'painted:eyes-sleepy-lidded', 'painted:eyes-cyborg-lens', 'painted:eyes-furnace-glow', 'painted:eyes-dizzy-swirls', 'painted:eyes-rivet-socket', 'painted:eyes-button-doll', 'painted:eyes-puppy-sad'],
+  eyewear: ['none', 'goggles-up', 'goggles-down', 'brass-monocle', 'leather-eyepatch', 'painted:eyewear-welding-goggles', 'painted:eyewear-clockwork-monocle', 'painted:eyewear-racing-goggles', 'painted:eyewear-leather-eyepatch', 'painted:eyewear-cracked-spectacles', 'painted:eyewear-cyclops-lens-rig', 'painted:eyewear-aviator-shades', 'painted:eyewear-triple-loupe', 'painted:eyewear-welder-visor', 'painted:eyewear-steam-goggles', 'painted:eyewear-fur-pilot-goggles', 'painted:eyewear-gauge-eyes', 'painted:eyewear-safety-specs', 'painted:eyewear-visor-strip', 'painted:eyewear-retro-shades'],
+  hair: ['none', 'grease-mohawk', 'mutton-chops', 'singed-topknot', 'wire-tufts', 'painted:hair-grease-mohawk', 'painted:hair-mutton-chops', 'painted:hair-singed-topknot', 'painted:hair-wire-tufts', 'painted:hair-slicked-quiff', 'painted:hair-long-braids', 'painted:hair-wild-flame', 'painted:hair-greasy-pigtails', 'painted:hair-copper-ponytail', 'painted:hair-rivet-fringe', 'painted:hair-stud-buzz'],
+  headgear: ['none', 'aviator-cap', 'miner-headlamp', 'pickelhaube', 'grease-bowler', 'painted:headgear-aviator-helmet', 'painted:headgear-gear-tophat', 'painted:headgear-miner-headlamp', 'painted:headgear-spiked-pickelhaube', 'painted:headgear-grease-bowler', 'painted:headgear-scrap-crown', 'painted:headgear-horned-scrap-helm', 'painted:headgear-bandana-knot', 'painted:headgear-propeller-beanie', 'painted:headgear-bucket-pot', 'painted:headgear-smokestack', 'painted:headgear-jewel-crown', 'painted:headgear-valve-cap', 'painted:headgear-oil-beret', 'painted:headgear-ear-defenders', 'painted:headgear-grease-flatcap', 'painted:headgear-turbo-helm', 'painted:headgear-checkered-cap', 'painted:headgear-horseshoe-magnet'],
+  neck: ['none', 'spiked-collar', 'gear-chain', 'boiler-suit', 'tool-bandolier', 'painted:neck-brass-gorget', 'painted:neck-spiked-collar', 'painted:neck-gear-chain', 'painted:neck-boiler-suit-collar', 'painted:neck-tool-bandolier', 'painted:neck-wool-scarf', 'painted:neck-padlock-collar', 'painted:neck-trophy-medal', 'painted:neck-aviator-scarf', 'painted:neck-sergeant-collar', 'painted:neck-wire-torc', 'painted:neck-check-scarf', 'painted:neck-wrench-pendant', 'painted:neck-fur-mantle', 'painted:neck-plug-cables'],
+  warpaint: ['none', 'mud-stripes', 'red-handprint', 'cog-tattoo', 'soot-smudges', 'painted:warpaint-tribal-stripes', 'painted:warpaint-bone-skull', 'painted:warpaint-carbon-scorch', 'painted:warpaint-grease-star', 'painted:warpaint-checker-tears', 'painted:warpaint-ash-bandit', 'painted:warpaint-spark-bolt'],
+  // The bust the head sits on. Structural while there is exactly one: DNA v1–v3 know nothing about
+  // bodies and decode with body 0; DNA v4 encodes it (V4_CAPACITY room for 16). APPEND-ONLY.
+  body: ['painted:body-racer-bust', 'painted:body-mechanic-overalls', 'painted:body-pilot-bomber', 'painted:body-junkknight-plate', 'painted:body-warlord-pauldron', 'painted:body-pit-crew-vest', 'painted:body-engineer-apron', 'painted:body-champion-cape', 'painted:body-scavenger-poncho', 'painted:body-captain-coat', 'painted:body-welder-leathers', 'painted:body-rocker-denim', 'painted:body-flag-wrap', 'painted:body-pinstripe-suit', 'painted:body-fur-coat', 'painted:body-oilskin-slicker'],
 };
 
 export const SKIN_TONES: readonly { id: SkinToneId; name: string; base: string; shade: string; light: string }[] = [
@@ -44,15 +47,20 @@ export const ACCENT_PALETTE = ['#c8372d', '#e58a2b', '#e8c547', '#3fa7a0', '#4f6
 export const LEATHER_PALETTE = ['#5a3a22', '#7b4a2a', '#2e2621', '#8c6b45'] as const;
 export const METAL_PALETTE = ['#c08a2e', '#9aa0a8', '#b86b3a', '#5b5f66'] as const;
 
-const LAYER_KEYS: readonly AvatarLayerId[] = ['background', 'ears', 'head', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck', 'warpaint'];
+/** FROZEN: the eleven layers DNA v1–v3 encode, in radix order. Never reorder, never extend. */
+const BASE_LAYER_KEYS = ['background', 'ears', 'head', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck', 'warpaint'] as const satisfies readonly AvatarLayerId[];
+export type BaseLayerId = (typeof BASE_LAYER_KEYS)[number];
+
+/** Encoded layers in radix order. v1–v3 encode the base set only; DNA v4 appends 'body' at the end. */
+const LAYER_KEYS: readonly AvatarLayerId[] = [...BASE_LAYER_KEYS, 'body'];
 
 /** FROZEN: catalog sizes at the time v1 shipped. Never edit — v1 codes in the wild depend on it. */
-const V1_SIZES: Readonly<Record<AvatarLayerId, number>> = {
+const V1_SIZES: Readonly<Record<BaseLayerId, number>> = {
   background: 4, ears: 4, head: 3, mouth: 4, nose: 3, eyes: 4, eyewear: 5, hair: 5, headgear: 5, neck: 5, warpaint: 5,
 };
 
 /** FROZEN: catalog sizes when v2 shipped (before art wave 1). Never edit — v2 codes depend on it. */
-const V2_SIZES: Readonly<Record<AvatarLayerId, number>> = {
+const V2_SIZES: Readonly<Record<BaseLayerId, number>> = {
   background: 4, ears: 4, head: 3, mouth: 5, nose: 3, eyes: 4, eyewear: 7, hair: 5, headgear: 7, neck: 6, warpaint: 5,
 };
 
@@ -71,29 +79,47 @@ export function isDuplicateItem(layer: AvatarLayerId, index: number): boolean {
   return drawn !== item && AVATAR_CATALOG[layer].includes(drawn);
 }
 
-export const V3_CAPACITY: Readonly<Record<AvatarLayerId, number>> = {
+export const V3_CAPACITY: Readonly<Record<BaseLayerId, number>> = {
   background: 12, ears: 12, head: 4, mouth: 20, nose: 12, eyes: 12, eyewear: 20, hair: 16, headgear: 24, neck: 20, warpaint: 12,
 };
+
+/**
+ * FROZEN: v4's fixed room per layer. The body layer enters the codec here (radix 16 — the Phase-0
+ * commitment) and heads gain a slot (8, room for five more). Grander fields stay at v3 sizes.
+ */
+export const V4_CAPACITY: Readonly<Record<AvatarLayerId, number>> = { ...V3_CAPACITY, head: 8, body: 16 };
+
+/**
+ * FROZEN: v5's fixed room per layer. Ears and eyes widen 12 → 16 — the feature slots exhausted in
+ * the round-6 art wave (four ears and two eyes were vaulted when v4 filled; v5 is their landing).
+ * The payload grows to ~56.9 bits, still under 2^68, so the wire shape stays v4's five groups.
+ */
+export const V5_CAPACITY: Readonly<Record<AvatarLayerId, number>> = { ...V4_CAPACITY, ears: 16, eyes: 16 };
 
 type Radix = readonly { key: string; size: number }[];
 const paletteRadix = [
   { key: 'skin', size: SKIN_TONES.length }, { key: 'accent', size: ACCENT_PALETTE.length },
   { key: 'leather', size: LEATHER_PALETTE.length }, { key: 'metal', size: METAL_PALETTE.length },
 ];
-type Version = 1 | 2 | 3;
+type Version = 1 | 2 | 3 | 4 | 5;
 const RADIX_BY_VERSION: Readonly<Record<Version, Radix>> = {
-  1: [...LAYER_KEYS.map((k) => ({ key: k, size: V1_SIZES[k] })), ...paletteRadix],
-  2: [...LAYER_KEYS.map((k) => ({ key: k, size: V2_SIZES[k] })), ...paletteRadix],
-  3: [...LAYER_KEYS.map((k) => ({ key: k, size: V3_CAPACITY[k] })), ...paletteRadix],
+  1: [...BASE_LAYER_KEYS.map((k) => ({ key: k, size: V1_SIZES[k] })), ...paletteRadix],
+  2: [...BASE_LAYER_KEYS.map((k) => ({ key: k, size: V2_SIZES[k] })), ...paletteRadix],
+  3: [...BASE_LAYER_KEYS.map((k) => ({ key: k, size: V3_CAPACITY[k] })), ...paletteRadix],
+  4: [...LAYER_KEYS.map((k) => ({ key: k, size: V4_CAPACITY[k] })), ...paletteRadix],
+  5: [...LAYER_KEYS.map((k) => ({ key: k, size: V5_CAPACITY[k] })), ...paletteRadix],
 };
 const space = (v: Version) => RADIX_BY_VERSION[v].reduce((p, r) => p * r.size, 1);
-export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3) } as const;
-/** Hex digits of payload per version (v1/v2: 9, v3: 13). */
-const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13 };
+const spaceBig = (v: Version) => RADIX_BY_VERSION[v].reduce((p, r) => p * BigInt(r.size), 1n);
+export const PAYLOAD_SPACE = { 1: space(1), 2: space(2), 3: space(3), 4: space(4), 5: space(5) } as const;
+/** Hex digits of payload per version (v1/v2: 9, v3: 13, v4/v5: 17 — v4+ exceed 52 bits, so the codec packs with BigInt; v5 still fits 68 bits). */
+const PAYLOAD_HEX: Readonly<Record<Version, number>> = { 1: 9, 2: 9, 3: 13, 4: 17, 5: 17 };
 if (PAYLOAD_SPACE[2] >= 16 ** 9) throw new Error('DNA v2 payload no longer fits 36 bits');
 if (PAYLOAD_SPACE[3] >= 16 ** 13) throw new Error('DNA v3 payload no longer fits 52 bits');
+if (spaceBig(4) >= 16n ** 17n) throw new Error('DNA v4 payload no longer fits 68 bits');
+if (spaceBig(5) >= 16n ** 17n) throw new Error('DNA v5 payload no longer fits 68 bits');
 for (const k of LAYER_KEYS) {
-  if (AVATAR_CATALOG[k].length > V3_CAPACITY[k]) throw new Error(`The ${k} catalog outgrew DNA v3 (${AVATAR_CATALOG[k].length} > ${V3_CAPACITY[k]}): add a v4`);
+  if (AVATAR_CATALOG[k].length > V5_CAPACITY[k]) throw new Error(`The ${k} catalog outgrew DNA v5 (${AVATAR_CATALOG[k].length} > ${V5_CAPACITY[k]}): add a v6`);
 }
 
 /* ───────────── Nudge block ───────────── */
@@ -141,22 +167,30 @@ function configDigits(config: GoblinAvatarConfig, radix: Radix): number[] {
 
 function packHead(version: Version, digits: number[]): string {
   const radix = RADIX_BY_VERSION[version];
-  let payload = 0;
+  // BigInt: v4's payload is 68 bits, past the last bit of exact float space. v1–v3 produce the
+  // same strings as the float codec did (the 700-fixture corpus round-trips byte-identically).
+  let payload = 0n;
   for (let i = radix.length - 1; i >= 0; i--) {
     const d = digits[i];
     if (!Number.isInteger(d) || d < 0 || d >= radix[i].size) throw new RangeError(`DNA digit ${radix[i].key}=${d} out of range for v${version}`);
-    payload = payload * radix[i].size + d;
+    payload = payload * BigInt(radix[i].size) + BigInt(d);
   }
   const head = (version.toString(16) + payload.toString(16).padStart(PAYLOAD_HEX[version], '0')).toUpperCase();
   return head + checksum8(head).toString(16).padStart(2, '0').toUpperCase();
 }
 
 export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
-  const fitsV1 = LAYER_KEYS.every((k) => config.layers[k] < V1_SIZES[k]);
-  const fitsV2 = LAYER_KEYS.every((k) => config.layers[k] < V2_SIZES[k]);
+  // v1–v3 know nothing about bodies: only a goblin wearing the structural body (index 0) may
+  // take those forms, so its code stays byte-identical to one written before bodies existed.
+  const body = config.layers.body ?? 0;
+  const normalized: GoblinAvatarConfig = { ...config, layers: { ...config.layers, body } };
+  const fitsV1 = body === 0 && BASE_LAYER_KEYS.every((k) => config.layers[k] < V1_SIZES[k]);
+  const fitsV2 = body === 0 && BASE_LAYER_KEYS.every((k) => config.layers[k] < V2_SIZES[k]);
+  const fitsV3 = body === 0 && BASE_LAYER_KEYS.every((k) => config.layers[k] < V3_CAPACITY[k]);
+  const fitsV4 = LAYER_KEYS.every((k) => config.layers[k] < V4_CAPACITY[k]);
   const nudged = isNudged(config.nudge);
-  const version: Version = fitsV1 && !nudged ? 1 : fitsV2 ? 2 : 3;
-  const hex = packHead(version, configDigits(config, RADIX_BY_VERSION[version]));
+  const version: Version = fitsV1 && !nudged ? 1 : fitsV2 ? 2 : fitsV3 ? 3 : fitsV4 ? 4 : 5;
+  const hex = packHead(version, configDigits(normalized, RADIX_BY_VERSION[version]));
   let dna = hex.match(/.{4}/g)!.reduce((out, group) => `${out}-${group}`, 'GOB');
   if (nudged) {
     let payload = 0;
@@ -170,16 +204,18 @@ export function encodeGoblinDna(config: GoblinAvatarConfig): GoblinDna {
   return dna as GoblinDna;
 }
 
+/** Groups after the `GOB-` marker per DNA version, before the optional 3-group nudge block. */
+const HEAD_GROUPS: Readonly<Record<Version, number>> = { 1: 3, 2: 3, 3: 4, 4: 5, 5: 5 };
+
 export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
-  // Groups after GOB: 3 (v1/v2) or 4 (v3) hex groups, then optionally the 3-group nudge block.
   const groups = dna.trim().toUpperCase().split('-');
   if (groups[0] !== 'GOB' || !groups.slice(1).every((g) => /^[0-9A-Z]{4}$/.test(g))) throw new SyntaxError('Malformed goblin DNA');
   const version = parseInt(groups[1]?.[0] ?? '', 16);
-  if (version !== 1 && version !== 2 && version !== 3) {
+  if (version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5) {
     if (/^[0-9A-F]$/.test(groups[1]?.[0] ?? '')) throw new RangeError(`Unsupported DNA version ${version}`);
     throw new SyntaxError('Malformed goblin DNA');
   }
-  const headGroups = version === 3 ? 4 : 3;
+  const headGroups = HEAD_GROUPS[version as Version];
   if (groups.length !== 1 + headGroups && groups.length !== 1 + headGroups + 3) throw new SyntaxError('Malformed goblin DNA');
   const hex = groups.slice(1, 1 + headGroups).join('');
   if (!/^[0-9A-F]+$/.test(hex)) throw new SyntaxError('Malformed goblin DNA');
@@ -187,12 +223,17 @@ export function decodeGoblinDna(dna: string): GoblinAvatarConfig {
   const m: (string | undefined)[] = [undefined, undefined, undefined, undefined, ...nudgeGroups];
   const head = hex.slice(0, -2);
   if (parseInt(hex.slice(-2), 16) !== checksum8(head)) throw new SyntaxError('Goblin DNA checksum mismatch');
-  const radix = RADIX_BY_VERSION[version];
-  let payload = parseInt(head.slice(1), 16);
-  if (payload >= PAYLOAD_SPACE[version]) throw new RangeError('DNA payload out of range');
+  const radix = RADIX_BY_VERSION[version as Version];
+  let payload = BigInt(`0x${head.slice(1)}`);
+  if (payload >= spaceBig(version as Version)) throw new RangeError('DNA payload out of range');
   const digits: number[] = [];
-  for (const r of radix) { digits.push(payload % r.size); payload = Math.floor(payload / r.size); }
-  const layers = {} as Record<AvatarLayerId, number>;
+  for (const r of radix) {
+    const size = BigInt(r.size);
+    digits.push(Number(payload % size));
+    payload /= size;
+  }
+  // v1–v3 carry no body digit: those codes wear the structural body (index 0).
+  const layers = { body: 0 } as Record<AvatarLayerId, number>;
   radix.forEach((r, i) => { if (r.key in AVATAR_CATALOG) layers[r.key as AvatarLayerId] = digits[i]; });
   const at = (key: string) => digits[radix.findIndex((r) => r.key === key)];
   const config: GoblinAvatarConfig = { version: 1, layers, skin: SKIN_TONES[at('skin')].id, accent: at('accent'), leather: at('leather'), metal: at('metal') };
@@ -238,18 +279,21 @@ function pickWeighted(rand: () => number, size: number, weights?: readonly numbe
  * Lobbies persist the generator version they were created with, so AI faces never change mid-season
  * when the catalog grows (a question the first draft of the plan didn't ask).
  */
-export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3 = 2): GoblinAvatarConfig {
+export function generateRandomGoblin(seed: number | string, generator: 1 | 2 | 3 | 4 = 2): GoblinAvatarConfig {
   const rand = mulberry32(typeof seed === 'number' ? seed : checksum32(seed));
-  const layers = {} as Record<AvatarLayerId, number>;
+  // Generators 1–3 predate selectable bodies: they keep body 0 (the structural racer bust) and,
+  // critically, never spend a random roll on it, so their frozen goblins are unchanged.
+  const layers = { body: 0 } as Record<AvatarLayerId, number>;
   for (const layer of LAYER_KEYS) {
-    if (generator === 3) {
+    if (layer === 'body' && generator < 4) continue;
+    if (generator >= 3) {
       const items = AVATAR_CATALOG[layer];
       const optional = items[0] === 'none';
       const live = items.map((_, i) => i).filter((i) => !isDuplicateItem(layer, i));
       const weights = optional ? noneWeighted(live.length, Math.max(2, Math.round(live.length / 4))) : undefined;
       layers[layer] = live[pickWeighted(rand, live.length, weights)];
     } else {
-      layers[layer] = pickWeighted(rand, RADIX_BY_VERSION[generator].find((r) => r.key === layer)!.size, WEIGHTS[generator][layer]);
+      layers[layer] = pickWeighted(rand, RADIX_BY_VERSION[generator as 1 | 2].find((r) => r.key === layer)!.size, WEIGHTS[generator as 1 | 2][layer]);
     }
   }
   if (layers.headgear === 3 && layers.hair === 1) layers.hair = 4;

@@ -84,6 +84,18 @@ history; this file is for what a player or a reviewer can see.
   fashion catalog is now full — only ears/eyes/nose/background spare slots and the big one, head
   shapes, remain.
 
+### Round 7: faces war-ready, walls everywhere (avatar art)
+
+- Warpaint catalog full (12/12): **carbon scorch** (soot splash with an ember core), **grease
+  star** (crisp stencil over one eye), **checker stripes** (racing chequers riding the jawline),
+  **ash bandit** (chimney-ash mask across the eyes) and **spark bolt** (a jagged yellow bolt
+  straight across the face).
+- Backgrounds catalog full (12/12): **scrapyard dusk**, **desert canyon**, **night garage** and
+  **podium lights** — full-bleed backdrops that bypass chroma-keying (opaque 512² downscales,
+  `fixedFile` only; key-art's manifest entries for them were removed).
+- Contact sheet `docs/art-rounds/warpaint-bg-1.png`. Nine of twelve catalogs now sit at capacity —
+  only noses (9/12), bodies (10/16) and heads (3/8) still have room under codec v4.
+
 ### Round 6: a feature at every cap (avatar art)
 
 - Ears catalog full (12/12): big cupped **moth ears** with ribbed fan grooves, and long

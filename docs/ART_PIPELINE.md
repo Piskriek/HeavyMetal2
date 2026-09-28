@@ -633,3 +633,35 @@ painted brass on every goblin, like the torn-ring ears always have). Contact she
 | ears-shredded-flag | 512×228 | [0.92, 0.60] | ear-left (mirrored) |
 | eyes-dizzy-swirls | 512×146 | [0.50, 0.50] | eye-mid |
 | eyes-rivet-socket | 512×160 | [0.50, 0.50] | eye-mid |
+
+### 11.8 Round 7 — faces war-ready, walls everywhere (2026-09-28)
+
+Nine parts: five warpaint marks plus four full-bleed backdrops (the round's second track).
+Warpaints keyed 5/5 PASS through the normal magenta pipeline; **the backdrops must NOT go
+through chroma-key** — key-art detects the scene's dominant sky colour as the "key", mattes
+most of the painting away (coverage 5–36 %) and fails QA ("key drifted ~300 from #FF00FF").
+Backdrops are instead downscaled to opaque 512² masters (`convert raw -resize 512x512^
+-gravity center -extent 512x512`) exactly like the four originals, and stay OUT of
+`painted-parts.generated.ts` (they ride `fixedFile`, so the manifest entry key-art writes for
+them must be deleted). Registration: warpaint boxes are measured off the untrimmed raw squares
+with the same `-fuzz 10% -trim` method that produced the tribal/bone numbers (verified against
+their committed boxes); backdrops share the stock frame def (`anchor 'frame', pivot [0,0],
+width 256, fixedFile 512×512`). Checker stripes is named for what the painter actually did —
+racing stripes riding the jawline, not under-eye tears. Contact sheet:
+`docs/art-rounds/warpaint-bg-1.png`.
+
+Catalogs after this round: **warpaint 12/12 FULL, backgrounds 12/12 FULL** — that is nine of
+eleven layers capped (eyewear, neck, hair, mouth, headgear, ears, eyes, warpaint, background).
+Only noses (9/12), bodies (10/16) and heads (3/8) still have painted-room under codec v4.
+
+| part | keyed trim | W box (raw fractions) |
+|---|---|---|
+| warpaint-carbon-scorch | 472×512 | [0.097, 0.033, 0.826, 0.899] |
+| warpaint-grease-star | 443×512 | [0.401, 0.151, 0.494, 0.573] |
+| warpaint-checker-tears | 512×378 | [0.157, 0.258, 0.685, 0.505] |
+| warpaint-ash-bandit | 512×178 | [0.100, 0.308, 0.809, 0.278] |
+| warpaint-spark-bolt | 512×508 | [0.082, 0.091, 0.821, 0.813] |
+| background-scrapyard-dusk | 512² opaque | frame def (fixedFile) |
+| background-desert-canyon | 512² opaque | frame def (fixedFile) |
+| background-night-garage | 512² opaque | frame def (fixedFile) |
+| background-podium-lights | 512² opaque | frame def (fixedFile) |

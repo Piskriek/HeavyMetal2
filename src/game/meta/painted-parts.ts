@@ -138,6 +138,11 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'background-furnace-glow', layer: 'background', name: 'Furnace glow', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-furnace-glow.png', width: 512, height: 512 }, replaces: 'furnace-glow' }),
   P({ id: 'background-racing-pennants', layer: 'background', name: 'Racing pennants', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-racing-pennants.png', width: 512, height: 512 }, replaces: 'racing-pennants' }),
   P({ id: 'background-smog-sky', layer: 'background', name: 'Smog sky', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-smog-sky.png', width: 512, height: 512 }, replaces: 'smog-sky' }),
+  // Round 7 backdrops: full-bleed scenes (chroma-key skips these — opaque 512² downscales of the raw).
+  P({ id: 'background-scrapyard-dusk', layer: 'background', name: 'Scrapyard dusk', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-scrapyard-dusk.png', width: 512, height: 512 } }),
+  P({ id: 'background-desert-canyon', layer: 'background', name: 'Desert canyon', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-desert-canyon.png', width: 512, height: 512 } }),
+  P({ id: 'background-night-garage', layer: 'background', name: 'Night garage', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-night-garage.png', width: 512, height: 512 } }),
+  P({ id: 'background-podium-lights', layer: 'background', name: 'Podium lights', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-podium-lights.png', width: 512, height: 512 } }),
   // These ears pre-date the rig and overhang the canvas on the widest head (bloated): bat bled
   // 16.3 px at 96 %, torn 12.6 px, long-ragged 29.2 px. Widths are capped where they would run
   // off the frame while Angular keeps its hand-tuned width (whole ear visible everywhere).
@@ -237,6 +242,12 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   W('warpaint-soot-smudges', 'Soot smudges', [0.082, 0.139, 0.829, 0.738], 'soot-smudges'),
   W('warpaint-tribal-stripes', 'Tribal stripes', [0.05, 0.041, 0.885, 0.878]),
   W('warpaint-bone-skull', 'Bone skull', [0.069, 0.117, 0.857, 0.808]),
+  // Round 7 warpaint: boxes trimmed from the raw squares (same measurement as tribal/bone above).
+  W('warpaint-carbon-scorch', 'Carbon scorch', [0.097, 0.033, 0.826, 0.899]),
+  W('warpaint-grease-star', 'Grease star', [0.401, 0.151, 0.494, 0.573]),
+  W('warpaint-checker-tears', 'Checker stripes', [0.157, 0.258, 0.685, 0.505]),
+  W('warpaint-ash-bandit', 'Ash bandit', [0.1, 0.308, 0.809, 0.278]),
+  W('warpaint-spark-bolt', 'Spark bolt', [0.082, 0.091, 0.821, 0.813]),
   P({ id: 'neck-tool-bandolier', layer: 'neck', name: 'Tool bandolier', pivot: [0.5, 0.15], anchor: 'chin', width: S(170), replaces: 'tool-bandolier' }),
   // Round 2 neck-wear: everything chin-anchored, collars hug the jaw (registration test: sides
   // must stay inside the canvas; tails may hang to the shoulder line like the other neck pieces).

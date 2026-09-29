@@ -104,7 +104,23 @@ Reference sheets normalize framing so each object can be inspected. Their actual
 | 55 | `sand-dune-carpet-large` | Large dune patch | pass | Broad 32 × 24 m dune field; large ripple/swale language and durable boundary. |
 | 56 | `mud-puddle-carpet-small` | Small wet-mud patch | pass | Compact 4 × 3 m roughness-driven wet patch with no droplets or thin fingers. |
 | 57 | `mud-runoff-carpet-large` | Large runoff patch | pass | Broad 24 × 12 m runoff zone with simple continuous material masses. |
-| 58 | `scree-ground-carpet-small` | Small scree patch | **pending** | The tenth generation failed and the per-turn cap was reached; generate after refresh. |
+| 58 | `scree-ground-carpet-small` | Small scree patch | pass | Regenerated successfully; compact 4 × 3 m shallow-relief patch with clean top/profile coverage. |
+
+## Batch 07 — bridge, stunt, and barrier expansion
+
+![Batch 07 track-expansion contact sheet](./review/batch-07-track-expansion-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 59 | `rope-suspension-bridge` | Two-lane rope bridge | pass | Thick LOD-safe cables, readable towers, sagging deck, side and underside coverage. |
+| 60 | `iron-girder-bridge` | Three-lane iron bridge | pass | Strong truss bays, deck, connector ends and fully readable underside structure. |
+| 61 | `stone-arch-race-bridge` | Stone arch bridge | pass | Broad durable opening, thick masonry and consistent radial/top/underside views. |
+| 62 | `corkscrew-descent-module` | Helical descent | pass with engineering constraint | Strong circular silhouette and supported route; exact drop, pitch and connectors must be rebuilt from the physics blockout. |
+| 63 | `banked-wall-ride-module` | Banked wall ride | pass | Banking transition, outer support ribs, top and approach views are clearly defined. |
+| 64 | `landing-ramp-reinforced` | Gap-jump landing ramp | pass | Concave receiving profile, flat exit, side/underside bracing and durable lip. |
+| 65 | `timber-guardrail-module` | Timber guardrail | pass | Thick repeatable rails/posts with clear end sockets and no fragile details. |
+| 66 | `rope-post-barrier-module` | Rope/post barrier | pass | Broad rope sag and stout posts remain readable from all required views. |
+| 67 | `stone-parapet-module` | Stone parapet | pass | Large block rhythm, iron reinforcement, clean modular ends and durable top profile. |
 
 ## Shared review result
 

@@ -207,7 +207,32 @@ Switch distances depend on screen size, not a universal metre value. Transitions
 
 ---
 
-## 9. Texture density by class
+## 9. Batch 07 — bridge, stunt, and barrier expansion
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 59 | Rope suspension bridge | `8 × 18 × 6 m` | 6 m two-lane clear deck; similar span to cliff bridge but narrower and lighter | 18,000 | 9,000 / 3,000 |
+| 60 | Iron girder bridge | `11 × 20 × 5 m` | 9 m three-lane clear deck; same span class as timber cliff bridge | 22,000 | 11,000 / 4,000 |
+| 61 | Stone arch bridge | `11 × 18 × 8 m` | 9 m road deck; thicker and heavier than iron bridge, below tunnel height | 24,000 | 12,000 / 4,500 |
+| 62 | Corkscrew descent | `20 × 20 × 10 m` | One 6 m two-lane helical turn with approximately 8 m drop; similar footprint to loop | 32,000 | 16,000 / 6,000 |
+| 63 | Banked wall ride | `24 × 18 × 10 m` | Three-lane 60° curve; footprint larger than hairpin quarter and about half loop height | 28,000 | 14,000 / 5,000 |
+| 64 | Reinforced landing ramp | `11 × 10 × 4 m` | Three-lane receiver matching launch-ramp width; slightly shorter and lower | 12,000 | 6,000 / 2,200 |
+| 65 | Timber guardrail | `6 × 0.5 × 0.8 m` | One repeatable barrier bay; top stays below ball diameter | 3,000 | 1,400 / 450 |
+| 66 | Rope/post barrier | `6 × 0.5 × 1.0 m` | Same bay length as timber rail; rope top at one ball diameter | 3,000 | 1,400 / 400 |
+| 67 | Stone parapet | `6 × 0.6 × 1.0 m` | Same modular bay; heavier opaque barrier using large LOD-safe blocks | 3,500 | 1,700 / 600 |
+
+### Expanded-track notes
+
+- Rope and cable thickness must survive LOD2; distant LODs may replace cylindrical rope with broad cards or simplified prisms.
+- The corkscrew reference defines style and support grammar only. Physics-approved centerline, gradient, connector transform and clearance control final geometry.
+- Wall-ride banking must transition smoothly enough for deterministic collision and camera motion.
+- Guardrail, rope barrier and parapet share a 6 m bay convention and compatible end sockets.
+- Bridge decks share existing 6 m or 9 m clear widths; structural trusses and parapets sit outside gameplay clearance.
+- Bridge undersides receive real geometry only where visible from lower routes or race cameras; hidden interior faces are removed.
+
+---
+
+## 10. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -223,7 +248,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 10. Acceptance and variance
+## 11. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

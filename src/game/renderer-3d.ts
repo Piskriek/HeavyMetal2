@@ -21,7 +21,7 @@ import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro
 import { HoopPodFleet } from './pod'; /* hoop-pod:v2 */
 import type { GyroFrame } from './first-person';
 import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-route/island-world';
-import { seaFarColor } from './island-route/island-sea';
+import { SEA_VIEW_FAR, seaFarColor } from './island-route/island-sea';
 import { readOptions } from './preferences';
 import { CloudLayer } from './sky/sky-clouds';
 import { gradientBlendWidth, getSkySettings, onSkySettings, type SkySettings } from './sky/sky-settings';
@@ -1797,7 +1797,7 @@ export class Renderer3D {
     this.scene.fog = new THREE.Fog(this.dayFogColor(), 6000, 48000);
 
     const aspect = (canvas.clientWidth || 1440) / (canvas.clientHeight || 620);
-    this.camera = new THREE.PerspectiveCamera(62, aspect, 30, 200000);
+    this.camera = new THREE.PerspectiveCamera(62, aspect, 30, SEA_VIEW_FAR);
 
     // Lights
     this.sun = new THREE.DirectionalLight(this.currentSkyPreset.sunColor, this.currentSkyPreset.sunIntensity);
@@ -1926,6 +1926,8 @@ export class Renderer3D {
   /** The day's fog and horizon colour: the gradient's horizon when the gradient sky is on, else the sky preset's. */
   private dayFogColor(): THREE.Color {
     const s = this.skySettings;
+    // The Sky window's own fog colour wins over the sky's.
+    if (s?.horizon.fogColor) return new THREE.Color(s.horizon.fogColor);
     const painted = new THREE.Color(this.currentSkyPreset.fogColor);
     return s?.mode === 'gradient' ? painted.lerp(new THREE.Color(s.gradient.horizon), s.gradient.opacity) : painted;
   }

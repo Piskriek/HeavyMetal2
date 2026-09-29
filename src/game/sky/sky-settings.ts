@@ -61,6 +61,8 @@ export interface SkyHorizon {
   readonly haze: number;
   /** Distance fog over the far sea and the island: 0 = none, 1 = thick. */
   readonly fog: number;
+  /** The fog's (and the horizon haze's) colour; '' follows the sky. */
+  readonly fogColor: string;
   /** A thin glow band on the horizon line, fading up into the sky and down onto the sea. */
   readonly glow: boolean;
   readonly glowColor: string;
@@ -132,14 +134,14 @@ export const DEFAULT_SKY_SETTINGS: SkySettings = Object.freeze({
   gradient: GRADIENT_PRESETS[0]!.gradient,
   sea: SEA_PRESETS[0]!.sea,
   clouds: { enabled: true, count: 36, size: 1, height: 1, drift: 1, opacity: 1, tint: '#ffffff', seed: 1, horizonSize: 0.45, horizonHug: 0.9 },
-  horizon: { haze: 0.2, fog: 0.45, glow: true, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 },
+  horizon: { haze: 0.2, fog: 0.2, fogColor: '', glow: true, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 },
 });
 
 /** Quick looks for the horizon (the Horizon section's buttons). */
 export const HORIZON_PRESETS: readonly { id: string; name: string; horizon: SkyHorizon }[] = Object.freeze([
   { id: 'glow', name: 'Thin glow', horizon: DEFAULT_SKY_SETTINGS.horizon },
-  { id: 'crisp', name: 'Crisp line', horizon: { haze: 0, fog: 0, glow: false, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 } },
-  { id: 'haze', name: 'Soft haze', horizon: { haze: 1, fog: 1, glow: false, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 } },
+  { id: 'crisp', name: 'Crisp line', horizon: { haze: 0, fog: 0, fogColor: '', glow: false, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 } },
+  { id: 'haze', name: 'Soft haze', horizon: { haze: 1, fog: 1, fogColor: '', glow: false, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 } },
 ]);
 
 export const SKY_SETTINGS_KEY = 'hm2-sky-settings-v1';
@@ -193,6 +195,7 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
     horizon: {
       haze: clamp(z.haze, 0, 1, dz.haze),
       fog: clamp(z.fog, 0, 1, dz.fog),
+      fogColor: z.fogColor === '' ? '' : hex(z.fogColor, dz.fogColor),
       glow: typeof z.glow === 'boolean' ? z.glow : dz.glow,
       glowColor: hex(z.glowColor, dz.glowColor),
       glowStrength: clamp(z.glowStrength, 0, 1, dz.glowStrength),

@@ -116,7 +116,14 @@ export interface IslandSeaOptions {
 }
 
 /** Sea and floor reach this far from the camera. */
-export const SEA_RADIUS = 165000;
+/**
+ * The sea disc's radius: far enough that from the road (~17 500 up) it reaches within half a degree
+ * of the horizon, so the water's own pattern runs out to the horizon line. The cameras' far planes
+ * reach past it (SEA_VIEW_FAR); depth precision is set by the near plane, so this costs nothing.
+ */
+export const SEA_RADIUS = 12_000_000;
+/** How far the cameras see (past the sea's edge). */
+export const SEA_VIEW_FAR = 16_000_000;
 
 export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   const group = new THREE.Group();
@@ -137,7 +144,7 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
 
   /* The water: rings that follow the shore and close in slowly. */
   const water = opts.water.clone();
-  if (water.map) { water.map = water.map.clone(); water.map.wrapS = water.map.wrapT = THREE.RepeatWrapping; water.map.needsUpdate = true; }
+  if (water.map) { water.map = water.map.clone(); water.map.wrapS = water.map.wrapT = THREE.RepeatWrapping; water.map.anisotropy = 16; water.map.needsUpdate = true; }
   // The foam breaks up on the painted waves whatever pattern the water wears.
   const foamNoise = water.map;
   const foamAround = { value: around.value };
@@ -150,19 +157,19 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
     else t = new THREE.TextureLoader().load(SEA_SHALLOWS_URL);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
+    t.anisotropy = 16;
     patterns[id] = t;
     return t;
   };
   water.color = new THREE.Color('#6fc2c0');
   water.opacity = 0.8;
   water.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS }, seaTile: tile, seaSpeed: speed, seaHazeW: hazeW, seaGlowCol: glowCol, seaGlowAmt: glowAmt, seaGlowW: glowW, seaGlowSoft: glowSoft, seaFarCol: farCol });
+    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS }, seaTile: tile, seaSpeed: speed, seaShore: shore, seaHazeW: hazeW, seaGlowCol: glowCol, seaGlowAmt: glowAmt, seaGlowW: glowW, seaGlowSoft: glowSoft, seaFarCol: farCol });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vSeaWorld;')
       .replace('#include <project_vertex>', '#include <project_vertex>\n  vSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\nuniform float seaTile;\nuniform float seaSpeed;\nuniform float seaHazeW;\nuniform vec3 seaGlowCol;\nuniform float seaGlowAmt;\nuniform float seaGlowW;\nuniform float seaGlowSoft;\nuniform vec3 seaFarCol;\n${SHORE_GLSL}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\nuniform float seaTile;\nuniform float seaSpeed;\nuniform float seaShore;\nuniform float seaHazeW;\nuniform vec3 seaGlowCol;\nuniform float seaGlowAmt;\nuniform float seaGlowW;\nuniform float seaGlowSoft;\nuniform vec3 seaFarCol;\n${SHORE_GLSL}`)
       .replace('#include <fog_fragment>', /* glsl */ `#include <fog_fragment>
 #ifdef USE_FOG
 {
@@ -170,7 +177,7 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   vec3 viewDir = normalize(vSeaWorld - cameraPosition);
   // Near the horizon line, and (seen from high up, where the sea's edge lies well below it) near the
   // sea's far edge: either way the water melts into the fog colour the sky shows at its horizon.
-  float edge = smoothstep(0.5, 0.97, length(vSeaWorld.xz - cameraPosition.xz) / seaRadius);
+  float edge = smoothstep(0.9, 0.995, length(vSeaWorld.xz - cameraPosition.xz) / seaRadius);
   // The disc's far edge melts into the far-sea colour the sky paints under the horizon (no seam);
   // then the horizon haze (fog colour) as wide as the Sky window asks (0: none, a crisp line).
   // This runs after the colour-space step (fog_fragment follows it), so the colours mixed in here go to
@@ -203,12 +210,30 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   dx.y = dFdx(v); dy.y = dFdy(v);
   vec4 a = textureGrad(map, vec2(u1, v), dx, dy);
   vec4 b = textureGrad(map, vec2(u1 * 1.7 + 0.37, v * 0.61 + 0.11), dx * vec2(1.7, 0.61), dy * vec2(1.7, 0.61));
-  diffuseColor *= mix(a, b, 0.35);
+  vec4 ring = mix(a, b, 0.35);
+  // Far out the rings round the island stretch into streaks: there the pattern is laid flat, the same
+  // size, drifting slowly, so the water keeps its texture all the way to the horizon.
+  float far = smoothstep(seaShore * 3.0, seaShore * 7.0, rn);
+  if (far > 0.0) {
+    vec2 pu = vSeaWorld.xz / seaTile + vec2(seaTime * 0.012 * seaSpeed, 0.0);
+    vec2 px = dFdx(pu), py = dFdy(pu);
+    vec4 fa = textureGrad(map, pu, px, py);
+    vec4 fb = textureGrad(map, pu * 0.61 + vec2(0.37, 0.11), px * 0.61, py * 0.61);
+    // Further out the same pattern laid 6x and 36x bigger (big swells), so it never averages out to a
+    // flat colour before the horizon; each scale fades in where the one before gets too small to see.
+    vec4 big = textureGrad(map, pu / 6.0 + vec2(0.19, 0.53), px / 6.0, py / 6.0);
+    vec4 huge = textureGrad(map, pu / 36.0 + vec2(0.71, 0.29), px / 36.0, py / 36.0);
+    vec4 flat_ = mix(fa, fb, 0.35);
+    flat_ = mix(flat_, big, smoothstep(seaShore * 5.0, seaShore * 14.0, rn));
+    flat_ = mix(flat_, huge, smoothstep(seaShore * 18.0, seaShore * 45.0, rn));
+    ring = mix(ring, flat_, far);
+  }
+  diffuseColor *= ring;
 }
 #endif
 `);
   };
-  water.customProgramCacheKey = () => 'island-sea-rings-haze-5';
+  water.customProgramCacheKey = () => 'island-sea-rings-haze-7';
   const sea = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 160), water);
   sea.rotation.x = -Math.PI / 2;
   sea.name = 'Sea';

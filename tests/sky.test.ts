@@ -114,7 +114,7 @@ test('clouds: the layout rings the island, each ring further out, lower and smal
   const quadrants = new Set(all.map((c) => Math.floor((((c.angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 2))));
   assert.equal(quadrants.size, 4);
   // The far ring stays inside the camera's far plane from anywhere on the island.
-  assert.ok(Math.max(...all.map((c) => c.radius)) + 74000 < 200000);
+  assert.ok(Math.max(...all.map((c) => c.radius)) + 74000 < 200000, 'well inside the far plane');
 });
 
 test('clouds: seeded (same settings, same sky), and size and height scale every cloud', () => {

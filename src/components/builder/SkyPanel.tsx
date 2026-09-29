@@ -145,7 +145,7 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
           {HORIZON_PRESETS.map((p) => (
             <button
               key={p.id}
-              onClick={() => setSkySettings({ horizon: { ...p.horizon, glowColor: z.glowColor } })}
+              onClick={() => setSkySettings({ horizon: { ...p.horizon, glowColor: z.glowColor, fogColor: z.fogColor } })}
               className="flex flex-col items-center gap-1 rounded border border-zinc-800 bg-zinc-900 p-1 hover:border-amber-600/60 cursor-pointer"
               title={p.id === 'crisp' ? 'Sky meets sea on a sharp line: no haze, no fog, no glow' : p.id === 'glow' ? 'A thin light band on the line, fading up and down' : 'The old wide soft haze'}
             >
@@ -175,7 +175,17 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
         )}
         <Slider label="Haze" value={z.haze} min={0} max={1} step={0.01} format={(v) => (v === 0 ? 'crisp' : `${Math.round(v * 100)}%`)} onChange={(v) => setSkySettings({ horizon: { haze: v } })} />
         <Slider label="Distance fog" value={z.fog} min={0} max={1} step={0.01} format={(v) => (v === 0 ? 'none' : `${Math.round(v * 100)}%`)} onChange={(v) => setSkySettings({ horizon: { fog: v } })} />
-        <div className="text-[10px] text-zinc-500">Haze and fog at 0 with the glow off give a crisp line where the sea meets the sky.</div>
+        <label className="flex items-center justify-between gap-2 text-[11px] text-zinc-300">
+          <span>Fog colour</span>
+          <span className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-[10px] text-zinc-400 cursor-pointer">
+              <input type="checkbox" checked={!z.fogColor} onChange={(e) => setSkySettings({ horizon: { fogColor: e.target.checked ? '' : '#cfe6ee' } })} className="accent-amber-500" />
+              From the sky
+            </label>
+            {z.fogColor && <input type="color" value={z.fogColor} onChange={(e) => setSkySettings({ horizon: { fogColor: e.target.value } })} className="h-6 w-10 cursor-pointer rounded border border-zinc-700 bg-transparent" />}
+          </span>
+        </label>
+        <div className="text-[10px] text-zinc-500">Haze and fog at 0 with the glow off: the sea's own texture runs right to a crisp horizon line.</div>
       </section>
 
       <section className="flex flex-col gap-2 border-t border-zinc-800 pt-3">

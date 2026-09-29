@@ -15,7 +15,11 @@ import { KEYED_PARTS } from './painted-parts.generated';
  * `headW` is the silhouette half-width chosen per head shape; `headH` is measured off the keyed
  * head PNG, not guessed (see `headRig`); `headTop` is where the drawn skull starts.
  */
-export interface RigParams { headW: number; headH: number; headTop: number }
+export interface RigParams {
+  headW: number; headH: number; headTop: number;
+  /** The jaw line: where the painted head's jaw ends (measured per master, see HEAD_JAW). */
+  jawY?: number;
+}
 
 /**
  * Measures the rig for a head shape off its keyed PNG: the head is drawn `2·headW+8` rig units
@@ -27,6 +31,17 @@ const HEAD_WIDTHS: Readonly<Record<string, number>> = {
   angular: 54, bloated: 62, scrawny: 44,
   lantern: 48, wedge: 58, peanut: 55, jowls: 58, bigchin: 55,
 };
+/**
+ * Where each head master's jaw ends, as a fraction of its keyed PNG's height: the last row still at
+ * least 35% as wide as the widest (below it only the chin's point). Measured off the keyed PNGs; the
+ * registration test re-measures them. The old 'chin' anchor (0.432·h under the eye line) sits 13–23
+ * rig px above this on every head, which put collars, scarves and medal ribbons across the jaw.
+ */
+export const HEAD_JAW: Readonly<Record<string, number>> = {
+  angular: 0.926, bloated: 0.961, scrawny: 0.939,
+  lantern: 0.916, wedge: 0.996, peanut: 0.951, jowls: 0.973, bigchin: 0.994,
+};
+
 export function headRig(shape: string): RigParams {
   // Catalog entries are the painted ids ('painted:head-x') or the legacy twin name ('angular').
   const id = shape.replace(/^painted:/, '').replace(/^head-/, '');
@@ -35,7 +50,8 @@ export function headRig(shape: string): RigParams {
   const headH = (2 * headW + 8) * (file ? file.height / file.width : 1.6);
   // The eye-line sits at each head's own pivot fraction (new masters aren't all painted at 40%).
   const pivotY = PAINTED_PARTS.find((p) => p.id === `head-${id}`)?.pivot[1] ?? 0.4;
-  return { headW, headH, headTop: 130 - pivotY * headH };
+  const headTop = 130 - pivotY * headH;
+  return { headW, headH, headTop, jawY: headTop + (HEAD_JAW[id] ?? 0.93) * headH };
 }
 
 /** Rig units covered by the square a war paint was painted in (see the 'face-square' anchor). */
@@ -48,6 +64,11 @@ export type RigAnchorId = 'eye-mid' | 'eye-right' | 'eye-left' | 'brow-line' | '
   | 'scalp'
   /** Where the body's neck stump meets the head: the chin, tucked 14 up under the jaw. Bodies anchor here. */
   | 'neck-top'
+  /**
+   * The jaw line measured off the head's art, 6 up so neck wear tucks under it. Neck wear anchors
+   * here and is drawn behind the head: whatever rises above the jaw goes behind the chin.
+   */
+  | 'jaw'
   /** Where the shoulders run off the portrait (bottom centre of the frame). */
   | 'shoulder'
   /** The whole 256² frame's top-left corner (backgrounds). */
@@ -72,6 +93,7 @@ export function rigAnchor(id: RigAnchorId, c: RigParams): { x: number; y: number
     case 'ear-left': return { x: 128 - w + 6, y: 130 - 0.054 * h };
     case 'scalp': return { x: 128, y: 130 - 0.281 * h };
     case 'neck-top': return { x: 128, y: 130 + 0.432 * h - 14 };
+    case 'jaw': return { x: 128, y: (c.jawY ?? 130 + 0.432 * h + 18) - 6 };
     case 'shoulder': return { x: 128, y: 256 };
     case 'frame': return { x: 0, y: 0 };
     case 'face-square': return { x: 128 - 0.5 * FACE_SQUARE, y: 130 - 0.42 * FACE_SQUARE };
@@ -151,7 +173,7 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'headgear-aviator-helmet', layer: 'headgear', name: 'Aviator helmet', pivot: [0.5, 0.45], anchor: 'brow-line', width: (c) => 2 * c.headW + 34, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15], replaces: 'aviator-cap' }),
   P({ id: 'headgear-gear-tophat', layer: 'headgear', name: 'Gear top hat', pivot: [0.5, 0.93], anchor: 'crown', width: (c) => 2 * c.headW + 38, hidesHair: [1, 3, 5, 7, 9, 11, 13, 15] }),
   P({ id: 'mouth-gold-tusk-grin', layer: 'mouth', name: 'Gold tusk grin', pivot: [0.5, 0.5], anchor: 'mouth', width: S(86) }),
-  P({ id: 'neck-brass-gorget', layer: 'neck', name: 'Brass gorget', pivot: [0.5, 0.42], anchor: 'chin', width: S(150) }),
+  P({ id: 'neck-brass-gorget', layer: 'neck', name: 'Brass gorget', pivot: [0.5, 0.42], anchor: 'jaw', width: S(150) }),
   P({ id: 'background-workshop-wall', layer: 'background', name: 'Workshop wall', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-workshop-wall.png', width: 512, height: 512 }, replaces: 'workshop-wall' }),
   P({ id: 'background-furnace-glow', layer: 'background', name: 'Furnace glow', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-furnace-glow.png', width: 512, height: 512 }, replaces: 'furnace-glow' }),
   P({ id: 'background-racing-pennants', layer: 'background', name: 'Racing pennants', pivot: [0, 0], anchor: 'frame', width: () => 256, fixedFile: { file: '/avatar-parts/keyed/background-racing-pennants.png', width: 512, height: 512 }, replaces: 'racing-pennants' }),
@@ -191,9 +213,9 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'headgear-spiked-pickelhaube', layer: 'headgear', name: 'Spiked pickelhaube', pivot: [0.5, 0.9], anchor: 'brow-line', width: (c) => 2 * c.headW + 12, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15], replaces: 'pickelhaube' }),
   P({ id: 'headgear-grease-bowler', layer: 'headgear', name: 'Grease bowler', pivot: [0.5, 0.92], anchor: 'brow-line', width: (c) => 2 * c.headW + 36, hidesHair: [1, 3, 5, 7, 9, 11, 13, 14, 15], replaces: 'grease-bowler' }),
   P({ id: 'headgear-scrap-crown', layer: 'headgear', name: 'Scrap crown', pivot: [0.5, 0.95], anchor: 'crown', width: (c) => 2 * c.headW + 10, hidesHair: [3, 7, 13] }),
-  P({ id: 'neck-spiked-collar', layer: 'neck', name: 'Spiked collar', pivot: [0.5, 0.2], anchor: 'chin', width: S(118), replaces: 'spiked-collar' }),
-  P({ id: 'neck-gear-chain', layer: 'neck', name: 'Gear chain', pivot: [0.5, 0.1], anchor: 'chin', width: S(84), replaces: 'gear-chain' }),
-  P({ id: 'neck-boiler-suit-collar', layer: 'neck', name: 'Boiler suit collar', pivot: [0.5, 0.15], anchor: 'chin', width: S(170), replaces: 'boiler-suit' }),
+  P({ id: 'neck-spiked-collar', layer: 'neck', name: 'Spiked collar', pivot: [0.5, 0.2], anchor: 'jaw', width: S(118), replaces: 'spiked-collar' }),
+  P({ id: 'neck-gear-chain', layer: 'neck', name: 'Gear chain', pivot: [0.5, 0.1], anchor: 'jaw', width: S(84), replaces: 'gear-chain' }),
+  P({ id: 'neck-boiler-suit-collar', layer: 'neck', name: 'Boiler suit collar', pivot: [0.5, 0.15], anchor: 'jaw', width: S(170), replaces: 'boiler-suit' }),
   // Art wave 2. The three heads and the four war paints only stand in for vector items (the head
   // layer is full in DNA v3); the rest are appended to the catalog.
   P({ id: 'head-angular', layer: 'head', name: 'Angular', pivot: [0.5, 0.4], anchor: 'eye-mid', width: (c) => 2 * c.headW + 8, replaces: 'angular' }),
@@ -234,15 +256,15 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'headgear-bandana-knot', layer: 'headgear', name: 'Bandana', pivot: [0.5, 0.75], anchor: 'brow-line', width: (c) => 2 * c.headW + 30, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15] }),
   P({ id: 'headgear-propeller-beanie', layer: 'headgear', name: 'Propeller beanie', pivot: [0.5, 0.9], anchor: 'brow-line', width: (c) => 2 * c.headW + 12, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15] }),
   P({ id: 'headgear-bucket-pot', layer: 'headgear', name: 'Cooking pot', pivot: [0.5, 0.9], anchor: 'brow-line', width: (c) => 2 * c.headW + 44, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15] }),
-  P({ id: 'headgear-smokestack', layer: 'headgear', name: 'Smokestack', pivot: [0.5, 0.92], anchor: 'crown', width: (c) => 2 * c.headW + 34, hidesHair: [1, 3, 5, 7, 9, 11, 13, 15], prompt: 'Riveted sooty stovepipe smokestack hat, rivet bands and scorched glowing rim.' }),
+  P({ id: 'headgear-smokestack', layer: 'headgear', name: 'Smokestack', pivot: [0.5, 0.92], anchor: 'crown', width: (c) => 2 * c.headW - 8, hidesHair: [1, 3, 5, 7, 9, 11, 13, 15], prompt: 'Riveted sooty stovepipe smokestack hat, rivet bands and scorched glowing rim.' }),
   P({ id: 'headgear-jewel-crown', layer: 'headgear', name: 'Jeweled crown', pivot: [0.5, 0.88], anchor: 'crown', width: (c) => 2 * c.headW + 30, hidesHair: [3, 7, 13], prompt: 'Chunky golden crown with thick pointed merlons and square-cut ruby and emerald gems.' }),
-  P({ id: 'headgear-valve-cap', layer: 'headgear', name: 'Valve cap', pivot: [0.5, 0.85], anchor: 'crown', width: (c) => 2 * c.headW + 26, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 15], prompt: 'Riveted brass skull cap with a red-bronze steam valve wheel on top and dark chin straps.' }),
+  P({ id: 'headgear-valve-cap', layer: 'headgear', name: 'Valve cap', pivot: [0.5, 0.77], anchor: 'crown', width: (c) => 2 * c.headW + 26, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 15], prompt: 'Riveted brass skull cap with a red-bronze steam valve wheel on top and dark chin straps.' }),
   P({ id: 'headgear-oil-beret', layer: 'headgear', name: 'Oil beret', pivot: [0.5, 0.75], anchor: 'brow-line', width: (c) => 2 * c.headW + 34, hidesHair: [1, 3, 5, 7, 9, 11, 13, 14, 15], prompt: 'Oil-stained slouched crimson-black racing beret with a brass piston pin, low on the forehead.' }),
-  P({ id: 'headgear-ear-defenders', layer: 'headgear', name: 'Ear defenders', pivot: [0.5, 0.22], anchor: 'crown', width: (c) => 2 * c.headW + 36, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 15], prompt: 'Riveted steel workshop ear defenders, spring headband, worn cushions.' }),
+  P({ id: 'headgear-ear-defenders', layer: 'headgear', name: 'Ear defenders', pivot: [0.5, 0.6], anchor: 'eye-mid', width: (c) => 2 * c.headW + 78, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 15], prompt: 'Riveted steel workshop ear defenders, spring headband, worn cushions.' }),
   P({ id: 'headgear-grease-flatcap', layer: 'headgear', name: 'Grease flatcap', pivot: [0.5, 0.75], anchor: 'brow-line', width: (c) => 2 * c.headW + 34, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15], prompt: 'Oil-blackened newsboy flat cap, short stiff brim, brass kart badge.' }),
   P({ id: 'headgear-turbo-helm', layer: 'headgear', name: 'Turbo snail', pivot: [0.46, 0.72], anchor: 'brow-line', width: (c) => 2 * c.headW + 38, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15], prompt: 'Cast-iron turbocharger snail housing worn as a helmet, compressor inlet at the side.' }),
   P({ id: 'headgear-checkered-cap', layer: 'headgear', name: 'Checkered cap', pivot: [0.5, 0.75], anchor: 'brow-line', width: (c) => 2 * c.headW + 32, hidesHair: [1, 3, 4, 5, 7, 8, 9, 11, 13, 14, 15], prompt: 'Racing checkered flag cap, short curved brim, brass winner-wreath pin.' }),
-  P({ id: 'headgear-horseshoe-magnet', layer: 'headgear', name: 'Lucky magnet', pivot: [0.48, 0.88], anchor: 'crown', width: (c) => 2 * c.headW + 26, hidesHair: [3, 7, 13], prompt: 'Giant red horseshoe magnet perched on the skull, hex nuts and bolts stuck to its poles.' }),
+  P({ id: 'headgear-horseshoe-magnet', layer: 'headgear', name: 'Lucky magnet', pivot: [0.48, 0.88], anchor: 'crown', width: (c) => 2 * c.headW - 12, hidesHair: [3, 7, 13], prompt: 'Giant red horseshoe magnet perched on the skull, hex nuts and bolts stuck to its poles.' }),
   P({ id: 'mouth-rusty-grille', layer: 'mouth', name: 'Rusty grille', pivot: [0.5, 0.5], anchor: 'mouth', width: S(84) }),
   P({ id: 'mouth-buck-teeth', layer: 'mouth', name: 'Buck teeth', pivot: [0.5, 0.5], anchor: 'mouth', width: S(72) }),
   P({ id: 'mouth-corncob-pipe', layer: 'mouth', name: 'Corncob pipe', pivot: [0.35, 0.6], anchor: 'mouth', width: S(100) }),
@@ -270,9 +292,9 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   P({ id: 'ears-bolted-flat', layer: 'ears', name: 'Bolted flat', pivot: [0.92, 0.56], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Ear edges clamped flat to the skull with heavy hex bolts.' }),
   P({ id: 'ears-spear-ring', layer: 'ears', name: 'Spear ring', pivot: [0.92, 0.64], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Long pointed ear with a single brass spear-ring through the tip.' }),
   P({ id: 'ears-patch-stitched', layer: 'ears', name: 'Patched ears', pivot: [0.92, 0.62], anchor: 'ear-left', width: () => 84, mirrorPair: true, prompt: 'Torn ear with a crude cloth patch sewn over the rip in big stitches.' }),
-  P({ id: 'neck-wool-scarf', layer: 'neck', name: 'Wool scarf', pivot: [0.5, 0.3], anchor: 'chin', width: S(150) }),
-  P({ id: 'neck-padlock-collar', layer: 'neck', name: 'Padlock collar', pivot: [0.5, 0.35], anchor: 'chin', width: S(120) }),
-  P({ id: 'neck-trophy-medal', layer: 'neck', name: "Winner's medal", pivot: [0.5, 0.42], anchor: 'chin', width: S(58) }),
+  P({ id: 'neck-wool-scarf', layer: 'neck', name: 'Wool scarf', pivot: [0.5, 0.3], anchor: 'jaw', width: S(150) }),
+  P({ id: 'neck-padlock-collar', layer: 'neck', name: 'Padlock collar', pivot: [0.5, 0.35], anchor: 'jaw', width: S(120) }),
+  P({ id: 'neck-trophy-medal', layer: 'neck', name: "Winner's medal", pivot: [0.5, 0.42], anchor: 'jaw', width: S(58) }),
   W('warpaint-mud-stripes', 'Mud stripes', [0.104, 0.164, 0.792, 0.47], 'mud-stripes', [0, 0.1]),
   W('warpaint-red-handprint', 'Red handprint', [0.171, 0.154, 0.752, 0.623], 'red-handprint'),
   W('warpaint-cog-tattoo', 'Cog tattoo', [0.313, 0.51, 0.163, 0.165], 'cog-tattoo', [-0.09, 0.05]),
@@ -285,16 +307,16 @@ export const PAINTED_PARTS: readonly PaintedPartDef[] = [
   W('warpaint-checker-tears', 'Checker stripes', [0.157, 0.258, 0.685, 0.505]),
   W('warpaint-ash-bandit', 'Ash bandit', [0.1, 0.308, 0.809, 0.278]),
   W('warpaint-spark-bolt', 'Spark bolt', [0.082, 0.091, 0.821, 0.813]),
-  P({ id: 'neck-tool-bandolier', layer: 'neck', name: 'Tool bandolier', pivot: [0.5, 0.15], anchor: 'chin', width: S(170), replaces: 'tool-bandolier' }),
+  P({ id: 'neck-tool-bandolier', layer: 'neck', name: 'Tool bandolier', pivot: [0.5, 0.15], anchor: 'jaw', width: S(170), replaces: 'tool-bandolier' }),
   // Round 2 neck-wear: everything chin-anchored, collars hug the jaw (registration test: sides
   // must stay inside the canvas; tails may hang to the shoulder line like the other neck pieces).
-  P({ id: 'neck-aviator-scarf', layer: 'neck', name: 'Aviator scarf', pivot: [0.5, 0.28], anchor: 'chin', width: S(130), prompt: 'Knotted cream-white aviator silk scarf, fat tidy knot at the front and two short tails, one flowing.' }),
-  P({ id: 'neck-sergeant-collar', layer: 'neck', name: 'Sergeant collar', pivot: [0.5, 0.3], anchor: 'chin', width: S(160), prompt: 'High stiff crimson parade collar with brass piping and a brass number 5 pin, framing the jaw.' }),
-  P({ id: 'neck-wire-torc', layer: 'neck', name: 'Wire torc', pivot: [0.5, 0.3], anchor: 'chin', width: S(112), prompt: 'Thick braided copper-and-steel wire torc necklace, kinked strands, hex-nut clasp at the front.' }),
-  P({ id: 'neck-check-scarf', layer: 'neck', name: 'Checkered bandana', pivot: [0.5, 0.28], anchor: 'chin', width: S(126), prompt: 'Racing checkered black-and-white bandana knotted at the side of the neck, short tails.' }),
-  P({ id: 'neck-wrench-pendant', layer: 'neck', name: 'Wrench pendant', pivot: [0.5, 0.12], anchor: 'chin', width: S(44), prompt: 'Big chunky tuning wrench hung as a pendant from a short dark cord, pointing down at the chest.' }),
-  P({ id: 'neck-fur-mantle', layer: 'neck', name: 'Fur mantle', pivot: [0.5, 0.12], anchor: 'chin', width: S(160), prompt: 'Shaggy dark-brown fur mantle collar on the shoulders, leather strap buckle front.' }),
-  P({ id: 'neck-plug-cables', layer: 'neck', name: 'Plug cables', pivot: [0.5, 0.06], anchor: 'chin', width: S(112), prompt: 'Loop of braided spark-plug cables around the neck, ceramic plug ends dangling.' }),
+  P({ id: 'neck-aviator-scarf', layer: 'neck', name: 'Aviator scarf', pivot: [0.5, 0.28], anchor: 'jaw', width: S(130), prompt: 'Knotted cream-white aviator silk scarf, fat tidy knot at the front and two short tails, one flowing.' }),
+  P({ id: 'neck-sergeant-collar', layer: 'neck', name: 'Sergeant collar', pivot: [0.5, 0.3], anchor: 'jaw', width: S(160), prompt: 'High stiff crimson parade collar with brass piping and a brass number 5 pin, framing the jaw.' }),
+  P({ id: 'neck-wire-torc', layer: 'neck', name: 'Wire torc', pivot: [0.5, 0.3], anchor: 'jaw', width: S(112), prompt: 'Thick braided copper-and-steel wire torc necklace, kinked strands, hex-nut clasp at the front.' }),
+  P({ id: 'neck-check-scarf', layer: 'neck', name: 'Checkered bandana', pivot: [0.5, 0.28], anchor: 'jaw', width: S(126), prompt: 'Racing checkered black-and-white bandana knotted at the side of the neck, short tails.' }),
+  P({ id: 'neck-wrench-pendant', layer: 'neck', name: 'Wrench pendant', pivot: [0.5, 0.12], anchor: 'jaw', width: S(44), prompt: 'Big chunky tuning wrench hung as a pendant from a short dark cord, pointing down at the chest.' }),
+  P({ id: 'neck-fur-mantle', layer: 'neck', name: 'Fur mantle', pivot: [0.5, 0.12], anchor: 'jaw', width: S(160), prompt: 'Shaggy dark-brown fur mantle collar on the shoulders, leather strap buckle front.' }),
+  P({ id: 'neck-plug-cables', layer: 'neck', name: 'Plug cables', pivot: [0.5, 0.06], anchor: 'jaw', width: S(112), prompt: 'Loop of braided spark-plug cables around the neck, ceramic plug ends dangling.' }),
 ];
 
 export const paintedById = new Map(PAINTED_PARTS.map((p) => [`painted:${p.id}`, p]));

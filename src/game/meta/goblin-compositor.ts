@@ -42,7 +42,10 @@ interface Ctx {
  */
 
 /** Render order (back → front). The body goes right after the background so ears, head and every
- * head-worn layer cover its neck stump; neck sits last so collars overlap the chin line. */
+ * head-worn layer cover its neck stump; neck sits last so collars overlap the chin line. Neck wear is
+ * registered to the head's measured jaw line ('jaw' anchor): on the old 'chin' anchor it sat 13–23 px
+ * too high and climbed over the jaw and the mouth. Parts with a depth mask send their back half
+ * behind the head. */
 export const RENDER_ORDER: readonly AvatarLayerId[] = ['background', 'body', 'ears', 'head', 'warpaint', 'mouth', 'nose', 'eyes', 'eyewear', 'hair', 'headgear', 'neck'];
 
 export interface ComposeOptions {
@@ -144,7 +147,7 @@ function paintedFragment(item: string, c: Ctx, resolve: (u: string) => string, p
   return defs + depthDefs + (place.def.mirrorPair ? `${part}<g transform="translate(256 0) scale(-1 1)">${part}</g>` : part);
 }
 
-const GUIDE_ANCHORS: readonly RigAnchorId[] = ['eye-left', 'eye-mid', 'eye-right', 'brow-line', 'crown', 'scalp', 'ear-left', 'nose', 'mouth', 'chin', 'neck-top', 'shoulder'];
+const GUIDE_ANCHORS: readonly RigAnchorId[] = ['eye-left', 'eye-mid', 'eye-right', 'brow-line', 'crown', 'scalp', 'ear-left', 'nose', 'mouth', 'chin', 'jaw', 'neck-top', 'shoulder'];
 
 export function composeGoblinSvg(config: GoblinAvatarConfig, options: ComposeOptions = {}): string {
   const skin = SKIN_TONES.find((s) => s.id === config.skin) ?? SKIN_TONES[0];

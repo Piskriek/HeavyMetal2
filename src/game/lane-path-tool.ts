@@ -18,7 +18,7 @@
  * Pure TypeScript: no DOM, no canvas, no three.js, no React.
  */
 import {
-  DEFAULT_HALF_WIDTH, LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_NETWORK_VERSION, LANE_Z_LIMIT,
+  DEFAULT_HALF_WIDTH, LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_NETWORK_VERSION, LANE_Z_LIMIT, laneRules,
   LANE_COLORS, inferKind, laneColorOf, validateLaneNetwork,
   type LaneNetwork, type LaneNode, type LaneNodeKind, type LanePath, type LaneRefusal,
 } from './lane-network';
@@ -102,7 +102,7 @@ export const LANE_WIDTH_CHOICES: readonly number[] = [LANE_HALF_WIDTH_MIN, 80, D
  */
 export function snapNode(x: number, z: number, opts: { lanes: boolean; grid: boolean }): { x: number; z: number } {
   const clampedX = clamp(x, START_X, FINISH);
-  const clampedZ = clamp(z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+  const clampedZ = laneRules.corridor ? clamp(z, -LANE_Z_LIMIT, LANE_Z_LIMIT) : z;
   let snappedZ = clampedZ;
   if (opts.lanes) {
     let best = clampedZ; let bestDistance = SNAP_Z_RADIUS;
@@ -149,7 +149,7 @@ const pathById = (network: LaneNetwork, pathId: string): LanePath | null =>
   network.paths.find((path) => path.id === pathId) ?? null;
 
 const inCorridor = (x: number, z: number): boolean =>
-  Number.isFinite(x) && Number.isFinite(z) && x >= START_X && x <= FINISH && Math.abs(z) <= LANE_Z_LIMIT;
+  Number.isFinite(x) && Number.isFinite(z) && x >= START_X && x <= FINISH && (!laneRules.corridor || Math.abs(z) <= LANE_Z_LIMIT);
 
 /**
  * Re-derives every referenced node's kind from the graph. A node whose shape is none of the four is
@@ -325,7 +325,7 @@ function moveNodes(network: LaneNetwork, moves: readonly { nodeId: string; x: nu
     const node = nodeById(next, move.nodeId);
     if (!node) return refuse('unknown_node', `there is no node ${move.nodeId}`);
     const x = clamp(move.x, START_X, FINISH);
-    const z = clamp(move.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    const z = laneRules.corridor ? clamp(move.z, -LANE_Z_LIMIT, LANE_Z_LIMIT) : move.z;
     if (node.x !== x || node.z !== z) changed = true;
     node.x = x;
     node.z = z;

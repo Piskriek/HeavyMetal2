@@ -99,3 +99,13 @@ test('a double-click line runs out to the junctions either side', () => {
   assert.deepEqual(laneLineThrough(branched, 'p', 2)!.nodeIds, ['b', 'c', 'd'], 'split to merge');
   assert.deepEqual(laneLineThrough(base(), 'p', 1)!.nodeIds, ['a', 'b', 'c', 'd'], 'no junctions: the whole lane');
 });
+
+test('free node placement: with the road rule off a node may go anywhere, and it is reported, not refused', async () => {
+  const { laneRules, laneCorridorWarnings } = await import('../src/game/lane-network');
+  assert.equal(applyLaneEdit(base(), { op: 'moveNode', nodeId: 'b', x: START_X + 2000, z: 900 }).ok, false, 'rule on: refused');
+  laneRules.corridor = false;
+  try {
+    const moved = run(base(), { op: 'moveNode', nodeId: 'b', x: START_X + 2000, z: 900 });
+    assert.deepEqual(laneCorridorWarnings(moved.network), ['b']);
+  } finally { laneRules.corridor = true; }
+});

@@ -24,6 +24,23 @@ export const LANE_NETWORK_VERSION = 1 as const;
 
 /** The corridor every node must live inside: `LANE` less one ball of clearance. */
 export const LANE_Z_LIMIT = LANE.far - RADIUS - 6; // 443
+
+/**
+ * The "nodes stay on the drivable corridor" rule (|z| <= 443). The builder can switch it off (Free
+ * node placement): nodes go anywhere, the network still saves and loads, and laneCorridorWarnings
+ * lists the nodes outside it so the author can fix them if a ball misbehaves.
+ */
+export const laneRules = { corridor: true };
+const LANE_FREE_KEY = 'hm2-lane-free-placement-v1';
+try { if (typeof localStorage !== 'undefined' && localStorage.getItem(LANE_FREE_KEY) === '1') laneRules.corridor = false; } catch { /* default */ }
+export function setLaneCorridorRule(on: boolean) {
+  laneRules.corridor = on;
+  try { if (typeof localStorage !== 'undefined') { if (on) localStorage.removeItem(LANE_FREE_KEY); else localStorage.setItem(LANE_FREE_KEY, '1'); } } catch { /* this visit only */ }
+}
+/** Nodes outside the drivable corridor (a warning, never a refusal, when the rule is off). */
+export function laneCorridorWarnings(network: { nodes: readonly { id: string; z: number }[] } | null): string[] {
+  return network ? network.nodes.filter((n) => Math.abs(n.z) > LANE_Z_LIMIT).map((n) => n.id) : [];
+}
 export const LANE_HALF_WIDTH_MIN = 40;
 export const LANE_HALF_WIDTH_MAX = 240;
 /** Default path half-width: one lane (D11). */
@@ -132,7 +149,7 @@ export function validateLaneNetwork(doc: unknown): LaneValidation {
     }
     const x = raw.x; const z = raw.z;
     if (typeof x !== 'number' || !Number.isFinite(x) || x < START_X || x > FINISH
-      || typeof z !== 'number' || !Number.isFinite(z) || Math.abs(z) > LANE_Z_LIMIT) {
+      || typeof z !== 'number' || !Number.isFinite(z) || (laneRules.corridor && Math.abs(z) > LANE_Z_LIMIT)) {
       errors.push({ code: 'out_of_corridor', nodeId: id });
       continue;
     }

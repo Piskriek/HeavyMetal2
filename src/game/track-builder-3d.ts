@@ -25,7 +25,7 @@ import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, RADIUS, START_X } from './scene';
 import { applyLaneEdit, brushStrokePoints, laneLineThrough, snapNode, type LaneEdit } from './lane-path-tool';
-import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_Z_LIMIT, laneColorOf, nearestPath, sampleLane, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
+import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_Z_LIMIT, laneRules, laneColorOf, nearestPath, sampleLane, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
   buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, readLaneStorage, writeLaneStorage,
 } from './lane-storage';
@@ -3540,7 +3540,7 @@ export class TrackBuilder3D {
     if (!draw.dir && Math.abs(dx) > draw.spacing * 0.5) draw.dir = dx > 0 ? 1 : -1;
     // Nodes drop while the line keeps running one way (down or up the hill), a spacing apart.
     if (draw.dir && Math.sign(dx) === draw.dir && Math.hypot(dx, at.z - last.z) >= draw.spacing) {
-      draw.points.push({ x: Math.round(at.x), z: Math.round(Math.max(-LANE_Z_LIMIT, Math.min(LANE_Z_LIMIT, at.z))) });
+      draw.points.push({ x: Math.round(at.x), z: Math.round(laneRules.corridor ? Math.max(-LANE_Z_LIMIT, Math.min(LANE_Z_LIMIT, at.z)) : at.z) });
     }
     this.laneGizmos.setDraft(draw.points, hologramMaterial(null));
     return draw.points.length;

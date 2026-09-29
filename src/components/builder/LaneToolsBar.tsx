@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { Eraser, Flag, MousePointer, Pencil, Play, Scissors, SplitSquareHorizontal, X } from 'lucide-react';
 import type { TrackBuilder3D } from '../../game/track-builder-3d';
-import { LANE_COLORS } from '../../game/lane-network';
+import { LANE_COLORS, laneCorridorWarnings, laneRules, setLaneCorridorRule } from '../../game/lane-network';
 import { BRUSH_SPACING_MAX, BRUSH_SPACING_MIN } from '../../game/lane-path-tool';
 
 interface Props {
@@ -82,6 +82,14 @@ export default function LaneToolsBar({ builder, drawing, spacing, onDrawing, onS
             <Eraser size={12} /> Start fresh
           </button>
         )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5 text-zinc-300 cursor-pointer" title="Off: nodes go anywhere (they only pull the ball along). Nodes off the drivable corridor are listed as a warning, never refused.">
+          <input type="checkbox" checked={!laneRules.corridor} onChange={(e) => { setLaneCorridorRule(!e.target.checked); onChange(); showToast(e.target.checked ? 'Free node placement: put nodes anywhere' : 'Nodes stay on the drivable corridor again'); }} className="accent-amber-500" />
+          Free node placement (no road rule)
+        </label>
+        {(() => { const off = laneCorridorWarnings(net); return off.length ? <span className="text-amber-300" title={off.join(', ')}>⚠ {off.length} node{off.length === 1 ? '' : 's'} off the drivable corridor (the ball may fall off there)</span> : null; })()}
       </div>
 
       {drawing && (

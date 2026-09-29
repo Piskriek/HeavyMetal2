@@ -24,6 +24,7 @@ import { SURFACE_CRACKED } from '../game/surface/surface-table';
 import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import EasyBuildBar from './builder/EasyBuildBar';
+import StartOptions from './builder/StartOptions';
 import { BuilderKeys, readKeyOverrides, writeKeyOverrides, type EditorMode } from '../game/builder/builder-keys';
 import CustomModelsTab from './builder/CustomModelsTab';
 import ShadingPanel from './builder/ShadingPanel';
@@ -308,8 +309,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   testStartModeRef.current = testStartMode;
   const draggingTestBall = useRef(false);
   /** How high the test ball hangs on the start hook (0: on the ground). */
-  const [testBallHeight, setTestBallHeight] = useState(() => builder.getTestBallHeight());
-  const [testBall, setTestBallState] = useState<{ x: number; z: number } | null>(() => builder.getTestBall());
+  const [, setTestBallHeight] = useState(() => builder.getTestBallHeight());
+  const [, setTestBallState] = useState<{ x: number; z: number } | null>(() => builder.getTestBall());
   const [showSections, setShowSections] = useState(false);
   // The decoration brush / auto-decorate and the sculpt & mesh-paint mode: one window at a time, and the
   // tool being left always turns its brush off, so no invisible brush keeps eating clicks.
@@ -752,6 +753,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           draggingTestBall.current = false;
           const at = builder.getTestBall();
           if (at) { builder.setTestBall(at); setTestBallState(at); }
+          // "Put it where I click" is one click: the mode ends once the ball is down.
+          if (testStartModeRef.current) setTestStartMode(false);
           setTestBallHeight(builder.getTestBallHeight());
           showToast(builder.getTestBallHeight() > 0
             ? `The ball hangs ${builder.getTestBallHeight()} up on the start hook: a test drive drops it (Shift-drag lifts it)`
@@ -2115,6 +2118,16 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               <EyeOff size={14} />
             </button>
 
+            <StartOptions
+              builder={builder}
+              placing={testStartMode}
+              onPlace={(on) => {
+                setTestStartMode(on);
+                if (on) { builder.setActivePropType(null); showToast('Click the road, a ramp or a deck: the test drive starts there', 5000); }
+              }}
+              onChange={() => { setTestBallState(builder.getTestBall()); setTestBallHeight(builder.getTestBallHeight()); onRequestRender?.(); }}
+              showToast={showToast}
+            />
             {onTestRace && (
               <button
                 onClick={(e) => {
@@ -3978,46 +3991,6 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 <span className="hidden xl:inline">Drag move</span>
                 <kbd className="forge-key">{keyLabel('tool.clickMove')}</kbd>
               </button>
-
-              <div className="flex items-center">
-                <button
-                  onClick={() => {
-                    setTestStartMode((prev) => {
-                      const next = !prev;
-                      if (next) builder.setActivePropType(null);
-                      showToast(next ? 'Test Start: click the road to put the test ball there' : 'Test Start: off (drag the ball to move it)');
-                      return next;
-                    });
-                  }}
-                  aria-pressed={testStartMode}
-                  className="forge-tool rounded-r-none"
-                  title="Test start: click the road to put the test ball there; test drives start from it"
-                >
-                  <Play size={14} />
-                  <span className="hidden xl:inline">Test start</span>
-                </button>
-                <button
-                  onClick={() => { builder.setTestBall(null); setTestBallState(null); setTestBallHeight(0); showToast('Test drives start from the grid again'); onRequestRender?.(); }}
-                  disabled={!testBall}
-                  className="forge-tool rounded-l-none border-l-0 !min-w-0 !px-1.5"
-                  title="Remove the test ball (test drives start from the grid)"
-                  aria-label="Remove the test ball"
-                >
-                  <X size={12} />
-                </button>
-                {testBall && (
-                  <label className="ml-1 flex items-center gap-1 text-[11px] text-zinc-400" title="How high the test ball hangs on the start hook; it drops when the test drive starts (0: it rests on the ground and gets the push). Shift-drag the ball to lift it.">
-                    <span>Hook</span>
-                    <input
-                      type="number" min={0} max={20000} step={50}
-                      value={testBallHeight}
-                      onChange={(e) => { builder.setTestBallHeight(Number(e.target.value) || 0); setTestBallHeight(builder.getTestBallHeight()); onRequestRender?.(); }}
-                      className="w-16 rounded border border-zinc-700/60 bg-zinc-900 px-1 py-0.5 text-xs text-amber-200"
-                      aria-label="Test ball drop height"
-                    />
-                  </label>
-                )}
-              </div>
 
               <button
                 onClick={() => {

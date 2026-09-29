@@ -15,7 +15,7 @@ import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } 
 const TEST_BALL_KEY = 'hm2-test-ball-v1';
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType, kitModelFor } from './models/kit-catalog';
-import { hologramize, hologramSpriteMaterial } from './builder/hologram';
+import { hologramMaterial, hologramize, hologramSpriteMaterial } from './builder/hologram';
 import { chaseCamera, engineXOfShare, roadPose, shareOfEngineX, type RoadPose, type RoadSpot } from './builder/easy-build';
 import { ghostKitObject } from './models/kit-object';
 import { collisionRoleOf, kitCollisionInput, patchFromWorldMeshes } from './models/kit-collision';
@@ -25,7 +25,7 @@ import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, RADIUS, START_X } from './scene';
 import { applyLaneEdit, brushStrokePoints, snapNode, type LaneEdit } from './lane-path-tool';
-import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
+import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_Z_LIMIT, laneColorOf, nearestPath, sampleLane, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
   buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, readLaneStorage, writeLaneStorage,
 } from './lane-storage';
@@ -3226,12 +3226,115 @@ export class TrackBuilder3D {
     const ball = marker.children[0] as THREE.Mesh;
     (ball.material as THREE.MeshStandardMaterial).opacity = this.testBall ? 1 : 0.45;
     marker.visible = this.testBallShown;
+    this.refreshStartGhost();
+  }
+
+  /* ───────────── Start options: where a test drive really starts ───────────── */
+
+  private startGhost: THREE.Group | null = null;
+
+  /**
+   * Where the engine will really put the ball for this test ball (engine x/z clamped to the course, as
+   * Engine.placeAtTestStart does), in the world; the lane it will roll onto; and how far the ball as
+   * placed is from that start. A ball put off the course (or on a branch the main road does not run
+   * along) starts at the course point nearest to it: the builder shows that as a hologram ball.
+   */
+  testStartReality(): { start: THREE.Vector3; join: THREE.Vector3 | null; laneName: string | null; offBy: number } | null {
+    const ball = this.testBall;
+    if (!ball) return null;
+    const x = Math.min(FINISH - 600, Math.max(START_X, ball.x));
+    const z = Math.min(LANE_Z_LIMIT, Math.max(-LANE_Z_LIMIT, ball.z));
+    const start = this.laneGizmos.worldFromEngine(x, z, RADIUS);
+    const placed = ball.world ? new THREE.Vector3(ball.world.x, ball.world.y + RADIUS, ball.world.z) : start.clone();
+    const net = this.laneDoc;
+    const pathId = net ? nearestPath(net, x, z) : null;
+    const sample = net && pathId ? sampleLane(net, pathId, x) : null;
+    const join = sample ? this.laneGizmos.worldFromEngine(x, sample.z, RADIUS) : null;
+    const path = net?.paths.find((p) => p.id === pathId);
+    return { start, join, laneName: path?.name ?? null, offBy: Math.hypot(placed.x - start.x, placed.z - start.z) };
+  }
+
+  /**
+   * Every place a test drive can start from: the grid's front, each placed start line, each lane's
+   * first node, and the test ball. Engine x/z plus the world point (for flying the camera there).
+   */
+  startSpots(): { id: string; label: string; kind: 'grid' | 'start-line' | 'lane' | 'test-ball'; x: number; z: number; color?: string }[] {
+    const out: { id: string; label: string; kind: 'grid' | 'start-line' | 'lane' | 'test-ball'; x: number; z: number; color?: string }[] = [];
+    const doc = this.laneDoc;
+    const starts = doc?.paths.map((p) => ({ path: p, node: doc.nodes.find((n) => n.id === p.nodeIds[0]) })).filter((s) => !!s.node) ?? [];
+    const front = [...starts].sort((a, b) => Math.abs(a.node!.z) - Math.abs(b.node!.z))[0];
+    out.push({ id: 'grid', label: 'The grid', kind: 'grid', x: front ? front.node!.x : START_X, z: front ? front.node!.z : 0 });
+    const space = courseTrackSpace(this.courseId as CourseId);
+    this.placedProps.filter((p) => p.type === START_LINE_TYPE && p.visible !== false).forEach((p, i) => {
+      out.push({ id: `line:${p.id}`, label: p.name && p.name !== 'Start Line' ? p.name : `Start line ${i + 1}`, kind: 'start-line', x: Math.round(engineXAt(space, p)), z: 0 });
+    });
+    for (const { path, node } of starts) {
+      out.push({ id: `lane:${path.id}`, label: `${path.name} (start)`, kind: 'lane', x: node!.x, z: node!.z, color: laneColorOf(path) });
+    }
+    if (this.testBall) out.push({ id: 'test-ball', label: 'The test ball', kind: 'test-ball', x: this.testBall.x, z: this.testBall.z });
+    return out;
+  }
+
+  /** Glide the camera behind this spot on the road, looking down it. */
+  flyToEngine(x: number, z: number) {
+    const share = shareOfEngineX(x);
+    const road = this.easyRoadPose(share, 'middle');
+    const at = this.laneGizmos.worldFromEngine(x, z, 0);
+    const cam = chaseCamera({ ...road, x: at.x, y: at.y, z: at.z }, 1800, 1100, 600);
+    const to = { ...cam.eye, yaw: cam.yaw, pitch: cam.pitch };
+    const f = this.freeFly;
+    const from = { x: f.x, y: f.y, z: f.z, yaw: f.yaw, pitch: f.pitch };
+    while (to.yaw - from.yaw > Math.PI) to.yaw -= Math.PI * 2;
+    while (to.yaw - from.yaw < -Math.PI) to.yaw += Math.PI * 2;
+    if (f.active) this.flyTween = { from, to, start: performance.now() };
+    else { Object.assign(f, to); this.camera.position.set(f.x, f.y, f.z); }
+    this.notify();
+  }
+
+  /** Puts the test ball on a start spot (engine x/z), resting on the road there. */
+  startAtEngine(x: number, z: number) {
+    const w = this.laneGizmos.worldFromEngine(x, z, 0);
+    const ground = this.surfaceBelow(w.x, w.y + 600, w.z);
+    this.setTestBall({ x, z, world: { x: w.x, y: ground ?? w.y, z: w.z } });
+  }
+
+  /** The hologram ball where the race really starts, and a dotted line to the lane it joins. */
+  private refreshStartGhost() {
+    const reality = this.testBallShown ? this.testStartReality() : null;
+    if (!this.startGhost) {
+      const group = new THREE.Group();
+      group.name = 'StartGhost';
+      group.userData.isKitGhost = true;
+      const ball = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, 20, 14), hologramMaterial(null));
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 1, 0)]),
+        new THREE.LineDashedMaterial({ color: 0x7fe9ff, dashSize: 50, gapSize: 35, transparent: true, opacity: 0.95, depthTest: false }),
+      );
+      line.renderOrder = 60;
+      group.add(ball, line);
+      for (const child of group.children) child.raycast = () => {};
+      this.scene.add(group);
+      this.startGhost = group;
+    }
+    const [ball, line] = this.startGhost.children as [THREE.Mesh, THREE.Line];
+    if (!reality) { this.startGhost.visible = false; return; }
+    this.startGhost.visible = true;
+    // The hologram only when the ball as placed is not where the race starts (off the course).
+    ball.visible = reality.offBy > 120;
+    ball.position.copy(reality.start);
+    const join = reality.join;
+    line.visible = !!join && join.distanceTo(reality.start) > 60;
+    if (join) {
+      line.geometry.setFromPoints([reality.start, join]);
+      line.computeLineDistances();
+    }
   }
 
   /** Shows the marker in build mode, hides it while test driving. */
   setTestBallShown(shown: boolean) {
     this.testBallShown = shown;
     if (this.testBallMarker) this.testBallMarker.visible = shown;
+    this.refreshStartGhost();
   }
 
   /** True when the pointer is over the test ball (to pick it up and drag it). */

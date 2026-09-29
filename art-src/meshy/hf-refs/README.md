@@ -29,12 +29,28 @@ These are multi-angle, single-object reference sheets governed by [`docs/ISLAND_
 | 12 | `jungle-understory-cluster` | Broadleaf understory | pass | Compact modular footprint with useful plant-height variation and top/underside views. |
 | 13 | `fern-cluster-large` | Large fern cluster | pass | Clean repeatable fern module with strong crown consistency and no terrain base. |
 | 14 | `flowering-shrub-cluster` | Flowering shrubs | pass | Readable woody structure, controlled coral accents, top and underside coverage. |
-| 15 | `coastal-grass-cluster` | Coastal grass and scrub | **weak—regenerate** | Object is useful, but the sheet contains forbidden view labels. Regenerate after turn refresh. |
+| 15 | `coastal-grass-cluster` | Coastal grass and scrub | pass | Regenerated without labels; eight clean views preserve the compact windswept module. |
 | 16 | `broadleaf-tree-cluster` | Two-tree broadleaf cluster | pass | Strong interlocking canopy, exposed roots, readable branch and canopy views. |
 | 17 | `windswept-highland-trees` | Wind-shaped highland pair | pass | Clear shared wind direction, sparse crown language, suitable for exposed upper slopes. |
 | 18 | `hanging-vine-cluster` | Hanging vine curtain | pass | Multiple hanging silhouettes and useful top attachment views; no wall/support baked in. |
 | 19 | `cliff-creeper-cluster` | Cliff creeper network | pass | Low modular creeping mass with varied silhouettes and no included cliff geometry. |
 | 20 | `driftwood-root-cluster` | Driftwood/root dressing | pass | Stable root and broken-limb silhouette with complete radial/top coverage. |
+
+## Batch 03 — rocks, coastal terrain, and waterfall geology
+
+![Batch 03 terrain review contact sheet](./review/batch-03-terrain-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 21 | `basalt-boulder-cluster` | Basalt boulder cluster | pass | Strong size hierarchy and radial/top coverage; clean natural footprint. |
+| 22 | `ochre-rock-slab-cluster` | Layered ochre slabs | pass | Readable eroded strata and low modular silhouette from eight views. |
+| 23 | `scree-cluster-mixed` | Mixed scree cluster | pass | Stable basalt/ochre composition with useful top and underside views. |
+| 24 | `sea-stack-hero` | Hero coastal sea stack | pass | Strong cardinal silhouette, basalt foot and ochre crown; no ocean or decorative base. |
+| 25 | `natural-sea-arch` | Natural coastal arch | pass | Consistent opening and crown thickness with front/rear/profile/top coverage. |
+| 26 | `beach-shelf-module` | Coastal shelf transition | pass | Clear land/water-facing profiles, modular edges and top surface. |
+| 27 | `tide-pool-rock-ring` | Tide-pool surround | **weak—regenerate** | Geometry is useful, but forbidden letters appeared between panels. Regenerate after refresh. |
+| 28 | `waterfall-lip-rock-module` | Bare waterfall lip | pass | Channel, spill edge, profiles, connectors and top are clearly exposed. |
+| 29 | `plunge-pool-rocks` | Plunge-pool surround | pass | Strong inflow/outflow gaps and radial/top coverage with no water baked in. |
 
 ## Shared review result
 

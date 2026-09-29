@@ -23,6 +23,7 @@ import {
   engineDistanceFromX, engineFromWorld, engineXFromDistance, getTrackSpace, worldFromCanonical, type TrackSpaceMap,
 } from './track-space';
 import type { LaneNetwork, LaneNode, LaneNodeKind } from './lane-network';
+import { START_X } from './scene';
 import { inferKind, laneColorOf } from './lane-network';
 
 /** How high above the ribbon a handle floats, and how big it is. World units (a lane is 240 wide). */
@@ -95,6 +96,12 @@ export class LaneGizmos {
   /** Engine (x, z) → the point on the ribbon a handle floats above. */
   worldFromEngine(x: number, z: number, lift = LANE_HANDLE_LIFT): THREE.Vector3 {
     const map = this.space();
+    // Before the start (free node placement): carry on straight back from the start, 2 world units
+    // per engine x... measured off the road's first stretch.
+    if (x < START_X) {
+      const a = this.worldFromEngine(START_X, z, lift), b = this.worldFromEngine(START_X + 200, z, lift);
+      return a.clone().add(b.sub(a).multiplyScalar((x - START_X) / 200));
+    }
     const s = map.trackDistFromEngineDistance(engineDistanceFromX(x));
     const placement = worldFromCanonical(map, { s, laneZ: z, altitude: 0 });
     const { world } = placement;
@@ -105,6 +112,14 @@ export class LaneGizmos {
   engineFromWorld(point: THREE.Vector3): { x: number; z: number; residual: number; ambiguous: boolean } {
     const map = this.space();
     const canonical = engineFromWorld(map, { x: point.x, y: point.y, z: point.z });
+    if (canonical.distance <= 0.5) {
+      // Behind the start: how far back along the start's heading (the inverse of the branch above).
+      const a = this.worldFromEngine(START_X, canonical.laneZ, 0), b = this.worldFromEngine(START_X + 200, canonical.laneZ, 0);
+      const dir = new THREE.Vector3(b.x - a.x, 0, b.z - a.z);
+      const len = dir.length() || 1;
+      const back = ((point.x - a.x) * dir.x + (point.z - a.z) * dir.z) / len;
+      if (back < 0) return { x: Math.round(START_X + (back / len) * 200), z: canonical.laneZ, residual: canonical.residual, ambiguous: canonical.ambiguous };
+    }
     return {
       x: engineXFromDistance(canonical.distance),
       z: canonical.laneZ,

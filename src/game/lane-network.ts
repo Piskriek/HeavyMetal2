@@ -148,7 +148,7 @@ export function validateLaneNetwork(doc: unknown): LaneValidation {
       continue;
     }
     const x = raw.x; const z = raw.z;
-    if (typeof x !== 'number' || !Number.isFinite(x) || x < START_X || x > FINISH
+    if (typeof x !== 'number' || !Number.isFinite(x) || (laneRules.corridor && (x < START_X || x > FINISH))
       || typeof z !== 'number' || !Number.isFinite(z) || (laneRules.corridor && Math.abs(z) > LANE_Z_LIMIT)) {
       errors.push({ code: 'out_of_corridor', nodeId: id });
       continue;

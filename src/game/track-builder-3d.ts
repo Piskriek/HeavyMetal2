@@ -25,7 +25,7 @@ import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, RADIUS, START_X } from './scene';
 import { applyLaneEdit, brushStrokePoints, laneLineThrough, snapNode, type LaneEdit } from './lane-path-tool';
-import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_Z_LIMIT, laneRules, laneColorOf, nearestPath, sampleLane, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
+import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_Z_LIMIT, laneRules, laneColorOf, nearestPath, nearestPathOrStart, sampleLane, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
   buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, readLaneStorage, writeLaneStorage,
 } from './lane-storage';
@@ -66,7 +66,7 @@ import { type PropDefinition, type DecalSide, type AnimGrid, animGridFor, ANIM_S
 import { PropBackupService, stripPropsRuntimeState, TRACK_BACKUP_ENDPOINTS } from './builder/backup-service';
 import {
   DEFAULT_ISLAND_TRACK, ISLAND_BACKUP_ENDPOINTS, createIslandTrack as createStoredIslandTrack, islandEndpoints,
-  readIslandProps, readIslandTracks, setActiveIslandTrack, writeIslandProps, type IslandTrack, type IslandTrackIndex,
+  readIslandProps, readIslandTracks, setActiveIslandTrack, writeIslandProps, getIslandTrackStartOffset, setIslandTrackStartOffset, type IslandTrack, type IslandTrackIndex,
 } from './island-route/island-props-storage';
 import { hasDevServer } from '../platform/dev-server';
 
@@ -277,6 +277,7 @@ export class TrackBuilder3D {
     this.shaderLibrary = loadShaderLibrary();
     this.initDecalSideHandles();
     this.laneGizmos = new LaneGizmos(this.scene, () => courseTrackSpace(this.courseId as CourseId));
+    this.laneGizmos.startOffset = this.getStartOffset();
     this.laneGizmos.root.visible = false;
     this.loadLaneDoc();
     if (typeof localStorage !== 'undefined') {
@@ -3209,11 +3210,12 @@ export class TrackBuilder3D {
     if (this.testBall?.world) at = new THREE.Vector3(this.testBall.world.x, this.testBall.world.y + RADIUS, this.testBall.world.z);
     else if (this.testBall) at = this.laneGizmos.worldFromEngine(this.testBall.x, this.testBall.z, RADIUS);
     else {
-      // The grid's front: the first node of the lane nearest the middle of the road.
+      // The grid's front: at the track's start offset, on the lane nearest the middle of the road.
       const doc = this.laneDoc;
       const starts = doc?.paths.map((p) => doc.nodes.find((n) => n.id === p.nodeIds[0])).filter((n): n is NonNullable<typeof n> => !!n) ?? [];
       const front = starts.sort((a, b) => Math.abs(a.z) - Math.abs(b.z))[0];
-      at = this.laneGizmos.worldFromEngine(front ? front.x : START_X, front ? front.z : 0, RADIUS);
+      const startX = this.getStartOffset();
+      at = this.laneGizmos.worldFromEngine(startX, front ? front.z : 0, RADIUS);
     }
     // On the hook: the ball hangs `height` above the ground point, the ring stays on the ground.
     const height = this.testBall?.height ?? 0;
@@ -3245,14 +3247,23 @@ export class TrackBuilder3D {
   testStartReality(): { start: THREE.Vector3; join: THREE.Vector3 | null; laneName: string | null; offBy: number } | null {
     const ball = this.testBall;
     if (!ball) return null;
-    const x = Math.min(FINISH - 600, Math.max(START_X, ball.x));
+    const x = Math.min(FINISH - 600, ball.x);
     const z = Math.min(LANE_Z_LIMIT, Math.max(-LANE_Z_LIMIT, ball.z));
     const start = this.laneGizmos.worldFromEngine(x, z, RADIUS);
     const placed = ball.world ? new THREE.Vector3(ball.world.x, ball.world.y + RADIUS, ball.world.z) : start.clone();
     const net = this.laneDoc;
-    const pathId = net ? nearestPath(net, x, z) : null;
+    const pathId = net ? nearestPathOrStart(net, x, z) : null;
     const sample = net && pathId ? sampleLane(net, pathId, x) : null;
-    const join = sample ? this.laneGizmos.worldFromEngine(x, sample.z, RADIUS) : null;
+    let join: THREE.Vector3 | null = null;
+    if (sample) {
+      join = this.laneGizmos.worldFromEngine(x, sample.z, RADIUS);
+    } else if (net && pathId) {
+      const first = net.paths.find((p) => p.id === pathId)?.nodeIds[0];
+      const startNode = first ? net.nodes.find((n) => n.id === first) : null;
+      if (startNode) {
+        join = this.laneGizmos.worldFromEngine(startNode.x, startNode.z, RADIUS);
+      }
+    }
     const path = net?.paths.find((p) => p.id === pathId);
     return { start, join, laneName: path?.name ?? null, offBy: Math.hypot(placed.x - start.x, placed.z - start.z) };
   }
@@ -3266,7 +3277,8 @@ export class TrackBuilder3D {
     const doc = this.laneDoc;
     const starts = doc?.paths.map((p) => ({ path: p, node: doc.nodes.find((n) => n.id === p.nodeIds[0]) })).filter((s) => !!s.node) ?? [];
     const front = [...starts].sort((a, b) => Math.abs(a.node!.z) - Math.abs(b.node!.z))[0];
-    out.push({ id: 'grid', label: 'The grid', kind: 'grid', x: front ? front.node!.x : START_X, z: front ? front.node!.z : 0 });
+    const startX = this.getStartOffset();
+    out.push({ id: 'grid', label: 'The grid', kind: 'grid', x: startX, z: front ? front.node!.z : 0 });
     const space = courseTrackSpace(this.courseId as CourseId);
     this.placedProps.filter((p) => p.type === START_LINE_TYPE && p.visible !== false).forEach((p, i) => {
       out.push({ id: `line:${p.id}`, label: p.name && p.name !== 'Start Line' ? p.name : `Start line ${i + 1}`, kind: 'start-line', x: Math.round(engineXAt(space, p)), z: 0 });
@@ -4045,6 +4057,38 @@ export class TrackBuilder3D {
     return track;
   }
 
+  getStartOffset(): number {
+    if (this.propStore === 'island') {
+      return getIslandTrackStartOffset(this.islandTrackId);
+    }
+    return START_X;
+  }
+
+  setStartOffset(offset: number) {
+    if (this.propStore === 'island') {
+      const prevOffset = this.getStartOffset();
+      setIslandTrackStartOffset(this.islandTrackId, offset);
+      this.laneGizmos.startOffset = offset;
+      if (this.laneDoc && Math.round(prevOffset) !== Math.round(offset)) {
+        let changed = false;
+        for (const path of this.laneDoc.paths) {
+          const firstId = path.nodeIds[0];
+          const node = firstId ? this.laneDoc.nodes.find((n) => n.id === firstId) : null;
+          if (node && Math.round(node.x) === Math.round(prevOffset)) {
+            node.x = offset;
+            changed = true;
+          }
+        }
+        if (changed) {
+          this.laneGizmos.setNetwork(this.laneDoc);
+          this.saveLaneDoc();
+        }
+      }
+      this.refreshTestBallMarker();
+      this.notify();
+    }
+  }
+
   private openIslandTrack(trackId: string) {
     this.selectProp(null);
     for (const prop of this.placedProps) this.removePropObject(prop);
@@ -4052,9 +4096,11 @@ export class TrackBuilder3D {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.islandTrackId = trackId;
+    this.laneGizmos.startOffset = this.getStartOffset();
     this.backups.resetDiskState();
     this.loadIslandProps();
     this.reloadIslandGround();
+    this.refreshTestBallMarker();
     this.notify();
   }
 

@@ -100,8 +100,9 @@ export const LANE_WIDTH_CHOICES: readonly number[] = [LANE_HALF_WIDTH_MIN, 80, D
  * `SNAP_Z_RADIUS`; `grid` rounds `x` to the nearest `SNAP_X_GRID`. Whatever is left is clamped into
  * the drivable corridor, so a handle dragged off the road cannot author a node the runtime refuses.
  */
-export function snapNode(x: number, z: number, opts: { lanes: boolean; grid: boolean }): { x: number; z: number } {
-  const clampedX = laneRules.corridor ? clamp(x, START_X, FINISH) : x;
+export function snapNode(x: number, z: number, opts: { lanes: boolean; grid: boolean }, startOffset: number = START_X): { x: number; z: number } {
+  const minX = Math.min(START_X, startOffset);
+  const clampedX = laneRules.corridor ? clamp(x, minX, FINISH) : x;
   const clampedZ = laneRules.corridor ? clamp(z, -LANE_Z_LIMIT, LANE_Z_LIMIT) : z;
   let snappedZ = clampedZ;
   if (opts.lanes) {
@@ -113,7 +114,7 @@ export function snapNode(x: number, z: number, opts: { lanes: boolean; grid: boo
     snappedZ = best;
   }
   const snappedX = opts.grid ? Math.round(clampedX / SNAP_X_GRID) * SNAP_X_GRID : clampedX;
-  return { x: clamp(snappedX, START_X, FINISH), z: snappedZ };
+  return { x: laneRules.corridor ? clamp(snappedX, minX, FINISH) : snappedX, z: snappedZ };
 }
 
 /* -----------------------------------------------------------------------------

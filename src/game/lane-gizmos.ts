@@ -87,6 +87,8 @@ export class LaneGizmos {
   }
 
   /** The document currently drawn, or null. */
+  startOffset: number = START_X;
+
   get document(): LaneNetwork | null { return this.network; }
 
   // ---------------------------------------------------------------------------
@@ -96,11 +98,12 @@ export class LaneGizmos {
   /** Engine (x, z) → the point on the ribbon a handle floats above. */
   worldFromEngine(x: number, z: number, lift = LANE_HANDLE_LIFT): THREE.Vector3 {
     const map = this.space();
+    const startX = this.startOffset ?? START_X;
     // Before the start (free node placement): carry on straight back from the start, 2 world units
     // per engine x... measured off the road's first stretch.
-    if (x < START_X) {
-      const a = this.worldFromEngine(START_X, z, lift), b = this.worldFromEngine(START_X + 200, z, lift);
-      return a.clone().add(b.sub(a).multiplyScalar((x - START_X) / 200));
+    if (x < startX) {
+      const a = this.worldFromEngine(startX, z, lift), b = this.worldFromEngine(startX + 200, z, lift);
+      return a.clone().add(b.sub(a).multiplyScalar((x - startX) / 200));
     }
     const s = map.trackDistFromEngineDistance(engineDistanceFromX(x));
     const placement = worldFromCanonical(map, { s, laneZ: z, altitude: 0 });
@@ -111,14 +114,15 @@ export class LaneGizmos {
   /** A raycast hit in the world → engine (x, z). The inverse of `worldFromEngine`. */
   engineFromWorld(point: THREE.Vector3): { x: number; z: number; residual: number; ambiguous: boolean } {
     const map = this.space();
+    const startX = this.startOffset ?? START_X;
     const canonical = engineFromWorld(map, { x: point.x, y: point.y, z: point.z });
     if (canonical.distance <= 0.5) {
       // Behind the start: how far back along the start's heading (the inverse of the branch above).
-      const a = this.worldFromEngine(START_X, canonical.laneZ, 0), b = this.worldFromEngine(START_X + 200, canonical.laneZ, 0);
+      const a = this.worldFromEngine(startX, canonical.laneZ, 0), b = this.worldFromEngine(startX + 200, canonical.laneZ, 0);
       const dir = new THREE.Vector3(b.x - a.x, 0, b.z - a.z);
       const len = dir.length() || 1;
       const back = ((point.x - a.x) * dir.x + (point.z - a.z) * dir.z) / len;
-      if (back < 0) return { x: Math.round(START_X + (back / len) * 200), z: canonical.laneZ, residual: canonical.residual, ambiguous: canonical.ambiguous };
+      if (back < 0) return { x: Math.round(startX + (back / len) * 200), z: canonical.laneZ, residual: canonical.residual, ambiguous: canonical.ambiguous };
     }
     return {
       x: engineXFromDistance(canonical.distance),

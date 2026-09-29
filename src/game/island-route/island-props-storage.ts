@@ -25,11 +25,11 @@ export const ISLAND_BACKUP_ENDPOINTS = {
   latestFile: 'island-props-latest.json',
 } as const;
 
-export interface IslandTrack { id: string; name: string; createdAt: number }
+export interface IslandTrack { id: string; name: string; createdAt: number; startOffset?: number }
 export interface IslandTrackIndex { active: string; tracks: IslandTrack[] }
 
 /** The island's first track: the original key, the original disk folder. */
-export const DEFAULT_ISLAND_TRACK: IslandTrack = { id: 'serpentine', name: 'Serpentine Isle', createdAt: 0 };
+export const DEFAULT_ISLAND_TRACK: IslandTrack = { id: 'serpentine', name: 'Serpentine Isle', createdAt: 0, startOffset: 190 };
 
 export interface IslandPropsDoc {
   version: number;
@@ -67,7 +67,12 @@ export function readIslandTracks(store?: Storage): IslandTrackIndex {
     if (parsed && Array.isArray(parsed.tracks)) {
       index = {
         active: typeof parsed.active === 'string' ? parsed.active : DEFAULT_ISLAND_TRACK.id,
-        tracks: parsed.tracks.filter((t): t is IslandTrack => !!t && typeof t.id === 'string' && typeof t.name === 'string'),
+        tracks: parsed.tracks
+          .filter((t): t is IslandTrack => !!t && typeof t.id === 'string' && typeof t.name === 'string')
+          .map((t) => ({
+            ...t,
+            startOffset: typeof t.startOffset === 'number' && Number.isFinite(t.startOffset) ? t.startOffset : 190,
+          })),
       };
     }
   } catch { /* unreadable: the default index */ }
@@ -75,7 +80,7 @@ export function readIslandTracks(store?: Storage): IslandTrackIndex {
   // starts on its chosen track.
   const published = shippedCourses();
   if (published) {
-    for (const t of published.tracks) if (!index.tracks.some((x) => x.id === t.id)) index.tracks.push({ id: t.id, name: t.name, createdAt: 0 });
+    for (const t of published.tracks) if (!index.tracks.some((x) => x.id === t.id)) index.tracks.push({ id: t.id, name: t.name, createdAt: 0, startOffset: 190 });
     if (!saved) index.active = published.active;
   }
   if (!index.tracks.some((t) => t.id === DEFAULT_ISLAND_TRACK.id)) index.tracks.unshift({ ...DEFAULT_ISLAND_TRACK });
@@ -96,6 +101,24 @@ export function setActiveIslandTrack(trackId: string, store?: Storage): boolean 
   return writeIslandTracks({ ...index, active: trackId }, store);
 }
 
+/** The start offset on the x axis for an island track (defaults to 190). */
+export function getIslandTrackStartOffset(trackId?: string, store?: Storage): number {
+  const index = readIslandTracks(store);
+  const targetId = trackId ?? index.active;
+  const track = index.tracks.find((t) => t.id === targetId);
+  return typeof track?.startOffset === 'number' && Number.isFinite(track.startOffset) ? track.startOffset : 190;
+}
+
+/** Updates the start offset on the x axis for an island track. */
+export function setIslandTrackStartOffset(trackId: string, startOffset: number, store?: Storage): boolean {
+  if (!Number.isFinite(startOffset)) return false;
+  const index = readIslandTracks(store);
+  const track = index.tracks.find((t) => t.id === trackId);
+  if (!track) return false;
+  track.startOffset = Math.round(startOffset);
+  return writeIslandTracks(index, store);
+}
+
 /** A track name trimmed to something a dropdown can show; empty names are refused. */
 export const cleanTrackName = (name: string) => name.replace(/\s+/g, ' ').trim().slice(0, 40);
 
@@ -103,14 +126,18 @@ export const cleanTrackName = (name: string) => name.replace(/\s+/g, ' ').trim()
  * Adds a track and makes it active. With `copyFrom`, its placed props are copied from that track
  * (the copy gets new ids, so the two never share an item); otherwise it starts empty.
  */
-export function createIslandTrack(name: string, copyFrom?: string, store?: Storage, now = Date.now()): IslandTrack | null {
+export function createIslandTrack(name: string, copyFrom?: string, store?: Storage, now = Date.now(), startOffset?: number): IslandTrack | null {
   const clean = cleanTrackName(name);
   if (!clean) return null;
   const index = readIslandTracks(store);
   const base = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'track';
   let id = base;
   for (let n = 2; index.tracks.some((t) => t.id === id); n++) id = `${base}-${n}`;
-  const track: IslandTrack = { id, name: clean, createdAt: now };
+  const source = copyFrom ? index.tracks.find((t) => t.id === copyFrom) : null;
+  const trackStartOffset = typeof startOffset === 'number' && Number.isFinite(startOffset)
+    ? startOffset
+    : (source?.startOffset ?? 190);
+  const track: IslandTrack = { id, name: clean, createdAt: now, startOffset: trackStartOffset };
   const props = copyFrom
     ? readIslandProps(store, copyFrom).map((p, i) => ({ ...p, id: `${p.id}_c${now.toString(36)}${i}` }))
     : [];

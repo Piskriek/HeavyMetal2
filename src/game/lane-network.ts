@@ -356,7 +356,7 @@ function searchSegment(nodes: readonly LaneNode[], x: number): number {
 /** A resolved path's centre z at an x, or NaN when the path is not active there. Allocates nothing. */
 function centreZ(resolved: ResolvedPath, x: number): number {
   const { nodes, segments } = resolved;
-  if (!nodes) return NaN;
+  if (!nodes || nodes.length === 0) return NaN;
   const first = nodes[0];
   const last = nodes[nodes.length - 1];
   if (!first || x < first.x || x > last.x) return NaN;
@@ -432,6 +432,27 @@ export function nearestPath(network: LaneNetwork, x: number, z: number): string 
 }
 
 /**
+ * Finds the nearest path at x, or when placed before a path starts (e.g. custom start offset),
+ * adopts the path whose start node is closest.
+ */
+export function nearestPathOrStart(network: LaneNetwork, x: number, z: number): string | null {
+  const atX = nearestPath(network, x, z);
+  if (atX) return atX;
+  let best: string | null = null;
+  let bestDistance = Infinity;
+  for (const path of network.paths) {
+    const firstId = path.nodeIds[0];
+    const node = firstId ? network.nodes.find((n) => n.id === firstId) : null;
+    if (!node) continue;
+    if (x <= node.x) {
+      const d = Math.hypot(node.x - x, node.z - z);
+      if (d < bestDistance) { bestDistance = d; best = path.id; }
+    }
+  }
+  return best;
+}
+
+/**
  * The two fields adoption needs: anything with a place on the course can be given a path, so this
  * stays structural rather than importing `Racer` (which would drag the whole simulation in here).
  */
@@ -447,7 +468,7 @@ export function assignNearestPaths(bearers: readonly PathBearer[], network: Lane
   if (!network) return 0;
   let changed = 0;
   for (const bearer of bearers) {
-    const pathId = nearestPath(network, bearer.x, bearer.z);
+    const pathId = nearestPathOrStart(network, bearer.x, bearer.z);
     if (pathId !== bearer.pathId) changed++;
     bearer.pathId = pathId;
   }
@@ -472,7 +493,7 @@ export function adoptNearestPaths(bearers: readonly PathBearer[], network: LaneN
   let adopted = 0;
   for (const bearer of bearers) {
     if (bearer.pathId !== null || bearer.finished) continue;
-    const pathId = nearestPath(network, bearer.x, bearer.z);
+    const pathId = nearestPathOrStart(network, bearer.x, bearer.z);
     if (pathId) { bearer.pathId = pathId; adopted++; }
   }
   return adopted;
@@ -627,7 +648,13 @@ export function resolveLaneTarget(
   const legacy = { targetZ: laneZOf(racer.targetLane), zMin: LEGACY_CORRIDOR.zMin, zMax: LEGACY_CORRIDOR.zMax };
   if (!network || !racer.pathId) return legacy;
   const sample = sampleLane(network, racer.pathId, racer.x);
-  if (!sample) return legacy;
+  if (!sample) {
+    const start = startNodeOf(network, racer.pathId);
+    if (start && racer.x < start.x) {
+      return { targetZ: start.z, zMin: -LANE_Z_LIMIT, zMax: LANE_Z_LIMIT };
+    }
+    return legacy;
+  }
   const corridor = corridorAt(network, racer.x);
   if (!corridor) return { ...legacy, targetZ: sample.z };
   return {

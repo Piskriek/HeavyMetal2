@@ -28,6 +28,8 @@ export default function StartOptions({ builder, placing, onPlace, onChange, show
   const spots = builder.startSpots();
   const height = builder.getTestBallHeight();
 
+  const [startOffset, setStartOffset] = useState(() => builder.getStartOffset());
+
   return (
     <>
       <button
@@ -35,6 +37,7 @@ export default function StartOptions({ builder, placing, onPlace, onChange, show
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           setAnchor({ right: window.innerWidth - r.right, top: r.bottom + 6 });
+          setStartOffset(builder.getStartOffset());
           setOpen((v) => !v);
         }}
         title="Where a test drive starts: go to a start, put the start anywhere, back to the grid"
@@ -112,6 +115,43 @@ export default function StartOptions({ builder, placing, onPlace, onChange, show
               />
             </label>
           )}
+          <div className="flex flex-col gap-1 border-t border-zinc-800 pt-2 text-[11px] text-zinc-300">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2" title="Track start offset on the X axis. The grid, default test ball and start nodes align here instead of fixed 190.">
+                <span>Start offset X:</span>
+                <input
+                  type="number"
+                  step={50}
+                  value={startOffset}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (Number.isFinite(val)) {
+                      setStartOffset(val);
+                      builder.setStartOffset(val);
+                      onChange();
+                    }
+                  }}
+                  className="w-20 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-xs text-amber-200"
+                />
+              </label>
+              {ball && (
+                <button
+                  className="forge-tool !h-6 !px-2 text-[10px]"
+                  title="Set this track's start offset to the test ball's current X"
+                  onClick={() => {
+                    const newX = Math.round(ball.x);
+                    setStartOffset(newX);
+                    builder.setStartOffset(newX);
+                    onChange();
+                    showToast(`Track start offset set to ${newX}`);
+                  }}
+                >
+                  Set to ball ({Math.round(ball.x)})
+                </button>
+              )}
+            </div>
+            <div className="text-[10px] text-zinc-500">The grid and start nodes align here. The ball freefalls and joins the nearest line.</div>
+          </div>
           <div className="text-[10px] text-zinc-500">Drag the yellow ball to move the start; Shift-drag lifts it onto the hook.</div>
         </div>,
         document.body,

@@ -15,6 +15,7 @@ import { compileRampSurfaces, getTrackSpace } from './track-space';
 import { courseTrackSpace } from './island-route/island-space';
 import { racePiecesFrom } from './race-pieces';
 import { courseMarks, usableStartX } from './race-marks';
+import { getIslandTrackStartOffset } from './island-route/island-props-storage';
 import {
   BALL_DRAW_RADIUS, FINISH, GROUND, RADIUS, STADIUM_START, START_X,
   TRACK_DISTANCE, closestLane, courseY, courseSlope, sectorAt,
@@ -391,7 +392,7 @@ export class GameEngine {
     this.pausedFrom = null;
     this.splitReached = false;
     this.collisionTimes.clear();
-    this.racers = createRacers(this.config);
+    this.racers = createRacers(this.config, this.startOffset);
     this.renderer.setRacerCount(this.racers.length);
     if (this.laneNetwork) this.assignPaths();
     // Solo mode: keep only the player, remove all AI racers
@@ -413,7 +414,7 @@ export class GameEngine {
     this.topSpeed = this.shake = 0;
     this.counts = { sheep: 0, explosions: 0, loops: 0, bumps: 0 };
     this.pickupCount = this.shieldBlocks = 0;
-    this.snapshot.sector = sectorAt(START_X, this.options.course);
+    this.snapshot.sector = sectorAt(this.startOffset, this.options.course);
     this.snapshot.notice = 'SOLO FIRST SPLIT — RIVALS JOIN AT MERGE GATE';
     this.canvas.style.cursor = '';
     this.renderer.view.configure(this.renderer.view.width, 0, this.options.downrange, 0);
@@ -562,8 +563,22 @@ export class GameEngine {
     }
   }
 
+  /** The start offset on the x axis: per-track for island courses, or fixed START_X (190) for legacy courses. */
+  get startOffset(): number {
+    if (this.options.course === 'basalt' || this.config?.course === 'basalt') {
+      try {
+        const builder = this.renderer?.trackBuilder;
+        if (builder && typeof builder.getStartOffset === 'function') {
+          return builder.getStartOffset();
+        }
+        return getIslandTrackStartOffset();
+      } catch { /* default */ }
+    }
+    return START_X;
+  }
+
   /**
-   * Adopts a racer who is not on a path yet. The grid sits at x = 190 and an authored network may
+   * Adopts a racer who is not on a path yet. The grid sits at x = startOffset and an authored network may
    * begin further down the hill (or a racer may be put back by the crew outside every path's x
    * range), so this runs each tick and costs one scan per *unassigned* racer.
    */
@@ -579,13 +594,14 @@ export class GameEngine {
   private placeOnStartNodes() {
     const network = this.laneNetwork;
     if (!network) return;
+    const startX = this.startOffset;
     // A Start Line placed on the island moves the grid there, on each racer's own lane.
     const start = this.startLineX();
     for (const racer of this.racers) {
       const node = startNodeOf(network, racer.pathId);
       if (!node) continue;
       const onLine = start !== null && start > node.x && racer.pathId ? sampleLane(network, racer.pathId, start) : null;
-      racer.x = (onLine ? start! : node.x) + (racer.x - START_X);
+      racer.x = (onLine ? start! : node.x) + (racer.x - startX);
       racer.z = onLine ? onLine.z : node.z;
       racer.y = this.y(racer.x) - RADIUS;
       racer.vx = racer.vy = racer.vz = 0;
@@ -709,7 +725,8 @@ export class GameEngine {
     const at = this.testStart;
     if (!at) return;
     const player = this.player;
-    const x = clamp(at.x, START_X, FINISH - 600);
+    const startX = this.startOffset;
+    const x = Math.min(FINISH - 600, at.x);
     const z = clamp(at.z, -LANE_Z_LIMIT, LANE_Z_LIMIT);
     // It starts exactly where the ball was put (on a ramp or deck if it stands on one) and steers onto
     // the nearest lane of the network from there.
@@ -719,7 +736,7 @@ export class GameEngine {
     player.x = x; player.z = z; player.y = this.world.surfaceAt(x, z).y - RADIUS - height;
     player.vx = player.vy = player.vz = 0;
     player.grounded = height <= 0;
-    player.distance = Math.max(0, (x - START_X) / 2);
+    player.distance = Math.max(0, (x - startX) / 2);
     player.previous = { x: player.x, y: player.y, z: player.z, rotation: player.rotation };
     player.launchOrigin = { x: player.x, y: player.y };
   }

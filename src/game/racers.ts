@@ -103,7 +103,7 @@ export const GRID_ROW_SPACING = 90;
  *   `PLAYER_ID`, bounded deterministic pace spread, and a starting grid stacked in rows
  *   behind the launch line so lane-mates never spawn inside each other.
  */
-export function createRacers(config?: RaceConfig): Racer[] {
+export function createRacers(config?: RaceConfig, startOffset: number = START_X): Racer[] {
   const fieldSize = clampFieldSize(config?.fieldSize ?? 4);
   const roster = buildRoster(fieldSize, config?.roster?.[0] ?? { rider: 'rivet', capsule: 'iron' });
   return roster.map((entry) => {
@@ -112,7 +112,7 @@ export function createRacers(config?: RaceConfig): Racer[] {
     const loadout = legacy ? config?.roster?.[entry.id] ?? entry.loadout : entry.loadout;
     const stats = loadoutStats(loadout);
     const row = Math.floor(entry.id / 4);
-    const startX = fieldSize > 4 ? START_X - row * GRID_ROW_SPACING : START_X;
+    const startX = fieldSize > 4 ? startOffset - row * GRID_ROW_SPACING : startOffset;
     return {
       ...entry, x: startX, y: START_Y, z: laneZ(entry.homeLane), vx: 0, vy: 0, vz: 0,
       // Legacy parity: the four-racer field always raced at pace 1 with loadout weight,

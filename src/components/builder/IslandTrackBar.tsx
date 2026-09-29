@@ -74,6 +74,11 @@ export default function IslandTrackBar({ builder, course, onCourseChange, showTo
         ) : courses.length <= 1 && (
           <span className="text-amber-300 font-bold">{courses.find((c) => c.id === course)?.name}</span>
         )}
+        {tracks && (
+          <span className="text-[10px] text-amber-400/80 font-mono hidden sm:inline" title="Track start offset on the x axis">
+            x={builder.getStartOffset()}
+          </span>
+        )}
       </div>
       {tracks && (
         <div className="flex items-center gap-0.5">

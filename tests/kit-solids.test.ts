@@ -63,7 +63,8 @@ test('the sea: a disc following the camera, waves in rings round the shore, foam
   assert.match(sea, /float v = \(rn \+ seaTime \* 160\.0 \* seaSpeed\) \/ seaTile;/, 'rings close in on the island over time');
   assert.match(sea, /const tile = \{ value: 3000 \};/, 'the default pattern size is unchanged');
   assert.match(sea, /name = 'Shore foam'/);
-  assert.match(sea, /float haze = max\(1\.0 - smoothstep\(0\.0, 0\.07, -viewDir\.y\), edge\);/, 'the sea fades into the fog colour near the horizon line and near its own far edge (seen from high up)');
+  assert.match(sea, /gl_FragColor\.rgb = mix\(gl_FragColor\.rgb, farOut, edge\);/, 'the sea melts into the far-sea colour near its own far edge (seen from high up), where the sky paints the same colour on');
+  assert.match(sea, /float line = seaHazeW > 0\.0005 \? 1\.0 - smoothstep\(0\.0, seaHazeW, -viewDir\.y\) : 0\.0;/, 'and into the fog colour near the horizon line, as wide as the Sky window asks (0: a crisp line)');
   const world = readFileSync(new URL('../src/game/island-route/island-world.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(world, /PlaneGeometry\(2 \* SEA_HALF/, 'no square sea');
 });

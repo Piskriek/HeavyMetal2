@@ -9,9 +9,19 @@
  *   the water texture so they never read as clean stripes.
  * - **Horizon haze**: the sea fades into the fog's colour the nearer it lies to the horizon line (by view
  *   angle, not distance, so it reads at every height), and the sky fades to the same colour just above it
- *   (renderer-3d's sky shader): sea and sky meet in a soft haze, no line.
+ *   (renderer-3d's sky shader). How wide is the Sky window's `horizon.haze` (0: a crisp line); its glow
+ *   band fades down onto the water here as it fades up into the sky there.
  */
 import * as THREE from 'three';
+
+/**
+ * The far sea's colour: what the water averages out to far away (its tint over the pattern, a little of
+ * the deep through it). The sea's far edge melts into it and the sky paints it under the horizon, so the
+ * sea runs on to the horizon line with no band of haze unless the Sky window asks for one.
+ */
+export function seaFarColor(look: Pick<SeaLookInput, 'water' | 'deep' | 'seeThrough'>): THREE.Color {
+  return new THREE.Color(look.water).multiplyScalar(0.86).lerp(new THREE.Color(look.deep), 0.2 + look.seeThrough * 0.5);
+}
 
 /** The beach outline's wobble (as island-world's beachHeight): radius multiplier at an angle. */
 export function shoreWobble(angle: number): number {
@@ -29,6 +39,17 @@ export interface IslandSea {
   update(time: number, camera: THREE.Camera, fogColor: THREE.Color): void;
   /** The ocean's look (the Sky window): colours, how much of the deep shows through, the pattern. */
   setLook(look: SeaLookInput): void;
+  /** The horizon (the Sky window): haze width and the glow band. */
+  setHorizon(h: SeaHorizonInput): void;
+}
+
+export interface SeaHorizonInput {
+  haze: number;
+  glow: boolean;
+  glowColor: string;
+  glowStrength: number;
+  glowWidth: number;
+  glowSoftness: number;
 }
 
 export interface SeaLookInput {
@@ -106,6 +127,13 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   const tile = { value: 3000 };
   const speed = { value: 1 };
   const around = { value: seaRepeatsAround(opts.shoreRadius, tile.value) };
+  // The horizon: haze width below the line (0.07 was the old fixed one) and the glow band.
+  const hazeW = { value: 0.07 };
+  const glowCol = { value: new THREE.Color('#ffffff') };
+  const glowAmt = { value: 0 };
+  const glowW = { value: 0.016 };
+  const glowSoft = { value: 0.85 };
+  const farCol = { value: seaFarColor({ water: '#6fc2c0', deep: '#557f78', seeThrough: 0.2 }) };
 
   /* The water: rings that follow the shore and close in slowly. */
   const water = opts.water.clone();
@@ -129,12 +157,12 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   water.color = new THREE.Color('#6fc2c0');
   water.opacity = 0.8;
   water.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS }, seaTile: tile, seaSpeed: speed });
+    Object.assign(shader.uniforms, { seaTime: time, seaAround: around, seaRadius: { value: SEA_RADIUS }, seaTile: tile, seaSpeed: speed, seaHazeW: hazeW, seaGlowCol: glowCol, seaGlowAmt: glowAmt, seaGlowW: glowW, seaGlowSoft: glowSoft, seaFarCol: farCol });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vSeaWorld;')
       .replace('#include <project_vertex>', '#include <project_vertex>\n  vSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\nuniform float seaTile;\nuniform float seaSpeed;\n${SHORE_GLSL}`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSeaWorld;\nuniform float seaTime;\nuniform float seaAround;\nuniform float seaRadius;\nuniform float seaTile;\nuniform float seaSpeed;\nuniform float seaHazeW;\nuniform vec3 seaGlowCol;\nuniform float seaGlowAmt;\nuniform float seaGlowW;\nuniform float seaGlowSoft;\nuniform vec3 seaFarCol;\n${SHORE_GLSL}`)
       .replace('#include <fog_fragment>', /* glsl */ `#include <fog_fragment>
 #ifdef USE_FOG
 {
@@ -143,9 +171,21 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
   // Near the horizon line, and (seen from high up, where the sea's edge lies well below it) near the
   // sea's far edge: either way the water melts into the fog colour the sky shows at its horizon.
   float edge = smoothstep(0.5, 0.97, length(vSeaWorld.xz - cameraPosition.xz) / seaRadius);
-  float haze = max(1.0 - smoothstep(0.0, 0.07, -viewDir.y), edge);
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, haze);
-  gl_FragColor.a = mix(gl_FragColor.a, 1.0, haze);
+  // The disc's far edge melts into the far-sea colour the sky paints under the horizon (no seam);
+  // then the horizon haze (fog colour) as wide as the Sky window asks (0: none, a crisp line).
+  // This runs after the colour-space step (fog_fragment follows it), so the colours mixed in here go to
+  // the screen's space first: the sky shader converts the same colours, and the two meet with no seam.
+  vec3 farOut = sRGBTransferOETF(vec4(seaFarCol, 1.0)).rgb;
+  vec3 fogOut = sRGBTransferOETF(vec4(fogColor, 1.0)).rgb;
+  vec3 glowOut = sRGBTransferOETF(vec4(seaGlowCol, 1.0)).rgb;
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, farOut, edge);
+  float line = seaHazeW > 0.0005 ? 1.0 - smoothstep(0.0, seaHazeW, -viewDir.y) : 0.0;
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogOut, line);
+  gl_FragColor.a = mix(gl_FragColor.a, 1.0, max(line, edge));
+  // The horizon glow, fading down from the line onto the water (its twin fades up the sky).
+  float glow = seaGlowAmt * (1.0 - smoothstep(seaGlowW * (1.0 - seaGlowSoft), seaGlowW, -viewDir.y));
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, glowOut, glow);
+  gl_FragColor.a = mix(gl_FragColor.a, 1.0, glow);
 }
 #endif
 `)
@@ -168,7 +208,7 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
 #endif
 `);
   };
-  water.customProgramCacheKey = () => 'island-sea-rings-haze-3';
+  water.customProgramCacheKey = () => 'island-sea-rings-haze-5';
   const sea = new THREE.Mesh(new THREE.CircleGeometry(SEA_RADIUS, 160), water);
   sea.rotation.x = -Math.PI / 2;
   sea.name = 'Sea';
@@ -222,7 +262,15 @@ export function buildIslandSea(opts: IslandSeaOptions): IslandSea {
       sea.position.x = floor.position.x = camera.position.x;
       sea.position.z = floor.position.z = camera.position.z;
     },
+    setHorizon(h) {
+      hazeW.value = 0.07 * h.haze;
+      glowCol.value.set(h.glowColor);
+      glowAmt.value = h.glow ? h.glowStrength : 0;
+      glowW.value = h.glowWidth;
+      glowSoft.value = h.glowSoftness;
+    },
     setLook(look) {
+      farCol.value.copy(seaFarColor(look));
       water.color.set(look.water);
       floorMat.color.set(look.deep);
       water.opacity = 1 - look.seeThrough;

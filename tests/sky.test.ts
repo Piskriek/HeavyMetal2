@@ -9,6 +9,7 @@ import {
   CLOUD_COUNT_MAX, DEFAULT_SKY_SETTINGS, GRADIENT_PRESETS, SKY_SETTINGS_KEY, _resetSkySettingsCache, getSkySettings,
   gradientBlendWidth, gradientColorAt, normalizeSkySettings, onSkySettings, resetSkySettings, setSkySettings,
 } from '../src/game/sky/sky-settings';
+import { HORIZON_PRESETS, horizonGlowAt } from '../src/game/sky/sky-settings';
 import { CLOUD_RINGS, CLOUD_SHAPES, CloudLayer, cloudArtUrl, cloudLayout } from '../src/game/sky/sky-clouds';
 
 const near = (a: number, b: number, eps = 1e-6) => Math.abs(a - b) <= eps;
@@ -178,4 +179,52 @@ test('gradient opacity: defaults to fully opaque, clamps, and a preset keeps wha
   assert.equal(normalizeSkySettings({ gradient: { opacity: -1 } }).gradient.opacity, 0);
   assert.equal(normalizeSkySettings({ gradient: {} }).gradient.opacity, 1, 'an old save stays fully opaque');
   for (const p of GRADIENT_PRESETS) assert.equal(p.gradient.opacity, 1);
+});
+
+test('horizon: saves without it get the thin glow; values are clamped; presets include a crisp line', () => {
+  const s = normalizeSkySettings({ mode: 'gradient' });
+  assert.deepEqual(s.horizon, DEFAULT_SKY_SETTINGS.horizon);
+  assert.equal(s.horizon.glow, true);
+  assert.equal(s.horizon.glowColor, '#ffffff');
+  assert.ok(s.horizon.glowWidth < 0.05, 'a thin band, not a wide one');
+  const odd = normalizeSkySettings({ horizon: { haze: 5, fog: -1, glow: 'yes', glowColor: 'red', glowWidth: 9, glowSoftness: 2, glowStrength: -3 } });
+  assert.equal(odd.horizon.haze, 1);
+  assert.equal(odd.horizon.fog, 0);
+  assert.equal(odd.horizon.glow, DEFAULT_SKY_SETTINGS.horizon.glow);
+  assert.equal(odd.horizon.glowColor, DEFAULT_SKY_SETTINGS.horizon.glowColor);
+  assert.equal(odd.horizon.glowWidth, 0.12);
+  assert.equal(odd.horizon.glowSoftness, 1);
+  assert.equal(odd.horizon.glowStrength, 0);
+  const crisp = HORIZON_PRESETS.find((p) => p.id === 'crisp')!.horizon;
+  assert.equal(crisp.haze, 0);
+  assert.equal(crisp.fog, 0);
+  assert.equal(crisp.glow, false);
+});
+
+test('horizon glow: strongest on the line, fading to nothing past its width; off is off', () => {
+  const z = DEFAULT_SKY_SETTINGS.horizon;
+  assert.ok(Math.abs(horizonGlowAt(z, 0) - z.glowStrength) < 1e-9);
+  assert.ok(horizonGlowAt(z, z.glowWidth * 0.5) < horizonGlowAt(z, 0));
+  assert.equal(horizonGlowAt(z, z.glowWidth * 1.01), 0);
+  assert.equal(horizonGlowAt(z, -z.glowWidth * 0.3), horizonGlowAt(z, z.glowWidth * 0.3), 'fades up and down alike');
+  assert.equal(horizonGlowAt({ ...z, glow: false }, 0), 0);
+  const hard = { ...z, glowSoftness: 0 };
+  assert.equal(horizonGlowAt(hard, z.glowWidth * 0.9), z.glowStrength, 'no fade: a hard-edged band');
+});
+
+test('clouds: horizon size shrinks the far ring (not the near one); hugging stretches the far ring out', () => {
+  const base = { count: 60, size: 1, height: 1, seed: 5 };
+  const plain = cloudLayout({ ...base, horizonSize: 1, horizonHug: 0 });
+  const tiny = cloudLayout({ ...base, horizonSize: 0.2, horizonHug: 0 });
+  const ringWidth = (all: typeof plain, r: number) => all.filter((c) => c.ring === r).reduce((a, c) => a + c.width, 0);
+  assert.equal(ringWidth(tiny, 0), ringWidth(plain, 0), 'the near ring keeps its size');
+  assert.ok(Math.abs(ringWidth(tiny, 2) - ringWidth(plain, 2) * 0.2) < 1e-6, 'the far ring at 0.2×');
+  assert.ok(ringWidth(tiny, 1) < ringWidth(plain, 1) && ringWidth(tiny, 1) > ringWidth(plain, 1) * 0.2, 'the middle ring in between');
+  const hug = cloudLayout({ ...base, horizonSize: 1, horizonHug: 1 });
+  assert.ok(hug.every((c) => c.hug === 1));
+  assert.ok(plain.every((c) => c.hug === 0));
+  const far = hug.filter((c) => c.ring === 2);
+  const near = hug.filter((c) => c.ring === 0);
+  assert.ok(Math.min(...near.map((c) => c.lineOffset)) > Math.max(...far.map((c) => c.lineOffset)), 'near clouds float higher above the line than far ones');
+  assert.ok(Math.max(...hug.map((c) => c.radius)) + 74000 < 200000, 'still inside the far plane');
 });

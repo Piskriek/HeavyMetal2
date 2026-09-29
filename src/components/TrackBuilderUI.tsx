@@ -1755,7 +1755,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                   setShowSnappingMenu(false);
                 }}
                 className="flex items-center gap-1.5 px-2 py-1 text-xs bg-zinc-900/80 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/50 font-medium cursor-pointer"
-                title="Choose Skydome Environment & Atmosphere"
+                title="Sky, sea & clouds"
+                aria-label="Sky"
               >
                 <Sun size={12} />
                 <span className="hidden min-[1800px]:inline text-[11px]">Sky: {skyMode === 'gradient' ? 'Gradient' : SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>

@@ -1,12 +1,13 @@
 /**
  * The Sky, sea & clouds window: the painted skybox, or a crisp gradient over it (its three colours, how
  * crisp, where the middle band sits, how opaque); the ocean (colours, how clear, its pattern, the pattern's
- * size and the waves' pace); and the painted clouds floating round the island. Changes show at once and
- * are kept for the race (sky-settings.ts).
+ * size and the waves' pace); the horizon (a thin glow band, how far sky and sea haze into it, the distance
+ * fog, or a crisp line); and the painted clouds floating round the island, tiny on the horizon if asked.
+ * Changes show at once and are kept for the race (sky-settings.ts).
  */
 import { useEffect, useState } from 'react';
 import {
-  CLOUD_COUNT_MAX, GRADIENT_PRESETS, SEA_PRESETS, SEA_TEXTURES, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
+  CLOUD_COUNT_MAX, GRADIENT_PRESETS, HORIZON_PRESETS, SEA_PRESETS, SEA_TEXTURES, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
   type SkyGradient, type SkySettings,
 } from '../../game/sky/sky-settings';
 import { rebase } from '../../platform/asset-base';
@@ -54,7 +55,7 @@ function ColorRow(props: { label: string; value: string; onChange: (v: string) =
 export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, onChange, onClose }: Props) {
   const [s, setS] = useState<SkySettings>(() => getSkySettings());
   useEffect(() => onSkySettings((next) => { setS(next); onChange?.(); }), [onChange]);
-  const g = s.gradient, c = s.clouds, w = s.sea;
+  const g = s.gradient, c = s.clouds, w = s.sea, z = s.horizon;
   const tab = (active: boolean) => `flex-1 px-2 py-1 text-[11px] font-bold rounded border cursor-pointer ${active ? 'bg-amber-950/70 border-amber-500/80 text-amber-200' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`;
 
   return (
@@ -139,6 +140,45 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
       </section>
 
       <section className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Horizon</div>
+        <div className="grid grid-cols-3 gap-1">
+          {HORIZON_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setSkySettings({ horizon: { ...p.horizon, glowColor: z.glowColor } })}
+              className="flex flex-col items-center gap-1 rounded border border-zinc-800 bg-zinc-900 p-1 hover:border-amber-600/60 cursor-pointer"
+              title={p.id === 'crisp' ? 'Sky meets sea on a sharp line: no haze, no fog, no glow' : p.id === 'glow' ? 'A thin light band on the line, fading up and down' : 'The old wide soft haze'}
+            >
+              <span
+                className="h-5 w-full rounded"
+                style={{ background: p.id === 'crisp'
+                  ? 'linear-gradient(to bottom, #8cc4f0 50%, #3f8f8c 50%)'
+                  : p.id === 'glow'
+                    ? 'linear-gradient(to bottom, #8cc4f0 38%, #ffffff 50%, #3f8f8c 62%)'
+                    : 'linear-gradient(to bottom, #8cc4f0 10%, #cfe6ee 45%, #cfe6ee 55%, #3f8f8c 90%)' }}
+              />
+              <span className="text-[10px] text-zinc-300 truncate w-full text-center">{p.name}</span>
+            </button>
+          ))}
+        </div>
+        <label className="flex items-center gap-1.5 text-[11px] text-zinc-300 cursor-pointer">
+          <input type="checkbox" checked={z.glow} onChange={(e) => setSkySettings({ horizon: { glow: e.target.checked } })} className="accent-amber-500" />
+          Glow band on the horizon
+        </label>
+        {z.glow && (
+          <>
+            <ColorRow label="Glow colour" value={z.glowColor} onChange={(v) => setSkySettings({ horizon: { glowColor: v } })} />
+            <Slider label="Glow strength" value={z.glowStrength} min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ horizon: { glowStrength: v } })} />
+            <Slider label="Glow width" value={z.glowWidth} min={0.002} max={0.12} step={0.001} format={(v) => (v < 0.006 ? 'hairline' : `${(v * 100).toFixed(1)}`)} onChange={(v) => setSkySettings({ horizon: { glowWidth: v } })} />
+            <Slider label="Glow fade" value={z.glowSoftness} min={0} max={1} step={0.01} format={(v) => (v < 0.05 ? 'hard' : `${Math.round(v * 100)}%`)} onChange={(v) => setSkySettings({ horizon: { glowSoftness: v } })} />
+          </>
+        )}
+        <Slider label="Haze" value={z.haze} min={0} max={1} step={0.01} format={(v) => (v === 0 ? 'crisp' : `${Math.round(v * 100)}%`)} onChange={(v) => setSkySettings({ horizon: { haze: v } })} />
+        <Slider label="Distance fog" value={z.fog} min={0} max={1} step={0.01} format={(v) => (v === 0 ? 'none' : `${Math.round(v * 100)}%`)} onChange={(v) => setSkySettings({ horizon: { fog: v } })} />
+        <div className="text-[10px] text-zinc-500">Haze and fog at 0 with the glow off give a crisp line where the sea meets the sky.</div>
+      </section>
+
+      <section className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Clouds</span>
           <label className="flex items-center gap-1.5 text-[11px] text-zinc-300 cursor-pointer">
@@ -149,6 +189,8 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
         <Slider label="Amount" value={c.count} min={0} max={CLOUD_COUNT_MAX} step={1} format={(v) => String(Math.round(v))} onChange={(v) => setSkySettings({ clouds: { count: v } })} />
         <Slider label="Size" value={c.size} min={0.3} max={2.5} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { size: v } })} />
         <Slider label="Height" value={c.height} min={0.3} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { height: v } })} />
+        <Slider label="Horizon size" value={c.horizonSize} min={0.1} max={1.5} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { horizonSize: v } })} />
+        <Slider label="Hug horizon" value={c.horizonHug} min={0} max={1} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ clouds: { horizonHug: v } })} />
         <Slider label="Drift" value={c.drift} min={0} max={4} step={0.1} format={(v) => (v === 0 ? 'still' : `${v.toFixed(1)}×`)} onChange={(v) => setSkySettings({ clouds: { drift: v } })} />
         <Slider label="Opacity" value={c.opacity} min={0.1} max={1} step={0.05} onChange={(v) => setSkySettings({ clouds: { opacity: v } })} />
         <ColorRow label="Tint" value={c.tint} onChange={(v) => setSkySettings({ clouds: { tint: v } })} />

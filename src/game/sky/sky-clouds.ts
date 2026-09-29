@@ -76,6 +76,12 @@ export interface CloudPlacement {
   readonly bobRate: number;
   readonly phase: number;
   readonly flip: boolean;
+  /**
+   * 0‥1 (the Sky window's Hug horizon × the ring's share): how far this cloud is pulled from `y` onto
+   * the horizon line as the camera sees it, `lineOffset` above it (half its own height, so it sits on it).
+   */
+  readonly hug: number;
+  readonly lineOffset: number;
 }
 
 /** Small, fast, seeded: the same seed always gives the same sky. */
@@ -84,8 +90,16 @@ function rng(seed: number) {
   return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
+/** How much of Horizon size a ring takes: the far ring all of it, the middle ring half, the near ring none. */
+const HORIZON_SHARE = [0, 0.5, 1] as const;
+/**
+ * Hugging the horizon, each ring floats this high above the line the camera sees (world units): the
+ * near ring well up, the middle a little above, the far ring (null) right on it, half its height up.
+ */
+const RING_LIFT: readonly ([number, number] | null)[] = [[3500, 8000], [1000, 3000], null];
+
 /** Where every cloud floats, for these settings (pure: the tests check it). */
-export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height' | 'seed'>): CloudPlacement[] {
+export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height' | 'seed'> & Partial<Pick<SkyClouds, 'horizonSize' | 'horizonHug'>>): CloudPlacement[] {
   const count = Math.max(0, Math.min(CLOUD_COUNT_MAX, Math.round(settings.count)));
   const rand = rng(settings.seed);
   const lerp = (range: readonly [number, number], t: number) => range[0] + (range[1] - range[0]) * t;
@@ -95,19 +109,28 @@ export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height
     const n = ri === CLOUD_RINGS.length - 1 ? count - made : Math.round(count * ring.share);
     // Even spacing round the ring, jittered, so no two cloud banks pile up on one side.
     const start = rand() * Math.PI * 2;
+    const share = HORIZON_SHARE[ri] ?? 1;
+    const sizeK = 1 + ((settings.horizonSize ?? 1) - 1) * share;
+    const hug = settings.horizonHug ?? 0;
+    const lift = RING_LIFT[ri] ?? null;
     for (let k = 0; k < n; k++) {
+      const baseY = lerp(ring.y, rand()) * settings.height;
+      const width = lerp(ring.width, rand()) * settings.size * sizeK;
       out.push({
         shape: Math.floor(rand() * CLOUD_SHAPES.length) % CLOUD_SHAPES.length,
         ring: ri,
         angle: start + ((k + 0.5 + (rand() - 0.5) * 0.7) / n) * Math.PI * 2,
-        radius: lerp(ring.r, rand()),
-        y: lerp(ring.y, rand()) * settings.height,
-        width: lerp(ring.width, rand()) * settings.size,
+        radius: lerp(ring.r, rand()) * (1 + 0.15 * hug * share),
+        y: baseY,
+        width,
         orbit: (0.00035 + rand() * 0.00035) * (rand() < 0.5 ? 1 : -1) * (ri === 0 ? 1.4 : 1),
         bobAmp: (120 + rand() * 260) * (1 + (CLOUD_RINGS.length - 1 - ri) * 0.4),
         bobRate: 0.12 + rand() * 0.14,
         phase: rand() * Math.PI * 2,
         flip: rand() < 0.5,
+        hug,
+        // The far ring sits on the line (about half its height above it); the others float higher.
+        lineOffset: lift ? lerp(lift, rand()) : width * (0.3 + rand() * 0.25),
       });
     }
     made += n;
@@ -230,7 +253,7 @@ export class CloudLayer {
     this.group.visible = settings.enabled && settings.count > 0;
     const tint = new THREE.Color(settings.tint);
     for (const m of this.materials) { m.opacity = settings.opacity; m.color.copy(tint); }
-    const key = `${settings.count}|${settings.size}|${settings.height}|${settings.seed}`;
+    const key = `${settings.count}|${settings.size}|${settings.height}|${settings.seed}|${settings.horizonSize}|${settings.horizonHug}`;
     if (key === this.layoutKey) return;
     this.layoutKey = key;
     for (const s of this.shown) this.group.remove(s.sprite);
@@ -248,12 +271,17 @@ export class CloudLayer {
     this.update(0, 1);
   }
 
-  /** Each frame: drift round the island and bob. `drift` 0 (or reduced motion) holds them still. */
-  update(time: number, drift: number) {
+  /**
+   * Each frame: drift round the island and bob. `drift` 0 (or reduced motion) holds them still.
+   * `eyeY` is the camera's height: the horizon line sits there, so hugging clouds float just on it
+   * wherever the camera is (racing on the road or flying high in the editor).
+   */
+  update(time: number, drift: number, eyeY?: number) {
     for (const { sprite, place } of this.shown) {
       const a = place.angle + time * place.orbit * drift;
-      const bob = Math.sin(time * place.bobRate * drift + place.phase) * place.bobAmp * Math.min(1, drift);
-      sprite.position.set(Math.sin(a) * place.radius, place.y + bob, -Math.cos(a) * place.radius);
+      const bob = Math.sin(time * place.bobRate * drift + place.phase) * place.bobAmp * Math.min(1, drift) * (1 - place.hug);
+      const y = eyeY === undefined || !place.hug ? place.y : place.y + (eyeY + place.lineOffset - place.y) * place.hug;
+      sprite.position.set(Math.sin(a) * place.radius, y + bob, -Math.cos(a) * place.radius);
     }
   }
 

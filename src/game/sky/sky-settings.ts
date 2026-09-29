@@ -9,7 +9,10 @@
  *  - **sea**: the island ocean's colour: the water's own tint, the deep colour under it, and how much of
  *    the deep shows through (island-sea.ts).
  *  - **clouds**: painted billboard clouds floating round the island in three rings, smaller and lower
- *    toward the horizon (`sky-clouds.ts`).
+ *    toward the horizon (`sky-clouds.ts`); `horizonSize` / `horizonHug` shrink and sink the far rings.
+ *  - **horizon**: where sky meets sea. `haze` is how far each fades into the fog colour (0 = a crisp
+ *    line), `fog` the distance fog over the far sea, and an optional thin glow band (colour, strength,
+ *    width, softness) that fades up into the sky and down onto the sea.
  *
  * Pure data and a tiny store: no THREE, no DOM, so tests can load it headless.
  */
@@ -47,6 +50,26 @@ export interface SkyClouds {
   readonly tint: string;
   /** Another layout of the same amount. */
   readonly seed: number;
+  /** × the size of the far rings (the middle ring gets half the change): small = tiny clouds on the horizon. */
+  readonly horizonSize: number;
+  /** 0‥1: how far the far rings move onto the horizon line (as the race camera sees it), further out. */
+  readonly horizonHug: number;
+}
+
+export interface SkyHorizon {
+  /** How far sky and sea fade into the fog colour at the horizon: 0 = a crisp line, 1 = a wide soft haze. */
+  readonly haze: number;
+  /** Distance fog over the far sea and the island: 0 = none, 1 = thick. */
+  readonly fog: number;
+  /** A thin glow band on the horizon line, fading up into the sky and down onto the sea. */
+  readonly glow: boolean;
+  readonly glowColor: string;
+  /** 0‥1. */
+  readonly glowStrength: number;
+  /** Half the band's height, in view-angle (0.002 ≈ a hairline, 0.12 ≈ a wide band). */
+  readonly glowWidth: number;
+  /** 0 = hard-edged band, 1 = fades all the way from its centre. */
+  readonly glowSoftness: number;
 }
 
 /** The water's pattern: the painted waves, painted ripples, the lagoon shallows tile, or none (flat). */
@@ -77,6 +100,7 @@ export interface SkySettings {
   readonly gradient: SkyGradient;
   readonly sea: SeaLook;
   readonly clouds: SkyClouds;
+  readonly horizon: SkyHorizon;
 }
 
 export interface SeaPreset { readonly id: string; readonly name: string; readonly sea: SeaLook }
@@ -107,8 +131,16 @@ export const DEFAULT_SKY_SETTINGS: SkySettings = Object.freeze({
   mode: 'painted',
   gradient: GRADIENT_PRESETS[0]!.gradient,
   sea: SEA_PRESETS[0]!.sea,
-  clouds: { enabled: true, count: 36, size: 1, height: 1, drift: 1, opacity: 1, tint: '#ffffff', seed: 1 },
+  clouds: { enabled: true, count: 36, size: 1, height: 1, drift: 1, opacity: 1, tint: '#ffffff', seed: 1, horizonSize: 0.45, horizonHug: 0.9 },
+  horizon: { haze: 0.2, fog: 0.45, glow: true, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 },
 });
+
+/** Quick looks for the horizon (the Horizon section's buttons). */
+export const HORIZON_PRESETS: readonly { id: string; name: string; horizon: SkyHorizon }[] = Object.freeze([
+  { id: 'glow', name: 'Thin glow', horizon: DEFAULT_SKY_SETTINGS.horizon },
+  { id: 'crisp', name: 'Crisp line', horizon: { haze: 0, fog: 0, glow: false, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 } },
+  { id: 'haze', name: 'Soft haze', horizon: { haze: 1, fog: 1, glow: false, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 } },
+]);
 
 export const SKY_SETTINGS_KEY = 'hm2-sky-settings-v1';
 
@@ -126,7 +158,8 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
   const g = (r.gradient && typeof r.gradient === 'object' ? r.gradient : {}) as Record<string, unknown>;
   const c = (r.clouds && typeof r.clouds === 'object' ? r.clouds : {}) as Record<string, unknown>;
   const w = (r.sea && typeof r.sea === 'object' ? r.sea : {}) as Record<string, unknown>;
-  const dg = DEFAULT_SKY_SETTINGS.gradient, dc = DEFAULT_SKY_SETTINGS.clouds, dw = DEFAULT_SKY_SETTINGS.sea;
+  const z = (r.horizon && typeof r.horizon === 'object' ? r.horizon : {}) as Record<string, unknown>;
+  const dg = DEFAULT_SKY_SETTINGS.gradient, dc = DEFAULT_SKY_SETTINGS.clouds, dw = DEFAULT_SKY_SETTINGS.sea, dz = DEFAULT_SKY_SETTINGS.horizon;
   return {
     mode: r.mode === 'gradient' ? 'gradient' : 'painted',
     gradient: {
@@ -154,8 +187,26 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
       opacity: clamp(c.opacity, 0.1, 1, dc.opacity),
       tint: hex(c.tint, dc.tint),
       seed: Math.round(clamp(c.seed, 1, 9999, dc.seed)),
+      horizonSize: clamp(c.horizonSize, 0.1, 1.5, dc.horizonSize),
+      horizonHug: clamp(c.horizonHug, 0, 1, dc.horizonHug),
+    },
+    horizon: {
+      haze: clamp(z.haze, 0, 1, dz.haze),
+      fog: clamp(z.fog, 0, 1, dz.fog),
+      glow: typeof z.glow === 'boolean' ? z.glow : dz.glow,
+      glowColor: hex(z.glowColor, dz.glowColor),
+      glowStrength: clamp(z.glowStrength, 0, 1, dz.glowStrength),
+      glowWidth: clamp(z.glowWidth, 0.002, 0.12, dz.glowWidth),
+      glowSoftness: clamp(z.glowSoftness, 0, 1, dz.glowSoftness),
     },
   };
+}
+
+/** The glow band's strength at view height `h` (the shaders' twin): 1 on the line, 0 past its width. */
+export function horizonGlowAt(z: SkyHorizon, h: number): number {
+  if (!z.glow) return 0;
+  const edge0 = z.glowWidth * (1 - z.glowSoftness);
+  return z.glowStrength * (1 - smoothstep(edge0, z.glowWidth, Math.abs(h)));
 }
 
 /* ───────────── the colour of the gradient (the shader's twin, for tests and the window's preview) ───────────── */
@@ -194,13 +245,14 @@ export function getSkySettings(): SkySettings {
 }
 
 /** Merges a change (gradient and clouds merge field by field), saves, and tells every listener. */
-export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyGradient>; sea?: Partial<SeaLook>; clouds?: Partial<SkyClouds> }): SkySettings {
+export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyGradient>; sea?: Partial<SeaLook>; clouds?: Partial<SkyClouds>; horizon?: Partial<SkyHorizon> }): SkySettings {
   const now = getSkySettings();
   current = normalizeSkySettings({
     mode: change.mode ?? now.mode,
     gradient: { ...now.gradient, ...change.gradient },
     sea: { ...now.sea, ...change.sea },
     clouds: { ...now.clouds, ...change.clouds },
+    horizon: { ...now.horizon, ...change.horizon },
   });
   try { if (typeof localStorage !== 'undefined') localStorage.setItem(SKY_SETTINGS_KEY, JSON.stringify(current)); } catch { /* storage full or blocked: this session keeps it */ }
   for (const cb of listeners) cb(current);
@@ -208,7 +260,7 @@ export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyG
 }
 
 export function resetSkySettings(): SkySettings {
-  return setSkySettings({ mode: DEFAULT_SKY_SETTINGS.mode, gradient: DEFAULT_SKY_SETTINGS.gradient, sea: DEFAULT_SKY_SETTINGS.sea, clouds: DEFAULT_SKY_SETTINGS.clouds });
+  return setSkySettings({ mode: DEFAULT_SKY_SETTINGS.mode, gradient: DEFAULT_SKY_SETTINGS.gradient, sea: DEFAULT_SKY_SETTINGS.sea, clouds: DEFAULT_SKY_SETTINGS.clouds, horizon: DEFAULT_SKY_SETTINGS.horizon });
 }
 
 export function onSkySettings(cb: (s: SkySettings) => void): () => void {

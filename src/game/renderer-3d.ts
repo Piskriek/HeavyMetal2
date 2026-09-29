@@ -21,6 +21,7 @@ import { CAP_RADIUS_SCALE, CAP_THETA, TAU, gyroFrameFor, gyroPose } from './gyro
 import { HoopPodFleet } from './pod'; /* hoop-pod:v2 */
 import type { GyroFrame } from './first-person';
 import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-route/island-world';
+import { seaFarColor } from './island-route/island-sea';
 import { readOptions } from './preferences';
 import { CloudLayer } from './sky/sky-clouds';
 import { gradientBlendWidth, getSkySettings, onSkySettings, type SkySettings } from './sky/sky-settings';
@@ -1362,6 +1363,16 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
       gradMiddle: { value: new THREE.Color('#6cb4f2') },
       gradMidHeight: { value: 0.28 },
       gradBlend: { value: 0.2 },
+      // The horizon (sky-settings.ts SkyHorizon, island only): how far the sky fades into the fog colour
+      // above the line (0 = a crisp line; 0.16 was the old fixed haze), and a thin glow band on it.
+      hazeWidth: { value: 0.16 },
+      glowColor: { value: new THREE.Color('#ffffff') },
+      glowStrength: { value: 0 },
+      glowWidth: { value: 0.016 },
+      glowSoft: { value: 0.85 },
+      // Island only: the dome under the horizon is the far sea (the sea disc ends before the horizon).
+      seaBelow: { value: 0 },
+      seaFar: { value: new THREE.Color('#5e9e9a') },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -1385,6 +1396,13 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
       uniform vec3 gradMiddle;
       uniform float gradMidHeight;
       uniform float gradBlend;
+      uniform float hazeWidth;
+      uniform vec3 glowColor;
+      uniform float glowStrength;
+      uniform float glowWidth;
+      uniform float glowSoft;
+      uniform float seaBelow;
+      uniform vec3 seaFar;
       varying vec2 vUv;
       varying vec3 vDir;
 
@@ -1403,12 +1421,18 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
         color = mix(color, zenithColor, zenithBlend * (isPanorama > 0.5 ? 0.0 : 0.22));
         // Horizon haze: the sky fades into the fog's colour just above the horizon, where the sea's own
         // haze meets it, so sea and sky blend with no line.
-        color = mix(color, horizonColor, 1.0 - smoothstep(0.0, 0.16, max(h, 0.0)));
+        if (hazeWidth > 0.0005) color = mix(color, horizonColor, 1.0 - smoothstep(0.0, hazeWidth, max(h, 0.0)));
+        bool underSea = seaBelow > 0.5 && h < 0.0;
+        if (underSea) {
+          // The far sea runs on to the horizon, hazed into the fog colour as wide as asked (0: a crisp line).
+          color = seaFar;
+          if (hazeWidth > 0.0005) color = mix(color, horizonColor, 1.0 - smoothstep(0.0, hazeWidth * 0.45, -h));
+        }
 
         if (hasTexture < 0.5) {
           color = mix(horizonColor, zenithColor, smoothstep(-0.1, 0.7, h));
         }
-        if (gradMode > 0.5) {
+        if (gradMode > 0.5 && !underSea) {
           // Horizon → middle → top, each blend as wide as the crispness allows (gradientColorAt's twin).
           float y = max(h, 0.0);
           float a = smoothstep(0.5 - gradBlend, 0.5 + gradBlend, min(1.0, y / gradMidHeight));
@@ -1416,6 +1440,8 @@ function buildSky(preset: SkyPreset, loader: THREE.TextureLoader) {
           // Over the painting as opaque as asked (0: the painting shows through untouched).
           color = mix(color, mix(mix(gradHorizon, gradMiddle, a), gradTop, b), gradOpacity);
         }
+        // The glow band on the horizon line, fading up (and down, where the dome shows under the sea's edge).
+        if (glowStrength > 0.0) color = mix(color, glowColor, glowStrength * (1.0 - smoothstep(glowWidth * (1.0 - glowSoft), glowWidth, abs(h))));
 
         gl_FragColor = vec4(color, 1.0);
         // To the screen's colour space, as every lit material and the fog are: the pictures show as painted
@@ -1737,6 +1763,8 @@ export class Renderer3D {
   private islandGates: { layout: SceneFrame['routeLayout']; group: THREE.Group } | null = null;
   private fogNear = 6000;
   private fogFar = 48000;
+  /** × the island's fog distances: the Sky window's fog amount (1 = the old thick haze, big = none). */
+  private fogScale = 1;
   /** The Sky & Clouds window's settings (the gradient sky, the clouds), live. */
   private skySettings: SkySettings = getSkySettings();
   private readonly offSkySettings: () => void;
@@ -1919,6 +1947,23 @@ export class Renderer3D {
       (u.horizonColor.value as THREE.Color).copy(this.dayFogColor());
     }
     (this.scene.fog as THREE.Fog | null)?.color.copy(this.dayFogColor());
+    if (this.island) {
+      // The horizon (island only; the classic courses keep their own haze): haze width, glow, fog amount.
+      const z = settings.horizon;
+      if (u?.hazeWidth) {
+        u.hazeWidth.value = 0.16 * z.haze;
+        (u.glowColor.value as THREE.Color).set(z.glowColor);
+        u.glowStrength.value = z.glow ? z.glowStrength : 0;
+        u.glowWidth.value = z.glowWidth;
+        u.glowSoft.value = z.glowSoftness;
+      }
+      u.seaBelow.value = 1;
+      (u.seaFar.value as THREE.Color).copy(seaFarColor(settings.sea));
+      this.fogScale = z.fog <= 0.001 ? 1000 : 1 / z.fog;
+      const fog = this.scene.fog as THREE.Fog | null;
+      if (fog) { fog.near = this.fogNear * this.fogScale; fog.far = this.fogFar * this.fogScale; }
+      this.island.setHorizon(z);
+    }
     this.island?.setSea(settings.sea);
     this.clouds?.apply(settings.clouds);
   }
@@ -2113,8 +2158,8 @@ export class Renderer3D {
     const dayFog = this.dayFogColor();
     const dayAmbient = new THREE.Color(this.currentSkyPreset.ambientColor);
     (this.scene.fog as THREE.Fog).color.copy(dayFog).lerp(SKY.fogCave, under);
-    (this.scene.fog as THREE.Fog).near = lerp(this.fogNear, 1500, under);
-    (this.scene.fog as THREE.Fog).far = lerp(this.fogFar, 17000, under);
+    (this.scene.fog as THREE.Fog).near = lerp(this.fogNear * this.fogScale, 1500, under);
+    (this.scene.fog as THREE.Fog).far = lerp(this.fogFar * this.fogScale, 17000, under);
     this.ambient.color.copy(dayAmbient).lerp(SKY.ambientCave, under);
     this.ambient.intensity = lerp(1.6, 1.1, under);
     this.sun.intensity = lerp(this.currentSkyPreset.sunIntensity, 0.15, under);
@@ -2447,7 +2492,7 @@ export class Renderer3D {
     this.sky.rotation.y += dt * 0.0012;
     this.island?.sky.position.copy(this.camera.position);
     // Clouds drift round the island (held still for reduced motion).
-    this.clouds?.update(frame.time, frame.reducedMotion ? 0 : this.skySettings.clouds.drift);
+    this.clouds?.update(frame.time, frame.reducedMotion ? 0 : this.skySettings.clouds.drift, this.camera.position.y);
 
     // 3. Texture scrolls + animated decoration frames (frozen on frame 0 for reduced motion)
     const raw = frame.time;

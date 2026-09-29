@@ -232,7 +232,33 @@ Switch distances depend on screen size, not a universal metre value. Transitions
 
 ---
 
-## 10. Texture density by class
+## 10. Batch 08 — volcanic terrain, cliffs, and caves
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 68 | Straight ochre cliff | `14 × 6 × 10 m` | Slightly wider and lower than basalt cliff benchmark; one major cliff bay | 16,000 | 8,000 / 3,000 |
+| 69 | Concave cliff corner | `12 × 12 × 10 m` | Two cliff bays meeting at 90°; same height class as straight ochre cliff | 18,000 | 9,000 / 3,500 |
+| 70 | Overhanging outer corner | `13 × 13 × 12 m` | Similar height to basalt cliff; broader footprint and visible underside | 20,000 | 10,000 / 3,800 |
+| 71 | Sea-cave mouth | `16 × 8 × 10 m` | Clear opening `10 × 7 m`; slightly wider than basalt tunnel entrance | 18,000 | 9,000 / 3,500 |
+| 72 | Cave interior bend | `12 × 12 × 8 m` | Clear passage `7 × 6 m`; one 90° route/cave module | 22,000 | 11,000 / 4,000 |
+| 73 | Timber-braced mine mouth | `10 × 6 × 8 m` | Clear opening `6 × 5 m`; smaller than race tunnel and workshop width | 18,000 | 9,000 / 3,200 |
+| 74 | Volcano summit cone | `30 × 28 × 22 m` | Major skyline mass; similar height to loop and below sea stack | 30,000 | 14,000 / 4,500 + impostor |
+| 75 | Crater-rim segment | `18 × 8 × 7 m` | 60° arc; six segments form roughly a 34 m diameter rim | 16,000 | 8,000 / 3,000 |
+| 76 | Volcanic lava vent | `7 × 6 × 5 m` | Similar footprint to medium boulder cluster; taller than shack doorway | 10,000 | 5,000 / 1,600 |
+| 77 | Lava-pool surround | `12 × 9 × 2 m` | Low hazard ring slightly larger than tide pool; separate shader insert | 9,000 | 4,500 / 1,500 |
+
+### Volcanic-terrain notes
+
+- Cliff modules share height classes and connector conventions so straight, inner-corner, outer-corner and tunnel pieces can overlap without thin cracks.
+- Cave and tunnel clearance is gameplay-authoritative; concept shells are rebuilt around validated collision volumes.
+- Large terrain pieces spend geometry on silhouette, overhangs and openings, while strata and small fractures remain in Normal/Height maps.
+- Volcano summit and crater rim use HLOD/impostors at skyline distance.
+- Lava vent emissive cracks and the pool insert use separate Emissive maps/materials; no orange light is baked into BaseColor.
+- Lava, smoke, heat haze and particles are runtime effects, never opaque Meshy geometry.
+
+---
+
+## 11. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -248,7 +274,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 11. Acceptance and variance
+## 12. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

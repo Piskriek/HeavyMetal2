@@ -122,6 +122,23 @@ Reference sheets normalize framing so each object can be inspected. Their actual
 | 66 | `rope-post-barrier-module` | Rope/post barrier | pass | Broad rope sag and stout posts remain readable from all required views. |
 | 67 | `stone-parapet-module` | Stone parapet | pass | Large block rhythm, iron reinforcement, clean modular ends and durable top profile. |
 
+## Batch 08 — volcanic terrain, cliffs, and caves
+
+![Batch 08 volcanic-terrain contact sheet](./review/batch-08-volcanic-terrain-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 68 | `ochre-cliff-straight-module` | Straight layered cliff | pass | Strong strata, ledges, top and connector sides with a durable rectangular module. |
+| 69 | `cliff-inner-corner-module` | Concave cliff corner | pass | Clear 90° interior corner and matching modular end profiles. |
+| 70 | `cliff-outer-corner-overhang` | Convex overhanging cliff | pass | Thick readable overhang, broad support mass and useful underside views. |
+| 71 | `sea-cave-mouth-module` | Coastal cave mouth | pass | Broad opening, thick crown, rear connector and wave-worn interior coverage. |
+| 72 | `cave-interior-bend-module` | 90° cave bend | pass with cleanup constraint | Passage and bend read clearly; final shell must be rebuilt to exact clearance with hidden exterior faces removed. |
+| 73 | `timber-braced-mine-mouth` | Reinforced mine entrance | pass | Thick portal frames and rock shell remain consistent across opening/rear/side views. |
+| 74 | `volcano-summit-cone` | Volcanic summit | pass | Strong crater, radial ridges, four-side silhouette and top coverage. |
+| 75 | `crater-rim-segment` | Modular crater rim | pass | Durable curved segment, basalt crown, ochre outer wall and clean repeatable ends. |
+| 76 | `volcanic-lava-vent` | Compact lava vent | pass | Broad central opening and cooled folds with restrained separate emissive direction. |
+| 77 | `lava-pool-surround` | Lava-pool ring and insert | pass with separation constraint | Rock ring and emissive surface are readable; production lava insert must remain a separate flat shader mesh. |
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

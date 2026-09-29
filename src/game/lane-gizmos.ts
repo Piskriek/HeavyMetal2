@@ -144,7 +144,8 @@ export class LaneGizmos {
     }
 
     const nodeCount = Math.min(network.nodes.length, LANE_HANDLE_CAPACITY);
-    const geometry = new THREE.SphereGeometry(LANE_HANDLE_RADIUS, 10, 8);
+    // Boxes: flat-shaded, 12 triangles each, easy to see and cheap to draw however many there are.
+    const geometry = new THREE.BoxGeometry(LANE_HANDLE_RADIUS * 1.5, LANE_HANDLE_RADIUS * 1.5, LANE_HANDLE_RADIUS * 1.5);
     const handles = new THREE.InstancedMesh(geometry, this.handleMaterial, Math.max(1, nodeCount));
     handles.name = 'LaneHandles';
     handles.count = nodeCount;
@@ -203,6 +204,8 @@ export class LaneGizmos {
   private group = new Set<string>();
   private colorOf(node: LaneNode): THREE.Color {
     if (this.group.has(node.id)) return new THREE.Color(LANE_GROUP_COLOR);
+    // A node coloured by hand keeps its colour.
+    if (typeof node.color === 'string') return new THREE.Color(node.color);
     const kind = this.kindOf(node);
     // Splits, merges and out-of-bounds ends keep their kind's colour (red, amber, green); a plain node
     // shows its lane's.
@@ -267,7 +270,7 @@ export class LaneGizmos {
         });
         this.stats.materialsCreated += 1;
       }
-      this.selected = new THREE.Mesh(new THREE.SphereGeometry(LANE_HANDLE_RADIUS * 1.45, 12, 8), this.selectedMaterial);
+      this.selected = new THREE.Mesh(new THREE.BoxGeometry(LANE_HANDLE_RADIUS * 2.2, LANE_HANDLE_RADIUS * 2.2, LANE_HANDLE_RADIUS * 2.2), this.selectedMaterial);
       this.selected.name = 'LaneSelectedNode';
       this.root.add(this.selected);
     }
@@ -283,6 +286,112 @@ export class LaneGizmos {
     const hit = hits.find((candidate) => (candidate.instanceId ?? -1) >= 0);
     if (!hit) return null;
     return this.order[hit.instanceId as number] ?? null;
+  }
+
+  /**
+   * The connection nearest the pointer on screen (within `radiusPx`): the lane and the index of its
+   * first node, so a click on a line between two nodes picks that connection.
+   */
+  pickSegment(camera: THREE.Camera, ndcX: number, ndcY: number, width: number, height: number, radiusPx = 10): { pathId: string; index: number; fromId: string; toId: string } | null {
+    if (!this.network) return null;
+    let best: { pathId: string; index: number; fromId: string; toId: string } | null = null;
+    let bestDistance = radiusPx;
+    const px = (ndcX + 1) * width / 2, py = (1 - ndcY) * height / 2;
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    for (const path of this.network.paths) {
+      for (let i = 0; i < path.nodeIds.length - 1; i++) {
+        const na = this.findNode(path.nodeIds[i]), nb = this.findNode(path.nodeIds[i + 1]);
+        if (!na || !nb) continue;
+        a.copy(this.worldFromEngine(na.x, na.z, LANE_HANDLE_LIFT * 0.4)).project(camera);
+        b.copy(this.worldFromEngine(nb.x, nb.z, LANE_HANDLE_LIFT * 0.4)).project(camera);
+        if (a.z <= -1 || a.z >= 1 || b.z <= -1 || b.z >= 1) continue;
+        const ax = (a.x + 1) * width / 2, ay = (1 - a.y) * height / 2;
+        const bx = (b.x + 1) * width / 2, by = (1 - b.y) * height / 2;
+        const dx = bx - ax, dy = by - ay;
+        const len2 = dx * dx + dy * dy || 1;
+        const t = Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / len2));
+        const d = Math.hypot(ax + dx * t - px, ay + dy * t - py);
+        if (d < bestDistance) { bestDistance = d; best = { pathId: path.id, index: i, fromId: path.nodeIds[i], toId: path.nodeIds[i + 1] }; }
+      }
+    }
+    return best;
+  }
+
+  private highlight: THREE.Mesh | null = null;
+  private highlightMaterial: THREE.MeshBasicMaterial | null = null;
+
+  /**
+   * A bright ribbon over the picked connection or line (consecutive node ids of one lane): lines are
+   * one pixel wide, so a selection needs something you can see.
+   */
+  setHighlightedLine(nodeIds: readonly string[] | null): void {
+    if (!nodeIds || nodeIds.length < 2 || !this.network) {
+      if (this.highlight) this.highlight.visible = false;
+      return;
+    }
+    const points = nodeIds.map((id) => this.findNode(id)).filter((n): n is LaneNode => !!n)
+      .map((n) => this.worldFromEngine(n.x, n.z, LANE_HANDLE_LIFT * 0.45));
+    const half = 22;
+    const positions: number[] = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const p = points[i], q = points[i + 1];
+      const dir = new THREE.Vector3().subVectors(q, p);
+      const side = new THREE.Vector3(-dir.z, 0, dir.x).normalize().multiplyScalar(half);
+      const a1 = p.clone().add(side), a2 = p.clone().sub(side), b1 = q.clone().add(side), b2 = q.clone().sub(side);
+      positions.push(a1.x, a1.y, a1.z, a2.x, a2.y, a2.z, b1.x, b1.y, b1.z, b1.x, b1.y, b1.z, a2.x, a2.y, a2.z, b2.x, b2.y, b2.z);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (!this.highlight) {
+      this.highlightMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
+      this.stats.materialsCreated += 1;
+      this.highlight = new THREE.Mesh(geometry, this.highlightMaterial);
+      this.highlight.name = 'LaneHighlight';
+      this.highlight.renderOrder = 30;
+      this.highlight.raycast = () => {};
+      this.root.add(this.highlight);
+    } else {
+      this.highlight.geometry.dispose();
+      this.highlight.geometry = geometry;
+    }
+    this.highlight.visible = true;
+  }
+
+  private draft: THREE.InstancedMesh | null = null;
+  private draftLine: THREE.Line | null = null;
+
+  /**
+   * The line being drawn out, before it is let go: hologram boxes where nodes will drop and a line
+   * joining them (engine points). Empty hides it.
+   */
+  setDraft(points: readonly { x: number; z: number }[], material: THREE.Material): void {
+    if (!points.length) {
+      if (this.draft) this.draft.visible = false;
+      if (this.draftLine) this.draftLine.visible = false;
+      return;
+    }
+    if (!this.draft) {
+      const size = LANE_HANDLE_RADIUS * 1.5;
+      this.draft = new THREE.InstancedMesh(new THREE.BoxGeometry(size, size, size), material, 512);
+      this.draft.name = 'LaneDraft';
+      this.draft.raycast = () => {};
+      this.draft.renderOrder = 40;
+      this.root.add(this.draft);
+      this.draftLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x7fe9ff, transparent: true, opacity: 0.9, depthTest: false }));
+      this.draftLine.name = 'LaneDraftLine';
+      this.draftLine.raycast = () => {};
+      this.draftLine.renderOrder = 41;
+      this.root.add(this.draftLine);
+    }
+    const count = Math.min(512, points.length);
+    const world = points.slice(0, count).map((p) => this.worldFromEngine(p.x, p.z));
+    world.forEach((w, i) => this.draft!.setMatrixAt(i, new THREE.Matrix4().setPosition(w)));
+    this.draft.count = count;
+    this.draft.instanceMatrix.needsUpdate = true;
+    this.draft.visible = true;
+    this.draftLine!.geometry.dispose();
+    this.draftLine!.geometry = new THREE.BufferGeometry().setFromPoints(world.map((w) => w.clone().setY(w.y - LANE_HANDLE_LIFT * 0.6)));
+    this.draftLine!.visible = true;
   }
 
   /** Removes everything this layer drew, and nothing else. Materials are kept for reuse. */

@@ -55,7 +55,29 @@ export type LaneEdit =
    */
   | { op: 'fork'; nodeId: string }
   /** The lanes leaving a node (or, at a lane's end, the lanes arriving) take the next colour. */
-  | { op: 'recolor'; nodeId: string };
+  | { op: 'recolor'; nodeId: string }
+  /** A lone node on the road: where a new line will be drawn out from (an unjoined node is allowed). */
+  | { op: 'addNode'; x: number; z: number }
+  /**
+   * Draws a line out of a node: `at` are the new nodes, in the order they were laid. Down the hill a
+   * lane ending at the node grows; up the hill a lane starting at it grows backwards; otherwise a new
+   * lane leaves (or arrives at) the node. `toId` joins the last new node to an existing one.
+   */
+  | { op: 'drawFrom'; fromId: string; at: { x: number; z: number }[]; toId?: string | null }
+  /** Cuts the connection between two neighbouring nodes of a lane (the lane becomes two, or shorter). */
+  | { op: 'disconnect'; fromId: string; toId: string }
+  /** Colours whole lanes (a ball only changes to a lane of its own colour). */
+  | { op: 'recolorPaths'; pathIds: string[]; color: string }
+  /** Colours nodes themselves (null: back to their lane's colour). Display only. */
+  | { op: 'recolorNodes'; nodeIds: string[]; color: string | null }
+  /**
+   * Doubles a line (nodes `nodeIds`, consecutive on one lane) into two lanes side by side: a second
+   * lane, one lane width over, leaves the line's first node and rejoins its last (or runs on its own
+   * where the line starts or ends the lane). Same colour, so a ball may change between the two.
+   */
+  | { op: 'twin'; pathId: string; nodeIds: string[] }
+  /** Every node and lane gone: start fresh. */
+  | { op: 'clear' };
 
 export type LaneEditResult =
   | { ok: true; network: LaneNetwork; /** Node the panel should select after the edit. */ focus?: string }
@@ -241,6 +263,13 @@ export function applyLaneEdit(network: LaneNetwork, edit: LaneEdit): LaneEditRes
     case 'markOob': return markOob(network, edit.pathId);
     case 'fork': return forkLane(network, edit.nodeId);
     case 'recolor': return recolorAt(network, edit.nodeId);
+    case 'addNode': return addLoneNode(network, edit.x, edit.z);
+    case 'drawFrom': return drawFrom(network, edit.fromId, edit.at, edit.toId ?? null);
+    case 'disconnect': return disconnect(network, edit.fromId, edit.toId);
+    case 'recolorPaths': return recolorPaths(network, edit.pathIds, edit.color);
+    case 'recolorNodes': return recolorNodes(network, edit.nodeIds, edit.color);
+    case 'twin': return twinRun(network, edit.pathId, edit.nodeIds);
+    case 'clear': return finish({ ...copyNetwork(network), nodes: [], paths: [] });
   }
 }
 
@@ -558,6 +587,163 @@ export function createLaneHistory(initial: LaneNetwork, limit = 200): LaneHistor
       past.length = 0; future.length = 0; present = network;
     },
   };
+}
+
+/* -----------------------------------------------------------------------------
+   THE FRIENDLY LANE TOOLS (draw out, cut, colour, twin, lines between junctions)
+   -------------------------------------------------------------------------- */
+
+function addLoneNode(network: LaneNetwork, x: number, z: number): LaneEditResult {
+  if (!inCorridor(x, z)) return refuse('out_of_corridor', 'that point is off the drivable road');
+  const next = copyNetwork(network);
+  const id = uniqueId(next, 'n');
+  next.nodes.push({ id, x: Math.round(x), z: Math.round(z), kind: 'normal' });
+  return finish(next, id);
+}
+
+function drawFrom(network: LaneNetwork, fromId: string, at: readonly { x: number; z: number }[], toId: string | null): LaneEditResult {
+  const from = nodeById(network, fromId);
+  if (!from) return refuse('unknown_node', `there is no node ${fromId}`);
+  const to = toId ? nodeById(network, toId) : null;
+  if (toId && !to) return refuse('unknown_node', `there is no node ${toId}`);
+  if (!at.length && !to) return refuse('too_short', 'drag further to draw a line');
+  const last = at.length ? at[at.length - 1] : to!;
+  const downhill = last.x > from.x;
+  // The line as it runs down the hill: from the node out, or (drawn uphill) back to the node.
+  const points = downhill ? at : [...at].reverse();
+  const run = downhill ? [from, ...points] : [...points, from];
+  const bad = checkRun(run);
+  if (bad) return bad;
+  if (to && (downhill ? to.x <= last.x : to.x >= (points[0]?.x ?? from.x))) {
+    return refuse('non_monotone', 'the line has to keep running one way down the hill to reach that node');
+  }
+  const next = copyNetwork(network);
+  const made = points.map((point) => {
+    const id = uniqueId(next, 'n');
+    next.nodes.push({ id, x: Math.round(point.x), z: Math.round(point.z), kind: 'normal' });
+    return id;
+  });
+  const leaving = (id: string) => next.paths.some((path) => path.nodeIds.includes(id) && path.nodeIds[path.nodeIds.length - 1] !== id);
+  const arriving = (id: string) => next.paths.some((path) => path.nodeIds.includes(id) && path.nodeIds[0] !== id);
+  let lane: LanePath | undefined;
+  if (downhill) {
+    // Carry on a lane that ends here (and nothing leaves): one lane grows. Else a new lane leaves.
+    const ending = next.paths.filter((path) => path.nodeIds[path.nodeIds.length - 1] === fromId);
+    if (ending.length === 1 && !leaving(fromId)) { lane = ending[0]; lane.nodeIds.push(...made); }
+    else {
+      lane = { id: uniqueId(next, 'p'), name: `Lane ${next.paths.length + 1}`, nodeIds: [fromId, ...made], halfWidth: DEFAULT_HALF_WIDTH };
+      const parent = next.paths.find((path) => path.nodeIds.includes(fromId));
+      if (parent?.color) lane.color = parent.color;
+      next.paths.push(lane);
+    }
+    if (to) lane.nodeIds.push(to.id);
+  } else {
+    const starting = next.paths.filter((path) => path.nodeIds[0] === fromId);
+    const head = to ? [to.id, ...made] : made;
+    if (starting.length === 1 && !arriving(fromId)) { lane = starting[0]; lane.nodeIds.unshift(...head); }
+    else {
+      lane = { id: uniqueId(next, 'p'), name: `Lane ${next.paths.length + 1}`, nodeIds: [...head, fromId], halfWidth: DEFAULT_HALF_WIDTH };
+      next.paths.push(lane);
+    }
+  }
+  return finish(next, made.length ? (downhill ? made[made.length - 1] : made[0]) : fromId);
+}
+
+function disconnect(network: LaneNetwork, fromId: string, toId: string): LaneEditResult {
+  const path = network.paths.find((candidate) => {
+    const i = candidate.nodeIds.indexOf(fromId);
+    const j = candidate.nodeIds.indexOf(toId);
+    return i >= 0 && j >= 0 && Math.abs(i - j) === 1;
+  });
+  if (!path) return refuse('not_joined', 'those two nodes are not joined');
+  const next = copyNetwork(network);
+  const lane = pathById(next, path.id)!;
+  const cut = Math.max(lane.nodeIds.indexOf(fromId), lane.nodeIds.indexOf(toId));
+  const head = lane.nodeIds.slice(0, cut);
+  const tail = lane.nodeIds.slice(cut);
+  next.paths = next.paths.filter((candidate) => candidate.id !== lane.id);
+  if (head.length >= 2) next.paths.push({ ...lane, nodeIds: head });
+  if (tail.length >= 2) next.paths.push({ ...lane, id: head.length >= 2 ? uniqueId(next, 'p') : lane.id, name: head.length >= 2 ? `${lane.name} (2)` : lane.name, nodeIds: tail });
+  return finish(next);
+}
+
+function recolorPaths(network: LaneNetwork, pathIds: readonly string[], color: string): LaneEditResult {
+  if (!/^#[0-9a-f]{6}$/i.test(color)) return refuse('bad_color', `${color} is not a colour`);
+  const next = copyNetwork(network);
+  let changed = 0;
+  for (const id of pathIds) { const path = pathById(next, id); if (path) { path.color = color.toLowerCase(); changed++; } }
+  if (!changed) return refuse('no_lane', 'pick a line first');
+  return finish(next);
+}
+
+function recolorNodes(network: LaneNetwork, nodeIds: readonly string[], color: string | null): LaneEditResult {
+  if (color !== null && !/^#[0-9a-f]{6}$/i.test(color)) return refuse('bad_color', `${color} is not a colour`);
+  const next = copyNetwork(network);
+  let changed = 0;
+  for (const id of nodeIds) {
+    const node = nodeById(next, id);
+    if (!node) continue;
+    if (color) node.color = color.toLowerCase(); else delete node.color;
+    changed++;
+  }
+  if (!changed) return refuse('no_node', 'pick a node first');
+  return finish(next);
+}
+
+function twinRun(network: LaneNetwork, pathId: string, nodeIds: readonly string[]): LaneEditResult {
+  const path = pathById(network, pathId);
+  if (!path) return refuse('unknown_path', `there is no lane ${pathId}`);
+  const first = path.nodeIds.indexOf(nodeIds[0]);
+  const last = path.nodeIds.indexOf(nodeIds[nodeIds.length - 1]);
+  if (first < 0 || last <= first) return refuse('no_line', 'pick a line of at least two joined nodes first');
+  const next = copyNetwork(network);
+  const run = path.nodeIds.slice(first, last + 1).map((id) => nodeById(next, id)!);
+  // One lane width over, towards the side of the road with more room.
+  const mid = run.reduce((sum, node) => sum + node.z, 0) / run.length;
+  const side = mid >= 0 ? -1 : 1;
+  const offset = (z: number) => {
+    let moved = clamp(z + side * FORK_OFFSET, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    if (Math.abs(moved - z) < FORK_OFFSET / 2) moved = clamp(z - side * FORK_OFFSET, -LANE_Z_LIMIT, LANE_Z_LIMIT);
+    return Math.round(moved);
+  };
+  const shareStart = first > 0;
+  const shareEnd = last < path.nodeIds.length - 1;
+  const ids: string[] = [];
+  run.forEach((node, i) => {
+    const endpoint = (i === 0 && shareStart) || (i === run.length - 1 && shareEnd);
+    if (endpoint) { ids.push(node.id); return; }
+    const id = uniqueId(next, 'n');
+    next.nodes.push({ id, x: node.x, z: offset(node.z), kind: 'normal' });
+    ids.push(id);
+  });
+  // Two shared ends and nothing between: put one node in the middle so the twin runs beside the line.
+  if (ids.length === 2 && shareStart && shareEnd) {
+    const a = run[0], b = run[run.length - 1];
+    const id = uniqueId(next, 'n');
+    next.nodes.push({ id, x: Math.round((a.x + b.x) / 2), z: offset((a.z + b.z) / 2), kind: 'normal' });
+    ids.splice(1, 0, id);
+  }
+  next.paths.push({
+    id: uniqueId(next, 'p'), name: `${path.name} (twin)`, nodeIds: ids, halfWidth: path.halfWidth,
+    ...(path.color ? { color: path.color } : {}),
+  });
+  return finish(next, ids[1]);
+}
+
+/**
+ * The line through a lane segment or node, out to the nearest junction (or lane end) either way: a
+ * node other lanes also use (a split, a merge, a crossing) stops it and is its last node.
+ */
+export function laneLineThrough(network: LaneNetwork, pathId: string, index: number): { pathId: string; nodeIds: string[] } | null {
+  const path = pathById(network, pathId);
+  if (!path || index < 0 || index >= path.nodeIds.length) return null;
+  const shared = (id: string) => network.paths.filter((candidate) => candidate.nodeIds.includes(id)).length > 1;
+  let a = index;
+  while (a > 0 && !(a !== index && shared(path.nodeIds[a]))) a--;
+  let b = index;
+  while (b < path.nodeIds.length - 1 && !(b !== index && shared(path.nodeIds[b]))) b++;
+  if (a === b) { if (b < path.nodeIds.length - 1) b++; else if (a > 0) a--; }
+  return { pathId, nodeIds: path.nodeIds.slice(a, b + 1) };
 }
 
 /** A blank network for a course: one straight line down the middle lane, start to flag. */

@@ -14,7 +14,7 @@ import { type CourseId } from '../game/types';
 import { isRaceMarkType } from '../game/race-marks';
 import { isKitModelType } from '../game/models/kit-catalog';
 import BrightnessSlider from './builder/BrightnessSlider';
-import { BRUSH_SPACING_DEFAULT, BRUSH_SPACING_MAX, BRUSH_SPACING_MIN } from '../game/lane-path-tool';
+import { BRUSH_SPACING_DEFAULT } from '../game/lane-path-tool';
 import IslandTrackBar from './builder/IslandTrackBar';
 import FloatingWindow from './builder/FloatingWindow';
 import { DecorPanel } from './DecorPanel';
@@ -25,6 +25,7 @@ import ZenRestore from './builder/ZenRestore';
 import CheatSheet from './builder/CheatSheet';
 import EasyBuildBar from './builder/EasyBuildBar';
 import StartOptions from './builder/StartOptions';
+import LaneToolsBar from './builder/LaneToolsBar';
 import { BuilderKeys, readKeyOverrides, writeKeyOverrides, type EditorMode } from '../game/builder/builder-keys';
 import CustomModelsTab from './builder/CustomModelsTab';
 import ShadingPanel from './builder/ShadingPanel';
@@ -301,6 +302,8 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   /** The lane brush: drag along the road to draw a lane, one node every `spacing` down the hill. */
   const [laneBrush, setLaneBrush] = useState({ on: false, spacing: BRUSH_SPACING_DEFAULT });
   const laneBrushRef = useRef(laneBrush);
+  /** A line being drawn out (Draw in the Lanes window). */
+  const laneDrawing = useRef(false);
   laneBrushRef.current = laneBrush;
   const laneStroke = useRef<{ x: number; z: number }[] | null>(null);
   /** Test Start: click the road to put the test ball there (test drives start from it); drag it to move. */
@@ -456,11 +459,27 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           }
           const additive = e.shiftKey;
           laneDragReason.current = null;
-          if (!hitNode && laneBrushRef.current.on) {
-            // The brush: this drag draws a new lane along the road.
-            const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
-            laneStroke.current = point ? [point] : [];
+          if (laneBrushRef.current.on) {
+            // Draw: out of the node pressed on, or out of a new start node on the open road.
+            const point = hitNode ? null : builder.lanePointAt(e.clientX, e.clientY, canvas);
+            const started = builder.beginLaneDraw(hitNode, point, laneBrushRef.current.spacing);
+            if (!started.ok) { showToast(started.reason, 4000); return; }
+            laneDrawing.current = true;
+            showToast(`Drag along the road: a box drops every ${laneBrushRef.current.spacing}. Let go (on a node to join it)`);
+            setLaneRevision((revision) => revision + 1);
+            onRequestRender?.();
             return;
+          }
+          if (!hitNode) {
+            // A line between two nodes: pick that connection (Del cuts it, double-click the whole line).
+            const seg = builder.raycastLaneSegment(e.clientX, e.clientY, canvas);
+            if (seg) {
+              builder.selectLaneLine({ pathId: seg.pathId, nodeIds: [seg.fromId, seg.toId] });
+              showToast('Connection picked: Del cuts it · double-click picks the whole line · colour or split it in the Lanes window');
+              setLaneRevision((revision) => revision + 1);
+              onRequestRender?.();
+              return;
+            }
           }
           if (hitNode) {
             if (!(additive && builder.getSelectedLaneNodeIds().includes(hitNode))) builder.selectLaneNode(hitNode, additive);
@@ -625,6 +644,11 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
         if (point) { builder.setTestBall(point, false); onRequestRender?.(); }
         return;
       }
+      if (laneDrawing.current && !isRightMouseDown.current) {
+        builder.extendLaneDraw(builder.lanePointAt(e.clientX, e.clientY, canvas));
+        onRequestRender?.();
+        return;
+      }
       if (laneStroke.current && !isRightMouseDown.current) {
         const point = builder.lanePointAt(e.clientX, e.clientY, canvas);
         if (point) {
@@ -761,6 +785,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
             : 'Test drives start from the ball, on the nearest lane (Shift-drag lifts it onto a hook)');
           onRequestRender?.();
         }
+        if (laneDrawing.current) {
+          laneDrawing.current = false;
+          const made = builder.endLaneDraw(builder.raycastLaneNode(e.clientX, e.clientY, canvas));
+          showToast(made.ok
+            ? made.nodes ? `Line drawn: ${made.nodes} new node${made.nodes === 1 ? '' : 's'}. Keep drawing from its end, or click its last node to make it a finish` : 'Start node placed: press on it and drag to draw a line'
+            : made.reason, made.ok ? 3500 : 4500);
+          setLaneRevision((revision) => revision + 1);
+          onRequestRender?.();
+        }
         if (laneStroke.current) {
           const stroke = laneStroke.current;
           laneStroke.current = null;
@@ -821,12 +854,25 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       }
     };
 
+    // Double-click in the lanes tool: the whole line through that node or connection, junction to junction.
+    const onDoubleClick = (e: MouseEvent) => {
+      if (!builder.getLanesToolActive() || laneBrushRef.current.on) return;
+      const node = builder.raycastLaneNode(e.clientX, e.clientY, canvas);
+      const at = node ? builder.laneAtNode(node) : null;
+      const seg = at ? null : builder.raycastLaneSegment(e.clientX, e.clientY, canvas);
+      const n = at ? builder.selectLaneLineThrough(at.pathId, at.index) : seg ? builder.selectLaneLineThrough(seg.pathId, seg.index) : 0;
+      if (n) showToast(`Line picked: ${n} nodes. Colour it, split it into two lanes, or Del to cut it`);
+      setLaneRevision((revision) => revision + 1);
+      onRequestRender?.();
+    };
+    canvas.addEventListener('dblclick', onDoubleClick);
     window.addEventListener('contextmenu', onContextMenu);
     canvas.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
 
     return () => {
+      canvas.removeEventListener('dblclick', onDoubleClick);
       window.removeEventListener('contextmenu', onContextMenu);
       canvas.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
@@ -877,6 +923,22 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       if (builder.getLanesToolActive()) {
         // Group tools for selected lane nodes: nudge with the arrows (Shift for big steps), L for the
         // whole lanes, Ctrl+A for every node, Esc to let go, Delete for all of them at once.
+        if (builder.getSelectedLaneLine()) {
+          if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            const cut = builder.deleteSelectedLaneLine();
+            showToast(cut.ok ? 'Cut. Ctrl-click the two nodes to join them again (Ctrl+Z undoes)' : cut.reason, 4000);
+            setLaneRevision((revision) => revision + 1);
+            onRequestRender?.();
+            return;
+          }
+          if (e.code === 'Escape') {
+            builder.selectLaneLine(null);
+            setLaneRevision((revision) => revision + 1);
+            onRequestRender?.();
+            return;
+          }
+        }
         const laneGroup = builder.getSelectedLaneNodeIds();
         const arrow = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code);
         if (arrow && laneGroup.length && !e.ctrlKey && !e.metaKey && !isRightMouseDown.current) {
@@ -4238,42 +4300,21 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 </div>
                 <FloatingWindow title="Lanes & Paths" storageKey="hm2-lane-window-v1" initial={{ x: 16, y: 72 }} width={540}>
                 <div className="flex flex-col gap-1 w-full pb-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-2 text-[11px] text-zinc-400">
-                  <span><strong className="text-zinc-200">Drag</strong> a node over the ground</span>·
-                  <span><strong className="text-zinc-200">Shift-click</strong> or drag a box to select more</span>·
-                  <span><strong className="text-zinc-200">Ctrl-click</strong> nodes one after another to join them into a lane</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 pt-1 text-xs">
-                  <button
-                    onClick={() => {
-                      setLaneBrush((b) => {
-                        const next = { ...b, on: !b.on };
-                        showToast(next.on ? 'Lane brush: drag down the road to draw a lane' : 'Lane brush off');
-                        return next;
-                      });
-                    }}
-                    aria-pressed={laneBrush.on}
-                    className={`flex items-center gap-1 px-2 py-1 rounded font-bold border cursor-pointer ${
-                      laneBrush.on ? 'bg-amber-500 text-zinc-950 border-amber-400' : 'bg-zinc-900 text-amber-300 border-zinc-700 hover:bg-zinc-800'
-                    }`}
-                    title="Draw a new lane by dragging along the road"
-                  >
-                    <Paintbrush size={12} /> Lane brush
-                  </button>
-                  <label className="flex items-center gap-2 text-zinc-400">
-                    Node spacing
-                    <input
-                      type="range"
-                      min={BRUSH_SPACING_MIN}
-                      max={BRUSH_SPACING_MAX}
-                      step={50}
-                      value={laneBrush.spacing}
-                      onChange={(e) => setLaneBrush((b) => ({ ...b, spacing: Number(e.target.value) }))}
-                      className="w-32 accent-amber-500 cursor-pointer"
-                      aria-label="Lane brush node spacing"
-                    />
-                    <span className="font-mono text-amber-200 tabular-nums w-10">{laneBrush.spacing}</span>
-                  </label>
+                <LaneToolsBar
+                  builder={builder}
+                  drawing={laneBrush.on}
+                  spacing={laneBrush.spacing}
+                  onDrawing={(on) => { setLaneBrush((b) => ({ ...b, on })); if (on) builder.selectLaneNode(null); onRequestRender?.(); }}
+                  onSpacing={(spacing) => setLaneBrush((b) => ({ ...b, spacing }))}
+                  onChange={() => { setLaneRevision((r) => r + 1); refreshLanes(); onRequestRender?.(); }}
+                  showToast={showToast}
+                />
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 text-[10.5px] text-zinc-500">
+                  <span><strong className="text-zinc-300">Click</strong> a node or the line between two</span>·
+                  <span><strong className="text-zinc-300">Double-click</strong> a whole line</span>·
+                  <span><strong className="text-zinc-300">Del</strong> cuts a line</span>·
+                  <span><strong className="text-zinc-300">Ctrl-click</strong> two nodes to join them</span>·
+                  <span><strong className="text-zinc-300">Shift</strong>-click or box to pick more</span>
                 </div>
                 <LanePanel
                   model={laneModel}

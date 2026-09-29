@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { wedgeMesh, createSlingshotMesh, type TrackData, type TrackSample } from './renderer-3d';
 import { classifyPlacedRamp, type TrackStageId } from './track-space';
 import { courseTrackSpace, islandTrackSpace } from './island-route/island-space';
-import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } from './race-marks';
+import { FINISH_LINE_TYPE, START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } from './race-marks';
 
 /** Where each course's (and island track's) test ball stands, on this device. */
 const TEST_BALL_KEY = 'hm2-test-ball-v1';
@@ -24,7 +24,7 @@ import type { CourseId } from './types';
 import { readOptions } from './preferences';
 import { LaneGizmos } from './lane-gizmos';
 import { FINISH, RADIUS, START_X } from './scene';
-import { applyLaneEdit, brushStrokePoints, snapNode, type LaneEdit } from './lane-path-tool';
+import { applyLaneEdit, brushStrokePoints, laneLineThrough, snapNode, type LaneEdit } from './lane-path-tool';
 import { LANE_HALF_WIDTH_MAX, LANE_HALF_WIDTH_MIN, LANE_Z_LIMIT, laneColorOf, nearestPath, sampleLane, validateLaneNetwork, type LaneNetwork, type LaneValidation } from './lane-network';
 import {
   buildLaneDocument, exportLaneNetworks, importLaneNetworks, loadLaneNetwork, readLaneStorage, writeLaneStorage,
@@ -2965,6 +2965,9 @@ export class TrackBuilder3D {
     this.laneGizmos.root.visible = active;
     this.refreshRaceMarkGhosts();
     if (!active) {
+      this.laneLine = null;
+      this.laneGizmos.setHighlightedLine(null);
+      this.laneDraw = null;
       this.selectedLaneNodeId = null;
       this.setLaneGroup([]);
       this.laneGizmos.setSelectedNode(null);
@@ -3385,6 +3388,184 @@ export class TrackBuilder3D {
     return { ok: true, nodes: added.length };
   }
 
+  /* ───────────── The friendly lane tools: lines, drawing out, colours ───────────── */
+
+  /** The picked line: consecutive nodes of one lane (two of them: one connection). */
+  private laneLine: { pathId: string; nodeIds: string[] } | null = null;
+
+  getSelectedLaneLine(): { pathId: string; nodeIds: string[] } | null { return this.laneLine; }
+
+  /** The connection under the pointer (a line between two nodes), or null. */
+  raycastLaneSegment(clientX: number, clientY: number, canvas: HTMLCanvasElement): { pathId: string; index: number; fromId: string; toId: string } | null {
+    const rect = canvas.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -(((clientY - rect.top) / rect.height) * 2 - 1);
+    return this.laneGizmos.pickSegment(this.camera, x, y, rect.width, rect.height);
+  }
+
+  /** Picks a line (or null to let go). Its nodes join the node selection so they can be dragged too. */
+  selectLaneLine(line: { pathId: string; nodeIds: string[] } | null) {
+    this.laneLine = line;
+    this.laneGizmos.setHighlightedLine(line?.nodeIds ?? null);
+    if (line) {
+      this.selectedLaneNodeId = null;
+      this.laneGizmos.setSelectedNode(null);
+      this.setLaneGroup(line.nodeIds);
+    }
+    this.notify();
+  }
+
+  /** Double-click: the whole line through a connection or a node, out to the junctions either side. */
+  selectLaneLineThrough(pathId: string, index: number): number {
+    if (!this.laneDoc) return 0;
+    const line = laneLineThrough(this.laneDoc, pathId, index);
+    this.selectLaneLine(line);
+    return line?.nodeIds.length ?? 0;
+  }
+
+  /** The lane a node carries on along (or the one it ends), and its index there. */
+  laneAtNode(nodeId: string): { pathId: string; index: number } | null {
+    const paths = this.laneDoc?.paths.filter((p) => p.nodeIds.includes(nodeId)) ?? [];
+    const path = paths.find((p) => p.nodeIds[p.nodeIds.length - 1] !== nodeId) ?? paths[0];
+    return path ? { pathId: path.id, index: path.nodeIds.indexOf(nodeId) } : null;
+  }
+
+  /** One edit with its undo step; the line selection follows what survived. */
+  private laneEdit(edit: LaneEdit): { ok: true; focus?: string } | { ok: false; reason: string } {
+    const result = this.applyLaneCommand(edit);
+    if (result.ok && this.laneLine) {
+      const path = this.laneDoc?.paths.find((p) => p.id === this.laneLine!.pathId);
+      const stillThere = path && this.laneLine.nodeIds.every((id, i, all) => i === 0 || path.nodeIds.indexOf(id) === path.nodeIds.indexOf(all[i - 1]) + 1);
+      this.selectLaneLine(stillThere ? this.laneLine : null);
+    }
+    return result;
+  }
+
+  /**
+   * Delete on a picked line: its connections go. One connection just comes apart (Ctrl-click the two
+   * nodes to join them again); a longer line also loses the nodes left joined to nothing.
+   */
+  deleteSelectedLaneLine(): { ok: true; cut: number } | { ok: false; reason: string } {
+    const line = this.laneLine;
+    if (!line || !this.laneDoc) return { ok: false, reason: 'no_line: pick a line first' };
+    const before = this.snapshot();
+    let cut = 0;
+    for (let i = 0; i < line.nodeIds.length - 1; i++) {
+      if (this.applyLaneEditToDoc({ op: 'disconnect', fromId: line.nodeIds[i], toId: line.nodeIds[i + 1] }).ok) cut++;
+    }
+    if (!cut) return { ok: false, reason: 'not_joined: nothing to cut' };
+    if (line.nodeIds.length > 2) {
+      for (const id of line.nodeIds.slice(1, -1)) {
+        if (!this.laneDoc.paths.some((p) => p.nodeIds.includes(id))) this.applyLaneEditToDoc({ op: 'deleteNode', nodeId: id });
+      }
+    }
+    this.undoStack.push(before);
+    if (this.undoStack.length > 30) this.undoStack.shift();
+    this.redoStack.length = 0;
+    this.selectLaneLine(null);
+    return { ok: true, cut };
+  }
+
+  /** Colours the picked line's lane (a ball only changes to a lane of its own colour). */
+  colorSelectedLaneLine(color: string) {
+    return this.laneLine ? this.laneEdit({ op: 'recolorPaths', pathIds: [this.laneLine.pathId], color }) : { ok: false as const, reason: 'no_line: pick a line first' };
+  }
+
+  /** Colours the selected nodes themselves (null: back to their lane's colour). */
+  colorSelectedLaneNodes(color: string | null) {
+    const ids = this.getSelectedLaneNodeIds();
+    return ids.length ? this.laneEdit({ op: 'recolorNodes', nodeIds: ids, color }) : { ok: false as const, reason: 'no_node: pick a node first' };
+  }
+
+  /** Doubles the picked line into two lanes side by side. */
+  twinSelectedLaneLine() {
+    const line = this.laneLine;
+    if (!line) return { ok: false as const, reason: 'no_line: pick a line first' };
+    const result = this.laneEdit({ op: 'twin', pathId: line.pathId, nodeIds: line.nodeIds });
+    if (result.ok) this.selectLaneLine(null);
+    return result;
+  }
+
+  /** Every node and lane gone: start fresh (one undo step). */
+  clearLanes() {
+    this.selectLaneLine(null);
+    const result = this.applyLaneCommand({ op: 'clear' });
+    this.selectLaneNode(null);
+    return result;
+  }
+
+  /** A finish line across the road at this node (the race can end there). */
+  setFinishAtLaneNode(nodeId: string): PlacedProp | null {
+    const node = this.laneDoc?.nodes.find((n) => n.id === nodeId);
+    if (!node) return null;
+    const made = this.easyDrop(FINISH_LINE_TYPE, shareOfEngineX(node.x), 'middle');
+    if (!made) return null;
+    // Across the lane at the node itself, facing down it (not the course road's middle).
+    const at = this.laneGizmos.worldFromEngine(node.x, node.z, 0);
+    const ahead = this.laneGizmos.worldFromEngine(Math.min(FINISH, node.x + 80), node.z, 0);
+    const behind = this.laneGizmos.worldFromEngine(Math.max(START_X, node.x - 80), node.z, 0);
+    this.updatePropTransform(made.id, { x: Math.round(at.x), y: Math.round(at.y), z: Math.round(at.z), rotY: Math.atan2(ahead.x - behind.x, ahead.z - behind.z) });
+    return made;
+  }
+
+  /* Drawing a line out: press on a node (or open road: a start node goes there), drag, let go. */
+  private laneDraw: { fromId: string; points: { x: number; z: number }[]; dir: 0 | 1 | -1; spacing: number; madeStart: boolean } | null = null;
+
+  /** Starts drawing from a node, or from a new start node at this road point. */
+  beginLaneDraw(fromId: string | null, at: { x: number; z: number } | null, spacing: number): { ok: true; fromId: string } | { ok: false; reason: string } {
+    if (!this.laneDoc) this.laneDoc = { version: 1, course: this.courseId as CourseId, nodes: [], paths: [] } as LaneNetwork;
+    let id = fromId;
+    let madeStart = false;
+    if (!id) {
+      if (!at) return { ok: false, reason: 'off_road: press on the road (or on a node) to start a line' };
+      const made = this.applyLaneCommand({ op: 'addNode', x: at.x, z: at.z });
+      if (!made.ok) return made;
+      id = made.focus ?? null;
+      madeStart = true;
+      if (!id) return { ok: false, reason: 'no_node: the start node could not be placed' };
+    }
+    this.laneDraw = { fromId: id, points: [], dir: 0, spacing, madeStart };
+    this.selectLaneNode(id);
+    return { ok: true, fromId: id };
+  }
+
+  /** The pointer moved on: a node drops each time it gets `spacing` further along (hologram boxes). */
+  extendLaneDraw(at: { x: number; z: number } | null): number {
+    const draw = this.laneDraw;
+    if (!draw || !at || !this.laneDoc) return 0;
+    const from = this.laneDoc.nodes.find((n) => n.id === draw.fromId);
+    if (!from) return 0;
+    const last = draw.points[draw.points.length - 1] ?? from;
+    const dx = at.x - last.x;
+    if (!draw.dir && Math.abs(dx) > draw.spacing * 0.5) draw.dir = dx > 0 ? 1 : -1;
+    // Nodes drop while the line keeps running one way (down or up the hill), a spacing apart.
+    if (draw.dir && Math.sign(dx) === draw.dir && Math.hypot(dx, at.z - last.z) >= draw.spacing) {
+      draw.points.push({ x: Math.round(at.x), z: Math.round(Math.max(-LANE_Z_LIMIT, Math.min(LANE_Z_LIMIT, at.z))) });
+    }
+    this.laneGizmos.setDraft(draw.points, hologramMaterial(null));
+    return draw.points.length;
+  }
+
+  /** Let go: the line is made (one undo step), joined to `toId` if released on a node. */
+  endLaneDraw(toId: string | null): { ok: true; nodes: number } | { ok: false; reason: string } {
+    const draw = this.laneDraw;
+    this.laneDraw = null;
+    this.laneGizmos.setDraft([], hologramMaterial(null));
+    if (!draw || !this.laneDoc) return { ok: false, reason: 'no_draw' };
+    const target = toId && toId !== draw.fromId ? toId : null;
+    if (!draw.points.length && !target) {
+      return draw.madeStart
+        ? { ok: true, nodes: 0 }
+        : { ok: false, reason: 'too_short: drag further along the road to draw a line' };
+    }
+    const result = this.applyLaneCommand({ op: 'drawFrom', fromId: draw.fromId, at: draw.points, toId: target });
+    if (!result.ok) return result;
+    if (result.focus) this.selectLaneNode(result.focus);
+    return { ok: true, nodes: draw.points.length };
+  }
+
+  isDrawingLane(): boolean { return !!this.laneDraw; }
+
   /* ───────────── Ctrl-click: join nodes into a lane ───────────── */
 
   /** The node the next Ctrl-click joins from, and the lane the chain is growing (null: none yet). */
@@ -3474,6 +3655,7 @@ export class TrackBuilder3D {
    * that is already selected back out. The last node added is the primary one, which carries the gizmo.
    */
   selectLaneNodes(ids: readonly string[], additive = false) {
+    if (this.laneLine) { this.laneLine = null; this.laneGizmos.setHighlightedLine(null); }
     const next = additive ? new Set(this.selectedLaneNodeIds) : new Set<string>();
     if (additive && ids.length === 1 && next.has(ids[0])) next.delete(ids[0]);
     else for (const id of ids) next.add(id);
@@ -3533,6 +3715,7 @@ export class TrackBuilder3D {
   }
 
   selectLaneNode(nodeId: string | null, additive = false) {
+    if (this.laneLine) { this.laneLine = null; this.laneGizmos.setHighlightedLine(null); }
     if (additive && nodeId) { this.selectLaneNodes([nodeId], true); return; }
     this.setLaneGroup(nodeId ? [nodeId] : []);
     this.applyPrimaryLaneNode(nodeId);

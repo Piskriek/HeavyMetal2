@@ -53,6 +53,7 @@ const commands = [
     'tests/builder-keys.test.ts',
     'tests/easy-build.test.ts',
     'tests/goblin-jaw.test.ts',
+    'tests/lane-friendly-tools.test.ts',
     'tests/history.test.ts',
     'tests/storage-v2.test.ts',
     'tests/gizmo-math.test.ts',

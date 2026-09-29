@@ -242,6 +242,8 @@ All materials are reviewed in both rigs.
 
 ## 10. Modeling and delivery
 
+Impact-carveable assets and debris families also follow [`ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md`](./ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md). Destructible cleanup must provide support groups, protected volumes, fracture materials, simple chunk collisions, and no thin disconnected remnants.
+
 - Correct real-world scale, pivot, forward axis, and named sockets; validate against the per-asset scale registry.
 - Meet the suggested LOD0 triangle budget without padding the mesh; fewer triangles are preferred whenever silhouette and deformation remain intact.
 - Provide LOD1, LOD2, and impostors according to the registry, and verify transitions from the race camera.

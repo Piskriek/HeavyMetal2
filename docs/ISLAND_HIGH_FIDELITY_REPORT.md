@@ -462,13 +462,14 @@ Suggested starting budgets, to be finalized by the style bible:
 4. Add water features and shoreline transitions.
 5. Add props, decals, practical lights, smoke, and ambient VFX.
 
-### Phase 5 — fidelity and optimization
+### Phase 5 — fidelity, destruction, and optimization
 
-1. Lock sun, sky, fog, exposure, tone map, reflections, and color grade.
-2. Tune wetness, roughness, contact shadows, and material variation.
-3. Build LODs, impostors, HLODs, occlusion, and quality tiers.
-4. Test frame time, VRAM, texture streaming, overdraw, shadows, and draw calls.
-5. Review at source vantage, race height, route forks, loops, tunnels, beach, and summit.
+1. Integrate material-aware carving, support checks, authored collapse groups, pooled debris and quality-tier caps under [`ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md`](./ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md).
+2. Lock sun, sky, fog, exposure, tone map, reflections, and color grade.
+3. Tune wetness, roughness, contact shadows, and material variation.
+4. Build LODs, impostors, HLODs, occlusion, and quality tiers.
+5. Test frame time, VRAM, texture streaming, overdraw, shadows, and draw calls.
+6. Review at source vantage, race height, route forks, loops, tunnels, beach, and summit.
 
 ---
 
@@ -490,7 +491,8 @@ Suggested starting budgets, to be finalized by the style bible:
 14. `ISLAND-HF-LIGHTING` — sun/sky/fog/reflections/practicals/tone-map lock.
 15. `ISLAND-HF-ASSEMBLY` — terrain integration, foundations, decals, storytelling pass.
 16. `ISLAND-HF-OPTIMIZATION` — quality tiers, LOD/HLOD, streaming, culling, and budgets.
-17. `ISLAND-HF-REVIEW` — source-vantage and race-camera acceptance capture set.
+17. `ISLAND-HF-DESTRUCTION` — sculpt-based carving, support graph, authored collapse groups, pooled chunk recipes, deterministic collision updates, and quality-tier caps.
+18. `ISLAND-HF-REVIEW` — source-vantage and race-camera acceptance capture set.
 
 Existing `ISLAND-ART` and `ISLAND-ART-B` should not be executed unchanged for this fidelity pass. Their single three-quarter image requirement and occasional modeled sand/basalt bases conflict with the new multi-angle, grey-floor, no-base-plate standard. Superseding tickets must reference the approved style bible and this report.
 

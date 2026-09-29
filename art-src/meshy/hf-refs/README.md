@@ -139,6 +139,25 @@ Reference sheets normalize framing so each object can be inspected. Their actual
 | 76 | `volcanic-lava-vent` | Compact lava vent | pass | Broad central opening and cooled folds with restrained separate emissive direction. |
 | 77 | `lava-pool-surround` | Lava-pool ring and insert | pass with separation constraint | Rock ring and emissive surface are readable; production lava insert must remain a separate flat shader mesh. |
 
+## Batch 09 — impact-destruction chunk families
+
+![Batch 09 destruction-chunk contact sheet](./review/batch-09-destruction-chunks-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 78 | `timber-debris-chunk-family` | Timber chunks | pass | Broad beams, plank blocks and fresh end grain; no needle splinters. |
+| 79 | `iron-debris-chunk-family` | Iron fragments | pass | Thick bent girders/plates and bracket pieces with durable torn silhouettes. |
+| 80 | `basalt-debris-chunk-family` | Basalt fragments | pass with separation constraint | Strong closed rock forms; production kit must separate the six approved chunks rather than retain grouped contact. |
+| 81 | `ochre-rock-debris-family` | Layered rock chunks | pass | Clear strata-aligned slabs and fresh fracture faces across size classes. |
+| 82 | `masonry-debris-chunk-family` | Masonry rubble | pass | Block, bonded-wall and iron-strapped fragments provide useful collapse hierarchy. |
+| 83 | `road-surface-debris-family` | Road crust chunks | pass | Thick compacted-surface slabs and aggregate interiors remain LOD-readable. |
+| 84 | `dirt-clod-debris-family` | Dirt/mud clods | pass | Broad rounded clods with simple wet/dry breakup; no thin flakes. |
+| 85 | `foliage-debris-chunk-family` | Branch/frond chunks | pass | Attached canopy masses and thick broken stems; production kit omits isolated leaves. |
+| 86 | `lava-crust-debris-family` | Lava-crust fragments | pass | Thick dark crust plates and separate emissive fracture direction; no particle geometry. |
+| 87 | `machinery-debris-chunk-family` | Machine fragments | pass | Broad housing, axle, bracket and casing pieces with no loose micro-fasteners. |
+
+All destruction families are governed by [`docs/ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md`](../../../docs/ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md). The carved/sculpted result is authoritative; these reusable chunks provide pooled impact presentation.
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

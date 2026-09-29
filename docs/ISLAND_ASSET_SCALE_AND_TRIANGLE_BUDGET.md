@@ -258,7 +258,35 @@ Switch distances depend on screen size, not a universal metre value. Transitions
 
 ---
 
-## 11. Texture density by class
+## 11. Batch 09 — impact-destruction chunk families
+
+Family dimensions below describe the complete review-kit envelope. Runtime chunks spawn as separate pieces using the listed piece-size range, not as one rubble cluster.
+
+| # | Asset | Family envelope / piece range | Relative scale and use | Suggested family LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 78 | Timber debris family | `6 × 4 × 2 m`; pieces `0.35–2.8 m` | Splinters from rails, beams, decks and huts; largest piece under three balls long | 5,000 | 2,400 / 900 |
+| 79 | Iron debris family | `6 × 4 × 2.5 m`; pieces `0.3–3.0 m` | Girder, plate and bracket fragments; lower count/heavier motion than timber | 5,500 | 2,600 / 1,000 |
+| 80 | Basalt debris family | `5 × 4 × 2.5 m`; pieces `0.3–2.5 m` | Chips through medium blocks; largest roughly half boulder-cluster height | 4,000 | 2,000 / 700 |
+| 81 | Ochre-rock debris family | `6 × 4 × 2 m`; pieces `0.25–2.8 m` | Layer-aligned slabs from cliffs and arches | 4,000 | 2,000 / 700 |
+| 82 | Masonry debris family | `6 × 4 × 2.5 m`; pieces `0.3–2.5 m` | Block/wall fragments sized against 1 m ball and parapet courses | 5,000 | 2,400 / 900 |
+| 83 | Road-surface debris family | `6 × 4 × 1 m`; pieces `0.3–2.5 m` | Thick crust fragments; cosmetic only where road width is protected | 4,000 | 2,000 / 700 |
+| 84 | Dirt-clod debris family | `5 × 3 × 1.5 m`; pieces `0.2–1.8 m` | Low-density clods with broad spread and short collision lifetime | 3,000 | 1,400 / 450 |
+| 85 | Foliage debris family | `7 × 5 × 3 m`; pieces `0.5–3.5 m` | Attached branch/frond masses; no individual leaf bodies | 6,000 | 2,800 / 800 + cards |
+| 86 | Lava-crust debris family | `6 × 4 × 1.5 m`; pieces `0.3–2.5 m` | Thick cooled plates with separate emissive fracture surfaces | 4,500 | 2,200 / 750 |
+| 87 | Machinery debris family | `6 × 4 × 2 m`; pieces `0.25–2.5 m` | Housing, plate, axle and bracket pieces; no loose micro-fasteners | 5,500 | 2,600 / 900 |
+
+### Destruction-budget notes
+
+- Per-piece budgets and runtime behavior are governed by [`ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md`](./ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md).
+- Family triangle counts assume all six pieces are simultaneously visible; ordinary impacts spawn a subset.
+- Collision uses near-convex proxies of 8–80 triangles per piece and is disabled quickly.
+- Chunk LOD prioritizes closed outer silhouette and broad fracture face; small chips convert to particles or disappear at distance.
+- One family serves many impacts through seeded piece selection, rotation, uniform scale and subtle material variation.
+- Fracture-face BaseColor/Roughness/Normal and any Emissive remain separate, calibrated PBR channels.
+
+---
+
+## 12. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -274,7 +302,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 12. Acceptance and variance
+## 13. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

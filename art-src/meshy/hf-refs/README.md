@@ -1,6 +1,6 @@
 # Basalt Isle high-fidelity Meshy references
 
-These are multi-angle, single-object reference sheets governed by [`docs/ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md`](../../../docs/ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md).
+These are multi-angle, single-object reference sheets governed by [`docs/ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md`](../../../docs/ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md). Production dimensions, comparisons to the 1 m racing ball / 9 m standard road, and balanced triangle/LOD budgets are defined in [`docs/ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md`](../../../docs/ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md). Generated sheets communicate design and shape; the scale registry controls final cleanup.
 
 ## Batch 01 — benchmark set
 

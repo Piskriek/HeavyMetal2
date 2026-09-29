@@ -55,7 +55,7 @@ Core visual pillars:
 
 ## 3. Scale contract
 
-Final dimensions are verified against gameplay before model acceptance.
+The authoritative per-asset dimensions, relative comparisons, LOD ratios, and triangle budgets are maintained in [`ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md`](./ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md). Final dimensions are verified against gameplay before model acceptance.
 
 | Element | Reference proportion |
 |---|---:|
@@ -238,7 +238,9 @@ All materials are reviewed in both rigs.
 
 ## 10. Modeling and delivery
 
-- Correct real-world scale, pivot, forward axis, and named sockets.
+- Correct real-world scale, pivot, forward axis, and named sockets; validate against the per-asset scale registry.
+- Meet the suggested LOD0 triangle budget without padding the mesh; fewer triangles are preferred whenever silhouette and deformation remain intact.
+- Provide LOD1, LOD2, and impostors according to the registry, and verify transitions from the race camera.
 - Clean topology and silhouette; remove floating fragments and internal garbage.
 - Consistent bevel scale and normals.
 - Approved UV density and minimal material slots.

@@ -389,6 +389,8 @@ Every item above requires at least BaseColor, Normal, Roughness, Metallic, and A
 
 ## 6. Mesh and delivery requirements
 
+Per-asset dimensions, relative scale comparisons, balanced LOD0 triangle targets, LOD ratios, and texture-density guidance are defined in [`ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md`](./ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md). Those asset-specific values supersede the broad class estimates below whenever both are present.
+
 Each accepted Meshy result must go through a cleanup pass; raw output is not production-ready by default.
 
 - Real-world scale and documented dimensions.

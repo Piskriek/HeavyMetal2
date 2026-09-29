@@ -181,7 +181,33 @@ Switch distances depend on screen size, not a universal metre value. Transitions
 
 ---
 
-## 8. Texture density by class
+## 8. Batch 06 — small and large carpet scale variants
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 49 | Short S-curve road carpet | `6 × 12 × 0.10 m` | Two-lane width; 40% of long S-curve length and two-thirds its width | 3,000 | 1,500 / 600 |
+| 50 | Extra-long road curve | `9 × 60 × 0.12 m` | Standard three-lane width; twice the long S-curve length | 8,000 | 4,000 / 1,600 |
+| 51 | Small dirt-path carpet | `3 × 8 × 0.06 m` | One-lane width; about one-third of medium path length | 1,500 | 750 / 300 |
+| 52 | Small grass/moss carpet | `4 × 3 × 0.05 m` | Roughly 15% of medium grass-carpet area | 800 | 400 / 160 |
+| 53 | Large grass meadow carpet | `30 × 22 × 0.10 m` | Roughly eight medium grass-carpet areas; broad biome foundation | 5,000 | 2,500 / 1,000 |
+| 54 | Small sand-drift carpet | `5 × 3 × 0.06 m` | Local drift; about 12% of medium sand-carpet area | 900 | 450 / 180 |
+| 55 | Large sand-dune carpet | `32 × 24 × 0.12 m` | About six medium sand-carpet areas; large shoreline/dune foundation | 5,000 | 2,500 / 1,000 |
+| 56 | Small mud/puddle carpet | `4 × 3 × 0.05 m` | Local wet accent; one-sixth of medium runoff area | 800 | 400 / 160 |
+| 57 | Large mud/runoff carpet | `24 × 12 × 0.10 m` | Four times medium runoff area; broad drainage corridor | 4,000 | 2,000 / 800 |
+| 58 | Small scree carpet | `4 × 3 × 0.06 m` | Local transition; about 15% of medium scree-carpet area | 1,000 | 500 / 200 |
+
+### Scale-variant rules
+
+- Reference sheets normalize object framing; production scale comes from these dimensions and must be applied after Meshy generation.
+- Small carpets hide local seams, contacts, decals, and repeated-material edges. Medium carpets define standard transitions. Large carpets establish biome fields and broad route material zones.
+- Do not create a large carpet by uniformly scaling a small texture. Large variants need lower-frequency macro variation and correctly sized detail textures.
+- Small, medium, and large variants share material families and texel density so grains, grass, stones, and cracks retain believable world scale.
+- Large road carpets preserve the 9 m connector standard; narrow road/path variants explicitly use 6 m or 3–4 m widths.
+- Triangle growth follows deformation needs, not surface area alone. A large flat patch can remain inexpensive when broad detail stays in PBR maps.
+
+---
+
+## 9. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -197,7 +223,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 9. Acceptance and variance
+## 10. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

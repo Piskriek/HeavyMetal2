@@ -87,6 +87,25 @@ Finish and approve the entire individual-object run first. A later image-generat
 | 47 | `scree-ground-carpet` | Embedded scree ground patch | pass | Shallow relief and readable stone breakup without becoming a boulder cluster. |
 | 48 | `shallow-water-foam-carpet` | Shallow-water/foam ribbon | pass with cleanup constraint | Useful outline and foam direction; production mesh must be flattened and shader-driven rather than preserving generated wave thickness. |
 
+## Batch 06 — small and large carpet scale variants
+
+![Batch 06 scale-variant review contact sheet](./review/batch-06-scale-variant-carpets-contact-sheet.jpg)
+
+Reference sheets normalize framing so each object can be inspected. Their actual relative sizes are controlled by the scale registry, not by apparent size within the sheet.
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 49 | `road-carpet-short-s-curve` | Small two-lane S-curve | pass | Compact 6 × 12 m counterpart to the 9 × 30 m original; clear connectors and thin profile. |
+| 50 | `road-carpet-extra-long-curve` | Extra-long road curve | pass | 9 × 60 m large hillside ribbon; broad curve and exact standard-road width. |
+| 51 | `dirt-path-carpet-small` | Small dirt-path patch | pass | Short 3 × 8 m secondary path with durable edges and low profile. |
+| 52 | `grass-moss-carpet-small` | Small grass/moss patch | pass | Compact 4 × 3 m patch for local seam hiding and small biome breakup. |
+| 53 | `grass-meadow-carpet-large` | Large meadow patch | pass | Broad 30 × 22 m zone with large material masses and no small holes. |
+| 54 | `sand-drift-carpet-small` | Small sand drift | pass | Compact 5 × 3 m drift with LOD-safe ripples and rounded outline. |
+| 55 | `sand-dune-carpet-large` | Large dune patch | pass | Broad 32 × 24 m dune field; large ripple/swale language and durable boundary. |
+| 56 | `mud-puddle-carpet-small` | Small wet-mud patch | pass | Compact 4 × 3 m roughness-driven wet patch with no droplets or thin fingers. |
+| 57 | `mud-runoff-carpet-large` | Large runoff patch | pass | Broad 24 × 12 m runoff zone with simple continuous material masses. |
+| 58 | `scree-ground-carpet-small` | Small scree patch | **pending** | The tenth generation failed and the per-turn cap was reached; generate after refresh. |
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

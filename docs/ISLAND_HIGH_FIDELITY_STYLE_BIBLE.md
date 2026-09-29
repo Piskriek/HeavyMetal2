@@ -187,6 +187,10 @@ The lighting exists to reveal form and material consistently. It must not redesi
 
 ### Track and support
 
+- High-fidelity routes may combine structural road modules with thin terrain-conforming road carpets: straight/curved ribbons, hairpins, forks, plazas, and narrow paths.
+- Road carpets preserve exact connector widths, use regular deformable topology, and carry detail through PBR textures, decals, and terrain blending rather than wasteful geometry.
+- Organic environment carpets provide grass/moss, sand, mud/runoff, scree, and shallow-water/foam overlays. They use broad LOD-safe outlines without tiny holes or thin tendrils.
+- Surface carpets sit flush through controlled conforming/depth bias; they may not float or z-fight. The carpet itself is the asset and does not gain a second base plate.
 - Deck thickness and support spacing communicate plausible load.
 - Trestles use repeated bays with diagonal cross-bracing.
 - Bridges terminate into authored abutments or connector sockets.

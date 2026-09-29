@@ -151,7 +151,37 @@ Switch distances depend on screen size, not a universal metre value. Transitions
 
 ---
 
-## 7. Texture density by class
+## 7. Batch 05 — terrain-conforming road and environment carpets
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 39 | Long S-curve road carpet | `9 × 30 × 0.12 m` | Three-lane road width; two and a half straight modules long | 5,000 | 2,500 / 1,000 |
+| 40 | Hairpin road carpet | `24 × 22 × 0.12 m` | Three-lane constant-width 180° turn; footprint slightly larger than loop | 6,000 | 3,000 / 1,200 |
+| 41 | Y-fork road carpet | `24 × 28 × 0.12 m` | 9 m trunk into two 6 m branches; larger than bridge footprint | 7,000 | 3,500 / 1,400 |
+| 42 | Arena/plaza road blob | `24 × 18 × 0.12 m` | Broad racing area with three 9 m connector necks | 6,000 | 3,000 / 1,200 |
+| 43 | Curved dirt-path carpet | `4 × 22 × 0.08 m` | Slightly wider than one lane; long secondary path overlay | 3,000 | 1,500 / 600 |
+| 44 | Grass/moss carpet | `10 × 8 × 0.08 m` | Roughly one road module footprint; broad biome-blending patch | 2,000 | 1,000 / 400 |
+| 45 | Wind-swept sand carpet | `14 × 9 × 0.08 m` | Wider than standard road; shoreline and drift transition patch | 2,500 | 1,200 / 500 |
+| 46 | Mud/runoff carpet | `12 × 6 × 0.08 m` | One road module long and two lanes wide | 2,500 | 1,200 / 500 |
+| 47 | Scree-ground carpet | `10 × 8 × 0.10 m` | Road-module footprint; shallow embedded-rock transition | 4,000 | 2,000 / 800 |
+| 48 | Shallow-water/foam carpet | `16 × 6 × 0.05 m` | Long shoreline ribbon; approximately two lanes wide | 2,000 | 1,000 / 300 or shader proxy |
+
+### Surface-carpet rules
+
+- These assets are thin conforming overlays, not terrain slabs, cliffs, or presentation bases.
+- Mesh density supports broad bending over terrain. It must not encode gravel, grass blades, ripples, cracks, or aggregate that belongs in Normal, Height, Roughness, decals, or shaders.
+- Keep regular, decimation-friendly topology with enough cross-sections to conform without visible faceting.
+- Remove underside faces when the runtime conform/decal solution does not expose them; the listed budgets are ceilings and may drop substantially for projector/decal implementations.
+- Road connector widths remain exact after deformation. Keep UV direction continuous through curves, forks, and hairpins.
+- Feather edges with alpha, vertex color, height blend, or terrain material blending rather than thin geometric fringe strips.
+- Apply a controlled depth bias or terrain offset to prevent z-fighting without visibly floating above the ground.
+- Patches may overlap, but layered order and material blending must avoid coplanar flicker.
+- Water carpet is shader-driven. Foam and caustics belong in texture/shader channels; generated wave thickness is not production geometry.
+- Build several rotated/scaled variants only for organic carpets. Engineered road carpets use uniform scale and preserve connector dimensions.
+
+---
+
+## 8. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -167,7 +197,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 8. Acceptance and variance
+## 9. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

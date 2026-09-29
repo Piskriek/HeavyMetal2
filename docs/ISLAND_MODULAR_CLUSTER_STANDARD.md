@@ -280,9 +280,11 @@ After the complete individual run, prioritize:
 7. cliff-creeper + hanging-vine attachment clusters;
 8. waterfall rock + fern + vine clusters;
 9. settlement crate/barrel/lamp clusters;
-10. trackside barrier/sign/rock/plant clusters.
+10. trackside barrier/sign/rock/plant clusters;
+11. road-carpet combinations with shoulder, scree, grass, mud, or sand transition carpets;
+12. environment-carpet combinations that break up biome borders without creating thin fringe geometry.
 
-Each family should eventually provide A/B/C silhouette variants.
+Surface-carpet combinations keep engineered connectors exact, merge or overlap broad durable shapes, and move small breakup into masks/materials instead of geometry. Each family should eventually provide A/B/C silhouette variants.
 
 ---
 

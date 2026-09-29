@@ -70,6 +70,23 @@ Finish and approve the entire individual-object run first. A later image-generat
 | 37 | `goblin-lantern-post` | Unlit lantern post | pass | Thick LOD-safe post and arm, stable enclosed lantern, clean radial coverage. |
 | 38 | `blank-race-banner` | Blank banner assembly | pass | Broad cloth, sturdy post/bars, clear edge/top/underside views and no symbols. |
 
+## Batch 05 — terrain-conforming road and environment carpets
+
+![Batch 05 surface-carpet review contact sheet](./review/batch-05-surface-carpets-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 39 | `road-carpet-long-s-curve` | Long S-curve road plane | pass | Strong continuous road silhouette, open connectors, top/grazing/underside coverage. |
+| 40 | `road-carpet-hairpin` | Flat hairpin road plane | pass | Clear constant-width 180° path with durable curve and thin profile. |
+| 41 | `road-carpet-y-fork` | Y-fork road plane | pass | Broad trunk and branches, large central negative space, clean modular ends. |
+| 42 | `road-carpet-arena-blob` | Broad race plaza carpet | pass | Thick rounded footprint and three sturdy connector necks; no fragile holes. |
+| 43 | `dirt-path-carpet-curved` | Narrow curved dirt path | pass | Long reusable profile with readable top material and thin deformable construction. |
+| 44 | `grass-moss-carpet-blob` | Grass/moss surface patch | pass | Strong organic outline, broad material zones, flat LOD-safe profile. |
+| 45 | `sand-carpet-wind-swept` | Wind-swept sand patch | pass | Broad ripple language, rounded outline and useful top/profile views. |
+| 46 | `mud-runoff-carpet` | Wet mud/runoff patch | pass | Durable irregular footprint with broad roughness-driven wet/dry regions. |
+| 47 | `scree-ground-carpet` | Embedded scree ground patch | pass | Shallow relief and readable stone breakup without becoming a boulder cluster. |
+| 48 | `shallow-water-foam-carpet` | Shallow-water/foam ribbon | pass with cleanup constraint | Useful outline and foam direction; production mesh must be flattened and shader-driven rather than preserving generated wave thickness. |
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

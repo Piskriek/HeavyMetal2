@@ -223,13 +223,14 @@ Every reference image must meet all of these requirements:
 - neutral perspective, preferably 70–85 mm full-frame equivalent to reduce distortion;
 - same object state in every image: identical damage, plank placement, foliage, rope sag, and texture pattern;
 - individual PNG files, at least 2048 px on the long edge; lossless masters retained;
-- one image per view, not a contact sheet, for Meshy input. A contact sheet may be generated only for human review.
+- one multi-angle sheet per object: every sheet contains several clearly separated views of the same object, never a single-view object sheet;
+- no panel captions, borders, measurements, or arrows; retain individual full-resolution sheets and generate batch contact sheets only for human review.
 
-Ground-contact assets may touch the grey floor but must not carry a modeled decorative base. Floating assets require a clean underside view and must not gain a fake support stand.
+Ground-contact assets may touch the grey floor but must not carry a modeled decorative base. Floating assets require a clean underside view and must not gain a fake support stand. The multi-angle sheet rule is governed by `ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md` and supersedes the report's original individual-view recommendation.
 
 ## 4.2 Standard multi-angle pack
 
-Generate this pack for every model unless the asset-specific table says otherwise:
+Include this view pack within each model's sheet unless the asset-specific table says otherwise:
 
 | Code | View | Requirement |
 |---|---|---|

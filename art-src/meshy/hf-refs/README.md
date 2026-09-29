@@ -50,9 +50,25 @@ Finish and approve the entire individual-object run first. A later image-generat
 | 24 | `sea-stack-hero` | Hero coastal sea stack | pass | Strong cardinal silhouette, basalt foot and ochre crown; no ocean or decorative base. |
 | 25 | `natural-sea-arch` | Natural coastal arch | pass | Consistent opening and crown thickness with front/rear/profile/top coverage. |
 | 26 | `beach-shelf-module` | Coastal shelf transition | pass | Clear land/water-facing profiles, modular edges and top surface. |
-| 27 | `tide-pool-rock-ring` | Tide-pool surround | **weak—regenerate** | Geometry is useful, but forbidden letters appeared between panels. Regenerate after refresh. |
+| 27 | `tide-pool-rock-ring` | Tide-pool surround | pass | Regenerated without labels; clean radial, top, and underside coverage preserves the overflow notch. |
 | 28 | `waterfall-lip-rock-module` | Bare waterfall lip | pass | Channel, spill edge, profiles, connectors and top are clearly exposed. |
 | 29 | `plunge-pool-rocks` | Plunge-pool surround | pass | Strong inflow/outflow gaps and radial/top coverage with no water baked in. |
+
+## Batch 04 — settlement and race structures
+
+![Batch 04 structure review contact sheet](./review/batch-04-structures-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 30 | `goblin-shack` | Small goblin shack | pass | Stable compact building identity, strong roof and wall coverage, no surrounding clutter. |
+| 31 | `goblin-workshop-hut` | Medium workshop | pass | Clear platform, awning, chimney, pulley attachment, roof and underside views. |
+| 32 | `race-watchtower` | Marshal watchtower | pass | Consistent cabin, tapered bracing, ladder/stair and platform coverage from ten angles. |
+| 33 | `fixed-timber-crane` | Fixed goblin crane | pass | Plausible A-frame, boom, pulley, hook and winch with useful top/mechanism views. |
+| 34 | `goblin-mine-hoist` | Compact mine hoist | pass | Robust frame, drum, crank and pulley remain thick and readable across views. |
+| 35 | `grandstand-straight-bay` | Modular grandstand bay | pass | Empty seating, shade roof, connector ends and full support structure are clearly exposed. |
+| 36 | `finish-gate-arch` | Blank finish gate | pass | Strong distant silhouette, clear opening, blank banner and structural feet; no lettering. |
+| 37 | `goblin-lantern-post` | Unlit lantern post | pass | Thick LOD-safe post and arm, stable enclosed lantern, clean radial coverage. |
+| 38 | `blank-race-banner` | Blank banner assembly | pass | Broad cloth, sturdy post/bars, clear edge/top/underside views and no symbols. |
 
 ## Shared review result
 

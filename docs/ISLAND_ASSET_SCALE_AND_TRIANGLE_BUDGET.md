@@ -127,7 +127,31 @@ Switch distances depend on screen size, not a universal metre value. Transitions
 
 ---
 
-## 6. Texture density by class
+## 6. Batch 04 — settlement and race structures
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 30 | Small goblin shack | `5 × 4 × 5 m` | One-room building; doorway remains 2.2 m; lower than grandstand and half watchtower height | 12,000 | 6,000 / 2,200 |
+| 31 | Goblin workshop hut | `8 × 6 × 7 m` | About one road lane deep and nearly three lanes wide; larger than shack, below windmill mass | 18,000 | 9,000 / 3,200 |
+| 32 | Race watchtower | `5 × 5 × 14 m` | Same height class as tall trestle; cabin floor approximately 10 m above ground | 18,000 | 9,000 / 3,000 + impostor |
+| 33 | Fixed timber crane | `7 × 6 × 11 m` | Boom reaches roughly three lanes high; shorter than watchtower and windmill | 16,000 | 8,000 / 2,800 |
+| 34 | Goblin mine hoist | `4 × 3 × 5 m` | Similar height to shack but narrower; machine silhouette readable beside 1 m ball | 12,000 | 6,000 / 2,000 |
+| 35 | Straight grandstand bay | `10 × 5 × 6 m` | One modular bay spans slightly over three lanes; three seating tiers, below workshop roof height | 16,000 | 8,000 / 2,800 |
+| 36 | Finish gate arch | `14 × 4 × 10 m` | Clear opening `10 × 7 m`; wider than standard road and below tall trestle height | 14,000 | 7,000 / 2,200 + impostor |
+| 37 | Goblin lantern post | `1.5 × 1.5 × 5 m` | About two doorways high; lantern remains visible above guardrails and racers | 4,000 | 1,800 / 500 |
+| 38 | Blank race banner | `3 × 1.5 × 5 m` | Same height class as lantern post; cloth panel roughly `2 × 3 m` | 5,000 | 2,200 / 650 |
+
+### Structure-specific notes
+
+- Buildings use the same 2.2 m doorway and shared beam/fastener scale as the windmill, trestle, and bridge.
+- Watchtower, crane, gate, lantern, and banner require LOD-safe thickness; ropes, rails, and braces below the modular-cluster minimums are replaced by broader geometry or removed in distant LODs.
+- Grandstand connector ends must align so repeated bays do not create doubled posts or thin gaps.
+- Cloth uses broad folds in geometry and fine weave/fold breakup in Normal and Roughness maps.
+- Lantern emissive is a separate material/state; the reference and default model remain unlit.
+
+---
+
+## 7. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -143,7 +167,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 7. Acceptance and variance
+## 8. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

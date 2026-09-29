@@ -2,6 +2,8 @@
 
 These are multi-angle, single-object reference sheets governed by [`docs/ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md`](../../../docs/ISLAND_HIGH_FIDELITY_STYLE_BIBLE.md). Production dimensions, comparisons to the 1 m racing ball / 9 m standard road, and balanced triangle/LOD budgets are defined in [`docs/ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md`](../../../docs/ISLAND_ASSET_SCALE_AND_TRIANGLE_BUDGET.md). Generated sheets communicate design and shape; the scale registry controls final cleanup.
 
+Finish and approve the entire individual-object run first. A later image-generation pass will use these approved sheets as direct references for optimized modular combinations under [`docs/ISLAND_MODULAR_CLUSTER_STANDARD.md`](../../../docs/ISLAND_MODULAR_CLUSTER_STANDARD.md). Those clusters must remain readable close up and at distant LOD, with strong overlapping silhouettes, durable contact points, no floating thin geometry, and no unnecessary tiny holes.
+
 ## Batch 01 — benchmark set
 
 ![Batch 01 review contact sheet](./review/batch-01-contact-sheet.jpg)

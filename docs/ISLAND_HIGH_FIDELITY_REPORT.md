@@ -445,12 +445,14 @@ Suggested starting budgets, to be finalized by the style bible:
 
 ### Phase 3 — modular production
 
-1. Track and support kit.
-2. Terrain/cliff and shoreline kit.
-3. Settlement and industrial kit.
-4. Foliage kit.
-5. Props and storytelling landmarks.
-6. VFX-support geometry.
+1. Finish, review, and lock the full individual-object reference run.
+2. Use the approved sheets as direct image references for a second-generation modular-cluster pass governed by [`ISLAND_MODULAR_CLUSTER_STANDARD.md`](./ISLAND_MODULAR_CLUSTER_STANDARD.md).
+3. Build the track and support kit.
+4. Build the terrain/cliff and shoreline kit.
+5. Build the settlement and industrial kit.
+6. Build the foliage kit and optimized cluster variants.
+7. Build props and storytelling landmarks.
+8. Build VFX-support geometry.
 
 ### Phase 4 — world assembly
 

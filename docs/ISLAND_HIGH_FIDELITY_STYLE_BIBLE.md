@@ -255,7 +255,9 @@ Meshy output is a starting mesh. Cleanup, retopology, UV correction, PBR validat
 
 ## 11. Initial benchmark reference set
 
-The first ten sheets test the style across all major production risks:
+The first ten sheets test the style across all major production risks. Finish and approve the complete individual-object run before beginning second-generation combination assets. The later cluster pass is governed by [`ISLAND_MODULAR_CLUSTER_STANDARD.md`](./ISLAND_MODULAR_CLUSTER_STANDARD.md), including silhouette, grounding, minimum thickness, tiny-hole removal, LOD, rotation, scale variation, and cluster triangle-budget rules.
+
+The first ten benchmark sheets are:
 
 1. basalt cliff module;
 2. straight race-road module;

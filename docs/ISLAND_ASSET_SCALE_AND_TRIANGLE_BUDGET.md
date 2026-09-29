@@ -147,6 +147,8 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 
+Second-generation combination assets follow [`ISLAND_MODULAR_CLUSTER_STANDARD.md`](./ISLAND_MODULAR_CLUSTER_STANDARD.md). Their cleaned LOD0 budget normally targets 60–75% of the sum of the source objects' individual budgets, removing hidden contact faces, redundant interiors, fragile details, and tiny holes while protecting the outer silhouette.
+
 An asset passes its performance budget when:
 
 - dimensions match this registry or an approved gameplay override;

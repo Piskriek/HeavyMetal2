@@ -24,6 +24,7 @@ import { buildClosedGates, buildIslandWorld, type IslandWorld } from './island-r
 import { SEA_VIEW_FAR, seaFarColor } from './island-route/island-sea';
 import { readOptions } from './preferences';
 import { CloudLayer } from './sky/sky-clouds';
+import { OverheadClouds } from './sky/sky-overhead';
 import { gradientBlendWidth, getSkySettings, onSkySettings, type SkySettings } from './sky/sky-settings';
 import { cameraTrackSpace, islandRoadsAt, islandTrackSpace, racerTrackSpace } from './island-route/island-space';
 import type { CourseId } from './types';
@@ -1770,6 +1771,8 @@ export class Renderer3D {
   private readonly offSkySettings: () => void;
   /** Painted clouds floating round the island (null off the island). */
   private readonly clouds: CloudLayer | null = null;
+  /** Overhead clouds: a ceiling seen from below (sky-overhead.ts), island only. */
+  private readonly overhead: OverheadClouds | null = null;
 
   constructor(canvas: HTMLCanvasElement, assets: GameAssets, initialSky: string = 'ridge', course: CourseId = 'ridge') {
     this.storedAssets = assets;
@@ -1839,6 +1842,8 @@ export class Renderer3D {
       this.scene.fog = new THREE.Fog(this.dayFogColor(), this.fogNear, this.fogFar);
       this.clouds = new CloudLayer();
       this.scene.add(this.clouds.group);
+      this.overhead = new OverheadClouds();
+      this.scene.add(this.overhead.mesh);
     } else {
       const terrain = makeAlpineTerrain(this.track);
       buildTrackSurface(this.track, this.materials, this.scene);
@@ -1968,6 +1973,7 @@ export class Renderer3D {
     }
     this.island?.setSea(settings.sea);
     this.clouds?.apply(settings.clouds);
+    this.overhead?.apply(settings.overhead);
   }
 
   resize(width: number, height: number) {
@@ -2495,6 +2501,7 @@ export class Renderer3D {
     this.island?.sky.position.copy(this.camera.position);
     // Clouds drift round the island (held still for reduced motion).
     this.clouds?.update(frame.time, frame.reducedMotion ? 0 : this.skySettings.clouds.drift, this.camera.position.y);
+    this.overhead?.update(frame.time, this.camera, frame.reducedMotion ? 0 : 1);
 
     // 3. Texture scrolls + animated decoration frames (frozen on frame 0 for reduced motion)
     const raw = frame.time;
@@ -2537,6 +2544,7 @@ export class Renderer3D {
     this.destroyed = true;
     this.offSkySettings();
     this.clouds?.dispose();
+    this.overhead?.dispose();
     this.disposeRacerPool();
     this.pods.dispose();
     this.surfacePaintTool?.dispose();

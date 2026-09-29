@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import {
-  CLOUD_COUNT_MAX, GRADIENT_PRESETS, HORIZON_PRESETS, SEA_PRESETS, SEA_TEXTURES, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
+  CLOUD_COUNT_MAX, GRADIENT_PRESETS, HORIZON_PRESETS, OVERHEAD_PATTERNS, OVERHEAD_PRESETS, SEA_PRESETS, SEA_TEXTURES, getSkySettings, gradientColorAt, onSkySettings, resetSkySettings, setSkySettings,
   type SkyGradient, type SkySettings,
 } from '../../game/sky/sky-settings';
 import { rebase } from '../../platform/asset-base';
@@ -55,7 +55,7 @@ function ColorRow(props: { label: string; value: string; onChange: (v: string) =
 export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, onChange, onClose }: Props) {
   const [s, setS] = useState<SkySettings>(() => getSkySettings());
   useEffect(() => onSkySettings((next) => { setS(next); onChange?.(); }), [onChange]);
-  const g = s.gradient, c = s.clouds, w = s.sea, z = s.horizon;
+  const g = s.gradient, c = s.clouds, w = s.sea, z = s.horizon, o = s.overhead;
   const tab = (active: boolean) => `flex-1 px-2 py-1 text-[11px] font-bold rounded border cursor-pointer ${active ? 'bg-amber-950/70 border-amber-500/80 text-amber-200' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-zinc-200'}`;
 
   return (
@@ -197,7 +197,12 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
           </label>
         </div>
         <Slider label="Amount" value={c.count} min={0} max={CLOUD_COUNT_MAX} step={1} format={(v) => String(Math.round(v))} onChange={(v) => setSkySettings({ clouds: { count: v } })} />
-        <Slider label="Size" value={c.size} min={0.3} max={2.5} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { size: v } })} />
+        <label className="flex items-center gap-1.5 text-[11px] text-zinc-300 cursor-pointer" title="The horizon ring stands huge towering cloud banks instead of small puffs">
+          <input type="checkbox" checked={c.banks} onChange={(e) => setSkySettings({ clouds: { banks: e.target.checked } })} className="accent-amber-500" />
+          Epic cloud banks on the horizon
+        </label>
+        <Slider label="Size" value={c.size} min={0.3} max={6} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { size: v } })} />
+        <Slider label="Distance" value={c.distance} min={0} max={1} step={0.01} format={(v) => (v === 0 ? 'near' : v === 1 ? 'far' : `${Math.round(v * 100)}%`)} onChange={(v) => setSkySettings({ clouds: { distance: v } })} />
         <Slider label="Height" value={c.height} min={0.3} max={2} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { height: v } })} />
         <Slider label="Horizon size" value={c.horizonSize} min={0.1} max={1.5} step={0.05} format={(v) => `${v.toFixed(2)}×`} onChange={(v) => setSkySettings({ clouds: { horizonSize: v } })} />
         <Slider label="Hug horizon" value={c.horizonHug} min={0} max={1} step={0.05} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ clouds: { horizonHug: v } })} />
@@ -211,6 +216,47 @@ export default function SkyPanel({ paintedSkies, currentPainted, onPickPainted, 
         >
           Shuffle clouds
         </button>
+      </section>
+
+      <section className="flex flex-col gap-2 border-t border-zinc-800 pt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Overhead clouds</span>
+          <label className="flex items-center gap-1.5 text-[11px] text-zinc-300 cursor-pointer">
+            <input type="checkbox" checked={o.enabled} onChange={(e) => setSkySettings({ overhead: { enabled: e.target.checked } })} className="accent-amber-500" />
+            Show
+          </label>
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          {OVERHEAD_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setSkySettings({ overhead: p.overhead })}
+              className="rounded border border-zinc-800 bg-zinc-900 px-1 py-1 text-[10px] text-zinc-300 hover:border-amber-600/60 cursor-pointer"
+              title={p.id === 'storm' ? 'A dark storm ceiling' : 'A cloud layer over the island'}
+            >
+              <span className="block h-4 w-full rounded mb-1" style={{ background: `linear-gradient(to bottom, ${p.overhead.shadow}, ${p.overhead.color})` }} />
+              {p.name}
+            </button>
+          ))}
+        </div>
+        {o.enabled && (
+          <>
+            <label className="flex items-center justify-between gap-2 text-[11px] text-zinc-300">
+              <span>Pattern</span>
+              <select value={o.pattern} onChange={(e) => setSkySettings({ overhead: { pattern: e.target.value as typeof o.pattern } })} className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-0.5 text-[11px] text-zinc-200 cursor-pointer">
+                {OVERHEAD_PATTERNS.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </label>
+            <Slider label="Coverage" value={o.coverage} min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ overhead: { coverage: v } })} />
+            <Slider label="Height" value={o.height} min={20000} max={90000} step={500} format={(v) => `${(v / 1000).toFixed(0)}k`} onChange={(v) => setSkySettings({ overhead: { height: v } })} />
+            <Slider label="Cloud size" value={o.scale} min={8000} max={200000} step={1000} format={(v) => `${(v / 1000).toFixed(0)}k`} onChange={(v) => setSkySettings({ overhead: { scale: v } })} />
+            <ColorRow label="Lit colour" value={o.color} onChange={(v) => setSkySettings({ overhead: { color: v } })} />
+            <ColorRow label="Underside" value={o.shadow} onChange={(v) => setSkySettings({ overhead: { shadow: v } })} />
+            <Slider label="Darkness" value={o.darkness} min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ overhead: { darkness: v } })} />
+            <Slider label="Opacity" value={o.opacity} min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(v) => setSkySettings({ overhead: { opacity: v } })} />
+            <Slider label="Drift" value={o.drift} min={0} max={5} step={0.1} format={(v) => (v === 0 ? 'still' : `${v.toFixed(1)}×`)} onChange={(v) => setSkySettings({ overhead: { drift: v } })} />
+          </>
+        )}
       </section>
 
       <div className="flex justify-between border-t border-zinc-800 pt-2">

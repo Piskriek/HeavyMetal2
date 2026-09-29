@@ -18,6 +18,7 @@
  */
 import * as THREE from 'three';
 import { CLOUD_COUNT_MAX, type SkyClouds } from './sky-settings';
+import { rebase } from '../../platform/asset-base';
 
 /** A lobe of the painted stand-in: centre (x 0‥1 across, y 0‥1 down) and radius (× width). */
 type Lobe = readonly [number, number, number];
@@ -28,6 +29,8 @@ export interface CloudShape {
   /** Height ÷ width of the painted stand-in. */
   readonly aspect: number;
   readonly lobes: readonly Lobe[];
+  /** Sub-folder of /art/clouds/ the art lives in (the epic banks: 'banks'). */
+  readonly dir?: string;
 }
 
 /** The ten shapes (ids match the Codex art files). */
@@ -44,7 +47,25 @@ export const CLOUD_SHAPES: readonly CloudShape[] = Object.freeze([
   { id: 'cloud-10', name: 'Floating isle', aspect: 0.6, lobes: [[0.14, 0.42, 0.1], [0.28, 0.32, 0.14], [0.45, 0.24, 0.16], [0.62, 0.28, 0.15], [0.78, 0.34, 0.12], [0.88, 0.44, 0.08], [0.4, 0.46, 0.13], [0.58, 0.48, 0.13], [0.5, 0.62, 0.1], [0.5, 0.76, 0.06]] },
 ]);
 
-export const cloudArtUrl = (shape: CloudShape) => `/art/clouds/${shape.id}.png`;
+/**
+ * The epic horizon banks (ART-CLOUDS-EPIC): huge towering cumulus formations, wide, that stand on the
+ * horizon ring. Painted stand-ins until the art lands.
+ */
+export const BANK_SHAPES: readonly CloudShape[] = Object.freeze([
+  { id: 'cloud-bank-01', name: 'Thunderhead tower', dir: 'banks', aspect: 0.62, lobes: [[0.14, 0.78, 0.1], [0.26, 0.66, 0.13], [0.38, 0.44, 0.16], [0.42, 0.22, 0.13], [0.54, 0.36, 0.15], [0.66, 0.56, 0.13], [0.8, 0.72, 0.1], [0.5, 0.7, 0.15], [0.3, 0.82, 0.09], [0.7, 0.82, 0.09]] },
+  { id: 'cloud-bank-02', name: 'Long billow bank', dir: 'banks', aspect: 0.36, lobes: [[0.08, 0.7, 0.07], [0.18, 0.55, 0.1], [0.3, 0.45, 0.12], [0.43, 0.52, 0.1], [0.55, 0.4, 0.13], [0.68, 0.5, 0.11], [0.8, 0.44, 0.1], [0.91, 0.64, 0.07], [0.35, 0.72, 0.09], [0.62, 0.72, 0.09]] },
+  { id: 'cloud-bank-03', name: 'Cloud castle', dir: 'banks', aspect: 0.55, lobes: [[0.16, 0.5, 0.12], [0.2, 0.28, 0.1], [0.28, 0.66, 0.12], [0.5, 0.66, 0.12], [0.72, 0.62, 0.12], [0.8, 0.3, 0.11], [0.84, 0.52, 0.12], [0.5, 0.5, 0.09], [0.36, 0.8, 0.08], [0.64, 0.8, 0.08]] },
+  { id: 'cloud-bank-04', name: 'Breaking wave', dir: 'banks', aspect: 0.55, lobes: [[0.2, 0.74, 0.1], [0.32, 0.6, 0.12], [0.44, 0.42, 0.15], [0.58, 0.28, 0.16], [0.74, 0.3, 0.13], [0.84, 0.44, 0.09], [0.5, 0.64, 0.12], [0.36, 0.82, 0.08]] },
+  { id: 'cloud-bank-05', name: 'Anvil storm', dir: 'banks', aspect: 0.55, lobes: [[0.14, 0.22, 0.07], [0.3, 0.16, 0.1], [0.5, 0.14, 0.12], [0.7, 0.16, 0.1], [0.86, 0.22, 0.07], [0.5, 0.36, 0.12], [0.46, 0.56, 0.13], [0.54, 0.72, 0.13], [0.36, 0.8, 0.1], [0.66, 0.8, 0.1]] },
+  { id: 'cloud-bank-06', name: 'Layered sunset bank', dir: 'banks', aspect: 0.4, lobes: [[0.12, 0.72, 0.08], [0.28, 0.66, 0.1], [0.46, 0.7, 0.09], [0.64, 0.64, 0.1], [0.84, 0.7, 0.08], [0.3, 0.46, 0.09], [0.52, 0.42, 0.1], [0.72, 0.46, 0.08], [0.44, 0.26, 0.08], [0.6, 0.28, 0.07]] },
+  { id: 'cloud-bank-07', name: 'Heroic tower', dir: 'banks', aspect: 0.9, lobes: [[0.5, 0.18, 0.16], [0.36, 0.3, 0.12], [0.64, 0.32, 0.12], [0.44, 0.5, 0.14], [0.58, 0.56, 0.14], [0.36, 0.7, 0.12], [0.62, 0.76, 0.12], [0.5, 0.84, 0.1], [0.26, 0.84, 0.08], [0.74, 0.86, 0.08]] },
+  { id: 'cloud-bank-08', name: 'Cumulus range', dir: 'banks', aspect: 0.3, lobes: [[0.06, 0.7, 0.06], [0.16, 0.58, 0.08], [0.27, 0.52, 0.1], [0.38, 0.6, 0.08], [0.5, 0.48, 0.11], [0.62, 0.58, 0.08], [0.73, 0.5, 0.1], [0.85, 0.6, 0.08], [0.94, 0.72, 0.05]] },
+]);
+
+/** Every cloud the layer can draw: the ten puffs, then the banks (a placement's `shape` indexes this). */
+export const ALL_CLOUD_SHAPES: readonly CloudShape[] = Object.freeze([...CLOUD_SHAPES, ...BANK_SHAPES]);
+
+export const cloudArtUrl = (shape: CloudShape) => `/art/clouds/${shape.dir ? `${shape.dir}/` : ''}${shape.id}.png`;
 
 /* ───────────── layout ───────────── */
 
@@ -97,9 +118,11 @@ const HORIZON_SHARE = [0, 0.5, 1] as const;
  * near ring well up, the middle a little above, the far ring (null) right on it, half its height up.
  */
 const RING_LIFT: readonly ([number, number] | null)[] = [[3500, 8000], [1000, 3000], null];
+/** How wide an epic bank stands (world units, before Size, Horizon size and Distance). */
+const BANK_WIDTH: readonly [number, number] = [16000, 30000];
 
 /** Where every cloud floats, for these settings (pure: the tests check it). */
-export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height' | 'seed'> & Partial<Pick<SkyClouds, 'horizonSize' | 'horizonHug'>>): CloudPlacement[] {
+export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height' | 'seed'> & Partial<Pick<SkyClouds, 'horizonSize' | 'horizonHug' | 'distance' | 'banks'>>): CloudPlacement[] {
   const count = Math.max(0, Math.min(CLOUD_COUNT_MAX, Math.round(settings.count)));
   const rand = rng(settings.seed);
   const lerp = (range: readonly [number, number], t: number) => range[0] + (range[1] - range[0]) * t;
@@ -113,14 +136,19 @@ export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height
     const sizeK = 1 + ((settings.horizonSize ?? 1) - 1) * share;
     const hug = settings.horizonHug ?? 0;
     const lift = RING_LIFT[ri] ?? null;
+    // Distance pushes every ring out (and scales it up with it, so it keeps its size on screen).
+    const dm = 1 + 3 * Math.max(0, Math.min(1, settings.distance ?? 0));
+    // The horizon ring stands the epic banks: huge towering formations instead of small puffs.
+    const banks = !!settings.banks && ri === CLOUD_RINGS.length - 1;
     for (let k = 0; k < n; k++) {
-      const baseY = lerp(ring.y, rand()) * settings.height;
-      const width = lerp(ring.width, rand()) * settings.size * sizeK;
+      const baseY = lerp(ring.y, rand()) * settings.height * dm;
+      const width = (banks ? lerp(BANK_WIDTH, rand()) : lerp(ring.width, rand())) * settings.size * sizeK * dm;
+      const pick = rand();
       out.push({
-        shape: Math.floor(rand() * CLOUD_SHAPES.length) % CLOUD_SHAPES.length,
+        shape: banks ? CLOUD_SHAPES.length + (Math.floor(pick * BANK_SHAPES.length) % BANK_SHAPES.length) : Math.floor(pick * CLOUD_SHAPES.length) % CLOUD_SHAPES.length,
         ring: ri,
         angle: start + ((k + 0.5 + (rand() - 0.5) * 0.7) / n) * Math.PI * 2,
-        radius: lerp(ring.r, rand()) * (1 + 0.15 * hug * share),
+        radius: lerp(ring.r, rand()) * (1 + 0.15 * hug * share) * dm,
         y: baseY,
         width,
         orbit: (0.00035 + rand() * 0.00035) * (rand() < 0.5 ? 1 : -1) * (ri === 0 ? 1.4 : 1),
@@ -130,7 +158,7 @@ export function cloudLayout(settings: Pick<SkyClouds, 'count' | 'size' | 'height
         flip: rand() < 0.5,
         hug,
         // The far ring sits on the line (about half its height above it); the others float higher.
-        lineOffset: lift ? lerp(lift, rand()) : width * (0.3 + rand() * 0.25),
+        lineOffset: (lift ? lerp(lift, rand()) * dm : width * (banks ? 0.18 : 0.3 + rand() * 0.25)),
       });
     }
     made += n;
@@ -216,9 +244,9 @@ export class CloudLayer {
 
   constructor(opts: { loadArt?: boolean } = {}) {
     this.group.name = 'Clouds';
-    this.aspects = CLOUD_SHAPES.map((s) => s.aspect);
-    this.materials = CLOUD_SHAPES.map((shape) => {
-      const texture = typeof document !== 'undefined' ? new THREE.CanvasTexture(paintCloudCanvas(shape)) : null;
+    this.aspects = ALL_CLOUD_SHAPES.map((s) => s.aspect);
+    this.materials = ALL_CLOUD_SHAPES.map((shape) => {
+      const texture = typeof document !== 'undefined' ? new THREE.CanvasTexture(paintCloudCanvas(shape, shape.dir ? 1024 : 512)) : null;
       if (texture) texture.colorSpace = THREE.SRGBColorSpace;
       return new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, fog: true });
     });
@@ -228,8 +256,8 @@ export class CloudLayer {
   /** The Codex art replaces a stand-in the moment it decodes; a missing file keeps the stand-in. */
   private loadArt() {
     const loader = new THREE.TextureLoader();
-    CLOUD_SHAPES.forEach((shape, i) => {
-      loader.load(cloudArtUrl(shape), (texture) => {
+    ALL_CLOUD_SHAPES.forEach((shape, i) => {
+      loader.load(rebase(cloudArtUrl(shape)), (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.anisotropy = 4;
         const img = texture.image as { width?: number; height?: number } | undefined;
@@ -253,13 +281,13 @@ export class CloudLayer {
     this.group.visible = settings.enabled && settings.count > 0;
     const tint = new THREE.Color(settings.tint);
     for (const m of this.materials) { m.opacity = settings.opacity; m.color.copy(tint); }
-    const key = `${settings.count}|${settings.size}|${settings.height}|${settings.seed}|${settings.horizonSize}|${settings.horizonHug}`;
+    const key = `${settings.count}|${settings.size}|${settings.height}|${settings.seed}|${settings.horizonSize}|${settings.horizonHug}|${settings.distance}|${settings.banks}`;
     if (key === this.layoutKey) return;
     this.layoutKey = key;
     for (const s of this.shown) this.group.remove(s.sprite);
     this.shown = cloudLayout(settings).map((place) => {
       const sprite = new THREE.Sprite(this.materials[place.shape]);
-      sprite.name = `Cloud ${CLOUD_SHAPES[place.shape]!.name}`;
+      sprite.name = `Cloud ${ALL_CLOUD_SHAPES[place.shape]!.name}`;
       sprite.raycast = () => {};
       // Far rings first, so a near cloud is drawn over the ones behind it.
       sprite.renderOrder = -500 - place.ring;

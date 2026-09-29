@@ -54,6 +54,37 @@ export interface SkyClouds {
   readonly horizonSize: number;
   /** 0‥1: how far the far rings move onto the horizon line (as the race camera sees it), further out. */
   readonly horizonHug: number;
+  /** 0‥1: pushes every ring back toward the horizon (0 = over the shore, 1 = four times as far). */
+  readonly distance: number;
+  /** The horizon ring stands epic towering cloud banks instead of small puffs. */
+  readonly banks: boolean;
+}
+
+export type OverheadPattern = 'fair' | 'broken' | 'storm';
+export const OVERHEAD_PATTERNS: readonly { id: OverheadPattern; name: string }[] = Object.freeze([
+  { id: 'fair', name: 'Fair weather' },
+  { id: 'broken', name: 'Broken' },
+  { id: 'storm', name: 'Storm ceiling' },
+]);
+
+/** A cloud ceiling over the island, seen from below (a storm scene's overcast). */
+export interface SkyOverhead {
+  readonly enabled: boolean;
+  readonly pattern: OverheadPattern;
+  /** 0‥1: how much of the sky it covers. */
+  readonly coverage: number;
+  /** World height of the ceiling (the road runs ~17 500 up). */
+  readonly height: number;
+  /** World units per repeat of the pattern (bigger = bigger clouds). */
+  readonly scale: number;
+  /** The lit, thin parts, and the thick undersides. */
+  readonly color: string;
+  readonly shadow: string;
+  /** 0‥1: how dark the thick undersides go (storm). */
+  readonly darkness: number;
+  readonly opacity: number;
+  /** × how fast it drifts (0: still). */
+  readonly drift: number;
 }
 
 export interface SkyHorizon {
@@ -103,7 +134,14 @@ export interface SkySettings {
   readonly sea: SeaLook;
   readonly clouds: SkyClouds;
   readonly horizon: SkyHorizon;
+  readonly overhead: SkyOverhead;
 }
+
+export const OVERHEAD_PRESETS: readonly { id: string; name: string; overhead: SkyOverhead }[] = Object.freeze([
+  { id: 'fair', name: 'Fair', overhead: { enabled: true, pattern: 'fair', coverage: 0.35, height: 34000, scale: 40000, color: '#ffffff', shadow: '#aebccf', darkness: 0.35, opacity: 0.95, drift: 1 } },
+  { id: 'broken', name: 'Broken', overhead: { enabled: true, pattern: 'broken', coverage: 0.6, height: 32000, scale: 48000, color: '#f4f6fa', shadow: '#8494a8', darkness: 0.5, opacity: 0.95, drift: 1 } },
+  { id: 'storm', name: 'Storm', overhead: { enabled: true, pattern: 'storm', coverage: 0.9, height: 28000, scale: 36000, color: '#9aa4b0', shadow: '#2e3540', darkness: 0.85, opacity: 1, drift: 2 } },
+]);
 
 export interface SeaPreset { readonly id: string; readonly name: string; readonly sea: SeaLook }
 
@@ -129,11 +167,14 @@ export const GRADIENT_PRESETS: readonly GradientPreset[] = Object.freeze([
   { id: 'storm_teal', name: 'Storm teal', gradient: { top: '#23405a', middle: '#4f8a98', horizon: '#b9d4d0', crispness: 0.5, midHeight: 0.35, opacity: 1 } },
 ]);
 
+const OVERHEAD_PRESETS_BASE: SkyOverhead = { enabled: false, pattern: 'broken', coverage: 0.6, height: 32000, scale: 48000, color: '#f4f6fa', shadow: '#8494a8', darkness: 0.5, opacity: 0.95, drift: 1 };
+
 export const DEFAULT_SKY_SETTINGS: SkySettings = Object.freeze({
   mode: 'painted',
   gradient: GRADIENT_PRESETS[0]!.gradient,
   sea: SEA_PRESETS[0]!.sea,
-  clouds: { enabled: true, count: 36, size: 1, height: 1, drift: 1, opacity: 1, tint: '#ffffff', seed: 1, horizonSize: 0.45, horizonHug: 0.9 },
+  clouds: { enabled: true, count: 36, size: 1, height: 1, drift: 1, opacity: 1, tint: '#ffffff', seed: 1, horizonSize: 1, horizonHug: 0.9, distance: 0.35, banks: true },
+  overhead: { ...OVERHEAD_PRESETS_BASE, enabled: false },
   horizon: { haze: 0.2, fog: 0.2, fogColor: '', glow: true, glowColor: '#ffffff', glowStrength: 0.75, glowWidth: 0.016, glowSoftness: 0.85 },
 });
 
@@ -161,6 +202,8 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
   const c = (r.clouds && typeof r.clouds === 'object' ? r.clouds : {}) as Record<string, unknown>;
   const w = (r.sea && typeof r.sea === 'object' ? r.sea : {}) as Record<string, unknown>;
   const z = (r.horizon && typeof r.horizon === 'object' ? r.horizon : {}) as Record<string, unknown>;
+  const o = (r.overhead && typeof r.overhead === 'object' ? r.overhead : {}) as Record<string, unknown>;
+  const dov = DEFAULT_SKY_SETTINGS.overhead;
   const dg = DEFAULT_SKY_SETTINGS.gradient, dc = DEFAULT_SKY_SETTINGS.clouds, dw = DEFAULT_SKY_SETTINGS.sea, dz = DEFAULT_SKY_SETTINGS.horizon;
   return {
     mode: r.mode === 'gradient' ? 'gradient' : 'painted',
@@ -183,7 +226,7 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
     clouds: {
       enabled: typeof c.enabled === 'boolean' ? c.enabled : dc.enabled,
       count: Math.round(clamp(c.count, 0, CLOUD_COUNT_MAX, dc.count)),
-      size: clamp(c.size, 0.3, 2.5, dc.size),
+      size: clamp(c.size, 0.3, 6, dc.size),
       height: clamp(c.height, 0.3, 2, dc.height),
       drift: clamp(c.drift, 0, 4, dc.drift),
       opacity: clamp(c.opacity, 0.1, 1, dc.opacity),
@@ -191,6 +234,20 @@ export function normalizeSkySettings(raw: unknown): SkySettings {
       seed: Math.round(clamp(c.seed, 1, 9999, dc.seed)),
       horizonSize: clamp(c.horizonSize, 0.1, 1.5, dc.horizonSize),
       horizonHug: clamp(c.horizonHug, 0, 1, dc.horizonHug),
+      distance: clamp(c.distance, 0, 1, dc.distance),
+      banks: typeof c.banks === 'boolean' ? c.banks : dc.banks,
+    },
+    overhead: {
+      enabled: typeof o.enabled === 'boolean' ? o.enabled : dov.enabled,
+      pattern: OVERHEAD_PATTERNS.some((p) => p.id === o.pattern) ? (o.pattern as OverheadPattern) : dov.pattern,
+      coverage: clamp(o.coverage, 0, 1, dov.coverage),
+      height: Math.round(clamp(o.height, 20000, 90000, dov.height)),
+      scale: Math.round(clamp(o.scale, 8000, 200000, dov.scale)),
+      color: hex(o.color, dov.color),
+      shadow: hex(o.shadow, dov.shadow),
+      darkness: clamp(o.darkness, 0, 1, dov.darkness),
+      opacity: clamp(o.opacity, 0, 1, dov.opacity),
+      drift: clamp(o.drift, 0, 5, dov.drift),
     },
     horizon: {
       haze: clamp(z.haze, 0, 1, dz.haze),
@@ -248,7 +305,7 @@ export function getSkySettings(): SkySettings {
 }
 
 /** Merges a change (gradient and clouds merge field by field), saves, and tells every listener. */
-export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyGradient>; sea?: Partial<SeaLook>; clouds?: Partial<SkyClouds>; horizon?: Partial<SkyHorizon> }): SkySettings {
+export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyGradient>; sea?: Partial<SeaLook>; clouds?: Partial<SkyClouds>; horizon?: Partial<SkyHorizon>; overhead?: Partial<SkyOverhead> }): SkySettings {
   const now = getSkySettings();
   current = normalizeSkySettings({
     mode: change.mode ?? now.mode,
@@ -256,6 +313,7 @@ export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyG
     sea: { ...now.sea, ...change.sea },
     clouds: { ...now.clouds, ...change.clouds },
     horizon: { ...now.horizon, ...change.horizon },
+    overhead: { ...now.overhead, ...change.overhead },
   });
   try { if (typeof localStorage !== 'undefined') localStorage.setItem(SKY_SETTINGS_KEY, JSON.stringify(current)); } catch { /* storage full or blocked: this session keeps it */ }
   for (const cb of listeners) cb(current);
@@ -263,7 +321,7 @@ export function setSkySettings(change: { mode?: SkyMode; gradient?: Partial<SkyG
 }
 
 export function resetSkySettings(): SkySettings {
-  return setSkySettings({ mode: DEFAULT_SKY_SETTINGS.mode, gradient: DEFAULT_SKY_SETTINGS.gradient, sea: DEFAULT_SKY_SETTINGS.sea, clouds: DEFAULT_SKY_SETTINGS.clouds, horizon: DEFAULT_SKY_SETTINGS.horizon });
+  return setSkySettings({ mode: DEFAULT_SKY_SETTINGS.mode, gradient: DEFAULT_SKY_SETTINGS.gradient, sea: DEFAULT_SKY_SETTINGS.sea, clouds: DEFAULT_SKY_SETTINGS.clouds, horizon: DEFAULT_SKY_SETTINGS.horizon, overhead: DEFAULT_SKY_SETTINGS.overhead });
 }
 
 export function onSkySettings(cb: (s: SkySettings) => void): () => void {

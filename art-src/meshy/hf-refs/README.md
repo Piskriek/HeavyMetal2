@@ -19,6 +19,23 @@ These are multi-angle, single-object reference sheets governed by [`docs/ISLAND_
 | 09 | `basalt-tunnel-entrance` | Basalt tunnel entrance | pass | Consistent arch, profiles, top and interior coverage; naturally open bottom with no terrain cookie. |
 | 10 | `cliff-bridge-timber-iron` | Timber-and-iron cliff bridge | pass | Strong entry, broadside, three-quarter, top and underside coverage; readable truss and deck. |
 
+## Batch 02 — modular vegetation clusters
+
+![Batch 02 vegetation review contact sheet](./review/batch-02-vegetation-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 11 | `palm-cluster-three` | Three-palm cluster | pass | Strong varied-height silhouette, coherent roots, cardinal views and canopy coverage. |
+| 12 | `jungle-understory-cluster` | Broadleaf understory | pass | Compact modular footprint with useful plant-height variation and top/underside views. |
+| 13 | `fern-cluster-large` | Large fern cluster | pass | Clean repeatable fern module with strong crown consistency and no terrain base. |
+| 14 | `flowering-shrub-cluster` | Flowering shrubs | pass | Readable woody structure, controlled coral accents, top and underside coverage. |
+| 15 | `coastal-grass-cluster` | Coastal grass and scrub | **weak—regenerate** | Object is useful, but the sheet contains forbidden view labels. Regenerate after turn refresh. |
+| 16 | `broadleaf-tree-cluster` | Two-tree broadleaf cluster | pass | Strong interlocking canopy, exposed roots, readable branch and canopy views. |
+| 17 | `windswept-highland-trees` | Wind-shaped highland pair | pass | Clear shared wind direction, sparse crown language, suitable for exposed upper slopes. |
+| 18 | `hanging-vine-cluster` | Hanging vine curtain | pass | Multiple hanging silhouettes and useful top attachment views; no wall/support baked in. |
+| 19 | `cliff-creeper-cluster` | Cliff creeper network | pass | Low modular creeping mass with varied silhouettes and no included cliff geometry. |
+| 20 | `driftwood-root-cluster` | Driftwood/root dressing | pass | Stable root and broken-limb silhouette with complete radial/top coverage. |
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

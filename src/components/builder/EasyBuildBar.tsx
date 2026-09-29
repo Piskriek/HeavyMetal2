@@ -71,15 +71,18 @@ export default function EasyBuildBar({ builder, props, selectedCount, keyLabel, 
     onRequestRender?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [builder, share]);
+  // The hologram: the piece under the pointer (or the last one dropped) standing where it would land.
+  const hologram = hover ?? last;
   useEffect(() => {
     builder.showEasyCursor(builder.easyRoadPose(share, 'middle'), builder.easyRoadPose(share, spotFor(preview), side, preview?.type));
+    builder.showEasyGhost(hologram?.type ?? null, share, spotFor(hologram), side);
     onRequestRender?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [builder, spot, side, preview?.type]);
+  }, [builder, share, spot, side, preview?.type, hologram?.type]);
   const renderRef = useRef(onRequestRender);
   renderRef.current = onRequestRender;
   // Leaving Easy Build takes the cursor off the road (only on unmount: the render callback changes every render).
-  useEffect(() => () => { builder.showEasyCursor(null); renderRef.current?.(); }, [builder]);
+  useEffect(() => () => { builder.showEasyCursor(null); builder.showEasyGhost(null); renderRef.current?.(); }, [builder]);
 
   const walk = (dir: 1 | -1) => setShare((s) => stepShare(s, dir));
 

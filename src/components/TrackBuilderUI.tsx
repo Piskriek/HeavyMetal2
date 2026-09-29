@@ -8,7 +8,7 @@ import {
   HardDrive, Clock, ShieldCheck, Zap, Clapperboard, Pause,
   Minus, Plus, Film, Route, Box, Maximize2, Sparkles,
   Search, FolderDown, Magnet, ChevronLeft, ChevronRight, ChevronUp, Lightbulb, Shapes, Paintbrush,
-  Castle, Rocket, CircleDot, Palmtree, Gem, SquareDashedMousePointer, Eye as EyeIcon, EyeOff, ListChecks, Keyboard, LogOut, Wand2, Wrench
+  Castle, Rocket, CircleDot, Palmtree, Gem, SquareDashedMousePointer, Eye as EyeIcon, EyeOff, ListChecks, Keyboard, LogOut, Wand2, Wrench, BoxSelect
 } from 'lucide-react';
 import { type CourseId } from '../game/types';
 import { isRaceMarkType } from '../game/race-marks';
@@ -155,6 +155,13 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
   const [showShaders, setShowShaders] = useState(false);
   const [isZen, setIsZen] = useState(false);
   const [showCheatSheet, setShowCheatSheet] = useState(false);
+  const [boxesShown, setBoxesShown] = useState(() => builder.getSelectionBoxesShown());
+  // Dev builds only: the builder on window, for the browser checks in scripts/ and debugging.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as unknown as Record<string, unknown>).__builder = builder;
+    return () => { delete (window as unknown as Record<string, unknown>).__builder; };
+  }, [builder]);
   const [keyOverrides, setKeyOverrides] = useState(() => readKeyOverrides());
   const bindings = useMemo(() => new BuilderKeys(keyOverrides), [keyOverrides]);
   const bindingsRef = useRef(bindings);
@@ -2083,6 +2090,15 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="Redo (Ctrl+Y)"
             >
               <RotateCw size={13} />
+            </button>
+            <button
+              onClick={() => { const next = !boxesShown; builder.setSelectionBoxesShown(next); setBoxesShown(next); onRequestRender?.(); }}
+              aria-pressed={boxesShown}
+              className="forge-tool !px-1.5"
+              title={boxesShown ? 'Hide the boxes round picked pieces (a ring marks the pick)' : 'Show boxes round picked pieces'}
+              aria-label="Selection boxes"
+            >
+              <BoxSelect size={14} />
             </button>
             <button
               onClick={() => setShowCheatSheet(true)}

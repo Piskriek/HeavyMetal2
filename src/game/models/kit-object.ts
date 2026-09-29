@@ -2,6 +2,7 @@
  * A placed Meshy model: an empty group that stands in at once (so selection, the gizmo and undo work
  * straight away) and receives the model when its GLB has loaded. Copies share geometry and textures.
  */
+import { hologramize } from '../builder/hologram';
 import { effectiveColor, normalizeDescriptor, type MaterialDescriptor } from '../materials/material-descriptor';
 import * as THREE from 'three';
 import { injectIslandModelShader } from '../island-route/island-surface-shader';
@@ -29,18 +30,8 @@ export function fitKitModel(model: THREE.Object3D, size: number): THREE.Object3D
  * will land. Its materials are its own copies (the shared ones stay opaque).
  */
 export function ghostKitObject(type: string, low: boolean): THREE.Group {
-  const ghost = createKitObject(type, '__ghost', low, (group) => {
-    group.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const material = (mesh.material as THREE.Material).clone();
-      material.transparent = true;
-      material.opacity = 0.55;
-      material.depthWrite = false;
-      mesh.material = material;
-      mesh.castShadow = false;
-    });
-  });
+  // The builder's hologram look (builder/hologram.ts): see-through cyan over the model's own painting.
+  const ghost = createKitObject(type, '__ghost', low, (group) => hologramize(group));
   ghost.name = 'GhostKitModel';
   ghost.userData = { isKitGhost: true };
   return ghost;

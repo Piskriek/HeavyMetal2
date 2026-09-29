@@ -15,6 +15,7 @@ import { START_LINE_TYPE, engineXAt, isRaceMarkType, roadPoseAt, usableStartX } 
 const TEST_BALL_KEY = 'hm2-test-ball-v1';
 import { passageMouthX } from './qualifying/passage';
 import { isKitModelType, kitModelFor } from './models/kit-catalog';
+import { hologramize, hologramSpriteMaterial } from './builder/hologram';
 import { chaseCamera, engineXOfShare, roadPose, shareOfEngineX, type RoadPose, type RoadSpot } from './builder/easy-build';
 import { ghostKitObject } from './models/kit-object';
 import { collisionRoleOf, kitCollisionInput, patchFromWorldMeshes } from './models/kit-collision';
@@ -125,6 +126,10 @@ export class TrackBuilder3D {
   private ghostSprite: THREE.Sprite | null = null;
   private ghostMesh: THREE.Object3D | null = null;
   private selectionBoxes = new Map<string, THREE.BoxHelper>();
+  /** The yellow boxes round picked pieces: off by default (a ring on the ground marks the pick). */
+  private showSelectionBoxes = false;
+  /** One flat brass ring under each picked piece (drawn over everything, never picked). */
+  private selectionRings = new Map<string, THREE.Mesh>();
   private rotationHandle: THREE.Group | null = null;
   private gizmoAdapter: GizmoAdapter<PlacedProp> | null = null;
   private readonly commandHistory = new CommandStack<PlacedProp>();
@@ -1199,7 +1204,9 @@ export class TrackBuilder3D {
     // The placement ghost is not a placed prop, so it is not in the map; hide it by name too, or a
     // race that happens to be in the builder's placement mode would show a wireframe of the very
     // model that was just retired.
-    if (!visible && this.ghostMesh) this.ghostMesh.visible = false;
+    // Only the slingshot's own ghost: every other placement hologram stays (hiding them all, every
+    // frame, is why no Pro preview ever showed).
+    if (!visible && this.ghostMesh?.name === 'GhostSlingshotMesh') this.ghostMesh.visible = false;
   }
 
   // --- T08: VISIBILITY TOGGLE (H KEY) ---
@@ -1447,68 +1454,18 @@ export class TrackBuilder3D {
       .map(([, obj]) => obj);
     const hits = this.raycaster.intersectObjects(objects, true);
 
-    if (hits.length > 0) {
-      let hitObj: THREE.Object3D | null = hits[0].object;
-      while (hitObj && !hitObj.userData?.propId) {
-        hitObj = hitObj.parent;
-      }
-      if (hitObj?.userData?.propId) {
-        const found = this.placedProps.find((p) => p.id === hitObj!.userData.propId);
-        if (found) return found;
-      }
+    // Only the piece's own painted surface picks it: hidden helpers (collision proxies, bounds) and
+    // lines never do, and there is no "near enough on screen" box any more, so a click beside a model
+    // falls through to what is really under the pointer.
+    for (const hit of hits) {
+      const o = hit.object as THREE.Object3D & { isLine?: boolean; isLineSegments?: boolean };
+      if (o.isLine || o.isLineSegments || !SceneKit.shown(o)) continue;
+      let hitObj: THREE.Object3D | null = o;
+      while (hitObj && !hitObj.userData?.propId) hitObj = hitObj.parent;
+      const found = hitObj?.userData?.propId ? this.placedProps.find((p) => p.id === hitObj!.userData.propId) : undefined;
+      if (found) return found;
     }
-
-    // Screen-space proximity fallback (T08: skip invisible props):
-    let bestProp: PlacedProp | null = null;
-    let bestDistanceSq = Infinity;
-
-    for (const prop of this.placedProps) {
-      // T08: Exclude invisible props from fresh raycasts
-      if (prop.visible === false || isTerrainEdit(prop)) continue;
-      
-      const def = PROP_DEFINITIONS.find((p) => p.type === prop.type);
-      if (!def) continue;
-
-      const w = def.defaultWidth * prop.scale;
-      const h = def.defaultHeight * prop.scale;
-
-      const centerY = def.alignBottom !== false ? prop.y + h / 2 : prop.y;
-      const worldPos = new THREE.Vector3(prop.x, centerY, prop.z);
-
-      // Check if in front of camera
-      const cameraDir = this.camera.getWorldDirection(new THREE.Vector3());
-      const toProp = worldPos.clone().sub(this.camera.position);
-      if (cameraDir.dot(toProp) <= 0) continue;
-
-      const ndc = worldPos.clone().project(this.camera);
-      if (ndc.z > 1 || ndc.z < -1) continue;
-
-      const screenX = ((ndc.x + 1) / 2) * rect.width + rect.left;
-      const screenY = ((-ndc.y + 1) / 2) * rect.height + rect.top;
-
-      const dist = toProp.length();
-      const vFovRad = (this.camera.fov * Math.PI) / 180;
-      const screenH = (h / (2 * Math.tan(vFovRad / 2) * Math.max(10, dist))) * rect.height;
-      const screenW = (w / (2 * Math.tan(vFovRad / 2) * Math.max(10, dist))) * rect.height;
-
-      const halfW = Math.max(30, screenW / 2);
-      const halfH = Math.max(30, screenH / 2);
-
-      if (
-        clientX >= screenX - halfW - 20 &&
-        clientX <= screenX + halfW + 20 &&
-        clientY >= screenY - halfH - 20 &&
-        clientY <= screenY + halfH + 20
-      ) {
-        const d2 = (clientX - screenX) ** 2 + (clientY - screenY) ** 2;
-        if (d2 < bestDistanceSq) {
-          bestDistanceSq = d2;
-          bestProp = prop;
-        }
-      }
-    }
-
-    return bestProp;
+    return null;
   }
 
   raycastSurface(clientX: number, clientY: number, canvas: HTMLCanvasElement) {
@@ -1589,6 +1546,9 @@ export class TrackBuilder3D {
     if (this.snapping.snapToCenterline && hit.sample) {
       pos.copy(hit.sample.pos);
     }
+    // Back over something to stand on: the hologram shows again (a miss over the sky hid it).
+    if (this.ghostKind === 'mesh' && this.ghostMesh) this.ghostMesh.visible = true;
+    if (this.ghostKind === 'sprite' && this.ghostSprite) this.ghostSprite.visible = true;
 
     if (this.ghostMesh && this.ghostMesh.visible) {
       this.ghostMesh.position.copy(pos);
@@ -1634,10 +1594,14 @@ export class TrackBuilder3D {
     }
   }
 
+  /** Which placement hologram is in use for the held piece (the other one stays hidden). */
+  private ghostKind: 'mesh' | 'sprite' | null = null;
+
   private updateGhostSprite() {
     if (!this.activePropType) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
       if (this.ghostMesh) this.ghostMesh.visible = false;
+      this.ghostKind = null;
       return;
     }
 
@@ -1657,6 +1621,7 @@ export class TrackBuilder3D {
         this.scene.add(ghost);
       }
       this.ghostMesh.visible = true;
+      this.ghostKind = 'mesh';
       return;
     }
 
@@ -1677,9 +1642,11 @@ export class TrackBuilder3D {
         (this.ghostMesh as any)._forType = def.type;
         (this.ghostMesh as any)._isDecalMesh = true;
         this.ghostMesh.name = 'GhostDecalMesh';
+        hologramize(this.ghostMesh);
         this.scene.add(this.ghostMesh);
       }
       this.ghostMesh.visible = true;
+      this.ghostKind = 'mesh';
     } else if (def.isRamp) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
       if (!this.ghostMesh || (this.ghostMesh as any)._isRampMesh !== true) {
@@ -1688,9 +1655,11 @@ export class TrackBuilder3D {
         this.ghostMesh = wedgeMesh(def.defaultWidth, 1100, def.defaultHeight, ghostMat);
         this.ghostMesh.name = 'GhostMesh';
         (this.ghostMesh as any)._isRampMesh = true;
+        hologramize(this.ghostMesh);
         this.scene.add(this.ghostMesh);
       }
       this.ghostMesh.visible = true;
+      this.ghostKind = 'mesh';
     } else if (def.isSlingshot || def.is3DModel) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
       if (!this.ghostMesh || (this.ghostMesh as any)._forType !== def.type) {
@@ -1709,11 +1678,14 @@ export class TrackBuilder3D {
         ghostModel.name = 'GhostSlingshotMesh';
         (ghostModel as any)._forType = def.type;
         (ghostModel as any)._is3DModel = true;
+        hologramize(ghostModel);
         this.ghostMesh = ghostModel;
         this.scene.add(ghostModel);
       }
       if (this.ghostMesh) {
         this.ghostMesh.visible = true;
+        this.ghostKind = 'mesh';
+      this.ghostKind = 'mesh';
       }
     } else if (this.snapping.cameraFacingDefault === false) {
       if (this.ghostSprite) this.ghostSprite.visible = false;
@@ -1734,14 +1706,16 @@ export class TrackBuilder3D {
         this.ghostMesh = new THREE.Mesh(geom, mat);
         (this.ghostMesh as any)._forType = def.type;
         this.ghostMesh.name = 'GhostMesh';
+        hologramize(this.ghostMesh);
         this.scene.add(this.ghostMesh);
       }
       this.ghostMesh.visible = true;
+      this.ghostKind = 'mesh';
     } else {
       if (this.ghostMesh) this.ghostMesh.visible = false;
       const tex = this.getTexture(def.url);
       if (!this.ghostSprite) {
-        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.55, depthWrite: false });
+        const mat = hologramSpriteMaterial(tex);
         this.ghostSprite = new THREE.Sprite(mat);
         this.ghostSprite.name = 'Ghost';
         this.scene.add(this.ghostSprite);
@@ -1752,6 +1726,7 @@ export class TrackBuilder3D {
       this.ghostSprite.center.set(0.5, def.alignBottom !== false ? 0 : 0.5);
       this.ghostSprite.scale.set(def.defaultWidth, def.defaultHeight, 1);
       this.ghostSprite.visible = true;
+      this.ghostKind = 'sprite';
     }
   }
 
@@ -2258,12 +2233,48 @@ export class TrackBuilder3D {
   }
 
   // --- SELECTION BOX HIGHLIGHT & ROTATION HANDLE ---
+  /** Show or hide the yellow bounding boxes round picked pieces (the toolbar's Boxes toggle). */
+  setSelectionBoxesShown(shown: boolean) {
+    this.showSelectionBoxes = shown;
+    this.updateSelectionBox();
+    this.notify();
+  }
+
+  getSelectionBoxesShown(): boolean { return this.showSelectionBoxes; }
+
+  /** A soft brass ring on the ground under a picked piece, as wide as its footprint. */
+  private placeSelectionRing(id: string, obj: THREE.Object3D, color: number) {
+    const bounds = new THREE.Box3().setFromObject(obj);
+    if (bounds.isEmpty()) return;
+    let ring = this.selectionRings.get(id);
+    if (!ring) {
+      ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.86, 1, 48),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, depthTest: false, depthWrite: false, side: THREE.DoubleSide }),
+      );
+      ring.name = 'SelectionRing';
+      ring.userData.isKitGhost = true;
+      ring.rotation.x = -Math.PI / 2;
+      ring.renderOrder = 9998;
+      ring.raycast = () => {};
+      this.scene.add(ring);
+      this.selectionRings.set(id, ring);
+    }
+    const size = bounds.getSize(new THREE.Vector3());
+    const r = Math.max(60, Math.hypot(size.x, size.z) * 0.55);
+    ring.scale.setScalar(r);
+    ring.position.set((bounds.min.x + bounds.max.x) / 2, bounds.min.y + 4, (bounds.min.z + bounds.max.z) / 2);
+    (ring.material as THREE.MeshBasicMaterial).color.setHex(color);
+    ring.visible = true;
+  }
+
   private updateSelectionBox() {
     const selected = this.getSelectedProps();
     this.pruneNoOpTerrainEdits();
     if (selected.length === 0 || !this.freeFly.active) {
       this.kit.setSelected(this.selectedPropIds, this.propObjects);
       this.selectionBoxes.forEach((box) => { box.visible = false; });
+      this.selectionRings.forEach((ring) => { ring.visible = false; });
       if (this.rotationHandle) this.rotationHandle.visible = false;
       if (this.decalSideHandlesGroup) this.decalSideHandlesGroup.visible = false;
       if (!this.selectedLaneNodeId || !this.lanesVisible) {
@@ -2277,12 +2288,13 @@ export class TrackBuilder3D {
 
     const currentSelectedIds = new Set(selected.map((p) => p.id));
 
-    // Hide boxes for unselected props
+    // Hide boxes (and rings) for unselected props
     for (const [id, box] of this.selectionBoxes.entries()) {
       if (!currentSelectedIds.has(id)) {
         box.visible = false;
       }
     }
+    for (const [id, ring] of this.selectionRings.entries()) if (!currentSelectedIds.has(id)) ring.visible = false;
 
     const isGroup = selected.length > 1;
     const boxColor = isGroup ? 0x38bdf8 : 0xffdd00;
@@ -2303,8 +2315,9 @@ export class TrackBuilder3D {
       } else {
         box.setFromObject(obj);
         (box.material as THREE.LineBasicMaterial).color.setHex(boxColor);
-        box.visible = true;
       }
+      box.visible = this.showSelectionBoxes;
+      this.placeSelectionRing(prop.id, obj, boxColor);
     }
 
     // Centroid of selected group
@@ -3576,6 +3589,8 @@ export class TrackBuilder3D {
     }
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
     this.selectionBoxes.clear();
+    this.selectionRings.forEach((ring) => this.scene.remove(ring));
+    this.selectionRings.clear();
 
     this.placedProps = props;
     this.placedProps.forEach((p) => this.createPropSprite(p));
@@ -4588,6 +4603,39 @@ export class TrackBuilder3D {
     return prop;
   }
 
+  private easyGhost: THREE.Object3D | null = null;
+  private easyGhostType: string | null = null;
+
+  /** Where Easy Build would put a piece (the pose easyDrop uses, before scenery's own little turn). */
+  easyPlacement(type: string, share: number, spot: RoadSpot, side: 1 | -1 = 1): { x: number; y: number; z: number; rotY: number } {
+    if (isRaceMarkType(type)) {
+      const line = roadPoseAt(courseTrackSpace(this.courseId as CourseId), engineXOfShare(share));
+      return { x: line.x, y: line.y, z: line.z, rotY: line.rotY };
+    }
+    const pose = this.easyRoadPose(share, spot, side, type);
+    return { x: pose.x, y: pose.y, z: pose.z, rotY: pose.rotY };
+  }
+
+  /** The hologram of the piece Easy Build is about to drop, standing where it would land (null hides it). */
+  showEasyGhost(type: string | null, share = 0, spot: RoadSpot = 'middle', side: 1 | -1 = 1) {
+    if (!type || !isKitType(type)) {
+      if (this.easyGhost) this.easyGhost.visible = false;
+      return;
+    }
+    if (this.easyGhostType !== type || !this.easyGhost) {
+      if (this.easyGhost) this.scene.remove(this.easyGhost);
+      this.easyGhost = ghostKitObject(type, this.kit.lowTierModels);
+      this.easyGhost.name = 'EasyGhost';
+      this.easyGhost.userData.isKitGhost = true;
+      this.easyGhostType = type;
+      this.scene.add(this.easyGhost);
+    }
+    const at = this.easyPlacement(type, share, spot, side);
+    this.easyGhost.position.set(at.x, at.y, at.z);
+    this.easyGhost.rotation.set(0, at.rotY, 0);
+    this.easyGhost.visible = true;
+  }
+
   /** Where the race pieces and stunts stand along the course (0..1), for Easy Build's road strip. */
   easyMarkers(types: ReadonlySet<string>): { id: string; type: string; share: number }[] {
     const space = courseTrackSpace(this.courseId as CourseId);
@@ -4636,6 +4684,8 @@ export class TrackBuilder3D {
     if (this.ghostMesh) this.scene.remove(this.ghostMesh);
     this.selectionBoxes.forEach((box) => this.scene.remove(box));
     this.selectionBoxes.clear();
+    this.selectionRings.forEach((ring) => this.scene.remove(ring));
+    this.selectionRings.clear();
     if (this.rotationHandle) this.scene.remove(this.rotationHandle);
     for (const prop of [...this.placedProps]) this.removePropObject(prop);
     this.propObjects.forEach((s) => this.scene.remove(s));

@@ -34,6 +34,8 @@ const SETS: Record<string, SetConfig> = {
   'ui-icons': { raw: 'art-src/ui/raw', out: 'public/art/ui/icons', publicPrefix: '/art/ui/icons', master: 256 },
   // Billboard clouds round the island (docs/tickets/art/ART-CLOUDS.md): 512 wide is plenty at sky distance.
   'sky-clouds': { raw: 'art-src/clouds/raw', out: 'public/art/clouds', publicPrefix: '/art/clouds', master: 512 },
+  // Epic horizon cloud banks, wide and big (docs/tickets/art/ART-CLOUDS-EPIC.md).
+  'sky-cloud-banks': { raw: 'art-src/clouds/banks/raw', out: 'public/art/clouds/banks', publicPrefix: '/art/clouds/banks', master: 1536 },
   // Quick Races / Multiplayer card illustrations (docs/tickets/art/ART-MENU-CARDS.md).
   'menu-cards': { raw: 'art-src/menus/cards/raw', out: 'public/art/menus/cards', publicPrefix: '/art/menus/cards', master: 512 },
 };

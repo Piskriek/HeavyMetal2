@@ -1740,7 +1740,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="Shader Manager: blend three textures with cloud noise, and dress primitives and scenery"
             >
               <Paintbrush size={12} />
-              <span className="hidden 2xl:inline text-[11px]">Shaders</span>
+              <span className="hidden min-[1800px]:inline text-[11px]">Shaders</span>
             </button>
             </>)}
 
@@ -1758,7 +1758,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Choose Skydome Environment & Atmosphere"
               >
                 <Sun size={12} />
-                <span className="hidden 2xl:inline text-[11px]">Sky: {skyMode === 'gradient' ? 'Gradient' : SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
+                <span className="hidden min-[1800px]:inline text-[11px]">Sky: {skyMode === 'gradient' ? 'Gradient' : SKY_PRESETS[currentSky]?.name.split(' (')[0] ?? 'Azure Isles'}</span>
                 <ChevronDown size={10} />
               </button>
 
@@ -1818,7 +1818,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="View placed props hierarchy in scene"
             >
               <Layers size={13} />
-              <span className="text-[11px]"><span className="hidden 2xl:inline">Props </span>{placedProps.length}</span>
+              <span className="text-[11px]"><span className="hidden min-[1800px]:inline">Props </span>{placedProps.length}</span>
             </button>
 
             {/* The island itself: its ground settings, paint and sun shadows in the attribute window */}
@@ -1832,7 +1832,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="Select the island: its terrain, paint and sun shadows in the attribute window"
             >
               <Mountain size={13} />
-              <span className="hidden 2xl:inline text-[11px]">Island</span>
+              <span className="hidden min-[1800px]:inline text-[11px]">Island</span>
             </button>
             </>)}
           </div>
@@ -1885,7 +1885,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Camera views"
               >
                 <Camera size={12} className="text-amber-400" />
-                <span className="hidden 2xl:inline text-[11px] capitalize">{cameraPreset} View</span>
+                <span className="hidden min-[1800px]:inline text-[11px] capitalize">{cameraPreset} View</span>
                 <ChevronDown size={10} />
               </button>
 
@@ -1899,7 +1899,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                       builder.setCameraPreset('fly');
                       setCameraPreset('fly');
                       setShowCameraMenu(false);
-                      showToast('Camera: Perspective Free-Fly [WASD + Right-Drag]');
+                      showToast('Camera: free fly (WASD, right-drag to look)');
                       onRequestRender?.();
                     }}
                     className={`builder-dropdown-item ${cameraPreset === 'fly' ? 'bg-amber-950/70 text-amber-200 font-bold border-amber-600/50' : ''}`}
@@ -1989,7 +1989,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 title="Surface alignment, snapping, billboard & decal placement options"
               >
                 <Magnet size={12} className={alignToTrack || snapToCenterline ? 'text-amber-400' : 'text-zinc-400'} />
-                <span className="hidden 2xl:inline text-[11px]">Snapping</span>
+                <span className="hidden min-[1800px]:inline text-[11px]">Snapping</span>
                 <ChevronDown size={10} />
               </button>
 
@@ -2301,7 +2301,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                           showToast(`Focused on ${p.name}`);
                         }}
                         className="p-1 text-zinc-400 hover:text-amber-300 bg-zinc-800 hover:bg-zinc-700 rounded"
-                        title="Focus Camera [F]"
+                        title={`Frame it [${keyLabel('camera.focus')}]`}
                       >
                         <Eye size={12} />
                       </button>
@@ -2521,7 +2521,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 }}
                 className="text-[10px] text-amber-300 hover:text-amber-200 underline cursor-pointer"
               >
-                Cycle [5]
+                Cycle [{keyLabel('edit.nudgeAxis')}]
               </button>
             </div>
             <div className="grid grid-cols-4 gap-1 pt-1">
@@ -2569,7 +2569,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
 
           {/* Group Orbit Rotation (Yaw around Centroid) */}
           <div className="flex flex-col gap-1 text-xs">
-            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid) [E: rotate gizmo]:</span>
+            <span className="text-zinc-400 font-medium">Orbit Yaw (around Centroid) [{keyLabel('gizmo.rotate')}: rotate handles]:</span>
             <div className="grid grid-cols-7 gap-1">
               {[-90, -45, -15, 15, 45, 90, 180].map((deg) => (
                 <button
@@ -2625,7 +2625,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               title="Flip / Mirror all items horizontally [Key: X]"
             >
               <RotateCw size={13} />
-              <span>Mirror Selection [X]</span>
+              <span>Mirror Selection [{keyLabel('edit.flip')}]</span>
             </button>
           </div>
 
@@ -2765,9 +2765,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 }
               }}
               className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 text-cyan-300 rounded border border-zinc-700/60 font-medium cursor-pointer"
-              title="Focus Camera [F]"
+              title={`Frame it [${keyLabel('camera.focus')}]`}
             >
-              <Eye size={13} /> Focus [F]
+              <Eye size={13} /> Focus [{keyLabel('camera.focus')}]
             </button>
             <button
               onClick={() => {
@@ -2788,7 +2788,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 onRequestRender?.();
               }}
               className="flex items-center justify-center px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded font-bold shadow-lg shadow-red-600/30 cursor-pointer"
-              title="Delete Group [Del / Backspace]"
+              title={`Delete the group [${keyLabel('edit.delete')}]`}
             >
               <Trash2 size={14} /> DELETE
             </button>
@@ -2963,7 +2963,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
               }}
               className="text-[10px] text-amber-300 hover:text-amber-200 underline cursor-pointer"
             >
-              Cycle [5]
+              Cycle [{keyLabel('edit.nudgeAxis')}]
             </button>
           </div>
 
@@ -3094,7 +3094,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
           {/* Rotation Y */}
           <div className="flex flex-col gap-1 text-xs">
             <div className="flex justify-between text-zinc-400">
-              <span>Rotation Y (Yaw) [E: rotate gizmo]:</span>
+              <span>Rotation Y (Yaw) [{keyLabel('gizmo.rotate')}: rotate handles]:</span>
               <span className="text-amber-300 font-mono">{Math.round((selectedProp.rotY * 180) / Math.PI)}°</span>
             </div>
             <input
@@ -3310,7 +3310,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                         </span>
                       </div>
                       <p className="text-[10px] text-zinc-400 leading-tight">
-                        Spins decal flat on the surface without detaching from slope [E: rotate gizmo]:
+                        Spins decal flat on the surface without detaching from slope [{keyLabel('gizmo.rotate')}: rotate handles]:
                       </p>
                       <input
                         type="range"
@@ -3887,9 +3887,9 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 showToast(`Focused camera on ${selectedProp.name}`);
               }}
               className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-zinc-900 hover:bg-zinc-800 text-amber-300 rounded border border-zinc-700/60 font-medium"
-              title="Focus Camera [F]"
+              title={`Frame it [${keyLabel('camera.focus')}]`}
             >
-              <Eye size={13} /> Focus [F]
+              <Eye size={13} /> Focus [{keyLabel('camera.focus')}]
             </button>
             <button
               onClick={() => builder.duplicateSelected()}
@@ -3904,7 +3904,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
                 showToast('Deleted prop');
               }}
               className="flex items-center justify-center px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded font-bold shadow-lg shadow-red-600/30 cursor-pointer"
-              title="Delete Prop [Del / Backspace]"
+              title={`Delete [${keyLabel('edit.delete')}]`}
             >
               <Trash2 size={14} /> DELETE
             </button>
@@ -4632,7 +4632,7 @@ export default function TrackBuilderUI({ builder, canvas, onClose, onTestRace, o
       <CheatSheet isOpen={showCheatSheet} onClose={() => setShowCheatSheet(false)} bindings={bindings} mode={editorMode} onChange={(o) => { setKeyOverrides(o); writeKeyOverrides(o); }} />
 
       {/* Zen Mode Restore Floating Button */}
-      {isZen && <ZenRestore onRestore={() => setIsZen(false)} />}
+      {isZen && <ZenRestore onRestore={() => setIsZen(false)} keyLabel={keyLabel('view.zen')} />}
     </div>
   );
 }

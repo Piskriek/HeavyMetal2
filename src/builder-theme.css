@@ -537,7 +537,6 @@
 
 /* Compact icon tool buttons with a tooltip label (the title) and a key badge. */
 .forge-tool {
-  position: relative;
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   height: 28px; min-width: 28px; padding: 0 8px;
   border-radius: 5px; border: 1px solid #34422f;

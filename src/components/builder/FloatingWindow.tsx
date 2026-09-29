@@ -50,7 +50,7 @@ export default function FloatingWindow({ title, storageKey, initial, width = 460
       className="forge-theme fixed z-[60] pointer-events-auto max-w-[calc(100vw-1rem)] bg-zinc-950/95 border border-amber-500/60 rounded-lg shadow-2xl backdrop-blur-md text-amber-100 flex flex-col"
     >
       <div
-        className="flex items-center gap-2 px-2.5 py-1.5 border-b border-zinc-800 cursor-move select-none touch-none"
+        className="flex items-center gap-2 px-2.5 py-1.5 border-b border-amber-900/60 bg-gradient-to-b from-amber-950/70 to-transparent rounded-t-lg cursor-move select-none touch-none"
         onPointerDown={(e) => {
           if ((e.target as HTMLElement).closest('button')) return;
           drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
@@ -66,7 +66,7 @@ export default function FloatingWindow({ title, storageKey, initial, width = 460
         onPointerUp={() => { if (drag.current) { drag.current = null; remember(pos); } }}
       >
         <GripHorizontal size={14} className="text-zinc-500" />
-        <span className="flex-1 text-xs font-bold text-amber-300">{title}</span>
+        <span className="forge-title flex-1 text-[12px] font-bold text-amber-300">{title}</span>
         <button
           onClick={() => setFolded((f) => !f)}
           className="p-0.5 text-zinc-400 hover:text-amber-200 cursor-pointer"

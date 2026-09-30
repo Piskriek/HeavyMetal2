@@ -177,6 +177,23 @@ All destruction families are governed by [`docs/ISLAND_DESTRUCTION_AND_CHUNK_STA
 
 All coverage assets are governed by [`docs/ISLAND_DENSE_COVERAGE_STANDARD.md`](../../../docs/ISLAND_DENSE_COVERAGE_STANDARD.md). Production meshes retain selected perimeter hero forms, replace the dense center with optimized shells/textures, and use aggressive LOD/impostors.
 
+## Batch 11 — landmarks, secrets, and utility props
+
+![Batch 11 story-prop contact sheet](./review/batch-11-story-props-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 98 | `goblin-lighthouse` | Crooked coastal lighthouse | pass | Strong tower silhouette with external stairs, lantern room, radial and underside coverage. |
+| 99 | `shipwreck-hull` | Broken sailing hull | pass | Stable broadside/bow/stern/interior identity and connected LOD-safe ribs. |
+| 100 | `crashed-goblin-balloon` | Deflated balloon wreck | **weak—regenerate** | Basket is readable, but the envelope currently resembles a rock/sack more than patched balloon fabric. |
+| 101 | `goblin-marble-shrine` | Marble-idol shrine | pass | Strong stepped altar, sphere and paired brazier hierarchy with useful top view. |
+| 102 | `armored-sheep-statue` | Armored sheep monument | pass | Stable heroic sheep silhouette and actual monument plinth; armor should be clarified during cleanup. |
+| 103 | `kraken-tentacle-arch` | Three-tentacle arch | pass | Broad LOD-safe curves, large suckers and race-clear negative space. |
+| 104 | `skeleton-treasure-setpiece` | Skeleton and treasure | pass | Connected storytelling silhouette, blank sign and grouped LOD-safe treasure details. |
+| 105 | `dock-supply-cluster` | Crates, barrels, rope and anchor | pass | Dense asymmetrical utility cluster with strong top and perimeter silhouettes. |
+| 106 | `goblin-ore-cart` | Loaded mine cart | pass | Stable hopper, wheel, axle and ore identity from all required views. |
+| 107 | `modular-mine-rail-segment` | Straight mine rail | pass | Exact repeatable form with open sleepers, approach/end and top/underside coverage. |
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

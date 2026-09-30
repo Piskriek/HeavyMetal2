@@ -313,7 +313,33 @@ Family dimensions below describe the complete review-kit envelope. Runtime chunk
 
 ---
 
-## 13. Texture density by class
+## 13. Batch 11 — landmarks, secrets, and utility props
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 98 | Goblin lighthouse | `9 × 9 × 18 m` | Slightly taller than windmill; major coastal skyline landmark | 24,000 | 12,000 / 4,000 + impostor |
+| 99 | Shipwreck hull | `18 × 7 × 7 m` | Bridge-span length and workshop height; broad shoreline landmark | 24,000 | 12,000 / 4,000 |
+| 100 | Crashed balloon | `10 × 7 × 5 m` | Workshop footprint but lower; compact ledge story prop | 16,000 | 8,000 / 2,800 |
+| 101 | Marble shrine | `7 × 5 × 5 m` | Similar footprint to lava vent; sphere roughly two ball diameters | 14,000 | 7,000 / 2,400 |
+| 102 | Armored sheep statue | `5 × 3 × 5 m` | Roughly shack height on a narrow monument footprint | 12,000 | 6,000 / 2,000 |
+| 103 | Kraken tentacle arch | `14 × 8 × 10 m` | Race-clear opening spans standard road; tunnel-height landmark | 18,000 | 9,000 / 3,000 |
+| 104 | Skeleton treasure set | `4 × 3 × 2.5 m` | Slightly above doorway height; compact close-range secret | 14,000 | 7,000 / 2,200 |
+| 105 | Dock supply cluster | `5 × 4 × 3 m` | Medium prop pile; approximately two lanes wide | 10,000 | 5,000 / 1,600 |
+| 106 | Goblin ore cart | `3 × 2 × 2 m` | Door-height vehicle prop; clear beside 1 m racing ball | 10,000 | 5,000 / 1,600 |
+| 107 | Mine rail segment | `2 × 8 × 0.3 m` | Eight-ball repeat length; narrow utility route | 4,000 | 2,000 / 700 |
+
+### Landmark and prop notes
+
+- Lighthouse, shipwreck and tentacles need impostor/HLOD treatment when visible across the island.
+- Skeleton, treasure, cart and supply props preserve silhouette details but bake coins, grain, wicker and small hardware into PBR maps.
+- Balloon cloth requires broad connected folds; no thin loose fabric or rope geometry at distant LOD.
+- Tentacle suckers reduce to Normal/Height detail after LOD0 except those affecting outer silhouette.
+- Mine rails retain exact connectors and gauge; repeated segments instance and avoid doubled sleepers.
+- Landmark practical lights, lava glow and other emissives remain separate material channels.
+
+---
+
+## 14. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -329,7 +355,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 14. Acceptance and variance
+## 15. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

@@ -181,8 +181,27 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M073 | Salt and mineral deposits | Tide marks, drip fans, rings and crystalline blooms | Pass. Broad readable deposits suitable for cliffs, masonry, metal and timber. |
 | M074 | Waterline growth | Algae, seaweed, barnacles and wet staining | **Weak—regenerate.** Content variety is strong, but generated channel labels violate the clean-sheet standard. |
 
+## Material Batch 09 — aerial grand-landscape materials
+
+![Material Batch 09 aerial-landscape contact sheet](./review/material-batch-09-aerial-landscapes-contact-sheet.jpg)
+
+| ID | Macro landscape | Nominal coverage | Status and production note |
+|---|---|---:|---|
+| M075 | Patchwork farmland | `512 × 512 m` | Pass. Strong field boundaries, crop variation and shallow drainage suitable for grand vistas. |
+| M076 | Terraced hills | `512 × 512 m` | Pass. Excellent contour rhythm and broad stepped height language; randomize rotation with care. |
+| M077 | Alpine mountain ridges | `1 × 1 km` | Pass. Strong watershed structure, branching valleys and usable displacement guide. |
+| M078 | Volcanic mountain field | `1 × 1 km` | Weak—regenerate. Flow structure is strong, but bright crater centers can read as emissive or baked lighting. |
+| M079 | Temperate forest canopy | `512 × 512 m` | Pass. Broad clustered crown masses read from satellite distance without micro-tree noise. |
+| M080 | Tropical jungle canopy | `512 × 512 m` | **Weak—regenerate.** Useful canopy structure, but generated channel labels violate the clean-sheet standard. |
+| M081 | Meandering river valley | `1 × 1 km` | Pass. Clear river/floodplain/upland hierarchy and useful flow/height masks. |
+| M082 | Coastal wetlands | `512 × 512 m` | Pass. Strong channel network, mudflats and mangrove islands for expansive coastal scenes. |
+| M083 | Highland moor and scrub | `512 × 512 m` | **Weak—regenerate.** Good macro breakup but contains forbidden generated channel labels. |
+| M084 | Desert dune sea | `1 × 1 km` | **Weak—regenerate.** Dune forms are useful, but generated headings and channel labels must be removed. |
+
+These are macro terrain layers, not replacements for near-ground materials or geometry. Their runtime role, nested scale stack, displacement limits and biome spawning rules are defined in [`docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md`](../../../docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md).
+
 ## Next material batches
 
-### Batch 09 — flora, markings, damage, and utility decals
+### Batch 10 — flora, markings, damage, and utility decals
 
 Flower scatter, pollen, mushrooms, coral growth, goblin doodles, number-free racing symbols, weld heat, impact scorch, bullet/dart dents, patched fabric, tape, warning stickers without text, and clean/dirty wipe masks.

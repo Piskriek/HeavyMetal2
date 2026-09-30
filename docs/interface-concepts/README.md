@@ -8,14 +8,16 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 The concepts establish a **white-void racing collage with tactile PBR splashes and minimalist goblin doodle-grunge**. [Issue #63](https://github.com/Piskriek/HeavyMetal2/issues/63) is the composition reference for the calm minimalist baseline:
 
-- bright warm-white enamel and pale ceramic/polymer surfaces dominate every screen;
-- panels are thin, flat and shaped by useful negative space, stencil apertures, silhouette wells, notches and exposed white void;
+- bright warm-white enamel and pale ceramic/polymer surfaces dominate every screen as a believable three-dimensional gallery/workshop void;
+- every interface panel, tab, button, card, thumbnail and content frame uses sharp square corners, straight machined cuts and a precise rectilinear grid—no rounded rectangles, pill controls or soft card chrome;
 - smooth gunmetal connector strips physically join panel islands with small visible gold rivets;
 - vivid ultraviolet, hot magenta, electric cyan and racing orange lines form one or two purposeful perspective sweeps rather than filling the interface with glow;
 - thumbnails, material chips and selected previews are small windows into tactile PBR surfaces—skin, bark, foliage, stone, paint, cloth, water and metal show coherent neutral lighting, relief, roughness and metallic response;
-- acid green appears as an occasional hand-painted swipe behind an active or verified state rather than a full panel fill;
-- sparse black hand-inked goblin doodles—teeth, crooked arrows, eyes, crowns, wheels, flames and mischievous faces—bring irreverent South African street-zine energy together with appealing animated-feature character;
-- restrained physical weathering consists of chipped white enamel, fine scratches, faded overspray and scuffs—the design remains predominantly clean and flat;
+- paint is physically transformative: controlled green, magenta or cyan spills cross a content-window sill and convert a small patch of pristine white floor into PBR soil, moss, roots, leaf litter, basalt, ferns and context-specific props growing from the spill;
+- a small recurring punk goblin racer sleeps beside open paint cans and a brush at the lower-right corner of the framed content area, making the workspace feel inhabited without blocking content or controls;
+- acid green also appears as an occasional hand-painted swipe behind an active or verified state rather than a full panel fill;
+- sparse black hand-inked goblin doodles—teeth, crooked arrows, eyes, crowns, wheels, flames and mischievous faces—and a few colored handprints bring irreverent street-zine energy together with appealing animated-feature character;
+- restrained physical weathering consists of fine contact scratches, tiny enamel chips and faded overspray—the design remains predominantly clean and flat;
 - sharp modern condensed sans-serif typography uses charcoal text, bold numerics and strong editorial hierarchy;
 - the 3D viewport remains the primary detailed surface while surrounding UI behaves like lightweight racing bodywork;
 - context appears near the action instead of permanently consuming the screen.
@@ -23,13 +25,16 @@ The concepts establish a **white-void racing collage with tactile PBR splashes a
 ### Visual guardrails
 
 - White void must remain the largest color field; do not regress to heavy dark boxed panels.
+- **Zero rounded UI chrome:** corner radius is `0` for panels, cards, buttons, tabs, docks, thumbnails and windows. Circular controls are allowed only when their function is inherently radial, and their containing frame remains angular.
 - Cutouts must clarify grouping or create a useful silhouette, not become random decorative holes.
 - Perspective racing lines should point toward interaction and data flow; keep them out of text blocks and viewport focal areas.
 - PBR previews use one shared neutral lighting rig so roughness and metallic differences are meaningful; never bake dramatic colored lighting into material thumbnails.
 - Detailed material splashes belong inside thumbnails, swatches and selected-preview windows—not behind labels or across whole panels.
+- The paint-to-PBR growth vignette occupies only the lower sill and a small adjacent floor area. It must have a clean readable boundary, retain white negative space and never grow across controls.
+- The sleeping racer is one consistent recurring character at a small scale, always subordinate to the current content, always near paint cans in the lower-right content-frame corner, and never used as a button or status indicator.
 - Gold is reserved for physical rivets and tiny connection details, never broad ornamental frames.
 - Acid-green paint marks may emphasize only a small number of active, accepted or verified states.
-- Doodles are a controlled authored icon library, not random graffiti: place them in dead margins, keep their line weight consistent, and never let them replace icons, labels, focus indicators or accessibility states.
+- Doodles and handprints are a controlled authored library, not random graffiti: place them on background walls or dead margins, keep line weight consistent, and never let them replace icons, labels, focus indicators or accessibility states.
 - Use original street-zine/goblin motifs rather than reproducing a specific performer's, studio's or artist's protected characters or artwork.
 - Grunge belongs at edges and contact points. Controls, labels, sliders, maps and numeric telemetry remain crisp.
 - Purple/magenta denotes active or selected; cyan denotes links, masks and geometry; orange denotes motion or caution; red remains failure/destructive.

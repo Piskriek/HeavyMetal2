@@ -158,6 +158,25 @@ Reference sheets normalize framing so each object can be inspected. Their actual
 
 All destruction families are governed by [`docs/ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md`](../../../docs/ISLAND_DESTRUCTION_AND_CHUNK_STANDARD.md). The carved/sculpted result is authoritative; these reusable chunks provide pooled impact presentation.
 
+## Batch 10 — dense coverage and texture-bake masses
+
+![Batch 10 dense-coverage contact sheet](./review/batch-10-dense-coverage-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 88 | `dense-palm-grove-coverage` | Dense palm grove | pass | Strong perimeter palms, compact root zone and opaque understory/canopy core. |
+| 89 | `dense-broadleaf-forest-coverage` | Broadleaf forest mass | pass | Interlocking canopy lobes and thick trunks form a stable distant silhouette. |
+| 90 | `dense-fern-understory-coverage` | Fern/understory mat | pass | Low continuous coverage with recognizable perimeter ferns and dense texture-ready center. |
+| 91 | `dense-jungle-edge-coverage` | Mixed jungle edge | pass | Dense palm/broadleaf edge with thick overlapping end lobes and strong elevated-camera top view. |
+| 92 | `dense-highland-scrub-coverage` | Windswept scrub field | pass | Shared wind direction, broad rock/grass base and durable sparse-tree contour. |
+| 93 | `dense-rock-scree-field-coverage` | Rock/scree field | pass | Large perimeter rocks and tightly merged interior rubble eliminate micro gaps. |
+| 94 | `dense-beach-driftwood-coverage` | Driftwood beach pile | pass | Overlapping roots/trunks create broad close and distant silhouettes without loose sticks. |
+| 95 | `dense-timber-scrap-pile-coverage` | Timber scrap pile | pass | Strong diagonal beam hierarchy and compact texture-bake-ready interior. |
+| 96 | `dense-masonry-salvage-pile-coverage` | Masonry/industrial salvage | pass | Broad masonry steps and iron arcs surround a dense low-hole center. |
+| 97 | `dense-lava-rubble-coverage` | Lava rubble field | pass | Continuous crust mass, strong perimeter rocks and restrained broad emissive creases. |
+
+All coverage assets are governed by [`docs/ISLAND_DENSE_COVERAGE_STANDARD.md`](../../../docs/ISLAND_DENSE_COVERAGE_STANDARD.md). Production meshes retain selected perimeter hero forms, replace the dense center with optimized shells/textures, and use aggressive LOD/impostors.
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

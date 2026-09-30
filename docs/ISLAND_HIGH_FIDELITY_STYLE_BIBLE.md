@@ -223,6 +223,10 @@ Foliage remains outside protected racing sightlines and collision corridors.
 
 ---
 
+## 8.1 Dense coverage assets
+
+Forests, understory mats, rock fields, and salvage piles use the hybrid perimeter-plus-interior-shell method in [`ISLAND_DENSE_COVERAGE_STANDARD.md`](./ISLAND_DENSE_COVERAGE_STANDARD.md). They must read from distance, keep intentional top silhouettes for elevated cameras, bake dense interiors into optimized textures/impostors, and avoid micro holes, floating details, and hidden full-resolution source meshes.
+
 ## 9. Lighting and atmosphere target
 
 Reference sheets use the neutral studio rig above. The island uses a separate but locked cinematic rig:

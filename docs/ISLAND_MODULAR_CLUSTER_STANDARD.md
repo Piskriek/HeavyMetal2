@@ -211,6 +211,10 @@ A 5k-triangle transparent cluster can cost more than a 15k opaque rock cluster. 
 
 ---
 
+## 8.1 Dense coverage specialization
+
+When a cluster's purpose is broad forest, groundcover, rubble, or salvage coverage rather than individually readable components, apply [`ISLAND_DENSE_COVERAGE_STANDARD.md`](./ISLAND_DENSE_COVERAGE_STANDARD.md). Preserve selected perimeter hero forms, replace hidden interior objects with optimized shells/textures, and target distant silhouette and impostor quality instead of keeping full source topology.
+
 ## 9. LOD construction rules
 
 ### LOD0 — close range

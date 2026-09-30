@@ -286,7 +286,34 @@ Family dimensions below describe the complete review-kit envelope. Runtime chunk
 
 ---
 
-## 12. Texture density by class
+## 12. Batch 10 — dense coverage and texture-bake masses
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 88 | Dense palm grove | `18 × 14 × 13 m` | Several palm crowns across roughly six lanes; one broad tropical coverage cell | 18,000 | 9,000 / 3,000 + impostor |
+| 89 | Dense broadleaf forest | `22 × 18 × 12 m` | Wider than jungle tree pair; major forest coverage cell | 20,000 | 10,000 / 3,200 + impostor |
+| 90 | Dense fern/understory mat | `12 × 9 × 2.5 m` | One road-module footprint and near doorway height | 8,000 | 4,000 / 1,200 + impostor |
+| 91 | Dense jungle edge | `24 × 8 × 10 m` | Long biome-edge strip; approximately eight lanes long | 20,000 | 10,000 / 3,200 + impostor |
+| 92 | Dense highland scrub | `16 × 11 × 7 m` | Medium exposed-slope coverage with low tree crowns | 14,000 | 7,000 / 2,200 + impostor |
+| 93 | Dense rock/scree field | `18 × 14 × 5 m` | Broad rubble cell larger than boulder cluster and below cliff height | 12,000 | 6,000 / 2,000 |
+| 94 | Dense beach driftwood | `14 × 8 × 3 m` | Long low shoreline pile; slightly above doorway height | 10,000 | 5,000 / 1,600 |
+| 95 | Dense timber scrap pile | `10 × 8 × 4 m` | Workshop-scale clutter mass; below shack roof height | 12,000 | 6,000 / 1,800 |
+| 96 | Dense masonry salvage | `11 × 9 × 4.5 m` | Roughly one road-module footprint; dense settlement/industrial pile | 14,000 | 7,000 / 2,200 |
+| 97 | Dense lava rubble | `16 × 12 × 3.5 m` | Broad volcanic coverage cell; below vent height | 12,000 | 6,000 / 1,800 + emissive impostor |
+
+### Dense-coverage notes
+
+- These budgets assume perimeter hero forms plus a simplified interior shell, not complete source models hidden inside the center.
+- Remove buried geometry and bake dense interior detail to shared atlases or impostors.
+- LOD2 retains outer contour and several anchor forms; the interior becomes one or two broad shells.
+- Vegetation budgets are also constrained by alpha overdraw, wind vertices, shadow cards, and material count.
+- Use one material where possible and no more than two for normal coverage assets.
+- Collision uses coarse hulls only; groundcover is commonly non-colliding.
+- See [`ISLAND_DENSE_COVERAGE_STANDARD.md`](./ISLAND_DENSE_COVERAGE_STANDARD.md) for shell, bake, silhouette, collision, placement, and impostor rules.
+
+---
+
+## 13. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -302,7 +329,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 13. Acceptance and variance
+## 14. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

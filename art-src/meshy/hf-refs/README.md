@@ -210,6 +210,23 @@ All coverage assets are governed by [`docs/ISLAND_DENSE_COVERAGE_STANDARD.md`](.
 | 115 | `track-boost-inlay` | Boost-pad inlay | pass | Clean flush frame, three broad chevrons and separate dim emissive channels. |
 | 116 | `waterfall-sheet-mesh` | Shader-ready waterfall ribbon | pass with shader constraint | Geometry provides only broad flow silhouette; opacity, scrolling water, foam and motion remain shader/VFX work. |
 
+## Batch 13 — runtime VFX support geometry
+
+![Batch 13 VFX-support contact sheet](./review/batch-13-vfx-support-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 117 | `shoreline-foam-ribbon-mesh` | Foam edge ribbon | pass | Clean scalloped outline and thin regular shader-ready surface. |
+| 118 | `waterfall-splash-ring-mesh` | Splash ring | pass | Broad connected lobes and low center sheet with no tiny droplets. |
+| 119 | `mist-card-cluster` | Mist card volume | pass | Simple intersecting translucent cards with complete radial/top coverage. |
+| 120 | `smoke-emitter-housing` | Chimney emitter cap | **weak—regenerate** | Generation repeated a full pipe cluster instead of isolating the small emitter cap/housing. |
+| 121 | `steam-vent-emitter` | Ground steam vent | pass | Strong flush collar, broad holes, brass insert and emitter socket layout. |
+| 122 | `lava-crack-decal-mesh` | Emissive crack decal | pass | Thick branching shape with no micro tendrils and clear top/grazing views. |
+| 123 | `lantern-flame-insert` | Flame/glow insert | pass | Broad three-tongue silhouette and compact mounting socket; runtime emissive/flicker remains separate. |
+| 124 | `impact-dust-card-cluster` | Dust burst cards | pass with cleanup constraint | Useful radial mass; production must preserve intersecting card construction rather than solid petal volume. |
+| 125 | `leaf-burst-card-cluster` | Foliage burst cards | pass | Broad grouped leaf cards and radial layout suitable for spin/fade animation. |
+| 126 | `boost-trail-ribbon-cluster` | Boost trail ribbons | pass | Three clean tapered ribbons with shared mount and useful side/top profiles. |
+
 ## Shared review result
 
 - One object identity per sheet with multiple useful angles.

@@ -366,7 +366,34 @@ Family dimensions below describe the complete review-kit envelope. Runtime chunk
 
 ---
 
-## 15. Texture density by class
+## 15. Batch 13 — runtime VFX support geometry
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 117 | Shoreline foam ribbon | `16 × 2 × 0.05 m` | Long shore edge, narrower than one lane | 400 | 200 / shader proxy |
+| 118 | Waterfall splash ring | `8 × 6 × 1.5 m` | Plunge-pool center scale with low splash height | 600 | 300 / shader proxy |
+| 119 | Mist card cluster | `8 × 6 × 4 m` | Pool-scale atmospheric volume | 120 | 60 / billboard |
+| 120 | Smoke emitter housing | `2 × 2 × 2.5 m` | Small chimney-cap module | 4,000 | 2,000 / 600 |
+| 121 | Steam vent emitter | `2.5 × 2.5 × 0.8 m` | Low terrain/road-flush vent | 4,000 | 2,000 / 600 |
+| 122 | Lava crack decal | `8 × 5 × 0.04 m` | Multi-lane terrain overlay | 500 | 250 / shader proxy |
+| 123 | Lantern flame insert | `0.35 × 0.35 × 0.8 m` | Fits lantern housing; sub-ball scale | 200 | 80 / billboard |
+| 124 | Impact dust cards | `3 × 3 × 2 m` | Local ball-impact volume | 150 | 70 / billboard |
+| 125 | Leaf burst cards | `3 × 3 × 2.5 m` | Local foliage-impact volume | 150 | 70 / billboard |
+| 126 | Boost trail ribbons | `1.5 × 8 × 0.8 m` | Ball-width trail extending eight diameters | 300 | 150 / shader proxy |
+
+### VFX-support notes
+
+- These triangle budgets are ceilings; card/ribbon meshes should usually be far below them.
+- Opacity, UV scrolling, distortion, depth fade, soft particles, emissive and animation provide detail.
+- Do not model droplets, smoke wisps, sparks, foam bubbles, dust grains or individual flying leaves.
+- Disable collision and shadow casting unless a specific effect requires it.
+- Pool all effect meshes and materials; no runtime mesh creation.
+- Overdraw, fill rate and particle count are more important than triangle count for translucent effects.
+- Use camera-facing billboards or shader proxies for distant LOD.
+
+---
+
+## 16. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -382,7 +409,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 16. Acceptance and variance
+## 17. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

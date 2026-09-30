@@ -339,7 +339,34 @@ Family dimensions below describe the complete review-kit envelope. Runtime chunk
 
 ---
 
-## 14. Texture density by class
+## 14. Batch 12 — industrial, settlement, track-detail, and VFX support
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 108 | Goblin foundry hut | `10 × 8 × 8 m` | Slightly larger/taller than workshop; one-road-width industrial building | 26,000 | 13,000 / 4,500 |
+| 109 | Chimney/pipe cluster | `5 × 4 × 9 m` | Narrow industrial vertical accent; below watchtower height | 14,000 | 7,000 / 2,200 + impostor |
+| 110 | Work platform | `8 × 6 × 4 m` | One broad modular deck; lower than workshop doorway-plus-roof | 14,000 | 7,000 / 2,500 |
+| 111 | Dock pier segment | `6 × 12 × 5 m` | Two-lane deck width and one road-module length | 16,000 | 8,000 / 2,800 |
+| 112 | Patched market awning | `6 × 4 × 4 m` | Two-lane-width shelter; below shack roof | 10,000 | 5,000 / 1,600 |
+| 113 | Goblin tool rack | `3 × 1 × 2.5 m` | Door-height close prop; compact workshop dressing | 8,000 | 4,000 / 1,200 |
+| 114 | Track drainage grate | `3 × 1 × 0.25 m` | One lane wide and road-flush | 2,500 | 1,200 / 400 |
+| 115 | Track boost inlay | `6 × 3 × 0.20 m` | Two lanes long by one lane wide; road-flush | 4,000 | 2,000 / 650 |
+| 116 | Waterfall ribbon mesh | `6 × 1 × 12 m` | Two lanes wide, cliff-module height | 800 | 400 / 120 or shader proxy |
+
+### Industrial and VFX-support notes
+
+- Foundry lights, fire, smoke, steam and glow remain separate runtime effects/material channels.
+- Pipe interiors and hidden building faces are removed; only visible routing and silhouette receive geometry.
+- Dock piles and platform supports require underside LOD only when visible from lower routes.
+- Cloth awning folds simplify aggressively after LOD0; small fabric weave stays in Normal/Roughness.
+- Tool silhouettes remain broad at LOD0, then bake into a rack card/atlas for distance.
+- Drainage grate openings may collapse to Normal/Opacity detail at distant LOD.
+- Boost-pad emissive is separate and does not bake glow into BaseColor.
+- Waterfall mesh remains low-poly; scrolling normal, opacity, foam, refraction and spray supply fidelity.
+
+---
+
+## 15. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -355,7 +382,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 15. Acceptance and variance
+## 16. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

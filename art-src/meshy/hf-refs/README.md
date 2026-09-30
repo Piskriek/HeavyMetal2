@@ -185,7 +185,7 @@ All coverage assets are governed by [`docs/ISLAND_DENSE_COVERAGE_STANDARD.md`](.
 |---|---|---|---|---|
 | 98 | `goblin-lighthouse` | Crooked coastal lighthouse | pass | Strong tower silhouette with external stairs, lantern room, radial and underside coverage. |
 | 99 | `shipwreck-hull` | Broken sailing hull | pass | Stable broadside/bow/stern/interior identity and connected LOD-safe ribs. |
-| 100 | `crashed-goblin-balloon` | Deflated balloon wreck | **weak—regenerate** | Basket is readable, but the envelope currently resembles a rock/sack more than patched balloon fabric. |
+| 100 | `crashed-goblin-balloon` | Deflated balloon wreck | pass | Regenerated with unmistakable radial canvas gores, crown opening, gathered neck, basket and rigging. |
 | 101 | `goblin-marble-shrine` | Marble-idol shrine | pass | Strong stepped altar, sphere and paired brazier hierarchy with useful top view. |
 | 102 | `armored-sheep-statue` | Armored sheep monument | pass | Stable heroic sheep silhouette and actual monument plinth; armor should be clarified during cleanup. |
 | 103 | `kraken-tentacle-arch` | Three-tentacle arch | pass | Broad LOD-safe curves, large suckers and race-clear negative space. |
@@ -193,6 +193,22 @@ All coverage assets are governed by [`docs/ISLAND_DENSE_COVERAGE_STANDARD.md`](.
 | 105 | `dock-supply-cluster` | Crates, barrels, rope and anchor | pass | Dense asymmetrical utility cluster with strong top and perimeter silhouettes. |
 | 106 | `goblin-ore-cart` | Loaded mine cart | pass | Stable hopper, wheel, axle and ore identity from all required views. |
 | 107 | `modular-mine-rail-segment` | Straight mine rail | pass | Exact repeatable form with open sleepers, approach/end and top/underside coverage. |
+
+## Batch 12 — industrial, settlement, track-detail, and VFX support
+
+![Batch 12 industrial/VFX contact sheet](./review/batch-12-industrial-vfx-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 108 | `goblin-foundry-hut` | Compact foundry hut | pass | Stable workshop/furnace mass, chimney, open front, roof and underside coverage. |
+| 109 | `industrial-chimney-pipe-cluster` | Chimney and pipe cluster | pass | Thick connected pipe routing and broad stacks remain readable through LOD. |
+| 110 | `work-platform-module` | Raised work platform | pass | Strong modular deck, broad stair, cross-bracing and useful top/underside views. |
+| 111 | `dock-pier-segment` | Modular pier | pass | Exact deck connectors, stout piles, side/underside bracing and bollard rhythm. |
+| 112 | `patched-market-awning` | Cloth work awning | pass | Broad connected canvas, clear four-post silhouette and stable patch layout. |
+| 113 | `goblin-tool-rack` | Connected tool rack | pass | Thick LOD-safe tool silhouettes, stable rack and complete radial coverage. |
+| 114 | `track-drainage-grate` | Road-flush grate | pass | Broad bars, frame, catch channel and exact top/profile/underside definition. |
+| 115 | `track-boost-inlay` | Boost-pad inlay | pass | Clean flush frame, three broad chevrons and separate dim emissive channels. |
+| 116 | `waterfall-sheet-mesh` | Shader-ready waterfall ribbon | pass with shader constraint | Geometry provides only broad flow silhouette; opacity, scrolling water, foam and motion remain shader/VFX work. |
 
 ## Shared review result
 

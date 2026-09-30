@@ -6,16 +6,17 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 ## Shared visual language
 
-The concepts establish a **white-void racing collage with minimalist goblin grunge**:
+The concepts establish a **white-void racing collage with tactile PBR splashes and minimalist goblin doodle-grunge**. [Issue #63](https://github.com/Piskriek/HeavyMetal2/issues/63) is the composition reference for the calm minimalist baseline:
 
-- bright matte-white enamel and pale ceramic/polymer surfaces dominate every screen;
-- panels are thin, flat and heavily shaped by die-cut negative space, stencil apertures, silhouette wells, notches and exposed white void;
+- bright warm-white enamel and pale ceramic/polymer surfaces dominate every screen;
+- panels are thin, flat and shaped by useful negative space, stencil apertures, silhouette wells, notches and exposed white void;
 - smooth gunmetal connector strips physically join panel islands with small visible gold rivets;
-- vibrant ultraviolet, hot magenta, electric cyan and racing orange lines sweep in forced perspective, converge on the active subject and communicate flow, speed, hierarchy and dependency;
-- acid green appears as hand-tagged goblin graffiti, stencil marks and scratched signatures rather than filling whole panels;
-- restrained grunge consists of chipped white enamel, fine scratches, faded overspray, scuffs and occasional drips—the design remains predominantly clean and flat;
+- vivid ultraviolet, hot magenta, electric cyan and racing orange lines form one or two purposeful perspective sweeps rather than filling the interface with glow;
+- thumbnails, material chips and selected previews are small windows into tactile PBR surfaces—skin, bark, foliage, stone, paint, cloth, water and metal show coherent neutral lighting, relief, roughness and metallic response;
+- acid green appears as an occasional hand-painted swipe behind an active or verified state rather than a full panel fill;
+- sparse black hand-inked goblin doodles—teeth, crooked arrows, eyes, crowns, wheels, flames and mischievous faces—bring irreverent South African street-zine energy together with appealing animated-feature character;
+- restrained physical weathering consists of chipped white enamel, fine scratches, faded overspray and scuffs—the design remains predominantly clean and flat;
 - sharp modern condensed sans-serif typography uses charcoal text, bold numerics and strong editorial hierarchy;
-- black silhouette cutouts provide contrast for icons, thumbnails and inactive controls;
 - the 3D viewport remains the primary detailed surface while surrounding UI behaves like lightweight racing bodywork;
 - context appears near the action instead of permanently consuming the screen.
 
@@ -23,12 +24,16 @@ The concepts establish a **white-void racing collage with minimalist goblin grun
 
 - White void must remain the largest color field; do not regress to heavy dark boxed panels.
 - Cutouts must clarify grouping or create a useful silhouette, not become random decorative holes.
-- Perspective racing lines should point toward interaction and data flow; keep them out of text blocks and detailed viewport focal areas.
+- Perspective racing lines should point toward interaction and data flow; keep them out of text blocks and viewport focal areas.
+- PBR previews use one shared neutral lighting rig so roughness and metallic differences are meaningful; never bake dramatic colored lighting into material thumbnails.
+- Detailed material splashes belong inside thumbnails, swatches and selected-preview windows—not behind labels or across whole panels.
 - Gold is reserved for physical rivets and tiny connection details, never broad ornamental frames.
-- Green goblin tags are authored accents over scratches; they never replace icons, labels, focus indicators or accessibility states.
+- Acid-green paint marks may emphasize only a small number of active, accepted or verified states.
+- Doodles are a controlled authored icon library, not random graffiti: place them in dead margins, keep their line weight consistent, and never let them replace icons, labels, focus indicators or accessibility states.
+- Use original street-zine/goblin motifs rather than reproducing a specific performer's, studio's or artist's protected characters or artwork.
 - Grunge belongs at edges and contact points. Controls, labels, sliders, maps and numeric telemetry remain crisp.
 - Purple/magenta denotes active or selected; cyan denotes links, masks and geometry; orange denotes motion or caution; red remains failure/destructive.
-- Reuse a controlled library of panel silhouettes, cutouts, rivets, scratches, goblin tags and racing-line sweeps so every workspace belongs to one system.
+- Reuse a controlled library of panel silhouettes, cutouts, rivets, scratches, paint swipes, doodles and racing-line sweeps so every workspace belongs to one system.
 - Distress may not reduce minimum contrast, target size, channel-map readability or color-blind status redundancy.
 
 ## Shared interaction model

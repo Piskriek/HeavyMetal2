@@ -6,16 +6,27 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 ## Shared visual language
 
-The concepts extend the existing Heavy Metal 2 builder and creator identity:
+The concepts establish Heavy Metal 2's **post-apocalyptic neon-grunge cyberpunk goblin-world** identity:
 
-- forged dark iron and carved stone panels;
-- aged brass borders and primary actions;
-- warm amber for active tools and editable state;
-- restrained cyan/teal for selection, links, masks, and validation;
-- crimson only for destructive actions and errors;
-- tactile workshop controls with readable modern typography;
+- battered blackened steel, welded scrap frames, distressed rubber, exposed rivets, cables, taped repairs, scratches, grime, and chipped hazard coatings;
+- toxic goblin green as the base system/status color;
+- vivid ultraviolet purple and magenta spray paint for active tools, current depth, selected presets, and authored emphasis;
+- graffiti splashes, overspray, drips, punk stickers, and stencil glyphs used around panel edges—not beneath critical text or viewport content;
+- restrained cyan for selection outlines, UV seams, links, masks, placement ghosts, and validation;
+- acid yellow for shortcuts and near-limit warnings; red reserved for destructive actions and failures;
+- sharp modern condensed sans-serif typography with bold numerics and clear hierarchy—never medieval fantasy lettering;
+- tactile hacked-together workshop controls rather than polished holograms or generic sci-fi glass;
 - the 3D viewport remains the primary surface;
 - context appears near the action instead of permanently consuming the screen.
+
+### Visual guardrails
+
+- Grunge belongs in the shell and frame; controls and labels remain crisp.
+- Purple/green contrast identifies interaction, not decoration alone.
+- Graffiti never replaces icons, labels, focus indicators, or accessibility states.
+- Distress must not reduce minimum contrast, target size, or channel-map readability.
+- Reuse a small authored library of scratches, stencils, stickers, tape, welds, and spray masks so screens look related rather than randomly dirty.
+- Keep world and character content more detailed than the surrounding interface chrome.
 
 ## Shared interaction model
 

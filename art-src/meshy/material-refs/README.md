@@ -42,12 +42,31 @@ Generated maps may look coordinated but are not mathematically derived from one 
 | M012 | Dry dusty dirt | Dry paths, shoulders, disturbed terrain | `3 × 3 m` | Pass. Broad low-relief variation supports tiling and does not over-model individual grains. |
 | M013 | Road shoulder aggregate | Track edges and repair zones | `2 × 2 m` | Pass. Controlled embedded basalt chips with clear channel correspondence. |
 | M014 | Loose mixed scree | Talus, cliff feet, gravel beds | `2 × 2 m` | Pass. Dense readable packing and useful material/color variation; add macro masks at terrain scale. |
-| M015 | Cooled lava crust | Volcanic shelves and crater | `3 × 3 m` | **Pending generation.** The generator returned no image; reserve this ID. |
+| M015 | Cooled lava crust | Volcanic shelves and crater | `3 × 3 m` | Pass after regeneration. Broad ropy folds, restrained heat staining and strong cross-channel correspondence. |
 | M016 | Molten lava | Lava pools and channels | `3 × 3 m` | Pass as mask reference. Derive BaseColor and Emissive separately and animate flow in shader. |
 | M017 | Dry coastal rock | Beach shelves and salt rock | `3 × 3 m` | Weak—regenerate. Current deep vertical cuts read as a cliff face rather than a broadly eroded tile. |
 | M018 | Wet ochre waterfall rock | Waterfall channels and wet ledges | `3 × 3 m` | Pass. Strong strata and vertical wetness language; BaseColor must exclude generated shading. |
 | M019 | Basalt cave wall | Tunnel and cavern walls | `3 × 3 m` | Pass with variation constraint. Broad erosion pockets work; reduce repeated circular cavities in the production height source. |
 | M020 | Basalt cave floor | Driveable cave and tunnel floor | `3 × 3 m` | Pass. Low relief, restrained damp patches and broad plate structure support gameplay collision. |
+
+## Material Batch 03 — foliage and organic surfaces
+
+![Material Batch 03 contact sheet](./review/material-batch-03-contact-sheet.jpg)
+
+Foliage atlases retain BaseColor, Normal, and Roughness in the first three positions. Their bottom-right quadrant is an **Opacity/AO composite reference**: black is outside the cutout, white is exposed leaf surface, and grey describes internal overlap. Production must derive separate binary/dithered opacity and AO maps from this reference; do not import the composite directly.
+
+| ID | Material | Primary use | Recommended coverage | Status and production note |
+|---|---|---|---:|---|
+| M015 | Cooled lava crust | Volcanic shelves and crater | `3 × 3 m` | Pass after regeneration. Broad nondirectional rope folds and restrained heat staining. |
+| M021 | Palm trunk bark | Palm trunks | `1.5 × 1.5 m` | Pass. Broad horizontal growth rings and simple fibers remain readable through LOD. |
+| M022 | Broadleaf tree bark | Jungle tree trunks and branches | `1.5 × 1.5 m` | Pass. Deep irregular vertical plates with restrained color variation. |
+| M023 | Salt-weathered driftwood | Wreckage and shore dressing | `1.5 × 1.5 m` | **Weak—regenerate.** Material language is useful, but the sheet contains forbidden generated headings and channel labels. |
+| M024 | Palm frond atlas | Palm canopy cards | atlas | Pass. Six complete, well-padded silhouettes with useful age/color variation. |
+| M025 | Broadleaf canopy atlas | Jungle canopy cards | atlas | Pass. Eight broad leaf silhouettes and clean channel correspondence. |
+| M026 | Fern leaf atlas | Understory cards | atlas | Pass. Complete fronds with varied poses and strong alpha-test silhouettes. |
+| M027 | Coastal grass atlas | Grass cards and clump shells | atlas | Pass. Grouped thick blades in green/straw variants; readable at distance. |
+| M028 | Hanging vine atlas | Cliff, bridge and canopy vines | atlas | Pass. Six complete vine strips with broad leaves and wind-ready segmentation. |
+| M029 | Cushion moss | Damp rock and soil blends | `1 × 1 m` | **Weak—regenerate.** Good cushion forms, but generated channel labels violate the clean-sheet standard. |
 
 ## Required validation before engine use
 
@@ -63,10 +82,6 @@ Generated maps may look coordinated but are not mathematically derived from one 
 10. Never infer roughness from BaseColor at runtime; roughness is authored and required.
 
 ## Next material batches
-
-### Batch 03 — foliage and organics
-
-Palm bark, broadleaf bark, dead driftwood, palm frond, broadleaf canopy leaf, fern leaf, coastal grass, hanging vine, moss, and flower petals. Foliage sheets require opacity/cutout references in addition to PBR channels.
 
 ### Batch 04 — built materials
 

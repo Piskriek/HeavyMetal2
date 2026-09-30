@@ -330,7 +330,7 @@ Do not ask Meshy to reconstruct smoke, fire, spray, mist, god rays, or ocean sur
 
 ## 5. Texture and material reference list
 
-The following material library is required in addition to model beauty references. Each material needs a calibrated sphere, cube, and flat-plane lookdev under the standard neutral rig, plus its seamless texture preview.
+The following material library is required in addition to model beauty references. Each material needs a calibrated sphere, cube, and flat-plane lookdev under the standard neutral rig, plus its seamless texture preview. Four-channel generated derivation sheets, review status, physical coverage, validation rules, and the rolling production queue are tracked in [`art-src/meshy/material-refs/README.md`](../art-src/meshy/material-refs/README.md). Generated channel images guide authoring but must be rebuilt from one shared height/mask source before engine import.
 
 ### Terrain and road
 

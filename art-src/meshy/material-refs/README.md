@@ -282,11 +282,24 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M129 | Healed damage overlays | Old scars, burns and character history | Pass with cleanup. Strong variety; remove stitch-like and overly raw shapes to keep the character appealing and non-gory. |
 | M130 | Wet-skin sheen masks | Rain, sweat and water response | Pass. Broad roughness masks provide moisture without transparent geometry or baked highlights. |
 
+## Material Batch 15 — cosmetics and creator finish layers
+
+![Material Batch 15 cosmetics contact sheet](./review/material-batch-15-cosmetics-finish-contact-sheet.jpg)
+
+| ID | Finish layer | Use | Status and production note |
+|---|---|---|---|
+| M131 | Cosmetic glitter and mica | Face/body sparkle accents | **Weak—regenerate.** Channel structure is usable, but many shapes became full graffiti symbols instead of restrained glitter sweeps and clusters. |
+| M132 | Emissive body paint | Night racing and active markings | Pass. Strong original symbol set with clean emissive/alpha masks and no baked glow. |
+| M133 | Eye shadow and liner | Eye-area cosmetics | Pass. Broad wings, smoky arcs and asymmetrical punk shapes provide good creator variety. |
+| M134 | Lip paint and stain | Lip color customization | Pass. Useful fill, split, chipped, stain and racing-slash masks. |
+| M135 | Nail paint | Nail and claw enamel overlays | Pass. Excellent broad nail-compatible shapes, color range and chipped variants. |
+| M136 | Fabric dye masks | Suits, jackets, banners and upholstery | Pass with density constraint. Strong color-block vocabulary; production presets should combine only a few patterns at once. |
+| M137 | Dusted goggles | Dust, mud, rain, salt and wipe states | Pass. Strong lens-scale condition layers and clean wiper/roughness separation. |
+| M138 | Armor grease and workshop wear | Armor and machine condition | Pass with content constraint. Smears and rings work; use wrench/handprint shapes sparingly so they do not read as repeated symbols. |
+| M139 | Polished edge wear | Smart-mask reference for contact points | Pass. Clean straight, curved and oval high-point masks for metal and leather. |
+| M140 | Colorable team markings | Runtime-tinted team identity | Pass. Bold symbol variety, clean alpha and no lettering or numbers. |
+
 ## Next material batches
-
-### Batch 15 — cosmetics, accessories, and creator finish layers
-
-Cosmetic glitter, emissive paint, eye shadow, lip paint, nail paint, fabric dye masks, dusted goggles, grease on armor, polished edge wear and colorable team markings.
 
 ### Batch 16 — biome transitions and world-scale blend masks
 

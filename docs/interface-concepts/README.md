@@ -6,27 +6,30 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 ## Shared visual language
 
-The concepts establish Heavy Metal 2's **post-apocalyptic neon-grunge cyberpunk goblin-world** identity:
+The concepts establish a **white-void racing collage with minimalist goblin grunge**:
 
-- battered blackened steel, welded scrap frames, distressed rubber, exposed rivets, cables, taped repairs, scratches, grime, and chipped hazard coatings;
-- toxic goblin green as the base system/status color;
-- vivid ultraviolet purple and magenta spray paint for active tools, current depth, selected presets, and authored emphasis;
-- graffiti splashes, overspray, drips, punk stickers, and stencil glyphs used around panel edges—not beneath critical text or viewport content;
-- restrained cyan for selection outlines, UV seams, links, masks, placement ghosts, and validation;
-- acid yellow for shortcuts and near-limit warnings; red reserved for destructive actions and failures;
-- sharp modern condensed sans-serif typography with bold numerics and clear hierarchy—never medieval fantasy lettering;
-- tactile hacked-together workshop controls rather than polished holograms or generic sci-fi glass;
-- the 3D viewport remains the primary surface;
+- bright matte-white enamel and pale ceramic/polymer surfaces dominate every screen;
+- panels are thin, flat and heavily shaped by die-cut negative space, stencil apertures, silhouette wells, notches and exposed white void;
+- smooth gunmetal connector strips physically join panel islands with small visible gold rivets;
+- vibrant ultraviolet, hot magenta, electric cyan and racing orange lines sweep in forced perspective, converge on the active subject and communicate flow, speed, hierarchy and dependency;
+- acid green appears as hand-tagged goblin graffiti, stencil marks and scratched signatures rather than filling whole panels;
+- restrained grunge consists of chipped white enamel, fine scratches, faded overspray, scuffs and occasional drips—the design remains predominantly clean and flat;
+- sharp modern condensed sans-serif typography uses charcoal text, bold numerics and strong editorial hierarchy;
+- black silhouette cutouts provide contrast for icons, thumbnails and inactive controls;
+- the 3D viewport remains the primary detailed surface while surrounding UI behaves like lightweight racing bodywork;
 - context appears near the action instead of permanently consuming the screen.
 
 ### Visual guardrails
 
-- Grunge belongs in the shell and frame; controls and labels remain crisp.
-- Purple/green contrast identifies interaction, not decoration alone.
-- Graffiti never replaces icons, labels, focus indicators, or accessibility states.
-- Distress must not reduce minimum contrast, target size, or channel-map readability.
-- Reuse a small authored library of scratches, stencils, stickers, tape, welds, and spray masks so screens look related rather than randomly dirty.
-- Keep world and character content more detailed than the surrounding interface chrome.
+- White void must remain the largest color field; do not regress to heavy dark boxed panels.
+- Cutouts must clarify grouping or create a useful silhouette, not become random decorative holes.
+- Perspective racing lines should point toward interaction and data flow; keep them out of text blocks and detailed viewport focal areas.
+- Gold is reserved for physical rivets and tiny connection details, never broad ornamental frames.
+- Green goblin tags are authored accents over scratches; they never replace icons, labels, focus indicators or accessibility states.
+- Grunge belongs at edges and contact points. Controls, labels, sliders, maps and numeric telemetry remain crisp.
+- Purple/magenta denotes active or selected; cyan denotes links, masks and geometry; orange denotes motion or caution; red remains failure/destructive.
+- Reuse a controlled library of panel silhouettes, cutouts, rivets, scratches, goblin tags and racing-line sweeps so every workspace belongs to one system.
+- Distress may not reduce minimum contrast, target size, channel-map readability or color-blind status redundancy.
 
 ## Shared interaction model
 

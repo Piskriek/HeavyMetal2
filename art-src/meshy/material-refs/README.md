@@ -68,6 +68,23 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 | M028 | Hanging vine atlas | Cliff, bridge and canopy vines | atlas | Pass. Six complete vine strips with broad leaves and wind-ready segmentation. |
 | M029 | Cushion moss | Damp rock and soil blends | `1 × 1 m` | **Weak—regenerate.** Good cushion forms, but generated channel labels violate the clean-sheet standard. |
 
+## Material Batch 04 — built materials
+
+![Material Batch 04 contact sheet](./review/material-batch-04-contact-sheet.jpg)
+
+| ID | Material | Primary use | Recommended real-world coverage | Status and production note |
+|---|---|---|---:|---|
+| M030 | Fresh-cut timber | New repairs, clean structural beams | `1.5 × 1.5 m` | Pass. Warm broad grain complements the older M008 timber without duplicating it. |
+| M031 | Charred timber | Burned structures and impact damage | `1.5 × 1.5 m` | **Weak—regenerate.** Material language is useful, but the generator returned a `1408 × 768` landscape sheet instead of the required square 2 × 2 format. |
+| M032 | Heavy rope | Bridges, cranes, rigging and moorings | `0.5 × 0.5 m` | Pass with construction constraint. Use the bold braid as a tiling rope surface; geometry must provide the cable silhouette. |
+| M033 | Weathered sailcloth | Shipwreck sails, banners and shade cloth | `1 × 1 m` | **Weak—regenerate.** Current basket-like weave is too coarse and reads as interlocking strips rather than woven canvas. |
+| M034 | Patched goblin canvas | Awnings, tents and workshop covers | `2 × 2 m` | **Weak—regenerate.** Patch language works, but forbidden generated channel labels must be removed. |
+| M035 | Cut basalt masonry | Shrines, tunnel retaining walls | `3 × 3 m` | Pass. Strong regular courses, readable mortar and restrained surface variation. |
+| M036 | Ochre rubble masonry | Settlement walls and retaining structures | `3 × 3 m` | Pass. Warm irregular blocks contrast clearly with basalt masonry. |
+| M037 | Painted goblin metal | Machines, carts and race structures | `1 × 1 m` | Pass with cleanup. Preserve broad chipped green paint but remove highlight-like purple spots from production BaseColor. |
+| M038 | Galvanized grate iron | Drains, work decks and vents | `1 × 1 m` | Pass. Broad openings and thick bars remain stable through LOD; openings become geometry/opacity as required. |
+| M039 | Aged copper with patina | Lighthouse, trim and machinery | `0.75 × 0.75 m` | Pass. Controlled verdigris coverage and warm rubbed copper give a useful metallic mask basis. |
+
 ## Required validation before engine use
 
 1. Re-author all channels from one shared height/mask stack.
@@ -82,10 +99,6 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 10. Never infer roughness from BaseColor at runtime; roughness is authored and required.
 
 ## Next material batches
-
-### Batch 04 — built materials
-
-Fresh timber, charred timber, rope, sailcloth, patched canvas, cut basalt masonry, ochre masonry, painted goblin metal, galvanized grate iron, and copper/patina metal.
 
 ### Batch 05 — race and workshop details
 

@@ -15,7 +15,7 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 ## Shared visual language
 
-The concepts establish a **white-void racing collage with tactile PBR splashes and minimalist goblin doodle-grunge**. [Issue #63](https://github.com/Piskriek/HeavyMetal2/issues/63) is the composition reference for the calm minimalist baseline:
+The concepts establish a **white-void racing collage with tactile PBR splashes and minimalist goblin doodle-grunge**. [Issue #63](https://github.com/Piskriek/HeavyMetal2/issues/63) is the composition reference for the calm minimalist baseline. The exact approved generation prompt, reusable invariants, workspace substitutions, and failure tests are preserved in [`SCENE_FIRST_PROMPT_REFERENCE.md`](./SCENE_FIRST_PROMPT_REFERENCE.md):
 
 - bright warm-white enamel and pale ceramic/polymer surfaces dominate every screen as a believable three-dimensional gallery/workshop void;
 - every interface panel, tab, button, card, thumbnail and content frame uses sharp square corners, straight machined cuts and a precise rectilinear grid—no rounded rectangles, pill controls or soft card chrome;

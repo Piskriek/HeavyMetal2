@@ -164,8 +164,25 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M063 | Timber scrap | 12 plank, splinter and rope-remnant groups | Pass. Strong connected arrangements suitable for decals, conforming meshes or geometry spawning. |
 | M064 | Metal scrap | 12 plate, washer, gear and collar groups | Pass. Highly reusable goblin salvage vocabulary with stable alpha and broad LOD-safe pieces. |
 
+## Material Batch 08 — environmental decals and accumulation masks
+
+![Material Batch 08 contact sheet](./review/material-batch-08-environment-decals-contact-sheet.jpg)
+
+| ID | Decal family | Contents | Status and production note |
+|---|---|---|---|
+| M065 | Road wear | Lanes, bends, intersections and shoulder polish | Pass. Broad directional shapes support painted racing lines without literal tire tread. |
+| M066 | Dampness | Seepage, puddle edges, drips and waterlines | Pass. Strong reusable material-response masks; color stays subordinate to roughness change. |
+| M067 | Soot and smoke | Plumes, blast rings, vent bars and hand smears | Pass. Useful soft-to-hard range with controlled feathering and no opaque smoke geometry. |
+| M068 | Rust runoff | Drips, seam strips, halos and corrosion blooms | Pass. Clear oxidation language and excellent isolated alpha forms. |
+| M069 | Sand accumulation | Drifts, crescents, corners and seam buildup | **Weak—regenerate.** Masks are useful, but several forms read as thick plaster slabs rather than shallow windblown sand. |
+| M070 | Tire scuffs | Arcs, braking streaks, scrub and donut marks | Pass. Clean low-relief racing vocabulary without repeated tread patterns. |
+| M071 | Chipped paint | Edge chips, scrapes and impact flakes | **Pending generation.** The generator returned no image; reserve this ID. |
+| M072 | Oil and grease | Pools, wipes, leaks, rings and machine smears | Pass. Good variation from smooth oil to rough drying fringes. |
+| M073 | Salt and mineral deposits | Tide marks, drip fans, rings and crystalline blooms | Pass. Broad readable deposits suitable for cliffs, masonry, metal and timber. |
+| M074 | Waterline growth | Algae, seaweed, barnacles and wet staining | **Weak—regenerate.** Content variety is strong, but generated channel labels violate the clean-sheet standard. |
+
 ## Next material batches
 
-### Batch 08 — environmental decals and accumulation masks
+### Batch 09 — flora, markings, damage, and utility decals
 
-Road wear, dampness, soot, rust runoff, sand accumulation, tire scuff, chipped paint, oil stains, salt staining, waterline growth, flower scatter and goblin graffiti. These remain alpha/mask-first and must not carry baked lighting.
+Flower scatter, pollen, mushrooms, coral growth, goblin doodles, number-free racing symbols, weld heat, impact scorch, bullet/dart dents, patched fabric, tape, warning stickers without text, and clean/dirty wipe masks.

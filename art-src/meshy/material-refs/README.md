@@ -234,8 +234,29 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M102 | Irrigation canals | `1 × 1 km` | Pass with waterway constraint. Clear field/canal hierarchy; production channels must guarantee connected downhill flow. |
 | M103 | Flooded rice terraces | `512 × 512 m` | **Weak—regenerate.** Strong contour logic, but generated map labels must be removed. |
 
+## Material Batch 12 — goblin creator surfaces
+
+![Material Batch 12 goblin-creator contact sheet](./review/material-batch-12-goblin-creator-contact-sheet.jpg)
+
+| ID | Creator material | Use | Status and production note |
+|---|---|---|---|
+| M104 | Olive-green goblin skin | Primary skin base | Pass. Soft mottling, pores and broad folds provide a flexible non-photoreal PBR base. |
+| M105 | Moss-grey goblin skin | Tintable alternate skin base | Pass. Useful sage/tan/violet range for procedural color variation. |
+| M106 | Skin blemishes and scars | Freckles, warts, scars and dry patches | **Weak—regenerate.** Channel concept works, but several patches read too raw or tumorous; final set must stay appealing and non-gory. |
+| M107 | Face paint and tattoos | Punk racer customization | Pass. Strong original symbol language with clean alpha and no words. |
+| M108 | Eye and iris atlas | Iris, pupil and sclera variants | Pass. Excellent color/pupil variety and aligned eye masks for deep customization. |
+| M109 | Clear weathered lens glass | Goggles, visors and lenses | Pass. Restrained scratches/fog with useful transmission and roughness guidance. |
+| M110 | Weathered black leather | Jackets, boots, gloves and seats | **Weak—regenerate.** Surface breakup is strong, but generated channel labels violate the clean-sheet standard. |
+| M111 | Cracked tan leather | Harnesses, belts and armor pads | Pass. Broad creases, worn dye and dry cracking remain readable without excessive noise. |
+| M112 | Layered rusted iron | Armor, buckles, weapons and vehicle parts | Pass. Strong large-scale rust/metal separation and useful pitting relief. |
+| M113 | Tooth, tusk, horn and bone | Teeth, accessories and armor details | Pass. Broad varied creature-material samples with clean masks and no gore. |
+
 ## Next material batches
 
-### Batch 12 — biome transitions and world-scale blend masks
+### Batch 13 — additional goblin creator materials
+
+Lips and inner mouth, tongue, nails/claws, ear translucency, hair and eyebrows, facial stubble, fabric knits, racing cloth, rubber grips, polished/scratched goggles, painted armor, oxidized jewelry, dirt/sweat overlays and healed damage.
+
+### Batch 14 — biome transitions and world-scale blend masks
 
 Forest-to-grass, jungle-to-beach, basalt-to-ochre, mountain-to-valley, wetland-to-upland, snowline, volcanic-to-forest, settlement-to-wilderness, farm-to-village and coast-to-deep-water transitions.

@@ -1,6 +1,6 @@
 # Recursive preset system — interface concepts
 
-Ten interface directions for the new preset-based world and goblin building system. These are UX composition studies, not pixel-perfect implementation specifications. Labels, spacing, and accessibility must be rebuilt with real UI components rather than extracted from generated images.
+Ten interface directions for the new preset-based world and goblin building system. These are UX composition studies, not pixel-perfect implementation specifications. **The images combine multiple possible drawer states to communicate capability; they must not be implemented as simultaneously persistent windows.** The runtime default is a nearly empty canvas with one compact toolbar. Labels, spacing, and accessibility must be rebuilt with real UI components rather than extracted from generated images.
 
 ![Ten interface concepts](./interface-concepts-contact-sheet.jpg)
 
@@ -43,17 +43,24 @@ The concepts establish a **white-void racing collage with tactile PBR splashes a
 
 ## Shared interaction model
 
-Every workspace reuses the same concepts:
+Every workspace reuses the same sparse-shell model:
 
-1. **Depth breadcrumb** — shows where the user is in the recursive preset hierarchy.
-2. **Adaptive tool rail** — Paint, Sculpt, Clear, Select, Dive In, and Dive Out change meaning by depth.
-3. **Six preset dimensions** — Content, Surface, Spread, Shape, Style, and Rules.
-4. **Linked state** — changes flow upward to parents unless a branch is detached.
-5. **Preset action model** — Save, Branch, Detach, Bake, Place, Share.
-6. **Quality state** — Editable, Baked, or Hybrid is always visible.
-7. **Progressive disclosure** — common controls remain close; advanced controls live one level deeper.
+1. **Clean canvas by default** — the scene fills nearly the entire window. Only one compact toolbar of roughly five to seven context-sensitive buttons remains visible.
+2. **Toolbar opens a drawer** — Paint, Sculpt, Presets, Inspect, Dive and Build open one edge drawer on demand. Opening a peer replaces the current unpinned drawer rather than stacking permanent panels.
+3. **Drawers open child drawers** — selecting a preset, material, rule or part may open the next narrow drawer. Each child shows its parent path and can be closed independently.
+4. **Everything detaches** — any drawer can tear off into a floating square-corner window, dock to any edge, move to another display, collapse to a tab, or close. Detached state persists per workspace.
+5. **One-action cleanup** — `Esc` closes the newest transient drawer; `Shift+Esc` closes all unpinned drawers; a visible `Clean Canvas` action restores the scene-only state without losing edits.
+6. **Depth breadcrumb on demand** — the recursive path appears inside the active drawer or as a temporary overlay during Dive In/Out, not as a permanently large header.
+7. **Adaptive tools** — the same few toolbar buttons change meaning at world, object, part, material, texture and goblin depth.
+8. **Six preset dimensions** — Content, Surface, Spread, Shape, Style and Rules are successive drawer levels, not six always-visible tabs.
+9. **Linked state and quality badges** — propagation, Editable/Baked/Hybrid and validation states use tiny edge badges that expand only when selected.
+10. **Preset actions stay contextual** — Save, Branch, Detach, Bake, Place, Share and Remix live in the active drawer's action footer or command palette.
+11. **Pinning is explicit and scarce** — drawers never pin themselves. Limit the standard single-screen layout to two pinned drawers; additional pinned content requires a saved custom workspace.
+12. **Scene-first overlays** — brush radius, transform values, selection and warnings appear near the cursor/subject, then fade when interaction ends.
 
 ---
+
+> **Reading the screen studies:** layout bullets below inventory available drawer contents. Except for the compact toolbar and transient in-scene feedback, those regions are closed by default and are never required to remain on screen together.
 
 ## 01 — World Paint workspace
 

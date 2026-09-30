@@ -219,13 +219,29 @@ All coverage assets are governed by [`docs/ISLAND_DENSE_COVERAGE_STANDARD.md`](.
 | 117 | `shoreline-foam-ribbon-mesh` | Foam edge ribbon | pass | Clean scalloped outline and thin regular shader-ready surface. |
 | 118 | `waterfall-splash-ring-mesh` | Splash ring | pass | Broad connected lobes and low center sheet with no tiny droplets. |
 | 119 | `mist-card-cluster` | Mist card volume | pass | Simple intersecting translucent cards with complete radial/top coverage. |
-| 120 | `smoke-emitter-housing` | Chimney emitter cap | **weak—regenerate** | Generation repeated a full pipe cluster instead of isolating the small emitter cap/housing. |
+| 120 | `smoke-emitter-housing` | Chimney emitter cap | pass after regeneration | Isolated compact cap now has a clear mounting collar, vent openings, emitter socket and consistent radial views. |
 | 121 | `steam-vent-emitter` | Ground steam vent | pass | Strong flush collar, broad holes, brass insert and emitter socket layout. |
 | 122 | `lava-crack-decal-mesh` | Emissive crack decal | pass | Thick branching shape with no micro tendrils and clear top/grazing views. |
 | 123 | `lantern-flame-insert` | Flame/glow insert | pass | Broad three-tongue silhouette and compact mounting socket; runtime emissive/flicker remains separate. |
 | 124 | `impact-dust-card-cluster` | Dust burst cards | pass with cleanup constraint | Useful radial mass; production must preserve intersecting card construction rather than solid petal volume. |
 | 125 | `leaf-burst-card-cluster` | Foliage burst cards | pass | Broad grouped leaf cards and radial layout suitable for spin/fade animation. |
 | 126 | `boost-trail-ribbon-cluster` | Boost trail ribbons | pass | Three clean tapered ribbons with shared mount and useful side/top profiles. |
+
+## Batch 14 — modular road shapes and material transitions
+
+![Batch 14 road-module contact sheet](./review/batch-14-road-modules-contact-sheet.jpg)
+
+| # | ID | Subject | Status | Review notes |
+|---|---|---|---|---|
+| 127 | `race-road-gentle-curve` | 30-degree road curve | pass | Exact broad curve, readable connector ends, complete underside and restrained repair structure. |
+| 128 | `race-road-tight-curve` | Tight hairpin road | pass with dimensional correction | Strong U-turn silhouette and clear underside; production spline must enforce the registered 150-degree turn and 8 m lane width. |
+| 129 | `race-road-s-curve` | Equal opposing bends | pass | Clean S silhouette, parallel ends and useful profile/underside coverage. |
+| 130 | `race-road-split-junction` | Symmetric Y split | pass | Broad junction, three clean connectors and stable triangular negative space. |
+| 131 | `race-road-merge-junction` | Asymmetric merge | **pending generation** | Generator returned no image before the per-turn limit; reserve this ID for the next batch. |
+| 132 | `road-transition-dirt-to-timber` | Dirt to deck | pass | Clear stepped material handoff, broad connector bands and structural underside. |
+| 133 | `road-transition-timber-to-iron` | Timber to iron grate | **weak—regenerate** | Geometry is useful, but generated sheet contains forbidden labels. |
+| 134 | `road-transition-bridge-approach` | Dirt to raised bridge deck | **weak—regenerate** | Layout is useful, but generated sheet contains forbidden view labels and must be replaced. |
+| 135 | `road-transition-tunnel-approach` | Dirt to tunnel floor | **weak—regenerate** | Clean modular tray, but the basalt-floor handoff is not distinct enough from a generic road segment. |
 
 ## Shared review result
 

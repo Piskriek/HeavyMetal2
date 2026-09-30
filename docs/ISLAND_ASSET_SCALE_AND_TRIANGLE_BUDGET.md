@@ -393,7 +393,31 @@ Family dimensions below describe the complete review-kit envelope. Runtime chunk
 
 ---
 
-## 16. Texture density by class
+## 16. Batch 14 — modular road shapes and transitions
+
+| # | Asset | Target size W × D × H | Relative scale and use | Suggested LOD0 triangles | LOD1 / LOD2 |
+|---|---|---:|---|---:|---:|
+| 127 | Gentle curve | `8 × 24 × 0.5 m`, 30° | Three ball-width lane; broad routing adjustment | 8,000 | 4,000 / 1,200 |
+| 128 | Tight curve | `18 × 26 × 0.5 m`, 150° | Hairpin footprint; enforce playable 8 m lane | 14,000 | 7,000 / 2,000 |
+| 129 | S-curve | `8 × 32 × 0.5 m` | Two opposing 30° bends; parallel ends | 12,000 | 6,000 / 1,800 |
+| 130 | Split junction | `20 × 26 × 0.5 m` | One 8 m lane into two equal branches | 14,000 | 7,000 / 2,000 |
+| 131 | Merge junction | `18 × 28 × 0.5 m` | Shallow asymmetric branch into main road; image pending | 14,000 | 7,000 / 2,000 |
+| 132 | Dirt-to-timber transition | `8 × 12 × 0.7 m` | Short material and structure handoff | 7,000 | 3,500 / 1,000 |
+| 133 | Timber-to-iron transition | `8 × 12 × 0.7 m` | Heavy deck-joint module | 9,000 | 4,500 / 1,300 |
+| 134 | Bridge approach | `8 × 16 × 1.2 m` | Gentle 0.7 m rise into deck connector | 9,000 | 4,500 / 1,300 |
+| 135 | Tunnel approach | `8 × 14 × 0.7 m` | Dirt-to-basalt floor with edge drainage | 8,000 | 4,000 / 1,200 |
+
+### Modular-road notes
+
+- Connector width, elevation, pivot, tangent and edge-beam sockets must be shared exactly across the road kit.
+- Author direction variants through rotation or spline metadata, not duplicate left/right meshes.
+- Keep road collision continuous and simpler than visual geometry; avoid seams that can catch the ball.
+- Preserve broad silhouettes and structural bands through LOD2; bake small wear and fasteners.
+- Track materials require complete BaseColor, Normal, Roughness and AO maps; iron may additionally use Metallic.
+
+---
+
+## 17. Texture density by class
 
 | Asset class | Master texture | Target texel density | Notes |
 |---|---:|---:|---|
@@ -409,7 +433,7 @@ Every texture set requires an authored roughness map. Texture memory, material c
 
 ---
 
-## 17. Acceptance and variance
+## 18. Acceptance and variance
 
 Every future reference asset must receive a row in this registry with bounding dimensions, a comparison to existing assets, an LOD0 triangle ceiling, LOD reductions, and texture class before its generated model is accepted.
 

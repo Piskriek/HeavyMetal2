@@ -265,12 +265,29 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M119 | Stubble and facial hair | Beard shadow, moustaches and short beards | Pass. Broad connected shapes provide efficient customization without hair noise. |
 | M120 | Weathered racing cloth | Suits, jackets, gloves and upholstery | **Weak—regenerate.** Current patchwork/checker structure reads as tiled fabric strips rather than a seamless racing weave. |
 
+## Material Batch 14 — goblin equipment and condition overlays
+
+![Material Batch 14 goblin equipment contact sheet](./review/material-batch-14-goblin-equipment-condition-contact-sheet.jpg)
+
+| ID | Material | Use | Status and production note |
+|---|---|---|---|
+| M121 | Racing grip rubber | Grips, pedals and flexible armor | Pass. Broad compression ribs, worn contact bands and restrained green flecks remain readable through LOD. |
+| M122 | Polished goggle-frame metal | Frames, buckles and accessory trim | Pass. Useful polished swirl and scratch response; production BaseColor must remain free of reflected environment. |
+| M123 | Scratched tinted lens | Goggles and visors | Pass. Subtle cyan tint, wipe arcs, scratches and transmission masks support proper lens shaders. |
+| M124 | Painted racing armor | Armor plates and vehicle protection | Pass. Strong acid-green enamel, restrained racing accents and broad chipped-metal breakup. |
+| M125 | Oxidized jewelry | Rings, ear cuffs, tooth caps and charms | Pass. Excellent brass, copper, silver and patina variants with clean masks. |
+| M126 | Coarse knit | Shirts, cuffs, socks and padding | Pass. Chunky interlocked yarn is seamless, tactile and distinct from canvas. |
+| M127 | Padded racing suit | Suits, jackets and upholstery | **Weak—regenerate.** The current irregular cell pattern reads as fractured stone/glass rather than padded technical fabric. |
+| M128 | Dirt and sweat overlays | Skin and clothing condition | Pass. Useful broad wipes, rings and smears with rough/damp separation. |
+| M129 | Healed damage overlays | Old scars, burns and character history | Pass with cleanup. Strong variety; remove stitch-like and overly raw shapes to keep the character appealing and non-gory. |
+| M130 | Wet-skin sheen masks | Rain, sweat and water response | Pass. Broad roughness masks provide moisture without transparent geometry or baked highlights. |
+
 ## Next material batches
 
-### Batch 14 — goblin equipment and condition overlays
+### Batch 15 — cosmetics, accessories, and creator finish layers
 
-Rubber grips, polished and scratched goggles, painted armor, oxidized jewelry, fabric knits, padded racing suit, dirt and sweat overlays, healed damage, grease stains, wet skin, cosmetic glitter and emissive accessories.
+Cosmetic glitter, emissive paint, eye shadow, lip paint, nail paint, fabric dye masks, dusted goggles, grease on armor, polished edge wear and colorable team markings.
 
-### Batch 15 — biome transitions and world-scale blend masks
+### Batch 16 — biome transitions and world-scale blend masks
 
 Forest-to-grass, jungle-to-beach, basalt-to-ochre, mountain-to-valley, wetland-to-upland, snowline, volcanic-to-forest, settlement-to-wilderness, farm-to-village and coast-to-deep-water transitions.

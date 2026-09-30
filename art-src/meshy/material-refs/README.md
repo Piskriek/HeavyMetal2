@@ -32,6 +32,23 @@ Generated maps may look coordinated but are not mathematically derived from one 
 | M009 | Blackened forged iron | Girders, straps, machines | `1 × 1 m` | Pass. Restrained forged variation; use Metallic = 1 except rust/contamination masks. |
 | M010 | Aged brass | Rivets, collars, controls | `0.75 × 0.75 m` | Weak—regenerate. Current surface reads like yellow stone; next pass needs finer hammered metal and controlled patina. |
 
+## Material Batch 02 — ground and natural surfaces
+
+![Material Batch 02 contact sheet](./review/material-batch-02-contact-sheet.jpg)
+
+| ID | Material | Primary use | Recommended real-world coverage | Status and production note |
+|---|---|---|---:|---|
+| M011 | Mud and puddle edge | Runoff, low ground, track margins | `2 × 2 m` | Pass as breakup reference. Separate mud and wetness into blendable layers; soften the repeated round puddle shapes. |
+| M012 | Dry dusty dirt | Dry paths, shoulders, disturbed terrain | `3 × 3 m` | Pass. Broad low-relief variation supports tiling and does not over-model individual grains. |
+| M013 | Road shoulder aggregate | Track edges and repair zones | `2 × 2 m` | Pass. Controlled embedded basalt chips with clear channel correspondence. |
+| M014 | Loose mixed scree | Talus, cliff feet, gravel beds | `2 × 2 m` | Pass. Dense readable packing and useful material/color variation; add macro masks at terrain scale. |
+| M015 | Cooled lava crust | Volcanic shelves and crater | `3 × 3 m` | **Pending generation.** The generator returned no image; reserve this ID. |
+| M016 | Molten lava | Lava pools and channels | `3 × 3 m` | Pass as mask reference. Derive BaseColor and Emissive separately and animate flow in shader. |
+| M017 | Dry coastal rock | Beach shelves and salt rock | `3 × 3 m` | Weak—regenerate. Current deep vertical cuts read as a cliff face rather than a broadly eroded tile. |
+| M018 | Wet ochre waterfall rock | Waterfall channels and wet ledges | `3 × 3 m` | Pass. Strong strata and vertical wetness language; BaseColor must exclude generated shading. |
+| M019 | Basalt cave wall | Tunnel and cavern walls | `3 × 3 m` | Pass with variation constraint. Broad erosion pockets work; reduce repeated circular cavities in the production height source. |
+| M020 | Basalt cave floor | Driveable cave and tunnel floor | `3 × 3 m` | Pass. Low relief, restrained damp patches and broad plate structure support gameplay collision. |
+
 ## Required validation before engine use
 
 1. Re-author all channels from one shared height/mask stack.
@@ -46,10 +63,6 @@ Generated maps may look coordinated but are not mathematically derived from one 
 10. Never infer roughness from BaseColor at runtime; roughness is authored and required.
 
 ## Next material batches
-
-### Batch 02 — ground and natural surfaces
-
-Mud, dry dirt, road shoulder, loose scree, lava crust, molten lava, dry beach rock, waterfall-wet ochre rock, cave wall, and cave floor.
 
 ### Batch 03 — foliage and organics
 

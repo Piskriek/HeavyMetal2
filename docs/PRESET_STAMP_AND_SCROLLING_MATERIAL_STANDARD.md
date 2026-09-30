@@ -104,7 +104,29 @@ Recommended starting motion:
 
 Speeds are authored in world units where practical. Offset phases and use nonmatching periods so loops are not obvious. Do not move collision, buoyancy or gameplay water volumes with visual UV scrolling.
 
-## 7. Recursive editing and propagation
+## 7. Coverage and scatter stamp behavior
+
+Alpha coverage atlases can resolve to several outputs from the same painted preset:
+
+- **Near:** selected edge stones, planks, grass tufts or scrap become instanced geometry while the dense center uses a conforming decal.
+- **Mid:** the complete patch becomes a normal/height/ORM decal or thin card with parallax constrained to safe depth.
+- **Far:** patches bake into the parent terrain, vehicle or prop material, then merge into macro color/roughness variation.
+
+The preset stores density, physical patch size, seed, rotation, scale range, slope response, altitude/moisture rules, edge feather, geometry percentage and protected masks. Scatter pieces must remain inside the alpha footprint unless an authored edge element deliberately breaks the silhouette.
+
+For repeated painting:
+
+- reject obvious atlas-entry repetition within the configured neighborhood;
+- rotate and mirror only entries approved for those operations;
+- use blue-noise placement with minimum separation rather than unconstrained random points;
+- blend dense centers so they can function as texture coverage;
+- preserve selected broad edge silhouettes through LOD;
+- trim against roads, water, sockets and gameplay clearance masks;
+- prevent floating rocks, vertical grass on ceilings, and debris penetrating thin surfaces;
+- limit stacked transparent layers and convert stable overlaps into a bake;
+- allow `Dissolve on impact`, rigidity and chunk-spawn rules to inherit from the touched material.
+
+## 8. Recursive editing and propagation
 
 - Vehicle → engine bay → manifold → pipe → collar → material is one navigable preset chain.
 - `Dive In` changes the adaptive Paint, Sculpt, Clear, Select and Rules tools to the active depth.
@@ -113,7 +135,7 @@ Speeds are authored in world units where practical. Offset phases and use nonmat
 - Undo/redo records the preset operation and seed rather than every generated triangle.
 - Sharing/remixing preserves source attribution, dependencies, atlas versions and performance profiles.
 
-## 8. Baking and performance
+## 9. Baking and performance
 
 - Batch decals by atlas/material family and prefer texture arrays or virtual textures where supported.
 - Instance repeated raised parts; merge only when baking a stable final assembly.
@@ -125,7 +147,7 @@ Speeds are authored in world units where practical. Offset phases and use nonmat
 - Pool water splash, foam, mist and particle children.
 - Bake combined Normal/ORM outputs without destroying the editable source recipe.
 
-## 9. Acceptance tests
+## 10. Acceptance tests
 
 A preset passes when it:
 

@@ -145,8 +145,27 @@ Stamp atlases use BaseColor, Normal, Roughness/metal reference and Alpha. Produc
 9. Use texture arrays/atlases by shader family and mip-chain every channel consistently.
 10. Never infer roughness from BaseColor at runtime; roughness is authored and required.
 
+## Material Batch 07 — alpha coverage and scatter patches
+
+![Material Batch 07 alpha-coverage contact sheet](./review/material-batch-07-alpha-coverage-contact-sheet.jpg)
+
+These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Production exports separate authored Roughness and AO maps. Dense patch centers may collapse into a texture/decal at distance while selected edge elements remain geometry.
+
+| ID | Coverage family | Contents | Status and production note |
+|---|---|---|---|
+| M055 | Grass patches | 12 tuft, strip, edge and dense grass shapes | Pass. Excellent silhouette variety and clean alpha, with green/straw age variation. |
+| M056 | Scattered rocks | 12 basalt/ochre scatter groups | Pass. Strong top-down groups from sparse scatter to connected dense patches. |
+| M057 | Leaf litter | 14 broadleaf ground patches | Pass. Dense attractive packing, curved windrows and clear connected masks. |
+| M058 | Twig and root litter | 12 chunky forest-floor arrangements | Pass. Broad root/twig forms avoid fragile hair-thin geometry and remain readable. |
+| M059 | Beach shells and pebbles | 12 shoreline scatter patches | Pass with content adjustment. Strong pebble coverage; production should increase recognizable shell fragments without adding micro-noise. |
+| M060 | Moss and lichen | 14 organic surface patches | **Weak—regenerate.** Useful shapes and channel correspondence, but generated headings and channel labels violate the clean-sheet standard. |
+| M061 | Mud splash | 12 drips, arcs, smears and impact stamps | Pass. Excellent decal vocabulary with controlled soft alpha fringes and limited micro-droplets. |
+| M062 | Volcanic cinder | 12 ash/cinder accumulation shapes | Pass with material correction. Silhouettes work; production must strengthen porous charcoal cinder language and remove any organic/leaf-like read. |
+| M063 | Timber scrap | 12 plank, splinter and rope-remnant groups | Pass. Strong connected arrangements suitable for decals, conforming meshes or geometry spawning. |
+| M064 | Metal scrap | 12 plate, washer, gear and collar groups | Pass. Highly reusable goblin salvage vocabulary with stable alpha and broad LOD-safe pieces. |
+
 ## Next material batches
 
-### Batch 07 — decals and blend masks
+### Batch 08 — environmental decals and accumulation masks
 
-Road wear, dampness, soot, rust runoff, moss edge, sand accumulation, mud splash, tire scuff, chipped paint, and goblin graffiti. These require alpha/mask-first sheets and must not carry baked lighting.
+Road wear, dampness, soot, rust runoff, sand accumulation, tire scuff, chipped paint, oil stains, salt staining, waterline growth, flower scatter and goblin graffiti. These remain alpha/mask-first and must not carry baked lighting.

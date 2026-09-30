@@ -6,11 +6,12 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 ### Sparse-canvas pass status
 
-- `01`, `02`, `05`, `06`, `08`, and `10` now demonstrate the intended scene-dominant shell.
+- All ten studies now use the scene-dominant shell.
+- `01` and `10` demonstrate the clean-canvas default with only the compact toolbar.
+- `02`, `04`, `05`, `07`, and `08` demonstrate one open contextual drawer or a tiny local control group.
 - `03` intentionally demonstrates one parent drawer plus one child drawer; this is an active editing state, not the default.
-- `04` remains on the previous multi-panel composition because its sparse-canvas regeneration failed; it is first in the regeneration queue.
-- `07` and `09` improved scene emphasis but still expose too much simultaneous chrome; regenerate them with only one open drawer.
-- The authoritative default remains a compact toolbar over a clean canvas, regardless of how many possible states a study composites.
+- `06` demonstrates a detached details drawer, while `09` demonstrates the single shallow preset drawer.
+- The authoritative default remains a compact toolbar over a clean canvas; every visible drawer can close, collapse, dock, or detach.
 
 ## Shared visual language
 

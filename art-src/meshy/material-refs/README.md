@@ -251,12 +251,26 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M112 | Layered rusted iron | Armor, buckles, weapons and vehicle parts | Pass. Strong large-scale rust/metal separation and useful pitting relief. |
 | M113 | Tooth, tusk, horn and bone | Teeth, accessories and armor details | Pass. Broad varied creature-material samples with clean masks and no gore. |
 
+## Material Batch 13 — additional goblin creator surfaces
+
+![Material Batch 13 goblin-creator contact sheet](./review/material-batch-13-goblin-creator-contact-sheet.jpg)
+
+| ID | Creator material | Use | Status and production note |
+|---|---|---|---|
+| M114 | Lips, gums and inner mouth | Mouth color and moisture variation | Pass. Strong expressive lip/gum variants with useful roughness and material masks. |
+| M115 | Tongues | Tongue shape and color variants | Pass. Broad stylized silhouettes, center grooves and clean alpha masks. |
+| M116 | Nails and claws | Fingernails, toenails and claw tips | **Weak—regenerate.** The result repeated tooth/horn forms from its source reference instead of producing clear nail plates and claws. |
+| M117 | Ear skin and translucency | Ear color, thickness and subsurface scattering | Pass. Excellent ear variants with aligned thickness masks and appealing color range. |
+| M118 | Hair and eyebrows | Mohawks, tufts, brows and sideburn cards | Pass. Strong punk silhouettes, controlled dyed accents and LOD-safe alpha shapes. |
+| M119 | Stubble and facial hair | Beard shadow, moustaches and short beards | Pass. Broad connected shapes provide efficient customization without hair noise. |
+| M120 | Weathered racing cloth | Suits, jackets, gloves and upholstery | **Weak—regenerate.** Current patchwork/checker structure reads as tiled fabric strips rather than a seamless racing weave. |
+
 ## Next material batches
 
-### Batch 13 — additional goblin creator materials
+### Batch 14 — goblin equipment and condition overlays
 
-Lips and inner mouth, tongue, nails/claws, ear translucency, hair and eyebrows, facial stubble, fabric knits, racing cloth, rubber grips, polished/scratched goggles, painted armor, oxidized jewelry, dirt/sweat overlays and healed damage.
+Rubber grips, polished and scratched goggles, painted armor, oxidized jewelry, fabric knits, padded racing suit, dirt and sweat overlays, healed damage, grease stains, wet skin, cosmetic glitter and emissive accessories.
 
-### Batch 14 — biome transitions and world-scale blend masks
+### Batch 15 — biome transitions and world-scale blend masks
 
 Forest-to-grass, jungle-to-beach, basalt-to-ochre, mountain-to-valley, wetland-to-upland, snowline, volcanic-to-forest, settlement-to-wilderness, farm-to-village and coast-to-deep-water transitions.

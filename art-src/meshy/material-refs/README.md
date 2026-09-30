@@ -217,8 +217,25 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M092 | Dents and punctures | Concave hits, raised lips, tears and gouges | Pass. Excellent normal-driven damage vocabulary for non-silhouette deformation. |
 | M093 | Tape, stickers and fabric patches | 16 blank quick-repair pieces | Pass. Strong sharp-edged customization kit with no text or logos. |
 
+## Material Batch 11 — grand-world infrastructure macros
+
+![Material Batch 11 contact sheet](./review/material-batch-11-infrastructure-macros-contact-sheet.jpg)
+
+| ID | Macro landscape | Nominal coverage | Status and production note |
+|---|---|---:|---|
+| M094 | City blocks | `1 × 1 km` | Weak—regenerate. Channel consistency is useful, but the radial central avenue/monument makes repetition obvious. |
+| M095 | Industrial yard | `1 × 1 km` | **Weak—regenerate.** Strong district zoning, but generated channel labels violate the clean-sheet standard. |
+| M096 | Rural village pattern | `512 × 512 m` | **Weak—regenerate.** Good settlement grammar, but extensive generated labels violate the standard. |
+| M097 | Regional road network | `1 × 1 km` | Weak—regenerate. Current organic cell pattern reads more like fields than a deliberate road hierarchy. |
+| M098 | Rail and mine logistics yard | `512 × 512 m` | Pass. Parallel corridors, switches, yards and large structures are readable at macro scale. |
+| M099 | Quarry and excavation | `1 × 1 km` | Pass. Excellent terraced depth, haul-road logic and displacement hierarchy. |
+| M100 | Port and dock district | `1 × 1 km` | Pass. Strong harbor channels, quays, piers and service blocks with clear height separation. |
+| M101 | Overgrown ruins | `512 × 512 m` | Pass. Readable broken wall network, courtyards and vegetation takeover suitable for modular spawning. |
+| M102 | Irrigation canals | `1 × 1 km` | Pass with waterway constraint. Clear field/canal hierarchy; production channels must guarantee connected downhill flow. |
+| M103 | Flooded rice terraces | `512 × 512 m` | **Weak—regenerate.** Strong contour logic, but generated map labels must be removed. |
+
 ## Next material batches
 
-### Batch 11 — grand-world infrastructure and settlement macros
+### Batch 12 — biome transitions and world-scale blend masks
 
-Aerial city blocks, industrial yards, villages, road networks, rail yards, quarries, ports, ruins, irrigation, rice fields and mixed biome-transition masks. These remain macro layers that spawn modular geometry rather than baking buildings into playable close-range surfaces.
+Forest-to-grass, jungle-to-beach, basalt-to-ochre, mountain-to-valley, wetland-to-upland, snowline, volcanic-to-forest, settlement-to-wilderness, farm-to-village and coast-to-deep-water transitions.

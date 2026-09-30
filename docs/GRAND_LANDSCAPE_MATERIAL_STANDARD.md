@@ -84,6 +84,16 @@ A macro material is itself an editable preset. Examples:
 - Blend rotations through vector fields rather than abruptly rotating the texture.
 - Volcanic materials separate cooled crust, ash and emissive lava; bright crater lighting never belongs in BaseColor.
 
+### Settlements and infrastructure
+
+- Treat aerial roofs, walls, piers, rails and roads as occupancy and spawning masks, not close-range painted architecture.
+- Classify routes as arterial, local, service, rail, footpath or waterway and preserve that hierarchy across tile boundaries.
+- Replace macro footprints with approved modular buildings, walls, props and spline networks before the camera reaches ground-detail range.
+- Reserve sockets for bridges, gates, junctions, loading zones, drainage and track connections.
+- Avoid a centered plaza, radial monument, hero factory or identical village core that exposes tile repetition.
+- Keep ports hydrologically open, rail switches physically plausible, quarry benches traversable and irrigation networks connected downhill.
+- Generate empty/service space deliberately; do not cover every macro cell with buildings or props.
+
 ## 6. Anti-repetition strategy
 
 - Blend at least two rotated or mirrored macro samples only where directional rules permit.

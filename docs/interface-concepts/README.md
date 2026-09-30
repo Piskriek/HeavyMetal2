@@ -4,6 +4,14 @@ Ten interface directions for the new preset-based world and goblin building syst
 
 ![Ten interface concepts](./interface-concepts-contact-sheet.jpg)
 
+### Sparse-canvas pass status
+
+- `01`, `02`, `05`, `06`, `08`, and `10` now demonstrate the intended scene-dominant shell.
+- `03` intentionally demonstrates one parent drawer plus one child drawer; this is an active editing state, not the default.
+- `04` remains on the previous multi-panel composition because its sparse-canvas regeneration failed; it is first in the regeneration queue.
+- `07` and `09` improved scene emphasis but still expose too much simultaneous chrome; regenerate them with only one open drawer.
+- The authoritative default remains a compact toolbar over a clean canvas, regardless of how many possible states a study composites.
+
 ## Shared visual language
 
 The concepts establish a **white-void racing collage with tactile PBR splashes and minimalist goblin doodle-grunge**. [Issue #63](https://github.com/Piskriek/HeavyMetal2/issues/63) is the composition reference for the calm minimalist baseline:
@@ -303,11 +311,11 @@ Controller-friendly and lower-compute editing without replacing the full desktop
 
 ### Layout idea
 
-- Nearly full-screen world viewport.
-- Seven large actions in the bottom hotbar.
-- Hold-to-open radial preset wheel.
-- Small context drawer containing only essential parameters.
-- Baked/Editable mode and frame budget visible at top-right.
+- Scene occupies at least 90 percent of the window in its default state.
+- Six square adaptive buttons form one compact toolbar.
+- A tap opens one context drawer; hold opens a temporary angular command fan directly under the pointer or controller focus.
+- Advanced parameters open as child drawers and disappear on confirmation or `Esc`.
+- Baked/Editable mode and frame budget collapse to tiny edge badges.
 
 ### Key interaction
 
@@ -333,12 +341,14 @@ The recursive model remains usable on controller and low-end hardware without in
 
 ## Cross-screen components to prototype once
 
-- `PresetBreadcrumb`
-- `AdaptiveToolRail`
-- `PresetDimensionTabs`
-- `PresetCard` and `PresetShelf`
+- `CompactAdaptiveToolbar`
+- `DrawerHost`, `ChildDrawerStack`, and `DrawerDetachHandle`
+- `CleanCanvasAction` and drawer workspace persistence
+- `TransientPresetBreadcrumb`
+- `PresetDimensionDrawer`
+- `PresetCard` and virtualized drawer shelf
 - `LinkedInstanceBadge`
-- `BranchDetachDialog`
+- `BranchDetachDrawer`
 - `PbrChannelStrip`
 - `ProceduralSlider`
 - `BrushCursorHud`

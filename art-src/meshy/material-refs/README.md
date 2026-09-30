@@ -85,6 +85,25 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 | M038 | Galvanized grate iron | Drains, work decks and vents | `1 × 1 m` | Pass. Broad openings and thick bars remain stable through LOD; openings become geometry/opacity as required. |
 | M039 | Aged copper with patina | Lighthouse, trim and machinery | `0.75 × 0.75 m` | Pass. Controlled verdigris coverage and warm rubbed copper give a useful metallic mask basis. |
 
+## Material Batch 05 — race, interface, and workshop surfaces
+
+![Material Batch 05 contact sheet](./review/material-batch-05-contact-sheet.jpg)
+
+Specialized transparent or emissive sheets replace bottom-right AO/Height with a documented Emissive or Opacity/Transmission mask. Production still requires AO where materially relevant; the special mask is an additional authored channel, not a waiver.
+
+| ID | Material | Primary use | Recommended real-world coverage | Status and production note |
+|---|---|---|---:|---|
+| M040 | Road repair plate | Track patches and industrial floors | `2 × 2 m` | Pass with material check. Good overlapping structure; production BaseColor must clearly retain metallic plate rather than stone-tile response. |
+| M041 | Boost emissive inlay | Boost pads and racing-line inserts | `2 × 2 m` | Pass. Excellent broad cyan/magenta channels and clean emissive mask; animate UV flow separately. |
+| M042 | Chipped hazard paint | Track edges and workshop hazards | `2 × 2 m` | Pass. Strong readable stripe rhythm, restrained chips and coordinated relief. |
+| M043 | White enamel interface metal | White void UI and clean race structures | `1 × 1 m` | Pass. Dominant warm white with appropriately minimal scratches and chips. |
+| M044 | Gold rivet metal | Interface rivets and premium fasteners | `0.5 × 0.5 m` | **Weak—regenerate.** Surface is useful but the image contains extensive forbidden generated UI, headings and buttons. |
+| M045 | Racing rubber | Bumpers, grips and flexible guards | `1 × 1 m` | Pass. Restrained compressed grain and broad abrasion arcs without tire-tread literalism. |
+| M046 | Weathered leather | Harnesses, straps and balloon rigging | `1 × 1 m` | **Weak—regenerate.** Useful leather breakup, but tiny generated channel labels violate the clean-sheet standard. |
+| M047 | Painted ceramic | Race markers and goblin props | `1 × 1 m` | Pass. Clean off-white glaze with controlled green/purple handmade accents. |
+| M048 | Dirty lantern glass | Lanterns and workshop glazing | `1 × 1 m` | Pass. Restrained soot and transmission-mask concept; final glass uses proper transmission/refraction shader. |
+| M049 | Worn rail steel | Mine rail and machine contact surfaces | `1 × 1 m` | Pass. Strong longitudinal wear, restrained pitting and usable metallic/roughness separation. |
+
 ## Required validation before engine use
 
 1. Re-author all channels from one shared height/mask stack.
@@ -99,10 +118,6 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 10. Never infer roughness from BaseColor at runtime; roughness is authored and required.
 
 ## Next material batches
-
-### Batch 05 — race and workshop details
-
-Road repair plate, iron grate, boost emissive inlay, hazard paint, white enamel interface metal, gold rivet metal, rubber, leather, ceramic, and dirty glass.
 
 ### Batch 06 — decals and blend masks
 

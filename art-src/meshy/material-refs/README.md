@@ -104,6 +104,34 @@ Specialized transparent or emissive sheets replace bottom-right AO/Height with a
 | M048 | Dirty lantern glass | Lanterns and workshop glazing | `1 × 1 m` | Pass. Restrained soot and transmission-mask concept; final glass uses proper transmission/refraction shader. |
 | M049 | Worn rail steel | Mine rail and machine contact surfaces | `1 × 1 m` | Pass. Strong longitudinal wear, restrained pitting and usable metallic/roughness separation. |
 
+## Material Batch 06 — scrolling water and projected effects
+
+![Material Batch 06 water contact sheet](./review/material-batch-06-water-contact-sheet.jpg)
+
+| ID | Material | Primary use | Recommended coverage | Status and production note |
+|---|---|---|---:|---|
+| M050 | Deep-ocean scrolling water | Open sea and deep channels | `12 × 12 m` | Pass. Broad current bands support two offset scrolling normal/flow layers without noisy texture swimming. |
+| M051 | Shallow tropical water | Lagoons, shallows and tide pools | `6 × 6 m` | Pass. Clear intersecting currents and calm wavelets; depth absorption comes from the water shader, not BaseColor alone. |
+| M052 | Waterfall flow | Vertical waterfall ribbons | `4 × 8 m` | Pass. Strong continuous top-to-bottom strands for looped downward scrolling and opacity breakup. |
+| M053 | Water foam mask atlas | Shore foam, wakes, churn and splash rings | atlas | Pass. Eight broad alpha-ready shapes with useful normal, roughness and opacity references. |
+| M054 | Underwater caustic projector | Submerged rock, sand and props | `4 × 4 m` | Pass. Broad cells and secondary phase mask support inexpensive animated cross-fade projection. |
+
+Water textures are shader inputs rather than opaque material replacements. Use world-space or stable local-space coordinates, depth fade, shoreline intersection masks and two incommensurate scroll speeds. Never scroll BaseColor, Normal and foam at the same rate. Keep ocean collision and buoyancy independent from visual displacement.
+
+## Kitbash Stamp Batch 01 — vehicle and machine construction
+
+![Kitbash Stamp Batch 01 contact sheet](./review/kitbash-stamp-batch-01-contact-sheet.jpg)
+
+| ID | Stamp family | Contents | Status and production note |
+|---|---|---|---|
+| K001 | Armor plates | 12 rectangular, trapezoid, curved and repair plates | Pass. Strong varied silhouettes, large fasteners and clean alpha masks. |
+| K002 | Gears and mechanisms | 12 gears, sprockets, flywheels and toothed arcs | Pass. Low tooth counts and broad holes remain readable after scaling and LOD. |
+| K003 | Engine pipes | 12 pipe bends, manifolds, headers and hose loops | Pass. Excellent one-click engine-bay vocabulary with thick tubing and clear masks. |
+| K004 | Vents and grilles | 12 louvers, meshes, intakes and radiator faces | Pass. Wide range of opening patterns with stable frames and useful cutout alpha. |
+| K005 | Fasteners and welds | 16 rivet, bolt, weld, hinge, collar and seam details | Pass. Good secondary-detail family for joining primary stamps without random noise. |
+
+Stamp atlases use BaseColor, Normal, Roughness/metal reference and Alpha. Production exports separate Roughness, Metallic, AO and Opacity maps; the displayed roughness/metal quadrant is a derivation guide, not a packed runtime texture. Runtime projection, raised-mesh selection, engine-bay recipes, recursive editing, water scrolling and bake rules are defined in [`docs/PRESET_STAMP_AND_SCROLLING_MATERIAL_STANDARD.md`](../../../docs/PRESET_STAMP_AND_SCROLLING_MATERIAL_STANDARD.md).
+
 ## Required validation before engine use
 
 1. Re-author all channels from one shared height/mask stack.
@@ -119,6 +147,6 @@ Specialized transparent or emissive sheets replace bottom-right AO/Height with a
 
 ## Next material batches
 
-### Batch 06 — decals and blend masks
+### Batch 07 — decals and blend masks
 
 Road wear, dampness, soot, rust runoff, moss edge, sand accumulation, mud splash, tire scuff, chipped paint, and goblin graffiti. These require alpha/mask-first sheets and must not carry baked lighting.

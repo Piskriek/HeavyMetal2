@@ -176,7 +176,7 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M068 | Rust runoff | Drips, seam strips, halos and corrosion blooms | Pass. Clear oxidation language and excellent isolated alpha forms. |
 | M069 | Sand accumulation | Drifts, crescents, corners and seam buildup | **Weak—regenerate.** Masks are useful, but several forms read as thick plaster slabs rather than shallow windblown sand. |
 | M070 | Tire scuffs | Arcs, braking streaks, scrub and donut marks | Pass. Clean low-relief racing vocabulary without repeated tread patterns. |
-| M071 | Chipped paint | Edge chips, scrapes and impact flakes | **Pending generation.** The generator returned no image; reserve this ID. |
+| M071 | Chipped paint | Edge chips, scrapes and impact flakes | Pass after regeneration. Clean alpha-ready wear shapes with paint relief and broad LOD-safe damage. |
 | M072 | Oil and grease | Pools, wipes, leaks, rings and machine smears | Pass. Good variation from smooth oil to rough drying fringes. |
 | M073 | Salt and mineral deposits | Tide marks, drip fans, rings and crystalline blooms | Pass. Broad readable deposits suitable for cliffs, masonry, metal and timber. |
 | M074 | Waterline growth | Algae, seaweed, barnacles and wet staining | **Weak—regenerate.** Content variety is strong, but generated channel labels violate the clean-sheet standard. |
@@ -200,8 +200,25 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 
 These are macro terrain layers, not replacements for near-ground materials or geometry. Their runtime role, nested scale stack, displacement limits and biome spawning rules are defined in [`docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md`](../../../docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md).
 
+## Material Batch 10 — flora, markings, damage, and utility decals
+
+![Material Batch 10 contact sheet](./review/material-batch-10-flora-damage-utility-contact-sheet.jpg)
+
+| ID | Atlas family | Contents | Status and production note |
+|---|---|---|---|
+| M071 | Chipped paint | Edge wear, scrapes, flakes and impact chips | Pass after regeneration. Useful color variants and clean alpha-ready damage shapes. |
+| M085 | Flowers and pollen | 14 tropical flower scatter groups | Pass. Excellent color restraint, connected patches and clear distance-readable silhouettes. |
+| M086 | Mushrooms and fungi | 12 mushroom clusters and bracket growths | Pass. Strong cap diversity, shelf forms and low-poly-friendly alpha masks. |
+| M087 | Coral and reef growth | 12 brain, plate, sponge and stubby branch patches | Pass. Broad underwater forms with restrained tropical colors and stable silhouettes. |
+| M088 | Goblin doodle graffiti | Faces, crowns, teeth, handprints and racing scribbles | **Weak—regenerate.** Visual language is strong, but generated words such as `SPEED` violate the symbol-only rule. |
+| M089 | Number-free racing symbols | Chevrons, turns, boost, wheel, wrench and checkpoint marks | Pass. Crisp, varied, readable symbols without numbers or lettering. |
+| M090 | Weld heat and joining | Weld beads, rings, seams and repair joins | Pass with content constraint. Useful construction shapes; production should reduce pipe-like forms and emphasize weld/heat halos. |
+| M091 | Impact scorch | Blast blooms, streaks, rings and directional burns | Pass. Good range of hard impact centers and soft soot feathering. |
+| M092 | Dents and punctures | Concave hits, raised lips, tears and gouges | Pass. Excellent normal-driven damage vocabulary for non-silhouette deformation. |
+| M093 | Tape, stickers and fabric patches | 16 blank quick-repair pieces | Pass. Strong sharp-edged customization kit with no text or logos. |
+
 ## Next material batches
 
-### Batch 10 — flora, markings, damage, and utility decals
+### Batch 11 — grand-world infrastructure and settlement macros
 
-Flower scatter, pollen, mushrooms, coral growth, goblin doodles, number-free racing symbols, weld heat, impact scorch, bullet/dart dents, patched fabric, tape, warning stickers without text, and clean/dirty wipe masks.
+Aerial city blocks, industrial yards, villages, road networks, rail yards, quarries, ports, ruins, irrigation, rice fields and mixed biome-transition masks. These remain macro layers that spawn modular geometry rather than baking buildings into playable close-range surfaces.

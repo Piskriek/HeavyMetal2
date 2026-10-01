@@ -9529,6 +9529,710 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 64 island volcanic foundations"
+    },
+    {
+      "registryId": "M510",
+      "canonicalCode": "HM2-TXP-M510-ENV-EMBER-TIL-BCNROHE-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island scorched ground embers pbr sheet",
+      "sourceFile": "M510-island-scorched-ground-embers-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "EMBER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M511",
+      "canonicalCode": "HM2-TXP-M511-ENV-CRYSTAL-TIL-BCNROHT-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island crystal field pbr sheet",
+      "sourceFile": "M511-island-crystal-field-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "CRYSTAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M512",
+      "canonicalCode": "HM2-TXP-M512-ENV-GEODE-TIL-BCNROHT-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island geode lining pbr sheet",
+      "sourceFile": "M512-island-geode-lining-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GEODE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M513",
+      "canonicalCode": "HM2-TXP-M513-ENV-GRASS-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island short tropical grass pbr sheet",
+      "sourceFile": "M513-island-short-tropical-grass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M514",
+      "canonicalCode": "HM2-TXP-M514-ENV-DRYGRASS-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island dry golden grass pbr sheet",
+      "sourceFile": "M514-island-dry-golden-grass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "DRYGRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M515",
+      "canonicalCode": "HM2-TXP-M515-ENV-DUNEGRASS-ATL-BCNROHA-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island dune grass tuft alpha pbr sheet",
+      "sourceFile": "M515-island-dune-grass-tuft-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "DUNEGRASS",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "tuft atlas",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M516",
+      "canonicalCode": "HM2-TXP-M516-ENV-WETSAND-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island wet sand pbr sheet",
+      "sourceFile": "M516-island-wet-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WETSAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M517",
+      "canonicalCode": "HM2-TXP-M517-ENV-TIDELINE-TRN-BCNRHA-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island tideline foam edge alpha pbr sheet",
+      "sourceFile": "M517-island-tideline-foam-edge-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "TIDELINE",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m horizontal shoreline strip",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M518",
+      "canonicalCode": "HM2-TXP-M518-ENV-LAGOON-TIL-BCNRTD-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island deep lagoon water shader sheet",
+      "sourceFile": "M518-island-deep-lagoon-water-shader-sheet.png",
+      "domain": "ENV",
+      "material": "LAGOON",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Transmission",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m square",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M519",
+      "canonicalCode": "HM2-TXP-M519-ENV-FOAM-TRN-BCNRHA-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island shore foam strip alpha pbr sheet",
+      "sourceFile": "M519-island-shore-foam-strip-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "FOAM",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary guide",
+        "bottomRight": "registered relief, alpha, transmission or flow guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "6 m horizontal shoreline strip",
+      "mipPolicy": "Preserve broad island-surface identity before microdetail.",
+      "intendedUses": [
+        "base island terrain, shore, foliage or water surface"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "baked lighting",
+        "text or inset previews"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "flow",
+        "emissive or transmission intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "square text-free channels",
+          "real relief or shader guide",
+          "no obvious repeated focal feature"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "shoreline axis for M517/M519; both axes otherwise"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 65 island crystal grass and water foundations"
     }
   ]
 }

@@ -1026,3 +1026,15 @@ M120, M169, M211, M218, M235, M254 and M298 now pass as square text-free replace
 | M509 | Lava crust with glowing cracks | Pass. Broad cooling plates, recessed emissive cracks and no central focus. |
 
 M116 and M231 corrections pass. M078, M127 and M193 remain queued for channel-layout or material-identity issues.
+
+## Material Batch 65 — island crystal, grass and water foundations
+
+![Material Batch 65 contact sheet](./review/material-batch-65-island-crystal-grass-water.jpg)
+
+| IDs | Coverage | Review |
+|---|---|---|
+| M510–M512 | Scorched ground/embers, crystal field and geode lining | Pass. Distributed detail without central focal repetition. |
+| M513–M515 | Short tropical grass, dry golden grass and dune-grass tufts | Pass. Dense terrain coverage plus detachable alpha tufts. |
+| M516–M519 | Wet sand, tideline foam, deep lagoon water and shore foam | Pass. Water supports independent flow scrolling; foam strips register shoreline-axis repetition. |
+
+These fill the next island-plan priorities from the ingestion agent. All are verified `1024×1024`, text-free references with explicit channel recipes.

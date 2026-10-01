@@ -2756,7 +2756,7 @@
     },
     {
       "registryId": "M412",
-      "canonicalCode": "HM2-TXP-M412-GEN-PAPER-TIL-BCNROH-D16-PX128-Q4-WRN-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M412-GEN-PAPER-TIL-BCNROH-D16-PX128-Q4-WRN-P10-PT-R02",
       "name": "nostalgic dithered cardboard pbr sheet",
       "sourceFile": "M412-nostalgic-dithered-cardboard-pbr-sheet.png",
       "domain": "GEN",
@@ -2813,13 +2813,13 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M413",
-      "canonicalCode": "HM2-TXP-M413-GEN-ENAMEL-TIL-BCNRMH-PXL3D-PX128-Q4-WRN-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M413-GEN-ENAMEL-TIL-BCNRMH-PXL3D-PX128-Q4-WRN-P10-PT-R02",
       "name": "nostalgic classic enamelware pbr sheet",
       "sourceFile": "M413-nostalgic-classic-enamelware-pbr-sheet.png",
       "domain": "GEN",
@@ -2876,13 +2876,13 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M414",
-      "canonicalCode": "HM2-TXP-M414-GEN-GLASS-TIL-BCNRHT-PXLENS-PX128-Q4-WRN-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M414-GEN-GLASS-TIL-BCNRHT-PXLENS-PX128-Q4-WRN-P10-PT-R02",
       "name": "nostalgic retro bottle glass pbr sheet",
       "sourceFile": "M414-nostalgic-retro-bottle-glass-pbr-sheet.png",
       "domain": "GEN",
@@ -2939,13 +2939,13 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M415",
-      "canonicalCode": "HM2-TXP-M415-BLD-PLASTIC-TIL-BCNROH-Y2K-PX128-Q4-CLN-P12-PT-R01",
+      "canonicalCode": "HM2-TXP-M415-BLD-PLASTIC-TIL-BCNROH-Y2K-PX128-Q4-CLN-P12-PT-R02",
       "name": "nostalgic arcade vending plastic pbr sheet",
       "sourceFile": "M415-nostalgic-arcade-vending-plastic-pbr-sheet.png",
       "domain": "BLD",
@@ -3002,13 +3002,13 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M416",
-      "canonicalCode": "HM2-TXP-M416-BLD-CLOTH-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M416-BLD-CLOTH-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P10-PT-R02",
       "name": "nostalgic chunky awning cloth pbr sheet",
       "sourceFile": "M416-nostalgic-chunky-awning-cloth-pbr-sheet.png",
       "domain": "BLD",
@@ -3065,13 +3065,13 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M417",
-      "canonicalCode": "HM2-TXP-M417-BLD-SIGN-ATL-BCNRA-PXL3D-PX256-AT16-CLN-P06-PT-R01",
+      "canonicalCode": "HM2-TXP-M417-BLD-SIGN-ATL-BCNRA-PXL3D-PX256-AT16-CLN-P06-PT-R02",
       "name": "nostalgic market sign symbol alpha pbr sheet",
       "sourceFile": "M417-nostalgic-market-sign-symbol-alpha-pbr-sheet.png",
       "domain": "BLD",
@@ -3127,9 +3127,9 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M418",
@@ -3195,7 +3195,7 @@
     },
     {
       "registryId": "M419",
-      "canonicalCode": "HM2-TXP-M419-GEN-FIBER-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M419-GEN-FIBER-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P10-PT-R02",
       "name": "nostalgic rope basket pbr sheet",
       "sourceFile": "M419-nostalgic-rope-basket-pbr-sheet.png",
       "domain": "GEN",
@@ -3252,13 +3252,13 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     },
     {
       "registryId": "M420",
-      "canonicalCode": "HM2-TXP-M420-BLD-LIGHT-ATL-BCNRAE-Y2K-PX256-AT12-CLN-P06-PT-R01",
+      "canonicalCode": "HM2-TXP-M420-BLD-LIGHT-ATL-BCNRAE-Y2K-PX256-AT12-CLN-P06-PT-R02",
       "name": "nostalgic retro light fixture atlas",
       "sourceFile": "M420-nostalgic-retro-light-fixture-atlas.png",
       "domain": "BLD",
@@ -3315,9 +3315,9 @@
         ],
         "frequency": "primary forms survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 43"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 44 regeneration"
     }
   ]
 }

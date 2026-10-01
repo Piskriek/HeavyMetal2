@@ -811,8 +811,16 @@ Canonical codes and reconstruction recipes for M401–M410 are registered in [`t
 
 Canonical codes and reconstruction records for M411–M420 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
 
+## Material Batch 44 — targeted settlement regeneration
+
+![Material Batch 44 regenerated contact sheet](./review/material-batch-44-regenerated-settlement-contact-sheet.jpg)
+
+![Material Batch 44 BaseColor previews at 128 px](./review/material-batch-44-basecolor-128px-preview.png)
+
+M412–M417 and M419–M420 now pass after regeneration. Cardboard reads as pressed paper; all sheets are square and unlabeled; bottle glass has complete coordinated channels; awning cloth and rope retain clean material separation; the market atlas uses large padded symbols; and the light family now provides matched Normal, Roughness and Alpha/Emissive quadrants. Their canonical recipe revisions advanced from `R01` to `R02`. M411 and M418 remain the approved unchanged anchors.
+
 ## Next material batches
 
-### Batch 44 — targeted Batch 43 regeneration
+### Batch 45 — nostalgic tracks, landscape transitions, and recovery
 
-Regenerate M412–M417 and M419–M420, preserving M411 and M418 as approved anchors. Require square coordinated channels, no generated labels, sixteen-or-fewer large atlas elements, and 128 px readability.
+Pixel asphalt correction, dithered road shoulders, retro terrain transitions, water-edge blend masks, chunky weather accumulation, impact dissolve masks, support-loss collapse masks, recovery-stage overlays, nostalgic track props and low-resolution landscape signage.

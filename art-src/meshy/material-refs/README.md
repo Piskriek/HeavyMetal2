@@ -905,9 +905,17 @@ All surfaces remain free of baked sport markings so multiple rule presets can re
 
 These kits separate semantic line geometry, zone fills, paint breakup and distance-field treatment from the playing surface. Production reconstruction must use authoritative rule dimensions rather than tracing generated pixels. Canonical `SPT` records are registered for M451–M460.
 
+## Material Batch 51 — rule-mask corrections and global play objects
+
+![Material Batch 51 contact sheet](./review/material-batch-51-sports-corrections-play-objects-contact-sheet.jpg)
+
+M454–M456 and M458 now expose complete line, zone, wear and signed-distance quadrants and pass at `R02`. M461–M463 and M465–M466 provide brand-neutral stitched round-ball, oval-ball, felt-ball, puck-rubber and lacquered cricket-ball materials. M464 is a useful shuttlecock multi-angle object reference but must be regenerated as a detached material/channel sheet before production use.
+
+The play-object materials remain independent of mesh topology and protected branding. Their seams, palettes, grip, wear and finish remain editable preset parameters.
+
 ## Next material batches
 
-### Batch 51 — global sports objects, structures and style variants
+### Sports continuation after the interface foundation batches
 
 Complete sports textures in all three established styles: full-fidelity PBR, mobile low-resolution PBR and nostalgic PBR. Continue with:
 

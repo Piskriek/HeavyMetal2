@@ -5669,7 +5669,7 @@
     },
     {
       "registryId": "M454",
-      "canonicalCode": "HM2-TXP-M454-SPT-HOCKEY-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M454-SPT-HOCKEY-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R02",
       "name": "sports field-hockey rule mask kit",
       "sourceFile": "M454-sports-field-hockey-rule-mask-kit.png",
       "domain": "SPT",
@@ -5725,13 +5725,13 @@
         ],
         "frequency": "primary boundaries survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 50"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 51 correction"
     },
     {
       "registryId": "M455",
-      "canonicalCode": "HM2-TXP-M455-SPT-TENNIS-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M455-SPT-TENNIS-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R02",
       "name": "sports tennis rule mask kit",
       "sourceFile": "M455-sports-tennis-rule-mask-kit.png",
       "domain": "SPT",
@@ -5787,13 +5787,13 @@
         ],
         "frequency": "primary boundaries survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 50"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 51 correction"
     },
     {
       "registryId": "M456",
-      "canonicalCode": "HM2-TXP-M456-SPT-BADM-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M456-SPT-BADM-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R02",
       "name": "sports badminton rule mask kit",
       "sourceFile": "M456-sports-badminton-rule-mask-kit.png",
       "domain": "SPT",
@@ -5849,9 +5849,9 @@
         ],
         "frequency": "primary boundaries survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 50"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 51 correction"
     },
     {
       "registryId": "M457",
@@ -5917,7 +5917,7 @@
     },
     {
       "registryId": "M458",
-      "canonicalCode": "HM2-TXP-M458-SPT-NETBALL-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M458-SPT-NETBALL-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R02",
       "name": "sports netball rule mask kit",
       "sourceFile": "M458-sports-netball-rule-mask-kit.png",
       "domain": "SPT",
@@ -5973,9 +5973,9 @@
         ],
         "frequency": "primary boundaries survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 50"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 51 correction"
     },
     {
       "registryId": "M459",
@@ -6100,6 +6100,397 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M461",
+      "canonicalCode": "HM2-TXP-M461-SPT-BALL-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports stitched panel ball pbr sheet",
+      "sourceFile": "M461-sports-stitched-panel-ball-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "BALL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "object-relative UV tile",
+      "mipPolicy": "Preserve seams and broad contact wear.",
+      "intendedUses": [
+        "brand-neutral sports play-object materials"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "seam depth",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Configurable sports play-object material independent of mesh.",
+        "required": [
+          "material identity",
+          "broad seam/contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "text",
+          "baked lighting"
+        ],
+        "frequency": "identity and seams survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 51"
+    },
+    {
+      "registryId": "M462",
+      "canonicalCode": "HM2-TXP-M462-SPT-BALL-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports oval ball grip pbr sheet",
+      "sourceFile": "M462-sports-oval-ball-grip-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "BALL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "object-relative UV tile",
+      "mipPolicy": "Preserve seams and broad contact wear.",
+      "intendedUses": [
+        "brand-neutral sports play-object materials"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "seam depth",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Configurable sports play-object material independent of mesh.",
+        "required": [
+          "material identity",
+          "broad seam/contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "text",
+          "baked lighting"
+        ],
+        "frequency": "identity and seams survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 51"
+    },
+    {
+      "registryId": "M463",
+      "canonicalCode": "HM2-TXP-M463-SPT-FELT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports felt ball pbr sheet",
+      "sourceFile": "M463-sports-felt-ball-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FELT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "object-relative UV tile",
+      "mipPolicy": "Preserve seams and broad contact wear.",
+      "intendedUses": [
+        "brand-neutral sports play-object materials"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "seam depth",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Configurable sports play-object material independent of mesh.",
+        "required": [
+          "material identity",
+          "broad seam/contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "text",
+          "baked lighting"
+        ],
+        "frequency": "identity and seams survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 51"
+    },
+    {
+      "registryId": "M464",
+      "canonicalCode": "HM2-TXP-M464-SPT-SHUTTLE-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports shuttlecock material pbr sheet",
+      "sourceFile": "M464-sports-shuttlecock-material-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "SHUTTLE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference and Alpha"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "object-relative UV tile",
+      "mipPolicy": "Preserve seams and broad contact wear.",
+      "intendedUses": [
+        "brand-neutral sports play-object materials"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "seam depth",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Configurable sports play-object material independent of mesh.",
+        "required": [
+          "material identity",
+          "broad seam/contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "text",
+          "baked lighting"
+        ],
+        "frequency": "identity and seams survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 51"
+    },
+    {
+      "registryId": "M465",
+      "canonicalCode": "HM2-TXP-M465-SPT-PUCK-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports puck rubber pbr sheet",
+      "sourceFile": "M465-sports-puck-rubber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "PUCK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "object-relative UV tile",
+      "mipPolicy": "Preserve seams and broad contact wear.",
+      "intendedUses": [
+        "brand-neutral sports play-object materials"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "seam depth",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Configurable sports play-object material independent of mesh.",
+        "required": [
+          "material identity",
+          "broad seam/contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "text",
+          "baked lighting"
+        ],
+        "frequency": "identity and seams survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 51"
+    },
+    {
+      "registryId": "M466",
+      "canonicalCode": "HM2-TXP-M466-SPT-BALL-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports lacquered cricket ball leather pbr sheet",
+      "sourceFile": "M466-sports-lacquered-cricket-ball-leather-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "BALL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "object-relative UV tile",
+      "mipPolicy": "Preserve seams and broad contact wear.",
+      "intendedUses": [
+        "brand-neutral sports play-object materials"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "seam depth",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Configurable sports play-object material independent of mesh.",
+        "required": [
+          "material identity",
+          "broad seam/contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "text",
+          "baked lighting"
+        ],
+        "frequency": "identity and seams survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 51"
     }
   ]
 }

@@ -13790,7 +13790,7 @@
     },
     {
       "registryId": "M572",
-      "canonicalCode": "HM2-TXP-M572-ENV-BASLAVA-TRN-BCNROHE-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M572-ENV-BASLAVA-TRN-BCNROHE-NAT-PX256-Q4-CLN-PFULL-TR-R02",
       "name": "island basalt to lava transition pbr sheet",
       "sourceFile": "M572-island-basalt-to-lava-transition-pbr-sheet.png",
       "domain": "ENV",
@@ -13853,9 +13853,9 @@
         ],
         "frequency": "both material identities survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 73 island transition fringes"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 74 grayscale-guide correction"
     },
     {
       "registryId": "M573",
@@ -14197,6 +14197,621 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M578",
+      "canonicalCode": "HM2-TXP-M578-ENV-OBSIDBAS-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island obsidian to basalt transition pbr sheet",
+      "sourceFile": "M578-mobile-island-obsidian-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "OBSIDBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M571",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M579",
+      "canonicalCode": "HM2-TXP-M579-ENV-BASLAVA-TRN-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island basalt to lava transition pbr sheet",
+      "sourceFile": "M579-mobile-island-basalt-to-lava-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASLAVA",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M572",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M580",
+      "canonicalCode": "HM2-TXP-M580-ENV-CRYSBAS-TRN-BCNROHT-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island crystal to basalt transition pbr sheet",
+      "sourceFile": "M580-mobile-island-crystal-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "CRYSBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M573",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M581",
+      "canonicalCode": "HM2-TXP-M581-ENV-GRASSDRY-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island tropical to dry grass transition pbr sheet",
+      "sourceFile": "M581-mobile-island-tropical-to-dry-grass-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASSDRY",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M574",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M582",
+      "canonicalCode": "HM2-TXP-M582-ENV-WETUSAND-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island wet to underwater sand transition pbr sheet",
+      "sourceFile": "M582-mobile-island-wet-to-underwater-sand-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WETUSAND",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M575",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M583",
+      "canonicalCode": "HM2-TXP-M583-ENV-EARTHROOT-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island earth to roots underside transition pbr sheet",
+      "sourceFile": "M583-mobile-island-earth-to-roots-underside-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "EARTHROOT",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M576",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M584",
+      "canonicalCode": "HM2-TXP-M584-ENV-ROOTSTAL-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island roots to stalactite underside transition pbr sheet",
+      "sourceFile": "M584-mobile-island-roots-to-stalactite-underside-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "ROOTSTAL",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M577",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M585",
+      "canonicalCode": "HM2-TXP-M585-ENV-OBSIDBAS-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island obsidian to basalt transition pbr sheet",
+      "sourceFile": "M585-nostalgic-island-obsidian-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "OBSIDBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M571",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M586",
+      "canonicalCode": "HM2-TXP-M586-ENV-CRYSBAS-TRN-BCNROHT-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island crystal to basalt transition pbr sheet",
+      "sourceFile": "M586-nostalgic-island-crystal-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "CRYSBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional registered guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity transition parent",
+      "mipPolicy": "Preserve both identities and interlocked fringe.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle transition child"
+      ],
+      "prohibitedUses": [
+        "straight split",
+        "misordered channels",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M573",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier vertical-fringe transition child.",
+        "required": [
+          "top-bottom continuity",
+          "fixed quadrant order",
+          "distinct left/right materials"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both identities survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 74 runtime island transition variants"
     }
   ]
 }

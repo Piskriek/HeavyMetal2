@@ -1094,3 +1094,9 @@ M558–M564 complete mobile shoreline foam, floating-earth, exposed-root, stalac
 ![Material Batch 73 contact sheet](./review/material-batch-73-island-transition-fringes.jpg)
 
 M568–M571 and M573–M577 pass as nostalgic and full-fidelity vertical-fringe transitions covering grass, sand, basalt, lava, obsidian, crystal and floating-island underside materials. M572 retains a good basalt/lava boundary but must be regenerated because its lower-right guide quadrant contains unrelated vivid colors instead of registered grayscale/emissive data.
+
+## Material Batch 74 — runtime island transition variants
+
+![Material Batch 74 contact sheet](./review/material-batch-74-runtime-island-transition-variants.jpg)
+
+M572 now passes at `R02` with a corrected grayscale/emissive guide. M578–M582 and M584–M586 pass as mobile and nostalgic transition children. M583 is queued because its generated quadrants are misordered: the upper-left slot contains Normal-like data rather than the registered BaseColor transition.

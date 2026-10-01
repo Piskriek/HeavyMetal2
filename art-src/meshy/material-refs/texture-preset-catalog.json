@@ -11731,7 +11731,7 @@
     },
     {
       "registryId": "M542",
-      "canonicalCode": "HM2-TXP-M542-ENV-LAVARIV-TIL-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M542-ENV-LAVARIV-TIL-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic island directional lava river pbr sheet",
       "sourceFile": "M542-nostalgic-island-directional-lava-river-pbr-sheet.png",
       "domain": "ENV",
@@ -11794,9 +11794,9 @@
         ],
         "frequency": "identity survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 71 directional-flow correction"
     },
     {
       "registryId": "M543",
@@ -12209,6 +12209,628 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M549",
+      "canonicalCode": "HM2-TXP-M549-ENV-DUNEGRASS-ATL-BCNROHA-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island dune grass alpha pbr sheet",
+      "sourceFile": "M549-nostalgic-island-dune-grass-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "DUNEGRASS",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M515",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M550",
+      "canonicalCode": "HM2-TXP-M550-ENV-WETSAND-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island wet sand pbr sheet",
+      "sourceFile": "M550-nostalgic-island-wet-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WETSAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M516",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M551",
+      "canonicalCode": "HM2-TXP-M551-ENV-USAND-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island underwater sand pbr sheet",
+      "sourceFile": "M551-nostalgic-island-underwater-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "USAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M520",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M552",
+      "canonicalCode": "HM2-TXP-M552-ENV-LAGOON-TIL-BCNRTD-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island deep lagoon water shader sheet",
+      "sourceFile": "M552-nostalgic-island-deep-lagoon-water-shader-sheet.png",
+      "domain": "ENV",
+      "material": "LAGOON",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Transmission",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M518",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M553",
+      "canonicalCode": "HM2-TXP-M553-ENV-TIDELINE-TRN-BCNRHA-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island tideline foam alpha pbr sheet",
+      "sourceFile": "M553-nostalgic-island-tideline-foam-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "TIDELINE",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M517",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M554",
+      "canonicalCode": "HM2-TXP-M554-ENV-FOAM-TRN-BCNRHA-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island shore foam strip alpha pbr sheet",
+      "sourceFile": "M554-nostalgic-island-shore-foam-strip-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "FOAM",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M519",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M555",
+      "canonicalCode": "HM2-TXP-M555-ENV-UNDEARTH-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island floating earth underside pbr sheet",
+      "sourceFile": "M555-nostalgic-island-floating-earth-underside-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "UNDEARTH",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M521",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M556",
+      "canonicalCode": "HM2-TXP-M556-ENV-UNDROOT-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island floating roots pbr sheet",
+      "sourceFile": "M556-nostalgic-island-floating-roots-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "UNDROOT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M522",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M557",
+      "canonicalCode": "HM2-TXP-M557-ENV-STALFACE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island stalactite face pbr sheet",
+      "sourceFile": "M557-nostalgic-island-stalactite-face-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "STALFACE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve chunky stepped macro forms and PBR separation.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle shore or underside child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro styling",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M523",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 71 nostalgic island shore and underside"
     }
   ]
 }

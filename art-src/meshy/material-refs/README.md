@@ -1076,3 +1076,9 @@ M526, M529, M530 and M531 now pass at `R02` with the fixed BaseColor/Normal/Roug
 ![Material Batch 70 contact sheet](./review/material-batch-70-nostalgic-island-volcanic-surfaces.jpg)
 
 M539–M541 and M543–M548 pass as authored nostalgic-PBR children for obsidian, basalt columns, lava crust, scorched ground, crystals, geode lining and grasses. M542 retains useful lava material response but must be regenerated because its crust arrangement does not communicate a directional river flowing along the repeat axis.
+
+## Material Batch 71 — nostalgic island shore and underside
+
+![Material Batch 71 contact sheet](./review/material-batch-71-nostalgic-island-shore-underside.jpg)
+
+M542 now passes at `R02` with unmistakable top-to-bottom lava flow. M549–M557 pass as nostalgic-PBR children for dune grass, wet and underwater sand, scrolling lagoon water, two shore-foam scales, packed-earth underside, exposed roots and stalactite-face material.

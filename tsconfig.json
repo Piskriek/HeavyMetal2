@@ -38,6 +38,9 @@
       ],
       "@hm/ui": [
         "packages/ui/src/index.ts"
+      ],
+      "@hm/render": [
+        "packages/render/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

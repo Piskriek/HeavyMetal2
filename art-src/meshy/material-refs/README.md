@@ -1108,3 +1108,9 @@ M572 now passes at `R02` with a corrected grayscale/emissive guide. M578–M582 
 M583 now passes at `R02`. M587, M588 and M591 pass as nostalgic transition children; M590 requires regeneration because its BaseColor quadrant was replaced by Normal-like data. M592–M594 pass as brand-neutral net-cord, painted-post and wicket-timber materials. M595 is a constrained pass: the coordinated hoop/backboard regions are useful, but production must resolve its vivid lower-right transmission/metal guide from the registered recipe rather than pixel color.
 
 M589 was not registered because the image service returned no image; its ID remains unused rather than pointing to a missing asset.
+
+## Material Batch 76 — global sports equipment surfaces
+
+![Material Batch 76 contact sheet](./review/material-batch-76-global-sports-equipment-surfaces.jpg)
+
+M590 now passes at `R02`, and M589 completes the nostalgic wet-to-underwater-sand transition. M596–M603 pass as brand-neutral target board, archery straw, combat-ring rope, fine court net, table felt, landing foam, equestrian footing and velodrome timber materials. Their recipes keep protected branding out and preserve editable wear and palette controls.

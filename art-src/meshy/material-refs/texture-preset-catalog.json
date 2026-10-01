@@ -14951,8 +14951,76 @@
       "provenance": "Material Batch 75 transition corrections and sports structures"
     },
     {
+      "registryId": "M589",
+      "canonicalCode": "HM2-TXP-M589-ENV-WETUSAND-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island wet to underwater sand transition pbr sheet",
+      "sourceFile": "M589-nostalgic-island-wet-to-underwater-sand-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WETUSAND",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": "M575",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
       "registryId": "M590",
-      "canonicalCode": "HM2-TXP-M590-ENV-EARTHROOT-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M590-ENV-EARTHROOT-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic island earth to roots underside transition pbr sheet",
       "sourceFile": "M590-nostalgic-island-earth-to-roots-underside-transition-pbr-sheet.png",
       "domain": "ENV",
@@ -15014,9 +15082,9 @@
         ],
         "frequency": "identity survives fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 75 transition corrections and sports structures"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 76 fixed-channel correction"
     },
     {
       "registryId": "M591",
@@ -15360,6 +15428,551 @@
       "status": "constrained-pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M596",
+      "canonicalCode": "HM2-TXP-M596-SPT-TARGET-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports painted target board pbr sheet",
+      "sourceFile": "M596-sports-painted-target-board-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TARGET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M597",
+      "canonicalCode": "HM2-TXP-M597-SPT-STRAW-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports archery straw target pbr sheet",
+      "sourceFile": "M597-sports-archery-straw-target-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "STRAW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M598",
+      "canonicalCode": "HM2-TXP-M598-SPT-ROPE-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports boxing ring rope pbr sheet",
+      "sourceFile": "M598-sports-boxing-ring-rope-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ROPE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M599",
+      "canonicalCode": "HM2-TXP-M599-SPT-NET-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports fine net cord pbr sheet",
+      "sourceFile": "M599-sports-fine-net-cord-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "NET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M600",
+      "canonicalCode": "HM2-TXP-M600-SPT-FELT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports table felt pbr sheet",
+      "sourceFile": "M600-sports-table-felt-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FELT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M601",
+      "canonicalCode": "HM2-TXP-M601-SPT-FOAM-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports landing foam pbr sheet",
+      "sourceFile": "M601-sports-landing-foam-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FOAM",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M602",
+      "canonicalCode": "HM2-TXP-M602-SPT-FOOTING-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports equestrian footing pbr sheet",
+      "sourceFile": "M602-sports-equestrian-footing-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FOOTING",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M603",
+      "canonicalCode": "HM2-TXP-M603-SPT-VELO-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports velodrome surface pbr sheet",
+      "sourceFile": "M603-sports-velodrome-surface-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "VELO",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus Alpha where registered"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "parent transition scale or object-relative sports UV",
+      "mipPolicy": "Preserve broad sport/material identity and contact wear.",
+      "intendedUses": [
+        "nostalgic island transition or brand-neutral global sports equipment/surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Reusable transition or globally applicable sports material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 76 global sports equipment surfaces"
     }
   ]
 }

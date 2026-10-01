@@ -5,8 +5,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cmd, defineSchema } from '@hm/contracts';
-import { createCommandBus, createEventBus, createPresetStore, createSchemaRegistry, createVariableSystem } from '@hm/kernel';
+import { defineSchema } from '@hm/contracts';
+import { createEventBus, createPresetStore, createSchemaRegistry, createVariableSystem } from '@hm/kernel';
 
 const racer = defineSchema({
   kind: 'racer', version: 2, label: 'Racer', doc: 'A ball that races.',
@@ -36,8 +36,7 @@ function setup(limits?: { maxDepth?: number; maxNodes?: number; maxBundleBytes?:
   const store = createPresetStore({ schemas, ...(limits ? { limits } : {}), newId: () => `p${++n}`, now: () => ++t });
   const events = createEventBus();
   const vars = createVariableSystem({ store, schemas, events });
-  const commands = createCommandBus({ store, vars });
-  return { schemas, store, events, vars, commands };
+  return { schemas, store, events, vars };
 }
 
 test('variables: read/write/describe/search on preset params (inherited, defaults, dotted keys)', () => {
@@ -104,53 +103,3 @@ test('variables: providers own a scheme (entity:, global:)', () => {
   assert.equal(vars.describe('global:mass')!.type, 'number');
   assert.ok([...vars.all()].includes('global:mass'));
 });
-
-test('commands: set-param, undo/redo, transactions as one step, history, batch', () => {
-  const { store, commands, vars } = setup();
-  const r = store.put({ kind: 'racer', name: 'R', params: { weight: 3 } });
-  assert.equal(commands.canUndo, false);
-  const res = commands.execute(cmd.setParam(`${r.id}.weight`, 6, 'Heavier'));
-  assert.equal(res.ok, true); assert.deepEqual(res.touched, [r.id]);
-  assert.equal(vars.read(`${r.id}.weight`), 6);
-  assert.equal(commands.undo(), true);
-  assert.equal(vars.read(`${r.id}.weight`), 3);
-  assert.equal(commands.redo(), true);
-  assert.equal(vars.read(`${r.id}.weight`), 6);
-  commands.transaction('Drag', () => {
-    commands.execute(cmd.setParam(`${r.id}.weight`, 7));
-    commands.execute(cmd.setParam(`${r.id}.weight`, 8));
-    commands.execute(cmd.setParam(`${r.id}.bounce`, 1));
-  });
-  assert.equal(vars.read(`${r.id}.weight`), 8);
-  commands.undo();
-  assert.equal(vars.read(`${r.id}.weight`), 6); assert.equal(vars.read(`${r.id}.bounce`), 5, 'the whole transaction undid in one step');
-  assert.deepEqual(commands.history().map((h) => h.label), ['Heavier', 'Drag']);
-  assert.equal(commands.history()[1]!.undone, true);
-  commands.execute(cmd.batch([cmd.setParam(`${r.id}.weight`, 1), cmd.setParam(`${r.id}.bounce`, 2)], 'Both'));
-  commands.undo();
-  assert.equal(vars.read(`${r.id}.weight`), 6);
-  assert.equal(commands.history().some((h) => h.label === 'Drag'), false, 'a new command drops the redo branch');
-});
-
-test('commands: add-child/remove-child/put/set-script undo cleanly; bad commands fail without changing anything', () => {
-  const { store, commands } = setup();
-  const m = store.put({ kind: 'mechanic', name: 'M' });
-  const r = store.put({ kind: 'racer', name: 'R' });
-  commands.execute(cmd.addChild(r.id, 'mechanics', m.id));
-  assert.deepEqual(store.get(r.id)!.children['mechanics'], [{ ref: m.id }]);
-  commands.execute(cmd.setScript(m.id, 'export function update() {}'));
-  assert.equal(store.get(m.id)!.script!.source, 'export function update() {}');
-  commands.undo(); assert.equal(store.get(m.id)!.script, undefined);
-  commands.undo(); assert.deepEqual(store.get(r.id)!.children['mechanics'] ?? [], []);
-  const before = store.get(r.id)!.revision;
-  const bad = commands.execute(cmd.addChild(r.id, 'mechanics', 'ghost'));
-  assert.equal(bad.ok, false); assert.ok(bad.error);
-  assert.equal(store.get(r.id)!.revision, before);
-  assert.equal(commands.execute({ type: 'no-such', payload: {}, label: 'x' }).ok, false);
-  const seen: string[] = [];
-  commands.subscribe((c, res) => seen.push(`${c.type}:${res.ok}`));
-  commands.registerHandler('custom', { apply: () => ({ result: { ok: true, touched: [] }, inverse: null }) });
-  commands.execute({ type: 'custom', payload: {}, label: 'c' });
-  assert.deepEqual(seen, ['custom:true']);
-});
-

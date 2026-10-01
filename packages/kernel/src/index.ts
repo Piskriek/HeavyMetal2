@@ -12,5 +12,7 @@ export { migrateBundle, hashBundle } from './bundle';
 export { cyrb53, hashText, hashValue, hashPresetContent, stableStringify } from './hash';
 export type { PresetContent } from './hash';
 
-export const createVariableSystem: KernelExports['createVariableSystem'] = () => todo('createVariableSystem');
+export { createVariableSystem } from './variables';
+export { compileExpression } from './expr';
+export type { CompiledExpression, ExprIssue, ExprValue } from './expr';
 export const createCommandBus: KernelExports['createCommandBus'] = () => todo('createCommandBus');

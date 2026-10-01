@@ -2242,6 +2242,76 @@
       "provenance": "Material Batch 42 partial"
     },
     {
+      "registryId": "M404",
+      "canonicalCode": "HM2-TXP-M404-CHR-METAL-TIL-BCNRMH-PSXMET-PX128-Q4-WRN-P12-PT-R01",
+      "name": "Retro protective plate material",
+      "sourceFile": "M404-nostalgic-retro-armor-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "METAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Metallic+Height guide"
+      },
+      "style": "PSXMET",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.5 m square",
+      "mipPolicy": "Preserve large paint and exposed-metal islands through PX64.",
+      "intendedUses": [
+        "Goblin protective plates",
+        "racing gear",
+        "vehicle panel accents"
+      ],
+      "prohibitedUses": [
+        "weapons",
+        "clean bare metal"
+      ],
+      "parentPreset": "M346",
+      "editableParameters": [
+        "palette",
+        "paint coverage",
+        "corrosion",
+        "dent scale"
+      ],
+      "recipe": {
+        "intent": "Nostalgic pixel-painted fantasy racing protective plate with modern metal response.",
+        "required": [
+          "acid-green enamel",
+          "charcoal metal",
+          "orange trim",
+          "large cream wear"
+        ],
+        "forbidden": [
+          "symbols",
+          "weapons",
+          "microchips",
+          "labels"
+        ],
+        "frequency": "condition islands remain wider than two texels at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42"
+    },
+    {
       "registryId": "M405",
       "canonicalCode": "HM2-TXP-M405-CHR-LEATHER-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P12-PT-R01",
       "name": "Hand-painted boot leather",
@@ -2359,13 +2429,16 @@
         ],
         "forbidden": [
           "words",
-          "real-world symbols"
+          "religious icons",
+          "real-world symbols",
+          "tiny chains",
+          "labels"
         ],
         "frequency": "primary forms survive PX128 fallback"
       },
-      "status": "constrained-pass",
+      "status": "pass",
       "recipeRevision": 1,
-      "provenance": "Material Batch 42 partial"
+      "provenance": "Material Batch 42 final"
     },
     {
       "registryId": "M407",
@@ -2607,13 +2680,16 @@
         ],
         "forbidden": [
           "words",
-          "channel labels"
+          "numbers",
+          "channel labels",
+          "real logos",
+          "thin lines"
         ],
         "frequency": "primary forms survive PX128 fallback"
       },
-      "status": "regenerate",
+      "status": "pass",
       "recipeRevision": 1,
-      "provenance": "Material Batch 42 partial"
+      "provenance": "Material Batch 42 final"
     }
   ]
 }

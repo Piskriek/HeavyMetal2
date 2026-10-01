@@ -769,10 +769,29 @@ Canonical codes and reconstruction recipes for M381–M390 are registered in [`t
 
 Canonical codes and reconstruction recipes for M391–M400 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
 
+## Material Batch 42 — nostalgic Goblin Creator wardrobe and accessories
+
+![Material Batch 42 nostalgic Creator contact sheet](./review/material-batch-42-nostalgic-creator-contact-sheet.jpg)
+
+![Material Batch 42 BaseColor previews at 128 px](./review/material-batch-42-nostalgic-basecolor-128px-preview.png)
+
+| ID | Nostalgic Creator preset | Canonical use | Status and production note |
+|---|---|---|---|
+| M401 | Pixel hair cards | Hair, brows and punk silhouettes | Pass. Excellent chunky mohawks, tufts, locks and brows with six-color palette swaps. |
+| M402 | Dithered skin details | Pigment, freckles, blush and age layers | Pass. Strong appealing olive, tan, violet and coral clusters without fixed facial texture. |
+| M403 | Classic goggle kit | Goggle frames and lenses | Pass. Excellent round, oval and angular variants with clean transmission silhouettes. |
+| M404 | Retro protective plate material | Creator protective gear and racing panels | Pass. Strong acid-green enamel, charcoal metal, orange trim and broad exposed wear. |
+| M405 | Hand-painted boot leather | Boots, gloves and heavy gear | Pass. Excellent broad flex creases, mud, pale wear and painterly limited palette. |
+| M406 | Chunky jewelry atlas | Rings, cuffs, beads and abstract charms | Pass after regeneration. Clean original loops, plates, spirals and machine charms without real-world religious forms. |
+| M407 | Arcade cloth patches | Wardrobe and team patches | Pass. Strong geometric shapes, clean alpha and indexed racing palette. |
+| M408 | Limited-palette cosmetics | Eye, lip, cheek and nail overlays | Pass. Excellent chunky punk cosmetics without full-face dependency or micro-glitter. |
+| M409 | Creator grime atlas | Dust, mud, chalk, grease and paint | Pass. Strong broad wipes, rings and drags with clean material-condition masks. |
+| M410 | Palette-swap team kit | Clothing, helmets and vehicle identity | Pass after regeneration. Excellent bold panels, bands and emblems without generated labels. |
+
+Canonical codes and reconstruction recipes for M401–M410 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
+
 ## Next material batches
 
-### Batch 42 — nostalgic Goblin Creator wardrobe and accessories — in progress
+### Batch 43 — nostalgic settlement props and signage
 
-Pixel hair cards, dithered skin details, classic goggles, retro armor, hand-painted boots, chunky jewelry, arcade cloth patches, limited-palette cosmetics, creator grime overlays and palette-swap team kits.
-
-M401–M403 and M405–M410 have been generated and cataloged. M404 retro armor remains pending because the generation turn reached its image cap after a moderated attempt. Interim review: M401–M405 and M407–M409 pass; M406 requires removal of real-world cross-like charm forms; M410 requires regeneration without generated channel labels. Final Batch 42 contact sheets will replace the partial review sheets after M404 is generated.
+Pixel crate wood, dithered cardboard, classic enamelware, retro bottle glass, arcade vending plastic, chunky fabric awnings, market-sign symbol atlas, pixel utility labels without words, nostalgic rope/basket materials and retro light fixtures.

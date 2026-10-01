@@ -316,8 +316,27 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M149 | Farm to village | `512 × 512 m` | Pass. Field boundaries and roads transition naturally into settlement footprints. |
 | M150 | Coast to deep water | `1 × 1 km` | Pass. Excellent shore, shallows, reef/channel and deep-ocean bathymetric progression. |
 
+## Material Batch 17 — weather, season, and world-condition layers
+
+![Material Batch 17 weather and season contact sheet](./review/material-batch-17-weather-season-contact-sheet.jpg)
+
+| ID | Condition layer | Use | Status and production note |
+|---|---|---|---|
+| M151 | Frost and rime | Props, glass, foliage, rock and metal | Pass. Strong edge strips, crystalline fans and broad frost blooms with clean alpha. |
+| M152 | Light snow cover | Thin seasonal deposits and ledges | Pass. Useful strips, crescents and low-cover masks; shader controls powder depth and exposed base material. |
+| M153 | Heavy snowpack | Deep seasonal terrain surface | Pass. Excellent broad wind dunes, compacted hollows and usable height structure. |
+| M154 | Rain darkening | Wet material response and runoff | **Weak—regenerate.** Mask variety is useful, but small generated footer labels violate the clean-sheet standard. |
+| M155 | Puddle accumulation | Standing water in ruts and low ground | Pass. Strong shape variety with good depth, edge and roughness separation. |
+| M156 | Windblown leaves | Seasonal windrows and corner buildup | Pass. Excellent connected leaf groups, warm seasonal colors and LOD-safe silhouettes. |
+| M157 | Dry-season bleaching | Terrain and foliage stress | Pass. Broad pale stress masks support tint, density and roughness changes without replacing geometry. |
+| M158 | Spring bloom | Flower and fresh-growth coverage | Pass. Strong verge strips, islands and meadow patches with controlled color. |
+| M159 | Volcanic ashfall | Event deposition on terrain and props | **Weak—regenerate.** Content is useful, but the generated sheet broke the required four-quadrant channel layout. |
+| M160 | Storm debris | Windrows of leaves, twigs, timber, rope and scrap | Pass. Excellent directional piles and connected masks for decal/geometry hybrid spawning. |
+
+Layer ordering, accumulation, melt/dry behavior, geometry response and event baking are defined in [`docs/WEATHER_AND_SEASON_MATERIAL_STANDARD.md`](../../../docs/WEATHER_AND_SEASON_MATERIAL_STANDARD.md).
+
 ## Next material batches
 
-### Batch 17 — weather, season, and world-condition layers
+### Batch 18 — environmental media and recovery states
 
-Frost, light snow, heavy snow, rain-darkening, puddle accumulation, windblown leaves, dry-season bleaching, spring bloom, ashfall, storm debris, underwater depth haze and burned-ground recovery.
+Underwater depth haze, algae bloom, burned-ground recovery, regrowing forest, dust storm deposition, fog moisture, oil-on-water sheen, mineral hot-spring deposits, tidal wet/dry cycling and post-race track recovery.

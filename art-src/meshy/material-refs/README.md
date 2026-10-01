@@ -279,7 +279,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M124 | Painted racing armor | Armor plates and vehicle protection | Pass. Strong acid-green enamel, restrained racing accents and broad chipped-metal breakup. |
 | M125 | Oxidized jewelry | Rings, ear cuffs, tooth caps and charms | Pass. Excellent brass, copper, silver and patina variants with clean masks. |
 | M126 | Coarse knit | Shirts, cuffs, socks and padding | Pass. Chunky interlocked yarn is seamless, tactile and distinct from canvas. |
-| M127 | Padded racing suit | Suits, jackets and upholstery | **Weak—regenerate.** Softer than before, but large closed cells still dominate instead of flowing stitched padding channels. |
+| M127 | Padded racing suit | Suits, jackets and upholstery | Pass after regeneration. Soft woven cloth with open-ended flowing stitched channels and no hard closed cells. |
 | M128 | Dirt and sweat overlays | Skin and clothing condition | Pass. Useful broad wipes, rings and smears with rough/damp separation. |
 | M129 | Healed damage overlays | Old scars, burns and character history | Pass with cleanup. Strong variety; remove stitch-like and overly raw shapes to keep the character appealing and non-gory. |
 | M130 | Wet-skin sheen masks | Rain, sweat and water response | Pass. Broad roughness masks provide moisture without transparent geometry or baked highlights. |
@@ -598,7 +598,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 
 | ID | Creator layer | Use | Status and production note |
 |---|---|---|---|
-| M311 | Skin thickness and SSS masks | Ears, nose, cheeks, knuckles and thin tissue | **Weak—regenerate.** Detached fragments improved, but the sheet still contains assembled face/torso anatomy instead of regional masks only. |
+| M311 | Skin thickness and SSS masks | Ears, nose, cheeks, knuckles and thin tissue | Pass after regeneration. Fully abstract detached thickness, edge, curvature and subsurface masks with no assembled anatomy. |
 | M312 | Skin pigment variation | Natural runtime-tintable skin diversity | Pass. Strong olive, sage, tan, violet and lime patches with clean soft alpha. |
 | M313 | Freckles and beauty marks | Fine identity variation | Pass. Restrained clustered marks and broad placements avoid diseased or noisy skin. |
 | M314 | Age wrinkles and expression folds | Brow, smile, eye, nose and neck aging | Pass. Excellent separated fold groups, aligned normals and readable stylized depth. |
@@ -1058,3 +1058,9 @@ M193 galvanized steel now passes. This completes the planning request’s missin
 ![Material Batch 67 contact sheet](./review/material-batch-67-legacy-and-island-corrections.jpg)
 
 M078, M175, M176, M203, M245, M319, M464 and M523 now pass. M464 advances to `R03`; M523 advances to `R02`. M127 and M311 remain queued because closed padding cells and assembled anatomy still violate their reconstruction recipes.
+
+## Material Batch 68 — mobile volcanic foundations and mask corrections
+
+![Material Batch 68 contact sheet](./review/material-batch-68-mobile-volcanic-and-mask-corrections.jpg)
+
+M127 and M311 now pass after removing closed armor-like padding cells and assembled anatomy respectively. M525, M527, M528 and M532 pass as mobile obsidian, basalt-face, lava-river and geode children. Regenerate M526, M529, M530 and M531 because their generated channel quadrants are misordered despite useful visual content.

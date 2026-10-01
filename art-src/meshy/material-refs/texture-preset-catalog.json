@@ -10574,6 +10574,547 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 66 island sand and floating underside"
+    },
+    {
+      "registryId": "M525",
+      "canonicalCode": "HM2-TXP-M525-ENV-OBSID-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island obsidian pbr sheet",
+      "sourceFile": "M525-mobile-island-obsidian-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "OBSID",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M505",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M526",
+      "canonicalCode": "HM2-TXP-M526-ENV-BASEND-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island basalt column ends pbr sheet",
+      "sourceFile": "M526-mobile-island-basalt-column-ends-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASEND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M506",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M527",
+      "canonicalCode": "HM2-TXP-M527-ENV-BASFACE-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island basalt column face pbr sheet",
+      "sourceFile": "M527-mobile-island-basalt-column-face-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASFACE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M507",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M528",
+      "canonicalCode": "HM2-TXP-M528-ENV-LAVARIV-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island directional lava river pbr sheet",
+      "sourceFile": "M528-mobile-island-directional-lava-river-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVARIV",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M508",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M529",
+      "canonicalCode": "HM2-TXP-M529-ENV-LAVACRUST-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island lava crust pbr sheet",
+      "sourceFile": "M529-mobile-island-lava-crust-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVACRUST",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M509",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M530",
+      "canonicalCode": "HM2-TXP-M530-ENV-EMBER-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island scorched embers pbr sheet",
+      "sourceFile": "M530-mobile-island-scorched-embers-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "EMBER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M510",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M531",
+      "canonicalCode": "HM2-TXP-M531-ENV-CRYSTAL-TIL-BCNROHT-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island crystal field pbr sheet",
+      "sourceFile": "M531-mobile-island-crystal-field-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "CRYSTAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M511",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M532",
+      "canonicalCode": "HM2-TXP-M532-ENV-GEODE-TIL-BCNROHT-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island geode lining pbr sheet",
+      "sourceFile": "M532-mobile-island-geode-lining-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GEODE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and three-value response; discard microdetail.",
+      "intendedUses": [
+        "mobile Basalt Isle runtime bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "visible repeated focus",
+        "misordered channel quadrants"
+      ],
+      "parentPreset": "M512",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Mobile material child preserving parent identity at low resolution.",
+        "required": [
+          "correct fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 68 mobile volcanic foundations"
     }
   ]
 }

@@ -573,8 +573,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M299 | Wet leaf litter | Damp jungle-floor carpets and recovery states | Pass. Strong compressed dark leaves, decay edges and low wet relief. |
 | M300 | Tropical moss carpet | Damp stone, roots and shaded ground | Pass. Excellent packed cushion forms, varied greens and LOD-readable soft depth. |
 
+## Material Batch 32 — tropical canopy and understory kits
+
+![Material Batch 32 tropical-canopy contact sheet](./review/material-batch-32-tropical-canopy-understory-contact-sheet.jpg)
+
+| ID | Vegetation kit | Use | Status and production note |
+|---|---|---|---|
+| M301 | Palm frond atlas | Palm crowns, fallen fronds and canopy cards | Pass. Excellent arching silhouettes, broad leaflets and useful healthy-to-dry variation. |
+| M302 | Banana-leaf atlas | Banana crowns and broad tropical foliage | Pass. Strong intact and wind-split blades with clean alpha and readable central ribs. |
+| M303 | Tropical grass clumps | Lawns, roadside edges and jungle clearings | Pass. Dense varied clumps with attractive centers and strong distance silhouettes. |
+| M304 | Wetland reed atlas | Marshes, canals and tidal margins | Pass. Clean height variation, broad blades, restrained seed heads and mip-safe alpha. |
+| M305 | Mangrove seedlings | Tidal recovery, nurseries and wetland succession | Pass. Excellent paired leaves, propagules and multiple growth stages. |
+| M306 | Flowering groundcover | Selective jungle color accents and settlement gardens | Pass. Strong grouped flowers and broad foliage; keep production density restrained. |
+| M307 | Jungle fungi | Damp roots, logs, caves and forest floors | Pass. Excellent chunky shelf, cap and cup silhouettes with varied material response. |
+| M308 | Exposed roots | Ground contact, buttresses and sculptable root networks | Pass. Strong forks, thick volumes and modular LOD-safe endpoints. |
+| M309 | Epiphyte clusters | Trunks, ruins, rocks and canopy decoration | Pass. Excellent rosettes, strap leaves and multiple compact physical scales. |
+| M310 | Dead branch debris | Fallen woody carpets and modular debris | Pass. Strong branch and bundle silhouettes without hair-thin clutter. |
+
 ## Next material batches
 
-### Batch 32 — tropical canopy and understory kits
+### Batch 33 — Goblin Creator skin and expression detail
 
-Palm frond atlas, banana-leaf atlas, tropical grass clumps, wetland reeds, mangrove seedlings, flowering groundcover, jungle fungi, exposed root atlas, epiphyte clusters and dead branch/debris atlas.
+Skin thickness/SSS masks, pigment variation, freckles and beauty marks, age wrinkles, pore roughness, flush/blush overlays, subtle vein masks, eye wetness, tooth staining and face grime.

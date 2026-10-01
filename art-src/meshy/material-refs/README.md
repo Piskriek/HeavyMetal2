@@ -647,8 +647,27 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 | M339 | Water and foam masks | Mobile standard, `128 × 128` | Pass. Bold independently scrollable teal bands and thick connected foam survive mip reduction. |
 | M340 | Packed leaf litter | Mobile standard, `128 × 128` | Pass. Excellent six-color overlapping leaves with no dependence on fine veins or fragments. |
 
+## Material Batch 36 — mobile Goblin Creator and vehicle detail
+
+![Material Batch 36 mobile Creator and vehicle contact sheet](./review/material-batch-36-mobile-creator-vehicle-contact-sheet.jpg)
+
+![Material Batch 36 BaseColor previews at 128 px](./review/material-batch-36-mobile-basecolor-128px-preview.png)
+
+| ID | Mobile material | Intended tier | Status and production note |
+|---|---|---|---|
+| M341 | Dyed hair atlas | Mobile atlas, `256 × 256` | Pass. Excellent chunky punk silhouettes, six bold colors and no fragile strand detail. |
+| M342 | Coarse knit | Mobile standard, `128 × 128` | Pass. Oversized interlocked loops, simple dyed regions and broad compression remain clear. |
+| M343 | Padded racing cloth | Mobile hero, `256 × 256` | Pass. Strong intentional rectangular pads and straight seams finally read as racing apparel rather than stone cells. |
+| M344 | Worn suede | Mobile standard, `128 × 128` | Pass. Broad directional nap and large tan, brown and turquoise handling zones survive reduction. |
+| M345 | Tinted goggle lens | Mobile hero, `256 × 256` | Pass. Simple cyan/magenta tint, one broad wipe and sparse scratches avoid shimmer. |
+| M346 | Painted armor metal | Mobile hero, `256 × 256` | Pass. Excellent acid-green, charcoal, orange and exposed-metal armor blocks with clean masks. |
+| M347 | Racing tire tread | Mobile rectangular, `128 × 256` | Pass. Large angular tread blocks and wide channels retain a strong vehicle read through LOD. |
+| M348 | Vehicle light-lens atlas | Mobile atlas, `256 × 256` | Pass. Eight large red, amber, cyan and green forms provide stable emissive and alpha masks. |
+| M349 | Dashboard plastic | Mobile standard, `128 × 128` | Pass. Restrained broad handling wear and grime avoid unstable molded micro-grain. |
+| M350 | Grime decal atlas | Mobile atlas, `256 × 256` | Pass. Strong dust, mud, chalk, grease and paint marks with thick padded silhouettes. |
+
 ## Next material batches
 
-### Batch 36 — mobile Goblin Creator and vehicle detail
+### Batch 37 — mobile track, effects, and destruction
 
-Dyed hair atlas, coarse knit, padded racing cloth, suede, goggle lens, painted armor metal, tire tread, light lens, dashboard plastic and grime decal atlas.
+Mobile asphalt, lane paint, grass ground, mossy stone, boost-pad markings, dust-puff atlas, smoke atlas, rain-splash atlas, impact-crack decals and material chunk atlas.

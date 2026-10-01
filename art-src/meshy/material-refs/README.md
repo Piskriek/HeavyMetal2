@@ -873,11 +873,26 @@ M432, M433 and M437 pass after strict regeneration from shared authoritative fie
 
 ## Next material batches
 
-### Batch 49 — global sports playing surfaces — in progress
+## Material Batch 49 — global sports playing surfaces
 
-![Material Batch 49 partial contact sheet](./review/material-batch-49-sports-surfaces-partial-contact-sheet.jpg)
+![Material Batch 49 contact sheet](./review/material-batch-49-global-sports-surfaces-contact-sheet.jpg)
 
-Generated M442–M445 and M447–M450. M442 artificial turf, M443 clay court, M444 acrylic hard court, M448 pool-deck tile and M449 combat mat pass. M445 timber court requires a strict four-quadrant regeneration; M447 ice requires removal of generated labels; M450 beach-sport sand lacks a clear BaseColor quadrant. M441 natural turf and M446 athletics rubber remain pending after the image service returned resource-exhaustion errors. All existing sheets have canonical `SPT` catalog records.
+| ID | Sports surface | Primary uses | Review |
+|---|---|---|---|
+| M441 | Natural turf | Football, rugby, cricket, hockey and field sports | Pass. |
+| M442 | Artificial turf | Football, hockey, rugby and multi-sport grounds | Pass. |
+| M443 | Clay court | Tennis and regional clay-court sports | Pass. |
+| M444 | Acrylic hard court | Tennis, basketball, netball, volleyball, handball and futsal | Pass. |
+| M445 | Indoor timber court | Basketball, volleyball, badminton, handball and futsal | Pass after R02 regeneration. |
+| M446 | Athletics-track rubber | Running and field-event approaches | Pass. |
+| M447 | Maintained sports ice | Ice hockey, curling and skating | Pass after R02 regeneration. |
+| M448 | Pool-deck tile | Swimming and water polo venues | Pass. |
+| M449 | Combat/gymnastics mat | Judo, wrestling, taekwondo, MMA and landing areas | Pass. |
+| M450 | Groomed beach sand | Beach football, volleyball, handball, wrestling and athletics | Pass after R02 regeneration. |
+
+All surfaces remain free of baked sport markings so multiple rule presets can reuse them. Canonical `SPT` records are registered for M441–M450.
+
+## Next material batches
 
 ### Batches 50–51 — global sports preset foundations
 

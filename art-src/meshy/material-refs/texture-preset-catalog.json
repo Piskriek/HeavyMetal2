@@ -4832,6 +4832,71 @@
       "provenance": "Material Batch 47"
     },
     {
+      "registryId": "M441",
+      "canonicalCode": "HM2-TXP-M441-SPT-TURF-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports natural turf pbr sheet",
+      "sourceFile": "M441-sports-natural-turf-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TURF",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve broad sport-surface identity and wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked markings",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports surface with detachable line markings.",
+        "required": [
+          "clean material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 final"
+    },
+    {
       "registryId": "M442",
       "canonicalCode": "HM2-TXP-M442-SPT-TURF-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
       "name": "sports artificial turf pbr sheet",
@@ -5028,7 +5093,7 @@
     },
     {
       "registryId": "M445",
-      "canonicalCode": "HM2-TXP-M445-SPT-COURT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M445-SPT-COURT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R02",
       "name": "sports indoor timber court pbr sheet",
       "sourceFile": "M445-sports-indoor-timber-court-pbr-sheet.png",
       "domain": "SPT",
@@ -5087,13 +5152,78 @@
         ],
         "frequency": "surface remains readable at fallback tier"
       },
-      "status": "regenerate",
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 49 final regeneration"
+    },
+    {
+      "registryId": "M446",
+      "canonicalCode": "HM2-TXP-M446-SPT-TRACK-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports athletics track rubber pbr sheet",
+      "sourceFile": "M446-sports-athletics-track-rubber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve broad sport-surface identity and wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked markings",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports surface with detachable line markings.",
+        "required": [
+          "clean material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
       "recipeRevision": 1,
-      "provenance": "Material Batch 49 partial"
+      "provenance": "Material Batch 49 final"
     },
     {
       "registryId": "M447",
-      "canonicalCode": "HM2-TXP-M447-SPT-ICE-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M447-SPT-ICE-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R02",
       "name": "sports ice rink pbr sheet",
       "sourceFile": "M447-sports-ice-rink-pbr-sheet.png",
       "domain": "SPT",
@@ -5152,9 +5282,9 @@
         ],
         "frequency": "surface remains readable at fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 49 partial"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 49 final regeneration"
     },
     {
       "registryId": "M448",
@@ -5288,7 +5418,7 @@
     },
     {
       "registryId": "M450",
-      "canonicalCode": "HM2-TXP-M450-SPT-SAND-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M450-SPT-SAND-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R02",
       "name": "sports beach sand pbr sheet",
       "sourceFile": "M450-sports-beach-sand-pbr-sheet.png",
       "domain": "SPT",
@@ -5347,9 +5477,9 @@
         ],
         "frequency": "surface remains readable at fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 49 partial"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 49 final regeneration"
     }
   ]
 }

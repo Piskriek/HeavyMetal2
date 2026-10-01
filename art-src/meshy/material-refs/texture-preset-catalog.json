@@ -6576,7 +6576,7 @@
     },
     {
       "registryId": "M468",
-      "canonicalCode": "HM2-TXP-M468-UI-SCULPT-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "canonicalCode": "HM2-TXP-M468-UI-SCULPT-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
       "name": "clean sculpt-paint-tool icon atlas",
       "sourceFile": "M468-ui-clean-sculpt-paint-tool-icon-atlas.png",
       "domain": "UI",
@@ -6653,12 +6653,12 @@
         ]
       },
       "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 52 clean interface icon atlases"
+      "recipeRevision": 2,
+      "provenance": "Material Batch 53 correction attempt"
     },
     {
       "registryId": "M469",
-      "canonicalCode": "HM2-TXP-M469-UI-CHAN-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "canonicalCode": "HM2-TXP-M469-UI-CHAN-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
       "name": "clean material-channel icon atlas",
       "sourceFile": "M469-ui-clean-material-channel-icon-atlas.png",
       "domain": "UI",
@@ -6734,9 +6734,9 @@
           "bake"
         ]
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 52 clean interface icon atlases"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 53 correction attempt"
     },
     {
       "registryId": "M470",
@@ -6904,7 +6904,7 @@
     },
     {
       "registryId": "M472",
-      "canonicalCode": "HM2-TXP-M472-UI-WEATHER-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "canonicalCode": "HM2-TXP-M472-UI-WEATHER-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
       "name": "clean weather-season icon atlas",
       "sourceFile": "M472-ui-clean-weather-season-icon-atlas.png",
       "domain": "UI",
@@ -6980,13 +6980,13 @@
           "recover"
         ]
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 52 clean interface icon atlases"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 53 correction attempt"
     },
     {
       "registryId": "M473",
-      "canonicalCode": "HM2-TXP-M473-UI-DAMAGE-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "canonicalCode": "HM2-TXP-M473-UI-DAMAGE-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
       "name": "clean destruction-repair icon atlas",
       "sourceFile": "M473-ui-clean-destruction-repair-icon-atlas.png",
       "domain": "UI",
@@ -7063,8 +7063,8 @@
         ]
       },
       "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 52 clean interface icon atlases"
+      "recipeRevision": 2,
+      "provenance": "Material Batch 53 correction attempt"
     },
     {
       "registryId": "M474",
@@ -7150,7 +7150,7 @@
     },
     {
       "registryId": "M475",
-      "canonicalCode": "HM2-TXP-M475-UI-AI-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "canonicalCode": "HM2-TXP-M475-UI-AI-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
       "name": "clean local-ai-preset icon atlas",
       "sourceFile": "M475-ui-clean-local-ai-preset-icon-atlas.png",
       "domain": "UI",
@@ -7227,8 +7227,8 @@
         ]
       },
       "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 52 clean interface icon atlases"
+      "recipeRevision": 2,
+      "provenance": "Material Batch 53 correction attempt"
     },
     {
       "registryId": "M476",
@@ -7311,6 +7311,411 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M477",
+      "canonicalCode": "HM2-TXP-M477-UI-CORE-ATL-A-MOBILE-PX128-AT16-CLN-P02-BL-R01",
+      "name": "mobile core action icon style atlas",
+      "sourceFile": "M477-ui-mobile-core-action-icon-style-atlas.png",
+      "domain": "UI",
+      "material": "CORE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major core semantic slots",
+        "styleReference": "derive all UI semantic atlases without changing slot IDs"
+      },
+      "style": "MOBILE",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and redundant semantic cues.",
+      "intendedUses": [
+        "swappable custom-interface icon style family"
+      ],
+      "prohibitedUses": [
+        "semantic ID reassignment",
+        "embedded text labels",
+        "rounded interface chrome"
+      ],
+      "parentPreset": "M467",
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "depth"
+      ],
+      "recipe": {
+        "intent": "Restyle stable core action identities for custom interfaces.",
+        "required": [
+          "same semantic identity across styles",
+          "small-size readability",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "core silhouette survives fallback tier",
+        "semanticIds": [
+          "home",
+          "world",
+          "sculpt",
+          "paint",
+          "material",
+          "goblin",
+          "vehicle",
+          "track",
+          "weather",
+          "damage",
+          "sport",
+          "local-ai",
+          "drawer",
+          "detach",
+          "clean-canvas",
+          "save"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 53 interface icon style families"
+    },
+    {
+      "registryId": "M478",
+      "canonicalCode": "HM2-TXP-M478-UI-CORE-ATL-A-NOST-PX128-AT16-CLN-P04-BL-R01",
+      "name": "nostalgic core action icon style atlas",
+      "sourceFile": "M478-ui-nostalgic-core-action-icon-style-atlas.png",
+      "domain": "UI",
+      "material": "CORE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major core semantic slots",
+        "styleReference": "derive all UI semantic atlases without changing slot IDs"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P04",
+        "maximumColors": 4
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and redundant semantic cues.",
+      "intendedUses": [
+        "swappable custom-interface icon style family"
+      ],
+      "prohibitedUses": [
+        "semantic ID reassignment",
+        "embedded text labels",
+        "rounded interface chrome"
+      ],
+      "parentPreset": "M467",
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "depth"
+      ],
+      "recipe": {
+        "intent": "Restyle stable core action identities for custom interfaces.",
+        "required": [
+          "same semantic identity across styles",
+          "small-size readability",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "core silhouette survives fallback tier",
+        "semanticIds": [
+          "home",
+          "world",
+          "sculpt",
+          "paint",
+          "material",
+          "goblin",
+          "vehicle",
+          "track",
+          "weather",
+          "damage",
+          "sport",
+          "local-ai",
+          "drawer",
+          "detach",
+          "clean-canvas",
+          "save"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 53 interface icon style families"
+    },
+    {
+      "registryId": "M479",
+      "canonicalCode": "HM2-TXP-M479-UI-CORE-ATL-A-GPUNK-PX256-AT16-CLN-PFULL-BL-R01",
+      "name": "goblin-punk core action icon style atlas",
+      "sourceFile": "M479-ui-goblin-punk-core-action-icon-style-atlas.png",
+      "domain": "UI",
+      "material": "CORE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major core semantic slots",
+        "styleReference": "derive all UI semantic atlases without changing slot IDs"
+      },
+      "style": "GPUNK",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and redundant semantic cues.",
+      "intendedUses": [
+        "swappable custom-interface icon style family"
+      ],
+      "prohibitedUses": [
+        "semantic ID reassignment",
+        "embedded text labels",
+        "rounded interface chrome"
+      ],
+      "parentPreset": "M467",
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "depth"
+      ],
+      "recipe": {
+        "intent": "Restyle stable core action identities for custom interfaces.",
+        "required": [
+          "same semantic identity across styles",
+          "small-size readability",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "core silhouette survives fallback tier",
+        "semanticIds": [
+          "home",
+          "world",
+          "sculpt",
+          "paint",
+          "material",
+          "goblin",
+          "vehicle",
+          "track",
+          "weather",
+          "damage",
+          "sport",
+          "local-ai",
+          "drawer",
+          "detach",
+          "clean-canvas",
+          "save"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 53 interface icon style families"
+    },
+    {
+      "registryId": "M480",
+      "canonicalCode": "HM2-TXP-M480-UI-CORE-ATL-A-HICON-PX128-AT16-CLN-P02-BL-R01",
+      "name": "high-contrast core action icon style atlas",
+      "sourceFile": "M480-ui-high-contrast-core-action-icon-style-atlas.png",
+      "domain": "UI",
+      "material": "CORE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major core semantic slots",
+        "styleReference": "derive all UI semantic atlases without changing slot IDs"
+      },
+      "style": "HICON",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and redundant semantic cues.",
+      "intendedUses": [
+        "swappable custom-interface icon style family"
+      ],
+      "prohibitedUses": [
+        "semantic ID reassignment",
+        "embedded text labels",
+        "rounded interface chrome"
+      ],
+      "parentPreset": "M467",
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "depth"
+      ],
+      "recipe": {
+        "intent": "Restyle stable core action identities for custom interfaces.",
+        "required": [
+          "same semantic identity across styles",
+          "small-size readability",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "core silhouette survives fallback tier",
+        "semanticIds": [
+          "home",
+          "world",
+          "sculpt",
+          "paint",
+          "material",
+          "goblin",
+          "vehicle",
+          "track",
+          "weather",
+          "damage",
+          "sport",
+          "local-ai",
+          "drawer",
+          "detach",
+          "clean-canvas",
+          "save"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 53 interface icon style families"
+    },
+    {
+      "registryId": "M481",
+      "canonicalCode": "HM2-TXP-M481-UI-CORE-ATL-A-PBR-PX256-AT16-CLN-PFULL-BL-R01",
+      "name": "tactile-pbr core action icon style atlas",
+      "sourceFile": "M481-ui-tactile-pbr-core-action-icon-style-atlas.png",
+      "domain": "UI",
+      "material": "CORE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major core semantic slots",
+        "styleReference": "derive all UI semantic atlases without changing slot IDs"
+      },
+      "style": "PBR",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and redundant semantic cues.",
+      "intendedUses": [
+        "swappable custom-interface icon style family"
+      ],
+      "prohibitedUses": [
+        "semantic ID reassignment",
+        "embedded text labels",
+        "rounded interface chrome"
+      ],
+      "parentPreset": "M467",
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "depth"
+      ],
+      "recipe": {
+        "intent": "Restyle stable core action identities for custom interfaces.",
+        "required": [
+          "same semantic identity across styles",
+          "small-size readability",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "core silhouette survives fallback tier",
+        "semanticIds": [
+          "home",
+          "world",
+          "sculpt",
+          "paint",
+          "material",
+          "goblin",
+          "vehicle",
+          "track",
+          "weather",
+          "damage",
+          "sport",
+          "local-ai",
+          "drawer",
+          "detach",
+          "clean-canvas",
+          "save"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 53 interface icon style families"
     }
   ]
 }

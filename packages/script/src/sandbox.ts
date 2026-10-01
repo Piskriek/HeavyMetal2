@@ -1,4 +1,5 @@
-import { getQuickJS, type QuickJSContext, type QuickJSHandle, type QuickJSRuntime } from 'quickjs-emscripten';
+import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from 'quickjs-emscripten';
+import { loadQuickJS } from './quickjs-loader.js';
 import type { ScriptContext, ScriptLimits, Value } from '@hm/contracts';
 import { buildCtx, Marshal } from './marshal.js';
 
@@ -6,7 +7,7 @@ import { buildCtx, Marshal } from './marshal.js';
  * Top-level await: the WASM module is loaded once when this module is imported,
  * so `createScriptHost()` itself can stay synchronous.
  */
-const QuickJS = await getQuickJS();
+const QuickJS = await loadQuickJS();
 
 const MEMORY_LIMIT = 16 * 1024 * 1024;
 const STACK_LIMIT = 512 * 1024;

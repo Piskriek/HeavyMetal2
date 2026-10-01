@@ -124,6 +124,7 @@ export function buildCtx(vm: QuickJSContext, m: Marshal, ctx: ScriptContext): Qu
   put('self', m.toVM({ id: ctx.self.id, params: ctx.self.params }));
   put('tick', m.toVM(ctx.tick));
   put('dt', m.toVM(ctx.dt));
+  put('input', m.toVM(ctx.input));
 
   put('rng', rngObject(vm, m, ctx.rng));
 

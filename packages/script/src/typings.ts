@@ -51,6 +51,7 @@ interface ScriptContext {
   readonly self: { readonly id: string; readonly params: Params };
   readonly tick: number;
   readonly dt: number;
+  readonly input: Readonly<Record<string, Readonly<Record<string, number | boolean>>>>;
   readonly rng: Rng;
   readonly vars: ScriptVars;
   readonly world: ScriptWorld;

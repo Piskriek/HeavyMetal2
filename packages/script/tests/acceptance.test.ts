@@ -19,6 +19,7 @@ function makeCtx(over: Partial<ScriptContext> = {}): ScriptContext & { writes: u
   let r = 0;
   const base: ScriptContext = {
     self: { id: 's1', params: { power: 3 } }, tick: 7, dt: 1 / 120,
+    input: { p1: { steer: 0.5, boost: true } },
     rng: {
       next: () => (r = (r + 0.25) % 1), int: (a: number) => a, pick: <T>(x: readonly T[]) => x[0] as T,
       fork: () => makeCtx().rng, state: () => [r], restore: () => undefined,

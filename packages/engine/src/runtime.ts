@@ -1,10 +1,12 @@
-import type { CommandBus, EventBus, InputFrame, PresetId, PresetStore, SchemaRegistry, Simulation, VariableSystem, World, WorldSnapshot } from '@hm/contracts';
+import type { ScriptHost, CommandBus, EventBus, InputFrame, PresetId, PresetStore, SchemaRegistry, Simulation, VariableSystem, World, WorldSnapshot } from '@hm/contracts';
 import { createCommandBus, createEventBus, createPresetStore, createSchemaRegistry, createVariableSystem } from '@hm/kernel';
 import { createSimulation, createEntityVariableProvider } from '@hm/sim';
+import { createScriptHost } from '@hm/script';
 import { createPhysics, createPhysicsSystem, definePhysicsComponents, type PhysicsEngine } from '@hm/physics';
 import { defineRenderComponents } from '@hm/render';
 import { registerCoreSchemas } from './schemas';
 import { createSceneBinder, type SceneBinder } from './scene-binder';
+import { createScriptSystem, type ScriptSystem } from './script-system';
 
 export type Mode = 'edit' | 'play';
 
@@ -30,6 +32,8 @@ export interface Runtime {
   readonly world: World;
   readonly physics: PhysicsEngine;
   readonly binder: SceneBinder;
+  readonly scripts: ScriptSystem;
+  readonly scriptHost: ScriptHost;
   readonly mode: Mode;
   /** Create the scene and bind it (also what a game "load" does). */
   loadScene(sceneId: PresetId): void;
@@ -48,12 +52,15 @@ export function createRuntime(opts: RuntimeOptions = {}): Runtime {
   const vars = createVariableSystem({ store, schemas, events });
   const commands = createCommandBus({ store, vars });
   const physics = createPhysics();
+  const scriptHost = createScriptHost();
   const tickListeners = new Set<() => void>();
   const sim = createSimulation({
     seed: opts.seed ?? 1, events, vars,
     systems: [createPhysicsSystem(physics), { name: 'tick-notify', order: 1000, update: () => { for (const l of tickListeners) l(); } }],
   });
   const world = sim.world;
+  const scripts = createScriptSystem({ host: scriptHost, store, vars, world, events });
+  sim.addSystem(scripts);
   defineRenderComponents(world);
   definePhysicsComponents(world);
   physics.attach(world);
@@ -63,12 +70,13 @@ export function createRuntime(opts: RuntimeOptions = {}): Runtime {
   let saved: WorldSnapshot | null = null;
 
   const rt: Runtime = {
-    schemas, store, events, vars, commands, sim, world, physics, binder,
+    schemas, store, events, vars, commands, sim, world, physics, binder, scripts, scriptHost,
     get mode() { return mode; },
     loadScene(sceneId) {
       mode = 'edit';
       saved = null;
       binder.bind(sceneId);
+      scripts.bind(sceneId);
       const g = store.get(sceneId)?.params['gravity'];
       physics.setGravity([0, -(typeof g === 'number' ? g : 9.81), 0]);
     },

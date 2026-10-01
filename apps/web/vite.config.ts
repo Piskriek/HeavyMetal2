@@ -10,6 +10,9 @@ export default defineConfig({
   plugins: [viteSingleFile()],
   resolve: {
     alias: {
+      // browser build: the script host uses the transpile-only compiler (no TypeScript program, no Node fs)
+      './compile.js': p('../../packages/script/src/compile-lite.ts'),
+      './quickjs-loader.js': p('../../packages/script/src/quickjs-loader-browser.ts'),
       '@hm/contracts': p('../../packages/contracts/src/index.ts'),
       '@hm/kernel': p('../../packages/kernel/src/index.ts'),
       '@hm/script': p('../../packages/script/src/index.ts'),

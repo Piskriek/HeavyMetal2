@@ -27,6 +27,8 @@ export interface ScriptContext {
   readonly self: { readonly id: string; readonly params: Params };
   readonly tick: number;
   readonly dt: number;
+  /** This tick's input per actor, e.g. ctx.input.p1.steer: the same frame the simulation was stepped with. */
+  readonly input: Readonly<Record<string, Readonly<Record<string, number | boolean>>>>;
   readonly rng: Rng;
   readonly vars: Pick<VariableSystem, 'read' | 'write' | 'evaluate'>;
   /** Read-only view of the world (query / get / has / getResource); writes go through `set` below. */

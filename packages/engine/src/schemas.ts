@@ -64,7 +64,10 @@ export const sceneSchema = defineSchema({
     num('seed', 'Random seed', 'Same seed, same game: used by everything random.', 1, 'pro', { min: 0, max: 4294967295, step: 1 }),
     { key: 'camera', type: 'ref', label: 'Camera', doc: 'Which camera preset looks at this scene.', tier: 'build', default: null, refKinds: ['camera'] },
   ],
-  slots: [{ key: 'entities', label: 'Objects', doc: 'Everything placed in this scene.', kinds: ['entity'], min: 0, max: null, tier: 'play' }] as readonly ChildSlot[],
+  slots: [
+    { key: 'entities', label: 'Objects', doc: 'Everything placed in this scene.', kinds: ['entity'], min: 0, max: null, tier: 'play' },
+    { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
+  ] as readonly ChildSlot[],
 });
 
 export const cameraSchema = defineSchema({
@@ -85,7 +88,20 @@ export const cameraSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema] as const;
+export const mechanicSchema = defineSchema({
+  kind: 'mechanic',
+  version: 1,
+  label: 'Behaviour',
+  doc: 'A small script that runs every tick. Game kinds (racer, rule, item ...) extend this idea with their own settings.',
+  icon: 'script',
+  scriptInterface: 'Mechanic',
+  variables: [
+    { key: 'enabled', type: 'boolean', label: 'Enabled', doc: 'Switch the behaviour off without deleting it.', tier: 'build', default: true },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

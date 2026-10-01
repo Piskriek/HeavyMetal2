@@ -11524,6 +11524,691 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 69 mobile island surfaces"
+    },
+    {
+      "registryId": "M539",
+      "canonicalCode": "HM2-TXP-M539-ENV-OBSID-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island obsidian pbr sheet",
+      "sourceFile": "M539-nostalgic-island-obsidian-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "OBSID",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M505",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M540",
+      "canonicalCode": "HM2-TXP-M540-ENV-BASEND-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island basalt column ends pbr sheet",
+      "sourceFile": "M540-nostalgic-island-basalt-column-ends-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASEND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M506",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M541",
+      "canonicalCode": "HM2-TXP-M541-ENV-BASFACE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island basalt column face pbr sheet",
+      "sourceFile": "M541-nostalgic-island-basalt-column-face-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASFACE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M507",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M542",
+      "canonicalCode": "HM2-TXP-M542-ENV-LAVARIV-TIL-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island directional lava river pbr sheet",
+      "sourceFile": "M542-nostalgic-island-directional-lava-river-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVARIV",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M508",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M543",
+      "canonicalCode": "HM2-TXP-M543-ENV-LAVACRUST-TIL-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island lava crust pbr sheet",
+      "sourceFile": "M543-nostalgic-island-lava-crust-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVACRUST",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M509",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M544",
+      "canonicalCode": "HM2-TXP-M544-ENV-EMBER-TIL-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island scorched embers pbr sheet",
+      "sourceFile": "M544-nostalgic-island-scorched-embers-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "EMBER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M510",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M545",
+      "canonicalCode": "HM2-TXP-M545-ENV-CRYSTAL-TIL-BCNROHT-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island crystal field pbr sheet",
+      "sourceFile": "M545-nostalgic-island-crystal-field-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "CRYSTAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M511",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M546",
+      "canonicalCode": "HM2-TXP-M546-ENV-GEODE-TIL-BCNROHT-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island geode lining pbr sheet",
+      "sourceFile": "M546-nostalgic-island-geode-lining-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GEODE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M512",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M547",
+      "canonicalCode": "HM2-TXP-M547-ENV-GRASS-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island tropical grass pbr sheet",
+      "sourceFile": "M547-nostalgic-island-tropical-grass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M513",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
+    },
+    {
+      "registryId": "M548",
+      "canonicalCode": "HM2-TXP-M548-ENV-DRYGRASS-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island dry grass pbr sheet",
+      "sourceFile": "M548-nostalgic-island-dry-grass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "DRYGRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus registered emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve stepped macro forms and PBR separation; discard microdetail.",
+      "intendedUses": [
+        "nostalgic PBR Basalt Isle material child"
+      ],
+      "prohibitedUses": [
+        "post-process-only retro treatment",
+        "visible repeated focus",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M514",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "emissive or transmission strength"
+      ],
+      "recipe": {
+        "intent": "Nostalgic PBR child with authored low-resolution forms and full material response.",
+        "required": [
+          "fixed quadrant order",
+          "chunky stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 70 nostalgic island volcanic surfaces"
     }
   ]
 }

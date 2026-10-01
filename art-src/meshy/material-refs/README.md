@@ -1070,3 +1070,9 @@ M127 and M311 now pass after removing closed armor-like padding cells and assemb
 ![Material Batch 69 contact sheet](./review/material-batch-69-mobile-island-surfaces-corrections.jpg)
 
 M526, M529, M530 and M531 now pass at `R02` with the fixed BaseColor/Normal/Roughness/guide quadrant order. M533–M538 add passing mobile children for tropical grass, dry grass, dune-grass tufts, wet sand, underwater rippled sand and independently scrolling deep-lagoon water.
+
+## Material Batch 70 — nostalgic island volcanic surfaces
+
+![Material Batch 70 contact sheet](./review/material-batch-70-nostalgic-island-volcanic-surfaces.jpg)
+
+M539–M541 and M543–M548 pass as authored nostalgic-PBR children for obsidian, basalt columns, lava crust, scorched ground, crystals, geode lining and grasses. M542 retains useful lava material response but must be regenerated because its crust arrangement does not communicate a directional river flowing along the repeat axis.

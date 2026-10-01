@@ -94,6 +94,17 @@ A macro material is itself an editable preset. Examples:
 - Keep ports hydrologically open, rail switches physically plausible, quarry benches traversable and irrigation networks connected downhill.
 - Generate empty/service space deliberately; do not cover every macro cell with buildings or props.
 
+### Biome transitions
+
+- Store one authoritative signed blend field; derive BaseColor mixing, Normal blend, Roughness, Height, spawn density and exclusion masks from it.
+- Transition width is registered in metres and remains stable regardless of terrain UV scale.
+- Keep pure source zones on both sides so presets can chain without contaminating adjacent biomes.
+- Use broad peninsulas, islands and fingers rather than a straight midpoint gradient or pixel noise.
+- Blend height conservatively: preserve drainage, avoid averaging cliffs into ramps, and never create water that climbs the transition.
+- Spawn transition-specific geometry such as saplings, scrub, driftwood, reeds, scree, snow pockets or pioneer plants from dedicated grey-band masks.
+- Near the camera, replace macro transition imagery with ground materials, decals and geometry while retaining the same signed field.
+- Support reversible A/B orientation and spline/shape projection; mirroring must not reverse river flow, wind, snow aspect or settlement logic.
+
 ## 6. Anti-repetition strategy
 
 - Blend at least two rotated or mirrored macro samples only where directional rules permit.

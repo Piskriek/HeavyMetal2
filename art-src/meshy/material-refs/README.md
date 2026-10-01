@@ -299,8 +299,25 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M139 | Polished edge wear | Smart-mask reference for contact points | Pass. Clean straight, curved and oval high-point masks for metal and leather. |
 | M140 | Colorable team markings | Runtime-tinted team identity | Pass. Bold symbol variety, clean alpha and no lettering or numbers. |
 
+## Material Batch 16 — biome transitions and world-scale blend masks
+
+![Material Batch 16 biome-transition contact sheet](./review/material-batch-16-biome-transitions-contact-sheet.jpg)
+
+| ID | Transition | Nominal coverage | Status and production note |
+|---|---|---:|---|
+| M141 | Forest to grassland | `256 × 256 m` | Pass with channel-rebuild constraint. Strong canopy breakup and broad irregular meadow edge; rebuild all maps from one authoritative transition mask. |
+| M142 | Jungle to beach | `256 × 256 m` | Pass. Excellent layered jungle, root/scrub fringe and clean sand handoff. |
+| M143 | Basalt to ochre rock | `16 × 16 m` | Weak—regenerate. Material identity is strong, but the boundary is too straight and narrow to feel naturally interlocked. |
+| M144 | Mountain to valley | `1 × 1 km` | Pass. Clear elevation descent, branching foothills and broad valley hierarchy. |
+| M145 | Wetland to upland | `512 × 512 m` | Weak—regenerate. Water/channel masks are strong, but the BaseColor does not show enough distinct dry upland material. |
+| M146 | Alpine snowline | `512 × 512 m` | Pass. Natural ridge/aspect-driven snow fingers and exposed-rock islands. |
+| M147 | Volcanic field to forest | `512 × 512 m` | Pass. Strong succession sequence from crust through pioneer growth to canopy. |
+| M148 | Settlement to wilderness | `512 × 512 m` | Pass. Readable occupancy edge, gardens, service gaps and forest takeover. |
+| M149 | Farm to village | `512 × 512 m` | Pass. Field boundaries and roads transition naturally into settlement footprints. |
+| M150 | Coast to deep water | `1 × 1 km` | Pass. Excellent shore, shallows, reef/channel and deep-ocean bathymetric progression. |
+
 ## Next material batches
 
-### Batch 16 — biome transitions and world-scale blend masks
+### Batch 17 — weather, season, and world-condition layers
 
-Forest-to-grass, jungle-to-beach, basalt-to-ochre, mountain-to-valley, wetland-to-upland, snowline, volcanic-to-forest, settlement-to-wilderness, farm-to-village and coast-to-deep-water transitions.
+Frost, light snow, heavy snow, rain-darkening, puddle accumulation, windblown leaves, dry-season bleaching, spring bloom, ashfall, storm debris, underwater depth haze and burned-ground recovery.

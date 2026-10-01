@@ -727,8 +727,29 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 
 All nostalgic presets keep coordinated material channels. Pixel grouping, dithering, palette limits and deliberate texel edges must survive mip generation; baked highlights and fixed illumination remain prohibited.
 
+## Material Batch 40 — nostalgic PBR environment and vehicle expansion
+
+![Material Batch 40 nostalgic-expansion contact sheet](./review/material-batch-40-nostalgic-expansion-contact-sheet.jpg)
+
+![Material Batch 40 BaseColor previews at 128 px](./review/material-batch-40-nostalgic-basecolor-128px-preview.png)
+
+| ID | Nostalgic PBR preset | Canonical use | Status and production note |
+|---|---|---|---|
+| M381 | Pixel-painted beach sand | Retro shoreline terrain | Pass. Excellent broad sand bands, dithered moisture transitions and chunky shell/mineral groups. |
+| M382 | Dithered tropical water | Scrolling retro water | Pass. Strong limited teal/aqua wave bands and thick connected foam with coordinated flow guidance. |
+| M383 | Sprite foliage atlas | Point-sampled tropical foliage | Pass. Excellent palms, ferns, shrubs and broad leaves with clean stepped silhouettes and alpha. |
+| M384 | Low-poly timber | Classic-console wood | Pass. Strong orange/brown grain, turquoise paint transfer and broad stepped relief. |
+| M385 | Retro rusted steel | Industrial and vehicle surfaces | Pass. Excellent steel, oxide, orange rust, pale exposure and green paint regions. |
+| M386 | Chunky tire rubber | Racing tires and rubber panels | Pass. Strong oversized tread blocks, wide channels and mip-stable limited palette. |
+| M387 | Pixel lens glass | Goggles, visors and vehicle lenses | Pass. Strong broad cyan/violet haze and sparse stepped scratches; runtime Fresnel remains separate. |
+| M388 | Hand-painted racing cloth | Suits, seats and padding | Pass. Excellent rectangular quilt pads, straight seams and arcade-racer palette. |
+| M389 | Pixel smoke and dust atlas | Low-overdraw nostalgic VFX | Pass. Strong tan, charcoal, blue-grey and steam silhouettes with hard density bands. |
+| M390 | Palette-swap Goblin markings | Creator and racing identity | Pass. Excellent chunky marks, clean alpha and six-color runtime-swappable palette. |
+
+Canonical codes and reconstruction recipes for M381–M390 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
+
 ## Next material batches
 
-### Batch 40 — nostalgic PBR environment and vehicle expansion
+### Batch 41 — nostalgic architecture, weather, and world effects
 
-Pixel-painted sand, dithered water, sprite foliage atlas, low-poly timber, retro rusted steel, chunky tire rubber, pixel lens glass, hand-painted racing cloth, nostalgic smoke/dust effects and palette-swap Goblin markings.
+Pixel corrugated roofing, dithered plaster, classic tile, retro mud, pixel snow, chunky rain/wetness, limited-palette fire, arcade oil/skid decals, neon sign materials and retro interface glass.

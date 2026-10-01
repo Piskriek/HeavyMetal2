@@ -18,26 +18,62 @@
       "domain": "ENV",
       "material": "ROCK",
       "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "AO", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "AO+Height reference"},
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
       "style": "PXL3D",
       "targetTier": "PX128",
       "fallbackTier": "PX64",
       "layout": "Q4",
       "condition": "WRN",
-      "palette": {"token": "P12", "maximumColors": 12},
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
       "sampling": "PT",
       "wrap": "repeat",
       "physicalScale": "2 m square",
       "mipPolicy": "preserve clustered texel masses; no new colors",
-      "intendedUses": ["tropical rock terrain", "low-poly cliff modules", "nostalgic environment presets"],
-      "prohibitedUses": ["photoreal hero rock", "baked directional lighting"],
+      "intendedUses": [
+        "tropical rock terrain",
+        "low-poly cliff modules",
+        "nostalgic environment presets"
+      ],
+      "prohibitedUses": [
+        "photoreal hero rock",
+        "baked directional lighting"
+      ],
       "parentPreset": "M322",
-      "editableParameters": ["palette", "moss amount", "fissure width", "weathering"],
+      "editableParameters": [
+        "palette",
+        "moss amount",
+        "fissure width",
+        "weathering"
+      ],
       "recipe": {
         "intent": "Chunky late-1990s pixel-painted rock with modern coordinated PBR response.",
-        "required": ["broad polygonal planes", "hand-placed transition dithering", "thick fissures", "olive moss clusters"],
-        "forbidden": ["photographic noise", "microcracks", "baked highlights", "generated labels"],
+        "required": [
+          "broad polygonal planes",
+          "hand-placed transition dithering",
+          "thick fissures",
+          "olive moss clusters"
+        ],
+        "forbidden": [
+          "photographic noise",
+          "microcracks",
+          "baked highlights",
+          "generated labels"
+        ],
         "frequency": "features remain wider than two texels at PX128"
       },
       "status": "pass",
@@ -49,145 +85,1316 @@
       "canonicalCode": "HM2-TXP-M372-ENV-GROUND-TIL-BCNROH-D16-PX128-Q4-MIX-P16-PT-R01",
       "name": "Dithered 16-bit jungle ground",
       "sourceFile": "M372-nostalgic-16bit-jungle-ground-pbr-sheet.png",
-      "domain": "ENV", "material": "GROUND", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "AO", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "AO+Height reference"},
-      "style": "D16", "targetTier": "PX128", "fallbackTier": "PX64", "layout": "Q4", "condition": "MIX",
-      "palette": {"token": "P16", "maximumColors": 16}, "sampling": "PT", "wrap": "repeat", "physicalScale": "4 m square",
+      "domain": "ENV",
+      "material": "GROUND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "D16",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P16",
+        "maximumColors": 16
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
       "mipPolicy": "preserve major foliage/soil masses and ordered dither average",
-      "intendedUses": ["jungle ground", "top-down terrain", "oblique retro terrain"],
-      "prohibitedUses": ["fine grass blades", "photoreal leaf litter"], "parentPreset": "M353",
-      "editableParameters": ["soil path width", "foliage density", "palette ramp", "dither amount"],
-      "recipe": {"intent": "16-bit jungle floor with sprite-like foliage masses and PBR depth.", "required": ["limited green/brown palette", "visible pixel clusters", "broad soil paths"], "forbidden": ["fine blades", "random pixel noise", "baked shadows", "labels"], "frequency": "large sprite masses at PX128"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "jungle ground",
+        "top-down terrain",
+        "oblique retro terrain"
+      ],
+      "prohibitedUses": [
+        "fine grass blades",
+        "photoreal leaf litter"
+      ],
+      "parentPreset": "M353",
+      "editableParameters": [
+        "soil path width",
+        "foliage density",
+        "palette ramp",
+        "dither amount"
+      ],
+      "recipe": {
+        "intent": "16-bit jungle floor with sprite-like foliage masses and PBR depth.",
+        "required": [
+          "limited green/brown palette",
+          "visible pixel clusters",
+          "broad soil paths"
+        ],
+        "forbidden": [
+          "fine blades",
+          "random pixel noise",
+          "baked shadows",
+          "labels"
+        ],
+        "frequency": "large sprite masses at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M373",
       "canonicalCode": "HM2-TXP-M373-VEH-METAL-TIL-BCNRMH-PSXMET-PX128-Q4-WRN-P12-PT-R01",
       "name": "Late-1990s low-poly vehicle metal",
       "sourceFile": "M373-nostalgic-90s-vehicle-metal-pbr-sheet.png",
-      "domain": "VEH", "material": "METAL", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "Metallic", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "Metallic+Height guide"},
-      "style": "PSXMET", "targetTier": "PX128", "fallbackTier": "PX64", "layout": "Q4", "condition": "WRN",
-      "palette": {"token": "P12", "maximumColors": 12}, "sampling": "PT", "wrap": "repeat", "physicalScale": "1 m square",
+      "domain": "VEH",
+      "material": "METAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Metallic+Height guide"
+      },
+      "style": "PSXMET",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "1 m square",
       "mipPolicy": "preserve acid-green/teal panel blocks and orange trim",
-      "intendedUses": ["vehicle panels", "racing armor", "low-poly machinery"], "prohibitedUses": ["neutral bare steel", "baked reflections"],
-      "parentPreset": "M324", "editableParameters": ["primary paint", "accent paint", "chip amount", "rust amount"],
-      "recipe": {"intent": "Pixel-painted arcade vehicle panel with physically valid paint/metal separation.", "required": ["acid-green and teal blocks", "orange trim", "large exposed steel islands"], "forbidden": ["microchips", "reflection in BaseColor", "labels", "numbers"], "frequency": "large damage islands at PX128"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "vehicle panels",
+        "racing armor",
+        "low-poly machinery"
+      ],
+      "prohibitedUses": [
+        "neutral bare steel",
+        "baked reflections"
+      ],
+      "parentPreset": "M324",
+      "editableParameters": [
+        "primary paint",
+        "accent paint",
+        "chip amount",
+        "rust amount"
+      ],
+      "recipe": {
+        "intent": "Pixel-painted arcade vehicle panel with physically valid paint/metal separation.",
+        "required": [
+          "acid-green and teal blocks",
+          "orange trim",
+          "large exposed steel islands"
+        ],
+        "forbidden": [
+          "microchips",
+          "reflection in BaseColor",
+          "labels",
+          "numbers"
+        ],
+        "frequency": "large damage islands at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M374",
       "canonicalCode": "HM2-TXP-M374-BLD-MASON-TIL-BCNROH-C5MAS-PX128-Q4-WRN-P12-PT-R01",
       "name": "Classic-console masonry",
       "sourceFile": "M374-nostalgic-console-masonry-pbr-sheet.png",
-      "domain": "BLD", "material": "MASON", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "AO", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "AO+Height reference"},
-      "style": "C5MAS", "targetTier": "PX128", "fallbackTier": "PX64", "layout": "Q4", "condition": "WRN",
-      "palette": {"token": "P12", "maximumColors": 12}, "sampling": "PT", "wrap": "repeat", "physicalScale": "2 m square",
+      "domain": "BLD",
+      "material": "MASON",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "C5MAS",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
       "mipPolicy": "retain oversized bond and thick mortar",
-      "intendedUses": ["settlement walls", "ruins", "trackside structures"], "prohibitedUses": ["precision modern brickwork", "micro-pitted masonry"],
-      "parentPreset": "M334", "editableParameters": ["bond", "brick palette", "mortar width", "moss amount"],
-      "recipe": {"intent": "Fifth-generation console masonry with chunky blocks and modern relief.", "required": ["oversized brick/stone blocks", "wide mortar", "limited terracotta/grey palette"], "forbidden": ["tiny pores", "hairline cracks", "baked lighting", "labels"], "frequency": "minimum mortar width two texels at PX128"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "settlement walls",
+        "ruins",
+        "trackside structures"
+      ],
+      "prohibitedUses": [
+        "precision modern brickwork",
+        "micro-pitted masonry"
+      ],
+      "parentPreset": "M334",
+      "editableParameters": [
+        "bond",
+        "brick palette",
+        "mortar width",
+        "moss amount"
+      ],
+      "recipe": {
+        "intent": "Fifth-generation console masonry with chunky blocks and modern relief.",
+        "required": [
+          "oversized brick/stone blocks",
+          "wide mortar",
+          "limited terracotta/grey palette"
+        ],
+        "forbidden": [
+          "tiny pores",
+          "hairline cracks",
+          "baked lighting",
+          "labels"
+        ],
+        "frequency": "minimum mortar width two texels at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M375",
       "canonicalCode": "HM2-TXP-M375-ENV-TRACK-TIL-BCNROH-ARCRAC-PX128-Q4-WRN-P12-PT-R01",
       "name": "Turn-of-the-millennium arcade track",
       "sourceFile": "M375-nostalgic-arcade-track-pbr-sheet.png",
-      "domain": "ENV", "material": "TRACK", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "AO", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "AO+Height reference"},
-      "style": "ARCRAC", "targetTier": "PX128", "fallbackTier": "PX64", "layout": "Q4", "condition": "WRN",
-      "palette": {"token": "P12", "maximumColors": 12}, "sampling": "PT", "wrap": "repeat", "physicalScale": "4 m square",
+      "domain": "ENV",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "ARCRAC",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
       "mipPolicy": "preserve vertical cyan/orange/green scars and dark track mass",
-      "intendedUses": ["expressive arcade track panels", "pit-lane surfacing", "racing trim"], "prohibitedUses": ["neutral asphalt base", "realistic public road"],
-      "parentPreset": "M351", "editableParameters": ["scar direction", "accent colors", "wear amount", "racing-line polish"],
-      "recipe": {"intent": "Expressive Y2K arcade racing surface with vertical color scars.", "required": ["dark track mass", "cyan and orange accents", "chunky wear"], "forbidden": ["photographic gravel", "microcracks", "baked shadows", "labels"], "frequency": "broad scars and wear at PX128"},
-      "status": "constrained-pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "expressive arcade track panels",
+        "pit-lane surfacing",
+        "racing trim"
+      ],
+      "prohibitedUses": [
+        "neutral asphalt base",
+        "realistic public road"
+      ],
+      "parentPreset": "M351",
+      "editableParameters": [
+        "scar direction",
+        "accent colors",
+        "wear amount",
+        "racing-line polish"
+      ],
+      "recipe": {
+        "intent": "Expressive Y2K arcade racing surface with vertical color scars.",
+        "required": [
+          "dark track mass",
+          "cyan and orange accents",
+          "chunky wear"
+        ],
+        "forbidden": [
+          "photographic gravel",
+          "microcracks",
+          "baked shadows",
+          "labels"
+        ],
+        "frequency": "broad scars and wear at PX128"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M376",
       "canonicalCode": "HM2-TXP-M376-GEN-PLASTIC-TIL-BCNRHT-Y2K-PX128-Q4-CLN-P10-PT-R01",
       "name": "Y2K translucent glossy plastic",
       "sourceFile": "M376-nostalgic-y2k-glossy-plastic-pbr-sheet.png",
-      "domain": "GEN", "material": "PLASTIC", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "Height", "Transmission"],
-      "channelLayout": {"topLeft": "BaseColor+transmission tint", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "Transmission+Height guide"},
-      "style": "Y2K", "targetTier": "PX128", "fallbackTier": "PX64", "layout": "Q4", "condition": "CLN",
-      "palette": {"token": "P10", "maximumColors": 10}, "sampling": "PT", "wrap": "repeat", "physicalScale": "0.5 m square",
+      "domain": "GEN",
+      "material": "PLASTIC",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor+transmission tint",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Transmission+Height guide"
+      },
+      "style": "Y2K",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.5 m square",
       "mipPolicy": "retain cyan/aqua/violet geometric fields",
-      "intendedUses": ["lenses", "accessories", "interface props", "translucent panels"], "prohibitedUses": ["structural glass", "opaque rubber"],
-      "parentPreset": "M345", "editableParameters": ["tint palette", "transmission", "roughness bands", "scratch amount"],
-      "recipe": {"intent": "Early-2000s translucent plastic with pixel geometry and runtime Fresnel.", "required": ["cyan/aqua/violet blocks", "clean transmission regions", "broad molded waves"], "forbidden": ["reflected scene", "baked highlights", "fine scratches", "labels"], "frequency": "large geometric bands at PX128"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "lenses",
+        "accessories",
+        "interface props",
+        "translucent panels"
+      ],
+      "prohibitedUses": [
+        "structural glass",
+        "opaque rubber"
+      ],
+      "parentPreset": "M345",
+      "editableParameters": [
+        "tint palette",
+        "transmission",
+        "roughness bands",
+        "scratch amount"
+      ],
+      "recipe": {
+        "intent": "Early-2000s translucent plastic with pixel geometry and runtime Fresnel.",
+        "required": [
+          "cyan/aqua/violet blocks",
+          "clean transmission regions",
+          "broad molded waves"
+        ],
+        "forbidden": [
+          "reflected scene",
+          "baked highlights",
+          "fine scratches",
+          "labels"
+        ],
+        "frequency": "large geometric bands at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M377",
       "canonicalCode": "HM2-TXP-M377-CHR-LEATHER-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P12-PT-R01",
       "name": "Hand-painted fantasy leather",
       "sourceFile": "M377-nostalgic-handpainted-leather-pbr-sheet.png",
-      "domain": "CHR", "material": "LEATHER", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "AO", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "AO+Height reference"},
-      "style": "HFPNT", "targetTier": "PX128", "fallbackTier": "PX64", "layout": "Q4", "condition": "WRN",
-      "palette": {"token": "P12", "maximumColors": 12}, "sampling": "PT", "wrap": "repeat", "physicalScale": "0.5 m square",
+      "domain": "CHR",
+      "material": "LEATHER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "HFPNT",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.5 m square",
       "mipPolicy": "preserve painterly fold masses and pale wear",
-      "intendedUses": ["Goblin clothing", "seats", "equipment", "fantasy props"], "prohibitedUses": ["modern polished leather", "micro-pore closeups"],
-      "parentPreset": "M337", "editableParameters": ["leather hue", "fold scale", "wear", "dye accent"],
-      "recipe": {"intent": "Classic hand-painted adventure leather with modern roughness and relief.", "required": ["broad expressive folds", "deep brown ramp", "large pale wear"], "forbidden": ["micro-pores", "baked highlights", "stitches", "labels"], "frequency": "fold masses wider than four texels at PX128"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "Goblin clothing",
+        "seats",
+        "equipment",
+        "fantasy props"
+      ],
+      "prohibitedUses": [
+        "modern polished leather",
+        "micro-pore closeups"
+      ],
+      "parentPreset": "M337",
+      "editableParameters": [
+        "leather hue",
+        "fold scale",
+        "wear",
+        "dye accent"
+      ],
+      "recipe": {
+        "intent": "Classic hand-painted adventure leather with modern roughness and relief.",
+        "required": [
+          "broad expressive folds",
+          "deep brown ramp",
+          "large pale wear"
+        ],
+        "forbidden": [
+          "micro-pores",
+          "baked highlights",
+          "stitches",
+          "labels"
+        ],
+        "frequency": "fold masses wider than four texels at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M378",
       "canonicalCode": "HM2-TXP-M378-CHR-SKIN-TIL-BCNROH-CELPX-PX256-Q4-CLN-P10-PT-R01",
       "name": "Retro cel-banded Goblin skin",
       "sourceFile": "M378-nostalgic-cel-goblin-skin-pbr-sheet.png",
-      "domain": "CHR", "material": "SKIN", "form": "TIL",
-      "channels": ["BaseColor", "Normal", "Roughness", "AO", "Height"],
-      "channelLayout": {"topLeft": "BaseColor", "topRight": "Normal", "bottomLeft": "Roughness", "bottomRight": "AO+Height reference"},
-      "style": "CELPX", "targetTier": "PX256", "fallbackTier": "PX128", "layout": "Q4", "condition": "CLN",
-      "palette": {"token": "P10", "maximumColors": 10}, "sampling": "PT", "wrap": "repeat", "physicalScale": "0.25 m square",
+      "domain": "CHR",
+      "material": "SKIN",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "CELPX",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.25 m square",
       "mipPolicy": "preserve olive/lime cel bands; never convert bands to baked light",
-      "intendedUses": ["Goblin Creator skin style", "retro character presets"], "prohibitedUses": ["fixed face texture", "baked shadow bands"],
-      "parentPreset": "M328", "editableParameters": ["skin palette", "band width", "violet accent", "pore amount"],
-      "recipe": {"intent": "Retro cel-pixel Goblin skin whose bands describe pigment/material, not lighting.", "required": ["olive and lime bands", "restrained violet accents", "broad pores"], "forbidden": ["portrait", "wounds", "baked illumination", "labels"], "frequency": "broad pigment bands at PX256"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "Goblin Creator skin style",
+        "retro character presets"
+      ],
+      "prohibitedUses": [
+        "fixed face texture",
+        "baked shadow bands"
+      ],
+      "parentPreset": "M328",
+      "editableParameters": [
+        "skin palette",
+        "band width",
+        "violet accent",
+        "pore amount"
+      ],
+      "recipe": {
+        "intent": "Retro cel-pixel Goblin skin whose bands describe pigment/material, not lighting.",
+        "required": [
+          "olive and lime bands",
+          "restrained violet accents",
+          "broad pores"
+        ],
+        "forbidden": [
+          "portrait",
+          "wounds",
+          "baked illumination",
+          "labels"
+        ],
+        "frequency": "broad pigment bands at PX256"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M379",
       "canonicalCode": "HM2-TXP-M379-VFX-FX-ATL-BCNRAE-LPFX-PX256-AT16-CLN-P06-PT-R01",
       "name": "Limited-palette nostalgic effects atlas",
       "sourceFile": "M379-nostalgic-limited-palette-fx-sheet.png",
-      "domain": "VFX", "material": "FX", "form": "ATL",
-      "channels": ["BaseColor", "Normal", "Roughness", "Alpha", "Emissive"],
-      "channelLayout": {"topLeft": "unlit Color", "topRight": "Normal+distortion guide", "bottomLeft": "Roughness+intensity", "bottomRight": "Alpha+Emissive mask"},
-      "style": "LPFX", "targetTier": "PX256", "fallbackTier": "PX128", "layout": "AT16", "condition": "CLN",
-      "palette": {"token": "P06", "maximumColors": 6}, "sampling": "PT", "wrap": "clamp", "physicalScale": "effect dependent",
+      "domain": "VFX",
+      "material": "FX",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "unlit Color",
+        "topRight": "Normal+distortion guide",
+        "bottomLeft": "Roughness+intensity",
+        "bottomRight": "Alpha+Emissive mask"
+      },
+      "style": "LPFX",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "effect dependent",
       "mipPolicy": "alpha-coverage preserving; hard palette steps",
-      "intendedUses": ["fire", "sparks", "boosts", "electric arcs", "impact effects"], "prohibitedUses": ["continuous full-screen overlay", "high-particle-count mist"],
-      "parentPreset": "M366", "editableParameters": ["palette swap", "emissive intensity", "frame selection", "effect scale"],
-      "recipe": {"intent": "Point-sampled classic effects with modern emissive and alpha control.", "required": ["thick silhouettes", "six-color maximum", "hard stepped intensity"], "forbidden": ["baked bloom", "tiny particles", "antialiased blur", "labels"], "frequency": "silhouettes survive PX128 fallback"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "fire",
+        "sparks",
+        "boosts",
+        "electric arcs",
+        "impact effects"
+      ],
+      "prohibitedUses": [
+        "continuous full-screen overlay",
+        "high-particle-count mist"
+      ],
+      "parentPreset": "M366",
+      "editableParameters": [
+        "palette swap",
+        "emissive intensity",
+        "frame selection",
+        "effect scale"
+      ],
+      "recipe": {
+        "intent": "Point-sampled classic effects with modern emissive and alpha control.",
+        "required": [
+          "thick silhouettes",
+          "six-color maximum",
+          "hard stepped intensity"
+        ],
+        "forbidden": [
+          "baked bloom",
+          "tiny particles",
+          "antialiased blur",
+          "labels"
+        ],
+        "frequency": "silhouettes survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
     },
     {
       "registryId": "M380",
       "canonicalCode": "HM2-TXP-M380-UI-CRT-ATL-BCNRAD-CRT-PX256-AT16-WRN-P10-PT-R01",
       "name": "CRT-era selective overlay atlas",
       "sourceFile": "M380-nostalgic-crt-overlay-alpha-sheet.png",
-      "domain": "UI", "material": "CRT", "form": "ATL",
-      "channels": ["BaseColor", "Normal", "Roughness", "Alpha", "Distortion"],
-      "channelLayout": {"topLeft": "Color", "topRight": "Normal+distortion guide", "bottomLeft": "Roughness+intensity", "bottomRight": "Alpha"},
-      "style": "CRT", "targetTier": "PX256", "fallbackTier": "PX128", "layout": "AT16", "condition": "WRN",
-      "palette": {"token": "P10", "maximumColors": 10}, "sampling": "PT", "wrap": "clamp", "physicalScale": "screen relative",
+      "domain": "UI",
+      "material": "CRT",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "Color",
+        "topRight": "Normal+distortion guide",
+        "bottomLeft": "Roughness+intensity",
+        "bottomRight": "Alpha"
+      },
+      "style": "CRT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "screen relative",
       "mipPolicy": "preserve broad scan blocks and color fringe; remove subpixel moire",
-      "intendedUses": ["in-world displays", "preview thumbnails", "selective screen damage"], "prohibitedUses": ["mandatory whole-interface filter", "gameplay-obscuring static"],
-      "parentPreset": null, "editableParameters": ["scan strength", "color fringe", "wipe grime", "distortion"],
-      "recipe": {"intent": "Optional CRT-era screen condition overlays with stable modern controls.", "required": ["broad scan blocks", "cyan-magenta fringe", "wipe/static patches"], "forbidden": ["full-screen requirement", "tiny random noise", "baked glow", "labels"], "frequency": "features survive compression at PX256"},
-      "status": "pass", "recipeRevision": 1, "provenance": "Material Batch 39"
+      "intendedUses": [
+        "in-world displays",
+        "preview thumbnails",
+        "selective screen damage"
+      ],
+      "prohibitedUses": [
+        "mandatory whole-interface filter",
+        "gameplay-obscuring static"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "scan strength",
+        "color fringe",
+        "wipe grime",
+        "distortion"
+      ],
+      "recipe": {
+        "intent": "Optional CRT-era screen condition overlays with stable modern controls.",
+        "required": [
+          "broad scan blocks",
+          "cyan-magenta fringe",
+          "wipe/static patches"
+        ],
+        "forbidden": [
+          "full-screen requirement",
+          "tiny random noise",
+          "baked glow",
+          "labels"
+        ],
+        "frequency": "features survive compression at PX256"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 39"
+    },
+    {
+      "registryId": "M381",
+      "canonicalCode": "HM2-TXP-M381-ENV-SAND-TIL-BCNROH-PXL3D-PX128-Q4-MIX-P12-PT-R01",
+      "name": "Pixel-painted tropical beach sand",
+      "sourceFile": "M381-nostalgic-pixel-beach-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "SAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "retro shoreline terrain",
+        "beach shelves",
+        "sandbars"
+      ],
+      "prohibitedUses": [
+        "photoreal sand",
+        "micro-grain closeups"
+      ],
+      "parentPreset": "M331",
+      "editableParameters": [
+        "sand palette",
+        "moisture bands",
+        "shell groups",
+        "ripple scale"
+      ],
+      "recipe": {
+        "intent": "Pixel-painted tropical sand with dithered moisture bands and modern PBR.",
+        "required": [
+          "broad sand bands",
+          "ordered transition dithering",
+          "chunky shell and mineral groups"
+        ],
+        "forbidden": [
+          "micro-grains",
+          "baked lighting",
+          "footprints",
+          "labels"
+        ],
+        "frequency": "features remain wider than two texels at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M382",
+      "canonicalCode": "HM2-TXP-M382-ENV-WATER-TIL-BCNRHAD-D16-PX128-Q4-WET-P10-PT-R01",
+      "name": "Dithered tropical water",
+      "sourceFile": "M382-nostalgic-dithered-water-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WATER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Flow+Foam Alpha+Height guide"
+      },
+      "style": "D16",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WET",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "scrolling retro water",
+        "shoreline water",
+        "canals"
+      ],
+      "prohibitedUses": [
+        "static opaque terrain",
+        "photoreal ocean"
+      ],
+      "parentPreset": "M339",
+      "editableParameters": [
+        "water palette",
+        "foam width",
+        "flow direction",
+        "roughness"
+      ],
+      "recipe": {
+        "intent": "Dithered teal water with independently scrolling flow and foam.",
+        "required": [
+          "broad teal wave bands",
+          "connected pale foam",
+          "shared flow coordinates"
+        ],
+        "forbidden": [
+          "reflections in BaseColor",
+          "micro-ripples",
+          "tiny bubbles",
+          "labels"
+        ],
+        "frequency": "wave and foam bands survive PX64 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M383",
+      "canonicalCode": "HM2-TXP-M383-ENV-FOL-ATL-BCNRA-D16-PX256-AT16-CLN-P16-PT-R01",
+      "name": "Nostalgic sprite foliage atlas",
+      "sourceFile": "M383-nostalgic-sprite-foliage-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "FOL",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Alpha"
+      },
+      "style": "D16",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P16",
+        "maximumColors": 16
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "card dependent",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "point-sampled foliage cards",
+        "tropical canopy",
+        "undergrowth"
+      ],
+      "prohibitedUses": [
+        "hair-thin grass",
+        "photoreal hero leaves"
+      ],
+      "parentPreset": "M329",
+      "editableParameters": [
+        "palette",
+        "card selection",
+        "leaf scale",
+        "age mix"
+      ],
+      "recipe": {
+        "intent": "Sixteen chunky tropical foliage sprites with PBR shading and stable alpha.",
+        "required": [
+          "palms ferns shrubs and broad leaves",
+          "stepped silhouettes",
+          "generous padding"
+        ],
+        "forbidden": [
+          "antialiased edges",
+          "tiny holes",
+          "hair-thin stems",
+          "labels"
+        ],
+        "frequency": "alpha coverage survives PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M384",
+      "canonicalCode": "HM2-TXP-M384-GEN-WOOD-TIL-BCNROH-C5WOOD-PX128-Q4-WRN-P12-PT-R01",
+      "name": "Nostalgic low-poly timber",
+      "sourceFile": "M384-nostalgic-lowpoly-timber-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "WOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "C5WOOD",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "1 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "retro construction timber",
+        "vehicle wood trim",
+        "settlement props"
+      ],
+      "prohibitedUses": [
+        "fine furniture veneer",
+        "photoreal closeups"
+      ],
+      "parentPreset": "M325",
+      "editableParameters": [
+        "wood palette",
+        "grain scale",
+        "paint transfer",
+        "damp stain"
+      ],
+      "recipe": {
+        "intent": "Classic-console timber with exaggerated grain and modern PBR channels.",
+        "required": [
+          "broad orange brown grain",
+          "turquoise transfer",
+          "stepped saw wear"
+        ],
+        "forbidden": [
+          "microfibers",
+          "tiny scratches",
+          "baked highlights",
+          "labels"
+        ],
+        "frequency": "grain channels wider than two texels at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M385",
+      "canonicalCode": "HM2-TXP-M385-GEN-METAL-TIL-BCNRMH-PSXRST-PX128-Q4-RST-P12-PT-R01",
+      "name": "Nostalgic retro rusted steel",
+      "sourceFile": "M385-nostalgic-retro-rusted-steel-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "METAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Metallic+Height guide"
+      },
+      "style": "PSXRST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "RST",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "1 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "retro machinery",
+        "vehicle corrosion",
+        "industrial props"
+      ],
+      "prohibitedUses": [
+        "clean stainless steel",
+        "micro-pitted hero metal"
+      ],
+      "parentPreset": "M338",
+      "editableParameters": [
+        "rust amount",
+        "paint remnant",
+        "steel value",
+        "pit scale"
+      ],
+      "recipe": {
+        "intent": "Early-3D rusted steel with crisp material separation.",
+        "required": [
+          "dark steel",
+          "orange rust islands",
+          "pale exposure",
+          "green paint remnants"
+        ],
+        "forbidden": [
+          "micro-pits",
+          "fine flakes",
+          "reflections",
+          "labels"
+        ],
+        "frequency": "condition islands remain broad at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M386",
+      "canonicalCode": "HM2-TXP-M386-VEH-RUBBER-TIL-BCNROH-C5RUB-PX128-Q4-WRN-P08-PT-R01",
+      "name": "Nostalgic chunky tire rubber",
+      "sourceFile": "M386-nostalgic-chunky-tire-rubber-pbr-sheet.png",
+      "domain": "VEH",
+      "material": "RUBBER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "C5RUB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.5 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "racing tire tread",
+        "rubber panels",
+        "track barriers"
+      ],
+      "prohibitedUses": [
+        "tire sidewall lettering",
+        "fine modern siping"
+      ],
+      "parentPreset": "M347",
+      "editableParameters": [
+        "tread block scale",
+        "wear crowns",
+        "dust amount",
+        "paint rub"
+      ],
+      "recipe": {
+        "intent": "Chunky classic-console tire tread with wide channels.",
+        "required": [
+          "oversized angular tread blocks",
+          "deep wide channels",
+          "limited dark palette"
+        ],
+        "forbidden": [
+          "tiny siping",
+          "lettering",
+          "micro-grain",
+          "labels"
+        ],
+        "frequency": "tread blocks remain distinct at PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M387",
+      "canonicalCode": "HM2-TXP-M387-GEN-GLASS-TIL-BCNRHT-PXLENS-PX128-Q4-WRN-P10-PT-R01",
+      "name": "Nostalgic pixel lens glass",
+      "sourceFile": "M387-nostalgic-pixel-lens-glass-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "GLASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor+transmission tint",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Transmission+Height guide"
+      },
+      "style": "PXLENS",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.5 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "goggles",
+        "visors",
+        "vehicle lenses"
+      ],
+      "prohibitedUses": [
+        "building glazing",
+        "baked reflected scenes"
+      ],
+      "parentPreset": "M345",
+      "editableParameters": [
+        "tint palette",
+        "haze",
+        "scratch count",
+        "transmission"
+      ],
+      "recipe": {
+        "intent": "Pixel-art tinted lens with sparse wear and runtime Fresnel.",
+        "required": [
+          "cyan violet haze",
+          "one broad wipe",
+          "few stepped scratches"
+        ],
+        "forbidden": [
+          "reflected environment",
+          "fine scratches",
+          "baked highlights",
+          "labels"
+        ],
+        "frequency": "wear marks remain sparse at PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M388",
+      "canonicalCode": "HM2-TXP-M388-CHR-CLOTH-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P12-PT-R01",
+      "name": "Hand-painted nostalgic racing cloth",
+      "sourceFile": "M388-nostalgic-handpainted-racing-cloth-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "CLOTH",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "HFPNT",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "0.5 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "racing suits",
+        "vehicle seats",
+        "protective padding"
+      ],
+      "prohibitedUses": [
+        "unquilted flat cloth",
+        "irregular stone-like padding"
+      ],
+      "parentPreset": "M343",
+      "editableParameters": [
+        "panel colors",
+        "pad scale",
+        "seam width",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Arcade-racer padded cloth with hand-painted pixel clusters.",
+        "required": [
+          "rectangular quilt pads",
+          "straight dark seams",
+          "green and orange accents"
+        ],
+        "forbidden": [
+          "micro-weave",
+          "tiny stitches",
+          "irregular cells",
+          "labels"
+        ],
+        "frequency": "pads remain distinct at PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M389",
+      "canonicalCode": "HM2-TXP-M389-VFX-FX-ATL-BCNAD-PXFX-PX256-AT16-MIX-P10-PT-R01",
+      "name": "Nostalgic smoke and dust effects atlas",
+      "sourceFile": "M389-nostalgic-smoke-dust-fx-sheet.png",
+      "domain": "VFX",
+      "material": "FX",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Alpha",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "unlit Color",
+        "topRight": "Normal+Distortion guide",
+        "bottomLeft": "Density+Intensity guide",
+        "bottomRight": "Alpha"
+      },
+      "style": "PXFX",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "MIX",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "effect dependent",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "dust impacts",
+        "vehicle smoke",
+        "steam cards"
+      ],
+      "prohibitedUses": [
+        "full-screen fog",
+        "high-particle-count mist"
+      ],
+      "parentPreset": "M356",
+      "editableParameters": [
+        "palette",
+        "frame choice",
+        "density",
+        "effect scale"
+      ],
+      "recipe": {
+        "intent": "Point-sampled low-overdraw smoke and dust animation cards.",
+        "required": [
+          "tan dust",
+          "charcoal smoke",
+          "blue-grey exhaust",
+          "hard density bands"
+        ],
+        "forbidden": [
+          "tiny particles",
+          "antialiased blur",
+          "thin wisps",
+          "labels"
+        ],
+        "frequency": "silhouettes survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M390",
+      "canonicalCode": "HM2-TXP-M390-CHR-MARK-ATL-BCNRA-PALSWP-PX256-AT16-CLN-P06-PT-R01",
+      "name": "Nostalgic palette-swap Goblin markings",
+      "sourceFile": "M390-nostalgic-goblin-palette-mark-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "MARK",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Alpha"
+      },
+      "style": "PALSWP",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features described by the frequency rule.",
+      "intendedUses": [
+        "Goblin Creator markings",
+        "team identity",
+        "vehicle decals"
+      ],
+      "prohibitedUses": [
+        "written words",
+        "fixed full-face textures"
+      ],
+      "parentPreset": "M330",
+      "editableParameters": [
+        "palette swap",
+        "mark selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Six-color pixel markings for runtime Goblin and racing identity swaps.",
+        "required": [
+          "cheek bands",
+          "eye arcs",
+          "crowns",
+          "teeth zigzags",
+          "racing slashes"
+        ],
+        "forbidden": [
+          "words",
+          "numbers",
+          "tiny splatter",
+          "portrait"
+        ],
+        "frequency": "thick silhouettes survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 40"
     }
   ]
 }

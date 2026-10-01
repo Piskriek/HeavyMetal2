@@ -666,8 +666,27 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 | M349 | Dashboard plastic | Mobile standard, `128 × 128` | Pass. Restrained broad handling wear and grime avoid unstable molded micro-grain. |
 | M350 | Grime decal atlas | Mobile atlas, `256 × 256` | Pass. Strong dust, mud, chalk, grease and paint marks with thick padded silhouettes. |
 
+## Material Batch 37 — mobile track, effects, and destruction
+
+![Material Batch 37 mobile track-and-effects contact sheet](./review/material-batch-37-mobile-track-effects-contact-sheet.jpg)
+
+![Material Batch 37 BaseColor previews at 128 px](./review/material-batch-37-mobile-basecolor-128px-preview.png)
+
+| ID | Mobile material/effect | Intended tier | Status and production note |
+|---|---|---|---|
+| M351 | Racing-track asphalt | Mobile standard, `128 × 128` | **Weak—regenerate.** Bold values survive reduction, but the broken pale plates read as damaged concrete rather than continuous asphalt. |
+| M352 | Racing-lane paint atlas | Mobile atlas, `256 × 256` | Pass. Excellent thick lines, corners, arcs and chevrons with bold palette and stable alpha. |
+| M353 | Tropical grass ground | Mobile standard, `128 × 128` | Pass with identity constraint. Strong packed rosette groundcover; use as broad-leaf turf rather than fine-blade grass. |
+| M354 | Mossy stone paving | Mobile standard, `128 × 128` | Pass. Excellent large stones, wide joints, lime moss accents and readable height. |
+| M355 | Boost-pad marking atlas | Mobile atlas, `256 × 256` | Pass. Strong neon chevrons and turbine arcs with clean emissive masks and no thin circuitry. |
+| M356 | Dust-puff atlas | Mobile VFX atlas, `256 × 256` | Pass. Broad tan impact and trail lobes support low-overdraw animation cards. |
+| M357 | Smoke atlas | Mobile VFX atlas, `256 × 256` | Pass. Strong charcoal, soot and steam silhouettes with connected soft volumes. |
+| M358 | Rain-splash atlas | Mobile VFX atlas, `256 × 256` | Pass. Thick crowns, rings and puddle arcs avoid fragile droplets and retain clear masks. |
+| M359 | Impact-crack atlas | Mobile decal atlas, `256 × 256` | Pass. Excellent thick radial fractures, crater rims and stable-hole edge forms. |
+| M360 | Material chunk atlas | Mobile destruction atlas, `256 × 256` | Pass. Strong rock, concrete, wood, metal and rubber silhouettes for velocity, spin, bounce and recycle. |
+
 ## Next material batches
 
-### Batch 37 — mobile track, effects, and destruction
+### Batch 38 — mobile weather and vehicle effects
 
-Mobile asphalt, lane paint, grass ground, mossy stone, boost-pad markings, dust-puff atlas, smoke atlas, rain-splash atlas, impact-crack decals and material chunk atlas.
+Snow cover, frost masks, wetness overlays, puddle atlas, mud splatter, fire atlas, spark atlas, electric-arc atlas, oil-spill decals and tire skid marks.

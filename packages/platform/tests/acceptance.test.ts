@@ -1,8 +1,3 @@
-/**
- * T9 acceptance: platform adapters. The 'stub' platform must behave like RUN in every way the harness depends on (limits included),
- * so the whole harness can be developed and tested without RUN. The 'run' adapter is tested here only against a FAKE sdk you write
- * in packages/platform/tests/fake-run-sdk.ts (the real RUN SDK docs are in docs/run-sdk/; read them before writing the adapter).
- */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UGC_MAX_BYTES, UgcTooLargeError, type PresetBundle } from '@hm/contracts';

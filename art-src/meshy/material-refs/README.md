@@ -1088,3 +1088,9 @@ M542 now passes at `R02` with unmistakable top-to-bottom lava flow. M549–M557 
 ![Material Batch 72 contact sheet](./review/material-batch-72-mobile-island-underside-transitions.jpg)
 
 M558–M564 complete mobile shoreline foam, floating-earth, exposed-root, stalactite-face and stalactite-atlas children plus the nostalgic stalactite atlas. M565–M567 add passing mobile grass/basalt, sand/grass and lava/basalt interlocked transition fringes. All preserve explicit parent links and runtime-tier recipes.
+
+## Material Batch 73 — island transition fringes
+
+![Material Batch 73 contact sheet](./review/material-batch-73-island-transition-fringes.jpg)
+
+M568–M571 and M573–M577 pass as nostalgic and full-fidelity vertical-fringe transitions covering grass, sand, basalt, lava, obsidian, crystal and floating-island underside materials. M572 retains a good basalt/lava boundary but must be regenerated because its lower-right guide quadrant contains unrelated vivid colors instead of registered grayscale/emissive data.

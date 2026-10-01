@@ -13514,6 +13514,689 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M568",
+      "canonicalCode": "HM2-TXP-M568-ENV-GRASSBAS-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island grass to basalt transition pbr sheet",
+      "sourceFile": "M568-nostalgic-island-grass-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASSBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M513",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M569",
+      "canonicalCode": "HM2-TXP-M569-ENV-SANDGRASS-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island sand to grass transition pbr sheet",
+      "sourceFile": "M569-nostalgic-island-sand-to-grass-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "SANDGRASS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M516",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M570",
+      "canonicalCode": "HM2-TXP-M570-ENV-LAVABAS-TRN-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island lava to basalt transition pbr sheet",
+      "sourceFile": "M570-nostalgic-island-lava-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVABAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M509",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M571",
+      "canonicalCode": "HM2-TXP-M571-ENV-OBSIDBAS-TRN-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island obsidian to basalt transition pbr sheet",
+      "sourceFile": "M571-island-obsidian-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "OBSIDBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M505",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M572",
+      "canonicalCode": "HM2-TXP-M572-ENV-BASLAVA-TRN-BCNROHE-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island basalt to lava transition pbr sheet",
+      "sourceFile": "M572-island-basalt-to-lava-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASLAVA",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M507",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M573",
+      "canonicalCode": "HM2-TXP-M573-ENV-CRYSBAS-TRN-BCNROHT-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island crystal to basalt transition pbr sheet",
+      "sourceFile": "M573-island-crystal-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "CRYSBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M511",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M574",
+      "canonicalCode": "HM2-TXP-M574-ENV-GRASSDRY-TRN-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island tropical to dry grass transition pbr sheet",
+      "sourceFile": "M574-island-tropical-to-dry-grass-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASSDRY",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M513",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M575",
+      "canonicalCode": "HM2-TXP-M575-ENV-WETUSAND-TRN-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island wet to underwater sand transition pbr sheet",
+      "sourceFile": "M575-island-wet-to-underwater-sand-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WETUSAND",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M516",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M576",
+      "canonicalCode": "HM2-TXP-M576-ENV-EARTHROOT-TRN-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island earth to roots underside transition pbr sheet",
+      "sourceFile": "M576-island-earth-to-roots-underside-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "EARTHROOT",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M521",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
+    },
+    {
+      "registryId": "M577",
+      "canonicalCode": "HM2-TXP-M577-ENV-ROOTSTAL-TRN-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island roots to stalactite underside transition pbr sheet",
+      "sourceFile": "M577-island-roots-to-stalactite-underside-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "ROOTSTAL",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor transition",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height plus optional emissive/transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical fringe; repeats top-to-bottom",
+      "mipPolicy": "Preserve material identities and interlocked boundary.",
+      "intendedUses": [
+        "Basalt Isle biome and underside blending"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "misordered channels",
+        "radial focal pattern"
+      ],
+      "parentPreset": "M522",
+      "editableParameters": [
+        "boundary width",
+        "material balance",
+        "relief",
+        "roughness",
+        "accent strength"
+      ],
+      "recipe": {
+        "intent": "Detachable vertical-fringe transition between named island materials.",
+        "required": [
+          "top-bottom edge continuity",
+          "distinct left/right materials",
+          "real relief guide"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "straight divider"
+        ],
+        "frequency": "both material identities survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 73 island transition fringes"
     }
   ]
 }

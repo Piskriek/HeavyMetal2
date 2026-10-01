@@ -2,6 +2,8 @@
 
 This is the approved interface-generation baseline. Future interface concepts should preserve its composition, density, material treatment, and interaction hierarchy while changing only the workspace-specific scene and drawer contents.
 
+The interface is itself a recursively editable preset. Its stage, toolbar, drawers, icon families, materials, accents and inhabited details may be sculpted and painted under [`../INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md`](../INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md) without violating this scene-first contract.
+
 ## Approved prompt
 
 > Redesign this Preset Library, Share and Remix view as a scene-first gallery. A selected high-fidelity island or goblin preset preview occupies around 78 percent of the image on a bright white 3D stage. Remove persistent hierarchy tree, multi-tab grid, details sidebar, remix tree and action panel. Keep one compact six-button square toolbar at lower-left. Show ONE shallow Presets drawer pulled up from the bottom, occupying at most 20 percent height, containing a single row of six sharp-corner tactile PBR thumbnails, search icon, and square close/detach control. Selecting a card enlarges the scene; details appear temporarily beside the selected card, not in another window. No rounded cards or pills. A green/magenta paint spill from the selected card grows into PBR soil, ferns, road timber and metal props on the white floor. Small punk goblin racer sleeps beside paint cans at lower-right. Sparse handprints, crown/remix doodle and restrained scratches only. No additional windows, dense grids, dark background or clutter.

@@ -883,3 +883,7 @@ Build sports textures in all three established styles: full-fidelity PBR, mobile
 - goals, nets, posts, wickets, hoops, targets and venue-condition layers.
 
 The global category and naming requirements are defined in [`docs/SPORTS_TEXTURE_PRESET_STANDARD.md`](../../../docs/SPORTS_TEXTURE_PRESET_STANDARD.md). American sports are included but do not define the default taxonomy.
+
+### Batches 52–54 — custom interface icon and material presets
+
+Build clean machined, mobile, nostalgic, Goblin-punk and high-contrast icon families from shared semantic action IDs. Cover scene/preset navigation; paint/sculpt/stamp tools; materials and channels; Creator controls; vehicle/track tools; weather/recovery; destruction/repair; sports tools; local-AI actions; and detachable drawer controls. The interface, icon libraries, toolbar, drawers, stage and materials remain recursively sculptable and paintable under [`docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md`](../../../docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md).

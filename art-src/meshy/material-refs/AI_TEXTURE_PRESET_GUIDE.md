@@ -9,6 +9,7 @@
 - Human review registry: [`README.md`](./README.md)
 - Mobile rules: [`docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md`](../../../docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md)
 - Global sports taxonomy: [`docs/SPORTS_TEXTURE_PRESET_STANDARD.md`](../../../docs/SPORTS_TEXTURE_PRESET_STANDARD.md)
+- Sculptable interface and icon presets: [`docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md`](../../../docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md)
 
 ## Required AI behavior
 

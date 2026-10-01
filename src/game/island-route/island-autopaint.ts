@@ -94,6 +94,8 @@ export interface IslandPreset {
  * read well across the whole island from the air. The painterly originals stay in the tile picker.
  */
 const lib = (file: string) => `library/${file}`;
+/** A tile of the pipeline-built Basalt Isle library (`public/textures/island-lib`): these carry PBR maps (real relief and shine). */
+const pbr = (file: string) => `lib/${file}`;
 export const CALM_TILES: Readonly<Record<number, string>> = Object.freeze({
   [SURFACE_SAND]: lib('sand-soft-packed-01.jpg'),
   [SURFACE_WET_SAND]: lib('wetsand-tideline-01.jpg'),
@@ -211,6 +213,34 @@ export const ISLAND_PRESETS: readonly IslandPreset[] = Object.freeze<IslandPrese
       L({ key: 'moss', name: 'Mossy rock', role: 'moss', surface: SURFACE_MOSSY_ROCK, strength: 1, slope: B(18, 46, 6), altitude: B(30, 100, 10), hollow: { scale: 'small', amount: 0.4, depth: 50 } }),
       ...CLIFF_LAYERS(36, 0.8),
       L({ key: 'crystal', name: 'Crystal seams', role: 'accent', surface: SURFACE_CRYSTAL, strength: 0.9, altitude: B(62, 100, 8), hollow: { scale: 'small', amount: -0.8, depth: 50 }, noise: { scale: 800, amount: 1, bias: -0.3, seed: 31 } }),
+      L({ key: 'verge', name: 'Road verges', role: 'verge', surface: SURFACE_SAND, strength: 0.9, road: B(0, 240, 140), noise: { scale: 700, amount: 0.4, bias: 0.3, seed: 17 } }),
+    ],
+  },
+  {
+    id: 'basalt', name: 'Basalt Isle (PBR)',
+    blurb: 'Black basalt headlands and ochre strata over pale rippled sand, mossy damp creases and tropical ground cover, every surface painted with PBR tiles from the art pipeline: real relief, real shine.',
+    tiles: {
+      [SURFACE_SAND]: pbr('dunes-rippled-tidal-sand-m282.webp'),
+      [SURFACE_WET_SAND]: pbr('wetsand-wet-compact-sand-m281.webp'),
+      [SURFACE_SHALLOWS]: pbr('shallows-shallow-tropical-water-m051.webp'),
+      [SURFACE_DARK_ROCK]: pbr('rock-wet-coastal-basalt-m005.webp'),
+      [SURFACE_BEACH_GRASS]: pbr('grass-tropical-grass-ground-m353.webp'),
+      [SURFACE_CORAL_SAND]: pbr('coral-coral-limestone-m284.webp'),
+      [SURFACE_GRANITE]: pbr('cliff-basalt-cliff-m001.webp'),
+      [SURFACE_MOSSY_ROCK]: pbr('moss-tropical-moss-carpet-m300.webp'),
+      [SURFACE_DRY_MUD]: pbr('mud-mud-and-puddle-edge-m011.webp'),
+      [SURFACE_DUNES]: pbr('dunes-rippled-tidal-sand-m282.webp'),
+      [SURFACE_STRATA]: pbr('strata-ochre-layered-cliff-m002.webp'),
+    },
+    layers: [
+      L({ key: 'base', name: 'Rippled sand', role: 'base', surface: SURFACE_SAND, strength: 1, shore: B(-120, INF, 80) }),
+      ...SHORE_LAYERS,
+      L({ key: 'coral', name: 'Coral limestone', role: 'accent', surface: SURFACE_CORAL_SAND, strength: 0.8, shore: B(-500, 700, 250), noise: { scale: 1100, amount: 1, bias: -0.45, seed: 7 } }),
+      L({ key: 'basalt', name: 'Basalt headlands', role: 'rock', surface: SURFACE_DARK_ROCK, strength: 1, shore: B(350, INF, 500), hollow: { scale: 'large', amount: -0.6, depth: 70 }, noise: { scale: 1900, amount: 0.7, bias: 0.15, seed: 29 } }),
+      L({ key: 'grass', name: 'Tropical ground cover', role: 'grass', surface: SURFACE_BEACH_GRASS, strength: 0.95, shore: B(1500, INF, 600), slope: B(0, 22, 6), hollow: { scale: 'large', amount: 0.6, depth: 80 }, noise: { scale: 1600, amount: 0.6, bias: 0.05, seed: 5 } }),
+      L({ key: 'mud', name: 'Wet loam', role: 'accent', surface: SURFACE_DRY_MUD, strength: 0.7, shore: B(2400, INF, 800), slope: B(0, 9, 4), hollow: { scale: 'large', amount: 0.7, depth: 80 }, noise: { scale: 2400, amount: 0.8, bias: -0.3, seed: 13 } }),
+      L({ key: 'moss', name: 'Moss in the damp', role: 'moss', surface: SURFACE_MOSSY_ROCK, strength: 0.9, slope: B(20, 42, 6), hollow: { scale: 'small', amount: 0.7, depth: 50 }, facing: 0.4 }),
+      ...CLIFF_LAYERS(30, 1),
       L({ key: 'verge', name: 'Road verges', role: 'verge', surface: SURFACE_SAND, strength: 0.9, road: B(0, 240, 140), noise: { scale: 700, amount: 0.4, bias: 0.3, seed: 17 } }),
     ],
   },

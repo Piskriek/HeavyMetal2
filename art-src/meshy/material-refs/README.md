@@ -471,8 +471,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M239 | Glazed wall tile | Kitchens, garages and wash areas | Pass. Clean handmade tile grid with varied glaze, crazing and useful grout depth. |
 | M240 | Woven shade mat | Awnings, partitions and shade panels | Pass. Strong packed reed weave, muted variation and LOD-readable crossings. |
 
+## Material Batch 26 — settlement floors, interiors, and screens
+
+![Material Batch 26 settlement-interior contact sheet](./review/material-batch-26-settlement-interiors-contact-sheet.jpg)
+
+| ID | Interior material | Use | Status and production note |
+|---|---|---|---|
+| M241 | Rough timber planks | Floors, decks and wall lining | Pass. Strong broad plank construction, saw wear, damp joints and readable height. |
+| M242 | Bamboo slats | Floors, wall panels and screens | Pass. Clean slat rhythm, node bands and rounded LOD-readable crowns. |
+| M243 | Terrazzo floor | Durable settlement and workshop interiors | Pass. Excellent broad chips, calm matrix and appropriately subtle height response. |
+| M244 | Painted concrete floor | Workshops, garages and utility rooms | Pass. Strong teal paint wear, oil haze, aggregate exposure and traffic polish. |
+| M245 | Worn linoleum | Domestic and service interiors | **Weak—regenerate.** Current BaseColor reads as crushed organic stone or leaf litter rather than smooth marbled sheet flooring. |
+| M246 | Galvanized diamond mesh | Screens, partitions and machine guards | Pass. Clean thick expanded-metal silhouette, matched normal response and production-ready alpha. |
+| M247 | Woven rag rug | Domestic floors and lived-in accents | Pass. Excellent chunky colored strips, dense packing and broad cloth depth. |
+| M248 | Heavy canvas | Tarps, curtains and upholstery | Pass with constraint. Strong weathered fiber response; preserve the broad herringbone-like weave as a deliberate canvas variant. |
+| M249 | Mosquito net | Beds, windows and breathable partitions | Pass. Crisp mip-conscious square grid with matched channels and clean alpha. |
+| M250 | Stained interior wood | Counters, shelves, trim and furniture | Pass. Strong warm grain, stain pooling, water marks and calm satin wear. |
+
 ## Next material batches
 
-### Batch 26 — settlement floors, interiors, and screens
+### Batch 27 — domestic, market, and service materials
 
-Rough timber planks, bamboo slats, terrazzo, painted concrete floor, worn linoleum, galvanized mesh, woven rag rug, heavy canvas, mosquito net and stained interior wood.
+Chipped enamelware, brushed sink steel, glazed porcelain, clear bottle glass, amber bottle glass, woven basket reed, utility rope, candle wax, handmade soap and weathered paper packaging.

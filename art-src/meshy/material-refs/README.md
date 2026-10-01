@@ -685,11 +685,26 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 | M359 | Impact-crack atlas | Mobile decal atlas, `256 × 256` | Pass. Excellent thick radial fractures, crater rims and stable-hole edge forms. |
 | M360 | Material chunk atlas | Mobile destruction atlas, `256 × 256` | Pass. Strong rock, concrete, wood, metal and rubber silhouettes for velocity, spin, bounce and recycle. |
 
+## Material Batch 38 — mobile weather and vehicle effects
+
+![Material Batch 38 mobile weather-and-effects contact sheet](./review/material-batch-38-mobile-weather-effects-contact-sheet.jpg)
+
+![Material Batch 38 BaseColor previews at 128 px](./review/material-batch-38-mobile-basecolor-128px-preview.png)
+
+| ID | Mobile material/effect | Intended tier | Status and production note |
+|---|---|---|---|
+| M361 | Snow cover | Mobile standard, `128 × 128` | **Weak—regenerate.** Useful broad melt shapes, but the source returned at `1408×768` rather than a square four-channel sheet. |
+| M362 | Frost masks | Mobile standard, `128 × 128` | **Weak—regenerate.** Clean alpha survives reduction, but the broad shapes read as pale leaves or feathers rather than surface frost. |
+| M363 | Wetness overlay | Mobile standard, `128 × 128` | **Weak—regenerate.** Strong runoff language, but the source returned at `1408×768` rather than the required square layout. |
+| M364 | Puddle atlas | Mobile decal atlas, `256 × 256` | Pass. Excellent large puddles, dark wet rims and simple low ripples with clean alpha. |
+| M365 | Mud-splatter atlas | Mobile decal atlas, `256 × 256` | Pass. Strong chunky blobs, wheel arcs and short streaks without unstable tiny droplets. |
+| M366 | Fire atlas | Mobile VFX atlas, `256 × 256` | Pass. Excellent limited-palette flame silhouettes and broad intensity masks for low overdraw. |
+| M367 | Spark atlas | Mobile VFX atlas, `256 × 256` | Pass. Bold short-ray bursts and compact impact stars remain unmistakable at 128 px. |
+| M368 | Electric-arc atlas | Mobile VFX atlas, `256 × 256` | Pass. Strong cyan, green and magenta coils, loops and thick arcs without hairline branches. |
+| M369 | Oil-spill atlas | Mobile decal atlas, `256 × 256` | Pass. Excellent pools, rings and drags with restrained amber and contaminated-green variation. |
+| M370 | Tire-skid atlas | Mobile decal atlas, `256 × 256` | Pass. Strong braking bars, drift curves, donut arcs and burnout patches for racing-camera distance. |
+
 ## Next material batches
-
-### Batch 38 — mobile weather and vehicle effects
-
-Snow cover, frost masks, wetness overlays, puddle atlas, mud splatter, fire atlas, spark atlas, electric-arc atlas, oil-spill decals and tire skid marks.
 
 ### Batch 39 — nostalgic styles with modern PBR response
 

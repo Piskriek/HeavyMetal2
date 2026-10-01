@@ -335,8 +335,25 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 
 Layer ordering, accumulation, melt/dry behavior, geometry response and event baking are defined in [`docs/WEATHER_AND_SEASON_MATERIAL_STANDARD.md`](../../../docs/WEATHER_AND_SEASON_MATERIAL_STANDARD.md).
 
+## Material Batch 18 — environmental media and recovery states
+
+![Material Batch 18 environmental-media contact sheet](./review/material-batch-18-environmental-media-recovery-contact-sheet.jpg)
+
+| ID | State or medium | Use | Status and production note |
+|---|---|---|---|
+| M161 | Underwater depth haze | Volumetric absorption and suspended particles | Pass. Excellent broad low-frequency density, distortion and depth-phase references. |
+| M162 | Water algae bloom | Flowing bloom density and absorption | **Weak—regenerate.** Material language is strong, but the generator returned a `1408 × 768` landscape sheet instead of the square channel layout. |
+| M163 | Burned-ground recovery | Ash-to-pioneer-growth succession | Pass. Strong material and recovery-mask progression without active fire or smoke. |
+| M164 | Regrowing forest | Clearing-to-mature-canopy succession | Pass. Excellent staged meadow, shrub, sapling and canopy transition. |
+| M165 | Dust-storm deposition | Post-storm dust buildup | Pass. Useful directional fans and sheltered deposits with clean alpha. |
+| M166 | Fog condensation | Dew, fogged film and cleared wipes | Pass. Restrained low-relief moisture masks suitable for glass, metal and foliage. |
+| M167 | Oil-on-water sheen | Thin-film industrial runoff | Pass. Strong restrained interference color, flow normal, thickness and film masks. |
+| M168 | Hot-spring mineral deposits | Travertine, crust and mineral flow | Pass with cleanup. Useful palette/relief; production should consolidate decorative splash-like shapes into seamless mineral terraces. |
+| M169 | Tidal wet/dry cycle | Waterline wetness, salt and growth | **Weak—regenerate.** Content range is useful, but generated channel labels violate the clean-sheet standard. |
+| M170 | Post-race track recovery | Ruts, repairs and regrowth over time | Pass with sequencing constraint. Treat displayed shapes as staged masks driven by recovery time, not permanent road markings. |
+
 ## Next material batches
 
-### Batch 18 — environmental media and recovery states
+### Batch 19 — workshop, interior, and lived-in surface details
 
-Underwater depth haze, algae bloom, burned-ground recovery, regrowing forest, dust storm deposition, fog moisture, oil-on-water sheen, mineral hot-spring deposits, tidal wet/dry cycling and post-race track recovery.
+Fingerprints, dusty shelves, cobwebs, paint drips, adhesive residue, tool scratches, boot scuffs, drink rings, food grease, chalk marks without text, electrical scorch and repaired wall/plaster patches.

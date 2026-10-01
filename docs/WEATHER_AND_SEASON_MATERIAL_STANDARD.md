@@ -71,7 +71,17 @@ Every condition preset records:
 - Storm debris combines approved organic, timber, rope and metal families with material-appropriate rigidity.
 - Impact and cleanup can locally dissolve deposits and spawn pooled chunks according to the destruction standard.
 
-## 8. Recursive editing
+## 8. Environmental media and recovery
+
+- Underwater haze, algae bloom, fog and airborne dust are shader/volume states driven by world depth, flow and density—not opaque geometry.
+- Oil sheen, condensation and tidal wetness modify the receiving water or surface shader and retain independent thickness/roughness masks.
+- Burn and forest recovery use one monotonic recovery parameter plus authored stage curves for color, roughness, ground cover, shrubs and mature geometry.
+- Recovery does not respawn every asset at once; geometry families enter by stage and preserve deterministic seeds.
+- Tidal exposure accumulates wetness, salt and marine growth over different time constants and removes them gradually when conditions reverse.
+- Post-race recovery separately restores material compaction, rut height, loose scatter, foliage density and repair geometry.
+- Environmental media must fade and stream without discontinuities at volume, terrain-tile or water-body boundaries.
+
+## 9. Recursive editing
 
 Weather layers remain presets at every depth:
 
@@ -81,7 +91,7 @@ Weather layers remain presets at every depth:
 - changing the parent weather preset propagates unless a child response is explicitly detached;
 - baking preserves source preset, seed, amount and timestamp so the state can be rebuilt.
 
-## 9. Performance and quality tiers
+## 10. Performance and quality tiers
 
 - Low: macro tint/roughness masks, no spawned seasonal geometry.
 - Medium: local height/normal, limited decals and instanced edge debris.
@@ -90,7 +100,7 @@ Weather layers remain presets at every depth:
 
 Pool all transient particles and debris. Merge stable distant coverage into runtime virtual textures or equivalent terrain caches. Limit transparent layers, especially puddles, mist, blowing snow and wet glass.
 
-## 10. Acceptance tests
+## 11. Acceptance tests
 
 A condition layer passes when:
 

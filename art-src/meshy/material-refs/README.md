@@ -352,8 +352,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M169 | Tidal wet/dry cycle | Waterline wetness, salt and growth | **Weak—regenerate.** Content range is useful, but generated channel labels violate the clean-sheet standard. |
 | M170 | Post-race track recovery | Ruts, repairs and regrowth over time | Pass with sequencing constraint. Treat displayed shapes as staged masks driven by recovery time, not permanent road markings. |
 
+## Material Batch 19 — workshop, interior, and lived-in details
+
+![Material Batch 19 lived-in surface contact sheet](./review/material-batch-19-lived-in-surfaces-contact-sheet.jpg)
+
+| ID | Detail family | Use | Status and production note |
+|---|---|---|---|
+| M171 | Fingerprints and hand smudges | Walls, tools, glass, controls and vehicles | Pass. Strong skin-oil, grime and colored-paint marks with broad readable shapes. |
+| M172 | Dusty shelf accumulation | Ledges, shelves and long-idle equipment | Pass. Useful strips, object ghosts, wipes and settled powder islands. |
+| M173 | Cobwebs | Sparse abandoned corners and ruins | Pass. Excellent thick grouped strands that remain readable without micro-line noise. |
+| M174 | Paint drips and splashes | White-stage walls, props and workshop history | Pass. Strong color range, brush texture, can rings and wet/dry roughness variants. |
+| M175 | Adhesive residue | Removed tape and sticker history | Weak—regenerate. Many forms still read as intact tape/patches rather than translucent glue ghosts and torn fiber residue. |
+| M176 | Tool scratches and gouges | Machines, worktops, armor and timber | Weak—regenerate. The clean edge/arc vocabulary is useful, but needs more unmistakable screwdriver slips, saw drags and chisel gouges. |
+| M177 | Boot scuffs and partial prints | Floors, vehicles and workshop stages | Pass. Excellent chunky tread abstraction, paint/mud variants and incomplete foot traffic. |
+| M178 | Drink rings and spills | Benches, consoles and lived-in interiors | Pass. Strong incomplete rings, overlapping cups, drips and wiped crescents. |
+| M179 | Electrical scorch | Machines, wiring zones and vehicles | Pass. Good branching arcs, heat rings and pitted short-circuit damage. |
+| M180 | Repaired wall and plaster | White-stage repairs and settlement interiors | Pass. Broad filler, mortar and trowel shapes with clean alpha and restrained overspray. |
+
 ## Next material batches
 
-### Batch 19 — workshop, interior, and lived-in surface details
+### Batch 20 — workshop consumables and mechanical residues
 
-Fingerprints, dusty shelves, cobwebs, paint drips, adhesive residue, tool scratches, boot scuffs, drink rings, food grease, chalk marks without text, electrical scorch and repaired wall/plaster patches.
+Food grease, chalk symbols without text, wax crayon marks, welding spatter, sawdust, metal filings, fuel stains, coolant leaks, battery corrosion and expanding foam/sealant.

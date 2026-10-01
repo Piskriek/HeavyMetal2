@@ -2052,6 +2052,568 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M401",
+      "canonicalCode": "HM2-TXP-M401-CHR-HAIR-ATL-BCNRA-PXHAIR-PX256-AT16-CLN-P06-PT-R01",
+      "name": "Pixel hair cards",
+      "sourceFile": "M401-nostalgic-pixel-hair-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "HAIR",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "PXHAIR",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "hair and eyebrows"
+      ],
+      "prohibitedUses": [
+        "thin strand simulation"
+      ],
+      "parentPreset": "M341",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Pixel hair cards with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "chunky silhouettes",
+          "six-color palette"
+        ],
+        "forbidden": [
+          "flyaways",
+          "antialiasing"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M402",
+      "canonicalCode": "HM2-TXP-M402-CHR-SKIN-ATL-BCNRA-D16-PX256-AT16-CLN-P08-PT-R01",
+      "name": "Dithered skin details",
+      "sourceFile": "M402-nostalgic-dithered-skin-detail-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "SKIN",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "D16",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "skin overlays"
+      ],
+      "prohibitedUses": [
+        "full face texture"
+      ],
+      "parentPreset": "M312",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Dithered skin details with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "pigment clouds",
+          "freckles",
+          "blush bands"
+        ],
+        "forbidden": [
+          "gore",
+          "tiny noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M403",
+      "canonicalCode": "HM2-TXP-M403-CHR-GLASS-ATL-BCNRAT-C5ACC-PX256-AT12-CLN-P12-PT-R01",
+      "name": "Classic goggle kit",
+      "sourceFile": "M403-nostalgic-classic-goggle-kit-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "GLASS",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "C5ACC",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT12",
+      "condition": "CLN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "goggles and visors"
+      ],
+      "prohibitedUses": [
+        "building glass"
+      ],
+      "parentPreset": "M345",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Classic goggle kit with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "lens and frame variants",
+          "clean silhouettes"
+        ],
+        "forbidden": [
+          "reflections",
+          "tiny screws"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M405",
+      "canonicalCode": "HM2-TXP-M405-CHR-LEATHER-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P12-PT-R01",
+      "name": "Hand-painted boot leather",
+      "sourceFile": "M405-nostalgic-handpainted-boot-leather-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "LEATHER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "HFPNT",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "boots gloves and gear"
+      ],
+      "prohibitedUses": [
+        "boot object texture"
+      ],
+      "parentPreset": "M377",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Hand-painted boot leather with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "broad flex creases",
+          "mud and wear"
+        ],
+        "forbidden": [
+          "micro-pores",
+          "stitches"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M406",
+      "canonicalCode": "HM2-TXP-M406-CHR-JEWEL-ATL-BCNRMA-C5ACC-PX256-AT16-WRN-P12-PT-R01",
+      "name": "Chunky jewelry atlas",
+      "sourceFile": "M406-nostalgic-chunky-jewelry-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "JEWEL",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "C5ACC",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "jewelry and charms"
+      ],
+      "prohibitedUses": [
+        "fine chains"
+      ],
+      "parentPreset": "M125",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Chunky jewelry atlas with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "rings cuffs beads and plates",
+          "metal separation"
+        ],
+        "forbidden": [
+          "words",
+          "real-world symbols"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M407",
+      "canonicalCode": "HM2-TXP-M407-CHR-CLOTH-ATL-BCNRA-ARCRAC-PX256-AT16-CLN-P06-PT-R01",
+      "name": "Arcade cloth patches",
+      "sourceFile": "M407-nostalgic-arcade-cloth-patch-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "CLOTH",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "ARCRAC",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "wardrobe patches"
+      ],
+      "prohibitedUses": [
+        "written patches"
+      ],
+      "parentPreset": "M136",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Arcade cloth patches with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "thick patch shapes",
+          "indexed colors"
+        ],
+        "forbidden": [
+          "tiny stitching",
+          "words"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M408",
+      "canonicalCode": "HM2-TXP-M408-CHR-COSMETIC-ATL-BCNRA-PALSWP-PX256-AT16-CLN-P06-PT-R01",
+      "name": "Limited-palette cosmetics",
+      "sourceFile": "M408-nostalgic-limited-cosmetics-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "COSMETIC",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "PALSWP",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "creator cosmetics"
+      ],
+      "prohibitedUses": [
+        "full face texture"
+      ],
+      "parentPreset": "M133",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Limited-palette cosmetics with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "eye arcs lip bands cheek slashes",
+          "six colors"
+        ],
+        "forbidden": [
+          "tiny glitter",
+          "gore"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M409",
+      "canonicalCode": "HM2-TXP-M409-CHR-GRIME-ATL-BCNRA-PXL3D-PX256-AT16-WRN-P08-PT-R01",
+      "name": "Creator grime overlays",
+      "sourceFile": "M409-nostalgic-creator-grime-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "GRIME",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "WRN",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "creator condition overlays"
+      ],
+      "prohibitedUses": [
+        "wounds"
+      ],
+      "parentPreset": "M350",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Creator grime overlays with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "dust mud chalk grease and paint",
+          "broad wipes"
+        ],
+        "forbidden": [
+          "tiny splatter",
+          "handprints"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
+    },
+    {
+      "registryId": "M410",
+      "canonicalCode": "HM2-TXP-M410-CHR-TEAM-ATL-BCNRA-PALSWP-PX256-AT16-CLN-P06-PT-R01",
+      "name": "Palette-swap team kit",
+      "sourceFile": "M410-nostalgic-team-kit-alpha-pbr-sheet.png",
+      "domain": "CHR",
+      "material": "TEAM",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "Alpha or AO/Height as declared"
+      },
+      "style": "PALSWP",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "character relative",
+      "mipPolicy": "Preserve indexed palette and thick silhouettes through fallback mips.",
+      "intendedUses": [
+        "team wardrobe and vehicle markings"
+      ],
+      "prohibitedUses": [
+        "written branding"
+      ],
+      "parentPreset": "M390",
+      "editableParameters": [
+        "palette",
+        "selection",
+        "scale",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Palette-swap team kit with nostalgic pixels and modern PBR controls.",
+        "required": [
+          "shoulder panels chest bands chevrons",
+          "indexed palette"
+        ],
+        "forbidden": [
+          "words",
+          "channel labels"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 42 partial"
     }
   ]
 }

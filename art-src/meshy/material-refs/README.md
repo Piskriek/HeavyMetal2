@@ -771,6 +771,8 @@ Canonical codes and reconstruction recipes for M391–M400 are registered in [`t
 
 ## Next material batches
 
-### Batch 42 — nostalgic Goblin Creator wardrobe and accessories
+### Batch 42 — nostalgic Goblin Creator wardrobe and accessories — in progress
 
 Pixel hair cards, dithered skin details, classic goggles, retro armor, hand-painted boots, chunky jewelry, arcade cloth patches, limited-palette cosmetics, creator grime overlays and palette-swap team kits.
+
+M401–M403 and M405–M410 have been generated and cataloged. M404 retro armor remains pending because the generation turn reached its image cap after a moderated attempt. Interim review: M401–M405 and M407–M409 pass; M406 requires removal of real-world cross-like charm forms; M410 requires regeneration without generated channel labels. Final Batch 42 contact sheets will replace the partial review sheets after M404 is generated.

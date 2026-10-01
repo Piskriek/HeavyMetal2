@@ -1,6 +1,8 @@
 /**
  * ISLAND-ROUTE: every tile an island surface can wear. The 14 originals (`public/textures/island`), plus
- * whatever is dropped into `src/assets/island-textures/` — found at build time, no list to keep. A file
+ * whatever is dropped into `src/assets/island-textures/` — found at build time, no list to keep — plus
+ * the Basalt Isle library in `public/textures/island-lib/` (256 px WebP tiles built from the image
+ * agent's material sheets by the art pipeline, listed in `island-lib-index.generated.ts`). A file
  * named `<kind>-<anything>.jpg` (e.g. `grass-lush-meadow-03.jpg`) is offered first for the surfaces of
  * that kind; every tile is offered for every surface.
  *
@@ -12,7 +14,11 @@ import {
   SURFACE_GRANITE, SURFACE_MOSSY_ROCK, SURFACE_OLD_PLANKS, SURFACE_RIVETED_IRON, SURFACE_SAND, SURFACE_SHALLOWS,
   SURFACE_STRATA, SURFACE_WET_SAND,
 } from '../surface/surface-table';
+import { ISLAND_LIB } from './island-lib-index.generated';
 import { ISLAND_SURFACES, ISLAND_TEXTURE_DIR } from './island-surfaces';
+
+/** Where the library's tiles are served from. In `public/` on purpose: `src/assets` is inlined into the RUN single-file build. */
+export const ISLAND_LIB_DIR = '/textures/island-lib/';
 
 export interface LibraryTexture {
   /** Stable key saved with the ground: `original/<file>` or `library/<file>`. */
@@ -33,11 +39,11 @@ export const KINDS_FOR_SURFACE: Readonly<Record<number, readonly string[]>> = {
   [SURFACE_OLD_PLANKS]: ['planks', 'wood'],
   [SURFACE_RIVETED_IRON]: ['iron', 'metal'],
   [SURFACE_CRYSTAL]: ['crystal'],
-  [SURFACE_BEACH_GRASS]: ['grass'],
+  [SURFACE_BEACH_GRASS]: ['grass', 'forest'],
   [SURFACE_CORAL_SAND]: ['coral', 'sand'],
   [SURFACE_GRANITE]: ['cliff', 'rock'],
   [SURFACE_MOSSY_ROCK]: ['moss', 'rock'],
-  [SURFACE_DRY_MUD]: ['mud', 'path'],
+  [SURFACE_DRY_MUD]: ['mud', 'path', 'litter'],
   [SURFACE_DUNES]: ['dunes', 'sand'],
   [SURFACE_STRATA]: ['cliff', 'strata', 'rock'],
 };
@@ -62,13 +68,16 @@ const DROPPED: LibraryTexture[] = (() => {
   }).sort((a, b) => a.key.localeCompare(b.key));
 })();
 
+/** The Basalt Isle library (public/textures/island-lib): the name carries the sheet's id and says when a tile is provisional. */
+const LIB: LibraryTexture[] = ISLAND_LIB.map((e) => ({ key: `lib/${e.file}`, url: ISLAND_LIB_DIR + e.file, kind: e.kind, name: e.name }));
+
 /** The game's own ground textures (public/textures), usable on the island too. */
 const GAME: LibraryTexture[] = ([
   ['dirt.png', 'path'], ['grass.png', 'grass'], ['cliff.png', 'cliff'], ['caverock.png', 'rock'], ['cobble.png', 'path'],
   ['wood.png', 'planks'], ['iron.png', 'iron'], ['water.png', 'shallows'], ['lava.png', 'lava'], ['bark.png', 'bark'],
 ] as const).map(([file, kind]) => ({ key: `game/${file}`, url: `/textures/${file}`, kind, name: `${nameOf(file)} (game)` }));
 
-export const ISLAND_TEXTURE_LIBRARY: readonly LibraryTexture[] = Object.freeze([...ORIGINALS, ...DROPPED, ...GAME]);
+export const ISLAND_TEXTURE_LIBRARY: readonly LibraryTexture[] = Object.freeze([...ORIGINALS, ...DROPPED, ...LIB, ...GAME]);
 
 export const libraryTexture = (key: string | undefined) => (key ? ISLAND_TEXTURE_LIBRARY.find((t) => t.key === key) : undefined);
 

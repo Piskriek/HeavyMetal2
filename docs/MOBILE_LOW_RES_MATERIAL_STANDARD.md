@@ -61,3 +61,18 @@ A mobile material passes only when:
 - GPU cost and texture residency fit the active platform budget.
 
 High-resolution and mobile materials remain recursively linked presets. Editing the parent material may propagate broad palette and condition changes, but the mobile child keeps hand-authored frequency limits, masks and packing decisions.
+
+## Nostalgic PBR variants
+
+Nostalgic style presets are first-class material children, not post-process filters. They may use deliberate pixel clusters, limited palettes, ordered or hand-placed dithering, chunky painted shapes, hard texel transitions and era-inspired color ramps while retaining physically useful material channels.
+
+- BaseColor carries the nostalgic palette but no baked illumination or highlights.
+- Normal uses broad stepped forms; noisy modern microdetail is removed.
+- Roughness and Metallic remain materially plausible, though grouped into bold bands.
+- Alpha silhouettes must preserve intentional pixel steps through mip generation.
+- Emissive uses compact palette ramps without baked bloom.
+- Dither patterns must be evaluated under texture compression and at every target mip.
+- Point sampling is optional per preset; filtered and point-sampled variants share the same recursive parent.
+- Era-inspired presentation must not require unstable affine warping, shimmer or reduced gameplay readability.
+
+The planned nostalgic family covers early pixel-painted 3D, 16-bit dithered nature, fifth-generation console surfaces, colorful arcade racing, early-2000s glossy plastics, hand-painted fantasy materials, retro cel-banded Goblin skin, limited-palette effects and CRT-era condition overlays.

@@ -690,3 +690,20 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 ### Batch 38 — mobile weather and vehicle effects
 
 Snow cover, frost masks, wetness overlays, puddle atlas, mud splatter, fire atlas, spark atlas, electric-arc atlas, oil-spill decals and tire skid marks.
+
+### Batch 39 — nostalgic styles with modern PBR response
+
+A dedicated family of low-resolution nostalgic art directions that retain modern material behavior rather than baking lighting into color:
+
+- early 3D pixel-painted rock and terrain;
+- dithered 16-bit tropical ground and foliage;
+- late-1990s low-poly painted metal and vehicle panels;
+- chunky fifth-generation console wood, brick and concrete;
+- colorful arcade-racer asphalt and track markings;
+- early-2000s glossy plastic and translucent lens materials;
+- hand-painted fantasy leather and cloth;
+- retro cel-banded Goblin skin and creator overlays;
+- limited-palette emissive and boost effects;
+- CRT-era grime, scanline and color-fringe overlays.
+
+Each nostalgic preset still receives coordinated BaseColor, Normal, Roughness, Metallic/AO and optional Alpha/Emissive channels. Pixel grouping, palette limits, dithering and deliberate texel edges must survive mips; baked highlights and fixed illumination remain prohibited.

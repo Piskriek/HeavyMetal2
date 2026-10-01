@@ -748,8 +748,29 @@ All nostalgic presets keep coordinated material channels. Pixel grouping, dither
 
 Canonical codes and reconstruction recipes for M381–M390 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
 
+## Material Batch 41 — nostalgic architecture, weather, and world effects
+
+![Material Batch 41 nostalgic world-and-effects contact sheet](./review/material-batch-41-nostalgic-world-effects-contact-sheet.jpg)
+
+![Material Batch 41 BaseColor previews at 128 px](./review/material-batch-41-nostalgic-basecolor-128px-preview.png)
+
+| ID | Nostalgic PBR preset | Canonical use | Status and production note |
+|---|---|---|---|
+| M391 | Pixel corrugated roofing | Retro roofs and cladding | Pass. Excellent turquoise waves, orange rust islands and crisp metal/paint masks. |
+| M392 | Dithered limewashed plaster | Settlement walls and interiors | Pass. Strong ivory/aqua clouding, sparse pixels and broad feathered wear. |
+| M393 | Classic-console glazed tile | Service and domestic interiors | Pass. Excellent oversized tile grid, limited aqua/lime/tan palette and thick grout. |
+| M394 | Retro pixel tropical mud | Tidal ground and track edges | Pass. Strong olive/brown flow masses, dark pools and chunky drainage channels. |
+| M395 | Nostalgic pixel snow | Seasonal highland coverage | Pass. Excellent pale cyan drift bands, dirty melt edge and exposed-ground control. |
+| M396 | Chunky rain/wetness masks | Recursive weather condition | Pass. Strong connected runoff, thick streak groups and coordinated wetness/roughness masks. |
+| M397 | Limited-palette fire atlas | Fire and boost VFX | Pass. Excellent four-color flames, hard intensity bands and clean emissive alpha. |
+| M398 | Arcade oil and skid atlas | Track and vehicle-condition decals | Pass. Strong pools, twin skids, drift arcs and donut marks with point-sampled silhouettes. |
+| M399 | Wordless neon sign atlas | In-world racing signs and accents | Pass. Excellent arrows, rings, stars and crowns; runtime emission and bloom stay separate. |
+| M400 | Retro interface glass | Instruments and in-world displays | Pass. Strong teal-violet scan bands, chunky haze and modern transmission control. |
+
+Canonical codes and reconstruction recipes for M391–M400 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
+
 ## Next material batches
 
-### Batch 41 — nostalgic architecture, weather, and world effects
+### Batch 42 — nostalgic Goblin Creator wardrobe and accessories
 
-Pixel corrugated roofing, dithered plaster, classic tile, retro mud, pixel snow, chunky rain/wetness, limited-palette fire, arcade oil/skid decals, neon sign materials and retro interface glass.
+Pixel hair cards, dithered skin details, classic goggles, retro armor, hand-painted boots, chunky jewelry, arcade cloth patches, limited-palette cosmetics, creator grime overlays and palette-swap team kits.

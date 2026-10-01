@@ -1395,6 +1395,663 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 40"
+    },
+    {
+      "registryId": "M391",
+      "canonicalCode": "HM2-TXP-M391-BLD-METAL-TIL-BCNRMH-PXL3D-PX128-Q4-RST-P12-PT-R01",
+      "name": "Pixel corrugated roofing",
+      "sourceFile": "M391-nostalgic-pixel-corrugated-roof-pbr-sheet.png",
+      "domain": "BLD",
+      "material": "METAL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Metallic+Height guide"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "RST",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "retro roofing",
+        "settlement cladding"
+      ],
+      "prohibitedUses": [
+        "clean interior metal"
+      ],
+      "parentPreset": "M335",
+      "editableParameters": [
+        "palette",
+        "rust",
+        "wave scale"
+      ],
+      "recipe": {
+        "intent": "Pixel corrugated steel with modern paint and metal separation.",
+        "required": [
+          "turquoise waves",
+          "orange rust islands",
+          "dark troughs"
+        ],
+        "forbidden": [
+          "micro-pits",
+          "reflections",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M392",
+      "canonicalCode": "HM2-TXP-M392-BLD-PLASTER-TIL-BCNROH-D16-PX128-Q4-WRN-P10-PT-R01",
+      "name": "Dithered limewashed plaster",
+      "sourceFile": "M392-nostalgic-dithered-plaster-pbr-sheet.png",
+      "domain": "BLD",
+      "material": "PLASTER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "D16",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "retro walls",
+        "settlement interiors"
+      ],
+      "prohibitedUses": [
+        "exposed masonry"
+      ],
+      "parentPreset": "M236",
+      "editableParameters": [
+        "palette",
+        "damp amount",
+        "undercoat",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Dithered limewash with broad clouding and modern PBR.",
+        "required": [
+          "ivory field",
+          "aqua undercoat",
+          "olive damp patches"
+        ],
+        "forbidden": [
+          "micro-noise",
+          "baked light",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M393",
+      "canonicalCode": "HM2-TXP-M393-BLD-TILE-TIL-BCNROH-C5MAS-PX128-Q4-CLN-P12-PT-R01",
+      "name": "Classic-console glazed tile",
+      "sourceFile": "M393-nostalgic-classic-tile-pbr-sheet.png",
+      "domain": "BLD",
+      "material": "TILE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "C5MAS",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "1 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "retro wall tiles",
+        "service interiors"
+      ],
+      "prohibitedUses": [
+        "fine mosaic"
+      ],
+      "parentPreset": "M239",
+      "editableParameters": [
+        "tile palette",
+        "grid",
+        "grout width"
+      ],
+      "recipe": {
+        "intent": "Chunky glazed tiles with physically useful glaze and grout.",
+        "required": [
+          "oversized square tiles",
+          "thick grout",
+          "aqua lime tan palette"
+        ],
+        "forbidden": [
+          "tiny crazing",
+          "baked highlights",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M394",
+      "canonicalCode": "HM2-TXP-M394-ENV-MUD-TIL-BCNROH-PXL3D-PX128-Q4-WET-P10-PT-R01",
+      "name": "Retro pixel tropical mud",
+      "sourceFile": "M394-nostalgic-retro-mud-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "MUD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WET",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "retro tidal mud",
+        "wet track edges"
+      ],
+      "prohibitedUses": [
+        "dry sand"
+      ],
+      "parentPreset": "M332",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "channel width"
+      ],
+      "recipe": {
+        "intent": "Pixel mud with broad flow bands and wet-dry response.",
+        "required": [
+          "olive brown flow masses",
+          "dark pools",
+          "thick channels"
+        ],
+        "forbidden": [
+          "pinholes",
+          "microcracks",
+          "reflections",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M395",
+      "canonicalCode": "HM2-TXP-M395-ENV-SNOW-TIL-BCNROH-PXL3D-PX128-Q4-MIX-P10-PT-R01",
+      "name": "Nostalgic pixel snow cover",
+      "sourceFile": "M395-nostalgic-pixel-snow-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "SNOW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "seasonal snow cover",
+        "highland terrain"
+      ],
+      "prohibitedUses": [
+        "snow particles"
+      ],
+      "parentPreset": "M361",
+      "editableParameters": [
+        "palette",
+        "coverage",
+        "melt edge"
+      ],
+      "recipe": {
+        "intent": "Pixel snow drifts with seasonal coverage control.",
+        "required": [
+          "off-white cyan drifts",
+          "dirty melt edges",
+          "exposed ground"
+        ],
+        "forbidden": [
+          "crystals",
+          "sparkles",
+          "footprints",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M396",
+      "canonicalCode": "HM2-TXP-M396-ENV-WET-MSK-BCNRAD-D16-PX128-Q4-WET-P08-PT-R01",
+      "name": "Chunky rain and wetness masks",
+      "sourceFile": "M396-nostalgic-chunky-rain-wetness-mask-sheet.png",
+      "domain": "ENV",
+      "material": "WET",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "condition Color reference",
+        "topRight": "Normal+Distortion guide",
+        "bottomLeft": "Roughness mask",
+        "bottomRight": "Wetness Alpha mask"
+      },
+      "style": "D16",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WET",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "rain condition",
+        "recursive wetness overlay"
+      ],
+      "prohibitedUses": [
+        "standalone opaque material"
+      ],
+      "parentPreset": "M363",
+      "editableParameters": [
+        "coverage",
+        "streak direction",
+        "roughness shift"
+      ],
+      "recipe": {
+        "intent": "Dithered rain runoff and unified wetness masks.",
+        "required": [
+          "connected wet islands",
+          "thick runoff",
+          "shared coordinates"
+        ],
+        "forbidden": [
+          "tiny droplets",
+          "reflections",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M397",
+      "canonicalCode": "HM2-TXP-M397-VFX-FIRE-ATL-BCNRAE-LPFX-PX256-AT16-CLN-P04-PT-R01",
+      "name": "Limited-palette nostalgic fire",
+      "sourceFile": "M397-nostalgic-limited-fire-fx-sheet.png",
+      "domain": "VFX",
+      "material": "FIRE",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "unlit Color",
+        "topRight": "Normal+Distortion guide",
+        "bottomLeft": "Roughness+Intensity guide",
+        "bottomRight": "Alpha+Emissive mask"
+      },
+      "style": "LPFX",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P04",
+        "maximumColors": 4
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "effect dependent",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "fire cards",
+        "boost flames"
+      ],
+      "prohibitedUses": [
+        "smoke atlas"
+      ],
+      "parentPreset": "M366",
+      "editableParameters": [
+        "palette",
+        "frame",
+        "intensity"
+      ],
+      "recipe": {
+        "intent": "Four-color point-sampled fire with runtime emissive.",
+        "required": [
+          "red orange yellow cream",
+          "thick flames",
+          "hard intensity bands"
+        ],
+        "forbidden": [
+          "bloom",
+          "tiny tongues",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M398",
+      "canonicalCode": "HM2-TXP-M398-VEH-OILSKID-ATL-BCNRA-PXL3D-PX256-AT16-WRN-P10-PT-R01",
+      "name": "Arcade oil and skid decals",
+      "sourceFile": "M398-nostalgic-arcade-oil-skid-alpha-pbr-sheet.png",
+      "domain": "VEH",
+      "material": "OILSKID",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Alpha"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "track relative",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "oil spills",
+        "skid decals",
+        "burnout marks"
+      ],
+      "prohibitedUses": [
+        "rainbow oil"
+      ],
+      "parentPreset": "M369",
+      "editableParameters": [
+        "mark choice",
+        "scale",
+        "freshness"
+      ],
+      "recipe": {
+        "intent": "Pixel oil pools and racing skid marks with clean alpha.",
+        "required": [
+          "oil pools",
+          "twin skids",
+          "drift curves",
+          "donut arcs"
+        ],
+        "forbidden": [
+          "tiny droplets",
+          "thin streaks",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M399",
+      "canonicalCode": "HM2-TXP-M399-VFX-NEON-ATL-BCNRAE-Y2K-PX256-AT16-CLN-P06-PT-R01",
+      "name": "Nostalgic neon sign elements",
+      "sourceFile": "M399-nostalgic-neon-sign-material-atlas.png",
+      "domain": "VFX",
+      "material": "NEON",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "unlit Color",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness+Intensity guide",
+        "bottomRight": "Alpha+Emissive mask"
+      },
+      "style": "Y2K",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "sign relative",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "in-world signs",
+        "racing accents"
+      ],
+      "prohibitedUses": [
+        "written signage"
+      ],
+      "parentPreset": "M379",
+      "editableParameters": [
+        "palette",
+        "symbol",
+        "intensity"
+      ],
+      "recipe": {
+        "intent": "Wordless arcade neon tubes with runtime emission.",
+        "required": [
+          "arrows rings stars crowns",
+          "six colors",
+          "thick tubes"
+        ],
+        "forbidden": [
+          "letters",
+          "numbers",
+          "baked glow",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
+    },
+    {
+      "registryId": "M400",
+      "canonicalCode": "HM2-TXP-M400-UI-GLASS-TIL-BCNRHT-CRT-PX128-Q4-WRN-P10-PT-R01",
+      "name": "Retro interface glass",
+      "sourceFile": "M400-nostalgic-retro-interface-glass-pbr-sheet.png",
+      "domain": "UI",
+      "material": "GLASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor+transmission tint",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "Transmission+Height guide"
+      },
+      "style": "CRT",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "screen relative",
+      "mipPolicy": "Preserve deliberate pixel clusters, palette limits, and features wider than two target texels.",
+      "intendedUses": [
+        "instrument glass",
+        "in-world displays"
+      ],
+      "prohibitedUses": [
+        "mandatory full-interface filter"
+      ],
+      "parentPreset": "M380",
+      "editableParameters": [
+        "tint",
+        "scan bands",
+        "haze",
+        "transmission"
+      ],
+      "recipe": {
+        "intent": "Retro teal-violet screen glass with selective CRT character.",
+        "required": [
+          "broad scan bands",
+          "chunky wipe",
+          "color fringe"
+        ],
+        "forbidden": [
+          "UI content",
+          "tiny static",
+          "reflections",
+          "labels"
+        ],
+        "frequency": "primary features survive the declared fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 41"
     }
   ]
 }

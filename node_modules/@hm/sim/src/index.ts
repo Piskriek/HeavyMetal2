@@ -1,9 +1,10 @@
 import type { SimExports } from '@hm/contracts';
+import { createRecorder, createSimulation, runReplay } from './simulation';
+import { createRng } from './rng';
+import { createWorld } from './world';
 
-const todo = (what: string): never => { throw new Error(`@hm/sim: ${what} is not implemented yet (task T3)`); };
+export { createRng, createWorld, createSimulation, runReplay, createRecorder };
+export { createEntityVariableProvider } from './entity-vars';
 
-export const createRng: SimExports['createRng'] = () => todo('createRng');
-export const createWorld: SimExports['createWorld'] = () => todo('createWorld');
-export const createSimulation: SimExports['createSimulation'] = () => todo('createSimulation');
-export const runReplay: SimExports['runReplay'] = () => todo('runReplay');
-export const createRecorder: SimExports['createRecorder'] = () => todo('createRecorder');
+/** Compile-time proof that the exports match the contract. */
+export const _contractCheck: SimExports = { createRng, createWorld, createSimulation, runReplay, createRecorder };

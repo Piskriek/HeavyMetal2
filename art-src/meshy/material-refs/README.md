@@ -556,8 +556,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M289 | Pumice gravel | Volcanic shoreline and lightweight gravel carpets | Pass. Excellent vesicular chunks, broad value variation and packed ground read. |
 | M290 | Tar-ball beach residue | Pollution patches and contact-condition decals | Pass. Strong varied lumps and smears, sand-crusted edges and clean rearrangeable alpha. |
 
+## Material Batch 31 — tropical vegetation surfaces and carpets
+
+![Material Batch 31 tropical-vegetation contact sheet](./review/material-batch-31-tropical-vegetation-contact-sheet.jpg)
+
+| ID | Vegetation material | Use | Status and production note |
+|---|---|---|---|
+| M291 | Palm trunk | Palm trunks, posts and wrapped cylindrical geometry | Pass. Strong horizontal scar bands, dry fibers and deep LOD-readable relief. |
+| M292 | Mangrove bark | Mangrove trunks, prop roots and wetland timber | Pass. Excellent broad corky plates, salt bleaching, algae and wet recesses. |
+| M293 | Tropical hardwood bark | Mature jungle trees and rugged timber | Pass. Strong reddish plates, charcoal fissures and restrained pale lichen. |
+| M294 | Banana pseudostem | Banana plants and lush stem clusters | Pass. Excellent layered green sheaths, wax response, bruising and vertical overlap. |
+| M295 | Broadleaf foliage atlas | Canopy, shrubs and modular foliage cards | Pass. Strong varied leaf silhouettes, clean alpha and useful normal/roughness separation. |
+| M296 | Tropical fern atlas | Understory and damp transition foliage | Pass. Excellent varied fronds and chunky clusters with distance-readable leaflets. |
+| M297 | Jungle vine atlas | Climbers, hanging growth and modular tendrils | Pass. Strong loops, forks, leafy clusters and clean modular silhouettes. |
+| M298 | Dry leaf litter | Dry forest-floor carpets and debris | **Weak—regenerate.** Dense layered leaf result is useful, but generated channel labels violate the clean-sheet standard. |
+| M299 | Wet leaf litter | Damp jungle-floor carpets and recovery states | Pass. Strong compressed dark leaves, decay edges and low wet relief. |
+| M300 | Tropical moss carpet | Damp stone, roots and shaded ground | Pass. Excellent packed cushion forms, varied greens and LOD-readable soft depth. |
+
 ## Next material batches
 
-### Batch 31 — tropical vegetation surfaces and carpets
+### Batch 32 — tropical canopy and understory kits
 
-Palm trunk, mangrove bark, tropical hardwood bark, banana pseudostem, broadleaf foliage atlas, fern atlas, vine atlas, dry leaf litter, wet leaf litter and moss carpet.
+Palm frond atlas, banana-leaf atlas, tropical grass clumps, wetland reeds, mangrove seedlings, flowering groundcover, jungle fungi, exposed root atlas, epiphyte clusters and dead branch/debris atlas.

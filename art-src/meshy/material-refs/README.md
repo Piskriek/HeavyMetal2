@@ -819,8 +819,29 @@ Canonical codes and reconstruction records for M411–M420 are registered in [`t
 
 M412–M417 and M419–M420 now pass after regeneration. Cardboard reads as pressed paper; all sheets are square and unlabeled; bottle glass has complete coordinated channels; awning cloth and rope retain clean material separation; the market atlas uses large padded symbols; and the light family now provides matched Normal, Roughness and Alpha/Emissive quadrants. Their canonical recipe revisions advanced from `R01` to `R02`. M411 and M418 remain the approved unchanged anchors.
 
+## Material Batch 45 — nostalgic tracks, transitions, and recovery
+
+![Material Batch 45 contact sheet](./review/material-batch-45-nostalgic-transitions-contact-sheet.jpg)
+
+![Material Batch 45 BaseColor previews](./review/material-batch-45-basecolor-128px-preview.png)
+
+| ID | Preset | Review |
+|---|---|---|
+| M421 | Corrected pixel asphalt | Pass. Continuous dark road mass, broad racing line and sparse thick cracking. |
+| M422 | Dithered road shoulder | Pass. Strong dirt/asphalt/grass hierarchy and readable edge transition. |
+| M423 | Retro terrain transition | Pass. Excellent irregular jungle-to-rock signed boundary and coordinated channels. |
+| M424 | Water-edge transition | Pass. Excellent sand, wet band, foam and water signed masks. |
+| M425 | Weather accumulation | Pass with constraint. Broad masks are useful; derive all production channels from the authoritative grayscale field. |
+| M426 | Impact dissolve atlas | Pass. Strong rigid, brittle, soft and granular removal silhouettes. |
+| M427 | Support-loss collapse masks | **Regenerate.** Returned as concept diagrams rather than coordinated channel quadrants. |
+| M428 | Recovery-stage overlays | **Regenerate.** Returned as a tiled beauty collection rather than matched channels. |
+| M429 | Track-prop atlas | **Regenerate.** Attractive prop family, but lacks coordinated PBR quadrants. |
+| M430 | Landscape signs | Pass. Strong wordless route, bridge, water, cliff, repair and hazard emblems. |
+
+Canonical codes and reconstruction records for M421–M430 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
+
 ## Next material batches
 
-### Batch 45 — nostalgic tracks, landscape transitions, and recovery
+### Batch 46 — correction and regeneration pass
 
-Pixel asphalt correction, dithered road shoulders, retro terrain transitions, water-edge blend masks, chunky weather accumulation, impact dissolve masks, support-loss collapse masks, recovery-stage overlays, nostalgic track props and low-resolution landscape signage.
+Regenerate M427–M429 with strict coordinated channels, then correct earlier mobile weaknesses M351 asphalt, M361 snow, M362 frost and M363 wetness. Preserve canonical IDs and advance recipe revisions.

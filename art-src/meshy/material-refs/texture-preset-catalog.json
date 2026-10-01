@@ -3318,6 +3318,638 @@
       "status": "pass",
       "recipeRevision": 2,
       "provenance": "Material Batch 44 regeneration"
+    },
+    {
+      "registryId": "M421",
+      "canonicalCode": "HM2-TXP-M421-ENV-TRACK-TIL-BCNROH-PXL3D-PX256-Q4-WRN-P10-PT-R01",
+      "name": "nostalgic corrected asphalt pbr sheet",
+      "sourceFile": "M421-nostalgic-corrected-asphalt-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M351",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M422",
+      "canonicalCode": "HM2-TXP-M422-ENV-GROUND-TIL-BCNROH-D16-PX256-Q4-MIX-P12-PT-R01",
+      "name": "nostalgic road shoulder pbr sheet",
+      "sourceFile": "M422-nostalgic-road-shoulder-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GROUND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "D16",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M372",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M423",
+      "canonicalCode": "HM2-TXP-M423-ENV-GROUND-TRN-BCNRA-PXL3D-PX256-Q4-MIX-P12-PT-R01",
+      "name": "nostalgic terrain transition mask sheet",
+      "sourceFile": "M423-nostalgic-terrain-transition-mask-sheet.png",
+      "domain": "ENV",
+      "material": "GROUND",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M141",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M424",
+      "canonicalCode": "HM2-TXP-M424-ENV-WATER-TRN-BCNRA-D16-PX256-Q4-WET-P10-PT-R01",
+      "name": "nostalgic water edge transition mask sheet",
+      "sourceFile": "M424-nostalgic-water-edge-transition-mask-sheet.png",
+      "domain": "ENV",
+      "material": "WATER",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "D16",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "WET",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M382",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M425",
+      "canonicalCode": "HM2-TXP-M425-ENV-WEATHER-MSK-BCNRA-PXL3D-PX256-Q4-MIX-P10-PT-R01",
+      "name": "nostalgic weather accumulation mask sheet",
+      "sourceFile": "M425-nostalgic-weather-accumulation-mask-sheet.png",
+      "domain": "ENV",
+      "material": "WEATHER",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M396",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M426",
+      "canonicalCode": "HM2-TXP-M426-GEN-DISSOLVE-ATL-BCNRA-PXL3D-PX256-AT16-MIX-P10-PT-R01",
+      "name": "nostalgic impact dissolve mask sheet",
+      "sourceFile": "M426-nostalgic-impact-dissolve-mask-sheet.png",
+      "domain": "GEN",
+      "material": "DISSOLVE",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "MIX",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M359",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M427",
+      "canonicalCode": "HM2-TXP-M427-GEN-SUPPORT-ATL-BCNRA-PXL3D-PX256-AT16-BRN-P10-PT-R01",
+      "name": "nostalgic support collapse mask sheet",
+      "sourceFile": "M427-nostalgic-support-collapse-mask-sheet.png",
+      "domain": "GEN",
+      "material": "SUPPORT",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "BRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M359",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M428",
+      "canonicalCode": "HM2-TXP-M428-ENV-RECOVERY-ATL-BCNRA-PXL3D-PX256-AT16-MIX-P10-PT-R01",
+      "name": "nostalgic recovery stage overlay sheet",
+      "sourceFile": "M428-nostalgic-recovery-stage-overlay-sheet.png",
+      "domain": "ENV",
+      "material": "RECOVERY",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "MIX",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M170",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M429",
+      "canonicalCode": "HM2-TXP-M429-ENV-TRACKPROP-ATL-BCNRA-ARCRAC-PX256-AT16-WRN-P12-PT-R01",
+      "name": "nostalgic track prop material atlas",
+      "sourceFile": "M429-nostalgic-track-prop-material-atlas.png",
+      "domain": "ENV",
+      "material": "TRACKPROP",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "ARCRAC",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M352",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M430",
+      "canonicalCode": "HM2-TXP-M430-ENV-SIGN-ATL-BCNRA-PXL3D-PX256-AT16-CLN-P06-PT-R01",
+      "name": "nostalgic landscape sign alpha pbr sheet",
+      "sourceFile": "M430-nostalgic-landscape-sign-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "SIGN",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or response guide",
+        "bottomRight": "Alpha or authoritative mask"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "world or preset relative",
+      "mipPolicy": "Preserve broad signed fields and chunky silhouettes.",
+      "intendedUses": [
+        "nostalgic track landscape and recovery systems"
+      ],
+      "prohibitedUses": [
+        "unreviewed alternate use"
+      ],
+      "parentPreset": "M418",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition",
+        "mask threshold"
+      ],
+      "recipe": {
+        "intent": "Nostalgic world-system preset with coordinated runtime masks.",
+        "required": [
+          "broad readable forms",
+          "shared channel coordinates"
+        ],
+        "forbidden": [
+          "labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive PX128 fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 45"
     }
   ]
 }

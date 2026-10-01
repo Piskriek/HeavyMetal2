@@ -216,7 +216,7 @@ test('expressions: a stored {expr} param is evaluated on read and sums several p
   const { store, vars } = setup();
   const a = store.put({ kind: 'racer', name: 'A', params: { weight: 3 } });
   const b = store.put({ kind: 'racer', name: 'B', params: { bounce: 4 } });
-  const c = store.put({ kind: 'racer', name: 'C', params: { weight: { expr: `sum:$${a.id}.weight:$${b.id}.bounce` } } });
+  const c = store.put({ kind: 'racer', name: 'C', params: { weight: { expr: `sum: $${a.id}.weight $${b.id}.bounce` } } });
   assert.equal(vars.read(`${c.id}.weight`), 7);
   vars.write(`${a.id}.weight`, 10);
   assert.equal(vars.read(`${c.id}.weight`), 14, 'the stored expression is live');

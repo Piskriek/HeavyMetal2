@@ -704,21 +704,29 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 | M369 | Oil-spill atlas | Mobile decal atlas, `256 × 256` | Pass. Excellent pools, rings and drags with restrained amber and contaminated-green variation. |
 | M370 | Tire-skid atlas | Mobile decal atlas, `256 × 256` | Pass. Strong braking bars, drift curves, donut arcs and burnout patches for racing-camera distance. |
 
+## Material Batch 39 — nostalgic styles with modern PBR response
+
+![Material Batch 39 nostalgic-PBR contact sheet](./review/material-batch-39-nostalgic-pbr-contact-sheet.jpg)
+
+![Material Batch 39 BaseColor previews at 128 px](./review/material-batch-39-nostalgic-basecolor-128px-preview.png)
+
+| ID | Nostalgic PBR style | Intended presentation | Status and production note |
+|---|---|---|---|
+| M371 | Early-3D pixel-painted rock | Fifth-generation terrain | Pass. Excellent stepped planes, hand-dithered transitions and classic limited stone/moss palette. |
+| M372 | Dithered 16-bit jungle ground | Top-down and oblique tropical terrain | Pass. Strong sprite-like foliage masses, deliberate pixels and readable soil paths with coordinated PBR depth. |
+| M373 | Late-1990s vehicle metal | Low-poly arcade vehicle panels | Pass. Excellent acid-green/teal panel blocks, orange trim and chunky damage without baked reflection. |
+| M374 | Classic-console masonry | Settlement walls and ruins | Pass. Strong oversized brick/stone bond, limited palette and thick readable mortar. |
+| M375 | Turn-of-the-millennium arcade track | Racing surfaces and trim | Pass with identity constraint. Excellent vertical color scars and wear; use as expressive arcade track/panel surfacing rather than neutral asphalt. |
+| M376 | Y2K translucent plastic | Lenses, accessories and interface props | Pass. Excellent cyan, aqua and violet geometric bands with clean roughness/transmission regions. |
+| M377 | Hand-painted fantasy leather | Goblin clothing, seats and equipment | Pass. Strong painterly brown folds and broad wear that still drive modern roughness and normal response. |
+| M378 | Retro cel-banded Goblin skin | Creator skin-style preset | Pass. Excellent deliberate pixels, olive/lime bands and restrained violet accents without fixed lighting. |
+| M379 | Limited-palette effects atlas | Fire, sparks, boosts and electric effects | Pass. Strong point-sampled silhouettes, hard palette steps and clean alpha/emissive masks. |
+| M380 | CRT-era overlay atlas | Displays, previews and selective world screens | Pass. Excellent scan bands, phosphor blocks, color fringe and wipe/static patches; never apply as a mandatory full-interface filter. |
+
+All nostalgic presets keep coordinated material channels. Pixel grouping, dithering, palette limits and deliberate texel edges must survive mip generation; baked highlights and fixed illumination remain prohibited.
+
 ## Next material batches
 
-### Batch 39 — nostalgic styles with modern PBR response
+### Batch 40 — nostalgic PBR environment and vehicle expansion
 
-A dedicated family of low-resolution nostalgic art directions that retain modern material behavior rather than baking lighting into color:
-
-- early 3D pixel-painted rock and terrain;
-- dithered 16-bit tropical ground and foliage;
-- late-1990s low-poly painted metal and vehicle panels;
-- chunky fifth-generation console wood, brick and concrete;
-- colorful arcade-racer asphalt and track markings;
-- early-2000s glossy plastic and translucent lens materials;
-- hand-painted fantasy leather and cloth;
-- retro cel-banded Goblin skin and creator overlays;
-- limited-palette emissive and boost effects;
-- CRT-era grime, scanline and color-fringe overlays.
-
-Each nostalgic preset still receives coordinated BaseColor, Normal, Roughness, Metallic/AO and optional Alpha/Emissive channels. Pixel grouping, palette limits, dithering and deliberate texel edges must survive mips; baked highlights and fixed illumination remain prohibited.
+Pixel-painted sand, dithered water, sprite foliage atlas, low-poly timber, retro rusted steel, chunky tire rubber, pixel lens glass, hand-painted racing cloth, nostalgic smoke/dust effects and palette-swap Goblin markings.

@@ -892,9 +892,22 @@ M432, M433 and M437 pass after strict regeneration from shared authoritative fie
 
 All surfaces remain free of baked sport markings so multiple rule presets can reuse them. Canonical `SPT` records are registered for M441–M450.
 
+## Material Batch 50 — detachable global sports rule masks
+
+![Material Batch 50 contact sheet](./review/material-batch-50-global-sports-rule-mask-contact-sheet.jpg)
+
+| IDs | Coverage | Review |
+|---|---|---|
+| M451–M453 | Association football, configurable rugby, cricket pitch/creases | M451–M452 pass; M453 constrained pass pending authoritative dimensional reconstruction. |
+| M454–M456 | Field hockey, tennis, badminton | Regenerate: M454 contains generated labels; M455–M456 do not expose the complete four-channel mask contract. |
+| M457–M458 | Basketball and netball | M457 passes; regenerate M458 with the complete mask contract. |
+| M459–M460 | Volleyball/handball/futsal modular kit and athletics | Pass as derivation references. |
+
+These kits separate semantic line geometry, zone fills, paint breakup and distance-field treatment from the playing surface. Production reconstruction must use authoritative rule dimensions rather than tracing generated pixels. Canonical `SPT` records are registered for M451–M460.
+
 ## Next material batches
 
-### Batches 50–51 — global sports preset foundations
+### Batch 51 — global sports objects, structures and style variants
 
 Complete sports textures in all three established styles: full-fidelity PBR, mobile low-resolution PBR and nostalgic PBR. Continue with:
 

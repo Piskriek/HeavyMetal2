@@ -5480,6 +5480,626 @@
       "status": "pass",
       "recipeRevision": 2,
       "provenance": "Material Batch 49 final regeneration"
+    },
+    {
+      "registryId": "M451",
+      "canonicalCode": "HM2-TXP-M451-SPT-FOOT-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports association-football rule mask kit",
+      "sourceFile": "M451-sports-association-football-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "FOOT",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M452",
+      "canonicalCode": "HM2-TXP-M452-SPT-RUGBY-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports rugby rule mask kit",
+      "sourceFile": "M452-sports-rugby-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "RUGBY",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M453",
+      "canonicalCode": "HM2-TXP-M453-SPT-CRICKET-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports cricket-pitch rule mask kit",
+      "sourceFile": "M453-sports-cricket-pitch-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "CRICKET",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M454",
+      "canonicalCode": "HM2-TXP-M454-SPT-HOCKEY-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports field-hockey rule mask kit",
+      "sourceFile": "M454-sports-field-hockey-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "HOCKEY",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M455",
+      "canonicalCode": "HM2-TXP-M455-SPT-TENNIS-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports tennis rule mask kit",
+      "sourceFile": "M455-sports-tennis-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "TENNIS",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M456",
+      "canonicalCode": "HM2-TXP-M456-SPT-BADM-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports badminton rule mask kit",
+      "sourceFile": "M456-sports-badminton-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "BADM",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M457",
+      "canonicalCode": "HM2-TXP-M457-SPT-BASKET-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports basketball rule mask kit",
+      "sourceFile": "M457-sports-basketball-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "BASKET",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M458",
+      "canonicalCode": "HM2-TXP-M458-SPT-NETBALL-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports netball rule mask kit",
+      "sourceFile": "M458-sports-netball-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "NETBALL",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M459",
+      "canonicalCode": "HM2-TXP-M459-SPT-MULTI-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports volleyball-handball-futsal rule mask kit",
+      "sourceFile": "M459-sports-volleyball-handball-futsal-mask-kit.png",
+      "domain": "SPT",
+      "material": "MULTI",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
+    },
+    {
+      "registryId": "M460",
+      "canonicalCode": "HM2-TXP-M460-SPT-ATHLET-MSK-A-NAT-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "sports athletics rule mask kit",
+      "sourceFile": "M460-sports-athletics-rule-mask-kit.png",
+      "domain": "SPT",
+      "material": "ATHLET",
+      "form": "MSK",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "LineMask",
+        "topRight": "ZoneMask",
+        "bottomLeft": "WearMask",
+        "bottomRight": "SignedDistanceField"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "normalized regulation playing area",
+      "mipPolicy": "Preserve primary boundaries before subsidiary marks.",
+      "intendedUses": [
+        "detachable brand-neutral sports rules and zones"
+      ],
+      "prohibitedUses": [
+        "baking markings into playing surfaces",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "line width",
+        "line color",
+        "rule variant",
+        "wear",
+        "zone visibility"
+      ],
+      "recipe": {
+        "intent": "Detachable sport rule geometry independent of surface material.",
+        "required": [
+          "semantic line geometry",
+          "surface-independent masks"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked surface color"
+        ],
+        "frequency": "primary boundaries survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 50"
     }
   ]
 }

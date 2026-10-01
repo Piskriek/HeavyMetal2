@@ -607,8 +607,29 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M319 | Tooth and horn staining | Teeth, tusks and horn condition | **Weak—regenerate.** Attractive color response, but the atlas became complete tooth/horn shapes rather than stain-only overlays. |
 | M320 | Face grime overlays | Dust, grease, paint and goggle-contact condition | Pass with placement constraint. Strong smears and goggle bands; treat the face-like preview only as placement guidance, never a fixed face texture. |
 
+## Material Batch 34 — mobile and low-resolution core materials
+
+![Material Batch 34 mobile contact sheet](./review/material-batch-34-mobile-low-res-contact-sheet.jpg)
+
+![Material Batch 34 BaseColor previews at 128 px](./review/material-batch-34-mobile-basecolor-128px-preview.png)
+
+| ID | Mobile material | Intended tier | Status and production note |
+|---|---|---|---|
+| M321 | Packed dirt | Mobile standard, `128 × 128` | Pass. Five-color macro grouping, broad wear and sparse pebble clusters remain legible at 128 px. |
+| M322 | Chunky tropical rock | Mobile standard, `128 × 128` | Pass. Excellent large planes, thick fissures and restrained moss/mineral accents. |
+| M323 | Tropical bark | Mobile rectangular, `128 × 256` | Pass. Strong vertical plates, broad grooves and clear dry/damp grouping for low-poly trunks. |
+| M324 | Worn racing paint | Mobile standard, `128 × 128` | Pass. Bold acid-green identity, large exposed-metal islands and simple condition masks. |
+| M325 | Rough timber | Mobile rectangular, `128 × 256` | Pass. Excellent exaggerated grain flow, pale wear and turquoise transfer without micro-noise. |
+| M326 | Ribbed rubber | Mobile standard, `128 × 128` | Pass. Thick stable ribs and large contact-polish bands survive aggressive mip reduction. |
+| M327 | Heavy canvas | Mobile standard, `128 × 128` | Pass. Oversized weave and broad abrasion read clearly without relying on fine fibers. |
+| M328 | Goblin skin base | Mobile hero, `256 × 256` | Pass. Six-color soft mottling and broad pores preserve appealing skin identity at low resolution. |
+| M329 | Tropical foliage atlas | Mobile atlas, `256 × 256` | Pass. Thick silhouettes, simple veins, generous padding and no fragile internal holes. |
+| M330 | Goblin racing-mark atlas | Mobile atlas, `256 × 256` | Pass. Excellent bold symbols and paint marks with no thin lines, words or tiny splatter. |
+
+Authoring, packing, mip, alpha, fallback and validation requirements are defined in [`docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md`](../../../docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md).
+
 ## Next material batches
 
-### Batch 34 — Goblin Creator hair and wardrobe materials
+### Batch 35 — mobile architecture, weather, and character expansion
 
-Dyed hair cards, shaved-scalp stubble, braided hair, synthetic fur, suede, technical mesh, reflective racing fabric, elastic ribbing, translucent raincoat polymer and patch/stitch atlas.
+Mobile sand, tidal mud, rough concrete, fired brick, corrugated roofing, scratched glass, weathered leather, broad rust, water/foam masks and packed leaf litter.

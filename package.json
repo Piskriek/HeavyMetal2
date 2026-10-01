@@ -21,6 +21,7 @@
     "check:ui": "npm run build && node tests/ui-frame-check.mjs",
     "art:textures": "node scripts/generate-stylized-track-textures.mjs",
     "check:textures": "node scripts/generate-stylized-track-textures.mjs --check",
+    "check:texture-presets": "node scripts/validate-texture-preset-catalog.mjs",
     "balance:art": "node scripts/balance-asset-color.mjs",
     "seamless:sky": "node scripts/make-skybox-seamless.mjs",
     "check:parity-fixture": "node scripts/build-parity-fixture.mjs --check",

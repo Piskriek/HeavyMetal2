@@ -2,6 +2,8 @@
 
 These sheets establish material breakup, color range, weathering scale, and channel intent for the high-fidelity island kit. They are **derivation references**, not engine-ready textures.
 
+> **AI and automation checkout requirement:** before interpreting any image in this directory, read [`AI_TEXTURE_PRESET_GUIDE.md`](./AI_TEXTURE_PRESET_GUIDE.md), resolve its `M###` ID in [`texture-preset-catalog.json`](./texture-preset-catalog.json), and follow [`docs/TEXTURE_PRESET_NAMING_STANDARD.md`](../../../docs/TEXTURE_PRESET_NAMING_STANDARD.md). M371 onward requires a validated canonical preset code and reconstruction recipe.
+
 ![Material Batch 01 contact sheet](./review/material-batch-01-contact-sheet.jpg)
 
 ## Four-square convention

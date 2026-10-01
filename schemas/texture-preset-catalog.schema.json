@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://heavymetal2.local/schemas/texture-preset-catalog.schema.json",
+  "title": "HeavyMetal2 Texture Preset Catalog",
+  "type": "object",
+  "required": ["schemaVersion", "project", "kind", "coverage", "presets"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "minimum": 1},
+    "project": {"const": "HeavyMetal2"},
+    "kind": {"const": "texture-preset-catalog"},
+    "coverage": {
+      "type": "object",
+      "required": ["catalogedFrom", "legacyRange", "newRecordsMandatoryFrom"]
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "registryId", "canonicalCode", "name", "sourceFile", "domain", "material", "form",
+          "channels", "channelLayout", "style", "targetTier", "fallbackTier", "layout", "condition",
+          "palette", "sampling", "wrap", "physicalScale", "mipPolicy", "intendedUses", "prohibitedUses",
+          "parentPreset", "editableParameters", "recipe", "status", "recipeRevision", "provenance"
+        ],
+        "properties": {
+          "registryId": {"type": "string", "pattern": "^M[0-9]{3,}$"},
+          "canonicalCode": {"type": "string", "pattern": "^HM2-TXP-M[0-9]{3,}-[A-Z0-9]+-[A-Z0-9]+-(TIL|ATL|MSK|DEC|TRN)-[A-Z]+-[A-Z0-9]+-PX(64|128|256|512|1K|2K)-(Q4|AT[0-9]+|SET)-[A-Z]+-P(FULL|[0-9]{2})-(PT|BL|TR)-R[0-9]{2}$"},
+          "sourceFile": {"type": "string", "pattern": "^M[0-9]{3,}-.*\\.(png|jpg|jpeg|webp)$"},
+          "channels": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+          "palette": {
+            "type": "object",
+            "required": ["token", "maximumColors"],
+            "properties": {
+              "token": {"type": "string", "pattern": "^P(FULL|[0-9]{2})$"},
+              "maximumColors": {"type": ["integer", "null"], "minimum": 1}
+            }
+          },
+          "sampling": {"enum": ["PT", "BL", "TR"]},
+          "wrap": {"enum": ["repeat", "clamp", "mirror"]},
+          "recipe": {
+            "type": "object",
+            "required": ["intent", "required", "forbidden", "frequency"]
+          },
+          "recipeRevision": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}

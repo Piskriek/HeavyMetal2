@@ -192,7 +192,7 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M075 | Patchwork farmland | `512 × 512 m` | Pass. Strong field boundaries, crop variation and shallow drainage suitable for grand vistas. |
 | M076 | Terraced hills | `512 × 512 m` | Pass. Excellent contour rhythm and broad stepped height language; randomize rotation with care. |
 | M077 | Alpine mountain ridges | `1 × 1 km` | Pass. Strong watershed structure, branching valleys and usable displacement guide. |
-| M078 | Volcanic mountain field | `1 × 1 km` | **Weak—regenerate.** Square and text-free, but radial mountain flow still creates an obvious starburst center. |
+| M078 | Volcanic mountain field | `1 × 1 km` | **Weak—regenerate.** Second square pass still has an obvious radial/starburst mountain center. |
 | M079 | Temperate forest canopy | `512 × 512 m` | Pass. Broad clustered crown masses read from satellite distance without micro-tree noise. |
 | M080 | Tropical jungle canopy | `512 × 512 m` | Pass after regeneration. Dense text-free canopy with broad height hierarchy. |
 | M081 | Meandering river valley | `1 × 1 km` | Pass. Clear river/floodplain/upland hierarchy and useful flow/height masks. |
@@ -225,7 +225,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 
 | ID | Macro landscape | Nominal coverage | Status and production note |
 |---|---|---:|---|
-| M094 | City blocks | `1 × 1 km` | **Weak—regenerate.** Replacement returned at `1408×768`, so the fixed square channel layout is invalid. |
+| M094 | City blocks | `1 × 1 km` | Pass after regeneration. Square text-free city blocks with distributed hierarchy and no radial monument. |
 | M095 | Industrial yard | `1 × 1 km` | Pass after regeneration. Text-free industrial zoning and broad height hierarchy. |
 | M096 | Rural village pattern | `512 × 512 m` | Pass after ingestion regeneration. Text-free settlement pattern with broad height hierarchy. |
 | M097 | Regional road network | `1 × 1 km` | Pass after regeneration. Connected primary/secondary road hierarchy with no radial hub. |
@@ -261,11 +261,11 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 |---|---|---|---|
 | M114 | Lips, gums and inner mouth | Mouth color and moisture variation | Pass. Strong expressive lip/gum variants with useful roughness and material masks. |
 | M115 | Tongues | Tongue shape and color variants | Pass after square ingestion regeneration. Detached tissue material with broad folds and no object render. |
-| M116 | Nails and claws | Fingernails, toenails and claw tips | **Weak—regenerate.** The result repeated tooth/horn forms from its source reference instead of producing clear nail plates and claws. |
+| M116 | Nails and claws | Fingernails, toenails and claw tips | **Weak—regenerate.** Square and text-free, but broad organic folds still do not read clearly as nail/claw keratin. |
 | M117 | Ear skin and translucency | Ear color, thickness and subsurface scattering | Pass. Excellent ear variants with aligned thickness masks and appealing color range. |
 | M118 | Hair and eyebrows | Mohawks, tufts, brows and sideburn cards | Pass. Strong punk silhouettes, controlled dyed accents and LOD-safe alpha shapes. |
 | M119 | Stubble and facial hair | Beard shadow, moustaches and short beards | Pass. Broad connected shapes provide efficient customization without hair noise. |
-| M120 | Weathered racing cloth | Suits, jackets, gloves and upholstery | **Weak—regenerate.** Current patchwork/checker structure reads as tiled fabric strips rather than a seamless racing weave. |
+| M120 | Weathered racing cloth | Suits, jackets, gloves and upholstery | **Weak—regenerate.** Material response improved, but generated letter-like stencil forms violate the text-free standard. |
 
 ## Material Batch 14 — goblin equipment and condition overlays
 
@@ -279,7 +279,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M124 | Painted racing armor | Armor plates and vehicle protection | Pass. Strong acid-green enamel, restrained racing accents and broad chipped-metal breakup. |
 | M125 | Oxidized jewelry | Rings, ear cuffs, tooth caps and charms | Pass. Excellent brass, copper, silver and patina variants with clean masks. |
 | M126 | Coarse knit | Shirts, cuffs, socks and padding | Pass. Chunky interlocked yarn is seamless, tactile and distinct from canvas. |
-| M127 | Padded racing suit | Suits, jackets and upholstery | **Weak—regenerate.** The current irregular cell pattern reads as fractured stone/glass rather than padded technical fabric. |
+| M127 | Padded racing suit | Suits, jackets and upholstery | **Weak—regenerate.** Square and text-free, but repeated large hexagonal cells still read as armor/stone rather than padded cloth. |
 | M128 | Dirt and sweat overlays | Skin and clothing condition | Pass. Useful broad wipes, rings and smears with rough/damp separation. |
 | M129 | Healed damage overlays | Old scars, burns and character history | Pass with cleanup. Strong variety; remove stitch-like and overly raw shapes to keep the character appealing and non-gory. |
 | M130 | Wet-skin sheen masks | Rain, sweat and water response | Pass. Broad roughness masks provide moisture without transparent geometry or baked highlights. |
@@ -290,7 +290,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 
 | ID | Finish layer | Use | Status and production note |
 |---|---|---|---|
-| M131 | Cosmetic glitter and mica | Face/body sparkle accents | **Weak—regenerate.** Channel structure is usable, but many shapes became full graffiti symbols instead of restrained glitter sweeps and clusters. |
+| M131 | Cosmetic glitter and mica | Face/body sparkle accents | Pass after regeneration. Sparse restrained mica flakes with alpha and real shallow relief. |
 | M132 | Emissive body paint | Night racing and active markings | Pass after text-free ingestion regeneration. Angular paint marks, emissive/alpha mask and no baked glow. |
 | M133 | Eye shadow and liner | Eye-area cosmetics | Pass. Broad wings, smoky arcs and asymmetrical punk shapes provide good creator variety. |
 | M134 | Lip paint and stain | Lip color customization | Pass. Useful fill, split, chipped, stain and racing-slash masks. |
@@ -309,9 +309,9 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 |---|---|---:|---|
 | M141 | Forest to grassland | `256 × 256 m` | Pass with channel-rebuild constraint. Strong canopy breakup and broad irregular meadow edge; rebuild all maps from one authoritative transition mask. |
 | M142 | Jungle to beach | `256 × 256 m` | Pass. Excellent layered jungle, root/scrub fringe and clean sand handoff. |
-| M143 | Basalt to ochre rock | `16 × 16 m` | Weak—regenerate. Material identity is strong, but the boundary is too straight and narrow to feel naturally interlocked. |
+| M143 | Basalt to ochre rock | `16 × 16 m` | Pass after regeneration. Natural interlocked left-to-right basalt/ochre fringe with aligned repeating edges. |
 | M144 | Mountain to valley | `1 × 1 km` | Pass. Clear elevation descent, branching foothills and broad valley hierarchy. |
-| M145 | Wetland to upland | `512 × 512 m` | Weak—regenerate. Water/channel masks are strong, but the BaseColor does not show enough distinct dry upland material. |
+| M145 | Wetland to upland | `512 × 512 m` | Pass after regeneration. Distinct wetland and dry upland materials with continuous terrain relief. |
 | M146 | Alpine snowline | `512 × 512 m` | Pass. Natural ridge/aspect-driven snow fingers and exposed-rock islands. |
 | M147 | Volcanic field to forest | `512 × 512 m` | Pass. Strong succession sequence from crust through pioneer growth to canopy. |
 | M148 | Settlement to wilderness | `512 × 512 m` | Pass. Readable occupancy edge, gardens, service gaps and forest takeover. |
@@ -327,7 +327,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M151 | Frost and rime | Props, glass, foliage, rock and metal | Pass. Strong edge strips, crystalline fans and broad frost blooms with clean alpha. |
 | M152 | Light snow cover | Thin seasonal deposits and ledges | Pass after square ingestion regeneration. Broad coverage alpha and real shallow drift relief. |
 | M153 | Heavy snowpack | Deep seasonal terrain surface | Pass. Excellent broad wind dunes, compacted hollows and usable height structure. |
-| M154 | Rain darkening | Wet material response and runoff | **Weak—regenerate.** Mask variety is useful, but small generated footer labels violate the clean-sheet standard. |
+| M154 | Rain darkening | Wet material response and runoff | Pass after regeneration. Text-free neutral rain-darkening masks and pooled-water relief. |
 | M155 | Puddle accumulation | Standing water in ruts and low ground | Pass. Strong shape variety with good depth, edge and roughness separation. |
 | M156 | Windblown leaves | Seasonal windrows and corner buildup | Pass. Excellent connected leaf groups, warm seasonal colors and LOD-safe silhouettes. |
 | M157 | Dry-season bleaching | Terrain and foliage stress | Pass. Broad pale stress masks support tint, density and roughness changes without replacing geometry. |
@@ -465,7 +465,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M231 | Galvanized corrugated iron | Walls, roofs and improvised enclosures | **Weak—regenerate.** Corrugation profile is useful, but generated channel labels violate the clean-sheet standard. |
 | M232 | Rusted painted roof sheet | Aged roofs, walls and repair panels | Pass. Strong turquoise paint, trough rust, exposed crowns and continuous corrugations. |
 | M233 | Clay roof tile | Settlement and shrine roofing | Pass. Excellent chunky curved courses, offset repetition, overlap depth and subtle moss. |
-| M234 | Palm thatch | Roofs, awnings and hut cladding | **Weak—regenerate.** Text was removed, but the generator returned a single-channel thatch image instead of the fixed 2 × 2 layout. |
+| M234 | Palm thatch | Roofs, awnings and hut cladding | Pass after regeneration. Fixed square four-channel thatch with dense strip layering and real relief. |
 | M235 | Tar-paper roofing | Low-cost roofs and waterproof repairs | **Weak—regenerate.** Current result reads as dark masonry blocks rather than mineral felt and broad lap bands. |
 | M236 | Limewashed plaster | Settlement walls and interior surfaces | Pass. Calm trowel clouding, chalk response and restrained damp/undercoat variation. |
 | M237 | Rough concrete | Foundations, walls and utility structures | Pass. Excellent broad aggregate, air pockets and trowel drag without disruptive slab seams. |
@@ -1000,3 +1000,9 @@ M003, M004, M006, M007, M017, M029, M033, M034 and M060 pass as verified square,
 ![Material Batch 61 contact sheet](./review/material-batch-61-environment-and-decals-regenerations.jpg)
 
 M010, M069, M074, M080, M084, M095, M097 and M106 pass as text-free square replacements with usable relief. M078 remains queued for radial starburst flow; M094 remains queued because its replacement returned at `1408×768`.
+
+## Material Batch 62 — material and transition corrections
+
+![Material Batch 62 contact sheet](./review/material-batch-62-material-transition-corrections.jpg)
+
+M094, M131, M143, M145, M154 and M234 now pass as square text-free replacements. M078 remains radial; M116 still lacks clear keratin identity; M120 contains letter-like marks; and M127 retains an overly repetitive hexagonal structure. Those four remain queued.

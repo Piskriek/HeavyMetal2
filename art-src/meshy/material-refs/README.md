@@ -940,6 +940,16 @@ M469 and M472 passed after `R02` corrections. M470, M471, M474 and M476 remain p
 
 M477–M481 establish mobile, nostalgic, Goblin-punk, accessibility-first high-contrast and restrained tactile-PBR treatments over the same 16 core semantic action IDs. All five style references pass. Styles may alter stroke, fill, palette, wear, depth and accents, but must not alter action identity or scene-first interaction behavior.
 
-### Batch 54 — sculptable interface materials and remaining corrections
+## Material Batch 54 — sculptable interface materials and final clean-atlas corrections
 
-Regenerate M468, M473 and M475 without captions. Add recursively sculptable/paintable toolbar, drawer, stage, connector, rivet, typography-state and restrained inhabited-detail materials under [`docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md`](../../../docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md).
+![Material Batch 54 contact sheet](./review/material-batch-54-sculptable-interface-materials-corrections.jpg)
+
+M468, M473 and M475 now pass at `R03` as caption-free semantic atlases. M482–M486 and M488 establish independently editable white stage/panel, smooth connector metal, selective gold rivet, perspective racing-line decal, Goblin paint-to-jungle transition and detachable drawer-rail children. These all pass while preserving the white scene-first baseline, sharp geometry and clean-canvas drawer behavior.
+
+M487 demonstrates the intended sparse handprint, crown, remix, scratch and paint-detail density, but must be regenerated because several generated marks resemble lettering. Production decals remain isolated alpha children rather than irreversible marks baked into the interface stage.
+
+Every entry is a child of a recursively sculptable and paintable interface preset under [`docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md`](../../../docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md). Geometry, placement, palette, roughness, wear and accent intensity remain editable and bake only for the selected runtime tier.
+
+### Next interface work
+
+Regenerate M487 without letter-like forms, add typography-state and accessibility-focus presets, and assemble complete scene-first toolbar/drawer/stage graphs from the approved child libraries.

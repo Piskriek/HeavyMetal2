@@ -6576,7 +6576,7 @@
     },
     {
       "registryId": "M468",
-      "canonicalCode": "HM2-TXP-M468-UI-SCULPT-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
+      "canonicalCode": "HM2-TXP-M468-UI-SCULPT-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R03",
       "name": "clean sculpt-paint-tool icon atlas",
       "sourceFile": "M468-ui-clean-sculpt-paint-tool-icon-atlas.png",
       "domain": "UI",
@@ -6652,9 +6652,9 @@
           "redo"
         ]
       },
-      "status": "regenerate",
-      "recipeRevision": 2,
-      "provenance": "Material Batch 53 correction attempt"
+      "status": "pass",
+      "recipeRevision": 3,
+      "provenance": "Material Batch 54 text-free correction"
     },
     {
       "registryId": "M469",
@@ -6986,7 +6986,7 @@
     },
     {
       "registryId": "M473",
-      "canonicalCode": "HM2-TXP-M473-UI-DAMAGE-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
+      "canonicalCode": "HM2-TXP-M473-UI-DAMAGE-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R03",
       "name": "clean destruction-repair icon atlas",
       "sourceFile": "M473-ui-clean-destruction-repair-icon-atlas.png",
       "domain": "UI",
@@ -7062,9 +7062,9 @@
           "restore"
         ]
       },
-      "status": "regenerate",
-      "recipeRevision": 2,
-      "provenance": "Material Batch 53 correction attempt"
+      "status": "pass",
+      "recipeRevision": 3,
+      "provenance": "Material Batch 54 text-free correction"
     },
     {
       "registryId": "M474",
@@ -7150,7 +7150,7 @@
     },
     {
       "registryId": "M475",
-      "canonicalCode": "HM2-TXP-M475-UI-AI-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R02",
+      "canonicalCode": "HM2-TXP-M475-UI-AI-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R03",
       "name": "clean local-ai-preset icon atlas",
       "sourceFile": "M475-ui-clean-local-ai-preset-icon-atlas.png",
       "domain": "UI",
@@ -7226,9 +7226,9 @@
           "remix"
         ]
       },
-      "status": "regenerate",
-      "recipeRevision": 2,
-      "provenance": "Material Batch 53 correction attempt"
+      "status": "pass",
+      "recipeRevision": 3,
+      "provenance": "Material Batch 54 text-free correction"
     },
     {
       "registryId": "M476",
@@ -7716,6 +7716,461 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 53 interface icon style families"
+    },
+    {
+      "registryId": "M482",
+      "canonicalCode": "HM2-TXP-M482-UI-STAGE-TIL-BCNROH-CLN-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "ui white stage panel pbr sheet",
+      "sourceFile": "M482-ui-white-stage-panel-pbr-sheet.png",
+      "domain": "UI",
+      "material": "STAGE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M483",
+      "canonicalCode": "HM2-TXP-M483-UI-CONNECT-TIL-BCNRMO-CLN-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "ui smooth metal connector pbr sheet",
+      "sourceFile": "M483-ui-smooth-metal-connector-pbr-sheet.png",
+      "domain": "UI",
+      "material": "CONNECT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M484",
+      "canonicalCode": "HM2-TXP-M484-UI-RIVET-TIL-BCNRMO-CLN-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "ui gold rivet pbr sheet",
+      "sourceFile": "M484-ui-gold-rivet-pbr-sheet.png",
+      "domain": "UI",
+      "material": "RIVET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M485",
+      "canonicalCode": "HM2-TXP-M485-UI-RACING-ATL-BCA-GPUNK-PX512-AT16-CLN-PFULL-BL-R01",
+      "name": "ui perspective racing line decal atlas",
+      "sourceFile": "M485-ui-perspective-racing-line-decal-atlas.png",
+      "domain": "UI",
+      "material": "RACING",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "GPUNK",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M486",
+      "canonicalCode": "HM2-TXP-M486-UI-SPILL-TRN-BCHA-GPUNK-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "ui goblin paint spill jungle transition atlas",
+      "sourceFile": "M486-ui-goblin-paint-spill-jungle-transition-atlas.png",
+      "domain": "UI",
+      "material": "SPILL",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "GPUNK",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M487",
+      "canonicalCode": "HM2-TXP-M487-UI-DETAIL-ATL-BCA-GPUNK-PX512-AT16-CLN-PFULL-BL-R01",
+      "name": "ui inhabited detail decal atlas",
+      "sourceFile": "M487-ui-inhabited-detail-decal-atlas.png",
+      "domain": "UI",
+      "material": "DETAIL",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "GPUNK",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M488",
+      "canonicalCode": "HM2-TXP-M488-UI-DRAWER-TIL-BCNRMOH-CLN-PX512-Q4-CLN-PFULL-BL-R01",
+      "name": "ui detachable drawer rail pbr sheet",
+      "sourceFile": "M488-ui-detachable-drawer-rail-pbr-sheet.png",
+      "domain": "UI",
+      "material": "DRAWER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "reference": "Resolve named channels from the registered reconstruction recipe; do not infer from appearance."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative; parameterized by owning preset node",
+      "mipPolicy": "Preserve clean silhouette and broad material response; remove micro-wear first.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset"
+      ],
+      "prohibitedUses": [
+        "rounded interface chrome",
+        "whole-screen neon glow",
+        "baked semantic behavior"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "shape",
+        "scale",
+        "color",
+        "roughness",
+        "wear",
+        "accent intensity"
+      ],
+      "recipe": {
+        "intent": "Scene-first interface child material or decal that remains independently editable.",
+        "required": [
+          "sharp geometry",
+          "clean white baseline compatibility",
+          "detachable node ownership"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic action reassignment",
+          "dense visual noise"
+        ],
+        "frequency": "broad identity survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 54 sculptable interface materials"
     }
   ]
 }

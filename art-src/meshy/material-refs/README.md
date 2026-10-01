@@ -25,14 +25,14 @@ Generated maps may look coordinated but are not mathematically derived from one 
 |---|---|---|---:|---|
 | M001 | Basalt cliff | Cliffs, cave mouths, boulders | `4 × 4 m` | Pass as derivation reference. Strong broad plates; rebuild cracks from one shared height source. |
 | M002 | Ochre layered cliff | Dry cliffs, shelves, strata | `4 × 4 m` | Pass. Good horizontal strata; use macro variation to avoid visible band repetition. |
-| M003 | Compacted race dirt | Main drivable road | `4 × 4 m` | Weak—regenerate. Useful color/roughness range, but the radial swirl is too directional and will expose tiling. |
-| M004 | Volcanic ash and cinder | Crater slopes, soot beds | `3 × 3 m` | Weak—regenerate. The starburst flow is unsuitable for a seamless general-purpose tile. |
+| M003 | Compacted race dirt | Main drivable road | `4 × 4 m` | Pass after regeneration. Broad compacted ruts and aggregate relief without radial flow. |
+| M004 | Volcanic ash and cinder | Crater slopes, soot beds | `3 × 3 m` | Pass after regeneration. Broad ash/cinder breakup without starburst flow. |
 | M005 | Wet coastal basalt | Tide pools, wet cliff feet | `3 × 3 m` | Pass with shape constraint. Keep broad eroded cells irregular and break the cobble-like repetition with macro masks. |
-| M006 | Tropical beach sand | Beach shelves, sandbars | `3 × 3 m` | Weak—regenerate. Color is useful, but deep slab-like cuts must become shallow wind ripples. |
-| M007 | Mossy jungle soil | Forest floor, humid banks | `2 × 2 m` | Weak—regenerate. Current breakup reads as loose rubble; production needs compact loam with decomposed organic staining. |
+| M006 | Tropical beach sand | Beach shelves, sandbars | `3 × 3 m` | Pass after regeneration. Shallow sand ripples and grain relief without slab cuts. |
+| M007 | Mossy jungle soil | Forest floor, humid banks | `2 × 2 m` | Pass after regeneration. Compact humid loam with moss, roots and decomposed organics. |
 | M008 | Weathered structural timber | Trestles, huts, bridges | `1.5 × 1.5 m` | Pass. Broad vertical grain survives LOD; board seams and fasteners remain geometry or trim-sheet details. |
 | M009 | Blackened forged iron | Girders, straps, machines | `1 × 1 m` | Pass. Restrained forged variation; use Metallic = 1 except rust/contamination masks. |
-| M010 | Aged brass | Rivets, collars, controls | `0.75 × 0.75 m` | Weak—regenerate. Current surface reads like yellow stone; next pass needs finer hammered metal and controlled patina. |
+| M010 | Aged brass | Rivets, collars, controls | `0.75 × 0.75 m` | **Weak—regenerate.** Brass response improved, but a rectangular preview inset remains in the roughness quadrant. |
 
 ## Material Batch 02 — ground and natural surfaces
 
@@ -46,7 +46,7 @@ Generated maps may look coordinated but are not mathematically derived from one 
 | M014 | Loose mixed scree | Talus, cliff feet, gravel beds | `2 × 2 m` | Pass. Dense readable packing and useful material/color variation; add macro masks at terrain scale. |
 | M015 | Cooled lava crust | Volcanic shelves and crater | `3 × 3 m` | Pass after regeneration. Broad ropy folds, restrained heat staining and strong cross-channel correspondence. |
 | M016 | Molten lava | Lava pools and channels | `3 × 3 m` | Pass as mask reference. Derive BaseColor and Emissive separately and animate flow in shader. |
-| M017 | Dry coastal rock | Beach shelves and salt rock | `3 × 3 m` | Weak—regenerate. Current deep vertical cuts read as a cliff face rather than a broadly eroded tile. |
+| M017 | Dry coastal rock | Beach shelves and salt rock | `3 × 3 m` | Pass after regeneration. Broad mineral weathering and shallow coastal-rock relief. |
 | M018 | Wet ochre waterfall rock | Waterfall channels and wet ledges | `3 × 3 m` | Pass. Strong strata and vertical wetness language; BaseColor must exclude generated shading. |
 | M019 | Basalt cave wall | Tunnel and cavern walls | `3 × 3 m` | Pass with variation constraint. Broad erosion pockets work; reduce repeated circular cavities in the production height source. |
 | M020 | Basalt cave floor | Driveable cave and tunnel floor | `3 × 3 m` | Pass. Low relief, restrained damp patches and broad plate structure support gameplay collision. |
@@ -68,7 +68,7 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 | M026 | Fern leaf atlas | Understory cards | atlas | Pass. Complete fronds with varied poses and strong alpha-test silhouettes. |
 | M027 | Coastal grass atlas | Grass cards and clump shells | atlas | Pass. Grouped thick blades in green/straw variants; readable at distance. |
 | M028 | Hanging vine atlas | Cliff, bridge and canopy vines | atlas | Pass. Six complete vine strips with broad leaves and wind-ready segmentation. |
-| M029 | Cushion moss | Damp rock and soil blends | `1 × 1 m` | **Weak—regenerate.** Good cushion forms, but generated channel labels violate the clean-sheet standard. |
+| M029 | Cushion moss | Damp rock and soil blends | `1 × 1 m` | Pass after regeneration. Text-free densely packed cushion forms with usable relief. |
 
 ## Material Batch 04 — built materials
 
@@ -79,8 +79,8 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 | M030 | Fresh-cut timber | New repairs, clean structural beams | `1.5 × 1.5 m` | Pass. Warm broad grain complements the older M008 timber without duplicating it. |
 | M031 | Charred timber | Burned structures and impact damage | `1.5 × 1.5 m` | Pass after square ingestion regeneration. Text-free char relief with no preview inset. |
 | M032 | Heavy rope | Bridges, cranes, rigging and moorings | `0.5 × 0.5 m` | Pass with construction constraint. Use the bold braid as a tiling rope surface; geometry must provide the cable silhouette. |
-| M033 | Weathered sailcloth | Shipwreck sails, banners and shade cloth | `1 × 1 m` | **Weak—regenerate.** Current basket-like weave is too coarse and reads as interlocking strips rather than woven canvas. |
-| M034 | Patched goblin canvas | Awnings, tents and workshop covers | `2 × 2 m` | **Weak—regenerate.** Patch language works, but forbidden generated channel labels must be removed. |
+| M033 | Weathered sailcloth | Shipwreck sails, banners and shade cloth | `1 × 1 m` | Pass after regeneration. Fine woven sailcloth, broad stains and restrained crease relief. |
+| M034 | Patched goblin canvas | Awnings, tents and workshop covers | `2 × 2 m` | Pass after regeneration. Text-free patched canvas with weave and patch-edge relief. |
 | M035 | Cut basalt masonry | Shrines, tunnel retaining walls | `3 × 3 m` | Pass. Strong regular courses, readable mortar and restrained surface variation. |
 | M036 | Ochre rubble masonry | Settlement walls and retaining structures | `3 × 3 m` | Pass. Warm irregular blocks contrast clearly with basalt masonry. |
 | M037 | Painted goblin metal | Machines, carts and race structures | `1 × 1 m` | Pass with cleanup. Preserve broad chipped green paint but remove highlight-like purple spots from production BaseColor. |
@@ -160,7 +160,7 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M057 | Leaf litter | 14 broadleaf ground patches | Pass. Dense attractive packing, curved windrows and clear connected masks. |
 | M058 | Twig and root litter | 12 chunky forest-floor arrangements | Pass. Broad root/twig forms avoid fragile hair-thin geometry and remain readable. |
 | M059 | Beach shells and pebbles | 12 shoreline scatter patches | Pass with content adjustment. Strong pebble coverage; production should increase recognizable shell fragments without adding micro-noise. |
-| M060 | Moss and lichen | 14 organic surface patches | **Weak—regenerate.** Useful shapes and channel correspondence, but generated headings and channel labels violate the clean-sheet standard. |
+| M060 | Moss and lichen | 14 organic surface patches | Pass after regeneration. Text-free moss/lichen islands with alpha and relief correspondence. |
 | M061 | Mud splash | 12 drips, arcs, smears and impact stamps | Pass. Excellent decal vocabulary with controlled soft alpha fringes and limited micro-droplets. |
 | M062 | Volcanic cinder | 12 ash/cinder accumulation shapes | Pass with material correction. Silhouettes work; production must strengthen porous charcoal cinder language and remove any organic/leaf-like read. |
 | M063 | Timber scrap | 12 plank, splinter and rope-remnant groups | Pass. Strong connected arrangements suitable for decals, conforming meshes or geometry spawning. |
@@ -988,3 +988,9 @@ M031, M044, M046, M083, M088, M111, M115, M159, M162 and M265 were regenerated i
 ![Material Batch 59 contact sheet](./review/material-batch-59-text-and-inset-corrections.jpg)
 
 M023, M096, M103, M110, M204, M212, M228, M259 and M275 now pass as verified `1024×1024`, text-free sheets with useful relief guides. M023 no longer contains a tile-preview inset. M234 remains queued because its replacement omitted the required four-quadrant channel layout.
+
+## Material Batch 60 — foundation regeneration set
+
+![Material Batch 60 contact sheet](./review/material-batch-60-foundation-regenerations.jpg)
+
+M003, M004, M006, M007, M017, M029, M033, M034 and M060 pass as verified square, text-free replacements with non-flat relief. M010 remains queued because its improved brass sheet still contains a small rectangular preview inset in the roughness quadrant.

@@ -590,8 +590,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M309 | Epiphyte clusters | Trunks, ruins, rocks and canopy decoration | Pass. Excellent rosettes, strap leaves and multiple compact physical scales. |
 | M310 | Dead branch debris | Fallen woody carpets and modular debris | Pass. Strong branch and bundle silhouettes without hair-thin clutter. |
 
+## Material Batch 33 — Goblin Creator skin and expression detail
+
+![Material Batch 33 Goblin Creator skin-detail contact sheet](./review/material-batch-33-goblin-skin-expression-contact-sheet.jpg)
+
+| ID | Creator layer | Use | Status and production note |
+|---|---|---|---|
+| M311 | Skin thickness and SSS masks | Ears, nose, cheeks, knuckles and thin tissue | **Weak—regenerate.** Thickness separation is useful, but the result assembles a full generic face rather than reusable detached regional masks. |
+| M312 | Skin pigment variation | Natural runtime-tintable skin diversity | Pass. Strong olive, sage, tan, violet and lime patches with clean soft alpha. |
+| M313 | Freckles and beauty marks | Fine identity variation | Pass. Restrained clustered marks and broad placements avoid diseased or noisy skin. |
+| M314 | Age wrinkles and expression folds | Brow, smile, eye, nose and neck aging | Pass. Excellent separated fold groups, aligned normals and readable stylized depth. |
+| M315 | Skin pores and roughness | Tileable multi-scale skin microdetail | Pass with intensity constraint. Useful pore/roughness structure; production should keep the bubbled patches subtle. |
+| M316 | Flush and blush overlays | Emotion, temperature and circulation color | Pass. Excellent broad feathered color clouds with clean alpha and flat normals. |
+| M317 | Subtle vein masks | Ears, temples, forearms and hands | Pass. Sparse fantasy-colored branches remain adjustable and non-gory. |
+| M318 | Eye wetness masks | Cornea, tearline and inner-corner moisture | Pass. Strong eye-region clearcoat, roughness and thickness masks without baked highlights. |
+| M319 | Tooth and horn staining | Teeth, tusks and horn condition | **Weak—regenerate.** Attractive color response, but the atlas became complete tooth/horn shapes rather than stain-only overlays. |
+| M320 | Face grime overlays | Dust, grease, paint and goggle-contact condition | Pass with placement constraint. Strong smears and goggle bands; treat the face-like preview only as placement guidance, never a fixed face texture. |
+
 ## Next material batches
 
-### Batch 33 — Goblin Creator skin and expression detail
+### Batch 34 — Goblin Creator hair and wardrobe materials
 
-Skin thickness/SSS masks, pigment variation, freckles and beauty marks, age wrinkles, pore roughness, flush/blush overlays, subtle vein masks, eye wetness, tooth staining and face grime.
+Dyed hair cards, shaved-scalp stubble, braided hair, synthetic fur, suede, technical mesh, reflective racing fabric, elastic ribbing, translucent raincoat polymer and patch/stitch atlas.

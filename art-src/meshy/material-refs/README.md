@@ -437,8 +437,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M219 | Reinforced drive belt | Belts and flexible engine components | Pass. Broad continuous ribs, reinforcement grain and controlled wear. |
 | M220 | Spark-plug ceramic | Ignition parts and heat-resistant insulators | Pass. Strong heat staining, soot bands and subtle glaze crazing. |
 
+## Material Batch 24 — engine and mechanical hard surfaces
+
+![Material Batch 24 engine-surface contact sheet](./review/material-batch-24-engine-hard-surfaces-contact-sheet.jpg)
+
+| ID | Mechanical material | Use | Status and production note |
+|---|---|---|---|
+| M221 | Cast iron | Blocks, housings and heavy machinery | Pass. Strong dark casting grain, pits, oxidation and rubbed high points. |
+| M222 | Cast aluminum | Engine housings and light structures | Pass. Excellent broad cast porosity, chalky oxidation and oily handling zones. |
+| M223 | Machined steel | Shafts, faces and precision parts | Pass. Strong overlapping mill/tool paths without a single central pivot. |
+| M224 | Copper windings | Motors, generators and coils | Pass. Excellent broad wire grouping, dark varnish and restrained oxidation. |
+| M225 | Radiator fins | Cooling cores and vent internals | Pass. Continuous thick rows, packed dirt and LOD-readable depth. |
+| M226 | Heavy chains | Drives, hoists and restraint systems | Pass. Strong complete link silhouettes, grease/rust variation and clean alpha. |
+| M227 | Carbon and baked oil | Combustion and exhaust deposits | Pass. Useful rings, crust blooms and smooth glazed centers. |
+| M228 | Exhaust heat wrap | Wrapped pipes and thermal protection | **Weak—regenerate.** Weave and staining are useful, but generated channel labels violate the clean-sheet standard. |
+| M229 | Fiberglass composite | Vehicle shells and repair patches | Pass. Strong translucent weave, aged resin and broad abrasion response. |
+| M230 | Gasket-paper fiber | Gaskets, sheet insulation and seals | Pass. Calm compressed pulp variation with oil-darkened zones and subtle cracks. |
+
 ## Next material batches
 
-### Batch 24 — engine and mechanical hard surfaces
+### Batch 25 — settlement architecture and roofing
 
-Cast iron, cast aluminum, machined steel, copper windings, radiator fins, chain links, carbon deposits, exhaust wrap, fiberglass composite and gasket-paper fiber.
+Corrugated iron, rusted roof sheet, clay roof tile, palm thatch, tar paper, limewashed plaster, rough concrete, fired brick, glazed wall tile and woven shade mat.

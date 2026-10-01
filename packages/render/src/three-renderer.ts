@@ -92,7 +92,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): RenderService & {
       renderer.setPixelRatio(Math.min(2, Math.max(0.5, opts.pixelRatio ?? deviceRatio)));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.05;
+      renderer.toneMappingExposure = 0.95;
       renderer.shadowMap.enabled = opts.shadows !== false;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       renderer.domElement.style.width = '100%';

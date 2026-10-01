@@ -1,0 +1,35 @@
+:root { color-scheme: dark; --bg: #0f1318; --panel: #151a21; --line: #26303b; --text: #dde6ee; --dim: #8fa0b1; --accent: #ffd24a; }
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 14px system-ui, sans-serif; overflow: hidden; }
+.app { display: flex; flex-direction: column; height: 100%; }
+.bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.bar .brand { margin-right: 8px; letter-spacing: .04em; }
+.bar .grow { flex: 1; }
+.bar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+.bar .fps { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+button { font: inherit; color: var(--text); background: #1d2530; border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; cursor: pointer; }
+button:hover:not(:disabled) { background: #263140; }
+button:disabled { opacity: .4; cursor: default; }
+button.on { background: var(--accent); color: #1a1500; border-color: var(--accent); }
+.seg { display: inline-flex; gap: 0; }
+.seg button { border-radius: 0; }
+.seg button:first-child { border-radius: 6px 0 0 6px; }
+.seg button:last-child { border-radius: 0 6px 6px 0; }
+.body { flex: 1; min-height: 0; display: flex; }
+.view { flex: 1; min-width: 0; position: relative; touch-action: none; }
+.view canvas { display: block; }
+.panel { width: 300px; background: var(--panel); overflow: auto; padding: 8px 12px 24px; }
+.panel.left { width: 190px; border-right: 1px solid var(--line); }
+.panel.right { border-left: 1px solid var(--line); }
+.panel h3 { margin: 6px 0 8px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.panel h3.sub { margin-top: 18px; }
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.list button { width: 100%; text-align: left; }
+.hint { color: var(--dim); font-size: 12px; line-height: 1.4; }
+@media (max-width: 760px) {
+  .body { flex-direction: column; }
+  .view { flex: 0 0 52%; }
+  .panel, .panel.left { width: auto; flex: 1; border: 0; border-top: 1px solid var(--line); }
+  .panel.left { display: none; }
+}

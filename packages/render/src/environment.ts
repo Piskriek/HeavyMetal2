@@ -63,7 +63,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   const environment = pmrem.fromScene(room, 0.04);
   room.dispose();
   scene.environment = environment.texture;
-  scene.environmentIntensity = 0.7;
+  scene.environmentIntensity = 0.35;
 
   let sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null = null;
   if (background === 'sky') {
@@ -99,10 +99,10 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const hemisphere = new THREE.HemisphereLight(0xb9d7ff, 0x29241f, 1.25);
+  const hemisphere = new THREE.HemisphereLight(0xb9d7ff, 0x29241f, 0.55);
   scene.add(hemisphere);
 
-  const sun = new THREE.DirectionalLight(0xffddb3, 4.2);
+  const sun = new THREE.DirectionalLight(0xffddb3, 3.2);
   sun.castShadow = shadows;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.00025;

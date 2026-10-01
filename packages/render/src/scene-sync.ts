@@ -65,8 +65,9 @@ const renderableDef: ComponentDef = {
 export type RenderWorld = Pick<World, 'tick' | 'defineComponent' | 'components' | 'alive' | 'has' | 'get' | 'query' | 'drainChanges'>;
 
 export function defineRenderComponents(world: RenderWorld): void {
-  world.defineComponent(transformDef);
-  world.defineComponent(renderableDef);
+  const have = new Set(world.components().map((c) => c.name));
+  if (!have.has('transform')) world.defineComponent(transformDef);
+  if (!have.has('renderable')) world.defineComponent(renderableDef);
 }
 
 export interface RenderDesc {

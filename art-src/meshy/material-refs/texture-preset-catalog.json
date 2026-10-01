@@ -8044,7 +8044,7 @@
     },
     {
       "registryId": "M487",
-      "canonicalCode": "HM2-TXP-M487-UI-DETAIL-ATL-BCA-GPUNK-PX512-AT16-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M487-UI-DETAIL-ATL-BCA-GPUNK-PX512-AT16-CLN-PFULL-BL-R02",
       "name": "ui inhabited detail decal atlas",
       "sourceFile": "M487-ui-inhabited-detail-decal-atlas.png",
       "domain": "UI",
@@ -8101,9 +8101,9 @@
         ],
         "frequency": "broad identity survives mobile fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 54 sculptable interface materials"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 55 text-free correction"
     },
     {
       "registryId": "M488",
@@ -8171,6 +8171,575 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 54 sculptable interface materials"
+    },
+    {
+      "registryId": "M489",
+      "canonicalCode": "HM2-TXP-M489-UI-TYPO-ATL-A-CLN-PX512-AT16-CLN-PFULL-BL-R01",
+      "name": "ui typography state mask atlas",
+      "sourceFile": "M489-ui-typography-state-mask-atlas.png",
+      "domain": "UI",
+      "material": "TYPO",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M490",
+      "canonicalCode": "HM2-TXP-M490-UI-ACCESS-ATL-BCA-HICON-PX512-AT16-CLN-PFULL-BL-R01",
+      "name": "ui accessibility focus state atlas",
+      "sourceFile": "M490-ui-accessibility-focus-state-atlas.png",
+      "domain": "UI",
+      "material": "ACCESS",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "HICON",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M491",
+      "canonicalCode": "HM2-TXP-M491-UI-TOOLBAR-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui compact toolbar preset reference",
+      "sourceFile": "M491-ui-compact-toolbar-preset-reference.png",
+      "domain": "UI",
+      "material": "TOOLBAR",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M492",
+      "canonicalCode": "HM2-TXP-M492-UI-DRAWER-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui shallow preset drawer reference",
+      "sourceFile": "M492-ui-shallow-preset-drawer-reference.png",
+      "domain": "UI",
+      "material": "DRAWER",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M493",
+      "canonicalCode": "HM2-TXP-M493-UI-DEEPDRAW-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui detachable deep drawer reference",
+      "sourceFile": "M493-ui-detachable-deep-drawer-reference.png",
+      "domain": "UI",
+      "material": "DEEPDRAW",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M494",
+      "canonicalCode": "HM2-TXP-M494-UI-STAGE-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui clean canvas stage preset reference",
+      "sourceFile": "M494-ui-clean-canvas-stage-preset-reference.png",
+      "domain": "UI",
+      "material": "STAGE",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M495",
+      "canonicalCode": "HM2-TXP-M495-UI-CARD-ATL-BCA-CLN-PX512-AT16-CLN-PFULL-BL-R01",
+      "name": "ui sharp preset card frame atlas",
+      "sourceFile": "M495-ui-sharp-preset-card-frame-atlas.png",
+      "domain": "UI",
+      "material": "CARD",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M496",
+      "canonicalCode": "HM2-TXP-M496-UI-GOBLIN-DEC-BC-GPUNK-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui sleeping goblin racer multiview reference",
+      "sourceFile": "M496-ui-sleeping-goblin-racer-multiview-reference.png",
+      "domain": "UI",
+      "material": "GOBLIN",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "GPUNK",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M497",
+      "canonicalCode": "HM2-TXP-M497-UI-PAINTCAN-DEC-BC-GPUNK-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui paint can prop multiview reference",
+      "sourceFile": "M497-ui-paint-can-prop-multiview-reference.png",
+      "domain": "UI",
+      "material": "PAINTCAN",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve component graph, semantic states or alpha slots from registry recipe; do not infer behavior from pixels."
+      },
+      "style": "GPUNK",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "interface-relative or object-relative as defined by parent graph",
+      "mipPolicy": "Preserve interaction silhouette, focus cues and scene-first hierarchy.",
+      "intendedUses": [
+        "recursively sculptable and paintable custom-interface preset graph"
+      ],
+      "prohibitedUses": [
+        "baked interaction semantics",
+        "rounded persistent chrome",
+        "dense canvas-obscuring layout"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "geometry",
+        "placement",
+        "state",
+        "palette",
+        "roughness",
+        "wear",
+        "visibility"
+      ],
+      "recipe": {
+        "intent": "Editable scene-first interface graph child with stable semantics.",
+        "required": [
+          "white scene-first compatibility",
+          "detachable ownership",
+          "clean-canvas recovery"
+        ],
+        "forbidden": [
+          "protected branding",
+          "semantic reassignment",
+          "persistent clutter"
+        ],
+        "frequency": "primary control and component silhouette survives mobile fallback"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
     }
   ]
 }

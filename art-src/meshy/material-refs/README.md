@@ -950,6 +950,14 @@ M487 demonstrates the intended sparse handprint, crown, remix, scratch and paint
 
 Every entry is a child of a recursively sculptable and paintable interface preset under [`docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md`](../../../docs/INTERFACE_PRESET_SCULPT_PAINT_STANDARD.md). Geometry, placement, palette, roughness, wear and accent intensity remain editable and bake only for the selected runtime tier.
 
+## Material Batch 55 — interface graphs, accessibility and inhabited details
+
+![Material Batch 55 contact sheet](./review/material-batch-55-interface-graph-accessibility-inhabited-details.jpg)
+
+M487 passes at `R02` as a text-free sparse inhabited-detail atlas. M489 supplies abstract typography-state masks without binding the preset to a specific typeface. M494 validates the dominant clean white stage across closed, shallow-drawer, detached-drawer and clean-canvas states. M496–M497 pass as four-view references for the sleeping punk Goblin racer and paired paint-can prop.
+
+M491 and M493 are constrained passes: their component mechanics are useful, but reconstruction must restore the approved bright white scene-first context and avoid domestic-cabinet readings. Regenerate M490, M492 and M495 because generated captions violate the icon and component contract. All interaction meaning comes from registered semantic state IDs, never from generated text or pixel inference.
+
 ### Next interface work
 
-Regenerate M487 without letter-like forms, add typography-state and accessibility-focus presets, and assemble complete scene-first toolbar/drawer/stage graphs from the approved child libraries.
+Regenerate M490, M492 and M495 without captions, then register complete parent graphs binding the approved toolbar, drawer, stage, icon-family, focus-state, inhabited-detail and runtime-bake children.

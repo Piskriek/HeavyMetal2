@@ -47,6 +47,9 @@
       ],
       "@hm/physics": [
         "packages/physics/src/index.ts"
+      ],
+      "@hm/engine": [
+        "packages/engine/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

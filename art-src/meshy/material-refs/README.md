@@ -522,8 +522,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M269 | Patinated copper | Roof details, vessels and decorative fixtures | Pass. Excellent copper, turquoise patina, exposed rubs and coordinated crust height. |
 | M270 | Aged brass | Handles, taps, lamps and mechanical trim | Pass. Strong tarnish, hand oils, polished wear and restrained green oxidation. |
 
+## Material Batch 29 — coastal and maritime utility materials
+
+![Material Batch 29 coastal-maritime contact sheet](./review/material-batch-29-coastal-maritime-contact-sheet.jpg)
+
+| ID | Maritime material | Use | Status and production note |
+|---|---|---|---|
+| M271 | Marine rope | Moorings, railings and wrapped geometry | Pass. Strong salt-aged twist, algae tint and LOD-safe strand depth. |
+| M272 | Fishing net | Nets, traps and breathable barriers | Pass. Clean broad diamond mesh, chunky knots and matched mip-safe alpha. |
+| M273 | Weathered buoy plastic | Buoys, floats and marine safety props | Pass. Strong orange UV fade, dock rubs, salt streaks and shallow gouges. |
+| M274 | Salt-crusted steel | Marine machinery, hulls and dock hardware | Pass. Excellent steel, rust, salt crust and pitting separation. |
+| M275 | Boat fiberglass | Hulls, small craft and marine repairs | **Weak—regenerate.** Gelcoat wear is useful, but generated channel labels violate the clean-sheet standard. |
+| M276 | Antifouling paint | Hull undersides and submerged structures | Pass. Strong copper-red chalking, erosion, waterline grime and bio-staining. |
+| M277 | Wet dock timber | Piers, jetties and waterside structures | Pass. Excellent water-darkened grain, algae bands, splits and marine-borer pits. |
+| M278 | Barnacle shell coverage | Dense intertidal carpets and marine buildup | Pass. Excellent packed shell silhouettes, deep openings and LOD-readable coverage. |
+| M279 | Dried seaweed atlas | Shore carpets, debris and coastal decals | Pass. Strong varied ribbon clusters, clean alpha and multiple rearrangeable scales. |
+| M280 | Aged sailcloth | Sails, awnings, screens and marine canvas | Pass. Calm heavy weave, salt staining, mildew and turquoise repair transfer. |
+
 ## Next material batches
 
-### Batch 29 — coastal and maritime utility materials
+### Batch 30 — shoreline ground and tidal materials
 
-Marine rope, fishing net, weathered buoy plastic, salt-crusted steel, boat fiberglass, antifouling paint, wet dock timber, barnacle shell coverage, dried seaweed and aged sailcloth.
+Wet compact sand, rippled tidal sand, tidal mud, coral limestone, sea-polished stones, shell hash, driftwood, algae-coated rock, pumice gravel and tar-ball beach residue.

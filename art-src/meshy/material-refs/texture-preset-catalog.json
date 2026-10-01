@@ -4830,6 +4830,526 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M442",
+      "canonicalCode": "HM2-TXP-M442-SPT-TURF-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports artificial turf pbr sheet",
+      "sourceFile": "M442-sports-artificial-turf-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TURF",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M443",
+      "canonicalCode": "HM2-TXP-M443-SPT-COURT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports clay court pbr sheet",
+      "sourceFile": "M443-sports-clay-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "COURT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M444",
+      "canonicalCode": "HM2-TXP-M444-SPT-COURT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports acrylic hard court pbr sheet",
+      "sourceFile": "M444-sports-acrylic-hard-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "COURT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M445",
+      "canonicalCode": "HM2-TXP-M445-SPT-COURT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports indoor timber court pbr sheet",
+      "sourceFile": "M445-sports-indoor-timber-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "COURT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M447",
+      "canonicalCode": "HM2-TXP-M447-SPT-ICE-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports ice rink pbr sheet",
+      "sourceFile": "M447-sports-ice-rink-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ICE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M448",
+      "canonicalCode": "HM2-TXP-M448-SPT-COURT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports pool deck tile pbr sheet",
+      "sourceFile": "M448-sports-pool-deck-tile-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "COURT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M449",
+      "canonicalCode": "HM2-TXP-M449-SPT-MAT-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports combat mat pbr sheet",
+      "sourceFile": "M449-sports-combat-mat-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "MAT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
+    },
+    {
+      "registryId": "M450",
+      "canonicalCode": "HM2-TXP-M450-SPT-SAND-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports beach sand pbr sheet",
+      "sourceFile": "M450-sports-beach-sand-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "SAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height reference"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "2 m square",
+      "mipPolicy": "Preserve sport-surface identity and contact wear.",
+      "intendedUses": [
+        "brand-neutral global sports surfaces"
+      ],
+      "prohibitedUses": [
+        "baked field lines",
+        "branded venues"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "wear",
+        "wetness",
+        "friction"
+      ],
+      "recipe": {
+        "intent": "Global sports playing surface with detachable markings.",
+        "required": [
+          "material identity",
+          "broad contact wear"
+        ],
+        "forbidden": [
+          "logos",
+          "labels",
+          "baked lighting"
+        ],
+        "frequency": "surface remains readable at fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 49 partial"
     }
   ]
 }

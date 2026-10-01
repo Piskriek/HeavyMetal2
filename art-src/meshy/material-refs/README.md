@@ -873,9 +873,15 @@ M432, M433 and M437 pass after strict regeneration from shared authoritative fie
 
 ## Next material batches
 
-### Batches 49–51 — global sports preset foundations
+### Batch 49 — global sports playing surfaces — in progress
 
-Build sports textures in all three established styles: full-fidelity PBR, mobile low-resolution PBR and nostalgic PBR. Begin with:
+![Material Batch 49 partial contact sheet](./review/material-batch-49-sports-surfaces-partial-contact-sheet.jpg)
+
+Generated M442–M445 and M447–M450. M442 artificial turf, M443 clay court, M444 acrylic hard court, M448 pool-deck tile and M449 combat mat pass. M445 timber court requires a strict four-quadrant regeneration; M447 ice requires removal of generated labels; M450 beach-sport sand lacks a clear BaseColor quadrant. M441 natural turf and M446 athletics rubber remain pending after the image service returned resource-exhaustion errors. All existing sheets have canonical `SPT` catalog records.
+
+### Batches 50–51 — global sports preset foundations
+
+Complete sports textures in all three established styles: full-fidelity PBR, mobile low-resolution PBR and nostalgic PBR. Continue with:
 
 - universal grass, clay, hard-court, timber-court, track, ice, pool-deck and combat-mat surfaces;
 - detachable line/zone masks for association football, rugby, cricket, hockey, tennis, badminton, basketball, netball, volleyball, handball, futsal, athletics and regional variants;

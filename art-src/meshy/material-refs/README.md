@@ -1100,3 +1100,11 @@ M568–M571 and M573–M577 pass as nostalgic and full-fidelity vertical-fringe 
 ![Material Batch 74 contact sheet](./review/material-batch-74-runtime-island-transition-variants.jpg)
 
 M572 now passes at `R02` with a corrected grayscale/emissive guide. M578–M582 and M584–M586 pass as mobile and nostalgic transition children. M583 is queued because its generated quadrants are misordered: the upper-left slot contains Normal-like data rather than the registered BaseColor transition.
+
+## Material Batch 75 — transition corrections and sports structures
+
+![Material Batch 75 contact sheet](./review/material-batch-75-transition-corrections-sports-structures.jpg)
+
+M583 now passes at `R02`. M587, M588 and M591 pass as nostalgic transition children; M590 requires regeneration because its BaseColor quadrant was replaced by Normal-like data. M592–M594 pass as brand-neutral net-cord, painted-post and wicket-timber materials. M595 is a constrained pass: the coordinated hoop/backboard regions are useful, but production must resolve its vivid lower-right transmission/metal guide from the registered recipe rather than pixel color.
+
+M589 was not registered because the image service returned no image; its ID remains unused rather than pointing to a missing asset.

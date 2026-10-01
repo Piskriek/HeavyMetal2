@@ -14542,7 +14542,7 @@
     },
     {
       "registryId": "M583",
-      "canonicalCode": "HM2-TXP-M583-ENV-EARTHROOT-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M583-ENV-EARTHROOT-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile island earth to roots underside transition pbr sheet",
       "sourceFile": "M583-mobile-island-earth-to-roots-underside-transition-pbr-sheet.png",
       "domain": "ENV",
@@ -14604,9 +14604,9 @@
         ],
         "frequency": "both identities survive PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 74 runtime island transition variants"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 75 fixed-channel correction"
     },
     {
       "registryId": "M584",
@@ -14812,6 +14812,554 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 74 runtime island transition variants"
+    },
+    {
+      "registryId": "M587",
+      "canonicalCode": "HM2-TXP-M587-ENV-BASLAVA-TRN-BCNROHE-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island basalt to lava transition pbr sheet",
+      "sourceFile": "M587-nostalgic-island-basalt-to-lava-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASLAVA",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": "M572",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M588",
+      "canonicalCode": "HM2-TXP-M588-ENV-GRASSDRY-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island tropical to dry grass transition pbr sheet",
+      "sourceFile": "M588-nostalgic-island-tropical-to-dry-grass-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASSDRY",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": "M574",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M590",
+      "canonicalCode": "HM2-TXP-M590-ENV-EARTHROOT-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island earth to roots underside transition pbr sheet",
+      "sourceFile": "M590-nostalgic-island-earth-to-roots-underside-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "EARTHROOT",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": "M576",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M591",
+      "canonicalCode": "HM2-TXP-M591-ENV-ROOTSTAL-TRN-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island roots to stalactite transition pbr sheet",
+      "sourceFile": "M591-nostalgic-island-roots-to-stalactite-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "ROOTSTAL",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": "M577",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M592",
+      "canonicalCode": "HM2-TXP-M592-SPT-NET-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports goal net cord pbr sheet",
+      "sourceFile": "M592-sports-goal-net-cord-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "NET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M593",
+      "canonicalCode": "HM2-TXP-M593-SPT-POST-TIL-BCNRMOH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports painted goal post metal pbr sheet",
+      "sourceFile": "M593-sports-painted-goal-post-metal-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "POST",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M594",
+      "canonicalCode": "HM2-TXP-M594-SPT-WICKET-TIL-BCNROH-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports wicket stump timber pbr sheet",
+      "sourceFile": "M594-sports-wicket-stump-timber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "WICKET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
+    },
+    {
+      "registryId": "M595",
+      "canonicalCode": "HM2-TXP-M595-SPT-HOOP-TIL-BCNRMOT-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "name": "sports hoop backboard composite pbr sheet",
+      "sourceFile": "M595-sports-hoop-backboard-composite-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "HOOP",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or material kit",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "registered AO/Height/Alpha/Metallic/Transmission guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "transition-parent scale or object-relative UV",
+      "mipPolicy": "Preserve broad identity, silhouette and material separation.",
+      "intendedUses": [
+        "Basalt Isle transition or brand-neutral global sports structure material"
+      ],
+      "prohibitedUses": [
+        "branding",
+        "misordered quadrants",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Runtime transition or reusable global sports structure material.",
+        "required": [
+          "fixed quadrant order",
+          "text-free square canvas",
+          "broad LOD-safe identity"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives fallback tier"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 75 transition corrections and sports structures"
     }
   ]
 }

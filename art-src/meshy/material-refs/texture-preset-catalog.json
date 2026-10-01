@@ -6491,6 +6491,826 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 51"
+    },
+    {
+      "registryId": "M467",
+      "canonicalCode": "HM2-TXP-M467-UI-NAV-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean navigation-workspace icon atlas",
+      "sourceFile": "M467-ui-clean-navigation-workspace-icon-atlas.png",
+      "domain": "UI",
+      "material": "NAV",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "home",
+          "world",
+          "object",
+          "part",
+          "material",
+          "texture",
+          "goblin",
+          "interface",
+          "back",
+          "forward",
+          "depth-up",
+          "depth-down",
+          "focus",
+          "orbit",
+          "pan",
+          "reset-view"
+        ]
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M468",
+      "canonicalCode": "HM2-TXP-M468-UI-SCULPT-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean sculpt-paint-tool icon atlas",
+      "sourceFile": "M468-ui-clean-sculpt-paint-tool-icon-atlas.png",
+      "domain": "UI",
+      "material": "SCULPT",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "sculpt-raise",
+          "sculpt-lower",
+          "smooth",
+          "flatten",
+          "pinch",
+          "inflate",
+          "paint",
+          "erase",
+          "material-fill",
+          "sample",
+          "alpha-stamp",
+          "pattern-spray",
+          "mask",
+          "symmetry",
+          "undo",
+          "redo"
+        ]
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M469",
+      "canonicalCode": "HM2-TXP-M469-UI-CHAN-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean material-channel icon atlas",
+      "sourceFile": "M469-ui-clean-material-channel-icon-atlas.png",
+      "domain": "UI",
+      "material": "CHAN",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "material",
+          "base-color",
+          "normal",
+          "roughness",
+          "metallic",
+          "ao",
+          "height",
+          "alpha",
+          "emissive",
+          "transmission",
+          "distortion",
+          "subsurface",
+          "uv-tile",
+          "shader-scroll",
+          "palette",
+          "bake"
+        ]
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M470",
+      "canonicalCode": "HM2-TXP-M470-UI-GOBLIN-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean goblin-creator icon atlas",
+      "sourceFile": "M470-ui-clean-goblin-creator-icon-atlas.png",
+      "domain": "UI",
+      "material": "GOBLIN",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "head",
+          "ears",
+          "eyes",
+          "nose",
+          "mouth",
+          "teeth",
+          "horns",
+          "hair",
+          "skin",
+          "blemish",
+          "proportions",
+          "hands",
+          "clothing",
+          "accessory",
+          "pose",
+          "variant"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M471",
+      "canonicalCode": "HM2-TXP-M471-UI-VEHICLE-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean vehicle-track icon atlas",
+      "sourceFile": "M471-ui-clean-vehicle-track-icon-atlas.png",
+      "domain": "UI",
+      "material": "VEHICLE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "vehicle-body",
+          "wheel",
+          "suspension",
+          "engine",
+          "engine-bay",
+          "plate-stamp",
+          "exhaust",
+          "steering",
+          "track",
+          "checkpoint",
+          "ramp",
+          "loop",
+          "bank",
+          "hazard",
+          "start",
+          "test-drive"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M472",
+      "canonicalCode": "HM2-TXP-M472-UI-WEATHER-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean weather-season icon atlas",
+      "sourceFile": "M472-ui-clean-weather-season-icon-atlas.png",
+      "domain": "UI",
+      "material": "WEATHER",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "sun",
+          "cloud",
+          "rain",
+          "storm",
+          "wind",
+          "fog",
+          "snow",
+          "ice",
+          "heat",
+          "wetness",
+          "tide",
+          "spring",
+          "summer",
+          "autumn",
+          "winter",
+          "recover"
+        ]
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M473",
+      "canonicalCode": "HM2-TXP-M473-UI-DAMAGE-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean destruction-repair icon atlas",
+      "sourceFile": "M473-ui-clean-destruction-repair-icon-atlas.png",
+      "domain": "UI",
+      "material": "DAMAGE",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "impact",
+          "carve",
+          "stable-hole",
+          "support-loss",
+          "collapse",
+          "fracture",
+          "chunks",
+          "velocity",
+          "spin",
+          "bounce",
+          "dissolve",
+          "rigidity",
+          "reinforce",
+          "patch",
+          "repair",
+          "restore"
+        ]
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M474",
+      "canonicalCode": "HM2-TXP-M474-UI-SPORT-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean global-sports-tool icon atlas",
+      "sourceFile": "M474-ui-clean-global-sports-tool-icon-atlas.png",
+      "domain": "UI",
+      "material": "SPORT",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "surface",
+          "rule-line",
+          "zone",
+          "round-ball",
+          "oval-ball",
+          "shuttle",
+          "puck",
+          "goal",
+          "net",
+          "posts",
+          "wickets",
+          "hoop",
+          "target",
+          "lane",
+          "score",
+          "rules"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M475",
+      "canonicalCode": "HM2-TXP-M475-UI-AI-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean local-ai-preset icon atlas",
+      "sourceFile": "M475-ui-clean-local-ai-preset-icon-atlas.png",
+      "domain": "UI",
+      "material": "AI",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "generate",
+          "adjust",
+          "regenerate",
+          "seed",
+          "variations",
+          "canonical-code",
+          "resolve-recipe",
+          "modularize",
+          "inspect",
+          "validate",
+          "mismatch",
+          "bake",
+          "lod",
+          "mobile",
+          "save",
+          "remix"
+        ]
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
+    },
+    {
+      "registryId": "M476",
+      "canonicalCode": "HM2-TXP-M476-UI-DRAWER-ATL-A-CLN-PX256-AT16-CLN-P02-BL-R01",
+      "name": "clean drawer-canvas-control icon atlas",
+      "sourceFile": "M476-ui-clean-drawer-canvas-control-icon-atlas.png",
+      "domain": "UI",
+      "material": "DRAWER",
+      "form": "ATL",
+      "channels": [
+        "Alpha"
+      ],
+      "channelLayout": {
+        "atlas": "4x4 row-major semantic slots",
+        "background": "reference only; production export transparent"
+      },
+      "style": "CLN",
+      "targetTier": "PX256",
+      "fallbackTier": "PX64",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P02",
+        "maximumColors": 2
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "24\u201348 screen pixels per icon",
+      "mipPolicy": "Preserve silhouette and action distinction before interior detail.",
+      "intendedUses": [
+        "swappable custom-interface icon family",
+        "scene-first detachable drawers"
+      ],
+      "prohibitedUses": [
+        "reassigning semantic IDs",
+        "rounded button chrome",
+        "embedded text labels"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "stroke",
+        "fill",
+        "corner profile",
+        "accent",
+        "wear",
+        "state"
+      ],
+      "recipe": {
+        "intent": "Stable semantic icon identities with sculptable and paintable visual treatment.",
+        "required": [
+          "one icon per semantic slot",
+          "consistent family grammar",
+          "transparent production alpha"
+        ],
+        "forbidden": [
+          "words",
+          "logos",
+          "semantic reassignment"
+        ],
+        "frequency": "silhouette remains distinct at mobile fallback",
+        "semanticIds": [
+          "drawer-open",
+          "drawer-close",
+          "detach",
+          "reattach",
+          "dock-left",
+          "dock-right",
+          "dock-bottom",
+          "deeper",
+          "back-level",
+          "toolbar-collapse",
+          "toolbar-expand",
+          "clean-canvas",
+          "fullscreen",
+          "pin",
+          "search",
+          "selected"
+        ]
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 52 clean interface icon atlases"
     }
   ]
 }

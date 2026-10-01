@@ -11,6 +11,256 @@
   },
   "presets": [
     {
+      "registryId": "M351",
+      "canonicalCode": "HM2-TXP-M351-ENV-TRACK-TIL-BCNROH-MOB-PX128-Q4-WRN-P08-BL-R02",
+      "name": "Mobile track asphalt",
+      "sourceFile": "M351-mobile-track-asphalt-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO/Height or Alpha mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "repeat",
+      "physicalScale": "world relative",
+      "mipPolicy": "Mobile broad-form preservation.",
+      "intendedUses": [
+        "mobile environmental material"
+      ],
+      "prohibitedUses": [
+        "unreviewed hero closeup"
+      ],
+      "parentPreset": "M421",
+      "editableParameters": [
+        "coverage",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Mobile track asphalt corrected mobile preset.",
+        "required": [
+          "broad readable forms",
+          "coordinated channels"
+        ],
+        "forbidden": [
+          "labels",
+          "landscape layout",
+          "micro-noise"
+        ],
+        "frequency": "features survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 legacy backfill"
+    },
+    {
+      "registryId": "M361",
+      "canonicalCode": "HM2-TXP-M361-ENV-SNOW-TIL-BCNROH-MOB-PX128-Q4-MIX-P08-BL-R02",
+      "name": "Mobile snow cover",
+      "sourceFile": "M361-mobile-snow-cover-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "SNOW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO/Height or Alpha mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "repeat",
+      "physicalScale": "world relative",
+      "mipPolicy": "Mobile broad-form preservation.",
+      "intendedUses": [
+        "mobile environmental material"
+      ],
+      "prohibitedUses": [
+        "unreviewed hero closeup"
+      ],
+      "parentPreset": "M395",
+      "editableParameters": [
+        "coverage",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Mobile snow cover corrected mobile preset.",
+        "required": [
+          "broad readable forms",
+          "coordinated channels"
+        ],
+        "forbidden": [
+          "labels",
+          "landscape layout",
+          "micro-noise"
+        ],
+        "frequency": "features survive PX64"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 legacy backfill"
+    },
+    {
+      "registryId": "M362",
+      "canonicalCode": "HM2-TXP-M362-ENV-FROST-MSK-BCNRA-MOB-PX128-Q4-WET-P06-BL-R02",
+      "name": "Mobile frost mask",
+      "sourceFile": "M362-mobile-frost-mask-sheet.png",
+      "domain": "ENV",
+      "material": "FROST",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO/Height or Alpha mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WET",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "BL",
+      "wrap": "repeat",
+      "physicalScale": "world relative",
+      "mipPolicy": "Mobile broad-form preservation.",
+      "intendedUses": [
+        "mobile environmental material"
+      ],
+      "prohibitedUses": [
+        "unreviewed hero closeup"
+      ],
+      "parentPreset": "M425",
+      "editableParameters": [
+        "coverage",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Mobile frost mask corrected mobile preset.",
+        "required": [
+          "broad readable forms",
+          "coordinated channels"
+        ],
+        "forbidden": [
+          "labels",
+          "landscape layout",
+          "micro-noise"
+        ],
+        "frequency": "features survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 legacy backfill"
+    },
+    {
+      "registryId": "M363",
+      "canonicalCode": "HM2-TXP-M363-ENV-WET-MSK-BCNRA-MOB-PX128-Q4-WET-P06-BL-R02",
+      "name": "Mobile wetness overlay",
+      "sourceFile": "M363-mobile-wetness-overlay-mask-sheet.png",
+      "domain": "ENV",
+      "material": "WET",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or condition guide",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO/Height or Alpha mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WET",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "BL",
+      "wrap": "repeat",
+      "physicalScale": "world relative",
+      "mipPolicy": "Mobile broad-form preservation.",
+      "intendedUses": [
+        "mobile environmental material"
+      ],
+      "prohibitedUses": [
+        "unreviewed hero closeup"
+      ],
+      "parentPreset": "M396",
+      "editableParameters": [
+        "coverage",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Mobile wetness overlay corrected mobile preset.",
+        "required": [
+          "broad readable forms",
+          "coordinated channels"
+        ],
+        "forbidden": [
+          "labels",
+          "landscape layout",
+          "micro-noise"
+        ],
+        "frequency": "features survive PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 legacy backfill"
+    },
+    {
       "registryId": "M371",
       "canonicalCode": "HM2-TXP-M371-ENV-ROCK-TIL-BCNROH-PXL3D-PX128-Q4-WRN-P12-PT-R01",
       "name": "Early-3D pixel-painted tropical rock",
@@ -3701,7 +3951,7 @@
     },
     {
       "registryId": "M427",
-      "canonicalCode": "HM2-TXP-M427-GEN-SUPPORT-ATL-BCNRA-PXL3D-PX256-AT16-BRN-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M427-GEN-SUPPORT-ATL-BCNRA-PXL3D-PX256-AT16-BRN-P10-PT-R02",
       "name": "nostalgic support collapse mask sheet",
       "sourceFile": "M427-nostalgic-support-collapse-mask-sheet.png",
       "domain": "GEN",
@@ -3758,13 +4008,13 @@
         ],
         "frequency": "primary forms survive PX128 fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 45"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 regeneration"
     },
     {
       "registryId": "M428",
-      "canonicalCode": "HM2-TXP-M428-ENV-RECOVERY-ATL-BCNRA-PXL3D-PX256-AT16-MIX-P10-PT-R01",
+      "canonicalCode": "HM2-TXP-M428-ENV-RECOVERY-ATL-BCNRA-PXL3D-PX256-AT16-MIX-P10-PT-R02",
       "name": "nostalgic recovery stage overlay sheet",
       "sourceFile": "M428-nostalgic-recovery-stage-overlay-sheet.png",
       "domain": "ENV",
@@ -3821,13 +4071,13 @@
         ],
         "frequency": "primary forms survive PX128 fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 45"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 regeneration"
     },
     {
       "registryId": "M429",
-      "canonicalCode": "HM2-TXP-M429-ENV-TRACKPROP-ATL-BCNRA-ARCRAC-PX256-AT16-WRN-P12-PT-R01",
+      "canonicalCode": "HM2-TXP-M429-ENV-TRACKPROP-ATL-BCNRA-ARCRAC-PX256-AT16-WRN-P12-PT-R02",
       "name": "nostalgic track prop material atlas",
       "sourceFile": "M429-nostalgic-track-prop-material-atlas.png",
       "domain": "ENV",
@@ -3884,9 +4134,9 @@
         ],
         "frequency": "primary forms survive PX128 fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 45"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 46 regeneration"
     },
     {
       "registryId": "M430",

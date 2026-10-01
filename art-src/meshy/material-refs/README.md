@@ -676,7 +676,7 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 
 | ID | Mobile material/effect | Intended tier | Status and production note |
 |---|---|---|---|
-| M351 | Racing-track asphalt | Mobile standard, `128 × 128` | **Weak—regenerate.** Bold values survive reduction, but the broken pale plates read as damaged concrete rather than continuous asphalt. |
+| M351 | Racing-track asphalt | Mobile standard, `128 × 128` | Pass after R02 regeneration. Continuous charcoal road mass, sparse aggregate and a broad polished racing band now read correctly. |
 | M352 | Racing-lane paint atlas | Mobile atlas, `256 × 256` | Pass. Excellent thick lines, corners, arcs and chevrons with bold palette and stable alpha. |
 | M353 | Tropical grass ground | Mobile standard, `128 × 128` | Pass with identity constraint. Strong packed rosette groundcover; use as broad-leaf turf rather than fine-blade grass. |
 | M354 | Mossy stone paving | Mobile standard, `128 × 128` | Pass. Excellent large stones, wide joints, lime moss accents and readable height. |
@@ -695,9 +695,9 @@ Authoring, packing, mip, alpha, fallback and validation requirements are defined
 
 | ID | Mobile material/effect | Intended tier | Status and production note |
 |---|---|---|---|
-| M361 | Snow cover | Mobile standard, `128 × 128` | **Weak—regenerate.** Useful broad melt shapes, but the source returned at `1408×768` rather than a square four-channel sheet. |
-| M362 | Frost masks | Mobile standard, `128 × 128` | **Weak—regenerate.** Clean alpha survives reduction, but the broad shapes read as pale leaves or feathers rather than surface frost. |
-| M363 | Wetness overlay | Mobile standard, `128 × 128` | **Weak—regenerate.** Strong runoff language, but the source returned at `1408×768` rather than the required square layout. |
+| M361 | Snow cover | Mobile standard, `128 × 128` | Constrained pass after R02 regeneration. Square coordinated drift channels now work; rebuild the decorative colored strip in the lower-right guide before production. |
+| M362 | Frost masks | Mobile standard, `128 × 128` | Pass after R02 regeneration. Chunky crystalline edge crust now reads as frost rather than foliage. |
+| M363 | Wetness overlay | Mobile standard, `128 × 128` | Pass after R02 regeneration. Square coordinated runoff, roughness and coverage masks. |
 | M364 | Puddle atlas | Mobile decal atlas, `256 × 256` | Pass. Excellent large puddles, dark wet rims and simple low ripples with clean alpha. |
 | M365 | Mud-splatter atlas | Mobile decal atlas, `256 × 256` | Pass. Strong chunky blobs, wheel arcs and short streaks without unstable tiny droplets. |
 | M366 | Fire atlas | Mobile VFX atlas, `256 × 256` | Pass. Excellent limited-palette flame silhouettes and broad intensity masks for low overdraw. |
@@ -840,8 +840,14 @@ M412–M417 and M419–M420 now pass after regeneration. Cardboard reads as pres
 
 Canonical codes and reconstruction records for M421–M430 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
 
+## Material Batch 46 — correction and regeneration pass
+
+![Material Batch 46 correction sheet](./review/material-batch-46-corrections-contact-sheet.jpg)
+
+M351, M362, M363 and M427–M429 now pass after regeneration. M361 is a constrained pass: its square snow channels are usable, but the decorative colored strip in the lower-right guide must be removed during production rebuild. Regenerated cataloged presets advanced to `R02`; legacy mobile M351 and M361–M363 now also have canonical reconstruction records.
+
 ## Next material batches
 
-### Batch 46 — correction and regeneration pass
+### Batch 47 — mobile grand-landscape overview materials
 
-Regenerate M427–M429 with strict coordinated channels, then correct earlier mobile weaknesses M351 asphalt, M361 snow, M362 frost and M363 wetness. Preserve canonical IDs and advance recipe revisions.
+Low-resolution biome overview fields, track/settlement hierarchy, shoreline readability, foliage-density maps, infrastructure masks, cinematic lighting zones, seasonal overview states, destruction/recovery overview masks, route signage fields and distant-island impostor materials.

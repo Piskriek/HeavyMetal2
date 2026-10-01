@@ -10644,7 +10644,7 @@
     },
     {
       "registryId": "M526",
-      "canonicalCode": "HM2-TXP-M526-ENV-BASEND-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M526-ENV-BASEND-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile island basalt column ends pbr sheet",
       "sourceFile": "M526-mobile-island-basalt-column-ends-pbr-sheet.png",
       "domain": "ENV",
@@ -10705,9 +10705,9 @@
         ],
         "frequency": "identity survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 68 mobile volcanic foundations"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 69 fixed-channel correction"
     },
     {
       "registryId": "M527",
@@ -10846,7 +10846,7 @@
     },
     {
       "registryId": "M529",
-      "canonicalCode": "HM2-TXP-M529-ENV-LAVACRUST-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M529-ENV-LAVACRUST-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile island lava crust pbr sheet",
       "sourceFile": "M529-mobile-island-lava-crust-pbr-sheet.png",
       "domain": "ENV",
@@ -10908,13 +10908,13 @@
         ],
         "frequency": "identity survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 68 mobile volcanic foundations"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 69 fixed-channel correction"
     },
     {
       "registryId": "M530",
-      "canonicalCode": "HM2-TXP-M530-ENV-EMBER-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M530-ENV-EMBER-TIL-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile island scorched embers pbr sheet",
       "sourceFile": "M530-mobile-island-scorched-embers-pbr-sheet.png",
       "domain": "ENV",
@@ -10976,13 +10976,13 @@
         ],
         "frequency": "identity survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 68 mobile volcanic foundations"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 69 fixed-channel correction"
     },
     {
       "registryId": "M531",
-      "canonicalCode": "HM2-TXP-M531-ENV-CRYSTAL-TIL-BCNROHT-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M531-ENV-CRYSTAL-TIL-BCNROHT-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile island crystal field pbr sheet",
       "sourceFile": "M531-mobile-island-crystal-field-pbr-sheet.png",
       "domain": "ENV",
@@ -11044,9 +11044,9 @@
         ],
         "frequency": "identity survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 68 mobile volcanic foundations"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 69 fixed-channel correction"
     },
     {
       "registryId": "M532",
@@ -11115,6 +11115,415 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 68 mobile volcanic foundations"
+    },
+    {
+      "registryId": "M533",
+      "canonicalCode": "HM2-TXP-M533-ENV-GRASS-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island short tropical grass pbr sheet",
+      "sourceFile": "M533-mobile-island-short-tropical-grass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and simplified value groups.",
+      "intendedUses": [
+        "mobile Basalt Isle terrain, foliage or water bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M513",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving parent surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 69 mobile island surfaces"
+    },
+    {
+      "registryId": "M534",
+      "canonicalCode": "HM2-TXP-M534-ENV-DRYGRASS-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island dry golden grass pbr sheet",
+      "sourceFile": "M534-mobile-island-dry-golden-grass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "DRYGRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and simplified value groups.",
+      "intendedUses": [
+        "mobile Basalt Isle terrain, foliage or water bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M514",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving parent surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 69 mobile island surfaces"
+    },
+    {
+      "registryId": "M535",
+      "canonicalCode": "HM2-TXP-M535-ENV-DUNEGRASS-ATL-BCNROHA-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island dune grass alpha pbr sheet",
+      "sourceFile": "M535-mobile-island-dune-grass-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "DUNEGRASS",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and simplified value groups.",
+      "intendedUses": [
+        "mobile Basalt Isle terrain, foliage or water bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M515",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving parent surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 69 mobile island surfaces"
+    },
+    {
+      "registryId": "M536",
+      "canonicalCode": "HM2-TXP-M536-ENV-WETSAND-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island wet sand pbr sheet",
+      "sourceFile": "M536-mobile-island-wet-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WETSAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and simplified value groups.",
+      "intendedUses": [
+        "mobile Basalt Isle terrain, foliage or water bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M516",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving parent surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 69 mobile island surfaces"
+    },
+    {
+      "registryId": "M537",
+      "canonicalCode": "HM2-TXP-M537-ENV-USAND-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island underwater sand pbr sheet",
+      "sourceFile": "M537-mobile-island-underwater-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "USAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and simplified value groups.",
+      "intendedUses": [
+        "mobile Basalt Isle terrain, foliage or water bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M520",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving parent surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 69 mobile island surfaces"
+    },
+    {
+      "registryId": "M538",
+      "canonicalCode": "HM2-TXP-M538-ENV-LAGOON-TIL-BCNRTD-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island deep lagoon water shader sheet",
+      "sourceFile": "M538-mobile-island-deep-lagoon-water-shader-sheet.png",
+      "domain": "ENV",
+      "material": "LAGOON",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Transmission",
+        "Distortion"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or flow guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve broad silhouette and simplified value groups.",
+      "intendedUses": [
+        "mobile Basalt Isle terrain, foliage or water bake"
+      ],
+      "prohibitedUses": [
+        "micro-noise",
+        "misordered quadrants",
+        "visible repeated focus"
+      ],
+      "parentPreset": "M518",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "flow"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving parent surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "broad pixel-readable forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "channel-order substitution"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 69 mobile island surfaces"
     }
   ]
 }

@@ -1064,3 +1064,9 @@ M078, M175, M176, M203, M245, M319, M464 and M523 now pass. M464 advances to `R0
 ![Material Batch 68 contact sheet](./review/material-batch-68-mobile-volcanic-and-mask-corrections.jpg)
 
 M127 and M311 now pass after removing closed armor-like padding cells and assembled anatomy respectively. M525, M527, M528 and M532 pass as mobile obsidian, basalt-face, lava-river and geode children. Regenerate M526, M529, M530 and M531 because their generated channel quadrants are misordered despite useful visual content.
+
+## Material Batch 69 — mobile island surfaces and corrections
+
+![Material Batch 69 contact sheet](./review/material-batch-69-mobile-island-surfaces-corrections.jpg)
+
+M526, M529, M530 and M531 now pass at `R02` with the fixed BaseColor/Normal/Roughness/guide quadrant order. M533–M538 add passing mobile children for tropical grass, dry grass, dune-grass tufts, wet sand, underwater rippled sand and independently scrolling deep-lagoon water.

@@ -195,6 +195,11 @@ export class IslandSurfaceArray {
   }
 
   readonly texture: THREE.DataArrayTexture;
+  /**
+   * The same layers' PBR maps: R = normal x, G = normal y (+G = +v of the tile), B = roughness, A = 255 when the layer
+   * has a real map and 0 when it does not (the shader then keeps the surface's own roughness and the tile's height bump).
+   */
+  readonly pbrTexture: THREE.DataArrayTexture;
   /** vec4 per layer: world units per repeat, roughness, height contrast, 0. */
   readonly params: THREE.Vector4[];
   /** A 64 px picture per surface ID, for the palette and preset cards. */
@@ -230,13 +235,30 @@ export class IslandSurfaceArray {
     this.texture.anisotropy = 8;
     this.texture.needsUpdate = true;
 
+    // No PBR maps yet: flat normals, alpha 0 = "none".
+    const pbr = new Uint8Array(size * size * 4 * layers);
+    for (let i = 0; i < pbr.length; i += 4) { pbr[i] = 128; pbr[i + 1] = 128; pbr[i + 2] = 200; pbr[i + 3] = 0; }
+    this.pbrData = pbr;
+    this.pbrTexture = new THREE.DataArrayTexture(pbr, size, size, layers);
+    this.pbrTexture.format = THREE.RGBAFormat;
+    this.pbrTexture.type = THREE.UnsignedByteType;
+    this.pbrTexture.colorSpace = THREE.NoColorSpace; // data, not colour
+    this.pbrTexture.wrapS = this.pbrTexture.wrapT = THREE.RepeatWrapping;
+    this.pbrTexture.magFilter = THREE.LinearFilter;
+    this.pbrTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    this.pbrTexture.generateMipmaps = true;
+    this.pbrTexture.anisotropy = 4;
+    this.pbrTexture.needsUpdate = true;
+
     this.params = ISLAND_SURFACES.map((s) => new THREE.Vector4(s.repeat, surfaceDefinition(s.id).roughness, s.height.contrast, 0));
     this.ready = typeof document === 'undefined' ? Promise.resolve() : this.load();
   }
 
   private readonly size: number;
   private readonly data: Uint8Array;
+  private readonly pbrData: Uint8Array;
   private canvas: HTMLCanvasElement | null = null;
+  private pbrCanvas: HTMLCanvasElement | null = null;
   /** The tile each layer shows now (its URL). */
   private readonly urls: string[] = ISLAND_SURFACES.map((s) => ISLAND_TEXTURE_DIR + s.file);
 
@@ -288,15 +310,37 @@ export class IslandSurfaceArray {
    * Swaps one layer's tile (any image URL: a library tile). Its height is read with the surface's own
    * recipe, so a new grass tile still stands up out of sand. Resolves false when the image fails.
    */
-  async setLayerImage(layer: number, url: string): Promise<boolean> {
+  async setLayerImage(layer: number, url: string, pbrUrl?: string): Promise<boolean> {
     if (layer < 0 || layer >= ISLAND_SURFACES.length || this.urls[layer] === url) return true;
     await this.ready;
-    const img = await decode(url);
+    const [img, pbr] = await Promise.all([decode(url), pbrUrl ? decode(pbrUrl) : Promise.resolve(null)]);
     if (!img) return false;
     this.urls[layer] = url;
     this.write(layer, img);
+    this.writePbr(layer, pbr);
     this.texture.needsUpdate = true;
+    this.pbrTexture.needsUpdate = true;
     return true;
+  }
+
+  /** A layer's PBR maps (see `pbrTexture`); null puts the layer back to "none". */
+  private writePbr(layer: number, img: HTMLImageElement | null) {
+    const size = this.size;
+    const offset = layer * size * size * 4;
+    if (!img || typeof document === 'undefined') {
+      for (let i = 0; i < size * size * 4; i += 4) {
+        this.pbrData[offset + i] = 128; this.pbrData[offset + i + 1] = 128; this.pbrData[offset + i + 2] = 200; this.pbrData[offset + i + 3] = 0;
+      }
+      return;
+    }
+    if (!this.pbrCanvas) { this.pbrCanvas = document.createElement('canvas'); this.pbrCanvas.width = this.pbrCanvas.height = size; }
+    const g = this.pbrCanvas.getContext('2d', { willReadFrequently: true });
+    if (!g) return;
+    g.clearRect(0, 0, size, size);
+    g.drawImage(img, 0, 0, size, size);
+    const px = g.getImageData(0, 0, size, size).data;
+    for (let i = 3; i < px.length; i += 4) px[i] = 255;
+    this.pbrData.set(px, offset);
   }
 
   private write(layer: number, img: HTMLImageElement) {
@@ -317,7 +361,7 @@ export class IslandSurfaceArray {
     this.thumbs.set(surface.id, t.toDataURL('image/jpeg', 0.85));
   }
 
-  dispose() { this.texture.dispose(); }
+  dispose() { this.texture.dispose(); this.pbrTexture.dispose(); }
 }
 
 function decode(url: string): Promise<HTMLImageElement | null> {

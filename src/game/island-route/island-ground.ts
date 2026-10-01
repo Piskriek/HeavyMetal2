@@ -202,6 +202,7 @@ float gNear = 0.0;
 // and how wet the waterline makes it.
 float gAtlas = 0.0;
 float gAtlasRough = 1.0;
+vec3 gAtlasBump = vec3(0.0);   // the painted tile's PBR normal, as a world-space tilt (zero: none)
 float gWet = 0.0;
 uniform float groundBump;
 // A surface normal tilted by the slope of a height (screen-space derivatives; three.js's bump-map way).
@@ -346,6 +347,9 @@ export const GROUND_FRAGMENT_BODY = /* glsl */ `
     diffuseColor.rgb = mix(diffuseColor.rgb, tile.rgb * groundTint * groundBright, cover);
     gAtlas = cover;
     gAtlasRough = islRough(l0, l1, lw);
+    // The tile's own PBR maps (normal + roughness), where the library has them: real relief and real shine.
+    vec4 pbrTile = islPbrAt(l0, l1, lw, wp, gnrm);
+    if (pbrTile.w >= 0.0) { gAtlasRough = pbrTile.w; gAtlasBump = pbrTile.xyz; }
     // The tile's height lifts the relief, so light and shine catch grass blades and rock edges.
     gHeight = mix(gHeight, tile.a * 5.0, cover);
   }
@@ -488,6 +492,10 @@ export const GROUND_ROUGHNESS_BODY = /* glsl */ `
 /** GLSL after the normal is set up: pebbles stand up and cracks cut in (fading out with distance). */
 export const GROUND_RELIEF_BODY = /* glsl */ `
 {
+  if (gAtlas > 0.0 && dot(gAtlasBump, gAtlasBump) > 0.0) {
+    vec3 pn = normalize(normalize(vGroundNormal) + gAtlasBump);
+    normal = normalize(mix(normal, normalize((viewMatrix * vec4(pn, 0.0)).xyz) * faceDirection, gAtlas));
+  }
   vec2 dh = vec2(dFdx(gHeight), dFdy(gHeight)) * groundBump * gNear;
   if (groundBump > 0.0) normal = gBump(-vViewPosition, normal, dh);
 }
@@ -606,6 +614,8 @@ export class IslandGround {
       paintHalf: { value: PAINT_HALF },
       paintRes: { value: PAINT_RES },
       islSurfaces: { value: this.surfaces?.texture ?? null },
+      islPbr: { value: this.surfaces?.pbrTexture ?? null },
+      islNormalStrength: { value: 1 },
       islLayerOf: { value: Float32Array.from(ISLAND_LAYER_OF) },
       islParams: { value: this.surfaces?.params ?? [] },
       islSoft: { value: 0.6 },
@@ -673,8 +683,9 @@ export class IslandGround {
     if (!surfaces) return;
     const jobs: Promise<boolean>[] = [];
     ISLAND_SURFACES.forEach((surface, layer) => {
-      const url = libraryTexture(this.textureKeyOf(surface.id))?.url ?? ISLAND_TEXTURE_DIR + surface.file;
-      if (surfaces.urlOf(layer) !== url) jobs.push(surfaces.setLayerImage(layer, url));
+      const lib = libraryTexture(this.textureKeyOf(surface.id));
+      const url = lib?.url ?? ISLAND_TEXTURE_DIR + surface.file;
+      if (surfaces.urlOf(layer) !== url) jobs.push(surfaces.setLayerImage(layer, url, lib?.pbr));
     });
     if (jobs.length) this.textureLoads = Promise.all([this.textureLoads, ...jobs]).then(() => undefined);
   }

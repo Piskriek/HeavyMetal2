@@ -48,6 +48,10 @@ float surfNoise(vec2 p) {
 /** The uniforms every island-tile shader needs (ground and painted models alike). */
 const ISLAND_UNIFORMS_GLSL = /* glsl */ `
 uniform sampler2DArray islSurfaces;
+// The same layers' PBR maps: rg = tangent normal (0.5 flat, +g = +v), b = roughness, a = 1 when the layer has real maps.
+uniform sampler2DArray islPbr;
+// 0 = relief off, 1 = the maps as made.
+uniform float islNormalStrength;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 // Per layer: world units per repeat, roughness, height contrast, 0.
 uniform vec4 islParams[${ISLAND_LAYERS}];
@@ -169,6 +173,31 @@ vec4 islTriplanar(float la, float lb, float w, vec3 wp, vec3 n, vec3 dwx, vec3 d
   return acc / total;
 }
 
+/**
+ * The PBR maps of layers la, lb (B's share w) at a world position, projected along the face's dominant axis:
+ * xyz = the world-space bump (the tangent normal's x/y along the projection's u/v axes, so n + bump tilts the
+ * surface), w = roughness, or -1 where neither layer has maps. One projection only (a map is a small detail on
+ * top of the height bump the albedo already gives); the pick matches the ground's own pebble projection.
+ */
+vec4 islPbrAt(float la, float lb, float w, vec3 wp, vec3 n) {
+  vec3 an = abs(n);
+  bool top = an.y > 0.55;
+  bool xdom = an.x > an.z;
+  vec2 puv = top ? wp.xz : (xdom ? wp.zy : wp.xy);
+  vec3 U = top ? vec3(1.0, 0.0, 0.0) : (xdom ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0));
+  vec3 V = top ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
+  int ila = int(clamp(la + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  int ilb = int(clamp(lb + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
+  float repA = max(islParams[ila].x * islScale, 1.0);
+  float repB = max(islParams[ilb].x * islScale, 1.0);
+  vec4 a = texture(islPbr, vec3(puv / repA, float(ila)));
+  vec4 b = (ilb == ila) ? a : texture(islPbr, vec3(puv / repB, float(ilb)));
+  float has = mix(a.a, b.a, w);
+  if (has < 0.5) return vec4(0.0, 0.0, 0.0, -1.0);
+  vec2 t = (mix(a.rg, b.rg, w) - 0.5) * 2.0 * islNormalStrength;
+  return vec4(U * t.x + V * t.y, mix(a.b, b.b, w));
+}
+
 float islRough(float la, float lb, float w) {
   int ila = int(clamp(la + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
   int ilb = int(clamp(lb + 0.5, 0.0, float(${ISLAND_LAYERS} - 1)));
@@ -216,6 +245,8 @@ export function injectIslandModelShader(
 
     // Uniforms
     shader.uniforms['islSurfaces'] = { value: surfaceArray.texture };
+    shader.uniforms['islPbr'] = { value: surfaceArray.pbrTexture };
+    shader.uniforms['islNormalStrength'] = { value: 1.0 };
     shader.uniforms['islLayerOf'] = { value: ISLAND_LAYER_OF };
     shader.uniforms['islParams'] = { value: surfaceArray.params };
     shader.uniforms['islSoft'] = { value: 0.25 };

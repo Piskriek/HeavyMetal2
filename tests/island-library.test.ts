@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, statSync } from 'node:fs';
 import { ISLAND_LIB } from '../src/game/island-route/island-lib-index.generated';
-import { ISLAND_LIB_DIR, ISLAND_TEXTURE_LIBRARY, KINDS_FOR_SURFACE, libraryTexture, texturesFor } from '../src/game/island-route/island-texture-library';
+import { ISLAND_LIB_DIR, ISLAND_LIB_PBR_DIR, ISLAND_TEXTURE_LIBRARY, KINDS_FOR_SURFACE, libraryTexture, texturesFor } from '../src/game/island-route/island-texture-library';
 import { ISLAND_PALETTE } from '../src/game/island-route/island-surfaces';
 import { SURFACE_BEACH_GRASS, SURFACE_DRY_MUD } from '../src/game/surface/surface-table';
 
@@ -58,4 +58,17 @@ test('island-lib: every island surface is offered library tiles first', () => {
 test('island-lib: kinds the library adds are suggested where they fit', () => {
   assert.ok(KINDS_FOR_SURFACE[SURFACE_BEACH_GRASS]?.includes('forest'));
   assert.ok(KINDS_FOR_SURFACE[SURFACE_DRY_MUD]?.includes('litter'));
+});
+
+test('island-lib: every sheet tile has packed PBR maps, the salvaged ones do not, and nothing else is in the folder', () => {
+  const pbrDir = new URL('../public/textures/island-lib-pbr/', import.meta.url);
+  const pbrOnDisk = readdirSync(pbrDir).filter((f) => f.endsWith('.webp')).sort();
+  const expected = ISLAND_LIB.filter((e) => /-m\d{3}\.webp$/.test(e.file)).map((e) => e.file).sort();
+  assert.deepEqual(pbrOnDisk, expected);
+  for (const e of ISLAND_LIB) {
+    const t = libraryTexture(`lib/${e.file}`);
+    assert.equal(t?.pbr, expected.includes(e.file) ? ISLAND_LIB_PBR_DIR + e.file : undefined, e.file);
+  }
+  const total = pbrOnDisk.reduce((sum, f) => sum + statSync(new URL(f, pbrDir)).size, 0);
+  assert.ok(total <= 3 * 1048576, `island-lib-pbr is ${(total / 1048576).toFixed(1)} MB: keep it under 3 MB`);
 });

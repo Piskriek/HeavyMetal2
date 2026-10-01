@@ -19,6 +19,8 @@ import { ISLAND_SURFACES, ISLAND_TEXTURE_DIR } from './island-surfaces';
 
 /** Where the library's tiles are served from. In `public/` on purpose: `src/assets` is inlined into the RUN single-file build. */
 export const ISLAND_LIB_DIR = '/textures/island-lib/';
+/** The packed PBR maps of the library's sheet tiles (same file names): R/G tangent normal, B roughness. */
+export const ISLAND_LIB_PBR_DIR = '/textures/island-lib-pbr/';
 
 export interface LibraryTexture {
   /** Stable key saved with the ground: `original/<file>` or `library/<file>`. */
@@ -28,6 +30,8 @@ export interface LibraryTexture {
   readonly kind: string;
   /** Readable name from the file name. */
   readonly name: string;
+  /** The tile's packed PBR maps (normal xy + roughness), when it has them. */
+  readonly pbr?: string;
 }
 
 /** Which file-name kinds suit each surface (offered first when swapping its tile). */
@@ -69,7 +73,11 @@ const DROPPED: LibraryTexture[] = (() => {
 })();
 
 /** The Basalt Isle library (public/textures/island-lib): the name carries the sheet's id and says when a tile is provisional. */
-const LIB: LibraryTexture[] = ISLAND_LIB.map((e) => ({ key: `lib/${e.file}`, url: ISLAND_LIB_DIR + e.file, kind: e.kind, name: e.name }));
+const LIB: LibraryTexture[] = ISLAND_LIB.map((e) => ({
+  key: `lib/${e.file}`, url: ISLAND_LIB_DIR + e.file, kind: e.kind, name: e.name,
+  // every tile made from a sheet (id m###) has maps; the salvaged old-repo tiles (gp##) do not
+  pbr: /-m\d{3}\.webp$/.test(e.file) ? ISLAND_LIB_PBR_DIR + e.file : undefined,
+}));
 
 /** The game's own ground textures (public/textures), usable on the island too. */
 const GAME: LibraryTexture[] = ([

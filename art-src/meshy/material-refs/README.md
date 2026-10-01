@@ -61,7 +61,7 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 |---|---|---|---:|---|
 | M015 | Cooled lava crust | Volcanic shelves and crater | `3 × 3 m` | Pass after regeneration. Broad nondirectional rope folds and restrained heat staining. |
 | M021 | Palm trunk bark | Palm trunks | `1.5 × 1.5 m` | Pass. Broad horizontal growth rings and simple fibers remain readable through LOD. |
-| M022 | Broadleaf tree bark | Jungle tree trunks and branches | `1.5 × 1.5 m` | Pass. Deep irregular vertical plates with restrained color variation. |
+| M022 | Broadleaf tree bark | Jungle tree trunks and branches | `1.5 × 1.5 m` | Pass after square ingestion regeneration. Deep irregular vertical plates; real relief guide; no inset or text. |
 | M023 | Salt-weathered driftwood | Wreckage and shore dressing | `1.5 × 1.5 m` | **Weak—regenerate.** Material language is useful, but the sheet contains forbidden generated headings and channel labels. |
 | M024 | Palm frond atlas | Palm canopy cards | atlas | Pass. Six complete, well-padded silhouettes with useful age/color variation. |
 | M025 | Broadleaf canopy atlas | Jungle canopy cards | atlas | Pass. Eight broad leaf silhouettes and clean channel correspondence. |
@@ -174,11 +174,11 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 |---|---|---|---|
 | M065 | Road wear | Lanes, bends, intersections and shoulder polish | Pass. Broad directional shapes support painted racing lines without literal tire tread. |
 | M066 | Dampness | Seepage, puddle edges, drips and waterlines | Pass. Strong reusable material-response masks; color stays subordinate to roughness change. |
-| M067 | Soot and smoke | Plumes, blast rings, vent bars and hand smears | Pass. Useful soft-to-hard range with controlled feathering and no opaque smoke geometry. |
+| M067 | Soot and smoke | Plumes, blast rings, vent bars and hand smears | Pass after square ingestion regeneration. Text-free alpha data with real caked-soot relief. |
 | M068 | Rust runoff | Drips, seam strips, halos and corrosion blooms | Pass. Clear oxidation language and excellent isolated alpha forms. |
 | M069 | Sand accumulation | Drifts, crescents, corners and seam buildup | **Weak—regenerate.** Masks are useful, but several forms read as thick plaster slabs rather than shallow windblown sand. |
 | M070 | Tire scuffs | Arcs, braking streaks, scrub and donut marks | Pass. Clean low-relief racing vocabulary without repeated tread patterns. |
-| M071 | Chipped paint | Edge chips, scrapes and impact flakes | Pass after regeneration. Clean alpha-ready wear shapes with paint relief and broad LOD-safe damage. |
+| M071 | Chipped paint | Edge chips, scrapes and impact flakes | Pass after square ingestion regeneration. Clean alpha-ready wear with real raised-edge relief. |
 | M072 | Oil and grease | Pools, wipes, leaks, rings and machine smears | Pass. Good variation from smooth oil to rough drying fringes. |
 | M073 | Salt and mineral deposits | Tide marks, drip fans, rings and crystalline blooms | Pass. Broad readable deposits suitable for cliffs, masonry, metal and timber. |
 | M074 | Waterline growth | Algae, seaweed, barnacles and wet staining | **Weak—regenerate.** Content variety is strong, but generated channel labels violate the clean-sheet standard. |
@@ -208,7 +208,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 
 | ID | Atlas family | Contents | Status and production note |
 |---|---|---|---|
-| M071 | Chipped paint | Edge wear, scrapes, flakes and impact chips | Pass after regeneration. Useful color variants and clean alpha-ready damage shapes. |
+| M071 | Chipped paint | Edge wear, scrapes, flakes and impact chips | Pass after square ingestion regeneration. Useful clean alpha-ready damage shapes. |
 | M085 | Flowers and pollen | 14 tropical flower scatter groups | Pass. Excellent color restraint, connected patches and clear distance-readable silhouettes. |
 | M086 | Mushrooms and fungi | 12 mushroom clusters and bracket growths | Pass. Strong cap diversity, shelf forms and low-poly-friendly alpha masks. |
 | M087 | Coral and reef growth | 12 brain, plate, sponge and stubby branch patches | Pass. Broad underwater forms with restrained tropical colors and stable silhouettes. |
@@ -291,7 +291,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | ID | Finish layer | Use | Status and production note |
 |---|---|---|---|
 | M131 | Cosmetic glitter and mica | Face/body sparkle accents | **Weak—regenerate.** Channel structure is usable, but many shapes became full graffiti symbols instead of restrained glitter sweeps and clusters. |
-| M132 | Emissive body paint | Night racing and active markings | Pass. Strong original symbol set with clean emissive/alpha masks and no baked glow. |
+| M132 | Emissive body paint | Night racing and active markings | Pass after text-free ingestion regeneration. Angular paint marks, emissive/alpha mask and no baked glow. |
 | M133 | Eye shadow and liner | Eye-area cosmetics | Pass. Broad wings, smoky arcs and asymmetrical punk shapes provide good creator variety. |
 | M134 | Lip paint and stain | Lip color customization | Pass. Useful fill, split, chipped, stain and racing-slash masks. |
 | M135 | Nail paint | Nail and claw enamel overlays | Pass. Excellent broad nail-compatible shapes, color range and chipped variants. |
@@ -325,7 +325,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | ID | Condition layer | Use | Status and production note |
 |---|---|---|---|
 | M151 | Frost and rime | Props, glass, foliage, rock and metal | Pass. Strong edge strips, crystalline fans and broad frost blooms with clean alpha. |
-| M152 | Light snow cover | Thin seasonal deposits and ledges | Pass. Useful strips, crescents and low-cover masks; shader controls powder depth and exposed base material. |
+| M152 | Light snow cover | Thin seasonal deposits and ledges | Pass after square ingestion regeneration. Broad coverage alpha and real shallow drift relief. |
 | M153 | Heavy snowpack | Deep seasonal terrain surface | Pass. Excellent broad wind dunes, compacted hollows and usable height structure. |
 | M154 | Rain darkening | Wet material response and runoff | **Weak—regenerate.** Mask variety is useful, but small generated footer labels violate the clean-sheet standard. |
 | M155 | Puddle accumulation | Standing water in ruts and low ground | Pass. Strong shape variety with good depth, edge and roughness separation. |
@@ -366,7 +366,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M174 | Paint drips and splashes | White-stage walls, props and workshop history | Pass. Strong color range, brush texture, can rings and wet/dry roughness variants. |
 | M175 | Adhesive residue | Removed tape and sticker history | Weak—regenerate. Many forms still read as intact tape/patches rather than translucent glue ghosts and torn fiber residue. |
 | M176 | Tool scratches and gouges | Machines, worktops, armor and timber | Weak—regenerate. The clean edge/arc vocabulary is useful, but needs more unmistakable screwdriver slips, saw drags and chisel gouges. |
-| M177 | Boot scuffs and partial prints | Floors, vehicles and workshop stages | Pass. Excellent chunky tread abstraction, paint/mud variants and incomplete foot traffic. |
+| M177 | Boot scuffs and partial prints | Floors, vehicles and workshop stages | Pass after square ingestion regeneration. Sparse incomplete tread fragments with contact relief. |
 | M178 | Drink rings and spills | Benches, consoles and lived-in interiors | Pass. Strong incomplete rings, overlapping cups, drips and wiped crescents. |
 | M179 | Electrical scorch | Machines, wiring zones and vehicles | Pass. Good branching arcs, heat rings and pitted short-circuit damage. |
 | M180 | Repaired wall and plaster | White-stage repairs and settlement interiors | Pass. Broad filler, mortar and trowel shapes with clean alpha and restrained overspray. |
@@ -969,3 +969,10 @@ Regenerate M499 and M500 because their mobile and nostalgic states accumulated t
 ### Next interface work
 
 Correct M499, M500 and M504, then formalize the recursive parent/child graph registry and runtime resolver independently from these visual derivation references.
+
+
+## Material Batch 57 — automated-ingestion and interface corrections
+
+![Material Batch 57 contact sheet](./review/material-batch-57-ingestion-and-interface-corrections.jpg)
+
+Regenerated M022, M067, M071, M132, M152 and M177 as verified `1024×1024`, text-free sheets with no preview inset and usable relief guides in response to the PR ingestion review. M499, M500 and M504 now pass at `R02` with sparse scene-first layouts and no captions. M464 advances to `R02` as a constrained pass: its channels are usable, but production reconstruction must separate feather-vane and cork regions rather than treating the sheet as finished object geometry.

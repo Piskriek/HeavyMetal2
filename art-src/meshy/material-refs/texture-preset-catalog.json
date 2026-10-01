@@ -6298,7 +6298,7 @@
     },
     {
       "registryId": "M464",
-      "canonicalCode": "HM2-TXP-M464-SPT-SHUTTLE-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M464-SPT-SHUTTLE-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R02",
       "name": "sports shuttlecock material pbr sheet",
       "sourceFile": "M464-sports-shuttlecock-material-pbr-sheet.png",
       "domain": "SPT",
@@ -6358,9 +6358,9 @@
         ],
         "frequency": "identity and seams survive fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 51"
+      "status": "constrained-pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 57 automated-ingestion correction"
     },
     {
       "registryId": "M465",
@@ -8806,7 +8806,7 @@
     },
     {
       "registryId": "M499",
-      "canonicalCode": "HM2-TXP-M499-UI-PARENT-DEC-BC-MOBILE-PX512-SET-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M499-UI-PARENT-DEC-BC-MOBILE-PX512-SET-CLN-PFULL-BL-R02",
       "name": "ui mobile scene first parent graph reference",
       "sourceFile": "M499-ui-mobile-scene-first-parent-graph-reference.png",
       "domain": "UI",
@@ -8863,13 +8863,13 @@
         ],
         "frequency": "primary interaction hierarchy survives fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 56 interface parent graphs"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 57 automated-ingestion correction"
     },
     {
       "registryId": "M500",
-      "canonicalCode": "HM2-TXP-M500-UI-PARENT-DEC-BC-NOST-PX512-SET-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M500-UI-PARENT-DEC-BC-NOST-PX512-SET-CLN-PFULL-BL-R02",
       "name": "ui nostalgic scene first parent graph reference",
       "sourceFile": "M500-ui-nostalgic-scene-first-parent-graph-reference.png",
       "domain": "UI",
@@ -8926,9 +8926,9 @@
         ],
         "frequency": "primary interaction hierarchy survives fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 56 interface parent graphs"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 57 automated-ingestion correction"
     },
     {
       "registryId": "M501",
@@ -9121,7 +9121,7 @@
     },
     {
       "registryId": "M504",
-      "canonicalCode": "HM2-TXP-M504-UI-DEPTH-ATL-BCA-CLN-PX512-AT16-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M504-UI-DEPTH-ATL-BCA-CLN-PX512-AT16-CLN-PFULL-BL-R02",
       "name": "ui recursive depth and bake state atlas",
       "sourceFile": "M504-ui-recursive-depth-and-bake-state-atlas.png",
       "domain": "UI",
@@ -9179,9 +9179,9 @@
         ],
         "frequency": "primary interaction hierarchy survives fallback tier"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 56 interface parent graphs"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 57 automated-ingestion correction"
     }
   ]
 }

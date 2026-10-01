@@ -403,8 +403,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M199 | Candy-color enamel | Deep green translucent vehicle paint | Pass with shader constraint. Runtime clearcoat and substrate must provide depth; source BaseColor contains no fixed highlights. |
 | M200 | Tire sidewall rubber | Tires and flexible wheel parts | Pass. Broad abrasion rings, low rubber grain and no branding or tread literalism. |
 
+## Material Batch 22 — vehicle interiors and soft construction
+
+![Material Batch 22 vehicle-interior contact sheet](./review/material-batch-22-vehicle-interiors-contact-sheet.jpg)
+
+| ID | Interior material | Use | Status and production note |
+|---|---|---|---|
+| M201 | Worn seat vinyl | Seats, door pads and interior covers | Pass. Strong contact polish, creases and restrained cracks without shredded noise. |
+| M202 | Exposed seat foam | Torn upholstery and improvised padding | Pass. Excellent broad pores, compressed zones and age staining. |
+| M203 | Padded seat leather | Racing seats and interior panels | **Weak—regenerate.** The irregular cell pattern reads as fractured stone rather than intentional upholstered padding. |
+| M204 | Molded dashboard plastic | Dashboards, consoles and interior trim | **Weak—regenerate.** Surface response is useful, but generated channel labels violate the clean-sheet standard. |
+| M205 | Ribbed floor rubber | Footwells, cargo decks and floor mats | Pass. Strong continuous ribs, groove dirt and worn crown response. |
+| M206 | Harness webbing | Belts, restraints and heavy straps | Pass. Excellent broad basket weave with restrained green thread variation. |
+| M207 | Acoustic felt | Interior lining and vibration control | Pass. Calm compressed fiber mass with appropriate extreme roughness. |
+| M208 | Crinkled heat-shield foil | Engine bays and hot interior bulkheads | Pass. Broad foil folds, soot variation and useful metal/roughness breakup. |
+| M209 | Compressed cork gasket | Gaskets, insulation and improvised pads | Pass. Strong chunky cork/binder structure with oily condition variation. |
+| M210 | Steering-wrap tape | Wheels, grips and handles | Pass. Clean diagonal overlap, woven grain and restrained acid-green repairs. |
+
 ## Next material batches
 
-### Batch 22 — vehicle interiors and soft construction
+### Batch 23 — vehicle optics, electrical, and engine soft parts
 
-Worn vinyl, seat foam, padded leather, dashboard plastic, ribbed floor rubber, woven harness webbing, acoustic felt, heat shielding foil, cork gasket, steering-wrap tape and dusty instrument glass.
+Dusty instrument glass, headlamp lens, taillight lens, reflectors, LED/emissive indicators, wire insulation, braided cable sleeve, coolant/rubber hose, drive belt rubber and spark-plug ceramic.

@@ -12831,6 +12831,689 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 71 nostalgic island shore and underside"
+    },
+    {
+      "registryId": "M558",
+      "canonicalCode": "HM2-TXP-M558-ENV-TIDELINE-TRN-BCNRHA-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island tideline foam alpha pbr sheet",
+      "sourceFile": "M558-mobile-island-tideline-foam-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "TIDELINE",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M517",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M559",
+      "canonicalCode": "HM2-TXP-M559-ENV-FOAM-TRN-BCNRHA-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island shore foam strip alpha pbr sheet",
+      "sourceFile": "M559-mobile-island-shore-foam-strip-alpha-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "FOAM",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M519",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M560",
+      "canonicalCode": "HM2-TXP-M560-ENV-UNDEARTH-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island floating earth underside pbr sheet",
+      "sourceFile": "M560-mobile-island-floating-earth-underside-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "UNDEARTH",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M521",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M561",
+      "canonicalCode": "HM2-TXP-M561-ENV-UNDROOT-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island floating roots pbr sheet",
+      "sourceFile": "M561-mobile-island-floating-roots-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "UNDROOT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M522",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M562",
+      "canonicalCode": "HM2-TXP-M562-ENV-STALFACE-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island stalactite face pbr sheet",
+      "sourceFile": "M562-mobile-island-stalactite-face-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "STALFACE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M523",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M563",
+      "canonicalCode": "HM2-TXP-M563-ENV-STALACT-ATL-BCNROHA-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island stalactite alpha atlas",
+      "sourceFile": "M563-mobile-island-stalactite-alpha-atlas.png",
+      "domain": "ENV",
+      "material": "STALACT",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M524",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M564",
+      "canonicalCode": "HM2-TXP-M564-ENV-STALACT-ATL-BCNROHA-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic island stalactite alpha atlas",
+      "sourceFile": "M564-nostalgic-island-stalactite-alpha-atlas.png",
+      "domain": "ENV",
+      "material": "STALACT",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M524",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M565",
+      "canonicalCode": "HM2-TXP-M565-ENV-GRASSBAS-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island grass to basalt transition pbr sheet",
+      "sourceFile": "M565-mobile-island-grass-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "GRASSBAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M513",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M566",
+      "canonicalCode": "HM2-TXP-M566-ENV-SANDGRASS-TRN-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island sand to grass transition pbr sheet",
+      "sourceFile": "M566-mobile-island-sand-to-grass-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "SANDGRASS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M516",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
+    },
+    {
+      "registryId": "M567",
+      "canonicalCode": "HM2-TXP-M567-ENV-LAVABAS-TRN-BCNROHE-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile island lava to basalt transition pbr sheet",
+      "sourceFile": "M567-mobile-island-lava-to-basalt-transition-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVABAS",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height, Alpha or Emissive guide per recipe"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches parent preset or registered shoreline fringe",
+      "mipPolicy": "Preserve broad silhouettes and interlocked material boundary.",
+      "intendedUses": [
+        "mobile or nostalgic Basalt Isle shore, underside or transition child"
+      ],
+      "prohibitedUses": [
+        "straight artificial split",
+        "thin floating noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M509",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "coverage",
+        "boundary width"
+      ],
+      "recipe": {
+        "intent": "Runtime-tier child preserving parent surface and transition identity.",
+        "required": [
+          "fixed quadrant order",
+          "LOD-safe forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "post-process-only styling"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 72 mobile island underside and transitions"
     }
   ]
 }

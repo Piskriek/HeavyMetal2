@@ -1082,3 +1082,9 @@ M539–M541 and M543–M548 pass as authored nostalgic-PBR children for obsidian
 ![Material Batch 71 contact sheet](./review/material-batch-71-nostalgic-island-shore-underside.jpg)
 
 M542 now passes at `R02` with unmistakable top-to-bottom lava flow. M549–M557 pass as nostalgic-PBR children for dune grass, wet and underwater sand, scrolling lagoon water, two shore-foam scales, packed-earth underside, exposed roots and stalactite-face material.
+
+## Material Batch 72 — mobile island underside and transitions
+
+![Material Batch 72 contact sheet](./review/material-batch-72-mobile-island-underside-transitions.jpg)
+
+M558–M564 complete mobile shoreline foam, floating-earth, exposed-root, stalactite-face and stalactite-atlas children plus the nostalgic stalactite atlas. M565–M567 add passing mobile grass/basalt, sand/grass and lava/basalt interlocked transition fringes. All preserve explicit parent links and runtime-tier recipes.

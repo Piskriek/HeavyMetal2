@@ -4200,6 +4200,636 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 45"
+    },
+    {
+      "registryId": "M431",
+      "canonicalCode": "HM2-TXP-M431-ENV-BIOME-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile biome overview field sheet",
+      "sourceFile": "M431-mobile-biome-overview-field-sheet.png",
+      "domain": "ENV",
+      "material": "BIOME",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M432",
+      "canonicalCode": "HM2-TXP-M432-ENV-HIER-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile track settlement hierarchy sheet",
+      "sourceFile": "M432-mobile-track-settlement-hierarchy-sheet.png",
+      "domain": "ENV",
+      "material": "HIER",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M433",
+      "canonicalCode": "HM2-TXP-M433-ENV-SHORE-TRN-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile shoreline readability sheet",
+      "sourceFile": "M433-mobile-shoreline-readability-sheet.png",
+      "domain": "ENV",
+      "material": "SHORE",
+      "form": "TRN",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M434",
+      "canonicalCode": "HM2-TXP-M434-ENV-FOLDENS-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile foliage density field sheet",
+      "sourceFile": "M434-mobile-foliage-density-field-sheet.png",
+      "domain": "ENV",
+      "material": "FOLDENS",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M435",
+      "canonicalCode": "HM2-TXP-M435-ENV-INFRA-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile infrastructure mask sheet",
+      "sourceFile": "M435-mobile-infrastructure-mask-sheet.png",
+      "domain": "ENV",
+      "material": "INFRA",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M436",
+      "canonicalCode": "HM2-TXP-M436-ENV-LIGHT-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile cinematic light zone sheet",
+      "sourceFile": "M436-mobile-cinematic-light-zone-sheet.png",
+      "domain": "ENV",
+      "material": "LIGHT",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M437",
+      "canonicalCode": "HM2-TXP-M437-ENV-SEASON-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile seasonal overview state sheet",
+      "sourceFile": "M437-mobile-seasonal-overview-state-sheet.png",
+      "domain": "ENV",
+      "material": "SEASON",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M438",
+      "canonicalCode": "HM2-TXP-M438-ENV-RECOVERY-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile destruction recovery overview sheet",
+      "sourceFile": "M438-mobile-destruction-recovery-overview-sheet.png",
+      "domain": "ENV",
+      "material": "RECOVERY",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M439",
+      "canonicalCode": "HM2-TXP-M439-ENV-ROUTE-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile route signage field sheet",
+      "sourceFile": "M439-mobile-route-signage-field-sheet.png",
+      "domain": "ENV",
+      "material": "ROUTE",
+      "form": "MSK",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
+    },
+    {
+      "registryId": "M440",
+      "canonicalCode": "HM2-TXP-M440-ENV-IMPOSTOR-ATL-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "name": "mobile distant island impostor sheet",
+      "sourceFile": "M440-mobile-distant-island-impostor-sheet.png",
+      "domain": "ENV",
+      "material": "IMPOSTOR",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "overview color field",
+        "topRight": "Normal or response field",
+        "bottomLeft": "priority or roughness field",
+        "bottomRight": "authoritative mask"
+      },
+      "style": "MOB",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "MIX",
+      "palette": {
+        "token": "P08",
+        "maximumColors": 8
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "island overview",
+      "mipPolicy": "Preserve broad hierarchy at PX128.",
+      "intendedUses": [
+        "mobile grand-landscape overview systems"
+      ],
+      "prohibitedUses": [
+        "direct runtime channel use without coordinated rebuild"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "region boundaries",
+        "priority",
+        "exclusions"
+      ],
+      "recipe": {
+        "intent": "Mobile grand-landscape overview field.",
+        "required": [
+          "broad readable regions",
+          "authoritative shared mask"
+        ],
+        "forbidden": [
+          "labels",
+          "photographic detail",
+          "tiny roads"
+        ],
+        "frequency": "regions survive PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 47"
     }
   ]
 }

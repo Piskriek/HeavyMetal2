@@ -846,8 +846,27 @@ Canonical codes and reconstruction records for M421–M430 are registered in [`t
 
 M351, M362, M363 and M427–M429 now pass after regeneration. M361 is a constrained pass: its square snow channels are usable, but the decorative colored strip in the lower-right guide must be removed during production rebuild. Regenerated cataloged presets advanced to `R02`; legacy mobile M351 and M361–M363 now also have canonical reconstruction records.
 
+## Material Batch 47 — mobile grand-landscape overview materials
+
+![Material Batch 47 contact sheet](./review/material-batch-47-mobile-grand-landscape-contact-sheet.jpg)
+
+| ID | Overview preset | Review |
+|---|---|---|
+| M431 | Biome overview | Pass. Excellent broad island biome regions and authoritative mask. |
+| M432 | Track/settlement hierarchy | **Regenerate.** Route and settlement quadrants are not sufficiently coordinated. |
+| M433 | Shoreline readability | **Regenerate.** Photographic aerial content violates the low-resolution style. |
+| M434 | Foliage density | Pass. Strong clearings, corridors, density and exclusion fields. |
+| M435 | Infrastructure masks | Pass. Excellent chunky road, bridge, dock and utility hierarchy. |
+| M436 | Cinematic lighting zones | Pass. Strong warm/cool/coastal/racing light-volume fields. |
+| M437 | Seasonal overview | **Regenerate.** Generated channel labels violate the clean-sheet standard. |
+| M438 | Destruction/recovery overview | Pass. Strong intact, damaged, collapsed, repaired and regrown fields. |
+| M439 | Route signage fields | Constrained pass. Bold priority fields work; production must derive signage from the authoritative route mask. |
+| M440 | Distant-island impostors | Pass. Excellent four-climate silhouettes, normals, haze and alpha. |
+
+Canonical codes and reconstruction records for M431–M440 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
+
 ## Next material batches
 
-### Batch 47 — mobile grand-landscape overview materials
+### Batch 48 — grand-landscape correction pass
 
-Low-resolution biome overview fields, track/settlement hierarchy, shoreline readability, foliage-density maps, infrastructure masks, cinematic lighting zones, seasonal overview states, destruction/recovery overview masks, route signage fields and distant-island impostor materials.
+Regenerate M432, M433 and M437 with one authoritative shared field, strict mobile styling and no generated labels; then validate the overview system against landscape hierarchy, seasonal transitions and 128 px readability.

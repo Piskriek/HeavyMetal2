@@ -41,6 +41,9 @@
       ],
       "@hm/render": [
         "packages/render/src/index.ts"
+      ],
+      "@hm/tools": [
+        "packages/tools/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

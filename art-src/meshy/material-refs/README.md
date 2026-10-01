@@ -32,7 +32,7 @@ Generated maps may look coordinated but are not mathematically derived from one 
 | M007 | Mossy jungle soil | Forest floor, humid banks | `2 × 2 m` | Pass after regeneration. Compact humid loam with moss, roots and decomposed organics. |
 | M008 | Weathered structural timber | Trestles, huts, bridges | `1.5 × 1.5 m` | Pass. Broad vertical grain survives LOD; board seams and fasteners remain geometry or trim-sheet details. |
 | M009 | Blackened forged iron | Girders, straps, machines | `1 × 1 m` | Pass. Restrained forged variation; use Metallic = 1 except rust/contamination masks. |
-| M010 | Aged brass | Rivets, collars, controls | `0.75 × 0.75 m` | **Weak—regenerate.** Brass response improved, but a rectangular preview inset remains in the roughness quadrant. |
+| M010 | Aged brass | Rivets, collars, controls | `0.75 × 0.75 m` | Pass after regeneration. Text-free aged brass with no preview inset and real pitting relief. |
 
 ## Material Batch 02 — ground and natural surfaces
 
@@ -176,12 +176,12 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M066 | Dampness | Seepage, puddle edges, drips and waterlines | Pass. Strong reusable material-response masks; color stays subordinate to roughness change. |
 | M067 | Soot and smoke | Plumes, blast rings, vent bars and hand smears | Pass after square ingestion regeneration. Text-free alpha data with real caked-soot relief. |
 | M068 | Rust runoff | Drips, seam strips, halos and corrosion blooms | Pass. Clear oxidation language and excellent isolated alpha forms. |
-| M069 | Sand accumulation | Drifts, crescents, corners and seam buildup | **Weak—regenerate.** Masks are useful, but several forms read as thick plaster slabs rather than shallow windblown sand. |
+| M069 | Sand accumulation | Drifts, crescents, corners and seam buildup | Pass after regeneration. Broad shallow windblown accumulation masks and relief. |
 | M070 | Tire scuffs | Arcs, braking streaks, scrub and donut marks | Pass. Clean low-relief racing vocabulary without repeated tread patterns. |
 | M071 | Chipped paint | Edge chips, scrapes and impact flakes | Pass after square ingestion regeneration. Clean alpha-ready wear with real raised-edge relief. |
 | M072 | Oil and grease | Pools, wipes, leaks, rings and machine smears | Pass. Good variation from smooth oil to rough drying fringes. |
 | M073 | Salt and mineral deposits | Tide marks, drip fans, rings and crystalline blooms | Pass. Broad readable deposits suitable for cliffs, masonry, metal and timber. |
-| M074 | Waterline growth | Algae, seaweed, barnacles and wet staining | **Weak—regenerate.** Content variety is strong, but generated channel labels violate the clean-sheet standard. |
+| M074 | Waterline growth | Algae, seaweed, barnacles and wet staining | Pass after regeneration. Text-free tileable horizontal waterline fringe with alpha and relief. |
 
 ## Material Batch 09 — aerial grand-landscape materials
 
@@ -192,13 +192,13 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M075 | Patchwork farmland | `512 × 512 m` | Pass. Strong field boundaries, crop variation and shallow drainage suitable for grand vistas. |
 | M076 | Terraced hills | `512 × 512 m` | Pass. Excellent contour rhythm and broad stepped height language; randomize rotation with care. |
 | M077 | Alpine mountain ridges | `1 × 1 km` | Pass. Strong watershed structure, branching valleys and usable displacement guide. |
-| M078 | Volcanic mountain field | `1 × 1 km` | Weak—regenerate. Flow structure is strong, but bright crater centers can read as emissive or baked lighting. |
+| M078 | Volcanic mountain field | `1 × 1 km` | **Weak—regenerate.** Square and text-free, but radial mountain flow still creates an obvious starburst center. |
 | M079 | Temperate forest canopy | `512 × 512 m` | Pass. Broad clustered crown masses read from satellite distance without micro-tree noise. |
-| M080 | Tropical jungle canopy | `512 × 512 m` | **Weak—regenerate.** Useful canopy structure, but generated channel labels violate the clean-sheet standard. |
+| M080 | Tropical jungle canopy | `512 × 512 m` | Pass after regeneration. Dense text-free canopy with broad height hierarchy. |
 | M081 | Meandering river valley | `1 × 1 km` | Pass. Clear river/floodplain/upland hierarchy and useful flow/height masks. |
 | M082 | Coastal wetlands | `512 × 512 m` | Pass. Strong channel network, mudflats and mangrove islands for expansive coastal scenes. |
 | M083 | Highland moor and scrub | `512 × 512 m` | Pass after ingestion regeneration. Text-free broad moor/peat terrain breakup and real relief. |
-| M084 | Desert dune sea | `1 × 1 km` | **Weak—regenerate.** Dune forms are useful, but generated headings and channel labels must be removed. |
+| M084 | Desert dune sea | `1 × 1 km` | Pass after regeneration. Text-free asymmetric dune field with real macro relief. |
 
 These are macro terrain layers, not replacements for near-ground materials or geometry. Their runtime role, nested scale stack, displacement limits and biome spawning rules are defined in [`docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md`](../../../docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md).
 
@@ -225,10 +225,10 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 
 | ID | Macro landscape | Nominal coverage | Status and production note |
 |---|---|---:|---|
-| M094 | City blocks | `1 × 1 km` | Weak—regenerate. Channel consistency is useful, but the radial central avenue/monument makes repetition obvious. |
-| M095 | Industrial yard | `1 × 1 km` | **Weak—regenerate.** Strong district zoning, but generated channel labels violate the clean-sheet standard. |
+| M094 | City blocks | `1 × 1 km` | **Weak—regenerate.** Replacement returned at `1408×768`, so the fixed square channel layout is invalid. |
+| M095 | Industrial yard | `1 × 1 km` | Pass after regeneration. Text-free industrial zoning and broad height hierarchy. |
 | M096 | Rural village pattern | `512 × 512 m` | Pass after ingestion regeneration. Text-free settlement pattern with broad height hierarchy. |
-| M097 | Regional road network | `1 × 1 km` | Weak—regenerate. Current organic cell pattern reads more like fields than a deliberate road hierarchy. |
+| M097 | Regional road network | `1 × 1 km` | Pass after regeneration. Connected primary/secondary road hierarchy with no radial hub. |
 | M098 | Rail and mine logistics yard | `512 × 512 m` | Pass. Parallel corridors, switches, yards and large structures are readable at macro scale. |
 | M099 | Quarry and excavation | `1 × 1 km` | Pass. Excellent terraced depth, haul-road logic and displacement hierarchy. |
 | M100 | Port and dock district | `1 × 1 km` | Pass. Strong harbor channels, quays, piers and service blocks with clear height separation. |
@@ -244,7 +244,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 |---|---|---|---|
 | M104 | Olive-green goblin skin | Primary skin base | Pass. Soft mottling, pores and broad folds provide a flexible non-photoreal PBR base. |
 | M105 | Moss-grey goblin skin | Tintable alternate skin base | Pass. Useful sage/tan/violet range for procedural color variation. |
-| M106 | Skin blemishes and scars | Freckles, warts, scars and dry patches | **Weak—regenerate.** Channel concept works, but several patches read too raw or tumorous; final set must stay appealing and non-gory. |
+| M106 | Skin blemishes and scars | Freckles, warts, scars and dry patches | Pass after regeneration. Appealing non-gory blemish and healed-scar decals with shallow relief. |
 | M107 | Face paint and tattoos | Punk racer customization | Pass. Strong original symbol language with clean alpha and no words. |
 | M108 | Eye and iris atlas | Iris, pupil and sclera variants | Pass. Excellent color/pupil variety and aligned eye masks for deep customization. |
 | M109 | Clear weathered lens glass | Goggles, visors and lenses | Pass. Restrained scratches/fog with useful transmission and roughness guidance. |
@@ -994,3 +994,9 @@ M023, M096, M103, M110, M204, M212, M228, M259 and M275 now pass as verified `10
 ![Material Batch 60 contact sheet](./review/material-batch-60-foundation-regenerations.jpg)
 
 M003, M004, M006, M007, M017, M029, M033, M034 and M060 pass as verified square, text-free replacements with non-flat relief. M010 remains queued because its improved brass sheet still contains a small rectangular preview inset in the roughness quadrant.
+
+## Material Batch 61 — environment and decal regeneration set
+
+![Material Batch 61 contact sheet](./review/material-batch-61-environment-and-decals-regenerations.jpg)
+
+M010, M069, M074, M080, M084, M095, M097 and M106 pass as text-free square replacements with usable relief. M078 remains queued for radial starburst flow; M094 remains queued because its replacement returned at `1408×768`.

@@ -505,8 +505,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M259 | Handmade soap | Domestic and workshop cleaning props | **Weak—regenerate.** Soap response is usable, but generated channel labels violate the clean-sheet standard. |
 | M260 | Weathered paper packaging | Blank labels, wraps, patches and decals | Pass. Excellent text-free kraft, tape and paper silhouettes with clean alpha. |
 
+## Material Batch 28 — market storage and utility surfaces
+
+![Material Batch 28 market-storage contact sheet](./review/material-batch-28-market-storage-contact-sheet.jpg)
+
+| ID | Utility material | Use | Status and production note |
+|---|---|---|---|
+| M261 | Burlap sack cloth | Sacks, wraps and coarse upholstery | Pass. Excellent open jute weave, thick crossings and calm grime variation. |
+| M262 | Corrugated cardboard | Boxes, dividers and disposable repairs | Pass. Useful kraft pulp, water marks, pressed dents and subtle corrugation telegraphing. |
+| M263 | Produce-crate wood | Crates, shelves and light construction | Pass. Strong pale unfinished grain, saw wear, stains and paint transfer. |
+| M264 | Pallet wood | Pallets, heavy crates and workshop construction | Pass. Excellent grey weathering, oil rubs, paint scars and deep rough-sawn damage. |
+| M265 | Plastic tarpaulin | Covers, awnings and waterproof dividers | **Weak—regenerate.** Returned at `1408×768` rather than the required square four-channel sheet. |
+| M266 | Woven produce net | Market sacks and breathable storage | Pass. Clean diamond silhouette, chunky knots, matched channels and mip-safe alpha. |
+| M267 | Butcher block | Counters, worktops and food-preparation props | Pass. Excellent end-grain blocks, oil staining and broad crossing knife wear. |
+| M268 | Blackened cookware steel | Pans, pots, griddles and stove surfaces | Pass. Strong seasoned steel, soot, baked-oil halos and restrained scrub wear. |
+| M269 | Patinated copper | Roof details, vessels and decorative fixtures | Pass. Excellent copper, turquoise patina, exposed rubs and coordinated crust height. |
+| M270 | Aged brass | Handles, taps, lamps and mechanical trim | Pass. Strong tarnish, hand oils, polished wear and restrained green oxidation. |
+
 ## Next material batches
 
-### Batch 28 — market storage and utility surfaces
+### Batch 29 — coastal and maritime utility materials
 
-Burlap sack cloth, corrugated cardboard, produce-crate wood, pallet wood, plastic tarpaulin, woven produce net, butcher block, blackened cookware steel, patinated copper and aged brass.
+Marine rope, fishing net, weathered buoy plastic, salt-crusted steel, boat fiberglass, antifouling paint, wet dock timber, barnacle shell coverage, dried seaweed and aged sailcloth.

@@ -790,8 +790,29 @@ Canonical codes and reconstruction recipes for M391–M400 are registered in [`t
 
 Canonical codes and reconstruction recipes for M401–M410 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
 
+## Material Batch 43 — nostalgic settlement props and signage
+
+![Material Batch 43 contact sheet](./review/material-batch-43-nostalgic-settlement-contact-sheet.jpg)
+
+![Material Batch 43 BaseColor previews at 128 px](./review/material-batch-43-nostalgic-basecolor-128px-preview.png)
+
+| ID | Preset | Review |
+|---|---|---|
+| M411 | Pixel crate wood | Pass. Strong pale timber, turquoise transfer and chunky wear. |
+| M412 | Dithered cardboard | **Regenerate.** Reads as cracked masonry rather than pressed kraft board. |
+| M413 | Classic enamelware | **Regenerate.** Material read is useful, but generated headings and channel labels violate the standard. |
+| M414 | Retro bottle glass | **Regenerate.** Broke the required four-quadrant channel layout. |
+| M415 | Arcade vending plastic | **Regenerate.** Excellent color language, but generated channel labels must be removed. |
+| M416 | Chunky awning cloth | **Regenerate.** Generated labels and inconsistent channel interpretation. |
+| M417 | Market symbol atlas | **Regenerate.** Too many tiny symbols; rebuild as sixteen large padded forms. |
+| M418 | Utility symbol atlas | Pass. Strong wordless hazard, fluid, electrical, heat and tool symbols. |
+| M419 | Rope/basket material | **Regenerate.** Strong weave, but generated labels violate the standard. |
+| M420 | Retro light fixtures | **Regenerate.** Attractive fixture family, but returned as a single beauty atlas rather than coordinated channels. |
+
+Canonical codes and reconstruction records for M411–M420 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
+
 ## Next material batches
 
-### Batch 43 — nostalgic settlement props and signage
+### Batch 44 — targeted Batch 43 regeneration
 
-Pixel crate wood, dithered cardboard, classic enamelware, retro bottle glass, arcade vending plastic, chunky fabric awnings, market-sign symbol atlas, pixel utility labels without words, nostalgic rope/basket materials and retro light fixtures.
+Regenerate M412–M417 and M419–M420, preserving M411 and M418 as approved anchors. Require square coordinated channels, no generated labels, sixteen-or-fewer large atlas elements, and 128 px readability.

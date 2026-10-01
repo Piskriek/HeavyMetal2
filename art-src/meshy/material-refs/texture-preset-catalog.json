@@ -2690,6 +2690,634 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 42 final"
+    },
+    {
+      "registryId": "M411",
+      "canonicalCode": "HM2-TXP-M411-ENV-WOOD-TIL-BCNROH-PXL3D-PX128-Q4-WRN-P12-PT-R01",
+      "name": "nostalgic pixel crate wood pbr sheet",
+      "sourceFile": "M411-nostalgic-pixel-crate-wood-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "WOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M263",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M412",
+      "canonicalCode": "HM2-TXP-M412-GEN-PAPER-TIL-BCNROH-D16-PX128-Q4-WRN-P10-PT-R01",
+      "name": "nostalgic dithered cardboard pbr sheet",
+      "sourceFile": "M412-nostalgic-dithered-cardboard-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "PAPER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "D16",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M262",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M413",
+      "canonicalCode": "HM2-TXP-M413-GEN-ENAMEL-TIL-BCNRMH-PXL3D-PX128-Q4-WRN-P10-PT-R01",
+      "name": "nostalgic classic enamelware pbr sheet",
+      "sourceFile": "M413-nostalgic-classic-enamelware-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "ENAMEL",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M251",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M414",
+      "canonicalCode": "HM2-TXP-M414-GEN-GLASS-TIL-BCNRHT-PXLENS-PX128-Q4-WRN-P10-PT-R01",
+      "name": "nostalgic retro bottle glass pbr sheet",
+      "sourceFile": "M414-nostalgic-retro-bottle-glass-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "GLASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Height",
+        "Transmission"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "PXLENS",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M255",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M415",
+      "canonicalCode": "HM2-TXP-M415-BLD-PLASTIC-TIL-BCNROH-Y2K-PX128-Q4-CLN-P12-PT-R01",
+      "name": "nostalgic arcade vending plastic pbr sheet",
+      "sourceFile": "M415-nostalgic-arcade-vending-plastic-pbr-sheet.png",
+      "domain": "BLD",
+      "material": "PLASTIC",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "Y2K",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "P12",
+        "maximumColors": 12
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M376",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M416",
+      "canonicalCode": "HM2-TXP-M416-BLD-CLOTH-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P10-PT-R01",
+      "name": "nostalgic chunky awning cloth pbr sheet",
+      "sourceFile": "M416-nostalgic-chunky-awning-cloth-pbr-sheet.png",
+      "domain": "BLD",
+      "material": "CLOTH",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "HFPNT",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M248",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M417",
+      "canonicalCode": "HM2-TXP-M417-BLD-SIGN-ATL-BCNRA-PXL3D-PX256-AT16-CLN-P06-PT-R01",
+      "name": "nostalgic market sign symbol alpha pbr sheet",
+      "sourceFile": "M417-nostalgic-market-sign-symbol-alpha-pbr-sheet.png",
+      "domain": "BLD",
+      "material": "SIGN",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M260",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M418",
+      "canonicalCode": "HM2-TXP-M418-GEN-SIGN-ATL-BCNRA-PXL3D-PX256-AT16-CLN-P06-PT-R01",
+      "name": "nostalgic utility label symbol alpha pbr sheet",
+      "sourceFile": "M418-nostalgic-utility-label-symbol-alpha-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "SIGN",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "PXL3D",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M260",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M419",
+      "canonicalCode": "HM2-TXP-M419-GEN-FIBER-TIL-BCNROH-HFPNT-PX128-Q4-WRN-P10-PT-R01",
+      "name": "nostalgic rope basket pbr sheet",
+      "sourceFile": "M419-nostalgic-rope-basket-pbr-sheet.png",
+      "domain": "GEN",
+      "material": "FIBER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "HFPNT",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "WRN",
+      "palette": {
+        "token": "P10",
+        "maximumColors": 10
+      },
+      "sampling": "PT",
+      "wrap": "repeat",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M257",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
+    },
+    {
+      "registryId": "M420",
+      "canonicalCode": "HM2-TXP-M420-BLD-LIGHT-ATL-BCNRAE-Y2K-PX256-AT12-CLN-P06-PT-R01",
+      "name": "nostalgic retro light fixture atlas",
+      "sourceFile": "M420-nostalgic-retro-light-fixture-atlas.png",
+      "domain": "BLD",
+      "material": "LIGHT",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Alpha",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or material guide",
+        "bottomRight": "packed guide declared by channels"
+      },
+      "style": "Y2K",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "AT12",
+      "condition": "CLN",
+      "palette": {
+        "token": "P06",
+        "maximumColors": 6
+      },
+      "sampling": "PT",
+      "wrap": "clamp",
+      "physicalScale": "preset dependent",
+      "mipPolicy": "Preserve chunky silhouettes and palette groups.",
+      "intendedUses": [
+        "nostalgic settlement props and signage"
+      ],
+      "prohibitedUses": [
+        "unreviewed production conversion"
+      ],
+      "parentPreset": "M348",
+      "editableParameters": [
+        "palette",
+        "scale",
+        "condition"
+      ],
+      "recipe": {
+        "intent": "Nostalgic settlement material with modern coordinated channels.",
+        "required": [
+          "limited palette",
+          "chunky readable forms"
+        ],
+        "forbidden": [
+          "generated labels",
+          "baked lighting",
+          "micro-noise"
+        ],
+        "frequency": "primary forms survive fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 43"
     }
   ]
 }

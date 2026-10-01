@@ -1,8 +1,3 @@
-import type { KernelExports } from '@hm/contracts';
-
-/** Not built yet (tasks K-expr, K-variables, K-commands). */
-const todo = (what: string): never => { throw new Error(`@hm/kernel: ${what} is not implemented yet`); };
-
 export { createSchemaRegistry, asKernelRegistry } from './schema-registry';
 export type { KernelSchemaRegistry, MigrateFn } from './schema-registry';
 export { createEventBus } from './event-bus';
@@ -15,4 +10,4 @@ export type { PresetContent } from './hash';
 export { createVariableSystem } from './variables';
 export { compileExpression } from './expr';
 export type { CompiledExpression, ExprIssue, ExprValue } from './expr';
-export const createCommandBus: KernelExports['createCommandBus'] = () => todo('createCommandBus');
+export { createCommandBus } from './command-bus';

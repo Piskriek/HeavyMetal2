@@ -420,8 +420,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M209 | Compressed cork gasket | Gaskets, insulation and improvised pads | Pass. Strong chunky cork/binder structure with oily condition variation. |
 | M210 | Steering-wrap tape | Wheels, grips and handles | Pass. Clean diagonal overlap, woven grain and restrained acid-green repairs. |
 
+## Material Batch 23 — vehicle optics, electrical, and engine soft parts
+
+![Material Batch 23 optics and electrical contact sheet](./review/material-batch-23-vehicle-optics-electrical-contact-sheet.jpg)
+
+| ID | Material | Use | Status and production note |
+|---|---|---|---|
+| M211 | Dusty instrument glass | Gauges and protected displays | **Weak—regenerate.** Useful wipe/fingerprint response, but generated channel headings violate the clean-sheet standard. |
+| M212 | Clear ribbed headlamp lens | Headlamps and work lights | **Weak—regenerate.** Optical-rib language is strong, but generated channel labels must be removed. |
+| M213 | Red taillight lens | Rear lights and warning lamps | Pass. Broad hexagonal lens cells and clean transmission/emissive structure. |
+| M214 | Prismatic reflector | Safety reflectors and passive markers | Pass. Excellent triangular prism field and retroreflection mask reference. |
+| M215 | LED indicator atlas | Dashboards, status lights and machine controls | Pass. Strong off-state colors, domes, bars, rings and clean emissive masks. |
+| M216 | Wire insulation | Electrical looms and cable geometry | Pass. Useful extrusion grain, green identification bands and restrained age cracking. |
+| M217 | Braided cable sleeve | Wiring looms and protected hoses | Pass. Excellent broad braid with strong AO and distance readability. |
+| M218 | Coolant rubber hose | Engine hoses and fluid lines | **Weak—regenerate.** Surface response is useful, but duplicated channel labels violate the clean-sheet format. |
+| M219 | Reinforced drive belt | Belts and flexible engine components | Pass. Broad continuous ribs, reinforcement grain and controlled wear. |
+| M220 | Spark-plug ceramic | Ignition parts and heat-resistant insulators | Pass. Strong heat staining, soot bands and subtle glaze crazing. |
+
 ## Next material batches
 
-### Batch 23 — vehicle optics, electrical, and engine soft parts
+### Batch 24 — engine and mechanical hard surfaces
 
-Dusty instrument glass, headlamp lens, taillight lens, reflectors, LED/emissive indicators, wire insulation, braided cable sleeve, coolant/rubber hose, drive belt rubber and spark-plug ceramic.
+Cast iron, cast aluminum, machined steel, copper windings, radiator fins, chain links, carbon deposits, exhaust wrap, fiberglass composite and gasket-paper fiber.

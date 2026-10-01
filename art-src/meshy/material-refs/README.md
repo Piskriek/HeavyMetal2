@@ -192,7 +192,7 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M075 | Patchwork farmland | `512 × 512 m` | Pass. Strong field boundaries, crop variation and shallow drainage suitable for grand vistas. |
 | M076 | Terraced hills | `512 × 512 m` | Pass. Excellent contour rhythm and broad stepped height language; randomize rotation with care. |
 | M077 | Alpine mountain ridges | `1 × 1 km` | Pass. Strong watershed structure, branching valleys and usable displacement guide. |
-| M078 | Volcanic mountain field | `1 × 1 km` | **Weak—regenerate.** Radial flow is removed, but the replacement omitted the fixed four-quadrant channel layout. |
+| M078 | Volcanic mountain field | `1 × 1 km` | Pass after regeneration. Distributed diagonal volcanic shelves and gullies with fixed four-channel layout and no radial focus. |
 | M079 | Temperate forest canopy | `512 × 512 m` | Pass. Broad clustered crown masses read from satellite distance without micro-tree noise. |
 | M080 | Tropical jungle canopy | `512 × 512 m` | Pass after regeneration. Dense text-free canopy with broad height hierarchy. |
 | M081 | Meandering river valley | `1 × 1 km` | Pass. Clear river/floodplain/upland hierarchy and useful flow/height masks. |
@@ -279,7 +279,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M124 | Painted racing armor | Armor plates and vehicle protection | Pass. Strong acid-green enamel, restrained racing accents and broad chipped-metal breakup. |
 | M125 | Oxidized jewelry | Rings, ear cuffs, tooth caps and charms | Pass. Excellent brass, copper, silver and patina variants with clean masks. |
 | M126 | Coarse knit | Shirts, cuffs, socks and padding | Pass. Chunky interlocked yarn is seamless, tactile and distinct from canvas. |
-| M127 | Padded racing suit | Suits, jackets and upholstery | **Weak—regenerate.** Square and text-free, but large repeated cells still read as hard plates rather than soft padded technical cloth. |
+| M127 | Padded racing suit | Suits, jackets and upholstery | **Weak—regenerate.** Softer than before, but large closed cells still dominate instead of flowing stitched padding channels. |
 | M128 | Dirt and sweat overlays | Skin and clothing condition | Pass. Useful broad wipes, rings and smears with rough/damp separation. |
 | M129 | Healed damage overlays | Old scars, burns and character history | Pass with cleanup. Strong variety; remove stitch-like and overly raw shapes to keep the character appealing and non-gory. |
 | M130 | Wet-skin sheen masks | Rain, sweat and water response | Pass. Broad roughness masks provide moisture without transparent geometry or baked highlights. |
@@ -364,8 +364,8 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M172 | Dusty shelf accumulation | Ledges, shelves and long-idle equipment | Pass. Useful strips, object ghosts, wipes and settled powder islands. |
 | M173 | Cobwebs | Sparse abandoned corners and ruins | Pass. Excellent thick grouped strands that remain readable without micro-line noise. |
 | M174 | Paint drips and splashes | White-stage walls, props and workshop history | Pass. Strong color range, brush texture, can rings and wet/dry roughness variants. |
-| M175 | Adhesive residue | Removed tape and sticker history | Weak—regenerate. Many forms still read as intact tape/patches rather than translucent glue ghosts and torn fiber residue. |
-| M176 | Tool scratches and gouges | Machines, worktops, armor and timber | Weak—regenerate. The clean edge/arc vocabulary is useful, but needs more unmistakable screwdriver slips, saw drags and chisel gouges. |
+| M175 | Adhesive residue | Removed tape and sticker history | Pass after regeneration. Sparse translucent glue ghosts, torn gum edges, alpha and shallow residue relief. |
+| M176 | Tool scratches and gouges | Machines, worktops, armor and timber | Pass after regeneration. Clear varied scratch groups, screwdriver slips, chisel gouges and recessed alpha relief. |
 | M177 | Boot scuffs and partial prints | Floors, vehicles and workshop stages | Pass after square ingestion regeneration. Sparse incomplete tread fragments with contact relief. |
 | M178 | Drink rings and spills | Benches, consoles and lived-in interiors | Pass. Strong incomplete rings, overlapping cups, drips and wiped crescents. |
 | M179 | Electrical scorch | Machines, wiring zones and vehicles | Pass. Good branching arcs, heat rings and pitted short-circuit damage. |
@@ -413,7 +413,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 |---|---|---|---|
 | M201 | Worn seat vinyl | Seats, door pads and interior covers | Pass. Strong contact polish, creases and restrained cracks without shredded noise. |
 | M202 | Exposed seat foam | Torn upholstery and improvised padding | Pass. Excellent broad pores, compressed zones and age staining. |
-| M203 | Padded seat leather | Racing seats and interior panels | **Weak—regenerate.** The irregular cell pattern reads as fractured stone rather than intentional upholstered padding. |
+| M203 | Padded seat leather | Racing seats and interior panels | Pass after regeneration. Unmistakable soft dark seat leather with compression and upholstery relief. |
 | M204 | Molded dashboard plastic | Dashboards, consoles and interior trim | Pass after ingestion regeneration. Text-free molded polymer grain and shallow abrasion relief. |
 | M205 | Ribbed floor rubber | Footwells, cargo decks and floor mats | Pass. Strong continuous ribs, groove dirt and worn crown response. |
 | M206 | Harness webbing | Belts, restraints and heavy straps | Pass. Excellent broad basket weave with restrained green thread variation. |
@@ -483,7 +483,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M242 | Bamboo slats | Floors, wall panels and screens | Pass. Clean slat rhythm, node bands and rounded LOD-readable crowns. |
 | M243 | Terrazzo floor | Durable settlement and workshop interiors | Pass. Excellent broad chips, calm matrix and appropriately subtle height response. |
 | M244 | Painted concrete floor | Workshops, garages and utility rooms | Pass. Strong teal paint wear, oil haze, aggregate exposure and traffic polish. |
-| M245 | Worn linoleum | Domestic and service interiors | **Weak—regenerate.** Current BaseColor reads as crushed organic stone or leaf litter rather than smooth marbled sheet flooring. |
+| M245 | Worn linoleum | Domestic and service interiors | Pass after regeneration. Smooth olive-grey marbled sheet flooring with traffic polish and scuffs. |
 | M246 | Galvanized diamond mesh | Screens, partitions and machine guards | Pass. Clean thick expanded-metal silhouette, matched normal response and production-ready alpha. |
 | M247 | Woven rag rug | Domestic floors and lived-in accents | Pass. Excellent chunky colored strips, dense packing and broad cloth depth. |
 | M248 | Heavy canvas | Tarps, curtains and upholstery | Pass with constraint. Strong weathered fiber response; preserve the broad herringbone-like weave as a deliberate canvas variant. |
@@ -598,7 +598,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 
 | ID | Creator layer | Use | Status and production note |
 |---|---|---|---|
-| M311 | Skin thickness and SSS masks | Ears, nose, cheeks, knuckles and thin tissue | **Weak—regenerate.** Thickness separation is useful, but the result assembles a full generic face rather than reusable detached regional masks. |
+| M311 | Skin thickness and SSS masks | Ears, nose, cheeks, knuckles and thin tissue | **Weak—regenerate.** Detached fragments improved, but the sheet still contains assembled face/torso anatomy instead of regional masks only. |
 | M312 | Skin pigment variation | Natural runtime-tintable skin diversity | Pass. Strong olive, sage, tan, violet and lime patches with clean soft alpha. |
 | M313 | Freckles and beauty marks | Fine identity variation | Pass. Restrained clustered marks and broad placements avoid diseased or noisy skin. |
 | M314 | Age wrinkles and expression folds | Brow, smile, eye, nose and neck aging | Pass. Excellent separated fold groups, aligned normals and readable stylized depth. |
@@ -606,7 +606,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M316 | Flush and blush overlays | Emotion, temperature and circulation color | Pass. Excellent broad feathered color clouds with clean alpha and flat normals. |
 | M317 | Subtle vein masks | Ears, temples, forearms and hands | Pass. Sparse fantasy-colored branches remain adjustable and non-gory. |
 | M318 | Eye wetness masks | Cornea, tearline and inner-corner moisture | Pass. Strong eye-region clearcoat, roughness and thickness masks without baked highlights. |
-| M319 | Tooth and horn staining | Teeth, tusks and horn condition | **Weak—regenerate.** Attractive color response, but the atlas became complete tooth/horn shapes rather than stain-only overlays. |
+| M319 | Tooth and horn staining | Teeth, tusks and horn condition | Pass after regeneration. Stain-only mineral discoloration and edge grime with no tooth or horn silhouettes. |
 | M320 | Face grime overlays | Dust, grease, paint and goggle-contact condition | Pass with placement constraint. Strong smears and goggle bands; treat the face-like preview only as placement guidance, never a fixed face texture. |
 
 ## Material Batch 34 — mobile and low-resolution core materials
@@ -1048,7 +1048,13 @@ These fill the next island-plan priorities from the ingestion agent. All are ver
 | M520 | Rippled underwater sand | Pass. Sandbar-scale current ripples without baked caustics. |
 | M521 | Packed-earth underside | Pass. Compact strata, embedded stones and root traces. |
 | M522 | Exposed-root underside carpet | Pass. Dense interwoven LOD-safe roots over soil. |
-| M523 | Stalactite face material | Regenerate. Channel correspondence is useful, but the BaseColor reads as complete hanging formations rather than a seamless face material. |
+| M523 | Stalactite face material | Pass after R02 regeneration. Continuous mineral face grain and downward drip ridges without separate hanging silhouettes. |
 | M524 | Hanging stalactite alpha atlas | Pass. Sturdy varied clusters with corresponding alpha and relief. |
 
 M193 galvanized steel now passes. This completes the planning request’s missing underwater-sand and floating-rock-underside categories, with M523 retained honestly for a cleaner material-only correction.
+
+## Material Batch 67 — legacy and island corrections
+
+![Material Batch 67 contact sheet](./review/material-batch-67-legacy-and-island-corrections.jpg)
+
+M078, M175, M176, M203, M245, M319, M464 and M523 now pass. M464 advances to `R03`; M523 advances to `R02`. M127 and M311 remain queued because closed padding cells and assembled anatomy still violate their reconstruction recipes.

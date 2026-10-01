@@ -6298,7 +6298,7 @@
     },
     {
       "registryId": "M464",
-      "canonicalCode": "HM2-TXP-M464-SPT-SHUTTLE-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R02",
+      "canonicalCode": "HM2-TXP-M464-SPT-SHUTTLE-TIL-BCNROHA-NAT-PX512-Q4-CLN-PFULL-TR-R03",
       "name": "sports shuttlecock material pbr sheet",
       "sourceFile": "M464-sports-shuttlecock-material-pbr-sheet.png",
       "domain": "SPT",
@@ -6358,9 +6358,9 @@
         ],
         "frequency": "identity and seams survive fallback tier"
       },
-      "status": "constrained-pass",
-      "recipeRevision": 2,
-      "provenance": "Material Batch 57 automated-ingestion correction"
+      "status": "pass",
+      "recipeRevision": 3,
+      "provenance": "Material Batch 67 detached shuttlecock material correction"
     },
     {
       "registryId": "M465",
@@ -10440,7 +10440,7 @@
     },
     {
       "registryId": "M523",
-      "canonicalCode": "HM2-TXP-M523-ENV-STALFACE-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M523-ENV-STALFACE-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R02",
       "name": "island floating rock stalactite face pbr sheet",
       "sourceFile": "M523-island-floating-rock-stalactite-face-pbr-sheet.png",
       "domain": "ENV",
@@ -10502,9 +10502,9 @@
         ],
         "frequency": "macro identity survives PX128"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 66 island sand and floating underside"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 67 seamless mineral face correction"
     },
     {
       "registryId": "M524",

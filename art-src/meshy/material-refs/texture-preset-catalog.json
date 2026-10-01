@@ -9182,6 +9182,353 @@
       "status": "pass",
       "recipeRevision": 2,
       "provenance": "Material Batch 57 automated-ingestion correction"
+    },
+    {
+      "registryId": "M505",
+      "canonicalCode": "HM2-TXP-M505-ENV-OBSID-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island obsidian volcanic glass pbr sheet",
+      "sourceFile": "M505-island-obsidian-volcanic-glass-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "OBSID",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve volcanic identity and broad relief before microdetail.",
+      "intendedUses": [
+        "base island volcanic and caldera surfaces"
+      ],
+      "prohibitedUses": [
+        "obvious repeated feature",
+        "baked lighting",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "wear",
+        "emissive intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "text-free square channels",
+          "real relief guide",
+          "no visible repeated focus"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "vertical flow for M508; seamless both axes for all others"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 64 island volcanic foundations"
+    },
+    {
+      "registryId": "M506",
+      "canonicalCode": "HM2-TXP-M506-ENV-BASEND-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island basalt column ends pbr sheet",
+      "sourceFile": "M506-island-basalt-column-ends-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASEND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m square",
+      "mipPolicy": "Preserve volcanic identity and broad relief before microdetail.",
+      "intendedUses": [
+        "base island volcanic and caldera surfaces"
+      ],
+      "prohibitedUses": [
+        "obvious repeated feature",
+        "baked lighting",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "wear",
+        "emissive intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "text-free square channels",
+          "real relief guide",
+          "no visible repeated focus"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "vertical flow for M508; seamless both axes for all others"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 64 island volcanic foundations"
+    },
+    {
+      "registryId": "M507",
+      "canonicalCode": "HM2-TXP-M507-ENV-BASFACE-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island basalt column face pbr sheet",
+      "sourceFile": "M507-island-basalt-column-face-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "BASFACE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve volcanic identity and broad relief before microdetail.",
+      "intendedUses": [
+        "base island volcanic and caldera surfaces"
+      ],
+      "prohibitedUses": [
+        "obvious repeated feature",
+        "baked lighting",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "wear",
+        "emissive intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "text-free square channels",
+          "real relief guide",
+          "no visible repeated focus"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "vertical flow for M508; seamless both axes for all others"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 64 island volcanic foundations"
+    },
+    {
+      "registryId": "M508",
+      "canonicalCode": "HM2-TXP-M508-ENV-LAVARIV-TIL-BCNROHE-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island directional lava river pbr sheet",
+      "sourceFile": "M508-island-directional-lava-river-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVARIV",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height+Emissive guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "8 m vertical flow tile",
+      "mipPolicy": "Preserve volcanic identity and broad relief before microdetail.",
+      "intendedUses": [
+        "base island volcanic and caldera surfaces"
+      ],
+      "prohibitedUses": [
+        "obvious repeated feature",
+        "baked lighting",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "wear",
+        "emissive intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "text-free square channels",
+          "real relief guide",
+          "no visible repeated focus"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "vertical flow for M508; seamless both axes for all others"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 64 island volcanic foundations"
+    },
+    {
+      "registryId": "M509",
+      "canonicalCode": "HM2-TXP-M509-ENV-LAVACRUST-TIL-BCNROHE-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island lava crust glowing cracks pbr sheet",
+      "sourceFile": "M509-island-lava-crust-glowing-cracks-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "LAVACRUST",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Emissive"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height+Emissive guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve volcanic identity and broad relief before microdetail.",
+      "intendedUses": [
+        "base island volcanic and caldera surfaces"
+      ],
+      "prohibitedUses": [
+        "obvious repeated feature",
+        "baked lighting",
+        "protected branding"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "wear",
+        "emissive intensity"
+      ],
+      "recipe": {
+        "intent": "High-priority island surface named by the island plan.",
+        "required": [
+          "text-free square channels",
+          "real relief guide",
+          "no visible repeated focus"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "radial starburst"
+        ],
+        "frequency": "macro identity survives PX128",
+        "repeatAxis": "vertical flow for M508; seamless both axes for all others"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 64 island volcanic foundations"
     }
   ]
 }

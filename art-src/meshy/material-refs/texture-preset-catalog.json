@@ -15973,6 +15973,689 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 76 global sports equipment surfaces"
+    },
+    {
+      "registryId": "M604",
+      "canonicalCode": "HM2-TXP-M604-SPT-NET-TIL-BCNROHA-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports goal net cord pbr sheet",
+      "sourceFile": "M604-mobile-sports-goal-net-cord-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "NET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M592",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M605",
+      "canonicalCode": "HM2-TXP-M605-SPT-POST-TIL-BCNRMOH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports painted post metal pbr sheet",
+      "sourceFile": "M605-mobile-sports-painted-post-metal-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "POST",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M593",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M606",
+      "canonicalCode": "HM2-TXP-M606-SPT-WICKET-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports wicket timber pbr sheet",
+      "sourceFile": "M606-mobile-sports-wicket-timber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "WICKET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M594",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M607",
+      "canonicalCode": "HM2-TXP-M607-SPT-TARGET-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports painted target board pbr sheet",
+      "sourceFile": "M607-mobile-sports-painted-target-board-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TARGET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M596",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M608",
+      "canonicalCode": "HM2-TXP-M608-SPT-STRAW-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports archery straw pbr sheet",
+      "sourceFile": "M608-mobile-sports-archery-straw-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "STRAW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M597",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M609",
+      "canonicalCode": "HM2-TXP-M609-SPT-ROPE-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports ring rope pbr sheet",
+      "sourceFile": "M609-mobile-sports-ring-rope-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ROPE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M598",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M610",
+      "canonicalCode": "HM2-TXP-M610-SPT-NET-TIL-BCNROHA-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports fine net pbr sheet",
+      "sourceFile": "M610-mobile-sports-fine-net-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "NET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M599",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M611",
+      "canonicalCode": "HM2-TXP-M611-SPT-FELT-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports table felt pbr sheet",
+      "sourceFile": "M611-mobile-sports-table-felt-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FELT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M600",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M612",
+      "canonicalCode": "HM2-TXP-M612-SPT-FOAM-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports landing foam pbr sheet",
+      "sourceFile": "M612-mobile-sports-landing-foam-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FOAM",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M601",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M613",
+      "canonicalCode": "HM2-TXP-M613-SPT-FOOTING-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports equestrian footing pbr sheet",
+      "sourceFile": "M613-mobile-sports-equestrian-footing-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FOOTING",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad sport identity, mesh silhouette and contact wear.",
+      "intendedUses": [
+        "mobile global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "micro-noise",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M602",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear",
+        "coverage"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving global sports material identity.",
+        "required": [
+          "fixed quadrant order",
+          "bold low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 77 mobile global sports equipment"
     }
   ]
 }

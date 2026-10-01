@@ -1114,3 +1114,9 @@ M589 was not registered because the image service returned no image; its ID rema
 ![Material Batch 76 contact sheet](./review/material-batch-76-global-sports-equipment-surfaces.jpg)
 
 M590 now passes at `R02`, and M589 completes the nostalgic wet-to-underwater-sand transition. M596–M603 pass as brand-neutral target board, archery straw, combat-ring rope, fine court net, table felt, landing foam, equestrian footing and velodrome timber materials. Their recipes keep protected branding out and preserve editable wear and palette controls.
+
+## Material Batch 77 — mobile global sports equipment
+
+![Material Batch 77 contact sheet](./review/material-batch-77-mobile-global-sports-equipment.jpg)
+
+M604–M613 pass as mobile children for goal nets, painted posts, wickets, target faces, archery straw, combat-ring rope, fine court nets, table felt, landing foam and equestrian footing. Each keeps its full-fidelity parent link and a PX64 fallback-readable reconstruction recipe.

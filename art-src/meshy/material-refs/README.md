@@ -396,7 +396,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 |---|---|---|---|
 | M191 | Brushed aluminum | Body panels, trim and machinery | Pass. Clean grouped grain, restrained scratches and useful polished wear zones. |
 | M192 | Oxidized aluminum | Old bodywork and exposed structures | Pass. Strong chalky oxide, pits and broad weathering with good metal separation. |
-| M193 | Galvanized steel | Panels, ducts and workshop structures | **Weak—regenerate.** Zinc scale is subtler, but the replacement does not expose a recognizable tangent Normal quadrant. |
+| M193 | Galvanized steel | Panels, ducts and workshop structures | Pass after regeneration. Subtle rolled silver metal, tiny zinc mottling and a recognizable tangent Normal quadrant. |
 | M194 | Polished chrome | Mirrors, trim and accessories | Pass. Appropriately neutral source maps leave environment reflection to runtime lighting. |
 | M195 | Heat-blued steel | Engines, exhausts and high-temperature parts | Pass. Excellent blue/violet/straw temper colors with restrained scale and no glow. |
 | M196 | Exhaust heat tint | Thermal gradients around pipes and welds | Pass. Strong rings, fans and bands with clean reusable masks. |
@@ -1038,3 +1038,17 @@ M116 and M231 corrections pass. M078, M127 and M193 remain queued for channel-la
 | M516–M519 | Wet sand, tideline foam, deep lagoon water and shore foam | Pass. Water supports independent flow scrolling; foam strips register shoreline-axis repetition. |
 
 These fill the next island-plan priorities from the ingestion agent. All are verified `1024×1024`, text-free references with explicit channel recipes.
+
+## Material Batch 66 — underwater sand and floating-rock undersides
+
+![Material Batch 66 contact sheet](./review/material-batch-66-island-sand-floating-underside.jpg)
+
+| ID | Surface | Review |
+|---|---|---|
+| M520 | Rippled underwater sand | Pass. Sandbar-scale current ripples without baked caustics. |
+| M521 | Packed-earth underside | Pass. Compact strata, embedded stones and root traces. |
+| M522 | Exposed-root underside carpet | Pass. Dense interwoven LOD-safe roots over soil. |
+| M523 | Stalactite face material | Regenerate. Channel correspondence is useful, but the BaseColor reads as complete hanging formations rather than a seamless face material. |
+| M524 | Hanging stalactite alpha atlas | Pass. Sturdy varied clusters with corresponding alpha and relief. |
+
+M193 galvanized steel now passes. This completes the planning request’s missing underwater-sand and floating-rock-underside categories, with M523 retained honestly for a cleaner material-only correction.

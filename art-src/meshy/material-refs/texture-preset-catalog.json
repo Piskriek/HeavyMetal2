@@ -10233,6 +10233,347 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 65 island crystal grass and water foundations"
+    },
+    {
+      "registryId": "M520",
+      "canonicalCode": "HM2-TXP-M520-ENV-USAND-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island rippled underwater sand pbr sheet",
+      "sourceFile": "M520-island-rippled-underwater-sand-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "USAND",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or AO",
+        "bottomRight": "Height or Alpha relief guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "4 m square",
+      "mipPolicy": "Preserve broad underside silhouette and relief before microdetail.",
+      "intendedUses": [
+        "sandbar or floating-rock underside construction"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Complete named Basalt Isle sandbar or floating-rock underside requirement.",
+        "required": [
+          "square text-free channels",
+          "real relief guide",
+          "LOD-safe forms"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "thin floating noise"
+        ],
+        "frequency": "macro identity survives PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 66 island sand and floating underside"
+    },
+    {
+      "registryId": "M521",
+      "canonicalCode": "HM2-TXP-M521-ENV-UNDEARTH-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island floating rock packed earth underside pbr sheet",
+      "sourceFile": "M521-island-floating-rock-packed-earth-underside-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "UNDEARTH",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or AO",
+        "bottomRight": "Height or Alpha relief guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve broad underside silhouette and relief before microdetail.",
+      "intendedUses": [
+        "sandbar or floating-rock underside construction"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Complete named Basalt Isle sandbar or floating-rock underside requirement.",
+        "required": [
+          "square text-free channels",
+          "real relief guide",
+          "LOD-safe forms"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "thin floating noise"
+        ],
+        "frequency": "macro identity survives PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 66 island sand and floating underside"
+    },
+    {
+      "registryId": "M522",
+      "canonicalCode": "HM2-TXP-M522-ENV-UNDROOT-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island floating rock exposed roots pbr sheet",
+      "sourceFile": "M522-island-floating-rock-exposed-roots-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "UNDROOT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or AO",
+        "bottomRight": "Height or Alpha relief guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve broad underside silhouette and relief before microdetail.",
+      "intendedUses": [
+        "sandbar or floating-rock underside construction"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Complete named Basalt Isle sandbar or floating-rock underside requirement.",
+        "required": [
+          "square text-free channels",
+          "real relief guide",
+          "LOD-safe forms"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "thin floating noise"
+        ],
+        "frequency": "macro identity survives PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 66 island sand and floating underside"
+    },
+    {
+      "registryId": "M523",
+      "canonicalCode": "HM2-TXP-M523-ENV-STALFACE-TIL-BCNROH-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island floating rock stalactite face pbr sheet",
+      "sourceFile": "M523-island-floating-rock-stalactite-face-pbr-sheet.png",
+      "domain": "ENV",
+      "material": "STALFACE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or AO",
+        "bottomRight": "Height or Alpha relief guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "3 m square",
+      "mipPolicy": "Preserve broad underside silhouette and relief before microdetail.",
+      "intendedUses": [
+        "sandbar or floating-rock underside construction"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Complete named Basalt Isle sandbar or floating-rock underside requirement.",
+        "required": [
+          "square text-free channels",
+          "real relief guide",
+          "LOD-safe forms"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "thin floating noise"
+        ],
+        "frequency": "macro identity survives PX128"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 66 island sand and floating underside"
+    },
+    {
+      "registryId": "M524",
+      "canonicalCode": "HM2-TXP-M524-ENV-STALACT-ATL-BCNROHA-NAT-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "island floating rock stalactite alpha atlas",
+      "sourceFile": "M524-island-floating-rock-stalactite-alpha-atlas.png",
+      "domain": "ENV",
+      "material": "STALACT",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or AO",
+        "bottomRight": "Height or Alpha relief guide"
+      },
+      "style": "NAT",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "stalactite cluster atlas",
+      "mipPolicy": "Preserve broad underside silhouette and relief before microdetail.",
+      "intendedUses": [
+        "sandbar or floating-rock underside construction"
+      ],
+      "prohibitedUses": [
+        "visible repeated focus",
+        "text",
+        "baked lighting"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color",
+        "roughness",
+        "relief",
+        "coverage",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Complete named Basalt Isle sandbar or floating-rock underside requirement.",
+        "required": [
+          "square text-free channels",
+          "real relief guide",
+          "LOD-safe forms"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "thin floating noise"
+        ],
+        "frequency": "macro identity survives PX128"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 66 island sand and floating underside"
     }
   ]
 }

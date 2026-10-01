@@ -4266,7 +4266,7 @@
     },
     {
       "registryId": "M432",
-      "canonicalCode": "HM2-TXP-M432-ENV-HIER-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "canonicalCode": "HM2-TXP-M432-ENV-HIER-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R02",
       "name": "mobile track settlement hierarchy sheet",
       "sourceFile": "M432-mobile-track-settlement-hierarchy-sheet.png",
       "domain": "ENV",
@@ -4323,13 +4323,13 @@
         ],
         "frequency": "regions survive PX128"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 47"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 48 regeneration"
     },
     {
       "registryId": "M433",
-      "canonicalCode": "HM2-TXP-M433-ENV-SHORE-TRN-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "canonicalCode": "HM2-TXP-M433-ENV-SHORE-TRN-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R02",
       "name": "mobile shoreline readability sheet",
       "sourceFile": "M433-mobile-shoreline-readability-sheet.png",
       "domain": "ENV",
@@ -4386,9 +4386,9 @@
         ],
         "frequency": "regions survive PX128"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 47"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 48 regeneration"
     },
     {
       "registryId": "M434",
@@ -4581,7 +4581,7 @@
     },
     {
       "registryId": "M437",
-      "canonicalCode": "HM2-TXP-M437-ENV-SEASON-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R01",
+      "canonicalCode": "HM2-TXP-M437-ENV-SEASON-MSK-BCNRA-MOB-PX256-Q4-MIX-P08-BL-R02",
       "name": "mobile seasonal overview state sheet",
       "sourceFile": "M437-mobile-seasonal-overview-state-sheet.png",
       "domain": "ENV",
@@ -4638,9 +4638,9 @@
         ],
         "frequency": "regions survive PX128"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 47"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 48 regeneration"
     },
     {
       "registryId": "M438",

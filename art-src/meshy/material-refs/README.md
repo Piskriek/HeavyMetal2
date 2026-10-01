@@ -853,23 +853,25 @@ M351, M362, M363 and M427–M429 now pass after regeneration. M361 is a constrai
 | ID | Overview preset | Review |
 |---|---|---|
 | M431 | Biome overview | Pass. Excellent broad island biome regions and authoritative mask. |
-| M432 | Track/settlement hierarchy | **Regenerate.** Route and settlement quadrants are not sufficiently coordinated. |
-| M433 | Shoreline readability | **Regenerate.** Photographic aerial content violates the low-resolution style. |
+| M432 | Track/settlement hierarchy | Pass after R02 regeneration. One shared loop, branches, pads, grade and exclusion field now coordinate exactly. |
+| M433 | Shoreline readability | Pass after R02 regeneration. Fully stylized chunky coast, shallows, sand, rock, foam and signed mask. |
 | M434 | Foliage density | Pass. Strong clearings, corridors, density and exclusion fields. |
 | M435 | Infrastructure masks | Pass. Excellent chunky road, bridge, dock and utility hierarchy. |
 | M436 | Cinematic lighting zones | Pass. Strong warm/cool/coastal/racing light-volume fields. |
-| M437 | Seasonal overview | **Regenerate.** Generated channel labels violate the clean-sheet standard. |
+| M437 | Seasonal overview | Pass after R02 regeneration. Clean unlabeled dry, wet, storm, snow, regrowth and heat-stress fields. |
 | M438 | Destruction/recovery overview | Pass. Strong intact, damaged, collapsed, repaired and regrown fields. |
 | M439 | Route signage fields | Constrained pass. Bold priority fields work; production must derive signage from the authoritative route mask. |
 | M440 | Distant-island impostors | Pass. Excellent four-climate silhouettes, normals, haze and alpha. |
 
 Canonical codes and reconstruction records for M431–M440 are registered in [`texture-preset-catalog.json`](./texture-preset-catalog.json).
 
+## Material Batch 48 — grand-landscape correction pass
+
+![Material Batch 48 correction sheet](./review/material-batch-48-grand-landscape-corrections.jpg)
+
+M432, M433 and M437 pass after strict regeneration from shared authoritative fields. All three advanced to recipe revision `R02`. Track/settlement hierarchy, shoreline boundaries and seasonal regions now coordinate across every quadrant, remain clean and unlabeled, and preserve mobile readability.
+
 ## Next material batches
-
-### Batch 48 — grand-landscape correction pass
-
-Regenerate M432, M433 and M437 with one authoritative shared field, strict mobile styling and no generated labels; then validate the overview system against landscape hierarchy, seasonal transitions and 128 px readability.
 
 ### Batches 49–51 — global sports preset foundations
 

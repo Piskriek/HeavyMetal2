@@ -77,7 +77,7 @@ Foliage atlases retain BaseColor, Normal, and Roughness in the first three posit
 | ID | Material | Primary use | Recommended real-world coverage | Status and production note |
 |---|---|---|---:|---|
 | M030 | Fresh-cut timber | New repairs, clean structural beams | `1.5 × 1.5 m` | Pass. Warm broad grain complements the older M008 timber without duplicating it. |
-| M031 | Charred timber | Burned structures and impact damage | `1.5 × 1.5 m` | **Weak—regenerate.** Material language is useful, but the generator returned a `1408 × 768` landscape sheet instead of the required square 2 × 2 format. |
+| M031 | Charred timber | Burned structures and impact damage | `1.5 × 1.5 m` | Pass after square ingestion regeneration. Text-free char relief with no preview inset. |
 | M032 | Heavy rope | Bridges, cranes, rigging and moorings | `0.5 × 0.5 m` | Pass with construction constraint. Use the bold braid as a tiling rope surface; geometry must provide the cable silhouette. |
 | M033 | Weathered sailcloth | Shipwreck sails, banners and shade cloth | `1 × 1 m` | **Weak—regenerate.** Current basket-like weave is too coarse and reads as interlocking strips rather than woven canvas. |
 | M034 | Patched goblin canvas | Awnings, tents and workshop covers | `2 × 2 m` | **Weak—regenerate.** Patch language works, but forbidden generated channel labels must be removed. |
@@ -99,9 +99,9 @@ Specialized transparent or emissive sheets replace bottom-right AO/Height with a
 | M041 | Boost emissive inlay | Boost pads and racing-line inserts | `2 × 2 m` | Pass. Excellent broad cyan/magenta channels and clean emissive mask; animate UV flow separately. |
 | M042 | Chipped hazard paint | Track edges and workshop hazards | `2 × 2 m` | Pass. Strong readable stripe rhythm, restrained chips and coordinated relief. |
 | M043 | White enamel interface metal | White void UI and clean race structures | `1 × 1 m` | Pass. Dominant warm white with appropriately minimal scratches and chips. |
-| M044 | Gold rivet metal | Interface rivets and premium fasteners | `0.5 × 0.5 m` | **Weak—regenerate.** Surface is useful but the image contains extensive forbidden generated UI, headings and buttons. |
+| M044 | Gold rivet metal | Interface rivets and premium fasteners | `0.5 × 0.5 m` | Pass after ingestion regeneration. Text-free aged gold-brass with real shallow relief. |
 | M045 | Racing rubber | Bumpers, grips and flexible guards | `1 × 1 m` | Pass. Restrained compressed grain and broad abrasion arcs without tire-tread literalism. |
-| M046 | Weathered leather | Harnesses, straps and balloon rigging | `1 × 1 m` | **Weak—regenerate.** Useful leather breakup, but tiny generated channel labels violate the clean-sheet standard. |
+| M046 | Weathered leather | Harnesses, straps and balloon rigging | `1 × 1 m` | Pass after ingestion regeneration. Text-free broad hide grain and crack relief. |
 | M047 | Painted ceramic | Race markers and goblin props | `1 × 1 m` | Pass. Clean off-white glaze with controlled green/purple handmade accents. |
 | M048 | Dirty lantern glass | Lanterns and workshop glazing | `1 × 1 m` | Pass. Restrained soot and transmission-mask concept; final glass uses proper transmission/refraction shader. |
 | M049 | Worn rail steel | Mine rail and machine contact surfaces | `1 × 1 m` | Pass. Strong longitudinal wear, restrained pitting and usable metallic/roughness separation. |
@@ -197,7 +197,7 @@ These atlases use BaseColor, Normal, Roughness/AO reference and Alpha. Productio
 | M080 | Tropical jungle canopy | `512 × 512 m` | **Weak—regenerate.** Useful canopy structure, but generated channel labels violate the clean-sheet standard. |
 | M081 | Meandering river valley | `1 × 1 km` | Pass. Clear river/floodplain/upland hierarchy and useful flow/height masks. |
 | M082 | Coastal wetlands | `512 × 512 m` | Pass. Strong channel network, mudflats and mangrove islands for expansive coastal scenes. |
-| M083 | Highland moor and scrub | `512 × 512 m` | **Weak—regenerate.** Good macro breakup but contains forbidden generated channel labels. |
+| M083 | Highland moor and scrub | `512 × 512 m` | Pass after ingestion regeneration. Text-free broad moor/peat terrain breakup and real relief. |
 | M084 | Desert dune sea | `1 × 1 km` | **Weak—regenerate.** Dune forms are useful, but generated headings and channel labels must be removed. |
 
 These are macro terrain layers, not replacements for near-ground materials or geometry. Their runtime role, nested scale stack, displacement limits and biome spawning rules are defined in [`docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md`](../../../docs/GRAND_LANDSCAPE_MATERIAL_STANDARD.md).
@@ -212,7 +212,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M085 | Flowers and pollen | 14 tropical flower scatter groups | Pass. Excellent color restraint, connected patches and clear distance-readable silhouettes. |
 | M086 | Mushrooms and fungi | 12 mushroom clusters and bracket growths | Pass. Strong cap diversity, shelf forms and low-poly-friendly alpha masks. |
 | M087 | Coral and reef growth | 12 brain, plate, sponge and stubby branch patches | Pass. Broad underwater forms with restrained tropical colors and stable silhouettes. |
-| M088 | Goblin doodle graffiti | Faces, crowns, teeth, handprints and racing scribbles | **Weak—regenerate.** Visual language is strong, but generated words such as `SPEED` violate the symbol-only rule. |
+| M088 | Goblin doodle graffiti | Faces, crowns, teeth, handprints and racing scribbles | Pass after square ingestion regeneration. Symbol-only crown, handprint, wheel and scratch decals. |
 | M089 | Number-free racing symbols | Chevrons, turns, boost, wheel, wrench and checkpoint marks | Pass. Crisp, varied, readable symbols without numbers or lettering. |
 | M090 | Weld heat and joining | Weld beads, rings, seams and repair joins | Pass with content constraint. Useful construction shapes; production should reduce pipe-like forms and emphasize weld/heat halos. |
 | M091 | Impact scorch | Blast blooms, streaks, rings and directional burns | Pass. Good range of hard impact centers and soft soot feathering. |
@@ -249,7 +249,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M108 | Eye and iris atlas | Iris, pupil and sclera variants | Pass. Excellent color/pupil variety and aligned eye masks for deep customization. |
 | M109 | Clear weathered lens glass | Goggles, visors and lenses | Pass. Restrained scratches/fog with useful transmission and roughness guidance. |
 | M110 | Weathered black leather | Jackets, boots, gloves and seats | **Weak—regenerate.** Surface breakup is strong, but generated channel labels violate the clean-sheet standard. |
-| M111 | Cracked tan leather | Harnesses, belts and armor pads | Pass. Broad creases, worn dye and dry cracking remain readable without excessive noise. |
+| M111 | Cracked tan leather | Harnesses, belts and armor pads | Pass after square ingestion regeneration. Broad tan hide grain and sparse crack relief. |
 | M112 | Layered rusted iron | Armor, buckles, weapons and vehicle parts | Pass. Strong large-scale rust/metal separation and useful pitting relief. |
 | M113 | Tooth, tusk, horn and bone | Teeth, accessories and armor details | Pass. Broad varied creature-material samples with clean masks and no gore. |
 
@@ -260,7 +260,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | ID | Creator material | Use | Status and production note |
 |---|---|---|---|
 | M114 | Lips, gums and inner mouth | Mouth color and moisture variation | Pass. Strong expressive lip/gum variants with useful roughness and material masks. |
-| M115 | Tongues | Tongue shape and color variants | Pass. Broad stylized silhouettes, center grooves and clean alpha masks. |
+| M115 | Tongues | Tongue shape and color variants | Pass after square ingestion regeneration. Detached tissue material with broad folds and no object render. |
 | M116 | Nails and claws | Fingernails, toenails and claw tips | **Weak—regenerate.** The result repeated tooth/horn forms from its source reference instead of producing clear nail plates and claws. |
 | M117 | Ear skin and translucency | Ear color, thickness and subsurface scattering | Pass. Excellent ear variants with aligned thickness masks and appealing color range. |
 | M118 | Hair and eyebrows | Mohawks, tufts, brows and sideburn cards | Pass. Strong punk silhouettes, controlled dyed accents and LOD-safe alpha shapes. |
@@ -332,7 +332,7 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 | M156 | Windblown leaves | Seasonal windrows and corner buildup | Pass. Excellent connected leaf groups, warm seasonal colors and LOD-safe silhouettes. |
 | M157 | Dry-season bleaching | Terrain and foliage stress | Pass. Broad pale stress masks support tint, density and roughness changes without replacing geometry. |
 | M158 | Spring bloom | Flower and fresh-growth coverage | Pass. Strong verge strips, islands and meadow patches with controlled color. |
-| M159 | Volcanic ashfall | Event deposition on terrain and props | **Weak—regenerate.** Content is useful, but the generated sheet broke the required four-quadrant channel layout. |
+| M159 | Volcanic ashfall | Event deposition on terrain and props | Pass after square ingestion regeneration. Clean ash coverage alpha and powder relief. |
 | M160 | Storm debris | Windrows of leaves, twigs, timber, rope and scrap | Pass. Excellent directional piles and connected masks for decal/geometry hybrid spawning. |
 
 Layer ordering, accumulation, melt/dry behavior, geometry response and event baking are defined in [`docs/WEATHER_AND_SEASON_MATERIAL_STANDARD.md`](../../../docs/WEATHER_AND_SEASON_MATERIAL_STANDARD.md).
@@ -344,7 +344,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | ID | State or medium | Use | Status and production note |
 |---|---|---|---|
 | M161 | Underwater depth haze | Volumetric absorption and suspended particles | Pass. Excellent broad low-frequency density, distortion and depth-phase references. |
-| M162 | Water algae bloom | Flowing bloom density and absorption | **Weak—regenerate.** Material language is strong, but the generator returned a `1408 × 768` landscape sheet instead of the square channel layout. |
+| M162 | Water algae bloom | Flowing bloom density and absorption | Pass after square ingestion regeneration. Broad algae density masks for independent shader scrolling. |
 | M163 | Burned-ground recovery | Ash-to-pioneer-growth succession | Pass. Strong material and recovery-mask progression without active fire or smoke. |
 | M164 | Regrowing forest | Clearing-to-mature-canopy succession | Pass. Excellent staged meadow, shrub, sapling and canopy transition. |
 | M165 | Dust-storm deposition | Post-storm dust buildup | Pass. Useful directional fans and sheltered deposits with clean alpha. |
@@ -517,7 +517,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M262 | Corrugated cardboard | Boxes, dividers and disposable repairs | Pass. Useful kraft pulp, water marks, pressed dents and subtle corrugation telegraphing. |
 | M263 | Produce-crate wood | Crates, shelves and light construction | Pass. Strong pale unfinished grain, saw wear, stains and paint transfer. |
 | M264 | Pallet wood | Pallets, heavy crates and workshop construction | Pass. Excellent grey weathering, oil rubs, paint scars and deep rough-sawn damage. |
-| M265 | Plastic tarpaulin | Covers, awnings and waterproof dividers | **Weak—regenerate.** Returned at `1408×768` rather than the required square four-channel sheet. |
+| M265 | Plastic tarpaulin | Covers, awnings and waterproof dividers | Pass after square ingestion regeneration. Woven polymer, broad folds and real relief. |
 | M266 | Woven produce net | Market sacks and breathable storage | Pass. Clean diamond silhouette, chunky knots, matched channels and mip-safe alpha. |
 | M267 | Butcher block | Counters, worktops and food-preparation props | Pass. Excellent end-grain blocks, oil staining and broad crossing knife wear. |
 | M268 | Blackened cookware steel | Pans, pots, griddles and stove surfaces | Pass. Strong seasoned steel, soot, baked-oil halos and restrained scrub wear. |
@@ -976,3 +976,9 @@ Correct M499, M500 and M504, then formalize the recursive parent/child graph reg
 ![Material Batch 57 contact sheet](./review/material-batch-57-ingestion-and-interface-corrections.jpg)
 
 Regenerated M022, M067, M071, M132, M152 and M177 as verified `1024×1024`, text-free sheets with no preview inset and usable relief guides in response to the PR ingestion review. M499, M500 and M504 now pass at `R02` with sparse scene-first layouts and no captions. M464 advances to `R02` as a constrained pass: its channels are usable, but production reconstruction must separate feather-vane and cork regions rather than treating the sheet as finished object geometry.
+
+## Material Batch 58 — automated-ingestion regeneration set
+
+![Material Batch 58 contact sheet](./review/material-batch-58-ingestion-regenerations.jpg)
+
+M031, M044, M046, M083, M088, M111, M115, M159, M162 and M265 were regenerated in place as verified `1024×1024`, text-free sheets. They use fixed four-quadrant layouts, omit preview insets and provide non-flat relief guides for the ingestion pipeline.

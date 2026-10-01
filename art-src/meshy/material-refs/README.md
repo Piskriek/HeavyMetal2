@@ -628,8 +628,27 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 
 Authoring, packing, mip, alpha, fallback and validation requirements are defined in [`docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md`](../../../docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md).
 
+## Material Batch 35 — mobile architecture, weather, and shoreline expansion
+
+![Material Batch 35 mobile-expansion contact sheet](./review/material-batch-35-mobile-expansion-contact-sheet.jpg)
+
+![Material Batch 35 BaseColor previews at 128 px](./review/material-batch-35-mobile-basecolor-128px-preview.png)
+
+| ID | Mobile material | Intended tier | Status and production note |
+|---|---|---|---|
+| M331 | Tropical beach sand | Mobile standard, `128 × 128` | Pass. Five broad sand/moisture groups and sparse shell clusters remain distinct at 128 px. |
+| M332 | Tidal mud | Mobile standard, `128 × 128` | Pass. Strong low-frequency flow bands, wet/dry grouping and thick drainage cracks. |
+| M333 | Rough concrete | Mobile standard, `128 × 128` | Pass. Broad cement values, damp clouds and grouped aggregate avoid grey micro-noise. |
+| M334 | Fired brick | Mobile standard, `128 × 128` | Pass. Excellent oversized staggered bond, limited firing palette and thick readable mortar. |
+| M335 | Corrugated roof sheet | Mobile rectangular, `128 × 256` | Pass. Strong turquoise waves, dark troughs, worn crowns and large rust islands. |
+| M336 | Scratched dusty glass | Mobile standard, `128 × 128` | Pass. Simple haze, broad wipe and very sparse scratches remain useful after downsampling. |
+| M337 | Weathered leather | Mobile standard, `128 × 128` | Pass with simplification constraint. Strong dark folds and pale wear; retain only the largest crease masses in production. |
+| M338 | Broad rusted steel | Mobile standard, `128 × 128` | Pass. Excellent large steel, oxide, orange rust and exposed-metal regions with clean masks. |
+| M339 | Water and foam masks | Mobile standard, `128 × 128` | Pass. Bold independently scrollable teal bands and thick connected foam survive mip reduction. |
+| M340 | Packed leaf litter | Mobile standard, `128 × 128` | Pass. Excellent six-color overlapping leaves with no dependence on fine veins or fragments. |
+
 ## Next material batches
 
-### Batch 35 — mobile architecture, weather, and character expansion
+### Batch 36 — mobile Goblin Creator and vehicle detail
 
-Mobile sand, tidal mud, rough concrete, fired brick, corrugated roofing, scratched glass, weathered leather, broad rust, water/foam masks and packed leaf litter.
+Dyed hair atlas, coarse knit, padded racing cloth, suede, goggle lens, painted armor metal, tire tread, light lens, dashboard plastic and grime decal atlas.

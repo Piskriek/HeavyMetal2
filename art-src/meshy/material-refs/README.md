@@ -488,8 +488,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M249 | Mosquito net | Beds, windows and breathable partitions | Pass. Crisp mip-conscious square grid with matched channels and clean alpha. |
 | M250 | Stained interior wood | Counters, shelves, trim and furniture | Pass. Strong warm grain, stain pooling, water marks and calm satin wear. |
 
+## Material Batch 27 — domestic, market, and service materials
+
+![Material Batch 27 domestic and market contact sheet](./review/material-batch-27-domestic-market-contact-sheet.jpg)
+
+| ID | Domestic material | Use | Status and production note |
+|---|---|---|---|
+| M251 | Chipped enamelware | Cookware, fixtures and appliances | Pass. Strong ivory glaze, rounded steel chips, rust halos and coordinated condition masks. |
+| M252 | Brushed sink steel | Sinks, counters and service equipment | Pass. Calm directional brushing, hard-water haze and convincing utensil wear. |
+| M253 | Glazed porcelain | Dishes, basins and sanitary fixtures | Pass. Excellent ivory-blue glaze pooling, crazing and mineral-age variation. |
+| M254 | Clear bottle glass | Bottles, jars and salvaged glazing | **Weak—regenerate.** Glass waviness and haze are useful, but generated channel labels violate the clean-sheet standard. |
+| M255 | Amber bottle glass | Bottles, lamps and translucent details | Pass. Strong amber absorption, broad waviness and restrained trapped bubbles. |
+| M256 | Woven basket reed | Baskets, panels and market storage | Pass. Excellent dense basket pattern, broad reed strips and handled crowns. |
+| M257 | Utility rope | Ties, rails and wrapped geometry | Pass. Strong thick twist, grime variation and LOD-safe strand height. |
+| M258 | Candle wax | Candles, seals and melted-wax buildup | Pass. Calm creamy clouding, broad cooled drips, soot and subtle surface damage. |
+| M259 | Handmade soap | Domestic and workshop cleaning props | **Weak—regenerate.** Soap response is usable, but generated channel labels violate the clean-sheet standard. |
+| M260 | Weathered paper packaging | Blank labels, wraps, patches and decals | Pass. Excellent text-free kraft, tape and paper silhouettes with clean alpha. |
+
 ## Next material batches
 
-### Batch 27 — domestic, market, and service materials
+### Batch 28 — market storage and utility surfaces
 
-Chipped enamelware, brushed sink steel, glazed porcelain, clear bottle glass, amber bottle glass, woven basket reed, utility rope, candle wax, handmade soap and weathered paper packaging.
+Burlap sack cloth, corrugated cardboard, produce-crate wood, pallet wood, plastic tarpaulin, woven produce net, butcher block, blackened cookware steel, patinated copper and aged brass.

@@ -1,0 +1,21 @@
+{
+  "name": "hm-harness",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test packages/*/tests/*.test.ts",
+    "build": "npm run build -w @hm/web",
+    "dev": "npm run dev -w @hm/web",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.17",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "vite": "^7.3.2",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@hm/contracts": ["packages/contracts/src/index.ts"],
+      "@hm/kernel": ["packages/kernel/src/index.ts"],
+      "@hm/script": ["packages/script/src/index.ts"],
+      "@hm/sim": ["packages/sim/src/index.ts"],
+      "@hm/platform": ["packages/platform/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src", "packages/*/tests", "apps/*/src", "apps/*/vite.config.ts"]
+}

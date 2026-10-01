@@ -8237,7 +8237,7 @@
     },
     {
       "registryId": "M490",
-      "canonicalCode": "HM2-TXP-M490-UI-ACCESS-ATL-BCA-HICON-PX512-AT16-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M490-UI-ACCESS-ATL-BCA-HICON-PX512-AT16-CLN-PFULL-BL-R02",
       "name": "ui accessibility focus state atlas",
       "sourceFile": "M490-ui-accessibility-focus-state-atlas.png",
       "domain": "UI",
@@ -8295,9 +8295,9 @@
         ],
         "frequency": "primary control and component silhouette survives mobile fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 56 text-free correction"
     },
     {
       "registryId": "M491",
@@ -8364,7 +8364,7 @@
     },
     {
       "registryId": "M492",
-      "canonicalCode": "HM2-TXP-M492-UI-DRAWER-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M492-UI-DRAWER-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R02",
       "name": "ui shallow preset drawer reference",
       "sourceFile": "M492-ui-shallow-preset-drawer-reference.png",
       "domain": "UI",
@@ -8421,9 +8421,9 @@
         ],
         "frequency": "primary control and component silhouette survives mobile fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 56 text-free correction"
     },
     {
       "registryId": "M493",
@@ -8553,7 +8553,7 @@
     },
     {
       "registryId": "M495",
-      "canonicalCode": "HM2-TXP-M495-UI-CARD-ATL-BCA-CLN-PX512-AT16-CLN-PFULL-BL-R01",
+      "canonicalCode": "HM2-TXP-M495-UI-CARD-ATL-BCA-CLN-PX512-AT16-CLN-PFULL-BL-R02",
       "name": "ui sharp preset card frame atlas",
       "sourceFile": "M495-ui-sharp-preset-card-frame-atlas.png",
       "domain": "UI",
@@ -8611,9 +8611,9 @@
         ],
         "frequency": "primary control and component silhouette survives mobile fallback"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 56 text-free correction"
     },
     {
       "registryId": "M496",
@@ -8740,6 +8740,448 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 55 interface graph accessibility and inhabited details"
+    },
+    {
+      "registryId": "M498",
+      "canonicalCode": "HM2-TXP-M498-UI-PARENT-DEC-BC-CLN-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui scene first parent graph reference",
+      "sourceFile": "M498-ui-scene-first-parent-graph-reference.png",
+      "domain": "UI",
+      "material": "PARENT",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
+    },
+    {
+      "registryId": "M499",
+      "canonicalCode": "HM2-TXP-M499-UI-PARENT-DEC-BC-MOBILE-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui mobile scene first parent graph reference",
+      "sourceFile": "M499-ui-mobile-scene-first-parent-graph-reference.png",
+      "domain": "UI",
+      "material": "PARENT",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "MOBILE",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
+    },
+    {
+      "registryId": "M500",
+      "canonicalCode": "HM2-TXP-M500-UI-PARENT-DEC-BC-NOST-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui nostalgic scene first parent graph reference",
+      "sourceFile": "M500-ui-nostalgic-scene-first-parent-graph-reference.png",
+      "domain": "UI",
+      "material": "PARENT",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "NOST",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
+    },
+    {
+      "registryId": "M501",
+      "canonicalCode": "HM2-TXP-M501-UI-PARENT-DEC-BC-GPUNK-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui goblin punk scene first parent graph reference",
+      "sourceFile": "M501-ui-goblin-punk-scene-first-parent-graph-reference.png",
+      "domain": "UI",
+      "material": "PARENT",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "GPUNK",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
+    },
+    {
+      "registryId": "M502",
+      "canonicalCode": "HM2-TXP-M502-UI-PARENT-DEC-BC-HICON-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui high contrast scene first parent graph reference",
+      "sourceFile": "M502-ui-high-contrast-scene-first-parent-graph-reference.png",
+      "domain": "UI",
+      "material": "PARENT",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "HICON",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
+    },
+    {
+      "registryId": "M503",
+      "canonicalCode": "HM2-TXP-M503-UI-PARENT-DEC-BC-PBR-PX512-SET-CLN-PFULL-BL-R01",
+      "name": "ui tactile pbr scene first parent graph reference",
+      "sourceFile": "M503-ui-tactile-pbr-scene-first-parent-graph-reference.png",
+      "domain": "UI",
+      "material": "PARENT",
+      "form": "DEC",
+      "channels": [
+        "BaseColor"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "PBR",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "SET",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
+    },
+    {
+      "registryId": "M504",
+      "canonicalCode": "HM2-TXP-M504-UI-DEPTH-ATL-BCA-CLN-PX512-AT16-CLN-PFULL-BL-R01",
+      "name": "ui recursive depth and bake state atlas",
+      "sourceFile": "M504-ui-recursive-depth-and-bake-state-atlas.png",
+      "domain": "UI",
+      "material": "DEPTH",
+      "form": "ATL",
+      "channels": [
+        "BaseColor",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "reference": "Resolve graph nodes, states, semantics and child references from registry; never infer behavior from pixels."
+      },
+      "style": "CLN",
+      "targetTier": "PX512",
+      "fallbackTier": "PX128",
+      "layout": "AT16",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "BL",
+      "wrap": "clamp",
+      "physicalScale": "viewport-relative scene-first parent graph",
+      "mipPolicy": "Preserve dominant scene, primary toolbar and drawer detach/close cues.",
+      "intendedUses": [
+        "recursively editable interface parent graph or state reference"
+      ],
+      "prohibitedUses": [
+        "persistent dense windows",
+        "semantic inference from pixels",
+        "rounded dark dashboard chrome"
+      ],
+      "parentPreset": "M494",
+      "editableParameters": [
+        "node geometry",
+        "placement",
+        "icon family",
+        "materials",
+        "state",
+        "runtime tier"
+      ],
+      "recipe": {
+        "intent": "Parent graph binding sculptable and paintable stage, toolbar, drawers, icons and details.",
+        "required": [
+          "scene at least 78 percent",
+          "all drawers detachable and closable",
+          "clean-canvas state",
+          "stable semantic IDs"
+        ],
+        "forbidden": [
+          "persistent sidebars",
+          "dense nested windows",
+          "whole-interface neon glow"
+        ],
+        "frequency": "primary interaction hierarchy survives fallback tier"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 56 interface parent graphs"
     }
   ]
 }

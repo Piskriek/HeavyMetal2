@@ -958,6 +958,14 @@ M487 passes at `R02` as a text-free sparse inhabited-detail atlas. M489 supplies
 
 M491 and M493 are constrained passes: their component mechanics are useful, but reconstruction must restore the approved bright white scene-first context and avoid domestic-cabinet readings. Regenerate M490, M492 and M495 because generated captions violate the icon and component contract. All interaction meaning comes from registered semantic state IDs, never from generated text or pixel inference.
 
+## Material Batch 56 — complete scene-first parent graph references
+
+![Material Batch 56 contact sheet](./review/material-batch-56-interface-parent-graphs-corrections.jpg)
+
+M490, M492 and M495 pass at `R02` after text-free regeneration. M501 and M503 pass as Goblin-punk and restrained tactile-PBR parent graph references. M498 and M502 are constrained passes: retain their sparse composition and state logic while restoring stronger stage continuity and clearer drawer relationships during reconstruction.
+
+Regenerate M499 and M500 because their mobile and nostalgic states accumulated too much persistent interface, violating the dominant-scene requirement. Regenerate M504 without generated captions. Parent graph recipes require at least 78 percent scene, stable semantic action IDs, detachable/closable drawers and a guaranteed clean-canvas state. Style swaps may never alter interaction behavior.
+
 ### Next interface work
 
-Regenerate M490, M492 and M495 without captions, then register complete parent graphs binding the approved toolbar, drawer, stage, icon-family, focus-state, inhabited-detail and runtime-bake children.
+Correct M499, M500 and M504, then formalize the recursive parent/child graph registry and runtime resolver independently from these visual derivation references.

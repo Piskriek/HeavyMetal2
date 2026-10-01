@@ -386,8 +386,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M189 | Battery corrosion | Electrical and chemical weathering | Pass. Strong broad crystalline crust, copper salts and leak trails without micro-noise. |
 | M190 | Expanding foam and sealant | Improvised repairs and gap filling | Pass. Chunky foam lobes, gasket beads, plugs and overflow patches with clear alpha. |
 
+## Material Batch 21 — vehicle paint, metals, and heat finishes
+
+![Material Batch 21 vehicle-finish contact sheet](./review/material-batch-21-vehicle-finishes-contact-sheet.jpg)
+
+| ID | Vehicle finish | Use | Status and production note |
+|---|---|---|---|
+| M191 | Brushed aluminum | Body panels, trim and machinery | Pass. Clean grouped grain, restrained scratches and useful polished wear zones. |
+| M192 | Oxidized aluminum | Old bodywork and exposed structures | Pass. Strong chalky oxide, pits and broad weathering with good metal separation. |
+| M193 | Galvanized steel | Panels, ducts and workshop structures | **Weak—regenerate.** The surface reads too leafy/crystalline, and generated channel labels violate the clean-sheet standard. |
+| M194 | Polished chrome | Mirrors, trim and accessories | Pass. Appropriately neutral source maps leave environment reflection to runtime lighting. |
+| M195 | Heat-blued steel | Engines, exhausts and high-temperature parts | Pass. Excellent blue/violet/straw temper colors with restrained scale and no glow. |
+| M196 | Exhaust heat tint | Thermal gradients around pipes and welds | Pass. Strong rings, fans and bands with clean reusable masks. |
+| M197 | Matte ceramic coating | Protective armor and dark vehicle panels | Pass. Restrained charcoal coating, abrasion and highly matte response. |
+| M198 | Pearlescent racing paint | Premium bodywork and creator accents | Pass. Soft cyan/magenta/violet pearl zones support runtime view-angle color shift. |
+| M199 | Candy-color enamel | Deep green translucent vehicle paint | Pass with shader constraint. Runtime clearcoat and substrate must provide depth; source BaseColor contains no fixed highlights. |
+| M200 | Tire sidewall rubber | Tires and flexible wheel parts | Pass. Broad abrasion rings, low rubber grain and no branding or tread literalism. |
+
 ## Next material batches
 
-### Batch 21 — vehicle paint, metals, and heat finishes
+### Batch 22 — vehicle interiors and soft construction
 
-Brushed aluminum, oxidized aluminum, galvanized steel, polished chrome, heat-blued steel, exhaust heat tint, matte ceramic coating, pearlescent paint, candy-color enamel and tire sidewall rubber.
+Worn vinyl, seat foam, padded leather, dashboard plastic, ribbed floor rubber, woven harness webbing, acoustic felt, heat shielding foil, cork gasket, steering-wrap tape and dusty instrument glass.

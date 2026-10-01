@@ -369,8 +369,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M179 | Electrical scorch | Machines, wiring zones and vehicles | Pass. Good branching arcs, heat rings and pitted short-circuit damage. |
 | M180 | Repaired wall and plaster | White-stage repairs and settlement interiors | Pass. Broad filler, mortar and trowel shapes with clean alpha and restrained overspray. |
 
+## Material Batch 20 — workshop consumables and mechanical residues
+
+![Material Batch 20 workshop-residue contact sheet](./review/material-batch-20-workshop-residues-contact-sheet.jpg)
+
+| ID | Residue family | Use | Status and production note |
+|---|---|---|---|
+| M181 | Food grease and crumbs | Workbenches and inhabited interiors | Pass. Strong rings, smears, drips and grouped crumbs without branded food clutter. |
+| M182 | Chalk symbols | Workshop notes and temporary route marks | Pass. Excellent original symbol vocabulary with powder breakup and no words or numbers. |
+| M183 | Wax crayon marks | Bold temporary annotation and punk accents | Pass. Strong colored arrows, loops, cross-outs and broad wax relief. |
+| M184 | Welding spatter | Machine joins and repair history | Pass. Useful fused beads, fans, rings and heat-affected residue with LOD-safe grouping. |
+| M185 | Sawdust and wood shavings | Carpentry zones, docks and repair benches | Pass. Excellent powder/shaving mix and varied accumulation footprints. |
+| M186 | Metal filings and machining chips | Machine shops and foundries | Pass. Strong steel/brass chip groups, drill curls and magnetic windrows. |
+| M187 | Fuel and solvent stains | Floors, tanks and machinery | Pass. Useful fresh pools, evaporated halos, leaks and wipe states. |
+| M188 | Coolant leaks | Engines, pipes and machine floors | Pass. Distinct green/cyan/purple condition language without emissive slime. |
+| M189 | Battery corrosion | Electrical and chemical weathering | Pass. Strong broad crystalline crust, copper salts and leak trails without micro-noise. |
+| M190 | Expanding foam and sealant | Improvised repairs and gap filling | Pass. Chunky foam lobes, gasket beads, plugs and overflow patches with clear alpha. |
+
 ## Next material batches
 
-### Batch 20 — workshop consumables and mechanical residues
+### Batch 21 — vehicle paint, metals, and heat finishes
 
-Food grease, chalk symbols without text, wax crayon marks, welding spatter, sawdust, metal filings, fuel stains, coolant leaks, battery corrosion and expanding foam/sealant.
+Brushed aluminum, oxidized aluminum, galvanized steel, polished chrome, heat-blued steel, exhaust heat tint, matte ceramic coating, pearlescent paint, candy-color enamel and tire sidewall rubber.

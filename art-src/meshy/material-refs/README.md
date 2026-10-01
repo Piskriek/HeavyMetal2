@@ -454,8 +454,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M229 | Fiberglass composite | Vehicle shells and repair patches | Pass. Strong translucent weave, aged resin and broad abrasion response. |
 | M230 | Gasket-paper fiber | Gaskets, sheet insulation and seals | Pass. Calm compressed pulp variation with oil-darkened zones and subtle cracks. |
 
+## Material Batch 25 — settlement architecture and roofing
+
+![Material Batch 25 settlement-architecture contact sheet](./review/material-batch-25-settlement-architecture-contact-sheet.jpg)
+
+| ID | Architecture material | Use | Status and production note |
+|---|---|---|---|
+| M231 | Galvanized corrugated iron | Walls, roofs and improvised enclosures | **Weak—regenerate.** Corrugation profile is useful, but generated channel labels violate the clean-sheet standard. |
+| M232 | Rusted painted roof sheet | Aged roofs, walls and repair panels | Pass. Strong turquoise paint, trough rust, exposed crowns and continuous corrugations. |
+| M233 | Clay roof tile | Settlement and shrine roofing | Pass. Excellent chunky curved courses, offset repetition, overlap depth and subtle moss. |
+| M234 | Palm thatch | Roofs, awnings and hut cladding | **Weak—regenerate.** Dense strip layering is strong, but generated channel labels violate the clean-sheet standard. |
+| M235 | Tar-paper roofing | Low-cost roofs and waterproof repairs | **Weak—regenerate.** Current result reads as dark masonry blocks rather than mineral felt and broad lap bands. |
+| M236 | Limewashed plaster | Settlement walls and interior surfaces | Pass. Calm trowel clouding, chalk response and restrained damp/undercoat variation. |
+| M237 | Rough concrete | Foundations, walls and utility structures | Pass. Excellent broad aggregate, air pockets and trowel drag without disruptive slab seams. |
+| M238 | Fired brick | Walls, ovens and structural infill | Pass. Strong handmade staggered bond, varied firing and deeply readable mortar. |
+| M239 | Glazed wall tile | Kitchens, garages and wash areas | Pass. Clean handmade tile grid with varied glaze, crazing and useful grout depth. |
+| M240 | Woven shade mat | Awnings, partitions and shade panels | Pass. Strong packed reed weave, muted variation and LOD-readable crossings. |
+
 ## Next material batches
 
-### Batch 25 — settlement architecture and roofing
+### Batch 26 — settlement floors, interiors, and screens
 
-Corrugated iron, rusted roof sheet, clay roof tile, palm thatch, tar paper, limewashed plaster, rough concrete, fired brick, glazed wall tile and woven shade mat.
+Rough timber planks, bamboo slats, terrazzo, painted concrete floor, worn linoleum, galvanized mesh, woven rag rug, heavy canvas, mosquito net and stained interior wood.

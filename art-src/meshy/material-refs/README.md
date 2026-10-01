@@ -261,11 +261,11 @@ These are macro terrain layers, not replacements for near-ground materials or ge
 |---|---|---|---|
 | M114 | Lips, gums and inner mouth | Mouth color and moisture variation | Pass. Strong expressive lip/gum variants with useful roughness and material masks. |
 | M115 | Tongues | Tongue shape and color variants | Pass after square ingestion regeneration. Detached tissue material with broad folds and no object render. |
-| M116 | Nails and claws | Fingernails, toenails and claw tips | **Weak—regenerate.** Square and text-free, but broad organic folds still do not read clearly as nail/claw keratin. |
+| M116 | Nails and claws | Fingernails, toenails and claw tips | **Weak—regenerate.** Keratin identity improved, but replacement omitted the required four-quadrant channel layout. |
 | M117 | Ear skin and translucency | Ear color, thickness and subsurface scattering | Pass. Excellent ear variants with aligned thickness masks and appealing color range. |
 | M118 | Hair and eyebrows | Mohawks, tufts, brows and sideburn cards | Pass. Strong punk silhouettes, controlled dyed accents and LOD-safe alpha shapes. |
 | M119 | Stubble and facial hair | Beard shadow, moustaches and short beards | Pass. Broad connected shapes provide efficient customization without hair noise. |
-| M120 | Weathered racing cloth | Suits, jackets, gloves and upholstery | **Weak—regenerate.** Material response improved, but generated letter-like stencil forms violate the text-free standard. |
+| M120 | Weathered racing cloth | Suits, jackets, gloves and upholstery | Pass after regeneration. Text-free charcoal/olive racing weave with abstract paint wear and real relief. |
 
 ## Material Batch 14 — goblin equipment and condition overlays
 
@@ -351,7 +351,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M166 | Fog condensation | Dew, fogged film and cleared wipes | Pass. Restrained low-relief moisture masks suitable for glass, metal and foliage. |
 | M167 | Oil-on-water sheen | Thin-film industrial runoff | Pass. Strong restrained interference color, flow normal, thickness and film masks. |
 | M168 | Hot-spring mineral deposits | Travertine, crust and mineral flow | Pass with cleanup. Useful palette/relief; production should consolidate decorative splash-like shapes into seamless mineral terraces. |
-| M169 | Tidal wet/dry cycle | Waterline wetness, salt and growth | **Weak—regenerate.** Content range is useful, but generated channel labels violate the clean-sheet standard. |
+| M169 | Tidal wet/dry cycle | Waterline wetness, salt and growth | Pass after regeneration. Text-free wet/dry fringe with alpha and shallow tideline relief. |
 | M170 | Post-race track recovery | Ruts, repairs and regrowth over time | Pass with sequencing constraint. Treat displayed shapes as staged masks driven by recovery time, not permanent road markings. |
 
 ## Material Batch 19 — workshop, interior, and lived-in details
@@ -396,7 +396,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 |---|---|---|---|
 | M191 | Brushed aluminum | Body panels, trim and machinery | Pass. Clean grouped grain, restrained scratches and useful polished wear zones. |
 | M192 | Oxidized aluminum | Old bodywork and exposed structures | Pass. Strong chalky oxide, pits and broad weathering with good metal separation. |
-| M193 | Galvanized steel | Panels, ducts and workshop structures | **Weak—regenerate.** The surface reads too leafy/crystalline, and generated channel labels violate the clean-sheet standard. |
+| M193 | Galvanized steel | Panels, ducts and workshop structures | **Weak—regenerate.** Square and text-free, but oversized zinc crystals still read as leafy shards instead of subtle galvanized spangle. |
 | M194 | Polished chrome | Mirrors, trim and accessories | Pass. Appropriately neutral source maps leave environment reflection to runtime lighting. |
 | M195 | Heat-blued steel | Engines, exhausts and high-temperature parts | Pass. Excellent blue/violet/straw temper colors with restrained scale and no glow. |
 | M196 | Exhaust heat tint | Thermal gradients around pipes and welds | Pass. Strong rings, fans and bands with clean reusable masks. |
@@ -428,14 +428,14 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 
 | ID | Material | Use | Status and production note |
 |---|---|---|---|
-| M211 | Dusty instrument glass | Gauges and protected displays | **Weak—regenerate.** Useful wipe/fingerprint response, but generated channel headings violate the clean-sheet standard. |
+| M211 | Dusty instrument glass | Gauges and protected displays | Pass after regeneration. Text-free dusty glass with transmission, wipe arcs and dust relief. |
 | M212 | Clear ribbed headlamp lens | Headlamps and work lights | Pass after ingestion regeneration. Text-free ribbed transmission material with real rib relief. |
 | M213 | Red taillight lens | Rear lights and warning lamps | Pass. Broad hexagonal lens cells and clean transmission/emissive structure. |
 | M214 | Prismatic reflector | Safety reflectors and passive markers | Pass. Excellent triangular prism field and retroreflection mask reference. |
 | M215 | LED indicator atlas | Dashboards, status lights and machine controls | Pass. Strong off-state colors, domes, bars, rings and clean emissive masks. |
 | M216 | Wire insulation | Electrical looms and cable geometry | Pass. Useful extrusion grain, green identification bands and restrained age cracking. |
 | M217 | Braided cable sleeve | Wiring looms and protected hoses | Pass. Excellent broad braid with strong AO and distance readability. |
-| M218 | Coolant rubber hose | Engine hoses and fluid lines | **Weak—regenerate.** Surface response is useful, but duplicated channel labels violate the clean-sheet format. |
+| M218 | Coolant rubber hose | Engine hoses and fluid lines | Pass after regeneration. Text-free extruded coolant rubber with heat chalking and shallow relief. |
 | M219 | Reinforced drive belt | Belts and flexible engine components | Pass. Broad continuous ribs, reinforcement grain and controlled wear. |
 | M220 | Spark-plug ceramic | Ignition parts and heat-resistant insulators | Pass. Strong heat staining, soot bands and subtle glaze crazing. |
 
@@ -462,11 +462,11 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 
 | ID | Architecture material | Use | Status and production note |
 |---|---|---|---|
-| M231 | Galvanized corrugated iron | Walls, roofs and improvised enclosures | **Weak—regenerate.** Corrugation profile is useful, but generated channel labels violate the clean-sheet standard. |
+| M231 | Galvanized corrugated iron | Walls, roofs and improvised enclosures | **Weak—regenerate.** Square and text-free, but the BaseColor quadrant is corrupted by vivid normal-map colors. |
 | M232 | Rusted painted roof sheet | Aged roofs, walls and repair panels | Pass. Strong turquoise paint, trough rust, exposed crowns and continuous corrugations. |
 | M233 | Clay roof tile | Settlement and shrine roofing | Pass. Excellent chunky curved courses, offset repetition, overlap depth and subtle moss. |
 | M234 | Palm thatch | Roofs, awnings and hut cladding | Pass after regeneration. Fixed square four-channel thatch with dense strip layering and real relief. |
-| M235 | Tar-paper roofing | Low-cost roofs and waterproof repairs | **Weak—regenerate.** Current result reads as dark masonry blocks rather than mineral felt and broad lap bands. |
+| M235 | Tar-paper roofing | Low-cost roofs and waterproof repairs | Pass after regeneration. Broad charcoal bituminous felt and grit no longer read as masonry. |
 | M236 | Limewashed plaster | Settlement walls and interior surfaces | Pass. Calm trowel clouding, chalk response and restrained damp/undercoat variation. |
 | M237 | Rough concrete | Foundations, walls and utility structures | Pass. Excellent broad aggregate, air pockets and trowel drag without disruptive slab seams. |
 | M238 | Fired brick | Walls, ovens and structural infill | Pass. Strong handmade staggered bond, varied firing and deeply readable mortar. |
@@ -499,7 +499,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M251 | Chipped enamelware | Cookware, fixtures and appliances | Pass. Strong ivory glaze, rounded steel chips, rust halos and coordinated condition masks. |
 | M252 | Brushed sink steel | Sinks, counters and service equipment | Pass. Calm directional brushing, hard-water haze and convincing utensil wear. |
 | M253 | Glazed porcelain | Dishes, basins and sanitary fixtures | Pass. Excellent ivory-blue glaze pooling, crazing and mineral-age variation. |
-| M254 | Clear bottle glass | Bottles, jars and salvaged glazing | **Weak—regenerate.** Glass waviness and haze are useful, but generated channel labels violate the clean-sheet standard. |
+| M254 | Clear bottle glass | Bottles, jars and salvaged glazing | Pass after regeneration. Text-free pale bottle glass with broad waviness and thickness guide. |
 | M255 | Amber bottle glass | Bottles, lamps and translucent details | Pass. Strong amber absorption, broad waviness and restrained trapped bubbles. |
 | M256 | Woven basket reed | Baskets, panels and market storage | Pass. Excellent dense basket pattern, broad reed strips and handled crowns. |
 | M257 | Utility rope | Ties, rails and wrapped geometry | Pass. Strong thick twist, grime variation and LOD-safe strand height. |
@@ -571,7 +571,7 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M295 | Broadleaf foliage atlas | Canopy, shrubs and modular foliage cards | Pass. Strong varied leaf silhouettes, clean alpha and useful normal/roughness separation. |
 | M296 | Tropical fern atlas | Understory and damp transition foliage | Pass. Excellent varied fronds and chunky clusters with distance-readable leaflets. |
 | M297 | Jungle vine atlas | Climbers, hanging growth and modular tendrils | Pass. Strong loops, forks, leafy clusters and clean modular silhouettes. |
-| M298 | Dry leaf litter | Dry forest-floor carpets and debris | **Weak—regenerate.** Dense layered leaf result is useful, but generated channel labels violate the clean-sheet standard. |
+| M298 | Dry leaf litter | Dry forest-floor carpets and debris | Pass after regeneration. Dense text-free leaf fragments with layered litter relief. |
 | M299 | Wet leaf litter | Damp jungle-floor carpets and recovery states | Pass. Strong compressed dark leaves, decay edges and low wet relief. |
 | M300 | Tropical moss carpet | Damp stone, roots and shaded ground | Pass. Excellent packed cushion forms, varied greens and LOD-readable soft depth. |
 
@@ -1006,3 +1006,9 @@ M010, M069, M074, M080, M084, M095, M097 and M106 pass as text-free square repla
 ![Material Batch 62 contact sheet](./review/material-batch-62-material-transition-corrections.jpg)
 
 M094, M131, M143, M145, M154 and M234 now pass as square text-free replacements. M078 remains radial; M116 still lacks clear keratin identity; M120 contains letter-like marks; and M127 retains an overly repetitive hexagonal structure. Those four remain queued.
+
+## Material Batch 63 — ingestion-priority corrections
+
+![Material Batch 63 contact sheet](./review/material-batch-63-ingestion-priority-corrections.jpg)
+
+M120, M169, M211, M218, M235, M254 and M298 now pass as square text-free replacements. M116 omitted the four-quadrant contract, M193 retains oversized leafy zinc crystals, and M231 has corrupted BaseColor; those three remain queued.

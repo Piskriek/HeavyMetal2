@@ -539,8 +539,25 @@ Layer ordering, accumulation, melt/dry behavior, geometry response and event bak
 | M279 | Dried seaweed atlas | Shore carpets, debris and coastal decals | Pass. Strong varied ribbon clusters, clean alpha and multiple rearrangeable scales. |
 | M280 | Aged sailcloth | Sails, awnings, screens and marine canvas | Pass. Calm heavy weave, salt staining, mildew and turquoise repair transfer. |
 
+## Material Batch 30 — shoreline ground and tidal materials
+
+![Material Batch 30 shoreline and tidal contact sheet](./review/material-batch-30-shoreline-tidal-contact-sheet.jpg)
+
+| ID | Shoreline material | Use | Status and production note |
+|---|---|---|---|
+| M281 | Wet compact sand | Waterline flats and compact beach paths | Pass. Calm moisture clouding, fine drag and appropriately subtle height response. |
+| M282 | Rippled tidal sand | Shallow tidal flats and submerged shoreline | Pass. Excellent broad sinuous ripples, silted troughs and meter-readable relief. |
+| M283 | Tidal mud | Estuaries, mangroves and drainage pockets | Pass. Strong slurry flow, wetness separation, soft channels and restrained drying cracks. |
+| M284 | Coral limestone | Coastal bedrock, walls and eroded ground | Pass. Excellent broad fossil inclusions, porous matrix and dissolution relief. |
+| M285 | Sea-polished stones | Beaches, stream mouths and shore carpets | Pass. Strong packed rounded pebbles, varied color and clean LOD-readable height. |
+| M286 | Shell hash | High-tide bands and pale coastal carpets | Pass. Dense blunt shell fragments with a texture-like center and useful packed depth. |
+| M287 | Driftwood | Shore props, construction and salt-aged timber | Pass. Excellent flowing bleached grain, water streaks, erosion and borer holes. |
+| M288 | Algae-coated rock | Intertidal rock and permanently damp surfaces | Pass. Strong dark stone, thick green mats, wet pockets and exposed pale rubs. |
+| M289 | Pumice gravel | Volcanic shoreline and lightweight gravel carpets | Pass. Excellent vesicular chunks, broad value variation and packed ground read. |
+| M290 | Tar-ball beach residue | Pollution patches and contact-condition decals | Pass. Strong varied lumps and smears, sand-crusted edges and clean rearrangeable alpha. |
+
 ## Next material batches
 
-### Batch 30 — shoreline ground and tidal materials
+### Batch 31 — tropical vegetation surfaces and carpets
 
-Wet compact sand, rippled tidal sand, tidal mud, coral limestone, sea-polished stones, shell hash, driftwood, algae-coated rock, pumice gravel and tar-ball beach residue.
+Palm trunk, mangrove bark, tropical hardwood bark, banana pseudostem, broadleaf foliage atlas, fern atlas, vine atlas, dry leaf litter, wet leaf litter and moss carpet.

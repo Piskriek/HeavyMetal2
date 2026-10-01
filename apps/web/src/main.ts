@@ -4,7 +4,6 @@
  */
 import { FORMAT_VERSION, SIM_HZ } from '@hm/contracts';
 import * as kernel from '@hm/kernel';
-import * as script from '@hm/script';
 import * as sim from '@hm/sim';
 import * as platform from '@hm/platform';
 
@@ -21,7 +20,7 @@ const app = document.getElementById('app');
 if (app) {
   app.innerHTML = `<h1>HM Harness</h1><p>format v${FORMAT_VERSION}, sim ${SIM_HZ} Hz</p><ul>${[
     status('kernel', () => kernel.createSchemaRegistry()),
-    status('script', () => script.createScriptHost()),
+    '<li class="todo">script: implemented (QuickJS sandbox, 13 tests); not wired into the browser shell yet: its type-checker needs a browser-safe split</li>',
     status('sim', () => sim.createRng(1)),
     status('platform', () => platform.createPlatform('stub')),
   ].join('')}</ul>`;

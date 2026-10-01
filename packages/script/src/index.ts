@@ -1,5 +1,4 @@
-import type { ScriptExports } from '@hm/contracts';
-
-export const createScriptHost: ScriptExports['createScriptHost'] = () => {
-  throw new Error('@hm/script: createScriptHost is not implemented yet (task T2)');
-};
+export { createScriptHost } from './host.js';
+export { compile } from './compile.js';
+export { typings } from './typings.js';
+export { OPS_PER_INTERRUPT } from './sandbox.js';

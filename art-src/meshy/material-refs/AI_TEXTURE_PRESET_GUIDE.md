@@ -8,6 +8,7 @@
 - Machine catalog: [`texture-preset-catalog.json`](./texture-preset-catalog.json)
 - Human review registry: [`README.md`](./README.md)
 - Mobile rules: [`docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md`](../../../docs/MOBILE_LOW_RES_MATERIAL_STANDARD.md)
+- Global sports taxonomy: [`docs/SPORTS_TEXTURE_PRESET_STANDARD.md`](../../../docs/SPORTS_TEXTURE_PRESET_STANDARD.md)
 
 ## Required AI behavior
 

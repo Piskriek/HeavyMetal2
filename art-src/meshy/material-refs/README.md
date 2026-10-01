@@ -870,3 +870,14 @@ Canonical codes and reconstruction records for M431–M440 are registered in [`t
 ### Batch 48 — grand-landscape correction pass
 
 Regenerate M432, M433 and M437 with one authoritative shared field, strict mobile styling and no generated labels; then validate the overview system against landscape hierarchy, seasonal transitions and 128 px readability.
+
+### Batches 49–51 — global sports preset foundations
+
+Build sports textures in all three established styles: full-fidelity PBR, mobile low-resolution PBR and nostalgic PBR. Begin with:
+
+- universal grass, clay, hard-court, timber-court, track, ice, pool-deck and combat-mat surfaces;
+- detachable line/zone masks for association football, rugby, cricket, hockey, tennis, badminton, basketball, netball, volleyball, handball, futsal, athletics and regional variants;
+- brand-neutral ball, shuttle, puck and play-object materials;
+- goals, nets, posts, wickets, hoops, targets and venue-condition layers.
+
+The global category and naming requirements are defined in [`docs/SPORTS_TEXTURE_PRESET_STANDARD.md`](../../../docs/SPORTS_TEXTURE_PRESET_STANDARD.md). American sports are included but do not define the default taxonomy.

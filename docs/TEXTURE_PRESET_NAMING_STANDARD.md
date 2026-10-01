@@ -30,7 +30,7 @@ The example means: HeavyMetal2 texture preset M371; environment rock; seamless t
 | `HM2` | Project namespace | fixed |
 | `TXP` | Asset kind: texture preset | fixed |
 | `RID` | Stable registry ID | `M371` |
-| `DOM` | Primary domain | `ENV`, `VEH`, `CHR`, `BLD`, `VFX`, `UI`, `GEN` |
+| `DOM` | Primary domain | `ENV`, `VEH`, `CHR`, `BLD`, `VFX`, `UI`, `SPT`, `GEN` |
 | `MAT` | Material/content family | `ROCK`, `SKIN`, `METAL`, `TRACK`, `FOL`, `GLASS`, `FX` |
 | `FORM` | Runtime use/form | `TIL` seamless tile, `ATL` atlas, `MSK` mask, `DEC` decal, `TRN` transition |
 | `CH` | Channels in canonical order | tokens below |

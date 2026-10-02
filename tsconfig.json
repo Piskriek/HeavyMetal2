@@ -131,6 +131,9 @@
       ],
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
+      ],
+      "@hm/voxelart": [
+        "packages/voxelart/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

@@ -2,7 +2,8 @@ import { useState, type ReactElement } from 'react';
 import { cmd, type PresetId, type Tier } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Inspector } from '@hm/ui';
-import { encodeModel, exampleBarrel, exampleCone, countVoxels, decodeModel, type VoxelModel } from '@hm/voxel';
+import { encodeModel, countVoxels, decodeModel, type VoxelModel } from '@hm/voxel';
+import { MODELS } from '@hm/voxelart';
 import { heightAt } from '@hm/terrain';
 import type { ModelPlacement } from '@hm/render';
 
@@ -18,10 +19,9 @@ export function placementsOf(rt: Runtime, sceneId: PresetId): ModelPlacement[] {
   return out;
 }
 
-const EXAMPLES: readonly { readonly label: string; readonly make: () => VoxelModel }[] = [
-  { label: 'Barrel', make: exampleBarrel },
-  { label: 'Cone', make: exampleCone },
-];
+/** Block size that makes each ready-made model about the right size in the world (a goblin ~1.8 m, a palm ~11 m). */
+const BLOCK: Readonly<Record<string, number>> = { goblin: 0.04, 'goblin-ball-racer': 0.03, palm: 0.25, barrel: 0.08, rock: 0.15, trophy: 0.1, 'statue-plinth': 0.2 };
+const EXAMPLES = MODELS.map((m) => ({ id: m.id, label: m.name, doc: m.doc, scale: BLOCK[m.id] ?? 0.1, make: (): VoxelModel => m.build() as unknown as VoxelModel }));
 
 /**
  * Voxel models are presets in the scene's `models` slot: blocks, a palette, a place and a turn. Add an example, move it, and (in Pro) edit the
@@ -33,12 +33,12 @@ export function ModelsPanel(props: { readonly rt: Runtime; readonly sceneId: Pre
   const refs = rt.store.get(sceneId)?.children['models'] ?? [];
   const schema = rt.schemas.get('model');
 
-  const add = (label: string, m: VoxelModel): void => {
+  const add = (label: string, m: VoxelModel, scale: number): void => {
     const ts = rt.binder.terrain();
     const y = ts ? Math.round(heightAt(ts.terrain, 0, 0) * 100) / 100 : 0;
     const id = `model-${Date.now().toString(36)}`;
     rt.commands.transaction(`Add ${label}`, () => {
-      rt.commands.execute(cmd.put({ id, kind: 'model', name: label, params: { data: encodeModel(m), scale: 0.1, x: 0, y, z: 0, yaw: 0, ao: true, greedy: true, castShadow: true } as never, tier: 'build' }, `Add ${label}`));
+      rt.commands.execute(cmd.put({ id, kind: 'model', name: label, params: { data: encodeModel(m), scale, x: 0, y, z: 0, yaw: 0, ao: true, greedy: true, castShadow: true } as never, tier: 'build' }, `Add ${label}`));
       rt.commands.execute(cmd.addChild(sceneId, 'models', id, undefined, `Add ${label}`));
     });
     setOpen(id);
@@ -69,7 +69,7 @@ export function ModelsPanel(props: { readonly rt: Runtime; readonly sceneId: Pre
           })}
         </ul>
       )}
-      <div className="btns">{EXAMPLES.map((e) => <button key={e.label} className="go" onClick={() => add(e.label, e.make())}>＋ {e.label}</button>)}</div>
+      <div className="btns">{EXAMPLES.map((e) => <button key={e.id} className="go" title={e.doc} onClick={() => add(e.label, e.make(), e.scale)}>＋ {e.label}</button>)}</div>
     </section>
   );
 }

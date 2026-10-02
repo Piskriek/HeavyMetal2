@@ -38,3 +38,8 @@ subject to goblin laws; the dead wait to be resurrected and look like ghosts unt
 After the first week of racing a shaman arrives and resurrects the bodies where they lie. He does it with the game's own presets,
 and any player can copy him to make a class of their own. The next week racing balls start to break and a mechanic class appears
 to repair everything, and that class can be copied too. Every week adds a mechanic and a class that answers it, and the world grows.
+
+## In the maker today
+- **Evolve** (🌱) compares your map with the one you opened. Every change is tagged *plays differently* (laps, items, rules, track, physics) or *looks only* (colours, words, sounds, models, HUD).
+- For changes that play differently you can **Suggest for the next evolution** or **Keep as my branch**. Both are recorded on your device for now; tallying across players arrives with the platform backend (`@hm/evolve` already does the counting).
+- What counts as "plays differently" is a table (`GAMEPLAY` in `@hm/lineage`), so it can change with the game.

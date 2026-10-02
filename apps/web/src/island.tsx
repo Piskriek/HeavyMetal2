@@ -86,7 +86,7 @@ export function IslandWalk(props: {
     let px = 0, pz = 0;
     for (let r = 0; r < 120 && ground(px, pz) < SEA; r += 2) { px = r; pz = 0; }
     let py = ground(px, pz), face = 0, vy = 0;
-    let camYaw = Math.PI, camPitch = 0.38, camDist = 5.5, fpv = false;
+    let camYaw = Math.PI, camPitch = 0.3, camDist = 3.6, fpv = false;
     const intro = { on: introRef.current, t: 0, ms: 3200 };
     if (intro.on) { camPitch = 1.3; camDist = 150; }
     let eye: [number, number, number] | null = null;
@@ -141,7 +141,7 @@ export function IslandWalk(props: {
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); builder.undo(); return; }
       if (k >= '1' && k <= '9' && live.current.buildOn) { setSel(Number(k) - 1); fx('tool-switch', { volume: 0.5 }); return; }
       if (k === 'e' && live.current.buildOn) { const on = !live.current.inv; setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); return; }
-      if (k === 'v') { fpv = !fpv; camPitch = fpv ? 0 : 0.38; fx('ui-toggle', { volume: 0.5 }); return; }
+      if (k === 'v') { fpv = !fpv; camPitch = fpv ? 0 : 0.3; fx('ui-toggle', { volume: 0.5 }); return; }
       if ((k === 'x' || k === 'delete') && live.current.buildOn) { const a = aim(); const item = live.current.slots[live.current.sel]; if (a && item && builder.removeAt(a, item)) say('Removed'); return; }
       down.add(k);
     };
@@ -190,7 +190,7 @@ export function IslandWalk(props: {
       if (intro.on) {
         intro.t += dt * 1000;
         const k = Math.min(1, intro.t / intro.ms), e = 1 - Math.pow(1 - k, 3);
-        camDist = 150 + (5.5 - 150) * e; camPitch = 1.3 + (0.38 - 1.3) * e; camYaw = Math.PI + (1 - e) * 1.2;
+        camDist = 150 + (3.6 - 150) * e; camPitch = 1.3 + (0.3 - 1.3) * e; camYaw = Math.PI + (1 - e) * 1.2;
         if (k >= 1) { intro.on = false; onIntroDone?.(); }
       }
       const paused = live.current.menu || live.current.inv;
@@ -240,8 +240,10 @@ export function IslandWalk(props: {
         const cp = Math.cos(camPitch);
         target = [px - Math.sin(camYaw) * cp, py + head - Math.sin(camPitch), pz - Math.cos(camYaw) * cp];
       } else {
-        target = [px, py + head, pz];
-        wantEye = [px + Math.sin(camYaw) * Math.cos(camPitch) * camDist, py + head + Math.sin(camPitch) * camDist, pz + Math.cos(camYaw) * Math.cos(camPitch) * camDist];
+        // over the shoulder: the goblin sits to the left of the crosshair so the crosshair always has a clear view
+        const rgx = Math.cos(camYaw), rgz = -Math.sin(camYaw), shoulder = intro.on ? 0 : 0.85;
+        target = [px + rgx * shoulder, py + head + 0.25, pz + rgz * shoulder];
+        wantEye = [px + rgx * shoulder + Math.sin(camYaw) * Math.cos(camPitch) * camDist, py + head + 0.25 + Math.sin(camPitch) * camDist, pz + rgz * shoulder + Math.cos(camYaw) * Math.cos(camPitch) * camDist];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 0.6);
       }
       const k = fpv ? 1 : Math.min(1, dt * 10);

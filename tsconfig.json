@@ -132,6 +132,15 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
+      "@hm/juice": [
+        "packages/juice/src/index.ts"
+      ],
+      "@hm/tutorial": [
+        "packages/tutorial/src/index.ts"
+      ],
+      "@hm/uistack": [
+        "packages/uistack/src/index.ts"
+      ],
       "@hm/activities": [
         "packages/activities/src/index.ts"
       ],

@@ -28,6 +28,8 @@ export type ThreeRenderer = RenderService & {
   setLook(look: LookLike): void;
   /** Painted strips on the road: start line, rumble strips, boost pads (null removes them). */
   setRoadDecals(defs: readonly RoadDecalDef[] | null): void;
+  /** The world ray under a screen point (for tools that edit things the picker does not know, like voxels). */
+  ray(clientX: number, clientY: number): { readonly origin: Vec3; readonly direction: Vec3 } | null;
   /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
   setFov(deg: number): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
@@ -268,6 +270,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       const dt = previousFrame === null ? 0 : now - previousFrame;
       previousFrame = now;
       for (const listener of [...listeners]) listener(dt);
+    },
+    ray(clientX: number, clientY: number) {
+      if (!webgl) return null;
+      const rect = webgl.domElement.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      return rayFromPixel(orbitState, clientX - rect.left, clientY - rect.top, rect.width, rect.height);
     },
     pick(clientX: number, clientY: number): Pick {
       if (!webgl || !sceneSync) return miss();

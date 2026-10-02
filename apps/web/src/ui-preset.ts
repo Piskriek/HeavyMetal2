@@ -94,7 +94,13 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-body);
 .brand, h1, h2, .title { font-family: var(--font-display); }
 ${themeCss({ ...t, accent: c.accent, ink: c.text, dim: c.dim, wall: c.panel, line: c.line, ok: c.ok, danger: c.danger })}
 ${spray}
-${screensThemeCss(t, doodles)}`;
+${screensThemeCss(t, doodles)}
+/* the editor is dense: compact controls (the game screens keep the big touch-friendly ones) */
+.maker button { font-size: 0.85rem; padding: 0.2em 0.7em; min-height: 30px; box-shadow: 2px 2px 0 0 var(--ink); }
+.maker button.go { font-size: 0.95rem; letter-spacing: 0; text-transform: none; padding: 0.25em 0.9em; box-shadow: 3px 3px 0 0 var(--ink); }
+.maker button.go::after { display: none; }
+.maker .btns { gap: 6px; }
+.maker h3 { font-size: 1rem; }`;
 }
 
 export { THEMES };

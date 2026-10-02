@@ -8,11 +8,11 @@ import { heightAt } from '@hm/terrain';
 import type { ModelPlacement } from '@hm/render';
 
 /** The voxel models the scene holds, in the form the renderer draws. Cheap enough to recompute on every edit. */
-export function placementsOf(rt: Runtime, sceneId: PresetId): ModelPlacement[] {
+export function placementsOf(rt: Runtime, sceneId: PresetId, except?: PresetId): ModelPlacement[] {
   const out: ModelPlacement[] = [];
   for (const r of rt.store.get(sceneId)?.children['models'] ?? []) {
     const p = rt.store.get(r.ref);
-    if (!p) continue;
+    if (!p || r.ref === except) continue;
     const params = rt.store.resolve(p.id).params as Record<string, unknown>;
     out.push({ params, x: Number(params['x'] ?? 0), y: Number(params['y'] ?? 0), z: Number(params['z'] ?? 0), yawDeg: Number(params['yaw'] ?? 0) });
   }

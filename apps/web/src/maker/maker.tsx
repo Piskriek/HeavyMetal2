@@ -21,6 +21,8 @@ import { InterfacePanel } from './interface-panel';
 import { ItemsPanel } from './items-panel';
 import { ModelsPanel, placementsOf } from './models-panel';
 import { EvolutionPanel, snapshotOf } from './evolution-panel';
+import { DEFAULT_SCULPT, ModelSculptor, SculptBar, type SculptUi } from './sculpt';
+import { decodeModel } from '@hm/voxel';
 import { BlurRing, DECOR_FOCUS, FocusBar, ensureVeil, focusTargetOf, frameTarget, useFocus, type FocusTarget } from './focus';
 import { baselineOf, type Baseline } from '@hm/lineage';
 import { LAYOUTS } from '@hm/tracklayouts';
@@ -81,6 +83,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [evoOpen, setEvoOpen] = useState(false);
   const [rend, setRend] = useState<ThreeRenderer | null>(null);
   const [focus, setFocus] = useState<FocusTarget | null>(null);
+  const [sculptUi, setSculptUi] = useState<SculptUi>(DEFAULT_SCULPT);
   // the map as it was when the maker opened: the evolution panel compares against it
   const evoBase = useRef<Baseline | null>(null);
   if (!evoBase.current) evoBase.current = baselineOf(snapshotOf(rt, scene.sceneId));
@@ -95,8 +98,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [touchDevice] = useState(() => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
   const viewRef = useRef(false);
   viewRef.current = viewMode;
-  const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight });
-  live.current = { tool, brush, manip, selected, propName, shapeMode, shapeHeight };
+  const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight, focus, sculptUi });
+  live.current = { tool, brush, manip, selected, propName, shapeMode, shapeHeight, focus, sculptUi };
   const rendererRef = useRef<ThreeRenderer | null>(null);
   const [hourLive, setHourLive] = useState<number | null>(null);
 
@@ -245,6 +248,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     };
     const pickAt = (e: PointerEvent) => renderer.pick(e.clientX, e.clientY);
     const onMove = (e: PointerEvent): void => {
+      if (sculpting) { const ray = renderer.ray(e.clientX, e.clientY); if (ray) sculpting.dab(ray, false); return; }
       const h = pickAt(e);
       hover = { point: h.point, entity: h.entity };
       const L = live.current;
@@ -272,9 +276,18 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         }
       }
     };
+    let sculpting: ModelSculptor | null = null;
+    const sculptTarget = (): PresetId | null => { const f = live.current.focus; return f && f.id !== DECOR_FOCUS && rt.store.get(f.id)?.kind === 'model' ? f.id : null; };
     const onDown = (e: PointerEvent): void => {
       if (e.button !== 0 || rt.mode === 'play' || viewRef.current) return;
       const L = live.current;
+      const sid = sculptTarget();
+      if (sid && L.tool === 'brush') {
+        const sc = ModelSculptor.start(rt, sid, L.sculptUi, (p) => renderer.setModels(p), () => placementsOf(rt, scene.sceneId, sid));
+        const ray = renderer.ray(e.clientX, e.clientY);
+        if (sc && ray && sc.dab(ray, true)) { sculpting = sc; el.setPointerCapture(e.pointerId); fx('sculpt-tick', { volume: 0.6, pitch: 1.1 }); }
+        return;
+      }
       const h = pickAt(e);
       const ts = terrainState();
       if (L.tool === 'brush' && h.point && ts) {
@@ -341,6 +354,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     };
     const onUp = (e: PointerEvent): void => {
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      if (sculpting) { const sc = sculpting; sculpting = null; if (sc.end()) feedback('success', 'Sculpted'); return; }
       if (stroking) {
         const s = stroking; stroking = null;
         if (s.dirty) { const b = live.current.brush; const name = b.kind === 'paint' ? `Paint ${STARTER_SURFACES.find((x) => x.id === b.surface)?.name ?? ''}` : `Sculpt (${b.kind})`; commitTerrain(name); feedback('success'); toasts.push(name, 'ok', 1400); }
@@ -417,6 +431,11 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   // ----- panels
   const draft = readDraft(rt, scene.trackId);
   const analysis = useMemo(() => analyse(draft), [rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sculptPalette = (id: string): { name: string; color: readonly number[] }[] => {
+    const d = rt.store.resolve(id).params['data'];
+    const m = typeof d === 'string' && d ? decodeModel(d).model : null;
+    return m ? m.palette.map((e) => ({ name: e.name, color: e.color })) : [];
+  };
   const veil = useFocus(rend, rt, scene.sceneId, focus, rev);
   const enterFocus = (id: PresetId | typeof DECOR_FOCUS): void => {
     const t = focusTargetOf(rt, id);
@@ -512,7 +531,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           <p className="hint">V select · B brush · T track · P place · X delete · [ ] size · 1–9 surface · Ctrl+Z undo</p>
         </aside>
         <div className="view" ref={host}>
-          {focus ? <><BlurRing veil={veil} /><FocusBar target={focus} veil={veil} onVeil={() => { const id = ensureVeil(rt, scene.sceneId); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); }} onMode={() => { const id = ensureVeil(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${id}.mode`, veil.mode === 'fly' ? 'orbit' : 'fly', 'Camera mode')); }} onExit={exitFocus} /></> : null}
+          {focus ? <><BlurRing veil={veil} />{rt.store.get(focus.id as string)?.kind === 'model' && tool === 'brush' ? <SculptBar ui={sculptUi} palette={sculptPalette(focus.id as string)} onChange={setSculptUi} /> : null}<FocusBar target={focus} veil={veil} onVeil={() => { const id = ensureVeil(rt, scene.sceneId); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); }} onMode={() => { const id = ensureVeil(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${id}.mode`, veil.mode === 'fly' ? 'orbit' : 'fly', 'Camera mode')); }} onExit={exitFocus} /></> : null}
           {touchDevice ? <button className={`viewmode${viewMode ? ' on' : ''}`} aria-pressed={viewMode} title="Turn on to drag the camera with one finger; turn off to use the tool" onClick={() => { setViewMode(!viewMode); fx('ui-toggle'); }}>{viewMode ? '✋ Moving the view' : '✋ Move view'}</button> : null}
         </div>
         <aside className="panel right">

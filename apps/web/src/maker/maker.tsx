@@ -7,6 +7,8 @@ import { applyStroke, encodeTerrain, heightAt, normalYAtCell, type DirtyRect } f
 import { carveTrack, resample } from '@hm/trackgen';
 import { addPoint, analyse, deletePoint, DRAFT_PRESETS, hitTest, insertOnSegment, movePoint, snapPoint, toCenterline, type TrackDraft } from '@hm/trackedit';
 import { manipulateMove, DEFAULT_MANIPULATION } from '@hm/tools';
+import { applyLook, lookOf, LOOKS } from '../look';
+import { timeOfDayLook } from '@hm/looks';
 import { buildMakerScene, PROP_CARDS, propSeed, type MakerScene } from './scene';
 import { loadMap, saveMap, clearSavedMap } from './storage';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
@@ -52,6 +54,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const live = useRef({ tool, brush, manip, selected, propName });
   live.current = { tool, brush, manip, selected, propName };
   const rendererRef = useRef<ThreeRenderer | null>(null);
+  const [hourLive, setHourLive] = useState<number | null>(null);
 
   // ----- viewport, tools and feedback
   useEffect(() => {
@@ -309,6 +312,16 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     };
   }, [rt, scene]);
 
+  // ----- look (sky, sun, fog, exposure): from the scene preset, or live while the time-of-day slider is dragged
+  const sceneParams = rt.store.get(scene.sceneId)?.params;
+  useEffect(() => {
+    const r = rendererRef.current;
+    if (!r || !sceneParams) return;
+    applyLook(r, hourLive !== null ? timeOfDayLook(hourLive) : lookOf(sceneParams), 0.22);
+  }, [sceneParams, hourLive]);
+  const lookId = String(sceneParams?.['look'] ?? 'noon-clear');
+  const hourSaved = Number(sceneParams?.['timeOfDay'] ?? -1);
+
   // ----- panels
   const draft = readDraft(rt, scene.trackId);
   const analysis = useMemo(() => analyse(draft), [rev]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -346,6 +359,17 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <button onClick={() => { if (confirm('Start a new map? The saved one will be replaced.')) { clearSavedMap(); location.reload(); } }}>New</button>
         <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>▶ Test drive</button>
       </header>
+      <div className="looks" role="group" aria-label="Look">
+        {LOOKS.map((l) => (
+          <button key={l.id} className={hourSaved < 0 && lookId === l.id ? 'on' : ''} title={l.doc} onClick={() => { rt.commands.transaction(`Look: ${l.name}`, () => { rt.commands.execute(cmd.setParam(`${scene.sceneId}.look`, l.id, `Look: ${l.name}`)); rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, -1, `Look: ${l.name}`)); }); fx('ui-toggle'); }}>{l.name}</button>
+        ))}
+        <label className="hour" title="Drag to move the sun through the day"><span>{(hourLive ?? (hourSaved >= 0 ? hourSaved : 12)).toFixed(1)} h</span>
+          <input type="range" min={0} max={24} step={0.1} value={hourLive ?? (hourSaved >= 0 ? hourSaved : 12)}
+            onChange={(e) => setHourLive(Number(e.target.value))}
+            onPointerUp={() => { if (hourLive !== null) { rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, Math.round(hourLive * 10) / 10, 'Time of day')); setHourLive(null); fx('ui-click'); } }}
+            onKeyUp={() => { if (hourLive !== null) { rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, Math.round(hourLive * 10) / 10, 'Time of day')); setHourLive(null); } }} />
+        </label>
+      </div>
       <main className="body">
         <aside className="panel left">
           <Toolbar tools={TOOLS as never} active={tool} onSelect={(id) => pick(id as ToolId)} manip={manip} onManip={(p) => { setManip({ ...manip, ...p }); fx('ui-toggle'); }} tier={tier} />

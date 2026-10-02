@@ -3,6 +3,7 @@ import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
 import { chaseCamera, createRaceGame, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
+import { applyLook, lookOf } from './look';
 import { HUD, Minimap, ordinal, formatTime } from '@hm/ui';
 
 /** The playable shell: the Basalt Isle race. Keyboard (arrows/WASD, space = item), gamepad-ready, on-screen touch controls. */
@@ -23,6 +24,8 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const game = createRaceGame(rt, { seed: 7, laps: 3, fromScene: fromMap });
     gameRef.current = game;
+    const sceneNow = rt.store.get(rt.binder.sceneId ?? '');
+    if (sceneNow) applyLook(renderer, lookOf(sceneNow.params));
     const state = rt.binder.terrain();
     if (state) {
       const view = renderer.setTerrain(state.terrain, surfaces);

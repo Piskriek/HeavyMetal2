@@ -7,3 +7,4 @@ export * from './terrain/surface-set';
 export * from './terrain/starter-surfaces';
 export * from './terrain/terrain-view';
 export * from './terrain/terrain-pick';
+export type { LookLike } from './environment';

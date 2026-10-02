@@ -4,6 +4,7 @@ import { MAX_DIST, MIN_DIST, orbitPosition, project, rayFromPixel, stateFromPosi
 import { createEnvironment, type EnvironmentRig } from './environment';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
+import type { LookLike } from './environment';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -18,6 +19,8 @@ export type ThreeRenderer = RenderService & {
   /** Re-upload the nodes a brush stroke touched (everything when omitted). */
   refreshTerrain(dirty?: DirtyRectLike | null): void;
   readonly terrain: TerrainView | null;
+  /** Apply a scene mood (sky, sun, fog, exposure, water). Remembered across mount/unmount. */
+  setLook(look: LookLike): void;
 };
 
 export interface RenderOptions {
@@ -98,6 +101,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     previousFrame = null;
   };
 
+  let pendingLook: LookLike | null = null;
   let terrainView: TerrainView | null = null;
   let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
   const applyTerrain = (): void => {
@@ -139,6 +143,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       overlays = new OverlayManager(scene);
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
       applyTerrain();
+      if (pendingLook) environment.setLook(pendingLook);
       updateView();
       resize();
 
@@ -158,6 +163,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       pendingTerrain = data && surfaces ? { data, surfaces } : null;
       applyTerrain();
       return terrainView;
+    },
+    setLook(look: LookLike): void {
+      pendingLook = look;
+      environment?.setLook(look);
     },
     refreshTerrain(dirty?: DirtyRectLike | null): void {
       terrainView?.refresh(dirty ?? null);

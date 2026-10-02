@@ -63,6 +63,8 @@ export const sceneSchema = defineSchema({
     num('gravity', 'Gravity', 'Downward pull in m/s squared (9.81 is Earth).', 9.81, 'build', { min: 0, max: 60, step: 0.1, unit: 'm/s2' }),
     num('seed', 'Random seed', 'Same seed, same game: used by everything random.', 1, 'pro', { min: 0, max: 4294967295, step: 1 }),
     { key: 'camera', type: 'ref', label: 'Camera', doc: 'Which camera preset looks at this scene.', tier: 'build', default: null, refKinds: ['camera'] },
+    { key: 'look', type: 'enum', label: 'Look', doc: 'The mood of the scene: sky, sun, fog and colour.', tier: 'play', default: 'noon-clear', options: ['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast-day', 'storm-front', 'blue-hour', 'moonlit-night', 'volcanic-ash', 'neon-dusk'] },
+    num('timeOfDay', 'Time of day', 'Hour of the day (0-24); -1 uses the look as it is.', -1, 'build', { min: -1, max: 24, step: 0.1, unit: 'h' }),
     { key: 'track', type: 'ref', label: 'Race track', doc: 'The track raced in this scene.', tier: 'build', default: null, refKinds: ['track'] },
   ],
   slots: [

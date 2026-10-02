@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { PAINTS, SLOTS, TABS, TAB_IDS, THINGS, TOOLS, assignSlot, normalizeHotbars, normalizeTool, stepSlot, tabForKey, toolEdit, toolParams, toolVariables, toolsFor, type Hotbars } from '../src';
+
+const empty = (): Hotbars => Object.fromEntries(TAB_IDS.map((t) => [t, []])) as unknown as Hotbars;
+
+test('F1 to F10 open the ten tabs in the order the owner gave; P opens the avatar; F11 and F12 stay with the browser', () => {
+  assert.deepEqual(TABS.map((t) => t.id), ['select', 'paint', 'sculpt', 'animate', 'sound', 'lights', 'activities', 'avatar', 'things', 'camera']);
+  for (let i = 1; i <= 10; i++) assert.equal(tabForKey(`F${i}`), TABS[i - 1]!.id);
+  assert.equal(tabForKey('p'), 'avatar');
+  assert.equal(tabForKey('P'), 'avatar');
+  assert.equal(tabForKey('F11'), null);
+  assert.equal(tabForKey('F12'), null);
+  assert.equal(tabForKey('x'), null);
+  assert.equal(tabForKey(''), null);
+});
+
+test('hotbars come back in shape: every tab, nine slots, unknown ids dropped, missing tabs from the defaults', () => {
+  const defaults = empty();
+  defaults.paint = ['paint-4', 'paint-2'];
+  const valid = (_tab: string, id: string): boolean => id.startsWith('paint-') || id === 'raise';
+  const h = normalizeHotbars({ paint: ['paint-5', 'nonsense', 7], sculpt: ['raise'] }, defaults, valid);
+  for (const t of TAB_IDS) assert.equal(h[t].length, SLOTS);
+  assert.deepEqual(h.paint.slice(0, 3), ['paint-5', null, null]);
+  assert.equal(h.sculpt[0], 'raise');
+  assert.deepEqual(normalizeHotbars('junk', defaults, valid).paint.slice(0, 2), ['paint-4', 'paint-2']);
+});
+
+test('assigning a slot swaps with the slot that already held the preset', () => {
+  let h = normalizeHotbars(null, { ...empty(), paint: ['a', 'b', 'c'] }, () => true);
+  h = assignSlot(h, 'paint', 0, 'c');
+  assert.deepEqual(h.paint.slice(0, 3), ['c', 'b', 'a']);
+  h = assignSlot(h, 'paint', 5, 'z');
+  assert.equal(h.paint[5], 'z');
+  assert.equal(assignSlot(h, 'paint', 9, 'q'), h, 'out of range is ignored');
+  assert.equal(stepSlot(8, 1), 0);
+  assert.equal(stepSlot(0, -1), 8);
+});
+
+test('the tool library: unique ids, every tab of tools filled, every paint and thing has a tool', () => {
+  assert.equal(new Set(TOOLS.map((t) => t.id)).size, TOOLS.length);
+  for (const tab of ['select', 'paint', 'sculpt', 'things'] as const) assert.ok(toolsFor(tab).length >= 8, tab);
+  for (const p of PAINTS) assert.ok(TOOLS.some((t) => t.action === 'paint' && t.surface === p.id), p.name);
+  for (const m of THINGS) assert.ok(TOOLS.some((t) => t.action === 'place' && t.model === m.id), m.name);
+  for (const t of TOOLS) { assert.ok(t.left && t.right && t.doc, t.id); }
+});
+
+test('a tool with the player changes on top is legal; junk falls back; tools only take what fits them', () => {
+  assert.equal(normalizeTool('nope', {}), null);
+  const raise = normalizeTool('raise', { size: 9, strength: 99, falloff: 'odd', surface: 4, model: 'palm', name: '  Big lift  ' })!;
+  assert.equal(raise.size, 9);
+  assert.equal(raise.strength, 10);
+  assert.equal(raise.falloff, 'smooth');
+  assert.equal(raise.surface, 0, 'a sculpt tool does not paint');
+  assert.equal(raise.model, '');
+  assert.equal(raise.name, 'Big lift');
+  const paint = normalizeTool('paint-4', { surface: 2 })!;
+  assert.equal(paint.surface, 2);
+  assert.equal(normalizeTool('paint-4', { surface: 999 })!.surface, 4);
+});
+
+test('a tool shows only the variables that matter to it, and edits come back as ids', () => {
+  const sounds = ['place', 'select'];
+  const keys = (id: string): string[] => toolVariables(normalizeTool(id, {})!, sounds).map((v) => v.key);
+  assert.ok(keys('raise').includes('strength') && !keys('raise').includes('surface'));
+  assert.ok(keys('paint-4').includes('surface'));
+  assert.ok(keys('place-palm').includes('model') && !keys('place-palm').includes('falloff'));
+  assert.ok(!keys('delete').includes('size'));
+  const params = toolParams(normalizeTool('paint-4', {})!);
+  assert.equal(params.surface, 'Grass');
+  assert.deepEqual(toolEdit('surface', 'Sand'), ['surface', 2]);
+  assert.deepEqual(toolEdit('model', 'Rock'), ['model', 'rock']);
+  assert.deepEqual(toolEdit('size', 3), ['size', 3]);
+  for (const t of TOOLS) for (const v of toolVariables(t, sounds)) if (v.type === 'enum') assert.ok(v.options?.includes(String(v.default)), `${t.id}.${v.key}`);
+});

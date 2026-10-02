@@ -121,3 +121,6 @@ export function pushRecent(list: readonly string[], id: string, max = 6): string
   const next = [id, ...list.filter((x) => x !== id)];
   return next.slice(0, Math.max(1, max));
 }
+
+export * from './tabs';
+export * from './tools';

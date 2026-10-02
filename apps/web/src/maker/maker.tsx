@@ -15,6 +15,7 @@ import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { DriversPanel } from './drivers';
 import { SoundPanel } from './sound-panel';
+import { HelpOverlay, helpSeen, markHelpSeen } from './help';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
 
 type ToolId = 'select' | 'brush' | 'shape' | 'track' | 'dress' | 'place' | 'delete';
@@ -63,6 +64,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [previewing, setPreviewing] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [autosaved, setAutosaved] = useState<number | null>(null);
+  const [help, setHelp] = useState<'first' | 'keys' | null>(() => (helpSeen() ? null : 'first'));
+  const closeHelp = (): void => { markHelpSeen(); setHelp(null); fx('ui-click'); };
   const rev = useRev(rt);
   const toastList = useToasts();
   const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight });
@@ -343,7 +346,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         const idx = children.findIndex((c) => c.ref === L.selected);
         if (idx >= 0) { rt.commands.execute(cmd.removeChild(scene.sceneId, 'entities', idx, 'Delete object')); feedback('deleted', 'Deleted'); setSelected(null); }
       }
-      if (k === 'escape') setSelected(null);
+      if (k === '?') setHelp((h) => (h ? null : 'keys'));
+      if (k === 'escape') { setSelected(null); setHelp(null); }
     };
     const lastLabel = (undone: boolean): string => { const h = rt.commands.history().filter((x) => x.undone === undone); return (undone ? h[0] : h[h.length - 1])?.label ?? ''; };
     const doUndo = (): void => { const label = lastLabel(false); if (rt.commands.undo()) feedback('undo', label); else fx('ui-error'); };
@@ -415,6 +419,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <span className="grow" />
         <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
+        <button title="Shortcuts and tips (?)" onClick={() => { setHelp('keys'); fx('ui-click'); }}>?</button>
         <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); fx('ui-toggle'); }}>🎚 Sounds</button>
         <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
         <button onClick={save}>💾 Save</button>
@@ -488,6 +493,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           </div>
         </aside>
       </main>
+      {help ? <HelpOverlay firstRun={help === 'first'} onClose={closeHelp} /> : null}
       <div className="toasts" aria-live="polite">{toastList.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}</div>
     </div>
   );

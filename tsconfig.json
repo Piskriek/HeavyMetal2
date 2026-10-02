@@ -98,6 +98,9 @@
       ],
       "@hm/modui": [
         "packages/modui/src/index.ts"
+      ],
+      "@hm/soundlab": [
+        "packages/soundlab/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/scatter': p('../../packages/scatter/src/index.ts'),
       '@hm/modulation': p('../../packages/modulation/src/index.ts'),
       '@hm/modui': p('../../packages/modui/src/index.ts'),
+      '@hm/soundlab': p('../../packages/soundlab/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

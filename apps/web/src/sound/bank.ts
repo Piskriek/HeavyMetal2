@@ -1,6 +1,7 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { SFX, SFX_IDS, type PlayableRecipe, type SfxId } from '@hm/audio';
+import { DEFAULT_ENGINE_SPEC, DEFAULT_MUSIC_SPEC, normalizeMusicSpec, type EngineSpec, type MusicSpec } from '@hm/soundlab';
 
 /**
  * Sounds are presets. The built-in recipes are the defaults; editing one in the Sound Lab makes an override preset
@@ -70,4 +71,67 @@ export interface SoundSlot { readonly id: SfxId; readonly label: string; readonl
 
 export function listSlots(rt: Runtime): SoundSlot[] {
   return SFX_IDS.map((id) => ({ id, label: id.replace(/-/g, ' '), category: SFX[id].category, edited: hasOverride(rt, id) }));
+}
+
+/* ---- the engine hum and the music are presets too (one of each per scene) ---- */
+
+export const ENGINE_ID: PresetId = 'engine-hum';
+export const MUSIC_ID: PresetId = 'music-race';
+
+const numberParams = (rt: Runtime, id: PresetId): Record<string, number> => {
+  const out: Record<string, number> = {};
+  const p = rt.store.get(id);
+  if (!p) return out;
+  const resolved = rt.store.resolve(id).params;
+  for (const [k, v] of Object.entries(resolved)) if (typeof v === 'number') out[k] = v;
+  return out;
+};
+
+/** The scene's engine hum settings, or the built-in ones. Read every frame by the race, so a driver can move them live. */
+export function engineSpecOf(rt: Runtime): { spec: EngineSpec; volume: number } {
+  const scene = rt.binder.sceneId;
+  const has = scene && (rt.store.get(scene)?.children['sounds'] ?? []).some((r) => r.ref === ENGINE_ID);
+  if (!has) return { spec: DEFAULT_ENGINE_SPEC, volume: 1 };
+  const n = numberParams(rt, ENGINE_ID);
+  const spec = { ...DEFAULT_ENGINE_SPEC };
+  for (const k of Object.keys(spec) as (keyof EngineSpec)[]) if (typeof n[k] === 'number') spec[k] = n[k]!;
+  return { spec, volume: n['volume'] ?? 1 };
+}
+
+export function musicSpecOf(rt: Runtime): { spec: MusicSpec; volume: number; enabled: boolean } {
+  const scene = rt.binder.sceneId;
+  const has = scene && (rt.store.get(scene)?.children['sounds'] ?? []).some((r) => r.ref === MUSIC_ID);
+  if (!has) return { spec: DEFAULT_MUSIC_SPEC, volume: 1, enabled: true };
+  const p = rt.store.resolve(MUSIC_ID).params;
+  const spec = normalizeMusicSpec({
+    seed: Number(p['seed'] ?? DEFAULT_MUSIC_SPEC.seed), bars: Number(p['bars'] ?? DEFAULT_MUSIC_SPEC.bars),
+    mood: String(p['mood'] ?? DEFAULT_MUSIC_SPEC.mood) as MusicSpec['mood'], bpm: Number(p['bpm'] ?? DEFAULT_MUSIC_SPEC.bpm),
+  });
+  return { spec, volume: Number(p['volume'] ?? 1), enabled: p['enabled'] !== false };
+}
+
+/** Make (or find) the scene's engine hum or music preset, with the built-in values. One undo step. */
+export function ensureScenePreset(rt: Runtime, which: 'engine' | 'music'): PresetId {
+  const id = which === 'engine' ? ENGINE_ID : MUSIC_ID;
+  const scene = rt.binder.sceneId;
+  if (!scene) throw new Error('no scene loaded');
+  if (soundsOf(rt).includes(id)) return id;
+  const label = which === 'engine' ? 'Edit engine hum' : 'Edit music';
+  rt.commands.transaction(label, () => {
+    if (!rt.store.get(id)) {
+      const params = which === 'engine' ? { ...DEFAULT_ENGINE_SPEC, volume: 1 } : { ...DEFAULT_MUSIC_SPEC, volume: 1, enabled: true };
+      rt.commands.execute(cmd.put({ id, kind: which === 'engine' ? 'engine-sound' : 'music', name: which === 'engine' ? 'Engine hum' : 'Race music', params: params as never, tier: 'play' }, label));
+    }
+    rt.commands.execute(cmd.addChild(scene, 'sounds', id, undefined, label));
+  });
+  return id;
+}
+
+export function removeScenePreset(rt: Runtime, which: 'engine' | 'music'): boolean {
+  const scene = rt.binder.sceneId;
+  if (!scene) return false;
+  const idx = soundsOf(rt).indexOf(which === 'engine' ? ENGINE_ID : MUSIC_ID);
+  if (idx < 0) return false;
+  rt.commands.execute(cmd.removeChild(scene, 'sounds', idx, which === 'engine' ? 'Reset engine hum' : 'Reset music'));
+  return true;
 }

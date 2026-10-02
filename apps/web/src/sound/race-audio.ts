@@ -1,8 +1,10 @@
 import type { RaceGame } from '@hm/game';
-import { engineParams, musicPattern, patternDurationSec, rollParams, type Mood, type Surface } from '@hm/audio';
+import { musicPattern, patternDurationSec, rollParams, type Surface } from '@hm/audio';
+import { engineParamsFor } from '@hm/soundlab';
 import { heightAt } from '@hm/terrain';
 import { project } from '@hm/racing';
 import { audio, fx, soundEnabled } from '../maker/feedback';
+import { engineSpecOf, musicSpecOf } from './bank';
 
 /**
  * Turns what happens in a race into sound: countdown beeps, GO, lap and finish stingers, item sounds, the player's engine hum,
@@ -13,7 +15,7 @@ export interface RaceAudio { tick(dtMs: number): void; dispose(): void }
 
 const ITEM_SOUND: Record<string, Parameters<typeof fx>[0]> = { boost: 'boost', jump: 'jump', oil: 'oil', shockwave: 'shockwave', freeze: 'freeze', mass: 'item-pickup', slipstream: 'boost', ghost: 'item-pickup' };
 
-export function attachRaceAudio(game: RaceGame, music = { mood: 'energetic' as Mood, bpm: 138, seed: 7, bars: 8 }): RaceAudio {
+export function attachRaceAudio(game: RaceGame): RaceAudio {
   const { rt, world } = { rt: game.rt, world: game.rt.world };
   const me = game.player;
   let prevItem = '';
@@ -26,8 +28,9 @@ export function attachRaceAudio(game: RaceGame, music = { mood: 'energetic' as M
     const loop = (): void => {
       if (!musicOn) return;
       const eng = audio();
-      if (eng && soundEnabled()) {
-        const pattern = musicPattern(music.seed, music.bars, { mood: music.mood, bpm: music.bpm });
+      const m = musicSpecOf(rt);
+      if (eng && soundEnabled() && m.enabled) {
+        const pattern = musicPattern(m.spec.seed, m.spec.bars, { mood: m.spec.mood, bpm: m.spec.bpm });
         eng.playMusic(pattern);
         musicTimer = setTimeout(loop, patternDurationSec(pattern) * 1000);
       } else musicTimer = setTimeout(loop, 1000);
@@ -62,7 +65,9 @@ export function attachRaceAudio(game: RaceGame, music = { mood: 'energetic' as M
       prevItem = item;
       if (!racing) { eng.stopEngine('player'); eng.setRoll('player', { gain: 0, filterFreq: 800, q: 0.7 }); return; }
       const throttle = game.input.sample().throttle;
-      eng.setEngine('player', engineParams(speed, throttle, 28));
+      const hum = engineSpecOf(rt);
+      const p = engineParamsFor(hum.spec, speed, throttle, 28);
+      eng.setEngine('player', { ...p, gain: p.gain * hum.volume, noiseGain: p.noiseGain * hum.volume });
       const ground = heightAt(game.terrain, Number(t['x']), Number(t['z']));
       const air = Number(t['y']) - ground > 1.6;
       const surface: Surface = air ? 'air' : Math.abs(project(game.track, [Number(t['x']), Number(t['z'])]).lateral) < game.track.width / 2 ? 'road' : 'grass';

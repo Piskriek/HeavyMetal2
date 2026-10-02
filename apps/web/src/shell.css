@@ -119,3 +119,12 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 
 .help-card textarea.code { width: 100%; box-sizing: border-box; background: #0f1318; color: #c7d3de; border: 1px solid #26303b; border-radius: 8px; padding: 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; margin: 6px 0; resize: vertical; }
 .help-card .bad { color: #ff9a5e; font-size: 13px; }
+
+/* ---- sound lab ---- */
+.maker .lab { margin: 6px 0; }
+.maker .lab .wave { width: 100%; height: 64px; color: var(--accent, #ffd24a); background: #0f1318; border-radius: 8px; display: block; margin: 6px 0; }
+.maker .lab .layer { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+.maker .lab .layer-head { display: flex; align-items: center; gap: 6px; }
+.maker .lab .layer-head b { flex: 1; }
+.maker .lab textarea.code { width: 100%; box-sizing: border-box; background: #0f1318; color: #c7d3de; border: 1px solid #26303b; border-radius: 8px; padding: 6px; font: 11px/1.35 ui-monospace, Consolas, monospace; }
+.maker .lab ul.bad { color: #ff9a5e; font-size: 12px; padding-left: 18px; }

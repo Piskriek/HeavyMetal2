@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => ({
       ...(mode === 'run' ? {} : { '@series-inc/rundot-game-sdk/api': p('./src/platform/sdk-stub.ts') }),
       './compile.js': p('../../packages/script/src/compile-lite.ts'),
       './quickjs-loader.js': p('../../packages/script/src/quickjs-loader-browser.ts'),
+      './qjs.js': p('../../packages/script/src/qjs-browser.ts'),
       '@hm/contracts': p('../../packages/contracts/src/index.ts'),
       '@hm/kernel': p('../../packages/kernel/src/index.ts'),
       '@hm/script': p('../../packages/script/src/index.ts'),

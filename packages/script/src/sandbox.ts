@@ -1,13 +1,7 @@
 import type { QuickJSContext, QuickJSHandle, QuickJSRuntime } from 'quickjs-emscripten';
-import { loadQuickJS } from './quickjs-loader.js';
+import { quickjs } from './qjs.js';
 import type { ScriptContext, ScriptLimits, Value } from '@hm/contracts';
 import { buildCtx, Marshal } from './marshal.js';
-
-/**
- * Top-level await: the WASM module is loaded once when this module is imported,
- * so `createScriptHost()` itself can stay synchronous.
- */
-const QuickJS = await loadQuickJS();
 
 const MEMORY_LIMIT = 16 * 1024 * 1024;
 const STACK_LIMIT = 512 * 1024;
@@ -20,7 +14,7 @@ const STACK_LIMIT = 512 * 1024;
  */
 function measureInterruptGranularity(): number {
   const iterations = 1_000_000;
-  const runtime = QuickJS.newRuntime();
+  const runtime = quickjs().newRuntime();
   let calls = 0;
   runtime.setInterruptHandler(() => {
     calls += 1;
@@ -35,7 +29,12 @@ function measureInterruptGranularity(): number {
   return calls > 0 ? Math.max(1, Math.round(iterations / calls)) : 10_000;
 }
 
-export const OPS_PER_INTERRUPT = measureInterruptGranularity();
+/** Measured once, on first use (in the browser the engine is only loaded after start-up). */
+let opsPerInterrupt: number | null = null;
+export const getOpsPerInterrupt = (): number => (opsPerInterrupt ??= measureInterruptGranularity());
+/** Kept for callers and tests that read the number: measured now where the engine is already loaded (Node), else 0 until first use. */
+export let OPS_PER_INTERRUPT = 0;
+try { OPS_PER_INTERRUPT = getOpsPerInterrupt(); } catch { /* the browser loads QuickJS later */ }
 
 class Budget {
   private ops = 0;
@@ -52,7 +51,7 @@ class Budget {
 
   /** Returns true to interrupt the VM. */
   onInterrupt(): boolean {
-    this.ops += OPS_PER_INTERRUPT;
+    this.ops += getOpsPerInterrupt();
     if (this.ops > this.limits.opBudget) {
       this.reason = `op budget exceeded (limit ${this.limits.opBudget} ops)`;
       return true;
@@ -112,7 +111,7 @@ export class Sandbox {
 
   constructor(js: string, limits: ScriptLimits) {
     this.budget = new Budget(limits);
-    this.runtime = QuickJS.newRuntime();
+    this.runtime = quickjs().newRuntime();
     this.runtime.setMemoryLimit(MEMORY_LIMIT);
     this.runtime.setMaxStackSize(STACK_LIMIT);
     this.runtime.setInterruptHandler(() => this.budget.onInterrupt());

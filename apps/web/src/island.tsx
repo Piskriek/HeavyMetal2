@@ -132,6 +132,8 @@ export function IslandWalk(props: {
     const onKeyDown = (e: KeyboardEvent): void => {
       const k = e.key.toLowerCase();
       if (k === 'escape') {
+        // some embedded browsers deliver Esc to the page while the mouse is captured instead of releasing it themselves: always let go explicitly
+        if (document.pointerLockElement) { suppressMenu = true; document.exitPointerLock(); }
         if (intro.on) { intro.t = intro.ms; return; }
         if (live.current.inv) { setInv(false); return; }
         setMenu((m) => !m);

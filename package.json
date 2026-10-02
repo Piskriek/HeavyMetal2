@@ -14,10 +14,12 @@
     "dev": "npm run dev -w @hm/web",
     "verify": "node scripts/verify.mjs",
     "host": "npm run build && node scripts/serve.mjs",
-    "serve": "node scripts/serve.mjs"
+    "serve": "node scripts/serve.mjs",
+    "e2e": "node scripts/e2e-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "22.19.17",
+    "playwright-core": "^1.63.0",
     "tsx": "^4.23.15",
     "typescript": "5.9.3",
     "vite": "^7.3.2",

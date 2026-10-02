@@ -6,6 +6,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { createRuntime } from '@hm/engine';
+import { initQuickJS } from '@hm/script';
 import { MapMaker } from './maker/maker';
 import { App } from './app';
 import { Shell } from './shell/shell';
@@ -17,6 +18,7 @@ import './shell.css';
 import './studio.css';
 
 async function start(): Promise<void> {
+  await initQuickJS(); // the script engine is loaded explicitly: no top-level await in the single-file build
   await bootPlatform(); // in RUN.world this installs the cloud-backed save store before anything reads a save
   const editor = location.hash === '#edit';
   const rt = createRuntime({ seed: 1, now: () => Date.now() });

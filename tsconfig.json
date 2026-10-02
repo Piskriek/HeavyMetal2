@@ -119,6 +119,9 @@
       ],
       "@hm/tracklayouts": [
         "packages/tracklayouts/src/index.ts"
+      ],
+      "@hm/evolve": [
+        "packages/evolve/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

@@ -62,6 +62,12 @@
       ],
       "@hm/trackgen": [
         "packages/trackgen/src/index.ts"
+      ],
+      "@hm/content": [
+        "packages/content/src/index.ts"
+      ],
+      "@hm/looks": [
+        "packages/looks/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

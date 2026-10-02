@@ -28,6 +28,8 @@ export type ThreeRenderer = RenderService & {
   setLook(look: LookLike): void;
   /** Painted strips on the road: start line, rumble strips, boost pads (null removes them). */
   setRoadDecals(defs: readonly RoadDecalDef[] | null): void;
+  /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
+  setFov(deg: number): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
   setModels(items: readonly ModelPlacement[] | null): void;
   /**
@@ -223,6 +225,9 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setDecor(instances: readonly DecorInstance[] | null): void {
       pendingDecor = instances;
       applyDecor();
+    },
+    setFov(deg: number): void {
+      orbitState = { ...orbitState, fov: Math.min(150, Math.max(10, deg)) };
     },
     setFocus(f): void {
       focus = f;

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
-import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
+import { createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { Minimap } from '@hm/ui';
 import type { HudLayout } from '@hm/hudlayout';
 import { LayoutHud } from './hud';
+import { RaceCamera, rigsOf } from './rigs';
 import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
 import { applyLook, lookOf } from './look';
 import { decorInstances } from './maker/dress';
@@ -52,6 +53,7 @@ export function RaceView(props: {
   const [racers, setRacers] = useState<{ id: string; x: number; z: number; color: string; me: boolean }[]>([]);
   const [size, setSize] = useState({ w: 800, h: 450 });
   const [touchDevice, setTouchDevice] = useState(false);
+  const [rigName, setRigName] = useState('');
 
   useEffect(() => {
     const el = host.current;
@@ -83,7 +85,9 @@ export function RaceView(props: {
     const detachKeys = attachKeyboard(window, game.input);
     const detachOrbit = attachOrbitControls(el, renderer);
     const offTick = rt.onTick(() => renderer.step());
-    let prevCam: { position: readonly [number, number, number]; target: readonly [number, number, number] } | null = null;
+    const cam = new RaceCamera(rigsOf(rt), rt);
+    const onKey = (e: KeyboardEvent): void => { if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) { const r = cam.next(); setRigName(r.name); window.setTimeout(() => setRigName(''), 1600); } };
+    window.addEventListener('keydown', onKey);
     let last = performance.now(), raf = 0, hudAcc = 0, frames = 0, ready = false, racing = false, reported = false;
     const gamepads = (): void => {
       const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
@@ -107,9 +111,9 @@ export function RaceView(props: {
       let alpha = 1;
       if (L.active && !L.paused) { alpha = game.update(dt); raceAudio.tick(dt); } else raceAudio.tick(0, true);
       const pose = game.playerPose();
-      const cam = chaseCamera(prevCam, pose, dt);
-      prevCam = cam;
-      renderer.camera.set(cam.position, cam.target);
+      const shot = cam.step(dt, pose);
+      renderer.setFov(shot.fov);
+      renderer.camera.set(shot.eye, shot.target);
       renderer.step();
       renderer.render(alpha);
       if (++frames === 3 && !ready) { ready = true; cb.current.onReady(); }
@@ -140,6 +144,7 @@ export function RaceView(props: {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('keydown', onKey);
       detachKeys(); detachOrbit(); offTick(); offDecor(); raceAudio.dispose(); renderer.unmount();
       gameRef.current = null;
     };
@@ -150,6 +155,7 @@ export function RaceView(props: {
   const count = hud?.phase === 'countdown' ? (hud.message === 'GO!' || hud.message === undefined ? 0 : Number(hud.message)) : null;
   return (
     <div className="race">
+      {rigName ? <div className="rig-name" role="status">📷 {rigName}</div> : null}
       <div className="view" ref={host} />
       {hud ? <LayoutHud hud={hud} layout={size.w < 520 ? narrow(props.layout) : props.layout} minimap={game && props.settings.showMinimap ? <Minimap track={game.track.points} racers={racers} size={150} /> : null} /> : null}
       {showTouch && game ? <TouchControls width={size.w} height={size.h} onChange={(t) => game.input.setTouch(t)} /> : null}

@@ -123,6 +123,9 @@
       "@hm/evolve": [
         "packages/evolve/src/index.ts"
       ],
+      "@hm/lineage": [
+        "packages/lineage/src/index.ts"
+      ],
       "@hm/motion": [
         "packages/motion/src/index.ts"
       ],

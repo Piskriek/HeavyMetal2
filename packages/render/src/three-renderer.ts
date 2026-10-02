@@ -84,6 +84,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let scene: THREE.Scene | null = null;
   let viewCamera: THREE.PerspectiveCamera | null = null;
   const defaultNear = 0.05;
+  const nearFor = (distance: number): number => Math.min(2, Math.max(defaultNear, distance * 0.008));
   let sceneSync: SceneSync | null = null;
   let sceneAdapter: ThreeSceneAdapter | null = null;
   let environment: EnvironmentRig | null = null;
@@ -108,10 +109,11 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let focus: { readonly target: Vec3; readonly radius: number; readonly veil: boolean; readonly hideNear: boolean; readonly falloff: number } | null = null;
   const applyFocus = (): void => {
     if (!viewCamera) return;
-    if (!focus) { viewCamera.near = defaultNear; environment?.setVeil(null); return; }
+    // far views get a bigger near plane: depth precision is spent where the eye is, so the shore and the water do not flicker against each other
+    if (!focus) { viewCamera.near = nearFor(orbitState.distance); environment?.setVeil(null); return; }
     const p = orbitPosition(orbitState);
     const d = Math.hypot(p[0] - focus.target[0], p[1] - focus.target[1], p[2] - focus.target[2]);
-    viewCamera.near = focus.hideNear ? Math.max(defaultNear, d - focus.radius * 1.3) : defaultNear;
+    viewCamera.near = focus.hideNear ? Math.max(nearFor(d), d - focus.radius * 1.3) : nearFor(d);
     environment?.setVeil(focus.veil ? { color: 0xffffff, near: d + focus.radius * 1.1, far: d + focus.radius * 1.1 + Math.max(2, focus.falloff) } : null);
   };
   const updateView = (): void => {

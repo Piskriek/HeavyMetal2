@@ -17,6 +17,9 @@ export interface DecorPart {
 export interface DecorVoxel { readonly id: string; readonly model: VoxelModel; readonly block: number }
 export interface DecorInstance { readonly parts: readonly DecorPart[]; readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly scale: number; readonly voxel?: DecorVoxel }
 
+/** Meshed voxel props by id, kept for the life of the page (a handful of small meshes). */
+const VOXEL_GEOMETRY = new Map<string, THREE.BufferGeometry | null>();
+
 /**
  * The scale that turns the unit geometry into the part, by the recipe convention (see @hm/scatter): a sphere's radius is `size`, a box's edge is
  * `size`, a cylinder's radius is `size` and its height is 1; `scale` stretches each and, for a cylinder, scale.y is its length in metres.
@@ -64,7 +67,9 @@ export class DecorView {
       }
     }
     for (const { voxel, matrices } of voxelBuckets.values()) {
-      const geometry = voxelGeometry(voxel.model, { ao: true, greedy: true });
+      // meshing a voxel model is the slow part: do it once per model and share it between rebuilds (the plants are re-laid while you sculpt)
+      let geometry = VOXEL_GEOMETRY.get(voxel.id);
+      if (geometry === undefined) { geometry = voxelGeometry(voxel.model, { ao: true, greedy: true }); VOXEL_GEOMETRY.set(voxel.id, geometry); }
       if (!geometry) continue;
       const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
       const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
@@ -74,7 +79,6 @@ export class DecorView {
       mesh.receiveShadow = true;
       mesh.frustumCulled = false;
       this.group.add(mesh);
-      this.geometries.push(geometry);
       this.materials.push(material);
     }
     for (const { part, matrices } of buckets.values()) {

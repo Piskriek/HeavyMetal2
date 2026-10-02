@@ -1,5 +1,6 @@
 import { defineSchema, type ChildSlot, type SchemaRegistry, type VariableDef } from '@hm/contracts';
 import { LEGACY_SETUP_IDS, LIGHT_VARIABLES, SETUP_IDS } from '@hm/lighting';
+import { PLANT_VARIABLES, RULE_VARIABLES } from '@hm/worldrules';
 
 /** The core preset kinds the harness ships with. Games add their own kinds on top (racer, track-piece, item ...). */
 
@@ -75,6 +76,8 @@ export const sceneSchema = defineSchema({
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
     { key: 'items', label: 'Items', doc: 'The power-ups racers can pick up. Empty = the standard eight.', kinds: ['item'], min: 0, max: null, tier: 'build' },
     { key: 'views', label: 'Editing view', doc: 'How the world looks while you focus on one thing: the white-out and blur, and the orbit or fly camera.', kinds: ['veil'], min: 0, max: 1, tier: 'play' },
+    { key: 'world', label: 'World rules', doc: 'How the ground and the plants respond when you change the island: what digging exposes, what sinks, whether plants follow the ground.', kinds: ['world-rules'], min: 0, max: 1, tier: 'play' },
+    { key: 'plants', label: 'Plant behaviours', doc: 'How each kind of plant or prop behaves: where it grows, whether it follows the ground or goes when its ground is dug, drowned or too steep. Empty = the ready-made behaviours.', kinds: ['plant'], min: 0, max: null, tier: 'build' },
     { key: 'lighting', label: 'Lighting', doc: 'The light of this scene: sun, sky, haze, lamps and the picture effects. Empty = the ready-made look chosen above; edit it and it becomes your own.', kinds: ['light-setup'], min: 0, max: 1, tier: 'play' },
     { key: 'rigs', label: 'Camera rigs', doc: 'The ways to watch this scene: chase, first person, orbit, helicopter, free, ghost, director.', kinds: ['camera-rig'], min: 0, max: null, tier: 'play' },
     { key: 'models', label: 'Models', doc: 'Voxel models used in this scene: characters, props, statues.', kinds: ['model'], min: 0, max: null, tier: 'build' },
@@ -255,6 +258,29 @@ export const cameraRigSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const worldRulesSchema = defineSchema({
+  kind: 'world-rules',
+  version: 1,
+  label: 'World rules',
+  doc: 'How the island responds when you change it: dig grass and soil shows, dig deeper and rock shows, sink ground under the sea and it becomes sea bed, and plants follow or react.',
+  icon: 'globe',
+  variables: RULE_VARIABLES,
+  slots: [] as readonly ChildSlot[],
+});
+
+export const plantSchema = defineSchema({
+  kind: 'plant',
+  version: 1,
+  label: 'Plant behaviour',
+  doc: 'How one kind of plant or prop behaves when the ground under it changes.',
+  icon: 'sprout',
+  variables: [
+    { key: 'kind', type: 'string', label: 'For', doc: 'Which plants this is for (palm, bush, tuft, flowers, reeds, boulder, tiki, log).', tier: 'pro', default: 'palm', group: 'Behaviour' },
+    ...PLANT_VARIABLES,
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const lightSetupSchema = defineSchema({
   kind: 'light-setup',
   version: 1,
@@ -380,7 +406,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

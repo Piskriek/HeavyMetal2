@@ -150,6 +150,12 @@
       "@hm/voxelnature": [
         "packages/voxelnature/src/index.ts"
       ],
+      "@hm/worldrules": [
+        "packages/worldrules/src/index.ts"
+      ],
+      "@hm/anim": [
+        "packages/anim/src/index.ts"
+      ],
       "@hm/toolcatalog": [
         "packages/toolcatalog/src/index.ts"
       ],

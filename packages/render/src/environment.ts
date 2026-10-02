@@ -129,6 +129,10 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
     roughness: 0.94,
     metalness: 0.02,
     envMapIntensity: 0.35,
+    // the sea plane sits where the beach meets the water: pull it a hair towards the camera so the two never fight over the same depth
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -2,
   });
   const ground = new THREE.Mesh(new THREE.CircleGeometry(100, 128), groundMaterial);
   ground.rotation.x = -Math.PI / 2;

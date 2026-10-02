@@ -127,7 +127,10 @@ export function IslandWalk(props: {
     refreshModels();
 
     const ground = (x: number, z: number): number => { const st = rt.binder.terrain(); return st ? heightAt(st.terrain, x, z) : 0; };
-    const builder = new BuildController(rt, renderer, scene.sceneId, scene.terrainId, refreshModels, say);
+    const builder = new BuildController(rt, renderer, scene.sceneId, scene.terrainId, refreshModels, say, (preview) => {
+      const d = rt.binder.decor();
+      renderer.setDecor(preview ? decorInstances(preview) : d ? decorInstances(d.placements) : null);
+    });
     // start at the middle when it is low, flat-ish land; on a mountain or in the sea, walk out east to the first low ground
     let px = 0, pz = 0;
     for (let r = 0; r < 120 && (ground(px, pz) < SEA || ground(px, pz) > 5); r += 2) { px = r; pz = 0; }
@@ -269,8 +272,8 @@ export function IslandWalk(props: {
         let mx = 0, mz = 0;
         if (down.has('w') || down.has('arrowup')) { mx += fwx; mz += fwz; }
         if (down.has('s') || down.has('arrowdown')) { mx -= fwx; mz -= fwz; }
-        if (down.has('d') || down.has('arrowright')) { mx -= rx; mz -= rz; }
-        if (down.has('a') || down.has('arrowleft')) { mx += rx; mz += rz; }
+        if (down.has('d') || down.has('arrowright')) { mx += rx; mz += rz; }
+        if (down.has('a') || down.has('arrowleft')) { mx -= rx; mz -= rz; }
         const len = Math.hypot(mx, mz);
         if (len > 0 && !intro.on) {
           const speed = (down.has('shift') ? 8 : 3.6) * dt;

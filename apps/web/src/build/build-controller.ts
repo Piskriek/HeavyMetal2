@@ -1,5 +1,7 @@
 import { cmd, type PresetId } from '@hm/contracts';
-import type { Runtime } from '@hm/engine';
+import type { DecorPlacement, Runtime } from '@hm/engine';
+import { packDecor, rectToArea, respondToSculpt, settlePlants } from '@hm/worldrules';
+import { plantsOf, rulesOf } from '../world';
 import type { ThreeRenderer } from '@hm/render';
 import { applyStroke, encodeTerrain, heightAt, type DirtyRect } from '@hm/terrain';
 import { encodeModel, type VoxelModel } from '@hm/voxel';
@@ -23,8 +25,16 @@ export class BuildController {
   private lastUse = 0;
   private flattenTo: number | null = null;
   private strokeLabel = '';
+  /** Heights when the stroke began: the world rules compare against them (what was dug, what sank). */
+  private before: Float32Array | null = null;
+  private lastPreview = 0;
 
-  constructor(private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId, private readonly onModels: () => void, private readonly say: (text: string) => void) {}
+  constructor(
+    private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId,
+    private readonly onModels: () => void, private readonly say: (text: string) => void,
+    /** Show plants where they would settle while a stroke is still going (null = back to the stored ones). */
+    private readonly onDecorPreview: (placements: readonly DecorPlacement[] | null) => void = () => undefined,
+  ) {}
 
   private sprite(item: HotItem, a: Aim, scale = 1): void {
     const s = SPRITES[item.sprite];
@@ -55,7 +65,7 @@ export class BuildController {
       return;
     }
     if (!ts) return;
-    if (first) { this.dirty = null; this.last = null; this.flattenTo = item.kind === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = item.label; }
+    if (first) { this.dirty = null; this.last = null; this.flattenTo = item.kind === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = item.label; this.before = ts.terrain.heights.slice(); }
     const kind = item.kind === 'dig' ? 'lower' : item.kind === 'sculpt' ? (alt ? 'lower' : 'raise') : item.kind === 'flatten' ? 'flatten' : item.kind === 'smooth' ? 'smooth' : 'paint';
     const strength = item.strength ?? (kind === 'paint' ? 1 : kind === 'smooth' ? 0.5 : item.kind === 'dig' ? 0.55 : 0.4);
     const from = this.last ?? { x, z };
@@ -64,17 +74,41 @@ export class BuildController {
     if (!rect) return;
     this.dirty = this.dirty ? { c0: Math.min(this.dirty.c0, rect.c0), r0: Math.min(this.dirty.r0, rect.r0), c1: Math.max(this.dirty.c1, rect.c1), r1: Math.max(this.dirty.r1, rect.r1) } : rect;
     this.renderer.refreshTerrain(rect);
+    // plants ride the ground while you sculpt (a preview; the result is stored when the button is let go)
+    if (now - this.lastPreview > 200 && this.dirty) {
+      this.lastPreview = now;
+      const d = this.rt.binder.decor();
+      if (d) this.onDecorPreview(settlePlants(d.placements, ts.terrain, rectToArea(ts.terrain, this.dirty, 1), { ...rulesOf(this.rt, this.sceneId), plantsReact: false }, plantsOf(this.rt, this.sceneId)).items);
+    }
     this.sprite(item, aim, kind === 'paint' ? 0.4 : 0.6);
     fx(item.sound, { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 });
   }
 
-  /** The button was released: commit the stroke as one undo step and save. */
+  /**
+   * The button was released. The world responds (world-rules and plant presets): dug ground shows soil or rock, sunk ground becomes sea bed,
+   * plants follow the ground or go when their ground no longer suits them. Ground and plants are committed together as ONE undo step.
+   */
   end(): void {
     if (!this.dirty) return;
     const ts = this.rt.binder.terrain();
-    this.dirty = null; this.last = null;
+    const dirty = this.dirty, before = this.before;
+    this.dirty = null; this.last = null; this.before = null;
     if (!ts) return;
-    this.rt.commands.execute(cmd.setParam(`${this.terrainId}.data`, encodeTerrain(ts.terrain) as never, this.strokeLabel || 'Sculpt'));
+    const rules = rulesOf(this.rt, this.sceneId);
+    if (before) { if (respondToSculpt(ts.terrain, before, dirty, rules) > 0) this.renderer.refreshTerrain(dirty); }
+    const decor = this.rt.binder.decor();
+    const settled = decor ? settlePlants(decor.placements, ts.terrain, rectToArea(ts.terrain, dirty, 1), rules, plantsOf(this.rt, this.sceneId), before ?? undefined) : null;
+    const label = this.strokeLabel || 'Sculpt';
+    this.rt.commands.transaction(label, () => {
+      this.rt.commands.execute(cmd.setParam(`${this.terrainId}.data`, encodeTerrain(ts.terrain) as never, label));
+      if (decor && settled && (settled.removed > 0 || settled.moved > 0)) {
+        const packed = packDecor(settled.items);
+        this.rt.commands.execute(cmd.setParam(`${decor.presetId}.kinds`, packed.kinds as never, label));
+        this.rt.commands.execute(cmd.setParam(`${decor.presetId}.items`, packed.items as never, label));
+      }
+    });
+    this.onDecorPreview(null);
+    if (settled && settled.removed > 0) this.say(settled.removed === 1 ? 'One plant dug up' : `${settled.removed} plants dug up`);
     saveMap(this.rt, this.sceneId);
   }
 

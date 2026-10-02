@@ -1150,3 +1150,9 @@ M635 and M640 advance to R02/pass: clay is now compact mineral grain and snow is
 ![Material Batch 82 contact sheet](./review/material-batch-82-sports-surface-corrections-extensions.jpg)
 
 M646, M648, M649 and M651 advance to R02/pass with continuous rubber, maintained ice, poured concrete and non-tessellated grip relief. M652–M653 pass as nostalgic red-clay and groomed-snow children. M654–M657 pass as full-fidelity artificial turf, cinder track, tatami weave and aquatic pool-tile foundations. All remain line-free and brand-neutral.
+
+## Material Batch 83 — expanded global sports surfaces
+
+![Material Batch 83 contact sheet](./review/material-batch-83-expanded-global-sports-surfaces.jpg)
+
+M658–M663, M665 and M667 pass, adding mobile and nostalgic artificial turf, cinder, tatami and pool-tile children plus full-fidelity indoor rubber. M664 must regenerate because horizontal ridges replace the alternating tatami weave. M666 must regenerate because nested rectangular rake paths create a repeated focal motif instead of irregular beach-sports sand grooming.

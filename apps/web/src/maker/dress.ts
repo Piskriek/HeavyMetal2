@@ -1,18 +1,52 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { DecorPlacement, Runtime } from '@hm/engine';
 import type { DecorInstance } from '@hm/render';
-import { recipeParts, scatter, TROPICAL_RULES } from '@hm/scatter';
+import { recipeParts, scatter, TROPICAL_RULES, type ScatterRule } from '@hm/scatter';
+import type { VoxelModel } from '@hm/voxel';
+import { MODELS } from '@hm/voxelart';
+import { NATURE_BLOCK, NATURE_MODELS } from '@hm/voxelnature';
 import type { Terrain } from '@hm/terrain';
 import { toCenterline, type TrackDraft } from '@hm/trackedit';
 
-/** Placements -> instanced parts for the renderer (each prop is a few primitives). */
-export function decorInstances(placements: readonly DecorPlacement[]): DecorInstance[] {
-  return placements.map((p, i) => ({ parts: recipeParts(p.kind, 1, i + 1), x: p.x, y: p.y, z: p.z, yaw: p.yaw, scale: p.scale }));
+/**
+ * Which foliage kinds are drawn as voxel models (so the island matches the voxel goblin) and how big a voxel is. Anything not listed is drawn from
+ * its primitive recipe. The models are built once and shared by every copy.
+ */
+const VOXEL_KINDS: Readonly<Record<string, { source: 'art' | 'nature'; id: string; block: number }>> = {
+  palm: { source: 'art', id: 'palm', block: 0.13 },
+  boulder: { source: 'art', id: 'rock', block: 0.11 },
+  bush: { source: 'nature', id: 'bush', block: NATURE_BLOCK['bush']! },
+  tuft: { source: 'nature', id: 'grass-clump', block: NATURE_BLOCK['grass-clump']! },
+  flowers: { source: 'nature', id: 'flowers', block: NATURE_BLOCK['flowers']! },
+};
+const modelCache = new Map<string, VoxelModel>();
+function voxelModel(kind: string): { id: string; model: VoxelModel; block: number } | null {
+  const v = VOXEL_KINDS[kind];
+  if (!v) return null;
+  let model = modelCache.get(v.id);
+  if (!model) {
+    const entry = v.source === 'art' ? MODELS.find((m) => m.id === v.id) : NATURE_MODELS.find((m) => m.id === v.id);
+    if (!entry) return null;
+    model = entry.build() as unknown as VoxelModel;
+    modelCache.set(v.id, model);
+  }
+  return { id: v.id, model, block: v.block };
 }
+
+/** Placements -> instanced props for the renderer: voxel models where there is one for the kind, primitives otherwise. */
+export function decorInstances(placements: readonly DecorPlacement[]): DecorInstance[] {
+  return placements.map((p, i) => {
+    const voxel = voxelModel(p.kind);
+    return voxel ? { parts: [], x: p.x, y: p.y, z: p.z, yaw: p.yaw, scale: p.scale, voxel } : { parts: recipeParts(p.kind, 1, i + 1), x: p.x, y: p.y, z: p.z, yaw: p.yaw, scale: p.scale };
+  });
+}
+
+/** Flowers: colour in the meadow, on grass and moss, never on slopes. */
+const FLOWERS: ScatterRule = { id: 'flowers', surfaces: [4, 11], minHeight: 0.8, maxHeight: 30, maxSlopeDeg: 22, density: 6, minSpacing: 3.2, scale: [0.8, 1.4] };
 
 /** Scatter foliage over the island with the tropical rules, keeping clear of the track. Returns the flat arrays the decor preset stores. */
 export function dress(terrain: Terrain, draft: TrackDraft, seed: number, density: number): { kinds: string[]; items: number[]; count: number } {
-  const rules = TROPICAL_RULES.map((r) => ({ ...r, density: r.density * density }));
+  const rules = [...TROPICAL_RULES, FLOWERS].map((r) => ({ ...r, density: r.density * density }));
   const centre = draft.closed && draft.points.length >= 3 ? toCenterline(draft, 6) : [];
   const placed = scatter(terrain, rules, {
     seed, edgeMargin: 3, margin: 2, maxCount: 4000,

@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/islands': p('../../packages/islands/src/index.ts'),
       '@hm/lighting': p('../../packages/lighting/src/index.ts'),
       '@hm/buildkit': p('../../packages/buildkit/src/index.ts'),
+      '@hm/voxelnature': p('../../packages/voxelnature/src/index.ts'),
       '@hm/assembler': p('../../packages/assembler/src/index.ts'),
       '@hm/pbrgrass': p('../../packages/pbrgrass/src/index.ts'),
       '@hm/voxpartshead': p('../../packages/voxpartshead/src/index.ts'),

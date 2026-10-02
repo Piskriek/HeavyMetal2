@@ -147,6 +147,9 @@
       "@hm/buildkit": [
         "packages/buildkit/src/index.ts"
       ],
+      "@hm/voxelnature": [
+        "packages/voxelnature/src/index.ts"
+      ],
       "@hm/toolcatalog": [
         "packages/toolcatalog/src/index.ts"
       ],

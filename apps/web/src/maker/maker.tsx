@@ -19,6 +19,7 @@ import { SoundPanel } from './sound-panel';
 import { RulesPanel } from './rules-panel';
 import { InterfacePanel } from './interface-panel';
 import { ItemsPanel } from './items-panel';
+import { LAYOUTS } from '@hm/tracklayouts';
 import { themeOf } from '../ui-preset';
 import { HelpOverlay, helpSeen, markHelpSeen } from './help';
 import { ShareDialog } from './share';
@@ -521,7 +522,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
                 <button onClick={() => { writeDraft(rt, scene.trackId, { ...draft, points: [] }, 'Clear track'); feedback('deleted', 'Track cleared'); }}>Clear</button>
               </div>
               <h3 className="sub">Layouts</h3>
-              <div className="btns">{DRAFT_PRESETS.map((p) => <button key={p.id} title={p.doc} onClick={() => { writeDraft(rt, scene.trackId, { ...draft, points: p.draft.points }, `Layout: ${p.name}`); rt.commands.execute(cmd.setParam(`${scene.trackId}.width`, p.draft.width, 'Road width')); fx('ui-success'); }}>{p.name}</button>)}</div>
+              <div className="btns">{[...DRAFT_PRESETS.map((p) => ({ id: p.id, name: p.name, doc: p.doc, draft: p.draft })), ...LAYOUTS.map((l) => ({ id: l.id, name: l.name, doc: `${l.doc} (${'★'.repeat(l.difficulty)})`, draft: { ...draft, points: l.points.map(([x, z]) => ({ x, z })), width: l.width } }))].map((p) => <button key={p.id} title={p.doc} onClick={() => { writeDraft(rt, scene.trackId, { ...draft, points: p.draft.points }, `Layout: ${p.name}`); rt.commands.execute(cmd.setParam(`${scene.trackId}.width`, p.draft.width, 'Road width')); fx('ui-success'); }}>{p.name}</button>)}</div>
               <p className="hint">Click to add a point · click a line to insert · drag points · hover + Delete removes one.</p>
             </>
           ) : null}

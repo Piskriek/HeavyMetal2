@@ -116,6 +116,9 @@
       ],
       "@hm/texgraph": [
         "packages/texgraph/src/index.ts"
+      ],
+      "@hm/tracklayouts": [
+        "packages/tracklayouts/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

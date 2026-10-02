@@ -46,6 +46,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/hudlayout': p('../../packages/hudlayout/src/index.ts'),
       '@hm/soundpack': p('../../packages/soundpack/src/index.ts'),
       '@hm/texgraph': p('../../packages/texgraph/src/index.ts'),
+      '@hm/tracklayouts': p('../../packages/tracklayouts/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

@@ -1138,3 +1138,9 @@ M624–M633 pass as brand-neutral full-fidelity playing surfaces: short natural 
 ![Material Batch 80 contact sheet](./review/material-batch-80-mobile-global-sports-surfaces.jpg)
 
 M634, M636–M638 and M641–M643 pass as mobile playing-surface children. M639 is a constrained pass: reconstruction must break up its isolated broad resurfacing band. M635 must regenerate because its flowing bands read as wood instead of granular red clay. M640 must regenerate because its long folds read as cloth instead of compact groomed snow.
+
+## Material Batch 81 — mobile corrections and nostalgic sports surfaces
+
+![Material Batch 81 contact sheet](./review/material-batch-81-mobile-corrections-nostalgic-sports-surfaces.jpg)
+
+M635 and M640 advance to R02/pass: clay is now compact mineral grain and snow is now compact directional corduroy. M644, M645, M647 and M650 pass as nostalgic-PBR surface children. M651 is constrained-pass because reconstruction must suppress its square tessellation. M646, M648 and M649 require regeneration: respectively they contain broad channels, peeling plate-like ice, and recessed concrete panel intersections that conflict with the intended seamless materials.

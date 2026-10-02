@@ -18100,7 +18100,7 @@
     },
     {
       "registryId": "M635",
-      "canonicalCode": "HM2-TXP-M635-SPT-CLAY-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M635-SPT-CLAY-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile sports clay court pbr sheet",
       "sourceFile": "M635-mobile-sports-clay-court-pbr-sheet.png",
       "domain": "SPT",
@@ -18162,10 +18162,9 @@
         ],
         "frequency": "broad structure survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 80 mobile global sports surfaces",
-      "reviewNotes": "Current BaseColor reads as flowing wood grain; regenerate as compact granular red clay."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 81 corrected mobile sports surfaces"
     },
     {
       "registryId": "M636",
@@ -18442,7 +18441,7 @@
     },
     {
       "registryId": "M640",
-      "canonicalCode": "HM2-TXP-M640-SPT-SNOW-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M640-SPT-SNOW-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "mobile sports packed snow pbr sheet",
       "sourceFile": "M640-mobile-sports-packed-snow-pbr-sheet.png",
       "domain": "SPT",
@@ -18504,10 +18503,9 @@
         ],
         "frequency": "broad structure survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 80 mobile global sports surfaces",
-      "reviewNotes": "Current long folds read as draped cloth rather than compact groomed snow."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 81 corrected mobile sports surfaces"
     },
     {
       "registryId": "M641",
@@ -18712,6 +18710,554 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M644",
+      "canonicalCode": "HM2-TXP-M644-SPT-GRASS-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports short grass pitch pbr sheet",
+      "sourceFile": "M644-nostalgic-sports-short-grass-pitch-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M624",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces"
+    },
+    {
+      "registryId": "M645",
+      "canonicalCode": "HM2-TXP-M645-SPT-ACRYLIC-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports acrylic court pbr sheet",
+      "sourceFile": "M645-nostalgic-sports-acrylic-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ACRYLIC",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M626",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces"
+    },
+    {
+      "registryId": "M646",
+      "canonicalCode": "HM2-TXP-M646-SPT-TRACK-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports running track rubber pbr sheet",
+      "sourceFile": "M646-nostalgic-sports-running-track-rubber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M627",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces",
+      "reviewNotes": "Broad smooth channels interrupt the EPDM granules and will expose repetition."
+    },
+    {
+      "registryId": "M647",
+      "canonicalCode": "HM2-TXP-M647-SPT-GYMWOOD-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports gym hardwood pbr sheet",
+      "sourceFile": "M647-nostalgic-sports-gym-hardwood-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GYMWOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M628",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces"
+    },
+    {
+      "registryId": "M648",
+      "canonicalCode": "HM2-TXP-M648-SPT-ICE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports rink ice pbr sheet",
+      "sourceFile": "M648-nostalgic-sports-rink-ice-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ICE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M629",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces",
+      "reviewNotes": "Large peeling plate forms read as damaged coating rather than maintained rink ice."
+    },
+    {
+      "registryId": "M649",
+      "canonicalCode": "HM2-TXP-M649-SPT-CONCRETE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports skate concrete pbr sheet",
+      "sourceFile": "M649-nostalgic-sports-skate-concrete-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CONCRETE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M631",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces",
+      "reviewNotes": "Large recessed panel intersections violate the seamless poured-concrete identity."
+    },
+    {
+      "registryId": "M650",
+      "canonicalCode": "HM2-TXP-M650-SPT-LANEWOOD-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports bowling lane pbr sheet",
+      "sourceFile": "M650-nostalgic-sports-bowling-lane-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "LANEWOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M632",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces"
+    },
+    {
+      "registryId": "M651",
+      "canonicalCode": "HM2-TXP-M651-SPT-GRIPMAT-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports grip mat pbr sheet",
+      "sourceFile": "M651-nostalgic-sports-grip-mat-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GRIPMAT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "nostalgic PBR global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "baked court lines"
+      ],
+      "parentPreset": "M633",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable stepped forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad authored structure survives PX64"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 81 nostalgic global sports surfaces",
+      "reviewNotes": "Reconstruction must suppress the visible square tessellation and retain only fine grip relief."
     }
   ]
 }

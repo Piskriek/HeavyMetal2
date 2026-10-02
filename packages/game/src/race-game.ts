@@ -164,7 +164,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   const game: RaceGame = {
     rt, track, terrain, input, get director() { return dir; }, championship, racerIds, get player() { return player; },
     update(dtMs) {
-      const alpha = rt.frame(dtMs, (tick) => ({ tick, actors: phase === 'racing' ? { p1: toActorFrame(input.sample()) } : {} }));
+      const alpha = rt.frame(dtMs, (tick) => ({ tick, actors: (phase === 'racing' ? { p1: toActorFrame(input.sample()) } : {}) as Record<string, Record<string, number | boolean>> }));
       input.update(dtMs);
       emit(dir.update(dtMs, progressMap()));
       if (phase === 'racing') grantItems();

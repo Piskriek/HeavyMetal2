@@ -80,6 +80,9 @@
       ],
       "@hm/game": [
         "packages/game/src/index.ts"
+      ],
+      "@hm/audio": [
+        "packages/audio/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

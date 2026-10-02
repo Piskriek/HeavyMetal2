@@ -50,6 +50,9 @@
       ],
       "@hm/engine": [
         "packages/engine/src/index.ts"
+      ],
+      "@hm/terrain": [
+        "packages/terrain/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

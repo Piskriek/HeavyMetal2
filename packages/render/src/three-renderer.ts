@@ -4,8 +4,21 @@ import { MAX_DIST, MIN_DIST, orbitPosition, project, rayFromPixel, stateFromPosi
 import { createEnvironment, type EnvironmentRig } from './environment';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
+import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
+import { pickTerrain } from './terrain/terrain-pick';
+import type { SurfaceArray } from './terrain/surface-set';
 import { createSceneSync, defineRenderComponents, type SceneSync } from './scene-sync';
 import { ThreeSceneAdapter } from './three-scene-adapter';
+
+export type ThreeRenderer = RenderService & {
+  /** Call after each simulation tick. */
+  step(): void;
+  /** Show a terrain (the island ground) with its surface set; null removes it. */
+  setTerrain(data: TerrainLike | null, surfaces?: SurfaceArray): TerrainView | null;
+  /** Re-upload the nodes a brush stroke touched (everything when omitted). */
+  refreshTerrain(dirty?: DirtyRectLike | null): void;
+  readonly terrain: TerrainView | null;
+};
 
 export interface RenderOptions {
   readonly assetUrl?: (path: string) => string;
@@ -18,7 +31,7 @@ const miss = (): Pick => ({ entity: null, point: null, normal: null, distance: I
 const finiteNumber = (value: Value | undefined, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-export function createThreeRenderer(opts: RenderOptions = {}): RenderService & { step(): void } {
+export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let orbitState: OrbitState = { target: [0, 0, 0], yaw: 0.6, pitch: 0.5, distance: 18, fov: 50 };
   let hostElement: HTMLElement | null = null;
   let webgl: THREE.WebGLRenderer | null = null;
@@ -59,6 +72,9 @@ export function createThreeRenderer(opts: RenderOptions = {}): RenderService & {
     resizeObserver = null;
     removeWindowResize?.();
     removeWindowResize = null;
+    terrainView?.mesh.removeFromParent();
+    terrainView?.dispose();
+    terrainView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
     overlays?.dispose();
@@ -82,7 +98,19 @@ export function createThreeRenderer(opts: RenderOptions = {}): RenderService & {
     previousFrame = null;
   };
 
-  const service: RenderService & { step(): void } = {
+  let terrainView: TerrainView | null = null;
+  let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
+  const applyTerrain = (): void => {
+    terrainView?.mesh.removeFromParent();
+    terrainView?.dispose();
+    terrainView = null;
+    if (scene && pendingTerrain) {
+      terrainView = new TerrainView(pendingTerrain.data, pendingTerrain.surfaces);
+      scene.add(terrainView.mesh);
+    }
+  };
+
+  const service: ThreeRenderer = {
     mount(host: HTMLElement, world: World, store: PresetStore): void {
       unmount();
       hostElement = host;
@@ -108,6 +136,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): RenderService & {
       sceneSync = createSceneSync(world, sceneAdapter);
       sceneSync.step();
       overlays = new OverlayManager(scene);
+      applyTerrain();
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
       updateView();
       resize();
@@ -124,6 +153,17 @@ export function createThreeRenderer(opts: RenderOptions = {}): RenderService & {
     step(): void {
       sceneSync?.step();
     },
+    setTerrain(data: TerrainLike | null, surfaces?: SurfaceArray): TerrainView | null {
+      pendingTerrain = data && surfaces ? { data, surfaces } : null;
+      applyTerrain();
+      return terrainView;
+    },
+    refreshTerrain(dirty?: DirtyRectLike | null): void {
+      terrainView?.refresh(dirty ?? null);
+    },
+    get terrain(): TerrainView | null {
+      return terrainView;
+    },
     render(alpha: number): void {
       if (!webgl || !scene || !viewCamera) return;
       sceneSync?.present(alpha);
@@ -139,7 +179,11 @@ export function createThreeRenderer(opts: RenderOptions = {}): RenderService & {
       const rect = webgl.domElement.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return miss();
       const ray = rayFromPixel(orbitState, clientX - rect.left, clientY - rect.top, rect.width, rect.height);
-      return pickScene(ray, sceneSync.items(), 0);
+      const hit = pickScene(ray, sceneSync.items(), pendingTerrain ? null : 0);
+      if (!pendingTerrain) return hit;
+      const ground = pickTerrain(pendingTerrain.data, ray);
+      if (!ground || ground.distance >= hit.distance) return hit;
+      return { entity: null, point: ground.point, normal: ground.normal, distance: ground.distance };
     },
     setCamera(cameraPreset: string): void {
       if (!presetStore?.get(cameraPreset)) return;

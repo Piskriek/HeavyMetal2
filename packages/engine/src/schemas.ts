@@ -66,6 +66,7 @@ export const sceneSchema = defineSchema({
   ],
   slots: [
     { key: 'entities', label: 'Objects', doc: 'Everything placed in this scene.', kinds: ['entity'], min: 0, max: null, tier: 'play' },
+    { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
   ] as readonly ChildSlot[],
 });
@@ -88,6 +89,22 @@ export const cameraSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const terrainSchema = defineSchema({
+  kind: 'terrain',
+  version: 1,
+  label: 'Terrain',
+  doc: 'The ground: a height grid with painted surfaces. Edited with the sculpt and paint brushes.',
+  icon: 'terrain',
+  variables: [
+    { key: 'data', type: 'asset', label: 'Terrain data', doc: 'Heights and painted surfaces (edited with the brushes, not by hand).', tier: 'pro', default: null },
+    num('soft', 'Soft borders', '0 = crisp edges between surfaces, 1 = long soft fades.', 0.6, 'build', { min: 0, max: 1, step: 0.05, group: 'Look' }),
+    num('bump', 'Bump strength', 'How strong the surface relief looks.', 1, 'build', { min: 0, max: 3, step: 0.05, group: 'Look' }),
+    num('friction', 'Grip', 'How much the ground grips rolling things.', 0.8, 'build', { min: 0, max: 2, step: 0.01, group: 'Physics' }),
+    num('restitution', 'Bounce', '0 = thud, 1 = perfect bounce.', 0, 'build', { min: 0, max: 1, step: 0.01, group: 'Physics' }),
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const mechanicSchema = defineSchema({
   kind: 'mechanic',
   version: 1,
@@ -101,7 +118,7 @@ export const mechanicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

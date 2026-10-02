@@ -1,5 +1,6 @@
 import type { EntityId, Params, Preset, PresetId, PresetStore, Quat, Ref, Value, World } from '@hm/contracts';
 import type { PhysicsEngine } from '@hm/physics';
+import { decodeTerrain, toHeightfield, type Terrain } from '@hm/terrain';
 
 /**
  * Binds a scene preset to the simulation world: every 'entity' preset in the scene's `entities` slot becomes a world entity
@@ -7,6 +8,14 @@ import type { PhysicsEngine } from '@hm/physics';
  * the world in place (look and, for decoration, placement) or rebuilds that one entity (shape/physics changes).
  * This is the "everything is a preset" loop: inspector -> command -> preset store -> binder -> world -> renderer.
  */
+
+/** The decoded ground of the bound scene (null when it has none). `version` changes whenever it is rebuilt from its preset. */
+export interface TerrainState {
+  readonly presetId: PresetId;
+  readonly terrain: Terrain;
+  readonly version: number;
+  readonly look: { readonly soft: number; readonly bump: number };
+}
 
 export interface SceneBinder {
   bind(sceneId: PresetId): void;
@@ -16,6 +25,9 @@ export interface SceneBinder {
   entityOf(presetId: PresetId): EntityId | undefined;
   presetOf(entity: EntityId): PresetId | undefined;
   readonly sceneId: PresetId | null;
+  terrain(): TerrainState | null;
+  /** Called whenever the ground is (re)built or removed; returns the unsubscribe. */
+  onTerrain(listener: (state: TerrainState | null) => void): () => void;
   dispose(): void;
 }
 
@@ -72,6 +84,42 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
   let scene: PresetId | null = null;
   let unsub: (() => void) | null = null;
   let busy = false;
+  let ground: { state: TerrainState; hash: string; entity: EntityId } | null = null;
+  let groundVersion = 0;
+  const groundListeners = new Set<(s: TerrainState | null) => void>();
+
+  const clearGround = (): void => {
+    if (!ground) return;
+    physics?.removeBody(ground.entity);
+    if (world.alive(ground.entity)) world.despawn(ground.entity);
+    ground = null;
+    for (const l of groundListeners) l(null);
+  };
+
+  const syncGround = (sp: Preset | undefined): void => {
+    const ref = sp?.children['terrain']?.[0];
+    const preset = ref ? store.get(ref.ref, ref.rev) : undefined;
+    if (!ref || !preset) { clearGround(); return; }
+    if (ground && ground.state.presetId === preset.id && ground.hash === preset.hash) return;
+    let terrain: Terrain;
+    try {
+      terrain = decodeTerrain(preset.params['data'] as never);
+    } catch {
+      clearGround();
+      return;
+    }
+    const params = store.resolve(preset.id, ref.rev).params;
+    if (ground) { physics?.removeBody(ground.entity); if (world.alive(ground.entity)) world.despawn(ground.entity); }
+    const entity = world.spawn(ref);
+    const hf = toHeightfield(terrain);
+    physics?.addBody(entity, {
+      kind: 'static', collider: { shape: 'heightfield', cols: hf.cols, rows: hf.rows, cell: hf.cell, heights: hf.heights },
+      position: hf.position, friction: num(params, 'friction', 0.8), restitution: num(params, 'restitution', 0), tier: 'racing',
+    });
+    const state: TerrainState = { presetId: preset.id, terrain, version: ++groundVersion, look: { soft: num(params, 'soft', 0.6), bump: num(params, 'bump', 1) } };
+    ground = { state, hash: preset.hash, entity };
+    for (const l of groundListeners) l(state);
+  };
 
   const paramsOf = (ref: Ref): { preset: Preset; params: Params } | null => {
     const preset = store.get(ref.ref, ref.rev);
@@ -150,6 +198,7 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
     busy = true;
     try {
       const sp = store.get(scene);
+      syncGround(sp);
       const refs = sp?.children[SLOT] ?? [];
       const wanted = new Set<PresetId>();
       for (const ref of refs) {
@@ -188,6 +237,7 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
   };
 
   const clear = (): void => {
+    clearGround();
     for (const b of built.values()) despawn(b);
     built.clear();
     byEntity.clear();
@@ -207,6 +257,8 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
       scene = null;
     },
     refresh,
+    terrain: () => ground?.state ?? null,
+    onTerrain(listener) { groundListeners.add(listener); return () => { groundListeners.delete(listener); }; },
     entityOf: (id) => built.get(id)?.entity,
     presetOf: (e) => byEntity.get(e),
     dispose() { this.unbind(); },

@@ -3,3 +3,7 @@ export * from './pick-math';
 export * from './scene-sync';
 export * from './three-renderer';
 export * from './orbit-controls';
+export * from './terrain/surface-set';
+export * from './terrain/starter-surfaces';
+export * from './terrain/terrain-view';
+export * from './terrain/terrain-pick';

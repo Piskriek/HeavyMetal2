@@ -20085,7 +20085,7 @@
     },
     {
       "registryId": "M664",
-      "canonicalCode": "HM2-TXP-M664-SPT-TATAMI-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M664-SPT-TATAMI-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic sports tatami weave pbr sheet",
       "sourceFile": "M664-nostalgic-sports-tatami-weave-pbr-sheet.png",
       "domain": "SPT",
@@ -20148,10 +20148,9 @@
         ],
         "frequency": "broad wear plus identity-scale structure"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 83 expanded global sports surfaces",
-      "reviewNotes": "Current channels reduce the tatami identity to horizontal ridges instead of an alternating rush weave."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 85 corrected material"
     },
     {
       "registryId": "M665",
@@ -20224,7 +20223,7 @@
     },
     {
       "registryId": "M666",
-      "canonicalCode": "HM2-TXP-M666-SPT-BEACHSAND-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M666-SPT-BEACHSAND-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R02",
       "name": "sports beach sand pbr sheet",
       "sourceFile": "M666-sports-beach-sand-pbr-sheet.png",
       "domain": "SPT",
@@ -20288,9 +20287,9 @@
         "frequency": "broad wear plus identity-scale structure"
       },
       "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 83 expanded global sports surfaces",
-      "reviewNotes": "Nested rectangular rake paths form a repeated focal motif; regenerate with irregular non-looping grooming."
+      "recipeRevision": 2,
+      "provenance": "Material Batch 85 attempted beach-sand correction",
+      "reviewNotes": "R02 still fails: large looping concentric rake swirls create repeated focal motifs. Regenerate with short irregular non-looping grooming."
     },
     {
       "registryId": "M667",
@@ -20642,7 +20641,7 @@
     },
     {
       "registryId": "M672",
-      "canonicalCode": "HM2-TXP-M672-RCE-RUMBLE-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M672-RCE-RUMBLE-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R02",
       "name": "curb rumble redwhite m672",
       "sourceFile": "M672-curb-rumble-redwhite-m672.png",
       "domain": "RCE",
@@ -20706,10 +20705,9 @@
         ],
         "frequency": "traction-scale forms plus restrained broad wear"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 84 Map Maker tropical racing palette",
-      "reviewNotes": "Current BaseColor forms a checkerboard of offset blocks instead of continuous transverse red/white rumble bands."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 85 corrected material"
     },
     {
       "registryId": "M673",
@@ -21060,6 +21058,498 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 84 Map Maker tropical racing palette"
+    },
+    {
+      "registryId": "M678",
+      "canonicalCode": "HM2-TXP-M678-RCE-BASALTFRAC-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "M678 cliff basalt fractured m678",
+      "sourceFile": "M678-cliff-basalt-fractured-m678.png",
+      "domain": "RCE",
+      "material": "BASALTFRAC",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "vertical-repeat",
+      "physicalScale": "fractured ledges 0.2-0.8 m",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children"
+    },
+    {
+      "registryId": "M679",
+      "canonicalCode": "HM2-TXP-M679-RCE-TARMACDRY-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "M679 tarmac dry mobile m679",
+      "sourceFile": "M679-tarmac-dry-mobile-m679.png",
+      "domain": "RCE",
+      "material": "TARMACDRY",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M668",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children",
+      "reviewNotes": "Reconstruction must reduce the broad dark tyre-polish streaks to avoid obvious repeated lanes."
+    },
+    {
+      "registryId": "M680",
+      "canonicalCode": "HM2-TXP-M680-RCE-TARMACWET-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "M680 tarmac wet mobile m680",
+      "sourceFile": "M680-tarmac-wet-mobile-m680.png",
+      "domain": "RCE",
+      "material": "TARMACWET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M669",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children"
+    },
+    {
+      "registryId": "M681",
+      "canonicalCode": "HM2-TXP-M681-RCE-JUNGLEDIRT-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "M681 road jungle dirt mobile m681",
+      "sourceFile": "M681-road-jungle-dirt-mobile-m681.png",
+      "domain": "RCE",
+      "material": "JUNGLEDIRT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M673",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children"
+    },
+    {
+      "registryId": "M682",
+      "canonicalCode": "HM2-TXP-M682-RCE-BAMBOO-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "M682 boardwalk bamboo mobile m682",
+      "sourceFile": "M682-boardwalk-bamboo-mobile-m682.png",
+      "domain": "RCE",
+      "material": "BAMBOO",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M674",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children",
+      "reviewNotes": "Reconstruction must restore irregular bamboo nodes so the narrow slats do not read as ordinary timber planks."
+    },
+    {
+      "registryId": "M683",
+      "canonicalCode": "HM2-TXP-M683-RCE-WETCOBBLE-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "M683 cobble wet mobile m683",
+      "sourceFile": "M683-cobble-wet-mobile-m683.png",
+      "domain": "RCE",
+      "material": "WETCOBBLE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M675",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children"
+    },
+    {
+      "registryId": "M684",
+      "canonicalCode": "HM2-TXP-M684-RCE-DUSTROAD-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "M684 road tropical dusty mobile m684",
+      "sourceFile": "M684-road-tropical-dusty-mobile-m684.png",
+      "domain": "RCE",
+      "material": "DUSTROAD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "matches full-fidelity parent",
+      "mipPolicy": "Preserve racing direction, traction silhouette and broad wear; suppress fine aggregate aliasing.",
+      "intendedUses": [
+        "Map Maker tropical-island ball-racing course surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "generated text",
+        "baked perspective",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M676",
+      "editableParameters": [
+        "palette",
+        "wetness",
+        "relief",
+        "roughness",
+        "wear direction"
+      ],
+      "recipe": {
+        "intent": "Map Maker racing material reconstructible from a fixed PBR pack.",
+        "required": [
+          "fixed quadrant order",
+          "declared seamless axis",
+          "brand-neutral surface identity"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "perspective road scene"
+        ],
+        "frequency": "traction-scale forms plus restrained broad wear"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 85 Map Maker racing completion and mobile children"
     }
   ]
 }

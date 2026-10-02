@@ -1162,3 +1162,9 @@ M658–M663, M665 and M667 pass, adding mobile and nostalgic artificial turf, ci
 ![Material Batch 84 contact sheet](./review/material-batch-84-map-maker-tropical-racing.jpg)
 
 M668–M671 and M673–M677 pass as Map Maker racing packs: dry and wet tarmac, an axis-tileable checkered start/finish strip, emissive-mask boost chevrons, packed jungle dirt with tyre wear, bamboo boardwalk, wet volcanic cobbles, dusty tropical road and columnar basalt cliff. M672 must regenerate because it forms offset checker blocks rather than continuous transverse red/white rumble bands. Filenames preserve the requested `<kind>-<descriptor>-<m###>` barcode after the mandatory leading stable registry ID required by the validated ingestion pipeline. The second requested basalt variant remains queued for the next generation batch.
+
+## Material Batch 85 — Map Maker racing completion and mobile children
+
+![Material Batch 85 contact sheet](./review/material-batch-85-map-maker-racing-completion-mobile.jpg)
+
+M672 advances to R02/pass with continuous transverse red/white bands. M678 passes as the second requested basalt cliff, using fractured massive ledges distinct from M677's columnar face; this completes all requested full-fidelity tropical-racing categories. M664 also advances to R02/pass. M680, M681, M683 and M684 pass as mobile racing children. M679 and M682 are constrained passes: reconstruction must respectively reduce broad tyre streaks and restore irregular bamboo nodes. M666 R02 remains regenerate because its replacement still forms large looping sand-rake motifs.

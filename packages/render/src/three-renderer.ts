@@ -6,6 +6,7 @@ import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
 import type { LookLike } from './environment';
 import { DecorView, type DecorInstance } from './decor';
+import { RoadDecalView, type RoadDecalDef } from './road-decals';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -24,6 +25,8 @@ export type ThreeRenderer = RenderService & {
   setDecor(instances: readonly DecorInstance[] | null): void;
   /** Apply a scene mood (sky, sun, fog, exposure, water). Remembered across mount/unmount. */
   setLook(look: LookLike): void;
+  /** Painted strips on the road: start line, rumble strips, boost pads (null removes them). */
+  setRoadDecals(defs: readonly RoadDecalDef[] | null): void;
   /** Quality tier for phones: low = pixel ratio 1 and no shadows, medium = up to 1.5 and small shadows, high = up to 2 and full shadows. */
   setQuality(q: 'low' | 'medium' | 'high'): void;
 };
@@ -85,6 +88,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     terrainView = null;
     decorView?.dispose();
     decorView = null;
+    roadView?.dispose();
+    roadView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
     overlays?.dispose();
@@ -109,6 +114,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   };
 
   let pendingLook: LookLike | null = null;
+  let roadView: RoadDecalView | null = null;
+  let pendingRoad: readonly RoadDecalDef[] | null = null;
+  const applyRoad = (): void => {
+    if (roadView) { scene?.remove(roadView.group); roadView.dispose(); roadView = null; }
+    if (scene && pendingRoad && pendingRoad.length) { roadView = new RoadDecalView(pendingRoad); scene.add(roadView.group); }
+  };
   let decorView: DecorView | null = null;
   let pendingDecor: readonly DecorInstance[] | null = null;
   const applyDecor = (): void => {
@@ -158,6 +169,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
       applyTerrain();
       applyDecor();
+      applyRoad();
       if (pendingLook) environment.setLook(pendingLook);
       updateView();
       resize();
@@ -183,6 +195,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       pendingDecor = instances;
       applyDecor();
     },
+    setRoadDecals(defs: readonly RoadDecalDef[] | null): void {
+      pendingRoad = defs;
+      applyRoad();
+    },
     setQuality(q: 'low' | 'medium' | 'high'): void {
       const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
       webgl?.setPixelRatio(Math.min(q === 'low' ? 1 : q === 'medium' ? 1.5 : 2, Math.max(0.5, opts.pixelRatio ?? dpr)));
@@ -202,6 +218,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     render(alpha: number): void {
       if (!webgl || !scene || !viewCamera) return;
       sceneSync?.present(alpha);
+      roadView?.animate(performance.now());
       updateView();
       webgl.render(scene, viewCamera);
       const now = performance.now();

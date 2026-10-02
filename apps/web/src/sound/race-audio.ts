@@ -46,6 +46,7 @@ export function attachRaceAudio(game: RaceGame, music = { mood: 'energetic' as M
     const q = p as { entity?: number; item?: string };
     if (q.entity === me && q.item) fx(ITEM_SOUND[q.item] ?? 'item-pickup');
   });
+  const offPad = rt.events.on('pad:boost', (p) => { if ((p as { entity?: number }).entity === me) fx('boost', { pitch: 1.15, minGapMs: 600 }); });
   const offLap = rt.events.on('lap:completed', (p) => { if ((p as { entity?: number }).entity === me) fx('lap'); });
 
   return {
@@ -67,6 +68,6 @@ export function attachRaceAudio(game: RaceGame, music = { mood: 'energetic' as M
       const surface: Surface = air ? 'air' : Math.abs(project(game.track, [Number(t['x']), Number(t['z'])]).lateral) < game.track.width / 2 ? 'road' : 'grass';
       eng.setRoll('player', rollParams(speed, surface));
     },
-    dispose() { offDirector(); offItem(); offLap(); stopMusic(); const eng = audio(); eng?.stopEngine('player'); eng?.setRoll('player', { gain: 0, filterFreq: 800, q: 0.7 }); },
+    dispose() { offDirector(); offItem(); offPad(); offLap(); stopMusic(); const eng = audio(); eng?.stopEngine('player'); eng?.setRoll('player', { gain: 0, filterFreq: 800, q: 0.7 }); },
   };
 }

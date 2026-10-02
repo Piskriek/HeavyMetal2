@@ -13,6 +13,7 @@ import { buildMakerScene, PROP_CARDS, propSeed, type MakerScene } from './scene'
 import { loadMap, saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
+import { buildRoad } from '@hm/game';
 import { DriversPanel } from './drivers';
 import { SoundPanel } from './sound-panel';
 import { HelpOverlay, helpSeen, markHelpSeen } from './help';
@@ -395,6 +396,17 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const doUndo = (): void => (window as unknown as { makerUndo: () => void }).makerUndo();
   const doRedo = (): void => (window as unknown as { makerRedo: () => void }).makerRedo();
   const pick = (t: ToolId): void => { setTool(t); feedback('tool'); };
+  // the painted road (start line, rumble strips, boost pads) follows the track and the ground, so the maker shows what the race will have
+  useEffect(() => {
+    const r = rendererRef.current;
+    const ts = rt.binder.terrain();
+    if (!r || !ts) return;
+    if (!analysis.valid) { r.setRoadDecals(null); return; }
+    const road = buildRoad(toCenterline(draft, 5), draft.width, ts.terrain);
+    (window as unknown as { hmRoad: unknown }).hmRoad = road;
+    r.setRoadDecals(road.decals);
+  }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // autosave 1.5 s after the last edit (never while previewing, so driver values are not saved)
   useEffect(() => {
     if (rt.commands.history().length === 0) return;
@@ -410,7 +422,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'The track is not valid yet'); return; }
     const clone = { spec: ts.terrain.spec, heights: ts.terrain.heights.slice(), surfaceA: ts.terrain.surfaceA.slice(), surfaceB: ts.terrain.surfaceB.slice(), blend: ts.terrain.blend.slice() };
     const centre = resample(toCenterline(draft, 6), 6);
-    carveTrack(clone, { points: centre, width: draft.width }, { shoulder: 7, roadSurface: SURF.pumice, shoulderSurface: SURF.dunes });
+    carveTrack(clone, { points: centre, width: draft.width }, { shoulder: 7, roadSurface: SURF.tarmac, shoulderSurface: SURF.dustyRoad });
     rt.commands.execute(cmd.setParam(`${scene.terrainId}.data`, encodeTerrain(clone) as never, 'Carve track into terrain'));
     feedback('success', 'Track carved into the island');
   };

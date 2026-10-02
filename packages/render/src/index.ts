@@ -9,3 +9,4 @@ export * from './terrain/terrain-view';
 export * from './terrain/terrain-pick';
 export type { LookLike } from './environment';
 export * from './decor';
+export * from './road-decals';

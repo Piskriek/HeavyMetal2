@@ -3,7 +3,9 @@ import type { Runtime } from '@hm/engine';
 import { RACERS } from '@hm/content';
 import { trackLength, pointAt, project, derivePhysics, aiControl, rubberBand, createLapTracker, rankRacers, itemById, rollItem, type Track } from '@hm/racing';
 import { createRacerSystem, defineRacerComponents, grantItem } from '@hm/racers';
-import { trackWalls, carveTrack, chaikin, makeCenterline, resample, startGrid } from '@hm/trackgen';
+import { trackWalls, carveTrack, chaikin, makeCenterline, onPad, resample, startGrid } from '@hm/trackgen';
+import { buildRoad } from './road-features';
+import type { RoadDecalDef } from '@hm/render';
 import { encodeTerrain, generateIsland, heightAt, type Terrain } from '@hm/terrain';
 import { toCenterline } from '@hm/trackedit';
 import { createChampionship, createRaceDirector, type Championship, type DirectorEvent, type RaceDirector, type RaceResult } from '@hm/raceflow';
@@ -38,6 +40,8 @@ export interface RaceGame {
   readonly championship: Championship;
   readonly racerIds: readonly EntityId[];
   readonly player: EntityId;
+  /** Painted road strips (start line, rumble, boost pads) for the renderer. */
+  readonly roadDecals: readonly RoadDecalDef[];
   /** Advance the race by wall-clock ms. Returns the render interpolation alpha. */
   update(dtMs: number): number;
   hud(): Hud;
@@ -77,7 +81,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     const t = generateIsland(spec, seed, { surfaces: { seabed: SURF.seabed, sand: SURF.sand, grass: SURF.grass, rock: SURF.rock, cliff: SURF.cliff }, radius: 0.95, height: 18, roughness: 7 });
     const centre = makeCenterline({ seed, points: 36, radius: 52, wobble: 0.3, squash: 1.35 });
     const tr: Track = { points: resample(chaikin(centre, 2), 6), width: 13 };
-    carveTrack(t, tr, { shoulder: 7, roadSurface: SURF.pumice, shoulderSurface: SURF.dunes });
+    carveTrack(t, tr, { shoulder: 7, roadSurface: SURF.tarmac, shoulderSurface: SURF.dustyRoad });
     const ground = rt.store.put({ kind: 'terrain', name: 'Basalt Isle', params: { data: encodeTerrain(t) as never, soft: 0.55, bump: 1, friction: 0.9, restitution: 0 } });
     const cam = rt.store.put({ kind: 'camera', name: 'Chase', params: { fov: 60, distance: 14, yaw: 0, pitch: 0.4 } });
     const scene = rt.store.put({ kind: 'scene', name: 'Basalt Isle GP', params: { gravity: 19, camera: { ref: cam.id } }, children: { terrain: [{ ref: ground.id }] } });
@@ -235,14 +239,28 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     }
   };
 
+  const road = buildRoad(track.points, track.width, terrain);
+  /** Boost pads: any racer rolling over one gets a short boost (and a sound via the 'pad:boost' event). */
+  const padBoost = (): void => {
+    for (const id of racerIds) {
+      const t = world.get(id, 'transform'), rc = world.get(id, 'racer');
+      if (!t || !rc || Number(rc['boostMs']) > 700) continue;
+      const x = Number(t['x']), z = Number(t['z']);
+      if (road.pads.some((p) => onPad(p, x, z))) {
+        world.set(id, 'racer', { boostMs: 1400 });
+        rt.events.emit('pad:boost', { entity: id });
+      }
+    }
+  };
+
   const game: RaceGame = {
-    rt, track, terrain, input, get director() { return dir; }, championship, racerIds, get player() { return player; },
+    rt, track, terrain, input, roadDecals: road.decals, get director() { return dir; }, championship, racerIds, get player() { return player; },
     update(dtMs) {
       const alpha = rt.frame(dtMs, (tick) => ({ tick, actors: (phase === 'racing' ? { p1: toActorFrame(input.sample()) } : {}) as Record<string, Record<string, number | boolean>> }));
       input.update(dtMs);
       if (phase === 'racing') watchdog(dtMs);
       emit(dir.update(dtMs, progressMap()));
-      if (phase === 'racing') grantItems();
+      if (phase === 'racing') { grantItems(); padBoost(); }
       statusLook(dtMs);
       return alpha;
     },

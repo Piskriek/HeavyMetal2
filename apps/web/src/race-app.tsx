@@ -41,6 +41,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
       const view = renderer.setTerrain(state.terrain, surfaces);
       view?.setLook({ cliffSurface: SURF.cliff, soft: state.look.soft, normalStrength: state.look.bump });
     }
+    renderer.setRoadDecals(game.roadDecals);
     const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d ? decorInstances(d.placements) : null); };
     showDecor();
     const offDecor = rt.binder.onDecor(showDecor);

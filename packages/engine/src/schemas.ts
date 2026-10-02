@@ -73,6 +73,7 @@ export const sceneSchema = defineSchema({
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
     { key: 'items', label: 'Items', doc: 'The power-ups racers can pick up. Empty = the standard eight.', kinds: ['item'], min: 0, max: null, tier: 'build' },
+    { key: 'rigs', label: 'Camera rigs', doc: 'The ways to watch this scene: chase, first person, orbit, helicopter, free, ghost, director.', kinds: ['camera-rig'], min: 0, max: null, tier: 'play' },
     { key: 'models', label: 'Models', doc: 'Voxel models used in this scene: characters, props, statues.', kinds: ['model'], min: 0, max: null, tier: 'build' },
     { key: 'interface', label: 'Interface', doc: 'The look and wording of the menus and the HUD: colours, texts, which HUD parts show.', kinds: ['interface'], min: 0, max: 1, tier: 'play' },
     { key: 'rules', label: 'Race rules', doc: 'How the race is run: laps, field size, items, boost pads. Change it to make your own kind of race.', kinds: ['race'], min: 0, max: 1, tier: 'play' },
@@ -229,6 +230,28 @@ export const itemSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const cameraRigSchema = defineSchema({
+  kind: 'camera-rig',
+  version: 1,
+  label: 'Camera rig',
+  doc: 'How a camera follows the action: chase, first person, orbit, helicopter, top down, free or ghost. Used for players, spectators and the TV director.',
+  icon: 'camera',
+  variables: [
+    { key: 'rig', type: 'enum', label: 'Kind', doc: 'chase follows from behind, first-person sits in the goblin, orbit circles it, helicam flies round, topdown looks straight down, free and ghost are flown by hand.', tier: 'play', default: 'chase', options: ['chase', 'orbit', 'free', 'topdown', 'first-person', 'helicam', 'ghost', 'director'], group: 'Rig' },
+    num('distance', 'Distance', 'How far behind or away the camera sits.', 6, 'play', { min: 0, max: 200, step: 0.5, unit: 'm', group: 'Position' }),
+    num('height', 'Height', 'How high above the subject.', 2.5, 'play', { min: -20, max: 200, step: 0.5, unit: 'm', group: 'Position' }),
+    num('lookAhead', 'Look ahead', 'How far in front of the subject the camera looks.', 4, 'build', { min: 0, max: 60, step: 0.5, unit: 'm', group: 'Position' }),
+    num('stiffness', 'Follow speed', 'Low = floaty and smooth, high = glued to the subject.', 6, 'build', { min: 0.1, max: 60, step: 0.1, group: 'Feel' }),
+    num('fov', 'Lens', 'Field of view. Small = zoomed in, big = wide.', 62, 'play', { min: 20, max: 120, step: 1, unit: 'deg', group: 'Feel' }),
+    num('fovBoostPerSpeed', 'Zoom out with speed', 'Extra degrees of lens for every m/s of speed.', 0.25, 'build', { min: 0, max: 2, step: 0.01, group: 'Feel' }),
+    num('shake', 'Shake', 'Speed and impact shake, 0 = none.', 0.2, 'play', { min: 0, max: 1, step: 0.01, group: 'Feel' }),
+    num('orbitSpeed', 'Orbit speed', 'Radians per second for orbit and helicopter shots.', 0.3, 'build', { min: -3, max: 3, step: 0.01, group: 'Feel' }),
+    { key: 'collideGround', type: 'boolean', label: 'Stay above ground', doc: 'Keep the camera from sinking into the island.', tier: 'build', default: true, group: 'Feel' },
+    num('eyeHeight', 'Eye height', 'First person only: how high the eyes are above the subject.', 0.9, 'build', { min: 0, max: 5, step: 0.05, unit: 'm', group: 'Position' }),
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const modelSchema = defineSchema({
   kind: 'model',
   version: 1,
@@ -326,7 +349,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

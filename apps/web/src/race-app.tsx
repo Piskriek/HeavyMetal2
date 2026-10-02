@@ -4,6 +4,7 @@ import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACE
 import { chaseCamera, createRaceGame, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { applyLook, lookOf } from './look';
+import { decorInstances } from './maker/dress';
 import { HUD, Minimap, ordinal, formatTime } from '@hm/ui';
 
 /** The playable shell: the Basalt Isle race. Keyboard (arrows/WASD, space = item), gamepad-ready, on-screen touch controls. */
@@ -31,6 +32,9 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
       const view = renderer.setTerrain(state.terrain, surfaces);
       view?.setLook({ cliffSurface: SURF.cliff, soft: state.look.soft, normalStrength: state.look.bump });
     }
+    const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d ? decorInstances(d.placements) : null); };
+    showDecor();
+    const offDecor = rt.binder.onDecor(showDecor);
     const detachKeys = attachKeyboard(window, game.input);
     const detachOrbit = attachOrbitControls(el, renderer);
     const offTick = rt.onTick(() => renderer.step());
@@ -69,7 +73,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
-      detachKeys(); detachOrbit(); offTick(); renderer.unmount();
+      detachKeys(); detachOrbit(); offTick(); offDecor(); renderer.unmount();
     };
   }, [rt, fromMap]);
 

@@ -69,6 +69,7 @@ export const sceneSchema = defineSchema({
   ],
   slots: [
     { key: 'entities', label: 'Objects', doc: 'Everything placed in this scene.', kinds: ['entity'], min: 0, max: null, tier: 'play' },
+    { key: 'decor', label: 'Foliage', doc: 'Palms, bushes and rocks.', kinds: ['decor'], min: 0, max: 1, tier: 'build' },
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
   ] as readonly ChildSlot[],
@@ -123,6 +124,21 @@ export const trackSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const decorSchema = defineSchema({
+  kind: 'decor',
+  version: 1,
+  label: 'Foliage and rocks',
+  doc: 'Palms, bushes, boulders and tufts scattered over the island by the Dress tool.',
+  icon: 'tree',
+  variables: [
+    num('seed', 'Random seed', 'Change it for a different arrangement.', 1, 'build', { min: 0, max: 99999, step: 1 }),
+    num('density', 'Density', 'More or fewer plants (1 = the default).', 1, 'play', { min: 0, max: 2, step: 0.05 }),
+    { key: 'kinds', type: 'list', label: 'Prop kinds', doc: 'Which prop each placement is.', tier: 'pro', default: [], itemType: 'string' },
+    { key: 'items', type: 'list', label: 'Placements', doc: 'kind index, x, y, z, yaw, scale for every prop.', tier: 'pro', default: [], itemType: 'number' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const mechanicSchema = defineSchema({
   kind: 'mechanic',
   version: 1,
@@ -136,7 +152,7 @@ export const mechanicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

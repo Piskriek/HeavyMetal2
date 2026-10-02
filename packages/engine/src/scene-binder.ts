@@ -17,6 +17,10 @@ export interface TerrainState {
   readonly look: { readonly soft: number; readonly bump: number };
 }
 
+/** One prop placement decoded from the decor preset. */
+export interface DecorPlacement { readonly kind: string; readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly scale: number }
+export interface DecorState { readonly presetId: PresetId; readonly placements: readonly DecorPlacement[]; readonly version: number }
+
 export interface SceneBinder {
   bind(sceneId: PresetId): void;
   unbind(): void;
@@ -26,6 +30,8 @@ export interface SceneBinder {
   presetOf(entity: EntityId): PresetId | undefined;
   readonly sceneId: PresetId | null;
   terrain(): TerrainState | null;
+  decor(): DecorState | null;
+  onDecor(listener: (state: DecorState | null) => void): () => void;
   /** Called whenever the ground is (re)built or removed; returns the unsubscribe. */
   onTerrain(listener: (state: TerrainState | null) => void): () => void;
   dispose(): void;
@@ -87,6 +93,28 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
   let ground: { state: TerrainState; hash: string; entity: EntityId } | null = null;
   let groundVersion = 0;
   const groundListeners = new Set<(s: TerrainState | null) => void>();
+  let decorState: { state: DecorState; hash: string } | null = null;
+  let decorVersion = 0;
+  const decorListeners = new Set<(s: DecorState | null) => void>();
+  const syncDecor = (sp: Preset | undefined): void => {
+    const ref = sp?.children['decor']?.[0];
+    const preset = ref ? store.get(ref.ref, ref.rev) : undefined;
+    if (!ref || !preset) {
+      if (decorState) { decorState = null; for (const l of decorListeners) l(null); }
+      return;
+    }
+    if (decorState && decorState.state.presetId === preset.id && decorState.hash === preset.hash) return;
+    const kinds = (preset.params['kinds'] as unknown as string[] | undefined) ?? [];
+    const flat = (preset.params['items'] as unknown as number[] | undefined) ?? [];
+    const placements: DecorPlacement[] = [];
+    for (let i = 0; i + 5 < flat.length; i += 6) {
+      const kind = kinds[flat[i]!];
+      if (kind) placements.push({ kind, x: flat[i + 1]!, y: flat[i + 2]!, z: flat[i + 3]!, yaw: flat[i + 4]!, scale: flat[i + 5]! });
+    }
+    const state: DecorState = { presetId: preset.id, placements, version: ++decorVersion };
+    decorState = { state, hash: preset.hash };
+    for (const l of decorListeners) l(state);
+  };
 
   const clearGround = (): void => {
     if (!ground) return;
@@ -199,6 +227,7 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
     try {
       const sp = store.get(scene);
       syncGround(sp);
+      syncDecor(sp);
       const refs = sp?.children[SLOT] ?? [];
       const wanted = new Set<PresetId>();
       for (const ref of refs) {
@@ -238,6 +267,7 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
 
   const clear = (): void => {
     clearGround();
+    if (decorState) { decorState = null; for (const l of decorListeners) l(null); }
     for (const b of built.values()) despawn(b);
     built.clear();
     byEntity.clear();
@@ -258,6 +288,8 @@ export function createSceneBinder(opts: { readonly store: PresetStore; readonly 
     },
     refresh,
     terrain: () => ground?.state ?? null,
+    decor: () => decorState?.state ?? null,
+    onDecor(listener) { decorListeners.add(listener); return () => { decorListeners.delete(listener); }; },
     onTerrain(listener) { groundListeners.add(listener); return () => { groundListeners.delete(listener); }; },
     entityOf: (id) => built.get(id)?.entity,
     presetOf: (e) => byEntity.get(e),

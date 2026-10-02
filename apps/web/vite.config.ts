@@ -34,6 +34,8 @@ export default defineConfig({
       '@hm/goblins': p('../../packages/goblins/src/index.ts'),
       '@hm/audio': p('../../packages/audio/src/index.ts'),
       '@hm/trackedit': p('../../packages/trackedit/src/index.ts'),
+      '@hm/terrainops': p('../../packages/terrainops/src/index.ts'),
+      '@hm/scatter': p('../../packages/scatter/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

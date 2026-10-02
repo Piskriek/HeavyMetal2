@@ -11,13 +11,19 @@ import { applyLook, lookOf, LOOKS } from '../look';
 import { timeOfDayLook } from '@hm/looks';
 import { buildMakerScene, PROP_CARDS, propSeed, type MakerScene } from './scene';
 import { loadMap, saveMap, clearSavedMap } from './storage';
+import { clearDress, commitDress, decorInstances, dress } from './dress';
+import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
 
-type ToolId = 'select' | 'brush' | 'track' | 'place' | 'delete';
+type ToolId = 'select' | 'brush' | 'shape' | 'track' | 'dress' | 'place' | 'delete';
+type ShapeMode = 'ramp' | StampKind;
+const SHAPES: { id: ShapeMode; label: string }[] = [{ id: 'ramp', label: 'Ramp' }, { id: 'mound', label: 'Hill' }, { id: 'crater', label: 'Crater' }, { id: 'plateau', label: 'Plateau' }, { id: 'ridge', label: 'Ridge' }, { id: 'volcano', label: 'Volcano' }, { id: 'dune', label: 'Dune' }];
 const TOOLS = [
   { id: 'select', label: 'Select', icon: '⌖', hotkey: 'V' },
   { id: 'brush', label: 'Brush', icon: '🖌', hotkey: 'B' },
+  { id: 'shape', label: 'Shape', icon: '⛰', hotkey: 'S' },
   { id: 'track', label: 'Track', icon: '〰', hotkey: 'T' },
+  { id: 'dress', label: 'Dress', icon: '🌴', hotkey: 'D' },
   { id: 'place', label: 'Place', icon: '⬢', hotkey: 'P' },
   { id: 'delete', label: 'Delete', icon: '✕', hotkey: 'X' },
 ] as const;
@@ -49,10 +55,13 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [propName, setPropName] = useState<string>(PROP_CARDS[0]!.name);
   const [filter, setFilter] = useState<PresetFilter>({ text: '', kind: null, tag: null });
   const [sound, setSound] = useState(soundEnabled());
+  const [shapeMode, setShapeMode] = useState<ShapeMode>('mound');
+  const [shapeHeight, setShapeHeight] = useState(6);
+  const [density, setDensity] = useState(1);
   const rev = useRev(rt);
   const toastList = useToasts();
-  const live = useRef({ tool, brush, manip, selected, propName });
-  live.current = { tool, brush, manip, selected, propName };
+  const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight });
+  live.current = { tool, brush, manip, selected, propName, shapeMode, shapeHeight };
   const rendererRef = useRef<ThreeRenderer | null>(null);
   const [hourLive, setHourLive] = useState<number | null>(null);
 
@@ -71,6 +80,10 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     };
     showTerrain();
     const offTerrain = rt.binder.onTerrain(showTerrain);
+    const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d ? decorInstances(d.placements) : null); };
+    showDecor();
+    const offDecor = rt.binder.onDecor(showDecor);
+    let rampA: readonly [number, number] | null = null;
     const cam = rt.store.get(scene.sceneId)?.params['camera'];
     if (cam && typeof cam === 'object' && 'ref' in cam) renderer.setCamera(String((cam as { ref: string }).ref));
     renderer.camera.set([150, 165, 160], [0, 2, 0]);
@@ -212,6 +225,20 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         stroking = { dirty: null, target: L.brush.kind === 'flatten' ? h.point[1] : null, last: { x: h.point[0], z: h.point[2] } };
         el.setPointerCapture(e.pointerId);
         dab(h.point[0], h.point[2]);
+      } else if (L.tool === 'shape' && h.point && ts) {
+        const x = h.point[0], z = h.point[2];
+        if (L.shapeMode === 'ramp') {
+          if (!rampA) { rampA = [x, z]; fx('select'); toasts.push('Ramp: click where it should end', 'info', 1800); }
+          else {
+            const a = rampA; rampA = null;
+            const width = Math.max(4, L.brush.radius * 0.7);
+            const rect = rampBetween(ts.terrain, a, [x, z], { width, shoulder: width * 0.6 });
+            if (rect) { renderer.refreshTerrain(rect); commitTerrain('Ramp'); feedback('success', 'Ramp built'); } else feedback('error', 'Nothing to change there');
+          }
+        } else {
+          const rect = stamp(ts.terrain, L.shapeMode, [x, z], Math.max(6, L.brush.radius * 2), { height: L.shapeHeight, seed: Math.floor(Math.random() * 99999), rotation: Math.random() * Math.PI });
+          if (rect) { renderer.refreshTerrain(rect); commitTerrain(`Stamp ${L.shapeMode}`); feedback('success'); fx('sculpt-tick', { volume: 1, pitch: 0.7 }); } else feedback('error', 'Outside the island');
+        }
       } else if (L.tool === 'select') {
         const pid = entityPresetOf(h.entity);
         if (pid) { setSelected(pid); feedback('select'); const t = rt.world.get(h.entity!, 'transform'); drag = { entity: h.entity!, presetId: pid, start: [Number(t?.['x']), Number(t?.['y']), Number(t?.['z'])], moved: false }; el.setPointerCapture(e.pointerId); }
@@ -278,7 +305,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       const L = live.current;
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); doRedo(); return; }
-      const tools: Record<string, ToolId> = { v: 'select', b: 'brush', t: 'track', p: 'place', x: 'delete' };
+      const tools: Record<string, ToolId> = { v: 'select', b: 'brush', s: 'shape', t: 'track', d: 'dress', p: 'place', x: 'delete' };
       if (tools[k]) { setTool(tools[k]!); feedback('tool'); return; }
       if (k === '[') setBrush((b) => ({ ...b, radius: Math.max(1, b.radius - (b.radius > 12 ? 2 : 1)) }));
       if (k === ']') setBrush((b) => ({ ...b, radius: Math.min(60, b.radius + (b.radius >= 12 ? 2 : 1)) }));
@@ -308,7 +335,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       el.removeEventListener('pointerdown', onDown, true); el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onUp);
       window.removeEventListener('keydown', onKey);
-      offTerrain(); detach(); renderer.unmount();
+      offTerrain(); offDecor(); detach(); renderer.unmount();
     };
   }, [rt, scene]);
 
@@ -382,6 +409,26 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
               <h3>Brush</h3>
               <BrushPanel brush={brush} tier={tier} onChange={(p) => { setBrush({ ...brush, ...p }); fx('ui-click', { volume: 0.5 }); }} />
               {brush.kind === 'paint' ? (<><h3 className="sub">Surface</h3><Palette items={PALETTE} selected={brush.surface} onSelect={(id) => { setBrush({ ...brush, surface: id }); fx('select'); }} columns={4} /></>) : null}
+            </>
+          ) : null}
+          {tool === 'shape' ? (
+            <>
+              <h3>Shape the land</h3>
+              <div className="btns">{SHAPES.map((s) => <button key={s.id} className={shapeMode === s.id ? 'on' : ''} onClick={() => { setShapeMode(s.id); fx('select'); }}>{s.label}</button>)}</div>
+              <label className="row">Size <input type="range" min={3} max={30} step={1} value={brush.radius} onChange={(e) => setBrush({ ...brush, radius: Number(e.target.value) })} /> <span>{brush.radius}</span></label>
+              {shapeMode !== 'ramp' ? <label className="row">Height <input type="range" min={1} max={20} step={0.5} value={shapeHeight} onChange={(e) => setShapeHeight(Number(e.target.value))} /> <span>{shapeHeight} m</span></label> : null}
+              <p className="hint">{shapeMode === 'ramp' ? 'Click the start, then the end: the ground is graded between them.' : 'Click the island to stamp. Stamps add up; Ctrl+Z removes the last one.'}</p>
+            </>
+          ) : null}
+          {tool === 'dress' ? (
+            <>
+              <h3>Dress the island</h3>
+              <label className="row">Density <input type="range" min={0.2} max={2} step={0.1} value={density} onChange={(e) => setDensity(Number(e.target.value))} /> <span>{density.toFixed(1)}x</span></label>
+              <div className="btns">
+                <button className="go" onClick={() => { const ts = rt.binder.terrain(); if (!ts) return; const seed = Math.floor(Math.random() * 99999); const d = dress(ts.terrain, draft, seed, density); commitDress(rt, scene.sceneId, d, seed, density); feedback('success', `${d.count} plants placed`); }}>Scatter palms, bushes and rocks</button>
+                <button onClick={() => { if (clearDress(rt, scene.sceneId)) feedback('deleted', 'Foliage cleared'); else fx('ui-error'); }}>Clear</button>
+              </div>
+              <p className="hint">Keeps clear of your track. Every press rolls a new arrangement; Ctrl+Z goes back.</p>
             </>
           ) : null}
           {tool === 'place' ? (<><h3>Props</h3><PresetBrowser cards={PROP_CARDS} filter={filter} tier={tier} onFilter={(p) => setFilter({ ...filter, ...p })} onPick={(id) => { setPropName(id); fx('select'); }} /><p className="hint">Selected: <b>{propName}</b>. Click the island to place; the grid snap applies.</p></>) : null}

@@ -5,6 +5,7 @@ import { createEnvironment, type EnvironmentRig } from './environment';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
 import type { LookLike } from './environment';
+import { DecorView, type DecorInstance } from './decor';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -19,6 +20,8 @@ export type ThreeRenderer = RenderService & {
   /** Re-upload the nodes a brush stroke touched (everything when omitted). */
   refreshTerrain(dirty?: DirtyRectLike | null): void;
   readonly terrain: TerrainView | null;
+  /** Show foliage/rocks as instanced meshes; null clears. */
+  setDecor(instances: readonly DecorInstance[] | null): void;
   /** Apply a scene mood (sky, sun, fog, exposure, water). Remembered across mount/unmount. */
   setLook(look: LookLike): void;
 };
@@ -78,6 +81,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     terrainView?.mesh.removeFromParent();
     terrainView?.dispose();
     terrainView = null;
+    decorView?.dispose();
+    decorView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
     overlays?.dispose();
@@ -102,6 +107,13 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   };
 
   let pendingLook: LookLike | null = null;
+  let decorView: DecorView | null = null;
+  let pendingDecor: readonly DecorInstance[] | null = null;
+  const applyDecor = (): void => {
+    decorView?.dispose();
+    decorView = null;
+    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); scene.add(decorView.group); }
+  };
   let terrainView: TerrainView | null = null;
   let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
   const applyTerrain = (): void => {
@@ -143,6 +155,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       overlays = new OverlayManager(scene);
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
       applyTerrain();
+      applyDecor();
       if (pendingLook) environment.setLook(pendingLook);
       updateView();
       resize();
@@ -163,6 +176,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       pendingTerrain = data && surfaces ? { data, surfaces } : null;
       applyTerrain();
       return terrainView;
+    },
+    setDecor(instances: readonly DecorInstance[] | null): void {
+      pendingDecor = instances;
+      applyDecor();
     },
     setLook(look: LookLike): void {
       pendingLook = look;

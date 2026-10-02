@@ -132,9 +132,6 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
-      "@hm/doodletheme": [
-        "packages/doodletheme/src/index.ts"
-      ],
       "@hm/camerarig": [
         "packages/camerarig/src/index.ts"
       ],

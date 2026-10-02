@@ -118,7 +118,6 @@ export function App({ rt, fromMap, autoStart = false, onEditor }: { readonly rt:
 
   return (
     <div className="game-app" style={{ position: 'absolute', inset: 0, ...theme.vars }}>
-      {theme.css ? <style>{theme.css}</style> : null}
       <ScreenStyles />
       {theme.hudCss ? <style>{theme.hudCss}</style> : null}
       {inRace ? (

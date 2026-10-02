@@ -13,6 +13,7 @@ import { bootPlatform } from './platform/boot';
 import { setSoundResolver } from './maker/feedback';
 import { packSound, resolveSound } from './sound/bank';
 import './shell.css';
+import './studio.css';
 
 async function start(): Promise<void> {
   await bootPlatform(); // in RUN.world this installs the cloud-backed save store before anything reads a save

@@ -21,6 +21,9 @@ import { InterfacePanel } from './interface-panel';
 import { ItemsPanel } from './items-panel';
 import { ModelsPanel, placementsOf } from './models-panel';
 import { EvolutionPanel, snapshotOf } from './evolution-panel';
+import { ToolRail } from './rail';
+import { PresetTree } from './preset-tree';
+import { Redo2, Undo2, Volume2, VolumeX } from 'lucide-react';
 import { DEFAULT_SCULPT, ModelSculptor, SculptBar, type SculptUi } from './sculpt';
 import { decodeModel } from '@hm/voxel';
 import { BlurRing, DECOR_FOCUS, FocusBar, ensureVeil, focusTargetOf, frameTarget, useFocus, type FocusTarget } from './focus';
@@ -489,30 +492,32 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
 
   return (
     <div className="maker" style={themeOf(rt).vars}>
-      {themeOf(rt).css ? <style>{themeOf(rt).css}</style> : null}
       <header className="bar">
-        <strong className="brand">Map Maker</strong>
-        <button onClick={doUndo} disabled={!rt.commands.canUndo}>↶ Undo</button>
-        <button onClick={doRedo} disabled={!rt.commands.canRedo}>↷ Redo</button>
+        <div className="brand"><b>GOBLIN</b><i>PRESET STUDIO</i></div>
+        <div className="crumbs" aria-label="Where you are"><span>Island</span>{focus ? <><span>/</span><b>{focus.name}</b><button title="Back to the island" onClick={() => { setFocus(null); fx('ui-toggle'); }}>esc</button></> : <><span>/</span><b>{rt.store.get(scene.sceneId)?.name ?? 'My map'}</b></>}</div>
+        <button onClick={doUndo} disabled={!rt.commands.canUndo}><Undo2 size={14} strokeWidth={1.6} style={{ verticalAlign: '-2px' }} /> Undo</button>
+        <button onClick={doRedo} disabled={!rt.commands.canRedo}><Redo2 size={14} strokeWidth={1.6} style={{ verticalAlign: '-2px' }} /> Redo</button>
         <span className="hist" title={history.map((h) => h.label).join('\n')}>{history.length ? `${history.filter((h) => !h.undone).length} steps` : 'no edits yet'}</span>
         <span className="saved" title="Your map saves itself a moment after every change">{autosaved ? 'autosaved ✓' : ''}</span>
         <span className="grow" />
-        <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
+        <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? <Volume2 size={14} strokeWidth={1.6} /> : <VolumeX size={14} strokeWidth={1.6} />}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
         <button title="Shortcuts and tips (?)" onClick={() => { setHelp('keys'); fx('ui-click'); }}>?</button>
-        <button className={itemsOpen ? 'on' : ''} title="Power-ups are presets" onClick={() => { setItemsOpen(!itemsOpen); setModelsOpen(false); setEvoOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>🎁 Items</button>
-        <button className={modelsOpen ? 'on' : ''} title="Voxel models are presets" onClick={() => { setModelsOpen(!modelsOpen); setEvoOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>🧊 Models</button>
-        <button className={evoOpen ? 'on' : ''} title="Suggest changes for the next evolution or keep them as your branch" onClick={() => { setEvoOpen(!evoOpen); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>🌱 Evolve</button>
-        <button className={uiOpen ? 'on' : ''} title="Colours, words and HUD parts are presets too" onClick={() => { setUiOpen(!uiOpen); setRulesOpen(false); setSoundOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>🎨 Interface</button>
-        <button className={rulesOpen ? 'on' : ''} title="The race is a preset: laps, racers, items, boost pads" onClick={() => { setRulesOpen(!rulesOpen); setSoundOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>🏁 Rules</button>
-        <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); setRulesOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>🎚 Sounds</button>
+        <div className="tabs">
+        <button className={itemsOpen ? 'on' : ''} title="Power-ups are presets" onClick={() => { setItemsOpen(!itemsOpen); setModelsOpen(false); setEvoOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>Items</button>
+        <button className={modelsOpen ? 'on' : ''} title="Voxel models are presets" onClick={() => { setModelsOpen(!modelsOpen); setEvoOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>Models</button>
+        <button className={evoOpen ? 'on' : ''} title="Suggest changes for the next evolution or keep them as your branch" onClick={() => { setEvoOpen(!evoOpen); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>Evolve</button>
+        <button className={uiOpen ? 'on' : ''} title="Colours, words and HUD parts are presets too" onClick={() => { setUiOpen(!uiOpen); setRulesOpen(false); setSoundOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>Interface</button>
+        <button className={rulesOpen ? 'on' : ''} title="The race is a preset: laps, racers, items, boost pads" onClick={() => { setRulesOpen(!rulesOpen); setSoundOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>Rules</button>
+        <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); setRulesOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>Sounds</button>
+        </div>
         <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
-        <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>🔗 Share</button>
-        <button onClick={save}>💾 Save</button>
+        <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>Share</button>
+        <button onClick={save}>Save</button>
         {confirmNew
           ? (<span className="confirm">Replace your saved map? <button className="danger" onClick={() => { clearSavedMap(); location.reload(); }}>Yes, start over</button> <button onClick={() => setConfirmNew(false)}>Keep it</button></span>)
           : <button onClick={() => { setConfirmNew(true); fx('ui-click'); }}>New</button>}
-        <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>▶ Test drive</button>
+        <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>Test drive</button>
       </header>
       <div className="looks" role="group" aria-label="Look">
         {LOOKS.map((l) => (
@@ -526,15 +531,14 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         </label>
       </div>
       <main className="body">
-        <aside className="panel left">
-          <Toolbar tools={TOOLS as never} active={tool} onSelect={(id) => pick(id as ToolId)} manip={manip} onManip={(p) => { setManip({ ...manip, ...p }); fx('ui-toggle'); }} tier={tier} />
-          <p className="hint">V select · B brush · T track · P place · X delete · [ ] size · 1–9 surface · Ctrl+Z undo</p>
-        </aside>
+        <ToolRail tools={TOOLS} active={tool} onSelect={(id) => pick(id as ToolId)} />
+        {tool === 'select' || tool === 'place' ? <div className="slideout"><h4>Snap and move</h4><div style={{ padding: 6 }}><Toolbar tools={[] as never} active={tool} onSelect={() => undefined} manip={manip} onManip={(p) => { setManip({ ...manip, ...p }); fx('ui-toggle'); }} tier={tier} /></div></div> : null}
         <div className="view" ref={host}>
           {focus ? <><BlurRing veil={veil} />{rt.store.get(focus.id as string)?.kind === 'model' && tool === 'brush' ? <SculptBar ui={sculptUi} palette={sculptPalette(focus.id as string)} onChange={setSculptUi} /> : null}<FocusBar target={focus} veil={veil} onVeil={() => { const id = ensureVeil(rt, scene.sceneId); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); }} onMode={() => { const id = ensureVeil(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${id}.mode`, veil.mode === 'fly' ? 'orbit' : 'fly', 'Camera mode')); }} onExit={exitFocus} /></> : null}
           {touchDevice ? <button className={`viewmode${viewMode ? ' on' : ''}`} aria-pressed={viewMode} title="Turn on to drag the camera with one finger; turn off to use the tool" onClick={() => { setViewMode(!viewMode); fx('ui-toggle'); }}>{viewMode ? '✋ Moving the view' : '✋ Move view'}</button> : null}
         </div>
         <aside className="panel right">
+          <PresetTree rt={rt} sceneId={scene.sceneId} selected={selected} onSelect={(id) => { setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); fx('select'); }} onEnter={(id) => { if (focusTargetOf(rt, id)) enterFocus(id); else { setTool('select'); setSelected(id); } }} />
           {soundOpen ? <SoundPanel rt={rt} tier={tier} rev={rev} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {evoOpen ? <EvolutionPanel rt={rt} sceneId={scene.sceneId} name={rt.store.get(scene.sceneId)?.name ?? 'My map'} base={evoBase} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {modelsOpen ? <ModelsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} onFocus={enterFocus} /> : null}

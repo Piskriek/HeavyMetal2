@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "@series-inc/rundot-game-sdk": "^5.29.0"
+  },
+  "dependencies": {
+    "lucide-react": "^1.50.0"
   }
 }

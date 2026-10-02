@@ -4,7 +4,7 @@ import type { BurstDef } from '@hm/render';
  * The hotbar and the creative inventory. A hotbar slot holds a "button": what it does (a tool), the sprite it plays and the sound it makes.
  * Every use is satisfying by default. These are plain data today; the plug system (button presets with attributes) replaces the literals.
  */
-export type ToolKind = 'sculpt' | 'dig' | 'paint' | 'flatten' | 'smooth' | 'place' | 'pick';
+export type ToolKind = 'sculpt' | 'dig' | 'paint' | 'flatten' | 'smooth' | 'place' | 'pick' | 'delete';
 export type SpriteId = 'dust' | 'sparkle' | 'debris' | 'pop' | 'leaf' | 'splash';
 export type SoundId = 'sculpt-tick' | 'paint-tick' | 'place' | 'delete' | 'select' | 'snap' | 'ui-success';
 
@@ -23,6 +23,11 @@ export interface HotItem {
   /** painted surface for `paint` */
   readonly surface?: number;
   readonly doc: string;
+  /** brush strength 0..1 (tools); the tool's own default when left out */
+  readonly strength?: number;
+  /** what the left and right mouse buttons do with this item, in words for the screen */
+  readonly left?: string;
+  readonly right?: string;
 }
 
 export type SpriteDef = Omit<BurstDef, 'position' | 'normal'>;
@@ -53,10 +58,23 @@ export const INVENTORY: readonly HotItem[] = [
 const byId = (id: string): HotItem | null => INVENTORY.find((i) => i.id === id) ?? null;
 export const DEFAULT_HOTBAR: readonly (string | null)[] = ['pick', 'paint', 'sculpt', 'flatten', 'smooth', 'dig', 'barrel', 'palm', null];
 const KEY = 'hm.hotbar.v1';
+const KINDS: readonly string[] = ['sculpt', 'dig', 'paint', 'flatten', 'smooth', 'place', 'pick', 'delete'];
+
+/** Items made from catalog tools carry their own size, surface and model, so they are saved whole; plain inventory items are saved by id. */
+function revive(x: unknown): HotItem | null {
+  if (typeof x === 'string') return byId(x);
+  if (x === null || typeof x !== 'object') return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o['id'] !== 'string' || typeof o['label'] !== 'string' || typeof o['icon'] !== 'string' || !KINDS.includes(String(o['kind'])) || !Number.isFinite(Number(o['size']))) return null;
+  const base = byId(String(o['id'])) ?? INVENTORY.find((i) => i.kind === o['kind']) ?? INVENTORY[0]!;
+  return { ...base, ...(o as unknown as HotItem) };
+}
 
 export function loadHotbar(): (HotItem | null)[] {
-  let ids: readonly (string | null)[] = DEFAULT_HOTBAR;
-  try { const raw = JSON.parse(localStorage.getItem(KEY) ?? 'null') as unknown; if (Array.isArray(raw) && raw.length === 9) ids = raw.map((x) => (typeof x === 'string' ? x : null)); } catch { /* defaults */ }
-  return ids.map((id) => (id ? byId(id) : null));
+  let raw: readonly unknown[] = DEFAULT_HOTBAR;
+  try { const parsed = JSON.parse(localStorage.getItem(KEY) ?? 'null') as unknown; if (Array.isArray(parsed) && parsed.length === 9) raw = parsed; } catch { /* defaults */ }
+  return raw.map(revive);
 }
-export function saveHotbar(slots: readonly (HotItem | null)[]): void { try { localStorage.setItem(KEY, JSON.stringify(slots.map((s) => s?.id ?? null))); } catch { /* storage unavailable */ } }
+export function saveHotbar(slots: readonly (HotItem | null)[]): void {
+  try { localStorage.setItem(KEY, JSON.stringify(slots.map((s) => (s ? (s.id.includes('.') ? s : s.id) : null)))); } catch { /* storage unavailable */ }
+}

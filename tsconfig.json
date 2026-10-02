@@ -144,6 +144,9 @@
       "@hm/lighting": [
         "packages/lighting/src/index.ts"
       ],
+      "@hm/buildkit": [
+        "packages/buildkit/src/index.ts"
+      ],
       "@hm/toolcatalog": [
         "packages/toolcatalog/src/index.ts"
       ],

@@ -7,6 +7,11 @@ import { MODELS } from '@hm/voxelart';
 import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
 import { followLighting } from './look';
 import { LightingWindow } from './lighting/lighting-window';
+import { PaletteWheel, type PaletteChoice } from '@hm/buildkit';
+import { findSub, type SubTool, type ToolSet } from '@hm/toolcatalog';
+import { SlideOut, TabPalette, ToolRail, ToolSay } from './build/rail';
+import { PALETTE_CATEGORIES } from './build/palette';
+import { itemFor } from './build/wiring';
 import { decorInstances } from './maker/dress';
 import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
@@ -40,6 +45,9 @@ export function IslandWalk(props: {
 
   const [menu, setMenu] = useState(false);
   const [lightOpen, setLightOpen] = useState(false);
+  const [railOpen, setRailOpen] = useState<string | null>(null);
+  const wheel = useRef(new PaletteWheel(PALETTE_CATEGORIES));
+  const [ptick, setPtick] = useState(0);
   const lightingRef = useRef<{ refresh: () => void } | null>(null);
   useEffect(() => { if (!menu) setLightOpen(false); }, [menu]);
   const [inv, setInv] = useState(false);
@@ -49,8 +57,8 @@ export function IslandWalk(props: {
   const [note, setNote] = useState('');
   const buildOn = props.grownUp !== false;
   const level = props.level ?? 'goblin';
-  const live = useRef({ menu, inv, slots, sel, buildOn, level });
-  live.current = { menu, inv, slots, sel, buildOn, level };
+  const live = useRef({ menu, inv, slots, sel, buildOn, level, railOpen });
+  live.current = { menu, inv, slots, sel, buildOn, level, railOpen };
   useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const scene = props.scene;
   const noteTimer = useRef(0);
@@ -60,6 +68,27 @@ export function IslandWalk(props: {
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
 
+  /** Put an item in the picked slot. */
+  const holdItem = useCallback((item: HotItem): void => { setSlots((s) => s.map((x, i) => (i === live.current.sel ? item : x))); }, []);
+  /** Tab was let go: what the palette chose goes into your hand (paint with that ground, or place that thing). */
+  const applyChoice = useCallback((c: PaletteChoice | null): void => {
+    if (!c) return;
+    const prev = live.current.slots[live.current.sel] ?? null;
+    const asGround = c.category === 'surfaces' || c.category === 'roads';
+    const sub = asGround ? findSub('brush', 'brush') : findSub('sculpt', 'voxel-add');
+    const item = sub ? itemFor(asGround ? 'brush' : 'sculpt', sub, c, prev) : null;
+    if (item) { holdItem(item); fx('select'); }
+  }, [holdItem]);
+  const pickSub = (set: ToolSet, sub: SubTool): void => {
+    const prev = live.current.slots[live.current.sel] ?? null;
+    const item = itemFor(set.tool, sub, wheel.current.choice, prev);
+    if (!item) { say(`${sub.name} is not on the island yet`); return; }
+    holdItem(item); fx('tool-switch', { volume: 0.5 });
+  };
+  const tune = (key: 'size' | 'strength', value: number): void => {
+    const cur = live.current.slots[live.current.sel];
+    if (cur) holdItem({ ...cur, [key]: value });
+  };
   const pickItem = (item: HotItem): void => { setSlots((s) => s.map((x, i) => (i === sel ? item : x))); fx('select'); };
   const openInv = (on: boolean): void => { setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); };
 
@@ -152,6 +181,16 @@ export function IslandWalk(props: {
 
     const onKeyDown = (e: KeyboardEvent): void => {
       const k = e.key.toLowerCase();
+      if (k === 'tab') {
+        e.preventDefault();
+        if (live.current.buildOn && !live.current.menu && !live.current.inv && !intro.on) { wheel.current.press(); setPtick((t) => t + 1); }
+        return;
+      }
+      if (wheel.current.isOpen) {
+        if (k === 'escape') { wheel.current.cancel(); setPtick((t) => t + 1); return; }
+        if (k === 'q' || k === 'e') { wheel.current.switchCategory(k === 'e' ? 1 : -1); setPtick((t) => t + 1); return; }
+      }
+      if (k === 'escape' && live.current.railOpen && !live.current.menu) { setRailOpen(null); return; }
       if (k === 'escape') {
         // some embedded browsers deliver Esc to the page while the mouse is captured instead of releasing it themselves: always let go explicitly
         if (document.pointerLockElement) { suppressMenu = true; document.exitPointerLock(); }
@@ -164,11 +203,17 @@ export function IslandWalk(props: {
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); builder.undo(); return; }
       if (k >= '1' && k <= '9' && live.current.buildOn) { setSel(Number(k) - 1); fx('tool-switch', { volume: 0.5 }); return; }
       if (k === 'e' && live.current.buildOn) { const on = !live.current.inv; setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); return; }
+      if (k === 't' && live.current.buildOn) { api.current?.unlock(); setRailOpen((o) => o ?? 'sculpt'); return; }
       if (k === 'v') { fpv = !fpv; camPitch = fpv ? 0 : 0.3; fx('ui-toggle', { volume: 0.5 }); return; }
       if ((k === 'x' || k === 'delete') && live.current.buildOn) { const a = aim(); const item = live.current.slots[live.current.sel]; if (a && item && builder.removeAt(a, item)) say('Removed'); return; }
       down.add(k);
     };
-    const onKeyUp = (e: KeyboardEvent): void => { down.delete(e.key.toLowerCase()); };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === 'Tab') { e.preventDefault(); const c = wheel.current.isOpen ? wheel.current.release() : null; setPtick((t) => t + 1); applyChoice(c); return; }
+      down.delete(e.key.toLowerCase());
+    };
+    const onBlur = (): void => { if (wheel.current.isOpen) { wheel.current.cancel(); setPtick((t) => t + 1); } down.clear(); };
+    window.addEventListener('blur', onBlur);
     let drag: { x: number; y: number } | null = null;
     const onPointerDown = (e: PointerEvent): void => {
       if (live.current.menu || live.current.inv || intro.on) return;
@@ -198,6 +243,7 @@ export function IslandWalk(props: {
       if (mouse) { mouse &= e.button === 2 && !softAim ? ~2 : ~1; if (!mouse) builder.end(); }
     };
     const onWheel = (e: WheelEvent): void => {
+      if (wheel.current.isOpen) { wheel.current.wheel(e.deltaY > 0 ? 1 : -1); setPtick((t) => t + 1); return; }
       if (!pointerLocked && !el.contains(e.target as Node)) return;
       if ((pointerLocked || softAim) && live.current.buildOn) setSel((s) => (s + (e.deltaY > 0 ? 1 : 8)) % 9);
       else camDist = Math.min(14, Math.max(2.2, camDist * (e.deltaY > 0 ? 1.08 : 0.92)));
@@ -286,7 +332,7 @@ export function IslandWalk(props: {
       document.removeEventListener('pointerlockchange', onLockChange);
       document.removeEventListener('pointerlockerror', onLockError);
       if (isLocked()) { suppressMenu = true; document.exitPointerLock(); }
-      window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
       offTerrain();
@@ -302,10 +348,14 @@ export function IslandWalk(props: {
     <div className="island" style={{ position: 'absolute', inset: 0 }}>
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       {buildOn && !menu ? <Crosshair active={locked} /> : null}
+      {buildOn && !menu ? <ToolRail openSet={railOpen} activeSet={slots[sel]?.id.split('.')[0] ?? null} locked={locked} onToggle={(id) => { if (locked) api.current?.unlock(); setRailOpen((o) => (o === id ? null : id)); }} /> : null}
+      {buildOn && !menu && railOpen && !locked ? <SlideOut setId={railOpen} held={slots[sel] ?? null} onPick={pickSub} onTune={tune} onClose={() => setRailOpen(null)} /> : null}
+      {buildOn && !menu ? <ToolSay item={slots[sel] ?? null} /> : null}
+      {buildOn && !menu ? <TabPalette wheel={wheel.current} tick={ptick} /> : null}
       {buildOn && !menu ? <Hotbar slots={slots} selected={sel} onSelect={(i) => { setSel(i); fx('tool-switch', { volume: 0.5 }); }} onOpenInventory={() => openInv(true)} /> : null}
       {inv ? <Inventory selected={sel} onPick={pickItem} onClose={() => openInv(false)} /> : null}
       {note ? <div className="island-note" role="status">{note}</div> : null}
-      {!menu && !inv ? <p className="island-hint">{buildOn ? (locked ? 'Mouse look · Space jump · 1-9 tools · click use · right click or Shift lower · E inventory · V view · Ctrl+Z undo · Esc menu' : 'Click to capture the mouse · W A S D move · Esc menu') : (locked ? 'Mouse look · W A S D move · Shift run · Space jump · Esc menu' : 'Click to capture the mouse · W A S D move · Esc menu')}</p> : null}
+      {!menu && !inv ? <p className="island-hint">{buildOn ? (locked ? 'Hold Tab for presets. T opens the tools. Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.') : (locked ? 'Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.')}</p> : null}
       {lightOpen && menu ? <LightingWindow rt={rt} sceneId={scene.sceneId} onClose={() => setLightOpen(false)} /> : null}
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">

@@ -34,7 +34,7 @@ export class BuildController {
   /** Called every frame the button is held (and once on press). `alt` flips raise to lower. */
   use(item: HotItem, aim: Aim, alt: boolean, now: number, first: boolean): void {
     const ts = this.rt.binder.terrain();
-    const every = item.kind === 'place' || item.kind === 'pick' ? 1e9 : 70; // brushes repeat, one-shot tools fire once per press
+    const every = item.kind === 'place' || item.kind === 'pick' || item.kind === 'delete' ? 1e9 : 70; // brushes repeat, one-shot tools fire once per press
     if (!first && now - this.lastUse < every) return;
     this.lastUse = now;
     const x = aim.point[0], z = aim.point[2];
@@ -45,15 +45,21 @@ export class BuildController {
     }
     if (item.kind === 'place') {
       if (!first) return;
+      if (alt) { if (this.removeAt(aim, item)) this.say('Removed'); else this.say('Nothing here to take away'); return; }
       this.place(item, aim);
+      return;
+    }
+    if (item.kind === 'delete') {
+      if (!first) return;
+      if (this.removeAt(aim, item)) this.say('Removed'); else this.say('Nothing here to delete');
       return;
     }
     if (!ts) return;
     if (first) { this.dirty = null; this.last = null; this.flattenTo = item.kind === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = item.label; }
     const kind = item.kind === 'dig' ? 'lower' : item.kind === 'sculpt' ? (alt ? 'lower' : 'raise') : item.kind === 'flatten' ? 'flatten' : item.kind === 'smooth' ? 'smooth' : 'paint';
-    const strength = kind === 'paint' ? 1 : kind === 'smooth' ? 0.5 : item.kind === 'dig' ? 0.55 : 0.4;
+    const strength = item.strength ?? (kind === 'paint' ? 1 : kind === 'smooth' ? 0.5 : item.kind === 'dig' ? 0.55 : 0.4);
     const from = this.last ?? { x, z };
-    const rect = applyStroke(ts.terrain, { kind, x, z, radius: item.size, strength, falloff: 'smooth', ...(item.surface !== undefined ? { surface: item.surface } : {}), ...(this.flattenTo !== null ? { target: this.flattenTo } : {}) }, from, { x, z }, Math.max(0.5, item.size * 0.3));
+    const rect = applyStroke(ts.terrain, { kind, x, z, radius: item.kind === 'paint' && alt ? item.size * 0.5 : item.size, strength, falloff: 'smooth', ...(item.surface !== undefined ? { surface: item.surface } : {}), ...(this.flattenTo !== null ? { target: this.flattenTo } : {}) }, from, { x, z }, Math.max(0.5, item.size * 0.3));
     this.last = { x, z };
     if (!rect) return;
     this.dirty = this.dirty ? { c0: Math.min(this.dirty.c0, rect.c0), r0: Math.min(this.dirty.r0, rect.r0), c1: Math.max(this.dirty.c1, rect.c1), r1: Math.max(this.dirty.r1, rect.r1) } : rect;

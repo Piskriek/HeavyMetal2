@@ -71,6 +71,9 @@
       ],
       "@hm/raceflow": [
         "packages/raceflow/src/index.ts"
+      ],
+      "@hm/input": [
+        "packages/input/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

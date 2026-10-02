@@ -132,6 +132,12 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
+      "@hm/voxpartsbody": [
+        "packages/voxpartsbody/src/index.ts"
+      ],
+      "@hm/smoothvox": [
+        "packages/smoothvox/src/index.ts"
+      ],
       "@hm/juice": [
         "packages/juice/src/index.ts"
       ],

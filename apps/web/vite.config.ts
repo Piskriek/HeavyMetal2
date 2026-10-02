@@ -22,6 +22,7 @@ export default defineConfig({
       '@hm/render': p('../../packages/render/src/index.ts'),
       '@hm/ui': p('../../packages/ui/src/index.ts'),
       '@hm/engine': p('../../packages/engine/src/index.ts'),
+      '@hm/terrain': p('../../packages/terrain/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

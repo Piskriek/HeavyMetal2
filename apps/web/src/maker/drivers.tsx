@@ -1,4 +1,5 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { recordToClip } from '@hm/motion';
 import { cmd, type PresetId, type Tier } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { MODULATOR_PRESETS, describeModulator, validateModulator, type ModulatorDef } from '@hm/modulation';
@@ -56,6 +57,36 @@ export function DriversPanel(props: {
   const [adding, setAdding] = useState(false);
   const [key, setKey] = useState(numberKeys[0]?.key ?? 'y');
   const [open, setOpen] = useState<PresetId | null>(null);
+  const [recording, setRecording] = useState<{ key: string; since: number } | null>(null);
+  const samples = useRef<{ t: number; v: number }[]>([]);
+
+  // RECORD: while on, the chosen setting is sampled every frame; whatever you drag (a slider, a gizmo, a brush) becomes a timeline driver
+  useEffect(() => {
+    if (!recording) return;
+    samples.current = [];
+    let raf = 0;
+    const tick = (now: number): void => {
+      const v = rt.vars.read(`${propId}.${recording.key}`);
+      if (typeof v === 'number') samples.current.push({ t: now - recording.since, v });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [recording, rt, propId]);
+  const stopRecording = (): void => {
+    if (!recording) return;
+    const key = recording.key;
+    setRecording(null);
+    const s = samples.current;
+    const lo = Math.min(...s.map((x) => x.v)), hi = Math.max(...s.map((x) => x.v));
+    if (s.length < 5 || !(hi > lo)) { onFeedback('deleted', 'Nothing moved while recording'); return; }
+    const clip = recordToClip('rec', key, s, { tolerance: (hi - lo) * 0.01, smoothMs: 30 });
+    const keys = clip.tracks[0]!.keys;
+    const def = { kind: 'timeline', durationMs: Math.max(100, Math.round(clip.durationMs)), loop: 'loop', keys: keys.map((k) => ({ timeMs: Math.round(k.t), value: k.v, ...(k.ease && k.ease !== 'linear' ? { ease: k.ease } : {}) })) } as never;
+    const id = addDriver(rt, sceneId, propId, key, 'Recorded movement', def, 'replace');
+    setOpen(id);
+    onFeedback('success', `Recorded ${(clip.durationMs / 1000).toFixed(1)} s as ${keys.length} keyframes`);
+  };
   const rows = driversOf(rt, sceneId, propId);
   const label = (k: string): string => numberKeys.find((n) => n.key === k)?.label ?? k;
   const setParam = (id: PresetId, k: string, v: string | number | boolean): void => { rt.commands.execute(cmd.setParam(`${id}.${k}`, v, 'Edit driver')); };
@@ -100,7 +131,9 @@ export function DriversPanel(props: {
           </div>
           <button onClick={() => setAdding(false)}>Cancel</button>
         </div>
-      ) : <button className="go" onClick={() => setAdding(true)}>＋ Drive a setting…</button>}
+      ) : recording ? (
+        <div className="driver-add"><p className="hint" role="status">● Recording {label(recording.key)}: drag it now, then stop.</p><button className="go" onClick={stopRecording}>■ Stop and keep it</button><button onClick={() => setRecording(null)}>Cancel</button></div>
+      ) : <div className="btns"><button className="go" onClick={() => setAdding(true)}>＋ Drive a setting…</button><button title="Drag a setting and keep the movement as a looping driver" onClick={() => setRecording({ key, since: performance.now() })}>● Record movement of {label(key)}</button><select value={key} onChange={(e) => setKey(e.target.value)} aria-label="Setting to record">{numberKeys.map((n) => <option key={n.key} value={n.key}>{n.label}</option>)}</select></div>}
     </section>
   );
 }

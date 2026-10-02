@@ -6,7 +6,7 @@ import { attachKeyboard, TouchControls } from '@hm/input';
 import { HUD, Minimap, ordinal, formatTime } from '@hm/ui';
 
 /** The playable shell: the Basalt Isle race. Keyboard (arrows/WASD, space = item), gamepad-ready, on-screen touch controls. */
-export function RaceApp({ rt }: { readonly rt: Runtime }): ReactElement {
+export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonly fromMap?: boolean }): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const gameRef = useRef<RaceGame | null>(null);
   const [hud, setHud] = useState<HudData | null>(null);
@@ -21,7 +21,7 @@ export function RaceApp({ rt }: { readonly rt: Runtime }): ReactElement {
     const renderer = createThreeRenderer({ shadows: true, background: 'sky' });
     renderer.mount(el, rt.world, rt.store);
     const surfaces = new SurfaceArray(STARTER_SURFACES);
-    const game = createRaceGame(rt, { seed: 7, laps: 3 });
+    const game = createRaceGame(rt, { seed: 7, laps: 3, fromScene: fromMap });
     gameRef.current = game;
     const state = rt.binder.terrain();
     if (state) {
@@ -68,7 +68,7 @@ export function RaceApp({ rt }: { readonly rt: Runtime }): ReactElement {
       window.removeEventListener('resize', resize);
       detachKeys(); detachOrbit(); offTick(); renderer.unmount();
     };
-  }, [rt]);
+  }, [rt, fromMap]);
 
   const game = gameRef.current;
   return (

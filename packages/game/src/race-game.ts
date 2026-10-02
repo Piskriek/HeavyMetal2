@@ -5,6 +5,7 @@ import { trackLength, pointAt, project, derivePhysics, aiControl, rubberBand, cr
 import { createRacerSystem, defineRacerComponents, grantItem } from '@hm/racers';
 import { trackWalls, carveTrack, chaikin, makeCenterline, resample, startGrid } from '@hm/trackgen';
 import { encodeTerrain, generateIsland, heightAt, type Terrain } from '@hm/terrain';
+import { toCenterline } from '@hm/trackedit';
 import { createChampionship, createRaceDirector, type Championship, type DirectorEvent, type RaceDirector, type RaceResult } from '@hm/raceflow';
 import { goblinParts, lookFromParams, quatFromYaw, type Part } from '@hm/goblins';
 import { createInputState, toActorFrame, type InputState } from '@hm/input';
@@ -19,6 +20,8 @@ export interface RaceGameOptions {
   readonly field?: number;
   /** Which racer seed the player drives (index into the content library's goblins). */
   readonly playerIndex?: number;
+  /** Race on the map already loaded in the runtime (terrain + track preset) instead of generating one. */
+  readonly fromScene?: boolean;
 }
 
 export interface Hud {
@@ -56,17 +59,31 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   const n = Math.max(2, Math.min(12, opts.field ?? 8));
   const playerSeed = RACERS[(opts.playerIndex ?? 0) % RACERS.length]!;
 
-  // ---- the island and the track carved into it
-  const spec = { cols: 129, rows: 129, cell: 2, originX: -128, originZ: -128 };
-  const terrain = generateIsland(spec, seed, { surfaces: { seabed: SURF.seabed, sand: SURF.sand, grass: SURF.grass, rock: SURF.rock, cliff: SURF.cliff }, radius: 0.95, height: 18, roughness: 7 });
-  const centre = makeCenterline({ seed, points: 36, radius: 52, wobble: 0.3, squash: 1.35 });
-  const track: Track = { points: resample(chaikin(centre, 2), 6), width: 13 };
-  carveTrack(terrain, track, { shoulder: 7, roadSurface: SURF.pumice, shoulderSurface: SURF.dunes });
-
-  const ground = rt.store.put({ kind: 'terrain', name: 'Basalt Isle', params: { data: encodeTerrain(terrain) as never, soft: 0.55, bump: 1, friction: 0.9, restitution: 0 } });
-  const cam = rt.store.put({ kind: 'camera', name: 'Chase', params: { fov: 60, distance: 14, yaw: 0, pitch: 0.4 } });
-  const scene = rt.store.put({ kind: 'scene', name: 'Basalt Isle GP', params: { gravity: 19, camera: { ref: cam.id } }, children: { terrain: [{ ref: ground.id }] } });
-  rt.loadScene(scene.id as PresetId);
+  // ---- the island and the track: generated, or taken from the scene the Map Maker built
+  const { terrain, track } = ((): { terrain: Terrain; track: Track } => {
+    if (opts.fromScene) {
+      const st = rt.binder.terrain();
+      if (!st) throw new Error('race: the loaded map has no terrain');
+      const sp = rt.store.get(rt.binder.sceneId ?? '');
+      const tref = sp?.params['track'];
+      const tp = tref && typeof tref === 'object' && 'ref' in tref ? rt.store.get(String((tref as { ref: string }).ref)) : undefined;
+      const pts = (tp?.params['points'] as unknown as number[][] | undefined) ?? [];
+      const draft = { points: pts.map(([x, z]) => ({ x: x ?? 0, z: z ?? 0 })), closed: true, width: Number(tp?.params['width'] ?? 12) };
+      const centre = resample(toCenterline(draft, 6), 6);
+      if (centre.length < 8) throw new Error('race: the map needs a closed track with at least 3 control points');
+      return { terrain: st.terrain, track: { points: centre, width: draft.width } };
+    }
+    const spec = { cols: 129, rows: 129, cell: 2, originX: -128, originZ: -128 };
+    const t = generateIsland(spec, seed, { surfaces: { seabed: SURF.seabed, sand: SURF.sand, grass: SURF.grass, rock: SURF.rock, cliff: SURF.cliff }, radius: 0.95, height: 18, roughness: 7 });
+    const centre = makeCenterline({ seed, points: 36, radius: 52, wobble: 0.3, squash: 1.35 });
+    const tr: Track = { points: resample(chaikin(centre, 2), 6), width: 13 };
+    carveTrack(t, tr, { shoulder: 7, roadSurface: SURF.pumice, shoulderSurface: SURF.dunes });
+    const ground = rt.store.put({ kind: 'terrain', name: 'Basalt Isle', params: { data: encodeTerrain(t) as never, soft: 0.55, bump: 1, friction: 0.9, restitution: 0 } });
+    const cam = rt.store.put({ kind: 'camera', name: 'Chase', params: { fov: 60, distance: 14, yaw: 0, pitch: 0.4 } });
+    const scene = rt.store.put({ kind: 'scene', name: 'Basalt Isle GP', params: { gravity: 19, camera: { ref: cam.id } }, children: { terrain: [{ ref: ground.id }] } });
+    rt.loadScene(scene.id as PresetId);
+    return { terrain: t, track: tr };
+  })();
 
   const world = rt.world;
   defineRacerComponents(world as never);

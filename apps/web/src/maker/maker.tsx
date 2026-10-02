@@ -8,6 +8,7 @@ import { carveTrack, resample } from '@hm/trackgen';
 import { addPoint, analyse, deletePoint, DRAFT_PRESETS, hitTest, insertOnSegment, movePoint, snapPoint, toCenterline, type TrackDraft } from '@hm/trackedit';
 import { manipulateMove, DEFAULT_MANIPULATION } from '@hm/tools';
 import { buildMakerScene, PROP_CARDS, propSeed, type MakerScene } from './scene';
+import { loadMap, saveMap, clearSavedMap } from './storage';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
 
 type ToolId = 'select' | 'brush' | 'track' | 'place' | 'delete';
@@ -37,7 +38,7 @@ const useToasts = (): readonly { id: number; text: string; kind: string }[] => u
 
 export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly onTestDrive: () => void }): ReactElement {
   const host = useRef<HTMLDivElement>(null);
-  const scene = useMemo<MakerScene>(() => buildMakerScene(rt), [rt]);
+  const scene = useMemo<MakerScene>(() => loadMap(rt) ?? buildMakerScene(rt), [rt]);
   const [tool, setTool] = useState<ToolId>('brush');
   const [tier, setTier] = useState<Tier>('build');
   const [brush, setBrush] = useState<BrushState & { surface: number }>({ kind: 'paint', radius: 9, strength: 0.6, falloff: 'smooth', surface: SURF.grass });
@@ -318,6 +319,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const doUndo = (): void => (window as unknown as { makerUndo: () => void }).makerUndo();
   const doRedo = (): void => (window as unknown as { makerRedo: () => void }).makerRedo();
   const pick = (t: ToolId): void => { setTool(t); feedback('tool'); };
+  const save = (): void => { if (saveMap(rt, scene.sceneId)) feedback('saved', 'Map saved'); else feedback('error', 'Could not save the map'); };
 
   const carve = (): void => {
     const ts = rt.binder.terrain();
@@ -340,7 +342,9 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <span className="grow" />
         <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
-        <button className="go" onClick={() => { fx('go'); onTestDrive(); }}>▶ Test drive</button>
+        <button onClick={save}>💾 Save</button>
+        <button onClick={() => { if (confirm('Start a new map? The saved one will be replaced.')) { clearSavedMap(); location.reload(); } }}>New</button>
+        <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>▶ Test drive</button>
       </header>
       <main className="body">
         <aside className="panel left">

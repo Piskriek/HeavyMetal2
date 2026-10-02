@@ -68,6 +68,9 @@
       ],
       "@hm/looks": [
         "packages/looks/src/index.ts"
+      ],
+      "@hm/raceflow": [
+        "packages/raceflow/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

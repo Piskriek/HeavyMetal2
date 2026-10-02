@@ -110,6 +110,9 @@
       ],
       "@hm/hudlayout": [
         "packages/hudlayout/src/index.ts"
+      ],
+      "@hm/soundpack": [
+        "packages/soundpack/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

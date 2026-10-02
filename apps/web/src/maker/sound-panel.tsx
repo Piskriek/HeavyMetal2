@@ -4,7 +4,7 @@ import type { Runtime } from '@hm/engine';
 import { SFX, musicPattern, type SfxId } from '@hm/audio';
 import { normalizeRecipe, recipeToJson, type MusicSpec, type SfxRecipe } from '@hm/soundlab';
 import { audio, fx } from './feedback';
-import { ENGINE_ID, MUSIC_ID, ensureOverride, ensureScenePreset, engineSpecOf, listSlots, musicSpecOf, overrideId, removeOverride, removeScenePreset, type SoundSlot } from '../sound/bank';
+import { builtInRecipe, ENGINE_ID, MUSIC_ID, ensureOverride, ensureScenePreset, engineSpecOf, listSlots, musicSpecOf, overrideId, removeOverride, removeScenePreset, type SoundSlot } from '../sound/bank';
 import { EngineLab, MusicLab, SoundLab } from '../sound/lab';
 
 /**
@@ -39,7 +39,7 @@ export function SoundPanel(props: {
   const recipeOf = (slot: SfxId): SfxRecipe => {
     const raw = rt.store.get(overrideId(slot))?.params['recipe'];
     try { if (typeof raw === 'string' && raw) return normalizeRecipe(JSON.parse(raw) as SfxRecipe); } catch { /* fall back to the built-in */ }
-    return normalizeRecipe(SFX[slot] as unknown as SfxRecipe);
+    return normalizeRecipe((builtInRecipe(slot) ?? SFX[slot]) as unknown as SfxRecipe);
   };
   const writeRecipe = (slot: SfxId, r: SfxRecipe): void => {
     const id = ensureOverride(rt, slot);

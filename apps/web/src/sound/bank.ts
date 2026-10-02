@@ -1,6 +1,7 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { SFX, SFX_IDS, type PlayableRecipe, type SfxId } from '@hm/audio';
+import { RACE_SOUNDS } from '@hm/soundpack';
 import { DEFAULT_ENGINE_SPEC, DEFAULT_MUSIC_SPEC, normalizeMusicSpec, type EngineSpec, type MusicSpec } from '@hm/soundlab';
 
 /**
@@ -12,6 +13,17 @@ import { DEFAULT_ENGINE_SPEC, DEFAULT_MUSIC_SPEC, normalizeMusicSpec, type Engin
 export interface Resolved { readonly recipe: PlayableRecipe; readonly volume: number; readonly pitch: number }
 
 const parsed = new Map<string, { hash: string; recipe: PlayableRecipe | null }>();
+
+/** The designed recipe for a slot: the sound pack when it has one, else the audio package's built-in. */
+export function builtInRecipe(slot: string): PlayableRecipe | undefined {
+  return (RACE_SOUNDS.find((s) => s.id === slot) as PlayableRecipe | undefined) ?? (SFX as Record<string, PlayableRecipe>)[slot];
+}
+
+/** What plays when the map has no override for a slot (null = let the audio engine use its own built-in). */
+export function packSound(slot: string): Resolved | null {
+  const r = RACE_SOUNDS.find((s) => s.id === slot);
+  return r ? { recipe: r as PlayableRecipe, volume: 1, pitch: 1 } : null;
+}
 
 export const overrideId = (slot: string): PresetId => `sfx-${slot}`;
 
@@ -48,7 +60,7 @@ export function ensureOverride(rt: Runtime, slot: SfxId): PresetId {
   const scene = rt.binder.sceneId;
   if (!scene) throw new Error('no scene loaded');
   if (soundsOf(rt).includes(id)) return id;
-  const base = SFX[slot];
+  const base = builtInRecipe(slot) ?? SFX[slot];
   rt.commands.transaction(`Edit sound: ${slot}`, () => {
     if (!rt.store.get(id)) {
       rt.commands.execute(cmd.put({ id, kind: 'sound', name: slot.replace(/-/g, ' '), params: { slot, volume: 1, pitch: 1, enabled: true, recipe: JSON.stringify(base) }, tier: 'play' }, `Edit sound: ${slot}`));

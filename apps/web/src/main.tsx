@@ -11,14 +11,14 @@ import { App } from './app';
 import { hasSavedMap, loadMap } from './maker/storage';
 import { bootPlatform } from './platform/boot';
 import { setSoundResolver } from './maker/feedback';
-import { resolveSound } from './sound/bank';
+import { packSound, resolveSound } from './sound/bank';
 import './shell.css';
 
 async function start(): Promise<void> {
   await bootPlatform(); // in RUN.world this installs the cloud-backed save store before anything reads a save
   const editor = location.hash === '#edit';
   const rt = createRuntime({ seed: 1, now: () => Date.now() });
-  setSoundResolver((id) => resolveSound(rt, id));
+  setSoundResolver((id) => resolveSound(rt, id) ?? packSound(id));
   const root = document.getElementById('app');
   if (root && editor) {
     createRoot(root).render(<MapMaker rt={rt} onTestDrive={() => { location.hash = '#race'; location.reload(); }} />);

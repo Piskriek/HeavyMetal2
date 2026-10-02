@@ -1,0 +1,298 @@
+START FROM A CLEAN SLATE: delete every file in the project first, then create the files below. Create everything as real files in the project, run `npm install`, build, and run the tests. Reply with a short summary only (no code in the chat).
+
+You are a senior TypeScript engineer. TASK: a sandbox that compiles and runs small TypeScript scripts safely and deterministically. Package layout: a normal npm project (Node 20+, ESM, TypeScript strict). Put the code in packages/script/src/ and the tests in packages/script/tests/. Run tests with: node --import tsx --test packages/script/tests/*.test.ts (install tsx and typescript as dev dependencies). Path alias: '@hm/contracts' -> packages/contracts/src/index.ts and '@hm/script' -> packages/script/src/index.ts (use tsconfig "paths"; tsx honours them).
+
+CONTRACT (create packages/contracts/src/index.ts containing exactly the code below in one file; packages/script/src/index.ts must export createScriptHost):
+=== FILE: packages/contracts/src/index.ts ===
+export type Value = number | boolean | string | null | { readonly ref: string; readonly rev?: number } | { readonly expr: string } | readonly Value[] | { readonly [key: string]: Value };
+export type Params = Readonly<Record<string, Value>>;
+export type Tier = 'play' | 'build' | 'pro';
+export const SCRIPT_API_VERSION = 1;
+export interface ScriptSource { readonly language: 'ts'; readonly source: string; readonly apiVersion: number }
+export interface Preset { readonly id: string; readonly kind: string; readonly name: string; readonly revision: number; readonly hash: string; readonly params: Params; readonly children: Readonly<Record<string, readonly { readonly ref: string; readonly rev?: number }[]>>; readonly script?: ScriptSource; readonly tags: readonly string[]; readonly tier: Tier; readonly meta: { readonly createdAt: number } }
+export interface Rng { next(): number; int(min: number, max: number): number; pick<T>(items: readonly T[]): T; fork(label: string): Rng; state(): readonly number[]; restore(state: readonly number[]): void }
+export interface World { readonly tick: number; spawn(preset?: { readonly ref: string }, components?: Readonly<Record<string, Readonly<Record<string, Value>>>>): number; despawn(id: number): void; alive(id: number): boolean; presetOf(id: number): { readonly ref: string } | undefined; has(id: number, component: string): boolean; get(id: number, component: string): Readonly<Record<string, Value>> | undefined; set(id: number, component: string, values: Readonly<Record<string, Value>>): void; query(...components: string[]): readonly number[]; getResource(name: string): Value | undefined }
+export interface VariableSystem { read(path: string): Value | undefined; write(path: string, value: Value, source?: string): void; evaluate(source: string, scope?: Readonly<Record<string, Value>>): Value }
+
+export interface Diagnostic {
+  readonly severity: 'error' | 'warning';
+  readonly message: string;
+    readonly line: number;
+  readonly column: number;
+}
+
+export interface CompileResult {
+  readonly ok: boolean;
+  readonly diagnostics: readonly Diagnostic[];
+    readonly js: string;
+}
+
+export interface ScriptContext {
+    readonly self: { readonly id: string; readonly params: Params };
+  readonly tick: number;
+  readonly dt: number;
+  readonly rng: Rng;
+  readonly vars: Pick<VariableSystem, 'read' | 'write' | 'evaluate'>;
+    readonly world: Pick<World, 'query' | 'get' | 'has' | 'alive' | 'getResource' | 'presetOf'>;
+    readonly set: (entity: number, component: string, values: Readonly<Record<string, Value>>) => void;
+  readonly spawn: (presetId: string, components?: Readonly<Record<string, Readonly<Record<string, Value>>>>) => number;
+  readonly despawn: (entity: number) => void;
+  readonly emit: (name: string, payload?: Value) => void;
+  readonly log: (...parts: Value[]) => void;
+}
+
+export interface Mechanic {
+  init?(ctx: ScriptContext): void;
+  update?(ctx: ScriptContext): void;
+  onEvent?(ctx: ScriptContext, name: string, payload: Value): void;
+}
+export interface Rule {
+    evaluate?(ctx: ScriptContext): Value;
+  onEvent?(ctx: ScriptContext, name: string, payload: Value): void;
+}
+export interface ToolScript {
+  onPointer?(ctx: ScriptContext, event: { readonly type: 'down' | 'move' | 'up'; readonly x: number; readonly y: number }): void;
+}
+export const SCRIPT_INTERFACES: Readonly<Record<string, readonly string[]>> = {
+  Mechanic: ['init', 'update', 'onEvent'],
+  Rule: ['evaluate', 'onEvent'],
+  Tool: ['onPointer'],
+};
+
+export class ScriptError extends Error {
+  constructor(message: string, readonly line?: number) {
+    super(message);
+    this.name = 'ScriptError';
+  }
+}
+
+export interface ScriptLimits {
+    readonly callBudgetMs: number;
+    readonly opBudget: number;
+}
+
+export interface LoadedScript<T = unknown> {
+  readonly presetId: string;
+    readonly instance: T;
+    readonly faulted: boolean;
+  readonly lastError?: string;
+}
+
+export interface ScriptHost {
+  readonly limits: ScriptLimits;
+    compile(source: string): CompileResult;
+    load<T = unknown>(preset: Preset, iface: string): LoadedScript<T>;
+    call(script: LoadedScript, member: string, ctx: ScriptContext, ...args: Value[]): { readonly ok: boolean; readonly value?: Value; readonly error?: string };
+    reload(script: LoadedScript, source: ScriptSource): LoadedScript;
+    typings(iface: string): string;
+  dispose(): void;
+}
+=== END FILE ===
+
+WHAT TO BUILD (packages/script/src/index.ts exports `createScriptHost(opts?: { limits?: Partial<ScriptLimits> }): ScriptHost`, defaults callBudgetMs 100 and opBudget 2_000_000):
+1. compile(source): TypeScript -> JavaScript with the `typescript` package. Return diagnostics (line/column 1-based in the user's source) for syntax errors AND type errors, never throw. Type-check by creating a ts.Program on an in-memory CompilerHost with two files: user.ts (the source) and ambient.d.ts (= the string returned by typings('Mechanic'), see 4), compiler options {strict:true, target:ES2022, module:ESNext, lib:['lib.es2022.d.ts']} (read lib files from the typescript package folder with fs). Unknown globals like window, document, fetch, process must therefore be type errors. ALSO walk the AST and refuse: import declarations, `export ... from`, calls to require() or eval(), `new Function(...)` / Function(...) calls. Output JS with ts.transpileModule (module CommonJS) so `export function f` becomes a property on an `exports` object.
+2. The sandbox: QuickJS compiled to WebAssembly: npm package `quickjs-emscripten` (use `getQuickJS()` with a top-level await so createScriptHost stays synchronous). One fresh runtime+context per loaded script. In each context, before running the script, evaluate a prelude that: replaces Math.random with a function that throws Error('Math.random is disabled: use ctx.rng'), replaces globalThis.Date with something that throws Error('Date is disabled: use ctx.tick') when called or constructed, and Object.freeze()s Object.prototype, Array.prototype, Function.prototype and the prototypes of String, Number and Boolean so a script cannot pollute them. Use runtime.setInterruptHandler for the budgets: count handler calls and abort when the count exceeds opBudget, or when wall time since the call started exceeds callBudgetMs. Also runtime.setMemoryLimit(16 MB) and setMaxStackSize.
+3. Marshalling for every call(script, member, ctx, ...args): build the ctx inside the VM for that call: plain values (self, tick, dt, args) copied as JSON; functions (ctx.set, spawn, despawn, emit, log, vars.read/write/evaluate, world.query/get/has/alive/getResource/presetOf, rng.next/int/pick/fork/state/restore) become VM functions made with vm.newFunction that call the host ctx function and marshal the result back as JSON. Return values come back as JSON (Value). A member not in SCRIPT_INTERFACES[iface] makes call return {ok:false,error:'...'}; a member the script does not export is a successful no-op (ok:true, value undefined). call() never throws: any exception or budget overrun gives {ok:false, error}, sets script.faulted=true and script.lastError. A faulted script returns {ok:false, error:'script is faulted: reload it'} until reload().
+4. typings(iface): returns a .d.ts string declaring ambient `interface ScriptContext` (plus Rng, Value, Params) copied from the contract, and the interface named iface (for example `interface Mechanic`). It must contain 'interface ScriptContext', 'rng' and the member names of the interface, and must not contain the word window.
+5. load(preset, iface): throws ScriptError if iface is not in SCRIPT_INTERFACES, if the preset has no script, or if compile fails; returns a LoadedScript {presetId, instance, faulted, lastError}. reload(script, source): compile and load the new source; on a compile error THROW and leave the old script untouched; on success return a fresh un-faulted script. dispose(): dispose all VMs.
+Keep files small (<300 lines): compile.ts, sandbox.ts, marshal.ts, typings.ts, host.ts, index.ts. Comments say WHY. No other runtime dependencies than quickjs-emscripten and typescript.
+
+ACCEPTANCE TESTS (make these pass; fix only obvious test typos and tell me which):
+=== FILE: packages/script/tests/acceptance.test.ts ===
+/**
+ * T2 acceptance: compile + sandbox + live reload of preset scripts.
+ * Script authoring convention (YOU define the compiler side, tests fix the surface): a script is a TypeScript module whose
+ * named exports are the members of its interface (`export function update(ctx) {...}`). `ScriptContext`, `Mechanic`, `Rule`
+ * are ambient types (no imports needed or allowed). Scripts have NO access to the host: see ScriptContext in contracts.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { SCRIPT_API_VERSION, SCRIPT_INTERFACES, type Preset, type ScriptContext, type Value } from '@hm/contracts';
+import { createScriptHost } from '@hm/script';
+
+const preset = (source: string, id = 's1'): Preset => ({
+  id, kind: 'mechanic', name: 'T', revision: 1, hash: 'h', params: { power: 3 }, children: {}, tags: [], tier: 'pro',
+  script: { language: 'ts', source, apiVersion: SCRIPT_API_VERSION }, meta: { createdAt: 0 },
+});
+
+function makeCtx(over: Partial<ScriptContext> = {}): ScriptContext & { writes: unknown[]; emitted: unknown[]; logs: unknown[] } {
+  const writes: unknown[] = [], emitted: unknown[] = [], logs: unknown[] = [];
+  let r = 0;
+  const base: ScriptContext = {
+    self: { id: 's1', params: { power: 3 } }, tick: 7, dt: 1 / 120,
+    rng: {
+      next: () => (r = (r + 0.25) % 1), int: (a: number) => a, pick: <T>(x: readonly T[]) => x[0] as T,
+      fork: () => makeCtx().rng, state: () => [r], restore: () => undefined,
+    },
+    vars: { read: () => 1, write: () => undefined, evaluate: () => 0 },
+    world: { query: () => [1, 2], get: () => ({ x: 1 }), has: () => true, alive: () => true, getResource: () => null, presetOf: () => undefined },
+    set: (e: number, c: string, v: Readonly<Record<string, Value>>) => { writes.push([e, c, v]); },
+    spawn: () => 1, despawn: () => undefined,
+    emit: (n: string, p?: Value) => { emitted.push([n, p]); },
+    log: (...p: Value[]) => { logs.push(p); },
+  };
+  return Object.assign(base, over, { writes, emitted, logs });
+}
+
+test('compile: valid TypeScript compiles to JavaScript', () => {
+  const host = createScriptHost();
+  const r = host.compile('export function update(ctx: ScriptContext): void { ctx.emit("hi", ctx.tick); }');
+  assert.equal(r.ok, true, JSON.stringify(r.diagnostics));
+  assert.ok(r.js.length > 0);
+  host.dispose();
+});
+
+test('compile: syntax errors and type errors are DIAGNOSTICS with line/column, never exceptions', () => {
+  const host = createScriptHost();
+  const syntax = host.compile('export function update( {');
+  assert.equal(syntax.ok, false); assert.equal(syntax.js, '');
+  assert.ok(syntax.diagnostics[0]!.line >= 1 && syntax.diagnostics[0]!.column >= 1);
+  const type = host.compile('export function update(ctx: ScriptContext) {\n  const n: number = "x";\n  ctx.nothing();\n}');
+  assert.equal(type.ok, false);
+  assert.ok(type.diagnostics.some((d) => d.line === 2), JSON.stringify(type.diagnostics));
+  assert.ok(type.diagnostics.some((d) => d.line === 3), 'unknown members of ctx are type errors');
+  host.dispose();
+});
+
+test('compile: imports, require, eval and the host globals are refused at compile time', () => {
+  const host = createScriptHost();
+  for (const src of [
+    'import fs from "fs"; export function update() {}',
+    'export function update() { const x = require("fs"); }',
+    'export function update() { eval("1"); }',
+    'export function update() { window.alert(1); }',
+    'export function update() { fetch("http://x"); }',
+    'export function update() { new Function("return 1")(); }',
+  ]) {
+    assert.equal(host.compile(src).ok, false, src);
+  }
+  host.dispose();
+});
+
+test('load + call: a Mechanic reads ctx and writes through ctx.set; members are optional', () => {
+  const host = createScriptHost();
+  const s = host.load(preset('export function update(ctx: ScriptContext) { for (const e of ctx.world.query("pos")) ctx.set(e, "pos", { x: ctx.tick * Number(ctx.self.params.power) }); ctx.emit("done", ctx.tick); }'), 'Mechanic');
+  const ctx = makeCtx();
+  const out = host.call(s, 'update', ctx);
+  assert.equal(out.ok, true, out.error);
+  assert.deepEqual(ctx.writes, [[1, 'pos', { x: 21 }], [2, 'pos', { x: 21 }]]);
+  assert.deepEqual(ctx.emitted, [['done', 7]]);
+  assert.equal(host.call(s, 'init', ctx).ok, true, 'a member the script does not export is a no-op');
+  assert.equal(host.call(s, 'notAMember', ctx).ok, false, 'a member outside the interface is refused');
+  host.dispose();
+});
+
+test('load: unknown interface or compile error throws; every SCRIPT_INTERFACES key loads', () => {
+  const host = createScriptHost();
+  assert.throws(() => host.load(preset('export function update() {}'), 'Nope'));
+  assert.throws(() => host.load(preset('export function update( {'), 'Mechanic'), /./);
+  for (const k of Object.keys(SCRIPT_INTERFACES)) assert.doesNotThrow(() => host.load(preset('export {};'), k));
+  host.dispose();
+});
+
+test('sandbox: no host objects, no Date, no Math.random, no timers, no escape through constructors', () => {
+  const host = createScriptHost();
+  const probe = (body: string, member = 'evaluate') => {
+    // type-check is bypassed on purpose with casts: the RUNTIME must still be sealed
+    const s = host.load(preset(`export function ${member}(ctx: ScriptContext): any { ${body} }`), 'Rule');
+    return host.call(s, member, makeCtx());
+  };
+  assert.equal(probe('return typeof (globalThis as any).process;').value, 'undefined');
+  assert.equal(probe('return typeof (globalThis as any).window;').value, 'undefined');
+  assert.equal(probe('return typeof (globalThis as any).document;').value, 'undefined');
+  assert.equal(probe('return typeof (globalThis as any).require;').value, 'undefined');
+  assert.equal(probe('return Math.random();').ok, false, 'Math.random must be unavailable (use ctx.rng)');
+  assert.equal(probe('return Date.now();').ok, false, 'Date must be unavailable (use ctx.tick)');
+  assert.equal(probe('return (new (Date as any)()).getTime();').ok, false);
+  assert.equal(probe('return typeof (globalThis as any).setTimeout;').value, 'undefined');
+  const escape = probe('return (function(){}).constructor("return typeof process")();');
+  assert.ok(!escape.ok || escape.value === 'undefined', 'the Function constructor must not reach host globals');
+  const proto = probe('return (({}) as any).constructor.constructor("return typeof process")();');
+  assert.ok(!proto.ok || proto.value === 'undefined');
+  host.dispose();
+});
+
+test('sandbox: scripts cannot change the host (frozen builtins, no shared state between scripts)', () => {
+  const host = createScriptHost();
+  const a = host.load(preset('let n = 0; export function evaluate(): number { return ++n; }', 'a'), 'Rule');
+  const b = host.load(preset('let n = 0; export function evaluate(): number { return ++n; }', 'b'), 'Rule');
+  const ctx = makeCtx();
+  assert.equal(host.call(a, 'evaluate', ctx).value, 1);
+  assert.equal(host.call(a, 'evaluate', ctx).value, 2);
+  assert.equal(host.call(b, 'evaluate', ctx).value, 1, 'each script has its own state');
+  const tamper = host.load(preset('export function evaluate(): any { try { (Array.prototype as any).evil = 1; (Object as any).prototype.evil = 1; } catch (e) {} return 0; }', 't'), 'Rule');
+  host.call(tamper, 'evaluate', ctx);
+  assert.equal(({} as Record<string, unknown>)['evil'], undefined, 'the host\'s Object.prototype is untouched');
+  assert.equal((Array.prototype as unknown as Record<string, unknown>)['evil'], undefined);
+  host.dispose();
+});
+
+test('limits: an infinite loop is stopped, the script is marked faulted, and the host survives', () => {
+  const host = createScriptHost({ limits: { callBudgetMs: 100, opBudget: 200_000 } });
+  const s = host.load(preset('export function update() { while (true) {} }'), 'Mechanic');
+  const t0 = Date.now();
+  const out = host.call(s, 'update', makeCtx());
+  assert.equal(out.ok, false);
+  assert.match(String(out.error), /budget|limit|too long|loop/i);
+  assert.ok(Date.now() - t0 < 3000, 'stopped promptly');
+  assert.equal(s.faulted, true);
+  const again = host.call(s, 'update', makeCtx());
+  assert.equal(again.ok, false);
+  assert.match(String(again.error), /fault/i, 'a faulted script is skipped until reloaded');
+  host.dispose();
+});
+
+test('limits: the op budget is deterministic (same script, same count, on any machine)', () => {
+  const host = createScriptHost({ limits: { callBudgetMs: 10_000, opBudget: 5_000 } });
+  const src = (n: number) => `export function evaluate(): number { let s = 0; for (let i = 0; i < ${n}; i++) { s += i; } return s; }`;
+  assert.equal(host.call(host.load(preset(src(1000)), 'Rule'), 'evaluate', makeCtx()).ok, true);
+  assert.equal(host.call(host.load(preset(src(1_000_000)), 'Rule'), 'evaluate', makeCtx()).ok, false);
+  host.dispose();
+});
+
+test('errors: a throwing script returns the error, faults, and never propagates', () => {
+  const host = createScriptHost();
+  const s = host.load(preset('export function update() { throw new Error("boom"); }'), 'Mechanic');
+  const out = host.call(s, 'update', makeCtx());
+  assert.equal(out.ok, false); assert.match(String(out.error), /boom/);
+  assert.equal(s.faulted, true); assert.match(String(s.lastError), /boom/);
+  host.dispose();
+});
+
+test('reload: live editing swaps behaviour, clears a fault, keeps state isolated', () => {
+  const host = createScriptHost();
+  const s = host.load(preset('export function evaluate(): number { return 1; }'), 'Rule');
+  assert.equal(host.call(s, 'evaluate', makeCtx()).value, 1);
+  const s2 = host.reload(s, { language: 'ts', source: 'export function evaluate(): number { return 2; }', apiVersion: SCRIPT_API_VERSION });
+  assert.equal(host.call(s2, 'evaluate', makeCtx()).value, 2);
+  const broken = host.load(preset('export function evaluate(): number { throw 1 as any; }'), 'Rule');
+  host.call(broken, 'evaluate', makeCtx());
+  assert.equal(broken.faulted, true);
+  const fixed = host.reload(broken, { language: 'ts', source: 'export function evaluate(): number { return 5; }', apiVersion: SCRIPT_API_VERSION });
+  assert.equal(fixed.faulted, false);
+  assert.equal(host.call(fixed, 'evaluate', makeCtx()).value, 5);
+  assert.throws(() => host.reload(s, { language: 'ts', source: 'export function evaluate( {', apiVersion: SCRIPT_API_VERSION }), 'a reload with a compile error throws and the old script keeps working');
+  assert.equal(host.call(s2, 'evaluate', makeCtx()).value, 2);
+  host.dispose();
+});
+
+test('determinism: the same script with the same context gives the same output every time', () => {
+  const host = createScriptHost();
+  const src = 'export function evaluate(ctx: ScriptContext): number { let s = 0; for (let i = 0; i < 10; i++) s += ctx.rng.next(); return s; }';
+  const run = () => host.call(host.load(preset(src), 'Rule'), 'evaluate', makeCtx()).value as Value;
+  assert.equal(run(), run());
+  host.dispose();
+});
+
+test('typings: the editor gets the .d.ts of ScriptContext and the chosen interface', () => {
+  const host = createScriptHost();
+  const t = host.typings('Mechanic');
+  assert.match(t, /interface ScriptContext/);
+  assert.match(t, /update/);
+  assert.match(t, /rng/);
+  assert.doesNotMatch(t, /\bwindow\b/);
+  host.dispose();
+});
+=== END FILE ===
+
+When finished: run the tests, build, and tell me which tests pass or fail and why.

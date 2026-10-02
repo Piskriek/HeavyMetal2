@@ -1,0 +1,398 @@
+START FROM A CLEAN SLATE: delete every file in the project first, then create the files below. Create everything as real files in the project, run `npm install`, build, and run the tests. Reply with a short summary only (no code in the chat).
+
+You are a senior real-time graphics engineer (TypeScript, Three.js). TASK: the `render` package of a small game-engine harness: (1) pure, unit-tested math (orbit camera, ray picking, world-to-scene sync planner) and (2) a Three.js (r186) PBR renderer that implements the `RenderService` contract on top of it. The pure parts MUST have no `three` import and pass the acceptance tests exactly. The three part must typecheck and build; it cannot be unit-tested in Node (no WebGL), so keep it small, clear and correct. Quality bar: it should look good: physically based materials, soft shadows, a sky gradient, tone mapping, image based lighting.
+
+Project: normal npm project (Node 20+, ESM, TypeScript strict incl. noUncheckedIndexedAccess/noUnusedLocals, deps: three@^0.186, @types/three, tsx, typescript, vite). Code in packages/render/src/, tests in packages/render/tests/. tsconfig: lib ES2022+DOM, "moduleResolution": "bundler", "paths": '@hm/contracts' -> packages/contracts/src/index.ts, include packages/*/src and packages/*/tests. Tests run with: node --import tsx --test packages/render/tests/*.test.ts  (type imports from '@hm/contracts' must be `import type`, so tsx needs no path mapping at runtime).
+
+Create this file exactly (the contracts, an excerpt of the real ones):
+=== FILE: packages/contracts/src/index.ts ===
+export type PresetId = string;
+
+export type Tier = 'play' | 'build' | 'pro';
+export const TIERS: readonly Tier[] = ['play', 'build', 'pro'] as const;
+export const tierRank = (t: Tier): number => (t === 'play' ? 0 : t === 'build' ? 1 : 2);
+export const visibleAt = (t: Tier, shown: Tier): boolean => tierRank(t) <= tierRank(shown);
+
+export type Vec2 = readonly [number, number];
+export type Vec3 = readonly [number, number, number];
+export type Quat = readonly [number, number, number, number];
+export type Color = string;
+
+export interface Ref {
+  readonly ref: PresetId;
+  readonly rev?: number;
+}
+
+export interface Expr {
+  readonly expr: string;
+}
+
+export type Value =
+  | number
+  | boolean
+  | string
+  | null
+  | Ref
+  | Expr
+  | readonly Value[]
+  | { readonly [key: string]: Value };
+
+export type Params = Readonly<Record<string, Value>>;
+
+export type Unsubscribe = () => void;
+
+export interface Issue {
+  readonly severity: 'error' | 'warning';
+  readonly code: string;
+  readonly message: string;
+    readonly presetId?: PresetId;
+  readonly path?: string;
+}
+
+export const CORE_KINDS = [
+  'game', 'mode', 'scene', 'entity', 'shape', 'material', 'mechanic', 'rule', 'item', 'racer', 'track-piece',
+  'camera', 'input-map', 'ui-skin', 'hud', 'tool', 'manipulation', 'brush', 'ai-driver', 'audio-cue', 'physics-model',
+] as const;
+export type CoreKind = (typeof CORE_KINDS)[number];
+export type PresetKind = CoreKind | (string & {});
+
+export const FORMAT_VERSION = 1;
+export const SCRIPT_API_VERSION = 1;
+export const SIM_HZ = 120;
+export const SIM_DT = 1 / SIM_HZ;
+
+export type ValueType = 'number' | 'int' | 'boolean' | 'string' | 'enum' | 'color' | 'vec2' | 'vec3' | 'quat' | 'ref' | 'list' | 'curve' | 'asset' | 'expr';
+export interface VariableDef { readonly key: string; readonly type: ValueType; readonly label: string; readonly doc: string; readonly tier: Tier; readonly default: Value; readonly min?: number; readonly max?: number; readonly step?: number; readonly unit?: string; readonly options?: readonly string[]; readonly group?: string }
+
+export type EntityId = number;
+export interface ComponentDef<T extends Record<string, Value> = Record<string, Value>> { readonly name: string; readonly defaults: T; readonly fields: readonly VariableDef[] }
+export type WorldChange =
+  | { readonly type: 'spawn'; readonly id: EntityId }
+  | { readonly type: 'despawn'; readonly id: EntityId }
+  | { readonly type: 'set'; readonly id: EntityId; readonly component: string };
+export interface World {
+  readonly tick: number;
+  defineComponent<T extends Record<string, Value>>(def: ComponentDef<T>): void;
+  components(): readonly ComponentDef[];
+  alive(id: EntityId): boolean;
+  has(id: EntityId, component: string): boolean;
+  get(id: EntityId, component: string): Readonly<Record<string, Value>> | undefined;
+  query(...components: string[]): readonly EntityId[];   // ascending ids
+  drainChanges(): readonly WorldChange[];
+}
+
+// minimal excerpt of the preset store (the real one has more methods)
+export interface Preset { readonly id: PresetId; readonly kind: string; readonly name: string; readonly params: Params }
+export interface ResolvedPreset { readonly preset: Preset; readonly params: Params }
+export interface PresetStore { get(id: PresetId): Preset | undefined; resolve(id: PresetId): ResolvedPreset }
+
+export interface Pick { readonly entity: EntityId | null; readonly point: Vec3 | null; readonly normal: Vec3 | null; readonly distance: number }
+export type OverlayShape =
+  | { readonly type: 'line'; readonly from: Vec3; readonly to: Vec3; readonly color: Color }
+  | { readonly type: 'ring'; readonly center: Vec3; readonly normal: Vec3; readonly radius: number; readonly color: Color }
+  | { readonly type: 'box'; readonly center: Vec3; readonly half: Vec3; readonly color: Color }
+  | { readonly type: 'handle'; readonly id: string; readonly position: Vec3; readonly color: Color; readonly size: number };
+export interface RenderService {
+  mount(host: HTMLElement, world: World, store: PresetStore): void;
+  unmount(): void;
+  render(alpha: number): void;
+  pick(clientX: number, clientY: number): Pick;
+  setCamera(cameraPreset: PresetId): void;
+  camera: {
+    readonly position: Vec3;
+    readonly target: Vec3;
+    set(position: Vec3, target: Vec3): void;
+    project(world: Vec3): readonly [number, number];
+  };
+  overlay: { show(id: string, shapes: readonly OverlayShape[]): void; hide(id: string): void };
+  onFrame(listener: (dtMs: number) => void): Unsubscribe;
+}
+=== END FILE ===
+
+YOU WRITE (each file < 250 lines; split further if needed):
+
+1. packages/render/src/camera-math.ts  (pure, Y-up right-handed, no three)
+   export interface OrbitState { readonly target: Vec3; readonly yaw: number; readonly pitch: number; readonly distance: number; readonly fov: number /* vertical, degrees */ }
+   export const MAX_PITCH = 1.5, MIN_DIST = 0.5, MAX_DIST = 2000;
+   camera position = target + distance * (cos(pitch)*sin(yaw), sin(pitch), cos(pitch)*cos(yaw)); the camera looks at the target, up is +Y. yaw 0/pitch 0 => camera on +Z looking down -Z, +X is screen-right.
+   export function orbitPosition(s: OrbitState): Vec3
+   export function stateFromPositionTarget(position: Vec3, target: Vec3, fov: number): OrbitState   (inverse; distance floored at MIN_DIST)
+   export function orbit(s, dYaw, dPitch): OrbitState   (adds, clamps pitch to +-MAX_PITCH, returns a new object)
+   export function zoom(s, factor): OrbitState   (distance*factor clamped to [MIN_DIST, MAX_DIST])
+   export function pan(s, right: number, up: number): OrbitState   (moves target by right*cameraRight + up*cameraUp, world units)
+   export interface Ray { readonly origin: Vec3; readonly direction: Vec3 /* unit */ }
+   export function project(s, p: Vec3, width: number, height: number): readonly [number, number] | null   (pixels, origin top-left, y down; null if behind the camera)
+   export function rayFromPixel(s, x, y, width, height): Ray   (origin = camera position)
+
+2. packages/render/src/pick-math.ts  (pure)
+   export function rayHitSphere(origin: Vec3, dir: Vec3, center: Vec3, radius: number): number | null   (nearest non-negative distance t; null on miss)
+   export function rayHitBox(origin, dir, center, half: Vec3): number | null   (axis aligned, slab method; 0 if the origin is inside)
+   export function rayHitPlaneY(origin, dir, y: number): number | null
+   export interface PickItem { readonly entity: EntityId; readonly shape: 'sphere' | 'box' | 'cylinder' | 'plane'; readonly center: Vec3; readonly size: number }   (box: half extent = size on every axis; sphere: radius = size; treat cylinder like a sphere of radius=size, plane like a flat box half [size,0.01,size])
+   export function pickScene(ray: Ray, items: readonly PickItem[], groundY: number | null): Pick   (nearest item wins; normal for a sphere = (point-center)/|..|, for a box = the axis normal of the face hit; else the ground plane y=groundY gives entity null, normal [0,1,0]; no hit => { entity: null, point: null, normal: null, distance: Infinity })
+
+3. packages/render/src/scene-sync.ts  (pure, uses only the `World` query/get/drainChanges/defineComponent)
+   export function defineRenderComponents(world: World): void
+     registers ComponentDef 'transform' with defaults { x:0,y:0,z:0, qx:0,qy:0,qz:0,qw:1, sx:1,sy:1,sz:1 } and 'renderable' with defaults { shape:'box', size:0.5, color:'#ffffff', roughness:0.6, metalness:0, albedo:'', normal:'', orm:'', repeat:1, normalStrength:1, visible:true }. Every field also gets a VariableDef (label, one-line doc, tier 'build' except the texture and roughness/metalness fields which are 'pro' and shape/size/color which are 'play'; type 'number' with min/max/step where sensible, 'color', 'boolean', 'enum' for shape with options ['sphere','box','cylinder','plane'], 'asset' for albedo/normal/orm).
+   export interface RenderDesc { shape: 'sphere'|'box'|'cylinder'|'plane'; size: number; color: string; roughness: number; metalness: number; albedo: string; normal: string; orm: string; repeat: number; normalStrength: number; visible: boolean; position: Vec3; rotation: Quat; scale: Vec3 }
+   export interface SceneAdapter { create(id: EntityId, desc: RenderDesc): void; update(id: EntityId, desc: RenderDesc): void; remove(id: EntityId): void }
+   export interface SceneSync { step(): void; present(alpha: number): void; dispose(): void; items(): readonly PickItem[] /* current (not interpolated) pick items of every renderable that is visible */ }
+   export function createSceneSync(world: World, adapter: SceneAdapter): SceneSync
+     step(): call after each simulation tick. Drain the world changes, then reconcile against world.query('transform','renderable') (so a removed component is noticed too): unknown ids => adapter.create (with the current desc; prev = curr), changed ids (any field of either component) => prev = curr then curr = new, ids no longer present => adapter.remove. Entities with only one of the two components are ignored.
+     present(alpha): for every node, build the desc with position and scale linearly interpolated and rotation nlerp'd (normalised, shortest path) between prev and curr, and call adapter.update only when it differs from what was last sent to the adapter.
+     dispose(): adapter.remove for every node.
+
+4. packages/render/src/three-renderer.ts (+ helpers: materials.ts, environment.ts, overlay.ts, orbit-controls.ts, as you like) using `import * as THREE from 'three'`:
+   export interface RenderOptions { assetUrl?: (path: string) => string; pixelRatio?: number; shadows?: boolean; background?: 'sky' | 'dark' }
+   export function createThreeRenderer(opts?: RenderOptions): RenderService   (the contract in packages/contracts/src/index.ts)
+   - mount(host, world, store): creates a WebGLRenderer (antialias, sRGB output, ACESFilmicToneMapping, PCFSoftShadowMap when shadows != false), a canvas filling host (a ResizeObserver keeps size and aspect right; devicePixelRatio capped at 2), the scene, a PerspectiveCamera driven by an OrbitState from camera-math (default target [0,0,0], yaw 0.6, pitch 0.5, distance 18, fov 50), calls defineRenderComponents(world) and createSceneSync with a Three SceneAdapter.
+   - SceneAdapter: one Object3D per entity. shapes: sphere (SphereGeometry, 48x32), box (BoxGeometry(2*size...)), cylinder (radius size, height 2*size), plane (PlaneGeometry(2*size, 2*size) rotated flat). Share one geometry per shape and unit size, scale mesh by size. MeshStandardMaterial with color, roughness, metalness; if albedo/normal/orm are non-empty strings load them with a cached TextureLoader through assetUrl (albedo sRGB, others linear; wrapS/T repeat, repeat from desc, anisotropy 8; the 'orm' map is a glTF-style ORM texture: R=ao, G=roughness, B=metal, assign it to aoMap, roughnessMap and metalnessMap). castShadow/receiveShadow true. visible = desc.visible. Reuse materials by a key of (color, roughness, metalness, maps, repeat, normalStrength). Dispose geometries/materials/textures on unmount.
+   - Look: a large gradient sky (a big inverted sphere with a small ShaderMaterial, horizon haze to blue zenith) and matching scene.fog; a PMREMGenerator environment made from RoomEnvironment (three/examples/jsm/environments/RoomEnvironment.js) as scene.environment with modest intensity; a warm DirectionalLight (sun) with a 2048 shadow map and a tight orthographic shadow camera that follows the camera target, plus a HemisphereLight fill; a large ground disc at y=0 receiving shadows (MeshStandardMaterial, dark neutral) with a subtle grid drawn by a small shader or a procedural CanvasTexture. Everything must look good with no assets loaded.
+   - render(alpha): call sceneSync.present(alpha), update camera and shadow follow, render. The host app calls sceneSync.step() through `renderer.step()`: add `step(): void` on the returned object (the return type is `RenderService & { step(): void }`) and call it from a documented place.
+   - pick(clientX, clientY): rayFromPixel on the canvas rect, pickScene over sceneSync.items() with ground at y=0.
+   - setCamera(presetId): store.resolve(id) params fov, distance, yaw, pitch, targetX, targetY, targetZ (numbers; missing ones keep the current value); an unknown id is ignored (no throw).
+   - camera.position/target are getters from the OrbitState; camera.set(position, target) uses stateFromPositionTarget; camera.project(world) returns pixels via project() (null => [-1,-1]).
+   - overlay.show(id, shapes)/hide(id): line (THREE.Line / LineSegments), ring (a line loop of 48 points in the plane of `normal`), box (wire box), handle (a small camera-facing Sprite or a sphere with depthTest false) all with depthTest false and renderOrder high so they draw over the scene; show replaces the previous shapes of that id; hide removes them.
+   - onFrame(listener): called each render with the milliseconds since the previous frame. Returns an unsubscribe.
+   - orbit-controls.ts: export function attachOrbitControls(el: HTMLElement, renderer: RenderService, opts?: { touchOrbit?: boolean }): () => void  (returns the detach function). Right or middle mouse drag = orbit, shift+right/middle drag = pan, wheel = zoom (factor 1.1^(deltaY/100)), two-finger touch = pinch zoom + pan, one finger orbits when touchOrbit is true. It reads the current camera from renderer.camera and writes it back with renderer.camera.set(...). preventDefault on contextmenu and wheel. Pointer events with pointer capture.
+   - No `any`. Handle ResizeObserver absence gracefully (fall back to window resize).
+
+5. packages/render/src/index.ts exporting everything above (functions and types) and `export { defineRenderComponents, createSceneSync }`.
+6. packages/render/tests/render-extra.test.ts with at least 10 more tests of the pure modules (edge cases: zero-length direction, pitch limits, project of far points, sync with many entities, interpolation with alpha 0 and 1, sync of invisible entities in items(), etc.).
+7. A tiny demo `index.html` + `src/demo.ts` that builds and opens a window with a fake World (copy the fake world from the sync test into src/demo-world.ts), spawns a ring of coloured spheres on a bobbing box, moves them every frame via setC, and calls attachOrbitControls. This is only to prove it runs; `vite build` must succeed.
+
+ACCEPTANCE TESTS (make these pass; if a test is wrong fix only obvious typos and tell me which):
+=== FILE: packages/render/tests/render-math.test.ts ===
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { MAX_PITCH, MAX_DIST, MIN_DIST, orbitPosition, orbit, zoom, pan, project, rayFromPixel, stateFromPositionTarget, type OrbitState } from '../src/camera-math';
+import { rayHitSphere, rayHitBox, rayHitPlaneY, pickScene } from '../src/pick-math';
+import type { Vec3 } from '@hm/contracts';
+
+const near = (a: number, b: number, eps = 1e-6): void => assert.ok(Math.abs(a - b) < eps, `${a} !~ ${b}`);
+const near3 = (a: readonly number[], b: readonly number[], eps = 1e-6): void => { for (let i = 0; i < 3; i++) near(a[i] as number, b[i] as number, eps); };
+const base: OrbitState = { target: [0, 0, 0], yaw: 0, pitch: 0, distance: 10, fov: 50 };
+
+test('orbitPosition: yaw 0 is +Z, yaw 90deg is +X, pitch raises the camera', () => {
+  near3(orbitPosition(base), [0, 0, 10]);
+  near3(orbitPosition({ ...base, yaw: Math.PI / 2 }), [10, 0, 0]);
+  near3(orbitPosition({ ...base, pitch: Math.PI / 2 }), [0, 10, 0]);
+  near3(orbitPosition({ ...base, target: [1, 2, 3] }), [1, 2, 13]);
+});
+
+test('stateFromPositionTarget inverts orbitPosition', () => {
+  const s = stateFromPositionTarget([10, 0, 0], [0, 0, 0], 50);
+  near(s.yaw, Math.PI / 2); near(s.pitch, 0); near(s.distance, 10); assert.equal(s.fov, 50);
+  const t: OrbitState = { target: [1, 2, 3], yaw: 0.7, pitch: 0.4, distance: 25, fov: 60 };
+  const back = stateFromPositionTarget(orbitPosition(t), t.target, 60);
+  near(back.yaw, 0.7); near(back.pitch, 0.4); near(back.distance, 25);
+});
+
+test('orbit adds the deltas and clamps pitch to +-MAX_PITCH', () => {
+  const a = orbit(base, 0.5, 0.25);
+  near(a.yaw, 0.5); near(a.pitch, 0.25);
+  assert.equal(orbit(base, 0, 10).pitch, MAX_PITCH);
+  assert.equal(orbit(base, 0, -10).pitch, -MAX_PITCH);
+  assert.equal(base.yaw, 0); // input is not mutated
+});
+
+test('zoom multiplies the distance and clamps', () => {
+  near(zoom(base, 0.5).distance, 5);
+  assert.equal(zoom(base, 1e-9).distance, MIN_DIST);
+  assert.equal(zoom(base, 1e9).distance, MAX_DIST);
+});
+
+test('pan moves the target along the camera right/up axes (world units)', () => {
+  near3(pan(base, 1, 2).target, [1, 2, 0]);
+  near3(pan({ ...base, yaw: Math.PI / 2 }, 1, 0).target, [0, 0, -1]);
+});
+
+test('project: target is the screen centre, +X is to the right, behind the camera is null', () => {
+  const c = project(base, [0, 0, 0], 800, 600);
+  assert.ok(c); near(c[0], 400); near(c[1], 300);
+  const r = project(base, [1, 0, 0], 800, 600);
+  assert.ok(r && r[0] > 400); near(r[1], 300);
+  const up = project(base, [0, 1, 0], 800, 600);
+  assert.ok(up && up[1] < 300); // screen y grows downwards
+  assert.equal(project(base, [0, 0, 20], 800, 600), null);
+});
+
+test('rayFromPixel: centre ray looks down -Z from the camera; the ray through project(p) hits p', () => {
+  const ray = rayFromPixel(base, 400, 300, 800, 600);
+  near3(ray.origin, [0, 0, 10]); near3(ray.direction, [0, 0, -1]);
+  const s: OrbitState = { target: [1, 0, -2], yaw: 0.6, pitch: 0.5, distance: 14, fov: 45 };
+  const p: Vec3 = [2, 1.5, 0.5];
+  const px = project(s, p, 640, 480);
+  assert.ok(px);
+  const r = rayFromPixel(s, px[0], px[1], 640, 480);
+  near(Math.hypot(...r.direction), 1);
+  const o = r.origin, d = r.direction;
+  const t = (p[0] - o[0]) * d[0] + (p[1] - o[1]) * d[1] + (p[2] - o[2]) * d[2];
+  near3([o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t], p, 1e-4);
+});
+
+test('ray tests: sphere, box, ground plane', () => {
+  const o: Vec3 = [0, 0, 10], d: Vec3 = [0, 0, -1];
+  near(rayHitSphere(o, d, [0, 0, 0], 1) as number, 9);
+  assert.equal(rayHitSphere(o, d, [5, 0, 0], 1), null);
+  assert.equal(rayHitSphere(o, [0, 0, 1], [0, 0, 0], 1), null); // sphere is behind
+  near(rayHitBox(o, d, [0, 0, 0], [1, 1, 1]) as number, 9);
+  assert.equal(rayHitBox(o, d, [3, 0, 0], [1, 1, 1]), null);
+  near(rayHitBox([0, 0, 0], d, [0, 0, 0], [1, 1, 1]) as number, 0); // starting inside hits at 0
+  near(rayHitPlaneY([0, 5, 0], [0, -1, 0], 2) as number, 3);
+  assert.equal(rayHitPlaneY([0, 5, 0], [0, 1, 0], 0), null);
+  assert.equal(rayHitPlaneY([0, 5, 0], [1, 0, 0], 0), null);
+});
+
+test('pickScene returns the nearest item, then the ground, then a miss', () => {
+  const items = [
+    { entity: 7, shape: 'sphere' as const, center: [0, 1, 0] as Vec3, size: 1 },
+    { entity: 8, shape: 'box' as const, center: [0, 1, -5] as Vec3, size: 1 },
+  ];
+  const ray = { origin: [0, 1, 10] as Vec3, direction: [0, 0, -1] as Vec3 };
+  const hit = pickScene(ray, items, 0);
+  assert.equal(hit.entity, 7); near(hit.distance, 9);
+  assert.ok(hit.point && hit.normal); near3(hit.point, [0, 1, 1]); near3(hit.normal, [0, 0, 1]);
+  const down = pickScene({ origin: [20, 5, 0], direction: [0, -1, 0] }, items, 0);
+  assert.equal(down.entity, null); near(down.distance, 5); near3(down.point as Vec3, [20, 0, 0]); near3(down.normal as Vec3, [0, 1, 0]);
+  const miss = pickScene({ origin: [20, 5, 0], direction: [0, 1, 0] }, items, 0);
+  assert.deepEqual(miss, { entity: null, point: null, normal: null, distance: Infinity });
+  assert.equal(pickScene({ origin: [20, 5, 0], direction: [0, -1, 0] }, items, null).entity, null);
+});
+
+=== END FILE ===
+
+=== FILE: packages/render/tests/scene-sync.test.ts ===
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type { ComponentDef, EntityId, Value, World, WorldChange } from '@hm/contracts';
+import { defineRenderComponents, createSceneSync, type RenderDesc, type SceneAdapter } from '../src/scene-sync';
+
+/** A tiny in-memory World, just enough for the sync. */
+function fakeWorld(): World & { spawn(c: Record<string, Record<string, Value>>): EntityId; despawn(id: EntityId): void; setC(id: EntityId, c: string, v: Record<string, Value>): void; removeC(id: EntityId, c: string): void } {
+  const defs = new Map<string, ComponentDef>();
+  const ents = new Map<EntityId, Map<string, Record<string, Value>>>();
+  let pending: WorldChange[] = [];
+  let next = 1;
+  const w = {
+    tick: 0,
+    defineComponent(def: ComponentDef) { defs.set(def.name, def); },
+    components: () => [...defs.values()],
+    alive: (id: EntityId) => ents.has(id),
+    has: (id: EntityId, c: string) => ents.get(id)?.has(c) ?? false,
+    get: (id: EntityId, c: string) => ents.get(id)?.get(c),
+    query: (...cs: string[]) => [...ents.keys()].filter((id) => cs.every((c) => ents.get(id)?.has(c))).sort((a, b) => a - b),
+    drainChanges: () => { const p = pending; pending = []; return p; },
+    spawn(c: Record<string, Record<string, Value>>) {
+      const id = next++; const m = new Map<string, Record<string, Value>>();
+      for (const [k, v] of Object.entries(c)) m.set(k, { ...(defs.get(k)?.defaults ?? {}), ...v });
+      ents.set(id, m); pending.push({ type: 'spawn', id }); return id;
+    },
+    despawn(id: EntityId) { ents.delete(id); pending.push({ type: 'despawn', id }); },
+    setC(id: EntityId, c: string, v: Record<string, Value>) { const m = ents.get(id)!; m.set(c, { ...(m.get(c) ?? defs.get(c)?.defaults ?? {}), ...v }); pending.push({ type: 'set', id, component: c }); },
+    removeC(id: EntityId, c: string) { ents.get(id)!.delete(c); },
+  };
+  return w;
+}
+
+function fakeAdapter() {
+  const log: string[] = [];
+  const last = new Map<EntityId, RenderDesc>();
+  const a: SceneAdapter = {
+    create(id, d) { log.push(`create ${id}`); last.set(id, d); },
+    update(id, d) { log.push(`update ${id}`); last.set(id, d); },
+    remove(id) { log.push(`remove ${id}`); last.delete(id); },
+  };
+  return { a, log, last };
+}
+
+const red = { renderable: { shape: 'sphere', size: 0.5, color: '#ff0000' } };
+
+test('defineRenderComponents registers transform and renderable with defaults and field defs', () => {
+  const w = fakeWorld(); defineRenderComponents(w);
+  const t = w.components().find((c) => c.name === 'transform');
+  const r = w.components().find((c) => c.name === 'renderable');
+  assert.ok(t && r);
+  assert.deepEqual([t.defaults.x, t.defaults.qw, t.defaults.sx], [0, 1, 1]);
+  assert.equal(r.defaults.shape, 'box'); assert.equal(r.defaults.visible, true); assert.equal(r.defaults.color, '#ffffff');
+  assert.ok(t.fields.length === Object.keys(t.defaults).length && r.fields.length === Object.keys(r.defaults).length);
+  for (const f of [...t.fields, ...r.fields]) assert.ok(f.label && f.doc && f.key in { ...t.defaults, ...r.defaults });
+});
+
+test('step creates a node for entities that already exist, with the right desc', () => {
+  const w = fakeWorld(); defineRenderComponents(w);
+  const e = w.spawn({ transform: { x: 1, y: 2, z: 3 }, ...red });
+  w.spawn({ transform: { x: 9 } }); // not renderable
+  const { a, log, last } = fakeAdapter();
+  const sync = createSceneSync(w, a);
+  sync.step();
+  assert.deepEqual(log, [`create ${e}`]);
+  const d = last.get(e)!;
+  assert.deepEqual(d.position, [1, 2, 3]); assert.deepEqual(d.rotation, [0, 0, 0, 1]); assert.deepEqual(d.scale, [1, 1, 1]);
+  assert.equal(d.shape, 'sphere'); assert.equal(d.size, 0.5); assert.equal(d.color, '#ff0000'); assert.equal(d.visible, true);
+  sync.step();
+  assert.deepEqual(log, [`create ${e}`], 'a second step with no changes does nothing');
+});
+
+test('spawn, change, despawn, and component removal are all reflected', () => {
+  const w = fakeWorld(); defineRenderComponents(w);
+  const { a, log, last } = fakeAdapter();
+  const sync = createSceneSync(w, a);
+  const e = w.spawn({ transform: {}, ...red });
+  sync.step();
+  w.setC(e, 'transform', { x: 4 });
+  sync.step(); sync.present(1);
+  assert.deepEqual(last.get(e)!.position, [4, 0, 0]);
+  w.setC(e, 'renderable', { color: '#00ff00' });
+  sync.step(); sync.present(1);
+  assert.equal(last.get(e)!.color, '#00ff00');
+  w.removeC(e, 'renderable');
+  sync.step();
+  assert.ok(!last.has(e)); assert.equal(log[log.length - 1], `remove ${e}`);
+  const f = w.spawn({ transform: {}, ...red });
+  sync.step(); assert.ok(last.has(f));
+  w.despawn(f); sync.step(); assert.ok(!last.has(f));
+  const g = w.spawn({ transform: {}, ...red }); w.despawn(g); // spawned and gone within one drain
+  sync.step(); assert.ok(!last.has(g));
+});
+
+test('present(alpha) interpolates the position between the last two steps and slerps rotation', () => {
+  const w = fakeWorld(); defineRenderComponents(w);
+  const e = w.spawn({ transform: { x: 0 }, ...red });
+  const { a, last } = fakeAdapter();
+  const sync = createSceneSync(w, a);
+  sync.step();
+  w.setC(e, 'transform', { x: 10, qy: 1, qw: 0 });
+  sync.step();
+  sync.present(0.5);
+  const d = last.get(e)!;
+  assert.ok(Math.abs(d.position[0] - 5) < 1e-9);
+  assert.ok(Math.abs(Math.hypot(...d.rotation) - 1) < 1e-9, 'rotation stays normalised');
+  assert.ok(d.rotation[1] > 0.5 && d.rotation[3] > 0.5);
+  sync.present(1);
+  assert.ok(Math.abs(last.get(e)!.position[0] - 10) < 1e-9);
+});
+
+test('present only calls update when something changed', () => {
+  const w = fakeWorld(); defineRenderComponents(w);
+  w.spawn({ transform: {}, ...red });
+  const { a, log } = fakeAdapter();
+  const sync = createSceneSync(w, a);
+  sync.step(); sync.present(1);
+  const n = log.length;
+  sync.step(); sync.present(1); sync.present(0.3);
+  assert.equal(log.length, n);
+});
+
+test('dispose removes every node', () => {
+  const w = fakeWorld(); defineRenderComponents(w);
+  const e = w.spawn({ transform: {}, ...red });
+  const { a, last } = fakeAdapter();
+  const sync = createSceneSync(w, a);
+  sync.step(); assert.ok(last.has(e));
+  sync.dispose(); assert.equal(last.size, 0);
+});
+
+=== END FILE ===
+
+When finished: run `npx tsc --noEmit`, the tests and `vite build`, and tell me which pass or fail and why.

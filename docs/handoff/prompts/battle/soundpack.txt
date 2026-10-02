@@ -1,0 +1,21 @@
+START FROM A CLEAN SLATE: delete every file in the project first, then create the files below. Create real files, run `npm install`, run tests and typecheck. Reply with a short summary only (no code in the chat). Library only: no vite, no index.html, no React, no DOM.
+
+TASK (TypeScript): "soundpack": a complete, carefully DESIGNED set of 29 synthesized game sound effects for a cheerful 3D goblin ball-racing game (goblins in glass balls on a tropical volcanic island), as data. This is a sound-design task: think about what each sound should feel like (pitch, shape, brightness, length, layering) and make them a coherent family: warm, bouncy, slightly cartoonish, clearly distinct from each other, never harsh or shrill, loudness balanced (gains 0.05..0.5, short UI sounds quieter than race events).
+
+Project: Node 20+, ESM, TypeScript strict incl. noUncheckedIndexedAccess/noUnusedLocals, tsx, typescript, @types/node. Code in packages/soundpack/src/, tests in packages/soundpack/tests/. Run tests: node --import tsx --test packages/soundpack/tests/*.test.ts. Import siblings WITHOUT file extensions.
+
+THE RECIPE FORMAT (define it in src/types.ts exactly):
+export type Wave = 'sine' | 'square' | 'sawtooth' | 'triangle' | 'noise';
+export interface SfxLayer { wave: Wave; freq: readonly [number, number] /* Hz at start and end, exponential glide, ignored for noise */; gain: number; attackMs: number; decayMs: number; delayMs?: number; detune?: number /* cents */; filter?: { type: 'lowpass' | 'highpass' | 'bandpass'; freq: readonly [number, number]; q: number } }
+export interface SfxRecipe { id: string; durationMs: number; layers: readonly SfxLayer[]; category: 'race' | 'editor' | 'ui' }
+LIMITS: 1 to 8 layers; freq and filter freq 20..20000; q 0.1..20; gain 0..1; attackMs 0..500; decayMs 1..1600; delayMs 0..1500; detune -1200..1200; durationMs <= 1600 and >= every layer's delayMs + attackMs + decayMs.
+
+DELIVER src/pack.ts exporting `export const SOUND_PACK: readonly SfxRecipe[]` with exactly these ids, each with a one-line `intent` comment above it, in this order (category in brackets):
+race: countdown-beep (a clear tick for 3, 2, 1 that repeats well), go (brighter, higher, more final than the beep), boost (rising whoosh with a sparkle), jump (springy up-glide), item-pickup (happy two or three note chime), hit-wall (dull thud with a little crunch), hit-racer (rubbery bonk, higher than the wall), splash (water: filtered noise burst with a bubble), lap (short fanfare of three rising notes), finish (longer triumphant arpeggio that resolves), respawn (magical soft pop-and-sparkle), oil (squelchy slippery downward wobble), shockwave (deep boom with expanding airy ring), freeze (icy crystalline downward chime with shimmer).
+ui: ui-click, ui-hover (barely there), ui-toggle (two quick tones, up or down), ui-error (soft low double buzz, not annoying), ui-success (bright two-note rise).
+editor: paint-tick (tiny soft scratch, must be pleasant when repeated 20 times a second), sculpt-tick (low soft thump tick), place (satisfying wooden plop), delete (short papery crumple down), undo (small downward sweep), redo (small upward sweep), snap (crisp magnetic click), select (soft bright blip), tool-switch (tiny mechanical ratchet), save (warm confirmation chord of two notes).
+Use 2 to 5 layers where it helps (a body, a sparkle, a noise texture), use filters and glides, use `delayMs` for arpeggios, keep durations short for UI (30..200 ms) and longer for race events (200..1200 ms).
+
+ALSO export `PACK_NOTES: Record<string, string>` with one sentence per id explaining the design choice.
+
+TESTS (you write, must pass): all 29 ids exist once, in the right category; every recipe respects every LIMIT (write a validate function in the test); no two recipes are identical; durations: ui and editor recipes <= 400 ms except save <= 700 ms, countdown-beep <= 250 ms, finish >= 600 ms; total peak gain of simultaneous layers per recipe (sum of layer gains) <= 1.2; paint-tick and sculpt-tick <= 80 ms and gain sum <= 0.35; every note frequency is musical for the pitched family: layers of lap, finish, powerup-like chimes (item-pickup, ui-success, save, go, countdown-beep) use frequencies within 2 cents of equal-tempered notes (A4 = 440 Hz), so they harmonise.

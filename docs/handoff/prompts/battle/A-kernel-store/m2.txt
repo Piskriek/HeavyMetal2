@@ -1,0 +1,5 @@
+Now output these files, and only these files, in the OUTPUT FORMAT (file blocks only):
+- packages/kernel/src/hash.ts
+- packages/kernel/src/schema-registry.ts
+- packages/kernel/src/event-bus.ts
+- packages/kernel/src/bundle.ts

@@ -1,0 +1,23 @@
+# TASK T2: the script compiler and sandbox (`packages/script`)
+
+You are given a zip of a TypeScript monorepo (the "harness"). Read `docs/README.md`, then `docs/RULES.md` (binding), then in `packages/contracts/src`: `core.ts`, `preset.ts`, `script.ts`, `sim.ts` (only `Rng`, `World`), `packages.ts` (`ScriptExports`).
+Your acceptance tests are `packages/script/tests/acceptance.test.ts`. Read them fully first.
+
+## Why this exists
+Any preset can carry a TypeScript `script` (a Mechanic, a Rule, a Tool). A 20-year-old edits it live in an in-game code panel; it is saved inside the preset JSON, shared on RUN, and runs inside a deterministic race on every player's machine. So it must be: **safe** (no host access, no escape), **deterministic** (no clock, no `Math.random`), **bounded** (an infinite loop cannot freeze the game), and **hot-reloadable**.
+
+## What to build (all inside `packages/script/src`)
+1. **`compile(source)`**: TypeScript to JavaScript in the browser, with diagnostics (line/column in the USER's source, never in generated code) for syntax errors AND type errors. `ScriptContext`, `Mechanic`, `Rule`, `ToolScript`, `Value` and `Rng` are AMBIENT types (supplied by `typings()`): scripts have no imports. Refuse at compile time: `import`/`export ... from`, `require`, `eval`, `Function` construction, and the host globals (`window`, `document`, `fetch`, `process`, `globalThis` property tricks cannot be fully blocked statically, so the RUNTIME must also be sealed, see below). A script is a module whose named exports are the members of its interface.
+2. **The sandbox** (`load`, `call`, `reload`): the strongest design that meets the tests is a real isolate: **QuickJS compiled to WASM** (`quickjs-emscripten`, MIT) with its interrupt handler for budgets, host functions for the capability object, `Math.random` and `Date` removed, intrinsics frozen, one fresh context per script (no shared state, no way to reach the host). Top-level `await` to initialise the WASM module is acceptable (the build target is es2022), as long as `createScriptHost` stays synchronous for callers. If you choose another design (for example a Worker or a frozen realm) it MUST still pass the escape tests (`.constructor.constructor(...)`, prototype pollution, `globalThis`) and you must justify it in `REPORT.md`.
+   - `ScriptContext` is marshalled in: plain values copied, functions (`set`, `emit`, `log`, `spawn`, `despawn`, `vars.*`, `world.*`) become host-function proxies. A script may only write through `ctx.set`/`spawn`/`despawn`/`emit`.
+   - **Budgets**: `callBudgetMs` (wall time, a safety net) and `opBudget` (a deterministic instruction/loop budget, so a script that is too slow fails the same way on every machine). Exceeding either aborts that call, sets `faulted`, records `lastError`, and `call` returns `{ok:false, error}`: never throws, never hangs the host. A faulted script is skipped (`{ok:false, error:'script is faulted...'}`) until `reload`.
+   - `call` of a member outside the script's interface is refused; a member the script does not export is a successful no-op.
+3. **`reload`**: compiles the new source; on a compile error it THROWS and the old script keeps working untouched; on success returns a fresh un-faulted `LoadedScript` for the same preset.
+4. **`typings(iface)`**: returns a `.d.ts` string with `ScriptContext`, `Value`, `Rng`, and the chosen interface (`Mechanic` etc.), generated from the contract types (you may hand-write it, but a test must check it stays in step with `ScriptContext`'s members). The editor panel (a later task) feeds it to Monaco/CodeMirror for autocomplete.
+5. **Size budget**: the TypeScript compiler is ~9 MB. Keep it OUT of the runtime path: runtime loading of saved scripts must use a fast transpile-only path (strip types) so a published game does not pay for type-checking; full type-check belongs to `compile()` for the editor. Isolate the type-checker in its own module, and report in `REPORT.md` the bytes your package adds to `apps/web/dist/index.html` with and without it. (If a lazy `import()` split is not possible in the single-file build, say so; the integrator will decide.)
+
+## Also
+- Add your own tests for: every sandbox escape you can think of (write at least 15), op-budget determinism, `reload` keeping slot order, marshalling of nested values and `null`, error messages carrying the user's line number, and a 1,000-call-per-second throughput check (a mechanic called 1,000 times must finish in under 1 s).
+- Wire a status line into `apps/web/src/main.ts` (it probes `createScriptHost`) and keep it working.
+
+Deliver per `docs/RULES.md` (zip + `REPORT.md`). The gate is `node scripts/verify.mjs script`.

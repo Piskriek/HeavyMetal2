@@ -1,0 +1,187 @@
+START FROM A CLEAN SLATE: delete every file in the project first, then create the files below. Create everything as real files in the project, run `npm install`, build, and run the tests. Reply with a short summary only (no code in the chat).
+
+You are a senior TypeScript engineer. TASK: platform adapters for a browser game that will run inside the RUN.world platform (a static build in an iframe, no server of our own). The game talks only to the `Platform` interface below. Build (1) a `stub` platform: in memory, per instance, behaving like RUN in every way the game depends on, used for tests and offline development; (2) a `run` platform that wraps the real RUN SDK (npm package `@series-inc/rundot-game-sdk`; after `npm install @series-inc/rundot-game-sdk` READ its docs in node_modules/@series-inc/rundot-game-sdk/docs/rundot-developer-platform/api/ (STORAGE.md, UGC.md, LEADERBOARD.md, MULTIPLAYER.md, PROFILE.md) and follow them exactly: method names and shapes must come from those docs, not from memory). The `run` adapter receives the SDK object through opts.sdk (so it can be tested with a fake) and must throw an Error whose message contains "sdk" if none is given.
+
+Project: a normal npm project (Node 20+, ESM, TypeScript strict). Code in packages/platform/src/, tests in packages/platform/tests/. Run tests with: node --import tsx --test packages/platform/tests/*.test.ts (dev dependencies: tsx, typescript, @types/node). Path alias in tsconfig "paths": '@hm/contracts' -> packages/contracts/src/index.ts and '@hm/platform' -> packages/platform/src/index.ts.
+
+CONTRACT (create packages/contracts/src/index.ts with exactly this code, one file; packages/platform/src/index.ts must export createPlatform):
+=== FILE: packages/contracts/src/index.ts ===
+export type Value = number | boolean | string | null | { readonly ref: string; readonly rev?: number } | { readonly expr: string } | readonly Value[] | { readonly [key: string]: Value };
+export type Unsubscribe = () => void;
+export type Tier = 'play' | 'build' | 'pro';
+export interface Preset { readonly id: string; readonly kind: string; readonly name: string; readonly revision: number; readonly hash: string; readonly params: Readonly<Record<string, Value>>; readonly children: Readonly<Record<string, readonly { readonly ref: string; readonly rev?: number }[]>>; readonly tags: readonly string[]; readonly tier: Tier; readonly meta: { readonly createdAt: number } }
+export interface PresetBundle { readonly format: 'hm-bundle'; readonly version: number; readonly root: string; readonly presets: readonly Preset[]; readonly schemaVersions: Readonly<Record<string, number>> }
+export interface PlatformExports {
+  createPlatform(kind: 'stub' | 'run', opts?: { readonly user?: string; readonly sdk?: unknown }): Platform;
+}
+
+export interface StorageAdapter {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+  keys(prefix?: string): Promise<readonly string[]>;
+}
+
+export interface PublishedItem {
+  readonly id: string;
+  readonly title: string;
+  readonly author: string;
+  readonly createdAt: number;
+  readonly tags: readonly string[];
+  readonly bytes: number;
+}
+
+export const UGC_MAX_BYTES = 100_000;
+
+export interface UgcAdapter {
+    publish(title: string, bundle: PresetBundle, tags?: readonly string[]): Promise<PublishedItem>;
+  list(opts?: { readonly tag?: string; readonly mine?: boolean; readonly limit?: number }): Promise<readonly PublishedItem[]>;
+  load(id: string): Promise<PresetBundle>;
+  remove(id: string): Promise<void>;
+}
+export class UgcTooLargeError extends Error {
+  constructor(readonly bytes: number) {
+    super(`bundle is ${bytes} bytes; the limit is ${UGC_MAX_BYTES}`);
+    this.name = 'UgcTooLargeError';
+  }
+}
+
+export interface LeaderboardAdapter {
+  submit(board: string, score: number, meta?: Readonly<Record<string, Value>>): Promise<void>;
+  top(board: string, limit?: number): Promise<readonly { readonly rank: number; readonly name: string; readonly score: number }[]>;
+}
+
+export interface RoomMessage {
+  readonly from: string;
+  readonly name: string;
+  readonly payload: Value;
+}
+export interface Room {
+  readonly id: string;
+  readonly members: readonly string[];
+  send(name: string, payload: Value, to?: string): void;
+  onMessage(listener: (message: RoomMessage) => void): Unsubscribe;
+  onMembers(listener: (members: readonly string[]) => void): Unsubscribe;
+  leave(): Promise<void>;
+}
+export interface RoomsAdapter {
+  create(opts?: { readonly maxPlayers?: number; readonly metadata?: Readonly<Record<string, Value>> }): Promise<Room>;
+  join(id: string): Promise<Room>;
+  list(): Promise<readonly { readonly id: string; readonly members: number; readonly metadata: Readonly<Record<string, Value>> }[]>;
+}
+
+export interface Profile {
+  readonly id: string;
+  readonly name: string;
+  readonly isAnonymous: boolean;
+}
+
+export interface Platform {
+  readonly kind: 'stub' | 'run';
+  readonly storage: StorageAdapter;
+  readonly ugc: UgcAdapter;
+  readonly leaderboard: LeaderboardAdapter;
+  readonly rooms: RoomsAdapter;
+  profile(): Promise<Profile>;
+}
+=== END FILE ===
+
+REQUIREMENTS
+1. Stub: storage get/set/remove/keys(prefix); ugc publish (title, bundle, tags): JSON size = JSON.stringify(bundle).length must be <= UGC_MAX_BYTES else throw UgcTooLargeError(bytes); returns PublishedItem with id, title, author (the user name or 'guest'), createdAt (a counter or injected clock: do NOT call Date.now inside logic, take an optional `now` function in opts, default a simple incrementing counter), tags, bytes; list({tag, mine, limit}), load(id) (throws if missing), remove(id). leaderboard: submit keeps only the BEST score per player per board; top(board, limit) returns rows {rank (1-based), name, score} sorted by score descending. rooms: create({maxPlayers, metadata}), join(id) (throws an Error mentioning "full" when maxPlayers is reached, "not found" if unknown), list(); a Room has id, members (names), send(name, payload, to?) which delivers to every OTHER member's onMessage listeners (not the sender), onMessage, onMembers (called when members change), leave(). profile(): {id, name, isAnonymous}; with no `user` option the profile is an anonymous guest. Several stub platforms may share one in-memory hub through an optional opts.hub so tests can play two users in one room; by default each createPlatform('stub') has its own hub.
+2. Run: map each adapter onto the SDK as the docs describe. Translate SDK errors into clear Errors. Never import the SDK statically: only use opts.sdk.
+3. packages/platform/tests/fake-run-sdk.ts exporting createFakeRunSdk(): an in-memory fake that has the same method names and shapes as the SDK parts you use (derive them from the docs/types). Test the run adapter with it: at least one test per adapter method.
+4. Also add at least 15 tests of your own (new file packages/platform/tests/extra.test.ts).
+Keep files small (<300 lines): stub.ts, run.ts, index.ts. Comments say WHY. No runtime dependencies (the SDK is only a dev dependency used for reading its docs/types).
+
+ACCEPTANCE TESTS (make these pass; fix only obvious test typos and tell me which):
+=== FILE: packages/platform/tests/acceptance.test.ts ===
+/**
+ * T9 acceptance: platform adapters. The 'stub' platform must behave like RUN in every way the harness depends on (limits included),
+ * so the whole harness can be developed and tested without RUN. The 'run' adapter is tested here only against a FAKE sdk you write
+ * in packages/platform/tests/fake-run-sdk.ts (the real RUN SDK docs are in docs/run-sdk/; read them before writing the adapter).
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { UGC_MAX_BYTES, UgcTooLargeError, type PresetBundle } from '@hm/contracts';
+import { createPlatform } from '@hm/platform';
+
+const bundle = (name: string, pad = 0): PresetBundle => ({
+  format: 'hm-bundle', version: 1, root: 'p1', schemaVersions: { racer: 1 },
+  presets: [{ id: 'p1', kind: 'racer', name, revision: 1, hash: 'h', params: pad ? { note: 'x'.repeat(pad) } : {}, children: {}, tags: [], tier: 'build', meta: { createdAt: 1 } }],
+});
+
+test('stub: kind and profile', async () => {
+  const p = createPlatform('stub', { user: 'Mo' });
+  assert.equal(p.kind, 'stub');
+  const me = await p.profile();
+  assert.equal(me.name, 'Mo'); assert.equal(me.isAnonymous, false);
+  assert.equal((await createPlatform('stub').profile()).isAnonymous, true, 'no user given = anonymous guest');
+});
+
+test('stub storage: get/set/remove/keys with prefix; independent platforms do not share data', async () => {
+  const p = createPlatform('stub');
+  assert.equal(await p.storage.get('a'), null);
+  await p.storage.set('a/1', 'x'); await p.storage.set('a/2', 'y'); await p.storage.set('b/1', 'z');
+  assert.equal(await p.storage.get('a/1'), 'x');
+  assert.deepEqual([...(await p.storage.keys('a/'))].sort(), ['a/1', 'a/2']);
+  assert.equal((await p.storage.keys()).length, 3);
+  await p.storage.remove('a/1');
+  assert.equal(await p.storage.get('a/1'), null);
+  assert.equal(await createPlatform('stub').storage.get('b/1'), null);
+});
+
+test('stub ugc: publish/list/load/remove, the 100 KB limit, tags, mine', async () => {
+  const p = createPlatform('stub', { user: 'Mo' });
+  const item = await p.ugc.publish('Fast ball', bundle('Fast'), ['racer']);
+  assert.ok(item.id); assert.equal(item.title, 'Fast ball'); assert.equal(item.author, 'Mo'); assert.deepEqual(item.tags, ['racer']);
+  assert.equal(item.bytes, JSON.stringify(bundle('Fast')).length);
+  assert.deepEqual((await p.ugc.list()).map((i) => i.id), [item.id]);
+  assert.deepEqual((await p.ugc.list({ tag: 'nope' })).length, 0);
+  assert.equal((await p.ugc.list({ mine: true })).length, 1);
+  assert.deepEqual(await p.ugc.load(item.id), bundle('Fast'));
+  await assert.rejects(p.ugc.publish('Huge', bundle('Huge', UGC_MAX_BYTES)), (e) => e instanceof UgcTooLargeError && e.bytes > UGC_MAX_BYTES);
+  await p.ugc.remove(item.id);
+  assert.equal((await p.ugc.list()).length, 0);
+  await assert.rejects(p.ugc.load(item.id));
+});
+
+test('stub leaderboard: submit keeps the best per player, top is ranked and limited', async () => {
+  const p = createPlatform('stub', { user: 'Mo' });
+  await p.leaderboard.submit('ranked', 900); await p.leaderboard.submit('ranked', 1200); await p.leaderboard.submit('ranked', 1000);
+  const top = await p.leaderboard.top('ranked', 10);
+  assert.deepEqual(top.map((t) => [t.rank, t.name, t.score]), [[1, 'Mo', 1200]], 'one row per player: the best score');
+  assert.deepEqual(await p.leaderboard.top('empty'), []);
+});
+
+test('stub rooms: create/join/list, messages reach the others (not the sender), members update, leave', async () => {
+  const hub = createPlatform('stub', { user: 'A' });
+  const room = await hub.rooms.create({ maxPlayers: 2, metadata: { mode: 'race' } });
+  assert.deepEqual(room.members, ['A']);
+  assert.equal((await hub.rooms.list())[0]!.metadata['mode'], 'race');
+  const got: string[] = [];
+  room.onMessage((m) => got.push(`${m.from}:${m.name}:${JSON.stringify(m.payload)}`));
+  const joined = await hub.rooms.join(room.id);
+  assert.ok(joined.members.length >= 1);
+  const members: string[][] = [];
+  room.onMembers((m) => members.push([...m]));
+  joined.send('hello', { n: 1 });
+  assert.equal(got.length, 1); assert.match(got[0]!, /:hello:\{"n":1\}/);
+  await assert.rejects(hub.rooms.join(room.id).then((r) => hub.rooms.join(r.id)).then((r) => hub.rooms.join(r.id)), /full|max/i, 'maxPlayers is enforced');
+  await joined.leave();
+  assert.ok(members.length >= 1);
+});
+
+test('run adapter: builds on an injected sdk, fails clearly without one', async () => {
+  assert.throws(() => createPlatform('run'), /sdk/i);
+  // the agent writes ./fake-run-sdk.ts; this test only requires that it exists and the adapter accepts it
+  const fakePath = './fake-run-sdk.ts';
+  const mod = (await import(fakePath).catch(() => null)) as { createFakeRunSdk?: () => unknown } | null;
+  assert.ok(mod && typeof mod.createFakeRunSdk === 'function' && mod.createFakeRunSdk, 'write packages/platform/tests/fake-run-sdk.ts exporting createFakeRunSdk()');
+  const p = createPlatform('run', { sdk: mod!.createFakeRunSdk!() });
+  assert.equal(p.kind, 'run');
+  await p.storage.set('k', 'v');
+  assert.equal(await p.storage.get('k'), 'v');
+});
+=== END FILE ===
+
+When finished: run the tests, build, and tell me which tests pass or fail and why.

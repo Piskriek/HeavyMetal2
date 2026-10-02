@@ -1,0 +1,540 @@
+You are a senior TypeScript engineer. I will give you a task in a few messages. This first message is the complete context. Reply to it with ONLY: Context received.
+
+RULES (binding)
+- TypeScript strict, ESM, no `any`, no ts-ignore. Small files (<400 lines), small functions, plain JSON-serialisable data. Comments explain WHY, briefly; every exported function has a one-line doc comment.
+- Time and randomness are never called inside logic (no Date.now, Math.random). No runtime dependencies. No network.
+- Import contract types only from '@hm/contracts' (already written, given below; do not change them). Relative imports inside your package use no file extension.
+- Errors thrown must say what was wrong and what to do. Never swallow errors.
+- Your output must compile under tsconfig (strict, noUncheckedIndexedAccess, noUnusedLocals, noUnusedParameters) and make the given tests pass.
+
+OUTPUT FORMAT (when asked for files): reply with ONLY file blocks, no commentary, no markdown fences, exactly:
+=== FILE: packages/kernel/src/example.ts ===
+<whole file content>
+=== END FILE ===
+One block per file, whole files only (never diffs, never "rest unchanged").
+
+FILES (context; these already exist, do not output them):
+
+=== FILE: packages/contracts/src/core.ts ===
+/**
+ * CORE VOCABULARY. Everything in the harness is built from these few types.
+ * Contracts are TYPES (plus a few tiny constants): no package may put logic here.
+ */
+
+/** Identifies a preset. Stable across revisions; forks get a new id. */
+export type PresetId = string;
+
+/** Which depth of the UI shows a thing. play = a 6-year-old, build = a maker, pro = every variable and the source. */
+export type Tier = 'play' | 'build' | 'pro';
+export const TIERS: readonly Tier[] = ['play', 'build', 'pro'] as const;
+export const tierRank = (t: Tier): number => (t === 'play' ? 0 : t === 'build' ? 1 : 2);
+/** A thing at tier `t` is visible in a UI shown at tier `shown` when it is at most as deep. */
+export const visibleAt = (t: Tier, shown: Tier): boolean => tierRank(t) <= tierRank(shown);
+
+export type Vec2 = readonly [number, number];
+export type Vec3 = readonly [number, number, number];
+/** Quaternion x, y, z, w. */
+export type Quat = readonly [number, number, number, number];
+/** '#rrggbb' or '#rrggbbaa'. */
+export type Color = string;
+
+/** A pointer to a preset. `rev` pins a revision; absent means "the latest". */
+export interface Ref {
+  readonly ref: PresetId;
+  readonly rev?: number;
+}
+
+/** A live expression, e.g. `"clamp($rider.weight * 2 + 1, 0, 10)"`. See `VariableSystem.compile`. */
+export interface Expr {
+  readonly expr: string;
+}
+
+/** Everything a variable can hold (JSON-serialisable on purpose: presets are shared as JSON). */
+export type Value =
+  | number
+  | boolean
+  | string
+  | null
+  | Ref
+  | Expr
+  | readonly Value[]
+  | { readonly [key: string]: Value };
+
+export type Params = Readonly<Record<string, Value>>;
+
+export type Unsubscribe = () => void;
+
+export interface Issue {
+  readonly severity: 'error' | 'warning';
+  readonly code: string;
+  readonly message: string;
+  /** The preset (and parameter, if any) the issue is about. */
+  readonly presetId?: PresetId;
+  readonly path?: string;
+}
+
+/** The kinds that exist from day one. Packs may register more: a kind is just a string with a schema. */
+export const CORE_KINDS = [
+  'game', 'mode', 'scene', 'entity', 'shape', 'material', 'mechanic', 'rule', 'item', 'racer', 'track-piece',
+  'camera', 'input-map', 'ui-skin', 'hud', 'tool', 'manipulation', 'brush', 'ai-driver', 'audio-cue', 'physics-model',
+] as const;
+export type CoreKind = (typeof CORE_KINDS)[number];
+/** Open on purpose: a pack adds `racer`-like kinds without touching contracts. */
+export type PresetKind = CoreKind | (string & {});
+
+/** The harness's own version of the preset file format and of the script API. Bump with a migration. */
+export const FORMAT_VERSION = 1;
+export const SCRIPT_API_VERSION = 1;
+/** The sim step: all gameplay runs at this fixed rate. */
+export const SIM_HZ = 120;
+export const SIM_DT = 1 / SIM_HZ;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/schema.ts ===
+import type { PresetKind, Tier, Value } from './core';
+
+export type ValueType =
+  | 'number' | 'int' | 'boolean' | 'string' | 'enum' | 'color'
+  | 'vec2' | 'vec3' | 'quat'
+  | 'ref'      // a pointer to a preset (of `refKinds`)
+  | 'list'     // a list of `itemType`
+  | 'curve'    // [[t, v], ...] sorted by t
+  | 'asset'    // a file name in the asset library (texture, sound, mesh)
+  | 'expr';    // free expression
+
+/**
+ * One variable of a preset kind. EVERY tunable thing is declared this way: the inspector, the search box, bindings,
+ * the code panel's autocomplete and the docs are all generated from these definitions. Nothing is a magic number.
+ */
+export interface VariableDef {
+  /** Key inside `Preset.params` (dotted keys are fine: "wheel.grip"). */
+  readonly key: string;
+  readonly type: ValueType;
+  readonly label: string;
+  /** One sentence a 10-year-old can read. Shown as the tooltip and in the Play tier. */
+  readonly doc: string;
+  /** The simplest UI tier that shows it. Most variables are 'pro'; the few that matter to a child are 'play'. */
+  readonly tier: Tier;
+  readonly default: Value;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+  readonly unit?: string;
+  /** For 'enum'. */
+  readonly options?: readonly string[];
+  /** For 'ref': which kinds may be chosen. */
+  readonly refKinds?: readonly PresetKind[];
+  /** For 'list'. */
+  readonly itemType?: ValueType;
+  /** Inspector grouping ("Handling", "Looks"). */
+  readonly group?: string;
+  /** False for values that must stay constants (rare). Default true: anything can be bound or driven by an expression. */
+  readonly bindable?: boolean;
+}
+
+/** A named place where a preset holds other presets (a game holds modes; a racer holds a body and mechanics). */
+export interface ChildSlot {
+  readonly key: string;
+  readonly label: string;
+  readonly doc: string;
+  readonly kinds: readonly PresetKind[];
+  readonly min: number;
+  /** Infinity is written as null in JSON. */
+  readonly max: number | null;
+  readonly tier: Tier;
+}
+
+/** Everything the harness needs to know about a kind of preset. */
+export interface PresetSchema {
+  readonly kind: PresetKind;
+  /** Bump when `variables` change shape; a migration then upgrades saved presets. */
+  readonly version: number;
+  readonly label: string;
+  readonly doc: string;
+  readonly icon?: string;
+  readonly variables: readonly VariableDef[];
+  readonly slots: readonly ChildSlot[];
+  /**
+   * If set, a preset of this kind may carry a script that implements this named interface
+   * (see `ScriptInterfaces` in script.ts), e.g. 'Mechanic'.
+   */
+  readonly scriptInterface?: string;
+}
+
+export interface SchemaRegistry {
+  register(schema: PresetSchema): void;
+  get(kind: PresetKind): PresetSchema | undefined;
+  kinds(): readonly PresetKind[];
+  /** Variables of a kind that a UI at `tier` should show, in declaration order. */
+  variablesFor(kind: PresetKind, tier: Tier): readonly VariableDef[];
+  /** Upgrades the params of a preset saved at `fromVersion` to the current schema. Registered per kind. */
+  registerMigration(kind: PresetKind, fromVersion: number, migrate: (params: Readonly<Record<string, Value>>) => Readonly<Record<string, Value>>): void;
+}
+
+/** Identity helper so a schema literal is type-checked at its definition site. */
+export const defineSchema = <S extends PresetSchema>(schema: S): S => schema;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/preset.ts ===
+import type { Issue, Params, PresetId, PresetKind, Ref, Tier, Unsubscribe, Value } from './core';
+
+/** Source code carried by a preset (the "Pro" tier). Compiled in the browser and run in a sandbox (see script.ts). */
+export interface ScriptSource {
+  readonly language: 'ts';
+  readonly source: string;
+  /** SCRIPT_API_VERSION it was written against. */
+  readonly apiVersion: number;
+}
+
+/**
+ * THE one node type. A game, a track, a ball, a tool, a mechanic, a material and a UI skin are all presets.
+ * A preset is IMMUTABLE: editing makes a new revision of the same id; forking makes a new id that remembers its source.
+ */
+export interface Preset {
+  readonly id: PresetId;
+  readonly kind: PresetKind;
+  readonly name: string;
+  /** 1 for the first version; each edit adds one. */
+  readonly revision: number;
+  /** Content hash of kind, name, params, children and script (not of meta). Equal hash = equal content. */
+  readonly hash: string;
+  /** The preset this was forked from. Unset params are inherited from it, then from the schema defaults. */
+  readonly forkOf?: Ref;
+  /** ONLY the values that differ from what would be inherited. Small on purpose: presets are shared as JSON (RUN UGC is 100 KB). */
+  readonly params: Params;
+  /** Slot key -> presets held in that slot, in order. */
+  readonly children: Readonly<Record<string, readonly Ref[]>>;
+  readonly script?: ScriptSource;
+  readonly tags: readonly string[];
+  /** The simplest UI tier that lists this preset in its browser. A draft that does not say defaults to 'build'. */
+  readonly tier: Tier;
+  readonly meta: {
+    readonly author?: string;
+    readonly createdAt: number;
+    readonly doc?: string;
+    readonly icon?: string;
+  };
+}
+
+/** What a caller supplies to create or revise a preset. Missing fields default (empty params, no children...). */
+export interface PresetDraft {
+  /** Omit to create a new preset; give an existing id to add a revision. */
+  readonly id?: PresetId;
+  readonly kind: PresetKind;
+  readonly name: string;
+  readonly forkOf?: Ref;
+  readonly params?: Params;
+  readonly children?: Readonly<Record<string, readonly Ref[]>>;
+  readonly script?: ScriptSource;
+  readonly tags?: readonly string[];
+  readonly tier?: Tier;
+  readonly meta?: Partial<Preset['meta']>;
+}
+
+/** A preset with its inheritance chain resolved: defaults < fork sources < own params. */
+export interface ResolvedPreset {
+  readonly preset: Preset;
+  readonly params: Params;
+  /** The chain that was applied, nearest first (the preset itself, its fork source, ...). */
+  readonly chain: readonly Preset[];
+}
+
+export interface StoreLimits {
+  /** Deepest allowed nesting of children (cycle guard and runtime guard). */
+  readonly maxDepth: number;
+  /** Most presets reachable from one root. */
+  readonly maxNodes: number;
+  /** Largest exported bundle in bytes (RUN UGC allows 100_000). */
+  readonly maxBundleBytes: number;
+}
+
+export type StoreChange =
+  | { readonly type: 'put'; readonly preset: Preset }
+  | { readonly type: 'remove'; readonly id: PresetId };
+
+/** The file a user shares or publishes: one root and everything it reaches. Plain JSON. */
+export interface PresetBundle {
+  readonly format: 'hm-bundle';
+  readonly version: number;
+  readonly root: PresetId;
+  readonly presets: readonly Preset[];
+  /** Schema version per kind at export time, so import can migrate. */
+  readonly schemaVersions: Readonly<Record<string, number>>;
+}
+
+export interface ImportReport {
+  readonly imported: number;
+  readonly skipped: number;
+  readonly renamed: Readonly<Record<PresetId, PresetId>>;
+  readonly issues: readonly Issue[];
+}
+
+export interface PresetFilter {
+  readonly kind?: PresetKind;
+  readonly tag?: string;
+  /** Show presets up to this tier. */
+  readonly tier?: Tier;
+  /** Case-insensitive match on name, tags and doc. */
+  readonly text?: string;
+}
+
+/** The preset graph. Content-addressed, copy-on-write, cycle-safe. Port target: the plan zip's graph.ts / authoring.ts. */
+export interface PresetStore {
+  readonly limits: StoreLimits;
+  /** A revision; omit `rev` for the latest. */
+  get(id: PresetId, rev?: number): Preset | undefined;
+  put(draft: PresetDraft): Preset;
+  /** A new preset (new id, revision 1) with `forkOf` set; `patch` overrides fields of the copy. */
+  fork(id: PresetId, patch?: Partial<PresetDraft>): Preset;
+  /** Removes all revisions. Refuses (throws) if another preset still references it. */
+  remove(id: PresetId): void;
+  list(filter?: PresetFilter): readonly Preset[];
+  resolve(id: PresetId, rev?: number): ResolvedPreset;
+  /** Presets whose children reference `id`. */
+  dependents(id: PresetId): readonly PresetId[];
+  /**
+   * Issue codes: about THIS preset only: 'missing-ref' (a child that does not exist), 'slot-kind' (a child of a kind the slot does not take),
+   * 'param-range' (outside min/max), 'unknown-param' (a key the schema does not declare). About everything reachable from it:
+   * 'cycle', 'depth' (> limits.maxDepth), 'nodes' (> limits.maxNodes).
+   */
+  validate(id: PresetId): readonly Issue[];
+  exportBundle(root: PresetId): PresetBundle;
+  importBundle(bundle: PresetBundle, opts?: { readonly onConflict?: 'keep' | 'replace' | 'rename' }): ImportReport;
+  subscribe(listener: (change: StoreChange) => void): Unsubscribe;
+}
+
+/** Deep-readonly helper used by contracts and tests. */
+export type Json = Value;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/commands.ts (EventBus excerpt) ===
+import type { Unsubscribe } from './core';
+
+export interface EventBus<M extends Record<string, unknown> = Record<string, unknown>> {
+  on<K extends keyof M & string>(name: K, listener: (payload: M[K]) => void): Unsubscribe;
+  once<K extends keyof M & string>(name: K, listener: (payload: M[K]) => void): Unsubscribe;
+  emit<K extends keyof M & string>(name: K, payload: M[K]): void;
+  /** Receives every event (for the "event log" in the Pro tier and for replays). */
+  onAny(listener: (name: string, payload: unknown) => void): Unsubscribe;
+}
+=== END FILE ===
+
+=== FILE: packages/kernel/src/index.ts (the exports you must satisfy) ===
+export interface KernelExportsSubset {
+  createSchemaRegistry(): SchemaRegistry;
+  createPresetStore(opts: { readonly schemas: SchemaRegistry; readonly limits?: Partial<StoreLimits>; readonly now?: () => number; readonly newId?: () => string }): PresetStore;
+  createEventBus(): EventBus;
+  migrateBundle(bundle: PresetBundle, schemas: SchemaRegistry): PresetBundle;
+  hashBundle(bundle: PresetBundle): string;
+}
+=== END FILE ===
+
+=== FILE: packages/kernel/tests/store.test.ts ===
+/**
+ * T1 acceptance: the kernel (schema registry, preset graph, variables, commands, events, migrations).
+ * Issue codes the store's validate() must use: 'cycle', 'missing-ref', 'slot-kind', 'param-range', 'unknown-param', 'depth', 'nodes'.
+ * If a test contradicts the contract text in packages/contracts, follow the contract, fix the test minimally and say so in your report.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { defineSchema, type PresetBundle, type PresetStore, type SchemaRegistry } from '@hm/contracts';
+import { createEventBus, createPresetStore, createSchemaRegistry, hashBundle, migrateBundle } from '@hm/kernel';
+
+const racer = defineSchema({
+  kind: 'racer', version: 2, label: 'Racer', doc: 'A ball that races.',
+  variables: [
+    { key: 'weight', type: 'number', label: 'Weight', doc: 'How heavy the ball is.', tier: 'play', default: 5, min: 0, max: 10, step: 1 },
+    { key: 'bounce', type: 'number', label: 'Bounce', doc: 'How bouncy.', tier: 'play', default: 5, min: 0, max: 10 },
+    { key: 'grip.rolling', type: 'number', label: 'Rolling grip', doc: 'Friction while rolling.', tier: 'pro', default: 0.8, min: 0, max: 2, unit: 'mu' },
+    { key: 'colour', type: 'color', label: 'Colour', doc: 'Paint.', tier: 'build', default: '#ff8800' },
+  ],
+  slots: [{ key: 'mechanics', label: 'Mechanics', doc: 'Extra behaviours.', kinds: ['mechanic'], min: 0, max: 4, tier: 'build' }],
+} as const);
+const mechanic = defineSchema({
+  kind: 'mechanic', version: 1, label: 'Mechanic', doc: 'A behaviour.', scriptInterface: 'Mechanic',
+  variables: [{ key: 'power', type: 'number', label: 'Power', doc: 'Strength.', tier: 'build', default: 1, min: 0, max: 100 }],
+  slots: [],
+} as const);
+const mode = defineSchema({
+  kind: 'mode', version: 1, label: 'Mode', doc: 'A way to play.',
+  variables: [{ key: 'laps', type: 'int', label: 'Laps', doc: 'How many laps.', tier: 'play', default: 3, min: 1, max: 20 }],
+  slots: [{ key: 'racers', label: 'Racers', doc: 'Who races.', kinds: ['racer'], min: 0, max: null, tier: 'play' }],
+} as const);
+
+function setup(limits?: { maxDepth?: number; maxNodes?: number; maxBundleBytes?: number }) {
+  const schemas = createSchemaRegistry();
+  for (const s of [racer, mechanic, mode]) schemas.register(s);
+  let n = 0, t = 1000;
+  const store = createPresetStore({ schemas, ...(limits ? { limits } : {}), newId: () => `p${++n}`, now: () => ++t });
+  const events = createEventBus();
+  return { schemas, store, events };
+}
+
+test('registry: kinds, tier filtering, unknown kinds', () => {
+  const { schemas } = setup();
+  assert.deepEqual([...schemas.kinds()].sort(), ['mechanic', 'mode', 'racer']);
+  assert.equal(schemas.get('nope'), undefined);
+  assert.deepEqual(schemas.variablesFor('racer', 'play').map((v) => v.key), ['weight', 'bounce']);
+  assert.deepEqual(schemas.variablesFor('racer', 'build').map((v) => v.key), ['weight', 'bounce', 'colour']);
+  assert.equal(schemas.variablesFor('racer', 'pro').length, 4);
+});
+
+test('store: put makes revisions; old revisions stay readable; hash is content-only', () => {
+  const { store } = setup();
+  const a = store.put({ kind: 'racer', name: 'Ball', params: { weight: 7 } });
+  assert.equal(a.id, 'p1'); assert.equal(a.revision, 1);
+  const b = store.put({ id: a.id, kind: 'racer', name: 'Ball', params: { weight: 8 } });
+  assert.equal(b.revision, 2);
+  assert.equal(store.get(a.id)!.params['weight'], 8);
+  assert.equal(store.get(a.id, 1)!.params['weight'], 7);
+  assert.notEqual(a.hash, b.hash);
+  const same = store.put({ kind: 'racer', name: 'Ball', params: { weight: 8 } });
+  assert.equal(same.hash, b.hash, 'equal content, equal hash, whatever the id, revision or time');
+});
+
+test('store: resolve = schema defaults < fork chain < own params; fork copies and remembers', () => {
+  const { store } = setup();
+  const base = store.put({ kind: 'racer', name: 'Base', params: { weight: 8 } });
+  const fork = store.fork(base.id, { name: 'Light', params: { bounce: 9 } });
+  assert.notEqual(fork.id, base.id);
+  assert.equal(fork.revision, 1);
+  assert.deepEqual(fork.forkOf, { ref: base.id, rev: 1 });
+  const r = store.resolve(fork.id);
+  assert.equal(r.params['weight'], 8, 'inherited from the fork source');
+  assert.equal(r.params['bounce'], 9, 'own override');
+  assert.equal(r.params['grip.rolling'], 0.8, 'schema default');
+  assert.deepEqual(r.chain.map((p) => p.id), [fork.id, base.id]);
+  store.put({ id: base.id, kind: 'racer', name: 'Base', params: { weight: 2 } });
+  assert.equal(store.resolve(fork.id).params['weight'], 8, 'a fork is pinned to the revision it was made from (copy-on-write)');
+});
+
+test('store: validate finds cycles, missing refs, wrong slot kinds, out-of-range and unknown params', () => {
+  const { store } = setup();
+  const m = store.put({ kind: 'mechanic', name: 'Nitro', params: { power: 500 } });
+  const r = store.put({ kind: 'racer', name: 'R', params: { weight: 3, wat: 1 }, children: { mechanics: [{ ref: m.id }, { ref: 'ghost' }] } });
+  const codes = store.validate(r.id).map((i) => i.code).sort();
+  assert.deepEqual(codes, ['missing-ref', 'unknown-param']);
+  const m2 = store.validate(m.id).map((i) => i.code);
+  assert.deepEqual(m2, ['param-range']);
+  const wrong = store.put({ kind: 'mode', name: 'M', children: { racers: [{ ref: m.id }] } });
+  assert.ok(store.validate(wrong.id).some((i) => i.code === 'slot-kind'));
+  // a cycle: a mode that holds a racer that holds ... the mode is not allowed by slots, so build one with two modes via a loose kind
+  const loose = createSchemaRegistry();
+  loose.register({ kind: 'node', version: 1, label: 'Node', doc: 'x', variables: [], slots: [{ key: 'kids', label: 'Kids', doc: 'x', kinds: ['node'], min: 0, max: null, tier: 'pro' }] });
+  const s2 = createPresetStore({ schemas: loose, newId: (() => { let i = 0; return () => `n${++i}`; })() });
+  const a = s2.put({ kind: 'node', name: 'A' });
+  const b = s2.put({ kind: 'node', name: 'B', children: { kids: [{ ref: a.id }] } });
+  s2.put({ id: a.id, kind: 'node', name: 'A', children: { kids: [{ ref: b.id }] } });
+  assert.ok(s2.validate(a.id).some((i) => i.code === 'cycle' && i.severity === 'error'));
+});
+
+test('store: limits (depth, nodes) are enforced by validate', () => {
+  const schemas = createSchemaRegistry();
+  schemas.register({ kind: 'node', version: 1, label: 'Node', doc: 'x', variables: [], slots: [{ key: 'kids', label: 'Kids', doc: 'x', kinds: ['node'], min: 0, max: null, tier: 'pro' }] });
+  const store = createPresetStore({ schemas, limits: { maxDepth: 3, maxNodes: 100 }, newId: (() => { let i = 0; return () => `n${++i}`; })() });
+  let prev = store.put({ kind: 'node', name: 'leaf' });
+  for (let i = 0; i < 5; i++) prev = store.put({ kind: 'node', name: `l${i}`, children: { kids: [{ ref: prev.id }] } });
+  assert.ok(store.validate(prev.id).some((i) => i.code === 'depth'));
+});
+
+test('store: remove refuses while referenced; list filters; subscribe sees changes', () => {
+  const { store } = setup();
+  const seen: string[] = [];
+  const off = store.subscribe((c) => seen.push(c.type));
+  const m = store.put({ kind: 'mechanic', name: 'Nitro', tags: ['speed'], tier: 'build' });
+  const r = store.put({ kind: 'racer', name: 'R', children: { mechanics: [{ ref: m.id }] } });
+  assert.throws(() => store.remove(m.id));
+  assert.deepEqual(store.dependents(m.id), [r.id]);
+  assert.deepEqual(store.list({ kind: 'mechanic' }).map((p) => p.name), ['Nitro']);
+  assert.deepEqual(store.list({ tag: 'speed' }).map((p) => p.name), ['Nitro']);
+  assert.deepEqual(store.list({ text: 'nitr' }).map((p) => p.name), ['Nitro']);
+  assert.deepEqual(store.list({ tier: 'play' }).map((p) => p.name), ['R'].filter(() => false), 'tier play hides build-tier presets');
+  store.remove(r.id);
+  off();
+  store.remove(m.id);
+  assert.deepEqual(seen, ['put', 'put', 'remove']);
+});
+
+test('bundles: export/import round-trip, size limit, conflicts', () => {
+  const { store, schemas } = setup();
+  const m = store.put({ kind: 'mechanic', name: 'Nitro' });
+  const r = store.put({ kind: 'racer', name: 'R', children: { mechanics: [{ ref: m.id }] } });
+  const bundle = store.exportBundle(r.id);
+  assert.equal(bundle.format, 'hm-bundle');
+  assert.equal(bundle.root, r.id);
+  assert.deepEqual(bundle.presets.map((p) => p.id).sort(), [m.id, r.id].sort());
+  assert.equal(bundle.schemaVersions['racer'], 2);
+  const fresh = createPresetStore({ schemas, newId: (() => { let i = 100; return () => `q${++i}`; })() });
+  const report = fresh.importBundle(JSON.parse(JSON.stringify(bundle)) as PresetBundle);
+  assert.equal(report.imported, 2);
+  assert.equal(fresh.get(r.id)!.name, 'R');
+  const again = fresh.importBundle(bundle, { onConflict: 'keep' });
+  assert.equal(again.skipped, 2);
+  const renamed = fresh.importBundle(bundle, { onConflict: 'rename' });
+  assert.equal(Object.keys(renamed.renamed).length, 2);
+  assert.ok(fresh.resolve(renamed.renamed[r.id]!).preset.children['mechanics']![0]!.ref === renamed.renamed[m.id], 'children refs follow the renames');
+  const tiny = setup({ maxBundleBytes: 50 });
+  const big = tiny.store.put({ kind: 'racer', name: 'R'.repeat(200) });
+  assert.throws(() => tiny.store.exportBundle(big.id), /bytes|limit|large/i);
+});
+
+test('hashBundle is stable and order-independent; migrateBundle upgrades old schema versions', () => {
+  const { store, schemas } = setup();
+  const m = store.put({ kind: 'mechanic', name: 'Nitro' });
+  const r = store.put({ kind: 'racer', name: 'R', children: { mechanics: [{ ref: m.id }] } });
+  const b = store.exportBundle(r.id);
+  const reversed: PresetBundle = { ...b, presets: [...b.presets].reverse() };
+  assert.equal(hashBundle(b), hashBundle(reversed));
+  assert.notEqual(hashBundle(b), hashBundle({ ...b, presets: b.presets.map((p) => (p.id === m.id ? { ...p, hash: 'x', name: 'Other' } : p)) }));
+  // racer v1 used "mass" instead of "weight"
+  schemas.registerMigration('racer', 1, (params) => {
+    const { mass, ...rest } = params as Record<string, unknown>;
+    return (mass === undefined ? rest : { ...rest, weight: mass }) as never;
+  });
+  const old: PresetBundle = { ...b, schemaVersions: { ...b.schemaVersions, racer: 1 }, presets: b.presets.map((p) => (p.id === r.id ? { ...p, params: { mass: 9 } } : p)) };
+  const migrated = migrateBundle(old, schemas);
+  assert.equal(migrated.schemaVersions['racer'], 2);
+  assert.deepEqual(migrated.presets.find((p) => p.id === r.id)!.params, { weight: 9 });
+});
+
+test('events: on, once, emit, onAny, unsubscribe', () => {
+  const { events } = setup();
+  const got: string[] = [];
+  const off = events.on('a', (p) => got.push(`a:${String(p)}`));
+  events.once('a', (p) => got.push(`once:${String(p)}`));
+  events.onAny((n, p) => got.push(`any:${n}:${String(p)}`));
+  events.emit('a', 1); events.emit('a', 2);
+  off(); events.emit('a', 3);
+  assert.deepEqual(got, ['a:1', 'once:1', 'any:a:1', 'a:2', 'any:a:2', 'any:a:3']);
+});
+
+test('performance: 5,000 presets put/resolve/list quickly', () => {
+  const { store } = setup();
+  const t0 = Date.now();
+  const base = store.put({ kind: 'racer', name: 'seed' });
+  let last = base;
+  for (let i = 0; i < 5000; i++) last = store.fork(base.id, { name: `r${i}`, params: { weight: i % 10 } });
+  store.resolve(last.id);
+  assert.ok(store.list({ kind: 'racer' }).length >= 5000);
+  assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0} ms`);
+});
+
+
+
+export type { PresetStore, SchemaRegistry };
+=== END FILE ===
+
+
+TASK: build the first half of the kernel package: the schema registry, the event bus, the preset store with bundles and migrations.
+Files you will output (in two later messages):
+  message A: packages/kernel/src/hash.ts, packages/kernel/src/schema-registry.ts, packages/kernel/src/event-bus.ts, packages/kernel/src/bundle.ts
+  message B: packages/kernel/src/store.ts  (and extra test file packages/kernel/tests/store-extra.test.ts with at least 8 additional tests)
+Exports (names fixed): createSchemaRegistry (schema-registry.ts), createEventBus (event-bus.ts), createPresetStore (store.ts), migrateBundle and hashBundle (bundle.ts), plus whatever helpers you need (hash.ts: a stable 53-bit string hash such as cyrb53, and a stableStringify with sorted keys).
+Semantics (the tests in store.test.ts are the exact behaviour; these notes explain the intent):
+1. Schema registry: register/get/kinds/variablesFor(kind, tier) (tier filter: a variable is shown when its tier is at most the shown tier; use visibleAt from contracts), registerMigration. `register` rejects a bad schema with a clear error: duplicate variable keys, 'enum' without options, min > max, a 'ref' variable without refKinds, a default outside min/max.
+2. Event bus: typed on/once/emit/onAny. A listener that throws must not stop the others; the error is reported through onAny as event 'error' with the error as payload.
+3. Preset store: content-addressed, immutable revisions, copy-on-write forks. put(draft): a new id from the injected newId (or a new revision of an existing id; revision numbers 1,2,3..); `hash` = stable hash of kind, name, params, children, script (NOT id, revision, meta; keys sorted). Defaults: tier 'build', limits {maxDepth 12, maxNodes 5000, maxBundleBytes 100000}, overridable. fork(id, patch) pins forkOf to {ref, rev: source's current revision}. resolve = schema defaults < fork chain (oldest first, each pinned to its revision) < own params; also returns the chain nearest first. validate: the issue codes documented in preset.ts. remove throws while referenced. list(filter) and dependents must be indexed (5000 presets must stay fast: no full scans per call). subscribe: put/remove notifications.
+4. Bundles: exportBundle(root) contains every revision reachable from the root (children refs: latest or pinned revision; fork sources: their pinned revisions) so an import can resolve inheritance; throws if the JSON is over limits.maxBundleBytes. importBundle(bundle, {onConflict}) runs migrateBundle first; 'keep' (default) skips presets whose id exists, 'replace' overwrites, 'rename' gives imported presets new ids and rewrites every child ref and forkOf. The report lists imported/skipped/renamed/issues.
+5. migrateBundle(bundle, schemas): for each preset, runs the migrations registered for its kind from bundle.schemaVersions[kind] up to the schema's current version, one version at a time; unknown kinds pass through; returns a new bundle with updated schemaVersions. hashBundle(bundle): stable hash over presets sorted by id then revision (order independent).
+
+Do not write any code yet. Reply with ONLY: Context received.

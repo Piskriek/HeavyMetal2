@@ -1,0 +1,20 @@
+Reply with exactly TWO TypeScript code blocks and NO explanation: block 1 = `voxelart.ts`, block 2 = `voxelart.test.ts` (imports from '../src'). Do NOT build a project, do not run anything, no npm packages. Pure deterministic TypeScript (strict, noUncheckedIndexedAccess, no Math.random, no Date, no DOM). Test runner node:test + node:assert/strict.
+
+TASK "voxelart": hand-designed, Minecraft-inspired but HIGH DETAIL voxel models, built in code from a few primitives so that artists can read and fork the recipe. Declare and export these yourself (no imports):
+type V3 = [number, number, number];
+interface Entry { name: string; color: V3 /* sRGB 0..1 */; roughness: number; metalness: number; emissive: number /* 0..1 */; alpha: number /* 1 opaque */ }
+interface Model { id: string; name: string; size: V3; pivot: V3; palette: Entry[]; cells: Uint8Array /* x fastest, then y, then z; 0 empty; cell value i = palette[i-1]; y up */ }
+Helpers you write: new model (id, name, size, pivot, palette), set(m,x,y,z,v), box(m,a,b,v), sphere(m,c,r,v), ellipsoid(m,c,radii,v), line(m,a,b,v,thickness), cylinder(m,base,r,h,v), mirrorX(m) (copies the left half onto the right so the model is exactly symmetric), shade-noise helper `speckle(m, seed, value, amount)` (deterministic hash, recolours some surface voxels with a second palette entry for texture variety).
+
+Export `MODELS: { id: string; name: string; doc: string; build: () => Model }[]` with these builds (each uses a palette of 8-16 entries with sensible PBR values: skin roughness 0.7, metal 0.9/0.3, glow for eyes/gems, wood 0.8, leaf 0.6):
+1. `goblin` : a game character, 28 wide x 44 tall x 20 deep voxels, standing on its feet with the pivot at the bottom centre. Big pointed ears, a long nose, small fangs, yellow glowing eyes, a ragged leather vest with a belt and a metal buckle, a loincloth, bare green skin with speckle, knobby knees, clawed hands, one hand holding a small round wooden shield with an iron rim. Symmetric except the shield.
+2. `goblin-ball-racer` : the same goblin crouched in a round wooden barrel-ball (sphere radius 16, wooden planks with two iron bands) with only the head, ears and hands showing out of an open top; 36x36x36, pivot at the centre.
+3. `palm` : a tropical palm tree, 40 tall, a curved ringed trunk (slight bend along x) and 7 drooping fronds made with lines of 2-voxel thickness, a few coconuts. 36x44x36, pivot bottom centre.
+4. `barrel` : 16 high, planks visible as vertical stripes, two iron bands, a lid with a bung. 14x16x14.
+5. `rock` : a chunky rock with strata layers (two greys + moss on top), irregular but deterministic, 20x14x18.
+6. `trophy` : a golden winner's trophy cup on a stepped base, 16x30x16, gold metalness 1.0 roughness 0.25, with an emissive gem.
+7. `statue-plinth` : a 24x8x24 stone plinth with a chamfer and a carved border, plus a hook point at the centre top (pivot at the bottom centre) where a giant statue will stand.
+
+Rules: every model must be ONE connected piece (6-connectivity) with no floating voxels; counts: goblin 3,000-9,000 voxels, ball-racer 4,000-14,000, palm 800-5,000, barrel 400-1,500, rock 500-2,500, trophy 300-1,200, plinth 600-3,000; all cell values must be within the palette; palette entries must be used (no unused entries); `build()` twice gives identical cells (deterministic); the goblin must be left-right symmetric apart from the shield; every model must fit inside `size` with at least 1 empty voxel border removed by nothing (do not clip). Also export `stats(m): { voxels: number; bounds: { min: V3; max: V3 }; components: number; paletteUse: number[] }` and `ascii(m, y)` that returns a text slice of layer y (one char per palette index, '.' for empty) so a human can eyeball the shapes.
+
+TESTS you write (must pass, under 10 s): for every model the rules above, plus the size/pivot sanity and unique ids, plus a few `ascii` slices of the goblin at the head height contain the glowing eye entry on both sides.

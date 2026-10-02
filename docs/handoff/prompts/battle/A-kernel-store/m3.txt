@@ -1,0 +1,3 @@
+Now output these files, and only these files, in the OUTPUT FORMAT (file blocks only):
+- packages/kernel/src/store.ts
+- packages/kernel/tests/store-extra.test.ts

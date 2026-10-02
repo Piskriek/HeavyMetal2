@@ -1,0 +1,38 @@
+[PART 4/4]
+
+# THE TASK
+
+# TASK T1: the kernel (`packages/kernel`)
+
+You were given a TypeScript monorepo (the "harness") as files in the earlier messages. Read `docs/README.md`, then `docs/RULES.md` (binding), then in `packages/contracts/src`: `core.ts`, `schema.ts`, `preset.ts`, `variables.ts`, `commands.ts`, `packages.ts` (the `KernelExports` interface is exactly what you must export).
+Your acceptance tests are `packages/kernel/tests/acceptance.test.ts`. Read them fully first: they pin down behaviour the contract text only hints at.
+
+## What to build (all inside `packages/kernel/src`)
+1. **Schema registry** (`createSchemaRegistry`): register/get/kinds/`variablesFor(kind, tier)` (tier filter uses `visibleAt`), per-kind migrations. Reject a bad schema on `register` (duplicate variable keys, `enum` without options, min > max, a `ref` variable without `refKinds`, a default outside min/max) with a clear error.
+2. **Preset store** (`createPresetStore`): content-addressed, immutable revisions, copy-on-write forks. `put` (new id from injected `newId`, or a new revision of an existing id), `get(id, rev?)`, `fork` (pins `forkOf: {ref, rev}` to the source's current revision), `remove` (refuses while referenced), `list(filter)`, `dependents`, `resolve` (schema defaults < fork chain, oldest first < own params; also returns the chain), `validate` (the issue codes listed in `preset.ts`), `exportBundle` / `importBundle`, `subscribe`.
+   - `hash` = stable hash of kind, name, params, children, script (not id, revision, meta). Keys sorted; equal content = equal hash. Any decent non-crypto 53-bit string hash is fine (implement it yourself).
+   - Defaults: `tier` 'build', `limits` = `{maxDepth: 12, maxNodes: 5000, maxBundleBytes: 100_000}`.
+   - A bundle contains every revision reachable from the root: children refs (latest, or the pinned revision) and fork sources (their pinned revisions), because an import must be able to resolve inheritance. `importBundle` honours `onConflict` ('keep' default, 'replace', 'rename': new ids, with every child ref and `forkOf` rewritten). Imports go through `migrateBundle` first.
+   - Performance: 5,000 presets must put/fork/list/resolve in well under a second each batch (index by id, kind, tag; do not scan everything per call).
+3. **Events** (`createEventBus`): typed `on/once/emit/onAny`; a listener that throws must not stop the others (report it through `onAny` as the event `'error'` with the error).
+4. **Variables** (`createVariableSystem`): paths are `<presetId>.<param key>` (split at the FIRST dot; keys may contain dots, ids may not) or `<scheme>:<rest>` for providers (`registerProvider`).
+   - `read` returns the effective value: live bindings first, then the resolved preset param; a stored `{expr}` value is evaluated on read.
+   - `write` on a preset param stores a new revision through the store (keeping everything else); on a provider path calls the provider.
+   - `bind(target, source)` is a live OVERLAY (never stored, no revisions): the target reads as the source; `observe` listeners on the target fire when the source changes. Refuse cycles (throw an error containing "cycle"). Unsubscribe restores the stored value.
+   - `observe`, `describe` (VariableDef + `owner`; undefined when nothing declares the path), `search` (substring over path, label, doc; capped by `limit`), `all()`.
+   - **Expressions**: write a small hand-written tokenizer + Pratt parser + evaluator. NO `eval`, NO `new Function`. Grammar: numbers, strings, booleans, `null`, `+ - * / % ^`, comparisons, `&& || !`, ternary, parentheses, identifiers resolved from the scope argument, `$path` reads (a `$` followed by `[A-Za-z0-9_.:/-]+`), vectors as `vec3(x,y,z)` (array values), and these functions only: `min max clamp lerp mix abs floor ceil round sqrt sin cos atan2 pow sign smoothstep vec3`. No loops, no property access, no calls to anything else (`process.exit(1)` and `while(true){}` must fail to compile with an issue). `compile` never throws: it returns `{ok:false, issues}`. `reads` lists the `$paths` (without the `$`). Evaluate must be fast (compile once, cache by source).
+5. **Command bus** (`createCommandBus`): handlers for the seven `StandardCommand`s, each returning its inverse, plus `registerHandler` for packs. `execute` returns a `CommandResult` and never throws (a failed command changes nothing). `transaction(label, run)` groups everything executed inside into ONE undo step (nesting joins the outer one). `undo/redo/canUndo/canRedo/history/clear`, a new command drops the redo branch, `maxHistory` (default 200) drops the oldest. `subscribe` sees every executed command.
+6. **`migrateBundle`** (runs registered migrations from the bundle's `schemaVersions[kind]` up to the schema's current version, one version step at a time; unknown kinds pass through untouched) and **`hashBundle`** (order-independent over presets).
+
+## Also
+- Wire a status line into `apps/web/src/main.ts` (it already probes `createSchemaRegistry`): keep it working.
+- Add your own tests for: expression edge cases (precedence, `^` right-associative, division by zero gives a clear error value rule you document), bundle import with fork chains and renames, binding chains (A to B to C), command undo of fork-preset / set-script, event listener errors, and every schema-registration rejection.
+- No runtime dependencies.
+
+Deliver per `docs/RULES.md` (zip + `REPORT.md`). The gate is `node scripts/verify.mjs kernel`.
+
+
+# FIRST STEPS
+1. Create every file from the earlier messages exactly as given (same paths, whole contents). 2. Run `npm install`. 3. Run `node scripts/verify.mjs kernel`: typecheck and build should pass and your acceptance tests should FAIL (stubs). 4. Implement the package until the gate passes, then add your own tests. 5. Deliver as described in docs/RULES.md: make the whole repo available for download as a zip (no node_modules, no dist) and paste the full text of REPORT.md in your final message.
+
+GO

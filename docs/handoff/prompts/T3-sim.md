@@ -1,0 +1,26 @@
+# TASK T3: the deterministic simulation core (`packages/sim`)
+
+You are given a zip of a TypeScript monorepo (the "harness"). Read `docs/README.md`, then `docs/RULES.md` (binding), then in `packages/contracts/src`: `core.ts`, `sim.ts`, `variables.ts` (only `VariableProvider`), `commands.ts` (only `EventBus`), `packages.ts` (`SimExports`).
+Your acceptance tests are `packages/sim/tests/acceptance.test.ts`. Read them fully first. This package must NOT depend on the kernel implementation (tests use fakes for the event bus and variable system).
+
+## Why this exists
+Every game is `(preset bundle, seed, input stream)`. Race results, replays, multiplayer sync and anti-cheat all rest on one promise: the same inputs give the same world, bit for bit, on every machine, forever. You build the engine that keeps that promise. It is also the thing every other system (physics, render, tools, scripts) reads and writes, so it must be fast and its API small.
+
+## What to build (all inside `packages/sim/src`)
+1. **`createRng(seed)`**: **mulberry32** exactly (the old game used it; the tests pin its output), 32-bit state, `int`, `pick`, `fork(label)` (derives an independent stream from the CURRENT state and a hash of the label; draining the parent afterwards must not change the fork), `state()/restore()`.
+2. **`createWorld`**: an entity-component store.
+   - Components are plain data declared with `defineComponent` (defaults + `fields`). Entities are numbers that only go up and are never reused. `spawn(preset?, components?)` fills missing fields from defaults; `set` on an unknown field or component, or on a dead entity, THROWS naming the field.
+   - `query(...names)` returns ids ascending (the order is part of determinism). Design for 10,000+ entities times 120 ticks in well under a second per 120 ticks: struct-of-arrays or sparse sets per component, no per-call allocations in hot paths where you can avoid them.
+   - `getResource/setResource` for singletons. `presetOf(id)` returns the preset `Ref` the entity was spawned from (the link between what you built and what runs).
+   - `snapshot()/restore()` round-trip everything including resources and the rng state; `hash()` is a stable hash of the complete state: components in name order, entities ascending, fields in name order, numbers canonicalised (`-0` equals `0`; NaN is an error: throw when a NaN is written, because NaN poisons determinism). 64-bit or double-32-bit FNV-1a style, hex string, fast (the sim hashes at checkpoints).
+   - `drainChanges()` (spawn / despawn / set per entity-component, each at most once per drain per entity-component) and `onChange`.
+3. **`createSimulation`**: owns a world, an rng seeded by `seed`, the event bus and variable system it is given, and systems. `step(input)` runs one fixed tick: systems by `order` then registration order, with a `StepContext` (`dt` = `SIM_DT`, tick, rng, events, vars, input), then increments `tick`. `advance(elapsedMs, inputFor, maxTicksPerCall = 8)` is the browser driver: accumulate wall time, run whole ticks, return the render interpolation alpha in [0,1); cap catch-up so a tab that was asleep does not spiral.
+   - A system that throws must not corrupt the sim silently: rethrow with the system name and tick in the message.
+4. **Replays**: `createRecorder(seed, bundleHash, checkpointEvery)` records input frames and world hashes; `finish(world)` returns a `Replay`. `runReplay(replay, build)` rebuilds the simulation with `build(seed)`, feeds the recorded inputs, compares checkpoints and the final hash, and returns `{finalHash, matches, firstMismatchTick}` where the tick is the first CHECKPOINT that differs (the acceptance test accepts a window).
+5. **Entity variables** (extra export, with its own tests): `createEntityVariableProvider(world): VariableProvider` for the scheme `entity`, so every component field of every live entity is a variable at `entity:<id>/<component>.<field>`: `read`, `write` (type-checked against the component's `fields` ranges: out of range throws), `describe` (the `VariableDef` from `fields`), `all()` (lazy iteration).
+
+## Also
+- Add your own tests for: snapshot/restore mid-run then continue equals an uninterrupted run (200 ticks); fork stability; hash canonicalisation (`-0`), NaN rejection; despawn during a system's query loop (document the rule: the query result is a snapshot of ids; despawning inside is safe); the entity provider; 100,000 entity hash under 250 ms.
+- No runtime dependencies. Wire a status line into `apps/web/src/main.ts` (it probes `createRng`) and keep it working.
+
+Deliver per `docs/RULES.md` (zip + `REPORT.md`). The gate is `node scripts/verify.mjs sim`.

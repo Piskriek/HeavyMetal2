@@ -1,0 +1,206 @@
+From now on you have names. Option A is SLATE, option B is VIOLET. Each of you does ONLY your own job below; do not do the other's.
+
+Common rules: same RULES as message 1. Create the files as real files in the project (not in the chat), build the project, and reply with a short summary only (no code in the chat). Do not change files you did not create unless told. The kernel's first half (hash, schema-registry, event-bus, store, bundle) is merged and passing, so you can import it.
+
+=== VIOLET: the expression language ===
+Create packages/kernel/src/expr.ts (and packages/kernel/tests/expr.test.ts with at least 30 tests). Hand-written tokenizer + Pratt parser + evaluator. NO eval, NO new Function. Exact exports:
+export type ExprValue = number | string | boolean | null | readonly ExprValue[];
+export interface ExprIssue { readonly message: string; readonly position: number }
+export interface CompiledExpression {
+  readonly ok: boolean;
+  readonly issues: readonly ExprIssue[];
+  /** The $paths the expression reads, without the $, unique, in order of first appearance. */
+  readonly reads: readonly string[];
+  /** Throws an Error with a clear message on a runtime error (unknown identifier, division by zero, wrong types). */
+  evaluate(scope?: Readonly<Record<string, ExprValue>>, read?: (path: string) => ExprValue | undefined): ExprValue;
+}
+export function compileExpression(source: string): CompiledExpression;   // never throws; ok=false plus issues instead
+Grammar: numbers (1, 1.5, .5, 1e3), strings in single or double quotes, true/false/null, + - * / % ^ (^ is right-associative and binds tighter than unary minus, so -2^2 = -4), comparisons < <= > >= == != (strict), && || ! (short-circuit: `true || missing` never evaluates `missing`), ternary a ? b : c (nested ok), parentheses, identifiers read from the scope argument, `$path` reads that call read(path). A `$path` is a $ followed by [A-Za-z0-9_.:/] characters; a hyphen belongs to the path only when it sits directly between two letters or digits (so write `$a - 1` with spaces for subtraction). `+` also concatenates strings. Functions ONLY (arity checked at COMPILE time, with an issue if wrong): min and max (1 or more args), clamp(x,lo,hi), lerp(a,b,t), mix(a,b,t) (same as lerp), abs, floor, ceil, round, sqrt, sin, cos, sign (1 arg), atan2(y,x), pow(a,b), smoothstep(a,b,x), vec3(x,y,z) (returns an array of 3 numbers). Anything else is a compile issue: unknown function, property access (`process.exit(1)` must fail with an issue), braces/loops/assignment (`while(true){}` must fail), a source longer than 2000 characters, nesting deeper than 50. Division by zero and sqrt of a negative throw at evaluate with a clear message. Also add a one-paragraph comment at the top of expr.ts documenting the language.
+
+=== SLATE: the variable system ===
+Create packages/kernel/src/variables.ts exporting createVariableSystem(opts: { store: PresetStore; schemas: SchemaRegistry; events: EventBus }): VariableSystem, and packages/kernel/tests/variables-extra.test.ts with at least 12 extra tests. Violet is writing the expression compiler in parallel: import { compileExpression, type ExprValue, type CompiledExpression } from './expr'. To make YOUR project build right now, create a TEMPORARY packages/kernel/src/expr.ts that exports exactly the types and function below, where compileExpression throws Error('not implemented'); I will replace it with Violet's file. (The same signature Violet implements:)
+export type ExprValue = number | string | boolean | null | readonly ExprValue[];
+export interface ExprIssue { readonly message: string; readonly position: number }
+export interface CompiledExpression { readonly ok: boolean; readonly issues: readonly ExprIssue[]; readonly reads: readonly string[]; evaluate(scope?: Readonly<Record<string, ExprValue>>, read?: (path: string) => ExprValue | undefined): ExprValue }
+export function compileExpression(source: string): CompiledExpression;
+Because your tests cannot use the real compiler yet, make your variable-system tests that need expressions inject nothing: instead give createVariableSystem an optional extra opts field `compile?: (source: string) => CompiledExpression` (default: compileExpression from ./expr) so tests can pass a fake.
+Semantics: a path is `<presetId>.<param key>` (split at the FIRST dot; param keys may contain dots; preset ids may not) or `<scheme>:<rest>` handled by a registered provider. read() returns the effective value: live bindings first, then the resolved preset param (store.resolve); a stored {expr} value is evaluated on read. write() on a preset param stores a NEW REVISION through the store keeping everything else; on a provider path calls the provider. bind(target, source) is a live OVERLAY that is never stored (no revisions): the target reads as the source, `source` is a path or {expr}; observers of the target fire when the source changes; refuse a cycle by throwing an Error whose message contains the word cycle; the returned function unbinds and restores the stored value. observe, describe (the VariableDef plus `owner`; undefined when nothing declares the path), search (substring over path, label and doc, capped by `limit`), all() (every declared preset-param path plus every provider path), registerProvider. Expression `$paths` are resolved with this same read(). The VariableSystem and VariableProvider types are given below, together with the exact behaviour tests. Violet does not need these.
+
+=== FILE: packages/contracts/src/variables.ts ===
+import type { Issue, PresetId, Unsubscribe, Value } from './core';
+import type { VariableDef } from './schema';
+
+/**
+ * A VarPath addresses ANY variable in the running harness:
+ *   preset parameter     "<presetId>.<param key>"              e.g. "racer-ball-1.weight"
+ *   entity field (sim)   "entity:<entityId>/<component>.<field>"   e.g. "entity:42/body.mass"
+ *   global               "global:<name>"                       e.g. "global:gravity"
+ * The "every variable is accessible" promise = everything has a VarPath, a VariableDef and can be read, written, searched, observed and bound.
+ */
+export type VarPath = string;
+
+export interface CompiledExpr {
+  readonly source: string;
+  readonly ok: boolean;
+  readonly issues: readonly Issue[];
+  /** VarPaths the expression reads (written `$path` in source); used to re-evaluate when they change. */
+  readonly reads: readonly VarPath[];
+  evaluate(scope?: Readonly<Record<string, Value>>): Value;
+}
+
+export interface VariableHit {
+  readonly path: VarPath;
+  readonly def: VariableDef;
+  readonly ownerLabel: string;
+  readonly value: Value | undefined;
+}
+
+/**
+ * Something other than the preset store that owns variables under a scheme prefix: the sim registers `entity:` so every component
+ * field of every live entity is a variable; the host may register `global:`. The kernel's VariableSystem routes paths to providers.
+ */
+export interface VariableProvider {
+  /** The path prefix this provider owns, without the colon: 'entity', 'global'. */
+  readonly scheme: string;
+  read(rest: string): Value | undefined;
+  write(rest: string, value: Value): void;
+  describe(rest: string): VariableDef | undefined;
+  /** Every path it currently knows, in `rest` form (may be large: iterate lazily). */
+  all(): Iterable<string>;
+}
+
+/**
+ * Reading, writing, searching and binding variables. Expression language (small, safe, no loops, no property access on host objects):
+ * numbers, strings, booleans, + - * / % ^, comparisons, && || !, ternary a ? b : c, `$path` reads, and the functions
+ * min max clamp lerp abs floor ceil round sqrt sin cos atan2 pow sign mix(a,b,t) smoothstep vec3(x,y,z).
+ */
+export interface VariableSystem {
+  /** The effective value (inherited, bound and expression-driven values resolved). */
+  read(path: VarPath): Value | undefined;
+  /** A direct write that is NOT undoable (used by the sim and by scripts). Editors use the CommandBus 'set-param' instead. */
+  write(path: VarPath, value: Value, source?: string): void;
+  /** Keep `target` equal to `source` (another path or an expression) until the returned function is called. Cycles are detected and refused. */
+  bind(target: VarPath, source: VarPath | { readonly expr: string }): Unsubscribe;
+  observe(path: VarPath, listener: (value: Value | undefined, previous: Value | undefined) => void): Unsubscribe;
+  compile(source: string): CompiledExpr;
+  evaluate(source: string, scope?: Readonly<Record<string, Value>>): Value;
+  /** Metadata for the inspector: type, range, doc, tier. Undefined for a path nothing declares. */
+  describe(path: VarPath): (VariableDef & { readonly owner: PresetId | string }) | undefined;
+  /** Substring search over paths, labels and docs (the "find any variable" box). */
+  search(query: string, limit?: number): readonly VariableHit[];
+  /** Every declared path (presets and everything the providers know). */
+  all(): Iterable<VarPath>;
+  /** Hands a scheme (entity:, global:) to a provider. Registering the same scheme twice replaces it. */
+  registerProvider(provider: VariableProvider): Unsubscribe;
+}
+=== END FILE ===
+
+=== FILE: packages/kernel/tests/variables.test.ts (these must pass; for expressions they use the real compiler once Violet's file is merged, so your own temporary stub will make 2 of them fail: that is expected) ===
+/**
+ * T1 acceptance: the kernel (schema registry, preset graph, variables, commands, events, migrations).
+ * Issue codes the store's validate() must use: 'cycle', 'missing-ref', 'slot-kind', 'param-range', 'unknown-param', 'depth', 'nodes'.
+ * If a test contradicts the contract text in packages/contracts, follow the contract, fix the test minimally and say so in your report.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { defineSchema } from '@hm/contracts';
+import { createEventBus, createPresetStore, createSchemaRegistry, createVariableSystem } from '@hm/kernel';
+
+const racer = defineSchema({
+  kind: 'racer', version: 2, label: 'Racer', doc: 'A ball that races.',
+  variables: [
+    { key: 'weight', type: 'number', label: 'Weight', doc: 'How heavy the ball is.', tier: 'play', default: 5, min: 0, max: 10, step: 1 },
+    { key: 'bounce', type: 'number', label: 'Bounce', doc: 'How bouncy.', tier: 'play', default: 5, min: 0, max: 10 },
+    { key: 'grip.rolling', type: 'number', label: 'Rolling grip', doc: 'Friction while rolling.', tier: 'pro', default: 0.8, min: 0, max: 2, unit: 'mu' },
+    { key: 'colour', type: 'color', label: 'Colour', doc: 'Paint.', tier: 'build', default: '#ff8800' },
+  ],
+  slots: [{ key: 'mechanics', label: 'Mechanics', doc: 'Extra behaviours.', kinds: ['mechanic'], min: 0, max: 4, tier: 'build' }],
+} as const);
+const mechanic = defineSchema({
+  kind: 'mechanic', version: 1, label: 'Mechanic', doc: 'A behaviour.', scriptInterface: 'Mechanic',
+  variables: [{ key: 'power', type: 'number', label: 'Power', doc: 'Strength.', tier: 'build', default: 1, min: 0, max: 100 }],
+  slots: [],
+} as const);
+const mode = defineSchema({
+  kind: 'mode', version: 1, label: 'Mode', doc: 'A way to play.',
+  variables: [{ key: 'laps', type: 'int', label: 'Laps', doc: 'How many laps.', tier: 'play', default: 3, min: 1, max: 20 }],
+  slots: [{ key: 'racers', label: 'Racers', doc: 'Who races.', kinds: ['racer'], min: 0, max: null, tier: 'play' }],
+} as const);
+
+function setup(limits?: { maxDepth?: number; maxNodes?: number; maxBundleBytes?: number }) {
+  const schemas = createSchemaRegistry();
+  for (const s of [racer, mechanic, mode]) schemas.register(s);
+  let n = 0, t = 1000;
+  const store = createPresetStore({ schemas, ...(limits ? { limits } : {}), newId: () => `p${++n}`, now: () => ++t });
+  const events = createEventBus();
+  const vars = createVariableSystem({ store, schemas, events });
+  return { schemas, store, events, vars };
+}
+
+test('variables: read/write/describe/search on preset params (inherited, defaults, dotted keys)', () => {
+  const { store, vars } = setup();
+  const base = store.put({ kind: 'racer', name: 'Base', params: { weight: 8 } });
+  const fork = store.fork(base.id, { name: 'Fork' });
+  assert.equal(vars.read(`${fork.id}.weight`), 8);
+  assert.equal(vars.read(`${fork.id}.grip.rolling`), 0.8);
+  vars.write(`${fork.id}.bounce`, 2);
+  assert.equal(vars.read(`${fork.id}.bounce`), 2);
+  assert.equal(store.get(fork.id)!.revision, 2, 'a stored write makes a revision');
+  const d = vars.describe(`${fork.id}.weight`)!;
+  assert.equal(d.type, 'number'); assert.equal(d.tier, 'play'); assert.equal(d.max, 10); assert.equal(d.owner, fork.id);
+  assert.equal(vars.describe(`${fork.id}.nope`), undefined);
+  const hits = vars.search('rolling');
+  assert.ok(hits.some((h) => h.path === `${fork.id}.grip.rolling`));
+  assert.ok([...vars.all()].includes(`${fork.id}.weight`));
+});
+
+test('variables: expressions (functions, ternary, $path reads) and compile diagnostics', () => {
+  const { store, vars } = setup();
+  const r = store.put({ kind: 'racer', name: 'R', params: { weight: 4 } });
+  assert.equal(vars.evaluate('clamp(12, 0, 10)'), 10);
+  assert.equal(vars.evaluate('lerp(0, 10, 0.25)'), 2.5);
+  assert.equal(vars.evaluate('1 > 0 ? "yes" : "no"'), 'yes');
+  assert.equal(vars.evaluate(`$${r.id}.weight * 2 + 1`), 9);
+  assert.equal(vars.evaluate('max(a, b)', { a: 3, b: 7 }), 7);
+  const bad = vars.compile('1 +');
+  assert.equal(bad.ok, false); assert.ok(bad.issues.length > 0);
+  assert.deepEqual(vars.compile(`$${r.id}.weight + 1`).reads, [`${r.id}.weight`]);
+  assert.equal(vars.compile('process.exit(1)').ok, false, 'no host access in expressions');
+  assert.equal(vars.compile('while(true){}').ok, false, 'no loops');
+});
+
+test('variables: bind keeps a target in step with a source; overlay is not stored; cycles refused; unbind restores', () => {
+  const { store, vars } = setup();
+  const a = store.put({ kind: 'racer', name: 'A', params: { weight: 3 } });
+  const b = store.put({ kind: 'racer', name: 'B', params: { weight: 1 } });
+  const seen: unknown[] = [];
+  vars.observe(`${b.id}.weight`, (v) => seen.push(v));
+  const off = vars.bind(`${b.id}.weight`, { expr: `$${a.id}.weight * 2` });
+  assert.equal(vars.read(`${b.id}.weight`), 6);
+  vars.write(`${a.id}.weight`, 5);
+  assert.equal(vars.read(`${b.id}.weight`), 10);
+  assert.equal(store.get(b.id)!.params['weight'], 1, 'a binding is a live overlay: the stored preset is untouched');
+  assert.ok(seen.includes(10));
+  assert.throws(() => vars.bind(`${a.id}.weight`, `${b.id}.weight`), /cycle/i);
+  off();
+  assert.equal(vars.read(`${b.id}.weight`), 1);
+});
+
+test('variables: providers own a scheme (entity:, global:)', () => {
+  const { vars } = setup();
+  const data: Record<string, number> = { 'mass': 4 };
+  vars.registerProvider({
+    scheme: 'global',
+    read: (rest) => data[rest], write: (rest, v) => { data[rest] = Number(v); },
+    describe: (rest) => (rest in data ? { key: rest, type: 'number', label: rest, doc: 'x', tier: 'pro', default: 0 } : undefined),
+    all: () => Object.keys(data),
+  });
+  assert.equal(vars.read('global:mass'), 4);
+  vars.write('global:mass', 9);
+  assert.equal(data['mass'], 9);
+  assert.equal(vars.describe('global:mass')!.type, 'number');
+  assert.ok([...vars.all()].includes('global:mass'));
+});
+=== END FILE ===
+
+When finished, each of you: build the project, and tell me the files you created.

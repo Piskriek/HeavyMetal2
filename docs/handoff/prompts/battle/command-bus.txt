@@ -1,0 +1,291 @@
+You are a senior TypeScript engineer. Build ONE module and its tests. Create the files as real files in the project, build the project, and reply with a short summary only (no code in the chat).
+
+RULES: TypeScript strict (noUncheckedIndexedAccess, noUnusedLocals, noUnusedParameters), ESM, no `any`, no ts-ignore, no runtime dependencies, no Date.now/Math.random. Small functions, a one-line doc comment on every export, errors that say what was wrong. Relative imports have no file extension. The contract types below already exist in the project at packages/contracts/src/*.ts (create them from this message exactly; do not change them).
+
+TASK: create packages/kernel/src/command-bus.ts exporting
+  export function createCommandBus(opts: { store: PresetStore; vars: VariableSystem; maxHistory?: number }): CommandBus
+(CommandBus, Command, StandardCommand, CommandResult, CommandHandler are in commands.ts below.) Also create packages/kernel/tests/command-bus.test.ts with at least 15 tests of your own, using small hand-written in-memory fakes of PresetStore and VariableSystem (only the methods you call), because the real ones are not in your project. The acceptance tests at the end are the exact behaviour required; they use the real store, which you do not have, so read them carefully and make sure your code would pass them.
+
+Behaviour:
+- Handlers for the seven StandardCommand types, each performing the change THROUGH the store/vars interfaces and returning its inverse command. set-param: path is "<presetId>.<param key>" (split at the FIRST dot) and the change is a store.put of a new revision of that preset with the param set (keep everything else: name, kind, children, script, tags, tier, forkOf, other params; use vars.write(path, value) for this, vars.read for the previous value); the inverse restores the previous stored value (if the param was not stored in the preset's own params before, the inverse must REMOVE it again: for that case implement the inverse as a 'put-preset' of the previous preset revision's draft). put-preset: store.put(draft); inverse = restore the previous revision (put-preset with the previous draft) or, if it was new, a 'remove-preset' internal command you register yourself (handler calls store.remove). fork-preset: store.fork; inverse removes the fork. add-child / remove-child: new revision of the parent with the child ref inserted at index (default end) or removed; inverse is the opposite. set-script: new revision with script {language:'ts', source, apiVersion: 1}; inverse restores the previous script or removes it. batch: runs its commands in order as one unit; if one fails, undo the ones already done and report the failure; the inverse is a batch of the inverses in reverse order.
+- execute(command) returns a CommandResult and NEVER throws: unknown command type, or a handler that throws, gives {ok:false, error, touched:[]} and changes nothing. A successful command is pushed on the undo stack with its label, clears the redo branch, and notifies subscribers. touched = ids of presets created or revised.
+- transaction(label, run): everything executed inside run() becomes ONE undo step labelled `label` (nesting joins the outer one; if run throws, undo what was done and rethrow).
+- undo()/redo(): apply the stored inverse (and for redo, the original command again); return false when there is nothing to do. canUndo/canRedo getters. history(): list of {label, undone} oldest first, including undone entries that could still be redone. maxHistory (default 200) drops the oldest. clear() empties everything. registerHandler(type, handler) for extra command types (inverse may be null = not undoable: then it is still executed but cannot be undone; say so in a comment). subscribe(listener) sees every executed command with its result.
+
+=== FILE: packages/contracts/src/core.ts (excerpt) ===
+export type PresetId = string;
+export type Unsubscribe = () => void;
+export interface Ref { readonly ref: PresetId; readonly rev?: number }
+export interface Expr { readonly expr: string }
+export type Value = number | boolean | string | null | Ref | Expr | readonly Value[] | { readonly [key: string]: Value };
+export type Params = Readonly<Record<string, Value>>;
+export type Tier = 'play' | 'build' | 'pro';
+export type PresetKind = string;
+export interface Issue { readonly severity: 'error' | 'warning'; readonly code: string; readonly message: string; readonly presetId?: PresetId; readonly path?: string }
+=== END FILE ===
+
+=== FILE: packages/contracts/src/preset.ts ===
+import type { Issue, Params, PresetId, PresetKind, Ref, Tier, Unsubscribe, Value } from './core';
+
+export interface ScriptSource {
+  readonly language: 'ts';
+  readonly source: string;
+    readonly apiVersion: number;
+}
+
+export interface Preset {
+  readonly id: PresetId;
+  readonly kind: PresetKind;
+  readonly name: string;
+    readonly revision: number;
+    readonly hash: string;
+    readonly forkOf?: Ref;
+    readonly params: Params;
+    readonly children: Readonly<Record<string, readonly Ref[]>>;
+  readonly script?: ScriptSource;
+  readonly tags: readonly string[];
+    readonly tier: Tier;
+  readonly meta: {
+    readonly author?: string;
+    readonly createdAt: number;
+    readonly doc?: string;
+    readonly icon?: string;
+  };
+}
+
+export interface PresetDraft {
+    readonly id?: PresetId;
+  readonly kind: PresetKind;
+  readonly name: string;
+  readonly forkOf?: Ref;
+  readonly params?: Params;
+  readonly children?: Readonly<Record<string, readonly Ref[]>>;
+  readonly script?: ScriptSource;
+  readonly tags?: readonly string[];
+  readonly tier?: Tier;
+  readonly meta?: Partial<Preset['meta']>;
+}
+
+export interface ResolvedPreset {
+  readonly preset: Preset;
+  readonly params: Params;
+    readonly chain: readonly Preset[];
+}
+
+export interface StoreLimits {
+    readonly maxDepth: number;
+    readonly maxNodes: number;
+    readonly maxBundleBytes: number;
+}
+
+export type StoreChange =
+  | { readonly type: 'put'; readonly preset: Preset }
+  | { readonly type: 'remove'; readonly id: PresetId };
+
+export interface PresetBundle {
+  readonly format: 'hm-bundle';
+  readonly version: number;
+  readonly root: PresetId;
+  readonly presets: readonly Preset[];
+    readonly schemaVersions: Readonly<Record<string, number>>;
+}
+
+export interface ImportReport {
+  readonly imported: number;
+  readonly skipped: number;
+  readonly renamed: Readonly<Record<PresetId, PresetId>>;
+  readonly issues: readonly Issue[];
+}
+
+export interface PresetFilter {
+  readonly kind?: PresetKind;
+  readonly tag?: string;
+    readonly tier?: Tier;
+    readonly text?: string;
+}
+
+export interface PresetStore {
+  readonly limits: StoreLimits;
+    get(id: PresetId, rev?: number): Preset | undefined;
+  put(draft: PresetDraft): Preset;
+    fork(id: PresetId, patch?: Partial<PresetDraft>): Preset;
+    remove(id: PresetId): void;
+  list(filter?: PresetFilter): readonly Preset[];
+  resolve(id: PresetId, rev?: number): ResolvedPreset;
+    dependents(id: PresetId): readonly PresetId[];
+    validate(id: PresetId): readonly Issue[];
+  exportBundle(root: PresetId): PresetBundle;
+  importBundle(bundle: PresetBundle, opts?: { readonly onConflict?: 'keep' | 'replace' | 'rename' }): ImportReport;
+  subscribe(listener: (change: StoreChange) => void): Unsubscribe;
+}
+
+export type Json = Value;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/variables.ts ===
+export type VarPath = string;
+export interface VariableSystem {
+  /** Effective value of "<presetId>.<param key>" (inherited/default resolved); undefined if nothing declares it. */
+  read(path: VarPath): Value | undefined;
+  /** Stores a NEW REVISION of the preset with that param set, keeping everything else. */
+  write(path: VarPath, value: Value, source?: string): void;
+  // (more methods exist; you only need read and write)
+}
+=== END FILE ===
+
+=== FILE: packages/contracts/src/commands.ts ===
+import type { PresetId, Unsubscribe, Value } from './core';
+import type { PresetDraft } from './preset';
+import type { VarPath } from './variables';
+
+export interface Command {
+  readonly type: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+    readonly label: string;
+}
+
+export type StandardCommand =
+  | { readonly type: 'set-param'; readonly payload: { readonly path: VarPath; readonly value: Value }; readonly label: string }
+  | { readonly type: 'put-preset'; readonly payload: { readonly draft: PresetDraft }; readonly label: string }
+  | { readonly type: 'fork-preset'; readonly payload: { readonly id: PresetId; readonly patch?: Partial<PresetDraft> }; readonly label: string }
+  | { readonly type: 'add-child'; readonly payload: { readonly parent: PresetId; readonly slot: string; readonly child: PresetId; readonly index?: number }; readonly label: string }
+  | { readonly type: 'remove-child'; readonly payload: { readonly parent: PresetId; readonly slot: string; readonly index: number }; readonly label: string }
+  | { readonly type: 'set-script'; readonly payload: { readonly id: PresetId; readonly source: string }; readonly label: string }
+  | { readonly type: 'batch'; readonly payload: { readonly commands: readonly Command[] }; readonly label: string };
+
+export interface CommandResult {
+  readonly ok: boolean;
+  readonly error?: string;
+    readonly touched: readonly PresetId[];
+}
+
+export interface CommandHandler {
+  apply(command: Command): { readonly result: CommandResult; readonly inverse: Command | null };
+}
+
+export interface CommandBus {
+  execute(command: Command): CommandResult;
+    transaction<T>(label: string, run: () => T): T;
+  undo(): boolean;
+  redo(): boolean;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+    history(): readonly { readonly label: string; readonly undone: boolean }[];
+  registerHandler(type: string, handler: CommandHandler): void;
+  subscribe(listener: (command: Command, result: CommandResult) => void): Unsubscribe;
+    clear(): void;
+}
+
+export const cmd = {
+  setParam: (path: VarPath, value: Value, label = 'Change value'): StandardCommand => ({ type: 'set-param', payload: { path, value }, label }),
+  put: (draft: PresetDraft, label = 'Save preset'): StandardCommand => ({ type: 'put-preset', payload: { draft }, label }),
+  addChild: (parent: PresetId, slot: string, child: PresetId, index?: number, label = 'Add'): StandardCommand =>
+    ({ type: 'add-child', payload: index === undefined ? { parent, slot, child } : { parent, slot, child, index }, label }),
+  removeChild: (parent: PresetId, slot: string, index: number, label = 'Remove'): StandardCommand => ({ type: 'remove-child', payload: { parent, slot, index }, label }),
+  setScript: (id: PresetId, source: string, label = 'Edit script'): StandardCommand => ({ type: 'set-script', payload: { id, source }, label }),
+  batch: (commands: readonly Command[], label: string): StandardCommand => ({ type: 'batch', payload: { commands }, label }),
+};
+
+export interface EventBus<M extends Record<string, unknown> = Record<string, unknown>> {
+  on<K extends keyof M & string>(name: K, listener: (payload: M[K]) => void): Unsubscribe;
+  once<K extends keyof M & string>(name: K, listener: (payload: M[K]) => void): Unsubscribe;
+  emit<K extends keyof M & string>(name: K, payload: M[K]): void;
+    onAny(listener: (name: string, payload: unknown) => void): Unsubscribe;
+}
+=== END FILE ===
+
+ACCEPTANCE TESTS (they will be run against your module with the real store and variable system; their setup creates the real implementations, which you do not have):
+=== FILE: packages/kernel/tests/commands.test.ts ===
+/**
+ * T1 acceptance: the kernel (schema registry, preset graph, variables, commands, events, migrations).
+ * Issue codes the store's validate() must use: 'cycle', 'missing-ref', 'slot-kind', 'param-range', 'unknown-param', 'depth', 'nodes'.
+ * If a test contradicts the contract text in packages/contracts, follow the contract, fix the test minimally and say so in your report.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { cmd, defineSchema } from '@hm/contracts';
+import { createCommandBus, createEventBus, createPresetStore, createSchemaRegistry, createVariableSystem } from '@hm/kernel';
+
+const racer = defineSchema({
+  kind: 'racer', version: 2, label: 'Racer', doc: 'A ball that races.',
+  variables: [
+    { key: 'weight', type: 'number', label: 'Weight', doc: 'How heavy the ball is.', tier: 'play', default: 5, min: 0, max: 10, step: 1 },
+    { key: 'bounce', type: 'number', label: 'Bounce', doc: 'How bouncy.', tier: 'play', default: 5, min: 0, max: 10 },
+    { key: 'grip.rolling', type: 'number', label: 'Rolling grip', doc: 'Friction while rolling.', tier: 'pro', default: 0.8, min: 0, max: 2, unit: 'mu' },
+    { key: 'colour', type: 'color', label: 'Colour', doc: 'Paint.', tier: 'build', default: '#ff8800' },
+  ],
+  slots: [{ key: 'mechanics', label: 'Mechanics', doc: 'Extra behaviours.', kinds: ['mechanic'], min: 0, max: 4, tier: 'build' }],
+} as const);
+const mechanic = defineSchema({
+  kind: 'mechanic', version: 1, label: 'Mechanic', doc: 'A behaviour.', scriptInterface: 'Mechanic',
+  variables: [{ key: 'power', type: 'number', label: 'Power', doc: 'Strength.', tier: 'build', default: 1, min: 0, max: 100 }],
+  slots: [],
+} as const);
+const mode = defineSchema({
+  kind: 'mode', version: 1, label: 'Mode', doc: 'A way to play.',
+  variables: [{ key: 'laps', type: 'int', label: 'Laps', doc: 'How many laps.', tier: 'play', default: 3, min: 1, max: 20 }],
+  slots: [{ key: 'racers', label: 'Racers', doc: 'Who races.', kinds: ['racer'], min: 0, max: null, tier: 'play' }],
+} as const);
+
+function setup(limits?: { maxDepth?: number; maxNodes?: number; maxBundleBytes?: number }) {
+  const schemas = createSchemaRegistry();
+  for (const s of [racer, mechanic, mode]) schemas.register(s);
+  let n = 0, t = 1000;
+  const store = createPresetStore({ schemas, ...(limits ? { limits } : {}), newId: () => `p${++n}`, now: () => ++t });
+  const events = createEventBus();
+  const vars = createVariableSystem({ store, schemas, events });
+  const commands = createCommandBus({ store, vars });
+  return { schemas, store, events, vars, commands };
+}
+
+test('commands: set-param, undo/redo, transactions as one step, history, batch', () => {
+  const { store, commands, vars } = setup();
+  const r = store.put({ kind: 'racer', name: 'R', params: { weight: 3 } });
+  assert.equal(commands.canUndo, false);
+  const res = commands.execute(cmd.setParam(`${r.id}.weight`, 6, 'Heavier'));
+  assert.equal(res.ok, true); assert.deepEqual(res.touched, [r.id]);
+  assert.equal(vars.read(`${r.id}.weight`), 6);
+  assert.equal(commands.undo(), true);
+  assert.equal(vars.read(`${r.id}.weight`), 3);
+  assert.equal(commands.redo(), true);
+  assert.equal(vars.read(`${r.id}.weight`), 6);
+  commands.transaction('Drag', () => {
+    commands.execute(cmd.setParam(`${r.id}.weight`, 7));
+    commands.execute(cmd.setParam(`${r.id}.weight`, 8));
+    commands.execute(cmd.setParam(`${r.id}.bounce`, 1));
+  });
+  assert.equal(vars.read(`${r.id}.weight`), 8);
+  commands.undo();
+  assert.equal(vars.read(`${r.id}.weight`), 6); assert.equal(vars.read(`${r.id}.bounce`), 5, 'the whole transaction undid in one step');
+  assert.deepEqual(commands.history().map((h) => h.label), ['Heavier', 'Drag']);
+  assert.equal(commands.history()[1]!.undone, true);
+  commands.execute(cmd.batch([cmd.setParam(`${r.id}.weight`, 1), cmd.setParam(`${r.id}.bounce`, 2)], 'Both'));
+  commands.undo();
+  assert.equal(vars.read(`${r.id}.weight`), 6);
+  assert.equal(commands.history().some((h) => h.label === 'Drag'), false, 'a new command drops the redo branch');
+});
+
+test('commands: add-child/remove-child/put/set-script undo cleanly; bad commands fail without changing anything', () => {
+  const { store, commands } = setup();
+  const m = store.put({ kind: 'mechanic', name: 'M' });
+  const r = store.put({ kind: 'racer', name: 'R' });
+  commands.execute(cmd.addChild(r.id, 'mechanics', m.id));
+  assert.deepEqual(store.get(r.id)!.children['mechanics'], [{ ref: m.id }]);
+  commands.execute(cmd.setScript(m.id, 'export function update() {}'));
+  assert.equal(store.get(m.id)!.script!.source, 'export function update() {}');
+  commands.undo(); assert.equal(store.get(m.id)!.script, undefined);
+  commands.undo(); assert.deepEqual(store.get(r.id)!.children['mechanics'] ?? [], []);
+  const before = store.get(r.id)!.revision;
+  const bad = commands.execute(cmd.addChild(r.id, 'mechanics', 'ghost'));
+  assert.equal(bad.ok, false); assert.ok(bad.error);
+  assert.equal(store.get(r.id)!.revision, before);
+  assert.equal(commands.execute({ type: 'no-such', payload: {}, label: 'x' }).ok, false);
+  const seen: string[] = [];
+  commands.subscribe((c, res) => seen.push(`${c.type}:${res.ok}`));
+  commands.registerHandler('custom', { apply: () => ({ result: { ok: true, touched: [] }, inverse: null }) });
+  commands.execute({ type: 'custom', payload: {}, label: 'c' });
+  assert.deepEqual(seen, ['custom:true']);
+});
+=== END FILE ===
+
+When finished: build the project and tell me the files you created.

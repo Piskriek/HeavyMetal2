@@ -1,0 +1,12 @@
+[
+ [
+  "packages/kernel/src/hash.ts",
+  "packages/kernel/src/schema-registry.ts",
+  "packages/kernel/src/event-bus.ts",
+  "packages/kernel/src/bundle.ts"
+ ],
+ [
+  "packages/kernel/src/store.ts",
+  "packages/kernel/tests/store-extra.test.ts"
+ ]
+]

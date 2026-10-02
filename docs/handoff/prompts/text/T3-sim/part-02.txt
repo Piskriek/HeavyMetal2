@@ -1,0 +1,605 @@
+[PART 2/4]
+
+=== FILE: packages/contracts/src/preset.ts ===
+import type { Issue, Params, PresetId, PresetKind, Ref, Tier, Unsubscribe, Value } from './core';
+
+/** Source code carried by a preset (the "Pro" tier). Compiled in the browser and run in a sandbox (see script.ts). */
+export interface ScriptSource {
+  readonly language: 'ts';
+  readonly source: string;
+  /** SCRIPT_API_VERSION it was written against. */
+  readonly apiVersion: number;
+}
+
+/**
+ * THE one node type. A game, a track, a ball, a tool, a mechanic, a material and a UI skin are all presets.
+ * A preset is IMMUTABLE: editing makes a new revision of the same id; forking makes a new id that remembers its source.
+ */
+export interface Preset {
+  readonly id: PresetId;
+  readonly kind: PresetKind;
+  readonly name: string;
+  /** 1 for the first version; each edit adds one. */
+  readonly revision: number;
+  /** Content hash of kind, name, params, children and script (not of meta). Equal hash = equal content. */
+  readonly hash: string;
+  /** The preset this was forked from. Unset params are inherited from it, then from the schema defaults. */
+  readonly forkOf?: Ref;
+  /** ONLY the values that differ from what would be inherited. Small on purpose: presets are shared as JSON (RUN UGC is 100 KB). */
+  readonly params: Params;
+  /** Slot key -> presets held in that slot, in order. */
+  readonly children: Readonly<Record<string, readonly Ref[]>>;
+  readonly script?: ScriptSource;
+  readonly tags: readonly string[];
+  /** The simplest UI tier that lists this preset in its browser. A draft that does not say defaults to 'build'. */
+  readonly tier: Tier;
+  readonly meta: {
+    readonly author?: string;
+    readonly createdAt: number;
+    readonly doc?: string;
+    readonly icon?: string;
+  };
+}
+
+/** What a caller supplies to create or revise a preset. Missing fields default (empty params, no children...). */
+export interface PresetDraft {
+  /** Omit to create a new preset; give an existing id to add a revision. */
+  readonly id?: PresetId;
+  readonly kind: PresetKind;
+  readonly name: string;
+  readonly forkOf?: Ref;
+  readonly params?: Params;
+  readonly children?: Readonly<Record<string, readonly Ref[]>>;
+  readonly script?: ScriptSource;
+  readonly tags?: readonly string[];
+  readonly tier?: Tier;
+  readonly meta?: Partial<Preset['meta']>;
+}
+
+/** A preset with its inheritance chain resolved: defaults < fork sources < own params. */
+export interface ResolvedPreset {
+  readonly preset: Preset;
+  readonly params: Params;
+  /** The chain that was applied, nearest first (the preset itself, its fork source, ...). */
+  readonly chain: readonly Preset[];
+}
+
+export interface StoreLimits {
+  /** Deepest allowed nesting of children (cycle guard and runtime guard). */
+  readonly maxDepth: number;
+  /** Most presets reachable from one root. */
+  readonly maxNodes: number;
+  /** Largest exported bundle in bytes (RUN UGC allows 100_000). */
+  readonly maxBundleBytes: number;
+}
+
+export type StoreChange =
+  | { readonly type: 'put'; readonly preset: Preset }
+  | { readonly type: 'remove'; readonly id: PresetId };
+
+/** The file a user shares or publishes: one root and everything it reaches. Plain JSON. */
+export interface PresetBundle {
+  readonly format: 'hm-bundle';
+  readonly version: number;
+  readonly root: PresetId;
+  readonly presets: readonly Preset[];
+  /** Schema version per kind at export time, so import can migrate. */
+  readonly schemaVersions: Readonly<Record<string, number>>;
+}
+
+export interface ImportReport {
+  readonly imported: number;
+  readonly skipped: number;
+  readonly renamed: Readonly<Record<PresetId, PresetId>>;
+  readonly issues: readonly Issue[];
+}
+
+export interface PresetFilter {
+  readonly kind?: PresetKind;
+  readonly tag?: string;
+  /** Show presets up to this tier. */
+  readonly tier?: Tier;
+  /** Case-insensitive match on name, tags and doc. */
+  readonly text?: string;
+}
+
+/** The preset graph. Content-addressed, copy-on-write, cycle-safe. Port target: the plan zip's graph.ts / authoring.ts. */
+export interface PresetStore {
+  readonly limits: StoreLimits;
+  /** A revision; omit `rev` for the latest. */
+  get(id: PresetId, rev?: number): Preset | undefined;
+  put(draft: PresetDraft): Preset;
+  /** A new preset (new id, revision 1) with `forkOf` set; `patch` overrides fields of the copy. */
+  fork(id: PresetId, patch?: Partial<PresetDraft>): Preset;
+  /** Removes all revisions. Refuses (throws) if another preset still references it. */
+  remove(id: PresetId): void;
+  list(filter?: PresetFilter): readonly Preset[];
+  resolve(id: PresetId, rev?: number): ResolvedPreset;
+  /** Presets whose children reference `id`. */
+  dependents(id: PresetId): readonly PresetId[];
+  /**
+   * Issue codes: about THIS preset only: 'missing-ref' (a child that does not exist), 'slot-kind' (a child of a kind the slot does not take),
+   * 'param-range' (outside min/max), 'unknown-param' (a key the schema does not declare). About everything reachable from it:
+   * 'cycle', 'depth' (> limits.maxDepth), 'nodes' (> limits.maxNodes).
+   */
+  validate(id: PresetId): readonly Issue[];
+  exportBundle(root: PresetId): PresetBundle;
+  importBundle(bundle: PresetBundle, opts?: { readonly onConflict?: 'keep' | 'replace' | 'rename' }): ImportReport;
+  subscribe(listener: (change: StoreChange) => void): Unsubscribe;
+}
+
+/** Deep-readonly helper used by contracts and tests. */
+export type Json = Value;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/schema.ts ===
+import type { PresetKind, Tier, Value } from './core';
+
+export type ValueType =
+  | 'number' | 'int' | 'boolean' | 'string' | 'enum' | 'color'
+  | 'vec2' | 'vec3' | 'quat'
+  | 'ref'      // a pointer to a preset (of `refKinds`)
+  | 'list'     // a list of `itemType`
+  | 'curve'    // [[t, v], ...] sorted by t
+  | 'asset'    // a file name in the asset library (texture, sound, mesh)
+  | 'expr';    // free expression
+
+/**
+ * One variable of a preset kind. EVERY tunable thing is declared this way: the inspector, the search box, bindings,
+ * the code panel's autocomplete and the docs are all generated from these definitions. Nothing is a magic number.
+ */
+export interface VariableDef {
+  /** Key inside `Preset.params` (dotted keys are fine: "wheel.grip"). */
+  readonly key: string;
+  readonly type: ValueType;
+  readonly label: string;
+  /** One sentence a 10-year-old can read. Shown as the tooltip and in the Play tier. */
+  readonly doc: string;
+  /** The simplest UI tier that shows it. Most variables are 'pro'; the few that matter to a child are 'play'. */
+  readonly tier: Tier;
+  readonly default: Value;
+  readonly min?: number;
+  readonly max?: number;
+  readonly step?: number;
+  readonly unit?: string;
+  /** For 'enum'. */
+  readonly options?: readonly string[];
+  /** For 'ref': which kinds may be chosen. */
+  readonly refKinds?: readonly PresetKind[];
+  /** For 'list'. */
+  readonly itemType?: ValueType;
+  /** Inspector grouping ("Handling", "Looks"). */
+  readonly group?: string;
+  /** False for values that must stay constants (rare). Default true: anything can be bound or driven by an expression. */
+  readonly bindable?: boolean;
+}
+
+/** A named place where a preset holds other presets (a game holds modes; a racer holds a body and mechanics). */
+export interface ChildSlot {
+  readonly key: string;
+  readonly label: string;
+  readonly doc: string;
+  readonly kinds: readonly PresetKind[];
+  readonly min: number;
+  /** Infinity is written as null in JSON. */
+  readonly max: number | null;
+  readonly tier: Tier;
+}
+
+/** Everything the harness needs to know about a kind of preset. */
+export interface PresetSchema {
+  readonly kind: PresetKind;
+  /** Bump when `variables` change shape; a migration then upgrades saved presets. */
+  readonly version: number;
+  readonly label: string;
+  readonly doc: string;
+  readonly icon?: string;
+  readonly variables: readonly VariableDef[];
+  readonly slots: readonly ChildSlot[];
+  /**
+   * If set, a preset of this kind may carry a script that implements this named interface
+   * (see `ScriptInterfaces` in script.ts), e.g. 'Mechanic'.
+   */
+  readonly scriptInterface?: string;
+}
+
+export interface SchemaRegistry {
+  register(schema: PresetSchema): void;
+  get(kind: PresetKind): PresetSchema | undefined;
+  kinds(): readonly PresetKind[];
+  /** Variables of a kind that a UI at `tier` should show, in declaration order. */
+  variablesFor(kind: PresetKind, tier: Tier): readonly VariableDef[];
+  /** Upgrades the params of a preset saved at `fromVersion` to the current schema. Registered per kind. */
+  registerMigration(kind: PresetKind, fromVersion: number, migrate: (params: Readonly<Record<string, Value>>) => Readonly<Record<string, Value>>): void;
+}
+
+/** Identity helper so a schema literal is type-checked at its definition site. */
+export const defineSchema = <S extends PresetSchema>(schema: S): S => schema;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/script.ts ===
+import type { Params, Value } from './core';
+import type { Preset, ScriptSource } from './preset';
+import type { Rng, World } from './sim';
+import type { VariableSystem } from './variables';
+
+export interface Diagnostic {
+  readonly severity: 'error' | 'warning';
+  readonly message: string;
+  /** 1-based, in the user's source (not in generated code). */
+  readonly line: number;
+  readonly column: number;
+}
+
+export interface CompileResult {
+  readonly ok: boolean;
+  readonly diagnostics: readonly Diagnostic[];
+  /** JavaScript ready for the sandbox. Empty when !ok. */
+  readonly js: string;
+}
+
+/**
+ * Everything a script may touch. It is a CAPABILITY OBJECT: a script has no `window`, no `document`, no `fetch`, no `Date`, no
+ * `Math.random`, no timers, no imports. Time is `tick`; randomness is `rng`. This is what keeps sandboxed code deterministic and safe.
+ */
+export interface ScriptContext {
+  /** The preset this script belongs to, with its params resolved (read-only snapshot, refreshed on change). */
+  readonly self: { readonly id: string; readonly params: Params };
+  readonly tick: number;
+  readonly dt: number;
+  readonly rng: Rng;
+  readonly vars: Pick<VariableSystem, 'read' | 'write' | 'evaluate'>;
+  /** Read-only view of the world (query / get / has / getResource); writes go through `set` below. */
+  readonly world: Pick<World, 'query' | 'get' | 'has' | 'alive' | 'getResource' | 'presetOf'>;
+  /** The only way a script changes the simulation. Rejected (throws ScriptError) for entities/components the script was not granted. */
+  readonly set: (entity: number, component: string, values: Readonly<Record<string, Value>>) => void;
+  readonly spawn: (presetId: string, components?: Readonly<Record<string, Readonly<Record<string, Value>>>>) => number;
+  readonly despawn: (entity: number) => void;
+  readonly emit: (name: string, payload?: Value) => void;
+  readonly log: (...parts: Value[]) => void;
+}
+
+/** The interfaces a script may implement. Each preset schema names one in `scriptInterface`. */
+export interface Mechanic {
+  init?(ctx: ScriptContext): void;
+  update?(ctx: ScriptContext): void;
+  onEvent?(ctx: ScriptContext, name: string, payload: Value): void;
+}
+export interface Rule {
+  /** Called every tick while the rule is active; return a score/decision value the game reads. */
+  evaluate?(ctx: ScriptContext): Value;
+  onEvent?(ctx: ScriptContext, name: string, payload: Value): void;
+}
+export interface ToolScript {
+  onPointer?(ctx: ScriptContext, event: { readonly type: 'down' | 'move' | 'up'; readonly x: number; readonly y: number }): void;
+}
+/** name -> the member names a script of that interface may export (used for validation and autocomplete). */
+export const SCRIPT_INTERFACES: Readonly<Record<string, readonly string[]>> = {
+  Mechanic: ['init', 'update', 'onEvent'],
+  Rule: ['evaluate', 'onEvent'],
+  Tool: ['onPointer'],
+};
+
+export class ScriptError extends Error {
+  constructor(message: string, readonly line?: number) {
+    super(message);
+    this.name = 'ScriptError';
+  }
+}
+
+export interface ScriptLimits {
+  /** Max wall time of one call into a script. Exceeding it aborts the call, marks the script faulted and reports a diagnostic. */
+  readonly callBudgetMs: number;
+  /** Max operations (loop iterations / calls) counted by instrumentation, as a deterministic budget independent of machine speed. */
+  readonly opBudget: number;
+}
+
+export interface LoadedScript<T = unknown> {
+  readonly presetId: string;
+  /** The implementation object the script exported (members per its interface). */
+  readonly instance: T;
+  /** True after a runtime fault; a faulted script is skipped until it is reloaded. */
+  readonly faulted: boolean;
+  readonly lastError?: string;
+}
+
+export interface ScriptHost {
+  readonly limits: ScriptLimits;
+  /** TypeScript -> JS in the browser (no server). Type errors are reported, never thrown. */
+  compile(source: string): CompileResult;
+  /** Compiles and instantiates a preset's script in a fresh sandbox. `iface` must be a key of SCRIPT_INTERFACES. Throws ScriptError for a compile error. */
+  load<T = unknown>(preset: Preset, iface: string): LoadedScript<T>;
+  /** Calls a member with a context, enforcing the limits; a throw or budget overrun faults the script and is returned, never propagated. */
+  call(script: LoadedScript, member: string, ctx: ScriptContext, ...args: Value[]): { readonly ok: boolean; readonly value?: Value; readonly error?: string };
+  /** Replaces the script of a loaded preset with new source, keeping its slot in the system order (live editing). */
+  reload(script: LoadedScript, source: ScriptSource): LoadedScript;
+  /** Autocomplete/typing text for the editor: the .d.ts of ScriptContext and the interface, as a string. */
+  typings(iface: string): string;
+  dispose(): void;
+}
+=== END FILE ===
+
+=== FILE: packages/contracts/src/services.ts ===
+/**
+ * SERVICE SHELLS for waves B and C (physics, render, tools). They are contracts now so wave A code can already depend on their shape;
+ * the tasks that implement them may ADD members but must not change or remove these (change requests go through the integrator).
+ */
+import type { Color, Params, PresetId, Quat, Ref, Unsubscribe, Vec3 } from './core';
+import type { Command } from './commands';
+import type { CommandBus } from './commands';
+import type { PresetStore } from './preset';
+import type { EntityId, World } from './sim';
+import type { VariableSystem } from './variables';
+
+/* ───────────── physics (T4) ───────────── */
+
+export type ColliderSpec =
+  | { readonly shape: 'sphere'; readonly radius: number }
+  | { readonly shape: 'box'; readonly half: Vec3 }
+  | { readonly shape: 'heightfield'; readonly cols: number; readonly rows: number; readonly cell: number; readonly heights: readonly number[] }
+  | { readonly shape: 'mesh'; readonly positions: readonly number[]; readonly indices: readonly number[] };
+
+export interface BodySpec {
+  readonly kind: 'dynamic' | 'static' | 'kinematic';
+  readonly collider: ColliderSpec;
+  readonly mass?: number;
+  readonly friction?: number;
+  readonly restitution?: number;
+  readonly linearDamping?: number;
+  readonly angularDamping?: number;
+  readonly position: Vec3;
+  readonly rotation?: Quat;
+  /** Collision tier: 'racing' bodies collide with the road; 'decor' never does (HeavyMetal2's collision tiers). */
+  readonly tier?: 'racing' | 'decor' | 'trigger';
+}
+
+export interface PhysicsService {
+  /** Registers the physics components on the world and a fixed-order system; bodies live on entities (component 'body'). */
+  attach(world: World): void;
+  addBody(entity: EntityId, spec: BodySpec): void;
+  removeBody(entity: EntityId): void;
+  applyForce(entity: EntityId, force: Vec3): void;
+  applyImpulse(entity: EntityId, impulse: Vec3): void;
+  raycast(origin: Vec3, direction: Vec3, maxDistance: number): { readonly entity: EntityId; readonly distance: number; readonly point: Vec3; readonly normal: Vec3 } | null;
+  /** Deterministic: same inputs, same order, same result on every machine. */
+  step(dt: number): void;
+}
+
+/* ───────────── render (T5) ───────────── */
+
+/** A material preset's resolved look: the PBR slots refer to assets from the art pipeline. */
+export interface MaterialLook {
+  readonly albedo?: string;
+  readonly normal?: string;
+  readonly orm?: string;
+  readonly tint: Color;
+  /** World units per texture repeat. */
+  readonly repeat: number;
+  readonly roughness: number;
+  readonly metalness: number;
+  readonly normalStrength: number;
+}
+
+export interface Pick {
+  readonly entity: EntityId | null;
+  readonly point: Vec3 | null;
+  readonly normal: Vec3 | null;
+  readonly distance: number;
+}
+
+export interface RenderService {
+  /** Mounts a canvas into `host`, syncs from `world` every frame with interpolation alpha. */
+  mount(host: HTMLElement, world: World, store: PresetStore): void;
+  unmount(): void;
+  render(alpha: number): void;
+  pick(clientX: number, clientY: number): Pick;
+  setCamera(cameraPreset: PresetId): void;
+  /** Camera control for tools: orbit/pan/zoom without presets. */
+  camera: {
+    readonly position: Vec3;
+    readonly target: Vec3;
+    set(position: Vec3, target: Vec3): void;
+    project(world: Vec3): readonly [number, number];
+  };
+  /** Draws editor-only overlays (gizmos, grids, bounds) that never reach the sim. */
+  overlay: { show(id: string, shapes: readonly OverlayShape[]): void; hide(id: string): void };
+  onFrame(listener: (dtMs: number) => void): Unsubscribe;
+}
+
+export type OverlayShape =
+  | { readonly type: 'line'; readonly from: Vec3; readonly to: Vec3; readonly color: Color }
+  | { readonly type: 'ring'; readonly center: Vec3; readonly normal: Vec3; readonly radius: number; readonly color: Color }
+  | { readonly type: 'box'; readonly center: Vec3; readonly half: Vec3; readonly color: Color }
+  | { readonly type: 'handle'; readonly id: string; readonly position: Vec3; readonly color: Color; readonly size: number };
+
+/* ───────────── tools & manipulation presets (T7) ───────────── */
+
+/** Manipulation presets are DATA: how a tool snaps, constrains and pivots. Kind 'manipulation'. */
+export interface ManipulationSettings {
+  readonly snapGrid: number;        // world units; 0 = off
+  readonly snapAngle: number;       // degrees; 0 = off
+  readonly snapToSurface: boolean;
+  readonly alignToNormal: boolean;
+  readonly axes: 'free' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz';
+  readonly pivot: 'center' | 'first' | 'ground' | 'cursor';
+  readonly space: 'world' | 'local';
+  readonly mirror: 'none' | 'x' | 'z';
+  readonly array: { readonly count: number; readonly offset: Vec3 };
+  readonly magnet: { readonly radius: number; readonly strength: number };
+}
+
+export interface Selection {
+  readonly ids: readonly PresetId[];
+  readonly entities: readonly EntityId[];
+}
+
+export interface PointerEventData {
+  readonly type: 'down' | 'move' | 'up' | 'wheel';
+  readonly x: number;
+  readonly y: number;
+  readonly button: number;
+  readonly shift: boolean;
+  readonly ctrl: boolean;
+  readonly alt: boolean;
+  readonly pick: Pick;
+  readonly delta?: number;
+}
+
+export interface ToolContext {
+  readonly store: PresetStore;
+  readonly commands: CommandBus;
+  readonly vars: VariableSystem;
+  readonly world: World;
+  readonly render: RenderService;
+  readonly manipulation: ManipulationSettings;
+  readonly selection: Selection;
+  setSelection(selection: Selection): void;
+}
+
+/** A tool turns pointer input into Commands. It never mutates anything itself. Kind 'tool' presets name a built-in tool and its settings. */
+export interface Tool {
+  readonly id: string;
+  readonly label: string;
+  readonly cursor: string;
+  activate?(ctx: ToolContext): void;
+  deactivate?(ctx: ToolContext): void;
+  onPointer(ctx: ToolContext, event: PointerEventData): readonly Command[];
+  onKey?(ctx: ToolContext, key: string): readonly Command[];
+  /** Overlay shapes to draw now (gizmo handles, brush ring...). */
+  overlay?(ctx: ToolContext): readonly OverlayShape[];
+}
+
+export interface ToolRegistry {
+  register(tool: Tool): void;
+  get(id: string): Tool | undefined;
+  list(): readonly Tool[];
+}
+
+export type { Params, Ref };
+=== END FILE ===
+
+=== FILE: packages/contracts/src/sim.ts ===
+import type { PresetId, Ref, Unsubscribe, Value } from './core';
+import type { VariableDef } from './schema';
+import type { EventBus } from './commands';
+import type { VariableSystem } from './variables';
+
+export type EntityId = number;
+
+/** A component is plain data. Declaring `fields` makes every field a variable (VarPath "entity:<id>/<component>.<field>"). */
+export interface ComponentDef<T extends Record<string, Value> = Record<string, Value>> {
+  readonly name: string;
+  readonly defaults: T;
+  readonly fields: readonly VariableDef[];
+}
+
+/** Seeded, fast, reproducible. The ONLY source of randomness in a simulation. Same seed = same sequence on every machine. */
+export interface Rng {
+  /** [0, 1) */
+  next(): number;
+  /** Integer in [min, max] inclusive. */
+  int(min: number, max: number): number;
+  pick<T>(items: readonly T[]): T;
+  /** A new independent stream derived from this one and a label (so adding a system does not shift others' numbers). */
+  fork(label: string): Rng;
+  /** Serialisable state, to snapshot and restore. */
+  state(): readonly number[];
+  restore(state: readonly number[]): void;
+}
+
+/** What the players are doing this tick: actor id -> action name -> value (booleans as 0/1 or true/false, axes as numbers). */
+export interface InputFrame {
+  readonly tick: number;
+  readonly actors: Readonly<Record<string, Readonly<Record<string, number | boolean>>>>;
+}
+
+export interface StepContext {
+  /** Always SIM_DT. */
+  readonly dt: number;
+  readonly tick: number;
+  readonly rng: Rng;
+  readonly events: EventBus;
+  readonly vars: VariableSystem;
+  readonly input: InputFrame;
+}
+
+/** Systems run in ascending `order`, ties by registration order. They may only change the world through `World`. */
+export interface System {
+  readonly name: string;
+  readonly order: number;
+  update(world: World, ctx: StepContext): void;
+}
+
+export interface WorldSnapshot {
+  readonly tick: number;
+  readonly nextEntity: EntityId;
+  readonly entities: readonly { readonly id: EntityId; readonly preset?: Ref; readonly components: Readonly<Record<string, Readonly<Record<string, Value>>>> }[];
+  readonly resources: Readonly<Record<string, Value>>;
+  readonly rng: readonly number[];
+}
+
+export interface World {
+  readonly tick: number;
+  defineComponent<T extends Record<string, Value>>(def: ComponentDef<T>): void;
+  components(): readonly ComponentDef[];
+  spawn(preset?: Ref, components?: Readonly<Record<string, Readonly<Record<string, Value>>>>): EntityId;
+  despawn(id: EntityId): void;
+  alive(id: EntityId): boolean;
+  /** The preset an entity was spawned from (the link between "what you built" and "what runs"). */
+  presetOf(id: EntityId): Ref | undefined;
+  add(id: EntityId, component: string, values?: Readonly<Record<string, Value>>): void;
+  remove(id: EntityId, component: string): void;
+  has(id: EntityId, component: string): boolean;
+  get(id: EntityId, component: string): Readonly<Record<string, Value>> | undefined;
+  /** Sets fields of a component the entity has. Unknown fields throw (typos must not be silent). */
+  set(id: EntityId, component: string, values: Readonly<Record<string, Value>>): void;
+  /** Entities that have ALL the listed components, in ascending id order (the order is part of determinism). */
+  query(...components: string[]): readonly EntityId[];
+  /** Singleton data (race state, the clock...). */
+  getResource(name: string): Value | undefined;
+  setResource(name: string, value: Value): void;
+  snapshot(): WorldSnapshot;
+  restore(snapshot: WorldSnapshot): void;
+  /** A stable hash of the entire world state (components in id order, resources by name). Equal hash = equal state. */
+  hash(): string;
+  /** Changes since the last call, for render/UI sync: spawned, despawned, changed (entity, component). */
+  drainChanges(): readonly WorldChange[];
+  onChange(listener: (change: WorldChange) => void): Unsubscribe;
+}
+
+export type WorldChange =
+  | { readonly type: 'spawn'; readonly id: EntityId }
+  | { readonly type: 'despawn'; readonly id: EntityId }
+  | { readonly type: 'set'; readonly id: EntityId; readonly component: string };
+
+export interface Simulation {
+  readonly world: World;
+  readonly rng: Rng;
+  readonly events: EventBus;
+  addSystem(system: System): void;
+  removeSystem(name: string): void;
+  /** Advances exactly one fixed tick with `input` (default: empty). */
+  step(input?: InputFrame): void;
+  /** Wall-clock driver for the browser: feeds elapsed ms, runs as many fixed ticks as fit (max `maxTicksPerCall`), returns the render alpha in [0,1). */
+  advance(elapsedMs: number, inputFor: (tick: number) => InputFrame, maxTicksPerCall?: number): number;
+  readonly tick: number;
+}
+
+/** A race (or any session) is (preset graph, seed, input stream). Replaying it must give the same `finalHash`. */
+export interface Replay {
+  readonly seed: number;
+  /** `PresetBundle` content hash the session ran on. */
+  readonly bundleHash: string;
+  readonly ticks: number;
+  readonly inputs: readonly InputFrame[];
+  readonly finalHash: string;
+  /** Optional checkpoints (tick, world hash) every N ticks to find where a desync starts. */
+  readonly checkpoints?: readonly { readonly tick: number; readonly hash: string }[];
+}
+
+export type { PresetId };
+=== END FILE ===
+
+
+
+[END OF PART 2/4. Reply only: Part 2/4 received]

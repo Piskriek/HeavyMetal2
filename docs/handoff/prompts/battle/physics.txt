@@ -1,0 +1,376 @@
+START FROM A CLEAN SLATE: delete every file in the project first, then create the files below. Create everything as real files in the project, run `npm install`, and run the tests. Reply with a short summary only (no code in the chat).
+
+You are a senior game-physics engineer (TypeScript). TASK: the `physics` package of a small game-engine harness: a small, DETERMINISTIC rigid-body engine for a 3D ball racer (rolling spheres on terrain heightfields, triangle-mesh tracks and boxes). No dependencies except dev tools. Pure TypeScript, no `any`, no DOM, no Math.random, no Date, no trig/pow/exp in the step (only + - * / and Math.sqrt/abs/min/max/floor/ceil), so results are identical in every JS engine. Fixed step (the caller passes dt = 1/120).
+
+Project: normal npm project (Node 20+, ESM, TypeScript strict incl. noUncheckedIndexedAccess/noUnusedLocals, devDeps tsx, typescript, @types/node). Code in packages/physics/src/, tests in packages/physics/tests/. tsconfig: "paths": '@hm/contracts' -> packages/contracts/src/index.ts, include packages/*/src and packages/*/tests. Tests: node --import tsx --test packages/physics/tests/*.test.ts (use `import type` for '@hm/contracts' so tsx needs no path mapping at runtime).
+
+Create this file exactly (excerpt of the real contracts):
+=== FILE: packages/contracts/src/index.ts ===
+export type PresetId = string;
+
+export type Tier = 'play' | 'build' | 'pro';
+export const TIERS: readonly Tier[] = ['play', 'build', 'pro'] as const;
+export const tierRank = (t: Tier): number => (t === 'play' ? 0 : t === 'build' ? 1 : 2);
+export const visibleAt = (t: Tier, shown: Tier): boolean => tierRank(t) <= tierRank(shown);
+
+export type Vec2 = readonly [number, number];
+export type Vec3 = readonly [number, number, number];
+export type Quat = readonly [number, number, number, number];
+export type Color = string;
+
+export interface Ref {
+  readonly ref: PresetId;
+  readonly rev?: number;
+}
+
+export interface Expr {
+  readonly expr: string;
+}
+
+export type Value =
+  | number
+  | boolean
+  | string
+  | null
+  | Ref
+  | Expr
+  | readonly Value[]
+  | { readonly [key: string]: Value };
+
+export type Params = Readonly<Record<string, Value>>;
+
+export type Unsubscribe = () => void;
+
+export interface Issue {
+  readonly severity: 'error' | 'warning';
+  readonly code: string;
+  readonly message: string;
+    readonly presetId?: PresetId;
+  readonly path?: string;
+}
+
+export const CORE_KINDS = [
+  'game', 'mode', 'scene', 'entity', 'shape', 'material', 'mechanic', 'rule', 'item', 'racer', 'track-piece',
+  'camera', 'input-map', 'ui-skin', 'hud', 'tool', 'manipulation', 'brush', 'ai-driver', 'audio-cue', 'physics-model',
+] as const;
+export type CoreKind = (typeof CORE_KINDS)[number];
+export type PresetKind = CoreKind | (string & {});
+
+export const FORMAT_VERSION = 1;
+export const SCRIPT_API_VERSION = 1;
+export const SIM_HZ = 120;
+export const SIM_DT = 1 / SIM_HZ;
+
+export type ValueType = 'number' | 'int' | 'boolean' | 'string' | 'enum' | 'color' | 'vec2' | 'vec3' | 'quat' | 'ref' | 'list' | 'curve' | 'asset' | 'expr';
+export interface VariableDef { readonly key: string; readonly type: ValueType; readonly label: string; readonly doc: string; readonly tier: Tier; readonly default: Value; readonly min?: number; readonly max?: number; readonly step?: number; readonly unit?: string; readonly options?: readonly string[]; readonly group?: string }
+
+export type EntityId = number;
+export interface ComponentDef<T extends Record<string, Value> = Record<string, Value>> { readonly name: string; readonly defaults: T; readonly fields: readonly VariableDef[] }
+export type WorldChange =
+  | { readonly type: 'spawn'; readonly id: EntityId }
+  | { readonly type: 'despawn'; readonly id: EntityId }
+  | { readonly type: 'set'; readonly id: EntityId; readonly component: string };
+export interface World {
+  readonly tick: number;
+  defineComponent<T extends Record<string, Value>>(def: ComponentDef<T>): void;
+  components(): readonly ComponentDef[];
+  alive(id: EntityId): boolean;
+  has(id: EntityId, component: string): boolean;
+  get(id: EntityId, component: string): Readonly<Record<string, Value>> | undefined;
+  query(...components: string[]): readonly EntityId[];   // ascending ids
+  drainChanges(): readonly WorldChange[];
+}
+
+// minimal excerpt of the preset store (the real one has more methods)
+export interface Preset { readonly id: PresetId; readonly kind: string; readonly name: string; readonly params: Params }
+export interface ResolvedPreset { readonly preset: Preset; readonly params: Params }
+export interface PresetStore { get(id: PresetId): Preset | undefined; resolve(id: PresetId): ResolvedPreset }
+
+export type ColliderSpec =
+  | { readonly shape: 'sphere'; readonly radius: number }
+  | { readonly shape: 'box'; readonly half: Vec3 }
+  | { readonly shape: 'heightfield'; readonly cols: number; readonly rows: number; readonly cell: number; readonly heights: readonly number[] }
+  | { readonly shape: 'mesh'; readonly positions: readonly number[]; readonly indices: readonly number[] };
+
+export interface BodySpec {
+  readonly kind: 'dynamic' | 'static' | 'kinematic';
+  readonly collider: ColliderSpec;
+  readonly mass?: number;
+  readonly friction?: number;
+  readonly restitution?: number;
+  readonly linearDamping?: number;
+  readonly angularDamping?: number;
+  readonly position: Vec3;
+  readonly rotation?: Quat;
+  readonly tier?: 'racing' | 'decor' | 'trigger';
+}
+
+export interface PhysicsService {
+  attach(world: World): void;
+  addBody(entity: EntityId, spec: BodySpec): void;
+  removeBody(entity: EntityId): void;
+  applyForce(entity: EntityId, force: Vec3): void;
+  applyImpulse(entity: EntityId, impulse: Vec3): void;
+  raycast(origin: Vec3, direction: Vec3, maxDistance: number): { readonly entity: EntityId; readonly distance: number; readonly point: Vec3; readonly normal: Vec3 } | null;
+  step(dt: number): void;
+}
+
+// minimal excerpt of the simulation System contract (the real StepContext has more fields)
+export interface StepContext { readonly dt: number; readonly tick: number }
+export interface System { readonly name: string; readonly order: number; update(world: World, ctx: StepContext): void }
+=== END FILE ===
+
+ARCHITECTURE (important): the engine keeps NO dynamic state of its own. The truth for every dynamic body lives in the simulation World's components, so that snapshots, replays and live editing work: it reads the components at the start of each step and writes them back at the end. The engine owns only the static collision data (colliders added with addBody) and the force accumulators.
+Components (you register them in definePhysicsComponents; 'transform' is registered by the renderer, you only require it and throw a clear error if it is missing):
+  'transform': fields x,y,z, qx,qy,qz,qw, sx,sy,sz (already defined elsewhere).
+  'velocity': defaults vx,vy,vz, wx,wy,wz all 0 (linear and angular velocity; angular in rad/s about world axes).
+  'body': defaults { mass:1, radius:0.5, friction:0.5, restitution:0, linearDamping:0.02, angularDamping:0.05, tier:'racing' }. Dynamic bodies are always spheres; radius lives here.
+  Every field of 'velocity' and 'body' gets a VariableDef (key, type 'number' (or 'enum' for tier with options racing/decor/trigger), label, one-line doc, tier 'pro' except mass/radius/friction/restitution which are 'build', min/max/step/unit where sensible), so the inspector can edit them live.
+
+YOU WRITE (each file < 250 lines; split into modules as you like):
+packages/physics/src/physics.ts (re-exporting from helper modules is fine), exporting:
+  export type PhysWorld = Pick<World, 'defineComponent' | 'components' | 'alive' | 'has' | 'get' | 'set' | 'add' | 'query'>;
+  export interface PhysicsEngine extends PhysicsService {
+    attach(world: PhysWorld): void;
+    setGravity(g: Vec3): void;            // default [0,-9.81,0]
+    onContact(listener: (a: EntityId, b: EntityId, point: Vec3, normal: Vec3, impulse: number) => void): Unsubscribe;   // b = the static collider or the other body; normal points from b to a; called for contacts with impulse > 0.5 (to avoid spam from resting contact)
+    onTrigger(listener: (entity: EntityId, trigger: EntityId, enter: boolean) => void): Unsubscribe;
+  }
+  export function definePhysicsComponents(world: PhysWorld): void;
+  export function createPhysics(): PhysicsEngine;
+  export function createPhysicsSystem(engine: PhysicsEngine): System;   // name 'physics', order 100, update(world, ctx) { engine.step(ctx.dt) }  (the engine already holds the world from attach; update() calls engine.attach(world) first if it was never attached or the world differs)
+
+BEHAVIOUR
+- addBody(entity, spec): kind 'static' registers a collider (box, heightfield, mesh) at spec.position / spec.rotation (quaternion; default identity; rotation only needs to be supported for box and mesh, heightfield is axis aligned), with friction, restitution, tier. For a 'dynamic' spec (sphere collider only) it adds the components 'transform' (x,y,z = position, rotation if given), 'velocity' and 'body' (mass, radius from the collider, friction, restitution, damping, tier from the spec) to the entity (replace if present). 'kinematic' = a static collider that you may later move by changing... NOT needed: treat kinematic like static. removeBody(entity): removes a static collider, or the 'body' and 'velocity' components of a dynamic one.
+- Heightfield: cols x rows samples, `cell` metres apart; x from position[0] to position[0]+(cols-1)*cell, z from position[2]; height = position[1] + heights[row*cols+col]; each cell is two triangles with a fixed diagonal. Mesh: positions flat xyz, indices triples; build a uniform-grid broadphase when added. Triangles collide from BOTH sides (a ball is pushed out to whichever side its centre is on). Box: oriented box.
+- Dynamics per step(dt): bodies are the world entities that have transform+velocity+body, in ascending entity id order. Semi-implicit Euler: v += (gravity + force/mass) * dt; damping: v *= 1/(1+linearDamping*dt) (same for angular); then x += v * dt; rotation q integrated from the angular velocity (q += 0.5*dt*(w,0)*q then normalise). Forces from applyForce are accumulated and cleared at the end of the step. applyImpulse changes velocity immediately: v += impulse/mass.
+- Substeps against tunnelling: n = clamp(ceil(speed*dt / (0.5*radius)), 1, 16) where speed is the current speed; each substep integrates, then collides. (Derive n from state only, so it is deterministic.)
+- Collision of a sphere with a static collider: find the closest point on the shape to the centre (triangle: Ericson's closest-point-on-triangle; box: clamp in local space; heightfield: only the cells overlapping the sphere's bounding box, two triangles each). If distance < radius: normal = (centre - closest)/distance (if the centre is on the surface use the triangle/face normal); push the sphere out along it; velocity: remove the inward normal component with restitution (apply restitution only when the impact speed along the normal > 1.0 m/s, otherwise 0, to avoid jitter), and Coulomb friction at the contact point with proper rolling coupling: contact point relative velocity vt = v_tangent + w x (-n*radius); friction impulse = clamp so |j_t| <= mu * j_n (use inverse inertia 5/(2*m*r^2) for the solid sphere), applied to BOTH the linear and the angular velocity (this makes the ball roll without slipping on a slope). Combined restitution = max(body, collider); combined friction = sqrt(body*collider). Process up to 8 contacts per sphere per substep, re-evaluating after each push.
+- Tiers: a 'racing' body collides with 'racing' statics and 'racing' bodies; a 'decor' body (debris) collides with 'racing' and 'decor' statics; 'trigger'-tier statics never push anything: they report onTrigger(entity, trigger, true) the first substep a dynamic body's centre is inside the (box) trigger, and (entity, trigger, false) when it leaves. The engine keeps the inside-set per trigger (the only extra state; a body unknown to the set counts as outside, so a body already inside on the first step reports an enter). Only box triggers are supported.
+- Sphere vs sphere between dynamic bodies of compatible tiers: positional separation split by inverse mass plus an impulse with the combined restitution and friction. Process pairs in ascending (a,b) id order. A simple O(n^2) is fine up to 64 bodies; use a sorted sweep on x if n > 64.
+- raycast(origin, direction, maxDistance): nearest hit over all non-trigger static colliders (box slab, triangle Moeller-Trumbore, heightfield via its triangles along the ray's cells or just per-cell marching); returns { entity, distance, point, normal } (normal facing the ray origin) or null. direction need not be normalised (normalise it, zero length => null).
+- Determinism rules: iterate in ascending entity-id order everywhere (statics too); never rely on Map/Set iteration order unless insertion order is itself deterministic and documented; no floating point trig. Add a comment block at the top of physics.ts stating these rules.
+- Robustness: if a body has NaN/Infinity, throw an Error naming the entity and field. Zero mass => treat as 1.
+
+ALSO write packages/physics/tests/physics-extra.test.ts with at least 12 more tests (sphere-sphere collision conserves momentum, damping, sloped heightfield, box rotated 45 degrees about Y, sphere on a mesh edge between two coplanar triangles does not bump (speed change < 2%), contact listener fires on impact and not at rest, many bodies run < 2 s for 5 s of simulation with 100 balls, etc.). Use the helpers file below.
+
+=== FILE: packages/physics/tests/helpers.ts ===
+import type { ComponentDef, EntityId, Value } from '@hm/contracts';
+import type { PhysWorld } from '../src/physics';
+
+export type TestWorld = PhysWorld & { spawn(): EntityId };
+
+export function fakeWorld(): TestWorld {
+  const defs = new Map<string, ComponentDef>();
+  const ents = new Map<EntityId, Map<string, Record<string, Value>>>();
+  let next = 1;
+  const need = (c: string): ComponentDef => { const d = defs.get(c); if (!d) throw new Error(`unknown component ${c}`); return d; };
+  return {
+    defineComponent(def: ComponentDef) { defs.set(def.name, def); },
+    components: () => [...defs.values()],
+    alive: (id: EntityId) => ents.has(id),
+    has: (id: EntityId, c: string) => ents.get(id)?.has(c) ?? false,
+    get: (id: EntityId, c: string) => ents.get(id)?.get(c),
+    set(id: EntityId, c: string, v: Readonly<Record<string, Value>>) {
+      const m = ents.get(id); const cur = m?.get(c);
+      if (!m || !cur) throw new Error(`no ${c} on ${id}`);
+      m.set(c, { ...cur, ...v });
+    },
+    add(id: EntityId, c: string, v?: Readonly<Record<string, Value>>) {
+      const m = ents.get(id); if (!m) throw new Error(`entity ${id} is not alive`);
+      m.set(c, { ...need(c).defaults, ...(v ?? {}) });
+    },
+    query: (...cs: string[]) => [...ents.keys()].filter((id) => cs.every((c) => ents.get(id)?.has(c))).sort((a, b) => a - b),
+    spawn() { const id = next++; ents.set(id, new Map()); return id; },
+  };
+}
+
+/** The 'transform' component as the render package defines it (physics only needs these fields to exist). */
+export const transformDef: ComponentDef = {
+  name: 'transform',
+  defaults: { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1, sx: 1, sy: 1, sz: 1 },
+  fields: [],
+};
+=== END FILE ===
+
+ACCEPTANCE TESTS (make these pass; if a test is wrong fix only obvious typos and tell me which; do NOT weaken tolerances):
+=== FILE: packages/physics/tests/physics.test.ts ===
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type { BodySpec, EntityId } from '@hm/contracts';
+import { createPhysics, definePhysicsComponents, createPhysicsSystem } from '../src/physics';
+import { fakeWorld, transformDef, type TestWorld } from './helpers';
+
+function setup(gravity?: readonly [number, number, number]) {
+  const w = fakeWorld();
+  w.defineComponent(transformDef);
+  definePhysicsComponents(w);
+  const e = createPhysics();
+  e.attach(w);
+  if (gravity) e.setGravity(gravity);
+  return { w, e };
+}
+type Eng = ReturnType<typeof setup>['e'];
+const ball = (e: Eng, w: TestWorld, pos: [number, number, number], extra: Partial<BodySpec> = {}): EntityId => {
+  const id = w.spawn();
+  e.addBody(id, { kind: 'dynamic', collider: { shape: 'sphere', radius: 0.5 }, mass: 1, friction: 0.5, restitution: 0, position: pos, tier: 'racing', ...extra });
+  return id;
+};
+const ground = (e: Eng, w: TestWorld, extra: Partial<BodySpec> = {}): EntityId => {
+  const id = w.spawn();
+  e.addBody(id, { kind: 'static', collider: { shape: 'heightfield', cols: 3, rows: 3, cell: 20, heights: [0, 0, 0, 0, 0, 0, 0, 0, 0] }, position: [-20, 0, -20], friction: 0.5, restitution: 0, tier: 'racing', ...extra });
+  return id;
+};
+const run = (e: Eng, secs: number, each?: (tick: number) => void): void => { const n = Math.round(secs * 120); for (let i = 0; i < n; i++) { each?.(i); e.step(1 / 120); } };
+const P = (w: TestWorld, id: EntityId): number[] => { const t = w.get(id, 'transform')!; return [t.x as number, t.y as number, t.z as number]; };
+const V = (w: TestWorld, id: EntityId): number[] => { const v = w.get(id, 'velocity')!; return [v.vx as number, v.vy as number, v.vz as number]; };
+
+test('free fall matches y0 - g t^2 / 2 within the integrator error, default gravity is -9.81 on Y', () => {
+  const { w, e } = setup();
+  const b = ball(e, w, [0, 100, 0]);
+  run(e, 1);
+  assert.ok(Math.abs(P(w, b)[1]! - (100 - 4.905)) < 0.06, `y=${P(w, b)[1]}`);
+  assert.ok(Math.abs(V(w, b)[1]! + 9.81) < 0.02);
+});
+
+test('a ball dropped on a flat heightfield comes to rest at y = radius', () => {
+  const { w, e } = setup();
+  ground(e, w);
+  const b = ball(e, w, [0, 3, 0]);
+  run(e, 3);
+  assert.ok(Math.abs(P(w, b)[1]! - 0.5) < 0.02, `y=${P(w, b)[1]}`);
+  assert.ok(Math.hypot(...V(w, b)) < 0.05);
+});
+
+test('restitution 0.5 sends the ball back up to about a quarter of the drop height', () => {
+  const { w, e } = setup();
+  ground(e, w);
+  const b = ball(e, w, [0, 5.5, 0], { restitution: 0.5 });
+  let bounced = false, peak = 0;
+  run(e, 3, () => { const vy = V(w, b)[1]!; if (vy > 0.5) bounced = true; if (bounced) peak = Math.max(peak, P(w, b)[1]!); });
+  assert.ok(bounced);
+  assert.ok(Math.abs(peak - 1.75) < 0.2, `peak=${peak}`);
+});
+
+test('a ball released on a 30 degree mesh ramp rolls (not slides) at about 5/7 g sin(a)', () => {
+  const { w, e } = setup();
+  const t = Math.tan(Math.PI / 6);
+  const id = w.spawn();
+  // plane y = -tan(30deg) * x, x in [-1, 60], z in [-10, 10]; descends towards +x
+  e.addBody(id, { kind: 'static', collider: { shape: 'mesh', positions: [-1, t, -10, 60, -60 * t, -10, 60, -60 * t, 10, -1, t, 10], indices: [0, 1, 2, 0, 2, 3] }, position: [0, 0, 0], friction: 1, restitution: 0, tier: 'racing' });
+  const b = ball(e, w, [0.25, 0.434, 0], { friction: 1 });
+  let worst = 0;
+  run(e, 1, () => { const p = P(w, b); const d = Math.sin(Math.PI / 6) * p[0]! + Math.cos(Math.PI / 6) * p[1]!; worst = Math.max(worst, 0.5 - d); });
+  const v = Math.hypot(...V(w, b));
+  assert.ok(v > 2.7 && v < 4.3, `speed=${v}`);
+  assert.ok(worst < 0.06, `penetration=${worst}`);
+  const wv = w.get(b, 'velocity')!;
+  const spin = Math.hypot(wv.wx as number, wv.wy as number, wv.wz as number);
+  assert.ok(Math.abs(spin * 0.5 - v) / v < 0.3, `spin=${spin} speed=${v}`);
+  assert.ok((w.get(b, 'transform')!.qw as number) < 0.999, 'rotation was integrated');
+});
+
+test('a ball stops at a box wall and a very fast ball does not tunnel through a thin one', () => {
+  const a = setup([0, 0, 0]);
+  const wall = a.w.spawn();
+  a.e.addBody(wall, { kind: 'static', collider: { shape: 'box', half: [0.05, 5, 5] }, position: [0, 0, 0], restitution: 0.5, tier: 'racing' });
+  const fast = ball(a.e, a.w, [-5, 0, 0], { restitution: 0.5 });
+  a.w.set(fast, 'velocity', { vx: 90 });
+  let maxX = -Infinity;
+  run(a.e, 0.5, () => { maxX = Math.max(maxX, P(a.w, fast)[0]!); });
+  assert.ok(maxX < 0, `maxX=${maxX}`);
+  assert.ok(V(a.w, fast)[0]! < 0, 'it bounced back');
+  const b = setup([0, 0, 0]);
+  const wall2 = b.w.spawn();
+  b.e.addBody(wall2, { kind: 'static', collider: { shape: 'box', half: [0.5, 1, 5] }, position: [0, 1, 0], restitution: 0, tier: 'racing' });
+  const slow = ball(b.e, b.w, [-5, 1, 0]);
+  b.w.set(slow, 'velocity', { vx: 10 });
+  run(b.e, 2);
+  assert.ok(P(b.w, slow)[0]! <= -0.99, `x=${P(b.w, slow)[0]}`);
+});
+
+test('the same inputs give bit-identical results; the engine keeps no dynamic state of its own', () => {
+  const build = () => {
+    const s = setup(); ground(s.e, s.w, { friction: 0.7 });
+    const bs = [ball(s.e, s.w, [0, 4, 0], { restitution: 0.4 }), ball(s.e, s.w, [0.6, 6, 0.1], { restitution: 0.3 })];
+    return { ...s, bs };
+  };
+  const drive = (s: ReturnType<typeof build>, from: number, to: number): void => {
+    for (let i = from; i < to; i++) { if (i % 10 === 0) s.e.applyForce(s.bs[0]!, [3, 0, 1]); if (i === 100) s.e.applyImpulse(s.bs[1]!, [0, 2, 1]); s.e.step(1 / 120); }
+  };
+  const dump = (s: ReturnType<typeof build>): string => JSON.stringify(s.bs.map((id) => [s.w.get(id, 'transform'), s.w.get(id, 'velocity')]));
+  const a = build(), b = build();
+  drive(a, 0, 600); drive(b, 0, 600);
+  assert.equal(dump(a), dump(b));
+  // restore: copy the state of a at tick 300 into a fresh world and continue; must equal the straight run
+  const c = build(), d = build();
+  drive(c, 0, 300);
+  for (let i = 0; i < d.bs.length; i++) { d.w.set(d.bs[i]!, 'transform', c.w.get(c.bs[i]!, 'transform')!); d.w.set(d.bs[i]!, 'velocity', c.w.get(c.bs[i]!, 'velocity')!); }
+  drive(c, 300, 600); drive(d, 300, 600);
+  assert.equal(dump(c), dump(d));
+  assert.equal(dump(c), dump(a));
+});
+
+test('raycast hits the heightfield and boxes, returns entity, distance, point and normal; misses return null', () => {
+  const { w, e } = setup();
+  const g = ground(e, w);
+  const box = w.spawn();
+  e.addBody(box, { kind: 'static', collider: { shape: 'box', half: [1, 1, 1] }, position: [10, 1, 0], tier: 'racing' });
+  const down = e.raycast([5, 10, 5], [0, -1, 0], 100)!;
+  assert.equal(down.entity, g); assert.ok(Math.abs(down.distance - 10) < 1e-6); assert.ok(Math.abs(down.normal[1] - 1) < 1e-6);
+  const side = e.raycast([0, 1, 0], [1, 0, 0], 100)!;
+  assert.equal(side.entity, box); assert.ok(Math.abs(side.distance - 9) < 1e-6); assert.ok(Math.abs(side.normal[0] + 1) < 1e-6);
+  assert.equal(e.raycast([5, 10, 5], [0, -1, 0], 5), null);
+  assert.equal(e.raycast([5, 10, 5], [0, 1, 0], 100), null);
+});
+
+test('trigger colliders report enter and exit once and do not push the ball', () => {
+  const { w, e } = setup([0, 0, 0]);
+  const trig = w.spawn();
+  e.addBody(trig, { kind: 'static', collider: { shape: 'box', half: [1, 5, 5] }, position: [0, 0, 0], tier: 'trigger' });
+  const b = ball(e, w, [-5, 0, 0], { linearDamping: 0 });
+  w.set(b, 'velocity', { vx: 5 });
+  const log: string[] = [];
+  e.onTrigger((entity, trigger, enter) => log.push(`${enter ? 'enter' : 'exit'} ${entity} ${trigger}`));
+  run(e, 3);
+  assert.deepEqual(log, [`enter ${b} ${trig}`, `exit ${b} ${trig}`]);
+  assert.ok(Math.abs(V(w, b)[0]! - 5) < 1e-6);
+});
+
+test('tiers: a racing ball ignores decor statics and collides with racing ones', () => {
+  const { w, e } = setup([0, 0, 0]);
+  const decor = w.spawn();
+  e.addBody(decor, { kind: 'static', collider: { shape: 'box', half: [0.5, 5, 5] }, position: [0, 0, 0], tier: 'decor' });
+  const b = ball(e, w, [-3, 0, 0]);
+  w.set(b, 'velocity', { vx: 5 });
+  run(e, 2);
+  assert.ok(P(w, b)[0]! > 2, `x=${P(w, b)[0]}`);
+});
+
+test('impulse and force: impulse/mass changes velocity at once, a force acts for one step only', () => {
+  const { w, e } = setup([0, 0, 0]);
+  const b = ball(e, w, [0, 0, 0], { mass: 2, linearDamping: 0 });
+  e.applyImpulse(b, [0, 0, 10]);
+  assert.ok(Math.abs(V(w, b)[2]! - 5) < 1e-9);
+  e.applyForce(b, [4, 0, 0]);
+  e.step(1 / 120);
+  assert.ok(Math.abs(V(w, b)[0]! - 4 / 2 / 120) < 1e-9);
+  e.step(1 / 120);
+  assert.ok(Math.abs(V(w, b)[0]! - 4 / 2 / 120) < 1e-9, 'the force is cleared after the step');
+});
+
+test('removeBody on a static collider makes the ball fall through; the physics system steps with ctx.dt', () => {
+  const { w, e } = setup();
+  const g = ground(e, w);
+  const b = ball(e, w, [0, 2, 0]);
+  const sys = createPhysicsSystem(e);
+  assert.equal(sys.name, 'physics');
+  for (let i = 0; i < 240; i++) sys.update(w, { dt: 1 / 120, tick: i });
+  assert.ok(Math.abs(P(w, b)[1]! - 0.5) < 0.05);
+  e.removeBody(g);
+  for (let i = 0; i < 240; i++) sys.update(w, { dt: 1 / 120, tick: i });
+  assert.ok(P(w, b)[1]! < -5);
+});
+=== END FILE ===
+
+When finished: run `npx tsc --noEmit` and the tests, and tell me which pass or fail and why, and the time the 100-ball test took.

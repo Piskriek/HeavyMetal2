@@ -1,0 +1,576 @@
+[PART 1/4]
+
+You will receive ONE coding task in 4 messages (parts). RULES FOR THE PARTS: after each part except the last, reply with ONLY the text 'Part k/4 received' (k = the part number). Do not start working, do not summarise, do not ask questions until you receive the last part, which ends with the word GO. Files are given as blocks that start with a line '=== FILE: <path> ===' and end with '=== END FILE ==='; everything between is the exact file content.
+
+=== FILE: package.json ===
+{
+  "name": "hm-harness",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test packages/*/tests/*.test.ts",
+    "build": "npm run build -w @hm/web",
+    "dev": "npm run dev -w @hm/web",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.17",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "vite": "^7.3.2",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
+=== END FILE ===
+
+=== FILE: tsconfig.json ===
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@hm/contracts": ["packages/contracts/src/index.ts"],
+      "@hm/kernel": ["packages/kernel/src/index.ts"],
+      "@hm/script": ["packages/script/src/index.ts"],
+      "@hm/sim": ["packages/sim/src/index.ts"],
+      "@hm/platform": ["packages/platform/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src", "packages/*/tests", "apps/*/src", "apps/*/vite.config.ts"]
+}
+=== END FILE ===
+
+=== FILE: scripts/verify.mjs ===
+/**
+ * The gate every delivered zip must pass.
+ *   node scripts/verify.mjs <package> [<package> ...]   typecheck + that package's tests + build   (what a task zip must pass)
+ *   node scripts/verify.mjs                             typecheck + ALL tests + build              (what the integrator runs)
+ * The build must produce ONE static html file (RUN loads a static build; there is no server).
+ */
+import { spawnSync } from 'node:child_process';
+import { existsSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const only = process.argv.slice(2);
+const sh = process.platform === 'win32';
+const run = (label, cmd, args) => {
+  console.log(`\n== ${label}`);
+  const r = spawnSync(cmd, args, { cwd: root, stdio: 'inherit', shell: sh });
+  if (r.status !== 0) {
+    console.error(`\nFAILED: ${label}`);
+    process.exit(r.status ?? 1);
+  }
+};
+run('typecheck', 'npm', ['run', 'typecheck']);
+const patterns = only.length ? only.map((p) => `packages/${p}/tests/*.test.ts`) : ['packages/*/tests/*.test.ts'];
+run(`tests (${only.length ? only.join(', ') : 'all packages'})`, 'node', ['--import', 'tsx', '--test', ...patterns]);
+run('build', 'npm', ['run', 'build']);
+const html = fileURLToPath(new URL('../apps/web/dist/index.html', import.meta.url));
+if (!existsSync(html)) {
+  console.error('FAILED: apps/web/dist/index.html is missing');
+  process.exit(1);
+}
+console.log(`\nOK: apps/web/dist/index.html is ${(statSync(html).size / 1024).toFixed(0)} KB (one file). Deployable.`);
+=== END FILE ===
+
+=== FILE: apps/web/package.json ===
+{
+  "name": "@hm/web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build" }
+}
+=== END FILE ===
+
+=== FILE: apps/web/vite.config.ts ===
+import { defineConfig } from 'vite';
+import { viteSingleFile } from 'vite-plugin-singlefile';
+import { fileURLToPath } from 'node:url';
+
+const p = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
+
+/** The deployable app: ONE static html file (RUN loads a static build; no server). base './' so it works from a sub-path. */
+export default defineConfig({
+  base: './',
+  plugins: [viteSingleFile()],
+  resolve: {
+    alias: {
+      '@hm/contracts': p('../../packages/contracts/src/index.ts'),
+      '@hm/kernel': p('../../packages/kernel/src/index.ts'),
+      '@hm/script': p('../../packages/script/src/index.ts'),
+      '@hm/sim': p('../../packages/sim/src/index.ts'),
+      '@hm/platform': p('../../packages/platform/src/index.ts'),
+    },
+  },
+  build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },
+});
+=== END FILE ===
+
+=== FILE: apps/web/index.html ===
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HM Harness</title>
+    <style>body{margin:0;font:14px system-ui;background:#101418;color:#dde6ee}main{padding:24px;max-width:720px}li{margin:4px 0}.ok{color:#7d7}.todo{color:#da7}</style>
+  </head>
+  <body><main id="app"></main><script type="module" src="/src/main.ts"></script></body>
+</html>
+=== END FILE ===
+
+=== FILE: apps/web/src/main.ts ===
+/**
+ * The deployable shell. It must always build to one static html file and show which packages are implemented.
+ * Tasks may wire their package into this page (a small demo/status panel), but must never break `npm run build`.
+ */
+import { FORMAT_VERSION, SIM_HZ } from '@hm/contracts';
+import * as kernel from '@hm/kernel';
+import * as script from '@hm/script';
+import * as sim from '@hm/sim';
+import * as platform from '@hm/platform';
+
+function status(name: string, probe: () => unknown): string {
+  try {
+    probe();
+    return `<li class="ok">${name}: implemented</li>`;
+  } catch (e) {
+    return /not implemented/.test(String(e)) ? `<li class="todo">${name}: not implemented yet</li>` : `<li class="todo">${name}: error - ${String(e).slice(0, 120)}</li>`;
+  }
+}
+
+const app = document.getElementById('app');
+if (app) {
+  app.innerHTML = `<h1>HM Harness</h1><p>format v${FORMAT_VERSION}, sim ${SIM_HZ} Hz</p><ul>${[
+    status('kernel', () => kernel.createSchemaRegistry()),
+    status('script', () => script.createScriptHost()),
+    status('sim', () => sim.createRng(1)),
+    status('platform', () => platform.createPlatform('stub')),
+  ].join('')}</ul>`;
+}
+=== END FILE ===
+
+=== FILE: docs/README.md ===
+# The harness in one page
+
+**Idea.** A kernel in which everything is a *preset* (a game, a track, a ball, a tool, a mechanic, a material, a UI skin) and every parameter is a *variable* with a path, a range, a unit and a one-sentence explanation. The same project opens at three depths: **play** (a 6-year-old picks cards and paints), **build** (sliders, snapping, tools), **pro** (every variable, the preset graph and the source code of any preset). Games are *content* built inside it; the first is a goblin ball-racing game on a volcanic island.
+
+**Where things live**
+| Path | What |
+|---|---|
+| `packages/contracts` | types only: the one source of truth (read `src/core.ts`, `preset.ts`, `schema.ts`, then the file for your task) |
+| `packages/kernel` | T1: schema registry, preset graph, variables + bindings + expressions, commands/undo, events, migrations |
+| `packages/script` | T2: TypeScript-in-the-browser compiler and the script sandbox |
+| `packages/sim` | T3: deterministic world, fixed 120 Hz step, seeded RNG, replays |
+| `packages/platform` | T9: RUN adapters (storage, UGC, leaderboards, rooms, profile) + a local stub |
+| `apps/web` | the deployable shell: builds to ONE static html file |
+| `docs/run-sdk` | RUN SDK docs (only in the platform task) |
+
+**Principles** (they decide every design question)
+1. One node type: Preset. Immutable revisions, copy-on-write forks, content hashes.
+2. Every parameter is a Variable declared in a schema; UIs are *generated* from schemas.
+3. Source is a tier, not a different tool: a preset may carry a TypeScript script run in a deterministic sandbox.
+4. All edits are Commands (undo/redo, replay, later multiplayer editing).
+5. Deterministic by construction: 120 Hz fixed step, injected time and randomness. A session is (preset bundle, seed, input stream).
+6. Packages talk only through contracts.
+7. Static and RUN-native: no server of our own.
+
+**Run it**: `npm install`, then `node scripts/verify.mjs <package>`; `npm run dev` for the shell.
+=== END FILE ===
+
+=== FILE: docs/RULES.md ===
+# Rules for every task (read first)
+
+You are building ONE package of a larger system (the "harness": a game-engine kernel in which everything is a preset and every variable is addressable).
+Other people build the other packages at the same time; a human integrator merges everything. That only works if you obey these rules.
+
+## The contract
+- `packages/contracts` is the single source of truth. **Do not edit it.** If something in it is wrong or missing, say so under *CONTRACT CHANGE REQUESTS* in `REPORT.md` and implement the closest thing that satisfies the existing text.
+- Your package must export exactly the factories named in `packages/contracts/src/packages.ts` (acceptance tests import them by name). Extra exports are fine.
+- Import other harness packages only through `@hm/contracts` types. If you need another package at runtime (for example the kernel), the task says so; otherwise use small local fakes in your tests.
+- Only edit files inside your own package and its `tests/`. The one exception: the task may allow a small wiring change in `apps/web/src/main.ts`. Never touch another package's `src` or tests.
+
+## Acceptance tests
+- `packages/<yours>/tests/acceptance.test.ts` is the executable form of the contract. Make it pass. **Do not weaken or delete tests.**
+- If a test contradicts the contract text or is plainly buggy, follow the contract text, fix the test minimally, and list every such change under *TEST CHANGES* in `REPORT.md` with the reason.
+- Add your own tests (new files, `*.test.ts`) for everything you build that the acceptance tests do not cover. Aim for at least as many again.
+- The gate: `node scripts/verify.mjs <your-package>` must exit 0 (typecheck, your tests, production build to ONE html file). Run it before you deliver. A zip that fails the gate is rejected unread.
+
+## Code quality bar (the code will be read by non-experts and edited by AI agents)
+- TypeScript strict, ESM, no `any` outside tests, no `// @ts-ignore`. Small files (under ~400 lines), small functions, pure where possible, data in plain JSON-serialisable objects.
+- No globals, no singletons that cannot be reset. Time and randomness are INJECTED (`now`, `newId`, `Rng`): never call `Date.now()` or `Math.random()` in logic.
+- Comments explain WHY, briefly. Every exported function and type has a one-line doc comment. Names are plain words, not abbreviations.
+- Errors are thrown with messages that say what was wrong and what to do. Never swallow an error silently.
+- No network calls, no telemetry, no `eval`/`new Function` except where the task explicitly requires (the script sandbox).
+
+## Dependencies
+- Prefer none. A runtime dependency needs a real reason, a permissive licence (MIT, BSD, Apache-2.0, ISC), small size, and a line in `REPORT.md` (name, version, licence, size, why). Add it to YOUR package's `package.json` only.
+- Everything must work offline after `npm install`.
+
+## Deliverable
+A zip of the **whole repo** (all packages, apps, scripts, docs), **without** `node_modules` and `dist`, no bigger than 763 KB excluding `docs/run-sdk` (that is the size of the plan zip this process copies: if you are over, you are building too much).
+Put `REPORT.md` in the zip root with: what you built (one paragraph); **TEST CHANGES**; **CONTRACT CHANGE REQUESTS**; **KNOWN GAPS**; bundle size your package adds to `apps/web/dist/index.html`; dependencies added; and the exact output tail of `node scripts/verify.mjs <your-package>`.
+=== END FILE ===
+
+=== FILE: packages/contracts/package.json ===
+{
+  "name": "@hm/contracts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
+=== END FILE ===
+
+=== FILE: packages/kernel/package.json ===
+{
+  "name": "@hm/kernel",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
+=== END FILE ===
+
+=== FILE: packages/script/package.json ===
+{
+  "name": "@hm/script",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
+=== END FILE ===
+
+=== FILE: packages/sim/package.json ===
+{
+  "name": "@hm/sim",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
+=== END FILE ===
+
+=== FILE: packages/platform/package.json ===
+{
+  "name": "@hm/platform",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}
+=== END FILE ===
+
+=== FILE: packages/contracts/src/commands.ts ===
+import type { PresetId, Unsubscribe, Value } from './core';
+import type { PresetDraft } from './preset';
+import type { VarPath } from './variables';
+
+/**
+ * EVERY edit is a Command: tools, the inspector, the code panel and scripts-with-permission all go through the CommandBus.
+ * That gives undo/redo, replay, and (later) multiplayer editing for free. Nothing edits a preset in place.
+ */
+export interface Command {
+  readonly type: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  /** Short human text for the undo list ("Paint basalt", "Move 3 props"). */
+  readonly label: string;
+}
+
+/** The commands the kernel must understand. Packs may register more with `registerHandler`. */
+export type StandardCommand =
+  | { readonly type: 'set-param'; readonly payload: { readonly path: VarPath; readonly value: Value }; readonly label: string }
+  | { readonly type: 'put-preset'; readonly payload: { readonly draft: PresetDraft }; readonly label: string }
+  | { readonly type: 'fork-preset'; readonly payload: { readonly id: PresetId; readonly patch?: Partial<PresetDraft> }; readonly label: string }
+  | { readonly type: 'add-child'; readonly payload: { readonly parent: PresetId; readonly slot: string; readonly child: PresetId; readonly index?: number }; readonly label: string }
+  | { readonly type: 'remove-child'; readonly payload: { readonly parent: PresetId; readonly slot: string; readonly index: number }; readonly label: string }
+  | { readonly type: 'set-script'; readonly payload: { readonly id: PresetId; readonly source: string }; readonly label: string }
+  | { readonly type: 'batch'; readonly payload: { readonly commands: readonly Command[] }; readonly label: string };
+
+export interface CommandResult {
+  readonly ok: boolean;
+  readonly error?: string;
+  /** Presets created or revised by this command. */
+  readonly touched: readonly PresetId[];
+}
+
+/** A handler does the work and returns how to undo it. */
+export interface CommandHandler {
+  apply(command: Command): { readonly result: CommandResult; readonly inverse: Command | null };
+}
+
+export interface CommandBus {
+  execute(command: Command): CommandResult;
+  /** Several commands that undo as one step (a drag, a paint stroke). The callback may call `execute` many times. */
+  transaction<T>(label: string, run: () => T): T;
+  undo(): boolean;
+  redo(): boolean;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  /** Newest last. */
+  history(): readonly { readonly label: string; readonly undone: boolean }[];
+  registerHandler(type: string, handler: CommandHandler): void;
+  subscribe(listener: (command: Command, result: CommandResult) => void): Unsubscribe;
+  /** Drops history (e.g. after loading a different project). */
+  clear(): void;
+}
+
+export const cmd = {
+  setParam: (path: VarPath, value: Value, label = 'Change value'): StandardCommand => ({ type: 'set-param', payload: { path, value }, label }),
+  put: (draft: PresetDraft, label = 'Save preset'): StandardCommand => ({ type: 'put-preset', payload: { draft }, label }),
+  addChild: (parent: PresetId, slot: string, child: PresetId, index?: number, label = 'Add'): StandardCommand =>
+    ({ type: 'add-child', payload: index === undefined ? { parent, slot, child } : { parent, slot, child, index }, label }),
+  removeChild: (parent: PresetId, slot: string, index: number, label = 'Remove'): StandardCommand => ({ type: 'remove-child', payload: { parent, slot, index }, label }),
+  setScript: (id: PresetId, source: string, label = 'Edit script'): StandardCommand => ({ type: 'set-script', payload: { id, source }, label }),
+  batch: (commands: readonly Command[], label: string): StandardCommand => ({ type: 'batch', payload: { commands }, label }),
+};
+
+export interface EventBus<M extends Record<string, unknown> = Record<string, unknown>> {
+  on<K extends keyof M & string>(name: K, listener: (payload: M[K]) => void): Unsubscribe;
+  once<K extends keyof M & string>(name: K, listener: (payload: M[K]) => void): Unsubscribe;
+  emit<K extends keyof M & string>(name: K, payload: M[K]): void;
+  /** Receives every event (for the "event log" in the Pro tier and for replays). */
+  onAny(listener: (name: string, payload: unknown) => void): Unsubscribe;
+}
+=== END FILE ===
+
+=== FILE: packages/contracts/src/core.ts ===
+/**
+ * CORE VOCABULARY. Everything in the harness is built from these few types.
+ * Contracts are TYPES (plus a few tiny constants): no package may put logic here.
+ */
+
+/** Identifies a preset. Stable across revisions; forks get a new id. */
+export type PresetId = string;
+
+/** Which depth of the UI shows a thing. play = a 6-year-old, build = a maker, pro = every variable and the source. */
+export type Tier = 'play' | 'build' | 'pro';
+export const TIERS: readonly Tier[] = ['play', 'build', 'pro'] as const;
+export const tierRank = (t: Tier): number => (t === 'play' ? 0 : t === 'build' ? 1 : 2);
+/** A thing at tier `t` is visible in a UI shown at tier `shown` when it is at most as deep. */
+export const visibleAt = (t: Tier, shown: Tier): boolean => tierRank(t) <= tierRank(shown);
+
+export type Vec2 = readonly [number, number];
+export type Vec3 = readonly [number, number, number];
+/** Quaternion x, y, z, w. */
+export type Quat = readonly [number, number, number, number];
+/** '#rrggbb' or '#rrggbbaa'. */
+export type Color = string;
+
+/** A pointer to a preset. `rev` pins a revision; absent means "the latest". */
+export interface Ref {
+  readonly ref: PresetId;
+  readonly rev?: number;
+}
+
+/** A live expression, e.g. `"clamp($rider.weight * 2 + 1, 0, 10)"`. See `VariableSystem.compile`. */
+export interface Expr {
+  readonly expr: string;
+}
+
+/** Everything a variable can hold (JSON-serialisable on purpose: presets are shared as JSON). */
+export type Value =
+  | number
+  | boolean
+  | string
+  | null
+  | Ref
+  | Expr
+  | readonly Value[]
+  | { readonly [key: string]: Value };
+
+export type Params = Readonly<Record<string, Value>>;
+
+export type Unsubscribe = () => void;
+
+export interface Issue {
+  readonly severity: 'error' | 'warning';
+  readonly code: string;
+  readonly message: string;
+  /** The preset (and parameter, if any) the issue is about. */
+  readonly presetId?: PresetId;
+  readonly path?: string;
+}
+
+/** The kinds that exist from day one. Packs may register more: a kind is just a string with a schema. */
+export const CORE_KINDS = [
+  'game', 'mode', 'scene', 'entity', 'shape', 'material', 'mechanic', 'rule', 'item', 'racer', 'track-piece',
+  'camera', 'input-map', 'ui-skin', 'hud', 'tool', 'manipulation', 'brush', 'ai-driver', 'audio-cue', 'physics-model',
+] as const;
+export type CoreKind = (typeof CORE_KINDS)[number];
+/** Open on purpose: a pack adds `racer`-like kinds without touching contracts. */
+export type PresetKind = CoreKind | (string & {});
+
+/** The harness's own version of the preset file format and of the script API. Bump with a migration. */
+export const FORMAT_VERSION = 1;
+export const SCRIPT_API_VERSION = 1;
+/** The sim step: all gameplay runs at this fixed rate. */
+export const SIM_HZ = 120;
+export const SIM_DT = 1 / SIM_HZ;
+=== END FILE ===
+
+=== FILE: packages/contracts/src/index.ts ===
+export * from './core';
+export * from './schema';
+export * from './preset';
+export * from './variables';
+export * from './commands';
+export * from './sim';
+export * from './script';
+export * from './platform';
+export * from './services';
+export * from './packages';
+=== END FILE ===
+
+=== FILE: packages/contracts/src/packages.ts ===
+/**
+ * ENTRY POINTS. Each implementation package must export EXACTLY these factory functions from its `src/index.ts`
+ * (the acceptance tests import them by name). Extra exports are fine; renaming or changing these is not.
+ */
+import type { CommandBus, EventBus } from './commands';
+import type { SchemaRegistry } from './schema';
+import type { PresetBundle, PresetStore, StoreLimits } from './preset';
+import type { Rng, Replay, Simulation, System, World } from './sim';
+import type { InputFrame } from './sim';
+import type { ScriptHost, ScriptLimits } from './script';
+import type { Platform } from './platform';
+import type { VariableSystem } from './variables';
+
+/** `@hm/kernel` (T1) */
+export interface KernelExports {
+  createSchemaRegistry(): SchemaRegistry;
+  createPresetStore(opts: { readonly schemas: SchemaRegistry; readonly limits?: Partial<StoreLimits>; readonly now?: () => number; readonly newId?: () => string }): PresetStore;
+  createEventBus(): EventBus;
+  createVariableSystem(opts: { readonly store: PresetStore; readonly schemas: SchemaRegistry; readonly events: EventBus }): VariableSystem;
+  createCommandBus(opts: { readonly store: PresetStore; readonly vars: VariableSystem; readonly maxHistory?: number }): CommandBus;
+  /** Upgrades a bundle saved by an older FORMAT_VERSION / schema versions to the current ones. */
+  migrateBundle(bundle: PresetBundle, schemas: SchemaRegistry): PresetBundle;
+  /** Stable content hash of a bundle (order-independent over presets). */
+  hashBundle(bundle: PresetBundle): string;
+}
+
+/** `@hm/script` (T2) */
+export interface ScriptExports {
+  createScriptHost(opts?: { readonly limits?: Partial<ScriptLimits> }): ScriptHost;
+}
+
+/** `@hm/sim` (T3) */
+export interface SimExports {
+  createRng(seed: number): Rng;
+  createWorld(opts?: { readonly seed?: number }): World;
+  createSimulation(opts: { readonly seed: number; readonly events: EventBus; readonly vars: VariableSystem; readonly systems?: readonly System[] }): Simulation;
+  /** Runs a replay from scratch on a fresh simulation built by `build(seed)` and returns the final world hash and where it first differed. */
+  runReplay(replay: Replay, build: (seed: number) => Simulation): { readonly finalHash: string; readonly matches: boolean; readonly firstMismatchTick: number | null };
+  /** Records a session: call `record(frame)` with each input frame you step with, then `finish(world)`. */
+  createRecorder(seed: number, bundleHash: string, checkpointEvery?: number): { record(frame: InputFrame, world: World): void; finish(world: World): Replay };
+}
+
+/** `@hm/platform` (T9) */
+export interface PlatformExports {
+  /** 'stub' keeps everything in memory/localStorage-free maps (tests, dev); 'run' wraps the RUN SDK. */
+  createPlatform(kind: 'stub' | 'run', opts?: {
+    readonly user?: string;
+    /** The RUN SDK object (`RundotGameAPI`). Injected so the 'run' adapter can be tested with a fake; omitted in the real build, where it is imported. */
+    readonly sdk?: unknown;
+  }): Platform;
+}
+=== END FILE ===
+
+=== FILE: packages/contracts/src/platform.ts ===
+import type { Unsubscribe, Value } from './core';
+import type { PresetBundle } from './preset';
+
+/** RUN has no server of ours: persistence, sharing, scores and rooms all go through the platform. Every adapter has a local stub with the same behaviour. */
+export interface StorageAdapter {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
+  keys(prefix?: string): Promise<readonly string[]>;
+}
+
+export interface PublishedItem {
+  readonly id: string;
+  readonly title: string;
+  readonly author: string;
+  readonly createdAt: number;
+  readonly tags: readonly string[];
+  readonly bytes: number;
+}
+
+export const UGC_MAX_BYTES = 100_000;
+
+export interface UgcAdapter {
+  /** Rejects (throws UgcTooLargeError) a bundle whose JSON is over UGC_MAX_BYTES. */
+  publish(title: string, bundle: PresetBundle, tags?: readonly string[]): Promise<PublishedItem>;
+  list(opts?: { readonly tag?: string; readonly mine?: boolean; readonly limit?: number }): Promise<readonly PublishedItem[]>;
+  load(id: string): Promise<PresetBundle>;
+  remove(id: string): Promise<void>;
+}
+export class UgcTooLargeError extends Error {
+  constructor(readonly bytes: number) {
+    super(`bundle is ${bytes} bytes; the limit is ${UGC_MAX_BYTES}`);
+    this.name = 'UgcTooLargeError';
+  }
+}
+
+export interface LeaderboardAdapter {
+  submit(board: string, score: number, meta?: Readonly<Record<string, Value>>): Promise<void>;
+  top(board: string, limit?: number): Promise<readonly { readonly rank: number; readonly name: string; readonly score: number }[]>;
+}
+
+export interface RoomMessage {
+  readonly from: string;
+  readonly name: string;
+  readonly payload: Value;
+}
+export interface Room {
+  readonly id: string;
+  readonly members: readonly string[];
+  send(name: string, payload: Value, to?: string): void;
+  onMessage(listener: (message: RoomMessage) => void): Unsubscribe;
+  onMembers(listener: (members: readonly string[]) => void): Unsubscribe;
+  leave(): Promise<void>;
+}
+export interface RoomsAdapter {
+  create(opts?: { readonly maxPlayers?: number; readonly metadata?: Readonly<Record<string, Value>> }): Promise<Room>;
+  join(id: string): Promise<Room>;
+  list(): Promise<readonly { readonly id: string; readonly members: number; readonly metadata: Readonly<Record<string, Value>> }[]>;
+}
+
+export interface Profile {
+  readonly id: string;
+  readonly name: string;
+  readonly isAnonymous: boolean;
+}
+
+export interface Platform {
+  readonly kind: 'stub' | 'run';
+  readonly storage: StorageAdapter;
+  readonly ugc: UgcAdapter;
+  readonly leaderboard: LeaderboardAdapter;
+  readonly rooms: RoomsAdapter;
+  profile(): Promise<Profile>;
+}
+=== END FILE ===
+
+
+
+[END OF PART 1/4. Reply only: Part 1/4 received]

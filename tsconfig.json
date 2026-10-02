@@ -74,6 +74,9 @@
       ],
       "@hm/input": [
         "packages/input/src/index.ts"
+      ],
+      "@hm/goblins": [
+        "packages/goblins/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

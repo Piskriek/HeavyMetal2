@@ -40,6 +40,7 @@ export function IslandWalk(props: {
 
   const [menu, setMenu] = useState(false);
   const [lightOpen, setLightOpen] = useState(false);
+  const lightingRef = useRef<{ refresh: () => void } | null>(null);
   useEffect(() => { if (!menu) setLightOpen(false); }, [menu]);
   const [inv, setInv] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -57,7 +58,7 @@ export function IslandWalk(props: {
   const api = useRef<{ lock: () => void; unlock: () => void } | null>(null);
   useEffect(() => { saveHotbar(slots); }, [slots]);
   // the island overview needs the cursor: let go of the mouse when the level goes up
-  useEffect(() => { if (level === 'island') api.current?.unlock(); }, [level]);
+  useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
 
   const pickItem = (item: HotItem): void => { setSlots((s) => s.map((x, i) => (i === sel ? item : x))); fx('select'); };
   const openInv = (on: boolean): void => { setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); };
@@ -83,7 +84,9 @@ export function IslandWalk(props: {
     };
     showTerrain();
     const offTerrain = rt.binder.onTerrain(showTerrain);
-    const stopLighting = followLighting(rt.store, scene.sceneId, renderer);
+    // looking down from the island overview there is a lot of air between the camera and the ground: thin the haze so the island can be seen
+    const stopLighting = followLighting(rt.store, scene.sceneId, renderer, () => (live.current.level === 'island' ? 0.1 : 1));
+    lightingRef.current = stopLighting;
     const d = rt.binder.decor();
     renderer.setDecor(d ? decorInstances(d.placements) : null);
 
@@ -96,8 +99,10 @@ export function IslandWalk(props: {
 
     const ground = (x: number, z: number): number => { const st = rt.binder.terrain(); return st ? heightAt(st.terrain, x, z) : 0; };
     const builder = new BuildController(rt, renderer, scene.sceneId, scene.terrainId, refreshModels, say);
+    // start at the middle when it is low, flat-ish land; on a mountain or in the sea, walk out east to the first low ground
     let px = 0, pz = 0;
-    for (let r = 0; r < 120 && ground(px, pz) < SEA; r += 2) { px = r; pz = 0; }
+    for (let r = 0; r < 120 && (ground(px, pz) < SEA || ground(px, pz) > 5); r += 2) { px = r; pz = 0; }
+    if (ground(px, pz) < SEA || ground(px, pz) > 5) { px = 0; pz = 0; for (let r = 0; r < 120 && ground(px, pz) < SEA; r += 2) { px = r; pz = 0; } }
     let face = 0;
     if (!introRef.current && lastPose) { px = lastPose.px; pz = lastPose.pz; face = lastPose.face; }
     let py = ground(px, pz), vy = 0;

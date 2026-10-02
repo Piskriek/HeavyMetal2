@@ -29,19 +29,22 @@ export function applyLighting(renderer: ThreeRenderer, setup: LightSetup, fogSca
 
 /**
  * Keep the renderer lit with whatever the scene's lighting is now: picks a new look, edits to the light-setup preset and the time of day all
- * flow through here. Returns the stop function.
+ * flow through here. The haze can be thinned (a number, or a function asked on every refresh; call `refresh()` when its answer changes). Returns the stop function.
  */
-export function followLighting(store: PresetStore, sceneId: PresetId, renderer: ThreeRenderer, fogScale = 1): () => void {
+export function followLighting(store: PresetStore, sceneId: PresetId, renderer: ThreeRenderer, fogScale: number | (() => number) = 1): (() => void) & { readonly refresh: () => void } {
   let last = '';
+  const scaleNow = (): number => (typeof fogScale === 'function' ? fogScale() : fogScale);
   const refresh = (): void => {
     const setup = setupOf(store, sceneId);
-    const sig = JSON.stringify(setup) + fogScale;
+    const scale = scaleNow();
+    const sig = JSON.stringify(setup) + scale;
     if (sig === last) return;
     last = sig;
-    applyLighting(renderer, setup, fogScale);
+    applyLighting(renderer, setup, scale);
   };
   refresh();
-  return store.subscribe(refresh);
+  const off = store.subscribe(refresh);
+  return Object.assign(() => off(), { refresh });
 }
 
 /**

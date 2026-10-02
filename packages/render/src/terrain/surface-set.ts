@@ -21,9 +21,14 @@ export interface SurfaceDef {
   readonly height: HeightRecipe;
   /** Shown until the tile has loaded. */
   readonly fallback: string;
+  /** The flat (voxel) skin: up to FLAT_COLORS hand-picked tones. Each half-metre block of the ground takes one of them, so no texture file is involved. */
+  readonly flat?: readonly string[];
+  /** Light the surface gives off (lava): 0 or left out for none. The bright tones of its palette glow, the dark ones stay dark. */
+  readonly glow?: number;
 }
 
 export const LAYER_SIZE = 256;
+export const FLAT_COLORS = 5;
 export const SURFACE_SLOTS = 256;
 
 export const recipe = (lum: number, sat = 0, green = 0, contrast = 1): HeightRecipe => ({ lum, sat, green, contrast });
@@ -71,12 +76,34 @@ async function decode(url: string): Promise<ImageBitmap | HTMLImageElement | nul
   }
 }
 
+/** One row per surface, FLAT_COLORS tones across. A short palette is spread so its tones keep equal weight (two tones fill 3 and 2 of the 5 texels). */
+export function makeFlatTexture(defs: readonly SurfaceDef[]): THREE.DataTexture {
+  const rows = Math.max(1, defs.length);
+  const data = new Uint8Array(FLAT_COLORS * rows * 4);
+  defs.forEach((d, row) => {
+    const pal = d.flat && d.flat.length > 0 ? d.flat : [d.fallback];
+    for (let i = 0; i < FLAT_COLORS; i++) {
+      const [r, g, b] = hexToRgb(pal[Math.min(pal.length - 1, Math.floor((i * pal.length) / FLAT_COLORS))]!);
+      const o = (row * FLAT_COLORS + i) * 4;
+      data[o] = r; data[o + 1] = g; data[o + 2] = b; data[o + 3] = 255;
+    }
+  });
+  const t = new THREE.DataTexture(data, FLAT_COLORS, rows, THREE.RGBAFormat, THREE.UnsignedByteType);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  return t;
+}
+
 export class SurfaceArray {
   readonly texture: THREE.DataArrayTexture;
   readonly pbrTexture: THREE.DataArrayTexture;
+  /** The flat skin's palettes: FLAT_COLORS texels across, one row per layer. */
+  readonly flatTexture: THREE.DataTexture;
   /** id -> layer (or -1), in the shape the shader wants. */
   readonly layerOf = new Float32Array(SURFACE_SLOTS).fill(-1);
-  /** (metres per repeat, roughness, height contrast, 0) per layer. */
+  /** (metres per repeat, roughness, height contrast, glow) per layer. */
   readonly params: THREE.Vector4[];
   readonly ready: Promise<void>;
   progress = 0;
@@ -97,7 +124,8 @@ export class SurfaceArray {
         this.pbr[o] = 128; this.pbr[o + 1] = 128; this.pbr[o + 2] = 200; this.pbr[o + 3] = 0;
       }
     });
-    this.params = defs.map((d) => new THREE.Vector4(d.repeat, d.roughness, d.height.contrast, 0));
+    this.params = defs.map((d) => new THREE.Vector4(d.repeat, d.roughness, d.height.contrast, d.glow ?? 0));
+    this.flatTexture = makeFlatTexture(defs);
     this.texture = this.makeArray(this.data, layers, true);
     this.pbrTexture = this.makeArray(this.pbr, layers, false);
     this.ready = typeof document === 'undefined' ? Promise.resolve() : this.load(assetUrl);
@@ -143,5 +171,5 @@ export class SurfaceArray {
     }));
   }
 
-  dispose(): void { this.texture.dispose(); this.pbrTexture.dispose(); }
+  dispose(): void { this.texture.dispose(); this.pbrTexture.dispose(); this.flatTexture.dispose(); }
 }

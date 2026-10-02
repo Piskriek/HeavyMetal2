@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SurfaceArray } from './surface-set';
-import { COLOR_STAGE_GLSL, GLOBALS_GLSL, NOISE_GLSL, NORMAL_STAGE_GLSL, ROUGH_STAGE_GLSL, tileGlsl, uniformsGlsl } from './terrain-glsl';
+import { COLOR_STAGE_GLSL, EMISSIVE_STAGE_GLSL, GLOBALS_GLSL, NOISE_GLSL, NORMAL_STAGE_GLSL, ROUGH_STAGE_GLSL, tileGlsl, uniformsGlsl } from './terrain-glsl';
 
 /** What the renderer needs of a terrain (structurally the terrain package's Terrain; no import, so render stays independent). */
 export interface TerrainLike {
@@ -73,7 +73,7 @@ export class TerrainView {
     const { cols, rows, cell, originX, originZ } = this.t.spec;
     m.onBeforeCompile = (shader) => {
       const u: Record<string, THREE.IUniform> = {
-        islSurfaces: { value: this.surfaces.texture }, islPbr: { value: this.surfaces.pbrTexture },
+        islSurfaces: { value: this.surfaces.texture }, islPbr: { value: this.surfaces.pbrTexture }, islFlatPalette: { value: this.surfaces.flatTexture },
         islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: this.surfaces.layerOf },
         islFlat: { value: this.look.skin === 'flat' ? 1 : 0 },
         islParams: { value: this.surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
@@ -91,6 +91,7 @@ export class TerrainView {
         .replace('void main() {', `${NOISE_GLSL}\n${uniformsGlsl(layers)}\n${tileGlsl(layers)}\n${GLOBALS_GLSL}\nvoid main() {`)
         .replace('#include <color_fragment>', COLOR_STAGE_GLSL)
         .replace('#include <roughnessmap_fragment>', ROUGH_STAGE_GLSL)
+        .replace('#include <emissivemap_fragment>', EMISSIVE_STAGE_GLSL)
         .replace('#include <normal_fragment_maps>', NORMAL_STAGE_GLSL);
     };
     m.customProgramCacheKey = () => `terrain-${layers}`;

@@ -34,6 +34,7 @@ vec4 surfTexel(sampler2D mask, vec2 size, vec2 cell) {
 export const uniformsGlsl = (layers: number): string => /* glsl */ `
 uniform sampler2DArray islSurfaces;
 uniform sampler2DArray islPbr;
+uniform sampler2D islFlatPalette;
 uniform float islNormalStrength;
 uniform float islFlat;
 uniform float islLayerOf[${SURFACE_SLOTS}];
@@ -172,6 +173,7 @@ export const GLOBALS_GLSL = /* glsl */ `
 varying vec3 vTWorld;
 varying vec3 vTNormal;
 float gRough = -1.0;
+float gGlow = 0.0;
 vec3 gBump = vec3(0.0);
 `;
 
@@ -195,11 +197,22 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
   if (la < 0.0) { la = lb; lw = 1.0; }
   if (lb < 0.0) { lb = la; lw = 0.0; }
   if (la >= 0.0) {
-    vec4 tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);
     float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
-    if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
-    tile.rgb *= 0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7);
-    if (islFlat > 0.5) { vec2 bk = floor(vTWorld.xz / 0.5); tile.rgb *= 0.9 + 0.2 * fract(sin(dot(bk, vec2(12.9898, 78.233))) * 43758.5453); tile.rgb = floor(tile.rgb * 9.0 + 0.5) / 9.0; tile.rgb = mix(vec3(dot(tile.rgb, vec3(0.3, 0.59, 0.11))), tile.rgb, 1.15); }
+    vec4 tile;
+    if (islFlat > 0.5) {
+      // voxel look: every half-metre block takes one tone of its surface's hand-picked palette; where two surfaces meet, each block picks one of them
+      vec3 bk = floor(vTWorld / 0.5);
+      float hTone = fract(sin(dot(bk, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+      float hMix = fract(sin(dot(bk, vec3(39.346, 11.135, 83.155))) * 24634.6345);
+      float layer = hMix < lw ? lb : la;
+      if (islCliffLayer >= 0.0 && hMix < steep) layer = islCliffLayer;
+      tile = vec4(texelFetch(islFlatPalette, ivec2(int(floor(hTone * 5.0)), int(layer + 0.5)), 0).rgb, 1.0);
+      gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
+    } else {
+      tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);
+      if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
+      tile.rgb *= 0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7);
+    }
     diffuseColor.rgb = tile.rgb;
     gRough = islRough(la, lb, lw);
     vec4 pbrTile = islPbrAt(la, lb, lw, wp, gnrm);
@@ -220,4 +233,10 @@ if (gRough >= 0.0) roughnessFactor = clamp(gRough, 0.04, 1.0);
 export const NORMAL_STAGE_GLSL = /* glsl */ `
 #include <normal_fragment_maps>
 if (dot(gBump, gBump) > 0.0) normal = normalize(normal + (viewMatrix * vec4(gBump, 0.0)).xyz);
+`;
+
+/** Replaces `#include <emissivemap_fragment>`: glowing surfaces (lava) give off their own colour. */
+export const EMISSIVE_STAGE_GLSL = /* glsl */ `
+#include <emissivemap_fragment>
+totalEmissiveRadiance += diffuseColor.rgb * gGlow;
 `;

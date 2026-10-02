@@ -136,6 +136,13 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   ground.receiveShadow = true;
   scene.add(ground);
 
+  // beyond and beneath the island the sea is one deep colour: without it the clear water lets the edge of the terrain grid show as a square
+  const deepSea = new THREE.Mesh(new THREE.CircleGeometry(3000, 64), new THREE.MeshBasicMaterial({ color: 0x0d5f6e }));
+  deepSea.rotation.x = -Math.PI / 2;
+  deepSea.position.y = -9;
+  deepSea.visible = false;
+  scene.add(deepSea);
+
   let veilOn = false;
   let savedFog: THREE.Scene["fog"] = null;
   let savedBackground: THREE.Scene['background'] = null;
@@ -181,6 +188,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
     },
     setWater(color: THREE.Color, opacity: number, roughness: number): void {
       seaColor = color.clone();
+      deepSea.material.color.copy(color).multiplyScalar(0.62);
       seaOpacity = opacity;
       seaRoughness = roughness;
       if (groundMaterial.transparent) { groundMaterial.color.copy(seaColor); groundMaterial.opacity = seaOpacity; groundMaterial.roughness = seaRoughness; }
@@ -242,6 +250,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       if (sun.shadow.mapSize.x !== mapSize) { sun.shadow.mapSize.set(mapSize, mapSize); sun.shadow.map?.dispose(); sun.shadow.map = null; }
     },
     setSea(on: boolean): void {
+      deepSea.visible = on;
       groundMaterial.map = on ? null : gridTexture;
       groundMaterial.color.copy(on ? (seaColor ?? seaTint) : new THREE.Color(0xffffff));
       groundMaterial.transparent = on;
@@ -263,7 +272,9 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       }
     },
     dispose(): void {
-      scene.remove(ground, hemisphere, sun, sun.target);
+      scene.remove(ground, hemisphere, sun, sun.target, deepSea);
+      deepSea.geometry.dispose();
+      deepSea.material.dispose();
       ground.geometry.dispose();
       groundMaterial.dispose();
       gridTexture.dispose();

@@ -50,7 +50,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const registry = useSyncExternalStore(subscribe, () => islands(), () => islands());
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
-  const [newTemplate, setNewTemplate] = useState('blank-island');
+  const [newTemplate, setNewTemplate] = useState('volcano');
   useEffect(() => onFork((m) => { setNote(`This island is now yours: "${m.name}". Rename it in My islands.`); window.setTimeout(() => setNote(''), 6000); }), []);
   const [screen, setScreen] = useState<Screen>('menu');
   // where the hub / activities were opened from (the main menu or the island): their Back and Esc return there, never to each other

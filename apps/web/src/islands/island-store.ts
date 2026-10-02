@@ -22,7 +22,7 @@ export function islands(): IslandRegistry {
   if (registry) return registry;
   const raw = read(REGISTRY_KEY);
   let r = IslandRegistry.fromJSON(raw ? safeParse(raw) : null);
-  if (r.list().length === 0) r = r.create('My Island', 'blank-island', Date.now());
+  if (r.list().length === 0) r = r.create('My Island', 'volcano', Date.now());
   registry = r;
   activeId = r.defaultId();
   return r;

@@ -23,19 +23,21 @@ test('the race starts with a countdown, then everybody drives; AI racers make pr
   assert.ok(hud.speed > 5 || progress.length > 0); assert.equal(hud.racers, 8); assert.ok(hud.position >= 1 && hud.position <= 8);
 });
 
-test('the player drives with input: throttle makes progress, steering changes heading', () => {
+test('the player drives with input: throttle gives speed and progress, steering changes the heading', () => {
   const g = createRaceGame(createRuntime({ seed: 4 }), { seed: 7, laps: 2 });
   run(g, 4.2);
   g.input.keyDown('ArrowUp');
-  const h0 = g.playerPose();
-  run(g, 5);
-  const p1 = g.playerPose();
-  assert.ok(p1.speed > 5, `speed ${p1.speed}`);
-  assert.ok(Math.hypot(p1.x - h0.x, p1.z - h0.z) > 8);
-  g.input.keyDown('ArrowRight');
-  run(g, 1.5);
-  const p2 = g.playerPose();
-  assert.ok(Math.abs(p2.hx * h0.hx + p2.hz * h0.hz) < 0.98, 'heading changed');
+  let top = 0;
+  for (let i = 0; i < 3; i++) { run(g, 1); top = Math.max(top, g.playerPose().speed); }
+  assert.ok(top > 10, `top speed ${top}`);
+  assert.ok(Number(g.rt.world.get(g.player, 'race')!['progress']) > 0.01);
+  const g2 = createRaceGame(createRuntime({ seed: 4 }), { seed: 7, laps: 2 });
+  run(g2, 4.2);
+  g2.input.keyDown('ArrowUp'); g2.input.keyDown('ArrowRight');
+  const h0 = g2.playerPose();
+  run(g2, 1.2);
+  const h1 = g2.playerPose();
+  assert.ok(h1.hx * h0.hx + h1.hz * h0.hz < 0.95, 'heading turned');
 });
 
 test('restart puts everybody back on the grid and runs a fresh countdown', () => {

@@ -1,12 +1,12 @@
 import type { EntityId, PresetId, Value } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { RACERS } from '@hm/content';
-import { derivePhysics, aiControl, rubberBand, createLapTracker, rankRacers, itemById, rollItem, type Track } from '@hm/racing';
+import { trackLength, pointAt, project, derivePhysics, aiControl, rubberBand, createLapTracker, rankRacers, itemById, rollItem, type Track } from '@hm/racing';
 import { createRacerSystem, defineRacerComponents, grantItem } from '@hm/racers';
-import { carveTrack, chaikin, makeCenterline, resample, startGrid } from '@hm/trackgen';
+import { trackWalls, carveTrack, chaikin, makeCenterline, resample, startGrid } from '@hm/trackgen';
 import { encodeTerrain, generateIsland, heightAt, type Terrain } from '@hm/terrain';
 import { createChampionship, createRaceDirector, type Championship, type DirectorEvent, type RaceDirector, type RaceResult } from '@hm/raceflow';
-import { goblinParts, lookFromParams, type Part } from '@hm/goblins';
+import { goblinParts, lookFromParams, quatFromYaw, type Part } from '@hm/goblins';
 import { createInputState, toActorFrame, type InputState } from '@hm/input';
 import { SURF } from '@hm/render';
 import { attachDef, createFollowSystem, defineAttachComponent } from './follow';
@@ -95,6 +95,17 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   rt.sim.addSystem(createFollowSystem());
   install();
 
+  // ---- low walls along both sides keep the field on the island road
+  const WALL_H = 0.9;
+  for (const w of trackWalls(track, { offset: track.width / 2 + 3, spacing: 4, side: 'both' })) {
+    const q = quatFromYaw(Math.atan2(w.dz, w.dx));
+    const y = heightAt(terrain, w.x, w.z) + WALL_H * 0.5;
+    const e = world.spawn();
+    world.add(e, 'transform', { x: w.x, y, z: w.z, qx: q[0], qy: q[1], qz: q[2], qw: q[3], sx: w.length / 2 + 0.05, sy: WALL_H / 2, sz: 0.4 });
+    world.add(e, 'renderable', { shape: 'box', size: 1, color: '#9b8f7d', roughness: 0.85, metalness: 0 });
+    rt.physics.addBody(e, { kind: 'static', collider: { shape: 'box', half: [w.length / 2 + 0.05, WALL_H / 2, 0.4] }, position: [w.x, y, w.z], rotation: [q[0], q[1], q[2], q[3]], friction: 0.2, restitution: 0.3, tier: 'racing' });
+  }
+
   // ---- spawn the field
   const grid = startGrid(track, n);
   const spawnRacer = (i: number): EntityId => {
@@ -123,6 +134,30 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   for (let i = 0; i < n; i++) racerIds.push(spawnRacer(i));
   player = racerIds[0]!;
   rt.play();
+
+  /** Put a racer back on the road at its current race progress (fell off, stuck, or pressed reset). */
+  const respawn = (id: EntityId): void => {
+    const r = world.get(id, 'race');
+    const len = trackLength(track);
+    const s = (((Number(r?.['progress'] ?? 0) % 1) + 1) % 1) * len;
+    const here = pointAt(track, s), ahead = pointAt(track, s + 2);
+    const hx = ahead[0] - here[0], hz = ahead[1] - here[1], hl = Math.hypot(hx, hz) || 1;
+    world.set(id, 'transform', { x: here[0], y: heightAt(terrain, here[0], here[1]) + BALL_RADIUS + 0.5, z: here[1], qx: 0, qy: 0, qz: 0, qw: 1 });
+    world.set(id, 'velocity', { vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0 });
+    world.set(id, 'racer', { hx: hx / hl, hz: hz / hl, boostMs: 0 });
+  };
+  const fallen = new Map<EntityId, number>();
+  const watchdog = (dtMs: number): void => {
+    for (const id of racerIds) {
+      const t = world.get(id, 'transform');
+      if (!t) continue;
+      const low = Number(t['y']) < -1.5 || !onTrackish(Number(t['x']), Number(t['z']));
+      const acc = low ? (fallen.get(id) ?? 0) + dtMs : 0;
+      fallen.set(id, acc);
+      if (acc > 1500 || (id === player && input.sample().reset)) { fallen.set(id, 0); respawn(id); }
+    }
+  };
+  const onTrackish = (x: number, z: number): boolean => Math.abs(project(track, [x, z]).lateral) < track.width / 2 + 9;
 
   const emit = (events: DirectorEvent[]): void => {
     for (const e of events) {
@@ -166,6 +201,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     update(dtMs) {
       const alpha = rt.frame(dtMs, (tick) => ({ tick, actors: (phase === 'racing' ? { p1: toActorFrame(input.sample()) } : {}) as Record<string, Record<string, number | boolean>> }));
       input.update(dtMs);
+      if (phase === 'racing') watchdog(dtMs);
       emit(dir.update(dtMs, progressMap()));
       if (phase === 'racing') grantItems();
       return alpha;

@@ -108,6 +108,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       terrainView = new TerrainView(pendingTerrain.data, pendingTerrain.surfaces);
       scene.add(terrainView.mesh);
     }
+    environment?.setSea(!!terrainView);
   };
 
   const service: ThreeRenderer = {
@@ -136,8 +137,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       sceneSync = createSceneSync(world, sceneAdapter);
       sceneSync.step();
       overlays = new OverlayManager(scene);
-      applyTerrain();
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
+      applyTerrain();
       updateView();
       resize();
 

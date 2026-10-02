@@ -4,6 +4,8 @@ import type { Vec3 } from '@hm/contracts';
 
 export interface EnvironmentRig {
   update(target: Vec3): void;
+  /** Sea mode: the ground disc becomes clear tropical water at y = 0 (used when a terrain island is shown). */
+  setSea(on: boolean): void;
   dispose(): void;
 }
 
@@ -116,7 +118,19 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   camera.far = 140;
   scene.add(sun, sun.target);
 
+  const seaTint = new THREE.Color(0x1d8fa3);
   return {
+    setSea(on: boolean): void {
+      groundMaterial.map = on ? null : gridTexture;
+      groundMaterial.color.set(on ? seaTint : 0xffffff);
+      groundMaterial.transparent = on;
+      groundMaterial.opacity = on ? 0.72 : 1;
+      groundMaterial.roughness = on ? 0.06 : 0.94;
+      groundMaterial.envMapIntensity = on ? 1.2 : 0.35;
+      groundMaterial.depthWrite = !on;
+      ground.position.y = on ? 0 : -0.012;
+      groundMaterial.needsUpdate = true;
+    },
     update(target: Vec3): void {
       sun.target.position.fromArray(target);
       sun.position.set(target[0] + 32, target[1] + 48, target[2] + 24);

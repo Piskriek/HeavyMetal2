@@ -18849,7 +18849,7 @@
     },
     {
       "registryId": "M646",
-      "canonicalCode": "HM2-TXP-M646-SPT-TRACK-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M646-SPT-TRACK-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic sports running track rubber pbr sheet",
       "sourceFile": "M646-nostalgic-sports-running-track-rubber-pbr-sheet.png",
       "domain": "SPT",
@@ -18911,10 +18911,9 @@
         ],
         "frequency": "broad authored structure survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 81 nostalgic global sports surfaces",
-      "reviewNotes": "Broad smooth channels interrupt the EPDM granules and will expose repetition."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 82 corrected nostalgic sports surfaces"
     },
     {
       "registryId": "M647",
@@ -18986,7 +18985,7 @@
     },
     {
       "registryId": "M648",
-      "canonicalCode": "HM2-TXP-M648-SPT-ICE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M648-SPT-ICE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic sports rink ice pbr sheet",
       "sourceFile": "M648-nostalgic-sports-rink-ice-pbr-sheet.png",
       "domain": "SPT",
@@ -19048,14 +19047,13 @@
         ],
         "frequency": "broad authored structure survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 81 nostalgic global sports surfaces",
-      "reviewNotes": "Large peeling plate forms read as damaged coating rather than maintained rink ice."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 82 corrected nostalgic sports surfaces"
     },
     {
       "registryId": "M649",
-      "canonicalCode": "HM2-TXP-M649-SPT-CONCRETE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M649-SPT-CONCRETE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic sports skate concrete pbr sheet",
       "sourceFile": "M649-nostalgic-sports-skate-concrete-pbr-sheet.png",
       "domain": "SPT",
@@ -19117,10 +19115,9 @@
         ],
         "frequency": "broad authored structure survives PX64"
       },
-      "status": "regenerate",
-      "recipeRevision": 1,
-      "provenance": "Material Batch 81 nostalgic global sports surfaces",
-      "reviewNotes": "Large recessed panel intersections violate the seamless poured-concrete identity."
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 82 corrected nostalgic sports surfaces"
     },
     {
       "registryId": "M650",
@@ -19192,7 +19189,7 @@
     },
     {
       "registryId": "M651",
-      "canonicalCode": "HM2-TXP-M651-SPT-GRIPMAT-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "canonicalCode": "HM2-TXP-M651-SPT-GRIPMAT-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R02",
       "name": "nostalgic sports grip mat pbr sheet",
       "sourceFile": "M651-nostalgic-sports-grip-mat-pbr-sheet.png",
       "domain": "SPT",
@@ -19254,10 +19251,423 @@
         ],
         "frequency": "broad authored structure survives PX64"
       },
-      "status": "constrained-pass",
+      "status": "pass",
+      "recipeRevision": 2,
+      "provenance": "Material Batch 82 corrected nostalgic sports surfaces"
+    },
+    {
+      "registryId": "M652",
+      "canonicalCode": "HM2-TXP-M652-SPT-CLAY-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports clay court pbr sheet",
+      "sourceFile": "M652-nostalgic-sports-clay-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CLAY",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches red-clay parent",
+      "mipPolicy": "Preserve sports-surface identity and broad wear while suppressing micro-aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M625",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Reconstructible line-free sports playing surface.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "meaningful PBR guides"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "venue view"
+        ],
+        "frequency": "broad wear plus identity-scale structure"
+      },
+      "status": "pass",
       "recipeRevision": 1,
-      "provenance": "Material Batch 81 nostalgic global sports surfaces",
-      "reviewNotes": "Reconstruction must suppress the visible square tessellation and retain only fine grip relief."
+      "provenance": "Material Batch 82 sports surface extensions"
+    },
+    {
+      "registryId": "M653",
+      "canonicalCode": "HM2-TXP-M653-SPT-SNOW-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports packed snow pbr sheet",
+      "sourceFile": "M653-nostalgic-sports-packed-snow-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "SNOW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "groom bands 50-100 mm",
+      "mipPolicy": "Preserve sports-surface identity and broad wear while suppressing micro-aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": "M630",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Reconstructible line-free sports playing surface.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "meaningful PBR guides"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "venue view"
+        ],
+        "frequency": "broad wear plus identity-scale structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 82 sports surface extensions"
+    },
+    {
+      "registryId": "M654",
+      "canonicalCode": "HM2-TXP-M654-SPT-ARTTURF-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports artificial turf pbr sheet",
+      "sourceFile": "M654-sports-artificial-turf-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ARTTURF",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "short blades 10-30 mm",
+      "mipPolicy": "Preserve sports-surface identity and broad wear while suppressing micro-aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Reconstructible line-free sports playing surface.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "meaningful PBR guides"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "venue view"
+        ],
+        "frequency": "broad wear plus identity-scale structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 82 sports surface extensions"
+    },
+    {
+      "registryId": "M655",
+      "canonicalCode": "HM2-TXP-M655-SPT-CINDER-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports cinder track pbr sheet",
+      "sourceFile": "M655-sports-cinder-track-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CINDER",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve sports-surface identity and broad wear while suppressing micro-aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Reconstructible line-free sports playing surface.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "meaningful PBR guides"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "venue view"
+        ],
+        "frequency": "broad wear plus identity-scale structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 82 sports surface extensions"
+    },
+    {
+      "registryId": "M656",
+      "canonicalCode": "HM2-TXP-M656-SPT-TATAMI-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports tatami weave pbr sheet",
+      "sourceFile": "M656-sports-tatami-weave-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TATAMI",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "weave strips 2-5 mm",
+      "mipPolicy": "Preserve sports-surface identity and broad wear while suppressing micro-aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Reconstructible line-free sports playing surface.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "meaningful PBR guides"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "venue view"
+        ],
+        "frequency": "broad wear plus identity-scale structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 82 sports surface extensions"
+    },
+    {
+      "registryId": "M657",
+      "canonicalCode": "HM2-TXP-M657-SPT-POOLTILE-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports pool tile pbr sheet",
+      "sourceFile": "M657-sports-pool-tile-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "POOLTILE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "tiles about 25 mm square",
+      "mipPolicy": "Preserve sports-surface identity and broad wear while suppressing micro-aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Reconstructible line-free sports playing surface.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "meaningful PBR guides"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "venue view"
+        ],
+        "frequency": "broad wear plus identity-scale structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 82 sports surface extensions"
     }
   ]
 }

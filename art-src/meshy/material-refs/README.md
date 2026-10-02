@@ -1144,3 +1144,9 @@ M634, M636–M638 and M641–M643 pass as mobile playing-surface children. M639 
 ![Material Batch 81 contact sheet](./review/material-batch-81-mobile-corrections-nostalgic-sports-surfaces.jpg)
 
 M635 and M640 advance to R02/pass: clay is now compact mineral grain and snow is now compact directional corduroy. M644, M645, M647 and M650 pass as nostalgic-PBR surface children. M651 is constrained-pass because reconstruction must suppress its square tessellation. M646, M648 and M649 require regeneration: respectively they contain broad channels, peeling plate-like ice, and recessed concrete panel intersections that conflict with the intended seamless materials.
+
+## Material Batch 82 — sports-surface corrections and extensions
+
+![Material Batch 82 contact sheet](./review/material-batch-82-sports-surface-corrections-extensions.jpg)
+
+M646, M648, M649 and M651 advance to R02/pass with continuous rubber, maintained ice, poured concrete and non-tessellated grip relief. M652–M653 pass as nostalgic red-clay and groomed-snow children. M654–M657 pass as full-fidelity artificial turf, cinder track, tatami weave and aquatic pool-tile foundations. All remain line-free and brand-neutral.

@@ -14,6 +14,7 @@ import { loadMap, saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { DriversPanel } from './drivers';
+import { SoundPanel } from './sound-panel';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
 
 type ToolId = 'select' | 'brush' | 'shape' | 'track' | 'dress' | 'place' | 'delete';
@@ -60,6 +61,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [shapeHeight, setShapeHeight] = useState(6);
   const [density, setDensity] = useState(1);
   const [previewing, setPreviewing] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
+  const [autosaved, setAutosaved] = useState<number | null>(null);
   const rev = useRev(rt);
   const toastList = useToasts();
   const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight });
@@ -126,6 +129,20 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           { type: 'ring', center: [x, y + 0.08, z], normal: [0, 1, 0], radius: L.brush.radius * 0.5 * pulse, color: c },
           { type: 'handle', id: 'brush-c', position: [x, y + 0.2, z], color: c, size: stroking ? 0.5 : 0.3 },
         ]);
+      } else if (L.tool === 'shape' && hover.point && ts) {
+        const [x, y, z] = hover.point;
+        const r = Math.max(3, L.brush.radius), col = rampA ? '#9be3ff' : '#ffb35e';
+        const items: import('@hm/contracts').OverlayShape[] = [
+          { type: 'ring', center: [x, y + 0.1, z], normal: [0, 1, 0], radius: r * pulse, color: col },
+          { type: 'handle', id: 'shape-c', position: [x, y + 0.3, z], color: col, size: 0.35 },
+        ];
+        if (L.shapeMode !== 'ramp') items.push({ type: 'line', from: [x, y + 0.1, z], to: [x, y + 0.1 + L.shapeHeight * (L.shapeMode === 'crater' ? 0.3 : 1), z], color: col });
+        if (rampA) {
+          const ay = heightAt(ts.terrain, rampA[0], rampA[1]);
+          items.push({ type: 'handle', id: 'ramp-a', position: [rampA[0], ay + 0.4, rampA[1]], color: '#ffffff', size: 0.5 });
+          items.push({ type: 'line', from: [rampA[0], ay + 0.4, rampA[1]], to: [x, y + 0.4, z], color: '#9be3ff' });
+        }
+        renderer.overlay.show('brush', items);
       } else renderer.overlay.hide('brush');
 
       const shapes: import('@hm/contracts').OverlayShape[] = [];
@@ -367,6 +384,13 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const doUndo = (): void => (window as unknown as { makerUndo: () => void }).makerUndo();
   const doRedo = (): void => (window as unknown as { makerRedo: () => void }).makerRedo();
   const pick = (t: ToolId): void => { setTool(t); feedback('tool'); };
+  // autosave 1.5 s after the last edit (never while previewing, so driver values are not saved)
+  useEffect(() => {
+    if (rt.commands.history().length === 0) return;
+    const t = setTimeout(() => { if (rt.mode === 'edit' && saveMap(rt, scene.sceneId)) setAutosaved(Date.now()); }, 1500);
+    return () => clearTimeout(t);
+  }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const save = (): void => { if (saveMap(rt, scene.sceneId)) feedback('saved', 'Map saved'); else feedback('error', 'Could not save the map'); };
 
   const carve = (): void => {
@@ -387,9 +411,11 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <button onClick={doUndo} disabled={!rt.commands.canUndo}>↶ Undo</button>
         <button onClick={doRedo} disabled={!rt.commands.canRedo}>↷ Redo</button>
         <span className="hist" title={history.map((h) => h.label).join('\n')}>{history.length ? `${history.filter((h) => !h.undone).length} steps` : 'no edits yet'}</span>
+        <span className="saved" title="Your map saves itself a moment after every change">{autosaved ? 'autosaved ✓' : ''}</span>
         <span className="grow" />
         <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
+        <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); fx('ui-toggle'); }}>🎚 Sounds</button>
         <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
         <button onClick={save}>💾 Save</button>
         <button onClick={() => { if (confirm('Start a new map? The saved one will be replaced.')) { clearSavedMap(); location.reload(); } }}>New</button>
@@ -413,6 +439,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         </aside>
         <div className="view" ref={host} />
         <aside className="panel right">
+          {soundOpen ? <SoundPanel rt={rt} tier={tier} rev={rev} onFeedback={(k, t) => feedback(k, t)} /> : null}
+          <div style={soundOpen ? { display: 'none' } : undefined}>
           {tool === 'brush' ? (
             <>
               <h3>Brush</h3>
@@ -457,6 +485,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           ) : null}
           {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><DriversPanel rt={rt} sceneId={scene.sceneId} propId={sel.id} tier={tier} numberKeys={schema.variables.filter((v) => v.type === 'number' || v.type === 'int').map((v) => ({ key: v.key, label: v.label }))} onFeedback={(k, t) => feedback(k, t)} /><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
           {tool === 'delete' ? <p className="hint">Click a prop to delete it. Ctrl+Z brings it back.</p> : null}
+          </div>
         </aside>
       </main>
       <div className="toasts" aria-live="polite">{toastList.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}</div>

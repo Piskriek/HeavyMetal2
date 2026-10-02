@@ -82,3 +82,14 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 .maker .driver-edit input, .maker .driver-edit select { max-width: 100%; box-sizing: border-box; }
 
 .race .mute { position: absolute; right: 12px; bottom: 12px; background: #0008; color: #fff; border: 0; border-radius: 6px; padding: 4px 10px; font-size: 16px; cursor: pointer; }
+
+/* ---- sounds panel ---- */
+.maker .sound-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.maker .sound-list li { border-bottom: 1px solid var(--line, #26303b); padding: 4px 0; }
+.maker .sound-row { display: flex; align-items: center; gap: 8px; }
+.maker .sound-row .grow { flex: 1; text-transform: capitalize; }
+.maker .sound-row i { color: var(--accent, #ffd24a); font-style: normal; }
+.maker .sound-edit { padding: 6px 0 8px; }
+.maker .sound-list li.edited .grow { color: var(--accent, #ffd24a); }
+
+.maker .saved { color: var(--ok, #5fd38d); font-size: 12px; margin-left: 8px; opacity: 0.85; }

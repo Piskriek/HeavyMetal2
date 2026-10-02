@@ -1132,3 +1132,9 @@ M614–M622 pass as nostalgic-PBR children for nets, painted posts, wickets, tar
 ![Material Batch 79 contact sheet](./review/material-batch-79-global-sports-playing-surfaces.jpg)
 
 M624–M633 pass as brand-neutral full-fidelity playing surfaces: short natural grass, red clay, acrylic hard court, synthetic running-track rubber, gym maple, maintained rink ice, packed groomed snow, skate concrete, bowling-lane maple and indoor grip mat. No court markings or protected branding are baked into these materials; markings remain separately paintable presets.
+
+## Material Batch 80 — mobile global sports surfaces
+
+![Material Batch 80 contact sheet](./review/material-batch-80-mobile-global-sports-surfaces.jpg)
+
+M634, M636–M638 and M641–M643 pass as mobile playing-surface children. M639 is a constrained pass: reconstruction must break up its isolated broad resurfacing band. M635 must regenerate because its flowing bands read as wood instead of granular red clay. M640 must regenerate because its long folds read as cloth instead of compact groomed snow.

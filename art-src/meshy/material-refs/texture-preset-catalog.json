@@ -18029,6 +18029,689 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M634",
+      "canonicalCode": "HM2-TXP-M634-SPT-GRASS-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports short grass pitch pbr sheet",
+      "sourceFile": "M634-mobile-sports-short-grass-pitch-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M624",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M635",
+      "canonicalCode": "HM2-TXP-M635-SPT-CLAY-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports clay court pbr sheet",
+      "sourceFile": "M635-mobile-sports-clay-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CLAY",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M625",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces",
+      "reviewNotes": "Current BaseColor reads as flowing wood grain; regenerate as compact granular red clay."
+    },
+    {
+      "registryId": "M636",
+      "canonicalCode": "HM2-TXP-M636-SPT-ACRYLIC-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports acrylic court pbr sheet",
+      "sourceFile": "M636-mobile-sports-acrylic-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ACRYLIC",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M626",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M637",
+      "canonicalCode": "HM2-TXP-M637-SPT-TRACK-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports running track rubber pbr sheet",
+      "sourceFile": "M637-mobile-sports-running-track-rubber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M627",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M638",
+      "canonicalCode": "HM2-TXP-M638-SPT-GYMWOOD-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports gym hardwood pbr sheet",
+      "sourceFile": "M638-mobile-sports-gym-hardwood-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GYMWOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M628",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M639",
+      "canonicalCode": "HM2-TXP-M639-SPT-ICE-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports rink ice pbr sheet",
+      "sourceFile": "M639-mobile-sports-rink-ice-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ICE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M629",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces",
+      "reviewNotes": "Break up the isolated broad resurfacing band during reconstruction to avoid visible repetition."
+    },
+    {
+      "registryId": "M640",
+      "canonicalCode": "HM2-TXP-M640-SPT-SNOW-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports packed snow pbr sheet",
+      "sourceFile": "M640-mobile-sports-packed-snow-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "SNOW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M630",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "regenerate",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces",
+      "reviewNotes": "Current long folds read as draped cloth rather than compact groomed snow."
+    },
+    {
+      "registryId": "M641",
+      "canonicalCode": "HM2-TXP-M641-SPT-CONCRETE-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports skate concrete pbr sheet",
+      "sourceFile": "M641-mobile-sports-skate-concrete-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CONCRETE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M631",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M642",
+      "canonicalCode": "HM2-TXP-M642-SPT-LANEWOOD-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports bowling lane pbr sheet",
+      "sourceFile": "M642-mobile-sports-bowling-lane-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "LANEWOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M632",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
+    },
+    {
+      "registryId": "M643",
+      "canonicalCode": "HM2-TXP-M643-SPT-GRIPMAT-TIL-BCNROH-MOB-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "mobile sports grip mat pbr sheet",
+      "sourceFile": "M643-mobile-sports-grip-mat-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GRIPMAT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "MOB",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve broad playing-surface identity and suppress micro-noise.",
+      "intendedUses": [
+        "mobile global sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M633",
+      "editableParameters": [
+        "palette",
+        "relief",
+        "roughness",
+        "wear direction",
+        "density"
+      ],
+      "recipe": {
+        "intent": "Mobile child preserving line-free sports surface identity.",
+        "required": [
+          "fixed quadrant order",
+          "PX64-readable broad forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "logos"
+        ],
+        "frequency": "broad structure survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 80 mobile global sports surfaces"
     }
   ]
 }

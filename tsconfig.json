@@ -86,6 +86,12 @@
       ],
       "@hm/trackedit": [
         "packages/trackedit/src/index.ts"
+      ],
+      "@hm/terrainops": [
+        "packages/terrainops/src/index.ts"
+      ],
+      "@hm/scatter": [
+        "packages/scatter/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

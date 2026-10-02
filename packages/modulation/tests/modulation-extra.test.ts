@@ -5,7 +5,7 @@ import {
   describeModulator,
   gaussian01,
   hash01,
-  normalizeModulator,
+
   rangeOf,
   validateModulator,
   type ModContext,

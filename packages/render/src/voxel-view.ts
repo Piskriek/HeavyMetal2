@@ -66,9 +66,11 @@ export interface ModelPlacement { readonly params: Readonly<Record<string, unkno
 export class ModelsView {
   readonly group = new THREE.Group();
   private readonly views: VoxelView[] = [];
+  private readonly slots: (VoxelView | null)[] = [];
   constructor(items: readonly ModelPlacement[]) {
     for (const it of items) {
       const v = voxelViewFromParams(it.params);
+      this.slots.push(v);
       if (!v) continue;
       v.group.position.set(it.x, it.y, it.z);
       v.group.rotation.y = (it.yawDeg * Math.PI) / 180;
@@ -76,5 +78,12 @@ export class ModelsView {
       this.group.add(v.group);
     }
   }
-  dispose(): void { for (const v of this.views) v.dispose(); this.views.length = 0; this.group.clear(); }
+  /** Move one placed model without rebuilding it (index = position in the list given to the constructor). */
+  pose(i: number, x: number, y: number, z: number, yawDeg: number): void {
+    const v = this.slots[i];
+    if (!v) return;
+    v.group.position.set(x, y, z);
+    v.group.rotation.y = (yawDeg * Math.PI) / 180;
+  }
+  dispose(): void { for (const v of this.views) v.dispose(); this.views.length = 0; this.slots.length = 0; this.group.clear(); }
 }

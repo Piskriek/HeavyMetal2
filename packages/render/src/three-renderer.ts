@@ -30,6 +30,8 @@ export type ThreeRenderer = RenderService & {
   setRoadDecals(defs: readonly RoadDecalDef[] | null): void;
   /** The world ray under a screen point (for tools that edit things the picker does not know, like voxels). */
   ray(clientX: number, clientY: number): { readonly origin: Vec3; readonly direction: Vec3 } | null;
+  /** Move one of the models given to setModels (an avatar walking about) without rebuilding it. */
+  setModelPose(index: number, x: number, y: number, z: number, yawDeg: number): void;
   /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
   setFov(deg: number): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
@@ -227,6 +229,9 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setDecor(instances: readonly DecorInstance[] | null): void {
       pendingDecor = instances;
       applyDecor();
+    },
+    setModelPose(index: number, x: number, y: number, z: number, yawDeg: number): void {
+      modelsView?.pose(index, x, y, z, yawDeg);
     },
     setFov(deg: number): void {
       orbitState = { ...orbitState, fov: Math.min(150, Math.max(10, deg)) };

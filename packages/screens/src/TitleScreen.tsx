@@ -18,7 +18,7 @@ export function TitleScreen(props: { title?: string; subtitle?: string; quickLab
         <button type="button" className="hms-btn" data-action="championship" onClick={() => props.onPlay('championship')}>{props.seriesLabel ?? 'Championship'}</button>
         <div className="hms-row">
           <button type="button" className="hms-btn quiet" data-action="settings" onClick={props.onSettings}>Settings</button>
-          {props.onEditor ? <button type="button" className="hms-btn quiet" data-action="editor" onClick={props.onEditor}>Map Maker</button> : null}
+          {props.onEditor ? <button type="button" className="hms-btn quiet" data-action="editor" onClick={props.onEditor}>My Island</button> : null}
         </div>
       </div>
       {props.version ? <p className="hms-hint" style={{ position: 'absolute', bottom: 8 }}>v{props.version}</p> : null}

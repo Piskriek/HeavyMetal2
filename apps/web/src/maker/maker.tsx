@@ -16,6 +16,7 @@ import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { DriversPanel } from './drivers';
 import { SoundPanel } from './sound-panel';
 import { HelpOverlay, helpSeen, markHelpSeen } from './help';
+import { ShareDialog } from './share';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
 
 type ToolId = 'select' | 'brush' | 'shape' | 'track' | 'dress' | 'place' | 'delete';
@@ -64,6 +65,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [previewing, setPreviewing] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [autosaved, setAutosaved] = useState<number | null>(null);
   const [help, setHelp] = useState<'first' | 'keys' | null>(() => (helpSeen() ? null : 'first'));
   const closeHelp = (): void => { markHelpSeen(); setHelp(null); fx('ui-click'); };
@@ -427,6 +429,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <button title="Shortcuts and tips (?)" onClick={() => { setHelp('keys'); fx('ui-click'); }}>?</button>
         <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); fx('ui-toggle'); }}>🎚 Sounds</button>
         <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
+        <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>🔗 Share</button>
         <button onClick={save}>💾 Save</button>
         {confirmNew
           ? (<span className="confirm">Replace your saved map? <button className="danger" onClick={() => { clearSavedMap(); location.reload(); }}>Yes, start over</button> <button onClick={() => setConfirmNew(false)}>Keep it</button></span>)
@@ -502,6 +505,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           </div>
         </aside>
       </main>
+      {sharing ? <ShareDialog rt={rt} sceneId={scene.sceneId} onClose={() => setSharing(false)} onDone={(t) => feedback('success', t)} /> : null}
       {help ? <HelpOverlay firstRun={help === 'first'} onClose={closeHelp} /> : null}
       <div className="toasts" aria-live="polite">{toastList.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}</div>
     </div>

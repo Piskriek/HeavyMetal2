@@ -116,3 +116,6 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 .maker .view { position: relative; }
 .maker .viewmode { position: absolute; left: 10px; bottom: 10px; z-index: 5; background: #0009; color: #fff; border: 1px solid #ffffff44; border-radius: 999px; padding: 8px 14px; font-size: 13px; min-height: 40px; }
 .maker .viewmode.on { background: #ffd24a; color: #111; border-color: #ffd24a; }
+
+.help-card textarea.code { width: 100%; box-sizing: border-box; background: #0f1318; color: #c7d3de; border: 1px solid #26303b; border-radius: 8px; padding: 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; margin: 6px 0; resize: vertical; }
+.help-card .bad { color: #ff9a5e; font-size: 13px; }

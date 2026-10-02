@@ -1,0 +1,108 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { BUDGET, validateStats, normalizeStats, derivePhysics, pointsFor, scoreRace, addPoints, rankTable, trackLength, pointAt, project, onTrack, createLapTracker, aiControl, rubberBand, rankRacers, ITEMS, itemById, rollItem, expectedScore, updateRatings, type Track, type Vec2 } from '../src';
+
+const near = (a: number, b: number, e = 1e-6): void => assert.ok(Math.abs(a - b) < e, `${a} !~ ${b}`);
+const square: Track = { points: [[0, 0], [100, 0], [100, 100], [0, 100]], width: 10 };
+/** The point s metres along the square's perimeter. */
+const perimeter = (s: number): Vec2 => pointAt(square, s);
+
+test('stats: budget, validation messages, normalising, derived physics', () => {
+  assert.equal(BUDGET, 15);
+  assert.deepEqual(validateStats({ weight: 5, speed: 5, bounce: 5 }), { ok: true, total: 15, errors: [] });
+  const over = validateStats({ weight: 6, speed: 5, bounce: 5 });
+  assert.equal(over.ok, false); assert.equal(over.total, 16); assert.ok(over.errors.length >= 1);
+  assert.equal(validateStats({ weight: 0, speed: 5, bounce: 5 }).ok, false);
+  assert.equal(validateStats({ weight: 2.5, speed: 5, bounce: 5 }).ok, false);
+  assert.match(validateStats({ weight: 11, speed: 1, bounce: 1 }).errors.join(' '), /weight/);
+  assert.deepEqual(normalizeStats({ weight: 9, speed: 9, bounce: 9 }), { weight: 5, speed: 5, bounce: 5 });
+  assert.deepEqual(normalizeStats({ weight: 20, speed: 0, bounce: 3.4 }), { weight: 10, speed: 1, bounce: 3 });
+  const heavy = derivePhysics({ weight: 8, speed: 3, bounce: 4 }), fast = derivePhysics({ weight: 3, speed: 8, bounce: 4 });
+  assert.ok(heavy.mass > fast.mass && heavy.acceleration < fast.acceleration && heavy.grip > fast.grip && heavy.maxSpeed < fast.maxSpeed);
+  near(derivePhysics({ weight: 5, speed: 5, bounce: 5 }).mass, 1.4);
+});
+
+test('points and standings', () => {
+  assert.deepEqual([1, 2, 3, 10, 11, 0, 1.5].map(pointsFor), [25, 18, 15, 1, 0, 0, 0]);
+  const race = [{ id: 'a', position: 2 }, { id: 'b', position: 1 }, { id: 'c', position: 3, dnf: true }];
+  assert.deepEqual(scoreRace(race), { a: 18, b: 25, c: 0 });
+  const t1 = addPoints({ a: 10 }, race);
+  assert.deepEqual(t1, { a: 28, b: 25, c: 0 });
+  const rows = rankTable({ a: 25, b: 25, c: 10 }, [[{ id: 'a', position: 2 }, { id: 'b', position: 1 }], [{ id: 'a', position: 1 }, { id: 'b', position: 3 }, { id: 'c', position: 2 }]]);
+  assert.deepEqual(rows.map((r) => [r.id, r.points, r.wins]), [['a', 25, 1], ['b', 25, 1], ['c', 10, 0]]);
+});
+
+test('track: length, pointAt, project, onTrack', () => {
+  near(trackLength(square), 400);
+  assert.deepEqual(pointAt(square, 50), [50, 0]); assert.deepEqual(pointAt(square, 150), [100, 50]);
+  near(pointAt(square, 410)[0], 10); near(pointAt(square, -50)[1], 50);
+  const p = project(square, [50, -5]);
+  assert.equal(p.segment, 0); near(p.t, 0.5); near(p.s, 50); near(p.lateral, -5); near(p.distance, 5);
+  near(project(square, [50, 5]).lateral, 5);
+  near(project(square, [100, 50]).s, 150);
+  const w = project(square, [-5, 50]); near(w.s, 350); near(w.lateral, -5);
+  assert.equal(onTrack(square, [50, -5]), true); assert.equal(onTrack(square, [50, -6]), false);
+});
+
+test('laps: a full loop counts once, backwards and shortcuts never count, finish after N laps', () => {
+  const lt = createLapTracker(square, 3);
+  let completed = 0, last = lt.state;
+  for (let s = 0; s <= 400; s += 2.5) { last = lt.update(perimeter(s % 400)); if (last.lapCompleted) completed++; if (Math.abs(s - 200) < 1e-9) near(last.progress, 0.5, 0.02); }
+  assert.equal(completed, 1); assert.equal(last.lap, 2); assert.ok(last.progress >= 1 && last.progress < 1.05);
+  const back = createLapTracker(square, 3);
+  back.update(perimeter(10));
+  for (let s = 10; s >= -300; s -= 2.5) assert.equal(back.update(perimeter(((s % 400) + 400) % 400)).lapCompleted, false);
+  const cut = createLapTracker(square, 3);
+  cut.update(perimeter(10));
+  cut.update([50, 50]);
+  for (let s = 380; s <= 410; s += 2.5) assert.equal(cut.update(perimeter(s % 400)).lapCompleted, false);
+  const run = createLapTracker(square, 2);
+  let st = run.state;
+  for (let s = 0; s <= 800; s += 2.5) st = run.update(perimeter(s % 400));
+  assert.equal(st.finished, true); assert.equal(st.lap, 2); assert.ok(st.progress <= 2 + 1e-9);
+  run.reset(); assert.equal(run.state.finished, false); assert.equal(run.state.progress, 0);
+});
+
+test('ai: steers towards the centreline, lifts for corners, rubber band', () => {
+  const skill = { lookahead: 20, cornerCare: 1, noise: 0 };
+  const rng = () => 0.5;
+  const onLine = aiControl(square, { x: 10, z: 0, hx: 1, hz: 0, speed: 20 }, skill, rng);
+  near(onLine.steer, 0, 1e-6); assert.ok(onLine.throttle > 0.95);
+  const off = aiControl(square, { x: 10, z: -5, hx: 1, hz: 0, speed: 20 }, skill, rng);
+  assert.ok(off.steer > 0.1, `steer ${off.steer}`);
+  const other = aiControl(square, { x: 10, z: 5, hx: 1, hz: 0, speed: 20 }, skill, rng);
+  assert.ok(other.steer < -0.1);
+  const corner = aiControl(square, { x: 90, z: 0, hx: 1, hz: 0, speed: 30 }, skill, rng);
+  assert.ok(corner.throttle < onLine.throttle - 0.2 && corner.throttle >= 0.25, `throttle ${corner.throttle}`);
+  const sloppy = aiControl(square, { x: 10, z: 0, hx: 1, hz: 0, speed: 20 }, { ...skill, noise: 1 }, () => 1);
+  near(sloppy.steer, 0.1, 1e-6);
+  near(rubberBand(1, 8), 0.92); near(rubberBand(8, 8), 1.08); near(rubberBand(1, 1), 1); near(rubberBand(4.5, 8), 1);
+});
+
+test('rank: by progress, ties by id', () => {
+  assert.deepEqual(rankRacers([{ id: 'b', progress: 1.5 }, { id: 'a', progress: 1.5 }, { id: 'c', progress: 2.1 }]), [{ id: 'c', position: 1 }, { id: 'a', position: 2 }, { id: 'b', position: 3 }]);
+});
+
+test('items: the 8 items, deterministic rolls, back markers get boosts more often than the leader', () => {
+  assert.deepEqual(ITEMS.map((i) => i.id), ['boost', 'jump', 'oil', 'shockwave', 'mass', 'slipstream', 'freeze', 'ghost']);
+  assert.ok(ITEMS.every((i) => i.weights.length === 3 && i.weights.every((w) => w > 0)));
+  assert.equal(itemById('oil')?.kind, 'drop'); assert.equal(itemById('nope'), undefined);
+  const seq = (seed: number) => { let s = seed; return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296; };
+  const a = seq(5), b = seq(5);
+  for (let i = 0; i < 20; i++) assert.equal(rollItem(3, 8, a).id, rollItem(3, 8, b).id);
+  const rng = seq(99);
+  let first = 0, last = 0;
+  for (let i = 0; i < 3000; i++) { if (rollItem(1, 8, rng).id === 'boost') first++; if (rollItem(8, 8, rng).id === 'boost') last++; }
+  assert.ok(last > first * 2, `boost: last ${last} first ${first}`);
+});
+
+test('rating: expected score and zero-sum updates', () => {
+  near(expectedScore(1000, 1000), 0.5); near(expectedScore(1200, 1000), 0.7597, 1e-3); near(expectedScore(1000, 1200), 1 - expectedScore(1200, 1000), 1e-9);
+  assert.deepEqual(updateRatings([{ id: 'a', rating: 1000 }, { id: 'b', rating: 1000 }]), { a: 1012, b: 988 });
+  const r = updateRatings([{ id: 'a', rating: 1100 }, { id: 'b', rating: 1000 }, { id: 'c', rating: 900 }]);
+  near(Object.values(r).reduce((s, v) => s + v, 0), 3000, 0.05);
+  assert.ok(r.a! > 1100 && r.c! < 900);
+  assert.deepEqual(updateRatings([{ id: 'solo', rating: 1234 }]), { solo: 1234 });
+  const upset = updateRatings([{ id: 'low', rating: 800 }, { id: 'high', rating: 1200 }]);
+  assert.ok(upset.low! - 800 > 12);
+});

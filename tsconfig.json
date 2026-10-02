@@ -53,6 +53,9 @@
       ],
       "@hm/terrain": [
         "packages/terrain/src/index.ts"
+      ],
+      "@hm/racing": [
+        "packages/racing/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

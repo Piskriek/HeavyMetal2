@@ -29,3 +29,12 @@ The winners' avatars are built into giant statues on the island of the next evol
 The next canon is chosen by **what players actually use**: for every part of the game (rules, items, tracks, looks, sounds,
 interface) the most-used preset becomes the new default. The rules of the evolution itself are presets too, so the community can
 change how it evolves.
+
+## Spectating, bodies and classes
+Spectating is a preset too. You can watch from a chase camera, a free camera, a cinematic director that jumps to the action, as a
+ghost, or in first person, where you are an embodied goblin walking around the island. Goblins can die, go to jail and are
+subject to goblin laws; the dead wait to be resurrected and look like ghosts until then, though they can still do everything.
+
+After the first week of racing a shaman arrives and resurrects the bodies where they lie. He does it with the game's own presets,
+and any player can copy him to make a class of their own. The next week racing balls start to break and a mechanic class appears
+to repair everything, and that class can be copied too. Every week adds a mechanic and a class that answers it, and the world grows.

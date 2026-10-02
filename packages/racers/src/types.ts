@@ -23,5 +23,5 @@ export interface RacerDeps {
   rubberBand(position: number, racers: number): number;
   createLapTracker(track: Track, laps: number): LapTrackerLike;
   rankRacers(states: readonly { id: string; progress: number }[]): { id: string; position: number }[];
-  itemById(id: string): { id: string; kind: 'self' | 'drop' | 'area'; durationMs: number } | undefined;
+  itemById(id: string): { id: string; kind: 'self' | 'drop' | 'area'; durationMs: number; /** what it does (defaults to the id); 'anchor' and 'mass' are the same */ effect?: string; power?: number; radius?: number } | undefined;
 }

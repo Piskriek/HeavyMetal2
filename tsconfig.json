@@ -104,6 +104,9 @@
       ],
       "@hm/screens": [
         "packages/screens/src/index.ts"
+      ],
+      "@hm/itemdefs": [
+        "packages/itemdefs/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

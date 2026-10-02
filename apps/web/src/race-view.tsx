@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
-import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, type Hud as HudData, type RaceGame } from '@hm/game';
+import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { HUD, Minimap } from '@hm/ui';
 import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
@@ -60,7 +60,7 @@ export function RaceView(props: {
     renderer.setQuality(adaptive.current);
     let appliedQuality = live.current.settings.quality;
     const surfaces = new SurfaceArray(STARTER_SURFACES);
-    const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
+    const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, items: setup.fromMap ? itemsOf(rt) : undefined, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
     gameRef.current = game;
     (window as unknown as { hmGame: unknown }).hmGame = game; // console: hmGame.hud(), hmGame.racerIds ...
     const sceneNow = rt.store.get(rt.binder.sceneId ?? '');

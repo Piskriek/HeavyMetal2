@@ -1,7 +1,8 @@
 import type { EntityId, PresetId, Value } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { RACERS, type PresetSeed } from '@hm/content';
-import { trackLength, pointAt, project, derivePhysics, aiControl, rubberBand, createLapTracker, rankRacers, itemById, rollItem, type Track } from '@hm/racing';
+import { trackLength, pointAt, project, derivePhysics, aiControl, rubberBand, createLapTracker, rankRacers, type Track } from '@hm/racing';
+import { ITEM_PRESETS, normalizeItem, rollItem, type ItemDef, type ItemEffect } from '@hm/itemdefs';
 import { createRacerSystem, defineRacerComponents, grantItem } from '@hm/racers';
 import { trackWalls, carveTrack, chaikin, makeCenterline, onPad, resample, startGrid } from '@hm/trackgen';
 import { buildRoad } from './road-features';
@@ -21,6 +22,8 @@ export interface RaceGameOptions {
   readonly laps?: number;
   /** Race rules (usually from rulesOf(rt)); explicit laps/field still win. */
   readonly rules?: Partial<RaceRules>;
+  /** Items for this race (usually itemsOf(rt)); defaults to the standard eight. */
+  readonly items?: readonly ItemDef[];
   readonly field?: number;
   /** Which racer seed the player drives (index into the content library's goblins). */
   readonly playerIndex?: number;
@@ -64,6 +67,22 @@ export interface RaceGame {
 export interface RaceRules { laps: number; field: number; aiSkill: number; itemsPerLap: number; boostPads: number; boostPadMs: number; rumble: boolean; startLine: boolean; walls: boolean }
 export const DEFAULT_RULES: RaceRules = { laps: 3, field: 8, aiSkill: 1, itemsPerLap: 4, boostPads: 3, boostPadMs: 1400, rumble: true, startLine: true, walls: true };
 
+/** The items of the loaded scene (its `items` children), or the standard eight. Every field is a preset variable. */
+export function itemsOf(rt: Runtime): ItemDef[] {
+  const scene = rt.binder.sceneId ? rt.store.get(rt.binder.sceneId) : undefined;
+  const refs = scene?.children['items'] ?? [];
+  if (!refs.length) return ITEM_PRESETS.map((i) => ({ ...i, weights: [...i.weights] as [number, number, number] }));
+  return refs.flatMap((r) => {
+    const p = rt.store.get(r.ref) ? rt.store.resolve(r.ref).params : undefined;
+    if (!p) return [];
+    const n = (k: string, d: number): number => (Number.isFinite(Number(p[k])) ? Number(p[k]) : d);
+    return [normalizeItem({
+      id: r.ref, label: String(p['label'] ?? r.ref), icon: String(p['icon'] ?? '⭐'), effect: String(p['effect'] ?? 'boost') as ItemEffect, kind: 'self',
+      durationMs: n('durationMs', 2500), power: n('power', 1), radius: n('radius', 0), weights: [n('weightFront', 2), n('weightMiddle', 2), n('weightBack', 2)], enabled: p['enabled'] !== false,
+    })];
+  });
+}
+
 /** Read the race rules of the loaded scene (its first `rules` child), filling anything missing from the defaults. */
 export function rulesOf(rt: Runtime): RaceRules {
   const scene = rt.binder.sceneId ? rt.store.get(rt.binder.sceneId) : undefined;
@@ -81,6 +100,8 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   const laps = opts.laps ?? rules.laps;
   const n = Math.max(2, Math.min(12, opts.field ?? rules.field));
   const itemQuarter = rules.itemsPerLap;
+  const items = (opts.items ?? ITEM_PRESETS) as readonly ItemDef[];
+  const itemById = (id: string): { id: string; kind: ItemDef['kind']; durationMs: number; effect: string; power: number; radius: number } | undefined => { const d = items.find((i) => i.id === id); return d ? { id: d.id, kind: d.kind, durationMs: d.durationMs, effect: d.effect, power: d.power, radius: d.radius } : undefined; };
   const playerSeed = opts.player ? ({ kind: 'racer', name: opts.player.name, tags: [], tier: 'play', params: { skill: 0.7, hat: 'helmet', ears: 'pointy', ...opts.player.params } } as PresetSeed) : RACERS[(opts.playerIndex ?? 0) % RACERS.length]!;
 
   // ---- the island and the track: generated, or taken from the scene the Map Maker built
@@ -256,7 +277,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
       if (itemQuarter <= 0) continue;
       const q = Math.floor(Number(r['progress']) * itemQuarter);
       const prev = lastQuarter.get(id) ?? 0;
-      if (q > prev && rc['item'] === '' && q < laps * itemQuarter) grantItem(world as never, id, rollItem(Number(r['place']) || 1, racerIds.length, () => rt.sim.rng.next()).id);
+      if (q > prev && rc['item'] === '' && q < laps * itemQuarter) { const got = rollItem(items, Number(r['place']) || 1, racerIds.length, () => rt.sim.rng.next()); if (got) grantItem(world as never, id, got.id); }
       lastQuarter.set(id, q);
     }
   };
@@ -299,7 +320,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
       return {
         speed: Math.hypot(Number(v?.['vx'] ?? 0), Number(v?.['vz'] ?? 0)) * 3.6,
         lap: Math.min(laps, Number(r?.['lap'] ?? 1)), laps, position: Number(r?.['place'] ?? 1) || 1, racers: racerIds.length,
-        timeMs: dir.state.raceTimeMs, item: def ? { id: def.id, label: def.id, icon: ITEM_ICONS[def.id] ?? '?' } : null,
+        timeMs: dir.state.raceTimeMs, item: def ? { id: def.id, label: items.find((i) => i.id === def.id)?.label ?? def.id, icon: items.find((i) => i.id === def.id)?.icon ?? '?' } : null,
         boost: Math.min(1, Number(rc?.['boostMs'] ?? 0) / 2500), message, phase,
       };
     },
@@ -329,6 +350,5 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   return game;
 }
 
-const ITEM_ICONS: Record<string, string> = { boost: '⚡', jump: '⤴', oil: '🛢', shockwave: '💥', mass: '⚓', slipstream: '🌀', freeze: '❄', ghost: '👻' };
 
 export type { Value };

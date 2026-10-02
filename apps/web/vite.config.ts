@@ -42,6 +42,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/modui': p('../../packages/modui/src/index.ts'),
       '@hm/soundlab': p('../../packages/soundlab/src/index.ts'),
       '@hm/screens': p('../../packages/screens/src/index.ts'),
+      '@hm/itemdefs': p('../../packages/itemdefs/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

@@ -72,6 +72,7 @@ export const sceneSchema = defineSchema({
     { key: 'decor', label: 'Foliage', doc: 'Palms, bushes and rocks.', kinds: ['decor'], min: 0, max: 1, tier: 'build' },
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
+    { key: 'items', label: 'Items', doc: 'The power-ups racers can pick up. Empty = the standard eight.', kinds: ['item'], min: 0, max: null, tier: 'build' },
     { key: 'interface', label: 'Interface', doc: 'The look and wording of the menus and the HUD: colours, texts, which HUD parts show.', kinds: ['interface'], min: 0, max: 1, tier: 'play' },
     { key: 'rules', label: 'Race rules', doc: 'How the race is run: laps, field size, items, boost pads. Change it to make your own kind of race.', kinds: ['race'], min: 0, max: 1, tier: 'play' },
     { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
@@ -205,6 +206,27 @@ export const interfaceSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const itemSchema = defineSchema({
+  kind: 'item',
+  version: 1,
+  label: 'Race item',
+  doc: 'A power-up: what it does, for how long, how strong, how far it reaches and how likely each part of the field is to get it.',
+  icon: 'star',
+  variables: [
+    { key: 'label', type: 'string', label: 'Name', doc: 'Shown to the player.', tier: 'play', default: 'Item', group: 'Item' },
+    { key: 'icon', type: 'string', label: 'Icon', doc: 'One emoji.', tier: 'play', default: '⭐', group: 'Item' },
+    { key: 'effect', type: 'enum', label: 'Effect', doc: 'What it does. boost, jump, anchor, slipstream and ghost help you; oil is dropped behind you; shockwave and freeze hit everyone nearby.', tier: 'build', default: 'boost', options: ['boost', 'jump', 'oil', 'shockwave', 'anchor', 'slipstream', 'freeze', 'ghost'], group: 'Item' },
+    num('durationMs', 'Lasts', 'How long the effect lasts.', 2500, 'play', { min: 0, max: 20000, step: 100, unit: 'ms', group: 'Strength' }),
+    num('power', 'Power', '1 = as designed. Scales how hard it hits or pushes.', 1, 'play', { min: 0.25, max: 4, step: 0.05, group: 'Strength' }),
+    num('radius', 'Reach', 'Metres affected (oil slick size, shockwave and freeze range).', 0, 'build', { min: 0, max: 80, step: 0.5, unit: 'm', group: 'Strength' }),
+    num('weightFront', 'Chance up front', 'Relative chance for racers in the front third.', 2, 'build', { min: 0, max: 10, step: 0.5, group: 'Chance' }),
+    num('weightMiddle', 'Chance in the middle', 'Relative chance for the middle third.', 2, 'build', { min: 0, max: 10, step: 0.5, group: 'Chance' }),
+    num('weightBack', 'Chance at the back', 'Relative chance for the back third.', 2, 'build', { min: 0, max: 10, step: 0.5, group: 'Chance' }),
+    { key: 'enabled', type: 'boolean', label: 'Enabled', doc: 'Switch the item off without deleting it.', tier: 'play', default: true, group: 'Item' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const raceSchema = defineSchema({
   kind: 'race',
   version: 1,
@@ -281,7 +303,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

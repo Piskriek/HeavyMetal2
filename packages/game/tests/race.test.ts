@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRuntime } from '@hm/engine';
-import { createRaceGame, rulesOf, DEFAULT_RULES } from '../src';
+import { createRaceGame, rulesOf, itemsOf, DEFAULT_RULES } from '../src';
 import { chaseCamera } from '../src/chase-camera';
 
 const run = (g: ReturnType<typeof createRaceGame>, seconds: number, each?: (t: number) => void): void => {
@@ -81,4 +81,20 @@ test('the race is a preset: rules come from the scene, are clamped, and change t
   assert.ok(g.roadDecals.some((d) => d.kind === 'startLine'));
   const none = createRuntime({ seed: 4 });
   assert.deepEqual(rulesOf(none), DEFAULT_RULES);
+});
+
+test('items are presets: a scene with its own items hands out only those, with their icons', () => {
+  const rt = createRuntime({ seed: 4 });
+  const rocket = rt.store.put({ id: 'rocket', kind: 'item', name: 'Rocket', params: { label: 'Rocket', icon: '🚀', effect: 'boost', durationMs: 3000, weightFront: 1, weightMiddle: 1, weightBack: 1 } });
+  const scene = rt.store.put({ kind: 'scene', name: 'S', params: {}, children: { items: [{ ref: rocket.id }] } });
+  rt.loadScene(scene.id);
+  const items = itemsOf(rt);
+  assert.deepEqual(items.map((i) => [i.id, i.icon, i.effect, i.durationMs]), [['rocket', '🚀', 'boost', 3000]]);
+  assert.equal(itemsOf(createRuntime({ seed: 4 })).length, 8);
+  const g = createRaceGame(rt, { seed: 7, items });
+  run(g, 60);
+  const held = g.racerIds.map((id) => String(g.rt.world.get(id, 'racer')!['item'])).filter(Boolean);
+  assert.ok(held.length > 0 && held.every((h) => h === 'rocket'), `held ${held}`);
+  const hud = g.hud();
+  assert.ok(hud.item === null || hud.item.icon === '🚀');
 });

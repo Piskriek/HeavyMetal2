@@ -110,31 +110,33 @@ export function createRacerSystem(deps: RacerDeps): System {
       prevUse.set(id, c.use);
       if (fired && item !== '') {
         const def = deps.itemById(item);
-        if (def?.id === 'boost') boostMs = def.durationMs;
-        else if (def?.id === 'jump') deps.physics.applyImpulse(id, [0, phys.mass * 6, 0]);
-        else if (def?.id === 'mass') shieldMs = def.durationMs;
-        else if (def?.id === 'slipstream') draftMs = def.durationMs;
-        else if (def?.id === 'ghost') ghostMs = def.durationMs;
-        else if (def?.id === 'oil') {
-          const s = { x: x - hx * 6, z: z - hz * 6, r: 4.5, ttlMs: def.durationMs };
+        const eff = ((def?.effect ?? def?.id) === 'anchor' ? 'mass' : (def?.effect ?? def?.id));
+        const power = def?.power ?? 1;
+        if (eff === 'boost') boostMs = def!.durationMs;
+        else if (eff === 'jump') deps.physics.applyImpulse(id, [0, phys.mass * 6 * power, 0]);
+        else if (eff === 'mass') shieldMs = def!.durationMs;
+        else if (eff === 'slipstream') draftMs = def!.durationMs;
+        else if (eff === 'ghost') ghostMs = def!.durationMs;
+        else if (eff === 'oil') {
+          const s = { x: x - hx * 6, z: z - hz * 6, r: def!.radius || 4.5, ttlMs: def!.durationMs };
           slicks.push(s);
           ctx.events.emit('hazard:oil', { x: s.x, z: s.z, r: s.r, ttlMs: s.ttlMs });
-        } else if (def?.id === 'shockwave' || def?.id === 'freeze') {
-          const reach = def.id === 'shockwave' ? 22 : 30;
+        } else if (eff === 'shockwave' || eff === 'freeze') {
+          const reach = def!.radius || (eff === 'shockwave' ? 22 : 30);
           for (const other of ids) {
             if (other === id) continue;
             const ot = world.get(other, 'transform'), orc = world.get(other, 'racer');
             if (!ot || !orc || num0(orc['shieldMs']) > 0 || num0(orc['ghostMs']) > 0) continue;
             const dx = num0(ot['x']) - x, dz = num0(ot['z']) - z, d = Math.sqrt(dx * dx + dz * dz);
             if (d > reach) continue;
-            if (def.id === 'freeze') world.set(other, 'racer', { freezeMs: 1800 });
+            if (eff === 'freeze') world.set(other, 'racer', { freezeMs: (def!.durationMs || 1800) * power });
             else {
               const m = deps.derivePhysics({ weight: num0(orc['weight']), speed: num0(orc['speed']), bounce: num0(orc['bounce']) }).mass;
               const k2 = d > 0.01 ? 1 / d : 0;
-              deps.physics.applyImpulse(other, [dx * k2 * m * 9 * (1 - d / reach * 0.6), m * 3.5, dz * k2 * m * 9 * (1 - d / reach * 0.6)]);
+              deps.physics.applyImpulse(other, [dx * k2 * m * 9 * power * (1 - d / reach * 0.6), m * 3.5 * power, dz * k2 * m * 9 * power * (1 - d / reach * 0.6)]);
             }
           }
-          ctx.events.emit('hazard:' + def.id, { x, z, r: reach });
+          ctx.events.emit('hazard:' + eff, { x, z, r: reach });
         }
         ctx.events.emit('item:used', { entity: id, item, kind: def?.kind ?? 'self' });
         item = '';

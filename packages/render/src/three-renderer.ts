@@ -4,6 +4,9 @@ import { MAX_DIST, MIN_DIST, orbitPosition, project, rayFromPixel, stateFromPosi
 import { QUALITY, type LightSetup, type Quality } from '@hm/lighting';
 import { createEnvironment, type EnvironmentRig } from './environment';
 import { LightingRig } from './lighting-rig';
+import { AvatarView } from './avatar-view';
+import type { VoxelModel } from '@hm/voxel';
+import type { Pose } from '@hm/anim';
 import { PostChain } from './post-chain';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
@@ -55,6 +58,10 @@ export type ThreeRenderer = RenderService & {
   setLighting(setup: LightSetup | null, blendSeconds?: number): void;
   /** Where the action is: lamps without a prop hang near `focus`, and named props (lantern, torch, campfire, barrel) pin lamps to them. */
   setLightFocus(focus: Vec3, anchors?: LightAnchors): void;
+  /** Your character, split into bones so animation presets can move it (null removes it). `block` is metres per voxel. */
+  setAvatar(model: VoxelModel | null, block?: number): void;
+  /** Feet at (x, y, z), facing `yaw` radians (0 = facing -Z), in `pose` (null = standing). */
+  setAvatarPose(x: number, y: number, z: number, yaw: number, pose: Pose | null, visible?: boolean): void;
   /** The lighting setup as it is right now (mid-blend values included), or null while a plain look is in charge. */
   readonly lighting: LightSetup | null;
   /**
@@ -150,6 +157,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     post = null;
     rig?.dispose();
     rig = null;
+    avatar?.dispose();
+    avatar = null;
     environment?.dispose();
     if (webgl) {
       const canvas = webgl.domElement;
@@ -178,6 +187,13 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let lightFocus: Vec3 = [0, 0, 0];
   let lightAnchors: LightAnchors | undefined;
   let postStale = true;
+  let avatar: AvatarView | null = null;
+  let pendingAvatar: { model: VoxelModel; block: number } | null = null;
+  const buildAvatar = (): void => {
+    avatar?.dispose();
+    avatar = null;
+    if (scene && pendingAvatar) { avatar = new AvatarView(pendingAvatar.model, undefined, pendingAvatar.block); scene.add(avatar.group); }
+  };
   /** Picture effects need the lighting rig and a tier above low. Rebuilt when the tier changes (multisampling is fixed at creation). */
   const buildPost = (): void => {
     post?.dispose();
@@ -267,6 +283,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyModels();
       if (pendingLook) environment.setLook(pendingLook);
       buildRig();
+      buildAvatar();
       updateView();
       resize();
 
@@ -335,6 +352,15 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setLightFocus(focus: Vec3, anchors?: LightAnchors): void {
       lightFocus = focus;
       lightAnchors = anchors;
+    },
+    setAvatar(model: VoxelModel | null, block = 0.04): void {
+      pendingAvatar = model ? { model, block } : null;
+      buildAvatar();
+    },
+    setAvatarPose(x: number, y: number, z: number, yaw: number, pose: Pose | null, visible = true): void {
+      if (!avatar) return;
+      avatar.place(x, y, z, yaw, visible);
+      if (pose) avatar.setPose(pose);
     },
     get lighting(): LightSetup | null {
       return rig ? rig.current : null;

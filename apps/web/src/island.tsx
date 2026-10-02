@@ -1,96 +1,132 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import type { PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
+import { Animator, type MoveSet } from '@hm/anim';
+import { stepSlot, tabDef, tabForKey, type TabId, type ToolPreset } from '@hm/buildkit';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
-import { encodeModel, type VoxelModel } from '@hm/voxel';
-import { MODELS } from '@hm/voxelart';
 import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
-import { followLighting } from './look';
-import { LightingWindow } from './lighting/lighting-window';
-import { PaletteWheel, type PaletteChoice } from '@hm/buildkit';
-import { findSub, type SubTool, type ToolSet } from '@hm/toolcatalog';
-import { SlideOut, TabPalette, ToolRail, ToolSay } from './build/rail';
-import { PALETTE_CATEGORIES } from './build/palette';
-import { itemFor } from './build/wiring';
+import type { SfxId } from '@hm/audio';
+import { followLighting, pickLook } from './look';
 import { decorInstances } from './maker/dress';
 import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
+import { focusTargetOf } from './maker/focus';
 import { fx } from './maker/feedback';
-import { BuildController } from './build/build-controller';
-import { Crosshair, Hotbar, Inventory } from './build/hud';
-import { loadHotbar, saveHotbar, type HotItem } from './build/hotbar';
+import { BuildController, type Aim } from './build/build-controller';
+import { Crosshair, Hotbar, ModeBar, TabStrip, TabWheel, ToolSay } from './build/hud';
+import { animOf, catalog, lookOf, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { goblinWearing } from './build/cards';
+import { EditorFor, MovesEditor, PlantEditor, WorldRulesEditor, type EditorActions } from './build/editors';
+import { PresetWindowBody } from './build/preset-window';
+import { FloatingWindow, useWindows } from './build/windows';
+import { player, putInSlot, setActivities, setMode, setSlot, setTab, setView, usePlayer, wearLook } from './build/player';
 
 /**
- * My Island: you are the goblin, on your own island, in third person (V for first person). W A S D / arrows move, Shift runs.
- * Build mode (grown-up switch on): click to aim with the crosshair, the hotbar (1-9) holds your tools, E opens the inventory, Ctrl+Z undoes.
- * Esc opens the jump menu: Main menu, Build mode (the full editor), Activities, Multiplayer.
+ * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
+ * Build HUD (grown-up switch on): F1..F10 pick a tab (Select, Paint, Sculpt, Animate, Sound, Lights, Activities, Avatar, Things, Camera), 1..9
+ * or the wheel pick a slot, left click uses it, right click does the opposite, E opens your presets (mouse free) with previews and editors,
+ * hold Tab for the quick wheel. Studio mode (B, or the button top right): no goblin, fly with W A S D, Space and C, look with the right mouse
+ * button, the mouse stays free, tools act where the cursor points, every setting opens in a movable window, F focuses on a thing, H hides
+ * the rest. Esc closes one thing at a time and then opens the jump menu.
  */
 const GOBLIN_BLOCK = 0.04;
 let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = null; // where the goblin stood when the island was last left
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
+const WIN = {
+  presets: { w: 560, h: 620 },
+  editor: { w: 380, h: 560 },
+};
+
 export function IslandWalk(props: {
-  readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr'; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+  readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean;
+  readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+  readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
   readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
 }): ReactElement {
   const { rt, onEdit, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
   const host = useRef<HTMLDivElement>(null);
   const introRef = useRef(props.intro === true);
   const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr' }) => void } | null>(null);
-  const skinRef = useRef(props.skin ?? 'flat');
-  skinRef.current = props.skin ?? 'flat';
-  useEffect(() => { terrainView.current?.setLook({ skin: props.skin ?? 'flat' }); }, [props.skin]);
+  const skin = props.skin ?? 'flat';
+  const skinRef = useRef(skin);
+  skinRef.current = skin;
+  useEffect(() => { terrainView.current?.setLook({ skin }); }, [skin]);
   const qualityRef = useRef(props.quality ?? 'auto');
   qualityRef.current = props.quality ?? 'auto';
+  const activities = useMemo(() => props.activities ?? [], [props.activities]);
+  useEffect(() => { setActivities(activities); }, [activities]);
 
+  const p = usePlayer();
   const [menu, setMenu] = useState(false);
-  const [lightOpen, setLightOpen] = useState(false);
-  const [railOpen, setRailOpen] = useState<string | null>(null);
-  const wheel = useRef(new PaletteWheel(PALETTE_CATEGORIES));
-  const [ptick, setPtick] = useState(0);
-  const lightingRef = useRef<{ refresh: () => void } | null>(null);
-  useEffect(() => { if (!menu) setLightOpen(false); }, [menu]);
-  const [inv, setInv] = useState(false);
   const [locked, setLocked] = useState(false);
-  const [slots, setSlots] = useState<(HotItem | null)[]>(() => loadHotbar());
-  const [sel, setSel] = useState(2);
   const [note, setNote] = useState('');
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [wheelIndex, setWheelIndex] = useState(0);
+  const [focusId, setFocusId] = useState<PresetId | null>(null);
+  const [isolateId, setIsolateId] = useState<PresetId | null>(null);
+  const win = useWindows();
   const buildOn = props.grownUp !== false;
   const level = props.level ?? 'goblin';
-  const live = useRef({ menu, inv, slots, sel, buildOn, level, railOpen });
-  live.current = { menu, inv, slots, sel, buildOn, level, railOpen };
-  useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const scene = props.scene;
+  const lightingRef = useRef<{ refresh: () => void } | null>(null);
+  const items = useMemo(() => catalog(p.tab, p, activities), [p, activities]);
+  const byId = useMemo(() => new Map(items.map((c) => [c.id, c])), [items]);
+  const row: (CatalogItem | null)[] = p.hotbars[p.tab].map((id) => (id ? byId.get(id) ?? null : null));
+  const heldItem = row[p.slots[p.tab]] ?? null;
+  const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win });
+  live.current = { menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win };
+  useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
-  const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 1800); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void } | null>(null);
-  useEffect(() => { saveHotbar(slots); }, [slots]);
+  const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
+  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; refreshModels: () => void } | null>(null);
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
+  // studio keeps the mouse free; walking takes it back when you click the world
+  useEffect(() => { if (p.mode === 'studio') api.current?.unlock(); }, [p.mode]);
+  useEffect(() => { api.current?.setAvatarLook(); }, [p.lookId, p.looks]);
+  useEffect(() => { api.current?.refreshModels(); }, [isolateId]);
 
-  /** Put an item in the picked slot. */
-  const holdItem = useCallback((item: HotItem): void => { setSlots((s) => s.map((x, i) => (i === live.current.sel ? item : x))); }, []);
-  /** Tab was let go: what the palette chose goes into your hand (paint with that ground, or place that thing). */
-  const applyChoice = useCallback((c: PaletteChoice | null): void => {
-    if (!c) return;
-    const prev = live.current.slots[live.current.sel] ?? null;
-    const asGround = c.category === 'surfaces' || c.category === 'roads';
-    const sub = asGround ? findSub('brush', 'brush') : findSub('sculpt', 'voxel-add');
-    const item = sub ? itemFor(asGround ? 'brush' : 'sculpt', sub, c, prev) : null;
-    if (item) { holdItem(item); fx('select'); }
-  }, [holdItem]);
-  const pickSub = (set: ToolSet, sub: SubTool): void => {
-    const prev = live.current.slots[live.current.sel] ?? null;
-    const item = itemFor(set.tool, sub, wheel.current.choice, prev);
-    if (!item) { say(`${sub.name} is not on the island yet`); return; }
-    holdItem(item); fx('tool-switch', { volume: 0.5 });
+  /** What happens when a slot of a tab that is not a tool gets picked: lights change, moves play, cameras switch, looks are worn. */
+  const applyNow = useCallback((tab: TabId, id: string | null) => {
+    if (!id) return;
+    const pl = player();
+    if (tab === 'lights') { pickLook(rt, scene.sceneId, id); say(`Light: ${byIdName(tab, id)}`); }
+    else if (tab === 'animate') api.current?.playAnim(id);
+    else if (tab === 'sound') fx(id as SfxId);
+    else if (tab === 'avatar') { wearLook(id); say(`Wearing ${lookOf(pl, id).name}`); }
+    else if (tab === 'camera') switchCamera(id);
+  }, [rt, scene.sceneId, say]); // eslint-disable-line react-hooks/exhaustive-deps
+  const byIdName = (tab: TabId, id: string): string => catalog(tab, player(), activities).find((c) => c.id === id)?.name ?? id;
+  const switchCamera = (id: string): void => {
+    if (id === 'studio') { setMode('studio'); return; }
+    if (id === 'island') { say('Esc, then the up arrow in the bar, shows the whole island'); return; }
+    setMode('walk'); setView(id === 'first' ? 'first' : 'third');
   };
-  const tune = (key: 'size' | 'strength', value: number): void => {
-    const cur = live.current.slots[live.current.sel];
-    if (cur) holdItem({ ...cur, [key]: value });
+  const pickTab = (t: TabId): void => { setTab(t); fx('tool-switch', { volume: 0.5 }); };
+  const pickSlot = (i: number): void => { const s = player(); setSlot(s.tab, i); fx('tool-switch', { volume: 0.5 }); applyNow(s.tab, s.hotbars[s.tab][i] ?? null); };
+  const openPresets = (): void => { api.current?.unlock(); win.toggle('presets', 'Your presets', { x: Math.max(12, window.innerWidth - WIN.presets.w - 24), y: 64, ...WIN.presets }); };
+  const openEditor = (tab: TabId, id: string): void => {
+    api.current?.unlock();
+    const name = catalog(tab, player(), activities).find((c) => c.id === id)?.name ?? id;
+    win.open(`edit:${tab}:${id}`, `${tabDef(tab).label}: ${name}`, { x: 24 + (win.list.length % 4) * 28, y: 70 + (win.list.length % 4) * 28, ...WIN.editor });
   };
-  const pickItem = (item: HotItem): void => { setSlots((s) => s.map((x, i) => (i === sel ? item : x))); fx('select'); };
-  const openInv = (on: boolean): void => { setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); };
+  const actions: EditorActions = {
+    playAnim: (a) => api.current?.playAnim(a.id),
+    openActivity: (id) => props.onActivity?.(id),
+    useCamera: switchCamera,
+    applyLook: () => api.current?.setAvatarLook(),
+  };
+  const pickWheel = (i: number): void => {
+    const it = live.current.items[i];
+    if (!it) return;
+    const s = player();
+    putInSlot(s.tab, s.slots[s.tab], it.id);
+    setWheelOpen(false);
+    applyNow(s.tab, it.id);
+    fx('select');
+  };
 
   useEffect(() => {
     const el = host.current;
@@ -116,20 +152,32 @@ export function IslandWalk(props: {
     // looking down from the island overview there is a lot of air between the camera and the ground: thin the haze so the island can be seen
     const stopLighting = followLighting(rt.store, scene.sceneId, renderer, () => (live.current.level === 'island' ? 0.1 : 1));
     lightingRef.current = stopLighting;
-    const d = rt.binder.decor();
-    renderer.setDecor(d ? decorInstances(d.placements) : null);
+    const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d && !live.current.isolateId ? decorInstances(d.placements) : null); };
+    showDecor();
+    const offDecor = rt.binder.onDecor(showDecor);
 
-    // models of the island plus the goblin as the last one, so the goblin can be moved without rebuilding anything
-    const goblin = MODELS.find((m) => m.id === 'goblin')!.build() as unknown as VoxelModel;
-    const goblinPlacement = { params: { data: encodeModel(goblin), scale: GOBLIN_BLOCK, ao: true, greedy: true, castShadow: true }, x: 0, y: 0, z: 0, yawDeg: 0 };
-    let avatarIndex = 0;
-    const refreshModels = (): void => { const others = placementsOf(rt, scene.sceneId); avatarIndex = others.length; renderer.setModels([...others, goblinPlacement]); };
+    // your goblin: the voxel goblin in the look you wear, split into bones so the animation presets move it
+    const setAvatarLook = (): void => { const pl = player(); renderer.setAvatar(goblinWearing(lookOf(pl, pl.lookId)), GOBLIN_BLOCK); };
+    setAvatarLook();
+    const animator = new Animator();
+    const moves = (): MoveSet => { const pl = player(); return { idle: animOf(pl, pl.moves.idle), walk: animOf(pl, pl.moves.walk), run: animOf(pl, pl.moves.run), jump: animOf(pl, pl.moves.jump), fall: animOf(pl, pl.moves.fall) }; };
+
+    const refreshModels = (): void => {
+      const iso = live.current.isolateId;
+      const all = placementsOf(rt, scene.sceneId);
+      const refs = rt.store.get(scene.sceneId)?.children['models'] ?? [];
+      renderer.setModels(iso ? all.filter((_, i) => refs[i]?.ref === iso) : all);
+      showDecor();
+    };
     refreshModels();
 
     const ground = (x: number, z: number): number => { const st = rt.binder.terrain(); return st ? heightAt(st.terrain, x, z) : 0; };
-    const builder = new BuildController(rt, renderer, scene.sceneId, scene.terrainId, refreshModels, say, (preview) => {
-      const d = rt.binder.decor();
-      renderer.setDecor(preview ? decorInstances(preview) : d ? decorInstances(d.placements) : null);
+    const builder = new BuildController(rt, renderer, scene.sceneId, scene.terrainId, {
+      onModels: refreshModels,
+      say,
+      onDecorPreview: (preview) => { const d = rt.binder.decor(); renderer.setDecor(live.current.isolateId ? null : preview ? decorInstances(preview) : d ? decorInstances(d.placements) : null); },
+      onFocus: (id) => { setFocusId(id); if (id) { setMode('studio'); say('Focused: drag with the right mouse button to look round it, Esc to leave'); } },
+      onIsolate: (id) => { setIsolateId(id); say(id ? 'Everything else is hidden (Hide others again, or Esc, to show it)' : 'Everything is shown'); },
     });
     // start at the middle when it is low, flat-ish land; on a mountain or in the sea, walk out east to the first low ground
     let px = 0, pz = 0;
@@ -138,11 +186,14 @@ export function IslandWalk(props: {
     let face = 0;
     if (!introRef.current && lastPose) { px = lastPose.px; pz = lastPose.pz; face = lastPose.face; }
     let py = ground(px, pz), vy = 0;
-    let camYaw = Math.PI, camPitch = 0.3, camDist = 3.6, fpv = false;
+    let camYaw = Math.PI, camPitch = 0.3, camDist = 3.6;
     if (!introRef.current && lastPose) camYaw = lastPose.camYaw;
     const intro = { on: introRef.current, t: 0, ms: 3200 };
     if (intro.on) { camPitch = 1.3; camDist = 150; }
     let eye: [number, number, number] | null = null;
+    // studio camera: where it is and where it looks
+    let fly: { x: number; y: number; z: number; yaw: number; pitch: number } | null = null;
+    let orbit = { yaw: 0.8, pitch: 0.4, dist: 8 };
     const down = new Set<string>();
     let mouse = 0; // bit 1 = left, 2 = right
     let firstUse = false;
@@ -150,21 +201,28 @@ export function IslandWalk(props: {
     let lockFails = 0;
     let softAim = false; // pointer lock is not available (some browsers, embedded views): aim at the centre, look with the right button
     let suppressMenu = false;
+    let cursor = { x: 0, y: 0 };
+    let looking: { x: number; y: number } | null = null;
 
     // the whole shell is the pointer-lock target, so the mouse stays captured through the dive and the menus
     const root = (el.closest('.shell') as HTMLElement | null) ?? el;
     const isLocked = (): boolean => !!document.pointerLockElement && root.contains(document.pointerLockElement);
+    const studio = (): boolean => player().mode === 'studio';
     const centre = (): { x: number; y: number } => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
-    const aim = () => { const c = centre(); const p = renderer.pick(c.x, c.y); return p.point ? { point: p.point, normal: p.normal ?? null } : null; };
+    /** Where the tool acts: the crosshair while the mouse is captured, the cursor when it is free. */
+    const aim = (): Aim | null => { const c = pointerLocked || softAim ? centre() : cursor; const h = renderer.pick(c.x, c.y); return h.point ? { point: h.point, normal: h.normal ?? null } : null; };
 
     // the browser refuses a re-lock for a moment after Esc: only give up on the mouse after three refusals in a row
     const failLock = (): void => { if (++lockFails >= 3) { softAim = true; setLocked(true); } };
+    const lock = (): void => {
+      if (document.pointerLockElement || studio()) return;
+      try { const r = root.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => failLock()); } catch { failLock(); }
+    };
+    const unlock = (): void => { softAim = false; suppressMenu = true; if (document.pointerLockElement) document.exitPointerLock(); else { suppressMenu = false; setLocked(false); } };
     api.current = {
-      lock: () => {
-        if (document.pointerLockElement) return;
-        try { const r = root.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => failLock()); } catch { failLock(); }
-      },
-      unlock: () => { suppressMenu = true; if (document.pointerLockElement) document.exitPointerLock(); else suppressMenu = false; },
+      lock, unlock, refreshModels,
+      playAnim: (id) => { animator.play(animOf(player(), id)); },
+      setAvatarLook,
     };
     const onLockChange = (): void => {
       const was = pointerLocked;
@@ -173,8 +231,8 @@ export function IslandWalk(props: {
       setLocked(pointerLocked);
       if (was && !pointerLocked) {
         if (suppressMenu) { suppressMenu = false; return; }
-        // Esc while aiming: close the inventory if it is open, else the jump menu
-        if (live.current.inv) setInv(false); else setMenu(true);
+        // Esc while aiming: the browser let go of the mouse; open the jump menu
+        setMenu(true);
       }
     };
     document.addEventListener('pointerlockchange', onLockChange);
@@ -182,81 +240,124 @@ export function IslandWalk(props: {
     const onLockError = (): void => failLock();
     document.addEventListener('pointerlockerror', onLockError);
 
+    /** Esc closes exactly one thing: the wheel, the front window, focus, hide-others, what Move carries; then it opens the menu. */
+    const escape = (): void => {
+      if (live.current.wheelOpen) { setWheelOpen(false); return; }
+      if (live.current.win.closeTop()) return;
+      if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
+      if (live.current.isolateId) { setIsolateId(null); return; }
+      if (builder.carrying) { builder.carrying = null; say('Put back'); return; }
+      if (document.pointerLockElement) { suppressMenu = true; document.exitPointerLock(); }
+      if (intro.on) { intro.t = intro.ms; return; }
+      setMenu((m) => !m);
+    };
+
     const onKeyDown = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
       const k = e.key.toLowerCase();
+      if (k === 'escape') { escape(); return; }
+      if (typing) return;
+      if (live.current.menu) return;
+      const tab = tabForKey(e.key);
+      if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
       if (k === 'tab') {
         e.preventDefault();
-        if (live.current.buildOn && !live.current.menu && !live.current.inv && !intro.on) { wheel.current.press(); setPtick((t) => t + 1); }
+        if (live.current.buildOn && !intro.on && !live.current.wheelOpen) { const s = player(); const id = s.hotbars[s.tab][s.slots[s.tab]]; setWheelIndex(Math.max(0, live.current.items.findIndex((c) => c.id === id))); setWheelOpen(true); }
         return;
       }
-      if (wheel.current.isOpen) {
-        if (k === 'escape') { wheel.current.cancel(); setPtick((t) => t + 1); return; }
-        if (k === 'q' || k === 'e') { wheel.current.switchCategory(k === 'e' ? 1 : -1); setPtick((t) => t + 1); return; }
-      }
-      if (k === 'escape' && live.current.railOpen && !live.current.menu) { setRailOpen(null); return; }
-      if (k === 'escape') {
-        // some embedded browsers deliver Esc to the page while the mouse is captured instead of releasing it themselves: always let go explicitly
-        if (document.pointerLockElement) { suppressMenu = true; document.exitPointerLock(); }
-        if (intro.on) { intro.t = intro.ms; return; }
-        if (live.current.inv) { setInv(false); return; }
-        setMenu((m) => !m);
-        return;
-      }
-      if (live.current.menu) return;
-      if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); builder.undo(); return; }
-      if (k >= '1' && k <= '9' && live.current.buildOn) { setSel(Number(k) - 1); fx('tool-switch', { volume: 0.5 }); return; }
-      if (k === 'e' && live.current.buildOn) { const on = !live.current.inv; setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); return; }
-      if (k === 't' && live.current.buildOn) { api.current?.unlock(); setRailOpen((o) => o ?? 'sculpt'); return; }
-      if (k === 'v') { fpv = !fpv; camPitch = fpv ? 0 : 0.3; fx('ui-toggle', { volume: 0.5 }); return; }
-      if ((k === 'x' || k === 'delete') && live.current.buildOn) { const a = aim(); const item = live.current.slots[live.current.sel]; if (a && item && builder.removeAt(a, item)) say('Removed'); return; }
+      if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) rt.commands.redo(); else builder.undo(); refreshModels(); return; }
+      if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); rt.commands.redo(); refreshModels(); return; }
+      if (k >= '1' && k <= '9' && live.current.buildOn) { pickSlot(Number(k) - 1); return; }
+      if (k === 'e' && live.current.buildOn) { openPresets(); return; }
+      if (k === 'b' && live.current.buildOn) { const to = studio() ? 'walk' : 'studio'; setMode(to); if (to === 'walk') { fly = null; setFocusId(null); renderer.setFocus(null); } fx('ui-toggle'); return; }
+      if (k === 'v' && !studio()) { const s = player(); setView(s.view === 'first' ? 'third' : 'first'); fx('ui-toggle', { volume: 0.5 }); return; }
+      if (k === 'f' && studio() && live.current.buildOn) { const a = aim(); const m = a ? builder.modelAt(a) : null; setFocusId(m ? m.ref : null); if (!m) renderer.setFocus(null); return; }
+      if (k === 'h' && live.current.buildOn) { const a = aim(); const m = a ? builder.modelAt(a) : null; setIsolateId((cur) => (cur ? null : m ? m.ref : null)); return; }
+      if ((k === 'x' || k === 'delete') && live.current.buildOn) { const a = aim(); if (a) builder.removeAt(a); return; }
       down.add(k);
     };
     const onKeyUp = (e: KeyboardEvent): void => {
-      if (e.key === 'Tab') { e.preventDefault(); const c = wheel.current.isOpen ? wheel.current.release() : null; setPtick((t) => t + 1); applyChoice(c); return; }
-      down.delete(e.key.toLowerCase());
-    };
-    const onBlur = (): void => { if (wheel.current.isOpen) { wheel.current.cancel(); setPtick((t) => t + 1); } down.clear(); };
-    window.addEventListener('blur', onBlur);
-    let drag: { x: number; y: number } | null = null;
-    const onPointerDown = (e: PointerEvent): void => {
-      if (live.current.menu || live.current.inv || intro.on) return;
-      if (!pointerLocked && !el.contains(e.target as Node)) return;
-      if (!pointerLocked && !softAim) { api.current?.lock(); return; }
-      if (softAim && e.button === 2) { drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); return; }
-      if (pointerLocked || softAim) {
-        mouse |= e.button === 2 ? 2 : 1;
-        if (e.button === 0 || e.button === 2) firstUse = true;
-      } else { drag = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ } }
-    };
-    const onPointerMove = (e: PointerEvent): void => {
-      if (live.current.menu || live.current.inv) return;
-      if (pointerLocked) {
-        camYaw -= e.movementX * 0.0026;
-        camPitch = Math.min(1.3, Math.max(fpv ? -1.3 : -0.55, camPitch + e.movementY * 0.0022));
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (live.current.wheelOpen) pickWheel(live.current.wheelIndex);
         return;
       }
-      if (!drag) return;
-      camYaw -= (e.clientX - drag.x) * 0.006;
-      camPitch = Math.min(1.3, Math.max(0.05, camPitch + (e.clientY - drag.y) * 0.004));
-      drag = { x: e.clientX, y: e.clientY };
+      down.delete(e.key.toLowerCase());
+    };
+    const onBlur = (): void => { setWheelOpen(false); down.clear(); mouse = 0; looking = null; };
+    window.addEventListener('blur', onBlur);
+    const overUi = (e: Event): boolean => !el.contains(e.target as Node);
+    const onPointerDown = (e: PointerEvent): void => {
+      if (live.current.menu || intro.on) return;
+      cursor = { x: e.clientX, y: e.clientY };
+      if (!pointerLocked && overUi(e)) return;
+      if (studio() || live.current.level === 'island') {
+        // the mouse is free: right button looks around, left button uses what you hold where the cursor points
+        if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
+        if (e.button === 0 && live.current.buildOn) { mouse |= 1; firstUse = true; }
+        return;
+      }
+      if (!pointerLocked && !softAim) { lock(); return; }
+      if (softAim && e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
+      mouse |= e.button === 2 ? 2 : 1;
+      if (e.button === 0 || e.button === 2) firstUse = true;
+    };
+    const onPointerMove = (e: PointerEvent): void => {
+      cursor = { x: e.clientX, y: e.clientY };
+      if (live.current.menu) return;
+      if (pointerLocked) {
+        camYaw -= e.movementX * 0.0026;
+        camPitch = Math.min(1.3, Math.max(player().view === 'first' ? -1.3 : -0.55, camPitch + e.movementY * 0.0022));
+        return;
+      }
+      if (!looking) return;
+      const dx = e.clientX - looking.x, dy = e.clientY - looking.y;
+      looking = { x: e.clientX, y: e.clientY };
+      if (live.current.focusId) { orbit = { ...orbit, yaw: orbit.yaw - dx * 0.008, pitch: Math.min(1.45, Math.max(-0.2, orbit.pitch + dy * 0.006)) }; return; }
+      if (fly) { fly.yaw -= dx * 0.004; fly.pitch = Math.min(1.5, Math.max(-1.5, fly.pitch - dy * 0.004)); return; }
+      camYaw -= dx * 0.006;
+      camPitch = Math.min(1.3, Math.max(0.05, camPitch + dy * 0.004));
     };
     const onPointerUp = (e: PointerEvent): void => {
-      drag = null;
-      if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      if (looking && e.button === 2) { looking = null; try { el.releasePointerCapture(e.pointerId); } catch { /* not captured */ } return; }
+      looking = null;
       if (mouse) { mouse &= e.button === 2 && !softAim ? ~2 : ~1; if (!mouse) builder.end(); }
     };
     const onWheel = (e: WheelEvent): void => {
-      if (wheel.current.isOpen) { wheel.current.wheel(e.deltaY > 0 ? 1 : -1); setPtick((t) => t + 1); return; }
-      if (!pointerLocked && !el.contains(e.target as Node)) return;
-      if ((pointerLocked || softAim) && live.current.buildOn) setSel((s) => (s + (e.deltaY > 0 ? 1 : 8)) % 9);
-      else camDist = Math.min(14, Math.max(2.2, camDist * (e.deltaY > 0 ? 1.08 : 0.92)));
+      if (live.current.wheelOpen) { const n = live.current.items.length; if (n) setWheelIndex((i) => (i + (e.deltaY > 0 ? 1 : -1) + n) % n); return; }
+      if (!pointerLocked && overUi(e)) return;
+      if (live.current.focusId) { orbit = { ...orbit, dist: Math.min(60, Math.max(1.5, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))) }; return; }
+      if (live.current.buildOn && (pointerLocked || softAim || studio())) { const s = player(); pickSlot(stepSlot(s.slots[s.tab], e.deltaY)); return; }
+      camDist = Math.min(14, Math.max(2.2, camDist * (e.deltaY > 0 ? 1.08 : 0.92)));
     };
     const onContext = (e: Event): void => e.preventDefault();
     window.addEventListener('keydown', onKeyDown); window.addEventListener('keyup', onKeyUp);
     window.addEventListener('pointerdown', onPointerDown); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('wheel', onWheel, { passive: true }); el.addEventListener('contextmenu', onContext);
 
+    /** Using what you hold: tools act on the world; the other tabs act on a left click too (play, light, open, wear, switch). */
+    const useHeld = (alt: boolean, now: number, first: boolean): void => {
+      const s = player();
+      const id = s.hotbars[s.tab][s.slots[s.tab]];
+      if (!id) { if (first) say('This slot is empty: press E to put a preset in it'); return; }
+      if (s.tab === 'select' || s.tab === 'paint' || s.tab === 'sculpt' || s.tab === 'things') {
+        const tool: ToolPreset | null = toolOf(s, id);
+        const a = aim();
+        if (tool && a) {
+          builder.use(tool, a, alt, now, first);
+          if (first && !studio() && tool.action !== 'inspect') animator.play(animOf(s, 'swing'));
+        }
+        return;
+      }
+      if (!first) return;
+      if (s.tab === 'activities') { if (alt) return; props.onActivity?.(id); return; }
+      if (s.tab === 'animate' && alt) { animator.stop(); return; }
+      applyNow(s.tab, id);
+    };
+
     let raf = 0, last = performance.now();
+    let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       if (intro.on) {
@@ -266,8 +367,11 @@ export function IslandWalk(props: {
         if (k >= 1) { intro.on = false; onIntroDone?.(); }
       }
       const overview = live.current.level === 'island';
-      const paused = live.current.menu || live.current.inv || overview;
-      if (!paused) {
+      const st = studio();
+      const fpv = player().view === 'first' && !st;
+      const paused = live.current.menu || overview;
+      let grounded = true;
+      if (!paused && !st) {
         const fwx = -Math.sin(camYaw), fwz = -Math.cos(camYaw), rx = -fwz, rz = fwx;
         let mx = 0, mz = 0;
         if (down.has('w') || down.has('arrowup')) { mx += fwx; mz += fwz; }
@@ -291,39 +395,72 @@ export function IslandWalk(props: {
         }
         // gravity and a jump on Space
         const g = ground(px, pz);
-        const grounded = py <= g + 0.04;
+        grounded = py <= g + 0.04;
         if (grounded && down.has(' ') && !intro.on) vy = 6.4;
         vy -= 18 * dt;
         let ny = py + vy * dt;
         if (ny <= g) { ny = g; vy = 0; }
         py = ny;
-        // using the hotbar slot under the crosshair
-        if (mouse && live.current.buildOn) {
-          const item = live.current.slots[live.current.sel];
-          const a = aim();
-          if (item && a) builder.use(item, a, (mouse & 2) !== 0 || down.has('shift'), now, firstUse);
-          firstUse = false;
-        }
+        grounded = py <= g + 0.04;
       }
-      const head = fpv ? 1.62 : 0.9;
-      renderer.setModelPose(avatarIndex, px, fpv ? -1000 : py, pz, ((face + Math.PI) * 180) / Math.PI);
+      // using what you hold, every frame the button is down
+      if (mouse && live.current.buildOn && !paused) { useHeld((mouse & 2) !== 0 || (!st && down.has('shift') && !down.has('w')), now, firstUse); firstUse = false; }
+
+      // the goblin: animation from how it moved this frame
+      const speed = dt > 0 ? Math.hypot(px - prevX, pz - prevZ) / dt : 0;
+      prevX = px; prevZ = pz;
+      animator.setMoves(moves());
+      const pose = animator.update(dt, { speed: paused ? 0 : speed, grounded, vy });
+      renderer.setAvatarPose(px, py, pz, face + Math.PI, pose, !fpv && !st);
       renderer.setLightFocus([px, py + 1.2, pz]);
+
+      const head = fpv ? 1.62 : 0.9;
       let wantEye: [number, number, number], target: [number, number, number];
-      if (fpv) {
+      const fid = live.current.focusId;
+      const ft = fid ? focusTargetOf(rt, fid) : null;
+      if (ft) {
+        // focus: orbit the thing; the world whites out around it
+        orbit = { ...orbit, dist: orbit.dist || ft.radius * 3 };
+        const c = ft.center;
+        target = [c[0], c[1], c[2]];
+        wantEye = [c[0] + Math.sin(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist, c[1] + Math.sin(orbit.pitch) * orbit.dist, c[2] + Math.cos(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist];
+        renderer.setFocus({ target: c, radius: ft.radius, veil: true, hideNear: true, falloff: 14 });
+      } else if (st) {
+        // studio: fly
+        if (!fly) { const e0 = eye ?? [px, py + 3, pz + 5]; fly = { x: e0[0], y: e0[1], z: e0[2], yaw: camYaw, pitch: -0.25 }; }
+        const fx3 = -Math.sin(fly.yaw) * Math.cos(fly.pitch), fy3 = Math.sin(fly.pitch), fz3 = -Math.cos(fly.yaw) * Math.cos(fly.pitch);
+        const rx3 = Math.cos(fly.yaw), rz3 = -Math.sin(fly.yaw);
+        const sp = (down.has('shift') ? 24 : 8) * dt;
+        if (!live.current.menu) {
+          if (down.has('w') || down.has('arrowup')) { fly.x += fx3 * sp; fly.y += fy3 * sp; fly.z += fz3 * sp; }
+          if (down.has('s') || down.has('arrowdown')) { fly.x -= fx3 * sp; fly.y -= fy3 * sp; fly.z -= fz3 * sp; }
+          if (down.has('d') || down.has('arrowright')) { fly.x += rx3 * sp; fly.z += rz3 * sp; }
+          if (down.has('a') || down.has('arrowleft')) { fly.x -= rx3 * sp; fly.z -= rz3 * sp; }
+          if (down.has(' ')) fly.y += sp;
+          if (down.has('c') || down.has('control')) fly.y -= sp;
+        }
+        fly.y = Math.max(fly.y, ground(fly.x, fly.z) + 0.4);
+        wantEye = [fly.x, fly.y, fly.z];
+        target = [fly.x + fx3, fly.y + fy3, fly.z + fz3];
+      } else if (fpv) {
+        fly = null;
         wantEye = [px, py + head, pz];
         const cp = Math.cos(camPitch);
         target = [px - Math.sin(camYaw) * cp, py + head - Math.sin(camPitch), pz - Math.cos(camYaw) * cp];
       } else {
+        fly = null;
         // over the shoulder: the goblin sits to the left of the crosshair so the crosshair always has a clear view
         const rgx = Math.cos(camYaw), rgz = -Math.sin(camYaw), shoulder = intro.on ? 0 : 0.85;
         target = [px + rgx * shoulder, py + head + 0.25, pz + rgz * shoulder];
         wantEye = [px + rgx * shoulder + Math.sin(camYaw) * Math.cos(camPitch) * camDist, py + head + 0.25 + Math.sin(camPitch) * camDist, pz + rgz * shoulder + Math.cos(camYaw) * Math.cos(camPitch) * camDist];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 0.6);
       }
+      if (!ft && !live.current.focusId) renderer.setFocus(null);
       if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
-      const k = fpv && !overview ? 1 : Math.min(1, dt * (overview ? 3 : 10));
-      eye = eye && (!fpv || overview) ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
-      renderer.setFov(fpv ? 75 : 60);
+      const snap = (fpv || st) && !overview && !ft;
+      const k = snap ? 1 : Math.min(1, dt * (overview ? 3 : 10));
+      eye = eye && !snap ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
+      renderer.setFov(fpv ? 75 : st ? 65 : 60);
       renderer.camera.set(eye, target);
       renderer.step();
       renderer.render(1);
@@ -338,40 +475,80 @@ export function IslandWalk(props: {
       window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
-      offTerrain();
-      offFrame();
-      stopLighting();
+      offTerrain(); offDecor(); offFrame(); stopLighting();
       lastPose = { px, pz, face, camYaw };
       api.current = null;
       renderer.unmount();
     };
   }, [rt, scene, say]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // studio opens the settings of what you hold in a window of its own (close it any time)
+  useEffect(() => {
+    if (p.mode !== 'studio' || !buildOn) return;
+    if (!win.isOpen('held')) win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor });
+  }, [p.mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
+  const showHud = buildOn && !menu && level !== 'island';
+  const free = !locked || p.mode === 'studio';
   return (
-    <div className="island" style={{ position: 'absolute', inset: 0 }}>
+    <div className={`island${p.mode === 'studio' ? ' studio' : ''}`} style={{ position: 'absolute', inset: 0 }}>
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
-      {buildOn && !menu ? <Crosshair active={locked} /> : null}
-      {buildOn && !menu ? <ToolRail openSet={railOpen} activeSet={slots[sel]?.id.split('.')[0] ?? null} locked={locked} onToggle={(id) => { if (locked) api.current?.unlock(); setRailOpen((o) => (o === id ? null : id)); }} /> : null}
-      {buildOn && !menu && railOpen && !locked ? <SlideOut setId={railOpen} held={slots[sel] ?? null} onPick={pickSub} onTune={tune} onClose={() => setRailOpen(null)} /> : null}
-      {buildOn && !menu ? <ToolSay item={slots[sel] ?? null} /> : null}
-      {buildOn && !menu ? <TabPalette wheel={wheel.current} tick={ptick} /> : null}
-      {buildOn && !menu ? <Hotbar slots={slots} selected={sel} onSelect={(i) => { setSel(i); fx('tool-switch', { volume: 0.5 }); }} onOpenInventory={() => openInv(true)} /> : null}
-      {inv ? <Inventory selected={sel} onPick={pickItem} onClose={() => openInv(false)} /> : null}
+      {showHud && p.mode === 'walk' ? <Crosshair active={locked} /> : null}
+      {showHud ? <ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR ground: full detail' : 'Flat ground: voxel blocks that match the goblin'); }} /> : null}
+      {showHud ? <ToolSay {...say2} /> : null}
+      {showHud ? <TabStrip tab={p.tab} onPick={pickTab} /> : null}
+      {showHud ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} /> : null}
+      {showHud && wheelOpen ? <TabWheel title={tabDef(p.tab).label} items={items} index={wheelIndex} clickable={free} onPick={pickWheel} /> : null}
+      {win.list.map((w) => (
+        <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (heldItem ? `${tabDef(p.tab).label}: ${heldItem.name}` : 'What you hold') : w.title} className={w.id === 'presets' ? 'wide' : ''}>
+          {w.id === 'presets' ? <PresetWindowBody activities={activities} onEdit={openEditor} onWorld={() => win.open('world', 'World rules', { x: 60, y: 90, ...WIN.editor })} onPlant={(kind) => win.open(`plant:${kind}`, `Behaviour: ${kind}`, { x: 80, y: 110, ...WIN.editor })} onMoves={() => win.open('moves', 'How my goblin moves', { x: 60, y: 90, ...WIN.editor })} />
+            : w.id === 'held' ? (heldItem ? <EditorFor tab={p.tab} id={heldItem.id} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} /> : <p className="hint">Pick a slot, or press E to put a preset in it.</p>)
+            : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
+            : w.id === 'moves' ? <MovesEditor actions={actions} />
+            : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
+            : w.id.startsWith('edit:') ? (() => { const [, tab, ...rest] = w.id.split(':'); return <EditorFor tab={tab as TabId} id={rest.join(':')} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} />; })()
+            : null}
+        </FloatingWindow>
+      ))}
       {note ? <div className="island-note" role="status">{note}</div> : null}
-      {!menu && !inv ? <p className="island-hint">{buildOn ? (locked ? 'Hold Tab for presets. T opens the tools. Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.') : (locked ? 'Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.')}</p> : null}
-      {lightOpen && menu ? <LightingWindow rt={rt} sceneId={scene.sceneId} onClose={() => setLightOpen(false)} /> : null}
+      {!menu ? <p className="island-hint">{hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
           <button className="go" onClick={onMainMenu}>Main menu</button>
-          {buildOn ? <button onClick={onEdit}>Build mode</button> : null}
-          <button onClick={() => setLightOpen(true)}>Lighting</button>
+          {buildOn ? <button onClick={() => { setMenu(false); setMode('studio'); }}>Studio mode</button> : null}
+          {buildOn ? <button onClick={onEdit}>Race track editor</button> : null}
+          <button onClick={() => { setMenu(false); setTab('lights'); win.open('edit:lights:light', 'Lighting', { x: Math.max(12, window.innerWidth - 400), y: 64, w: 372, h: 640 }); }}>Lighting</button>
+          <button onClick={() => { setMenu(false); setTab('avatar'); openPresets(); }}>My Avatar</button>
           <button onClick={onActivities}>Activities</button>
           {onIslands ? <button onClick={onIslands}>My islands</button> : null}
           <button onClick={onHub}>Multiplayer</button>
-          <button onClick={() => { setMenu(false); api.current?.lock(); }}>Back to walking</button>
+          <button onClick={() => { setMenu(false); if (p.mode === 'walk') api.current?.lock(); }}>Back to {p.mode === 'studio' ? 'the studio' : 'walking'}</button>
         </div>
       ) : null}
     </div>
   );
+}
+
+function hint(buildOn: boolean, locked: boolean, mode: 'walk' | 'studio', focus: boolean): string {
+  if (focus) return 'Right mouse button looks round it. Wheel zooms. Esc leaves focus.';
+  if (mode === 'studio') return 'Fly with W A S D, Space and C. Hold the right button to look. F focus, H hide, B walk.';
+  if (!buildOn) return locked ? 'Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.';
+  return locked ? 'F1 to F10 tabs, 1 to 9 slots, E presets, Tab wheel, B studio, Esc menu.' : 'Click the world to look around. E presets. Esc menu.';
+}
+
+/** The words about what you hold. */
+function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { title: string; line: string; left: string; right: string } {
+  const title = `${tabDef(tab).label}: ${item.name}`;
+  if (tool) return { title, line: tool.doc, left: tool.left, right: tool.right };
+  switch (tab) {
+    case 'animate': return { title, line: item.doc, left: 'Play it', right: 'Stop' };
+    case 'sound': return { title, line: item.doc, left: 'Play it', right: 'Play it' };
+    case 'lights': return { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' };
+    case 'activities': return { title, line: item.doc, left: 'Open it', right: 'Nothing' };
+    case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
+    case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
+    default: return { title, line: item.doc, left: 'Use it', right: 'The opposite' };
+  }
 }

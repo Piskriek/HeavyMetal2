@@ -13,7 +13,17 @@ import { useRev } from '../use-rev';
  */
 const swatch = (s: LightSetup): string => `linear-gradient(180deg, ${s.sky.top} 0%, ${s.sky.horizon} 62%, ${s.hemi.ground} 100%)`;
 
+/** The lighting window as a stand-alone panel (fixed on the right). */
 export function LightingWindow(props: { readonly rt: Runtime; readonly sceneId: PresetId; readonly onClose: () => void }): ReactElement {
+  return (
+    <aside className="light-win" role="dialog" aria-label="Lighting">
+      <LightingPanel rt={props.rt} sceneId={props.sceneId} onClose={props.onClose} />
+    </aside>
+  );
+}
+
+/** Everything in the lighting window, to put inside any window (the floating editors use it). `onClose` adds a Close button. */
+export function LightingPanel(props: { readonly rt: Runtime; readonly sceneId: PresetId; readonly onClose?: () => void }): ReactElement {
   const { rt, sceneId, onClose } = props;
   useRev(rt);
   const [deep, setDeep] = useState(false);
@@ -42,11 +52,11 @@ export function LightingWindow(props: { readonly rt: Runtime; readonly sceneId: 
   }, [rt, sceneId, lightId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <aside className="light-win" role="dialog" aria-label="Lighting">
+    <div className="light-panel">
       <header>
         <h3>Lighting</h3>
         <span className="hint">{own ? `${own.name} (your copy)` : shown.name}</span>
-        <button onClick={onClose}>Close</button>
+        {onClose ? <button onClick={onClose}>Close</button> : null}
       </header>
       <div className="looks-grid" role="group" aria-label="Ready-made looks">
         {SETUPS.map((s) => (
@@ -73,6 +83,6 @@ export function LightingWindow(props: { readonly rt: Runtime; readonly sceneId: 
         <label className="row"><input type="checkbox" checked={deep} onChange={(e) => setDeep(e.target.checked)} /> Show every control</label>
         {own ? <button onClick={() => pickLook(rt, sceneId, lookId)}>Back to the ready-made look</button> : null}
       </footer>
-    </aside>
+    </div>
   );
 }

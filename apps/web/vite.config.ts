@@ -59,6 +59,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/voxelnature': p('../../packages/voxelnature/src/index.ts'),
       '@hm/worldrules': p('../../packages/worldrules/src/index.ts'),
       '@hm/anim': p('../../packages/anim/src/index.ts'),
+      '@hm/avatarlook': p('../../packages/avatarlook/src/index.ts'),
       '@hm/assembler': p('../../packages/assembler/src/index.ts'),
       '@hm/pbrgrass': p('../../packages/pbrgrass/src/index.ts'),
       '@hm/voxpartshead': p('../../packages/voxpartshead/src/index.ts'),

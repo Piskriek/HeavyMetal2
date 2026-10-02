@@ -130,6 +130,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const picks = planets.find((p) => p.id === picked) ?? null;
   const pickedRow = visible.find((a) => a.id === picked) ?? null;
   const openActivity = (id: string): void => { setActivityId(id); go('activity'); };
+  const activityInfos = useMemo(() => visible.map((a) => ({ id: a.id, name: a.name, doc: a.doc, hue: a.planet.hue, ring: a.planet.ring })), [visible]);
   /** The racing activity has its own map (the racetrack island), pinned to its own key so it never mixes with your islands. */
   const startRace = (entry: 'select' | 'custom'): void => {
     pinMapKey('hm.racing.map.v1');
@@ -148,7 +149,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} quality={profile.quality} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} quality={profile.quality} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
             onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}

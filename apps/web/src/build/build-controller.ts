@@ -1,23 +1,37 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { DecorPlacement, Runtime } from '@hm/engine';
-import { packDecor, rectToArea, respondToSculpt, settlePlants } from '@hm/worldrules';
-import { plantsOf, rulesOf } from '../world';
+import type { SfxId } from '@hm/audio';
+import type { ToolPreset } from '@hm/buildkit';
 import type { ThreeRenderer } from '@hm/render';
 import { applyStroke, encodeTerrain, heightAt, type DirtyRect } from '@hm/terrain';
-import { encodeModel, type VoxelModel } from '@hm/voxel';
-import { MODELS } from '@hm/voxelart';
+import { stamp, type StampKind } from '@hm/terrainops';
+import { encodeModel } from '@hm/voxel';
+import { GROUND_NAMES, packDecor, rectToArea, respondToSculpt, settlePlants, surfaceAt } from '@hm/worldrules';
 import { fx } from '../maker/feedback';
 import { saveMap } from '../maker/storage';
 import { focusTargetOf } from '../maker/focus';
-import { SPRITES, type HotItem } from './hotbar';
+import { plantsOf, rulesOf } from '../world';
+import { voxelModelById } from './cards';
+import { SPRITES } from './sprites';
 
 /**
- * What using a hotbar slot does. The crosshair finds the point on the ground; the tool changes the world there, a sprite bursts and a sound plays.
- * Terrain strokes are committed as one undoable edit when the button is released; placing a model is its own undo step.
+ * What using a tool preset does where you aim. Ground tools paint and sculpt (one undo step per press, and the world rules respond when you
+ * let go); Things tools place voxel models; Select tools look at, move, turn, size, copy, delete, focus on and hide the things you placed.
+ * Every use plays the tool's sprite and sound.
  */
-const BLOCK: Readonly<Record<string, number>> = { goblin: 0.04, palm: 0.25, barrel: 0.08, rock: 0.15, trophy: 0.1, 'statue-plinth': 0.2 };
-
 export interface Aim { readonly point: readonly [number, number, number]; readonly normal: readonly [number, number, number] | null }
+
+/** Metres per voxel for each placeable model (size 1 on the tool). */
+const PLACE_BLOCK: Readonly<Record<string, number>> = { goblin: 0.04, 'goblin-ball-racer': 0.05, palm: 0.13, barrel: 0.08, rock: 0.12, trophy: 0.1, 'statue-plinth': 0.2, bush: 0.17, 'grass-clump': 0.11, flowers: 0.1 };
+const STAMPS: Readonly<Partial<Record<ToolPreset['action'], StampKind>>> = { mound: 'mound', crater: 'crater', plateau: 'plateau', ridge: 'ridge', dune: 'dune' };
+
+export interface ControllerHooks {
+  readonly onModels: () => void;
+  readonly say: (text: string) => void;
+  readonly onDecorPreview: (placements: readonly DecorPlacement[] | null) => void;
+  readonly onFocus: (id: PresetId | null) => void;
+  readonly onIsolate: (id: PresetId | null) => void;
+}
 
 export class BuildController {
   private dirty: DirtyRect | null = null;
@@ -25,63 +39,143 @@ export class BuildController {
   private lastUse = 0;
   private flattenTo: number | null = null;
   private strokeLabel = '';
-  /** Heights when the stroke began: the world rules compare against them (what was dug, what sank). */
   private before: Float32Array | null = null;
   private lastPreview = 0;
+  /** The thing the Move tool is carrying. */
+  carrying: PresetId | null = null;
 
-  constructor(
-    private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId,
-    private readonly onModels: () => void, private readonly say: (text: string) => void,
-    /** Show plants where they would settle while a stroke is still going (null = back to the stored ones). */
-    private readonly onDecorPreview: (placements: readonly DecorPlacement[] | null) => void = () => undefined,
-  ) {}
+  constructor(private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId, private readonly hooks: ControllerHooks) {}
 
-  private sprite(item: HotItem, a: Aim, scale = 1): void {
-    const s = SPRITES[item.sprite];
+  private burst(tool: ToolPreset, a: Aim, scale = 1): void {
+    const s = SPRITES[tool.sprite] ?? SPRITES['pop']!;
     this.renderer.burst({ ...s, count: Math.round(s.count * scale), position: [a.point[0], a.point[1] + 0.1, a.point[2]], ...(a.normal ? { normal: a.normal } : {}) });
   }
+  private sound(tool: ToolPreset, o: { volume?: number; pitch?: number; minGapMs?: number } = {}): void { fx(tool.sound as SfxId, o); }
 
-  /** Called every frame the button is held (and once on press). `alt` flips raise to lower. */
-  use(item: HotItem, aim: Aim, alt: boolean, now: number, first: boolean): void {
+  /** The placed model under the aim point (the nearest whose footprint holds it), with its slot index. */
+  modelAt(a: Aim): { ref: PresetId; index: number } | null {
+    const refs = this.rt.store.get(this.sceneId)?.children['models'] ?? [];
+    let best: { ref: PresetId; index: number; d: number } | null = null;
+    for (let i = 0; i < refs.length; i++) {
+      const t = focusTargetOf(this.rt, refs[i]!.ref);
+      if (!t) continue;
+      const d = Math.hypot(t.center[0] - a.point[0], t.center[2] - a.point[2]);
+      if (d <= Math.max(0.8, t.radius) && (!best || d < best.d)) best = { ref: refs[i]!.ref, index: i, d };
+    }
+    return best ? { ref: best.ref, index: best.index } : null;
+  }
+  private param(ref: PresetId, key: string, fallback: number): number { const v = Number(this.rt.store.resolve(ref).params[key]); return Number.isFinite(v) ? v : fallback; }
+
+  /** Called every frame the button is held (and once on press). `alt` is the right button: the opposite action. */
+  use(tool: ToolPreset, aim: Aim, alt: boolean, now: number, first: boolean): void {
     const ts = this.rt.binder.terrain();
-    const every = item.kind === 'place' || item.kind === 'pick' || item.kind === 'delete' ? 1e9 : 70; // brushes repeat, one-shot tools fire once per press
-    if (!first && now - this.lastUse < every) return;
+    const oneShot = !['paint', 'raise', 'lower', 'smooth', 'flatten', 'dig'].includes(tool.action);
+    if (oneShot && !first) return;
+    if (!first && now - this.lastUse < 70) return;
     this.lastUse = now;
     const x = aim.point[0], z = aim.point[2];
-    if (item.kind === 'pick') {
-      this.sprite(item, aim, 0.5); fx(item.sound);
-      this.say(`Ground at ${aim.point[1].toFixed(1)} m`);
-      return;
+    switch (tool.action) {
+      case 'inspect': {
+        const m = this.modelAt(aim);
+        const ground = ts ? GROUND_NAMES[surfaceAt(ts.terrain, x, z) - 1] ?? 'ground' : 'ground';
+        this.hooks.say(m ? `${this.rt.store.get(m.ref)?.name ?? 'A thing'}, on ${ground}` : `${ground[0]!.toUpperCase()}${ground.slice(1)}, ${aim.point[1].toFixed(1)} m up`);
+        this.burst(tool, aim, 0.5); this.sound(tool);
+        return;
+      }
+      case 'move': {
+        if (alt) { if (this.carrying) { this.carrying = null; this.hooks.say('Put back'); } return; }
+        if (this.carrying) {
+          const ref = this.carrying;
+          this.carrying = null;
+          if (!this.rt.store.get(ref)) return;
+          this.rt.commands.transaction('Move', () => {
+            this.rt.commands.execute(cmd.setParam(`${ref}.x`, x, 'Move'));
+            this.rt.commands.execute(cmd.setParam(`${ref}.y`, aim.point[1], 'Move'));
+            this.rt.commands.execute(cmd.setParam(`${ref}.z`, z, 'Move'));
+          });
+          this.done(tool, aim, 'Moved');
+          return;
+        }
+        const m = this.modelAt(aim);
+        if (!m) { this.hooks.say('Point at something you placed to pick it up'); return; }
+        this.carrying = m.ref;
+        this.hooks.say(`Carrying ${this.rt.store.get(m.ref)?.name ?? 'it'}: click where it goes`);
+        this.sound(tool);
+        return;
+      }
+      case 'turn': case 'resize': case 'copy': case 'delete': case 'focus': case 'isolate': {
+        const m = this.modelAt(aim);
+        if (tool.action === 'isolate') { this.hooks.onIsolate(alt || !m ? null : m.ref); this.sound(tool); return; }
+        if (tool.action === 'focus') { this.hooks.onFocus(alt || !m ? null : m.ref); this.sound(tool); return; }
+        if (!m) { this.hooks.say('Point at something you placed'); fx('ui-error', { volume: 0.4 }); return; }
+        if (tool.action === 'delete') { this.removeAt(aim, tool); return; }
+        if (tool.action === 'turn') {
+          const yaw = this.param(m.ref, 'yaw', 0) + (alt ? -1 : 1) * Math.max(1, tool.strength * 360);
+          this.rt.commands.execute(cmd.setParam(`${m.ref}.yaw`, ((yaw + 540) % 360) - 180, 'Turn'));
+          this.done(tool, aim, '');
+          return;
+        }
+        if (tool.action === 'resize') {
+          const s = this.param(m.ref, 'scale', 0.1) * (alt ? 1 / (1 + tool.strength) : 1 + tool.strength);
+          this.rt.commands.execute(cmd.setParam(`${m.ref}.scale`, Math.min(5, Math.max(0.01, s)), alt ? 'Smaller' : 'Bigger'));
+          this.done(tool, aim, '');
+          return;
+        }
+        // copy: the same model a little to the side
+        const src = this.rt.store.get(m.ref);
+        if (!src) return;
+        const id = `model-${Date.now().toString(36)}`;
+        const params = { ...this.rt.store.resolve(m.ref).params, x: this.param(m.ref, 'x', x) + 1.5, z: this.param(m.ref, 'z', z) + 0.5 };
+        this.rt.commands.transaction('Copy', () => {
+          this.rt.commands.execute(cmd.put({ id, kind: 'model', name: src.name, params: params as never, tier: 'build' }, 'Copy'));
+          this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, 'Copy'));
+        });
+        this.done(tool, aim, `${src.name} copied`);
+        return;
+      }
+      case 'place': {
+        if (alt) { if (!this.removeAt(aim, tool)) this.hooks.say('Nothing here to take away'); return; }
+        this.place(tool, aim);
+        return;
+      }
+      case 'mound': case 'crater': case 'plateau': case 'ridge': case 'dune': {
+        if (!ts) return;
+        const kind: StampKind = alt && tool.action === 'mound' ? 'crater' : STAMPS[tool.action]!;
+        this.before = ts.terrain.heights.slice();
+        this.strokeLabel = tool.name;
+        const rect = stamp(ts.terrain as never, kind, [x, z], Math.max(2, tool.size), { height: Math.max(0.2, tool.strength * tool.size * 0.6), seed: Math.floor(now) % 99991, rotation: (now % 6283) / 1000 });
+        if (rect) { this.dirty = rect; this.renderer.refreshTerrain(rect); }
+        this.burst(tool, aim, 1.2); this.sound(tool);
+        return;
+      }
     }
-    if (item.kind === 'place') {
-      if (!first) return;
-      if (alt) { if (this.removeAt(aim, item)) this.say('Removed'); else this.say('Nothing here to take away'); return; }
-      this.place(item, aim);
-      return;
-    }
-    if (item.kind === 'delete') {
-      if (!first) return;
-      if (this.removeAt(aim, item)) this.say('Removed'); else this.say('Nothing here to delete');
-      return;
-    }
+    // brushes: paint and sculpt
     if (!ts) return;
-    if (first) { this.dirty = null; this.last = null; this.flattenTo = item.kind === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = item.label; this.before = ts.terrain.heights.slice(); }
-    const kind = item.kind === 'dig' ? 'lower' : item.kind === 'sculpt' ? (alt ? 'lower' : 'raise') : item.kind === 'flatten' ? 'flatten' : item.kind === 'smooth' ? 'smooth' : 'paint';
-    const strength = item.strength ?? (kind === 'paint' ? 1 : kind === 'smooth' ? 0.5 : item.kind === 'dig' ? 0.55 : 0.4);
+    if (first) { this.dirty = null; this.last = null; this.flattenTo = tool.action === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = tool.name; this.before = ts.terrain.heights.slice(); }
+    const kind = tool.action === 'paint' ? 'paint'
+      : tool.action === 'raise' ? (alt ? 'lower' : 'raise')
+      : tool.action === 'lower' ? (alt ? 'raise' : 'lower')
+      : tool.action === 'dig' ? (alt ? 'raise' : 'lower')
+      : tool.action === 'flatten' ? 'flatten' : 'smooth';
+    const radius = tool.action === 'paint' && alt ? tool.size * 0.5 : tool.size;
     const from = this.last ?? { x, z };
-    const rect = applyStroke(ts.terrain, { kind, x, z, radius: item.kind === 'paint' && alt ? item.size * 0.5 : item.size, strength, falloff: 'smooth', ...(item.surface !== undefined ? { surface: item.surface } : {}), ...(this.flattenTo !== null ? { target: this.flattenTo } : {}) }, from, { x, z }, Math.max(0.5, item.size * 0.3));
+    const rect = applyStroke(ts.terrain, { kind, x, z, radius, strength: tool.strength, falloff: tool.falloff, ...(tool.action === 'paint' ? { surface: tool.surface } : {}), ...(this.flattenTo !== null ? { target: this.flattenTo } : {}) }, from, { x, z }, Math.max(0.5, radius * 0.3));
     this.last = { x, z };
     if (!rect) return;
     this.dirty = this.dirty ? { c0: Math.min(this.dirty.c0, rect.c0), r0: Math.min(this.dirty.r0, rect.r0), c1: Math.max(this.dirty.c1, rect.c1), r1: Math.max(this.dirty.r1, rect.r1) } : rect;
     this.renderer.refreshTerrain(rect);
-    // plants ride the ground while you sculpt (a preview; the result is stored when the button is let go)
     if (now - this.lastPreview > 200 && this.dirty) {
       this.lastPreview = now;
       const d = this.rt.binder.decor();
-      if (d) this.onDecorPreview(settlePlants(d.placements, ts.terrain, rectToArea(ts.terrain, this.dirty, 1), { ...rulesOf(this.rt, this.sceneId), plantsReact: false }, plantsOf(this.rt, this.sceneId)).items);
+      if (d) this.hooks.onDecorPreview(settlePlants(d.placements, ts.terrain, rectToArea(ts.terrain, this.dirty, 1), { ...rulesOf(this.rt, this.sceneId), plantsReact: false }, plantsOf(this.rt, this.sceneId)).items);
     }
-    this.sprite(item, aim, kind === 'paint' ? 0.4 : 0.6);
-    fx(item.sound, { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 });
+    this.burst(tool, aim, kind === 'paint' ? 0.4 : 0.6);
+    this.sound(tool, { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 });
+  }
+
+  private done(tool: ToolPreset, aim: Aim, text: string): void {
+    this.hooks.onModels(); this.burst(tool, aim); this.sound(tool); saveMap(this.rt, this.sceneId);
+    if (text) this.hooks.say(text);
   }
 
   /**
@@ -107,42 +201,59 @@ export class BuildController {
         this.rt.commands.execute(cmd.setParam(`${decor.presetId}.items`, packed.items as never, label));
       }
     });
-    this.onDecorPreview(null);
-    if (settled && settled.removed > 0) this.say(settled.removed === 1 ? 'One plant dug up' : `${settled.removed} plants dug up`);
+    // placed models stand on the ground too
+    this.settleModels(ts.terrain, dirty, label);
+    this.hooks.onDecorPreview(null);
+    if (settled && settled.removed > 0) this.hooks.say(settled.removed === 1 ? 'One plant dug up' : `${settled.removed} plants dug up`);
     saveMap(this.rt, this.sceneId);
   }
 
-  private place(item: HotItem, aim: Aim): void {
-    const entry = MODELS.find((m) => m.id === item.model);
-    if (!entry) return;
-    const model = entry.build() as unknown as VoxelModel;
+  /** Things you placed by hand follow the ground under them (they are props: they never disappear on their own). */
+  private settleModels(terrain: Parameters<typeof heightAt>[0], dirty: DirtyRect, label: string): void {
+    if (!rulesOf(this.rt, this.sceneId).plantsFollowGround) return;
+    const area = rectToArea(terrain, dirty, 1);
+    const refs = this.rt.store.get(this.sceneId)?.children['models'] ?? [];
+    const moves: [PresetId, number][] = [];
+    for (const r of refs) {
+      const x = this.param(r.ref, 'x', NaN), z = this.param(r.ref, 'z', NaN), y = this.param(r.ref, 'y', 0);
+      if (!Number.isFinite(x) || !Number.isFinite(z) || x < area.x0 || x > area.x1 || z < area.z0 || z > area.z1) continue;
+      const g = heightAt(terrain, x, z);
+      if (Math.abs(g - y) > 1e-3) moves.push([r.ref, g]);
+    }
+    if (!moves.length) return;
+    this.rt.commands.transaction(label, () => { for (const [ref, g] of moves) this.rt.commands.execute(cmd.setParam(`${ref}.y`, g, label)); });
+    this.hooks.onModels();
+  }
+
+  private place(tool: ToolPreset, aim: Aim): void {
+    const model = voxelModelById(tool.model);
+    if (!model) return;
     const id = `model-${Date.now().toString(36)}`;
     const yaw = Math.round(Math.random() * 360 - 180);
-    this.rt.commands.transaction(`Place ${item.label}`, () => {
-      this.rt.commands.execute(cmd.put({ id, kind: 'model', name: entry.name, params: { data: encodeModel(model), scale: BLOCK[model.id] ?? 0.1, x: aim.point[0], y: aim.point[1], z: aim.point[2], yaw, ao: true, greedy: true, castShadow: true } as never, tier: 'build' }, `Place ${item.label}`));
-      this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, `Place ${item.label}`));
+    const block = (PLACE_BLOCK[tool.model] ?? 0.1) * tool.size;
+    this.rt.commands.transaction(`Place ${tool.name}`, () => {
+      this.rt.commands.execute(cmd.put({ id, kind: 'model', name: tool.name, params: { data: encodeModel(model), scale: block, x: aim.point[0], y: aim.point[1], z: aim.point[2], yaw, ao: true, greedy: true, castShadow: true } as never, tier: 'build' }, `Place ${tool.name}`));
+      this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, `Place ${tool.name}`));
     });
-    this.onModels();
-    this.sprite(item, aim, 1.4); fx(item.sound);
+    this.hooks.onModels();
+    this.burst(tool, aim, 1.4); this.sound(tool);
     saveMap(this.rt, this.sceneId);
-    this.say(`${entry.name} placed`);
   }
 
-  /** Remove the placed model the crosshair is on, if any. Returns whether something was removed. */
-  removeAt(aim: Aim, item: HotItem): boolean {
-    const refs = this.rt.store.get(this.sceneId)?.children['models'] ?? [];
-    for (let i = 0; i < refs.length; i++) {
-      const t = focusTargetOf(this.rt, refs[i]!.ref);
-      if (t && Math.hypot(t.center[0] - aim.point[0], t.center[2] - aim.point[2]) <= t.radius) {
-        this.rt.commands.execute(cmd.removeChild(this.sceneId, 'models', i, 'Delete model'));
-        this.onModels(); this.sprite(item, aim, 1.2); fx('delete'); saveMap(this.rt, this.sceneId);
-        return true;
-      }
-    }
-    return false;
+  /** Remove the placed model the aim is on, if any. Returns whether something was removed. */
+  removeAt(aim: Aim, tool?: ToolPreset): boolean {
+    const m = this.modelAt(aim);
+    if (!m) return false;
+    this.rt.commands.execute(cmd.removeChild(this.sceneId, 'models', m.index, 'Delete'));
+    if (this.carrying === m.ref) this.carrying = null;
+    this.hooks.onModels();
+    if (tool) this.burst(tool, aim, 1.2);
+    fx('delete'); saveMap(this.rt, this.sceneId);
+    this.hooks.say('Taken away');
+    return true;
   }
 
   undo(): void {
-    if (this.rt.commands.undo()) { this.onModels(); fx('undo'); saveMap(this.rt, this.sceneId); } else fx('ui-error');
+    if (this.rt.commands.undo()) { this.hooks.onModels(); fx('undo'); saveMap(this.rt, this.sceneId); } else fx('ui-error');
   }
 }

@@ -75,6 +75,40 @@ try {
   await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.textContent === 'Close')?.click(); });
   await page.waitForSelector('.hotbar', { timeout: 30000 });
   check('Close returns to the island', true);
+
+  // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
+  check('ten tabs on the tab strip', await page.locator('.tab-strip button').count() === 10);
+  await page.keyboard.press('F2');
+  await page.waitForTimeout(300);
+  check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
+  check('the paint slots show ground swatches', await page.locator('.hotbar .pv-swatch').count() >= 9);
+  await page.keyboard.press('e');
+  await page.waitForTimeout(500);
+  check('E opens your presets', await page.locator('.fwin[aria-label="Your presets"]').count() === 1);
+  check('every paint preset has a card', await page.locator('.pw-card').count() >= 20);
+  await dom(() => { [...document.querySelectorAll('.pw-tabs button')].find((b) => /Animate/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(400);
+  check('animations preview as moving figures', await page.locator('.pw-card .pv-anim').count() >= 8);
+  await dom(() => { [...document.querySelectorAll('.pw-card .pw-edit')][0]?.click(); });
+  await page.waitForTimeout(400);
+  check('Edit opens an attribute editor window', await page.locator('.fwin').count() >= 2);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check('Esc closes the windows one at a time', await page.locator('.fwin').count() === 0 && await page.locator('.island-menu').count() === 0);
+  await page.keyboard.press('1');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('b');
+  await page.waitForTimeout(800);
+  check('B switches to studio mode', /Studio/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
+  check('studio opens the settings of what you hold', await page.locator('.fwin').count() >= 1);
+  check('the ground has Flat and PBR buttons', await page.locator('.mode-bar button', { hasText: 'PBR' }).count() === 1);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  await page.keyboard.press('b');
+  await page.waitForTimeout(400);
+  check('B goes back to walking', /Walk/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(600); }
   await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Up one level')?.click(); });
   await page.waitForTimeout(400);
@@ -82,9 +116,9 @@ try {
   await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Into the selected')?.click(); });
   await page.waitForTimeout(300);
   for (let i = 0; i < 6 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
-  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Build mode')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Race track editor')?.click(); });
   await page.waitForSelector('.maker', { timeout: 30000 });
-  check('Build mode opens inside the shell', true);
+  check('the race track editor opens inside the shell', true);
   for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
   check('Esc opens the menu in build mode', await page.locator('.maker .island-menu').count() === 1);
   await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Island')?.click(); });

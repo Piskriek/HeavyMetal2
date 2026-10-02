@@ -5,7 +5,7 @@ const stat = (key: string, label: string, doc: string): VariableDef =>
 
 export const RACER_COMPONENT: ComponentDef = {
   name: 'racer',
-  defaults: { name: '', controller: 'player', actor: 'p1', weight: 5, speed: 5, bounce: 5, hx: 1, hz: 0, boostMs: 0, item: '', skill: 0.6 },
+  defaults: { name: '', controller: 'player', actor: 'p1', weight: 5, speed: 5, bounce: 5, hx: 1, hz: 0, boostMs: 0, item: '', skill: 0.6, freezeMs: 0, slowMs: 0, shieldMs: 0, draftMs: 0, ghostMs: 0 },
   fields: [
     { key: 'name', type: 'string', label: 'Name', doc: 'Display name of the goblin driver.', tier: 'build', default: '' },
     { key: 'controller', type: 'enum', label: 'Controller', doc: 'Who drives: a player or the AI.', tier: 'build', default: 'player', options: ['player', 'ai'] },
@@ -17,6 +17,11 @@ export const RACER_COMPONENT: ComponentDef = {
     { key: 'hz', type: 'number', label: 'Heading Z', doc: 'Z component of the unit heading.', tier: 'pro', default: 0, min: -1, max: 1 },
     { key: 'boostMs', type: 'number', label: 'Boost time', doc: 'Remaining boost time in milliseconds.', tier: 'pro', default: 0, min: 0 },
     { key: 'item', type: 'string', label: 'Item', doc: 'Held item id, empty when none.', tier: 'build', default: '' },
+    { key: 'freezeMs', type: 'number', label: 'Frozen time', doc: 'Time left frozen in place (milliseconds).', tier: 'pro', default: 0, min: 0 },
+    { key: 'slowMs', type: 'number', label: 'Slippery time', doc: 'Time left sliding on oil (milliseconds).', tier: 'pro', default: 0, min: 0 },
+    { key: 'shieldMs', type: 'number', label: 'Anchor time', doc: 'Time left unshakeable: heavy, grippy and immune to hazards.', tier: 'pro', default: 0, min: 0 },
+    { key: 'draftMs', type: 'number', label: 'Slipstream time', doc: 'Time left in a slipstream: extra acceleration and top speed.', tier: 'pro', default: 0, min: 0 },
+    { key: 'ghostMs', type: 'number', label: 'Ghost time', doc: 'Time left as a ghost: see-through, immune to hazards, a little faster.', tier: 'pro', default: 0, min: 0 },
     { key: 'skill', type: 'number', label: 'AI skill', doc: 'AI driving skill from 0 (sloppy) to 1 (perfect).', tier: 'pro', default: 0.6, min: 0, max: 1, step: 0.05 },
   ],
 };

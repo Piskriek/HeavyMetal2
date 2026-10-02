@@ -152,6 +152,28 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   player = racerIds[0]!;
   rt.play();
 
+  // ---- item hazards you can see: oil slicks on the road; frozen / ghost / anchored balls change look
+  const slickViews: { e: EntityId; ttl: number }[] = [];
+  rt.events.on('hazard:oil', (p) => {
+    const q = p as { x: number; z: number; r: number; ttlMs: number };
+    const e = world.spawn();
+    world.add(e, 'transform', { x: q.x, y: heightAt(terrain, q.x, q.z) + 0.07, z: q.z, sx: q.r, sy: 0.02, sz: q.r });
+    world.add(e, 'renderable', { shape: 'cylinder', size: 1, color: '#14120f', roughness: 0.05, metalness: 0.4, opacity: 0.85 });
+    slickViews.push({ e, ttl: q.ttlMs });
+  });
+  const statusLook = (dtMs: number): void => {
+    for (let i = slickViews.length - 1; i >= 0; i--) {
+      const v = slickViews[i]!; v.ttl -= dtMs;
+      if (v.ttl <= 0) { if (world.alive(v.e)) world.despawn(v.e); slickViews.splice(i, 1); }
+    }
+    for (const id of racerIds) {
+      const rc = world.get(id, 'racer');
+      if (!rc) continue;
+      const frozen = Number(rc['freezeMs']) > 0, ghost = Number(rc['ghostMs']) > 0, anchored = Number(rc['shieldMs']) > 0, slick = Number(rc['slowMs']) > 0;
+      world.set(id, 'renderable', { color: frozen ? '#9fe8ff' : anchored ? '#c9c2b0' : slick ? '#d8cfa8' : '#bfe8ff', opacity: ghost ? 0.08 : frozen ? 0.6 : 0.22 });
+    }
+  };
+
   /** Put a racer back on the road at its current race progress (fell off, stuck, or pressed reset). */
   const respawn = (id: EntityId): void => {
     const r = world.get(id, 'race');
@@ -221,6 +243,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
       if (phase === 'racing') watchdog(dtMs);
       emit(dir.update(dtMs, progressMap()));
       if (phase === 'racing') grantItems();
+      statusLook(dtMs);
       return alpha;
     },
     hud() {

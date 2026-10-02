@@ -7,6 +7,7 @@ import { pickScene } from './pick-math';
 import type { LookLike } from './environment';
 import { DecorView, type DecorInstance } from './decor';
 import { RoadDecalView, type RoadDecalDef } from './road-decals';
+import { ModelsView, type ModelPlacement } from './voxel-view';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -27,6 +28,8 @@ export type ThreeRenderer = RenderService & {
   setLook(look: LookLike): void;
   /** Painted strips on the road: start line, rumble strips, boost pads (null removes them). */
   setRoadDecals(defs: readonly RoadDecalDef[] | null): void;
+  /** Voxel models placed in the world (statues, props, avatars); null clears. */
+  setModels(items: readonly ModelPlacement[] | null): void;
   /** Quality tier for phones: low = pixel ratio 1 and no shadows, medium = up to 1.5 and small shadows, high = up to 2 and full shadows. */
   setQuality(q: 'low' | 'medium' | 'high'): void;
 };
@@ -89,6 +92,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     decorView?.dispose();
     decorView = null;
     roadView?.dispose();
+    modelsView?.dispose();
+    modelsView = null;
     roadView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
@@ -119,6 +124,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   const applyRoad = (): void => {
     if (roadView) { scene?.remove(roadView.group); roadView.dispose(); roadView = null; }
     if (scene && pendingRoad && pendingRoad.length) { roadView = new RoadDecalView(pendingRoad); scene.add(roadView.group); }
+  };
+  let modelsView: ModelsView | null = null;
+  let pendingModels: readonly ModelPlacement[] | null = null;
+  const applyModels = (): void => {
+    if (modelsView) { scene?.remove(modelsView.group); modelsView.dispose(); modelsView = null; }
+    if (scene && pendingModels && pendingModels.length) { modelsView = new ModelsView(pendingModels); scene.add(modelsView.group); }
   };
   let decorView: DecorView | null = null;
   let pendingDecor: readonly DecorInstance[] | null = null;
@@ -170,6 +181,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyTerrain();
       applyDecor();
       applyRoad();
+      applyModels();
       if (pendingLook) environment.setLook(pendingLook);
       updateView();
       resize();
@@ -194,6 +206,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setDecor(instances: readonly DecorInstance[] | null): void {
       pendingDecor = instances;
       applyDecor();
+    },
+    setModels(items: readonly ModelPlacement[] | null): void {
+      pendingModels = items;
+      applyModels();
     },
     setRoadDecals(defs: readonly RoadDecalDef[] | null): void {
       pendingRoad = defs;

@@ -19,6 +19,7 @@ import { SoundPanel } from './sound-panel';
 import { RulesPanel } from './rules-panel';
 import { InterfacePanel } from './interface-panel';
 import { ItemsPanel } from './items-panel';
+import { ModelsPanel, placementsOf } from './models-panel';
 import { LAYOUTS } from '@hm/tracklayouts';
 import { themeOf } from '../ui-preset';
 import { HelpOverlay, helpSeen, markHelpSeen } from './help';
@@ -73,6 +74,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [rulesOpen, setRulesOpen] = useState(false);
   const [uiOpen, setUiOpen] = useState(false);
   const [itemsOpen, setItemsOpen] = useState(false);
+  const [modelsOpen, setModelsOpen] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [autosaved, setAutosaved] = useState<number | null>(null);
@@ -415,6 +417,9 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     r.setRoadDecals(road.decals);
   }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // voxel models placed in the scene follow the presets
+  useEffect(() => { rendererRef.current?.setModels(placementsOf(rt, scene.sceneId)); }, [rev]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // autosave 1.5 s after the last edit (never while previewing, so driver values are not saved)
   useEffect(() => {
     if (rt.commands.history().length === 0) return;
@@ -447,10 +452,11 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
         <button title="Shortcuts and tips (?)" onClick={() => { setHelp('keys'); fx('ui-click'); }}>?</button>
-        <button className={itemsOpen ? 'on' : ''} title="Power-ups are presets" onClick={() => { setItemsOpen(!itemsOpen); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>🎁 Items</button>
-        <button className={uiOpen ? 'on' : ''} title="Colours, words and HUD parts are presets too" onClick={() => { setUiOpen(!uiOpen); setRulesOpen(false); setSoundOpen(false); setItemsOpen(false); fx('ui-toggle'); }}>🎨 Interface</button>
-        <button className={rulesOpen ? 'on' : ''} title="The race is a preset: laps, racers, items, boost pads" onClick={() => { setRulesOpen(!rulesOpen); setSoundOpen(false); setUiOpen(false); setItemsOpen(false); fx('ui-toggle'); }}>🏁 Rules</button>
-        <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); setRulesOpen(false); setUiOpen(false); setItemsOpen(false); fx('ui-toggle'); }}>🎚 Sounds</button>
+        <button className={itemsOpen ? 'on' : ''} title="Power-ups are presets" onClick={() => { setItemsOpen(!itemsOpen); setModelsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>🎁 Items</button>
+        <button className={modelsOpen ? 'on' : ''} title="Voxel models are presets" onClick={() => { setModelsOpen(!modelsOpen); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>🧊 Models</button>
+        <button className={uiOpen ? 'on' : ''} title="Colours, words and HUD parts are presets too" onClick={() => { setUiOpen(!uiOpen); setRulesOpen(false); setSoundOpen(false); setItemsOpen(false); setModelsOpen(false); fx('ui-toggle'); }}>🎨 Interface</button>
+        <button className={rulesOpen ? 'on' : ''} title="The race is a preset: laps, racers, items, boost pads" onClick={() => { setRulesOpen(!rulesOpen); setSoundOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); fx('ui-toggle'); }}>🏁 Rules</button>
+        <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); setRulesOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); fx('ui-toggle'); }}>🎚 Sounds</button>
         <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
         <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>🔗 Share</button>
         <button onClick={save}>💾 Save</button>
@@ -480,10 +486,11 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         </div>
         <aside className="panel right">
           {soundOpen ? <SoundPanel rt={rt} tier={tier} rev={rev} onFeedback={(k, t) => feedback(k, t)} /> : null}
+          {modelsOpen ? <ModelsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {itemsOpen ? <ItemsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {uiOpen ? <InterfacePanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {rulesOpen ? <RulesPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          <div style={soundOpen || rulesOpen || uiOpen || itemsOpen ? { display: 'none' } : undefined}>
+          <div style={soundOpen || rulesOpen || uiOpen || itemsOpen || modelsOpen ? { display: 'none' } : undefined}>
           {tool === 'brush' ? (
             <>
               <h3>Brush</h3>

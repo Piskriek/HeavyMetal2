@@ -73,6 +73,7 @@ export const sceneSchema = defineSchema({
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
     { key: 'items', label: 'Items', doc: 'The power-ups racers can pick up. Empty = the standard eight.', kinds: ['item'], min: 0, max: null, tier: 'build' },
+    { key: 'models', label: 'Models', doc: 'Voxel models used in this scene: characters, props, statues.', kinds: ['model'], min: 0, max: null, tier: 'build' },
     { key: 'interface', label: 'Interface', doc: 'The look and wording of the menus and the HUD: colours, texts, which HUD parts show.', kinds: ['interface'], min: 0, max: 1, tier: 'play' },
     { key: 'rules', label: 'Race rules', doc: 'How the race is run: laps, field size, items, boost pads. Change it to make your own kind of race.', kinds: ['race'], min: 0, max: 1, tier: 'play' },
     { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
@@ -228,6 +229,27 @@ export const itemSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const modelSchema = defineSchema({
+  kind: 'model',
+  version: 1,
+  label: 'Model',
+  doc: 'A voxel model: a 3D grid of coloured blocks with a palette (colour, roughness, glow, see-through). Sculpt it with the voxel brushes; the PBR skin on top is a preset too.',
+  icon: 'cube',
+  variables: [
+    { key: 'data', type: 'string', label: 'Voxel data', doc: 'The encoded grid and palette (edited with the sculpt tools, not by hand).', tier: 'pro', default: '', group: 'Model' },
+    num('scale', 'Block size', 'Metres per block. A goblin is about 0.1 per block, a palm 0.25.', 0.1, 'play', { min: 0.01, max: 5, step: 0.01, unit: 'm', group: 'Model' }),
+    num('x', 'X', 'Position left/right.', 0, 'build', { step: 0.1, unit: 'm', group: 'Place' }),
+    num('y', 'Y', 'Position up/down (0 = on the ground).', 0, 'build', { step: 0.1, unit: 'm', group: 'Place' }),
+    num('z', 'Z', 'Position forward/back.', 0, 'build', { step: 0.1, unit: 'm', group: 'Place' }),
+    num('yaw', 'Turn', 'Which way it faces, in degrees.', 0, 'play', { min: -180, max: 180, step: 1, unit: 'deg', group: 'Place' }),
+    { key: 'ao', type: 'boolean', label: 'Soft shading', doc: 'Darken the creases between blocks.', tier: 'play', default: true, group: 'Look' },
+    { key: 'greedy', type: 'boolean', label: 'Merge flat faces', doc: 'Fewer triangles for flat areas. Turn off to see every block edge.', tier: 'pro', default: true, group: 'Look' },
+    { key: 'castShadow', type: 'boolean', label: 'Casts shadow', doc: 'Whether it throws a shadow.', tier: 'build', default: true, group: 'Look' },
+    { key: 'skin', type: 'ref', label: 'Skin', doc: 'An optional PBR skin preset drawn over the blocks.', tier: 'build', default: null, refKinds: ['material'], group: 'Look' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const raceSchema = defineSchema({
   kind: 'race',
   version: 1,
@@ -304,7 +326,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

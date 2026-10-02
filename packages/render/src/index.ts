@@ -10,3 +10,4 @@ export * from './terrain/terrain-pick';
 export type { LookLike } from './environment';
 export * from './decor';
 export * from './road-decals';
+export * from './voxel-view';

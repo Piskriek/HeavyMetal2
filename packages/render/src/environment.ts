@@ -19,6 +19,8 @@ export interface EnvironmentRig {
   setSea(on: boolean): void;
   /** Quality tier: shadows on/off and the shadow map size (smaller = faster on phones). */
   setShadows(on: boolean, mapSize?: number): void;
+  /** White-out: hides the sky, paints the background and fades everything beyond `far` metres from the camera to `color`. null restores the look. */
+  setVeil(veil: { readonly color: number; readonly near: number; readonly far: number } | null): void;
   dispose(): void;
 }
 
@@ -126,6 +128,10 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   ground.receiveShadow = true;
   scene.add(ground);
 
+  let veilOn = false;
+  let savedFog: THREE.Scene["fog"] = null;
+  let savedBackground: THREE.Scene['background'] = null;
+  let lastLook: LookLike | null = null;
   const hemisphere = new THREE.HemisphereLight(0xb9d7ff, 0x29241f, 0.55);
   scene.add(hemisphere);
 
@@ -158,6 +164,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   let seaOpacity = 0.72;
   return {
     setLook(look: LookLike): void {
+      lastLook = look;
       sunDirNow = new THREE.Vector3(look.sunDir[0], look.sunDir[1], look.sunDir[2]).normalize();
       if (sky) {
         const u = sky.material.uniforms;
@@ -177,12 +184,29 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       hemisphere.groundColor.copy(lin(look.ambientGround));
       hemisphere.intensity = look.ambientIntensity * 0.6;
       scene.environmentIntensity = 0.12 + look.ambientIntensity * 0.12;
-      const fog = scene.fog as THREE.FogExp2 | null;
+      const fog = veilOn ? null : (scene.fog as THREE.FogExp2 | null);
       if (fog) { fog.color.copy(lin(look.fogColor)); fog.density = look.fogDensity * (look.fogScale ?? 1); }
       renderer.toneMappingExposure = look.exposure * 0.95;
       seaColor = lin(look.waterColor);
       seaOpacity = look.waterOpacity;
       if (groundMaterial.transparent) { groundMaterial.color.copy(seaColor); groundMaterial.opacity = seaOpacity; }
+    },
+    setVeil(veil: { readonly color: number; readonly near: number; readonly far: number } | null): void {
+      if (veil) {
+        if (!veilOn) { savedFog = scene.fog; savedBackground = scene.background; }
+        veilOn = true;
+        if (sky) sky.visible = false;
+        scene.background = new THREE.Color(veil.color);
+        if (scene.fog instanceof THREE.Fog) { scene.fog.color.setHex(veil.color); scene.fog.near = veil.near; scene.fog.far = veil.far; }
+        else scene.fog = new THREE.Fog(veil.color, veil.near, veil.far);
+      } else if (veilOn) {
+        veilOn = false;
+        if (sky) sky.visible = true;
+        scene.background = savedBackground;
+        scene.fog = savedFog;
+        savedFog = null; savedBackground = null;
+        if (lastLook) this.setLook(lastLook);
+      }
     },
     setShadows(on: boolean, mapSize = 2048): void {
       shadowsOn = on && shadows;

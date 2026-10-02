@@ -73,6 +73,7 @@ export const sceneSchema = defineSchema({
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
     { key: 'items', label: 'Items', doc: 'The power-ups racers can pick up. Empty = the standard eight.', kinds: ['item'], min: 0, max: null, tier: 'build' },
+    { key: 'views', label: 'Editing view', doc: 'How the world looks while you focus on one thing: the white-out and blur, and the orbit or fly camera.', kinds: ['veil'], min: 0, max: 1, tier: 'play' },
     { key: 'rigs', label: 'Camera rigs', doc: 'The ways to watch this scene: chase, first person, orbit, helicopter, free, ghost, director.', kinds: ['camera-rig'], min: 0, max: null, tier: 'play' },
     { key: 'models', label: 'Models', doc: 'Voxel models used in this scene: characters, props, statues.', kinds: ['model'], min: 0, max: null, tier: 'build' },
     { key: 'interface', label: 'Interface', doc: 'The look and wording of the menus and the HUD: colours, texts, which HUD parts show.', kinds: ['interface'], min: 0, max: 1, tier: 'play' },
@@ -252,6 +253,24 @@ export const cameraRigSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const veilSchema = defineSchema({
+  kind: 'veil',
+  version: 1,
+  label: 'Focus veil',
+  doc: 'What happens to the world around the thing you are editing: it whites out and blurs so you can look at the one thing, and whatever is in the way is hidden so you can orbit or fly round it. Switch it off or change it like any preset.',
+  icon: 'eye',
+  variables: [
+    { key: 'style', type: 'enum', label: 'Around it', doc: 'white = fades to white, blur = blurs the edges, both, or off to keep the whole world visible.', tier: 'play', default: 'both', options: ['white', 'blur', 'both', 'off'], group: 'Veil' },
+    num('falloff', 'White-out distance', 'How many metres behind the thing the world takes to fade to white. Small = a sharp spotlight.', 14, 'play', { min: 2, max: 300, step: 1, unit: 'm', group: 'Veil' }),
+    num('blur', 'Blur', 'How blurry the edges of the screen get.', 6, 'play', { min: 0, max: 24, step: 1, unit: 'px', group: 'Veil' }),
+    { key: 'hideNear', type: 'boolean', label: 'Hide what is in the way', doc: 'Slice away anything between the camera and the thing, so you can see it from every side.', tier: 'play', default: true, group: 'Veil' },
+    num('margin', 'Room around it', 'Multiplies the size of the clear area around the thing.', 1, 'build', { min: 0.5, max: 4, step: 0.05, group: 'Veil' }),
+    { key: 'mode', type: 'enum', label: 'Camera', doc: 'orbit circles the thing; fly lets you move with W A S D and Q E.', tier: 'play', default: 'orbit', options: ['orbit', 'fly'], group: 'Camera' },
+    num('flySpeed', 'Fly speed', 'Metres per second in fly mode (hold Shift for 3x).', 8, 'build', { min: 1, max: 80, step: 1, unit: 'm/s', group: 'Camera' }),
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const modelSchema = defineSchema({
   kind: 'model',
   version: 1,
@@ -349,7 +368,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

@@ -21,6 +21,7 @@ import { InterfacePanel } from './interface-panel';
 import { ItemsPanel } from './items-panel';
 import { ModelsPanel, placementsOf } from './models-panel';
 import { EvolutionPanel, snapshotOf } from './evolution-panel';
+import { BlurRing, DECOR_FOCUS, FocusBar, ensureVeil, focusTargetOf, frameTarget, useFocus, type FocusTarget } from './focus';
 import { baselineOf, type Baseline } from '@hm/lineage';
 import { LAYOUTS } from '@hm/tracklayouts';
 import { themeOf } from '../ui-preset';
@@ -78,6 +79,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [itemsOpen, setItemsOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [evoOpen, setEvoOpen] = useState(false);
+  const [rend, setRend] = useState<ThreeRenderer | null>(null);
+  const [focus, setFocus] = useState<FocusTarget | null>(null);
   // the map as it was when the maker opened: the evolution panel compares against it
   const evoBase = useRef<Baseline | null>(null);
   if (!evoBase.current) evoBase.current = baselineOf(snapshotOf(rt, scene.sceneId));
@@ -104,6 +107,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     const renderer = createThreeRenderer({ shadows: true, background: 'sky' });
     renderer.mount(el, rt.world, rt.store);
     rendererRef.current = renderer;
+    setRend(renderer);
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
@@ -294,7 +298,15 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       } else if (L.tool === 'select') {
         const pid = entityPresetOf(h.entity);
         if (pid) { setSelected(pid); feedback('select'); const t = rt.world.get(h.entity!, 'transform'); drag = { entity: h.entity!, presetId: pid, start: [Number(t?.['x']), Number(t?.['y']), Number(t?.['z'])], moved: false }; el.setPointerCapture(e.pointerId); }
-        else setSelected(null);
+        else {
+          // voxel models are not entities: pick the one whose bounds the ray's ground hit falls inside
+          let hit: PresetId | null = null;
+          if (h.point) for (const r of rt.store.get(scene.sceneId)?.children['models'] ?? []) {
+            const t = focusTargetOf(rt, r.ref);
+            if (t && Math.hypot(t.center[0] - h.point[0], t.center[2] - h.point[2]) <= t.radius && Math.abs(t.center[1] - h.point[1]) <= t.radius * 1.5) { hit = r.ref; break; }
+          }
+          setSelected(hit); if (hit) feedback('select');
+        }
       } else if (L.tool === 'delete') {
         const pid = entityPresetOf(h.entity);
         const children = rt.store.get(scene.sceneId)?.children['entities'] ?? [];
@@ -371,7 +383,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         if (idx >= 0) { rt.commands.execute(cmd.removeChild(scene.sceneId, 'entities', idx, 'Delete object')); feedback('deleted', 'Deleted'); setSelected(null); }
       }
       if (k === '?') setHelp((h) => (h ? null : 'keys'));
-      if (k === 'escape') { setSelected(null); setHelp(null); }
+      if (k === 'escape') { setSelected(null); setHelp(null); setFocus(null); }
     };
     const lastLabel = (undone: boolean): string => { const h = rt.commands.history().filter((x) => x.undone === undone); return (undone ? h[0] : h[h.length - 1])?.label ?? ''; };
     const doUndo = (): void => { const label = lastLabel(false); if (rt.commands.undo()) feedback('undo', label); else fx('ui-error'); };
@@ -405,6 +417,16 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   // ----- panels
   const draft = readDraft(rt, scene.trackId);
   const analysis = useMemo(() => analyse(draft), [rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const veil = useFocus(rend, rt, scene.sceneId, focus, rev);
+  const enterFocus = (id: PresetId | typeof DECOR_FOCUS): void => {
+    const t = focusTargetOf(rt, id);
+    if (!t) { feedback('error', 'Nothing to focus on yet'); return; }
+    ensureVeil(rt, scene.sceneId);
+    setFocus(t);
+    if (rend) frameTarget(rend, t);
+    fx('select');
+  };
+  const exitFocus = (): void => { setFocus(null); fx('ui-toggle'); };
   const sel = selected ? rt.store.get(selected) : undefined;
   const schema = sel ? rt.schemas.get(sel.kind) : undefined;
   void normalYAtCell;
@@ -489,12 +511,13 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           <p className="hint">V select · B brush · T track · P place · X delete · [ ] size · 1–9 surface · Ctrl+Z undo</p>
         </aside>
         <div className="view" ref={host}>
+          {focus ? <><BlurRing veil={veil} /><FocusBar target={focus} veil={veil} onVeil={() => { const id = ensureVeil(rt, scene.sceneId); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); }} onMode={() => { const id = ensureVeil(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${id}.mode`, veil.mode === 'fly' ? 'orbit' : 'fly', 'Camera mode')); }} onExit={exitFocus} /></> : null}
           {touchDevice ? <button className={`viewmode${viewMode ? ' on' : ''}`} aria-pressed={viewMode} title="Turn on to drag the camera with one finger; turn off to use the tool" onClick={() => { setViewMode(!viewMode); fx('ui-toggle'); }}>{viewMode ? '✋ Moving the view' : '✋ Move view'}</button> : null}
         </div>
         <aside className="panel right">
           {soundOpen ? <SoundPanel rt={rt} tier={tier} rev={rev} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {evoOpen ? <EvolutionPanel rt={rt} sceneId={scene.sceneId} name={rt.store.get(scene.sceneId)?.name ?? 'My map'} base={evoBase} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          {modelsOpen ? <ModelsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
+          {modelsOpen ? <ModelsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} onFocus={enterFocus} /> : null}
           {itemsOpen ? <ItemsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {uiOpen ? <InterfacePanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
           {rulesOpen ? <RulesPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
@@ -523,6 +546,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
                 <button className="go" onClick={() => { const ts = rt.binder.terrain(); if (!ts) return; const seed = Math.floor(Math.random() * 99999); const d = dress(ts.terrain, draft, seed, density); commitDress(rt, scene.sceneId, d, seed, density); feedback('success', `${d.count} plants placed`); }}>Scatter palms, bushes and rocks</button>
                 <button onClick={() => { if (clearDress(rt, scene.sceneId)) feedback('deleted', 'Foliage cleared'); else fx('ui-error'); }}>Clear</button>
               </div>
+              <div className="btns"><button title="Go inside the foliage: white out the island around it" onClick={() => enterFocus(DECOR_FOCUS)}>✎ Edit the foliage</button></div>
               <p className="hint">Keeps clear of your track. Every press rolls a new arrangement; Ctrl+Z goes back.</p>
             </>
           ) : null}
@@ -541,7 +565,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
               <p className="hint">Click to add a point · click a line to insert · drag points · hover + Delete removes one.</p>
             </>
           ) : null}
-          {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><DriversPanel rt={rt} sceneId={scene.sceneId} propId={sel.id} tier={tier} numberKeys={schema.variables.filter((v) => v.type === 'number' || v.type === 'int').map((v) => ({ key: v.key, label: v.label }))} onFeedback={(k, t) => feedback(k, t)} /><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
+          {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><div className="btns"><button className="go" title="Go inside it: the world around whites out so you can see it from every side" onClick={() => enterFocus(sel.id)}>✎ Edit</button></div><DriversPanel rt={rt} sceneId={scene.sceneId} propId={sel.id} tier={tier} numberKeys={schema.variables.filter((v) => v.type === 'number' || v.type === 'int').map((v) => ({ key: v.key, label: v.label }))} onFeedback={(k, t) => feedback(k, t)} /><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
           {tool === 'delete' ? <p className="hint">Click a prop to delete it. Ctrl+Z brings it back.</p> : null}
           </div>
         </aside>

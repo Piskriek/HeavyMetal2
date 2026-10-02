@@ -27,8 +27,8 @@ const EXAMPLES = MODELS.map((m) => ({ id: m.id, label: m.name, doc: m.doc, scale
  * Voxel models are presets in the scene's `models` slot: blocks, a palette, a place and a turn. Add an example, move it, and (in Pro) edit the
  * encoded blocks. The sculpt brushes build on the same preset.
  */
-export function ModelsPanel(props: { readonly rt: Runtime; readonly sceneId: PresetId; readonly tier: Tier; readonly onFeedback: (kind: 'success' | 'deleted', text: string) => void }): ReactElement {
-  const { rt, sceneId, tier, onFeedback } = props;
+export function ModelsPanel(props: { readonly rt: Runtime; readonly sceneId: PresetId; readonly tier: Tier; readonly onFeedback: (kind: 'success' | 'deleted', text: string) => void; readonly onFocus?: (id: PresetId) => void }): ReactElement {
+  const { rt, sceneId, tier, onFeedback, onFocus } = props;
   const [open, setOpen] = useState<PresetId | null>(null);
   const refs = rt.store.get(sceneId)?.children['models'] ?? [];
   const schema = rt.schemas.get('model');
@@ -60,6 +60,7 @@ export function ModelsPanel(props: { readonly rt: Runtime; readonly sceneId: Pre
               <li key={r.ref}>
                 <div className="sound-row">
                   <span className="grow">{p.name}{m ? ` · ${countVoxels(m)} blocks` : ' · empty'}</span>
+                  {onFocus ? <button title="Go inside it: the world around whites out" onClick={() => onFocus(r.ref)}>✎ Focus</button> : null}
                   <button onClick={() => setOpen(open === r.ref ? null : r.ref)}>{open === r.ref ? 'Done' : 'Edit'}</button>
                   <button title="Remove" onClick={() => { rt.commands.execute(cmd.removeChild(sceneId, 'models', idx, 'Remove model')); onFeedback('deleted', 'Model removed'); }}>✕</button>
                 </div>

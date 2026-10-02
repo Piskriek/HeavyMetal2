@@ -30,6 +30,12 @@ export type ThreeRenderer = RenderService & {
   setRoadDecals(defs: readonly RoadDecalDef[] | null): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
   setModels(items: readonly ModelPlacement[] | null): void;
+  /**
+   * Focus on one thing: everything beyond it fades to white (`veil` = 'white' or 'both'), and with `hideNear` whatever sits between the camera
+   * and the thing is sliced away so you can orbit it freely. `radius` is how big the thing is; `falloff` how soon the white sets in (metres).
+   * null leaves focus. Follows the camera while you orbit and zoom.
+   */
+  setFocus(focus: { readonly target: Vec3; readonly radius: number; readonly veil: boolean; readonly hideNear: boolean; readonly falloff: number } | null): void;
   /** Quality tier for phones: low = pixel ratio 1 and no shadows, medium = up to 1.5 and small shadows, high = up to 2 and full shadows. */
   setQuality(q: 'low' | 'medium' | 'high'): void;
 };
@@ -51,6 +57,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let webgl: THREE.WebGLRenderer | null = null;
   let scene: THREE.Scene | null = null;
   let viewCamera: THREE.PerspectiveCamera | null = null;
+  const defaultNear = 0.05;
   let sceneSync: SceneSync | null = null;
   let sceneAdapter: ThreeSceneAdapter | null = null;
   let environment: EnvironmentRig | null = null;
@@ -71,12 +78,22 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     viewCamera.updateProjectionMatrix();
   };
 
+  let focus: { readonly target: Vec3; readonly radius: number; readonly veil: boolean; readonly hideNear: boolean; readonly falloff: number } | null = null;
+  const applyFocus = (): void => {
+    if (!viewCamera) return;
+    if (!focus) { viewCamera.near = defaultNear; environment?.setVeil(null); return; }
+    const p = orbitPosition(orbitState);
+    const d = Math.hypot(p[0] - focus.target[0], p[1] - focus.target[1], p[2] - focus.target[2]);
+    viewCamera.near = focus.hideNear ? Math.max(defaultNear, d - focus.radius * 1.3) : defaultNear;
+    environment?.setVeil(focus.veil ? { color: 0xffffff, near: d + focus.radius * 1.1, far: d + focus.radius * 1.1 + Math.max(2, focus.falloff) } : null);
+  };
   const updateView = (): void => {
     if (!viewCamera) return;
     viewCamera.fov = orbitState.fov;
     viewCamera.position.fromArray(orbitPosition(orbitState));
     viewCamera.up.set(0, 1, 0);
     viewCamera.lookAt(...orbitState.target);
+    applyFocus();
     viewCamera.updateProjectionMatrix();
     environment?.update(orbitState.target);
   };
@@ -171,7 +188,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       webgl = renderer;
 
       scene = new THREE.Scene();
-      viewCamera = new THREE.PerspectiveCamera(orbitState.fov, 1, 0.05, 6000);
+      viewCamera = new THREE.PerspectiveCamera(orbitState.fov, 1, defaultNear, 6000);
       defineRenderComponents(world);
       sceneAdapter = new ThreeSceneAdapter(scene, opts.assetUrl ?? ((path) => path));
       sceneSync = createSceneSync(world, sceneAdapter);
@@ -206,6 +223,11 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setDecor(instances: readonly DecorInstance[] | null): void {
       pendingDecor = instances;
       applyDecor();
+    },
+    setFocus(f): void {
+      focus = f;
+      applyFocus();
+      viewCamera?.updateProjectionMatrix();
     },
     setModels(items: readonly ModelPlacement[] | null): void {
       pendingModels = items;

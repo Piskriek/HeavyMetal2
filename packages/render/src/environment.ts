@@ -81,7 +81,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
     sky.frustumCulled = false;
     sky.renderOrder = -100;
     scene.add(sky);
-    scene.fog = new THREE.FogExp2(0xaebdc3, 0.006);
+    scene.fog = new THREE.FogExp2(0xaebdc3, 0.0022);
   } else {
     scene.background = new THREE.Color(0x090d13);
     scene.fog = new THREE.FogExp2(0x090d13, 0.012);

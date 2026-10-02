@@ -4,18 +4,15 @@
  */
 import { createRoot } from 'react-dom/client';
 import { createRuntime } from '@hm/engine';
-import { App } from './app';
+import { MapMaker } from './maker/maker';
 import { RaceApp } from './race-app';
-import { seedDemo } from './seed';
 import './shell.css';
 
 const editor = location.hash === '#edit';
 const rt = createRuntime({ seed: 1, now: () => Date.now() });
 const root = document.getElementById('app');
 if (editor) {
-  const sceneId = seedDemo(rt);
-  rt.loadScene(sceneId);
-  if (root) createRoot(root).render(<App rt={rt} sceneId={sceneId} />);
+  if (root) createRoot(root).render(<MapMaker rt={rt} onTestDrive={() => { location.hash = ''; location.reload(); }} />);
 } else if (root) {
   createRoot(root).render(<RaceApp rt={rt} />);
 }

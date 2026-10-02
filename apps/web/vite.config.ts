@@ -32,6 +32,8 @@ export default defineConfig({
       '@hm/raceflow': p('../../packages/raceflow/src/index.ts'),
       '@hm/input': p('../../packages/input/src/index.ts'),
       '@hm/goblins': p('../../packages/goblins/src/index.ts'),
+      '@hm/audio': p('../../packages/audio/src/index.ts'),
+      '@hm/trackedit': p('../../packages/trackedit/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

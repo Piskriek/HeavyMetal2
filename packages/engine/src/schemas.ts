@@ -63,6 +63,7 @@ export const sceneSchema = defineSchema({
     num('gravity', 'Gravity', 'Downward pull in m/s squared (9.81 is Earth).', 9.81, 'build', { min: 0, max: 60, step: 0.1, unit: 'm/s2' }),
     num('seed', 'Random seed', 'Same seed, same game: used by everything random.', 1, 'pro', { min: 0, max: 4294967295, step: 1 }),
     { key: 'camera', type: 'ref', label: 'Camera', doc: 'Which camera preset looks at this scene.', tier: 'build', default: null, refKinds: ['camera'] },
+    { key: 'track', type: 'ref', label: 'Race track', doc: 'The track raced in this scene.', tier: 'build', default: null, refKinds: ['track'] },
   ],
   slots: [
     { key: 'entities', label: 'Objects', doc: 'Everything placed in this scene.', kinds: ['entity'], min: 0, max: null, tier: 'play' },
@@ -105,6 +106,21 @@ export const terrainSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const trackSchema = defineSchema({
+  kind: 'track',
+  version: 1,
+  label: 'Race track',
+  doc: 'The racing line: control points the road is drawn through, and how wide it is.',
+  icon: 'track',
+  variables: [
+    { key: 'points', type: 'list', label: 'Control points', doc: 'The points the road passes through (edited with the Track tool).', tier: 'pro', default: [], itemType: 'vec2' },
+    num('width', 'Road width', 'How wide the road is.', 12, 'build', { min: 4, max: 40, step: 0.5, unit: 'm' }),
+    { key: 'closed', type: 'boolean', label: 'Closed loop', doc: 'A closed track is a circuit you lap.', tier: 'build', default: true },
+    num('laps', 'Laps', 'How many laps a race lasts.', 3, 'play', { min: 1, max: 20, step: 1 }),
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const mechanicSchema = defineSchema({
   kind: 'mechanic',
   version: 1,
@@ -118,7 +134,7 @@ export const mechanicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

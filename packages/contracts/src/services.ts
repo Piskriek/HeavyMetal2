@@ -88,7 +88,8 @@ export type OverlayShape =
   | { readonly type: 'line'; readonly from: Vec3; readonly to: Vec3; readonly color: Color }
   | { readonly type: 'ring'; readonly center: Vec3; readonly normal: Vec3; readonly radius: number; readonly color: Color }
   | { readonly type: 'box'; readonly center: Vec3; readonly half: Vec3; readonly color: Color }
-  | { readonly type: 'handle'; readonly id: string; readonly position: Vec3; readonly color: Color; readonly size: number };
+  | { readonly type: 'handle'; readonly id: string; readonly position: Vec3; readonly color: Color; readonly size: number }
+  | { readonly type: 'ribbon'; readonly points: readonly Vec3[]; readonly width: number; readonly color: Color; readonly closed?: boolean; readonly opacity?: number };
 
 /* ───────────── tools & manipulation presets (T7) ───────────── */
 

@@ -39,6 +39,33 @@ const makeBox = (shape: Extract<OverlayShape, { type: 'box' }>): THREE.LineSegme
   return line;
 };
 
+const makeRibbon = (shape: Extract<OverlayShape, { type: 'ribbon' }>): THREE.Mesh => {
+  const pts = shape.points;
+  const n = pts.length;
+  const pos: number[] = [];
+  const idx: number[] = [];
+  const half = shape.width / 2;
+  for (let i = 0; i < n; i++) {
+    const prev = pts[shape.closed ? (i + n - 1) % n : Math.max(0, i - 1)]!;
+    const next = pts[shape.closed ? (i + 1) % n : Math.min(n - 1, i + 1)]!;
+    let dx = next[0] - prev[0], dz = next[2] - prev[2];
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l; dz /= l;
+    const p = pts[i]!;
+    pos.push(p[0] - dz * half, p[1], p[2] + dx * half, p[0] + dz * half, p[1], p[2] - dx * half);
+  }
+  const segs = shape.closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = i * 2, b = ((i + 1) % n) * 2;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setIndex(idx);
+  const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(shape.color), transparent: true, opacity: shape.opacity ?? 0.5, depthTest: false, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+  return new THREE.Mesh(geometry, material);
+};
+
 const makeHandle = (shape: Extract<OverlayShape, { type: 'handle' }>): THREE.Sprite => {
   const material = new THREE.SpriteMaterial({
     color: new THREE.Color(shape.color),
@@ -55,7 +82,7 @@ const makeHandle = (shape: Extract<OverlayShape, { type: 'handle' }>): THREE.Spr
 
 const disposeObject = (object: THREE.Object3D): void => {
   object.traverse((child) => {
-    if (child instanceof THREE.Line || child instanceof THREE.LineSegments || child instanceof THREE.Sprite) {
+    if (child instanceof THREE.Line || child instanceof THREE.LineSegments || child instanceof THREE.Sprite || child instanceof THREE.Mesh) {
       if ('geometry' in child && child.geometry instanceof THREE.BufferGeometry) child.geometry.dispose();
       const material: THREE.Material | THREE.Material[] = child.material;
       if (Array.isArray(material)) material.forEach((item) => item.dispose());
@@ -77,7 +104,7 @@ export class OverlayManager {
     for (const shape of shapes) {
       const object = shape.type === 'line' ? makeLine(shape)
         : shape.type === 'ring' ? makeRing(shape)
-          : shape.type === 'box' ? makeBox(shape) : makeHandle(shape);
+          : shape.type === 'box' ? makeBox(shape) : shape.type === 'ribbon' ? makeRibbon(shape) : makeHandle(shape);
       object.renderOrder = 10000;
       group.add(object);
     }

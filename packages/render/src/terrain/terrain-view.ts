@@ -18,6 +18,8 @@ export interface TerrainLook {
   /** 0 = crisp height-led borders, 1 = long soft fades. */
   soft: number;
   normalStrength: number;
+  /** Multiplies every tile's size: bigger = calmer from the air. */
+  scale: number;
 }
 
 /** The terrain mesh, its paint-mask texture and the island material. Rebuilds only what a brush stroke touched. */
@@ -28,7 +30,7 @@ export class TerrainView {
   private readonly maskData: Uint8Array;
   private readonly material: THREE.MeshStandardMaterial;
   private uniforms: Record<string, THREE.IUniform> | null = null;
-  readonly look: TerrainLook = { cliffSurface: 0, soft: 0.6, normalStrength: 1 };
+  readonly look: TerrainLook = { cliffSurface: 0, soft: 0.6, normalStrength: 1, scale: 1.8 };
 
   constructor(private readonly t: TerrainLike, private readonly surfaces: SurfaceArray) {
     const { cols, rows, cell, originX, originZ } = t.spec;
@@ -71,7 +73,7 @@ export class TerrainView {
       const u: Record<string, THREE.IUniform> = {
         islSurfaces: { value: this.surfaces.texture }, islPbr: { value: this.surfaces.pbrTexture },
         islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: this.surfaces.layerOf },
-        islParams: { value: this.surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: 1 },
+        islParams: { value: this.surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
         islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
         paintMask: { value: this.mask }, paintRes: { value: new THREE.Vector2(cols, rows) },
         paintOrigin: { value: new THREE.Vector2(originX, originZ) }, paintCell: { value: cell },
@@ -98,6 +100,7 @@ export class TerrainView {
     this.uniforms['islCliffLayer']!.value = layer;
     this.uniforms['islSoft']!.value = this.look.soft;
     this.uniforms['islNormalStrength']!.value = this.look.normalStrength;
+    this.uniforms['islScale']!.value = this.look.scale;
   }
 
   setLook(look: Partial<TerrainLook>): void {

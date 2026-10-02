@@ -33,7 +33,7 @@ class TextureCache {
 
 const materialKey = (desc: RenderDesc): string => JSON.stringify([
   desc.color, desc.roughness, desc.metalness, desc.albedo, desc.normal,
-  desc.orm, desc.repeat, desc.normalStrength,
+  desc.orm, desc.repeat, desc.normalStrength, desc.opacity,
 ]);
 
 export class MaterialPool {
@@ -64,6 +64,7 @@ export class MaterialPool {
       envMapIntensity: 0.85,
     });
     material.normalScale.set(desc.normalStrength, desc.normalStrength);
+    if (desc.opacity < 1) { material.transparent = true; material.opacity = desc.opacity; material.depthWrite = false; }
     this.entries.set(key, { material, refs: 1 });
     return { key, material };
   }

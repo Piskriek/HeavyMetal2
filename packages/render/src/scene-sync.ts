@@ -9,7 +9,7 @@ const transformDefaults = {
 
 const renderableDefaults = {
   shape: 'box', size: 0.5, color: '#ffffff', roughness: 0.6, metalness: 0,
-  albedo: '', normal: '', orm: '', repeat: 1, normalStrength: 1, visible: true,
+  albedo: '', normal: '', orm: '', repeat: 1, normalStrength: 1, visible: true, opacity: 1,
 } satisfies Record<string, Value>;
 
 type FieldOptions = {
@@ -58,6 +58,7 @@ const renderableDef: ComponentDef = {
     field('repeat', 'number', 'Texture Repeat', 'Texture tiling in each direction.', 1, { tier: 'pro', min: 0.01, max: 100, step: 0.01 }),
     field('normalStrength', 'number', 'Normal Strength', 'Strength of the normal map.', 1, { tier: 'pro', min: 0, max: 4, step: 0.01 }),
     field('visible', 'boolean', 'Visible', 'Whether the entity is rendered.', true),
+    field('opacity', 'number', 'Opacity', '1 = solid, lower = see-through (glass).', 1, { tier: 'build', min: 0, max: 1, step: 0.01 }),
   ],
 };
 
@@ -82,6 +83,7 @@ export interface RenderDesc {
   readonly repeat: number;
   readonly normalStrength: number;
   readonly visible: boolean;
+  readonly opacity: number;
   readonly position: Vec3;
   readonly rotation: Quat;
   readonly scale: Vec3;
@@ -114,7 +116,7 @@ const readDesc = (world: RenderWorld, id: EntityId): RenderDesc => {
     size: numberValue(r.size, 0.5), color: stringValue(r.color, '#ffffff'),
     roughness: numberValue(r.roughness, 0.6), metalness: numberValue(r.metalness, 0),
     albedo: stringValue(r.albedo, ''), normal: stringValue(r.normal, ''), orm: stringValue(r.orm, ''),
-    repeat: numberValue(r.repeat, 1), normalStrength: numberValue(r.normalStrength, 1), visible: boolValue(r.visible, true),
+    repeat: numberValue(r.repeat, 1), normalStrength: numberValue(r.normalStrength, 1), visible: boolValue(r.visible, true), opacity: Math.min(1, Math.max(0, numberValue(r.opacity, 1))),
     position: [numberValue(t.x, 0), numberValue(t.y, 0), numberValue(t.z, 0)],
     rotation: [numberValue(t.qx, 0), numberValue(t.qy, 0), numberValue(t.qz, 0), numberValue(t.qw, 1)],
     scale: [numberValue(t.sx, 1), numberValue(t.sy, 1), numberValue(t.sz, 1)],
@@ -124,7 +126,7 @@ const readDesc = (world: RenderWorld, id: EntityId): RenderDesc => {
 const equal = (a: RenderDesc, b: RenderDesc): boolean =>
   a.shape === b.shape && a.size === b.size && a.color === b.color && a.roughness === b.roughness &&
   a.metalness === b.metalness && a.albedo === b.albedo && a.normal === b.normal && a.orm === b.orm &&
-  a.repeat === b.repeat && a.normalStrength === b.normalStrength && a.visible === b.visible &&
+  a.repeat === b.repeat && a.normalStrength === b.normalStrength && a.visible === b.visible && a.opacity === b.opacity &&
   a.position.every((v, i) => v === b.position[i]) && a.rotation.every((v, i) => v === b.rotation[i]) &&
   a.scale.every((v, i) => v === b.scale[i]);
 

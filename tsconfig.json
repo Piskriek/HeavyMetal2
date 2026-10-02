@@ -122,6 +122,9 @@
       ],
       "@hm/evolve": [
         "packages/evolve/src/index.ts"
+      ],
+      "@hm/motion": [
+        "packages/motion/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

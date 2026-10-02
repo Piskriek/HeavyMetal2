@@ -36,17 +36,36 @@ try {
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the menu', await page.locator('.shell-menu').count() === 1);
 
+  const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
+  // Play: the first time it asks you to make your goblin (look and name), then takes you to your island
   await text('.shell-menu button', 'Play').click();
-  check('Play shows the activities window', await page.locator('[aria-label="Activities"]').count() === 1);
-  await text('.shell-activity button', 'Play').click();
+  await page.waitForSelector('.create-goblin', { timeout: 15000 });
+  check('Play asks you to create your goblin first', true);
+  check('the creator offers ready-made looks', await page.locator('.cg-looks button').count() >= 6);
+  await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(300);
+  check('a goblin needs a name', await page.locator('.create-goblin').count() === 1 && await page.locator('.cg-panel .warn').count() === 1);
+  await page.locator('.cg-name input').fill('Snik');
+  await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForSelector('.hotbar', { timeout: 60000 });
+  check('Done takes you to your island', true);
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Activities')?.click(); });
+  await page.waitForTimeout(400);
+  check('the jump menu opens the activities window', await page.locator('[aria-label="Activities"]').count() === 1);
+  await dom(() => { [...document.querySelectorAll('.shell-activity button')].find((b) => b.textContent === 'Play')?.click(); });
   await page.waitForSelector('.shell-racing');
-  for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Settings', 'My Goblin', 'The Bookie', 'Quick Race']) await text('.shell-racing-nav button', s).click();
+  for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Settings', 'My Goblin', 'The Bookie', 'Quick Race']) await dom((t) => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === t)?.click(); }, s);
   check('every Goblin Racing section opens', true);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   check('Esc leaves the activity menu', await page.locator('.shell-racing').count() === 0);
-  if (await page.locator('.shell-menu').count() === 0) { await page.keyboard.press('Escape'); await page.waitForTimeout(300); }
-  check('and ends on the main menu', await page.locator('.shell-menu').count() === 1);
+  for (let i = 0; i < 4 && await page.locator('.shell-menu').count() === 0; i++) {
+    if (await page.locator('.island-menu').count() === 1) await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Main menu')?.click(); });
+    else await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+  }
+  check('and you can get back to the main menu', await page.locator('.shell-menu').count() === 1);
 
   await text('.shell-menu button', 'Multiplayer').click();
   await page.waitForSelector('.shell-top');
@@ -62,7 +81,6 @@ try {
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
   check('Esc opens the jump menu on the island', await page.locator('.island-menu').count() === 1);
   check('and the galaxy bar comes down', await page.locator('.galaxy-bar.open').count() === 1);
-  const dom = (fn) => page.evaluate(fn); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'My islands')?.click(); });
   await page.waitForSelector('[aria-label="My islands"]', { timeout: 5000 }).catch(() => undefined);
   check('My islands lists the first island', await page.locator('[aria-label="My islands"] article').count() >= 1);

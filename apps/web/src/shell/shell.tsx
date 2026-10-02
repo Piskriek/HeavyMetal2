@@ -15,17 +15,20 @@ import { GalaxyBar, type Level } from './galaxy-bar';
 import { GoblinRacingMenu } from './racing-menu';
 import { Community } from './community';
 import { createActivity, duplicateActivity, loadProfile, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
+import { CreateGoblin } from '../avatar/create-goblin';
+import { player } from '../build/player';
 
 /**
  * The shell: a game inside a game. It always opens on the main menu over the galaxy. My Island dives galaxy -> planet -> island -> goblin and hands
  * over to walking; from then on the menu is gone and Esc brings a bar down from the top (back to galaxy, up one level, into the selected).
  * Everything is a screen of this one shell: there are no separate pages, so nothing can strand you (see ROUTES and the e2e smoke test).
  */
-export type Screen = 'menu' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands';
+export type Screen = 'menu' | 'create' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
   menu: { back: null, doc: 'The main menu over the galaxy. The only root.' },
+  create: { back: 'menu', doc: 'Create your goblin (look and name): Play asks for it the first time, then dives to your island.' },
   zoom: { back: 'island', doc: 'The dive. Esc skips to the goblin.' },
   island: { back: 'menu', doc: 'Walking. Esc opens the jump menu and the galaxy bar.' },
   activities: { back: 'origin', doc: 'The activities window.' },
@@ -121,7 +124,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       const s = screenRef.current;
       if (s === 'activity') go('hub');
       else if (s === 'hub' || s === 'activities' || s === 'islands') back();
-      else if (s === 'settings') toMenu();
+      else if (s === 'settings' || s === 'create') toMenu();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -130,6 +133,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const picks = planets.find((p) => p.id === picked) ?? null;
   const pickedRow = visible.find((a) => a.id === picked) ?? null;
   const openActivity = (id: string): void => { setActivityId(id); go('activity'); };
+  /** Play: the first time you make your goblin (look and name); then, and every time after, it takes you to your island. */
+  const play = (): void => { if (!player().created) go('create'); else void myIsland(); };
   const activityInfos = useMemo(() => visible.map((a) => ({ id: a.id, name: a.name, doc: a.doc, hue: a.planet.hue, ring: a.planet.ring })), [visible]);
   /** The racing activity has its own map (the racetrack island), pinned to its own key so it never mixes with your islands. */
   const startRace = (entry: 'select' | 'custom'): void => {
@@ -160,16 +165,22 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         </div>
       ) : null}
 
+      {screen === 'create' ? (
+        <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
+          <CreateGoblin onBack={toMenu} onDone={(look) => { update((pr) => ({ ...pr, name: look.name })); void myIsland(); }} />
+        </div>
+      ) : null}
+
       {screen === 'menu' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
           <div className="shell-brand"><b>GOBLIN</b><i>PRESET STUDIO</i></div>
           <nav className="shell-menu" aria-label="Main menu">
-            <button className="go" onClick={toActivities}>Play</button>
+            <button className="go" onClick={play}>Play</button>
             <button onClick={() => toHub()}>Multiplayer</button>
             <button onClick={() => void myIsland()}>My Island</button>
             <button onClick={() => go('settings')}>Settings</button>
           </nav>
-          <p className="shell-foot">Everything is a preset. Press My Island to jump into your goblin.</p>
+          <p className="shell-foot">Everything is a preset. Play takes you to your island, as your goblin.</p>
         </div>
       ) : null}
 

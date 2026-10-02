@@ -83,6 +83,9 @@
       ],
       "@hm/audio": [
         "packages/audio/src/index.ts"
+      ],
+      "@hm/trackedit": [
+        "packages/trackedit/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

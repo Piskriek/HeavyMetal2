@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from 'react';
 import { Coins, Eye, Flag, Gauge, Settings2, Trophy, UserRound } from 'lucide-react';
-import type { ActivityRow, Profile } from './profile';
+import { humanizeDelta, type Activity } from '@hm/activities';
+import { currentTournament, withTournament, type Profile } from './profile';
 
 /**
  * The menu of one activity (Goblin Racing). It is a separate game inside the game: its own sections, its own profile page.
@@ -15,7 +16,7 @@ const SIM_PLAYERS = ['Snaggle', 'Mudwick', 'Grizzle', 'Pip', 'Bogra', 'Nettle', 
 const ratingOf = (n: string): number => 900 + ([...n].reduce((a, c) => a + c.charCodeAt(0), 0) % 7) * 55;
 
 export function GoblinRacingMenu(props: {
-  readonly profile: Profile; readonly activity: ActivityRow; readonly onBack: () => void;
+  readonly profile: Profile; readonly activity: Activity; readonly onBack: () => void;
   readonly onQuickRace: () => void; readonly onMyGoblin: () => void; readonly onProfile: (fn: (p: Profile) => Profile) => void;
 }): ReactElement {
   const { profile, activity, onBack, onQuickRace, onMyGoblin, onProfile } = props;
@@ -23,6 +24,14 @@ export function GoblinRacingMenu(props: {
   const [stake, setStake] = useState(50);
   const [pick, setPick] = useState(SIM_PLAYERS[0]!);
   const [bet, setBet] = useState<{ on: string; stake: number } | null>(null);
+  const [msg, setMsg] = useState('');
+  const now = Date.now();
+  const tourney = currentTournament(profile, now);
+  const cup = { state: tourney.toJSON(), strikes: tourney.strikesFor(profile.name), lockedOut: tourney.isLockedOut(profile.name) };
+  const joined = cup.state.entrants.some((e) => e.playerId === profile.name);
+  const mutate = (f: (t: ReturnType<typeof currentTournament>) => ReturnType<typeof currentTournament>): void => {
+    try { onProfile((p) => withTournament(p, f(currentTournament(p, Date.now())))); setMsg(''); } catch (e) { setMsg(e instanceof Error ? e.message : (e as { message?: string }).message ?? 'Could not do that'); }
+  };
   const rows = [...SIM_PLAYERS.map((n) => ({ n, r: ratingOf(n) })), { n: profile.name, r: 1000 }].sort((a, b) => b.r - a.r);
 
   return (
@@ -44,11 +53,12 @@ export function GoblinRacingMenu(props: {
             <article className="shell-activity">
               <h4>The Basalt Cup · weekly</h4>
               <p>Heats of eight, the top three go through, one final. Sign up before it locks, then show up for your heat: no-shows lose 50 rating and earn a strike (three strikes miss the next cup). While you wait, spectate, visit the bookie and mingle.</p>
-              <p className="hint">Strikes: {profile.strikes} / 3 · Sign-ups close in 2 days (simulated)</p>
+              <p className="hint">{cup.state.entrants.length} / {cup.state.capacity} signed up · sign-ups close in {humanizeDelta(cup.state.closesAt - now)} · your strikes {cup.strikes} / 3 (simulated field until the platform backend is connected)</p>
               <div className="btns">
-                {profile.signedUp ? <button onClick={() => onProfile((p) => ({ ...p, signedUp: false }))}>Withdraw</button> : <button className="go" disabled={profile.strikes >= 3} onClick={() => onProfile((p) => ({ ...p, signedUp: true }))}>Sign up</button>}
-                <span className="hint">{profile.signedUp ? 'You are in. See you in heat 3.' : profile.strikes >= 3 ? 'Locked out of this cup.' : 'Not signed up.'}</span>
+                {joined ? <button onClick={() => mutate((t) => t.withdraw(profile.name))}>Withdraw</button> : <button className="go" disabled={cup.lockedOut || cup.state.status !== 'signup'} onClick={() => mutate((t) => t.signUp(profile.name, now, 1000))}>Sign up</button>}
+                <span className="hint">{joined ? 'You are in. See you in your heat.' : cup.lockedOut ? 'Locked out of this cup (three strikes).' : cup.state.status !== 'signup' ? 'Sign-up is closed.' : 'Not signed up.'}</span>
               </div>
+              {msg ? <p className="hint" role="status">{msg}</p> : null}
             </article>
           </>
         ) : null}

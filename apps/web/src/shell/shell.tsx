@@ -7,7 +7,8 @@ import { hasSavedMap, loadMap } from '../maker/storage';
 import { GalaxyCanvas, type GalaxyHandle, type PlanetDef } from './galaxy';
 import { GoblinRacingMenu } from './racing-menu';
 import { Community } from './community';
-import { createActivity, duplicateActivity, loadProfile, removeActivity, saveProfile, unhideAll, type ActivityRow, type Profile } from './profile';
+import type { Activity } from '@hm/activities';
+import { createActivity, duplicateActivity, loadProfile, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
 
 /**
  * The shell: a game inside a game. It always opens on the main menu over the galaxy. My Island dives galaxy -> planet -> island -> goblin and hands
@@ -16,7 +17,7 @@ import { createActivity, duplicateActivity, loadProfile, removeActivity, savePro
 type Screen = 'menu' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build';
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false };
-const toPlanet = (a: ActivityRow): PlanetDef => ({ id: a.id, name: a.name, hue: a.hue, size: a.size, ring: a.ring, hosting: a.id === 'goblin-racing' });
+const toPlanet = (a: Activity): PlanetDef => ({ id: a.id, name: a.name, hue: a.planet.hue, size: a.planet.size, ring: a.planet.ring, hosting: a.hosting.tournament });
 
 export function Shell(props: { readonly rt: Runtime; readonly onBuild: () => void }): ReactElement {
   const { rt, onBuild } = props;
@@ -166,7 +167,7 @@ export function Shell(props: { readonly rt: Runtime; readonly onBuild: () => voi
             <p className="hint">Build mode is for adults. Switch it off for a kid profile: My Island and the activities stay, building is hidden.</p>
             <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
             <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel goblin)</option><option value="pbr">PBR (full relief)</option></select></label>
-            <div className="btns"><button onClick={() => update((p) => ({ ...p, tutorialDone: false }))}>Replay the tutorial</button><button className="danger" onClick={() => { update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', signedUp: false, strikes: 0 })); }}>Reset progress</button></div>
+            <div className="btns"><button onClick={() => update((p) => ({ ...p, tutorialDone: false }))}>Replay the tutorial</button><button className="danger" onClick={() => { update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', tournament: null })); }}>Reset progress</button></div>
           </div>
         </div>
       ) : null}

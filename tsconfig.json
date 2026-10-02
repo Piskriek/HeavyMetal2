@@ -132,6 +132,12 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
+      "@hm/activities": [
+        "packages/activities/src/index.ts"
+      ],
+      "@hm/plugs": [
+        "packages/plugs/src/index.ts"
+      ],
       "@hm/camerarig": [
         "packages/camerarig/src/index.ts"
       ],

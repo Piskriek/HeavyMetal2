@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRuntime } from '@hm/engine';
-import { createRaceGame } from '../src';
+import { createRaceGame, rulesOf, DEFAULT_RULES } from '../src';
 import { chaseCamera } from '../src/chase-camera';
 
 const run = (g: ReturnType<typeof createRaceGame>, seconds: number, each?: (t: number) => void): void => {
@@ -65,4 +65,20 @@ test('a whole race: nearly every AI goblin finishes (fast ones that slide wide s
   assert.ok(finished.length >= 6, `finishers ${finished.length}`);
   assert.ok(finished.every((r) => r.id !== String(g.player)), 'the idle player is not among the finishers');
   assert.ok(finished.every((r) => typeof r.timeMs === 'number' && r.timeMs! > 20000 && r.timeMs! < 90000), 'sensible times');
+});
+
+test('the race is a preset: rules come from the scene, are clamped, and change the race', () => {
+  const rt = createRuntime({ seed: 4 });
+  const rules = rt.store.put({ id: 'rules1', kind: 'race', name: 'Sprint', params: { laps: 1, field: 4, boostPads: 0, rumble: false, itemsPerLap: 0, aiSkill: 9 } });
+  const scene = rt.store.put({ kind: 'scene', name: 'S', params: {}, children: { rules: [{ ref: rules.id }] } });
+  rt.loadScene(scene.id);
+  const r = rulesOf(rt);
+  assert.deepEqual([r.laps, r.field, r.boostPads, r.rumble, r.itemsPerLap, r.aiSkill, r.walls], [1, 4, 0, false, 0, 1.5, true]);
+  const g = createRaceGame(rt, { seed: 7, rules: r });
+  assert.equal(g.racerIds.length, 4);
+  assert.equal(g.hud().laps, 1);
+  assert.equal(g.roadDecals.filter((d) => d.kind === 'boostPad' || d.kind === 'rumble').length, 0);
+  assert.ok(g.roadDecals.some((d) => d.kind === 'startLine'));
+  const none = createRuntime({ seed: 4 });
+  assert.deepEqual(rulesOf(none), DEFAULT_RULES);
 });

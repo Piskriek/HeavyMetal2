@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
-import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, type Hud as HudData, type RaceGame } from '@hm/game';
+import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { HUD, Minimap } from '@hm/ui';
 import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
@@ -58,7 +58,7 @@ export function RaceView(props: {
     renderer.setQuality(adaptive.current);
     let appliedQuality = live.current.settings.quality;
     const surfaces = new SurfaceArray(STARTER_SURFACES);
-    const game = createRaceGame(rt, { seed: 7, laps: 3, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
+    const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
     gameRef.current = game;
     (window as unknown as { hmGame: unknown }).hmGame = game; // console: hmGame.hud(), hmGame.racerIds ...
     const sceneNow = rt.store.get(rt.binder.sceneId ?? '');
@@ -145,7 +145,7 @@ export function RaceView(props: {
     <div className="race">
       <div className="view" ref={host} />
       {hud ? <HUD speed={hud.speed} lap={hud.lap} laps={hud.laps} position={hud.position} racers={hud.racers} timeMs={hud.timeMs} item={hud.item} boost={hud.boost} {...(hud.message && hud.phase !== 'countdown' ? { message: hud.message } : {})} /> : null}
-      {game && props.settings.showMinimap ? <div className="mini"><Minimap track={game.track.points} racers={racers} size={150} /></div> : null}
+      {game && props.settings.showMinimap ? <div className="mini"><Minimap track={game.track.points} racers={racers} size={size.w < 520 ? 96 : 150} /></div> : null}
       {showTouch && game ? <TouchControls width={size.w} height={size.h} onChange={(t) => game.input.setTouch(t)} /> : null}
       {props.active && count !== null && !props.paused ? <IntroOverlay countdown={count} lap={1} laps={hud?.laps ?? 3} reducedMotion={props.settings.reducedMotion} /> : null}
       {props.pausable && !props.paused ? <button className="pause-btn" aria-label="Pause" onClick={props.onPause}>⏸</button> : null}

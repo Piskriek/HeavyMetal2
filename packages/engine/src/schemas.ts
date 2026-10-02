@@ -72,6 +72,7 @@ export const sceneSchema = defineSchema({
     { key: 'decor', label: 'Foliage', doc: 'Palms, bushes and rocks.', kinds: ['decor'], min: 0, max: 1, tier: 'build' },
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
+    { key: 'rules', label: 'Race rules', doc: 'How the race is run: laps, field size, items, boost pads. Change it to make your own kind of race.', kinds: ['race'], min: 0, max: 1, tier: 'play' },
     { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
   ] as readonly ChildSlot[],
@@ -170,6 +171,26 @@ export const modulatorSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const raceSchema = defineSchema({
+  kind: 'race',
+  version: 1,
+  label: 'Race rules',
+  doc: 'The rules of a race on this map. Every number is a variable: fork it, tweak it, or let a driver move it.',
+  icon: 'flag',
+  variables: [
+    num('laps', 'Laps', 'How many times round the circuit.', 3, 'play', { min: 1, max: 20, step: 1, group: 'Race' }),
+    num('field', 'Racers', 'How many goblins start (you plus the AI).', 8, 'play', { min: 2, max: 12, step: 1, group: 'Race' }),
+    num('aiSkill', 'AI skill', '0.5 = sloppy rivals, 1 = as designed, 1.4 = ruthless.', 1, 'play', { min: 0.3, max: 1.5, step: 0.05, group: 'Race' }),
+    num('itemsPerLap', 'Items per lap', 'How often racers get an item (a new one every 1/N of a lap). 0 = no items.', 4, 'build', { min: 0, max: 12, step: 1, group: 'Items' }),
+    num('boostPads', 'Boost pads', 'Glowing pads on the road that give a speed burst.', 3, 'build', { min: 0, max: 8, step: 1, group: 'Road' }),
+    num('boostPadMs', 'Pad boost time', 'How long a boost pad boosts you.', 1400, 'build', { min: 200, max: 5000, step: 100, unit: 'ms', group: 'Road' }),
+    { key: 'rumble', type: 'boolean', label: 'Rumble strips', doc: 'Red and white strips on the corners.', tier: 'build', default: true, group: 'Road' },
+    { key: 'startLine', type: 'boolean', label: 'Start line', doc: 'The checkered start and finish line.', tier: 'build', default: true, group: 'Road' },
+    { key: 'walls', type: 'boolean', label: 'Walls', doc: 'Low walls along both sides keep everyone on the island.', tier: 'build', default: true, group: 'Road' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const soundSchema = defineSchema({
   kind: 'sound',
   version: 1,
@@ -226,7 +247,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

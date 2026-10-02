@@ -19,6 +19,8 @@ export const BALL_RADIUS = 0.8;
 export interface RaceGameOptions {
   readonly seed?: number;
   readonly laps?: number;
+  /** Race rules (usually from rulesOf(rt)); explicit laps/field still win. */
+  readonly rules?: Partial<RaceRules>;
   readonly field?: number;
   /** Which racer seed the player drives (index into the content library's goblins). */
   readonly playerIndex?: number;
@@ -58,13 +60,27 @@ export interface RaceGame {
   onEvent(listener: (e: DirectorEvent) => void): () => void;
 }
 
-const ITEM_QUARTER = 4;
+/** The rules of a race. They come from a 'race' preset in the scene's `rules` slot (see rulesOf), or from these defaults. */
+export interface RaceRules { laps: number; field: number; aiSkill: number; itemsPerLap: number; boostPads: number; boostPadMs: number; rumble: boolean; startLine: boolean; walls: boolean }
+export const DEFAULT_RULES: RaceRules = { laps: 3, field: 8, aiSkill: 1, itemsPerLap: 4, boostPads: 3, boostPadMs: 1400, rumble: true, startLine: true, walls: true };
+
+/** Read the race rules of the loaded scene (its first `rules` child), filling anything missing from the defaults. */
+export function rulesOf(rt: Runtime): RaceRules {
+  const scene = rt.binder.sceneId ? rt.store.get(rt.binder.sceneId) : undefined;
+  const ref = scene?.children['rules']?.[0]?.ref;
+  const p = ref ? rt.store.resolve(ref).params : {};
+  const n = (k: keyof RaceRules, lo: number, hi: number): number => { const v = Number(p[k]); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : (DEFAULT_RULES[k] as number); };
+  const b = (k: 'rumble' | 'startLine' | 'walls'): boolean => (typeof p[k] === 'boolean' ? (p[k] as boolean) : DEFAULT_RULES[k]);
+  return { laps: Math.round(n('laps', 1, 20)), field: Math.round(n('field', 2, 12)), aiSkill: n('aiSkill', 0.3, 1.5), itemsPerLap: Math.round(n('itemsPerLap', 0, 12)), boostPads: Math.round(n('boostPads', 0, 8)), boostPadMs: n('boostPadMs', 200, 5000), rumble: b('rumble'), startLine: b('startLine'), walls: b('walls') };
+}
 
 /** Builds the Basalt-Isle race: carved terrain + track, eight goblins in glass balls, rules, director and input. */
 export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGame {
   const seed = opts.seed ?? 7;
-  const laps = opts.laps ?? 3;
-  const n = Math.max(2, Math.min(12, opts.field ?? 8));
+  const rules: RaceRules = { ...DEFAULT_RULES, ...opts.rules };
+  const laps = opts.laps ?? rules.laps;
+  const n = Math.max(2, Math.min(12, opts.field ?? rules.field));
+  const itemQuarter = rules.itemsPerLap;
   const playerSeed = opts.player ? ({ kind: 'racer', name: opts.player.name, tags: [], tier: 'play', params: { skill: 0.7, hat: 'helmet', ears: 'pointy', ...opts.player.params } } as PresetSeed) : RACERS[(opts.playerIndex ?? 0) % RACERS.length]!;
 
   // ---- the island and the track: generated, or taken from the scene the Map Maker built
@@ -123,7 +139,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
 
   // ---- low walls along both sides keep the field on the island road
   const WALL_H = 0.9;
-  for (const w of trackWalls(track, { offset: track.width / 2 + 3, spacing: 4, side: 'both' })) {
+  if (rules.walls) for (const w of trackWalls(track, { offset: track.width / 2 + 3, spacing: 4, side: 'both' })) {
     const q = quatFromYaw(Math.atan2(w.dz, w.dx));
     const y = heightAt(terrain, w.x, w.z) + WALL_H * 0.5;
     const e = world.spawn();
@@ -144,7 +160,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     const ball = world.spawn();
     rt.physics.addBody(ball, { kind: 'dynamic', collider: { shape: 'sphere', radius: BALL_RADIUS }, mass: phys.mass, friction: 0.6, restitution: phys.restitution, linearDamping: 0.03, angularDamping: 0.3, position: [slot.x, y, slot.z], tier: 'racing' });
     world.add(ball, 'renderable', { shape: 'sphere', size: BALL_RADIUS, color: '#bfe8ff', roughness: 0.05, metalness: 0, opacity: 0.22 });
-    world.add(ball, 'racer', { name: seedI.name, controller: i === 0 ? 'player' : 'ai', actor: 'p1', weight: stats.weight, speed: stats.speed, bounce: stats.bounce, hx: slot.hx, hz: slot.hz, skill: Number(p['skill'] ?? 0.6) });
+    world.add(ball, 'racer', { name: seedI.name, controller: i === 0 ? 'player' : 'ai', actor: 'p1', weight: stats.weight, speed: stats.speed, bounce: stats.bounce, hx: slot.hx, hz: slot.hz, skill: Math.min(1, Math.max(0, Number(p['skill'] ?? 0.6) * (i === 0 ? 1 : rules.aiSkill))) });
     world.add(ball, 'race', {});
     colors.set(ball, String(p['color']));
     const look = lookFromParams(p as Record<string, unknown>);
@@ -237,22 +253,23 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
       const r = world.get(id, 'race');
       const rc = world.get(id, 'racer');
       if (!r || !rc) continue;
-      const q = Math.floor(Number(r['progress']) * ITEM_QUARTER);
+      if (itemQuarter <= 0) continue;
+      const q = Math.floor(Number(r['progress']) * itemQuarter);
       const prev = lastQuarter.get(id) ?? 0;
-      if (q > prev && rc['item'] === '' && q < laps * ITEM_QUARTER) grantItem(world as never, id, rollItem(Number(r['place']) || 1, racerIds.length, () => rt.sim.rng.next()).id);
+      if (q > prev && rc['item'] === '' && q < laps * itemQuarter) grantItem(world as never, id, rollItem(Number(r['place']) || 1, racerIds.length, () => rt.sim.rng.next()).id);
       lastQuarter.set(id, q);
     }
   };
 
-  const road = buildRoad(track.points, track.width, terrain);
+  const road = buildRoad(track.points, track.width, terrain, { boostPads: rules.boostPads, rumble: rules.rumble, startLine: rules.startLine });
   /** Boost pads: any racer rolling over one gets a short boost (and a sound via the 'pad:boost' event). */
   const padBoost = (): void => {
     for (const id of racerIds) {
       const t = world.get(id, 'transform'), rc = world.get(id, 'racer');
-      if (!t || !rc || Number(rc['boostMs']) > 700) continue;
+      if (!t || !rc || Number(rc['boostMs']) > rules.boostPadMs / 2) continue;
       const x = Number(t['x']), z = Number(t['z']);
       if (road.pads.some((p) => onPad(p, x, z))) {
-        world.set(id, 'racer', { boostMs: 1400 });
+        world.set(id, 'racer', { boostMs: rules.boostPadMs });
         rt.events.emit('pad:boost', { entity: id });
       }
     }

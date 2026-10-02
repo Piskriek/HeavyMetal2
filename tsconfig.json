@@ -56,6 +56,12 @@
       ],
       "@hm/racing": [
         "packages/racing/src/index.ts"
+      ],
+      "@hm/racers": [
+        "packages/racers/src/index.ts"
+      ],
+      "@hm/trackgen": [
+        "packages/trackgen/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

@@ -43,6 +43,8 @@ export function IslandWalk(props: {
   readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean;
   readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
+  /** Behind the main menu: no HUD, no controls, the camera circles your island and your goblin. When it turns off the camera flies down to the goblin. */
+  readonly showcase?: boolean;
   readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
 }): ReactElement {
   const { rt, onEdit, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
@@ -75,8 +77,13 @@ export function IslandWalk(props: {
   const byId = useMemo(() => new Map(items.map((c) => [c.id, c])), [items]);
   const row: (CatalogItem | null)[] = p.hotbars[p.tab].map((id) => (id ? byId.get(id) ?? null : null));
   const heldItem = row[p.slots[p.tab]] ?? null;
-  const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win });
-  live.current = { menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win };
+  const showcase = props.showcase === true;
+  const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase });
+  live.current = { menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase };
+  const landRef = useRef<(() => void) | null>(null);
+  const wasShowcase = useRef(showcase);
+  // leaving the menu: fly down from the orbit to the goblin
+  useEffect(() => { if (wasShowcase.current && !showcase) landRef.current?.(); wasShowcase.current = showcase; }, [showcase]);
   useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
@@ -150,7 +157,7 @@ export function IslandWalk(props: {
     showTerrain();
     const offTerrain = rt.binder.onTerrain(showTerrain);
     // looking down from the island overview there is a lot of air between the camera and the ground: thin the haze so the island can be seen
-    const stopLighting = followLighting(rt.store, scene.sceneId, renderer, () => (live.current.level === 'island' ? 0.1 : 1));
+    const stopLighting = followLighting(rt.store, scene.sceneId, renderer, () => (live.current.level === 'island' ? 0.1 : live.current.showcase ? 0.3 : 1));
     lightingRef.current = stopLighting;
     const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d && !live.current.isolateId ? decorInstances(d.placements) : null); };
     showDecor();
@@ -190,6 +197,7 @@ export function IslandWalk(props: {
     if (!introRef.current && lastPose) camYaw = lastPose.camYaw;
     const intro = { on: introRef.current, t: 0, ms: 3200 };
     if (intro.on) { camPitch = 1.3; camDist = 150; }
+    landRef.current = () => { intro.on = true; intro.t = 0; camPitch = 1.3; camDist = 150; };
     let eye: [number, number, number] | null = null;
     // studio camera: where it is and where it looks
     let fly: { x: number; y: number; z: number; yaw: number; pitch: number } | null = null;
@@ -256,6 +264,7 @@ export function IslandWalk(props: {
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
       const k = e.key.toLowerCase();
+      if (live.current.showcase) return;
       if (k === 'escape') { escape(); return; }
       if (typing) return;
       if (live.current.menu) return;
@@ -289,7 +298,7 @@ export function IslandWalk(props: {
     window.addEventListener('blur', onBlur);
     const overUi = (e: Event): boolean => !el.contains(e.target as Node);
     const onPointerDown = (e: PointerEvent): void => {
-      if (live.current.menu || intro.on) return;
+      if (live.current.menu || intro.on || live.current.showcase) return;
       cursor = { x: e.clientX, y: e.clientY };
       if (!pointerLocked && overUi(e)) return;
       if (studio() || live.current.level === 'island') {
@@ -325,6 +334,7 @@ export function IslandWalk(props: {
       if (mouse) { mouse &= e.button === 2 && !softAim ? ~2 : ~1; if (!mouse) builder.end(); }
     };
     const onWheel = (e: WheelEvent): void => {
+      if (live.current.showcase) return;
       if (live.current.wheelOpen) { const n = live.current.items.length; if (n) setWheelIndex((i) => (i + (e.deltaY > 0 ? 1 : -1) + n) % n); return; }
       if (!pointerLocked && overUi(e)) return;
       if (live.current.focusId) { orbit = { ...orbit, dist: Math.min(60, Math.max(1.5, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))) }; return; }
@@ -366,7 +376,7 @@ export function IslandWalk(props: {
         camDist = 150 + (3.6 - 150) * e; camPitch = 1.3 + (0.3 - 1.3) * e; camYaw = Math.PI + (1 - e) * 1.2;
         if (k >= 1) { intro.on = false; onIntroDone?.(); }
       }
-      const overview = live.current.level === 'island';
+      const overview = live.current.level === 'island' || live.current.showcase;
       const st = studio();
       const fpv = player().view === 'first' && !st;
       const paused = live.current.menu || overview;
@@ -456,7 +466,12 @@ export function IslandWalk(props: {
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 0.6);
       }
       if (!ft && !live.current.focusId) renderer.setFocus(null);
-      if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
+      if (live.current.showcase) {
+        // the main menu's view: a slow circle round the island, low enough to see the goblin standing on it
+        const a = now * 0.00005 + 0.6;
+        target = [px * 0.55, py * 0.55 + 6, pz * 0.55];
+        wantEye = [target[0] + Math.sin(a) * 62, target[1] + 24, target[2] + Math.cos(a) * 62];
+      } else if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
       const snap = (fpv || st) && !overview && !ft;
       const k = snap ? 1 : Math.min(1, dt * (overview ? 3 : 10));
       eye = eye && !snap ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
@@ -489,7 +504,7 @@ export function IslandWalk(props: {
   }, [p.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
-  const showHud = buildOn && !menu && level !== 'island';
+  const showHud = buildOn && !menu && level !== 'island' && !showcase;
   const free = !locked || p.mode === 'studio';
   return (
     <div className={`island${p.mode === 'studio' ? ' studio' : ''}`} style={{ position: 'absolute', inset: 0 }}>
@@ -511,8 +526,8 @@ export function IslandWalk(props: {
             : null}
         </FloatingWindow>
       ))}
-      {note ? <div className="island-note" role="status">{note}</div> : null}
-      {!menu ? <p className="island-hint">{hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
+      {note && !showcase ? <div className="island-note" role="status">{note}</div> : null}
+      {!menu && !showcase ? <p className="island-hint">{hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>

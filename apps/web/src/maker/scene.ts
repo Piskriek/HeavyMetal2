@@ -21,11 +21,11 @@ export interface TemplateShape {
 }
 export const TEMPLATE_SHAPES: Readonly<Record<string, TemplateShape>> = {
   'blank-island': { seed: 21, radius: 0.8, height: 9, roughness: 3, track: false, name: 'My Island' },
-  'palm-beach': { seed: 5, radius: 0.88, height: 11, roughness: 4, track: false, name: 'Palm Beach' },
-  'rocky-cove': { seed: 9, radius: 0.9, height: 24, roughness: 11, track: false, name: 'Rocky Cove' },
+  'palm-beach': { seed: 5, radius: 0.88, height: 11, roughness: 4, track: false, name: 'Palm Beach', dress: 1.2 },
+  'rocky-cove': { seed: 9, radius: 0.9, height: 24, roughness: 11, track: false, name: 'Rocky Cove', dress: 0.6 },
   volcano: { seed: 12, radius: 0.92, height: 11, roughness: 4, track: false, name: 'Volcano Isle', volcano: { peak: 40, cone: 0.34, crater: 0.2, craterDepth: 17 }, dress: 0.9 },
   'racing-starter': { seed: 7, radius: 0.95, height: 18, roughness: 7, track: true, name: 'Racing Island' },
-  'floating-rocks': { seed: 33, radius: 0.55, height: 15, roughness: 13, track: false, name: 'Floating Rocks' },
+  'floating-rocks': { seed: 33, radius: 0.55, height: 15, roughness: 13, track: false, name: 'Floating Rocks', dress: 0.5 },
   'empty-sea': { seed: 3, radius: 0.18, height: 3, roughness: 2, track: false, name: 'Empty Sea' },
 };
 

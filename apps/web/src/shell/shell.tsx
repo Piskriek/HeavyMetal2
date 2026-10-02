@@ -79,8 +79,10 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
   const visible = profile.activities.filter((a) => !a.hidden);
   const planets = useMemo(() => [HOME, ...visible.map(toPlanet)], [profile.activities]); // eslint-disable-line react-hooks/exhaustive-deps
-  const galaxyOn = screen === 'menu' || screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'settings' || screen === 'activity';
-  const islandMounted = world !== null && (screen === 'island' || (screen === 'zoom' && session));
+  /** Behind the main menu (and settings and the goblin creator) your island turns slowly; the galaxy is the multiplayer view. */
+  const showcase = screen === 'menu' || screen === 'settings' || screen === 'create';
+  const galaxyOn = screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'activity' || (showcase && world === null);
+  const islandMounted = world !== null && (screen === 'island' || showcase || (screen === 'zoom' && session));
 
   /** Open an island as a fresh world: load its saved map, or build it from its template (a template instance has no saved map until it is edited). */
   const openWorld = useCallback((id: string): World | null => {
@@ -94,6 +96,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     return w;
   }, [makeRuntime]);
 
+  // the menu shows your island: open it as soon as the menu is up
+  useEffect(() => { if ((screen === 'menu' || screen === 'create') && !world) { const id = activeIslandId(); if (id) openWorld(id); } }, [screen, world, openWorld]);
   const go = useCallback((to: Screen) => { setScreen(to); setGalaxyOpacity(to === 'island' || to === 'build' || to === 'racing' ? 0 : 1); }, []);
   const toMenu = useCallback(() => { go('menu'); setPicked('goblin-racing'); setIslandMenu(false); }, [go]);
   const toIsland = useCallback(() => { setIntro(false); setLevel('goblin'); setIslandMenu(false); go('island'); }, [go]);
@@ -110,6 +114,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     // capture the mouse now, while the click still counts as a user gesture: mouse look is on from the first frame on the island
     try { const r = (document.querySelector('.shell') as HTMLElement | null)?.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => undefined); } catch { /* not available */ }
     if (!world) { const id = activeIslandId(); if (!id || !openWorld(id)) return; }
+    // from the menu the island is already there behind it: the camera simply flies down to the goblin
+    if (screenRef.current === 'menu' || screenRef.current === 'create' || screenRef.current === 'settings') { setSession(true); setLevel('goblin'); setIslandMenu(false); setIntro(false); setGalaxyOpacity(0); setScreen('island'); return; }
     setSession(true); setLevel('goblin'); setIslandMenu(false);
     setScreen('zoom'); setIntro(!reduced);
     if (!reduced) await galaxy.current?.diveTo('home', 2600);
@@ -154,11 +160,11 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} quality={profile.quality} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} quality={profile.quality} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
             onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}
-      {screen === 'island' || screen === 'zoom' ? <GalaxyBar open={islandMenu || level === 'island'} level={level} onLevel={setLevel} onBackToGalaxy={toMenu} /> : null}
+      {screen === 'island' || screen === 'zoom' ? <GalaxyBar open={islandMenu || level === 'island'} level={level} onLevel={setLevel} onBackToGalaxy={() => toHub()} /> : null}
       {galaxyOn ? (
         <div className="shell-layer" style={{ zIndex: 2, opacity: galaxyOpacity, transition: 'opacity .9s ease', pointerEvents: galaxyOpacity < 0.5 ? 'none' : 'auto' }}>
           <GalaxyCanvas ref={galaxy} planets={planets} mode={screen === 'hub' ? 'hub' : 'backdrop'} focusId={screen === 'hub' ? 'goblin-racing' : undefined} highlightId={screen === 'hub' ? 'goblin-racing' : undefined} reducedMotion={reduced} onPick={(id) => { setPicked(id); }} />

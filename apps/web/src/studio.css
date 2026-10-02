@@ -415,3 +415,7 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .cg-panel .btns { display: flex; gap: 8px; align-items: center; margin-top: auto; }
 .cg-panel .grow { flex: 1; }
 @media (max-width: 760px) { .create-goblin { grid-template-columns: 1fr; grid-template-rows: 42vh 1fr; } .cg-panel { border-left: 0; border-top: 1px solid var(--line); } }
+
+/* the main menu over your island: a soft dark scrim on the left keeps the menu readable over a bright day */
+.shell[data-screen="menu"] .shell-ui { background: linear-gradient(90deg, rgba(8, 10, 14, .66) 0%, rgba(8, 10, 14, .38) 32%, rgba(8, 10, 14, 0) 58%); }
+.shell[data-screen="menu"] .shell-foot { color: #d8d6cc; }

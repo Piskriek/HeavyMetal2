@@ -132,6 +132,15 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
+      "@hm/pbrgrass": [
+        "packages/pbrgrass/src/index.ts"
+      ],
+      "@hm/assembler": [
+        "packages/assembler/src/index.ts"
+      ],
+      "@hm/islands": [
+        "packages/islands/src/index.ts"
+      ],
       "@hm/toolcatalog": [
         "packages/toolcatalog/src/index.ts"
       ],

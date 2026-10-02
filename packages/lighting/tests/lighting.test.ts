@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  DEFAULT_SETUP, LAMP_SLOTS, LIGHT_RANGES, LIGHT_VARIABLES, SETUPS, SETUP_IDS, applyTimeOfDay, cloneSetup, defaultLightParams, hexToRgb, isHex, lerpSetup, mixHex,
+  DEFAULT_SETUP, LAMP_SLOTS, LIGHT_LIMITS, LIGHT_RANGES, LIGHT_VARIABLES, SETUPS, SETUP_IDS, applyTimeOfDay, cloneSetup, defaultLightParams, hexToRgb, isHex, lerpSetup, mixHex,
   nightFactor, normalizeSetup, paramsToSetup, rgbToHex, setIn, setupById, setupToParams, sunDirection, todElevation,
 } from '../src';
 import type { LightSetup } from '../src';
@@ -41,15 +41,27 @@ test('normalizeSetup repairs junk and never throws', () => {
     assert.deepEqual(normalizeSetup(s), s, 'idempotent');
   }
   const wild = normalizeSetup({ sun: { intensity: 999, elevationDeg: 500, azimuthDeg: -90, shadowMapSize: 3000, color: '#ABCDEF' }, exposure: -3, toneMapping: 'sepia', post: { grain: 7, posterize: 2.6 } });
-  assert.equal(wild.sun.intensity, LIGHT_RANGES.sunIntensity[1]);
+  assert.equal(wild.sun.intensity, LIGHT_LIMITS.sunIntensity[1]);
   assert.equal(wild.sun.elevationDeg, 90);
   assert.equal(wild.sun.azimuthDeg, 270);
   assert.equal(wild.sun.shadowMapSize, 4096);
   assert.equal(wild.sun.color, '#abcdef');
-  assert.equal(wild.exposure, LIGHT_RANGES.exposure[0]);
+  assert.equal(wild.exposure, LIGHT_LIMITS.exposure[0]);
   assert.equal(wild.toneMapping, DEFAULT_SETUP.toneMapping);
-  assert.equal(wild.post.grain, LIGHT_RANGES.grain[1]);
+  assert.equal(wild.post.grain, LIGHT_LIMITS.grain[1]);
   assert.equal(wild.post.posterize, 3);
+});
+
+test('a typed value past the comfortable slider range is kept, not clamped to it', () => {
+  const s = normalizeSetup({ sun: { intensity: 30 }, exposure: 6, post: { bloom: { strength: 9 } } });
+  assert.equal(s.sun.intensity, 30);
+  assert.equal(s.exposure, 6);
+  assert.equal(s.post.bloom.strength, 9);
+  assert.ok(30 > LIGHT_RANGES.sunIntensity[1], 'it really is past the slider end');
+  for (const v of LIGHT_VARIABLES) if (v.type === 'number') {
+    assert.ok(v.hardMax !== undefined && v.hardMin !== undefined, v.key);
+    assert.ok(v.hardMin! <= v.min! && v.hardMax! >= v.max!, `${v.key}: the hard limits must contain the slider range`);
+  }
 });
 
 test('normalizeSetup keeps at most four point lamps and two spot lamps', () => {

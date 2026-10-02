@@ -3,21 +3,21 @@
  * Pure (no DOM): the shell feeds it the device facts and the frame times, and applies whatever it answers.
  */
 
-export type Quality = 'low' | 'medium' | 'high';
+export type Quality = 'low' | 'medium' | 'high' | 'ultra';
 
-const ORDER: readonly Quality[] = ['low', 'medium', 'high'];
+const ORDER: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
 
 export interface DeviceFacts { readonly touch: boolean; readonly cores: number; readonly dpr: number; readonly width: number }
 
-/** A first guess before any frame has been drawn: phones start lower, desktops start high. */
+/** A first guess before any frame has been drawn: phones start lower, desktops start at ultra (the adapting drops a tier if frames run slow). */
 export function guessQuality(d: DeviceFacts): Quality {
-  if (!d.touch) return d.cores > 0 && d.cores <= 2 ? 'medium' : 'high';
+  if (!d.touch) return d.cores > 0 && d.cores <= 2 ? 'medium' : d.cores >= 8 ? 'ultra' : 'high';
   if (d.cores > 0 && d.cores <= 4) return 'low';
   return d.dpr >= 3 || d.width < 420 ? 'medium' : 'high';
 }
 
 export function parseQuality(v: unknown): Quality | null {
-  return v === 'low' || v === 'medium' || v === 'high' ? v : null;
+  return v === 'low' || v === 'medium' || v === 'high' || v === 'ultra' ? v : null;
 }
 
 export interface AdaptiveQuality {

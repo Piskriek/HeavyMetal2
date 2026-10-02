@@ -1,4 +1,4 @@
-import { visibleAt, type ChildSlot, type Params, type PresetSchema, type Ref, type Tier, type Value, type ValueType, type VariableDef } from '@hm/contracts';
+import { hardLimits, visibleAt, type ChildSlot, type Params, type PresetSchema, type Ref, type Tier, type Value, type ValueType, type VariableDef } from '@hm/contracts';
 
 /** How a row is drawn. Chosen from the variable's type and limits, never from its name. */
 export type Control = 'slider' | 'number' | 'toggle' | 'text' | 'select' | 'color' | 'vector' | 'ref' | 'expr' | 'curve' | 'asset' | 'list';
@@ -16,8 +16,12 @@ export interface InspectorRow {
   readonly overridden: boolean;
   /** The formula text when the stored value is `{ expr }`. */
   readonly expression?: string;
+  /** The comfortable range (where the slider starts and ends); values outside it are allowed. */
   readonly min?: number;
   readonly max?: number;
+  /** What the value may never pass; absent when open on that side. */
+  readonly hardMin?: number;
+  readonly hardMax?: number;
   readonly step?: number;
   readonly unit?: string;
   readonly options?: readonly string[];
@@ -67,6 +71,8 @@ function controlFor(def: VariableDef, stored: Value | undefined): Control {
   }
 }
 
+const isNumeric = (def: VariableDef): boolean => def.type === 'number' || def.type === 'int';
+
 function matches(def: VariableDef, search: string): boolean {
   const q = search.toLowerCase();
   return def.key.toLowerCase().includes(q) || def.label.toLowerCase().includes(q) || def.doc.toLowerCase().includes(q);
@@ -88,6 +94,7 @@ export function buildInspectorModel(input: InspectorInput): InspectorModel {
       overridden: Object.prototype.hasOwnProperty.call(params, def.key),
       ...(isExpr(stored) ? { expression: stored.expr } : {}),
       ...(def.min !== undefined ? { min: def.min } : {}), ...(def.max !== undefined ? { max: def.max } : {}),
+      ...(isNumeric(def) && Number.isFinite(hardLimits(def).lo) ? { hardMin: hardLimits(def).lo } : {}), ...(isNumeric(def) && Number.isFinite(hardLimits(def).hi) ? { hardMax: hardLimits(def).hi } : {}),
       ...(def.step !== undefined ? { step: def.step } : {}), ...(def.unit !== undefined ? { unit: def.unit } : {}),
       ...(def.options !== undefined ? { options: def.options } : {}),
     };

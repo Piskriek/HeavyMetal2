@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement, isValidElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { defineSchema, type Params, type Ref, type Tier, type Value } from '@hm/contracts';
-import { Inspector } from '@hm/ui';
+import { Inspector, buildInspectorModel, numberToEmit } from '@hm/ui';
 
 const schema = defineSchema({
   kind: 'widget', version: 1, label: 'Widget', doc: 'A test widget.',
@@ -66,7 +66,9 @@ test('slider shows the current value with its unit and carries limits', () => {
   const html = rowHtml(render('build', { resolved: { power: 7 } }), 'power');
   assert.match(html, /type="range"/);
   assert.match(html, /value="7"/);
-  assert.match(html, /<output[^>]*>7 kW<\/output>/);
+  assert.match(html, /<input[^>]*type="number"[^>]*aria-label="Power value"[^>]*value="7"|<input[^>]*aria-label="Power value"[^>]*type="number"/, 'a box to type the exact number');
+  assert.match(html, /<span class="hmi-unit">kW<\/span>/);
+  assert.match(html, /class="hmi-src"/, 'every number has the input chooser');
 });
 
 test('number (no max) and int controls are number inputs holding the value', () => {
@@ -180,19 +182,50 @@ test('editing emits correctly typed values', () => {
   const onChange = (k: string, v: Value) => { calls.push([k, v]); };
   const fire = (tier: Tier, label: string, target: Record<string, unknown>, extra: Extra = {}) =>
     (byAria(tier, label, { onChange, ...extra })['onChange'] as (e: unknown) => void)({ target });
-  fire('build', 'Power', { value: '7' });
-  fire('build', 'Count', { value: '4.6' });
   fire('build', 'Enabled', { checked: false });
   fire('build', 'Title', { value: 'Yo' });
   fire('build', 'Mode', { value: 'c' });
   fire('build', 'Tint', { value: '#00ff00' });
   fire('pro', 'Speed', { value: 'a+b' });
   fire('build', 'Position y', { value: '9' });
-  fire('build', 'Count', { value: '' }); // empty entry emits nothing
   assert.deepEqual(calls, [
-    ['power', 7], ['count', 5], ['on', false], ['title', 'Yo'], ['mode', 'c'], ['tint', '#00ff00'],
+    ['on', false], ['title', 'Yo'], ['mode', 'c'], ['tint', '#00ff00'],
     ['speed', { expr: 'a+b' }], ['pos', [1, 9, 3]],
   ]);
+});
+
+test('numbers: typed values are whole for ints, never stopped by the slider range, and only a hard limit refuses them', () => {
+  const rows = buildInspectorModel({ schema, params: {}, resolved: {}, tier: 'pro' }).groups.flatMap((g) => g.rows);
+  const row = (key: string) => rows.find((r) => r.key === key)!;
+  assert.equal(numberToEmit(row('power'), '7', true), 7);
+  assert.equal(numberToEmit(row('count'), '4.6', false), 5);
+  assert.equal(numberToEmit(row('count'), '', false), null, 'an empty box emits nothing');
+  assert.equal(numberToEmit(row('count'), 'abc', false), null);
+  assert.equal(row('power').max, 10);
+  assert.equal(numberToEmit(row('power'), '70', false), 70, 'past the slider end is fine');
+  assert.equal(numberToEmit(row('power'), '-4', false), 0, 'a range that starts at zero stops at zero');
+  assert.equal(numberToEmit(row('power'), '7.3', true), 7, 'dragging snaps to the step, typing does not');
+  assert.equal(numberToEmit(row('power'), '7.3', false), 7.3);
+});
+
+test('the hard limits reach the row; open sides stay open', () => {
+  const frac = defineSchema({ kind: 'f', version: 1, label: 'F', doc: 'x', slots: [], variables: [
+    { key: 'opacity', type: 'number', label: 'Opacity', doc: 'x', tier: 'play', default: 1, min: 0, max: 1 },
+    { key: 'turn', type: 'number', label: 'Turn', doc: 'x', tier: 'play', default: 0, min: -180, max: 180 },
+  ] } as const);
+  const rows = buildInspectorModel({ schema: frac, params: {}, resolved: {}, tier: 'play' }).groups.flatMap((g) => g.rows);
+  const o = rows.find((r) => r.key === 'opacity')!, t = rows.find((r) => r.key === 'turn')!;
+  assert.equal(o.hardMin, 0); assert.equal(o.hardMax, 1);
+  assert.equal(t.hardMin, undefined); assert.equal(t.hardMax, undefined);
+  assert.equal(numberToEmit(o, '1.5', false), 1);
+  assert.equal(numberToEmit(t, '900', false), 900);
+});
+
+test('every number gets an input chooser, formulas can switch back, and the slider is still a native range', () => {
+  const html = render('pro', { params: { speed: { expr: 'power * 2' } } });
+  assert.ok((html.match(/class="hmi-src/g) ?? []).length >= 3, 'power, count and speed each have one');
+  assert.match(rowHtml(html, 'speed'), /hmi-src/);
+  assert.doesNotMatch(rowHtml(html, 'title'), /hmi-src/, 'text settings have no number input');
 });
 
 test('the reset button calls onReset with the key', () => {

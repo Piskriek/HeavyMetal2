@@ -3,6 +3,7 @@
  * Immutable revisions, pinned fork chains, indexed lookups (list/dependents never scan everything).
  */
 import {
+  hardLimits,
   visibleAt,
   type ImportReport,
   type Issue,
@@ -282,11 +283,12 @@ export const createPresetStore = (opts: PresetStoreOptions): PresetStore => {
           continue;
         }
         if (typeof value === 'number') {
-          if ((def.min !== undefined && value < def.min) || (def.max !== undefined && value > def.max)) {
+          const { lo, hi } = hardLimits(def);
+          if (value < lo || value > hi) {
             issues.push({
               severity: 'error',
               code: 'param-range',
-              message: `'${key}' is ${value} but must be between ${def.min ?? '-inf'} and ${def.max ?? '+inf'}.`,
+              message: `'${key}' is ${value} but must be between ${lo === -Infinity ? '-inf' : lo} and ${hi === Infinity ? '+inf' : hi}.`,
               presetId: preset.id,
               path: key,
             });

@@ -4,7 +4,9 @@ import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRe
 import { heightAt } from '@hm/terrain';
 import { encodeModel, type VoxelModel } from '@hm/voxel';
 import { MODELS } from '@hm/voxelart';
+import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
 import { followLighting } from './look';
+import { LightingWindow } from './lighting/lighting-window';
 import { decorInstances } from './maker/dress';
 import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
@@ -23,7 +25,7 @@ let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = 
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
 export function IslandWalk(props: {
-  readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr';
+  readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr'; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
 }): ReactElement {
   const { rt, onEdit, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
@@ -33,8 +35,12 @@ export function IslandWalk(props: {
   const skinRef = useRef(props.skin ?? 'flat');
   skinRef.current = props.skin ?? 'flat';
   useEffect(() => { terrainView.current?.setLook({ skin: props.skin ?? 'flat' }); }, [props.skin]);
+  const qualityRef = useRef(props.quality ?? 'auto');
+  qualityRef.current = props.quality ?? 'auto';
 
   const [menu, setMenu] = useState(false);
+  const [lightOpen, setLightOpen] = useState(false);
+  useEffect(() => { if (!menu) setLightOpen(false); }, [menu]);
   const [inv, setInv] = useState(false);
   const [locked, setLocked] = useState(false);
   const [slots, setSlots] = useState<(HotItem | null)[]>(() => loadHotbar());
@@ -61,7 +67,11 @@ export function IslandWalk(props: {
     if (!el) return;
     const renderer: ThreeRenderer = createThreeRenderer({ shadows: true, background: 'sky' });
     renderer.mount(el, rt.world, rt.store);
-    renderer.setQuality('high');
+    // graphics: a chosen tier is kept; auto starts at what the device can probably do and drops a tier when frames run slow
+    const chosen = parseQuality(qualityRef.current);
+    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }), { locked: chosen !== null });
+    renderer.setQuality(adaptive.current);
+    const offFrame = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) renderer.setQuality(q); });
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const showTerrain = (): void => {
@@ -275,6 +285,7 @@ export function IslandWalk(props: {
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
       offTerrain();
+      offFrame();
       stopLighting();
       lastPose = { px, pz, face, camYaw };
       api.current = null;
@@ -290,11 +301,13 @@ export function IslandWalk(props: {
       {inv ? <Inventory selected={sel} onPick={pickItem} onClose={() => openInv(false)} /> : null}
       {note ? <div className="island-note" role="status">{note}</div> : null}
       {!menu && !inv ? <p className="island-hint">{buildOn ? (locked ? 'Mouse look · Space jump · 1-9 tools · click use · right click or Shift lower · E inventory · V view · Ctrl+Z undo · Esc menu' : 'Click to capture the mouse · W A S D move · Esc menu') : (locked ? 'Mouse look · W A S D move · Shift run · Space jump · Esc menu' : 'Click to capture the mouse · W A S D move · Esc menu')}</p> : null}
+      {lightOpen && menu ? <LightingWindow rt={rt} sceneId={scene.sceneId} onClose={() => setLightOpen(false)} /> : null}
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
           <button className="go" onClick={onMainMenu}>Main menu</button>
           {buildOn ? <button onClick={onEdit}>Build mode</button> : null}
+          <button onClick={() => setLightOpen(true)}>Lighting</button>
           <button onClick={onActivities}>Activities</button>
           {onIslands ? <button onClick={onIslands}>My islands</button> : null}
           <button onClick={onHub}>Multiplayer</button>

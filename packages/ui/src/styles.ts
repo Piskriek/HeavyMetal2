@@ -14,6 +14,22 @@ export const CSS = `
 .hmi-in:focus-visible,.hmi-range:focus-visible,.hmi-check:focus-visible,.hmi-reset:focus-visible{outline:2px solid #4ea1ff;outline-offset:1px}
 .hmi-range{flex:1 1 auto;width:100%;min-width:0;height:34px;margin:0;accent-color:#4ea1ff}
 .hmi-val{flex:0 0 auto;min-width:3.5em;text-align:right;font-variant-numeric:tabular-nums;color:#9fd0ff}
+.hmi-num{flex:0 0 auto;width:5.6em;min-width:0;height:34px;padding:0 6px;background:#0e1216;color:#9fd0ff;border:1px solid #2f3b46;border-radius:6px;font:inherit;font-variant-numeric:tabular-nums;text-align:right}
+.hmi-unit{flex:0 0 auto;color:#8ea3b5;font-size:.85em}
+.hmi-src{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;background:transparent;color:#8ea3b5;border:1px solid #2f3b46;border-radius:6px;cursor:pointer}
+.hmi-src svg{fill:currentColor;stroke:currentColor;stroke-width:1.2;stroke-linecap:round}
+.hmi-src:hover{color:#dde6ee;border-color:#4ea1ff}
+.hmi-src.on{color:#4ea1ff;border-color:#4ea1ff}
+.hmi-src:focus-visible{outline:2px solid #4ea1ff;outline-offset:1px}
+.hmi-srcmenu{z-index:1000;width:230px;margin:0;padding:4px;list-style:none;background:#1b2229;color:#dde6ee;border:1px solid #3a4856}
+.hmi-srcmenu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;padding:6px 8px;background:transparent;color:inherit;border:0;border-radius:0;text-align:left;font:inherit;cursor:pointer}
+.hmi-srcmenu button b{font-weight:600}
+.hmi-srcmenu button span{font-size:.85em;color:#8ea3b5}
+.hmi-srcmenu button:hover,.hmi-srcmenu button.on{background:#243240}
+.hmi-play .hmi-num{height:48px}
+.hmi-play .hmi-src{width:48px;height:48px}
+.hmi-pro .hmi-num{height:24px}
+.hmi-pro .hmi-src{width:24px;height:24px}
 .hmi-check{width:22px;height:22px;margin:0;accent-color:#4ea1ff}
 .hmi-swatch{width:56px;height:34px;padding:2px;background:#0e1216;border:1px solid #2f3b46;border-radius:6px}
 .hmi-vec{display:flex;gap:6px;width:100%}

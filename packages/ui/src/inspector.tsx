@@ -1,22 +1,24 @@
 import type { ReactElement } from 'react';
 import type { Value } from '@hm/contracts';
-import { Control, type Emit } from './controls';
+import { Control, type Emit, type InputSource } from './controls';
 import { buildInspectorModel, type InspectorInput, type InspectorRow, type InspectorSlot } from './model';
 import { CSS } from './styles';
 
 export type InspectorProps = InspectorInput & {
   readonly onChange: (key: string, value: Value) => void;
   readonly onReset?: (key: string) => void;
+  /** Extra ways to drive a number (wave, random, curve ...) shown in the input menu next to every number. Number and Formula are always there. */
+  readonly inputs?: InputSource;
 };
 
-interface RowProps { readonly row: InspectorRow; readonly idPrefix: string; readonly emit: Emit; readonly onReset: ((key: string) => void) | undefined }
+interface RowProps { readonly row: InspectorRow; readonly idPrefix: string; readonly emit: Emit; readonly onReset: ((key: string) => void) | undefined; readonly inputs: InputSource | undefined }
 
-function Row({ row, idPrefix, emit, onReset }: RowProps): ReactElement {
+function Row({ row, idPrefix, emit, onReset, inputs }: RowProps): ReactElement {
   const id = `${idPrefix}-${row.key}`;
   return (
     <div className={row.overridden ? 'hmi-row hmi-ov' : 'hmi-row'} data-key={row.key} data-overridden={row.overridden ? 'true' : undefined}>
       <label className="hmi-label" htmlFor={id} title={row.doc}>{row.label}</label>
-      <div className="hmi-ctl"><Control row={row} id={id} emit={emit} /></div>
+      <div className="hmi-ctl"><Control row={row} id={id} emit={emit} inputs={inputs} /></div>
       {onReset && row.overridden ? (
         <button type="button" className="hmi-reset" data-reset={row.key} aria-label={`reset ${row.label}`} onClick={() => onReset(row.key)}>reset</button>
       ) : null}
@@ -40,7 +42,7 @@ function Slot({ slot }: { readonly slot: InspectorSlot }): ReactElement {
 
 /** Draws the model built by buildInspectorModel. Stateless: every edit goes out through onChange / onReset. */
 export function Inspector(props: InspectorProps): ReactElement {
-  const { onChange, onReset, tier } = props;
+  const { onChange, onReset, tier, inputs } = props;
   const model = buildInspectorModel(props);
   const idPrefix = `hmi-${props.schema.kind}`;
   const empty = model.groups.length === 0 && model.slots.length === 0;
@@ -51,7 +53,7 @@ export function Inspector(props: InspectorProps): ReactElement {
         <section className="hmi-group" key={group.name}>
           {tier === 'play' ? null : <h3 className="hmi-h">{group.name}</h3>}
           <div className="hmi-rows">
-            {group.rows.map((row) => <Row key={row.key} row={row} idPrefix={idPrefix} emit={onChange} onReset={onReset} />)}
+            {group.rows.map((row) => <Row key={row.key} row={row} idPrefix={idPrefix} emit={onChange} onReset={onReset} inputs={inputs} />)}
           </div>
         </section>
       ))}

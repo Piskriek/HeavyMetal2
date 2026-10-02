@@ -5,7 +5,7 @@ export interface ResultRow { id: string; name: string; color: string; position: 
 export interface Settings {
   master: number; sfx: number; music: number;
   /** auto picks from the device and drops a tier when frames run slow. */
-  quality: 'auto' | 'low' | 'medium' | 'high';
+  quality: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   touchControls: 'auto' | 'on' | 'off';
   reducedMotion: boolean;
   invertSteer: boolean;

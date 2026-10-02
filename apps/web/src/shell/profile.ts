@@ -12,12 +12,14 @@ export interface Profile {
   readonly grownUp: boolean;
   readonly tutorialDone: boolean;
   readonly skin: 'flat' | 'pbr';
+  /** Graphics tier for the island and the editor; auto starts at the best the device can probably do and drops a tier if frames run slow. */
+  readonly quality: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   readonly activities: readonly Activity[];
   readonly tournament: TournamentState | null;
 }
 
 const KEY = 'hm.profile.v2';
-export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', activities: ActivityRegistry.withDefaults().all(), tournament: null };
+export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', activities: ActivityRegistry.withDefaults().all(), tournament: null };
 
 export function loadProfile(): Profile {
   try {

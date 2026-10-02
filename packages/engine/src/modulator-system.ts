@@ -1,5 +1,5 @@
 import type { EventBus, Preset, PresetId, PresetStore, StepContext, System, Value, VariableSystem, World } from '@hm/contracts';
-import { SIM_HZ } from '@hm/contracts';
+import { SIM_HZ, hardLimits } from '@hm/contracts';
 import { createModulator, validateModulator, type Modulator, type ModulatorDef } from '@hm/modulation';
 
 /**
@@ -123,7 +123,7 @@ export function createModulatorSystem(opts: { readonly store: PresetStore; reado
       const base = entry.base ?? 0;
       const target = entry.mode === 'add' ? base + raw : entry.mode === 'scale' ? base * raw : raw;
       let value = base + (target - base) * Math.min(1, Math.max(0, entry.amount));
-      if (entry.bounds === undefined) { const d = vars.describe(entry.target); entry.bounds = { min: d?.min ?? -Infinity, max: d?.max ?? Infinity }; }
+      if (entry.bounds === undefined) { const d = vars.describe(entry.target); const lim = d ? hardLimits(d) : { lo: -Infinity, hi: Infinity }; entry.bounds = { min: lim.lo, max: lim.hi }; }
       value = Math.min(entry.bounds.max, Math.max(entry.bounds.min, value));
       const toPreset = !entry.target.includes(':');
       if (toPreset && step.tick % PRESET_WRITE_EVERY !== 0) continue;

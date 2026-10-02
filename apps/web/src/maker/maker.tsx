@@ -13,7 +13,7 @@ import { saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { buildRoad } from '@hm/game';
-import { DriversPanel } from './drivers';
+import { DriversPanel, driverInputs } from './drivers';
 import { SoundPanel } from './sound-panel';
 import { RulesPanel } from './rules-panel';
 import { InterfacePanel } from './interface-panel';
@@ -583,7 +583,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
               <p className="hint">Click to add a point · click a line to insert · drag points · hover + Delete removes one.</p>
             </>
           ) : null}
-          {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><div className="btns"><button className="go" title="Go inside it: the world around whites out so you can see it from every side" onClick={() => enterFocus(sel.id)}>✎ Edit</button></div><DriversPanel rt={rt} sceneId={scene.sceneId} propId={sel.id} tier={tier} numberKeys={schema.variables.filter((v) => v.type === 'number' || v.type === 'int').map((v) => ({ key: v.key, label: v.label }))} onFeedback={(k, t) => feedback(k, t)} /><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
+          {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><div className="btns"><button className="go" title="Go inside it: the world around whites out so you can see it from every side" onClick={() => enterFocus(sel.id)}>✎ Edit</button></div><DriversPanel rt={rt} sceneId={scene.sceneId} propId={sel.id} tier={tier} numberKeys={schema.variables.filter((v) => v.type === 'number' || v.type === 'int').map((v) => ({ key: v.key, label: v.label }))} onFeedback={(k, t) => feedback(k, t)} /><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} inputs={driverInputs(rt, scene.sceneId, sel.id)} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
           {tool === 'delete' ? <p className="hint">Click a prop to delete it. Ctrl+Z brings it back.</p> : null}
           </div>
         </aside>

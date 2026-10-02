@@ -240,3 +240,41 @@ kbd { border-radius: 0; }
 .shell-note { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 9; max-width: min(520px, 90vw); padding: 10px 14px; background: var(--text); color: var(--paper); font-size: 13px; cursor: pointer; }
 .shell-activity.current { box-shadow: inset 3px 0 0 var(--accent); }
 .shell-activity input { width: 100%; font-weight: 600; }
+
+/* lighting window: stays open beside the world so changes can be watched */
+.light-win { position: absolute; right: 14px; top: 66px; bottom: 14px; width: 352px; display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); color: var(--text); z-index: 30; }
+.light-win header { display: flex; align-items: baseline; gap: 10px; }
+.light-win header h3 { margin: 0; font: 800 20px/1 'Bricolage Grotesque', Inter, sans-serif; letter-spacing: -.01em; }
+.light-win header .hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.looks-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.look { display: grid; gap: 4px; padding: 4px; text-align: left; letter-spacing: 0; }
+.look i { position: relative; display: block; height: 40px; }
+.look i b { position: absolute; right: 7px; top: 7px; width: 9px; height: 9px; border-radius: 50%; }
+.look span { font-size: 10px; line-height: 1.2; }
+.look.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.light-clock { display: grid; gap: 6px; }
+.light-win .row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.light-win footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* the generic inspector (@hm/ui) in the white studio theme; "html " beats the stylesheet it injects itself */
+html .hmi { background: transparent; color: var(--text); font: 12px/1.4 Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; }
+html .hmi-h { color: var(--dim); font-size: 8px; letter-spacing: .14em; margin: 10px 0 6px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+html .hmi-row, html .hmi-slot { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 6px 0; }
+html .hmi-ov { box-shadow: inset 2px 0 0 var(--accent); padding-left: 8px; }
+html .hmi-label { flex-basis: 96px; }
+html .hmi-in, html .hmi-num { background: #fff; color: var(--text); border: 1px solid var(--line); border-radius: 0; height: 28px; }
+html .hmi-num { width: 5.4em; color: var(--text); }
+html .hmi-range { height: 28px; accent-color: var(--accent); }
+html .hmi-swatch { background: #fff; border: 1px solid var(--line); border-radius: 0; height: 28px; }
+html .hmi-unit { color: var(--dim); }
+html .hmi-src { width: 28px; height: 28px; border-radius: 0; border-color: var(--line); color: var(--dim); background: transparent; }
+html .hmi-src:hover { color: var(--text); border-color: #c9c7bc; }
+html .hmi-src.on { color: var(--accent); border-color: var(--accent); }
+html .hmi-srcmenu { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+html .hmi-srcmenu button { border: 0; padding: 7px 9px; }
+html .hmi-srcmenu button:hover, html .hmi-srcmenu button.on { background: #efeee7; }
+html .hmi-srcmenu button span { color: var(--dim); }
+html .hmi-reset { border-radius: 0; border-color: var(--line); color: var(--accent); }
+html .hmi-reset:hover { background: #efeee7; }
+html .hmi-fx { background: #efeee7; color: var(--accent); border-radius: 0; }
+html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; }

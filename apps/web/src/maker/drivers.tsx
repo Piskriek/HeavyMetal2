@@ -4,6 +4,7 @@ import { cmd, type PresetId, type Tier } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { MODULATOR_PRESETS, describeModulator, validateModulator, type ModulatorDef } from '@hm/modulation';
 import { ModulatorPanel, Sparkline, previewValues } from '@hm/modui';
+import type { InputSource } from '@hm/ui';
 
 /**
  * "Drive with ..." for any number setting of a prop: pick a ready-made driver (wobble, pulse, orbit ...), then tune it with the
@@ -44,6 +45,29 @@ export function removeDriver(rt: Runtime, sceneId: PresetId, id: PresetId): void
 
 /** Presets make most sense as an offset on top of the value the setting already has, except absolute ranges. */
 const modeFor = (def: ModulatorDef): 'replace' | 'add' => (def.kind === 'noise' || def.kind === 'random' || def.kind === 'lfo' ? 'add' : 'replace');
+
+/**
+ * The input menu next to every number in an inspector: Number and Formula are built in, and these are the drivers a number can be given
+ * instead (wobble, pulse, orbit ...). Picking one replaces whatever drove that setting before; picking Number takes the driver away.
+ */
+export function driverInputs(rt: Runtime, sceneId: PresetId, propId: PresetId): InputSource {
+  const idOf = (pid: string): string => `drv:${pid}`;
+  return {
+    choices: MODULATOR_PRESETS.map((p) => ({ id: idOf(p.id), label: p.name, doc: p.doc })),
+    current: (key) => {
+      const d = driversOf(rt, sceneId, propId).find((r) => r.key === key && r.enabled);
+      if (!d) return undefined;
+      const name = rt.store.get(d.id)?.name;
+      const match = MODULATOR_PRESETS.find((m) => m.name === name);
+      return match ? idOf(match.id) : 'driven';
+    },
+    pick: (key, id) => {
+      for (const d of driversOf(rt, sceneId, propId)) if (d.key === key) removeDriver(rt, sceneId, d.id);
+      const preset = MODULATOR_PRESETS.find((m) => idOf(m.id) === id);
+      if (preset) addDriver(rt, sceneId, propId, key, preset.name, preset.def, modeFor(preset.def));
+    },
+  };
+}
 
 export function DriversPanel(props: {
   readonly rt: Runtime;

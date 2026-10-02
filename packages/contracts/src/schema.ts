@@ -23,8 +23,15 @@ export interface VariableDef {
   /** The simplest UI tier that shows it. Most variables are 'pro'; the few that matter to a child are 'play'. */
   readonly tier: Tier;
   readonly default: Value;
+  /**
+   * The comfortable range: where a slider starts and ends. NOT a hard limit: the slider grows when pushed past its end and a typed number is
+   * always accepted. What a value may never be is `hardMin` / `hardMax` (see `hardLimits`).
+   */
   readonly min?: number;
   readonly max?: number;
+  /** Values below / above this make no sense (an opacity above 1, a size below 0) and are refused. Left out, `hardLimits` infers them. */
+  readonly hardMin?: number;
+  readonly hardMax?: number;
   readonly step?: number;
   readonly unit?: string;
   /** For 'enum'. */
@@ -80,3 +87,14 @@ export interface SchemaRegistry {
 
 /** Identity helper so a schema literal is type-checked at its definition site. */
 export const defineSchema = <S extends PresetSchema>(schema: S): S => schema;
+
+/**
+ * The limits a number can never pass. Explicit `hardMin` / `hardMax` win. Otherwise: a comfortable range that starts at zero or above is a size,
+ * a count or a strength, so it cannot go below its own start; a 0..1 range is a fraction, so it cannot go above 1. Everything else is open,
+ * so a slider never stops anybody short of what they want.
+ */
+export function hardLimits(def: Pick<VariableDef, 'min' | 'max' | 'hardMin' | 'hardMax'>): { readonly lo: number; readonly hi: number } {
+  const lo = def.hardMin ?? (def.min !== undefined && def.min >= 0 ? def.min : -Infinity);
+  const hi = def.hardMax ?? (def.min === 0 && def.max === 1 ? 1 : Infinity);
+  return { lo, hi };
+}

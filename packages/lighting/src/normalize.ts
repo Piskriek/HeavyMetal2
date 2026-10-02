@@ -1,7 +1,10 @@
 import { isHex } from './colour';
 import { LAMP_ANCHORS, TONE_MAPPINGS, type Lamp, type LampAnchor, type LightSetup, type ToneMappingName, type Vec3 } from './types';
 
-/** The legal range of every number a setup holds. The editors, the renderer and `normalizeSetup` all read this one table. */
+/**
+ * The comfortable range of every number a setup holds: where a slider starts and ends. A slider grows past its end and a typed number is always
+ * accepted, so these are NOT limits; see LIGHT_LIMITS for what is refused.
+ */
 export const LIGHT_RANGES = {
   sunIntensity: [0, 10], sunElevation: [-90, 90], sunSoftness: [0, 12], shadowMapSize: [256, 4096],
   hemiIntensity: [0, 4], ambientIntensity: [0, 2], fillIntensity: [0, 4], fillPosition: [-60, 60],
@@ -10,6 +13,16 @@ export const LIGHT_RANGES = {
   bloomStrength: [0, 3], bloomRadius: [0, 1.5], bloomThreshold: [0, 2], vignetteDarkness: [0, 1], vignetteOffset: [0, 1],
   saturation: [0, 2], contrast: [0.5, 1.8], ssaoRadius: [0.1, 4], ssaoIntensity: [0, 3], grain: [0, 0.2], posterize: [0, 32],
 } as const satisfies Record<string, readonly [number, number]>;
+
+/** What a number may never pass: wide enough that nobody is stopped short of what they want, tight where the value stops making sense. */
+export const LIGHT_LIMITS: Readonly<Record<keyof typeof LIGHT_RANGES, readonly [number, number]>> = {
+  sunIntensity: [0, 200], sunElevation: [-90, 90], sunSoftness: [0, 60], shadowMapSize: [256, 4096],
+  hemiIntensity: [0, 100], ambientIntensity: [0, 50], fillIntensity: [0, 100], fillPosition: [-2000, 2000],
+  lampIntensity: [0, 5000], lampDistance: [0, 1000], lampOffset: [-1000, 1000],
+  sunGlow: [0, 50], fogDensity: [0, 1], waterOpacity: [0, 1], waterRoughness: [0, 1], exposure: [0.01, 100],
+  bloomStrength: [0, 30], bloomRadius: [0, 3], bloomThreshold: [0, 30], vignetteDarkness: [0, 1], vignetteOffset: [0, 2],
+  saturation: [0, 20], contrast: [0, 8], ssaoRadius: [0.01, 100], ssaoIntensity: [0, 30], grain: [0, 1], posterize: [0, 256],
+};
 
 export const MAX_POINT_LAMPS = 4;
 export const MAX_SPOT_LAMPS = 2;
@@ -26,7 +39,7 @@ const vec = (v: unknown, fallback: Vec3, range: readonly [number, number]): Vec3
 const wrap360 = (d: number): number => ((d % 360) + 360) % 360;
 /** Snap to a power of two inside the range (shadow maps must be). */
 const pow2 = (v: number): number => {
-  const c = clamp(v, LIGHT_RANGES.shadowMapSize);
+  const c = clamp(v, LIGHT_LIMITS.shadowMapSize);
   return 2 ** Math.round(Math.log2(c));
 };
 const oneOf = <T extends string>(v: unknown, list: readonly T[], fallback: T): T => (typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : fallback);
@@ -61,10 +74,10 @@ function lamp(raw: unknown): Lamp {
   return {
     type: r.type === 'spot' ? 'spot' : 'point',
     color: col(r.color, '#ffb066'),
-    intensity: num(r.intensity, 6, LIGHT_RANGES.lampIntensity),
+    intensity: num(r.intensity, 6, LIGHT_LIMITS.lampIntensity),
     anchor: oneOf<LampAnchor>(r.anchor, LAMP_ANCHORS, 'focus'),
-    offset: vec(r.offset, [0, 0, 0], LIGHT_RANGES.lampOffset),
-    distance: num(r.distance, 8, LIGHT_RANGES.lampDistance),
+    offset: vec(r.offset, [0, 0, 0], LIGHT_LIMITS.lampOffset),
+    distance: num(r.distance, 8, LIGHT_LIMITS.lampDistance),
   };
 }
 
@@ -83,34 +96,34 @@ export function normalizeSetup(raw: unknown, base: LightSetup = DEFAULT_SETUP): 
     name: typeof r.name === 'string' && r.name.trim() ? r.name.trim() : id === b.id ? b.name : id,
     sun: {
       color: col(sun.color, b.sun.color),
-      intensity: num(sun.intensity, b.sun.intensity, LIGHT_RANGES.sunIntensity),
+      intensity: num(sun.intensity, b.sun.intensity, LIGHT_LIMITS.sunIntensity),
       azimuthDeg: wrap360(num(sun.azimuthDeg, b.sun.azimuthDeg, [-720, 720])),
-      elevationDeg: num(sun.elevationDeg, b.sun.elevationDeg, LIGHT_RANGES.sunElevation),
-      shadowSoftness: num(sun.shadowSoftness, b.sun.shadowSoftness, LIGHT_RANGES.sunSoftness),
-      shadowMapSize: pow2(num(sun.shadowMapSize, b.sun.shadowMapSize, LIGHT_RANGES.shadowMapSize)),
+      elevationDeg: num(sun.elevationDeg, b.sun.elevationDeg, LIGHT_LIMITS.sunElevation),
+      shadowSoftness: num(sun.shadowSoftness, b.sun.shadowSoftness, LIGHT_LIMITS.sunSoftness),
+      shadowMapSize: pow2(num(sun.shadowMapSize, b.sun.shadowMapSize, LIGHT_LIMITS.shadowMapSize)),
     },
-    hemi: { sky: col(hemi.sky, b.hemi.sky), ground: col(hemi.ground, b.hemi.ground), intensity: num(hemi.intensity, b.hemi.intensity, LIGHT_RANGES.hemiIntensity) },
-    ambient: { color: col(amb.color, b.ambient.color), intensity: num(amb.intensity, b.ambient.intensity, LIGHT_RANGES.ambientIntensity) },
-    sky: { top: col(sky.top, b.sky.top), horizon: col(sky.horizon, b.sky.horizon), bottom: col(sky.bottom, b.sky.bottom), sunGlow: num(sky.sunGlow, b.sky.sunGlow, LIGHT_RANGES.sunGlow) },
-    fog: { color: col(fog.color, b.fog.color), density: num(fog.density, b.fog.density, LIGHT_RANGES.fogDensity) },
-    water: { color: col(water.color, b.water.color), opacity: num(water.opacity, b.water.opacity, LIGHT_RANGES.waterOpacity), roughness: num(water.roughness, b.water.roughness, LIGHT_RANGES.waterRoughness) },
+    hemi: { sky: col(hemi.sky, b.hemi.sky), ground: col(hemi.ground, b.hemi.ground), intensity: num(hemi.intensity, b.hemi.intensity, LIGHT_LIMITS.hemiIntensity) },
+    ambient: { color: col(amb.color, b.ambient.color), intensity: num(amb.intensity, b.ambient.intensity, LIGHT_LIMITS.ambientIntensity) },
+    sky: { top: col(sky.top, b.sky.top), horizon: col(sky.horizon, b.sky.horizon), bottom: col(sky.bottom, b.sky.bottom), sunGlow: num(sky.sunGlow, b.sky.sunGlow, LIGHT_LIMITS.sunGlow) },
+    fog: { color: col(fog.color, b.fog.color), density: num(fog.density, b.fog.density, LIGHT_LIMITS.fogDensity) },
+    water: { color: col(water.color, b.water.color), opacity: num(water.opacity, b.water.opacity, LIGHT_LIMITS.waterOpacity), roughness: num(water.roughness, b.water.roughness, LIGHT_LIMITS.waterRoughness) },
     toneMapping: oneOf<ToneMappingName>(r.toneMapping, TONE_MAPPINGS, b.toneMapping),
-    exposure: num(r.exposure, b.exposure, LIGHT_RANGES.exposure),
+    exposure: num(r.exposure, b.exposure, LIGHT_LIMITS.exposure),
     post: {
-      bloom: { strength: num(bloom.strength, b.post.bloom.strength, LIGHT_RANGES.bloomStrength), radius: num(bloom.radius, b.post.bloom.radius, LIGHT_RANGES.bloomRadius), threshold: num(bloom.threshold, b.post.bloom.threshold, LIGHT_RANGES.bloomThreshold) },
-      vignette: { darkness: num(vig.darkness, b.post.vignette.darkness, LIGHT_RANGES.vignetteDarkness), offset: num(vig.offset, b.post.vignette.offset, LIGHT_RANGES.vignetteOffset) },
-      saturation: num(post.saturation, b.post.saturation, LIGHT_RANGES.saturation),
-      contrast: num(post.contrast, b.post.contrast, LIGHT_RANGES.contrast),
+      bloom: { strength: num(bloom.strength, b.post.bloom.strength, LIGHT_LIMITS.bloomStrength), radius: num(bloom.radius, b.post.bloom.radius, LIGHT_LIMITS.bloomRadius), threshold: num(bloom.threshold, b.post.bloom.threshold, LIGHT_LIMITS.bloomThreshold) },
+      vignette: { darkness: num(vig.darkness, b.post.vignette.darkness, LIGHT_LIMITS.vignetteDarkness), offset: num(vig.offset, b.post.vignette.offset, LIGHT_LIMITS.vignetteOffset) },
+      saturation: num(post.saturation, b.post.saturation, LIGHT_LIMITS.saturation),
+      contrast: num(post.contrast, b.post.contrast, LIGHT_LIMITS.contrast),
       lift: col(post.lift, b.post.lift), gamma: col(post.gamma, b.post.gamma), gain: col(post.gain, b.post.gain),
-      ssao: { enabled: bool(ssao.enabled, b.post.ssao.enabled), radius: num(ssao.radius, b.post.ssao.radius, LIGHT_RANGES.ssaoRadius), intensity: num(ssao.intensity, b.post.ssao.intensity, LIGHT_RANGES.ssaoIntensity) },
+      ssao: { enabled: bool(ssao.enabled, b.post.ssao.enabled), radius: num(ssao.radius, b.post.ssao.radius, LIGHT_LIMITS.ssaoRadius), intensity: num(ssao.intensity, b.post.ssao.intensity, LIGHT_LIMITS.ssaoIntensity) },
       fxaa: bool(post.fxaa, b.post.fxaa),
-      grain: num(post.grain, b.post.grain, LIGHT_RANGES.grain),
-      posterize: Math.round(num(post.posterize, b.post.posterize, LIGHT_RANGES.posterize)),
+      grain: num(post.grain, b.post.grain, LIGHT_LIMITS.grain),
+      posterize: Math.round(num(post.posterize, b.post.posterize, LIGHT_LIMITS.posterize)),
     },
   };
   if (r.fill !== undefined && r.fill !== null) {
     const f = rec(r.fill);
-    out.fill = { color: col(f.color, '#ffffff'), intensity: num(f.intensity, 0.3, LIGHT_RANGES.fillIntensity), position: vec(f.position, [-8, 6, 8], LIGHT_RANGES.fillPosition) };
+    out.fill = { color: col(f.color, '#ffffff'), intensity: num(f.intensity, 0.3, LIGHT_LIMITS.fillIntensity), position: vec(f.position, [-8, 6, 8], LIGHT_LIMITS.fillPosition) };
   } else if (r.fill === undefined && b.fill) out.fill = { ...b.fill, position: [...b.fill.position] as Vec3 };
   if (Array.isArray(r.extraLights)) {
     const all = r.extraLights.map(lamp);

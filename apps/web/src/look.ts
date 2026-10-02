@@ -1,5 +1,6 @@
-import type { PresetId, PresetStore } from '@hm/contracts';
-import { applyTimeOfDay, paramsToSetup, setupById, SETUPS, type LightSetup } from '@hm/lighting';
+import { cmd, type PresetId, type PresetStore } from '@hm/contracts';
+import type { Runtime } from '@hm/engine';
+import { applyTimeOfDay, paramsToSetup, setupById, setupToParams, SETUPS, type LightSetup } from '@hm/lighting';
 import type { ThreeRenderer } from '@hm/render';
 
 /** The ready-made looks, for the picker. */
@@ -41,4 +42,30 @@ export function followLighting(store: PresetStore, sceneId: PresetId, renderer: 
   };
   refresh();
   return store.subscribe(refresh);
+}
+
+/**
+ * Lighting is a preset that forks on first edit. A scene starts on a ready-made look (its `look` variable). The first change to any knob makes a
+ * `light-setup` preset from that look (all knobs, named after it) and hangs it in the scene's `lighting` slot; from then on it is yours to edit,
+ * rename, drive and share. Returns the preset's id.
+ */
+export function ensureLightPreset(rt: Runtime, sceneId: PresetId): PresetId {
+  const existing = rt.store.get(sceneId)?.children['lighting']?.[0]?.ref;
+  if (existing && rt.store.get(existing)) return existing;
+  const base = setupOf(rt.store, sceneId, Number.NaN); // the look as it is, without the clock
+  const id = `light-${sceneId}`;
+  rt.commands.transaction('Lighting', () => {
+    rt.commands.execute(cmd.put({ id, kind: 'light-setup', name: base.name, params: setupToParams(base), tier: 'build' }, 'Lighting'));
+    rt.commands.execute(cmd.addChild(sceneId, 'lighting', id, undefined, 'Lighting'));
+  });
+  return id;
+}
+
+/** Pick a ready-made look: drops any edited copy and points the scene at the look (one undo step). */
+export function pickLook(rt: Runtime, sceneId: PresetId, lookId: string): void {
+  const name = LOOKS.find((l) => l.id === lookId)?.name ?? lookId;
+  rt.commands.transaction(`Look: ${name}`, () => {
+    if (rt.store.get(sceneId)?.children['lighting']?.length) rt.commands.execute(cmd.removeChild(sceneId, 'lighting', 0, `Look: ${name}`));
+    rt.commands.execute(cmd.setParam(`${sceneId}.look`, lookId, `Look: ${name}`));
+  });
 }

@@ -147,7 +147,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} quality={profile.quality} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
             onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}
@@ -273,6 +273,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             <p className="hint">Build mode is for adults. Switch it off for a kid profile: My Island and the activities stay, building is hidden.</p>
             <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
             <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel goblin)</option><option value="pbr">PBR (full relief)</option></select></label>
+            <label className="row">Graphics <select value={profile.quality} onChange={(e) => update((p) => ({ ...p, quality: e.target.value as typeof profile.quality }))}><option value="auto">Auto (best the device can hold)</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low (phones)</option></select></label>
             <div className="btns"><button onClick={() => update((p) => ({ ...p, tutorialDone: false }))}>Replay the tutorial</button><button className="danger" onClick={() => { update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', tournament: null })); }}>Reset progress</button></div>
           </div>
         </div>

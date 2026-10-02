@@ -76,9 +76,28 @@ test('store: resolve = schema defaults < fork chain < own params; fork copies an
   assert.equal(store.resolve(fork.id).params['weight'], 8, 'a fork is pinned to the revision it was made from (copy-on-write)');
 });
 
+test('store: min and max are only the comfortable range; hard limits are explicit or inferred', () => {
+  const { store } = setup();
+  const m = store.put({ kind: 'mechanic', name: 'Big', params: { power: 5000 } });
+  assert.deepEqual(store.validate(m.id).map((i) => i.code), [], 'past the slider end is fine');
+  const loose = createSchemaRegistry();
+  loose.register({ kind: 'box', version: 1, label: 'Box', doc: 'x', slots: [], variables: [
+    { key: 'opacity', type: 'number', label: 'Opacity', doc: 'x', tier: 'play', default: 1, min: 0, max: 1 },
+    { key: 'yaw', type: 'number', label: 'Turn', doc: 'x', tier: 'play', default: 0, min: -180, max: 180 },
+    { key: 'glow', type: 'number', label: 'Glow', doc: 'x', tier: 'play', default: 1, min: 0, max: 5, hardMax: 50 },
+  ] });
+  const s2 = createPresetStore({ schemas: loose, newId: (() => { let i = 0; return () => `b${++i}`; })() });
+  const codes = (params: Record<string, number>) => s2.validate(s2.put({ kind: 'box', name: 'B', params }).id).map((i) => `${i.path}:${i.code}`);
+  assert.deepEqual(codes({ opacity: 1.5 }), ['opacity:param-range'], 'a fraction cannot pass 1');
+  assert.deepEqual(codes({ opacity: -0.1 }), ['opacity:param-range'], 'a range that starts at zero cannot go below it');
+  assert.deepEqual(codes({ yaw: 900 }), [], 'an angle range is open');
+  assert.deepEqual(codes({ glow: 40 }), [], 'past the slider end but inside the hard limit');
+  assert.deepEqual(codes({ glow: 60 }), ['glow:param-range'], 'past an explicit hard limit');
+});
+
 test('store: validate finds cycles, missing refs, wrong slot kinds, out-of-range and unknown params', () => {
   const { store } = setup();
-  const m = store.put({ kind: 'mechanic', name: 'Nitro', params: { power: 500 } });
+  const m = store.put({ kind: 'mechanic', name: 'Nitro', params: { power: -5 } });
   const r = store.put({ kind: 'racer', name: 'R', params: { weight: 3, wat: 1 }, children: { mechanics: [{ ref: m.id }, { ref: 'ghost' }] } });
   const codes = store.validate(r.id).map((i) => i.code).sort();
   assert.deepEqual(codes, ['missing-ref', 'unknown-param']);

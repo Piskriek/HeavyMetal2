@@ -33,6 +33,8 @@ interface Live {
   base: number | null;
   last: number | null;
   written: number | null;
+  bounds?: { min: number; max: number };
+  reported?: string;
   error?: string;
 }
 
@@ -46,8 +48,9 @@ export function createModulatorSystem(opts: { readonly store: PresetStore; reado
   let scene: PresetId | null = null;
 
   const fail = (id: PresetId, entry: Live, error: string): void => {
-    if (entry.error === error) return;
     entry.error = error;
+    if (entry.reported === error) return;
+    entry.reported = error;
     (events as EventBus<Record<string, unknown>>).emit('modulator:error', { id, error });
   };
 
@@ -119,12 +122,19 @@ export function createModulatorSystem(opts: { readonly store: PresetStore; reado
       entry.last = raw;
       const base = entry.base ?? 0;
       const target = entry.mode === 'add' ? base + raw : entry.mode === 'scale' ? base * raw : raw;
-      const value = base + (target - base) * Math.min(1, Math.max(0, entry.amount));
+      let value = base + (target - base) * Math.min(1, Math.max(0, entry.amount));
+      if (entry.bounds === undefined) { const d = vars.describe(entry.target); entry.bounds = { min: d?.min ?? -Infinity, max: d?.max ?? Infinity }; }
+      value = Math.min(entry.bounds.max, Math.max(entry.bounds.min, value));
       const toPreset = !entry.target.includes(':');
       if (toPreset && step.tick % PRESET_WRITE_EVERY !== 0) continue;
       if (entry.written !== null && Math.abs(entry.written - value) < 1e-6) continue;
       try { vars.write(entry.target, value, 'modulator'); entry.written = value; }
-      catch (e) { fail(id, entry, String((e as Error).message ?? e)); }
+      catch (e) {
+        // a value the target cannot take right now (e.g. a physics shape): skip it, put the base back, and report once
+        fail(id, entry, String((e as Error).message ?? e));
+        entry.error = undefined; entry.written = null;
+        try { vars.write(entry.target, entry.base ?? 0, 'modulator:recover'); } catch { /* give up quietly */ }
+      }
     }
   };
 

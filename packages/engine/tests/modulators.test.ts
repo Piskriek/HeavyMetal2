@@ -43,3 +43,10 @@ test('drivers are deterministic: two runs give the same value', () => {
   const b = demo(def); b.rt.play(); run(b.rt, 1.3);
   assert.equal(size(a.rt, a.ball.id), size(b.rt, b.ball.id));
 });
+
+test('driven values are clamped to the setting\'s limits (size never reaches 0)', () => {
+  const { rt, ball } = demo({ kind: 'constant', value: 0 });
+  rt.play(); run(rt, 0.3);
+  assert.ok(size(rt, ball.id) >= 0.01, `size=${size(rt, ball.id)}`);
+  assert.equal(rt.modulators.status()[0]!.error, undefined);
+});

@@ -13,6 +13,7 @@ import { buildMakerScene, PROP_CARDS, propSeed, type MakerScene } from './scene'
 import { loadMap, saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
+import { DriversPanel } from './drivers';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
 
 type ToolId = 'select' | 'brush' | 'shape' | 'track' | 'dress' | 'place' | 'delete';
@@ -58,6 +59,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [shapeMode, setShapeMode] = useState<ShapeMode>('mound');
   const [shapeHeight, setShapeHeight] = useState(6);
   const [density, setDensity] = useState(1);
+  const [previewing, setPreviewing] = useState(false);
   const rev = useRev(rt);
   const toastList = useToasts();
   const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight });
@@ -166,7 +168,13 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    const renderLoop = (): void => { renderer.step(); renderer.render(1); loopId = requestAnimationFrame(renderLoop); };
+    let lastT = performance.now();
+    const renderLoop = (): void => {
+      const now = performance.now();
+      const alpha = rt.mode === 'play' ? rt.frame(Math.min(100, now - lastT)) : 1;
+      lastT = now;
+      renderer.step(); renderer.render(alpha); loopId = requestAnimationFrame(renderLoop);
+    };
     let loopId = requestAnimationFrame(renderLoop);
 
     // --- pointer handling
@@ -217,7 +225,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       }
     };
     const onDown = (e: PointerEvent): void => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || rt.mode === 'play') return;
       const L = live.current;
       const h = pickAt(e);
       const ts = terrainState();
@@ -382,6 +390,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <span className="grow" />
         <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
+        <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
         <button onClick={save}>💾 Save</button>
         <button onClick={() => { if (confirm('Start a new map? The saved one will be replaced.')) { clearSavedMap(); location.reload(); } }}>New</button>
         <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>▶ Test drive</button>
@@ -446,7 +455,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
               <p className="hint">Click to add a point · click a line to insert · drag points · hover + Delete removes one.</p>
             </>
           ) : null}
-          {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
+          {tool === 'select' ? (sel && schema ? (<><h3>{sel.name}</h3><DriversPanel rt={rt} sceneId={scene.sceneId} propId={sel.id} tier={tier} numberKeys={schema.variables.filter((v) => v.type === 'number' || v.type === 'int').map((v) => ({ key: v.key, label: v.label }))} onFeedback={(k, t) => feedback(k, t)} /><Inspector schema={schema} params={sel.params} resolved={rt.store.resolve(sel.id).params} tier={tier} onChange={(k, v) => { rt.commands.execute(cmd.setParam(`${sel.id}.${k}`, v)); fx('ui-click', { volume: 0.4 }); }} /></>) : <p className="hint">Click a prop to select it, drag to move it. Props you place appear here.</p>) : null}
           {tool === 'delete' ? <p className="hint">Click a prop to delete it. Ctrl+Z brings it back.</p> : null}
         </aside>
       </main>

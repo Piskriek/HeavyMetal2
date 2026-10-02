@@ -64,3 +64,19 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 .looks .hour { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: 12px; min-width: 220px; }
 .looks .hour input { flex: 1; }
 @keyframes toast-in { from { transform: translateY(8px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---- drivers (modulators) panel ---- */
+.maker .drivers { margin: 4px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line, #2c3a44); }
+.maker .driver { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+.maker .driver.off { opacity: 0.5; }
+.maker .driver-head { display: flex; align-items: center; gap: 6px; }
+.maker .driver-head b { flex: 1; font-size: 13px; }
+.maker .driver-head button { padding: 2px 8px; }
+.maker .driver .bad { color: #ff9a5e; font-size: 12px; }
+.maker .driver-edit { margin-top: 6px; }
+.maker .driver-add .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; max-height: 220px; overflow: auto; }
+.maker .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; }
+.maker .chip svg { stroke: currentColor; }
+.maker .panel.right { overflow-x: hidden; }
+.maker .driver-edit svg, .maker .driver-edit canvas { max-width: 100%; height: auto; }
+.maker .driver-edit input, .maker .driver-edit select { max-width: 100%; box-sizing: border-box; }

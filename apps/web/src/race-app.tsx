@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
-import { chaseCamera, createRaceGame, type Hud as HudData, type RaceGame } from '@hm/game';
+import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { applyLook, lookOf } from './look';
 import { decorInstances } from './maker/dress';
@@ -25,6 +25,11 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
     if (!el) return;
     const renderer = createThreeRenderer({ shadows: true, background: 'sky' });
     renderer.mount(el, rt.world, rt.store);
+    // render quality: ?q=low|medium|high or the saved choice is respected; otherwise a guess from the device that drops a tier if frames run slow
+    const chosen = (() => { try { return parseQuality(new URLSearchParams(location.search).get('q')) ?? parseQuality(localStorage.getItem('hm.quality')); } catch { return null; } })();
+    const touchy = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }), { locked: chosen !== null });
+    renderer.setQuality(adaptive.current);
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const game = createRaceGame(rt, { seed: 7, laps: 3, fromScene: fromMap });
     gameRef.current = game;
@@ -51,8 +56,11 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
       game.input.setGamepad(pad ? { axes: Array.from(pad.axes), buttons: pad.buttons.map((b) => ({ pressed: b.pressed, value: b.value })) } : null);
     };
     const loop = (now: number): void => {
-      const dt = Math.min(100, now - last);
+      const rawDt = now - last;
+      const dt = Math.min(100, rawDt);
       last = now;
+      const lower = adaptive.frame(rawDt);
+      if (lower) renderer.setQuality(lower);
       gamepads();
       const alpha = game.update(dt);
       raceAudio.tick(dt);

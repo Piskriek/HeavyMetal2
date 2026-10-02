@@ -101,7 +101,7 @@ export const iconButton: CSSProperties = {
 
 /** Accent treatment for anything pressed / active. */
 export const accent: CSSProperties = {
-  borderColor: 'var(--hm-accent, #ffd24a)',
+  border: '1px solid var(--hm-accent, #ffd24a)',
   color: 'var(--hm-accent, #ffd24a)',
 };
 

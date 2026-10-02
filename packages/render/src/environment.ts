@@ -17,6 +17,8 @@ export interface EnvironmentRig {
   update(target: Vec3): void;
   /** Sea mode: the ground disc becomes clear tropical water at y = 0 (used when a terrain island is shown). */
   setSea(on: boolean): void;
+  /** Quality tier: shadows on/off and the shadow map size (smaller = faster on phones). */
+  setShadows(on: boolean, mapSize?: number): void;
   dispose(): void;
 }
 
@@ -129,6 +131,8 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
 
   const sun = new THREE.DirectionalLight(0xffddb3, 3.2);
   sun.castShadow = shadows;
+  let shadowsOn = shadows;
+  let lastSunUp = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.00025;
   sun.shadow.normalBias = 0.025;
@@ -167,7 +171,8 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       const peak = Math.max(look.sunColor[0], look.sunColor[1], look.sunColor[2], 1e-4);
       sun.color.setRGB(look.sunColor[0] / peak, look.sunColor[1] / peak, look.sunColor[2] / peak, THREE.LinearSRGBColorSpace);
       sun.intensity = peak * 0.85;
-      sun.castShadow = shadows && look.sunDir[1] > 0.02 && peak > 0.05;
+      lastSunUp = look.sunDir[1] > 0.02 && peak > 0.05;
+      sun.castShadow = shadowsOn && lastSunUp;
       hemisphere.color.copy(lin(look.ambientSky));
       hemisphere.groundColor.copy(lin(look.ambientGround));
       hemisphere.intensity = look.ambientIntensity * 0.6;
@@ -178,6 +183,11 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       seaColor = lin(look.waterColor);
       seaOpacity = look.waterOpacity;
       if (groundMaterial.transparent) { groundMaterial.color.copy(seaColor); groundMaterial.opacity = seaOpacity; }
+    },
+    setShadows(on: boolean, mapSize = 2048): void {
+      shadowsOn = on && shadows;
+      sun.castShadow = shadowsOn && lastSunUp;
+      if (sun.shadow.mapSize.x !== mapSize) { sun.shadow.mapSize.set(mapSize, mapSize); sun.shadow.map?.dispose(); sun.shadow.map = null; }
     },
     setSea(on: boolean): void {
       groundMaterial.map = on ? null : gridTexture;

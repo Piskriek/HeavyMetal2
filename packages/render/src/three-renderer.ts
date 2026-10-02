@@ -24,6 +24,8 @@ export type ThreeRenderer = RenderService & {
   setDecor(instances: readonly DecorInstance[] | null): void;
   /** Apply a scene mood (sky, sun, fog, exposure, water). Remembered across mount/unmount. */
   setLook(look: LookLike): void;
+  /** Quality tier for phones: low = pixel ratio 1 and no shadows, medium = up to 1.5 and small shadows, high = up to 2 and full shadows. */
+  setQuality(q: 'low' | 'medium' | 'high'): void;
 };
 
 export interface RenderOptions {
@@ -180,6 +182,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setDecor(instances: readonly DecorInstance[] | null): void {
       pendingDecor = instances;
       applyDecor();
+    },
+    setQuality(q: 'low' | 'medium' | 'high'): void {
+      const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+      webgl?.setPixelRatio(Math.min(q === 'low' ? 1 : q === 'medium' ? 1.5 : 2, Math.max(0.5, opts.pixelRatio ?? dpr)));
+      environment?.setShadows(q !== 'low', q === 'high' ? 2048 : 1024);
+      resize();
     },
     setLook(look: LookLike): void {
       pendingLook = look;

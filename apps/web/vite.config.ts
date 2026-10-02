@@ -50,6 +50,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/evolve': p('../../packages/evolve/src/index.ts'),
       '@hm/lineage': p('../../packages/lineage/src/index.ts'),
       '@hm/voxelart': p('../../packages/voxelart/src/index.ts'),
+      '@hm/camerarig': p('../../packages/camerarig/src/index.ts'),
       '@hm/voxelsculpt': p('../../packages/voxelsculpt/src/index.ts'),
       '@hm/motion': p('../../packages/motion/src/index.ts'),
       '@hm/voxel': p('../../packages/voxel/src/index.ts'),

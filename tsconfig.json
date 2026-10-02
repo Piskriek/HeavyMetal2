@@ -132,6 +132,9 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
+      "@hm/camerarig": [
+        "packages/camerarig/src/index.ts"
+      ],
       "@hm/voxelsculpt": [
         "packages/voxelsculpt/src/index.ts"
       ],

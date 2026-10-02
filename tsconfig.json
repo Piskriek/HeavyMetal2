@@ -125,6 +125,9 @@
       ],
       "@hm/motion": [
         "packages/motion/src/index.ts"
+      ],
+      "@hm/voxel": [
+        "packages/voxel/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

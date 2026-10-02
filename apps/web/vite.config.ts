@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/tracklayouts': p('../../packages/tracklayouts/src/index.ts'),
       '@hm/evolve': p('../../packages/evolve/src/index.ts'),
       '@hm/motion': p('../../packages/motion/src/index.ts'),
+      '@hm/voxel': p('../../packages/voxel/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

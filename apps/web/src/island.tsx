@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import type { PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { stepSlot, tabDef, tabForKey, type TabId, type ToolPreset } from '@hm/buildkit';
+import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
@@ -17,10 +17,11 @@ import { BuildController, type Aim } from './build/build-controller';
 import { Crosshair, Hotbar, ModeBar, TabStrip, TabWheel, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { goblinWearing } from './build/cards';
-import { EditorFor, MovesEditor, PlantEditor, WorldRulesEditor, type EditorActions } from './build/editors';
+import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
 import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
 import { player, putInSlot, setActivities, setMode, setSlot, setTab, setView, usePlayer, wearLook } from './build/player';
+import { spriteOf } from './build/sprites';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
@@ -87,13 +88,17 @@ export function IslandWalk(props: {
   useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; refreshModels: () => void } | null>(null);
+  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void } | null>(null);
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
   // studio keeps the mouse free; walking takes it back when you click the world
   useEffect(() => { if (p.mode === 'studio') api.current?.unlock(); }, [p.mode]);
   useEffect(() => { api.current?.setAvatarLook(); }, [p.lookId, p.looks]);
   useEffect(() => { api.current?.refreshModels(); }, [isolateId]);
+  // a tool's 'pick' plugs play when it comes into your hand (not when the island first opens)
+  const heldKey = `${p.tab}:${heldItem?.id ?? ''}`;
+  const lastHeld = useRef(heldKey);
+  useEffect(() => { if (lastHeld.current !== heldKey && heldItem) api.current?.pick(p.tab, heldItem.id); lastHeld.current = heldKey; }, [heldKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** What happens when a slot of a tab that is not a tool gets picked: lights change, moves play, cameras switch, looks are worn. */
   const applyNow = useCallback((tab: TabId, id: string | null) => {
@@ -124,6 +129,7 @@ export function IslandWalk(props: {
     openActivity: (id) => props.onActivity?.(id),
     useCamera: switchCamera,
     applyLook: () => api.current?.setAvatarLook(),
+    openSprite: (id) => win.open(`sprite:${id}`, `Sprite: ${spriteOf(id).name}`, { x: 420 + (win.list.length % 3) * 24, y: 90, ...WIN.editor }),
   };
   const pickWheel = (i: number): void => {
     const it = live.current.items[i];
@@ -185,7 +191,10 @@ export function IslandWalk(props: {
       onDecorPreview: (preview) => { const d = rt.binder.decor(); renderer.setDecor(live.current.isolateId ? null : preview ? decorInstances(preview) : d ? decorInstances(d.placements) : null); },
       onFocus: (id) => { setFocusId(id); if (id) { setMode('studio'); say('Focused: drag with the right mouse button to look round it, Esc to leave'); } },
       onIsolate: (id) => { setIsolateId(id); say(id ? 'Everything else is hidden (Hide others again, or Esc, to show it)' : 'Everything is shown'); },
+      onAnim: (id) => { if (!studio()) animator.play(animOf(player(), id)); },
+      onShake: (id, amount) => { shakes.push({ s: shakeById(id), t0: performance.now(), amount }); if (shakes.length > 6) shakes.shift(); },
     });
+    const shakes: { s: ShakePreset; t0: number; amount: number }[] = [];
     // start at the middle when it is low, flat-ish land; on a mountain or in the sea, walk out east to the first low ground
     let px = 0, pz = 0;
     for (let r = 0; r < 120 && (ground(px, pz) < SEA || ground(px, pz) > 5); r += 2) { px = r; pz = 0; }
@@ -231,6 +240,11 @@ export function IslandWalk(props: {
       lock, unlock, refreshModels,
       playAnim: (id) => { animator.play(animOf(player(), id)); },
       setAvatarLook,
+      pick: (tab, id) => {
+        if (tab !== 'select' && tab !== 'paint' && tab !== 'sculpt' && tab !== 'things') return;
+        const tool = toolOf(player(), id);
+        if (tool) builder.fire(tool, 'pick', aim());
+      },
     };
     const onLockChange = (): void => {
       const was = pointerLocked;
@@ -304,13 +318,13 @@ export function IslandWalk(props: {
       if (studio() || live.current.level === 'island') {
         // the mouse is free: right button looks around, left button uses what you hold where the cursor points
         if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
-        if (e.button === 0 && live.current.buildOn) { mouse |= 1; firstUse = true; }
+        if (e.button === 0 && live.current.buildOn) { mouse |= 1; firstUse = true; pressNow(); }
         return;
       }
       if (!pointerLocked && !softAim) { lock(); return; }
       if (softAim && e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
       mouse |= e.button === 2 ? 2 : 1;
-      if (e.button === 0 || e.button === 2) firstUse = true;
+      if (e.button === 0 || e.button === 2) { firstUse = true; pressNow(); }
     };
     const onPointerMove = (e: PointerEvent): void => {
       cursor = { x: e.clientX, y: e.clientY };
@@ -356,7 +370,6 @@ export function IslandWalk(props: {
         const a = aim();
         if (tool && a) {
           builder.use(tool, a, alt, now, first);
-          if (first && !studio() && tool.action !== 'inspect') animator.play(animOf(s, 'swing'));
         }
         return;
       }
@@ -364,6 +377,15 @@ export function IslandWalk(props: {
       if (s.tab === 'activities') { if (alt) return; props.onActivity?.(id); return; }
       if (s.tab === 'animate' && alt) { animator.stop(); return; }
       applyNow(s.tab, id);
+    };
+
+    /** The right button, or Shift standing still while walking: the opposite action. */
+    const altHeld = (): boolean => (mouse & 2) !== 0 || (!studio() && down.has('shift') && !down.has('w'));
+    /** A press uses the tool at once (a click shorter than a frame still counts); holding it repeats from the frame loop. */
+    const pressNow = (): void => {
+      if (!live.current.buildOn || live.current.menu || live.current.level === 'island' || intro.on) return;
+      useHeld(altHeld(), performance.now(), true);
+      firstUse = false;
     };
 
     let raf = 0, last = performance.now();
@@ -414,7 +436,7 @@ export function IslandWalk(props: {
         grounded = py <= g + 0.04;
       }
       // using what you hold, every frame the button is down
-      if (mouse && live.current.buildOn && !paused) { useHeld((mouse & 2) !== 0 || (!st && down.has('shift') && !down.has('w')), now, firstUse); firstUse = false; }
+      if (mouse && live.current.buildOn && !paused) { useHeld(altHeld(), now, firstUse); firstUse = false; }
 
       // the goblin: animation from how it moved this frame
       const speed = dt > 0 ? Math.hypot(px - prevX, pz - prevZ) / dt : 0;
@@ -476,7 +498,15 @@ export function IslandWalk(props: {
       const k = snap ? 1 : Math.min(1, dt * (overview ? 3 : 10));
       eye = eye && !snap ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
       renderer.setFov(fpv ? 75 : st ? 65 : 60);
-      renderer.camera.set(eye, target);
+      // camera-shake plugs wobble the view (never the stored eye, so the camera settles back exactly)
+      let sx = 0, sy = 0, sz = 0;
+      for (let i = shakes.length - 1; i >= 0; i--) {
+        const sh = shakes[i]!, t = now - sh.t0;
+        if (t >= sh.s.ms) { shakes.splice(i, 1); continue; }
+        const o = shakeOffset(sh.s, t, sh.amount); sx += o[0]; sy += o[1]; sz += o[2];
+      }
+      if (sx || sy || sz) renderer.camera.set([eye[0] + sx, eye[1] + sy, eye[2] + sz], [target[0] + sx * 0.5, target[1] + sy * 0.5, target[2] + sz * 0.5]);
+      else renderer.camera.set(eye, target);
       renderer.step();
       renderer.render(1);
       raf = requestAnimationFrame(loop);
@@ -522,6 +552,7 @@ export function IslandWalk(props: {
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
+            : w.id.startsWith('sprite:') ? <SpriteEditor id={w.id.slice(7)} />
             : w.id.startsWith('edit:') ? (() => { const [, tab, ...rest] = w.id.split(':'); return <EditorFor tab={tab as TabId} id={rest.join(':')} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} />; })()
             : null}
         </FloatingWindow>

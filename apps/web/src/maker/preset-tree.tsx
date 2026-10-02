@@ -12,8 +12,15 @@ const ICON: Record<string, LucideIcon> = {
   sound: Volume2, 'engine-sound': Volume2, music: Volume2, modulator: Waves, 'camera-rig': Camera, veil: Eye, 'light-setup': Sun,
 };
 
-export function PresetTree(props: { readonly rt: Runtime; readonly sceneId: PresetId; readonly selected: PresetId | null; readonly onSelect: (id: PresetId) => void; readonly onEnter: (id: PresetId) => void }): ReactElement {
+/** A preset the map can hold but does not have yet (it uses the defaults until then): a button makes the map's own copy. */
+export interface Addable { readonly label: string; readonly slot: string; readonly add: () => PresetId }
+
+export function PresetTree(props: {
+  readonly rt: Runtime; readonly sceneId: PresetId; readonly selected: PresetId | null; readonly onSelect: (id: PresetId) => void; readonly onEnter: (id: PresetId) => void;
+  readonly addable?: readonly Addable[]; readonly onAdded?: (id: PresetId) => void;
+}): ReactElement {
   const { rt, sceneId, selected, onSelect, onEnter } = props;
+  const missing = (props.addable ?? []).filter((a) => !rt.store.get(sceneId)?.children[a.slot]?.length);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (id: string): void => setClosed((c) => { const n = new Set(c); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const node = (id: PresetId, depth: number, seen: ReadonlySet<string>): ReactElement | null => {
@@ -39,6 +46,12 @@ export function PresetTree(props: { readonly rt: Runtime; readonly sceneId: Pres
     <section className="tree" aria-label="Preset tree">
       <h3>Preset tree</h3>
       <ul role="tree">{node(sceneId, 0, new Set())}</ul>
+      {missing.length ? (
+        <div className="tree-add" title="These use the defaults until you add your own copy">
+          <small>Add to this map</small>
+          {missing.map((a) => <button key={a.slot} onClick={() => props.onAdded?.(a.add())}>+ {a.label}</button>)}
+        </div>
+      ) : null}
     </section>
   );
 }

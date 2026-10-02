@@ -1,7 +1,7 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { DecorPlacement, Runtime } from '@hm/engine';
 import type { SfxId } from '@hm/audio';
-import type { ToolPreset } from '@hm/buildkit';
+import { plugsFor, type PlugEvent, type PlugKind, type ToolPreset } from '@hm/buildkit';
 import type { ThreeRenderer } from '@hm/render';
 import { applyStroke, encodeTerrain, heightAt, type DirtyRect } from '@hm/terrain';
 import { stamp, type StampKind } from '@hm/terrainops';
@@ -12,12 +12,13 @@ import { saveMap } from '../maker/storage';
 import { focusTargetOf } from '../maker/focus';
 import { plantsOf, rulesOf } from '../world';
 import { voxelModelById } from './cards';
-import { SPRITES } from './sprites';
+import { spriteDef } from './sprites';
 
 /**
  * What using a tool preset does where you aim. Ground tools paint and sculpt (one undo step per press, and the world rules respond when you
  * let go); Things tools place voxel models; Select tools look at, move, turn, size, copy, delete, focus on and hide the things you placed.
- * Every use plays the tool's sprite and sound.
+ * Every use sets off the tool's plugs (its sprites, sounds, goblin moves and camera shakes) for that moment: use, the opposite (right click),
+ * and letting go. Picking the slot is the island's job (it fires the 'pick' plugs through `fire`).
  */
 export interface Aim { readonly point: readonly [number, number, number]; readonly normal: readonly [number, number, number] | null }
 
@@ -31,6 +32,18 @@ export interface ControllerHooks {
   readonly onDecorPreview: (placements: readonly DecorPlacement[] | null) => void;
   readonly onFocus: (id: PresetId | null) => void;
   readonly onIsolate: (id: PresetId | null) => void;
+  /** An animation plug: the goblin plays this move. */
+  readonly onAnim: (id: string) => void;
+  /** A camera-shake plug. */
+  readonly onShake: (id: string, amount: number) => void;
+}
+export interface FireOptions {
+  /** Scales sprite counts (a big stamp bursts more than one brush tick). */
+  readonly scale?: number;
+  /** False for the repeats while a brush is held: moves and shakes play once per press, sprites and sounds every tick. */
+  readonly first?: boolean;
+  readonly sound?: { readonly volume?: number; readonly pitch?: number; readonly minGapMs?: number };
+  readonly only?: readonly PlugKind[];
 }
 
 export class BuildController {
@@ -46,11 +59,23 @@ export class BuildController {
 
   constructor(private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId, private readonly hooks: ControllerHooks) {}
 
-  private burst(tool: ToolPreset, a: Aim, scale = 1): void {
-    const s = SPRITES[tool.sprite] ?? SPRITES['pop']!;
-    this.renderer.burst({ ...s, count: Math.round(s.count * scale), position: [a.point[0], a.point[1] + 0.1, a.point[2]], ...(a.normal ? { normal: a.normal } : {}) });
+  private lastAim: Aim | null = null;
+  private pressed: ToolPreset | null = null;
+
+  /** Set off a tool's plugs for one moment. The right button falls back to the use plugs when the tool has none of its own for it. */
+  fire(tool: ToolPreset, on: PlugEvent, a: Aim | null, o: FireOptions = {}): void {
+    let plugs = plugsFor(tool.plugs, on);
+    if (on === 'opposite' && !plugs.length) plugs = plugsFor(tool.plugs, 'use');
+    for (const p of plugs) {
+      if (p.amount <= 0 || (o.only && !o.only.includes(p.kind))) continue;
+      if (p.kind === 'sprite') {
+        if (!a) continue;
+        const s = spriteDef(p.ref);
+        this.renderer.burst({ ...s, count: Math.max(1, Math.round(s.count * (o.scale ?? 1) * p.amount)), position: [a.point[0], a.point[1] + 0.1, a.point[2]], ...(a.normal ? { normal: a.normal } : {}) });
+      } else if (p.kind === 'sound') fx(p.ref as SfxId, { ...o.sound, volume: (o.sound?.volume ?? 1) * Math.min(1.5, p.amount) });
+      else if (o.first !== false) { if (p.kind === 'anim') this.hooks.onAnim(p.ref); else this.hooks.onShake(p.ref, p.amount); }
+    }
   }
-  private sound(tool: ToolPreset, o: { volume?: number; pitch?: number; minGapMs?: number } = {}): void { fx(tool.sound as SfxId, o); }
 
   /** The placed model under the aim point (the nearest whose footprint holds it), with its slot index. */
   modelAt(a: Aim): { ref: PresetId; index: number } | null {
@@ -73,13 +98,16 @@ export class BuildController {
     if (oneShot && !first) return;
     if (!first && now - this.lastUse < 70) return;
     this.lastUse = now;
+    this.lastAim = aim;
+    if (first) this.pressed = tool;
+    const on: PlugEvent = alt ? 'opposite' : 'use';
     const x = aim.point[0], z = aim.point[2];
     switch (tool.action) {
       case 'inspect': {
         const m = this.modelAt(aim);
         const ground = ts ? GROUND_NAMES[surfaceAt(ts.terrain, x, z) - 1] ?? 'ground' : 'ground';
         this.hooks.say(m ? `${this.rt.store.get(m.ref)?.name ?? 'A thing'}, on ${ground}` : `${ground[0]!.toUpperCase()}${ground.slice(1)}, ${aim.point[1].toFixed(1)} m up`);
-        this.burst(tool, aim, 0.5); this.sound(tool);
+        this.fire(tool, on, aim, { scale: 0.5 });
         return;
       }
       case 'move': {
@@ -93,32 +121,32 @@ export class BuildController {
             this.rt.commands.execute(cmd.setParam(`${ref}.y`, aim.point[1], 'Move'));
             this.rt.commands.execute(cmd.setParam(`${ref}.z`, z, 'Move'));
           });
-          this.done(tool, aim, 'Moved');
+          this.done(tool, aim, 'Moved', on);
           return;
         }
         const m = this.modelAt(aim);
         if (!m) { this.hooks.say('Point at something you placed to pick it up'); return; }
         this.carrying = m.ref;
         this.hooks.say(`Carrying ${this.rt.store.get(m.ref)?.name ?? 'it'}: click where it goes`);
-        this.sound(tool);
+        this.fire(tool, on, aim, { only: ['sound', 'anim'] });
         return;
       }
       case 'turn': case 'resize': case 'copy': case 'delete': case 'focus': case 'isolate': {
         const m = this.modelAt(aim);
-        if (tool.action === 'isolate') { this.hooks.onIsolate(alt || !m ? null : m.ref); this.sound(tool); return; }
-        if (tool.action === 'focus') { this.hooks.onFocus(alt || !m ? null : m.ref); this.sound(tool); return; }
+        if (tool.action === 'isolate') { this.hooks.onIsolate(alt || !m ? null : m.ref); this.fire(tool, on, aim); return; }
+        if (tool.action === 'focus') { this.hooks.onFocus(alt || !m ? null : m.ref); this.fire(tool, on, aim); return; }
         if (!m) { this.hooks.say('Point at something you placed'); fx('ui-error', { volume: 0.4 }); return; }
         if (tool.action === 'delete') { this.removeAt(aim, tool); return; }
         if (tool.action === 'turn') {
           const yaw = this.param(m.ref, 'yaw', 0) + (alt ? -1 : 1) * Math.max(1, tool.strength * 360);
           this.rt.commands.execute(cmd.setParam(`${m.ref}.yaw`, ((yaw + 540) % 360) - 180, 'Turn'));
-          this.done(tool, aim, '');
+          this.done(tool, aim, '', on);
           return;
         }
         if (tool.action === 'resize') {
           const s = this.param(m.ref, 'scale', 0.1) * (alt ? 1 / (1 + tool.strength) : 1 + tool.strength);
           this.rt.commands.execute(cmd.setParam(`${m.ref}.scale`, Math.min(5, Math.max(0.01, s)), alt ? 'Smaller' : 'Bigger'));
-          this.done(tool, aim, '');
+          this.done(tool, aim, '', on);
           return;
         }
         // copy: the same model a little to the side
@@ -130,7 +158,7 @@ export class BuildController {
           this.rt.commands.execute(cmd.put({ id, kind: 'model', name: src.name, params: params as never, tier: 'build' }, 'Copy'));
           this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, 'Copy'));
         });
-        this.done(tool, aim, `${src.name} copied`);
+        this.done(tool, aim, `${src.name} copied`, on);
         return;
       }
       case 'place': {
@@ -145,7 +173,7 @@ export class BuildController {
         this.strokeLabel = tool.name;
         const rect = stamp(ts.terrain as never, kind, [x, z], Math.max(2, tool.size), { height: Math.max(0.2, tool.strength * tool.size * 0.6), seed: Math.floor(now) % 99991, rotation: (now % 6283) / 1000 });
         if (rect) { this.dirty = rect; this.renderer.refreshTerrain(rect); }
-        this.burst(tool, aim, 1.2); this.sound(tool);
+        this.fire(tool, on, aim, { scale: 1.2 });
         return;
       }
     }
@@ -169,12 +197,11 @@ export class BuildController {
       const d = this.rt.binder.decor();
       if (d) this.hooks.onDecorPreview(settlePlants(d.placements, ts.terrain, rectToArea(ts.terrain, this.dirty, 1), { ...rulesOf(this.rt, this.sceneId), plantsReact: false }, plantsOf(this.rt, this.sceneId)).items);
     }
-    this.burst(tool, aim, kind === 'paint' ? 0.4 : 0.6);
-    this.sound(tool, { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 });
+    this.fire(tool, on, aim, { scale: kind === 'paint' ? 0.4 : 0.6, first, sound: { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 } });
   }
 
-  private done(tool: ToolPreset, aim: Aim, text: string): void {
-    this.hooks.onModels(); this.burst(tool, aim); this.sound(tool); saveMap(this.rt, this.sceneId);
+  private done(tool: ToolPreset, aim: Aim, text: string, on: PlugEvent = 'use'): void {
+    this.hooks.onModels(); this.fire(tool, on, aim); saveMap(this.rt, this.sceneId);
     if (text) this.hooks.say(text);
   }
 
@@ -183,6 +210,7 @@ export class BuildController {
    * plants follow the ground or go when their ground no longer suits them. Ground and plants are committed together as ONE undo step.
    */
   end(): void {
+    if (this.pressed) { this.fire(this.pressed, 'release', this.lastAim); this.pressed = null; }
     if (!this.dirty) return;
     const ts = this.rt.binder.terrain();
     const dirty = this.dirty, before = this.before;
@@ -236,7 +264,7 @@ export class BuildController {
       this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, `Place ${tool.name}`));
     });
     this.hooks.onModels();
-    this.burst(tool, aim, 1.4); this.sound(tool);
+    this.fire(tool, 'use', aim, { scale: 1.4 });
     saveMap(this.rt, this.sceneId);
   }
 
@@ -247,7 +275,7 @@ export class BuildController {
     this.rt.commands.execute(cmd.removeChild(this.sceneId, 'models', m.index, 'Delete'));
     if (this.carrying === m.ref) this.carrying = null;
     this.hooks.onModels();
-    if (tool) this.burst(tool, aim, 1.2);
+    if (tool) this.fire(tool, 'opposite', aim, { scale: 1.2, only: ['sprite', 'anim', 'shake'] });
     fx('delete'); saveMap(this.rt, this.sceneId);
     this.hooks.say('Taken away');
     return true;

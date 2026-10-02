@@ -20,6 +20,8 @@ export interface PlayerState extends CatalogPlayer {
   readonly created: boolean;
   readonly view: 'third' | 'first';
   readonly mode: 'walk' | 'studio';
+  /** Changes to the ready-made sprite bursts, by sprite id. */
+  readonly sprites: Readonly<Record<string, Record<string, unknown>>>;
 }
 
 const KEY = 'hm.player.v1';
@@ -30,7 +32,7 @@ const blank = (): PlayerState => {
   const p: CatalogPlayer = { tools: {}, anims: {}, looks: [] };
   return {
     ...p, tab: 'sculpt', slots: Object.fromEntries(TAB_IDS.map((t) => [t, 0])) as Record<TabId, number>, hotbars: defaultHotbars(activities, p),
-    moves: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', fall: 'fall' }, lookId: LOOKS[0]!.id, created: false, view: 'third', mode: 'walk',
+    moves: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', fall: 'fall' }, lookId: LOOKS[0]!.id, created: false, view: 'third', mode: 'walk', sprites: {},
   };
 };
 
@@ -54,6 +56,7 @@ function load(): PlayerState {
     created: raw.created === true,
     view: raw.view === 'first' ? 'first' : 'third',
     mode: raw.mode === 'studio' ? 'studio' : 'walk',
+    sprites: obj(raw.sprites),
   };
 }
 
@@ -95,6 +98,11 @@ export function editTool(id: string, key: string, value: unknown): void {
   set({ ...s, tools: { ...s.tools, [id]: { ...(s.tools[id] ?? {}), [key]: value } } });
 }
 export function resetTool(id: string): void { const s = get(); const { [id]: _drop, ...rest } = s.tools; set({ ...s, tools: rest }); }
+export function editSprite(id: string, key: string, value: unknown): void {
+  const s = get();
+  set({ ...s, sprites: { ...s.sprites, [id]: { ...(s.sprites[id] ?? {}), [key]: value } } });
+}
+export function resetSprite(id: string): void { const s = get(); const { [id]: _drop, ...rest } = s.sprites; set({ ...s, sprites: rest }); }
 export function editAnim(id: string, key: string, value: unknown): void {
   const s = get();
   set({ ...s, anims: { ...s.anims, [id]: { ...(s.anims[id] ?? {}), [key]: value } } });

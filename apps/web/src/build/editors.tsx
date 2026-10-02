@@ -1,9 +1,9 @@
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { cmd, defineSchema, type Params, type PresetId, type PresetSchema, type VariableDef } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
-import { ANIM_VARIABLES, MOVE_SLOTS, animToParams, type AnimPreset, type MoveSlot } from '@hm/anim';
+import { ANIMATIONS, ANIM_VARIABLES, MOVE_SLOTS, animToParams, type AnimPreset, type MoveSlot } from '@hm/anim';
 import { LOOK_VARIABLES, nameProblem, type AvatarLook } from '@hm/avatarlook';
-import { toolEdit, toolParams, toolVariables, type TabId } from '@hm/buildkit';
+import { PLUG_KINDS, PLUG_POINTS, SHAKES, SPRITE_PRESETS, SPRITE_VARIABLES, addPlug, addable, changePlug, removePlug, spriteToParams, toolEdit, toolParams, toolVariables, type PlugKind, type TabId, type ToolPlug, type ToolPreset } from '@hm/buildkit';
 import { SFX, type SfxId } from '@hm/audio';
 import { Inspector } from '@hm/ui';
 import { PLANT_VARIABLES, plantToParams, rulesToParams, RULE_VARIABLES, PLANTS } from '@hm/worldrules';
@@ -13,7 +13,9 @@ import { ensurePlant, ensureRules, plantsOf, rulesOf } from '../world';
 import { useRev } from '../use-rev';
 import { CAMERAS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
 import { PresetPreview, goblinWearing } from './cards';
-import { editAnim, editTool, resetAnim, resetTool, saveLook, setMove, usePlayer, wearLook } from './player';
+import { editAnim, editSprite, editTool, resetAnim, resetSprite, resetTool, saveLook, setMove, usePlayer, wearLook } from './player';
+import { spriteOf } from './sprites';
+import type { Preview } from './catalog';
 
 /**
  * Attribute editors: open any preset and change it. Each is the generic inspector (sliders that never stop short, a number box, the input
@@ -26,9 +28,11 @@ export interface EditorActions {
   readonly openActivity: (id: string) => void;
   readonly useCamera: (id: string) => void;
   readonly applyLook: (id: string) => void;
+  /** Open the editor of a sprite burst (a tool's sprite plug). */
+  readonly openSprite: (id: string) => void;
 }
 
-export function ToolEditor({ id }: { readonly id: string }): ReactElement {
+export function ToolEditor({ id, actions }: { readonly id: string; readonly actions: EditorActions }): ReactElement {
   const p = usePlayer();
   const tool = toolOf(p, id);
   if (!tool) return <p className="hint">This tool no longer exists.</p>;
@@ -38,7 +42,96 @@ export function ToolEditor({ id }: { readonly id: string }): ReactElement {
       <div className="ed-top"><PresetPreview p={tool.action === 'paint' ? { kind: 'icon', icon: 'Paintbrush' } : { kind: 'icon', icon: tool.icon }} size={44} /><p>{tool.doc}</p></div>
       <Inspector schema={schemaOf('tool', tool.name, vars)} params={(p.tools[id] ?? {}) as Params} resolved={toolParams(tool)} tier="build"
         onChange={(k, v) => { const [key, value] = toolEdit(k, v); editTool(id, key, value); }} />
+      <PlugList tool={tool} actions={actions} />
       {p.tools[id] ? <button onClick={() => { resetTool(id); fx('undo'); }}>Back to the ready-made tool</button> : null}
+    </div>
+  );
+}
+
+/** The choices for a plug of a kind: id, name, preview. */
+function plugChoices(kind: PlugKind): { readonly id: string; readonly name: string; readonly preview: Preview }[] {
+  switch (kind) {
+    case 'sprite': return SPRITE_PRESETS.map((s) => { const own = spriteOf(s.id); return { id: s.id, name: own.name, preview: { kind: 'sprite', sprite: own } }; });
+    case 'sound': return SOUND_IDS.map((id) => ({ id, name: soundName(id), preview: { kind: 'sound', id: id as SfxId } }));
+    case 'anim': return ANIMATIONS.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'anim', anim: a } }));
+    case 'shake': return SHAKES.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'shake', amp: s.amp } }));
+  }
+}
+const plugPreview = (pl: ToolPlug): Preview => plugChoices(pl.kind).find((c) => c.id === pl.ref)?.preview ?? { kind: 'icon', icon: 'Box' };
+const plugName = (pl: ToolPlug): string => plugChoices(pl.kind).find((c) => c.id === pl.ref)?.name ?? pl.ref;
+
+/**
+ * "When you use it": the tool's plugs. Each row is a moment (on use, on right click, when you pick it, when you let go) and a preset that
+ * plays then, with its preview; click the preview to choose another, Edit opens it (sprites), x takes it off. "+ attribute" adds one.
+ */
+function PlugList({ tool, actions }: { readonly tool: ToolPreset; readonly actions: EditorActions }): ReactElement {
+  const [adding, setAdding] = useState(false);
+  const [choosing, setChoosing] = useState<number | null>(null);
+  const save = (plugs: readonly ToolPlug[]): void => { editTool(tool.id, 'plugs', plugs); };
+  const try_ = (pl: ToolPlug): void => {
+    if (pl.kind === 'sound') fx(pl.ref as SfxId);
+    else if (pl.kind === 'anim') actions.playAnim(ANIMATIONS.find((a) => a.id === pl.ref) ?? ANIMATIONS[0]!);
+  };
+  return (
+    <section className="plugs" aria-label="When you use it">
+      <h4>When you use it</h4>
+      {tool.plugs.length === 0 ? <p className="hint">Nothing plays yet. Add a sprite, a sound, a move or a shake with + attribute.</p> : null}
+      {tool.plugs.map((pl, i) => (
+        <div key={i} className="plug">
+          <select aria-label="When" value={pl.on} onChange={(e) => { save(changePlug(tool.plugs, i, { on: e.target.value as ToolPlug['on'] })); fx('ui-click', { volume: 0.4 }); }}>
+            {PLUG_POINTS.filter((pt) => pt.accepts.includes(pl.kind)).map((pt) => <option key={pt.on} value={pt.on}>{pt.label}</option>)}
+          </select>
+          <button className="plug-pv" title={`${PLUG_KINDS[pl.kind].label}: ${plugName(pl)} (click to choose another)`} aria-expanded={choosing === i} onClick={() => { setChoosing(choosing === i ? null : i); try_(pl); }}>
+            <PresetPreview p={plugPreview(pl)} size={36} />
+          </button>
+          <span className="plug-name"><small>{PLUG_KINDS[pl.kind].label}</small>{plugName(pl)}</span>
+          <label className="plug-amt" title="How strongly it plays (1 = as made)">x<input type="number" min={0} max={4} step={0.1} value={pl.amount} onChange={(e) => save(changePlug(tool.plugs, i, { amount: Number(e.target.value) }))} /></label>
+          {pl.kind === 'sprite' ? <button title="Change this burst" onClick={() => actions.openSprite(pl.ref)}>Edit</button> : null}
+          <button className="x" aria-label="Take it off" title="Take it off" onClick={() => { save(removePlug(tool.plugs, i)); setChoosing(null); fx('delete', { volume: 0.5 }); }}>×</button>
+          {choosing === i ? (
+            <div className="plug-choose" role="listbox" aria-label={`Choose a ${PLUG_KINDS[pl.kind].label.toLowerCase()}`}>
+              {plugChoices(pl.kind).map((c) => (
+                <button key={c.id} role="option" aria-selected={c.id === pl.ref} className={c.id === pl.ref ? 'on' : ''} title={c.name}
+                  onClick={() => { const next = changePlug(tool.plugs, i, { ref: c.id }); save(next); try_(next[i]!); }}>
+                  <PresetPreview p={c.preview} size={40} /><span>{c.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ))}
+      <button className="plug-add" aria-expanded={adding} onClick={() => setAdding(!adding)}>+ attribute</button>
+      {adding ? (
+        <div className="plug-menu" role="menu">
+          {addable(tool.plugs).map(({ point, kinds }) => (
+            <div key={point.on} className="plug-point">
+              <b title={point.doc}>{point.label}</b>
+              {kinds.map((k) => (
+                <button key={k} role="menuitem" title={PLUG_KINDS[k].doc} onClick={() => {
+                  const r = addPlug(tool.plugs, point.on, k);
+                  if (r.refused) { fx('ui-error'); return; }
+                  save(r.plugs); setAdding(false); setChoosing(r.plugs.length - 1); fx('select');
+                }}>{PLUG_KINDS[k].label}</button>
+              ))}
+            </div>
+          ))}
+          {addable(tool.plugs).length === 0 ? <p className="hint">This tool has as many as it can hold. Take one off first.</p> : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** A sprite burst is a preset too: how many bits, their colours, size, speed, spread, gravity, how long they last. */
+export function SpriteEditor({ id }: { readonly id: string }): ReactElement {
+  const p = usePlayer();
+  const s = spriteOf(id);
+  const schema = useMemo(() => schemaOf('sprite', 'Sprite', SPRITE_VARIABLES), []);
+  return (
+    <div className="editor">
+      <div className="ed-top big"><PresetPreview p={{ kind: 'sprite', sprite: s }} size={120} /><p>Every tool that plays {s.name.toLowerCase()} changes with it.</p></div>
+      <Inspector schema={schema} params={(p.sprites[id] ?? {}) as Params} resolved={spriteToParams(s)} tier="build" onChange={(k, v) => editSprite(id, k, v)} />
+      {p.sprites[id] ? <button onClick={() => { resetSprite(id); fx('undo'); }}>Back to the ready-made burst</button> : null}
     </div>
   );
 }
@@ -158,7 +251,7 @@ export function CameraEditor({ id, actions }: { readonly id: string; readonly ac
 export function EditorFor(props: { readonly tab: TabId; readonly id: string; readonly rt: Runtime; readonly sceneId: PresetId; readonly activities: readonly ActivityInfo[]; readonly actions: EditorActions }): ReactElement {
   const { tab, id } = props;
   switch (tab) {
-    case 'select': case 'paint': case 'sculpt': case 'things': return <ToolEditor id={id} />;
+    case 'select': case 'paint': case 'sculpt': case 'things': return <ToolEditor id={id} actions={props.actions} />;
     case 'animate': return <AnimEditor id={id} actions={props.actions} />;
     case 'sound': return <SoundEditor id={id} />;
     case 'lights': return <LightingPanel rt={props.rt} sceneId={props.sceneId} />;

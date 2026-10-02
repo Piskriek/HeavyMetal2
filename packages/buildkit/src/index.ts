@@ -124,3 +124,4 @@ export function pushRecent(list: readonly string[], id: string, max = 6): string
 
 export * from './tabs';
 export * from './tools';
+export * from './plugs';

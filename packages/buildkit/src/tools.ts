@@ -1,4 +1,5 @@
 import type { VariableDef } from '@hm/contracts';
+import { SPRITE_PRESETS, defaultPlugs, normalizePlugs, type ToolPlug } from './plugs';
 
 /**
  * Tool presets: what the Select, Paint, Sculpt and Things tabs hold. A tool is a preset like everything else: its size, strength, the
@@ -11,8 +12,9 @@ export type ToolAction =
   | 'raise' | 'lower' | 'smooth' | 'flatten' | 'dig' | 'mound' | 'crater' | 'plateau' | 'ridge' | 'dune'
   | 'place';
 
-export const SPRITE_IDS = ['dust', 'sparkle', 'debris', 'pop', 'leaf', 'splash'] as const;
-export type SpriteName = (typeof SPRITE_IDS)[number];
+/** The ready-made sprite bursts (their editable values are in `plugs.ts`). */
+export const SPRITE_IDS: readonly string[] = SPRITE_PRESETS.map((s) => s.id);
+export type SpriteName = string;
 
 export interface ToolPreset {
   id: string;
@@ -34,8 +36,11 @@ export interface ToolPreset {
   surface: number;
   /** Model id placed (Things tools), '' for none. */
   model: string;
+  /** The first sprite and sound it plays on use (what the cards show); the full list is `plugs`. */
   sprite: SpriteName;
   sound: string;
+  /** What it sets off, and when: sprites, sounds, goblin moves, camera shakes (the "+ attribute" list). */
+  plugs: readonly ToolPlug[];
 }
 
 /** The ground you can paint, by id (the same numbers as the island's surfaces). */
@@ -56,8 +61,9 @@ export const THINGS: readonly { readonly id: string; readonly name: string; read
 
 type Base = Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'surface' | 'model' | 'sprite' | 'sound'>;
 const B: Base = { size: 1, strength: 0.5, falloff: 'smooth', surface: 0, model: '', sprite: 'pop', sound: 'select' };
-const tool = (id: string, name: string, tab: ToolTab, action: ToolAction, icon: string, doc: string, left: string, right: string, v: Partial<Base> = {}): ToolPreset =>
-  ({ id, name, tab, action, icon, doc, left, right, ...B, ...v });
+const tool = (id: string, name: string, tab: ToolTab, action: ToolAction, icon: string, doc: string, left: string, right: string, v: Partial<Base> = {}): ToolPreset => { const b = { ...B, ...v }; return { id, name, tab, action, icon, doc, left, right, ...b, plugs: defaultPlugs(b.sprite, b.sound, swings(action) ? 'swing' : undefined) }; };
+/** Tools that change the world make the goblin swing its arm; looking, focusing and hiding do not. */
+const swings = (a: ToolAction): boolean => a !== 'inspect' && a !== 'focus' && a !== 'isolate';
 
 export const TOOLS: readonly ToolPreset[] = [
   tool('inspect', 'Look at', 'select', 'inspect', 'MousePointer2', 'Point at something to see what it is and what it is made of.', 'Show what it is', 'Show what it is', { sound: 'select' }),
@@ -91,6 +97,11 @@ export function normalizeTool(id: string, overrides: unknown): ToolPreset | null
   const base = toolById(id);
   if (!base) return null;
   const o = overrides && typeof overrides === 'object' && !Array.isArray(overrides) ? (overrides as Record<string, unknown>) : {};
+  // plugs: the stored list, or (older saves) the single sprite and sound they picked
+  const sprite = SPRITE_IDS.includes(o.sprite as string) ? (o.sprite as string) : base.sprite;
+  const sound = typeof o.sound === 'string' && o.sound ? o.sound : base.sound;
+  const plugs = normalizePlugs(o.plugs) ?? (o.sprite === undefined && o.sound === undefined ? [...base.plugs] : defaultPlugs(sprite, sound, base.plugs.find((p) => p.kind === 'anim')?.ref));
+  const firstUse = (kind: ToolPlug['kind']): string | undefined => plugs.find((p) => p.on === 'use' && p.kind === kind)?.ref;
   return {
     ...base,
     name: typeof o.name === 'string' && o.name.trim() ? o.name.trim().slice(0, 40) : base.name,
@@ -99,8 +110,9 @@ export function normalizeTool(id: string, overrides: unknown): ToolPreset | null
     falloff: o.falloff === 'linear' || o.falloff === 'flat' || o.falloff === 'smooth' ? o.falloff : base.falloff,
     surface: base.action === 'paint' && typeof o.surface === 'number' && PAINTS.some((p) => p.id === o.surface) ? o.surface : base.surface,
     model: base.action === 'place' && typeof o.model === 'string' && THINGS.some((t) => t.id === o.model) ? o.model : base.model,
-    sprite: SPRITE_IDS.includes(o.sprite as SpriteName) ? (o.sprite as SpriteName) : base.sprite,
-    sound: typeof o.sound === 'string' && o.sound ? o.sound : base.sound,
+    sprite: firstUse('sprite') ?? sprite,
+    sound: firstUse('sound') ?? sound,
+    plugs,
   };
 }
 
@@ -117,8 +129,7 @@ export function toolVariables(t: ToolPreset, sounds: readonly string[]): Variabl
   if (t.action === 'turn' || t.action === 'resize') vars.push({ key: 'strength', type: 'number', label: t.action === 'turn' ? 'Turn by' : 'Grow by', doc: t.action === 'turn' ? 'How far one click turns it (1 = a full turn).' : 'How much one click grows it.', tier: 'play', default: t.strength, min: 0, max: 1, step: 0.01, hardMin: 0, group: 'Tool' });
   if (t.action === 'paint') vars.push({ key: 'surface', type: 'enum', label: 'Paints', doc: 'The ground it paints.', tier: 'play', default: PAINTS.find((p) => p.id === t.surface)?.name ?? 'Grass', options: PAINTS.map((p) => p.name), group: 'Tool' });
   if (t.action === 'place') vars.push({ key: 'model', type: 'enum', label: 'Places', doc: 'The thing it places.', tier: 'play', default: THINGS.find((m) => m.id === t.model)?.name ?? 'Palm', options: THINGS.map((m) => m.name), group: 'Tool' });
-  vars.push({ key: 'sprite', type: 'enum', label: 'Sprite', doc: 'The little burst it makes when you use it.', tier: 'build', default: t.sprite, options: SPRITE_IDS, group: 'Feel' });
-  vars.push({ key: 'sound', type: 'enum', label: 'Sound', doc: 'The sound it makes when you use it.', tier: 'build', default: t.sound, options: sounds.includes(t.sound) ? sounds : [t.sound, ...sounds], group: 'Feel' });
+  void sounds; // sprites and sounds are plugs now (see plugs.ts), edited in the tool's "When you use it" list
   return vars;
 }
 

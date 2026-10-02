@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { SFX, type SfxId } from '@hm/audio';
 import { poseAt, stickFigure, type AnimPreset } from '@hm/anim';
 import { recolour, type AvatarLook } from '@hm/avatarlook';
+import type { SpritePreset } from '@hm/buildkit';
 import type { VoxelModel } from '@hm/voxel';
 import { MODELS } from '@hm/voxelart';
 import { NATURE_MODELS } from '@hm/voxelnature';
@@ -83,6 +84,43 @@ function SoundPreview({ id, size }: { readonly id: SfxId; readonly size: number 
   );
 }
 
+/** A sprite burst, looping: bits fly out of the ground in their three colours, fall (or float) and fade. Same numbers as in the world. */
+function SpritePreview({ s, size }: { readonly s: SpritePreset; readonly size: number }): ReactElement {
+  const t = useClock(true);
+  const life = s.lifeMs / 1000, period = life + 0.45, k = (t % period) / life;
+  const n = Math.min(48, s.count);
+  const dots: ReactElement[] = [];
+  if (k <= 1) {
+    for (let i = 0; i < n; i++) {
+      const r1 = Math.sin(i * 12.9898) * 43758.5453, r2 = Math.sin(i * 78.233) * 12345.678;
+      const u = r1 - Math.floor(r1), v = r2 - Math.floor(r2);
+      const ang = -Math.PI / 2 + (u - 0.5) * Math.PI * s.spread;
+      const sp = 0.55 + v * 0.45;
+      const x = 0.5 + Math.cos(ang) * sp * k * 0.42;
+      const y = 0.86 + Math.sin(ang) * sp * k * 0.62 + (s.gravity / Math.max(1, s.speed)) * k * k * 0.12;
+      const r = Math.max(0.012, Math.min(0.06, s.size * 0.035)) * (1 - k * 0.6);
+      dots.push(<circle key={i} cx={x} cy={y} r={r} style={{ fill: [s.colorA, s.colorB, s.colorC][i % 3], opacity: 1 - k * 0.7 }} />);
+    }
+  }
+  return (
+    <svg viewBox="0 0 1 1" width={size} height={size} className={`pv-sprite${s.glow ? ' glow' : ''}`} aria-hidden="true">
+      <line x1="0.12" y1="0.88" x2="0.88" y2="0.88" className="ground" />
+      {dots}
+    </svg>
+  );
+}
+
+function ShakePreview({ amp, size }: { readonly amp: number; readonly size: number }): ReactElement {
+  const t = useClock(true);
+  const w = Math.sin(t * 40) * Math.min(0.12, amp * 0.6) * Math.max(0, 1 - (t % 1.2) / 0.7);
+  return (
+    <svg viewBox="0 0 1 1" width={size} height={size} className="pv-shake" aria-hidden="true">
+      <rect x={0.2 + w} y={0.28 + w * 0.6} width="0.6" height="0.44" />
+      <line x1={0.32 + w} y1={0.5} x2={0.68 + w} y2={0.5} />
+    </svg>
+  );
+}
+
 export function PresetPreview({ p, size = 48 }: { readonly p: Preview; readonly size?: number }): ReactElement {
   switch (p.kind) {
     case 'icon': { const I = iconByName(p.icon); return <span className="pv-icon" style={{ width: size, height: size }}><I size={Math.round(size * 0.45)} strokeWidth={1.5} /></span>; }
@@ -100,6 +138,8 @@ export function PresetPreview({ p, size = 48 }: { readonly p: Preview; readonly 
           {p.ring ? <ellipse cx="20" cy="20" rx="18" ry="5" transform="rotate(-18 20 20)" style={{ fill: 'none', stroke: `hsl(${(p.hue + 40) % 360} 60% 45%)`, strokeWidth: 1.6 }} /> : null}
         </svg>
       );
+    case 'sprite': return <SpritePreview s={p.sprite} size={size} />;
+    case 'shake': return <ShakePreview amp={p.amp} size={size} />;
     case 'look': { const src = thumb(goblinWearing(p.look), 20); return src ? <img className="pv-img" alt="" width={size} height={size} src={src} /> : <span className="pv-icon" style={{ width: size, height: size }} />; }
   }
 }

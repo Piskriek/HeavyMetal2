@@ -125,6 +125,15 @@ try {
   await page.waitForTimeout(800);
   check('B switches to studio mode', /Studio/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
   check('studio opens the settings of what you hold', await page.locator('.fwin').count() >= 1);
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(300);
+  check('a tool shows what it sets off (sprite, sound, swing)', await page.locator('.fwin .plugs .plug').count() === 3);
+  await page.locator('.fwin .plug-add').click();
+  await page.locator('.fwin .plug-menu .plug-point').last().locator('button', { hasText: 'Camera shake' }).click();
+  await page.waitForTimeout(200);
+  check('+ attribute adds a camera shake when you let go', await page.locator('.fwin .plugs .plug').count() === 4 && await page.locator('.fwin .plug-choose button').count() === 4);
+  await page.locator('.fwin .plugs .plug').last().locator('button.x').click();
+  check('and x takes it off again', await page.locator('.fwin .plugs .plug').count() === 3);
   check('the ground has Flat and PBR buttons', await page.locator('.mode-bar button', { hasText: 'PBR' }).count() === 1);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);

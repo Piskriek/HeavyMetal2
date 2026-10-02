@@ -1,7 +1,7 @@
 import { SFX, SFX_IDS, type SfxId } from '@hm/audio';
 import { ANIMATIONS, animById, animToParams, normalizeAnim, type AnimPreset } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type TabId, type ToolPreset } from '@hm/buildkit';
+import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import { SETUPS, setupById, type LightSetup } from '@hm/lighting';
 import { STARTER_SURFACES } from '@hm/render';
 
@@ -18,7 +18,9 @@ export type Preview =
   | { readonly kind: 'anim'; readonly anim: AnimPreset }
   | { readonly kind: 'sound'; readonly id: SfxId }
   | { readonly kind: 'planet'; readonly hue: number; readonly ring: boolean }
-  | { readonly kind: 'look'; readonly look: AvatarLook };
+  | { readonly kind: 'look'; readonly look: AvatarLook }
+  | { readonly kind: 'sprite'; readonly sprite: SpritePreset }
+  | { readonly kind: 'shake'; readonly amp: number };
 
 export interface CatalogItem { readonly tab: TabId; readonly id: string; readonly name: string; readonly doc: string; readonly preview: Preview; readonly edited: boolean }
 

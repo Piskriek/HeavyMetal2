@@ -14,21 +14,16 @@ import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { buildRoad } from '@hm/game';
 import { DriversPanel, driverInputs } from './drivers';
-import { SoundPanel } from './sound-panel';
-import { RulesPanel } from './rules-panel';
-import { InterfacePanel } from './interface-panel';
-import { ItemsPanel } from './items-panel';
-import { ModelsPanel, placementsOf } from './models-panel';
-import { EvolutionPanel, snapshotOf } from './evolution-panel';
+import { placementsOf } from './models-panel';
+import { ensureRules } from './race-rules';
 import { ToolRail } from './rail';
 import { PresetTree } from './preset-tree';
 import { Redo2, Undo2, Volume2, VolumeX } from 'lucide-react';
 import { DEFAULT_SCULPT, ModelSculptor, SculptBar, type SculptUi } from './sculpt';
 import { decodeModel } from '@hm/voxel';
 import { BlurRing, DECOR_FOCUS, FocusBar, ensureVeil, focusTargetOf, frameTarget, useFocus, type FocusTarget } from './focus';
-import { baselineOf, type Baseline } from '@hm/lineage';
 import { LAYOUTS } from '@hm/tracklayouts';
-import { themeOf } from '../ui-preset';
+import { ensureInterface, themeOf } from '../ui-preset';
 import { HelpOverlay, helpSeen, markHelpSeen } from './help';
 import { ShareDialog } from './share';
 import { feedback, fx, setSoundEnabled, soundEnabled, toasts } from './feedback';
@@ -75,19 +70,10 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
   const [shapeMode, setShapeMode] = useState<ShapeMode>('mound');
   const [shapeHeight, setShapeHeight] = useState(6);
   const [density, setDensity] = useState(1);
-  const [soundOpen, setSoundOpen] = useState(false);
-  const [rulesOpen, setRulesOpen] = useState(false);
-  const [uiOpen, setUiOpen] = useState(false);
-  const [itemsOpen, setItemsOpen] = useState(false);
-  const [modelsOpen, setModelsOpen] = useState(false);
-  const [evoOpen, setEvoOpen] = useState(false);
   const [jump, setJump] = useState(false);
   const [rend, setRend] = useState<ThreeRenderer | null>(null);
   const [focus, setFocus] = useState<FocusTarget | null>(null);
   const [sculptUi, setSculptUi] = useState<SculptUi>(DEFAULT_SCULPT);
-  // the map as it was when the maker opened: the evolution panel compares against it
-  const evoBase = useRef<Baseline | null>(null);
-  if (!evoBase.current) evoBase.current = baselineOf(snapshotOf(rt, scene.sceneId));
   const [confirmNew, setConfirmNew] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [autosaved, setAutosaved] = useState<number | null>(null);
@@ -528,18 +514,12 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
         <ToolRail tools={TOOLS} active={tool} onSelect={(id) => pick(id as ToolId)} />
         {tool === 'select' || tool === 'place' ? <div className="slideout"><h4>Snap and move</h4><div style={{ padding: 6 }}><Toolbar tools={[] as never} active={tool} onSelect={() => undefined} manip={manip} onManip={(p) => { setManip({ ...manip, ...p }); fx('ui-toggle'); }} tier={tier} /></div></div> : null}
         <div className="view" ref={host}>
-          {focus ? <><BlurRing veil={veil} />{rt.store.get(focus.id as string)?.kind === 'model' && tool === 'brush' ? <SculptBar ui={sculptUi} palette={sculptPalette(focus.id as string)} onChange={setSculptUi} /> : null}<FocusBar target={focus} veil={veil} onVeil={() => { const id = ensureVeil(rt, scene.sceneId); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); }} onMode={() => { const id = ensureVeil(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${id}.mode`, veil.mode === 'fly' ? 'orbit' : 'fly', 'Camera mode')); }} onExit={exitFocus} /></> : null}
+          {focus ? <><BlurRing veil={veil} />{rt.store.get(focus.id as string)?.kind === 'model' && tool === 'brush' ? <SculptBar ui={sculptUi} palette={sculptPalette(focus.id as string)} onChange={setSculptUi} /> : null}<FocusBar target={focus} veil={veil} onVeil={() => { const id = ensureVeil(rt, scene.sceneId); setTool('select'); setSelected(id); }} onMode={() => { const id = ensureVeil(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${id}.mode`, veil.mode === 'fly' ? 'orbit' : 'fly', 'Camera mode')); }} onExit={exitFocus} /></> : null}
           {touchDevice ? <button className={`viewmode${viewMode ? ' on' : ''}`} aria-pressed={viewMode} title="Turn on to drag the camera with one finger; turn off to use the tool" onClick={() => { setViewMode(!viewMode); fx('ui-toggle'); }}>{viewMode ? '✋ Moving the view' : '✋ Move view'}</button> : null}
         </div>
         <aside className="panel right">
-          <PresetTree rt={rt} sceneId={scene.sceneId} selected={selected} onSelect={(id) => { setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); setEvoOpen(false); setTool('select'); setSelected(id); fx('select'); }} onEnter={(id) => { if (focusTargetOf(rt, id)) enterFocus(id); else { setTool('select'); setSelected(id); } }} />
-          {soundOpen ? <SoundPanel rt={rt} tier={tier} rev={rev} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          {evoOpen ? <EvolutionPanel rt={rt} sceneId={scene.sceneId} name={rt.store.get(scene.sceneId)?.name ?? 'My map'} base={evoBase} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          {modelsOpen ? <ModelsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} onFocus={enterFocus} /> : null}
-          {itemsOpen ? <ItemsPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          {uiOpen ? <InterfacePanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          {rulesOpen ? <RulesPanel rt={rt} sceneId={scene.sceneId} tier={tier} onFeedback={(k, t) => feedback(k, t)} /> : null}
-          <div style={soundOpen || rulesOpen || uiOpen || itemsOpen || modelsOpen || evoOpen ? { display: 'none' } : undefined}>
+          <PresetTree rt={rt} sceneId={scene.sceneId} selected={selected} addable={[{ label: 'Race rules', slot: 'rules', add: () => ensureRules(rt, scene.sceneId) }, { label: 'Interface', slot: 'interface', add: () => ensureInterface(rt, scene.sceneId) }]} onAdded={(id) => { setTool('select'); setSelected(id); feedback('success', 'Added: change it in the inspector'); }} onSelect={(id) => { setTool('select'); setSelected(id); fx('select'); }} onEnter={(id) => { if (focusTargetOf(rt, id)) enterFocus(id); else { setTool('select'); setSelected(id); } }} />
+          <div>
           {tool === 'brush' ? (
             <>
               <h3>Brush</h3>

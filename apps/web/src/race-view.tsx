@@ -3,11 +3,16 @@ import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
 import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
 import { attachKeyboard, TouchControls } from '@hm/input';
-import { HUD, Minimap } from '@hm/ui';
+import { Minimap } from '@hm/ui';
+import type { HudLayout } from '@hm/hudlayout';
+import { LayoutHud } from './hud';
 import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
 import { applyLook, lookOf } from './look';
 import { decorInstances } from './maker/dress';
 import { attachRaceAudio, type RaceAudio } from './sound/race-audio';
+
+/** On phones the HUD gets a second pass: the same layout with the parts scaled down so nothing collides. */
+const narrow = (l: HudLayout): HudLayout => ({ ...l, elements: l.elements.map((e) => ({ ...e, scale: Math.min(e.scale, e.kind === 'minimap' ? 0.65 : 0.85) })) });
 
 export interface RaceSetup {
   readonly fromMap: boolean;
@@ -27,8 +32,8 @@ export function RaceView(props: {
   /** The game only advances while active and not paused (loading shows the grid without running the lights). */
   readonly active: boolean;
   readonly paused: boolean;
-  /** Minimap width from the interface preset. */
-  readonly minimapSize: number;
+  /** Where the HUD parts sit (from the interface preset). */
+  readonly layout: HudLayout;
   /** Show the pause button (not on the results screens). */
   readonly pausable: boolean;
   readonly onReady: () => void;
@@ -146,8 +151,7 @@ export function RaceView(props: {
   return (
     <div className="race">
       <div className="view" ref={host} />
-      {hud ? <HUD speed={hud.speed} lap={hud.lap} laps={hud.laps} position={hud.position} racers={hud.racers} timeMs={hud.timeMs} item={hud.item} boost={hud.boost} {...(hud.message && hud.phase !== 'countdown' ? { message: hud.message } : {})} /> : null}
-      {game && props.settings.showMinimap ? <div className="mini"><Minimap track={game.track.points} racers={racers} size={size.w < 520 ? Math.round(props.minimapSize * 0.65) : props.minimapSize} /></div> : null}
+      {hud ? <LayoutHud hud={hud} layout={size.w < 520 ? narrow(props.layout) : props.layout} minimap={game && props.settings.showMinimap ? <Minimap track={game.track.points} racers={racers} size={150} /> : null} /> : null}
       {showTouch && game ? <TouchControls width={size.w} height={size.h} onChange={(t) => game.input.setTouch(t)} /> : null}
       {props.active && count !== null && !props.paused ? <IntroOverlay countdown={count} lap={1} laps={hud?.laps ?? 3} reducedMotion={props.settings.reducedMotion} /> : null}
       {props.pausable && !props.paused ? <button className="pause-btn" aria-label="Pause" onClick={props.onPause}>⏸</button> : null}

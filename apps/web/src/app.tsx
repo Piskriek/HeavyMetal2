@@ -121,7 +121,7 @@ export function App({ rt, fromMap, autoStart = false, onEditor }: { readonly rt:
       <ScreenStyles />
       {theme.hudCss ? <style>{theme.hudCss}</style> : null}
       {inRace ? (
-        <RaceView key={raceKey} rt={rt} setup={setup} settings={settings} minimapSize={theme.minimapSize}
+        <RaceView key={raceKey} rt={rt} setup={setup} settings={settings} layout={theme.layout}
           active={flow.screen === 'intro' || flow.screen === 'race' || flow.screen === 'results' || flow.screen === 'standings'}
           pausable={canPause(flow)}
           paused={flow.screen === 'paused' || (flow.screen === 'settings' && flow.previous === 'paused')}

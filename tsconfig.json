@@ -107,6 +107,9 @@
       ],
       "@hm/itemdefs": [
         "packages/itemdefs/src/index.ts"
+      ],
+      "@hm/hudlayout": [
+        "packages/hudlayout/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

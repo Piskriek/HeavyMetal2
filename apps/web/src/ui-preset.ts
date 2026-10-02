@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { layoutFromJson, normalizeLayout, presetById, type HudLayout } from '@hm/hudlayout';
 import { cmd, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 
@@ -16,16 +17,27 @@ export interface UiTheme {
   readonly subtitle: string;
   readonly quickLabel: string;
   readonly seriesLabel: string;
-  readonly minimapSize: number;
+  readonly layout: HudLayout;
   /** CSS that hides the HUD parts the preset switches off. */
   readonly hudCss: string;
 }
 
 const DEFAULTS = {
   accent: '#ffd24a', text: '#dde6ee', dim: '#8fa0b1', panel: '#151a21', line: '#26303b', ok: '#5fd38d', danger: '#ff6b5e',
-  title: 'GOBLIN BALL RACERS', subtitle: 'Basalt Isle', quickLabel: 'Quick Race', seriesLabel: 'Championship', uiScale: 1, minimapSize: 150,
+  title: 'GOBLIN BALL RACERS', subtitle: 'Basalt Isle', quickLabel: 'Quick Race', seriesLabel: 'Championship', uiScale: 1,
   hudSpeed: true, hudLap: true, hudPosition: true, hudTime: true, hudItem: true,
 };
+
+/** The HUD layout the interface preset asks for: a ready-made one, or the custom JSON. */
+function layoutFrom(p: Record<string, unknown>): HudLayout {
+  const classic = presetById('classic')!;
+  const id = typeof p['hudLayout'] === 'string' ? (p['hudLayout'] as string) : 'classic';
+  if (id === 'custom' && typeof p['hudLayoutJson'] === 'string') {
+    const r = layoutFromJson(p['hudLayoutJson'] as string);
+    if (r.layout) return normalizeLayout(r.layout);
+  }
+  return presetById(id) ?? classic;
+}
 
 export function themeOf(rt: Runtime): UiTheme {
   const scene = rt.binder.sceneId ? rt.store.get(rt.binder.sceneId) : undefined;
@@ -43,7 +55,7 @@ export function themeOf(rt: Runtime): UiTheme {
       '--hms-scale': String(n('uiScale', 0.8, 1.6)),
     } as CSSProperties,
     title: s('title'), subtitle: s('subtitle'), quickLabel: s('quickLabel'), seriesLabel: s('seriesLabel'),
-    minimapSize: n('minimapSize', 80, 260),
+    layout: layoutFrom(p),
     hudCss: hidden.length ? `${hidden.join(',')} { display: none !important; }` : '',
   };
 }

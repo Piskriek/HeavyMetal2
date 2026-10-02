@@ -136,3 +136,7 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
   .race .mini { top: 92px; right: 10px; }
   .race .pause-btn { left: auto; right: 10px; top: 200px; transform: none; }
 }
+
+.maker .hud-preview { position: relative; background: #0f1a22; border: 1px solid var(--line, #26303b); border-radius: 6px; margin: 6px 0; overflow: hidden; }
+.maker .hud-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line, #26303b); font-size: 12px; }
+.maker .hud-row input[type=number] { width: 54px; }

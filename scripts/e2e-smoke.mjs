@@ -61,8 +61,24 @@ try {
   // the first Esc skips the arrival cinematic (slow under software rendering); keep pressing until the menu shows
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
   check('Esc opens the jump menu on the island', await page.locator('.island-menu').count() === 1);
-  // software rendering starves the page, so click through the DOM instead of waiting for Playwright's stability checks
-  await page.evaluate(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Main menu')?.click(); });
+  check('and the galaxy bar comes down', await page.locator('.galaxy-bar.open').count() === 1);
+  const dom = (fn) => page.evaluate(fn); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
+  await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Up one level')?.click(); });
+  await page.waitForTimeout(400);
+  check('up one level shows the island overview', await page.locator('.galaxy-bar.open').count() === 1);
+  await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Into the selected')?.click(); });
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 6 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Build mode')?.click(); });
+  await page.waitForSelector('.maker', { timeout: 30000 });
+  check('Build mode opens inside the shell', true);
+  for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
+  check('Esc opens the menu in build mode', await page.locator('.maker .island-menu').count() === 1);
+  await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Island')?.click(); });
+  await page.waitForSelector('.hotbar', { timeout: 30000 });
+  check('Back to Island returns from build mode', true);
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(600); }
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Main menu')?.click(); });
   await page.waitForTimeout(600);
   check('jump menu returns to the main menu', await page.locator('.shell-menu').count() === 1);
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));

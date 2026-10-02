@@ -63,7 +63,7 @@ function useRev(rt: Runtime): number {
 }
 const useToasts = (): readonly { id: number; text: string; kind: string }[] => useSyncExternalStore(toasts.subscribe, toasts.get);
 
-export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly onTestDrive: () => void }): ReactElement {
+export function MapMaker({ rt, onTestDrive, onExit, onMenu, onCommunity }: { readonly rt: Runtime; readonly onTestDrive: () => void; readonly onExit: () => void; readonly onMenu: () => void; readonly onCommunity: () => void }): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const scene = useMemo<MakerScene>(() => loadMap(rt) ?? buildMakerScene(rt), [rt]);
   const [tool, setTool] = useState<ToolId>('brush');
@@ -77,13 +77,13 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [shapeMode, setShapeMode] = useState<ShapeMode>('mound');
   const [shapeHeight, setShapeHeight] = useState(6);
   const [density, setDensity] = useState(1);
-  const [previewing, setPreviewing] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [uiOpen, setUiOpen] = useState(false);
   const [itemsOpen, setItemsOpen] = useState(false);
   const [modelsOpen, setModelsOpen] = useState(false);
   const [evoOpen, setEvoOpen] = useState(false);
+  const [jump, setJump] = useState(false);
   const [rend, setRend] = useState<ThreeRenderer | null>(null);
   const [focus, setFocus] = useState<FocusTarget | null>(null);
   const [sculptUi, setSculptUi] = useState<SculptUi>(DEFAULT_SCULPT);
@@ -101,8 +101,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [touchDevice] = useState(() => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
   const viewRef = useRef(false);
   viewRef.current = viewMode;
-  const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight, focus, sculptUi });
-  live.current = { tool, brush, manip, selected, propName, shapeMode, shapeHeight, focus, sculptUi };
+  const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight, focus, sculptUi, help, jump });
+  live.current = { tool, brush, manip, selected, propName, shapeMode, shapeHeight, focus, sculptUi, help, jump };
   const rendererRef = useRef<ThreeRenderer | null>(null);
   const [hourLive, setHourLive] = useState<number | null>(null);
 
@@ -400,7 +400,10 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         if (idx >= 0) { rt.commands.execute(cmd.removeChild(scene.sceneId, 'entities', idx, 'Delete object')); feedback('deleted', 'Deleted'); setSelected(null); }
       }
       if (k === '?') setHelp((h) => (h ? null : 'keys'));
-      if (k === 'escape') { setSelected(null); setHelp(null); setFocus(null); }
+      if (k === 'escape') {
+        // one thing per press: the jump menu, the help, the focus, the selection; with nothing open Esc opens the jump menu
+        if (L.jump) setJump(false); else if (L.help) setHelp(null); else if (L.focus) setFocus(null); else if (L.selected) setSelected(null); else setJump(true);
+      }
     };
     const lastLabel = (undone: boolean): string => { const h = rt.commands.history().filter((x) => x.undone === undone); return (undone ? h[0] : h[h.length - 1])?.label ?? ''; };
     const doUndo = (): void => { const label = lastLabel(false); if (rt.commands.undo()) feedback('undo', label); else fx('ui-error'); };
@@ -493,6 +496,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   return (
     <div className="maker" style={themeOf(rt).vars}>
       <header className="bar">
+        <button className="go" title="Back to walking on your island (Esc opens the menu)" onClick={onExit}>Back to Island</button>
         <div className="brand"><b>GOBLIN</b><i>PRESET STUDIO</i></div>
         <div className="crumbs" aria-label="Where you are"><span>Island</span>{focus ? <><span>/</span><b>{focus.name}</b><button title="Back to the island" onClick={() => { setFocus(null); fx('ui-toggle'); }}>esc</button></> : <><span>/</span><b>{rt.store.get(scene.sceneId)?.name ?? 'My map'}</b></>}</div>
         <button onClick={doUndo} disabled={!rt.commands.canUndo}><Undo2 size={14} strokeWidth={1.6} style={{ verticalAlign: '-2px' }} /> Undo</button>
@@ -503,16 +507,8 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <button onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? <Volume2 size={14} strokeWidth={1.6} /> : <VolumeX size={14} strokeWidth={1.6} />}</button>
         <div className="seg">{(['play', 'build', 'pro'] as Tier[]).map((t) => <button key={t} className={tier === t ? 'on' : ''} onClick={() => { setTier(t); fx('ui-click'); }}>{t === 'play' ? 'Easy' : t === 'build' ? 'Build' : 'Pro'}</button>)}</div>
         <button title="Shortcuts and tips (?)" onClick={() => { setHelp('keys'); fx('ui-click'); }}>?</button>
-        <div className="tabs">
-        <button className={itemsOpen ? 'on' : ''} title="Power-ups are presets" onClick={() => { setItemsOpen(!itemsOpen); setModelsOpen(false); setEvoOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>Items</button>
-        <button className={modelsOpen ? 'on' : ''} title="Voxel models are presets" onClick={() => { setModelsOpen(!modelsOpen); setEvoOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>Models</button>
-        <button className={evoOpen ? 'on' : ''} title="Suggest changes for the next evolution or keep them as your branch" onClick={() => { setEvoOpen(!evoOpen); setModelsOpen(false); setItemsOpen(false); setUiOpen(false); setRulesOpen(false); setSoundOpen(false); fx('ui-toggle'); }}>Evolve</button>
-        <button className={uiOpen ? 'on' : ''} title="Colours, words and HUD parts are presets too" onClick={() => { setUiOpen(!uiOpen); setRulesOpen(false); setSoundOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>Interface</button>
-        <button className={rulesOpen ? 'on' : ''} title="The race is a preset: laps, racers, items, boost pads" onClick={() => { setRulesOpen(!rulesOpen); setSoundOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>Rules</button>
-        <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); setRulesOpen(false); setUiOpen(false); setItemsOpen(false); setModelsOpen(false); setEvoOpen(false); fx('ui-toggle'); }}>Sounds</button>
-        </div>
-        <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
-        <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>Share</button>
+        <button title="Friends, and presets other people share" onClick={onCommunity}>Community</button>
+        <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>Map code</button>
         <button onClick={save}>Save</button>
         {confirmNew
           ? (<span className="confirm">Replace your saved map? <button className="danger" onClick={() => { clearSavedMap(); location.reload(); }}>Yes, start over</button> <button onClick={() => setConfirmNew(false)}>Keep it</button></span>)
@@ -596,6 +592,15 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       </main>
       {sharing ? <ShareDialog rt={rt} sceneId={scene.sceneId} onClose={() => setSharing(false)} onDone={(t) => feedback('success', t)} /> : null}
       {help ? <HelpOverlay firstRun={help === 'first'} onClose={closeHelp} /> : null}
+      {jump ? (
+        <div className="island-menu" role="dialog" aria-label="Menu">
+          <h3>Menu</h3>
+          <button className="go" onClick={onExit}>Back to Island</button>
+          <button onClick={onMenu}>Main menu</button>
+          <button onClick={onCommunity}>Community</button>
+          <button onClick={() => setJump(false)}>Keep building</button>
+        </div>
+      ) : null}
       <div className="toasts" aria-live="polite">{toastList.map((t) => <div key={t.id} className={`toast ${t.kind}`}>{t.text}</div>)}</div>
     </div>
   );

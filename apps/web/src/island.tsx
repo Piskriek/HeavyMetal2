@@ -20,13 +20,14 @@ import { loadHotbar, saveHotbar, type HotItem } from './build/hotbar';
  * Esc opens the jump menu: Main menu, Build mode (the full editor), Activities, Multiplayer.
  */
 const GOBLIN_BLOCK = 0.04;
+let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = null; // where the goblin stood when the island was last left
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
 export function IslandWalk(props: {
-  readonly rt: Runtime; readonly intro?: boolean; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr';
+  readonly rt: Runtime; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr';
   readonly onEdit: () => void; readonly onActivities: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
 }): ReactElement {
-  const { rt, onEdit, onActivities, onHub, onMainMenu, onIntroDone } = props;
+  const { rt, onEdit, onActivities, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
   const host = useRef<HTMLDivElement>(null);
   const introRef = useRef(props.intro === true);
   const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr' }) => void } | null>(null);
@@ -41,13 +42,17 @@ export function IslandWalk(props: {
   const [sel, setSel] = useState(2);
   const [note, setNote] = useState('');
   const buildOn = props.grownUp !== false;
-  const live = useRef({ menu, inv, slots, sel, buildOn });
-  live.current = { menu, inv, slots, sel, buildOn };
+  const level = props.level ?? 'goblin';
+  const live = useRef({ menu, inv, slots, sel, buildOn, level });
+  live.current = { menu, inv, slots, sel, buildOn, level };
+  useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const scene = useMemo<MakerScene>(() => loadMap(rt) ?? buildMakerScene(rt), [rt]);
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 1800); }, []);
   const api = useRef<{ lock: () => void; unlock: () => void } | null>(null);
   useEffect(() => { saveHotbar(slots); }, [slots]);
+  // the island overview needs the cursor: let go of the mouse when the level goes up
+  useEffect(() => { if (level === 'island') api.current?.unlock(); }, [level]);
 
   const pickItem = (item: HotItem): void => { setSlots((s) => s.map((x, i) => (i === sel ? item : x))); fx('select'); };
   const openInv = (on: boolean): void => { setInv(on); if (on) api.current?.unlock(); else api.current?.lock(); };
@@ -85,8 +90,11 @@ export function IslandWalk(props: {
     const builder = new BuildController(rt, renderer, scene.sceneId, scene.terrainId, refreshModels, say);
     let px = 0, pz = 0;
     for (let r = 0; r < 120 && ground(px, pz) < SEA; r += 2) { px = r; pz = 0; }
-    let py = ground(px, pz), face = 0, vy = 0;
+    let face = 0;
+    if (!introRef.current && lastPose) { px = lastPose.px; pz = lastPose.pz; face = lastPose.face; }
+    let py = ground(px, pz), vy = 0;
     let camYaw = Math.PI, camPitch = 0.3, camDist = 3.6, fpv = false;
+    if (!introRef.current && lastPose) camYaw = lastPose.camYaw;
     const intro = { on: introRef.current, t: 0, ms: 3200 };
     if (intro.on) { camPitch = 1.3; camDist = 150; }
     let eye: [number, number, number] | null = null;
@@ -195,7 +203,8 @@ export function IslandWalk(props: {
         camDist = 150 + (3.6 - 150) * e; camPitch = 1.3 + (0.3 - 1.3) * e; camYaw = Math.PI + (1 - e) * 1.2;
         if (k >= 1) { intro.on = false; onIntroDone?.(); }
       }
-      const paused = live.current.menu || live.current.inv;
+      const overview = live.current.level === 'island';
+      const paused = live.current.menu || live.current.inv || overview;
       if (!paused) {
         const fwx = -Math.sin(camYaw), fwz = -Math.cos(camYaw), rx = -fwz, rz = fwx;
         let mx = 0, mz = 0;
@@ -248,8 +257,9 @@ export function IslandWalk(props: {
         wantEye = [px + rgx * shoulder + Math.sin(camYaw) * Math.cos(camPitch) * camDist, py + head + 0.25 + Math.sin(camPitch) * camDist, pz + rgz * shoulder + Math.cos(camYaw) * Math.cos(camPitch) * camDist];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 0.6);
       }
-      const k = fpv ? 1 : Math.min(1, dt * 10);
-      eye = eye && !fpv ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
+      if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
+      const k = fpv && !overview ? 1 : Math.min(1, dt * (overview ? 3 : 10));
+      eye = eye && (!fpv || overview) ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
       renderer.setFov(fpv ? 75 : 60);
       renderer.camera.set(eye, target);
       renderer.step();
@@ -266,6 +276,7 @@ export function IslandWalk(props: {
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
       offTerrain();
+      lastPose = { px, pz, face, camYaw };
       api.current = null;
       renderer.unmount();
     };

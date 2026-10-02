@@ -211,3 +211,12 @@ kbd { border-radius: 0; }
 .inv-grid button span { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .inventory .hint { margin: 0 14px 12px; }
 .island-note { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 6px 12px; background: var(--text); color: var(--paper); font-size: 11px; letter-spacing: .08em; }
+
+/* the galaxy bar: hidden until Esc (or the top edge) once you have dived in */
+.galaxy-bar-edge { position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 7; }
+.galaxy-bar { position: absolute; left: 0; right: 0; top: 0; z-index: 8; display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 14px; background: var(--panel); border-bottom: 1px solid var(--line); transform: translateY(-101%); transition: transform .18s ease; }
+.galaxy-bar.open { transform: translateY(0); }
+.galaxy-bar ol { list-style: none; display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; color: var(--dim); }
+.galaxy-bar ol button { border: 0; padding: 4px 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.galaxy-bar ol button.on { color: var(--text); font-weight: 700; }
+.galaxy-bar .hint { margin-left: auto; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; }

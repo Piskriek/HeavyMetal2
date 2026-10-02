@@ -69,6 +69,10 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const closeHelp = (): void => { markHelpSeen(); setHelp(null); fx('ui-click'); };
   const rev = useRev(rt);
   const toastList = useToasts();
+  const [viewMode, setViewMode] = useState(false);
+  const [touchDevice] = useState(() => typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0));
+  const viewRef = useRef(false);
+  viewRef.current = viewMode;
   const live = useRef({ tool, brush, manip, selected, propName, shapeMode, shapeHeight });
   live.current = { tool, brush, manip, selected, propName, shapeMode, shapeHeight };
   const rendererRef = useRef<ThreeRenderer | null>(null);
@@ -97,7 +101,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
     if (cam && typeof cam === 'object' && 'ref' in cam) renderer.setCamera(String((cam as { ref: string }).ref));
     renderer.camera.set([150, 165, 160], [0, 2, 0]);
     (window as unknown as { mk: unknown }).mk = { renderer };
-    const detach = attachOrbitControls(el, renderer, { touchOrbit: false });
+    const detach = attachOrbitControls(el, renderer, { get touchOrbit() { return viewRef.current; } });
 
     let hover: { point: readonly [number, number, number] | null; entity: number | null } = { point: null, entity: null };
     let stroking: { dirty: DirtyRect | null; target: number | null; last: { x: number; z: number } } | null = null;
@@ -246,7 +250,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
       }
     };
     const onDown = (e: PointerEvent): void => {
-      if (e.button !== 0 || rt.mode === 'play') return;
+      if (e.button !== 0 || rt.mode === 'play' || viewRef.current) return;
       const L = live.current;
       const h = pickAt(e);
       const ts = terrainState();
@@ -445,7 +449,9 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
           <Toolbar tools={TOOLS as never} active={tool} onSelect={(id) => pick(id as ToolId)} manip={manip} onManip={(p) => { setManip({ ...manip, ...p }); fx('ui-toggle'); }} tier={tier} />
           <p className="hint">V select · B brush · T track · P place · X delete · [ ] size · 1–9 surface · Ctrl+Z undo</p>
         </aside>
-        <div className="view" ref={host} />
+        <div className="view" ref={host}>
+          {touchDevice ? <button className={`viewmode${viewMode ? ' on' : ''}`} aria-pressed={viewMode} title="Turn on to drag the camera with one finger; turn off to use the tool" onClick={() => { setViewMode(!viewMode); fx('ui-toggle'); }}>{viewMode ? '✋ Moving the view' : '✋ Move view'}</button> : null}
+        </div>
         <aside className="panel right">
           {soundOpen ? <SoundPanel rt={rt} tier={tier} rev={rev} onFeedback={(k, t) => feedback(k, t)} /> : null}
           <div style={soundOpen ? { display: 'none' } : undefined}>

@@ -28,6 +28,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const game = createRaceGame(rt, { seed: 7, laps: 3, fromScene: fromMap });
     gameRef.current = game;
+    (window as unknown as { hmGame: unknown }).hmGame = game; // console: hmGame.hud(), hmGame.racerIds ...
     const sceneNow = rt.store.get(rt.binder.sceneId ?? '');
     if (sceneNow) applyLook(renderer, lookOf(sceneNow.params));
     const state = rt.binder.terrain();

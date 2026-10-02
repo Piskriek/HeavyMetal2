@@ -158,7 +158,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     const q = p as { x: number; z: number; r: number; ttlMs: number };
     const e = world.spawn();
     world.add(e, 'transform', { x: q.x, y: heightAt(terrain, q.x, q.z) + 0.07, z: q.z, sx: q.r, sy: 0.02, sz: q.r });
-    world.add(e, 'renderable', { shape: 'cylinder', size: 1, color: '#14120f', roughness: 0.05, metalness: 0.4, opacity: 0.85 });
+    world.add(e, 'renderable', { shape: 'cylinder', size: 1, color: '#060504', roughness: 0.55, metalness: 0, opacity: 0.93 });
     slickViews.push({ e, ttl: q.ttlMs });
   });
   const statusLook = (dtMs: number): void => {

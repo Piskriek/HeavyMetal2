@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { Copy, Plus, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
+import { Copy, Pencil, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import type { Runtime } from '@hm/engine';
 import type { Activity } from '@hm/activities';
 import { App } from '../app';
 import { IslandWalk } from '../island';
 import { MapMaker } from '../maker/maker';
-import { hasSavedMap, loadMap } from '../maker/storage';
+import { buildMakerScene, TEMPLATE_SHAPES, type MakerScene } from '../maker/scene';
+import { loadMap, pinMapKey } from '../maker/storage';
+import { activeIslandId, createIsland, duplicateIsland, islands, onFork, openIsland, redoIslands, removeIsland, renameIsland, subscribe, templates, undoIslands } from '../islands/island-store';
+import { describeIsland } from '@hm/islands';
 import { GalaxyCanvas, type GalaxyHandle, type PlanetDef } from './galaxy';
 import { GalaxyBar, type Level } from './galaxy-bar';
 import { GoblinRacingMenu } from './racing-menu';
@@ -17,7 +20,7 @@ import { createActivity, duplicateActivity, loadProfile, removeActivity, savePro
  * over to walking; from then on the menu is gone and Esc brings a bar down from the top (back to galaxy, up one level, into the selected).
  * Everything is a screen of this one shell: there are no separate pages, so nothing can strand you (see ROUTES and the e2e smoke test).
  */
-export type Screen = 'menu' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build';
+export type Screen = 'menu' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
@@ -29,14 +32,26 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   activity: { back: 'hub', doc: 'One activity (Goblin Racing) with its own menu.' },
   racing: { back: 'activity', doc: 'A race. Esc pauses; quitting returns to where it was started.' },
   settings: { back: 'menu', doc: 'Settings.' },
+  islands: { back: 'origin', doc: 'My islands: open, duplicate, rename, delete, undo.' },
   build: { back: 'island', doc: 'Build mode. Esc opens the jump menu; Back to Island returns.' },
 };
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false };
 const toPlanet = (a: Activity): PlanetDef => ({ id: a.id, name: a.name, hue: a.planet.hue, size: a.planet.size, ring: a.planet.ring, hosting: a.hosting.tournament });
 
-export function Shell(props: { readonly rt: Runtime }): ReactElement {
-  const { rt } = props;
+/** An island opened for play or editing: its own runtime, so two islands can never share presets. */
+interface World { readonly rt: Runtime; readonly scene: MakerScene; readonly id: string }
+
+export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElement {
+  const { makeRuntime } = props;
+  const [world, setWorld] = useState<World | null>(null);
+  const [raceRt, setRaceRt] = useState<{ rt: Runtime; fromMap: boolean } | null>(null);
+  const [note, setNote] = useState('');
+  const registry = useSyncExternalStore(subscribe, () => islands(), () => islands());
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [newTemplate, setNewTemplate] = useState('blank-island');
+  useEffect(() => onFork((m) => { setNote(`This island is now yours: "${m.name}". Rename it in My islands.`); window.setTimeout(() => setNote(''), 6000); }), []);
   const [screen, setScreen] = useState<Screen>('menu');
   // where the hub / activities were opened from (the main menu or the island): their Back and Esc return there, never to each other
   const origin = useRef<'menu' | 'island'>('menu');
@@ -61,14 +76,27 @@ export function Shell(props: { readonly rt: Runtime }): ReactElement {
   const visible = profile.activities.filter((a) => !a.hidden);
   const planets = useMemo(() => [HOME, ...visible.map(toPlanet)], [profile.activities]); // eslint-disable-line react-hooks/exhaustive-deps
   const galaxyOn = screen === 'menu' || screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'settings' || screen === 'activity';
-  const islandMounted = screen === 'island' || (screen === 'zoom' && session);
+  const islandMounted = world !== null && (screen === 'island' || (screen === 'zoom' && session));
+
+  /** Open an island as a fresh world: load its saved map, or build it from its template (a template instance has no saved map until it is edited). */
+  const openWorld = useCallback((id: string): World | null => {
+    const meta = openIsland(id);
+    if (!meta) return null;
+    pinMapKey(null);
+    const rt = makeRuntime();
+    const scene = loadMap(rt) ?? (() => { const shape = TEMPLATE_SHAPES[meta.template ?? 'blank-island'] ?? TEMPLATE_SHAPES['blank-island']!; return buildMakerScene(rt, shape.seed, shape); })();
+    const w = { rt, scene, id };
+    setWorld(w);
+    return w;
+  }, [makeRuntime]);
 
   const go = useCallback((to: Screen) => { setScreen(to); setGalaxyOpacity(to === 'island' || to === 'build' || to === 'racing' ? 0 : 1); }, []);
   const toMenu = useCallback(() => { go('menu'); setPicked('goblin-racing'); setIslandMenu(false); }, [go]);
   const toIsland = useCallback(() => { setIntro(false); setLevel('goblin'); setIslandMenu(false); go('island'); }, [go]);
-  const remember = (): void => { const s = screenRef.current; if (s === 'menu' || s === 'island' || s === 'build') origin.current = s === 'menu' ? 'menu' : 'island'; };
+  const remember = (): void => { const s = screenRef.current; if (s === 'menu' || s === 'island' || s === 'build' || s === 'zoom') origin.current = s === 'menu' ? 'menu' : 'island'; };
   const toHub = useCallback((tab: 'hub' | 'community' = 'hub') => { remember(); setHubTab(tab); go('hub'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   const toActivities = useCallback(() => { remember(); go('activities'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toIslands = useCallback(() => { remember(); go('islands'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   /** "Back" for the hub and the activities window: return to where they were opened from. */
   const back = useCallback(() => { if (origin.current === 'island' && session) toIsland(); else toMenu(); }, [session, toIsland, toMenu]);
 
@@ -77,12 +105,13 @@ export function Shell(props: { readonly rt: Runtime }): ReactElement {
     if (screenRef.current === 'zoom') return;
     // capture the mouse now, while the click still counts as a user gesture: mouse look is on from the first frame on the island
     try { const r = (document.querySelector('.shell') as HTMLElement | null)?.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => undefined); } catch { /* not available */ }
+    if (!world) { const id = activeIslandId(); if (!id || !openWorld(id)) return; }
     setSession(true); setLevel('goblin'); setIslandMenu(false);
     setScreen('zoom'); setIntro(!reduced);
     if (!reduced) await galaxy.current?.diveTo('home', 2600);
     setGalaxyOpacity(0);
     window.setTimeout(() => { if (screenRef.current === 'zoom') setScreen('island'); }, reduced ? 0 : 900);
-  }, [reduced]);
+  }, [reduced, world, openWorld]);
 
   // Esc on the shell's own screens: one step back (the island, the editor and the race handle their own Esc)
   useEffect(() => {
@@ -90,24 +119,36 @@ export function Shell(props: { readonly rt: Runtime }): ReactElement {
       if (e.key !== 'Escape') return;
       const s = screenRef.current;
       if (s === 'activity') go('hub');
-      else if (s === 'hub' || s === 'activities') back();
+      else if (s === 'hub' || s === 'activities' || s === 'islands') back();
       else if (s === 'settings') toMenu();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [back, go, toMenu]);
 
-  const fromMap = useMemo(() => hasSavedMap() && loadMap(rt) !== null, [rt, screen]); // eslint-disable-line react-hooks/exhaustive-deps
   const picks = planets.find((p) => p.id === picked) ?? null;
   const pickedRow = visible.find((a) => a.id === picked) ?? null;
   const openActivity = (id: string): void => { setActivityId(id); go('activity'); };
+  /** The racing activity has its own map (the racetrack island), pinned to its own key so it never mixes with your islands. */
+  const startRace = (entry: 'select' | 'custom'): void => {
+    pinMapKey('hm.racing.map.v1');
+    const rt = makeRuntime();
+    const loaded = loadMap(rt);
+    const shape = TEMPLATE_SHAPES['racing-starter']!;
+    if (!loaded) buildMakerScene(rt, shape.seed, shape);
+    setRaceRt({ rt, fromMap: true });
+    setRaceEntry(entry); setRaceAuto(false); setRaceBack('activity'); go('racing');
+  };
+
+  const islandRows = registry.list();
+  const submitRename = (): void => { if (renaming) { const err = renameIsland(renaming, draft); if (err) setNote(err); setRenaming(null); } };
 
   return (
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk rt={rt} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
-            onEdit={() => go('build')} onActivities={toActivities} onHub={() => toHub()} onMainMenu={toMenu} />
+          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} grownUp={profile.grownUp} skin={profile.skin} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+            onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}
       {screen === 'island' || screen === 'zoom' ? <GalaxyBar open={islandMenu || level === 'island'} level={level} onLevel={setLevel} onBackToGalaxy={toMenu} /> : null}
@@ -184,10 +225,45 @@ export function Shell(props: { readonly rt: Runtime }): ReactElement {
       {screen === 'activity' ? (
         <div className="shell-layer" style={{ zIndex: 3 }}>
           <GoblinRacingMenu profile={profile} activity={visible.find((a) => a.id === activityId) ?? visible[0] ?? profile.activities[0]!} onBack={() => go('hub')}
-            onQuickRace={() => { setRaceEntry('select'); setRaceAuto(false); setRaceBack('activity'); go('racing'); }} onMyGoblin={() => { setRaceEntry('custom'); setRaceAuto(false); setRaceBack('activity'); go('racing'); }}
+            onQuickRace={() => { startRace('select'); }} onMyGoblin={() => { startRace('custom'); }}
             onProfile={(fn) => update(fn)} />
         </div>
       ) : null}
+
+      {screen === 'islands' ? (
+        <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
+          <div className="shell-window" role="dialog" aria-label="My islands">
+            <header>
+              <h3>My islands</h3>
+              <button aria-label="Undo" title={registry.canUndo ? `Undo: ${registry.history().at(-1) ?? ''}` : 'Nothing to undo'} disabled={!registry.canUndo} onClick={() => { const e = undoIslands(); if (e) setNote(e); }}><Undo2 size={14} strokeWidth={1.6} /></button>
+              <button aria-label="Redo" title="Redo" disabled={!registry.canRedo} onClick={() => { const e = redoIslands(); if (e) setNote(e); }}><Redo2 size={14} strokeWidth={1.6} /></button>
+              <button onClick={back}>Close</button>
+            </header>
+            <div className="shell-cards">
+              {islandRows.map((m) => (
+                <article key={m.id} className={`shell-activity${m.id === activeIslandId() ? ' current' : ''}`}>
+                  {renaming === m.id ? (
+                    <input autoFocus value={draft} maxLength={40} aria-label="Island name" onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') { e.stopPropagation(); setRenaming(null); } }} onBlur={submitRename} />
+                  ) : <h4>{m.name}</h4>}
+                  <p>{describeIsland(m, Date.now())}</p>
+                  <div className="btns">
+                    <button className="go" onClick={() => { const w = openWorld(m.id); if (w) { setSession(true); setLevel('goblin'); setIntro(false); go('island'); } }}>Open</button>
+                    <button title="Rename" aria-label="Rename" onClick={() => { setRenaming(m.id); setDraft(m.name); }}><Pencil size={13} strokeWidth={1.6} /></button>
+                    <button title="Duplicate" aria-label="Duplicate" onClick={() => { const e = duplicateIsland(m.id); if (e) setNote(e); }}><Copy size={13} strokeWidth={1.6} /></button>
+                    <button title="Delete (you can undo)" aria-label="Delete" onClick={() => { const e = removeIsland(m.id); if (e) setNote(e); if (world?.id === m.id) setWorld(null); }}><Trash2 size={13} strokeWidth={1.6} /></button>
+                  </div>
+                </article>
+              ))}
+              <div className="shell-activity new">
+                <select aria-label="Start from" value={newTemplate} onChange={(e) => setNewTemplate(e.target.value)}>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                <button onClick={() => { const e = createIsland(TEMPLATE_SHAPES[newTemplate]?.name ?? 'My Island', newTemplate); if (e) setNote(e); }}><Plus size={14} strokeWidth={1.4} /> Create new</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {note ? <div className="shell-note" role="status" onClick={() => setNote('')}>{note}</div> : null}
 
       {screen === 'settings' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
@@ -202,15 +278,15 @@ export function Shell(props: { readonly rt: Runtime }): ReactElement {
         </div>
       ) : null}
 
-      {screen === 'build' ? (
+      {screen === 'build' && world ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <MapMaker rt={rt} onTestDrive={() => { setRaceEntry('select'); setRaceAuto(true); setRaceBack('build'); go('racing'); }} onExit={toIsland} onMenu={toMenu} onCommunity={() => toHub('community')} />
+          <MapMaker key={world.id} rt={world.rt} scene={world.scene} onTestDrive={() => { setRaceEntry('select'); setRaceAuto(true); setRaceBack('build'); setRaceRt(null); go('racing'); }} onExit={toIsland} onMenu={toMenu} onIslands={toIslands} onCommunity={() => toHub('community')} />
         </div>
       ) : null}
 
-      {screen === 'racing' ? (
+      {screen === 'racing' && (raceAuto ? world : raceRt) ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <App rt={rt} fromMap={fromMap || raceAuto} {...(raceAuto ? { autoStart: true } : { entry: raceEntry })} onExit={() => go(raceBack)} />
+          <App rt={(raceAuto ? world! : raceRt!).rt} fromMap={raceAuto ? true : raceRt!.fromMap} {...(raceAuto ? { autoStart: true } : { entry: raceEntry })} onExit={() => { pinMapKey(null); go(raceBack); }} />
         </div>
       ) : null}
     </div>

@@ -2,7 +2,15 @@ import type { Preset, PresetBundle, PresetId, Value } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import type { MakerScene } from './scene';
 
-const KEY = 'hm.map.v1';
+import { activeIslandId, bundleKey, persistActive } from '../islands/island-store';
+
+/**
+ * Which map the editor, the island and the race read and write. By default it is the active island (see island-store: the first edit of a template
+ * forks it). The racing activity pins its own key so the racetrack never mixes with your island.
+ */
+let pinned: string | null = null;
+export function pinMapKey(key: string | null): void { pinned = key; }
+const currentKey = (): string => pinned ?? bundleKey(activeIslandId() ?? 'orphan');
 
 const isRef = (v: Value | undefined): v is { ref: string } => typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as { ref?: unknown }).ref === 'string';
 
@@ -24,7 +32,9 @@ export function mapBundle(rt: Runtime, sceneId: PresetId): PresetBundle {
 /** Save the map to the player's storage (the cloud save in RUN, localStorage elsewhere). */
 export function saveMap(rt: Runtime, sceneId: PresetId): boolean {
   try {
-    localStorage.setItem(KEY, JSON.stringify(mapBundle(rt, sceneId)));
+    const json = JSON.stringify(mapBundle(rt, sceneId));
+    if (pinned === null) return persistActive(json).ok;
+    localStorage.setItem(pinned, json);
     return true;
   } catch {
     return false;
@@ -55,7 +65,7 @@ export async function useMapCode(code: string): Promise<string | null> {
     const raw = await pipe(fromB64(text.slice(CODE_PREFIX.length)), new DecompressionStream('gzip'));
     const bundle = JSON.parse(new TextDecoder().decode(raw)) as PresetBundle;
     if (!bundle || typeof bundle.root !== 'string' || !Array.isArray(bundle.presets) || !bundle.presets.some((p) => p.id === bundle.root && p.kind === 'scene')) return 'The code is readable but it is not a map.';
-    localStorage.setItem(KEY, JSON.stringify(bundle));
+    localStorage.setItem(currentKey(), JSON.stringify(bundle));
     return null;
   } catch {
     return 'The code is damaged or incomplete. Copy the whole line, including the start.';
@@ -63,17 +73,17 @@ export async function useMapCode(code: string): Promise<string | null> {
 }
 
 export function hasSavedMap(): boolean {
-  try { return localStorage.getItem(KEY) !== null; } catch { return false; }
+  try { return localStorage.getItem(currentKey()) !== null; } catch { return false; }
 }
 
 export function clearSavedMap(): void {
-  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(currentKey()); } catch { /* ignore */ }
 }
 
 /** Import the saved map into the runtime and bind its scene. Returns the scene description, or null when there is none. */
 export function loadMap(rt: Runtime): MakerScene | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(currentKey());
     if (!raw) return null;
     const bundle = JSON.parse(raw) as PresetBundle;
     rt.store.importBundle(bundle, { onConflict: 'keep' });

@@ -63,6 +63,19 @@ try {
   check('Esc opens the jump menu on the island', await page.locator('.island-menu').count() === 1);
   check('and the galaxy bar comes down', await page.locator('.galaxy-bar.open').count() === 1);
   const dom = (fn) => page.evaluate(fn); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'My islands')?.click(); });
+  await page.waitForSelector('[aria-label="My islands"]', { timeout: 5000 }).catch(() => undefined);
+  check('My islands lists the first island', await page.locator('[aria-label="My islands"] article').count() >= 1);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => /Create new/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(300);
+  check('Create new adds an island', await page.locator('[aria-label="My islands"] article').count() >= 2);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
+  await page.waitForTimeout(300);
+  check('Undo takes it away again', await page.locator('[aria-label="My islands"] article').count() === 1);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.textContent === 'Close')?.click(); });
+  await page.waitForSelector('.hotbar', { timeout: 30000 });
+  check('Close returns to the island', true);
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(600); }
   await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Up one level')?.click(); });
   await page.waitForTimeout(400);
   check('up one level shows the island overview', await page.locator('.galaxy-bar.open').count() === 1);
@@ -83,6 +96,7 @@ try {
   check('jump menu returns to the main menu', await page.locator('.shell-menu').count() === 1);
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {
+  try { const pg = browser.contexts()[0]?.pages()[0]; if (pg) console.log('screen at failure:', await pg.evaluate(() => `${document.querySelector('.shell')?.getAttribute('data-screen')} | ${document.body.innerText.slice(0, 160).split(String.fromCharCode(10)).join(' / ')}`)); } catch { /* ignore */ }
   failures.push(`exception: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);
 } finally {
   await browser.close();

@@ -9,8 +9,8 @@ import { addPoint, analyse, deletePoint, DRAFT_PRESETS, hitTest, insertOnSegment
 import { manipulateMove, DEFAULT_MANIPULATION } from '@hm/tools';
 import { applyLook, lookOf, LOOKS } from '../look';
 import { timeOfDayLook } from '@hm/looks';
-import { buildMakerScene, PROP_CARDS, propSeed, type MakerScene } from './scene';
-import { loadMap, saveMap, clearSavedMap } from './storage';
+import { PROP_CARDS, propSeed, type MakerScene } from './scene';
+import { saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { buildRoad } from '@hm/game';
@@ -63,9 +63,8 @@ function useRev(rt: Runtime): number {
 }
 const useToasts = (): readonly { id: number; text: string; kind: string }[] => useSyncExternalStore(toasts.subscribe, toasts.get);
 
-export function MapMaker({ rt, onTestDrive, onExit, onMenu, onCommunity }: { readonly rt: Runtime; readonly onTestDrive: () => void; readonly onExit: () => void; readonly onMenu: () => void; readonly onCommunity: () => void }): ReactElement {
+export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, onCommunity }: { readonly rt: Runtime; readonly scene: MakerScene; readonly onTestDrive: () => void; readonly onExit: () => void; readonly onMenu: () => void; readonly onIslands?: () => void; readonly onCommunity: () => void }): ReactElement {
   const host = useRef<HTMLDivElement>(null);
-  const scene = useMemo<MakerScene>(() => loadMap(rt) ?? buildMakerScene(rt), [rt]);
   const [tool, setTool] = useState<ToolId>('brush');
   const [tier, setTier] = useState<Tier>('build');
   const [brush, setBrush] = useState<BrushState & { surface: number }>({ kind: 'paint', radius: 9, strength: 0.6, falloff: 'smooth', surface: SURF.grass });
@@ -596,6 +595,7 @@ export function MapMaker({ rt, onTestDrive, onExit, onMenu, onCommunity }: { rea
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
           <button className="go" onClick={onExit}>Back to Island</button>
+          {onIslands ? <button onClick={onIslands}>My islands</button> : null}
           <button onClick={onMenu}>Main menu</button>
           <button onClick={onCommunity}>Community</button>
           <button onClick={() => setJump(false)}>Keep building</button>

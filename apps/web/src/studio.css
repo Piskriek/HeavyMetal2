@@ -236,3 +236,7 @@ kbd { border-radius: 0; }
 .shell-racing-main h2, .shell-card h3, .shell-window .shell-activity h4 { font-family: var(--font-display); letter-spacing: -0.01em; }
 .shell-racing-main h2 { font-size: 34px; font-weight: 700; }
 .hms .hms-logo { font-family: var(--font-display); font-weight: 800; text-transform: none; letter-spacing: -0.02em; }
+
+.shell-note { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 9; max-width: min(520px, 90vw); padding: 10px 14px; background: var(--text); color: var(--paper); font-size: 13px; cursor: pointer; }
+.shell-activity.current { box-shadow: inset 3px 0 0 var(--accent); }
+.shell-activity input { width: 100%; font-weight: 600; }

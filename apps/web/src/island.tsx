@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
@@ -6,8 +6,7 @@ import { encodeModel, type VoxelModel } from '@hm/voxel';
 import { MODELS } from '@hm/voxelart';
 import { applyLook, lookOf } from './look';
 import { decorInstances } from './maker/dress';
-import { loadMap } from './maker/storage';
-import { buildMakerScene, type MakerScene } from './maker/scene';
+import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
 import { fx } from './maker/feedback';
 import { BuildController } from './build/build-controller';
@@ -24,10 +23,10 @@ let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = 
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
 export function IslandWalk(props: {
-  readonly rt: Runtime; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr';
-  readonly onEdit: () => void; readonly onActivities: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
+  readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean; readonly skin?: 'flat' | 'pbr';
+  readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
 }): ReactElement {
-  const { rt, onEdit, onActivities, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
+  const { rt, onEdit, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
   const host = useRef<HTMLDivElement>(null);
   const introRef = useRef(props.intro === true);
   const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr' }) => void } | null>(null);
@@ -46,7 +45,7 @@ export function IslandWalk(props: {
   const live = useRef({ menu, inv, slots, sel, buildOn, level });
   live.current = { menu, inv, slots, sel, buildOn, level };
   useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
-  const scene = useMemo<MakerScene>(() => loadMap(rt) ?? buildMakerScene(rt), [rt]);
+  const scene = props.scene;
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 1800); }, []);
   const api = useRef<{ lock: () => void; unlock: () => void } | null>(null);
@@ -296,6 +295,7 @@ export function IslandWalk(props: {
           <button className="go" onClick={onMainMenu}>Main menu</button>
           {buildOn ? <button onClick={onEdit}>Build mode</button> : null}
           <button onClick={onActivities}>Activities</button>
+          {onIslands ? <button onClick={onIslands}>My islands</button> : null}
           <button onClick={onHub}>Multiplayer</button>
           <button onClick={() => { setMenu(false); api.current?.lock(); }}>Back to walking</button>
         </div>

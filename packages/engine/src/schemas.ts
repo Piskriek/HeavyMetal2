@@ -72,6 +72,7 @@ export const sceneSchema = defineSchema({
     { key: 'decor', label: 'Foliage', doc: 'Palms, bushes and rocks.', kinds: ['decor'], min: 0, max: 1, tier: 'build' },
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
+    { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
   ] as readonly ChildSlot[],
 });
@@ -169,7 +170,63 @@ export const modulatorSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema] as const;
+export const soundSchema = defineSchema({
+  kind: 'sound',
+  version: 1,
+  label: 'Sound effect',
+  doc: 'A synthesized sound: layers of tones and noise with an envelope. Edit it in the Sound Lab, randomize it, or let a driver move its volume and pitch.',
+  icon: 'sound',
+  variables: [
+    { key: 'slot', type: 'string', label: 'Plays as', doc: 'Which game event uses this sound (e.g. boost, lap, ui-click).', tier: 'build', default: '' },
+    num('volume', 'Volume', '0 = silent, 1 = as designed.', 1, 'play', { min: 0, max: 2, step: 0.01 }),
+    num('pitch', 'Pitch', 'Multiplier on every note: 0.5 = an octave down, 2 = an octave up.', 1, 'play', { min: 0.25, max: 4, step: 0.01 }),
+    { key: 'enabled', type: 'boolean', label: 'Enabled', doc: 'Mute just this sound.', tier: 'play', default: true },
+    { key: 'recipe', type: 'string', label: 'Recipe', doc: 'The layers that make the sound (edited in the Sound Lab).', tier: 'pro', default: '' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const engineSoundSchema = defineSchema({
+  kind: 'engine-sound',
+  version: 1,
+  label: 'Engine hum',
+  doc: 'How the rolling ball hums: pitch, loudness and brightness follow speed and throttle.',
+  icon: 'engine',
+  variables: [
+    num('volume', 'Volume', '0 = silent, 1 = as designed.', 1, 'play', { min: 0, max: 2, step: 0.01 }),
+    num('baseFreq', 'Idle pitch', 'Pitch when standing still (Hz).', 70, 'play', { min: 20, max: 400, step: 1, unit: 'Hz', group: 'Pitch' }),
+    num('freqPerSpeed', 'Pitch rise with speed', 'How much the pitch climbs at top speed (Hz).', 190, 'play', { min: 0, max: 800, step: 1, unit: 'Hz', group: 'Pitch' }),
+    num('freqPerThrottle', 'Pitch rise with throttle', 'Extra pitch while accelerating (Hz).', 30, 'build', { min: 0, max: 300, step: 1, unit: 'Hz', group: 'Pitch' }),
+    num('baseGain', 'Idle loudness', 'Loudness when standing still.', 0.05, 'build', { min: 0, max: 0.3, step: 0.005, group: 'Loudness' }),
+    num('gainPerThrottle', 'Loudness with throttle', 'Extra loudness while accelerating.', 0.1, 'build', { min: 0, max: 0.3, step: 0.005, group: 'Loudness' }),
+    num('gainPerSpeed', 'Loudness with speed', 'Extra loudness at top speed.', 0.05, 'build', { min: 0, max: 0.3, step: 0.005, group: 'Loudness' }),
+    num('baseFilter', 'Idle brightness', 'How bright the hum is when standing still (Hz).', 400, 'build', { min: 100, max: 4000, step: 10, unit: 'Hz', group: 'Tone' }),
+    num('filterPerSpeed', 'Brightness with speed', 'How much brighter at top speed (Hz).', 2600, 'build', { min: 0, max: 8000, step: 10, unit: 'Hz', group: 'Tone' }),
+    num('filterPerThrottle', 'Brightness with throttle', 'Extra brightness while accelerating (Hz).', 600, 'pro', { min: 0, max: 4000, step: 10, unit: 'Hz', group: 'Tone' }),
+    num('baseNoise', 'Idle rumble', 'Airy noise when standing still.', 0.01, 'build', { min: 0, max: 0.2, step: 0.005, group: 'Noise' }),
+    num('noisePerSpeed', 'Rumble with speed', 'Extra noise at top speed.', 0.06, 'build', { min: 0, max: 0.3, step: 0.005, group: 'Noise' }),
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const musicSchema = defineSchema({
+  kind: 'music',
+  version: 1,
+  label: 'Music',
+  doc: 'A generated loop: pick a mood and tempo, change the seed for a different tune.',
+  icon: 'music',
+  variables: [
+    num('volume', 'Volume', '0 = silent, 1 = as designed.', 1, 'play', { min: 0, max: 2, step: 0.01 }),
+    { key: 'mood', type: 'enum', label: 'Mood', doc: 'The feel of the tune.', tier: 'play', default: 'energetic', options: ['chill', 'energetic', 'dramatic'] },
+    num('bpm', 'Tempo', 'Beats per minute.', 138, 'play', { min: 60, max: 200, step: 1, unit: 'BPM' }),
+    num('bars', 'Length', 'Bars before it loops.', 8, 'build', { min: 1, max: 16, step: 1 }),
+    num('seed', 'Seed', 'A different number is a different tune.', 7, 'play', { min: 0, max: 99999, step: 1 }),
+    { key: 'enabled', type: 'boolean', label: 'Enabled', doc: 'Switch the music off.', tier: 'play', default: true },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

@@ -7,10 +7,13 @@ import { createRuntime } from '@hm/engine';
 import { MapMaker } from './maker/maker';
 import { RaceApp } from './race-app';
 import { hasSavedMap, loadMap } from './maker/storage';
+import { setSoundResolver } from './maker/feedback';
+import { resolveSound } from './sound/bank';
 import './shell.css';
 
 const editor = location.hash === '#edit';
 const rt = createRuntime({ seed: 1, now: () => Date.now() });
+setSoundResolver((id) => resolveSound(rt, id));
 const root = document.getElementById('app');
 if (editor) {
   if (root) createRoot(root).render(<MapMaker rt={rt} onTestDrive={() => { location.hash = ''; location.reload(); }} />);

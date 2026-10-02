@@ -5,6 +5,8 @@ import { chaseCamera, createRaceGame, type Hud as HudData, type RaceGame } from 
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { applyLook, lookOf } from './look';
 import { decorInstances } from './maker/dress';
+import { attachRaceAudio } from './sound/race-audio';
+import { fx, setSoundEnabled, soundEnabled } from './maker/feedback';
 import { HUD, Minimap, ordinal, formatTime } from '@hm/ui';
 
 /** The playable shell: the Basalt Isle race. Keyboard (arrows/WASD, space = item), gamepad-ready, on-screen touch controls. */
@@ -16,6 +18,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
   const [results, setResults] = useState<readonly { id: string; position: number; dnf?: boolean; timeMs?: number }[] | null>(null);
   const [size, setSize] = useState({ w: 800, h: 450 });
   const [touch, setTouch] = useState(false);
+  const [sound, setSound] = useState(soundEnabled());
 
   useEffect(() => {
     const el = host.current;
@@ -35,6 +38,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
     const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d ? decorInstances(d.placements) : null); };
     showDecor();
     const offDecor = rt.binder.onDecor(showDecor);
+    const raceAudio = attachRaceAudio(game);
     const detachKeys = attachKeyboard(window, game.input);
     const detachOrbit = attachOrbitControls(el, renderer);
     const offTick = rt.onTick(() => renderer.step());
@@ -50,6 +54,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
       last = now;
       gamepads();
       const alpha = game.update(dt);
+      raceAudio.tick(dt);
       const pose = game.playerPose();
       const cam = chaseCamera(prevCam, pose, dt);
       prevCam = cam;
@@ -73,7 +78,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
-      detachKeys(); detachOrbit(); offTick(); offDecor(); renderer.unmount();
+      detachKeys(); detachOrbit(); offTick(); offDecor(); raceAudio.dispose(); renderer.unmount();
     };
   }, [rt, fromMap]);
 
@@ -100,6 +105,7 @@ export function RaceApp({ rt, fromMap = false }: { readonly rt: Runtime; readonl
           <button onClick={() => game.restart()}>Race again</button>
         </div>
       ) : null}
+      <button className="mute" aria-label={sound ? 'Mute sound' : 'Unmute sound'} onClick={() => { const on = !sound; setSound(on); setSoundEnabled(on); if (on) fx('ui-toggle'); }}>{sound ? '🔊' : '🔇'}</button>
       <a className="to-editor" href="#edit" onClick={() => setTimeout(() => location.reload(), 0)}>Editor</a>
     </div>
   );

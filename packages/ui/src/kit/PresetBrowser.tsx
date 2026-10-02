@@ -30,7 +30,7 @@ const fork: CSSProperties = {
   ...chip,
   alignSelf: 'flex-start',
   color: 'var(--hm-accent, #ffd24a)',
-  borderColor: 'var(--hm-accent, #ffd24a)',
+  border: '1px solid var(--hm-accent, #ffd24a)',
 };
 
 const name: CSSProperties = { fontWeight: 600, overflowWrap: 'anywhere' };
@@ -67,7 +67,7 @@ export function PresetBrowser(props: PresetBrowserProps): ReactElement {
     if (!kinds.includes(preset.kind)) kinds.push(preset.kind);
   }
   const pill = (active: boolean): CSSProperties =>
-    active ? { ...chip, color: 'var(--hm-accent, #ffd24a)', borderColor: 'var(--hm-accent, #ffd24a)' } : chip;
+    active ? { ...chip, color: 'var(--hm-accent, #ffd24a)', border: '1px solid var(--hm-accent, #ffd24a)' } : chip;
 
   return (
     <div data-kit="presets" style={panel}>

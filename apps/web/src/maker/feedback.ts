@@ -1,4 +1,4 @@
-import { createAudioEngine, type AudioEngine, type SfxId } from '@hm/audio';
+import { createAudioEngine, type AudioEngine, type PlayableRecipe, type SfxId } from '@hm/audio';
 
 /**
  * Tactile feedback for the Map Maker: synthesised sounds, toasts and haptics, behind one tiny API.
@@ -17,11 +17,22 @@ function ensure(): AudioEngine | null {
     const C = Ctx.AudioContext ?? Ctx.webkitAudioContext;
     engine = createAudioEngine(C ? (new C() as never) : null, { master: 0.7, sfx: 0.9, music: 0.5 });
     engine.resume();
+    // browsers keep audio suspended until a gesture: resume on the first key press or tap
+    const wake = (): void => { engine?.resume(); };
+    window.addEventListener('pointerdown', wake);
+    window.addEventListener('keydown', wake);
   } catch {
     engine = createAudioEngine(null);
   }
   return engine;
 }
+
+/** Lets the app substitute edited sound presets for the built-in recipes. */
+export type SoundResolver = (id: string) => { recipe: PlayableRecipe; volume: number; pitch: number } | null;
+let resolver: SoundResolver | null = null;
+export function setSoundResolver(r: SoundResolver | null): void { resolver = r; }
+/** The shared audio engine (null while sound is off), for engine hums, music and the Sound Lab preview. */
+export function audio(): AudioEngine | null { return ensure(); }
 
 export function setSoundEnabled(on: boolean): void { enabled = on; }
 export function soundEnabled(): boolean { return enabled; }
@@ -31,7 +42,14 @@ export function fx(id: SfxId, o: { volume?: number; pitch?: number; minGapMs?: n
   const now = performance.now();
   if (o.minGapMs && now - (lastPlayed.get(id) ?? -1e9) < o.minGapMs) return;
   lastPlayed.set(id, now);
-  ensure()?.playSfx(id, { ...(o.volume !== undefined ? { volume: o.volume } : {}), ...(o.pitch !== undefined ? { pitch: o.pitch } : {}) });
+  const eng = ensure();
+  if (!eng) return;
+  const over = resolver?.(id) ?? null;
+  if (over) {
+    if (over.volume > 0) eng.playRecipe(over.recipe, { volume: (o.volume ?? 1) * over.volume, pitch: (o.pitch ?? 1) * over.pitch });
+    return;
+  }
+  eng.playSfx(id, { ...(o.volume !== undefined ? { volume: o.volume } : {}), ...(o.pitch !== undefined ? { pitch: o.pitch } : {}) });
 }
 
 export function haptic(pattern: number | readonly number[] = 8): void {

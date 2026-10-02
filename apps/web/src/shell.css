@@ -80,3 +80,5 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 .maker .panel.right { overflow-x: hidden; }
 .maker .driver-edit svg, .maker .driver-edit canvas { max-width: 100%; height: auto; }
 .maker .driver-edit input, .maker .driver-edit select { max-width: 100%; box-sizing: border-box; }
+
+.race .mute { position: absolute; right: 12px; bottom: 12px; background: #0008; color: #fff; border: 0; border-radius: 6px; padding: 4px 10px; font-size: 16px; cursor: pointer; }

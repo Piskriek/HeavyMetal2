@@ -1,4 +1,4 @@
-import { SFX, type SfxId } from './recipes.js';
+import { SFX, type SfxId, type SfxRecipe } from './recipes.js';
 import { type EngineParams, type RollParams } from './engine.js';
 import { type MusicPattern } from './music.js';
 
@@ -61,6 +61,8 @@ export interface AudioContextLike {
 export interface AudioEngine {
   resume(): void;
   playSfx(id: SfxId, o?: { volume?: number; pitch?: number /* multiplier */ }): void;
+  /** Play any recipe (an edited or randomized sound preset), not just a built-in id. */
+  playRecipe(recipe: PlayableRecipe, o?: { volume?: number; pitch?: number }): void;
   setEngine(key: string, p: EngineParams): void;
   stopEngine(key: string): void;
   setRoll(key: string, p: RollParams): void;
@@ -70,6 +72,9 @@ export interface AudioEngine {
   readonly volumes: { master: number; sfx: number; music: number };
   dispose(): void;
 }
+
+/** The part of a recipe the player needs (sound presets may carry any id). */
+export type PlayableRecipe = Pick<SfxRecipe, 'layers'> & { readonly durationMs?: number };
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -93,6 +98,7 @@ export function createAudioEngine(
     return {
       resume: () => {},
       playSfx: () => {},
+      playRecipe: () => {},
       setEngine: () => {},
       stopEngine: () => {},
       setRoll: () => {},
@@ -180,6 +186,11 @@ export function createAudioEngine(
     playSfx(id: SfxId, o?: { volume?: number; pitch?: number }) {
       const recipe = SFX[id];
       if (!recipe) return;
+      this.playRecipe(recipe, o);
+    },
+
+    playRecipe(recipe: PlayableRecipe, o?: { volume?: number; pitch?: number }) {
+      if (!recipe || !Array.isArray(recipe.layers)) return;
 
       const userVol = o?.volume !== undefined ? Math.max(0, o.volume) : 1;
       const pitch = o?.pitch !== undefined && o.pitch > 0 ? o.pitch : 1;

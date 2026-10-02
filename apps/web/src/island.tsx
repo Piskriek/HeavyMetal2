@@ -94,6 +94,7 @@ export function IslandWalk(props: {
     let mouse = 0; // bit 1 = left, 2 = right
     let firstUse = false;
     let pointerLocked = false;
+    let lockFails = 0;
     let softAim = false; // pointer lock is not available (some browsers, embedded views): aim at the centre, look with the right button
     let suppressMenu = false;
 
@@ -103,16 +104,19 @@ export function IslandWalk(props: {
     const centre = (): { x: number; y: number } => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
     const aim = () => { const c = centre(); const p = renderer.pick(c.x, c.y); return p.point ? { point: p.point, normal: p.normal ?? null } : null; };
 
+    // the browser refuses a re-lock for a moment after Esc: only give up on the mouse after three refusals in a row
+    const failLock = (): void => { if (++lockFails >= 3) { softAim = true; setLocked(true); } };
     api.current = {
       lock: () => {
         if (document.pointerLockElement) return;
-        try { const r = root.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => { softAim = true; setLocked(true); }); } catch { softAim = true; setLocked(true); }
+        try { const r = root.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => failLock()); } catch { failLock(); }
       },
       unlock: () => { suppressMenu = true; if (document.pointerLockElement) document.exitPointerLock(); else suppressMenu = false; },
     };
     const onLockChange = (): void => {
       const was = pointerLocked;
       pointerLocked = isLocked();
+      if (pointerLocked) { lockFails = 0; softAim = false; }
       setLocked(pointerLocked);
       if (was && !pointerLocked) {
         if (suppressMenu) { suppressMenu = false; return; }
@@ -122,7 +126,7 @@ export function IslandWalk(props: {
     };
     document.addEventListener('pointerlockchange', onLockChange);
     pointerLocked = isLocked(); setLocked(pointerLocked);
-    const onLockError = (): void => { softAim = true; setLocked(true); };
+    const onLockError = (): void => failLock();
     document.addEventListener('pointerlockerror', onLockError);
 
     const onKeyDown = (e: KeyboardEvent): void => {

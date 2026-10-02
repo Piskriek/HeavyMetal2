@@ -1126,3 +1126,9 @@ M604–M613 pass as mobile children for goal nets, painted posts, wickets, targe
 ![Material Batch 78 contact sheet](./review/material-batch-78-nostalgic-global-sports-equipment.jpg)
 
 M614–M622 pass as nostalgic-PBR children for nets, painted posts, wickets, target faces, archery straw, ring rope, felt and landing foam. M623 is a constrained pass: its footing palette and channels are useful, but reconstruction should break up the rectangular groomed patches so they cannot read as slabs.
+
+## Material Batch 79 — global sports playing surfaces
+
+![Material Batch 79 contact sheet](./review/material-batch-79-global-sports-playing-surfaces.jpg)
+
+M624–M633 pass as brand-neutral full-fidelity playing surfaces: short natural grass, red clay, acrylic hard court, synthetic running-track rubber, gym maple, maintained rink ice, packed groomed snow, skate concrete, bowling-lane maple and indoor grip mat. No court markings or protected branding are baked into these materials; markings remain separately paintable presets.

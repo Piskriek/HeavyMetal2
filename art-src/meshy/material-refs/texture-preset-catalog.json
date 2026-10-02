@@ -17339,6 +17339,696 @@
       "status": "constrained-pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M624",
+      "canonicalCode": "HM2-TXP-M624-SPT-GRASS-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports short grass pitch pbr sheet",
+      "sourceFile": "M624-sports-short-grass-pitch-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GRASS",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "5 mm blades",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M625",
+      "canonicalCode": "HM2-TXP-M625-SPT-CLAY-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports clay court pbr sheet",
+      "sourceFile": "M625-sports-clay-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CLAY",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M626",
+      "canonicalCode": "HM2-TXP-M626-SPT-ACRYLIC-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports acrylic court pbr sheet",
+      "sourceFile": "M626-sports-acrylic-court-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ACRYLIC",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M627",
+      "canonicalCode": "HM2-TXP-M627-SPT-TRACK-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports running track rubber pbr sheet",
+      "sourceFile": "M627-sports-running-track-rubber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TRACK",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M628",
+      "canonicalCode": "HM2-TXP-M628-SPT-GYMWOOD-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports gym hardwood pbr sheet",
+      "sourceFile": "M628-sports-gym-hardwood-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GYMWOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "boards 60-90 mm wide",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M629",
+      "canonicalCode": "HM2-TXP-M629-SPT-ICE-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports rink ice pbr sheet",
+      "sourceFile": "M629-sports-rink-ice-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ICE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M630",
+      "canonicalCode": "HM2-TXP-M630-SPT-SNOW-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports packed snow pbr sheet",
+      "sourceFile": "M630-sports-packed-snow-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "SNOW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "grooming bands 50-100 mm",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M631",
+      "canonicalCode": "HM2-TXP-M631-SPT-CONCRETE-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports skate concrete pbr sheet",
+      "sourceFile": "M631-sports-skate-concrete-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "CONCRETE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M632",
+      "canonicalCode": "HM2-TXP-M632-SPT-LANEWOOD-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports bowling lane pbr sheet",
+      "sourceFile": "M632-sports-bowling-lane-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "LANEWOOD",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "directional-repeat",
+      "physicalScale": "boards about 27 mm wide",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
+    },
+    {
+      "registryId": "M633",
+      "canonicalCode": "HM2-TXP-M633-SPT-GRIPMAT-TIL-BCNROH-FULL-PX256-Q4-CLN-PFULL-TR-R01",
+      "name": "sports grip mat pbr sheet",
+      "sourceFile": "M633-sports-grip-mat-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "GRIPMAT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness",
+        "bottomRight": "AO+Height"
+      },
+      "style": "FULL",
+      "targetTier": "PX256",
+      "fallbackTier": "PX128",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "1 m surface patch",
+      "mipPolicy": "Preserve playing-surface direction and broad contact wear; suppress isolated scratch aliasing.",
+      "intendedUses": [
+        "brand-neutral globally applicable sports playing surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "baked court lines",
+        "large repeated focal damage"
+      ],
+      "parentPreset": null,
+      "editableParameters": [
+        "color family",
+        "relief",
+        "roughness",
+        "wear direction",
+        "surface density"
+      ],
+      "recipe": {
+        "intent": "Clean foundational sports surface with meaningful reconstructible PBR channels.",
+        "required": [
+          "fixed quadrant order",
+          "seamless edges",
+          "neutral line-free surface"
+        ],
+        "forbidden": [
+          "text",
+          "logos",
+          "preview inset",
+          "field or venue view"
+        ],
+        "frequency": "broad wear plus fine material structure"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 79 global sports playing surfaces"
     }
   ]
 }

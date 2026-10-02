@@ -92,6 +92,12 @@
       ],
       "@hm/scatter": [
         "packages/scatter/src/index.ts"
+      ],
+      "@hm/modulation": [
+        "packages/modulation/src/index.ts"
+      ],
+      "@hm/modui": [
+        "packages/modui/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

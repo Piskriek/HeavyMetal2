@@ -187,6 +187,8 @@ export const interfaceSchema = defineSchema({
   doc: 'How the game looks to the player: colours, wording, sizes and which HUD parts are shown. The menus, the HUD and the editor itself read these variables.',
   icon: 'palette',
   variables: [
+    { key: 'theme', type: 'enum', label: 'Theme', doc: 'The overall look. white-wall is a clean painted wall with marker doodles and spray paint; night-wall is the same on dark concrete; high-contrast is plain and easy to read; classic-dark is the original dark look. A colour you change below always wins over the theme.', tier: 'play', default: 'white-wall', options: ['white-wall', 'night-wall', 'high-contrast', 'classic-dark'], group: 'Look' },
+    { key: 'doodles', type: 'boolean', label: 'Doodles', doc: 'Marker doodles and spray splats in the margins of panels and menus.', tier: 'play', default: true, group: 'Look' },
     colour('accent', 'Accent', 'Highlights, the main button and the winner.', '#ffd24a', 'Colours'),
     colour('text', 'Text', 'Main text colour.', '#dde6ee', 'Colours'),
     colour('dim', 'Soft text', 'Hints and labels.', '#8fa0b1', 'Colours'),

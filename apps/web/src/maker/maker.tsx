@@ -470,6 +470,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
 
   return (
     <div className="maker" style={themeOf(rt).vars}>
+      {themeOf(rt).css ? <style>{themeOf(rt).css}</style> : null}
       <header className="bar">
         <strong className="brand">Map Maker</strong>
         <button onClick={doUndo} disabled={!rt.commands.canUndo}>↶ Undo</button>

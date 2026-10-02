@@ -8,6 +8,7 @@ import type { LookLike } from './environment';
 import { DecorView, type DecorInstance } from './decor';
 import { RoadDecalView, type RoadDecalDef } from './road-decals';
 import { ModelsView, type ModelPlacement } from './voxel-view';
+import { Bursts, type BurstDef } from './bursts';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -32,6 +33,8 @@ export type ThreeRenderer = RenderService & {
   ray(clientX: number, clientY: number): { readonly origin: Vec3; readonly direction: Vec3 } | null;
   /** Move one of the models given to setModels (an avatar walking about) without rebuilding it. */
   setModelPose(index: number, x: number, y: number, z: number, yawDeg: number): void;
+  /** A puff, spark or chip burst at a point in the world (the juice on every edit). */
+  burst(def: BurstDef): void;
   /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
   setFov(deg: number): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
@@ -117,6 +120,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     roadView?.dispose();
     modelsView?.dispose();
     modelsView = null;
+    bursts?.dispose();
+    bursts = null;
     roadView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
@@ -148,6 +153,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     if (roadView) { scene?.remove(roadView.group); roadView.dispose(); roadView = null; }
     if (scene && pendingRoad && pendingRoad.length) { roadView = new RoadDecalView(pendingRoad); scene.add(roadView.group); }
   };
+  let bursts: Bursts | null = null;
   let modelsView: ModelsView | null = null;
   let pendingModels: readonly ModelPlacement[] | null = null;
   const applyModels = (): void => {
@@ -200,6 +206,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       sceneSync = createSceneSync(world, sceneAdapter);
       sceneSync.step();
       overlays = new OverlayManager(scene);
+      bursts = new Bursts();
+      scene.add(bursts.points);
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
       applyTerrain();
       applyDecor();
@@ -230,6 +238,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       pendingDecor = instances;
       applyDecor();
     },
+    burst(def: BurstDef): void { bursts?.emit(def); },
     setModelPose(index: number, x: number, y: number, z: number, yawDeg: number): void {
       modelsView?.pose(index, x, y, z, yawDeg);
     },
@@ -269,6 +278,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       if (!webgl || !scene || !viewCamera) return;
       sceneSync?.present(alpha);
       roadView?.animate(performance.now());
+      bursts?.update(previousFrame === null ? 16 : performance.now() - previousFrame);
       updateView();
       webgl.render(scene, viewCamera);
       const now = performance.now();

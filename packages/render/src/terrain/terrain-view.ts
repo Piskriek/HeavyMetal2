@@ -18,6 +18,8 @@ export interface TerrainLook {
   /** 0 = crisp height-led borders, 1 = long soft fades. */
   soft: number;
   normalStrength: number;
+  /** 'flat' = blocky posterised colour like the voxel goblin; 'pbr' = full relief and roughness. */
+  skin?: 'flat' | 'pbr';
   /** Multiplies every tile's size: bigger = calmer from the air. */
   scale: number;
 }
@@ -73,6 +75,7 @@ export class TerrainView {
       const u: Record<string, THREE.IUniform> = {
         islSurfaces: { value: this.surfaces.texture }, islPbr: { value: this.surfaces.pbrTexture },
         islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: this.surfaces.layerOf },
+        islFlat: { value: this.look.skin === 'flat' ? 1 : 0 },
         islParams: { value: this.surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
         islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
         paintMask: { value: this.mask }, paintRes: { value: new THREE.Vector2(cols, rows) },
@@ -100,6 +103,7 @@ export class TerrainView {
     this.uniforms['islCliffLayer']!.value = layer;
     this.uniforms['islSoft']!.value = this.look.soft;
     this.uniforms['islNormalStrength']!.value = this.look.normalStrength;
+    this.uniforms['islFlat']!.value = this.look.skin === 'flat' ? 1 : 0;
     this.uniforms['islScale']!.value = this.look.scale;
   }
 

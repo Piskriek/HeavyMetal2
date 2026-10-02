@@ -42,6 +42,8 @@ export function Shell(props: { readonly rt: Runtime; readonly onBuild: () => voi
   /** My Island: dive to the home planet, cross-fade to the island arriving from above, then walk. */
   const myIsland = useCallback(async () => {
     if (screenRef.current === 'zoom') return;
+    // capture the mouse now, while the click still counts as a user gesture: mouse look is on from the first frame on the island
+    try { const r = (document.querySelector('.shell') as HTMLElement | null)?.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => undefined); } catch { /* not available */ }
     if (islandOn && screenRef.current !== 'menu') { setScreen('island'); setGalaxyOpacity(0); return; }
     setScreen('zoom'); setIntro(!reduced);
     if (!reduced) await galaxy.current?.diveTo('home', 2600);
@@ -76,7 +78,7 @@ export function Shell(props: { readonly rt: Runtime; readonly onBuild: () => voi
     <div className="shell">
       {islandOn ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk rt={rt} intro={intro} grownUp={profile.grownUp} onIntroDone={() => setIntro(false)} onEdit={onBuild} onActivities={toActivities} onHub={toHub} onMainMenu={toMenu} />
+          <IslandWalk rt={rt} intro={intro} grownUp={profile.grownUp} skin={profile.skin} onIntroDone={() => setIntro(false)} onEdit={onBuild} onActivities={toActivities} onHub={toHub} onMainMenu={toMenu} />
         </div>
       ) : null}
       {galaxyOn ? (
@@ -163,6 +165,7 @@ export function Shell(props: { readonly rt: Runtime; readonly onBuild: () => voi
             <label className="row"><input type="checkbox" checked={profile.grownUp} onChange={(e) => update((p) => ({ ...p, grownUp: e.target.checked }))} /> Grown-up mode (build mode on)</label>
             <p className="hint">Build mode is for adults. Switch it off for a kid profile: My Island and the activities stay, building is hidden.</p>
             <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
+            <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel goblin)</option><option value="pbr">PBR (full relief)</option></select></label>
             <div className="btns"><button onClick={() => update((p) => ({ ...p, tutorialDone: false }))}>Replay the tutorial</button><button className="danger" onClick={() => { update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', signedUp: false, strikes: 0 })); }}>Reset progress</button></div>
           </div>
         </div>

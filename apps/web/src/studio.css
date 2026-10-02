@@ -187,3 +187,27 @@ kbd { border-radius: 0; }
 .shell-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .shell-list.rank li { display: grid; grid-template-columns: 34px 1fr auto; }
 .shell-list.rank li.me { background: #ecebe4; font-weight: 700; }
+
+/* build mode in the world: crosshair, hotbar, inventory */
+.crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); pointer-events: none; opacity: .55; }
+.crosshair.on { opacity: 1; }
+.crosshair i { position: absolute; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+.crosshair i:nth-child(1) { left: 10px; top: 0; width: 2px; height: 7px; }
+.crosshair i:nth-child(2) { left: 10px; bottom: 0; width: 2px; height: 7px; }
+.crosshair i:nth-child(3) { top: 10px; left: 0; width: 7px; height: 2px; }
+.crosshair i:nth-child(4) { top: 10px; right: 0; width: 7px; height: 2px; }
+.hotbar { position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%); display: flex; border: 1px solid var(--line); background: var(--panel); }
+.hotbar button { position: relative; display: grid; place-items: center; gap: 2px; width: 62px; height: 62px; padding: 6px 2px 4px; border: 0; border-right: 1px solid var(--line); color: #4a4b44; }
+.hotbar button:last-child { border-right: 0; width: 36px; }
+.hotbar button.on { background: var(--text); color: var(--paper); }
+.hotbar button b { position: absolute; left: 5px; top: 4px; font-size: 9px; font-weight: 600; opacity: .6; }
+.hotbar button span { font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.hotbar button:hover::after { content: attr(data-label); position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 240px; padding: 5px 8px; background: var(--text); color: var(--paper); font-size: 10px; letter-spacing: .04em; text-transform: none; z-index: 30; white-space: normal; }
+.inventory { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, 92vw); background: var(--panel); border: 1px solid var(--line); }
+.inventory header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.inventory h3 { margin: 0; font-size: 9px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); border: 0; padding: 0; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); margin: 12px 14px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.inv-grid button { display: grid; place-items: center; gap: 6px; padding: 16px 4px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.inv-grid button span { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.inventory .hint { margin: 0 14px 12px; }
+.island-note { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 6px 12px; background: var(--text); color: var(--paper); font-size: 11px; letter-spacing: .08em; }

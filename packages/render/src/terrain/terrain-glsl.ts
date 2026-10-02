@@ -35,6 +35,7 @@ export const uniformsGlsl = (layers: number): string => /* glsl */ `
 uniform sampler2DArray islSurfaces;
 uniform sampler2DArray islPbr;
 uniform float islNormalStrength;
+uniform float islFlat;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 uniform vec4 islParams[${layers}];
 uniform float islSoft;
@@ -178,10 +179,13 @@ vec3 gBump = vec3(0.0);
 export const COLOR_STAGE_GLSL = /* glsl */ `
 #include <color_fragment>
 {
-  vec3 wp = vTWorld;
+  // the flat skin samples the ground in half-metre blocks, like the voxel goblin; the PBR skin samples it smoothly
+  vec3 wp = islFlat > 0.5 ? floor(vTWorld / 0.5) * 0.5 + 0.25 : vTWorld;
   vec3 gnrm = normalize(vTNormal);
-  vec3 dwx = dFdx(wp);
-  vec3 dwy = dFdy(wp);
+  // flat: ask for a very coarse mip so each block is the average colour of its surface, then vary blocks a little
+  float flatLod = islFlat > 0.5 ? 40.0 : 1.0;
+  vec3 dwx = dFdx(vTWorld) * flatLod;
+  vec3 dwy = dFdy(vTWorld) * flatLod;
   vec2 coord = (wp.xz - paintOrigin) / paintCell + 0.5;
   vec2 mwarp = vec2(surfNoise(wp.xz / 9.0), surfNoise(wp.xz / 9.0 + 19.7)) - 0.5;
   vec3 sm = islGather(paintMask, paintRes, coord + mwarp * 1.4);
@@ -195,10 +199,12 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
     if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
     tile.rgb *= 0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7);
+    if (islFlat > 0.5) { vec2 bk = floor(vTWorld.xz / 0.5); tile.rgb *= 0.9 + 0.2 * fract(sin(dot(bk, vec2(12.9898, 78.233))) * 43758.5453); tile.rgb = floor(tile.rgb * 9.0 + 0.5) / 9.0; tile.rgb = mix(vec3(dot(tile.rgb, vec3(0.3, 0.59, 0.11))), tile.rgb, 1.15); }
     diffuseColor.rgb = tile.rgb;
     gRough = islRough(la, lb, lw);
     vec4 pbrTile = islPbrAt(la, lb, lw, wp, gnrm);
     if (pbrTile.w >= 0.0) { gRough = pbrTile.w; gBump = pbrTile.xyz; }
+    if (islFlat > 0.5) { gRough = 0.92; gBump = vec3(0.0); }
     float wet = 1.0 - smoothstep(0.0, 1.3, wp.y);
     diffuseColor.rgb *= 1.0 - 0.32 * wet;
     gRough = gRough * (1.0 - 0.45 * wet);

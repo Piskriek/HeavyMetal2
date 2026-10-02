@@ -11,3 +11,4 @@ export type { LookLike } from './environment';
 export * from './decor';
 export * from './road-decals';
 export * from './voxel-view';
+export * from './bursts';

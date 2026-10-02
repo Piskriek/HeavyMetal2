@@ -7,6 +7,7 @@ import {
 } from '@hm/screens';
 import { audio, setSoundEnabled } from './maker/feedback';
 import { RaceView, type RaceSetup } from './race-view';
+import { themeOf } from './ui-preset';
 
 const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
 const KEY_SETTINGS = 'hm.settings', KEY_CUSTOM = 'hm.custom', KEY_RACER = 'hm.lastRacer';
@@ -35,6 +36,7 @@ export function App({ rt, fromMap, autoStart = false, onEditor }: { readonly rt:
     try { last = localStorage.getItem(KEY_RACER) ?? '0'; } catch { /* default goblin */ }
     return [{ type: 'play', mode: 'quick' }, { type: 'selectRacer', id: last }, { type: 'confirmRacer' }].reduce((s, a) => reduceFlow(s, a as never), first);
   });
+  const theme = useMemo(() => themeOf(rt), [rt]);
   const [raceKey, setRaceKey] = useState(() => (flow.screen === 'loading' ? 1 : 0));
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [table, setTable] = useState<Record<string, StandingRow>>({});
@@ -115,16 +117,17 @@ export function App({ rt, fromMap, autoStart = false, onEditor }: { readonly rt:
   const quickContinue = flow.mode === 'quick' ? 'Back to title' : 'Standings';
 
   return (
-    <div className="app" style={{ position: 'absolute', inset: 0 }}>
+    <div className="game-app" style={{ position: 'absolute', inset: 0, ...theme.vars }}>
       <ScreenStyles />
+      {theme.hudCss ? <style>{theme.hudCss}</style> : null}
       {inRace ? (
-        <RaceView key={raceKey} rt={rt} setup={setup} settings={settings}
+        <RaceView key={raceKey} rt={rt} setup={setup} settings={settings} minimapSize={theme.minimapSize}
           active={flow.screen === 'intro' || flow.screen === 'race' || flow.screen === 'results' || flow.screen === 'standings'}
           pausable={canPause(flow)}
           paused={flow.screen === 'paused' || (flow.screen === 'settings' && flow.previous === 'paused')}
           onReady={() => setReady(true)} onRacing={() => go({ type: 'raceStart' })} onResults={onResults} onPause={() => go({ type: 'pause' })} />
       ) : null}
-      {flow.screen === 'title' ? <TitleScreen reducedMotion={settings.reducedMotion} onPlay={(mode) => go({ type: 'play', mode })} onSettings={() => go({ type: 'openSettings' })} {...(onEditor ? { onEditor } : {})} /> : null}
+      {flow.screen === 'title' ? <TitleScreen title={theme.title} subtitle={theme.subtitle} quickLabel={theme.quickLabel} seriesLabel={theme.seriesLabel} reducedMotion={settings.reducedMotion} onPlay={(mode) => go({ type: 'play', mode })} onSettings={() => go({ type: 'openSettings' })} {...(onEditor ? { onEditor } : {})} /> : null}
       {flow.screen === 'select' ? (
         <CharacterSelect racers={CARDS} selected={flow.selectedRacer} reducedMotion={settings.reducedMotion} custom={custom} onCustomChange={(c) => { setCustom(c); if (flow.selectedRacer === 'custom') go({ type: 'selectRacer', id: 'custom' }); }}
           onSelect={(id) => go({ type: 'selectRacer', id })} onConfirm={() => go({ type: 'confirmRacer' })} onBack={() => go({ type: 'back' })} />

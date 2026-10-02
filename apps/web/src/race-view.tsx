@@ -27,6 +27,8 @@ export function RaceView(props: {
   /** The game only advances while active and not paused (loading shows the grid without running the lights). */
   readonly active: boolean;
   readonly paused: boolean;
+  /** Minimap width from the interface preset. */
+  readonly minimapSize: number;
   /** Show the pause button (not on the results screens). */
   readonly pausable: boolean;
   readonly onReady: () => void;
@@ -145,7 +147,7 @@ export function RaceView(props: {
     <div className="race">
       <div className="view" ref={host} />
       {hud ? <HUD speed={hud.speed} lap={hud.lap} laps={hud.laps} position={hud.position} racers={hud.racers} timeMs={hud.timeMs} item={hud.item} boost={hud.boost} {...(hud.message && hud.phase !== 'countdown' ? { message: hud.message } : {})} /> : null}
-      {game && props.settings.showMinimap ? <div className="mini"><Minimap track={game.track.points} racers={racers} size={size.w < 520 ? 96 : 150} /></div> : null}
+      {game && props.settings.showMinimap ? <div className="mini"><Minimap track={game.track.points} racers={racers} size={size.w < 520 ? Math.round(props.minimapSize * 0.65) : props.minimapSize} /></div> : null}
       {showTouch && game ? <TouchControls width={size.w} height={size.h} onChange={(t) => game.input.setTouch(t)} /> : null}
       {props.active && count !== null && !props.paused ? <IntroOverlay countdown={count} lap={1} laps={hud?.laps ?? 3} reducedMotion={props.settings.reducedMotion} /> : null}
       {props.pausable && !props.paused ? <button className="pause-btn" aria-label="Pause" onClick={props.onPause}>⏸</button> : null}

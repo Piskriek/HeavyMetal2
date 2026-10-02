@@ -6,7 +6,7 @@ import type { ReactElement } from 'react';
  */
 export const SCREEN_CSS = `
 .hms { --a: var(--hm-accent, #ffd24a); --t: var(--hm-text, #dde6ee); --d: var(--hm-dim, #8fa0b1); --p: var(--hm-panel, #151a21); --l: var(--hm-line, #26303b); --ok: var(--hm-ok, #5fd38d); --bad: var(--hm-danger, #ff6b5e);
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px 16px; box-sizing: border-box; overflow: auto; color: var(--t); font-family: inherit; text-align: center; }
+  zoom: var(--hms-scale, 1); position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px 16px; box-sizing: border-box; overflow: auto; color: var(--t); font-family: inherit; text-align: center; }
 .hms * { box-sizing: border-box; }
 .hms-bg { background: radial-gradient(120% 90% at 50% 0%, #1d3a46 0%, #0f1a22 55%, #090e13 100%); }
 .hms-dim { background: rgba(7, 12, 17, 0.72); backdrop-filter: blur(5px); }

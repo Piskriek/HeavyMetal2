@@ -72,6 +72,7 @@ export const sceneSchema = defineSchema({
     { key: 'decor', label: 'Foliage', doc: 'Palms, bushes and rocks.', kinds: ['decor'], min: 0, max: 1, tier: 'build' },
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
+    { key: 'interface', label: 'Interface', doc: 'The look and wording of the menus and the HUD: colours, texts, which HUD parts show.', kinds: ['interface'], min: 0, max: 1, tier: 'play' },
     { key: 'rules', label: 'Race rules', doc: 'How the race is run: laps, field size, items, boost pads. Change it to make your own kind of race.', kinds: ['race'], min: 0, max: 1, tier: 'play' },
     { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
@@ -171,6 +172,39 @@ export const modulatorSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+const colour = (key: string, label: string, doc: string, def: string, group: string): VariableDef => ({ key, type: 'color', label, doc, tier: 'play', default: def, group });
+const text = (key: string, label: string, doc: string, def: string, group: string): VariableDef => ({ key, type: 'string', label, doc, tier: 'play', default: def, group });
+const flag = (key: string, label: string, doc: string, group: string): VariableDef => ({ key, type: 'boolean', label, doc, tier: 'play', default: true, group });
+
+export const interfaceSchema = defineSchema({
+  kind: 'interface',
+  version: 1,
+  label: 'Interface',
+  doc: 'How the game looks to the player: colours, wording, sizes and which HUD parts are shown. The menus, the HUD and the editor itself read these variables.',
+  icon: 'palette',
+  variables: [
+    colour('accent', 'Accent', 'Highlights, the main button and the winner.', '#ffd24a', 'Colours'),
+    colour('text', 'Text', 'Main text colour.', '#dde6ee', 'Colours'),
+    colour('dim', 'Soft text', 'Hints and labels.', '#8fa0b1', 'Colours'),
+    colour('panel', 'Panel', 'Panels and cards.', '#151a21', 'Colours'),
+    colour('line', 'Lines', 'Borders and dividers.', '#26303b', 'Colours'),
+    colour('ok', 'Good', 'Success and points gained.', '#5fd38d', 'Colours'),
+    colour('danger', 'Warning', 'Errors and the last point.', '#ff6b5e', 'Colours'),
+    text('title', 'Game title', 'The big title on the first screen.', 'GOBLIN BALL RACERS', 'Words'),
+    text('subtitle', 'Subtitle', 'The line under the title.', 'Basalt Isle', 'Words'),
+    text('quickLabel', 'Quick game button', 'Text on the quick race button.', 'Quick Race', 'Words'),
+    text('seriesLabel', 'Series button', 'Text on the championship button.', 'Championship', 'Words'),
+    { key: 'uiScale', type: 'number', label: 'Text size', doc: '1 = normal, 1.3 = large print.', tier: 'play', default: 1, min: 0.8, max: 1.6, step: 0.05, group: 'Sizes' },
+    { key: 'minimapSize', type: 'number', label: 'Minimap size', doc: 'Width of the minimap in pixels (phones use two thirds).', tier: 'build', default: 150, min: 80, max: 260, step: 10, unit: 'px', group: 'Sizes' },
+    flag('hudSpeed', 'Show speed', 'The speedometer.', 'HUD'),
+    flag('hudLap', 'Show lap', 'Lap counter.', 'HUD'),
+    flag('hudPosition', 'Show position', 'Race position.', 'HUD'),
+    flag('hudTime', 'Show time', 'Race clock.', 'HUD'),
+    flag('hudItem', 'Show item', 'The item you are holding.', 'HUD'),
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
 export const raceSchema = defineSchema({
   kind: 'race',
   version: 1,
@@ -247,7 +281,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

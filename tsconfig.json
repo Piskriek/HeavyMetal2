@@ -101,6 +101,9 @@
       ],
       "@hm/soundlab": [
         "packages/soundlab/src/index.ts"
+      ],
+      "@hm/screens": [
+        "packages/screens/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

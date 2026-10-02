@@ -97,6 +97,17 @@ try {
   await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.textContent === 'Close')?.click(); });
   await page.waitForSelector('.hotbar', { timeout: 30000 });
   check('Close returns to the island', true);
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Share my island')?.click(); });
+  await page.waitForSelector('.share', { timeout: 5000 }).catch(() => undefined);
+  check('Share my island asks who gets it', await page.locator('.share-vis button').count() === 4);
+  await page.locator('.share-vis button', { hasText: 'Up for sale' }).click();
+  await page.locator('.share input[type=number]').fill('0');
+  check('a price of 0 is refused with a reason', await page.locator('.share .go').isDisabled() && /whole number of credits/.test(await page.locator('.share-problems').textContent() ?? ''));
+  await page.locator('.share-vis button', { hasText: 'Share freely' }).click();
+  await page.locator('.share .go').click();
+  await page.waitForTimeout(300);
+  check('sharing closes the dialog and says where it went', await page.locator('.share').count() === 0 && /Your shares/.test(await page.locator('.island-note').textContent() ?? ''));
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
   check('ten tabs on the tab strip', await page.locator('.tab-strip button').count() === 10);

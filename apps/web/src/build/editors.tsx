@@ -30,6 +30,8 @@ export interface EditorActions {
   readonly applyLook: (id: string) => void;
   /** Open the editor of a sprite burst (a tool's sprite plug). */
   readonly openSprite: (id: string) => void;
+  /** Open "Share with the community?" for a preset. */
+  readonly share: (kind: 'tool' | 'sprite' | 'animation' | 'look', id: string) => void;
 }
 
 export function ToolEditor({ id, actions }: { readonly id: string; readonly actions: EditorActions }): ReactElement {
@@ -43,7 +45,11 @@ export function ToolEditor({ id, actions }: { readonly id: string; readonly acti
       <Inspector schema={schemaOf('tool', tool.name, vars)} params={(p.tools[id] ?? {}) as Params} resolved={toolParams(tool)} tier="build"
         onChange={(k, v) => { const [key, value] = toolEdit(k, v); editTool(id, key, value); }} />
       <PlugList tool={tool} actions={actions} />
-      {p.tools[id] ? <button onClick={() => { resetTool(id); fx('undo'); }}>Back to the ready-made tool</button> : null}
+      <div className="btns">
+        {p.tools[id] ? <button onClick={() => { resetTool(id); fx('undo'); }}>Back to the ready-made tool</button> : null}
+        <span className="grow" />
+        <button onClick={() => actions.share('tool', id)}>Share…</button>
+      </div>
     </div>
   );
 }
@@ -123,7 +129,7 @@ function PlugList({ tool, actions }: { readonly tool: ToolPreset; readonly actio
 }
 
 /** A sprite burst is a preset too: how many bits, their colours, size, speed, spread, gravity, how long they last. */
-export function SpriteEditor({ id }: { readonly id: string }): ReactElement {
+export function SpriteEditor({ id, actions }: { readonly id: string; readonly actions: EditorActions }): ReactElement {
   const p = usePlayer();
   const s = spriteOf(id);
   const schema = useMemo(() => schemaOf('sprite', 'Sprite', SPRITE_VARIABLES), []);
@@ -131,7 +137,11 @@ export function SpriteEditor({ id }: { readonly id: string }): ReactElement {
     <div className="editor">
       <div className="ed-top big"><PresetPreview p={{ kind: 'sprite', sprite: s }} size={120} /><p>Every tool that plays {s.name.toLowerCase()} changes with it.</p></div>
       <Inspector schema={schema} params={(p.sprites[id] ?? {}) as Params} resolved={spriteToParams(s)} tier="build" onChange={(k, v) => editSprite(id, k, v)} />
-      {p.sprites[id] ? <button onClick={() => { resetSprite(id); fx('undo'); }}>Back to the ready-made burst</button> : null}
+      <div className="btns">
+        {p.sprites[id] ? <button onClick={() => { resetSprite(id); fx('undo'); }}>Back to the ready-made burst</button> : null}
+        <span className="grow" />
+        <button onClick={() => actions.share('sprite', id)}>Share…</button>
+      </div>
     </div>
   );
 }
@@ -148,7 +158,11 @@ export function AnimEditor({ id, actions }: { readonly id: string; readonly acti
         {MOVE_SLOTS.map((m) => <button key={m} className={usedFor.includes(m) ? 'on' : ''} aria-pressed={usedFor.includes(m)} onClick={() => { setMove(m, id); fx('select'); }}>{MOVE_WORDS[m]}</button>)}
       </div>
       <Inspector schema={schemaOf('animation', anim.name, ANIM_VARIABLES)} params={(p.anims[id] ?? {}) as Params} resolved={animToParams(anim)} tier="build" onChange={(k, v) => editAnim(id, k, v)} />
-      {p.anims[id] ? <button onClick={() => { resetAnim(id); fx('undo'); }}>Back to the ready-made move</button> : null}
+      <div className="btns">
+        {p.anims[id] ? <button onClick={() => { resetAnim(id); fx('undo'); }}>Back to the ready-made move</button> : null}
+        <span className="grow" />
+        <button onClick={() => actions.share('animation', id)}>Share…</button>
+      </div>
     </div>
   );
 }
@@ -197,7 +211,7 @@ export function LookEditor({ id, actions }: { readonly id: string; readonly acti
       </div>
       <Inspector schema={schemaOf('avatar', look.name, LOOK_VARIABLES)} params={mine ? Object.fromEntries(LOOK_VARIABLES.map((v) => [v.key, look[v.key as keyof AvatarLook]])) : {}} resolved={look as unknown as Record<string, string>} tier="build"
         onChange={(k, v) => { if (typeof v === 'string') change({ [k]: v } as Partial<AvatarLook>); }} />
-      {!mine ? <p className="hint">Change any colour and it becomes a goblin of your own.</p> : null}
+      {!mine ? <p className="hint">Change any colour and it becomes a goblin of your own.</p> : <div className="btns"><span className="grow" /><button onClick={() => actions.share('look', id)}>Share…</button></div>}
     </div>
   );
 }

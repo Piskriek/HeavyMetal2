@@ -40,7 +40,7 @@ export const LOOKS: readonly AvatarLook[] = [
 export const lookById = (id: string): AvatarLook => LOOKS.find((l) => l.id === id) ?? LOOKS[0]!;
 
 const HEX = /^#[0-9a-f]{6}$/i;
-const BLOCKED = ['fuck', 'shit', 'cunt', 'nigg', 'fag', 'rape', 'nazi', 'hitler', 'kys', 'retard', 'whore', 'slut', 'dick', 'penis', 'vagina', 'porn', 'sex'];
+export const BLOCKED_WORDS: readonly string[] = ['fuck', 'shit', 'cunt', 'nigg', 'fag', 'rape', 'nazi', 'hitler', 'kys', 'retard', 'whore', 'slut', 'dick', 'penis', 'vagina', 'porn', 'sex'];
 
 /** Why a name is not allowed, or null when it is fine: 2 to 20 letters, digits, spaces, dashes or apostrophes, no blocked words, no links. */
 export function nameProblem(raw: unknown): string | null {
@@ -51,7 +51,7 @@ export function nameProblem(raw: unknown): string | null {
   if (!/^[\p{L}\p{N}][\p{L}\p{N} '\-]*$/u.test(name)) return 'Use letters, numbers, spaces, dashes and apostrophes only.';
   const flat = name.toLowerCase().replace(/[^a-z]/g, '');
   if (/https?|www|\.com/.test(name.toLowerCase())) return 'Names cannot be links.';
-  if (BLOCKED.some((w) => flat.includes(w))) return 'Pick a different name.';
+  if (BLOCKED_WORDS.some((w) => flat.includes(w))) return 'Pick a different name.';
   return null;
 }
 

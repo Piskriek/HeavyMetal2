@@ -22,6 +22,10 @@ import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
 import { player, putInSlot, setActivities, setMode, setSlot, setTab, setView, usePlayer, wearLook } from './build/player';
 import { spriteOf } from './build/sprites';
+import { ShareDialog } from './share/share-dialog';
+import type { ShareKind } from './share/shares';
+import type { Preview } from './build/catalog';
+import { mapBundle } from './maker/storage';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
@@ -130,6 +134,22 @@ export function IslandWalk(props: {
     useCamera: switchCamera,
     applyLook: () => api.current?.setAvatarLook(),
     openSprite: (id) => win.open(`sprite:${id}`, `Sprite: ${spriteOf(id).name}`, { x: 420 + (win.list.length % 3) * 24, y: 90, ...WIN.editor }),
+    share: (kind, id) => openShare(kind, id),
+  };
+  const openShare = (kind: ShareKind, id: string): void => {
+    api.current?.unlock();
+    win.open(`share:${kind}:${id}`, 'Share', { x: Math.max(12, window.innerWidth / 2 - 220), y: 70, w: 440, h: 660 });
+  };
+  /** What a share holds and shows, by kind. */
+  const shareInfo = (kind: ShareKind, id: string): { name: string; preview: Preview; data: () => unknown } => {
+    const pl = player();
+    switch (kind) {
+      case 'tool': { const t = toolOf(pl, id); return { name: t?.name ?? id, preview: { kind: 'icon', icon: t?.icon ?? 'Box' }, data: () => ({ tool: toolOf(player(), id), sprites: Object.fromEntries((toolOf(player(), id)?.plugs ?? []).filter((x) => x.kind === 'sprite').map((x) => [x.ref, spriteOf(x.ref)])) }) }; }
+      case 'sprite': { const sp = spriteOf(id); return { name: sp.name, preview: { kind: 'sprite', sprite: sp }, data: () => spriteOf(id) }; }
+      case 'animation': { const a = animOf(pl, id); return { name: a.name, preview: { kind: 'anim', anim: a }, data: () => animOf(player(), id) }; }
+      case 'look': { const l = lookOf(pl, id); return { name: l.name, preview: { kind: 'look', look: l }, data: () => lookOf(player(), id) }; }
+      case 'island': return { name: rt.store.get(scene.sceneId)?.name ?? 'My island', preview: { kind: 'icon', icon: 'Globe' }, data: () => mapBundle(rt, scene.sceneId) };
+    }
   };
   const pickWheel = (i: number): void => {
     const it = live.current.items[i];
@@ -552,7 +572,8 @@ export function IslandWalk(props: {
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
-            : w.id.startsWith('sprite:') ? <SpriteEditor id={w.id.slice(7)} />
+            : w.id.startsWith('sprite:') ? <SpriteEditor id={w.id.slice(7)} actions={actions} />
+            : w.id.startsWith('share:') ? (() => { const [, kind, ...rest] = w.id.split(':'); const ref = rest.join(':'); const info = shareInfo(kind as ShareKind, ref); return <ShareDialog kind={kind as ShareKind} refId={ref} name={info.name} preview={info.preview} data={info.data} onDone={(t) => { win.close(w.id); say(t); }} />; })()
             : w.id.startsWith('edit:') ? (() => { const [, tab, ...rest] = w.id.split(':'); return <EditorFor tab={tab as TabId} id={rest.join(':')} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} />; })()
             : null}
         </FloatingWindow>
@@ -567,6 +588,7 @@ export function IslandWalk(props: {
           {buildOn ? <button onClick={onEdit}>Race track editor</button> : null}
           <button onClick={() => { setMenu(false); setTab('lights'); win.open('edit:lights:light', 'Lighting', { x: Math.max(12, window.innerWidth - 400), y: 64, w: 372, h: 640 }); }}>Lighting</button>
           <button onClick={() => { setMenu(false); setTab('avatar'); openPresets(); }}>My Avatar</button>
+          {buildOn ? <button onClick={() => { setMenu(false); openShare('island', scene.sceneId); }}>Share my island</button> : null}
           <button onClick={onActivities}>Activities</button>
           {onIslands ? <button onClick={onIslands}>My islands</button> : null}
           <button onClick={onHub}>Multiplayer</button>

@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import type { Profile } from './profile';
+import { VISIBILITY, unshare, useShares } from '../share/shares';
 
 /**
  * The Community tab: presets other people share. Until the platform backend exists this is a seeded simulated community, so share / get / buy / trade
@@ -21,9 +22,25 @@ export function Community(props: { readonly profile: Profile; readonly onCredits
   const [filter, setFilter] = useState('all');
   const kinds = ['all', ...new Set(LISTINGS.map((l) => l.kind))];
   const get = (l: Listing): void => { if (owned.has(l.id) || profile.credits < l.price) return; onCredits(-l.price); setOwned(new Set(owned).add(l.id)); };
+  const mine = useShares();
   return (
     <div className="shell-window wide" role="region" aria-label="Community">
       <header><h3>Community</h3><div className="tabs">{kinds.map((k) => <button key={k} className={filter === k ? 'on' : ''} onClick={() => setFilter(k)}>{k}</button>)}</div></header>
+      {mine.length ? (
+        <section className="your-shares" aria-label="Your shares">
+          <h4>Your shares</h4>
+          <div className="shell-cards">
+            {mine.map((sh) => (
+              <article key={sh.id} className="shell-activity">
+                <h4>{sh.name}</h4>
+                {sh.description ? <p>{sh.description}</p> : null}
+                <p className="hint">{sh.kind}, {VISIBILITY.find((v) => v.id === sh.visibility)?.label.toLowerCase()}{sh.priceCredits ? `, ${sh.priceCredits} cr` : ''}{sh.tags.length ? `, ${sh.tags.join(' ')}` : ''}</p>
+                <button onClick={() => unshare(sh.id)}>Stop sharing</button>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <div className="shell-cards">
         {LISTINGS.filter((l) => filter === 'all' || l.kind === filter).map((l) => (
           <article key={l.id} className="shell-activity">
@@ -35,7 +52,7 @@ export function Community(props: { readonly profile: Profile; readonly onCredits
           </article>
         ))}
       </div>
-      <p className="hint">Sharing, selling and trading your own presets starts from build mode: save a preset and choose Keep private / Up for sale / Share freely / Share with friends.</p>
+      <p className="hint">Share your own presets from any editor on your island (Share…), or your whole island from the Esc menu. Until the game is online, shares stay on this device.</p>
     </div>
   );
 }

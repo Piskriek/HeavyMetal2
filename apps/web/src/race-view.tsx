@@ -1,0 +1,155 @@
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import type { Runtime } from '@hm/engine';
+import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
+import { chaseCamera, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, type Hud as HudData, type RaceGame } from '@hm/game';
+import { attachKeyboard, TouchControls } from '@hm/input';
+import { HUD, Minimap } from '@hm/ui';
+import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
+import { applyLook, lookOf } from './look';
+import { decorInstances } from './maker/dress';
+import { attachRaceAudio, type RaceAudio } from './sound/race-audio';
+
+export interface RaceSetup {
+  readonly fromMap: boolean;
+  /** Index into the goblin library, or a custom goblin. */
+  readonly playerIndex?: number;
+  readonly player?: { readonly name: string; readonly params: Readonly<Record<string, number | boolean | string | null>> };
+}
+
+/**
+ * The race itself: renders the game, the HUD, the minimap and touch controls, and tells the shell what happens
+ * (ready, countdown over, results). The shell decides when the game runs (`active`) and when it is paused.
+ */
+export function RaceView(props: {
+  readonly rt: Runtime;
+  readonly setup: RaceSetup;
+  readonly settings: Settings;
+  /** The game only advances while active and not paused (loading shows the grid without running the lights). */
+  readonly active: boolean;
+  readonly paused: boolean;
+  /** Show the pause button (not on the results screens). */
+  readonly pausable: boolean;
+  readonly onReady: () => void;
+  readonly onRacing: () => void;
+  readonly onResults: (rows: ResultRow[]) => void;
+  readonly onPause: () => void;
+}): ReactElement {
+  const { rt, setup } = props;
+  const host = useRef<HTMLDivElement>(null);
+  const live = useRef({ active: props.active, paused: props.paused, settings: props.settings });
+  live.current = { active: props.active, paused: props.paused, settings: props.settings };
+  const cb = useRef(props);
+  cb.current = props;
+  const gameRef = useRef<RaceGame | null>(null);
+  const [hud, setHud] = useState<HudData | null>(null);
+  const [racers, setRacers] = useState<{ id: string; x: number; z: number; color: string; me: boolean }[]>([]);
+  const [size, setSize] = useState({ w: 800, h: 450 });
+  const [touchDevice, setTouchDevice] = useState(false);
+
+  useEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const renderer = createThreeRenderer({ shadows: true, background: 'sky' });
+    renderer.mount(el, rt.world, rt.store);
+    // quality: a chosen tier is respected; "auto" guesses from the device and drops a tier if frames run slow
+    const chosen = (() => { try { return parseQuality(new URLSearchParams(location.search).get('q')) ?? parseQuality(live.current.settings.quality); } catch { return null; } })();
+    const touchy = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }), { locked: chosen !== null });
+    renderer.setQuality(adaptive.current);
+    let appliedQuality = live.current.settings.quality;
+    const surfaces = new SurfaceArray(STARTER_SURFACES);
+    const game = createRaceGame(rt, { seed: 7, laps: 3, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
+    gameRef.current = game;
+    (window as unknown as { hmGame: unknown }).hmGame = game; // console: hmGame.hud(), hmGame.racerIds ...
+    const sceneNow = rt.store.get(rt.binder.sceneId ?? '');
+    if (sceneNow) applyLook(renderer, lookOf(sceneNow.params));
+    const state = rt.binder.terrain();
+    if (state) {
+      const view = renderer.setTerrain(state.terrain, surfaces);
+      view?.setLook({ cliffSurface: SURF.cliff, soft: state.look.soft, normalStrength: state.look.bump });
+    }
+    renderer.setRoadDecals(game.roadDecals);
+    const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d ? decorInstances(d.placements) : null); };
+    showDecor();
+    const offDecor = rt.binder.onDecor(showDecor);
+    const raceAudio: RaceAudio = attachRaceAudio(game);
+    const detachKeys = attachKeyboard(window, game.input);
+    const detachOrbit = attachOrbitControls(el, renderer);
+    const offTick = rt.onTick(() => renderer.step());
+    let prevCam: { position: readonly [number, number, number]; target: readonly [number, number, number] } | null = null;
+    let last = performance.now(), raf = 0, hudAcc = 0, frames = 0, ready = false, racing = false, reported = false;
+    const gamepads = (): void => {
+      const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? Array.from(navigator.getGamepads()) : [];
+      const pad = pads.find((p) => p && p.connected);
+      game.input.setGamepad(pad ? { axes: Array.from(pad.axes), buttons: pad.buttons.map((b) => ({ pressed: b.pressed, value: b.value })) } : null);
+    };
+    const loop = (now: number): void => {
+      const rawDt = now - last;
+      const dt = Math.min(100, rawDt);
+      last = now;
+      const L = live.current;
+      if (L.settings.quality !== appliedQuality) {
+        appliedQuality = L.settings.quality;
+        const q = parseQuality(appliedQuality);
+        renderer.setQuality(q ?? guessQuality({ touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }));
+      }
+      const lower = adaptive.frame(rawDt);
+      if (lower && parseQuality(L.settings.quality) === null) renderer.setQuality(lower);
+      game.invertSteer = L.settings.invertSteer;
+      gamepads();
+      let alpha = 1;
+      if (L.active && !L.paused) { alpha = game.update(dt); raceAudio.tick(dt); } else raceAudio.tick(0, true);
+      const pose = game.playerPose();
+      const cam = chaseCamera(prevCam, pose, dt);
+      prevCam = cam;
+      renderer.camera.set(cam.position, cam.target);
+      renderer.step();
+      renderer.render(alpha);
+      if (++frames === 3 && !ready) { ready = true; cb.current.onReady(); }
+      hudAcc += dt;
+      if (hudAcc > 90) {
+        hudAcc = 0;
+        const h = game.hud();
+        setHud(h);
+        setRacers(game.racerStates());
+        if (!racing && h.phase === 'racing') { racing = true; cb.current.onRacing(); }
+        const res = game.results();
+        if (res && !reported) {
+          reported = true;
+          const colours = new Map(game.racerStates().map((r) => [r.id, r.color]));
+          cb.current.onResults(res.map((r) => ({
+            id: r.id, name: String(game.rt.world.get(Number(r.id), 'racer')?.['name'] ?? r.id), color: colours.get(r.id) ?? '#888', position: r.position,
+            ...(r.dnf ? { dnf: true } : {}), ...(typeof r.timeMs === 'number' ? { timeMs: r.timeMs } : {}), ...(r.id === String(game.player) ? { isPlayer: true } : {}),
+          })));
+        }
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    const resize = (): void => setSize({ w: el.clientWidth, h: el.clientHeight });
+    resize();
+    window.addEventListener('resize', resize);
+    setTouchDevice(touchy);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+      detachKeys(); detachOrbit(); offTick(); offDecor(); raceAudio.dispose(); renderer.unmount();
+      gameRef.current = null;
+    };
+  }, [rt, setup.fromMap, setup.playerIndex, setup.player]);
+
+  const game = gameRef.current;
+  const showTouch = props.settings.touchControls === 'on' || (props.settings.touchControls === 'auto' && touchDevice);
+  const count = hud?.phase === 'countdown' ? (hud.message === 'GO!' || hud.message === undefined ? 0 : Number(hud.message)) : null;
+  return (
+    <div className="race">
+      <div className="view" ref={host} />
+      {hud ? <HUD speed={hud.speed} lap={hud.lap} laps={hud.laps} position={hud.position} racers={hud.racers} timeMs={hud.timeMs} item={hud.item} boost={hud.boost} {...(hud.message && hud.phase !== 'countdown' ? { message: hud.message } : {})} /> : null}
+      {game && props.settings.showMinimap ? <div className="mini"><Minimap track={game.track.points} racers={racers} size={150} /></div> : null}
+      {showTouch && game ? <TouchControls width={size.w} height={size.h} onChange={(t) => game.input.setTouch(t)} /> : null}
+      {props.active && count !== null && !props.paused ? <IntroOverlay countdown={count} lap={1} laps={hud?.laps ?? 3} reducedMotion={props.settings.reducedMotion} /> : null}
+      {props.pausable && !props.paused ? <button className="pause-btn" aria-label="Pause" onClick={props.onPause}>⏸</button> : null}
+      {!showTouch ? <div className="race-hint">Arrows / WASD to drive · Space = item · R = reset · Esc = pause</div> : null}
+    </div>
+  );
+}

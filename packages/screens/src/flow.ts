@@ -26,6 +26,7 @@ export type FlowAction =
   | { type: 'loadProgress'; value: number }
   | { type: 'loaded' }
   | { type: 'tickCountdown' }
+  | { type: 'raceStart' }
   | { type: 'pause' }
   | { type: 'resume' }
   | { type: 'finish' }
@@ -33,6 +34,7 @@ export type FlowAction =
   | { type: 'restart' }
   | { type: 'openSettings' }
   | { type: 'closeSettings' }
+  | { type: 'back' }
   | { type: 'quit' };
 
 export function initialFlow(): FlowState {
@@ -64,6 +66,8 @@ export function reduceFlow(s: FlowState, a: FlowAction): FlowState {
     case 'tickCountdown':
       if (s.screen !== 'intro') return s;
       return s.countdown > 0 ? { ...s, countdown: s.countdown - 1 } : { ...s, screen: 'race' };
+    case 'raceStart':
+      return s.screen === 'intro' ? { ...s, screen: 'race', countdown: 0 } : s;
     case 'pause':
       return s.screen === 'race' || s.screen === 'intro' ? { ...s, screen: 'paused', previous: s.screen } : s;
     case 'resume':
@@ -82,6 +86,8 @@ export function reduceFlow(s: FlowState, a: FlowAction): FlowState {
       return s.screen === 'title' || s.screen === 'paused' ? { ...s, screen: 'settings', previous: s.screen } : s;
     case 'closeSettings':
       return s.screen === 'settings' ? { ...s, screen: s.previous ?? 'title', previous: s.previous === 'paused' ? 'race' : null } : s;
+    case 'back':
+      return s.screen === 'select' ? { ...s, screen: 'title', previous: null } : s;
     case 'quit':
       return s.screen === 'paused' ? { ...initialFlow(), selectedRacer: s.selectedRacer } : s;
   }

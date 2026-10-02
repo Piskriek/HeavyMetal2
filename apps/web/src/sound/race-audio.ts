@@ -11,7 +11,7 @@ import { engineSpecOf, musicSpecOf } from './bank';
  * the rolling noise (by surface) and a looping music pattern. Every effect goes through `fx`, so edited sound presets apply.
  * Call `tick(dtMs)` once per frame; call the returned dispose when leaving the race.
  */
-export interface RaceAudio { tick(dtMs: number): void; dispose(): void }
+export interface RaceAudio { tick(dtMs: number, idle?: boolean): void; dispose(): void }
 
 const ITEM_SOUND: Record<string, Parameters<typeof fx>[0]> = { boost: 'boost', jump: 'jump', oil: 'oil', shockwave: 'shockwave', freeze: 'freeze', mass: 'item-pickup', slipstream: 'boost', ghost: 'item-pickup' };
 
@@ -53,9 +53,10 @@ export function attachRaceAudio(game: RaceGame): RaceAudio {
   const offLap = rt.events.on('lap:completed', (p) => { if ((p as { entity?: number }).entity === me) fx('lap'); });
 
   return {
-    tick() {
+    tick(_dtMs, idle) {
       const eng = audio();
       if (!eng) return;
+      if (idle) { eng.stopEngine('player'); eng.setRoll('player', { gain: 0, filterFreq: 800, q: 0.7 }); return; }
       const v = world.get(me, 'velocity'), t = world.get(me, 'transform'), rc = world.get(me, 'racer');
       if (!v || !t) return;
       const speed = Math.hypot(Number(v['vx']), Number(v['vz']));

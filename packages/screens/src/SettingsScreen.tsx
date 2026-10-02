@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { rootClass } from './styles';
 import type { Settings } from './types';
 
-function Segment<K extends 'quality' | 'touchControls' | 'units'>(props: { field: K; label: string; value: Settings[K]; options: readonly Settings[K][]; names?: Partial<Record<Settings[K] & string, string>>; onChange: (patch: Partial<Settings>) => void }): ReactElement {
+function Segment<K extends 'quality' | 'touchControls'>(props: { field: K; label: string; value: Settings[K]; options: readonly Settings[K][]; names?: Partial<Record<Settings[K] & string, string>>; onChange: (patch: Partial<Settings>) => void }): ReactElement {
   return (
     <div className="hms-toggle" data-field={props.field}>
       <span>{props.label}</span>
@@ -30,9 +30,8 @@ export function SettingsScreen(props: { settings: Settings; onChange: (patch: Pa
         <Volume field="master" label="Master volume" value={s.master} onChange={set} />
         <Volume field="sfx" label="Effects" value={s.sfx} onChange={set} />
         <Volume field="music" label="Music" value={s.music} onChange={set} />
-        <Segment field="quality" label="Graphics" value={s.quality} options={['low', 'medium', 'high']} onChange={set} />
+        <Segment field="quality" label="Graphics" value={s.quality} options={['auto', 'low', 'medium', 'high']} onChange={set} />
         <Segment field="touchControls" label="Touch controls" value={s.touchControls} options={['auto', 'on', 'off']} onChange={set} />
-        <Segment field="units" label="Speed units" value={s.units} options={['metric', 'imperial']} names={{ metric: 'km/h', imperial: 'mph' }} onChange={set} />
         <Check field="showMinimap" label="Show the minimap" value={s.showMinimap} onChange={set} />
         <Check field="invertSteer" label="Invert steering" value={s.invertSteer} onChange={set} />
         <Check field="reducedMotion" label="Reduce motion" value={s.reducedMotion} onChange={set} />

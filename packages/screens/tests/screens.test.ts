@@ -20,6 +20,13 @@ test('a quick race: title to select to loading to intro to race, pause, resume, 
   assert.deepEqual(path, ['title', 'select', 'select', 'loading', 'loading', 'intro', 'intro', 'intro', 'intro', 'race', 'paused', 'race', 'results', 'title']);
 });
 
+test('the race can also start straight from the intro (the game runs the lights)', () => {
+  const s = run([{ type: 'play', mode: 'quick' }, { type: 'selectRacer', id: 'a' }, { type: 'confirmRacer' }, { type: 'loaded' }, { type: 'raceStart' }]);
+  assert.equal(s.screen, 'race');
+  const t = initialFlow();
+  assert.equal(reduceFlow(t, { type: 'raceStart' }), t);
+});
+
 test('countdown goes 3, 2, 1, 0 (GO) and then the race starts', () => {
   let s = run([{ type: 'play', mode: 'quick' }, { type: 'selectRacer', id: 'a' }, { type: 'confirmRacer' }, { type: 'loaded' }]);
   const seen = [s.countdown];

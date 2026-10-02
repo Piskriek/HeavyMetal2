@@ -65,7 +65,11 @@ export function createRacerSystem(deps: RacerDeps): System {
         const a = ctx.input.actors[String(r?.['actor'] ?? '')] ?? {};
         c = { steer: clamp(num0(a['steer'] ?? 0), -1, 1), throttle: clamp(num0(a['throttle'] ?? 0), 0, 1), brake: clamp(num0(a['brake'] ?? 0), 0, 1), use: a['item'] === true };
       }
-      if (wasFinished) { c.throttle = 0; c.brake = 0.3; }
+      if (wasFinished) {
+        // after the flag everybody (the player too) rolls on at a gentle pace on autopilot, so the line never jams for the cars still racing
+        const auto = deps.aiControl(deps.track, { x, z, hx, hz, speed }, { lookahead: 14, cornerCare: 0.8, noise: 0 }, () => 0.5);
+        c = { steer: clamp(num0(auto.steer), -1, 1), throttle: Math.min(0.4, clamp(num0(auto.throttle), 0, 1)), brake: 0, use: false };
+      }
       if (!immune) for (const s of slicks) if ((x - s.x) ** 2 + (z - s.z) ** 2 < s.r * s.r) slowMs = Math.max(slowMs, 1300);
       if (freezeMs > 0) { c.steer = 0; c.throttle = 0; c.brake = 0.9; c.use = false; }
       if (slowMs > 0) c.throttle *= 0.6;

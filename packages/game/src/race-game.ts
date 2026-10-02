@@ -1,6 +1,6 @@
 import type { EntityId, PresetId, Value } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
-import { RACERS } from '@hm/content';
+import { RACERS, type PresetSeed } from '@hm/content';
 import { trackLength, pointAt, project, derivePhysics, aiControl, rubberBand, createLapTracker, rankRacers, itemById, rollItem, type Track } from '@hm/racing';
 import { createRacerSystem, defineRacerComponents, grantItem } from '@hm/racers';
 import { trackWalls, carveTrack, chaikin, makeCenterline, onPad, resample, startGrid } from '@hm/trackgen';
@@ -22,6 +22,8 @@ export interface RaceGameOptions {
   readonly field?: number;
   /** Which racer seed the player drives (index into the content library's goblins). */
   readonly playerIndex?: number;
+  /** A custom goblin for the player (name and the racer params: weight, speed, bounce, color, accent ...), instead of one from the library. */
+  readonly player?: { readonly name: string; readonly params: Readonly<Record<string, number | boolean | string | null>> };
   /** Race on the map already loaded in the runtime (terrain + track preset) instead of generating one. */
   readonly fromScene?: boolean;
 }
@@ -40,6 +42,8 @@ export interface RaceGame {
   readonly championship: Championship;
   readonly racerIds: readonly EntityId[];
   readonly player: EntityId;
+  /** Flip left and right steering (a setting). */
+  invertSteer: boolean;
   /** Painted road strips (start line, rumble, boost pads) for the renderer. */
   readonly roadDecals: readonly RoadDecalDef[];
   /** Advance the race by wall-clock ms. Returns the render interpolation alpha. */
@@ -61,7 +65,7 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   const seed = opts.seed ?? 7;
   const laps = opts.laps ?? 3;
   const n = Math.max(2, Math.min(12, opts.field ?? 8));
-  const playerSeed = RACERS[(opts.playerIndex ?? 0) % RACERS.length]!;
+  const playerSeed = opts.player ? ({ kind: 'racer', name: opts.player.name, tags: [], tier: 'play', params: { skill: 0.7, hat: 'helmet', ears: 'pointy', ...opts.player.params } } as PresetSeed) : RACERS[(opts.playerIndex ?? 0) % RACERS.length]!;
 
   // ---- the island and the track: generated, or taken from the scene the Map Maker built
   const { terrain, track } = ((): { terrain: Terrain; track: Track } => {
@@ -110,7 +114,8 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     physics: rt.physics, track, laps,
     derivePhysics,
     aiControl: (t, s, skill, rng) => (phase === 'racing' ? aiControl(t, s, skill, rng) : { steer: 0, throttle: 0 }),
-    rubberBand, createLapTracker, rankRacers, itemById,
+    // laps stay valid while a car is within the road plus its shoulder (fast goblins slide wide on corners); the infield still is not a shortcut
+    rubberBand, createLapTracker: (t, l) => createLapTracker({ points: t.points, width: t.width + 18 }, l), rankRacers, itemById,
   });
   const install = (): void => { rt.sim.removeSystem("racers"); rt.sim.addSystem(makeSystem() as never); };
   rt.sim.addSystem(createFollowSystem());
@@ -254,9 +259,13 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
   };
 
   const game: RaceGame = {
-    rt, track, terrain, input, roadDecals: road.decals, get director() { return dir; }, championship, racerIds, get player() { return player; },
+    rt, track, terrain, input, roadDecals: road.decals, invertSteer: false, get director() { return dir; }, championship, racerIds, get player() { return player; },
     update(dtMs) {
-      const alpha = rt.frame(dtMs, (tick) => ({ tick, actors: (phase === 'racing' ? { p1: toActorFrame(input.sample()) } : {}) as Record<string, Record<string, number | boolean>> }));
+      const alpha = rt.frame(dtMs, (tick) => {
+        const frame = phase === 'racing' ? toActorFrame(input.sample()) : null;
+        if (frame && game.invertSteer && typeof frame['steer'] === 'number') frame['steer'] = -frame['steer'];
+        return { tick, actors: (frame ? { p1: frame } : {}) as Record<string, Record<string, number | boolean>> };
+      });
       input.update(dtMs);
       if (phase === 'racing') watchdog(dtMs);
       emit(dir.update(dtMs, progressMap()));

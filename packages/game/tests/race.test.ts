@@ -55,3 +55,14 @@ test('chase camera eases behind the heading', () => {
   const b = chaseCamera(a, { ...t, x: 20 }, 16);
   assert.ok(b.position[0] > a.position[0] && b.position[0] < 20 - 8);
 });
+
+test('a whole race: nearly every AI goblin finishes (fast ones that slide wide still count their laps, nobody jams the line) and the player, idle, is classified last', () => {
+  const g = createRaceGame(createRuntime({ seed: 4 }), { seed: 7, laps: 3 });
+  run(g, 95);
+  const results = g.results();
+  assert.ok(results, 'the race ended with results');
+  const finished = results!.filter((r) => !r.dnf);
+  assert.ok(finished.length >= 6, `finishers ${finished.length}`);
+  assert.ok(finished.every((r) => r.id !== String(g.player)), 'the idle player is not among the finishers');
+  assert.ok(finished.every((r) => typeof r.timeMs === 'number' && r.timeMs! > 20000 && r.timeMs! < 90000), 'sensible times');
+});

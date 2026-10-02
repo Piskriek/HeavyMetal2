@@ -128,11 +128,15 @@ test('positions come from the ranking of everybody\'s progress', () => {
   assert.deepEqual(ids.map((id) => w.get(id, 'race')!['place']), [3, 1, 2]);
 });
 
-test('a finished racer coasts: no thrust, a gentle brake', () => {
+test('a finished racer rolls on at a gentle pace on autopilot, ignoring the player input and never braking to a stop', () => {
   const { w, sys, forces } = setup();
   const e = racer(w, {}, {}, { vx: 10 }); w.set(e, 'race', { finished: true });
-  sys.update(w, ctx({ p1: { throttle: 1 } }));
-  assert.equal(forces.length, 1); near(forces[0]![1][0]!, -15);
+  sys.update(w, ctx({ p1: { throttle: 0, brake: 1, steer: -1 } }));
+  const thrust = forces.filter((f) => f[0] === e);
+  assert.equal(thrust.length, 1);
+  assert.ok(thrust[0]![1][0]! > 0, 'pushes forward, not a brake');
+  near(thrust[0]![1][0]!, 8, 1e-3); // the fake autopilot asks for 0.8, capped at 0.4: acceleration 10 * mass 2 * 0.4
+  assert.ok((w.get(e, 'racer')!['hz'] as number) > 0, 'steers by the autopilot (+0.5), not by the player (-1)');
 });
 
 test('invalid numbers throw an error naming the entity and the field', () => {

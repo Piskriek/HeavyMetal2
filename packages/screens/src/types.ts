@@ -4,15 +4,15 @@ export interface ResultRow { id: string; name: string; color: string; position: 
 
 export interface Settings {
   master: number; sfx: number; music: number;
-  quality: 'low' | 'medium' | 'high';
+  /** auto picks from the device and drops a tier when frames run slow. */
+  quality: 'auto' | 'low' | 'medium' | 'high';
   touchControls: 'auto' | 'on' | 'off';
   reducedMotion: boolean;
   invertSteer: boolean;
   showMinimap: boolean;
-  units: 'metric' | 'imperial';
 }
 
-export const DEFAULT_SETTINGS: Settings = { master: 0.8, sfx: 0.9, music: 0.5, quality: 'high', touchControls: 'auto', reducedMotion: false, invertSteer: false, showMinimap: true, units: 'metric' };
+export const DEFAULT_SETTINGS: Settings = { master: 0.8, sfx: 0.9, music: 0.5, quality: 'auto', touchControls: 'auto', reducedMotion: false, invertSteer: false, showMinimap: true };
 
 /** Points a custom goblin may spend across weight, speed and bounce (each 1..10). */
 export const STAT_BUDGET = 15;

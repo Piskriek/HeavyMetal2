@@ -142,19 +142,31 @@ vec4 islTriplanar(float la, float lb, float w, vec3 wp, vec3 n, vec3 dwx, vec3 d
   return acc / total;
 }
 
-vec4 islPbrAt(float la, float lb, float w, vec3 wp, vec3 n) {
+// the normal/roughness tile, sampled with the SAME anti-repeat offsets as the colour (islVaried), so the bumps sit on the pebbles and blades you see
+vec4 islPbrVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
+  int il = int(clamp(layer + 0.5, 0.0, float(${layers} - 1)));
+  float rep = max(islParams[il].x * islScale, 0.05);
+  float l = surfNoise(uv / (rep * 2.7) + layer * 3.1) * 8.0;
+  float ia = floor(l);
+  vec2 oa = sin(vec2(3.0, 7.0) * ia), ob = sin(vec2(3.0, 7.0) * (ia + 1.0));
+  float ha = textureGrad(islSurfaces, vec3(uv / rep + oa, float(il)), dx / rep, dy / rep).a;
+  float hb = textureGrad(islSurfaces, vec3(uv / rep + ob, float(il)), dx / rep, dy / rep).a;
+  vec4 a = textureGrad(islPbr, vec3(uv / rep + oa, float(il)), dx / rep, dy / rep);
+  vec4 b = textureGrad(islPbr, vec3(uv / rep + ob, float(il)), dx / rep, dy / rep);
+  return mix(a, b, smoothstep(0.2, 0.8, fract(l) + (hb - ha) * 0.25));
+}
+
+vec4 islPbrAt(float la, float lb, float w, vec3 wp, vec3 n, vec3 dwx, vec3 dwy) {
   vec3 an = abs(n);
   bool top = an.y > 0.55;
   bool xdom = an.x > an.z;
   vec2 puv = top ? wp.xz : (xdom ? wp.zy : wp.xy);
+  vec2 pdx = top ? dwx.xz : (xdom ? dwx.zy : dwx.xy);
+  vec2 pdy = top ? dwy.xz : (xdom ? dwy.zy : dwy.xy);
   vec3 U = top ? vec3(1.0, 0.0, 0.0) : (xdom ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0));
   vec3 V = top ? vec3(0.0, 0.0, 1.0) : vec3(0.0, 1.0, 0.0);
-  int ila = int(clamp(la + 0.5, 0.0, float(${layers} - 1)));
-  int ilb = int(clamp(lb + 0.5, 0.0, float(${layers} - 1)));
-  float repA = max(islParams[ila].x * islScale, 0.05);
-  float repB = max(islParams[ilb].x * islScale, 0.05);
-  vec4 a = texture(islPbr, vec3(puv / repA, float(ila)));
-  vec4 b = (ilb == ila) ? a : texture(islPbr, vec3(puv / repB, float(ilb)));
+  vec4 a = islPbrVaried(la, puv, pdx, pdy);
+  vec4 b = abs(la - lb) < 0.5 ? a : islPbrVaried(lb, puv, pdx, pdy);
   float has = mix(a.a, b.a, w);
   if (has < 0.5) return vec4(0.0, 0.0, 0.0, -1.0);
   vec2 t = (mix(a.rg, b.rg, w) - 0.5) * 2.0 * islNormalStrength;
@@ -215,7 +227,7 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     }
     diffuseColor.rgb = tile.rgb;
     gRough = islRough(la, lb, lw);
-    vec4 pbrTile = islPbrAt(la, lb, lw, wp, gnrm);
+    vec4 pbrTile = islFlat > 0.5 ? vec4(0.0, 0.0, 0.0, -1.0) : islPbrAt(la, lb, lw, wp, gnrm, dwx, dwy);
     if (pbrTile.w >= 0.0) { gRough = pbrTile.w; gBump = pbrTile.xyz; }
     if (islFlat > 0.5) { gRough = 0.92; gBump = vec3(0.0); }
     float wet = 1.0 - smoothstep(0.0, 1.3, wp.y);

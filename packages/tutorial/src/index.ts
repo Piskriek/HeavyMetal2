@@ -525,4 +525,4 @@ export function validateSteps(steps: Step[]): { ok: boolean; errors: string[] } 
   const finishAt = steps.findIndex((s) => Boolean(s) && s.id === 'finish');
   if (finishAt !== -1 && finishAt !== steps.length - 1) errors.push(`no steps may follow 'finish'`);
   return { ok: errors.length === 0, errors };
-}
+}export * from './island-steps';

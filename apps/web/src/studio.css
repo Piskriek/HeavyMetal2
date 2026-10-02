@@ -474,3 +474,21 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .share-problems { margin: 0; padding-left: 18px; color: var(--accent); font-size: 12px; }
 .your-shares { padding: 0 12px; }
 .your-shares h4 { margin: 8px 0; }
+
+/* the island tour */
+.tour { position: absolute; left: 16px; bottom: 156px; width: 300px; max-width: calc(100vw - 32px); display: grid; gap: 6px; padding: 12px 14px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--text); z-index: 6; }
+.tour small { color: var(--dim); font-size: 11px; }
+.tour h3 { margin: 0; font: 800 20px/1.05 'Bricolage Grotesque', Inter, sans-serif; letter-spacing: -.01em; }
+.tour p { margin: 0; font-size: 13px; line-height: 1.4; }
+.tour-bar { height: 3px; background: var(--line); }
+.tour-bar i { display: block; height: 100%; background: var(--accent); transition: width .4s ease; }
+.tour-keys { display: flex; flex-wrap: wrap; gap: 4px; }
+.tour kbd { font: 600 11px/1 Inter, sans-serif; padding: 4px 6px; border: 1px solid var(--text); border-bottom-width: 2px; }
+.tour-btns { display: flex; gap: 6px; align-items: center; }
+.tour-btns button { font-size: 12px; padding: 4px 8px; }
+.tour.reveal-step { border-color: var(--accent); border-width: 2px; }
+.tour-reveal { font-size: 16px; padding: 10px 14px; }
+.reveal-flash { position: absolute; inset: 0; pointer-events: none; z-index: 7; background: radial-gradient(circle at 50% 60%, #fff 0%, rgba(255,255,255,.85) 40%, rgba(255,255,255,0) 75%); animation: reveal-flash 1.5s ease-out forwards; }
+@keyframes reveal-flash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .reveal-flash { animation-duration: .01s; } .tour-bar i { transition: none; } }
+@media (max-width: 640px) { .tour { bottom: 150px; width: auto; right: 16px; } }

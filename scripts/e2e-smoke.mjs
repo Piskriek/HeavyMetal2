@@ -49,6 +49,16 @@ try {
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
   await page.waitForSelector('.hotbar', { timeout: 60000 });
   check('Done takes you to your island', true);
+  await page.waitForSelector('.tour', { timeout: 15000 }).catch(() => undefined);
+  check('the island tour starts on your first visit', await page.locator('.tour h3').count() === 1);
+  for (let i = 0; i < 12 && await page.locator('.tour-reveal').count() === 0; i++) { await page.locator('.tour button', { hasText: 'Skip' }).click(); await page.waitForTimeout(120); }
+  check('the tour ends on the PBR reveal', await page.locator('.tour-reveal').count() === 1);
+  await page.locator('.tour-reveal').click();
+  await page.waitForTimeout(400);
+  check('Show me switches the ground to PBR', await page.locator('.mode-bar button.on', { hasText: 'PBR' }).count() === 1);
+  await page.locator('.tour button', { hasText: 'Not now' }).click();
+  check('Not now hides the tour', await page.locator('.tour').count() === 0);
+  await dom(() => { [...document.querySelectorAll('.mode-bar button')].find((b) => b.textContent === 'Flat')?.click(); });
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Activities')?.click(); });
   await page.waitForTimeout(400);

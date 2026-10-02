@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import type { PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
@@ -26,6 +27,9 @@ import { ShareDialog } from './share/share-dialog';
 import type { ShareKind } from './share/shares';
 import type { Preview } from './build/catalog';
 import { mapBundle } from './maker/storage';
+import { spriteDef } from './build/sprites';
+import { TourCard } from './tutorial/tour-card';
+import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
@@ -48,6 +52,8 @@ export function IslandWalk(props: {
   readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean;
   readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
+  /** The tour's thank-you (in-game credits, never money). */
+  readonly onCredits?: (amount: number) => void;
   /** Behind the main menu: no HUD, no controls, the camera circles your island and your goblin. When it turns off the camera flies down to the goblin. */
   readonly showcase?: boolean;
   readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
@@ -89,16 +95,47 @@ export function IslandWalk(props: {
   const wasShowcase = useRef(showcase);
   // leaving the menu: fly down from the orbit to the goblin
   useEffect(() => { if (wasShowcase.current && !showcase) landRef.current?.(); wasShowcase.current = showcase; }, [showcase]);
-  useEffect(() => { onMenuChange?.(menu); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onMenuChange?.(menu); if (menu) tourEvent('opened-menu'); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void } | null>(null);
+  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void } | null>(null);
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
   // studio keeps the mouse free; walking takes it back when you click the world
   useEffect(() => { if (p.mode === 'studio') api.current?.unlock(); }, [p.mode]);
   useEffect(() => { api.current?.setAvatarLook(); }, [p.lookId, p.looks]);
   useEffect(() => { api.current?.refreshModels(); }, [isolateId]);
+  // the tour: runs on your island (not behind the main menu); its effects are carried out here
+  const tourOn = !showcase && level === 'goblin';
+  const tourView = useTour();
+  const [revealing, setRevealing] = useState(0);
+  useEffect(() => {
+    if (!tourOn) return;
+    const apply = (e: Effect): void => {
+      const a = e.action;
+      switch (a.type) {
+        case 'say': say(a.text); break;
+        case 'give': {
+          const tool = toolById(a.item);
+          if (!tool) break;
+          const s = player();
+          setTab(tool.tab); putInSlot(tool.tab, s.slots[tool.tab], tool.id);
+          break;
+        }
+        case 'selectSlot': { const s = player(); setSlot(s.tab, a.slot); break; }
+        case 'setSkin': props.onSkin?.(a.skin); break;
+        case 'reveal': setRevealing(Date.now()); api.current?.reveal(); break;
+        case 'credits': props.onCredits?.(a.amount); say(`+${a.amount} credits`); break;
+      }
+    };
+    startTour(buildOn ? 'build' : 'walk', apply);
+    return () => stopTour();
+  }, [tourOn, buildOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const edits = `${JSON.stringify(p.tools).length}:${JSON.stringify(p.anims).length}:${JSON.stringify(p.sprites).length}:${p.looks.length}`;
+  const lastEdits = useRef(edits);
+  useEffect(() => { if (lastEdits.current !== edits) tourEvent('edited'); lastEdits.current = edits; }, [edits]);
+  useEffect(() => { if (!revealing) return; const t = window.setTimeout(() => setRevealing(0), 1600); return () => window.clearTimeout(t); }, [revealing]);
+
   // a tool's 'pick' plugs play when it comes into your hand (not when the island first opens)
   const heldKey = `${p.tab}:${heldItem?.id ?? ''}`;
   const lastHeld = useRef(heldKey);
@@ -120,9 +157,9 @@ export function IslandWalk(props: {
     if (id === 'island') { say('Esc, then the up arrow in the bar, shows the whole island'); return; }
     setMode('walk'); setView(id === 'first' ? 'first' : 'third');
   };
-  const pickTab = (t: TabId): void => { setTab(t); fx('tool-switch', { volume: 0.5 }); };
-  const pickSlot = (i: number): void => { const s = player(); setSlot(s.tab, i); fx('tool-switch', { volume: 0.5 }); applyNow(s.tab, s.hotbars[s.tab][i] ?? null); };
-  const openPresets = (): void => { api.current?.unlock(); win.toggle('presets', 'Your presets', { x: Math.max(12, window.innerWidth - WIN.presets.w - 24), y: 64, ...WIN.presets }); };
+  const pickTab = (t: TabId): void => { setTab(t); fx('tool-switch', { volume: 0.5 }); tourEvent('tab-selected'); };
+  const pickSlot = (i: number): void => { const s = player(); setSlot(s.tab, i); fx('tool-switch', { volume: 0.5 }); applyNow(s.tab, s.hotbars[s.tab][i] ?? null); tourEvent('slot-selected'); };
+  const openPresets = (): void => { api.current?.unlock(); if (!win.isOpen('presets')) tourEvent('opened-presets'); win.toggle('presets', 'Your presets', { x: Math.max(12, window.innerWidth - WIN.presets.w - 24), y: 64, ...WIN.presets }); };
   const openEditor = (tab: TabId, id: string): void => {
     api.current?.unlock();
     const name = catalog(tab, player(), activities).find((c) => c.id === id)?.name ?? id;
@@ -240,6 +277,7 @@ export function IslandWalk(props: {
     let suppressMenu = false;
     let cursor = { x: 0, y: 0 };
     let looking: { x: number; y: number } | null = null;
+    let lastLookEvent = 0, lastMoveEvent = 0, lastTourTick = 0;
 
     // the whole shell is the pointer-lock target, so the mouse stays captured through the dive and the menus
     const root = (el.closest('.shell') as HTMLElement | null) ?? el;
@@ -264,6 +302,13 @@ export function IslandWalk(props: {
         if (tab !== 'select' && tab !== 'paint' && tab !== 'sculpt' && tab !== 'things') return;
         const tool = toolOf(player(), id);
         if (tool) builder.fire(tool, 'pick', aim());
+      },
+      // the big reveal: confetti round the goblin, a cheer, a fanfare
+      reveal: () => {
+        const c = spriteDef('confetti');
+        for (let i = 0; i < 5; i++) renderer.burst({ ...c, count: Math.round(c.count * 1.4), position: [px + Math.cos(i * 1.26) * 2.5, py + 0.2, pz + Math.sin(i * 1.26) * 2.5] });
+        if (!studio()) animator.play(animOf(player(), 'cheer'));
+        fx('finish');
       },
     };
     const onLockChange = (): void => {
@@ -309,7 +354,7 @@ export function IslandWalk(props: {
         if (live.current.buildOn && !intro.on && !live.current.wheelOpen) { const s = player(); const id = s.hotbars[s.tab][s.slots[s.tab]]; setWheelIndex(Math.max(0, live.current.items.findIndex((c) => c.id === id))); setWheelOpen(true); }
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) rt.commands.redo(); else builder.undo(); refreshModels(); return; }
+      if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) rt.commands.redo(); else { builder.undo(); tourEvent('undo'); } refreshModels(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); rt.commands.redo(); refreshModels(); return; }
       if (k >= '1' && k <= '9' && live.current.buildOn) { pickSlot(Number(k) - 1); return; }
       if (k === 'e' && live.current.buildOn) { openPresets(); return; }
@@ -349,6 +394,7 @@ export function IslandWalk(props: {
     const onPointerMove = (e: PointerEvent): void => {
       cursor = { x: e.clientX, y: e.clientY };
       if (live.current.menu) return;
+      if ((pointerLocked || looking) && performance.now() - lastLookEvent > 400) { lastLookEvent = performance.now(); tourEvent('looked'); }
       if (pointerLocked) {
         camYaw -= e.movementX * 0.0026;
         camPitch = Math.min(1.3, Math.max(player().view === 'first' ? -1.3 : -0.55, camPitch + e.movementY * 0.0022));
@@ -390,6 +436,7 @@ export function IslandWalk(props: {
         const a = aim();
         if (tool && a) {
           builder.use(tool, a, alt, now, first);
+          if (first) tourEvent(tool.action === 'place' && !alt ? 'placed' : tool.tab === 'sculpt' ? 'used-sculpt' : tool.tab === 'paint' ? 'used-paint' : 'used-select');
         }
         return;
       }
@@ -412,6 +459,7 @@ export function IslandWalk(props: {
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      if (now - lastTourTick > 250) { lastTourTick = now; tourTick(); }
       if (intro.on) {
         intro.t += dt * 1000;
         const k = Math.min(1, intro.t / intro.ms), e = 1 - Math.pow(1 - k, 3);
@@ -434,6 +482,7 @@ export function IslandWalk(props: {
         if (len > 0 && !intro.on) {
           const speed = (down.has('shift') ? 8 : 3.6) * dt;
           const nx = px + (mx / len) * speed, nz = pz + (mz / len) * speed;
+          if (now - lastMoveEvent > 400) { lastMoveEvent = now; tourEvent('moved'); }
           if (ground(nx, nz) >= SEA) { px = nx; pz = nz; }
           else if (ground(nx, pz) >= SEA) px = nx;
           else if (ground(px, nz) >= SEA) pz = nz;
@@ -448,7 +497,7 @@ export function IslandWalk(props: {
         // gravity and a jump on Space
         const g = ground(px, pz);
         grounded = py <= g + 0.04;
-        if (grounded && down.has(' ') && !intro.on) vy = 6.4;
+        if (grounded && down.has(' ') && !intro.on) { vy = 6.4; tourEvent('jumped'); }
         vy -= 18 * dt;
         let ny = py + vy * dt;
         if (ny <= g) { ny = g; vy = 0; }
@@ -579,6 +628,8 @@ export function IslandWalk(props: {
         </FloatingWindow>
       ))}
       {note && !showcase ? <div className="island-note" role="status">{note}</div> : null}
+      {tourOn && !menu ? <TourCard /> : null}
+      {revealing ? <div className="reveal-flash" key={revealing} aria-hidden="true" /> : null}
       {!menu && !showcase ? <p className="island-hint">{hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
@@ -589,6 +640,7 @@ export function IslandWalk(props: {
           <button onClick={() => { setMenu(false); setTab('lights'); win.open('edit:lights:light', 'Lighting', { x: Math.max(12, window.innerWidth - 400), y: 64, w: 372, h: 640 }); }}>Lighting</button>
           <button onClick={() => { setMenu(false); setTab('avatar'); openPresets(); }}>My Avatar</button>
           {buildOn ? <button onClick={() => { setMenu(false); openShare('island', scene.sceneId); }}>Share my island</button> : null}
+          {!tourView.visible ? <button onClick={() => { setMenu(false); tourReplay(); }}>Show the tour</button> : null}
           <button onClick={onActivities}>Activities</button>
           {onIslands ? <button onClick={onIslands}>My islands</button> : null}
           <button onClick={onHub}>Multiplayer</button>

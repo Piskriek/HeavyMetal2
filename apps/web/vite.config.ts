@@ -53,6 +53,8 @@ export default defineConfig(({ mode }) => ({
       '@hm/voxelart': p('../../packages/voxelart/src/index.ts'),
       '@hm/camerarig': p('../../packages/camerarig/src/index.ts'),
       '@hm/plugs': p('../../packages/plugs/src/index.ts'),
+      '@hm/voxpartshead': p('../../packages/voxpartshead/src/index.ts'),
+      '@hm/toolcatalog': p('../../packages/toolcatalog/src/index.ts'),
       '@hm/smoothvox': p('../../packages/smoothvox/src/index.ts'),
       '@hm/voxpartsbody': p('../../packages/voxpartsbody/src/index.ts'),
       '@hm/uistack': p('../../packages/uistack/src/index.ts'),

@@ -132,6 +132,12 @@
       "@hm/voxel": [
         "packages/voxel/src/index.ts"
       ],
+      "@hm/toolcatalog": [
+        "packages/toolcatalog/src/index.ts"
+      ],
+      "@hm/voxpartshead": [
+        "packages/voxpartshead/src/index.ts"
+      ],
       "@hm/voxpartsbody": [
         "packages/voxpartsbody/src/index.ts"
       ],

@@ -40,8 +40,8 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   build: { back: 'island', doc: 'Build mode. Esc opens the jump menu; Back to Island returns.' },
 };
 
-const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false };
-const toPlanet = (a: Activity): PlanetDef => ({ id: a.id, name: a.name, hue: a.planet.hue, size: a.planet.size, ring: a.planet.ring, hosting: a.hosting.tournament });
+const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your goblin, build, host.' };
+const toPlanet = (a: Activity): PlanetDef => ({ id: a.id, name: a.name, hue: a.planet.hue > 1 ? a.planet.hue / 360 : a.planet.hue, size: a.planet.size, ring: a.planet.ring, hosting: a.hosting.tournament, doc: a.doc, players: a.hosting.players });
 
 /** An island opened for play or editing: its own runtime, so two islands can never share presets. */
 interface World { readonly rt: Runtime; readonly scene: MakerScene; readonly id: string }

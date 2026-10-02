@@ -419,3 +419,12 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 /* the main menu over your island: a soft dark scrim on the left keeps the menu readable over a bright day */
 .shell[data-screen="menu"] .shell-ui { background: linear-gradient(90deg, rgba(8, 10, 14, .66) 0%, rgba(8, 10, 14, .38) 32%, rgba(8, 10, 14, 0) 58%); }
 .shell[data-screen="menu"] .shell-foot { color: #d8d6cc; }
+
+/* the galaxy as a star chart: the card that follows the planet under the pointer */
+.planet-card { position: absolute; left: 0; top: 0; display: grid; gap: 3px; max-width: 240px; padding: 10px 12px 9px 12px; background: var(--panel); border: 1px solid var(--text); color: var(--text); pointer-events: none; z-index: 5; will-change: transform; }
+.planet-card i { position: absolute; left: -1px; top: -1px; bottom: -1px; width: 4px; }
+.planet-card b { font: 800 18px/1.05 'Bricolage Grotesque', Inter, sans-serif; letter-spacing: -.01em; }
+.planet-card span { font-size: 12px; line-height: 1.35; }
+.planet-card em { font-style: normal; font-size: 11px; color: var(--accent); }
+.planet-card small { font-size: 10px; color: var(--dim); }
+.shell[data-screen="hub"] .shell-top, .shell[data-screen="hub"] .shell-card { color: var(--text); }

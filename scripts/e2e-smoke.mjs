@@ -69,6 +69,10 @@ try {
 
   await text('.shell-menu button', 'Multiplayer').click();
   await page.waitForSelector('.shell-top');
+  const vp = page.viewportSize() ?? { width: 1280, height: 800 };
+  await page.mouse.move(vp.width * 0.5, vp.height * 0.42);
+  await page.waitForTimeout(600);
+  check('a planet near the pointer shows its card', await page.locator('.planet-card').count() === 1);
   await text('.shell-top .tabs button', 'Community').click();
   check('community tab lists presets', await page.locator('.shell-window.wide .shell-activity').count() > 0);
   await text('.shell-top button', 'Main menu').click();

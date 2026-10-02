@@ -8,7 +8,7 @@ import type { HudLayout } from '@hm/hudlayout';
 import { LayoutHud } from './hud';
 import { RaceCamera, rigsOf } from './rigs';
 import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
-import { applyLook, lookOf } from './look';
+import { followLighting } from './look';
 import { decorInstances } from './maker/dress';
 import { attachRaceAudio, type RaceAudio } from './sound/race-audio';
 
@@ -70,8 +70,7 @@ export function RaceView(props: {
     const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, items: setup.fromMap ? itemsOf(rt) : undefined, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
     gameRef.current = game;
     (window as unknown as { hmGame: unknown }).hmGame = game; // console: hmGame.hud(), hmGame.racerIds ...
-    const sceneNow = rt.store.get(rt.binder.sceneId ?? '');
-    if (sceneNow) applyLook(renderer, lookOf(sceneNow.params));
+    const stopLighting = rt.binder.sceneId ? followLighting(rt.store, rt.binder.sceneId, renderer) : () => undefined;
     const state = rt.binder.terrain();
     if (state) {
       const view = renderer.setTerrain(state.terrain, surfaces);
@@ -145,7 +144,7 @@ export function RaceView(props: {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       window.removeEventListener('keydown', onKey);
-      detachKeys(); detachOrbit(); offTick(); offDecor(); raceAudio.dispose(); renderer.unmount();
+      detachKeys(); detachOrbit(); offTick(); offDecor(); stopLighting(); raceAudio.dispose(); renderer.unmount();
       gameRef.current = null;
     };
   }, [rt, setup.fromMap, setup.playerIndex, setup.player]);

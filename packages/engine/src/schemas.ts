@@ -1,4 +1,5 @@
 import { defineSchema, type ChildSlot, type SchemaRegistry, type VariableDef } from '@hm/contracts';
+import { LEGACY_SETUP_IDS, LIGHT_VARIABLES, SETUP_IDS } from '@hm/lighting';
 
 /** The core preset kinds the harness ships with. Games add their own kinds on top (racer, track-piece, item ...). */
 
@@ -63,7 +64,7 @@ export const sceneSchema = defineSchema({
     num('gravity', 'Gravity', 'Downward pull in m/s squared (9.81 is Earth).', 9.81, 'build', { min: 0, max: 60, step: 0.1, unit: 'm/s2' }),
     num('seed', 'Random seed', 'Same seed, same game: used by everything random.', 1, 'pro', { min: 0, max: 4294967295, step: 1 }),
     { key: 'camera', type: 'ref', label: 'Camera', doc: 'Which camera preset looks at this scene.', tier: 'build', default: null, refKinds: ['camera'] },
-    { key: 'look', type: 'enum', label: 'Look', doc: 'The mood of the scene: sky, sun, fog and colour.', tier: 'play', default: 'noon-clear', options: ['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast-day', 'storm-front', 'blue-hour', 'moonlit-night', 'volcanic-ash', 'neon-dusk'] },
+    { key: 'look', type: 'enum', label: 'Look', doc: 'The mood of the scene: sky, sun, fog and colour.', tier: 'play', default: 'noon-clear', options: [...SETUP_IDS, ...Object.keys(LEGACY_SETUP_IDS)] },
     num('timeOfDay', 'Time of day', 'Hour of the day (0-24); -1 uses the look as it is.', -1, 'build', { min: -1, max: 24, step: 0.1, unit: 'h' }),
     { key: 'track', type: 'ref', label: 'Race track', doc: 'The track raced in this scene.', tier: 'build', default: null, refKinds: ['track'] },
   ],
@@ -74,6 +75,7 @@ export const sceneSchema = defineSchema({
     { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
     { key: 'items', label: 'Items', doc: 'The power-ups racers can pick up. Empty = the standard eight.', kinds: ['item'], min: 0, max: null, tier: 'build' },
     { key: 'views', label: 'Editing view', doc: 'How the world looks while you focus on one thing: the white-out and blur, and the orbit or fly camera.', kinds: ['veil'], min: 0, max: 1, tier: 'play' },
+    { key: 'lighting', label: 'Lighting', doc: 'The light of this scene: sun, sky, haze, lamps and the picture effects. Empty = the ready-made look chosen above; edit it and it becomes your own.', kinds: ['light-setup'], min: 0, max: 1, tier: 'play' },
     { key: 'rigs', label: 'Camera rigs', doc: 'The ways to watch this scene: chase, first person, orbit, helicopter, free, ghost, director.', kinds: ['camera-rig'], min: 0, max: null, tier: 'play' },
     { key: 'models', label: 'Models', doc: 'Voxel models used in this scene: characters, props, statues.', kinds: ['model'], min: 0, max: null, tier: 'build' },
     { key: 'interface', label: 'Interface', doc: 'The look and wording of the menus and the HUD: colours, texts, which HUD parts show.', kinds: ['interface'], min: 0, max: 1, tier: 'play' },
@@ -253,6 +255,16 @@ export const cameraRigSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
+export const lightSetupSchema = defineSchema({
+  kind: 'light-setup',
+  version: 1,
+  label: 'Lighting',
+  doc: 'How a place is lit and filmed: the sun and sky, haze, lamps, water colour, exposure and the picture effects (glow, contact shadows, colour grade). Pick one of the ready-made looks or change any knob.',
+  icon: 'sun',
+  variables: LIGHT_VARIABLES,
+  slots: [] as readonly ChildSlot[],
+});
+
 export const veilSchema = defineSchema({
   kind: 'veil',
   version: 1,
@@ -368,7 +380,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

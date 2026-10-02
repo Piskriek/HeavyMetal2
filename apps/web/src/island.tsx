@@ -4,7 +4,7 @@ import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRe
 import { heightAt } from '@hm/terrain';
 import { encodeModel, type VoxelModel } from '@hm/voxel';
 import { MODELS } from '@hm/voxelart';
-import { applyLook, lookOf } from './look';
+import { followLighting } from './look';
 import { decorInstances } from './maker/dress';
 import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
@@ -73,8 +73,7 @@ export function IslandWalk(props: {
     };
     showTerrain();
     const offTerrain = rt.binder.onTerrain(showTerrain);
-    const sceneParams = rt.store.get(scene.sceneId)?.params;
-    if (sceneParams) applyLook(renderer, lookOf(sceneParams));
+    const stopLighting = followLighting(rt.store, scene.sceneId, renderer);
     const d = rt.binder.decor();
     renderer.setDecor(d ? decorInstances(d.placements) : null);
 
@@ -244,6 +243,7 @@ export function IslandWalk(props: {
       }
       const head = fpv ? 1.62 : 0.9;
       renderer.setModelPose(avatarIndex, px, fpv ? -1000 : py, pz, ((face + Math.PI) * 180) / Math.PI);
+      renderer.setLightFocus([px, py + 1.2, pz]);
       let wantEye: [number, number, number], target: [number, number, number];
       if (fpv) {
         wantEye = [px, py + head, pz];
@@ -275,6 +275,7 @@ export function IslandWalk(props: {
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
       offTerrain();
+      stopLighting();
       lastPose = { px, pz, face, camYaw };
       api.current = null;
       renderer.unmount();

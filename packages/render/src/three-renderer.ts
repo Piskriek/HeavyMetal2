@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import type { Pick, PresetStore, RenderService, Value, Vec3, World } from '@hm/contracts';
 import { MAX_DIST, MIN_DIST, orbitPosition, project, rayFromPixel, stateFromPositionTarget, type OrbitState } from './camera-math';
+import { QUALITY, type LightSetup, type Quality } from '@hm/lighting';
 import { createEnvironment, type EnvironmentRig } from './environment';
+import { LightingRig } from './lighting-rig';
+import { PostChain } from './post-chain';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
 import type { LookLike } from './environment';
@@ -45,9 +48,23 @@ export type ThreeRenderer = RenderService & {
    * null leaves focus. Follows the camera while you orbit and zoom.
    */
   setFocus(focus: { readonly target: Vec3; readonly radius: number; readonly veil: boolean; readonly hideNear: boolean; readonly falloff: number } | null): void;
-  /** Quality tier for phones: low = pixel ratio 1 and no shadows, medium = up to 1.5 and small shadows, high = up to 2 and full shadows. */
-  setQuality(q: 'low' | 'medium' | 'high'): void;
+  /**
+   * Light the scene with a lighting setup (a `light-setup` preset): sun, sky, haze, lamps, sea tint, tone mapping and the picture effects.
+   * The change is a short blend. null goes back to the plain `setLook` mood. Remembered across mount/unmount.
+   */
+  setLighting(setup: LightSetup | null, blendSeconds?: number): void;
+  /** Where the action is: lamps without a prop hang near `focus`, and named props (lantern, torch, campfire, barrel) pin lamps to them. */
+  setLightFocus(focus: Vec3, anchors?: LightAnchors): void;
+  /** The lighting setup as it is right now (mid-blend values included), or null while a plain look is in charge. */
+  readonly lighting: LightSetup | null;
+  /**
+   * Quality tier. low = pixel ratio 1, no shadows and no picture effects; medium = up to 1.5, 1024 shadows, glow; high = up to 2, 2048
+   * shadows, contact shadows, smooth edges; ultra = supersampled, 4096 shadows, all effects.
+   */
+  setQuality(q: Quality): void;
 };
+
+export type LightAnchors = Partial<Record<'focus' | 'lantern' | 'torch' | 'campfire' | 'barrel', Vec3>>;
 
 export interface RenderOptions {
   readonly assetUrl?: (path: string) => string;
@@ -83,6 +100,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     const width = Math.max(1, Math.round(rect.width || hostElement.clientWidth || 1));
     const height = Math.max(1, Math.round(rect.height || hostElement.clientHeight || 1));
     webgl.setSize(width, height, false);
+    post?.setSize(width, height, webgl.getPixelRatio());
     viewCamera.aspect = width / height;
     viewCamera.updateProjectionMatrix();
   };
@@ -126,6 +144,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     sceneSync?.dispose();
     sceneAdapter?.dispose();
     overlays?.dispose();
+    post?.dispose();
+    post = null;
+    rig?.dispose();
+    rig = null;
     environment?.dispose();
     if (webgl) {
       const canvas = webgl.domElement;
@@ -147,6 +169,34 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   };
 
   let pendingLook: LookLike | null = null;
+  let quality: Quality = 'high';
+  let pendingSetup: LightSetup | null = null;
+  let rig: LightingRig | null = null;
+  let post: PostChain | null = null;
+  let lightFocus: Vec3 = [0, 0, 0];
+  let lightAnchors: LightAnchors | undefined;
+  let postStale = true;
+  /** Picture effects need the lighting rig and a tier above low. Rebuilt when the tier changes (multisampling is fixed at creation). */
+  const buildPost = (): void => {
+    post?.dispose();
+    post = null;
+    if (!webgl || !scene || !viewCamera || !rig || quality === 'low') return;
+    post = new PostChain(webgl, scene, viewCamera, quality === 'high' || quality === 'ultra' ? 4 : 0);
+    const sky = rig.skyMesh;
+    post.hideForAo = sky ? [sky] : [];
+    const rect = hostElement?.getBoundingClientRect();
+    post.setSize(Math.max(1, Math.round(rect?.width || 1)), Math.max(1, Math.round(rect?.height || 1)), webgl.getPixelRatio());
+    postStale = true;
+  };
+  const buildRig = (): void => {
+    rig?.dispose();
+    rig = null;
+    if (environment && webgl && scene && pendingSetup) {
+      rig = new LightingRig(scene, webgl, environment, pendingSetup);
+      rig.setShadowCap(quality === 'low' ? 0 : quality === 'ultra' ? 4096 : quality === 'high' ? 2048 : 1024);
+    }
+    buildPost();
+  };
   let roadView: RoadDecalView | null = null;
   let pendingRoad: readonly RoadDecalDef[] | null = null;
   const applyRoad = (): void => {
@@ -214,6 +264,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyRoad();
       applyModels();
       if (pendingLook) environment.setLook(pendingLook);
+      buildRig();
       updateView();
       resize();
 
@@ -258,15 +309,37 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       pendingRoad = defs;
       applyRoad();
     },
-    setQuality(q: 'low' | 'medium' | 'high'): void {
+    setQuality(q: Quality): void {
+      const changed = q !== quality;
+      quality = q;
       const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-      webgl?.setPixelRatio(Math.min(q === 'low' ? 1 : q === 'medium' ? 1.5 : 2, Math.max(0.5, opts.pixelRatio ?? dpr)));
-      environment?.setShadows(q !== 'low', q === 'high' ? 2048 : 1024);
+      const wanted = opts.pixelRatio ?? dpr;
+      // ultra supersamples on ordinary screens: it renders more pixels than the screen has and the picture comes out smoother
+      const ratio = q === 'ultra' ? Math.min(2, Math.max(1.5, wanted)) : Math.min(q === 'low' ? 1 : q === 'medium' ? 1.5 : 2, Math.max(0.5, wanted));
+      webgl?.setPixelRatio(ratio);
+      const shadowSize = q === 'ultra' ? 4096 : q === 'high' ? 2048 : 1024;
+      if (rig) rig.setShadowCap(q === 'low' ? 0 : shadowSize);
+      else environment?.setShadows(q !== 'low', shadowSize);
+      if (changed) buildPost();
       resize();
+      postStale = true;
+    },
+    setLighting(setup: LightSetup | null, blendSeconds = 0.6): void {
+      pendingSetup = setup;
+      if (!setup) { buildRig(); if (pendingLook) environment?.setLook(pendingLook); return; }
+      if (rig) { rig.set(setup, blendSeconds); postStale = true; }
+      else buildRig();
+    },
+    setLightFocus(focus: Vec3, anchors?: LightAnchors): void {
+      lightFocus = focus;
+      lightAnchors = anchors;
+    },
+    get lighting(): LightSetup | null {
+      return rig ? rig.current : null;
     },
     setLook(look: LookLike): void {
       pendingLook = look;
-      environment?.setLook(look);
+      if (!rig) environment?.setLook(look);
     },
     refreshTerrain(dirty?: DirtyRectLike | null): void {
       terrainView?.refresh(dirty ?? null);
@@ -280,7 +353,13 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       roadView?.animate(performance.now());
       bursts?.update(previousFrame === null ? 16 : performance.now() - previousFrame);
       updateView();
-      webgl.render(scene, viewCamera);
+      const frameSeconds = previousFrame === null ? 0.016 : Math.min(0.1, (performance.now() - previousFrame) / 1000);
+      if (rig) {
+        const changed = rig.update(frameSeconds, { focus: lightFocus, anchors: lightAnchors, time: performance.now() / 1000 });
+        if (post && (changed || postStale)) { post.apply(rig.current.post, QUALITY[quality]); postStale = false; }
+      }
+      if (post) post.render(frameSeconds);
+      else webgl.render(scene, viewCamera);
       const now = performance.now();
       const dt = previousFrame === null ? 0 : now - previousFrame;
       previousFrame = now;

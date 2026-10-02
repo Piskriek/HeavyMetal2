@@ -21,6 +21,14 @@ export interface EnvironmentRig {
   setShadows(on: boolean, mapSize?: number): void;
   /** White-out: hides the sky, paints the background and fades everything beyond `far` metres from the camera to `color`. null restores the look. */
   setVeil(veil: { readonly color: number; readonly near: number; readonly far: number } | null): void;
+  /** The pieces the lighting rig drives when a light-setup is in charge instead of a look. */
+  readonly parts: { readonly sun: THREE.DirectionalLight; readonly hemisphere: THREE.HemisphereLight; readonly sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> | null };
+  /** Point the sun along a unit vector (towards the sun); it casts shadows only while above the horizon. */
+  setSunDirection(dir: Vec3): void;
+  /** Sea tint, clarity and shine (the sea is the ground disc in sea mode). */
+  setWater(color: THREE.Color, opacity: number, roughness: number): void;
+  /** Haze colour and density; kept while the focus veil is on and restored after. */
+  setFog(color: THREE.Color, density: number): void;
   dispose(): void;
 }
 
@@ -162,7 +170,26 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   let sunDirNow = new THREE.Vector3(32, 48, 24).normalize();
   let seaColor: THREE.Color | null = null;
   let seaOpacity = 0.72;
+  let seaRoughness = 0.06;
+  let fogStyle: { readonly color: THREE.Color; readonly density: number } | null = null;
   return {
+    parts: { sun, hemisphere, sky },
+    setSunDirection(dir: Vec3): void {
+      sunDirNow = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+      lastSunUp = sunDirNow.y > 0.02;
+      sun.castShadow = shadowsOn && lastSunUp;
+    },
+    setWater(color: THREE.Color, opacity: number, roughness: number): void {
+      seaColor = color.clone();
+      seaOpacity = opacity;
+      seaRoughness = roughness;
+      if (groundMaterial.transparent) { groundMaterial.color.copy(seaColor); groundMaterial.opacity = seaOpacity; groundMaterial.roughness = seaRoughness; }
+    },
+    setFog(color: THREE.Color, density: number): void {
+      fogStyle = { color: color.clone(), density };
+      const fog = veilOn ? null : scene.fog;
+      if (fog instanceof THREE.FogExp2) { fog.color.copy(color); fog.density = density; }
+    },
     setLook(look: LookLike): void {
       lastLook = look;
       sunDirNow = new THREE.Vector3(look.sunDir[0], look.sunDir[1], look.sunDir[2]).normalize();
@@ -206,6 +233,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
         scene.fog = savedFog;
         savedFog = null; savedBackground = null;
         if (lastLook) this.setLook(lastLook);
+        else if (fogStyle) this.setFog(fogStyle.color, fogStyle.density);
       }
     },
     setShadows(on: boolean, mapSize = 2048): void {
@@ -218,7 +246,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       groundMaterial.color.copy(on ? (seaColor ?? seaTint) : new THREE.Color(0xffffff));
       groundMaterial.transparent = on;
       groundMaterial.opacity = on ? seaOpacity : 1;
-      groundMaterial.roughness = on ? 0.06 : 0.94;
+      groundMaterial.roughness = on ? seaRoughness : 0.94;
       groundMaterial.envMapIntensity = on ? 1.2 : 0.35;
       groundMaterial.depthWrite = !on;
       ground.position.y = on ? 0 : -0.012;
@@ -231,7 +259,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       sun.target.updateMatrixWorld();
       if (sky) {
         sky.position.fromArray(target);
-        (sky.material.uniforms.uCenter?.value as THREE.Vector3).fromArray(target);
+        (sky.material.uniforms.uCenter?.value as THREE.Vector3 | undefined)?.fromArray(target);
       }
     },
     dispose(): void {

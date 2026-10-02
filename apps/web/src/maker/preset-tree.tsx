@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { Box, Camera, ChevronDown, ChevronRight, Eye, Gauge, Globe2, Mountain, Palette, Route, Package, Sprout, Volume2, Waves, Flag, type LucideIcon } from 'lucide-react';
+import { Box, Camera, ChevronDown, ChevronRight, Eye, Gauge, Globe2, Mountain, Palette, Route, Package, Sprout, Sun, Volume2, Waves, Flag, type LucideIcon } from 'lucide-react';
 import type { PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 
@@ -9,7 +9,7 @@ import type { Runtime } from '@hm/engine';
  */
 const ICON: Record<string, LucideIcon> = {
   scene: Globe2, entity: Box, model: Package, terrain: Mountain, track: Route, decor: Sprout, item: Gauge, race: Flag, interface: Palette,
-  sound: Volume2, 'engine-sound': Volume2, music: Volume2, modulator: Waves, 'camera-rig': Camera, veil: Eye,
+  sound: Volume2, 'engine-sound': Volume2, music: Volume2, modulator: Waves, 'camera-rig': Camera, veil: Eye, 'light-setup': Sun,
 };
 
 export function PresetTree(props: { readonly rt: Runtime; readonly sceneId: PresetId; readonly selected: PresetId | null; readonly onSelect: (id: PresetId) => void; readonly onEnter: (id: PresetId) => void }): ReactElement {

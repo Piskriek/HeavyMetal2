@@ -141,6 +141,9 @@
       "@hm/islands": [
         "packages/islands/src/index.ts"
       ],
+      "@hm/lighting": [
+        "packages/lighting/src/index.ts"
+      ],
       "@hm/toolcatalog": [
         "packages/toolcatalog/src/index.ts"
       ],

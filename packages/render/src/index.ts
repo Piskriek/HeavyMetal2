@@ -12,3 +12,4 @@ export * from './decor';
 export * from './road-decals';
 export * from './voxel-view';
 export * from './bursts';
+export * from './lighting-rig';

@@ -7,8 +7,7 @@ import { applyStroke, encodeTerrain, heightAt, normalYAtCell, type DirtyRect } f
 import { carveTrack, resample } from '@hm/trackgen';
 import { addPoint, analyse, deletePoint, DRAFT_PRESETS, hitTest, insertOnSegment, movePoint, snapPoint, toCenterline, type TrackDraft } from '@hm/trackedit';
 import { manipulateMove, DEFAULT_MANIPULATION } from '@hm/tools';
-import { applyLook, lookOf, LOOKS } from '../look';
-import { timeOfDayLook } from '@hm/looks';
+import { applyLighting, LOOKS, setupOf } from '../look';
 import { PROP_CARDS, propSeed, type MakerScene } from './scene';
 import { saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
@@ -428,8 +427,8 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
   useEffect(() => {
     const r = rendererRef.current;
     if (!r || !sceneParams) return;
-    applyLook(r, hourLive !== null ? timeOfDayLook(hourLive) : lookOf(sceneParams), 0.22);
-  }, [sceneParams, hourLive]);
+    applyLighting(r, setupOf(rt.store, scene.sceneId, hourLive), 0.22, hourLive !== null ? 0.05 : 0.6);
+  }, [sceneParams, hourLive, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   const lookId = String(sceneParams?.['look'] ?? 'noon-clear');
   const hourSaved = Number(sceneParams?.['timeOfDay'] ?? -1);
 
@@ -516,7 +515,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
       </header>
       <div className="looks" role="group" aria-label="Look">
         {LOOKS.map((l) => (
-          <button key={l.id} className={hourSaved < 0 && lookId === l.id ? 'on' : ''} title={l.doc} onClick={() => { rt.commands.transaction(`Look: ${l.name}`, () => { rt.commands.execute(cmd.setParam(`${scene.sceneId}.look`, l.id, `Look: ${l.name}`)); rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, -1, `Look: ${l.name}`)); }); fx('ui-toggle'); }}>{l.name}</button>
+          <button key={l.id} className={hourSaved < 0 && lookId === l.id ? 'on' : ''} title={l.name} onClick={() => { rt.commands.transaction(`Look: ${l.name}`, () => { rt.commands.execute(cmd.setParam(`${scene.sceneId}.look`, l.id, `Look: ${l.name}`)); rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, -1, `Look: ${l.name}`)); }); fx('ui-toggle'); }}>{l.name}</button>
         ))}
         <label className="hour" title="Drag to move the sun through the day"><span>{(hourLive ?? (hourSaved >= 0 ? hourSaved : 12)).toFixed(1)} h</span>
           <input type="range" min={0} max={24} step={0.1} value={hourLive ?? (hourSaved >= 0 ? hourSaved : 12)}

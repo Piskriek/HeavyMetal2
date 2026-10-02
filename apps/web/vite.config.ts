@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => ({
       '@hm/camerarig': p('../../packages/camerarig/src/index.ts'),
       '@hm/plugs': p('../../packages/plugs/src/index.ts'),
       '@hm/islands': p('../../packages/islands/src/index.ts'),
+      '@hm/lighting': p('../../packages/lighting/src/index.ts'),
       '@hm/assembler': p('../../packages/assembler/src/index.ts'),
       '@hm/pbrgrass': p('../../packages/pbrgrass/src/index.ts'),
       '@hm/voxpartshead': p('../../packages/voxpartshead/src/index.ts'),

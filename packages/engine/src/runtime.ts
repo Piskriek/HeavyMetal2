@@ -7,6 +7,7 @@ import { defineRenderComponents } from '@hm/render';
 import { registerCoreSchemas } from './schemas';
 import { createSceneBinder, type SceneBinder } from './scene-binder';
 import { createScriptSystem, type ScriptSystem } from './script-system';
+import { createModulatorSystem, type ModulatorSystem } from './modulator-system';
 
 export type Mode = 'edit' | 'play';
 
@@ -33,6 +34,7 @@ export interface Runtime {
   readonly physics: PhysicsEngine;
   readonly binder: SceneBinder;
   readonly scripts: ScriptSystem;
+  readonly modulators: ModulatorSystem;
   readonly scriptHost: ScriptHost;
   readonly mode: Mode;
   /** Create the scene and bind it (also what a game "load" does). */
@@ -61,6 +63,8 @@ export function createRuntime(opts: RuntimeOptions = {}): Runtime {
   const world = sim.world;
   const scripts = createScriptSystem({ host: scriptHost, store, vars, world, events });
   sim.addSystem(scripts);
+  const modulators = createModulatorSystem({ store, vars, events });
+  sim.addSystem(modulators);
   defineRenderComponents(world);
   definePhysicsComponents(world);
   physics.attach(world);
@@ -70,24 +74,27 @@ export function createRuntime(opts: RuntimeOptions = {}): Runtime {
   let saved: WorldSnapshot | null = null;
 
   const rt: Runtime = {
-    schemas, store, events, vars, commands, sim, world, physics, binder, scripts, scriptHost,
+    schemas, store, events, vars, commands, sim, world, physics, binder, scripts, modulators, scriptHost,
     get mode() { return mode; },
     loadScene(sceneId) {
       mode = 'edit';
       saved = null;
       binder.bind(sceneId);
       scripts.bind(sceneId);
+      modulators.bind(sceneId);
       const g = store.get(sceneId)?.params['gravity'];
       physics.setGravity([0, -(typeof g === 'number' ? g : 9.81), 0]);
     },
     play() {
       if (mode === 'play') return;
       saved = world.snapshot();
+      modulators.release();
       mode = 'play';
     },
     stop() {
       if (mode === 'edit') return;
       mode = 'edit';
+      modulators.release();
       if (saved) world.restore(saved);
       saved = null;
       // the world is the truth for dynamic bodies, so a restore also resets them; statics are untouched

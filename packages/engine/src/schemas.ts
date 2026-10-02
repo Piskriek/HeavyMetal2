@@ -71,6 +71,7 @@ export const sceneSchema = defineSchema({
     { key: 'entities', label: 'Objects', doc: 'Everything placed in this scene.', kinds: ['entity'], min: 0, max: null, tier: 'play' },
     { key: 'decor', label: 'Foliage', doc: 'Palms, bushes and rocks.', kinds: ['decor'], min: 0, max: 1, tier: 'build' },
     { key: 'terrain', label: 'Ground', doc: 'The island or arena floor.', kinds: ['terrain'], min: 0, max: 1, tier: 'build' },
+    { key: 'modulators', label: 'Drivers', doc: 'Randomizers, LFOs, curves, timelines and data streams that drive any variable while the game runs.', kinds: ['modulator'], min: 0, max: null, tier: 'build' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
   ] as readonly ChildSlot[],
 });
@@ -152,7 +153,23 @@ export const mechanicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema] as const;
+export const modulatorSchema = defineSchema({
+  kind: 'modulator',
+  version: 1,
+  label: 'Driver',
+  doc: 'Moves a variable by itself while the game runs: a random wobble, a wave, a curve, a timeline, a step sequence, another value or a texture.',
+  icon: 'wave',
+  variables: [
+    { key: 'target', type: 'string', label: 'Drives', doc: 'The variable it moves, e.g. entity:5/transform.y or <preset>.<setting>.', tier: 'build', default: '' },
+    { key: 'def', type: 'string', label: 'Shape', doc: 'What it does (edited with the driver panel).', tier: 'build', default: '{"kind":"lfo","wave":"sine","freqHz":0.5,"out":{"min":0,"max":1}}' },
+    { key: 'mode', type: 'enum', label: 'Mode', doc: 'replace = the driver sets the value; add = adds to what it was; scale = multiplies what it was.', tier: 'build', default: 'replace', options: ['replace', 'add', 'scale'] },
+    num('amount', 'Amount', '0 = no effect, 1 = full effect.', 1, 'play', { min: 0, max: 1, step: 0.01 }),
+    { key: 'enabled', type: 'boolean', label: 'Enabled', doc: 'Switch the driver off without deleting it.', tier: 'play', default: true },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

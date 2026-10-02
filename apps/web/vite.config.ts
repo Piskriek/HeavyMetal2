@@ -36,6 +36,8 @@ export default defineConfig({
       '@hm/trackedit': p('../../packages/trackedit/src/index.ts'),
       '@hm/terrainops': p('../../packages/terrainops/src/index.ts'),
       '@hm/scatter': p('../../packages/scatter/src/index.ts'),
+      '@hm/modulation': p('../../packages/modulation/src/index.ts'),
+      '@hm/modui': p('../../packages/modui/src/index.ts'),
       '@hm/tools': p('../../packages/tools/src/index.ts'),
     },
   },

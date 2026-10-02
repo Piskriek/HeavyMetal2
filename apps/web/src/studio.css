@@ -310,3 +310,10 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .tp-grid div.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .tp-grid i { display: block; width: 44px; height: 44px; }
 .tp-grid img { display: block; background: #f1f0ea; }
+
+/* settings: the controls list */
+.controls-list h4 { margin: 12px 0 4px; font-size: 10px; font-weight: 600; color: var(--dim); }
+.controls-list dl { display: grid; margin: 0; border-top: 1px solid var(--line); }
+.controls-list dl > div { display: grid; grid-template-columns: 11em 1fr; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.controls-list dt { color: var(--dim); }
+.controls-list dd { margin: 0; }

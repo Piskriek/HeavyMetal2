@@ -22,6 +22,12 @@ export function islands(): IslandRegistry {
   if (registry) return registry;
   const raw = read(REGISTRY_KEY);
   let r = IslandRegistry.fromJSON(raw ? safeParse(raw) : null);
+  // an untouched blank starter island (the old default) gives way to the new default; anything the player edited or renamed is left alone
+  const only = r.list();
+  if (only.length === 1) {
+    const m = only[0]!;
+    if (m.template === 'blank-island' && m.name === 'My Island' && m.edits === 0 && m.lastEditedAt === null && !hasBundle(m.id)) r = r.remove(m.id, Date.now());
+  }
   if (r.list().length === 0) r = r.create('My Island', 'volcano', Date.now());
   registry = r;
   activeId = r.defaultId();

@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url';
 const p = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
 
 /** The deployable app: ONE static html file (RUN loads a static build; no server). base './' so it works from a sub-path. */
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: './',
   plugins: [viteSingleFile()],
   resolve: {
     alias: {
       // browser build: the script host uses the transpile-only compiler (no TypeScript program, no Node fs)
+      // the RUN SDK only exists in a RUN build (`npm run build:run`); everywhere else it is a harmless stub
+      ...(mode === 'run' ? {} : { '@series-inc/rundot-game-sdk/api': p('./src/platform/sdk-stub.ts') }),
       './compile.js': p('../../packages/script/src/compile-lite.ts'),
       './quickjs-loader.js': p('../../packages/script/src/quickjs-loader-browser.ts'),
       '@hm/contracts': p('../../packages/contracts/src/index.ts'),
@@ -42,4 +44,4 @@ export default defineConfig({
     },
   },
   build: { target: 'es2022', outDir: 'dist', emptyOutDir: true },
-});
+}));

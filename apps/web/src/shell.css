@@ -102,3 +102,6 @@ button.on { background: var(--accent); color: #1a1500; border-color: var(--accen
 .help-card th { text-align: left; padding: 3px 12px 3px 0; white-space: nowrap; font-weight: 500; }
 .help-card td { padding: 3px 0; color: #c7d3de; }
 .help-card kbd { background: #26303b; border-radius: 5px; padding: 1px 7px; font-family: inherit; font-size: 12px; border-bottom: 2px solid #0008; }
+
+.maker .confirm { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; }
+.maker .danger { background: #6b2a24; border-color: #ff6b5e; }

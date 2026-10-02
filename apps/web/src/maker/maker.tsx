@@ -63,6 +63,7 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
   const [density, setDensity] = useState(1);
   const [previewing, setPreviewing] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
+  const [confirmNew, setConfirmNew] = useState(false);
   const [autosaved, setAutosaved] = useState<number | null>(null);
   const [help, setHelp] = useState<'first' | 'keys' | null>(() => (helpSeen() ? null : 'first'));
   const closeHelp = (): void => { markHelpSeen(); setHelp(null); fx('ui-click'); };
@@ -423,7 +424,9 @@ export function MapMaker({ rt, onTestDrive }: { readonly rt: Runtime; readonly o
         <button className={soundOpen ? 'on' : ''} title="Hear and edit every sound" onClick={() => { setSoundOpen(!soundOpen); fx('ui-toggle'); }}>🎚 Sounds</button>
         <button className={previewing ? 'on' : ''} title="Run the scene so drivers and physics move, then stop to go back to editing" onClick={() => { if (rt.mode === 'play') { rt.stop(); setPreviewing(false); fx('ui-toggle'); } else { rt.play(); setPreviewing(true); fx('go', { volume: 0.5 }); toasts.push('Previewing: edits are paused. Press Stop to go back.', 'info', 2200); } }}>{previewing ? '■ Stop' : '▶ Preview'}</button>
         <button onClick={save}>💾 Save</button>
-        <button onClick={() => { if (confirm('Start a new map? The saved one will be replaced.')) { clearSavedMap(); location.reload(); } }}>New</button>
+        {confirmNew
+          ? (<span className="confirm">Replace your saved map? <button className="danger" onClick={() => { clearSavedMap(); location.reload(); }}>Yes, start over</button> <button onClick={() => setConfirmNew(false)}>Keep it</button></span>)
+          : <button onClick={() => { setConfirmNew(true); fx('ui-click'); }}>New</button>}
         <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>▶ Test drive</button>
       </header>
       <div className="looks" role="group" aria-label="Look">

@@ -26,17 +26,24 @@ const save = (key: string, value: unknown): void => { try { localStorage.setItem
  * The whole game: title, goblin select, loading, the race with its countdown and pause, results and the championship table.
  * The screen flow is a pure reducer (`@hm/screens`); this component owns the race view, the settings and the standings.
  */
-export function App({ rt, fromMap, autoStart = false, onEditor }: { readonly rt: Runtime; readonly fromMap: boolean; readonly autoStart?: boolean; readonly onEditor?: () => void }): ReactElement {
+export function App({ rt, fromMap, autoStart = false, onEditor, entry, onExit }: { readonly rt: Runtime; readonly fromMap: boolean; readonly autoStart?: boolean; readonly onEditor?: () => void; readonly entry?: 'select' | 'custom'; readonly onExit?: () => void }): ReactElement {
   const [settings, setSettings] = useState<Settings>(() => load(KEY_SETTINGS, DEFAULT_SETTINGS));
   const [custom, setCustom] = useState<RacerCard>(() => load(KEY_CUSTOM, DEFAULT_CUSTOM));
   const [flow, dispatch] = useReducer(reduceFlow, undefined, (): FlowState => {
     const first = initialFlow();
+    if (entry) {
+      const acts: FlowAction[] = [{ type: 'play', mode: 'quick' }];
+      if (entry === 'custom') acts.push({ type: 'selectRacer', id: 'custom' });
+      return acts.reduce((st, a) => reduceFlow(st, a), first);
+    }
     if (!autoStart) return first;
     let last = '0';
     try { last = localStorage.getItem(KEY_RACER) ?? '0'; } catch { /* default goblin */ }
     return [{ type: 'play', mode: 'quick' }, { type: 'selectRacer', id: last }, { type: 'confirmRacer' }].reduce((s, a) => reduceFlow(s, a as never), first);
   });
   const theme = useMemo(() => themeOf(rt), [rt]);
+  // inside the shell the title screen is the activity menu: going back to it leaves the game
+  useEffect(() => { if (onExit && flow.screen === 'title') onExit(); }, [flow.screen, onExit]);
   const [raceKey, setRaceKey] = useState(() => (flow.screen === 'loading' ? 1 : 0));
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [table, setTable] = useState<Record<string, StandingRow>>({});
@@ -127,7 +134,7 @@ export function App({ rt, fromMap, autoStart = false, onEditor }: { readonly rt:
           paused={flow.screen === 'paused' || (flow.screen === 'settings' && flow.previous === 'paused')}
           onReady={() => setReady(true)} onRacing={() => go({ type: 'raceStart' })} onResults={onResults} onPause={() => go({ type: 'pause' })} />
       ) : null}
-      {flow.screen === 'title' ? <TitleScreen title={theme.title} subtitle={theme.subtitle} quickLabel={theme.quickLabel} seriesLabel={theme.seriesLabel} reducedMotion={settings.reducedMotion} onPlay={(mode) => go({ type: 'play', mode })} onSettings={() => go({ type: 'openSettings' })} {...(onEditor ? { onEditor } : {})} /> : null}
+      {flow.screen === 'title' && !onExit ? <TitleScreen title={theme.title} subtitle={theme.subtitle} quickLabel={theme.quickLabel} seriesLabel={theme.seriesLabel} reducedMotion={settings.reducedMotion} onPlay={(mode) => go({ type: 'play', mode })} onSettings={() => go({ type: 'openSettings' })} {...(onEditor ? { onEditor } : {})} /> : null}
       {flow.screen === 'select' ? (
         <CharacterSelect racers={CARDS} selected={flow.selectedRacer} reducedMotion={settings.reducedMotion} custom={custom} onCustomChange={(c) => { setCustom(c); if (flow.selectedRacer === 'custom') go({ type: 'selectRacer', id: 'custom' }); }}
           onSelect={(id) => go({ type: 'selectRacer', id })} onConfirm={() => go({ type: 'confirmRacer' })} onBack={() => go({ type: 'back' })} />

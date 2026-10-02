@@ -17,8 +17,9 @@ import { placementsOf } from './maker/models-panel';
 const GOBLIN_BLOCK = 0.04;
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
-export function IslandWalk(props: { readonly rt: Runtime; readonly onEdit: () => void; readonly onRace: () => void; readonly onTitle: () => void }): ReactElement {
-  const { rt, onEdit, onRace, onTitle } = props;
+export function IslandWalk(props: { readonly rt: Runtime; readonly intro?: boolean; readonly grownUp?: boolean; readonly onEdit: () => void; readonly onActivities: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void }): ReactElement {
+  const { rt, onEdit, onActivities, onHub, onMainMenu, onIntroDone } = props;
+  const introRef = useRef(props.intro === true);
   const host = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef(false);
@@ -51,15 +52,18 @@ export function IslandWalk(props: { readonly rt: Runtime; readonly onEdit: () =>
     for (let r = 0; r < 120 && ground(px, pz) < SEA; r += 2) { px = r; pz = 0; }
     let py = ground(px, pz), face = 0;
     let camYaw = Math.PI, camPitch = 0.38, camDist = 5.5;
+    // the arrival: start high above the island and settle behind the goblin
+    const intro = { on: introRef.current, t: 0, ms: 3200 };
+    if (intro.on) { camPitch = 1.3; camDist = 150; }
     let eye: [number, number, number] | null = null;
     const down = new Set<string>();
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') { setMenu((m) => !m); return; }
+      if (e.key === 'Escape') { if (intro.on) { intro.t = intro.ms; return; } setMenu((m) => !m); return; }
       down.add(e.key.toLowerCase());
     };
     const onKeyUp = (e: KeyboardEvent): void => { down.delete(e.key.toLowerCase()); };
     let drag: { x: number; y: number } | null = null;
-    const onPointerDown = (e: PointerEvent): void => { if (menuRef.current) return; drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); };
+    const onPointerDown = (e: PointerEvent): void => { if (menuRef.current || intro.on) return; drag = { x: e.clientX, y: e.clientY }; el.setPointerCapture(e.pointerId); };
     const onPointerMove = (e: PointerEvent): void => {
       if (!drag) return;
       camYaw -= (e.clientX - drag.x) * 0.006;
@@ -74,6 +78,12 @@ export function IslandWalk(props: { readonly rt: Runtime; readonly onEdit: () =>
     let raf = 0, last = performance.now();
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      if (intro.on) {
+        intro.t += dt * 1000;
+        const k = Math.min(1, intro.t / intro.ms), e = 1 - Math.pow(1 - k, 3);
+        camDist = 150 + (5.5 - 150) * e; camPitch = 1.3 + (0.38 - 1.3) * e; camYaw = Math.PI + (1 - e) * 1.2;
+        if (k >= 1) { intro.on = false; onIntroDone?.(); }
+      }
       if (!menuRef.current) {
         // camera-relative movement: forward is away from the camera
         const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = -fz, rz = fx;
@@ -123,9 +133,10 @@ export function IslandWalk(props: { readonly rt: Runtime; readonly onEdit: () =>
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
-          <button className="go" onClick={onEdit}>Edit my island</button>
-          <button onClick={onRace}>Race</button>
-          <button onClick={onTitle}>Title screen</button>
+          <button className="go" onClick={onMainMenu}>Main menu</button>
+          {props.grownUp !== false ? <button onClick={onEdit}>Build mode</button> : null}
+          <button onClick={onActivities}>Activities</button>
+          <button onClick={onHub}>Multiplayer</button>
           <button onClick={() => setMenu(false)}>Back to walking</button>
         </div>
       ) : null}

@@ -16656,6 +16656,689 @@
       "status": "pass",
       "recipeRevision": 1,
       "provenance": "Material Batch 77 mobile global sports equipment"
+    },
+    {
+      "registryId": "M614",
+      "canonicalCode": "HM2-TXP-M614-SPT-NET-TIL-BCNROHA-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports goal net cord pbr sheet",
+      "sourceFile": "M614-nostalgic-sports-goal-net-cord-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "NET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M592",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M615",
+      "canonicalCode": "HM2-TXP-M615-SPT-POST-TIL-BCNRMOH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports painted post metal pbr sheet",
+      "sourceFile": "M615-nostalgic-sports-painted-post-metal-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "POST",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "Metallic",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M593",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M616",
+      "canonicalCode": "HM2-TXP-M616-SPT-WICKET-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports wicket timber pbr sheet",
+      "sourceFile": "M616-nostalgic-sports-wicket-timber-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "WICKET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M594",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M617",
+      "canonicalCode": "HM2-TXP-M617-SPT-TARGET-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports painted target board pbr sheet",
+      "sourceFile": "M617-nostalgic-sports-painted-target-board-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "TARGET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M596",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M618",
+      "canonicalCode": "HM2-TXP-M618-SPT-STRAW-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports archery straw pbr sheet",
+      "sourceFile": "M618-nostalgic-sports-archery-straw-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "STRAW",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M597",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M619",
+      "canonicalCode": "HM2-TXP-M619-SPT-ROPE-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports ring rope pbr sheet",
+      "sourceFile": "M619-nostalgic-sports-ring-rope-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "ROPE",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M598",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M620",
+      "canonicalCode": "HM2-TXP-M620-SPT-NET-TIL-BCNROHA-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports fine net pbr sheet",
+      "sourceFile": "M620-nostalgic-sports-fine-net-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "NET",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height",
+        "Alpha"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "clamp",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M599",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M621",
+      "canonicalCode": "HM2-TXP-M621-SPT-FELT-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports table felt pbr sheet",
+      "sourceFile": "M621-nostalgic-sports-table-felt-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FELT",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M600",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M622",
+      "canonicalCode": "HM2-TXP-M622-SPT-FOAM-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports landing foam pbr sheet",
+      "sourceFile": "M622-nostalgic-sports-landing-foam-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FOAM",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M601",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
+    },
+    {
+      "registryId": "M623",
+      "canonicalCode": "HM2-TXP-M623-SPT-FOOTING-TIL-BCNROH-NOST-PX128-Q4-CLN-PFULL-TR-R01",
+      "name": "nostalgic sports equestrian footing pbr sheet",
+      "sourceFile": "M623-nostalgic-sports-equestrian-footing-pbr-sheet.png",
+      "domain": "SPT",
+      "material": "FOOTING",
+      "form": "TIL",
+      "channels": [
+        "BaseColor",
+        "Normal",
+        "Roughness",
+        "AO",
+        "Height"
+      ],
+      "channelLayout": {
+        "topLeft": "BaseColor or target face",
+        "topRight": "Normal",
+        "bottomLeft": "Roughness or auxiliary",
+        "bottomRight": "AO+Height plus Alpha/Metallic where registered"
+      },
+      "style": "NOST",
+      "targetTier": "PX128",
+      "fallbackTier": "PX64",
+      "layout": "Q4",
+      "condition": "CLN",
+      "palette": {
+        "token": "PFULL",
+        "maximumColors": null
+      },
+      "sampling": "TR",
+      "wrap": "repeat",
+      "physicalScale": "matches full-fidelity sports parent",
+      "mipPolicy": "Preserve stepped sport identity, silhouette and contact wear.",
+      "intendedUses": [
+        "nostalgic PBR global sports equipment or venue surface"
+      ],
+      "prohibitedUses": [
+        "protected branding",
+        "post-process-only retro styling",
+        "misordered quadrants"
+      ],
+      "parentPreset": "M602",
+      "editableParameters": [
+        "palette",
+        "step size",
+        "relief",
+        "roughness",
+        "wear"
+      ],
+      "recipe": {
+        "intent": "Authored nostalgic-PBR child preserving global sports identity.",
+        "required": [
+          "fixed quadrant order",
+          "chunky low-resolution forms",
+          "text-free square canvas"
+        ],
+        "forbidden": [
+          "labels",
+          "preview inset",
+          "protected logos"
+        ],
+        "frequency": "identity survives PX64"
+      },
+      "status": "constrained-pass",
+      "recipeRevision": 1,
+      "provenance": "Material Batch 78 nostalgic global sports equipment"
     }
   ]
 }

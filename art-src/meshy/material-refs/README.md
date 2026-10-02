@@ -1120,3 +1120,9 @@ M590 now passes at `R02`, and M589 completes the nostalgic wet-to-underwater-san
 ![Material Batch 77 contact sheet](./review/material-batch-77-mobile-global-sports-equipment.jpg)
 
 M604–M613 pass as mobile children for goal nets, painted posts, wickets, target faces, archery straw, combat-ring rope, fine court nets, table felt, landing foam and equestrian footing. Each keeps its full-fidelity parent link and a PX64 fallback-readable reconstruction recipe.
+
+## Material Batch 78 — nostalgic global sports equipment
+
+![Material Batch 78 contact sheet](./review/material-batch-78-nostalgic-global-sports-equipment.jpg)
+
+M614–M622 pass as nostalgic-PBR children for nets, painted posts, wickets, target faces, archery straw, ring rope, felt and landing foam. M623 is a constrained pass: its footing palette and channels are useful, but reconstruction should break up the rectangular groomed patches so they cannot read as slabs.

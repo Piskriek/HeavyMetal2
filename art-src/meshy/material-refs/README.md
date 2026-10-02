@@ -1156,3 +1156,9 @@ M646, M648, M649 and M651 advance to R02/pass with continuous rubber, maintained
 ![Material Batch 83 contact sheet](./review/material-batch-83-expanded-global-sports-surfaces.jpg)
 
 M658–M663, M665 and M667 pass, adding mobile and nostalgic artificial turf, cinder, tatami and pool-tile children plus full-fidelity indoor rubber. M664 must regenerate because horizontal ridges replace the alternating tatami weave. M666 must regenerate because nested rectangular rake paths create a repeated focal motif instead of irregular beach-sports sand grooming.
+
+## Material Batch 84 — Map Maker tropical racing palette
+
+![Material Batch 84 contact sheet](./review/material-batch-84-map-maker-tropical-racing.jpg)
+
+M668–M671 and M673–M677 pass as Map Maker racing packs: dry and wet tarmac, an axis-tileable checkered start/finish strip, emissive-mask boost chevrons, packed jungle dirt with tyre wear, bamboo boardwalk, wet volcanic cobbles, dusty tropical road and columnar basalt cliff. M672 must regenerate because it forms offset checker blocks rather than continuous transverse red/white rumble bands. Filenames preserve the requested `<kind>-<descriptor>-<m###>` barcode after the mandatory leading stable registry ID required by the validated ingestion pipeline. The second requested basalt variant remains queued for the next generation batch.

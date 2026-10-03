@@ -34,7 +34,8 @@ export interface LightSetup {
   fill?: { color: string; intensity: number; position: Vec3 };
   /** At most 4 point lamps and 2 spot lamps are used; extras are ignored. */
   extraLights?: Lamp[];
-  sky: { top: string; horizon: string; bottom: string; sunGlow: number };
+  /** `clouds`: how much of the sky is cloud, 0 (clear) to 1 (overcast); a normalised setup always has it. */
+  sky: { top: string; horizon: string; bottom: string; sunGlow: number; clouds?: number };
   fog: { color: string; density: number };
   water: { color: string; opacity: number; roughness: number };
   toneMapping: ToneMappingName;

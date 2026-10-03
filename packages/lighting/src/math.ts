@@ -49,7 +49,7 @@ export function lerpSetup(a: LightSetup, b: LightSetup, t: number): LightSetup {
     },
     hemi: { sky: mixHex(a.hemi.sky, b.hemi.sky, k), ground: mixHex(a.hemi.ground, b.hemi.ground, k), intensity: lerp(a.hemi.intensity, b.hemi.intensity, k) },
     ambient: { color: mixHex(a.ambient.color, b.ambient.color, k), intensity: lerp(a.ambient.intensity, b.ambient.intensity, k) },
-    sky: { top: mixHex(a.sky.top, b.sky.top, k), horizon: mixHex(a.sky.horizon, b.sky.horizon, k), bottom: mixHex(a.sky.bottom, b.sky.bottom, k), sunGlow: lerp(a.sky.sunGlow, b.sky.sunGlow, k) },
+    sky: { top: mixHex(a.sky.top, b.sky.top, k), horizon: mixHex(a.sky.horizon, b.sky.horizon, k), bottom: mixHex(a.sky.bottom, b.sky.bottom, k), sunGlow: lerp(a.sky.sunGlow, b.sky.sunGlow, k), clouds: lerp(a.sky.clouds ?? 0.3, b.sky.clouds ?? 0.3, k) },
     fog: { color: mixHex(a.fog.color, b.fog.color, k), density: lerp(a.fog.density, b.fog.density, k) },
     water: { color: mixHex(a.water.color, b.water.color, k), opacity: lerp(a.water.opacity, b.water.opacity, k), roughness: lerp(a.water.roughness, b.water.roughness, k) },
     toneMapping: near.toneMapping,
@@ -157,7 +157,7 @@ export function applyTimeOfDay(s: LightSetup, hour: number): LightSetup {
   }
   out.hemi = { sky: mixHex(s.hemi.sky, p.hemi, amt), ground: mixHex(s.hemi.ground, scaleHex(s.hemi.ground, 0.35), night), intensity: s.hemi.intensity * p.hemiMul };
   out.ambient = { ...s.ambient, color: mixHex(s.ambient.color, p.hemi, 0.5) };
-  out.sky = { top: mixHex(s.sky.top, p.top, amt), horizon: mixHex(s.sky.horizon, p.hor, amt), bottom: mixHex(s.sky.bottom, p.bot, amt), sunGlow: Math.max(0.15, s.sky.sunGlow * 0.4 + p.glow * 0.6) };
+  out.sky = { top: mixHex(s.sky.top, p.top, amt), horizon: mixHex(s.sky.horizon, p.hor, amt), bottom: mixHex(s.sky.bottom, p.bot, amt), sunGlow: Math.max(0.15, s.sky.sunGlow * 0.4 + p.glow * 0.6), clouds: s.sky.clouds ?? 0.3 };
   out.fog = { ...s.fog, color: mixHex(s.fog.color, p.fog, amt) };
   out.water = { ...s.water, color: mixHex(s.water.color, p.water, 0.55) };
   out.exposure = s.exposure * (1 + night * 0.35);

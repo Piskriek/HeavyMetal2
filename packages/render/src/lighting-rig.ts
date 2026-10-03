@@ -51,6 +51,8 @@ export function createSkyMaterial(): THREE.ShaderMaterial {
       sunDir: { value: new THREE.Vector3(0, 1, 0) },
       sunColor: { value: new THREE.Color('#ffffff') },
       sunGlow: { value: 1 },
+      clouds: { value: 0.3 },
+      time: { value: 0 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -63,7 +65,14 @@ export function createSkyMaterial(): THREE.ShaderMaterial {
       uniform vec3 top; uniform vec3 horizon; uniform vec3 bottom;
       uniform vec3 fogColor; uniform float fogAmt;
       uniform vec3 sunDir; uniform vec3 sunColor; uniform float sunGlow;
+      uniform float clouds; uniform float time;
       varying vec3 vDir;
+      float cHash(vec2 p) { p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 19.19); return fract(p.x * p.y); }
+      float cNoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+        return mix(mix(cHash(i), cHash(i + vec2(1.0, 0.0)), u.x), mix(cHash(i + vec2(0.0, 1.0)), cHash(i + vec2(1.0, 1.0)), u.x), u.y);
+      }
+      float cFbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * cNoise(p); p = p * 2.03 + vec2(17.1, 9.2); a *= 0.5; } return s; }
       void main() {
         vec3 d = normalize(vDir);
         float h = d.y;
@@ -75,6 +84,19 @@ export function createSkyMaterial(): THREE.ShaderMaterial {
         float s = max(dot(d, normalize(sunDir)), 0.0);
         col += sunColor * (pow(s, 6.0) * 0.22 + pow(s, 48.0) * 0.6) * sunGlow;
         col += sunColor * smoothstep(0.99935, 0.9997, s) * 6.0 * min(sunGlow, 1.0);
+        // clouds: a drifting layer above the horizon, lit on the sun's side, as dark as the sky at night, thinning towards the horizon
+        if (h > 0.0 && clouds > 0.001) {
+          vec2 uv = d.xz / (h + 0.12) * 1.3 + vec2(time * 0.010, time * 0.004);
+          float n = cFbm(uv);
+          float t = 0.48 + (0.5 - clouds) * 0.4;
+          float c = smoothstep(t - 0.04, t + 0.14, n) * smoothstep(0.0, 0.16, h);
+          float bright = clamp(max(dot(top, vec3(0.3333)), dot(horizon, vec3(0.3333))) * 1.6, 0.05, 1.0);
+          float lit = 0.72 + 0.38 * s;
+          vec3 cloudCol = mix(horizon, vec3(1.0), 0.55) * lit * bright;
+          cloudCol = mix(cloudCol, cloudCol * 0.62, smoothstep(t + 0.05, t + 0.35, n) * 0.6);
+          cloudCol += sunColor * pow(s, 10.0) * 0.35 * sunGlow;
+          col = mix(col, cloudCol, c * 0.92);
+        }
         gl_FragColor = vec4(col, 1.0);
       }
     `,
@@ -166,10 +188,11 @@ export class LightingRig {
     (u.sunDir!.value as THREE.Vector3).set(d[0], d[1], d[2]);
     (u.sunColor!.value as THREE.Color).set(s.sun.color);
     u.sunGlow!.value = s.sky.sunGlow;
+    u.clouds!.value = s.sky.clouds ?? 0.3;
   }
 
   private updateEnvironmentMap(s: LightSetup): void {
-    const sig = [s.sky.top, s.sky.horizon, s.sky.bottom, s.sky.sunGlow.toFixed(2), s.fog.color, s.sun.color, s.sun.azimuthDeg.toFixed(0), s.sun.elevationDeg.toFixed(0), s.fog.density.toFixed(3)].join('|');
+    const sig = [s.sky.top, s.sky.horizon, s.sky.bottom, s.sky.sunGlow.toFixed(2), (s.sky.clouds ?? 0.3).toFixed(2), s.fog.color, s.sun.color, s.sun.azimuthDeg.toFixed(0), s.sun.elevationDeg.toFixed(0), s.fog.density.toFixed(3)].join('|');
     if (sig === this.envSig && this.envTarget) return;
     const settled = this.blend >= 1;
     if (this.envTarget && !settled && this.clock - this.envTime < 0.12) return;
@@ -225,6 +248,7 @@ export class LightingRig {
     for (; si < this.spots.length; si++) this.spots[si]!.intensity = 0;
 
     this.setSkyUniforms(this.skyMat, s);
+    this.skyMat.uniforms.time!.value = ctx.time;
     this.env.setFog(new THREE.Color(s.fog.color), Math.max(0.0013, s.fog.density));
     this.env.setWater(new THREE.Color(s.water.color), s.water.opacity, s.water.roughness);
 

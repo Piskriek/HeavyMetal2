@@ -474,7 +474,18 @@ const RAW: readonly unknown[] = [
   },
 ];
 
-export const SETUPS: readonly LightSetup[] = RAW.map((r) => normalizeSetup(r));
+/** How cloudy each ready-made sky is (anything not listed: a few fair-weather clouds). */
+const CLOUDS: Readonly<Record<string, number>> = {
+  'noon-clear': 0.28, 'golden-hour': 0.4, 'sunset-blaze': 0.5, 'tropical-dawn': 0.35, overcast: 0.88, 'storm-front': 0.95, 'blue-hour': 0.3, 'moonlit-night': 0.22,
+  'volcanic-ash': 0.75, 'neon-dusk': 0.25, 'foggy-morning': 0.7, 'studio-white': 0, 'toon-flat': 0.35, 'teal-orange': 0.35, 'candle-lantern': 0.1, 'product-shot': 0,
+  kodachrome: 0.4, aurora: 0.1,
+};
+const withClouds = (r: unknown): unknown => {
+  if (!r || typeof r !== 'object') return r;
+  const o = r as { id?: string; sky?: Record<string, unknown> };
+  return o.sky && o.sky['clouds'] === undefined ? { ...o, sky: { ...o.sky, clouds: CLOUDS[o.id ?? ''] ?? 0.3 } } : o;
+};
+export const SETUPS: readonly LightSetup[] = RAW.map((r) => normalizeSetup(withClouds(r)));
 export const SETUP_IDS: readonly string[] = SETUPS.map((s) => s.id);
 /** Ids that older maps stored for looks that have since been renamed. */
 export const LEGACY_SETUP_IDS: Readonly<Record<string, string>> = { 'overcast-day': 'overcast' };

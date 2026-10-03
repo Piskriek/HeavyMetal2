@@ -12,13 +12,13 @@ import { buildMakerScene, TEMPLATE_SHAPES, type MakerScene } from '../maker/scen
 import { loadMap, mapBundle, pinMapKey, seedMap } from '../maker/storage';
 import { OFFICIAL_RACING } from '../maker/official-racing';
 import { NewIsland, type NewIslandChoice } from '../islands/new-island';
-import { PlanetScreen, PlanetWindow } from '../islands/my-planet';
+import { PlanetScreen, PlanetWindow, type TryIsland } from '../islands/my-planet';
 import { NewActivity } from './new-activity';
 import { activeIslandId, createIslandWithMap, duplicateIsland, islands, onFork, openIsland, redoIslands, removeIsland, renameIsland, subscribe, undoIslands } from '../islands/island-store';
 import { GalaxyCanvas, type GalaxyHandle, type PlanetDef } from './galaxy';
 import { GalaxyBar, type Level } from './galaxy-bar';
 import { GoblinRacingMenu } from './racing-menu';
-import { Community } from './community';
+import { COMMUNITY_ISLANDS, Community } from './community';
 import { duplicateActivity, loadProfile, makeActivity, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
 import { SettingsBody } from './settings-body';
 import { GoblinFront, GoblinPreview, SetMixHome } from './goblin-front';
@@ -55,6 +55,11 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your avatar, build, host.' };
 /** Goblin Racing's island lives under its own key, never mixed with your islands (H7: an evolution replaces it). */
 const RACING_MAP = 'hm.racing.map.v2';
+/** My planet's Try an island: the ready-made islands, then the community's. */
+const ISLANDS_TO_TRY: readonly TryIsland[] = [
+  ...(['volcano', 'palm-beach', 'rocky-cove', 'racing-starter', 'floating-rocks', 'empty-sea'] as const).map((id) => ({ id, name: TEMPLATE_SHAPES[id]!.name, template: id, shape: TEMPLATE_SHAPES[id]! })),
+  ...COMMUNITY_ISLANDS.filter((c) => TEMPLATE_SHAPES[c.template]).map((c) => ({ id: c.id, name: c.name, template: c.template, shape: TEMPLATE_SHAPES[c.template]!, by: c.by })),
+];
 const toPlanet = (a: Activity): PlanetDef => ({ id: a.id, name: a.name, hue: a.planet.hue > 1 ? a.planet.hue / 360 : a.planet.hue, size: a.planet.size, ring: a.planet.ring, hosting: a.hosting.tournament, doc: a.doc, players: a.hosting.players });
 
 /** An island opened for play or editing: its own runtime, so two islands can never share presets. */
@@ -277,7 +282,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={false} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} profile={profile} onProfile={update} onReplayTour={replayTour} onResetProgress={resetProgress} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+          <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={false} grownUp={profile.grownUp} skin={profile.skin} style={profile.style} onStyle={(st) => update((pr) => ({ ...pr, style: st }))} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} profile={profile} onProfile={update} onReplayTour={replayTour} onResetProgress={resetProgress} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
             onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toHome} />
         </div>
       ) : null}
@@ -334,7 +339,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
           {/* your planet picked: its islands, drawn from above; pick one to go in, or open the planet for all of them */}
           {picks && picks.id === 'home' ? (
             <div ref={planetWinEl} className="planet-stage">
-              <PlanetWindow islands={islandRows} activeId={activeIslandId()} onGo={openIslandNow} onOpen={toIslands} />
+              <PlanetWindow islands={islandRows} activeId={activeIslandId()} look={profile.style === 'voxel' ? 'flat' : 'pbr'} onGo={openIslandNow} onOpen={toIslands} />
             </div>
           ) : null}
         </div>
@@ -404,6 +409,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             {newIsland ? <NewIsland onCancel={() => setNewIsland(false)} onMake={makeIsland} /> : (<>
             <p className="hint">Your islands, drawn from above as they are now. Go into one to walk and build it.</p>
             <PlanetScreen islands={islandRows} activeId={activeIslandId()} onGo={openIslandNow} onNew={() => setNewIsland(true)}
+              look={profile.style === 'voxel' ? 'flat' : 'pbr'} onLook={(l) => update((pr) => ({ ...pr, style: l === 'flat' ? 'voxel' : 'painted' }))}
+              tries={ISLANDS_TO_TRY} favs={profile.favIslands} onFav={(id) => update((pr) => ({ ...pr, favIslands: pr.favIslands.includes(id) ? pr.favIslands.filter((x) => x !== id) : [...pr.favIslands, id] }))}
+              onTry={(t) => makeIsland({ name: t.name, template: t.template, open: true })}
               onRename={(id, name) => { const err = renameIsland(id, name); if (err) setNote(err); }}
               onDuplicate={(id) => { const e = duplicateIsland(id); if (e) setNote(e); }}
               onDelete={(id) => { const e = removeIsland(id); if (e) setNote(e); if (world?.id === id) setWorld(null); }} />

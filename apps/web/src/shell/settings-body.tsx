@@ -80,7 +80,8 @@ export function SettingsBody(props: {
         <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
         <label className="row"><input type="checkbox" checked={profile.grownUp} onChange={(e) => update((p) => ({ ...p, grownUp: e.target.checked }))} /> Grown-up mode (build mode on)</label>
         <p className="hint">Build mode is for adults. Switch it off for a kid profile: My Island and the activities stay, building is hidden.</p>
-        <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel avatars)</option><option value="pbr">PBR (full relief)</option></select></label>
+        <label className="row">Island style <select value={profile.style} onChange={(e) => update((p) => ({ ...p, style: e.target.value as 'voxel' | 'painted' }))}><option value="voxel">Voxel (blocks that match the avatars)</option><option value="painted">Painted (the full ground)</option></select></label>
+        <label className="row">Detail <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (plain colours, lighter)</option><option value="pbr">PBR (bumps, shine and height detail)</option></select></label>
         <label className="row"><input type="checkbox" checked={play.reducedMotion} onChange={(e) => setPlaySettings({ reducedMotion: e.target.checked })} /> Less motion (no camera swoops or bouncing menus)</label>
         {props.onReplayTour || props.onReset ? <div className="btns">{props.onReplayTour ? <button onClick={props.onReplayTour}>Replay the tour</button> : null}{props.onReset ? <button className="danger" onClick={props.onReset}>Reset progress</button> : null}</div> : null}
       </section>

@@ -71,7 +71,7 @@ export function ModeBar(props: {
     <div className="mode-bar">
       {seg('Mode', props.mode, [['walk', 'Walk', 'Walk as your goblin (B switches)'], ['studio', 'Studio', 'Fly without your goblin; every setting has a window (B switches)']], props.onMode)}
       {props.mode === 'walk' ? seg('View', props.view, [['third', '3rd', 'Over the shoulder (V switches)'], ['first', '1st', 'First person (V switches)']], props.onView) : null}
-      {seg('Ground', props.skin, [['flat', 'Flat', 'Voxel blocks that match the goblin'], ['pbr', 'PBR', 'Full detail ground']], props.onSkin)}
+      {seg('Ground', props.skin, [['flat', 'Flat', 'Plain colours, no bumps or shine'], ['pbr', 'PBR', 'Bumps, shine and height detail (normal, roughness and height maps)']], props.onSkin)}
     </div>
   );
 }

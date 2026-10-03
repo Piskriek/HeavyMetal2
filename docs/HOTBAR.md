@@ -15,7 +15,7 @@ When you edit, five things are on screen, and every one of them is a preset made
 | **Selection** | in the world, outlined | what you work on: a thing, a part of it, an area of ground, a texture, the sky | the patch of beach you are looking at |
 | **Hotbar** | bottom, always there after the tour | 9 ways of working for the open tab (tools) | Brush, Spray, Fill, Gradient, Stamp, Pattern, Clone, Smudge, Eraser |
 | **Tool presets** | a row just above the hotbar, when a tool is picked | that tool's own presets, each **previewed on your selection** | Brush: soft, hard, noisy edge, square, splatter (each shown painting your beach) |
-| **Palette** | a film strip, top middle, scroll buttons both ends | what the tool applies: yours first, then the community's | sand, wet sand, coral, tarmac … and the community's textures |
+| **Palette** | a film strip, top middle, scroll buttons both ends; **Tab opens and closes it** like a window and frees the mouse while it is open (owner, 2026-10-03) | what the tool applies: yours first, then the community's; a tab without materials shows its own presets; its **Layers** button opens what the preset is made of | sand, wet sand, coral, tarmac … and the community's textures |
 | **Inspector** | a window (Pro, Studio) | every variable of the selection or the tool; **More…** opens the deeper presets (Studio) | brush size, strength, falloff; More…: pressure curve, jitter, script |
 
 The loop: select something, pick a way of working, pick one of its presets (you see what it would do), pick what to apply from the palette, use it. Every one of those is a preset you can open, change, save as your own and share; the hotbar itself is one too.
@@ -94,6 +94,10 @@ Works on the ground and on things (blocks added, removed, smoothed).
 | F8 Avatar | avatar mode (done): your characters, looks, colours, wears, moves | avatars, parts |
 | F9 Things | Place one, Scatter (a brush of many), Row (a line of them), Swap (replace one thing with another) | things |
 | F10 Camera | the ways to move (above), shots (follow, fixed, cinematic), Picture (screenshot) | camera presets |
+
+## 3b. Layers (owner, 2026-10-03)
+
+The palette's **Layers** button (or L) opens what the current preset is made of, one row per layer: pick one to change it (its place, turn and size; Move it carries it in the 3D view), its eye hides it, arrows change the order, the bin removes it, **+ Add** puts a new one where you look. First version: the island's layers (ground, plants, every placed thing). Next: the layers of whatever is selected (a thing's parts, a tool's plugs, a lighting setup's lights).
 
 ## 4. More… (deep presets stay out of the way)
 

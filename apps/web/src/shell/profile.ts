@@ -14,7 +14,9 @@ export interface Profile {
   /** Build mode is for adults: switched on in Settings. */
   readonly grownUp: boolean;
   readonly tutorialDone: boolean;
-  /** The island look you last used (voxel or PBR): your islands are shown in it on My planet. */
+  /** The island style you last used: voxel blocks or the painted ground (your islands are shown in it on My planet). */
+  readonly style: 'voxel' | 'painted';
+  /** The detail, the Flat / PBR buttons: normals, shine and height detail off or on, in either style (owner, 2026-10-03). */
   readonly skin: 'flat' | 'pbr';
   /** Islands you starred to try (ready-made templates and community islands, by id): they come first under Try an island. */
   readonly favIslands: readonly string[];
@@ -70,7 +72,7 @@ export function showTier(renderer: ThreeRenderer, tier: Quality, own: Params): v
 export const tierInUse = (): Quality | null => tierSeen;
 
 const KEY = 'hm.profile.v2';
-export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', favIslands: [], quality: 'auto', fpsTarget: 60, graphics: {}, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
+export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, style: 'voxel', skin: 'flat', favIslands: [], quality: 'auto', fpsTarget: 60, graphics: {}, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
 
 export function loadProfile(): Profile {
   try {
@@ -82,7 +84,9 @@ export function loadProfile(): Profile {
     const gpu: GpuChoice = raw.gpu === 'saver' || raw.gpu === 'browser' ? raw.gpu : 'fast';
     const graphics = raw.graphics && typeof raw.graphics === 'object' && !Array.isArray(raw.graphics) ? raw.graphics : {};
     const favIslands = Array.isArray(raw.favIslands) ? raw.favIslands.filter((x): x is string => typeof x === 'string').slice(0, 40) : [];
-    return { ...DEFAULT_PROFILE, ...raw, favIslands, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
+    // before style and detail were two choices, PBR meant the painted ground: keep what each player saw
+    const style = raw.style === 'voxel' || raw.style === 'painted' ? raw.style : raw.skin === 'pbr' ? 'painted' : 'voxel';
+    return { ...DEFAULT_PROFILE, ...raw, favIslands, style, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

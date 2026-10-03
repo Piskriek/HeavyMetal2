@@ -1,5 +1,5 @@
 import { useRef, type ReactElement } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { PresetPreview } from './cards';
 import type { Preview } from './catalog';
 
@@ -17,6 +17,8 @@ export function PaletteStrip(props: {
   readonly community: readonly StripItem[];
   readonly selected: string | undefined;
   readonly onPick: (id: string) => void;
+  /** Layers: what the current preset is made of (a window). */
+  readonly onLayers?: () => void;
 }): ReactElement {
   const reel = useRef<HTMLDivElement>(null);
   const roll = (dir: number): void => { const el = reel.current; if (el) el.scrollBy({ left: dir * el.clientWidth * 0.7, behavior: 'smooth' }); };
@@ -36,6 +38,7 @@ export function PaletteStrip(props: {
         {props.community.length ? props.community.map(frame) : <span className="ps-empty">Nothing shared here yet</span>}
       </div>
       <button className="ps-roll" aria-label="On along the palette" onClick={() => roll(1)}><ChevronRight size={16} strokeWidth={1.8} /></button>
+      {props.onLayers ? <button className="ps-layers" data-ui="island.layers" title="What this island is made of: pick, hide, order, remove and add layers (L)" onClick={props.onLayers}><Layers size={15} strokeWidth={1.7} /><span>Layers</span></button> : null}
     </div>
   );
 }

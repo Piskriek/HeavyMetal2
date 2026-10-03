@@ -19,8 +19,13 @@ export interface TerrainLook {
   /** 0 = crisp height-led borders, 1 = long soft fades. */
   soft: number;
   normalStrength: number;
-  /** 'flat' = blocky posterised colour like the voxel goblin; 'pbr' = full relief and roughness. */
+  /** The style: 'flat' = voxel blocks, posterised colour like the voxel avatars; 'pbr' = the painted ground. */
   skin?: 'flat' | 'pbr';
+  /**
+   * The detail (the owner's Flat / PBR buttons): normals, shine and height detail on or off, in either style. Left out: the painted ground
+   * has it, the voxel blocks do not (as before).
+   */
+  detail?: boolean;
   /** Multiplies every tile's size: bigger = calmer from the air. */
   scale: number;
 }
@@ -134,19 +139,30 @@ export class TerrainView {
     this.pickMaterial();
   }
 
+  /** Normals, shine and height detail on (the PBR detail), in whichever style. */
+  private detail(): boolean {
+    return this.look.detail ?? !this.flat();
+  }
+
   private pickMaterial(): void {
-    if (this.lowCost && this.flat()) {
+    // plain voxel blocks light the same with a diffuse-only material; voxel blocks with detail need the full one for their bumps and shine
+    if (this.lowCost && this.flat() && !this.detail()) {
       this.lambert ??= this.hook(new THREE.MeshLambertMaterial({ color: 0xffffff }), 'terrain-lambert');
       this.mesh.material = this.lambert;
     } else this.mesh.material = this.material;
   }
 
-  /** The flat skin is its own shader program (ISL_FLAT), so it carries none of the PBR path's cost. Switching skins compiles once. */
+  /**
+   * Each combination is its own shader program, so none carries another's cost: ISL_FLAT the voxel style; ISL_DETAIL voxel blocks with
+   * normals, shine and height detail; ISL_PLAIN the painted ground without them. Switching compiles once.
+   */
   private applySkinDefine(m: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial): void {
-    const flat = this.flat();
+    const flat = this.flat(), detail = this.detail();
+    const want: Record<string, boolean> = { ISL_FLAT: flat, ISL_DETAIL: flat && detail, ISL_PLAIN: !flat && !detail };
     const defines: Record<string, unknown> = { ...(m.defines ?? {}) };
-    if (flat === ('ISL_FLAT' in defines)) return;
-    if (flat) defines['ISL_FLAT'] = ''; else delete defines['ISL_FLAT'];
+    let changed = false;
+    for (const [k, on] of Object.entries(want)) { if (on === (k in defines)) continue; changed = true; if (on) defines[k] = ''; else delete defines[k]; }
+    if (!changed) return;
     m.defines = defines;
     m.needsUpdate = true;
   }

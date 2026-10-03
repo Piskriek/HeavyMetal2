@@ -18,10 +18,11 @@ import { placementsOf } from './maker/models-panel';
 import { focusTargetOf } from './maker/focus';
 import { fx } from './maker/feedback';
 import { BuildController, type Aim } from './build/build-controller';
-import { Crosshair, Hotbar, ModeBar, TabStrip, TabWheel, ToolSay } from './build/hud';
+import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
+import { LayersPanel } from './build/layers';
 import { avatarRigged } from './build/cards';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
@@ -62,6 +63,8 @@ const WIN = {
 export function IslandWalk(props: {
   readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean;
   readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | Quality;
+  /** The style: voxel blocks or the painted ground (the Flat / PBR detail is `skin`). */
+  readonly style?: 'voxel' | 'painted'; readonly onStyle?: (style: 'voxel' | 'painted') => void;
   /** Which graphics chip to ask for (Settings); read when the view opens. */
   readonly gpu?: GpuChoice;
   /** The frame rate auto quality aims for (Settings): 15 prettier, 60 smoother. */
@@ -89,11 +92,14 @@ export function IslandWalk(props: {
   const { rt, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
   const host = useRef<HTMLDivElement>(null);
   const introRef = useRef(props.intro === true);
-  const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr' }) => void } | null>(null);
+  const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr'; detail?: boolean }) => void } | null>(null);
   const skin = props.skin ?? 'flat';
-  const skinRef = useRef(skin);
-  skinRef.current = skin;
-  useEffect(() => { terrainView.current?.setLook({ skin }); }, [skin]);
+  const style = props.style ?? 'voxel';
+  // the renderer's look: its skin is the style (voxel blocks or painted), its detail the Flat / PBR buttons
+  const groundLook = { skin: style === 'voxel' ? 'flat' as const : 'pbr' as const, detail: skin === 'pbr' };
+  const lookRef = useRef(groundLook);
+  lookRef.current = groundLook;
+  useEffect(() => { terrainView.current?.setLook(lookRef.current); }, [skin, style]);
   const controlsRef = useRef(props.controls ?? { sensitivity: 1, invertY: false, fov: 75 });
   controlsRef.current = props.controls ?? { sensitivity: 1, invertY: false, fov: 75 };
   const qualityRef = useRef(props.quality ?? 'auto');
@@ -126,8 +132,11 @@ export function IslandWalk(props: {
   const [menu, setMenu] = useState(false);
   const [locked, setLocked] = useState(false);
   const [note, setNote] = useState('');
-  const [wheelOpen, setWheelOpen] = useState(false);
-  const [wheelIndex, setWheelIndex] = useState(0);
+  /**
+   * The palette film strip (top middle): Tab opens and closes it like a window (owner: "a toggle, so it doesn't hide when you let go"), and
+   * opening it frees the mouse to click it and the buttons round it (the PBR button, the presets); closing it gives the mouse back to looking.
+   */
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusId, setFocusId] = useState<PresetId | null>(null);
   const [isolateId, setIsolateId] = useState<PresetId | null>(null);
   const win = useWindows();
@@ -144,8 +153,8 @@ export function IslandWalk(props: {
   readyRef.current = props.onReady;
   /** Avatar mode: the Avatar tab (P) turns the camera to face your avatar, with your characters and its presets beside it (E11). */
   const avatarMode = p.tab === 'avatar' && level === 'goblin' && !showcase;
-  const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase, avatarMode });
-  live.current = { menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase, avatarMode };
+  const live = useRef({ menu, buildOn, level, items, focusId, isolateId, win, showcase, avatarMode, paletteOpen });
+  live.current = { menu, buildOn, level, items, focusId, isolateId, win, showcase, avatarMode, paletteOpen };
   /** The tab you were on before avatar mode: Done, Esc or P again goes back to it. */
   const beforeAvatar = useRef<TabId>('select');
   const landRef = useRef<(() => void) | null>(null);
@@ -155,7 +164,9 @@ export function IslandWalk(props: {
   useEffect(() => { onMenuChange?.(menu); if (menu) tourEvent('opened-menu'); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void; groundPeek: () => Terrain | null } | null>(null);
+  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void; groundPeek: () => Terrain | null;
+    /** Layers: carry a thing with the Move tool, place one where you look, show or hide the plants. */
+    carry: (ref: PresetId) => void; addThing: (modelId: string) => PresetId | null; showPlants: (on: boolean) => void } | null>(null);
   /** A small copy of the ground you are looking at (the tool presets draw on it). */
   const peekGround = useCallback((): Terrain | null => api.current?.groundPeek() ?? null, []);
   // the island overview needs the cursor: let go of the mouse when the level goes up
@@ -192,7 +203,8 @@ export function IslandWalk(props: {
           break;
         }
         case 'selectSlot': { const s = player(); setSlot(s.tab, a.slot); break; }
-        case 'setSkin': props.onSkin?.(a.skin); break;
+        // the reveal: the full ground (the painted style with its detail)
+        case 'setSkin': props.onSkin?.(a.skin); if (a.skin === 'pbr') props.onStyle?.('painted'); break;
         case 'reveal': setRevealing(Date.now()); api.current?.reveal(); break;
         case 'credits': props.onCredits?.(a.amount); say(`+${a.amount} credits`); break;
       }
@@ -266,13 +278,17 @@ export function IslandWalk(props: {
       case 'island': return { name: rt.store.get(scene.sceneId)?.name ?? 'My island', preview: { kind: 'icon', icon: 'Globe' }, data: () => mapBundle(rt, scene.sceneId) };
     }
   };
-  const pickWheel = (i: number): void => {
-    const it = live.current.items[i];
-    if (!it) return;
+  /** A preset picked in the palette (a tab without materials shows its presets there): it goes in the slot you are on. */
+  /** Layers: what this island is made of (the palette's Layers button, or L). */
+  const openLayers = (): void => { win.open('layers', 'Layers', { x: Math.max(12, window.innerWidth - 380), y: 70, w: 350, h: 560 }); };
+  const openLayersRef = useRef(openLayers);
+  openLayersRef.current = openLayers;
+  const [layerSel, setLayerSel] = useState<PresetId | null>(null);
+  const [plantsShown, setPlantsShown] = useState(true);
+  const pickPreset = (id: string): void => {
     const s = player();
-    putInSlot(s.tab, s.slots[s.tab], it.id);
-    setWheelOpen(false);
-    applyNow(s.tab, it.id);
+    putInSlot(s.tab, s.slots[s.tab], id);
+    applyNow(s.tab, id);
     fx('select');
   };
 
@@ -296,7 +312,7 @@ export function IslandWalk(props: {
       const st = rt.binder.terrain();
       if (!st) return;
       const tv = renderer.setTerrain(st.terrain, surfaces);
-      tv?.setLook({ cliffSurface: SURF.cliff, soft: st.look.soft, normalStrength: st.look.bump, skin: skinRef.current });
+      tv?.setLook({ cliffSurface: SURF.cliff, soft: st.look.soft, normalStrength: st.look.bump, ...lookRef.current });
       terrainView.current = tv;
     };
     showTerrain();
@@ -304,7 +320,8 @@ export function IslandWalk(props: {
     // looking down from the island overview there is a lot of air between the camera and the ground: thin the haze so the island can be seen
     const stopLighting = followLighting(rt.store, scene.sceneId, renderer, () => (live.current.level === 'island' ? 0.1 : live.current.showcase ? 0.3 : 1));
     lightingRef.current = stopLighting;
-    const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d && !live.current.isolateId ? decorInstances(d.placements) : null); };
+    let plantsHidden = false;
+    const showDecor = (): void => { const d = rt.binder.decor(); renderer.setDecor(d && !live.current.isolateId && !plantsHidden ? decorInstances(d.placements) : null); };
     showDecor();
     const offDecor = rt.binder.onDecor(showDecor);
 
@@ -387,6 +404,27 @@ export function IslandWalk(props: {
       lock, unlock, refreshModels,
       playAnim: (id) => { animator.play(animOf(player(), id)); },
       setAvatarLook, previewLook,
+      carry: (ref) => {
+        builder.carrying = ref;
+        // hand over the Move tool so the next click puts it down where you point
+        const s = player(); const slot = s.hotbars.select.indexOf('move');
+        setTab('select'); if (slot >= 0) setSlot('select', slot); else putInSlot('select', s.slots.select, 'move');
+        api.current?.unlock();
+        say(`Carrying ${rt.store.get(ref)?.name ?? 'it'}: click where it goes`);
+      },
+      addThing: (modelId) => {
+        const base = toolById(`place-${modelId}`);
+        if (!base) return null;
+        // where you look, or three steps in front of you
+        const fx3 = px + Math.sin(face) * 3, fz3 = pz + Math.cos(face) * 3;
+        const ts = rt.binder.terrain();
+        const a = aim() ?? { point: [fx3, ts ? heightAt(ts.terrain, fx3, fz3) : py, fz3] as const, normal: null };
+        builder.use(toolOf(player(), base.id) ?? base, a, false, performance.now(), true);
+        builder.end();
+        const refs = rt.store.get(scene.sceneId)?.children['models'] ?? [];
+        return refs[refs.length - 1]?.ref ?? null;
+      },
+      showPlants: (on) => { plantsHidden = !on; showDecor(); },
       groundPeek: () => { const ts = rt.binder.terrain(); if (!ts) return null; const a = aim(); const pt = a?.point ?? [px, py, pz]; return cropTerrain(ts.terrain, pt[0], pt[2], 24); },
       pick: (tab, id) => {
         if (tab !== 'select' && tab !== 'paint' && tab !== 'sculpt' && tab !== 'things') return;
@@ -419,7 +457,6 @@ export function IslandWalk(props: {
 
     /** Esc closes exactly one thing: the wheel, the front window, focus, hide-others, what Move carries; then it opens the menu. */
     const escape = (): void => {
-      if (live.current.wheelOpen) { setWheelOpen(false); return; }
       if (live.current.win.closeTop()) return;
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
       if (live.current.isolateId) { setIsolateId(null); return; }
@@ -442,13 +479,19 @@ export function IslandWalk(props: {
       if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
       if (k === 'tab') {
         e.preventDefault();
-        if (live.current.buildOn && !intro.on && !live.current.wheelOpen) { const s = player(); const id = s.hotbars[s.tab][s.slots[s.tab]]; setWheelIndex(Math.max(0, live.current.items.findIndex((c) => c.id === id))); setWheelOpen(true); }
+        if (live.current.buildOn && !intro.on && !e.repeat) {
+          const open = !live.current.paletteOpen;
+          setPaletteOpen(open);
+          if (open) unlock(); else if (!studio()) lock();
+          fx('ui-toggle', { volume: 0.4 });
+        }
         return;
       }
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) rt.commands.redo(); else { builder.undo(); tourEvent('undo'); } refreshModels(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); rt.commands.redo(); refreshModels(); return; }
       if (k >= '1' && k <= '9' && live.current.buildOn) { pickSlot(Number(k) - 1); return; }
       if (k === 'e' && live.current.buildOn) { openPresets(); return; }
+      if (k === 'l' && live.current.buildOn) { openLayersRef.current(); return; }
       if (k === 'b' && live.current.buildOn) { const to = studio() ? 'walk' : 'studio'; setMode(to); if (to === 'walk') { fly = null; setFocusId(null); renderer.setFocus(null); } fx('ui-toggle'); return; }
       if (k === 'v' && !studio()) { const s = player(); setView(s.view === 'first' ? 'third' : 'first'); fx('ui-toggle', { volume: 0.5 }); return; }
       if (k === 'f' && studio() && live.current.buildOn) { const a = aim(); const m = a ? builder.modelAt(a) : null; setFocusId(m ? m.ref : null); if (!m) renderer.setFocus(null); return; }
@@ -457,14 +500,10 @@ export function IslandWalk(props: {
       down.add(k);
     };
     const onKeyUp = (e: KeyboardEvent): void => {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        if (live.current.wheelOpen) pickWheel(live.current.wheelIndex);
-        return;
-      }
+      if (e.key === 'Tab') { e.preventDefault(); return; }
       down.delete(e.key.toLowerCase());
     };
-    const onBlur = (): void => { setWheelOpen(false); down.clear(); mouse = 0; looking = null; };
+    const onBlur = (): void => { down.clear(); mouse = 0; looking = null; };
     window.addEventListener('blur', onBlur);
     const overUi = (e: Event): boolean => !el.contains(e.target as Node);
     const onPointerDown = (e: PointerEvent): void => {
@@ -511,7 +550,6 @@ export function IslandWalk(props: {
     };
     const onWheel = (e: WheelEvent): void => {
       if (live.current.showcase) return;
-      if (live.current.wheelOpen) { const n = live.current.items.length; if (n) setWheelIndex((i) => (i + (e.deltaY > 0 ? 1 : -1) + n) % n); return; }
       if (!pointerLocked && overUi(e)) return;
       if (live.current.avatarMode) { mirror = { ...mirror, dist: Math.min(7, Math.max(1.4, mirror.dist * (e.deltaY > 0 ? 1.08 : 0.92))) }; return; }
       if (live.current.focusId) { orbit = { ...orbit, dist: Math.min(60, Math.max(1.5, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))) }; return; }
@@ -785,12 +823,11 @@ export function IslandWalk(props: {
     return () => cancelAnimationFrame(t);
   }, [showHud]);
   const inTopSlot = (node: ReactElement): ReactElement => (topSlot ? createPortal(node, topSlot) : node);
-  const free = !locked || p.mode === 'studio';
   return (
     <div className={`island${p.mode === 'studio' ? ' studio' : ''}${avatarMode ? ' avatar-mode' : ''}${showHud ? ' hud' : ''}`} style={{ position: 'absolute', inset: 0, ['--win-bottom' as string]: showHud && !avatarMode ? '172px' : '12px' }}>
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       {showHud && p.mode === 'walk' && !avatarMode ? <Crosshair active={locked} /> : null}
-      {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR ground: full detail' : 'Flat ground: voxel blocks that match the goblin'); }} />) : null}
+      {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR: bumps, shine and height detail on' : 'Flat: plain colours, no bumps or shine'); }} />) : null}
       {showHud && !avatarMode && !showPresets ? <ToolSay {...say2} /> : null}
       {showPresets && heldTool ? (
         <ToolPresetsRow tool={heldTool} level={p.level} surface={Number(p.palette.paint ?? 4) || 4} peek={peekGround} words={say2}
@@ -799,16 +836,22 @@ export function IslandWalk(props: {
           onAll={() => win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor })} />
       ) : null}
       {/* the palette: what the tool in your hand puts down (top middle) */}
-      {showHud && !avatarMode && p.tab === 'paint' ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} /> : null}
+      {showHud && !avatarMode && paletteOpen ? (
+        p.tab === 'paint'
+          ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
+          // a tab without materials shows its own presets here: one click puts it in the slot you are on
+          : <PaletteStrip title={tabDef(p.tab).label} items={items.map((c) => ({ id: c.id, name: c.name, preview: c.preview }))} community={[]} selected={heldItem?.id} onLayers={openLayers} onPick={pickPreset} />
+      ) : null}
       {showHud ? <TabStrip tab={p.tab} onPick={pickTab} /> : null}
       {showHud && !avatarMode ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} end={<LevelSwitch level={p.level} onLevel={(l) => { setLevel(l); fx('ui-toggle', { volume: 0.5 }); }} />} /> : null}
       {avatarMode && !menu ? <AvatarDock actions={actions} onPreview={(l) => api.current?.previewLook(l)} onDone={leaveAvatar} /> : null}
-      {showHud && wheelOpen ? <TabWheel title={tabDef(p.tab).label} items={items} index={wheelIndex} clickable={free} onPick={pickWheel} /> : null}
       {showcase ? null : win.list.map((w) => (
         <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (heldItem ? `${tabDef(p.tab).label}: ${heldItem.name}` : 'What you hold') : w.title} className={w.id === 'presets' ? 'wide' : ''}>
           {w.id === 'presets' ? <PresetWindowBody activities={activities} onEdit={openEditor} onWorld={() => win.open('world', 'World rules', { x: 60, y: 90, ...WIN.editor })} onPlant={(kind) => win.open(`plant:${kind}`, `Behaviour: ${kind}`, { x: 80, y: 110, ...WIN.editor })} onMoves={() => win.open('moves', 'How my goblin moves', { x: 60, y: 90, ...WIN.editor })} />
             : w.id === 'held' ? (heldItem ? <EditorFor tab={p.tab} id={heldItem.id} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} /> : <p className="hint">Pick a slot, or press E to put a preset in it.</p>)
             : w.id === 'settings' ? (props.profile && props.onProfile ? <SettingsBody profile={props.profile} update={props.onProfile} onReplayTour={() => props.onReplayTour?.()} onReset={() => props.onResetProgress?.()} top={<div className="btns settings-jump"><button onClick={openLighting}>Lighting presets and time of day</button></div>} /> : null)
+            : w.id === 'layers' ? <LayersPanel rt={rt} sceneId={scene.sceneId} selected={layerSel} onSelect={setLayerSel} plantsShown={plantsShown} onPlants={(on) => { setPlantsShown(on); api.current?.showPlants(on); }}
+                onMove={(ref) => api.current?.carry(ref)} onShow={(ref) => { setFocusId(ref); }} onAdd={(id) => api.current?.addThing(id) ?? null} onGround={() => pickTab('paint')} />
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
@@ -850,7 +893,7 @@ function hint(buildOn: boolean, locked: boolean, mode: 'walk' | 'studio', focus:
   if (focus) return 'Right mouse button looks round it. Wheel zooms. Esc leaves focus.';
   if (mode === 'studio') return 'Fly with W A S D, Space and C. Hold the right button to look. F focus, H hide, B walk.';
   if (!buildOn) return locked ? 'Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.';
-  return locked ? 'F1 to F10 tabs, 1 to 9 slots, E presets, Tab wheel, B studio, Esc menu.' : 'Click the world to look around. E presets. Esc menu.';
+  return locked ? 'F1 to F10 tabs, 1 to 9 slots, Tab palette, E presets, L layers, B studio, Esc menu.' : 'Click the world to look around. Tab palette, E presets, L layers, Esc menu.';
 }
 
 /** The words about what you hold. */

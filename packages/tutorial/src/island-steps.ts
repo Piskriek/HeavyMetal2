@@ -81,7 +81,7 @@ export const ISLAND_STEPS: Step[] = [
   },
   {
     id: 'finish', title: 'All yours',
-    text: 'Flat and PBR are the two buttons top right, switch any time. Goblin Racing waits in the Activities tab (F7). Here are 100 credits.',
+    text: 'Flat and PBR (top right) switch the bumps and shine on and off; the style, voxel or painted, is on My planet. Goblin Racing waits in the Activities tab (F7). Here are 100 credits.',
     advance: { type: 'time', ms: 7000 },
     skippable: true,
     onDone: [{ type: 'credits', amount: 100 }],

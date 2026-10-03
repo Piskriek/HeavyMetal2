@@ -23,6 +23,9 @@ const LISTINGS: readonly Listing[] = [
   { id: 'l6', name: 'Gold barrel', by: 'Nettle', kind: 'model', price: 25, swatch: '#d5a24a', doc: 'A barrel with real gold.', preview: () => ({ kind: 'model', model: 'barrel' }) },
 ];
 
+/** The islands people share, to try from My planet (each is drawn from its template shape until shares carry their own maps). */
+export const COMMUNITY_ISLANDS: readonly { readonly id: string; readonly name: string; readonly template: string; readonly by: string }[] = LISTINGS.filter((l) => l.island).map((l) => ({ id: `community-${l.id}`, name: l.name, template: l.island!, by: l.by }));
+
 export function Community(props: { readonly profile: Profile; readonly onCredits: (delta: number) => void }): ReactElement {
   const { profile, onCredits } = props;
   const [owned, setOwned] = useState<ReadonlySet<string>>(new Set());

@@ -239,6 +239,13 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
     diffuseColor.rgb = tile.rgb;
     gRough = 0.92;
+#ifdef ISL_DETAIL
+    // voxel blocks with the PBR detail: each block keeps its palette colour and takes its surface's bumps, shine and height shading
+    vec3 vdx = dFdx(vTWorld), vdy = dFdy(vTWorld);
+    vec4 vp = islPbrAt(layer, layer, 0.0, vTWorld, gnrm, vdx, vdy);
+    if (vp.w >= 0.0) { gRough = vp.w; gBump = vp.xyz; }
+    diffuseColor.rgb *= 0.86 + 0.28 * islVaried(layer, vTWorld.xz, vdx.xz, vdy.xz).a;
+#endif
 #else
     tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);
     // far away a small tile repeats like a checkerboard: blend in the same surface at three times the size, and vary its tone in big patches
@@ -247,9 +254,14 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
     tile.rgb *= mix(0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7), 0.8 + 0.4 * surfNoise(wp.xz / 31.0 + 9.1), far);
     diffuseColor.rgb = tile.rgb;
+#ifdef ISL_PLAIN
+    // the painted ground without the detail: matte, no bumps
+    gRough = 0.92;
+#else
     gRough = islRough(la, lb, lw);
     vec4 pbrTile = islPbrAt(la, lb, lw, wp, gnrm, dwx, dwy);
     if (pbrTile.w >= 0.0) { gRough = pbrTile.w; gBump = pbrTile.xyz; }
+#endif
 #endif
     float wet = 1.0 - smoothstep(0.0, 1.3, wp.y);
     diffuseColor.rgb *= 1.0 - 0.32 * wet;

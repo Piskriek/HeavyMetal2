@@ -181,7 +181,10 @@ try {
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
   check('Paint holds ways to paint (Brush, Fill, Clone ...), not surfaces', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Brush', 'Fill', 'Stamp', 'Clone', 'Eraser'].every((w) => t.includes(w)); }));
-  check('the surfaces are in the palette film strip, top middle', await page.locator('.palette-strip .ps-frame').count() >= 20);
+  check('the palette starts closed', await page.locator('.palette-strip').count() === 0);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(T(300));
+  check('Tab opens the palette: the surfaces in a film strip, top middle', await page.locator('.palette-strip .ps-frame').count() >= 20);
   check('the tool in hand shows its own presets, drawn on the ground', await page.locator('.tool-presets canvas.tp-pv').count() >= 4);
   check('the hotbar has Easy, Pro and Studio', JSON.stringify(await page.$$eval('.level-switch button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Easy', 'Pro', 'Studio']));
   await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
@@ -201,6 +204,25 @@ try {
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(T(300));
   check('and Ctrl+Z takes it back', (await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0)) === lavaBefore);
+  // Layers: what the island is made of; + Add puts a thing where you look, the eye hides it, the bin removes it
+  await dom(() => document.querySelector('[data-ui="island.layers"]')?.click());
+  await page.waitForTimeout(T(400));
+  check('the Layers button on the palette opens Layers', await page.locator('.fwin[aria-label="Layers"] .layers').count() === 1);
+  const things = await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count();
+  await dom(() => { [...document.querySelectorAll('.layers .ly-head button')].find((b) => /Add/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(200));
+  await dom(() => { [...document.querySelectorAll('.layers .ly-add button')].find((b) => /Barrel/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(500));
+  check('+ Add puts a thing in as a new layer, picked', await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count() === things + 1 && await page.locator('.layers .ly-row.on .ly-attrs').count() === 1);
+  await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });
+  await page.waitForTimeout(T(200));
+  check('its eye hides it', await page.locator('.layers .ly-row.hidden').count() === 1);
+  await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Remove"]')?.click(); });
+  await page.waitForTimeout(T(300));
+  check('and the bin removes it again', await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count() === things);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(T(300));
+  check('Tab again closes the palette', await page.locator('.palette-strip').count() === 0);
   await page.keyboard.press('b');
   await page.waitForTimeout(T(500));
   for (let i = 0; i < 3 && await page.locator('.fwin').count() > 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(250)); }

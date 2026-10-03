@@ -14,6 +14,8 @@ export function placementsOf(rt: Runtime, sceneId: PresetId, except?: PresetId):
     const p = rt.store.get(r.ref);
     if (!p || r.ref === except) continue;
     const params = rt.store.resolve(p.id).params as Record<string, unknown>;
+    // a layer hidden with its eye (Layers) is not drawn
+    if (params['hidden'] === true) continue;
     out.push({ params, x: Number(params['x'] ?? 0), y: Number(params['y'] ?? 0), z: Number(params['z'] ?? 0), yawDeg: Number(params['yaw'] ?? 0) });
   }
   return out;

@@ -69,6 +69,7 @@ function drawIsland(canvas: HTMLCanvasElement, src: MapSource, look: 'flat' | 'p
     }
     col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
   }
+  // Voxel: blocks of 3 x 3 cells, each one colour with a darker edge, so it reads as blocks at any size; PBR: 4 x finer and blended
   const k = look === 'pbr' ? 4 : 1;
   const W = cols * k, H = rows * k;
   canvas.width = W; canvas.height = H;
@@ -76,7 +77,7 @@ function drawIsland(canvas: HTMLCanvasElement, src: MapSource, look: 'flat' | 'p
   const img = ctx.createImageData(W, H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const o = (y * W + x) * 4;
-    if (k === 1) { const i = y * cols + x; img.data[o] = col[i * 3]!; img.data[o + 1] = col[i * 3 + 1]!; img.data[o + 2] = col[i * 3 + 2]!; img.data[o + 3] = 255; continue; }
+    if (look === 'flat') { const bx = Math.min(cols - 1, Math.floor(x / 3) * 3 + 1), by = Math.min(rows - 1, Math.floor(y / 3) * 3 + 1), i = by * cols + bx, e = x % 3 === 2 || y % 3 === 2 ? 0.86 : 1; img.data[o] = col[i * 3]! * e; img.data[o + 1] = col[i * 3 + 1]! * e; img.data[o + 2] = col[i * 3 + 2]! * e; img.data[o + 3] = 255; continue; }
     const fx = Math.min(cols - 1.001, x / k), fy = Math.min(rows - 1.001, y / k), c0 = Math.floor(fx), r0 = Math.floor(fy), u = fx - c0, v = fy - r0;
     const grain = (((x * 73856093) ^ (y * 19349663)) & 15) - 7.5;
     for (let ch = 0; ch < 3; ch++) {

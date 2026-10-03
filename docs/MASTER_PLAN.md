@@ -160,6 +160,21 @@ Rule 6 applies: load the frontend-design skill at the start; every screen is che
 | 7 | Track editor in the studio look | G5, Q4 |
 | 8 | Community: where shares land | G8 |
 
+**6.3 The hotbar: how everything is edited** (owner, 2026-10-03; the full design is `docs/HOTBAR.md`)
+
+The hotbar is how you edit everything, and it is where the game is still thinnest. The owner's instructions, all in HOTBAR.md: Select can select anything (the ground, a surface, a thing, its parts, its blocks: faces, edges and vertices) and change it; each tab holds ways of working, not materials (Paint = brushes, fills, sprays, stamps, clone; Sculpt = the brushes sculptors use most, with symmetry, more/less detail and smoothing toggles); materials go in a **palette**, a film strip at the top middle with the community's presets and scroll buttons; picking a tool shows **its presets previewed on your selection**; **Move** has ways to move a thing and, with nothing selected, the ways to move yourself (walk, fly, orbit, pan, zoom, map, focus, follow, jump to); the hotbar has **Easy / Pro / Studio** built in, arrives with the tour and stays; it is a preset, managed in Settings, Hotbar; deep preset trees (a racing ball's physics) sit behind **More…** in Studio; the screen map audits what the hotbar cannot edit yet.
+
+| Step | What | Gaps it closes |
+|---|---|---|
+| H-a | The hotbar audit in the screen map (every kind of thing × every tab: selectable? which tool edits it? at which level?) | measures the rest |
+| H-b | The skeleton: the hotbar preset with Easy / Pro / Studio, the tool-presets row with previews on the selection, the palette film strip, More… in the Inspector | the loop |
+| H-c | Paint as ways to paint (Brush, Spray, Fill, Gradient, Stamp, Pattern, Clone, Smudge, Eraser), the surfaces moved into the palette | owner's example |
+| H-d | Sculpt as ways to sculpt (Raise, Lower, Smooth, Flatten, Grab, Clay, Crease, Stamp, Terrace; + Inflate, Pinch, Twist, Noise, Erode, Bridge …), stamps and patterns in the palette, the toggles | |
+| H-e | Select picks anything (ground areas, a surface's wand, things, parts, blocks), Move's ways to move a thing and the ways to move yourself (shared with the Camera tab) | "select anything and change it" |
+| H-f | Things (Scatter, Row, Swap), Lights (sun and time, place a light, day and night), Animate (Pose, Keys, Blend), Sound (Attach, Zone) | |
+| H-g | Editing a thing's blocks on the island (paint, sculpt, select parts and faces) | |
+| H-h | Settings, Hotbar: add, remove, reorder tools per tab, back to ready-made, share | "hotbar management in the settings" |
+
 ---
 
 ## 7. The order of work
@@ -168,6 +183,7 @@ Rule 6 applies: load the frontend-design skill at the start; every screen is che
 2. **The owner's decisions** Q1 to Q5.
 3. **The design system** (6.1).
 4. **The design batch** (6.2), in journey order, each step reviewed on the map.
+4b. **The hotbar** (6.3, `docs/HOTBAR.md`): H-a to H-h, after the beta pass; the audit (H-a) first.
 5. **The tour from names** (B15), checked by the map.
 6. Then the rest of STATUS: H7 evolution (local first), H6 two RUN launches, the platform, D15 satellite islands, the day/night cycle, B12 the AI kit. Performance at every step.
 

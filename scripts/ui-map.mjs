@@ -29,6 +29,8 @@ const T = (ms) => Math.round(ms * slow);
 const gpu = process.env.E2E_GPU === '1';
 const port = 8196;
 const W = 1366, H = 768;
+/** What the hotbar can select and change (B18, docs/HOTBAR.md section 7): needs the TypeScript loader (`npm run ui-map` has it). */
+const coverage = await import('../packages/buildkit/src/coverage.ts').then((m) => m.hotbarCoverage()).catch(() => null);
 /** Most a screen may take (presses and restores), so one heavy screen cannot stall the run; the rest are listed as not pressed. */
 const STATE_BUDGET_MS = Number(opt('--budget') ?? 600) * 1000;
 
@@ -194,6 +196,7 @@ function writeReport(problems = []) {
   <h1>Screen map</h1>
   <p class="sum">${esc(report.at)} · ${report.size.join('×')} · ${report.states.length} screens · ${total} controls · <span class="${reds ? 'red' : ''}">${reds} to look at</span> · ${Math.round((Date.now() - t0) / 60000)} min</p>
   ${problems.length ? `<div class="problems"><b>Contract</b><ul>${problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>` : ''}
+  ${coverage ? `<section class="coverage"><div><h2>What the hotbar can edit</h2><p class="dim">Every kind of thing in the world: can Select pick it, which tools change it (docs/HOTBAR.md). Red is missing.</p>${coverage.design.length ? `<ul>${coverage.design.map((d) => `<li class="red">${esc(d.says)}</li>`).join('')}</ul>` : ''}</div><div><table><tr><td><b>Thing</b></td><td><b>Select</b></td><td><b>Changed by</b></td></tr>${coverage.rows.map((r) => `<tr><td>${esc(r.kind.name)}</td><td class="${r.selectable ? '' : 'red'}">${r.selectable ? 'yes' : 'no'}</td><td>${Object.entries(r.changedBy).map(([tab, names]) => `${esc(tab)}: ${esc(names.slice(0, 6).join(', '))}${names.length > 6 ? ' …' : ''}`).join('<br>') || '<span class="red">nothing</span>'}</td></tr>`).join('')}</table></div></section>` : ''}
   ${report.states.map((s) => `<section id="${s.id}"><div><h2>${esc(s.id)}</h2><p class="dim">${esc(s.doc)}</p>${s.reachError ? `<p class="red">Could not reach it: ${esc(s.reachError)}</p>` : `<a href="${s.shot}"><img src="${s.shot}" alt="${esc(s.doc)}" loading="lazy"></a><p class="dim">${esc(s.where?.screen ?? '')} ${esc((s.where?.dialogs ?? []).join(', '))}</p>`}</div>
   <div><table>${s.controls.map((c) => `<tr><td>${esc(c.id)}</td><td>${c.outcome.length ? esc(c.outcome.join('; ')) : '<span class="red">does nothing</span>'}${c.esc ? ` <span class="dim">· Esc ${esc(c.esc)}</span>` : ''}${c.shot ? ` <a href="${c.shot}">picture</a>` : ''}${c.flags.filter((f) => f !== 'does nothing').map((f) => `<br><span class="${isRed(f) ? 'red' : 'amber'}">${esc(f)}</span>`).join('')}</td></tr>`).join('')}</table></div></section>`).join('\n')}
   </main></body></html>`;

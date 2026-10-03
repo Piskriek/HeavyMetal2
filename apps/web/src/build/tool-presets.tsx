@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { HOTBAR_LEVELS, variantNow, variantsOf, type HotbarLevel, type ToolPreset, type ToolVariant } from '@hm/buildkit';
-import { createTerrain, paintWay, type Terrain } from '@hm/terrain';
+import { createTerrain, heightAt, paintWay, sculptWay, type SculptWay, type Terrain } from '@hm/terrain';
+import { stamp, type StampKind } from '@hm/terrainops';
 import { DEFAULT_RULES } from '@hm/worldrules';
 import { naturalSurface } from './build-controller';
 import { surfaceColours } from './catalog';
@@ -52,6 +53,61 @@ function drawPreview(canvas: HTMLCanvasElement, ground: Terrain, tool: ToolPrese
   ctx.putImageData(img, 0, 0);
 }
 
+/** Which sculpt a ground tool does, for its preview (the old shape tools press their shape). */
+function sculptOf(tool: ToolPreset): { way: SculptWay } | { shape: StampKind } | null {
+  if (tool.action === 'sculpt') return tool.sculpt === 'stamp' ? { shape: (tool.stampShape ?? 'mound') as StampKind } : tool.sculpt ? { way: tool.sculpt } : null;
+  if (tool.action === 'raise' || tool.action === 'lower' || tool.action === 'smooth' || tool.action === 'flatten') return { way: tool.action };
+  if (tool.action === 'dig') return { way: 'lower' };
+  if (tool.action === 'mound' || tool.action === 'crater' || tool.action === 'plateau' || tool.action === 'ridge' || tool.action === 'dune') return { shape: tool.action };
+  return null;
+}
+
+/**
+ * A sculpt preset used on the ground you look at: the same patch, the tool run across it (pressed once for a shape), drawn as a relief lit
+ * from the top left in the ground's own colours, so a terrace shows its steps and a crease its cut.
+ */
+function drawSculptPreview(canvas: HTMLCanvasElement, ground: Terrain, tool: ToolPreset, variant: ToolVariant): void {
+  const t2 = { ...tool, ...variant.patch };
+  const what = sculptOf(t2);
+  if (!what) return;
+  const g = ground.spec;
+  const gx = g.originX + ((g.cols - 1) * g.cell) / 2, gz = g.originZ + ((g.rows - 1) * g.cell) / 2;
+  const n = 33, span = Math.max(t2.size * 3.2, 4), fine = span / (n - 1);
+  const t = createTerrain({ cols: n, rows: n, cell: fine, originX: gx - span / 2, originZ: gz - span / 2 });
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const x = t.spec.originX + c * fine, z = t.spec.originZ + r * fine;
+    const gc = Math.max(0, Math.min(g.cols - 1, Math.round((x - g.originX) / g.cell)));
+    const gr = Math.max(0, Math.min(g.rows - 1, Math.round((z - g.originZ) / g.cell)));
+    const i = r * n + c, j = gr * g.cols + gc;
+    // heights sampled smoothly (the island's cells are coarser than the preview's): a relief drawn from copied cells would show their steps
+    t.heights[i] = heightAt(ground, x, z); t.surfaceA[i] = ground.surfaceA[j]!; t.surfaceB[i] = ground.surfaceB[j]!; t.blend[i] = ground.blend[j]!;
+  }
+  const cx = gx, cz = gz;
+  if ('shape' in what) stamp(t as never, what.shape, [cx, cz], Math.max(2, t2.size), { height: Math.max(0.2, t2.strength * t2.size * 0.6), seed: 7, rotation: 0.4 });
+  else {
+    const base = t.heights.slice();
+    const pts = [0.25, 0.4, 0.55, 0.7].map((f) => [t.spec.originX + span * f, cz + Math.sin(f * 6) * span * 0.08] as const);
+    for (const [x, z] of what.way === 'grab' ? [[cx + span * 0.12, cz] as const] : pts) {
+      sculptWay(t, { way: what.way, x, z, radius: t2.size, strength: what.way === 'smooth' || what.way === 'pinch' ? Math.min(1, t2.strength * 2) : t2.strength, falloff: t2.falloff, seed: 7, target: base[Math.floor(n / 2) * n + Math.floor(n / 2)]! + 0.5, ...(what.way === 'grab' ? { grab: { x: cx - span * 0.12, z: cz, base, dx: span * 0.24, dz: 0 } } : {}) });
+    }
+  }
+  canvas.width = n; canvas.height = n;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const img = ctx.createImageData(n, n);
+  const h = (c: number, r: number): number => t.heights[Math.max(0, Math.min(n - 1, r)) * n + Math.max(0, Math.min(n - 1, c))]!;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const i = r * n + c;
+    // relief: the slope exaggerated so gentle tools still show, lit from the top left
+    const dx = (h(c + 1, r) - h(c - 1, r)) / (2 * fine) * 1.6, dz = (h(c, r + 1) - h(c, r - 1)) / (2 * fine) * 1.6;
+    const len = Math.hypot(dx, 1, dz), lit = Math.max(0, (dx * 0.55 + 0.75 + dz * 0.4) / len);
+    const shade = 0.35 + 0.75 * lit;
+    const a = rgb(t.surfaceA[i]!);
+    img.data[i * 4] = Math.min(255, a[0] * shade); img.data[i * 4 + 1] = Math.min(255, a[1] * shade); img.data[i * 4 + 2] = Math.min(255, a[2] * shade); img.data[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function VariantTile(props: { readonly v: ToolVariant; readonly on: boolean; readonly draw: (c: HTMLCanvasElement) => void; readonly onPick: () => void }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null);
   const { draw } = props;
@@ -73,6 +129,8 @@ export function ToolPresetsRow(props: {
   readonly onPick: (v: ToolVariant) => void;
   readonly onEdit: (key: 'size' | 'strength', value: number) => void;
   readonly onAll: () => void;
+  /** Sculpt's toggles (Pro): mirror across the island's middle, smooth after each dab. */
+  readonly toggles?: { readonly mirror: boolean; readonly smoothAfter: boolean; readonly onToggle: (key: 'mirror' | 'smoothAfter') => void };
 }): ReactElement {
   const { tool, level, surface, peek } = props;
   const [ground, setGround] = useState<Terrain | null>(() => peek());
@@ -91,14 +149,20 @@ export function ToolPresetsRow(props: {
       </div>
       <div className="tp-list">
         {list.map((v) => (
-          <VariantTile key={`${tool.id}-${v.id}-${surface}-${ground ? ground.spec.originX + ',' + ground.spec.originZ : ''}`} v={v} on={now?.id === v.id} onPick={() => props.onPick(v)}
-            draw={(c) => { if (ground) drawPreview(c, ground, tool, v, surface); }} />
+          <VariantTile key={`${tool.id}-${v.id}-${surface}-${tool.stampShape ?? ""}-${ground ? ground.spec.originX + ',' + ground.spec.originZ : ''}`} v={v} on={now?.id === v.id} onPick={() => props.onPick(v)}
+            draw={(c) => { if (ground) { if (tool.tab === 'sculpt') drawSculptPreview(c, ground, tool, v); else drawPreview(c, ground, tool, v, surface); } }} />
         ))}
       </div>
       {level !== 'easy' ? (
         <div className="tp-knobs">
           <label>Size <input type="range" min={0.5} max={12} step={0.5} value={tool.size} onChange={(e) => props.onEdit('size', Number(e.target.value))} /></label>
           <label>Strength <input type="range" min={0.05} max={1} step={0.05} value={Math.min(1, tool.strength)} onChange={(e) => props.onEdit('strength', Number(e.target.value))} /></label>
+          {props.toggles && tool.tab === 'sculpt' ? (
+            <span className="tp-toggles" role="group" aria-label="Sculpt toggles">
+              <button aria-pressed={props.toggles.mirror} className={props.toggles.mirror ? 'on' : ''} data-ui="island.sculpt.mirror" title="Every stroke is mirrored across the middle of the island" onClick={() => props.toggles?.onToggle('mirror')}>Symmetry</button>
+              <button aria-pressed={props.toggles.smoothAfter} className={props.toggles.smoothAfter ? 'on' : ''} data-ui="island.sculpt.smooth" title="Smooth gently behind every stroke" onClick={() => props.toggles?.onToggle('smoothAfter')}>Smooth after</button>
+            </span>
+          ) : null}
         </div>
       ) : null}
       {level === 'studio' ? <button className="tp-all" onClick={props.onAll}>Every setting</button> : null}

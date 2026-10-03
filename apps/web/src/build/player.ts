@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { MOVE_SLOTS, animById, type MoveSlot } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { PAINTS, SLOTS, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
-import { defaultHotbars, validFor, type ActivityInfo, type CatalogPlayer } from './catalog';
+import { PAINTS, SLOTS, STAMP_SHAPES, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
+import { OLD_DEFAULT_ROWS, defaultHotbars, validFor, type ActivityInfo, type CatalogPlayer } from './catalog';
 
 /**
  * The player's own presets and HUD state, saved on this device: the hotbar of every tab, the tools and animations they changed (stored as
@@ -26,6 +26,8 @@ export interface PlayerState extends CatalogPlayer {
   readonly level: HotbarLevel;
   /** What each tab's tools apply, picked in the palette strip (Paint: a surface id). */
   readonly palette: Readonly<Partial<Record<TabId, string>>>;
+  /** Sculpt's toggles (Pro, beside the hotbar): mirror every stroke across the island's middle; smooth gently behind it. */
+  readonly sculptToggles: { readonly mirror: boolean; readonly smoothAfter: boolean };
 }
 
 const KEY = 'hm.player.v1';
@@ -37,7 +39,7 @@ const blank = (): PlayerState => {
   return {
     ...p, tab: 'sculpt', slots: Object.fromEntries(TAB_IDS.map((t) => [t, 0])) as Record<TabId, number>, hotbars: defaultHotbars(activities, p),
     moves: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', fall: 'fall' }, lookId: LOOKS[0]!.id, created: false, view: 'third', mode: 'walk', sprites: {},
-    level: 'easy', palette: { paint: '4' },
+    level: 'easy', palette: { paint: '4', sculpt: 'mound' }, sculptToggles: { mirror: false, smoothAfter: false },
   };
 };
 
@@ -63,19 +65,25 @@ function load(): PlayerState {
     mode: raw.mode === 'studio' ? 'studio' : 'walk',
     sprites: obj(raw.sprites),
     level: raw.level === 'pro' || raw.level === 'studio' ? raw.level : 'easy',
+    sculptToggles: { mirror: (raw.sculptToggles as { mirror?: unknown } | undefined)?.mirror === true, smoothAfter: (raw.sculptToggles as { smoothAfter?: unknown } | undefined)?.smoothAfter === true },
     palette: { ...base.palette, ...paletteOf(raw.palette) },
   };
 }
 /** A tab whose saved slots no longer name any tool (Paint's slots held surfaces before its tools became ways to paint) starts from the ready-made row. */
 function freshTabs(h: Hotbars, defaults: Hotbars): Hotbars {
   const out = { ...h };
-  for (const t of TAB_IDS) if (out[t].every((id) => id === null) && defaults[t].some((id) => id !== null)) out[t] = [...defaults[t]];
+  for (const t of TAB_IDS) {
+    if (out[t].every((id) => id === null) && defaults[t].some((id) => id !== null)) out[t] = [...defaults[t]];
+    // an untouched old ready-made row becomes today's
+    else if ((OLD_DEFAULT_ROWS[t] ?? []).some((old) => old.length === out[t].length && old.every((id, i) => out[t][i] === id))) out[t] = [...defaults[t]];
+  }
   return out;
 }
 const paletteOf = (v: unknown): Partial<Record<TabId, string>> => {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
   const paint = typeof o.paint === 'string' && PAINTS.some((s) => String(s.id) === o.paint) ? o.paint : undefined;
-  return paint ? { paint } : {};
+  const sculpt = typeof o.sculpt === 'string' && STAMP_SHAPES.some((s) => s.id === o.sculpt) ? o.sculpt : undefined;
+  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}) };
 };
 
 let state: PlayerState | null = null;
@@ -154,6 +162,8 @@ export function resetPlayer(): void { state = blank(); try { localStorage.remove
 /** Easy, Pro or Studio: how deep the hotbar goes. */
 export const setLevel = (level: HotbarLevel): void => { const s = get(); if (s.level !== level) set({ ...s, level }); };
 /** Pick what a tab's tools apply from the palette strip (Paint: a surface). */
+/** Sculpt's toggles: switch one on or off. */
+export const toggleSculpt = (key: 'mirror' | 'smoothAfter'): void => { const s = get(); set({ ...s, sculptToggles: { ...s.sculptToggles, [key]: !s.sculptToggles[key] } }); };
 export const pickPalette = (tab: TabId, id: string): void => { const s = get(); if (s.palette[tab] !== id) set({ ...s, palette: { ...s.palette, [tab]: id } }); };
 /** Set a tool to one of its presets: its values become your tool's (one change, kept like any edit). */
 export function applyVariant(toolId: string, patch: Readonly<Record<string, unknown>>): void {

@@ -10,6 +10,7 @@ export type ToolAction =
   | 'inspect' | 'move' | 'turn' | 'resize' | 'copy' | 'delete' | 'focus' | 'isolate'
   | 'paint'
   | 'raise' | 'lower' | 'smooth' | 'flatten' | 'dig' | 'mound' | 'crater' | 'plateau' | 'ridge' | 'dune'
+  | 'sculpt'
   | 'place';
 
 /** The ready-made sprite bursts (their editable values are in `plugs.ts`). */
@@ -47,12 +48,26 @@ export interface ToolPreset {
   shape?: StampShape;
   /** Paint, Pattern: what repeats. */
   pattern?: PatternId;
+  /** Sculpt tools: the way they sculpt (Stamp presses the palette's shape). */
+  sculpt?: SculptWayId;
+  /** Sculpt, Stamp: the palette's shape (set by the island from the palette, not stored). */
+  stampShape?: string;
+  /** Sculpt toggles (Pro, beside the hotbar; set by the island, not stored): mirror every dab across the island's middle; smooth after each one. */
+  mirror?: boolean;
+  smoothAfter?: boolean;
 }
 
 /** The ways to paint (the same names as @hm/terrain's paintWay). */
 export type PaintWayId = 'brush' | 'spray' | 'fill' | 'gradient' | 'stamp' | 'pattern' | 'clone' | 'smudge' | 'eraser';
 export type StampShape = 'blob' | 'square' | 'star' | 'ring';
 export type PatternId = 'checker' | 'stripes' | 'dots';
+/** The ways to sculpt (the same names as @hm/terrain's sculptWay, plus Stamp, which presses a shape from the palette). */
+export type SculptWayId = 'grab' | 'clay' | 'crease' | 'terrace' | 'noise' | 'pinch' | 'erode' | 'stamp';
+/** The shapes Sculpt's Stamp presses (the palette of the Sculpt tab; the same names as @hm/terrainops' stamp). */
+export const STAMP_SHAPES: readonly { readonly id: 'mound' | 'crater' | 'plateau' | 'ridge' | 'dune' | 'volcano'; readonly name: string; readonly icon: string }[] = [
+  { id: 'mound', name: 'Hill', icon: 'Mountain' }, { id: 'crater', name: 'Crater', icon: 'CircleDot' }, { id: 'plateau', name: 'Plateau', icon: 'Square' },
+  { id: 'ridge', name: 'Ridge', icon: 'TrendingUp' }, { id: 'dune', name: 'Dune', icon: 'Wind' }, { id: 'volcano', name: 'Volcano', icon: 'Flame' },
+];
 /** How deep the hotbar goes (docs/HOTBAR.md section 2): Easy shows the best few presets; Pro all of them and the sliders; Studio every setting. */
 export type HotbarLevel = 'easy' | 'pro' | 'studio';
 export const HOTBAR_LEVELS: readonly { readonly id: HotbarLevel; readonly name: string; readonly says: string }[] = [
@@ -80,6 +95,7 @@ export const THINGS: readonly { readonly id: string; readonly name: string; read
 type Base = Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'surface' | 'model' | 'sprite' | 'sound'> & Pick<ToolPreset, 'shape' | 'pattern'>;
 const B: Base = { size: 1, strength: 0.5, falloff: 'smooth', surface: 0, model: '', sprite: 'pop', sound: 'select' };
 const tool = (id: string, name: string, tab: ToolTab, action: ToolAction, icon: string, doc: string, left: string, right: string, v: Partial<Base> = {}): ToolPreset => { const b = { ...B, ...v }; return { id, name, tab, action, icon, doc, left, right, ...b, plugs: defaultPlugs(b.sprite, b.sound, swings(action) ? 'swing' : undefined) }; };
+const sculptTool = (way: SculptWayId, name: string, icon: string, doc: string, left: string, right: string, v: Partial<Base>): ToolPreset => ({ ...tool(`sculpt-${way}`, name, 'sculpt', 'sculpt', icon, doc, left, right, { sprite: 'dust', sound: 'sculpt-tick', ...v }), sculpt: way });
 const paintTool = (way: PaintWayId, name: string, icon: string, doc: string, left: string, right: string, v: Partial<Base>): ToolPreset => ({ ...tool(`paint-${way}`, name, 'paint', 'paint', icon, doc, left, right, { sprite: 'sparkle', sound: 'paint-tick', ...v }), way });
 /** Tools that change the world make the goblin swing its arm; looking, focusing and hiding do not. */
 const swings = (a: ToolAction): boolean => a !== 'inspect' && a !== 'focus' && a !== 'isolate';
@@ -113,6 +129,15 @@ export const TOOLS: readonly ToolPreset[] = [
   tool('plateau', 'Plateau', 'sculpt', 'plateau', 'Square', 'Stamp a flat-topped rise.', 'Make a plateau', 'Make a plateau', { size: 9, strength: 0.6, sprite: 'dust', sound: 'place' }),
   tool('ridge', 'Ridge', 'sculpt', 'ridge', 'TrendingUp', 'Stamp a long ridge.', 'Make a ridge', 'Make a ridge', { size: 10, strength: 0.6, sprite: 'dust', sound: 'place' }),
   tool('dune', 'Dune', 'sculpt', 'dune', 'Wind', 'Stamp a sand dune.', 'Make a dune', 'Make a dune', { size: 10, strength: 0.5, sprite: 'dust', sound: 'place' }),
+  // ways to sculpt (docs/HOTBAR.md): the shapes Stamp presses are in the palette
+  sculptTool('grab', 'Grab', 'Hand', 'Take hold of the ground and pull it along: drag a hill aside, stretch a bay.', 'Pull the ground along', 'Pull a smaller piece', { size: 5, strength: 1 }),
+  sculptTool('clay', 'Clay', 'Layers', 'Build up in flat layers, like laying clay: terraces and shelves instead of domes.', 'Add a layer', 'Scrape a layer off', { size: 4, strength: 0.4, falloff: 'linear' }),
+  sculptTool('crease', 'Crease', 'Scissors', 'Cut a sharp line, or press out a sharp ridge with the right button.', 'Cut a crease', 'Raise a sharp ridge', { size: 2.5, strength: 0.5 }),
+  sculptTool('stamp', 'Stamp', 'Stamp', 'Press a shape from the palette: a hill, a crater, a plateau, a ridge, a dune, a volcano.', 'Press the shape', 'Press it upside down', { size: 8, strength: 0.6, sound: 'place' }),
+  sculptTool('terrace', 'Terrace', 'BarChart3', 'Turn slopes into steps, like rice terraces or a stepped cliff. Strength sets the step height.', 'Make steps', 'Make steps', { size: 5, strength: 0.5, falloff: 'flat' }),
+  sculptTool('noise', 'Roughen', 'Sparkles', 'Make the ground bumpy and natural: pebbles and lumps.', 'Roughen', 'Roughen gently', { size: 4, strength: 0.4 }),
+  sculptTool('pinch', 'Sharpen', 'Gem', 'Make edges and ridges crisp (the opposite of Smooth).', 'Sharpen', 'Soften', { size: 4, strength: 0.4 }),
+  sculptTool('erode', 'Erode', 'Droplet', 'Let steep ground slide and settle, as rain and time would.', 'Erode', 'Erode gently', { size: 6, strength: 0.6 }),
   ...THINGS.map((t) => tool(`place-${t.id}`, t.name, 'things', 'place', t.icon, `Place a ${t.name.toLowerCase()} where you point.`, 'Place it', 'Take away the thing you point at', { model: t.id, size: 1, sprite: t.id === 'palm' || t.id === 'bush' || t.id === 'flowers' || t.id === 'grass-clump' ? 'leaf' : 'pop', sound: 'place' })),
 ];
 export const toolById = (id: string): ToolPreset | undefined => TOOLS.find((t) => t.id === id);
@@ -132,6 +157,18 @@ export const TOOL_VARIANTS: Readonly<Record<string, readonly ToolVariant[]>> = {
   'paint-pattern': [v('checker', 'Checker', { pattern: 'checker' }, true), v('stripes', 'Stripes', { pattern: 'stripes' }, true), v('dots', 'Dots', { pattern: 'dots' }, true), v('big-checker', 'Big checker', { pattern: 'checker', size: 8 })],
   'paint-clone': [v('small', 'Small', { size: 2 }, true), v('big', 'Big', { size: 6 }, true)],
   'paint-smudge': [v('gentle', 'Gentle', { size: 3, strength: 0.35 }, true), v('strong', 'Strong', { size: 3, strength: 0.9 }, true), v('wide', 'Wide', { size: 7, strength: 0.6 })],
+  'raise': [v('soft', 'Soft', { size: 5, strength: 0.4, falloff: 'smooth' }, true), v('hill', 'Wide hill', { size: 10, strength: 0.3, falloff: 'smooth' }, true), v('spike', 'Sharp', { size: 2, strength: 0.6, falloff: 'linear' }, true), v('flat-top', 'Flat top', { size: 5, strength: 0.4, falloff: 'flat' }, true)],
+  'lower': [v('soft', 'Soft', { size: 5, strength: 0.4, falloff: 'smooth' }, true), v('wide', 'Wide dip', { size: 10, strength: 0.3, falloff: 'smooth' }, true), v('hole', 'Hole', { size: 2, strength: 0.6, falloff: 'linear' }, true)],
+  'smooth': [v('gentle', 'Gentle', { size: 6, strength: 0.3 }, true), v('strong', 'Strong', { size: 6, strength: 0.9 }, true), v('wide', 'Wide', { size: 12, strength: 0.6 }, true)],
+  'flatten': [v('soft', 'Soft edge', { size: 6, strength: 0.5, falloff: 'smooth' }, true), v('hard', 'Hard edge', { size: 6, strength: 0.8, falloff: 'flat' }, true), v('pad', 'Big pad', { size: 12, strength: 0.6, falloff: 'linear' }, true)],
+  'sculpt-grab': [v('small', 'Small', { size: 3 }, true), v('big', 'Big', { size: 8 }, true), v('soft', 'Soft', { size: 5, falloff: 'smooth' }, true), v('firm', 'Firm', { size: 5, falloff: 'linear' })],
+  'sculpt-clay': [v('thin', 'Thin layers', { strength: 0.25 }, true), v('thick', 'Thick layers', { strength: 0.7 }, true), v('wide', 'Wide', { size: 8 }, true)],
+  'sculpt-crease': [v('fine', 'Fine', { size: 1.5, strength: 0.4 }, true), v('deep', 'Deep', { size: 3, strength: 0.9 }, true), v('gully', 'Gully', { size: 5, strength: 0.6 }, true)],
+  'sculpt-stamp': [v('small', 'Small', { size: 5 }, true), v('medium', 'Medium', { size: 8 }, true), v('big', 'Big', { size: 14 }, true), v('low', 'Low', { size: 10, strength: 0.3 }), v('tall', 'Tall', { size: 10, strength: 1 })],
+  'sculpt-terrace': [v('low', 'Low steps', { strength: 0.25 }, true), v('steps', 'Steps', { strength: 0.5 }, true), v('high', 'High steps', { strength: 1 }, true)],
+  'sculpt-noise': [v('pebbly', 'Pebbly', { size: 3, strength: 0.25 }, true), v('lumpy', 'Lumpy', { size: 5, strength: 0.6 }, true), v('rocky', 'Rocky', { size: 6, strength: 1 }, true)],
+  'sculpt-pinch': [v('gentle', 'Gentle', { strength: 0.25 }, true), v('crisp', 'Crisp', { strength: 0.7 }, true)],
+  'sculpt-erode': [v('gentle', 'Gentle', { strength: 0.3 }, true), v('strong', 'Strong', { strength: 1 }, true), v('wide', 'Wide', { size: 12, strength: 0.6 })],
   'paint-eraser': [v('small', 'Small', { size: 2 }, true), v('big', 'Big', { size: 6 }, true)],
 };
 /** The presets a tool shows at a level: Easy the best few, Pro and Studio all. */

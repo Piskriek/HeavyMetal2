@@ -775,6 +775,9 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 
 /* ---- the hotbar's loop (docs/HOTBAR.md): the palette film strip, a tool's presets, Easy / Pro / Studio ---- */
 .palette-strip { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 15; display: flex; align-items: stretch; width: min(640px, 50vw); padding: 10px 0; background: #1d1f1b; color: #f4f3ee; }
+/* the galaxy bar (Studio, or the menu) slides over the top of the screen: the palette moves down under it */
+body:has(.galaxy-bar.open) .palette-strip { top: 62px; }
+@media (prefers-reduced-motion: no-preference) { .palette-strip { transition: top .18s ease; } }
 /* sprocket holes along both edges: it is a film strip */
 .palette-strip::before, .palette-strip::after { content: ''; position: absolute; left: 0; right: 0; height: 5px; background: repeating-linear-gradient(90deg, transparent 0 6px, rgba(244, 243, 238, .7) 6px 11px, transparent 11px 17px); pointer-events: none; }
 .palette-strip::before { top: 2px; }
@@ -788,6 +791,7 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .ps-frame span { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-strip .ps-frame:hover:not(:disabled) { background: #2b2e28; border-color: rgba(244, 243, 238, .8); }
 .palette-strip .ps-frame.on, .palette-strip .ps-frame.on:hover:not(:disabled) { background: #3a3d36; color: #fff; border-color: #f4f3ee; box-shadow: inset 0 0 0 1px #f4f3ee; }
+.palette-strip .ps-frame .pv-icon { color: #f4f3ee; }
 .ps-split { align-self: center; padding: 0 8px; font-size: 11px; color: rgba(244, 243, 238, .6); border-left: 1px solid #3a3d36; white-space: nowrap; }
 .ps-empty { align-self: center; padding-right: 10px; font-size: 11px; color: rgba(244, 243, 238, .5); white-space: nowrap; }
 

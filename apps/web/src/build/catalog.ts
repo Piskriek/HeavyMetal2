@@ -95,6 +95,11 @@ export function validFor(tab: TabId, id: string, player: CatalogPlayer, activiti
   return catalog(tab, player, activities).some((c) => c.id === id);
 }
 
+/** Rows that were once the ready-made ones: a player who never changed them gets today's (Sculpt held shapes before it held ways). */
+export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly string[])[]>>> = {
+  sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']],
+};
+
 /** The hotbars a new player starts with: the nine most useful presets of each tab. */
 export function defaultHotbars(activities: readonly ActivityInfo[], player: CatalogPlayer): Hotbars {
   const ids = (list: readonly string[]): (string | null)[] => list.slice(0, 9);
@@ -102,7 +107,8 @@ export function defaultHotbars(activities: readonly ActivityInfo[], player: Cata
   for (const tab of TAB_IDS) out[tab] = [];
   out.select = ids(['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate']);
   out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']);
-  out.sculpt = ids(['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']);
+  // ways to sculpt; the shapes Stamp presses are in the palette (docs/HOTBAR.md)
+  out.sculpt = ids(['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']);
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
   out.sound = ids(['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']);
   out.lights = ids(['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat']);

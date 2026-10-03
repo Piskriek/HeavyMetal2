@@ -3,7 +3,7 @@ import type { DecorPlacement, Runtime } from '@hm/engine';
 import type { SfxId } from '@hm/audio';
 import { plugsFor, type PlugEvent, type PlugKind, type ToolPreset } from '@hm/buildkit';
 import type { ThreeRenderer } from '@hm/render';
-import { applyStroke, encodeTerrain, heightAt, paintWay, type DirtyRect } from '@hm/terrain';
+import { applyStroke, encodeTerrain, heightAt, mirroredDab, paintWay, sculptWay, type DirtyRect, type SculptDab } from '@hm/terrain';
 import { stamp, type StampKind } from '@hm/terrainops';
 import { encodeModel } from '@hm/voxel';
 import { GROUND_NAMES, SURFACE_IDS, packDecor, rectToArea, respondToSculpt, settlePlants, surfaceAt, type WorldRules } from '@hm/worldrules';
@@ -67,6 +67,8 @@ export class BuildController {
   /** Clone: where it copies from (right-click), and the offset fixed when a stroke starts. */
   private cloneSource: { x: number; z: number } | null = null;
   private cloneOffset: { dx: number; dz: number } | null = null;
+  /** Grab: where the press began (the ground there follows the pointer). */
+  private grabFrom: { x: number; z: number } | null = null;
 
   constructor(private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId, private readonly hooks: ControllerHooks) {}
 
@@ -190,6 +192,8 @@ export class BuildController {
     }
     // ways to paint (the surface is the palette's, set on the tool by the island)
     if (tool.action === 'paint' && tool.way) { this.paintWithWay(tool, aim, alt, now, first, on); return; }
+    // ways to sculpt (Stamp's shape is the palette's)
+    if (tool.action === 'sculpt' && tool.sculpt) { this.sculptWithWay(tool, aim, alt, now, first, on); return; }
     // brushes: paint and sculpt
     if (!ts) return;
     if (first) { this.dirty = null; this.last = null; this.flattenTo = tool.action === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = tool.name; this.before = ts.terrain.heights.slice(); }
@@ -246,6 +250,52 @@ export class BuildController {
     this.dirty = union(this.dirty, rect);
     this.renderer.refreshTerrain(rect);
     this.fire(tool, on, aim, { scale: way === 'fill' ? 1.4 : 0.4, first, sound: { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 } });
+  }
+
+  /**
+   * One tick of a way to sculpt. Grab pulls the ground held at the press along with the pointer (from the ground as it was, so it never
+   * smears); the others dab along the stroke. Symmetry mirrors each dab across the island's middle; Smooth after softens behind it.
+   */
+  private sculptWithWay(tool: ToolPreset, aim: Aim, alt: boolean, now: number, first: boolean, on: PlugEvent): void {
+    const ts = this.rt.binder.terrain();
+    if (!ts || !tool.sculpt) return;
+    const way = tool.sculpt, x = aim.point[0], z = aim.point[2], t = ts.terrain;
+    const mirrorX = t.spec.originX + ((t.spec.cols - 1) * t.spec.cell) / 2;
+    if (way === 'stamp') {
+      if (!first) return;
+      this.before = t.heights.slice(); this.strokeLabel = tool.name;
+      const shape = (tool.stampShape ?? 'mound') as StampKind;
+      const kind: StampKind = alt ? (shape === 'mound' ? 'crater' : shape === 'crater' ? 'mound' : shape) : shape;
+      const opts = { height: Math.max(0.2, tool.strength * tool.size * 0.6) * (alt && kind === shape ? -1 : 1), seed: Math.floor(now) % 99991, rotation: (now % 6283) / 1000 };
+      let rect = stamp(t as never, kind, [x, z], Math.max(2, tool.size), opts) as DirtyRect | null;
+      if (tool.mirror) rect = union(rect, stamp(t as never, kind, [2 * mirrorX - x, z], Math.max(2, tool.size), opts) as DirtyRect | null);
+      if (rect) { this.dirty = rect; this.renderer.refreshTerrain(rect); }
+      this.fire(tool, on, aim, { scale: 1.2 });
+      return;
+    }
+    if (first) { this.dirty = null; this.last = null; this.strokeLabel = tool.name; this.before = t.heights.slice(); this.grabFrom = { x, z }; }
+    const radius = alt && (way === 'grab' || way === 'noise' || way === 'erode') ? tool.size * 0.5 : tool.size;
+    const dabAt = (px: number, pz: number): DirtyRect | null => {
+      const d: SculptDab = {
+        way, x: px, z: pz, radius, strength: tool.strength, falloff: tool.falloff, invert: alt && (way === 'clay' || way === 'crease' || way === 'pinch'),
+        seed: (Math.floor(px * 7.3) * 31 + Math.floor(pz * 13.1)) >>> 0,
+        ...(way === 'grab' && this.before && this.grabFrom ? { grab: { x: this.grabFrom.x, z: this.grabFrom.z, base: this.before, dx: px - this.grabFrom.x, dz: pz - this.grabFrom.z } } : {}),
+      };
+      let rect = sculptWay(t, d);
+      if (tool.mirror) rect = union(rect, sculptWay(t, mirroredDab(d, mirrorX)));
+      if (tool.smoothAfter && way !== 'grab') rect = union(rect, sculptWay(t, { ...d, way: 'smooth', strength: 0.15 }));
+      return rect;
+    };
+    const from = this.last ?? { x, z };
+    const steps = way === 'grab' ? 0 : Math.min(40, Math.floor(Math.hypot(x - from.x, z - from.z) / Math.max(0.5, radius * 0.3)));
+    let rect: DirtyRect | null = null;
+    for (let k = 1; k <= steps; k++) rect = union(rect, dabAt(from.x + ((x - from.x) * k) / (steps + 1), from.z + ((z - from.z) * k) / (steps + 1)));
+    rect = union(rect, dabAt(x, z));
+    this.last = { x, z };
+    if (!rect) return;
+    this.dirty = union(this.dirty, rect);
+    this.renderer.refreshTerrain(rect);
+    this.fire(tool, on, aim, { scale: 0.6, first, sound: { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 } });
   }
 
   private done(tool: ToolPreset, aim: Aim, text: string, on: PlugEvent = 'use'): void {

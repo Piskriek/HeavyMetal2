@@ -200,6 +200,13 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(300));
   check('Esc closes the surface editor', await page.locator('.surface-editor').count() === 0);
+  // Sculpt holds ways to sculpt; the shapes its Stamp presses are the palette
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(T(300));
+  check('Sculpt holds ways to sculpt (Grab, Clay, Crease, Stamp, Terrace ...)', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Raise', 'Smooth', 'Grab', 'Clay', 'Crease', 'Stamp', 'Terrace'].every((w) => t.includes(w)); }));
+  check('the Sculpt palette holds the shapes to stamp', JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Hill', 'Crater', 'Plateau', 'Ridge', 'Dune', 'Volcano']));
+  await page.keyboard.press('F2');
+  await page.waitForTimeout(T(300));
   check('the hotbar has Easy, Pro and Studio', JSON.stringify(await page.$$eval('.level-switch button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Easy', 'Pro', 'Studio']));
   await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
   await page.waitForTimeout(T(300));

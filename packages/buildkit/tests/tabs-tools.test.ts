@@ -72,7 +72,7 @@ test('a tool is set to one of its presets by taking its values; Easy shows the b
   assert.equal(variantNow(normalizeTool('paint-stamp', star.patch)!)?.id, 'star');
   assert.ok(variantsOf('paint-brush', 'easy').every((v) => v.best));
   assert.ok(variantsOf('paint-brush', 'pro').length > variantsOf('paint-brush', 'easy').length);
-  assert.deepEqual(variantsOf('raise', 'pro'), [], 'tools without presets show none');
+  assert.deepEqual(variantsOf('dig', 'pro'), [], 'tools without presets show none');
 });
 
 test('a tool shows only the variables that matter to it, and edits come back as ids', () => {

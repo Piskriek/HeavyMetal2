@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Params, PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { PAINTS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { PAINTS, STAMP_SHAPES, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -30,7 +30,7 @@ import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
 import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
-import { applyVariant, editTool, pickPalette, player, putInSlot, setActivities, setLevel, setMode, setSlot, setTab, setView, usePlayer, wearLook } from './build/player';
+import { applyVariant, editTool, pickPalette, player, putInSlot, setActivities, setLevel, setMode, setSlot, setTab, setView, toggleSculpt, usePlayer, wearLook } from './build/player';
 import { spriteOf } from './build/sprites';
 import { ShareDialog } from './share/share-dialog';
 import type { ShareKind } from './share/shares';
@@ -56,6 +56,11 @@ const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
 /** The palette's surfaces for the ways to paint. */
 // the palette shows each surface's own tile (SetMix's graph-made set), its colours until the picture loads
+/** Sculpt's palette: the shapes its Stamp presses. */
+const SHAPE_ITEMS: readonly StripItem[] = STAMP_SHAPES.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'icon', icon: s.icon } }));
+/** A sculpt tool takes its shape (Stamp) from the palette and the toggles from beside the hotbar. */
+const withSculptPalette = (tool: ToolPreset, s: { readonly palette: Readonly<Partial<Record<TabId, string>>>; readonly sculptToggles: { readonly mirror: boolean; readonly smoothAfter: boolean } }): ToolPreset =>
+  tool.tab === 'sculpt' ? { ...tool, stampShape: s.palette.sculpt ?? 'mound', mirror: s.sculptToggles.mirror, smoothAfter: s.sculptToggles.smoothAfter } : tool;
 const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: SETMIX_FILE[s.id] ? { kind: 'image', url: `textures/setmix/${SETMIX_FILE[s.id]}.webp`, colors: surfaceColours(s.id) } : { kind: 'swatch', colors: surfaceColours(s.id) } }));
 
 const WIN = {
@@ -598,7 +603,7 @@ export function IslandWalk(props: {
       if (s.tab === 'select' || s.tab === 'paint' || s.tab === 'sculpt' || s.tab === 'things') {
         const own: ToolPreset | null = toolOf(s, id);
         // a way to paint puts down what the palette has picked (top middle)
-        const tool: ToolPreset | null = own && own.action === 'paint' && own.way ? { ...own, surface: Number(s.palette.paint ?? 4) || 4 } : own;
+        const tool: ToolPreset | null = own && own.action === 'paint' && own.way ? { ...own, surface: Number(s.palette.paint ?? 4) || 4 } : own ? withSculptPalette(own, s) : own;
         const a = aim();
         if (tool && a) {
           builder.use(tool, a, alt, now, first);
@@ -841,7 +846,8 @@ export function IslandWalk(props: {
   const openAvatar = (): void => { const cur = player().tab; if (cur !== 'avatar') beforeAvatar.current = cur; setTab('avatar'); };
   const openSettings = (): void => { win.open('settings', 'Settings', { x: Math.max(12, window.innerWidth - 470), y: 64, w: 448, h: Math.min(720, window.innerHeight - 90) }); };
   // the tool in your hand and its presets row (a tool with presets of its own shows them above the hotbar instead of the words)
-  const heldTool = heldItem && (p.tab === 'select' || p.tab === 'paint' || p.tab === 'sculpt' || p.tab === 'things') ? toolOf(p, heldItem.id) : null;
+  const heldOwn = heldItem && (p.tab === 'select' || p.tab === 'paint' || p.tab === 'sculpt' || p.tab === 'things') ? toolOf(p, heldItem.id) : null;
+  const heldTool = heldOwn ? withSculptPalette(heldOwn, p) : null;
   const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
   const showHud = buildOn && !menu && level !== 'island' && !showcase;
   const showPresets = showHud && !avatarMode && !!heldTool && variantsOf(heldTool.id, 'pro').length > 0;
@@ -865,6 +871,7 @@ export function IslandWalk(props: {
         <ToolPresetsRow tool={heldTool} level={p.level} surface={Number(p.palette.paint ?? 4) || 4} peek={peekGround} words={say2}
           onPick={(v) => { applyVariant(heldTool.id, v.patch); fx('select', { volume: 0.5 }); }}
           onEdit={(k, val) => editTool(heldTool.id, k, val)}
+          toggles={{ mirror: p.sculptToggles.mirror, smoothAfter: p.sculptToggles.smoothAfter, onToggle: (k) => { toggleSculpt(k); fx('ui-toggle', { volume: 0.5 }); } }}
           onAll={() => win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor })} />
       ) : null}
       {/* the palette: what the tool in your hand puts down (top middle) */}
@@ -872,6 +879,8 @@ export function IslandWalk(props: {
         p.tab === 'paint'
           ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'sculpt'
+          ? <PaletteStrip title="Stamp" items={SHAPE_ITEMS} community={[]} selected={p.palette.sculpt ?? 'mound'} onLayers={openLayers} onPick={(id) => { pickPalette('sculpt', id); fx('select', { volume: 0.5 }); }} />
           // a tab without materials shows its own presets here: one click puts it in the slot you are on
           : <PaletteStrip title={tabDef(p.tab).label} items={items.map((c) => ({ id: c.id, name: c.name, preview: c.preview }))} community={[]} selected={heldItem?.id} onLayers={openLayers} onPick={pickPreset} />
       ) : null}

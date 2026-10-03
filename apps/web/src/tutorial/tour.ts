@@ -39,6 +39,8 @@ function deliverIfMoved(t: Tutorial, effects: readonly Effect[]): void {
 /** Open the tour for this island visit (build tour for grown-ups, the short one otherwise). Effects queued on entering a step are delivered. */
 export function startTour(k: 'build' | 'walk', onEffect: (e: Effect) => void): void {
   handler = onEffect;
+  // the controls this tour points at, for the tests: each must exist on the island (data-ui names, B15)
+  (window as unknown as { hmTourTargets?: string[] }).hmTourTargets = stepsFor(k).map((s) => s.highlight).filter((h): h is string => !!h);
   const saved = read();
   mode = saved?.mode === 'never' ? 'never' : 'on';
   try { later = sessionStorage.getItem(LATER) === '1'; } catch { later = false; }

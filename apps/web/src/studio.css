@@ -450,7 +450,7 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .plug-name small { color: var(--dim); font-size: 10px; }
 .plug-amt { display: flex; align-items: center; gap: 2px; font-size: 11px; color: var(--dim); }
 .plug-amt input { width: 46px; }
-.plug .x { padding: 2px 7px; }
+.plug .x { min-width: 26px; min-height: 26px; padding: 2px 7px; }
 .plug-choose { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px; max-height: 210px; overflow: auto; padding: 4px; border: 1px solid var(--line); }
 .plug-choose button { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; font-size: 10px; background: var(--panel); color: var(--text); }
 .plug-choose button.on { outline: 2px solid var(--accent); outline-offset: -2px; }
@@ -610,7 +610,7 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
   opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s var(--ease-out); }
 .gr-preview-hit:hover .gr-cue, .gr-preview-hit:focus-visible .gr-cue { opacity: 1; transform: none; }
 .gr-preview-you { margin: 0; padding: 7px 14px; font-size: 12px; color: var(--text); background: var(--paper); border-top: 1px solid var(--text); }
-.gr-preview-menu { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--paper); border-top: 1px solid var(--line); }
+.gr-preview-menu { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--paper); border-top: 1px solid var(--line); }
 .gr-preview-menu button { font-family: var(--font-display); font-weight: 700; font-size: 16px; padding: 12px 0; border: 0; border-right: 1px solid var(--line); background: none; transition: background .18s, color .18s; }
 .gr-preview-menu button:last-child { border-right: 0; }
 .gr-preview-menu button:hover:not(:disabled) { background: var(--text); color: var(--paper); }
@@ -735,3 +735,40 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .new-activity { display: grid; gap: 12px; }
 .ni-q input:not([type="range"]) { width: 100%; }
 .ni-q .row.slider { display: grid; grid-template-columns: 5em 1fr; gap: 10px; align-items: center; font-size: 13px; margin-bottom: 8px; }
+/* the tour points at the control a step is about */
+.tour-ring { position: fixed; z-index: 60; pointer-events: none; border: 2px solid var(--accent); animation: tour-ring 1.6s ease-in-out infinite; }
+@keyframes tour-ring { 50% { outline: 6px solid color-mix(in srgb, var(--accent) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .tour-ring { animation: none; } }
+
+/* My planet on the home: your islands drawn from above, in a window placed like Goblin Racing's */
+.planet-stage { position: absolute; left: calc(96vw - min(42vw, 640px)); top: 16vh; width: min(42vw, 640px); z-index: 3; border: 1px solid var(--text); background: var(--paper); animation: gr-in .5s var(--ease-out) both; }
+.planet-window > header { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--text); }
+.planet-window .gr-preview-name { font-family: var(--font-setmix); }
+.pw-islands { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; padding: 12px; background: var(--hm-inset); }
+.pw-islands button { display: grid; justify-items: center; gap: 6px; padding: 6px; background: var(--paper); border: 1px solid var(--line); font-size: 12px; color: var(--text); }
+.pw-islands button:hover, .pw-islands button:focus-visible { border-color: var(--text); background: var(--paper); }
+.pw-islands button.on { border-color: var(--text); }
+.planet-window .gr-preview-menu button { font-family: var(--font-setmix); }
+@media (max-width: 760px) { .planet-stage { left: 4vw; width: 92vw; top: auto; bottom: 12px; } .pw-islands { grid-template-columns: repeat(2, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .planet-stage { animation: none; } }
+
+/* My planet's own screen */
+.planet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.planet-island { display: grid; gap: 6px; padding: 10px; background: var(--paper); border: 1px solid var(--line); align-content: start; }
+.planet-island.current { border-color: var(--text); }
+.planet-island .pi-map { padding: 0; border: 0; background: none; justify-self: center; cursor: pointer; }
+.planet-island .pi-map:hover, .planet-island .pi-map:focus-visible { background: none; outline: 1px solid var(--text); }
+.planet-island h4 { margin: 0; font-family: var(--font-setmix); font-size: 17px; font-weight: 700; }
+.planet-island p { margin: 0; font-size: 12px; color: var(--dim); }
+.planet-island.new { display: grid; place-items: center; align-content: center; gap: 6px; min-height: 240px; border-style: dashed; color: var(--dim); font-size: 14px; }
+
+/* a planet window whose island is still being built */
+.gr-loading { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); display: grid; justify-items: center; gap: 8px; font-size: 12px; color: var(--dim); pointer-events: none; }
+.gr-loading i { width: 40%; height: 3px; background: var(--line); position: relative; overflow: hidden; }
+.gr-loading i::after { content: ''; position: absolute; inset: 0; width: 40%; background: var(--text); animation: gr-load 1.1s ease-in-out infinite; }
+@keyframes gr-load { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { .gr-loading i::after { animation: none; width: 100%; } }
+.ad-row button.on { color: var(--text); }
+/* panels made inside a SetMix window keep the window padding */
+.shell-window > .new-island, .shell-window > .new-chooser, .shell-window > .new-activity, .shell-window > .avatar-new, .shell-window > .planet-grid { margin: 14px 16px 16px; }
+.shell-window > .hint { margin-left: 16px; margin-right: 16px; }

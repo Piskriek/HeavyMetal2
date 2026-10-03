@@ -63,6 +63,8 @@ export function IslandWalk(props: {
   readonly fpsTarget?: FpsTarget;
   /** Only this element's area of the view is seen (the SetMix home's window): the renderer shades just that part. */
   readonly clipTo?: RefObject<HTMLElement | null>;
+  /** Called once the view has drawn its first frames (a preview window shows its loading bar until then). */
+  readonly onReady?: () => void;
   /** Showcase only: where on the screen (0..1 across and down) the goblin should stand, when only part of the view is seen (the SetMix home's window). */
   readonly frame?: { readonly x: number; readonly y: number };
   /** The player's own changes to the graphics preset, on top of whichever tier draws (Settings). */
@@ -133,6 +135,8 @@ export function IslandWalk(props: {
   const row: (CatalogItem | null)[] = p.hotbars[p.tab].map((id) => (id ? byId.get(id) ?? null : null));
   const heldItem = row[p.slots[p.tab]] ?? null;
   const showcase = props.showcase === true;
+  const readyRef = useRef(props.onReady);
+  readyRef.current = props.onReady;
   /** Avatar mode: the Avatar tab (P) turns the camera to face your avatar, with your characters and its presets beside it (E11). */
   const avatarMode = p.tab === 'avatar' && level === 'goblin' && !showcase;
   const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase, avatarMode });
@@ -570,7 +574,7 @@ export function IslandWalk(props: {
       return menuBase + Math.sin(now * 0.00007) * SWAY;
     };
 
-    let raf = 0, last = performance.now();
+    let raf = 0, last = performance.now(), drawn = 0;
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -582,7 +586,7 @@ export function IslandWalk(props: {
         if (k >= 1) { intro.on = false; onIntroDone?.(); }
       }
       const overview = live.current.level === 'island' || live.current.showcase;
-      const st = studio();
+      const st = studio() && !live.current.showcase; // a showcase (the home's Goblin Racing window) is never the studio, whatever mode your island was left in
       const mirrorOn = live.current.avatarMode && !overview && !st;
       const fpv = player().view === 'first' && !st && !mirrorOn;
       const paused = live.current.menu || overview || mirrorOn;
@@ -724,6 +728,7 @@ export function IslandWalk(props: {
       if (clipEl && el) { const r = clipEl.getBoundingClientRect(), c = el.getBoundingClientRect(); const full = r.width >= c.width - 2 && r.height >= c.height - 2; renderer.setClip(full ? null : { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height }); }
       else renderer.setClip(null);
       renderer.render(1);
+      if (++drawn === 4) readyRef.current?.();
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -744,7 +749,7 @@ export function IslandWalk(props: {
 
   // studio opens the settings of what you hold in a window of its own (close it any time)
   useEffect(() => {
-    if (p.mode !== 'studio' || !buildOn) return;
+    if (p.mode !== 'studio' || !buildOn || showcase) return;
     if (!win.isOpen('held')) win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor });
   }, [p.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -757,7 +762,13 @@ export function IslandWalk(props: {
   const showHud = buildOn && !menu && level !== 'island' && !showcase;
   // the toggles go into the shell's slot above the galaxy bar (studio keeps that bar down), else they sit in place
   const [topSlot, setTopSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => { setTopSlot(document.getElementById('hud-top')); }, [showHud]);
+  useEffect(() => {
+    const slot = document.getElementById('hud-top');
+    if (slot) { setTopSlot(slot); return; }
+    // not there yet (it can come in the same moment as the view): look again next frame
+    const t = requestAnimationFrame(() => setTopSlot(document.getElementById('hud-top')));
+    return () => cancelAnimationFrame(t);
+  }, [showHud]);
   const inTopSlot = (node: ReactElement): ReactElement => (topSlot ? createPortal(node, topSlot) : node);
   const free = !locked || p.mode === 'studio';
   return (
@@ -770,7 +781,7 @@ export function IslandWalk(props: {
       {showHud && !avatarMode ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} /> : null}
       {avatarMode && !menu ? <AvatarDock actions={actions} onPreview={(l) => api.current?.previewLook(l)} onDone={leaveAvatar} /> : null}
       {showHud && wheelOpen ? <TabWheel title={tabDef(p.tab).label} items={items} index={wheelIndex} clickable={free} onPick={pickWheel} /> : null}
-      {win.list.map((w) => (
+      {showcase ? null : win.list.map((w) => (
         <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (heldItem ? `${tabDef(p.tab).label}: ${heldItem.name}` : 'What you hold') : w.title} className={w.id === 'presets' ? 'wide' : ''}>
           {w.id === 'presets' ? <PresetWindowBody activities={activities} onEdit={openEditor} onWorld={() => win.open('world', 'World rules', { x: 60, y: 90, ...WIN.editor })} onPlant={(kind) => win.open(`plant:${kind}`, `Behaviour: ${kind}`, { x: 80, y: 110, ...WIN.editor })} onMoves={() => win.open('moves', 'How my goblin moves', { x: 60, y: 90, ...WIN.editor })} />
             : w.id === 'held' ? (heldItem ? <EditorFor tab={p.tab} id={heldItem.id} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} /> : <p className="hint">Pick a slot, or press E to put a preset in it.</p>)
@@ -801,7 +812,7 @@ export function IslandWalk(props: {
           <div className="im-group" role="group" aria-label="SetMix">
             <h4>SetMix</h4>
             <button onClick={onMainMenu}>Home</button>
-            {onIslands ? <button onClick={onIslands}>My islands</button> : null}
+            {onIslands ? <button onClick={onIslands}>My planet</button> : null}
             <button onClick={onActivities}>Activities</button>
             <button onClick={onHub}>Community</button>
             <button onClick={() => { setMenu(false); openSettings(); }}>Settings</button>

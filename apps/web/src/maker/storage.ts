@@ -71,19 +71,34 @@ export async function mapToCode(rt: Runtime, sceneId: PresetId): Promise<string>
   return CODE_PREFIX + toB64(await pipe(json, new CompressionStream('gzip')));
 }
 
-/** Check a share code and make it the saved map. The caller reloads the maker afterwards. Returns an error sentence, or null on success. */
-export async function useMapCode(code: string): Promise<string | null> {
+/** Where a runtime's map is saved: the key it was loaded from (its own island or Goblin Racing's), never whichever island is active now. */
+const keyOf = (rt: Runtime | undefined): string => { const home = rt ? homeOf.get(rt) : undefined; return home ? home.pinned ?? bundleKey(home.island ?? 'orphan') : currentKey(); };
+
+/** Check a share code and make it the saved map of this runtime's island. The caller reloads afterwards. Returns an error sentence, or null on success. */
+export async function useMapCode(code: string, rt?: Runtime): Promise<string | null> {
   const text = code.trim();
   if (!text.startsWith(CODE_PREFIX)) return 'That does not look like a map code (it should start with HM1.).';
   try {
     const raw = await pipe(fromB64(text.slice(CODE_PREFIX.length)), new DecompressionStream('gzip'));
     const bundle = JSON.parse(new TextDecoder().decode(raw)) as PresetBundle;
     if (!bundle || typeof bundle.root !== 'string' || !Array.isArray(bundle.presets) || !bundle.presets.some((p) => p.id === bundle.root && p.kind === 'scene')) return 'The code is readable but it is not a map.';
-    localStorage.setItem(currentKey(), JSON.stringify(bundle));
+    localStorage.setItem(keyOf(rt), JSON.stringify(bundle));
     return null;
   } catch {
     return 'The code is damaged or incomplete. Copy the whole line, including the start.';
   }
+}
+
+/** Put a map (a share code) under a key unless something is saved there already. Resolves true when it was written. */
+export async function seedMap(key: string, code: string): Promise<boolean> {
+  try {
+    if (localStorage.getItem(key) !== null || !code.startsWith(CODE_PREFIX)) return false;
+    const raw = await pipe(fromB64(code.slice(CODE_PREFIX.length)), new DecompressionStream('gzip'));
+    const bundle = JSON.parse(new TextDecoder().decode(raw)) as PresetBundle;
+    if (!bundle || typeof bundle.root !== 'string' || !Array.isArray(bundle.presets)) return false;
+    localStorage.setItem(key, JSON.stringify(bundle));
+    return true;
+  } catch { return false; }
 }
 
 export function hasSavedMap(): boolean {
@@ -95,9 +110,7 @@ export function clearSavedMap(): void {
 }
 /** Forget the saved map this runtime was loaded from (its own island or Goblin Racing's), never whichever island happens to be active. */
 export function clearMapOf(rt: Runtime): void {
-  const home = homeOf.get(rt);
-  const key = home ? home.pinned ?? bundleKey(home.island ?? 'orphan') : currentKey();
-  try { localStorage.removeItem(key); } catch { /* ignore */ }
+  try { localStorage.removeItem(keyOf(rt)); } catch { /* ignore */ }
 }
 
 /** Import the saved map into the runtime and bind its scene. Returns the scene description, or null when there is none. */

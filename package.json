@@ -15,7 +15,9 @@
     "verify": "node scripts/verify.mjs",
     "host": "npm run build && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
-    "e2e": "node scripts/e2e-smoke.mjs"
+    "e2e": "node scripts/e2e-smoke.mjs",
+    "ui-map": "node scripts/ui-map.mjs",
+    "perf": "node scripts/perf.mjs"
   },
   "devDependencies": {
     "@types/node": "22.19.17",

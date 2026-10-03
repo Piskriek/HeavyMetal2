@@ -20,7 +20,7 @@ export function TabStrip(props: { readonly tab: TabId; readonly onPick: (t: TabI
       {TABS.map((t) => {
         const I = iconByName(t.icon);
         return (
-          <button key={t.id} role="tab" aria-selected={props.tab === t.id} className={props.tab === t.id ? 'on' : ''} data-label={`${t.label} (${t.key}${t.alt ? ` or ${t.alt.toUpperCase()}` : ''}): ${t.doc}`} onClick={() => props.onPick(t.id)}>
+          <button key={t.id} data-ui={`island.tab.${t.id}`} role="tab" aria-selected={props.tab === t.id} className={props.tab === t.id ? 'on' : ''} data-label={`${t.label} (${t.key}${t.alt ? ` or ${t.alt.toUpperCase()}` : ''}): ${t.doc}`} onClick={() => props.onPick(t.id)}>
             <I size={15} strokeWidth={1.6} /><span>{t.label}</span><kbd>{t.key}</kbd>
           </button>
         );
@@ -32,14 +32,14 @@ export function TabStrip(props: { readonly tab: TabId; readonly onPick: (t: TabI
 /** Nine slots of the open tab (keys 1 to 9, or the wheel). Each shows its preset. E opens the preset window to fill them. */
 export function Hotbar(props: { readonly items: readonly (CatalogItem | null)[]; readonly selected: number; readonly onSelect: (i: number) => void; readonly onOpen: () => void }): ReactElement {
   return (
-    <div className="hotbar" role="toolbar" aria-label="Hotbar">
+    <div className="hotbar" role="toolbar" aria-label="Hotbar" data-ui="island.hotbar">
       {props.items.map((it, i) => (
         <button key={i} className={i === props.selected ? 'on' : ''} data-label={it ? `${it.name}: ${it.doc}` : 'Empty: press E to put a preset here'} aria-label={it ? it.name : 'Empty slot'} onClick={() => (it ? props.onSelect(i) : props.onOpen())}>
           <b>{i + 1}</b>
           {it ? <><PresetPreview p={it.preview} size={34} /><span>{it.name}</span></> : <span className="empty">+</span>}
         </button>
       ))}
-      <button className="inv-btn" data-label="Your presets: pick what goes in these slots, change any of them (E)" aria-label="Open your presets" onClick={props.onOpen}>E</button>
+      <button className="inv-btn" data-ui="island.presets" data-label="Your presets: pick what goes in these slots, change any of them (E)" aria-label="Open your presets" onClick={props.onOpen}>E</button>
     </div>
   );
 }
@@ -63,7 +63,7 @@ export function ModeBar(props: {
 }): ReactElement {
   const seg = <T extends string>(label: string, value: T, opts: readonly [T, string, string][], on: (v: T) => void): ReactElement => (
     <div className="seg" role="group" aria-label={label}>
-      {opts.map(([v, text, title]) => <button key={v} className={value === v ? 'on' : ''} aria-pressed={value === v} title={title} onClick={() => on(v)}>{text}</button>)}
+      {opts.map(([v, text, title]) => <button key={v} data-ui={`island.${label.toLowerCase()}.${v}`} className={value === v ? 'on' : ''} aria-pressed={value === v} title={title} onClick={() => on(v)}>{text}</button>)}
     </div>
   );
   return (

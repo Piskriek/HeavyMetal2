@@ -23,7 +23,7 @@ export function ShareDialog({ rt, sceneId, onClose, onDone }: { readonly rt: Run
   };
   const load = async (): Promise<void> => {
     setBusy(true);
-    const problem = await useMapCode(incoming);
+    const problem = await useMapCode(incoming, rt);
     setBusy(false);
     if (problem) { setError(problem); return; }
     location.reload();

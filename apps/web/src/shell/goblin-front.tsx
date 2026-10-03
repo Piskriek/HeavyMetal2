@@ -13,20 +13,26 @@ export interface GoblinStatus {
   readonly you: string;
 }
 
-export function GoblinPreview(props: GoblinStatus & { readonly onOpen: () => void; readonly onPlay: () => void; readonly onModes: () => void; readonly onSettings: () => void }): ReactElement {
+/** A planet's live window on the SetMix home (Goblin Racing, or any activity): its name, what it is, where you stand, its own menu. */
+export function GoblinPreview(props: GoblinStatus & {
+  readonly name?: string; readonly onOpen: () => void;
+  readonly actions: readonly { readonly label: string; readonly onClick: () => void; readonly go?: boolean }[];
+  /** The island view behind the window has not drawn yet: a loading bar instead of an empty frame. */
+  readonly loading?: boolean;
+}): ReactElement {
+  const name = props.name ?? 'Goblin Racing';
   return (
     <div className="gr-preview">
       <header>
-        <div className="gr-preview-title"><span className="gr-preview-name">Goblin Racing</span><span className="gr-preview-doc">{props.doc}</span></div>
-        <button className="gr-open" aria-label="Open Goblin Racing" title="Open Goblin Racing" onClick={props.onOpen}><Maximize2 size={16} strokeWidth={1.6} /></button>
+        <div className="gr-preview-title"><span className="gr-preview-name">{name}</span><span className="gr-preview-doc">{props.doc}</span></div>
+        <button className="gr-open" aria-label={`Open ${name}`} title={`Open ${name}`} onClick={props.onOpen}><Maximize2 size={16} strokeWidth={1.6} /></button>
       </header>
       {/* the island itself opens the game: a cue says so on hover */}
-      <button className="gr-preview-hit" aria-label="Open Goblin Racing" onClick={props.onOpen}><span className="gr-cue"><Maximize2 size={13} strokeWidth={1.8} />Open Goblin Racing</span></button>
+      <button className="gr-preview-hit" aria-label={`Open ${name}`} onClick={props.onOpen}><span className="gr-cue"><Maximize2 size={13} strokeWidth={1.8} />Open {name}</span></button>
+      {props.loading ? <div className="gr-loading" role="status"><span>Loading the island</span><i /></div> : null}
       <p className="gr-preview-you">{props.you}</p>
-      <nav className="gr-preview-menu" aria-label="Goblin Racing menu">
-        <button className="go" onClick={props.onPlay}>Play</button>
-        <button onClick={props.onModes}>Race modes</button>
-        <button onClick={props.onSettings}>Settings</button>
+      <nav className="gr-preview-menu" aria-label={`${name} menu`}>
+        {props.actions.map((a) => <button key={a.label} className={a.go ? 'go' : ''} onClick={a.onClick}>{a.label}</button>)}
       </nav>
     </div>
   );
@@ -49,7 +55,7 @@ export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void;
 }
 
 const HARNESS_MENU: readonly { readonly id: 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
-  { id: 'island', label: 'My island', says: 'Walk and build your own island.' },
+  { id: 'island', label: 'My planet', says: 'Your islands: pick one to go in, or make a new one.' },
   { id: 'avatars', label: 'Avatars', says: 'Who you are: goblins, humans and more.' },
   { id: 'community', label: 'Community', says: 'Presets other players share, and yours.' },
   { id: 'settings', label: 'Settings', says: 'Graphics, controls and your profile.' },
@@ -61,8 +67,8 @@ const HARNESS_MENU: readonly { readonly id: 'island' | 'avatars' | 'community' |
  */
 export function SetMixHome(props: {
   readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
-  /** Your islands: switch to another or make a new one. */
-  readonly onIslands: () => void;
+  /** Straight into the island you were last on (or your first). */
+  readonly onIslandNow: () => void;
   /** The island My island opens, and whether you have been there before (then it says you carry on where you left off). */
   readonly island: { readonly name: string; readonly visited: boolean } | null;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
@@ -75,8 +81,8 @@ export function SetMixHome(props: {
       <nav className="sm-menu" aria-label="SetMix">
         {HARNESS_MENU.map((m, i) => (
           <Fragment key={m.id}>
-            <button style={{ ['--i' as string]: i }} onClick={act[m.id]}><b>{m.label}</b><small>{m.id === 'island' && props.island ? (props.island.visited ? `Carry on at ${props.island.name}, where you left off.` : `Walk and build ${props.island.name}.`) : m.says}</small></button>
-            {m.id === 'island' ? <button className="sm-sub" style={{ ['--i' as string]: i }} onClick={props.onIslands}>All my islands, or a new one</button> : null}
+            <button style={{ ['--i' as string]: i }} onClick={act[m.id]}><b>{m.label}</b><small>{m.says}</small></button>
+            {m.id === 'island' && props.island ? <button className="sm-sub" style={{ ['--i' as string]: i }} onClick={props.onIslandNow}>{props.island.visited ? `Carry on at ${props.island.name}` : `Go to ${props.island.name}`}</button> : null}
           </Fragment>
         ))}
       </nav>

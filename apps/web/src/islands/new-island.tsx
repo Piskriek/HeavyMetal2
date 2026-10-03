@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { generateIsland } from '@hm/terrain';
+import { decodeTerrain, generateIsland, type Terrain } from '@hm/terrain';
+import type { PresetBundle } from '@hm/contracts';
 import { SURF } from '@hm/render';
 import { DRAFT_PRESETS } from '@hm/trackedit';
 import { TEMPLATE_SHAPES, type TemplateShape } from '../maker/scene';
@@ -25,11 +26,26 @@ const SURF_RGB: Record<number, [number, number, number]> = {
   [SURF.sand]: [226, 208, 152], [SURF.grass]: [111, 160, 74], [SURF.rock]: [139, 132, 120], [SURF.cliff]: [109, 101, 92], [SURF.lava]: [176, 70, 44],
   [SURF.scree]: [154, 146, 134], [SURF.basalt]: [74, 70, 66], [SURF.soil]: [138, 106, 72], [SURF.seabed]: [196, 186, 150],
 };
-function drawIsland(canvas: HTMLCanvasElement, shape: TemplateShape): void {
-  const t = generateIsland({ cols: 129, rows: 129, cell: 2, originX: -128, originZ: -128 }, shape.seed, {
-    surfaces: { seabed: SURF.seabed, sand: SURF.sand, grass: SURF.grass, rock: SURF.rock, cliff: SURF.cliff, lava: SURF.lava, scree: SURF.scree, basalt: SURF.basalt, soil: SURF.soil },
-    radius: shape.radius, height: shape.height, roughness: shape.roughness, ...(shape.volcano ? { volcano: shape.volcano } : {}),
-  });
+/** What a map is drawn from: a template's shape (generated) or an island's own saved ground and track. */
+export type MapSource = { readonly shape: TemplateShape } | { readonly terrain: Terrain; readonly track: readonly (readonly [number, number])[] };
+const terrainOf = (shape: TemplateShape): Terrain => generateIsland({ cols: 129, rows: 129, cell: 2, originX: -128, originZ: -128 }, shape.seed, {
+  surfaces: { seabed: SURF.seabed, sand: SURF.sand, grass: SURF.grass, rock: SURF.rock, cliff: SURF.cliff, lava: SURF.lava, scree: SURF.scree, basalt: SURF.basalt, soil: SURF.soil },
+  radius: shape.radius, height: shape.height, roughness: shape.roughness, ...(shape.volcano ? { volcano: shape.volcano } : {}),
+});
+/** A saved island's map source from its bundle (the ground as edited, the track as drawn), or null when it cannot be read. */
+export function mapOfBundle(json: string): MapSource | null {
+  try {
+    const b = JSON.parse(json) as PresetBundle;
+    const ground = b.presets.find((x) => x.kind === 'terrain');
+    if (!ground) return null;
+    const terrain = decodeTerrain(ground.params['data'] as never);
+    const track = b.presets.find((x) => x.kind === 'track');
+    const pts = Array.isArray(track?.params['points']) ? (track!.params['points'] as unknown as [number, number][]) : [];
+    return { terrain, track: pts };
+  } catch { return null; }
+}
+function drawIsland(canvas: HTMLCanvasElement, src: MapSource): void {
+  const t = 'shape' in src ? terrainOf(src.shape) : src.terrain;
   const { cols, rows } = t.spec;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -46,16 +62,31 @@ function drawIsland(canvas: HTMLCanvasElement, shape: TemplateShape): void {
     img.data[i * 4] = rgb[0]; img.data[i * 4 + 1] = rgb[1]; img.data[i * 4 + 2] = rgb[2]; img.data[i * 4 + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  if (shape.track) {
-    const pts = DRAFT_PRESETS[0]!.draft.points;
+  const track: readonly (readonly [number, number])[] = 'shape' in src ? (src.shape.track ? DRAFT_PRESETS[0]!.draft.points.map((p) => [p.x, p.z] as const) : []) : src.track;
+  if (track.length > 2) {
+    const sx = cols / ((cols - 1) * t.spec.cell), ox = t.spec.originX, oz = t.spec.originZ;
     ctx.strokeStyle = 'rgba(40,36,30,.85)'; ctx.lineWidth = 2.5; ctx.beginPath();
-    pts.forEach((p, k) => { const x = (p.x + 128) / 2, y = (p.z + 128) / 2; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    track.forEach(([px, pz], k) => { const x = (px - ox) * sx, y = (pz - oz) * sx; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
     ctx.closePath(); ctx.stroke();
   }
 }
-export function IslandMap(props: { readonly shape: TemplateShape; readonly size: number; readonly label: string }): ReactElement {
+/** Maps draw one per frame (each is a few tens of milliseconds on a slow laptop): a grid of them never stalls the screen. */
+const queue: (() => void)[] = [];
+let pumping = false;
+function later(job: () => void): () => void {
+  let live = true;
+  queue.push(() => { if (live) job(); });
+  if (!pumping) {
+    pumping = true;
+    const pump = (): void => { const next = queue.shift(); next?.(); if (queue.length) requestAnimationFrame(pump); else pumping = false; };
+    requestAnimationFrame(pump);
+  }
+  return () => { live = false; };
+}
+export function IslandMap(props: ({ readonly shape: TemplateShape } | { readonly source: MapSource }) & { readonly size: number; readonly label: string }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => { if (ref.current) drawIsland(ref.current, props.shape); }, [props.shape]);
+  const src: MapSource = 'source' in props ? props.source : { shape: props.shape };
+  useEffect(() => later(() => { if (ref.current) drawIsland(ref.current, src); }), ['source' in props ? props.source : props.shape]); // eslint-disable-line react-hooks/exhaustive-deps
   return <canvas ref={ref} className="island-map" style={{ width: props.size, height: props.size }} role="img" aria-label={props.label} />;
 }
 

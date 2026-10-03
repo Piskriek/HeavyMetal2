@@ -55,3 +55,10 @@ Change a colour here, never in a component. Current values:
 6. Motion only to answer a press or to show where something went; reduced motion respected.
 7. Phone width: no horizontal scroll, docks become bottom sheets, targets at least 24 px.
 8. Measure on Potato and Low after any change that draws (`scripts/perf.mjs`).
+
+## The routine after any UI change
+
+1. `npm run verify` (types, tests, build) and `npm run e2e` (the journeys).
+2. `npm run ui-map -- --check` (on this laptop with `E2E_GPU=1 E2E_SLOW=2`): every screen, every control pressed; it fails if a button went missing, appeared undeclared, or does something else than before.
+3. Look at `ui-map/index.html`: every screenshot against the rules above.
+4. When a change is meant (a new button, a new screen), review it there, then `npm run ui-map -- --approve` writes the new contract (`tests/ui-contract.json`); commit it with the change.

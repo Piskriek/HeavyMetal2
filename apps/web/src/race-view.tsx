@@ -173,7 +173,7 @@ export function RaceView(props: {
       {showTouch && game ? <TouchControls width={size.w} height={size.h} onChange={(t) => game.input.setTouch(t)} /> : null}
       {props.active && count !== null && !props.paused ? <IntroOverlay countdown={count} lap={1} laps={hud?.laps ?? 3} reducedMotion={props.settings.reducedMotion} /> : null}
       {props.pausable && !props.paused ? <button className="pause-btn" aria-label="Pause" onClick={props.onPause}>⏸</button> : null}
-      {!showTouch ? <div className="race-hint">Arrows / WASD to drive · Space = item · R = reset · Esc = pause</div> : null}
+      {!showTouch ? <div className="race-hint">Drive with the arrows or W A S D. Space uses your item, R puts you back on the road, Esc pauses.</div> : null}
     </div>
   );
 }

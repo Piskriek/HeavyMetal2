@@ -35,7 +35,7 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix with the harness menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My island', 'Avatars', 'Community', 'Settings']));
+  check('the home is SetMix with the harness menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My planet', 'Avatars', 'Community', 'Settings']));
   await page.waitForSelector('.gr-preview', { timeout: T(30000) });
   check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings']));
   check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
@@ -63,8 +63,11 @@ try {
   await page.waitForTimeout(T(400));
   check('Esc again returns to the SetMix home', await page.locator('.sm-home').count() === 1);
 
-  // My island: the first time it makes your first avatar (look and name), then dives to your island
-  await text('.sm-menu button', 'My island').click();
+  // My planet shows your islands drawn from above; going into one the first time makes your first avatar (look and name), then dives
+  await text('.sm-menu button', 'My planet').click();
+  await page.waitForSelector('[aria-label="My planet"]', { timeout: T(10000) });
+  check('My planet shows your islands drawn from above', await page.locator('[aria-label="My planet"] canvas.island-map').count() >= 1);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.textContent === 'Go in')?.click(); });
   await page.waitForSelector('.create-goblin', { timeout: T(15000) });
   check('My island asks you to make your first avatar', true);
   check('the creator offers ready-made looks', await page.locator('.cg-looks button').count() >= 6);
@@ -81,6 +84,8 @@ try {
   check('Done takes you to your island', true);
   await page.waitForSelector('.tour', { timeout: T(15000) }).catch(() => undefined);
   check('the island tour starts on your first visit', await page.locator('.tour h3').count() === 1);
+  const missing = await page.evaluate(() => (window.hmTourTargets ?? ['(none published)']).filter((t) => !document.querySelector(`[data-ui="${t}"]`)));
+  check('every control the tour points at is on the island (B15)', missing.length === 0, missing.join(', '));
   for (let i = 0; i < 12 && await page.locator('.tour-reveal').count() === 0; i++) { await page.locator('.tour button', { hasText: 'Skip' }).click(); await page.waitForTimeout(T(120)); }
   check('the tour ends on the PBR reveal', await page.locator('.tour-reveal').count() === 1);
   await page.locator('.tour-reveal').click();
@@ -112,17 +117,17 @@ try {
   await page.waitForTimeout(T(600));
   check('a planet near the pointer shows its card', await page.locator('.planet-card').count() === 1);
 
-  await text('.sm-menu button', 'My island').click();
+  await page.locator('.sm-menu .sm-sub').click();
   await page.waitForSelector('.hotbar', { timeout: T(60000) });
   check('My island reaches the island with the hotbar', true);
   // the first Esc skips the arrival cinematic (slow under software rendering); keep pressing until the menu shows
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
   check('Esc opens the jump menu on the island', await page.locator('.island-menu').count() === 1);
   check('and the galaxy bar comes down', await page.locator('.galaxy-bar.open').count() === 1);
-  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'My islands')?.click(); });
-  await page.waitForSelector('[aria-label="My islands"]', { timeout: T(5000) }).catch(() => undefined);
-  check('My islands lists the first island', await page.locator('[aria-label="My islands"] article').count() >= 1);
-  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => /New island/.test(b.textContent ?? ''))?.click(); });
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'My planet')?.click(); });
+  await page.waitForSelector('[aria-label="My planet"]', { timeout: T(5000) }).catch(() => undefined);
+  check('My planet lists the first island', await page.locator('[aria-label="My planet"] article.planet-island').count() >= 1);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => /New island/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(T(300));
   check('New island offers Quick setup, Setup wizard and Manual', JSON.stringify(await page.$$eval('.nc-way b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Quick setup', 'Setup wizard', 'Manual']));
   await dom(() => { [...document.querySelectorAll('.nc-way')].find((b) => /Quick setup/.test(b.textContent ?? ''))?.click(); });
@@ -130,11 +135,11 @@ try {
   check('Quick setup shows the ready-made islands as maps', await page.locator('.ni-grid canvas.island-map').count() >= 5);
   await dom(() => { document.querySelector('.ni-grid button')?.click(); });
   await page.waitForTimeout(T(400));
-  check('one click makes the island', await page.locator('[aria-label="My islands"] article').count() >= 2);
-  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
+  check('one click makes the island', await page.locator('[aria-label="My planet"] article.planet-island').count() >= 2);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
   await page.waitForTimeout(T(300));
-  check('Undo takes it away again', await page.locator('[aria-label="My islands"] article').count() === 1);
-  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.textContent === 'Close')?.click(); });
+  check('Undo takes it away again', await page.locator('[aria-label="My planet"] article.planet-island').count() === 1);
+  await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.textContent === 'Close')?.click(); });
   await page.waitForSelector('.hotbar', { timeout: T(30000) });
   check('Close returns to the island', true);
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
@@ -197,6 +202,7 @@ try {
   await page.waitForTimeout(T(800));
   check('B switches to studio mode', /Studio/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
   check('studio opens the settings of what you hold', await page.locator('.fwin').count() >= 1);
+  check('in studio the Walk/Studio toggles sit on top of the open hierarchy bar (S3)', await page.evaluate(() => { const b = document.querySelector('.mode-bar button'); if (!b) return false; const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!top && !!top.closest('.mode-bar'); }));
   await page.keyboard.press('F3');
   await page.waitForTimeout(T(300));
   check('a tool shows what it sets off (sprite, sound, swing)', await page.locator('.fwin .plugs .plug').count() === 3);

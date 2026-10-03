@@ -37,7 +37,7 @@ const text = (page, sel, t) => page.locator(sel, { hasText: t }).first();
 const dom = (page, fn, a) => page.evaluate(fn, a);
 const clickText = (page, sel, t) => dom(page, ([s, x]) => { [...document.querySelectorAll(s)].find((b) => (b.textContent ?? '').trim().startsWith(x))?.click(); }, [sel, t]);
 const settle = (page, ms = 700) => page.waitForTimeout(T(ms));
-const toIsland = async (page) => { await clickText(page, '.sm-menu button', 'My island'); await page.waitForSelector('.hotbar', { timeout: T(60000) }); await settle(page, 5000); };
+const toIsland = async (page) => { await dom(page, () => document.querySelector('.sm-menu .sm-sub')?.click()); await page.waitForSelector('.hotbar', { timeout: T(60000) }); await settle(page, 5000); };
 const toGoblin = async (page) => { await dom(page, () => document.querySelector('.gr-open')?.click()); await page.waitForSelector('.gr-front', { timeout: T(15000) }); await settle(page, 1400); };
 
 /** Each state: the storage it starts from, how to get there from the home, and what tells it is ready. */
@@ -56,12 +56,12 @@ const STATES = [
   { id: 'island-esc', doc: "The island's Esc menu", seed: 'returning', go: async (p) => { await toIsland(p); await p.keyboard.press('Escape'); await p.waitForSelector('.island-menu'); } },
   { id: 'island-presets', doc: 'The presets window on the island (E)', seed: 'returning', go: async (p) => { await toIsland(p); await p.keyboard.press('e'); await p.waitForSelector('.presets'); } },
   { id: 'island-studio', doc: 'Studio mode on the island (B)', seed: 'returning', go: async (p) => { await toIsland(p); await p.keyboard.press('b'); await settle(p, 1200); } },
-  { id: 'islands', doc: 'My islands (from the home)', seed: 'returning', go: async (p) => { await clickText(p, '.sm-menu button', 'All my islands'); await p.waitForSelector('[aria-label="My islands"]'); } },
-  { id: 'island-new', doc: 'A new island: the three ways in', seed: 'returning', go: async (p) => { await clickText(p, '.sm-menu button', 'All my islands'); await p.waitForSelector('[aria-label="My islands"]'); await clickText(p, '[aria-label="My islands"] button', 'New island'); await p.waitForSelector('.new-chooser'); } },
-  { id: 'island-wizard', doc: 'The new-island wizard', seed: 'returning', go: async (p) => { await clickText(p, '.sm-menu button', 'All my islands'); await p.waitForSelector('[aria-label="My islands"]'); await clickText(p, '[aria-label="My islands"] button', 'New island'); await clickText(p, '.nc-way', 'Setup wizard'); await p.waitForSelector('.new-island.wizard'); } },
+  { id: 'islands', doc: 'My planet: your islands (from the home)', seed: 'returning', go: async (p) => { await clickText(p, '.sm-menu button', 'My planet'); await p.waitForSelector('[aria-label="My planet"]'); } },
+  { id: 'island-new', doc: 'A new island: the three ways in', seed: 'returning', go: async (p) => { await clickText(p, '.sm-menu button', 'My planet'); await p.waitForSelector('[aria-label="My planet"]'); await clickText(p, '[aria-label="My planet"] button', 'New island'); await p.waitForSelector('.new-chooser'); } },
+  { id: 'island-wizard', doc: 'The new-island wizard', seed: 'returning', go: async (p) => { await clickText(p, '.sm-menu button', 'My planet'); await p.waitForSelector('[aria-label="My planet"]'); await clickText(p, '[aria-label="My planet"] button', 'New island'); await clickText(p, '.nc-way', 'Setup wizard'); await p.waitForSelector('.new-island.wizard'); } },
   { id: 'island-avatar', doc: 'Avatar mode on the island (P)', seed: 'returning', go: async (p) => { await toIsland(p); await p.keyboard.press('p'); await p.waitForSelector('.avatar-dock'); await settle(p, 1200); } },
   { id: 'activities', doc: 'Activities', seed: 'returning', go: async (p) => { await toIsland(p); await p.keyboard.press('Escape'); await p.waitForSelector('.island-menu'); await clickText(p, '.island-menu button', 'Activities'); await p.waitForSelector('[aria-label="Activities"]'); } },
-  { id: 'track-editor', doc: 'The track editor', seed: 'returning', go: async (p) => { await toGoblin(p); await clickText(p, '.gr-front .shell-menu button', 'Race modes'); await p.waitForSelector('.shell-racing'); await clickText(p, '.shell-racing-nav button', 'Track editor'); await settle(p, 800); await clickText(p, '.shell-racing button', 'Open the track editor'); await settle(p, 6000); } },
+  { id: 'track-editor', doc: 'The track editor', seed: 'returning', go: async (p) => { await toGoblin(p); await clickText(p, '.gr-front .shell-menu button', 'Race modes'); await p.waitForSelector('.shell-racing'); await clickText(p, '.shell-racing-nav button', 'Track editor'); await settle(p, 800); await clickText(p, '.shell-racing button', 'Open the track editor'); await settle(p, 6000); await clickText(p, '.help-card button', "Let's build"); await settle(p, 600); } },
   { id: 'island-kids', doc: 'Your island with grown-up mode off', seed: 'kids', go: toIsland },
 ];
 
@@ -81,11 +81,11 @@ function readControls() {
     }
     return 'page';
   };
-  const nameOf = (el) => (el.getAttribute('aria-label') || (el.tagName === 'SELECT' ? '' : el.innerText) || el.getAttribute('title') || el.getAttribute('data-label') || el.getAttribute('placeholder') || el.getAttribute('name') || el.type || '').replace(/\s+/g, ' ').trim().slice(0, 48);
+  const nameOf = (el) => (el.getAttribute('aria-label') || (el.labels?.[0]?.innerText ?? '') || (el.tagName === 'SELECT' || el.tagName === 'INPUT' ? '' : el.innerText) || el.getAttribute('title') || el.getAttribute('data-label') || el.getAttribute('placeholder') || el.getAttribute('name') || el.type || '').replace(/\s+/g, ' ').trim().slice(0, 48);
   const seen = new Map();
   const list = [];
   for (const el of document.querySelectorAll(SEL)) {
-    if (el.closest('[aria-hidden="true"]')) continue;
+    if (el.closest('[aria-hidden="true"], [inert]')) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
     if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
@@ -100,7 +100,9 @@ function readControls() {
     // what a player sees of it: off screen, covered by something else, text cut off, too small to hit
     const flags = [];
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    if (r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) flags.push('off screen');
+    const scrolls = (() => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const o = getComputedStyle(a).overflowY; if ((o === 'auto' || o === 'scroll') && a.scrollHeight > a.clientHeight + 2) return true; } return false; })();
+    if (scrolls && (r.bottom > innerHeight || r.top < 0)) { /* below the fold of a scrolling panel: reachable by scrolling */ }
+    else if (r.right < 0 || r.bottom < 0 || r.left > innerWidth || r.top > innerHeight) flags.push('off screen');
     else if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) flags.push('partly off screen');
     else { const top = document.elementFromPoint(cx, cy); if (top && top !== el && !el.contains(top) && !top.contains(el)) flags.push(`covered by ${top.tagName.toLowerCase()}${top.className && typeof top.className === 'string' ? '.' + top.className.split(' ')[0] : ''}`); }
     if (el.scrollWidth > el.clientWidth + 2 && getComputedStyle(el).overflow !== 'visible' && el.clientWidth > 0) flags.push('text cut off');
@@ -221,7 +223,7 @@ try {
   // the storage each state starts from: fresh, or a returning player made the way a player makes one (My island, name, Done)
   const seeds = { fresh: {} };
   await page.goto(url); await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForSelector('.sm-home', { timeout: T(30000) });
-  await clickText(page, '.sm-menu button', 'My island');
+  await dom(page, () => document.querySelector('.sm-menu .sm-sub')?.click());
   await page.waitForSelector('.create-goblin', { timeout: T(20000) });
   await page.locator('.cg-name input').fill('Ada');
   await clickText(page, '.cg-panel button', 'Done');
@@ -267,8 +269,14 @@ try {
           const now = await page.evaluate(readState);
           if (!same(where(now), where(base))) { await reach(st); }
         }
-        const controls = await page.evaluate(readControls);
-        const here = controls.find((x) => x.id === c.id);
+        let controls = await page.evaluate(readControls);
+        let here = controls.find((x) => x.id === c.id);
+        if (here && (here.rect[1] < 0 || here.rect[1] + here.rect[3] > H)) {
+          await page.evaluate(([x, y, w, h]) => { for (const e of document.querySelectorAll('*')) { const b = e.getBoundingClientRect(); if (Math.abs(b.left - x) < 2 && Math.abs(b.top - y) < 2 && Math.abs(b.width - w) < 2 && Math.abs(b.height - h) < 2) { e.scrollIntoView({ block: 'center' }); break; } } }, here.rect);
+          await settle(page, 250);
+          controls = await page.evaluate(readControls);
+          here = controls.find((x) => x.id === c.id);
+        }
         if (!here) { rec.outcome = ['(gone before it could be pressed)']; continue; }
         const before = await page.evaluate(readState);
         // press it the way a player does: the mouse on its middle (a covered control is pressed where it is covered, like a player would)
@@ -283,7 +291,7 @@ try {
         rec.outcome = outcome(before, after, controls, cAfter);
         const errs = await page.evaluate(() => window.__errs.splice(0));
         if (errs.length) rec.flags = [...rec.flags, ...errs.map((e) => `page error: ${e}`)];
-        if (!rec.outcome.length) rec.flags = [...rec.flags, 'does nothing'];
+        if (!rec.outcome.length) { if (here.on) rec.outcome = ['(already selected)']; else rec.flags = [...rec.flags, 'does nothing']; }
         // a new place: screenshot it, then see whether Esc brings you back
         if (!same(where(after), where(before))) {
           shotN++;

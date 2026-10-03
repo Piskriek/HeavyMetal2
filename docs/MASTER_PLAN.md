@@ -111,6 +111,8 @@ Each journey: what happens today, where it breaks, what finishing it needs.
 | Q4 | Goblin Racing's track editor edits | **The Goblin Racing island, as your proposal for this week's evolution** (H7) / Your own island's track |
 | Q5 | In the universe (H8), a star is | **A creator** (you, the Goblin Racing studio, each player) with their planets round it / **A game** (Goblin Racing's star, its planets = its islands and modes) |
 
+**The universe, owner direction (2026-10-03):** from the galaxy you go to **My planet**, see your islands with previews, and go into one. Recommendation taken as the plan ("go with your recommendation for now"): **your star is your solar system**: your planet (your islands) orbits it, with any activities you make; **friends move in**: adding a friend brings their home planet into your system as a neighbour you can visit; **other creators are other stars** (Goblin Racing's studio is the goblin world's star; players' public creations are theirs); **to reach the goblin planet you fly your rocket** out of your system across the galaxy to its star (H9): a short flight first, later the rocket you built matters (range, speed, stops on the way).
+
 **Defaults in use until the owner decides** (2026-10-03: the owner asked to carry on to a beta without answering; each is easy to change): Q1 as the owner described the home (H2): Goblin Racing selected, its Play is the suggested first step and makes your first avatar; My island is the other way in; the progression story (H9) comes later. Q2 phones race and walk, building is desktop. Q3 "Race modes". Q4 the Goblin Racing island (your track is your proposal for the weekly vote). Q5 a star is a creator.
 
 ---
@@ -130,6 +132,11 @@ Each journey: what happens today, where it breaks, what finishing it needs.
 | B13 three ways in | `NewChooser` (remembers your last way); New avatar (island dock and the Avatars window) and New island (ready-made maps drawn from above; a five-question wizard whose map redraws as you answer; Manual opens a plain island) | `shell/new-thing.tsx`, `islands/new-island.tsx` |
 | B14/B16 screen map | `scripts/ui-map.mjs`: every screen, every control pressed, outcomes, Esc checks, layout flags, screenshots, `ui-map/index.html`; `--approve` / `--check` against `tests/ui-contract.json` | |
 | 6.1 design system | `docs/DESIGN.md` | |
+| My planet (owner: "from the galaxy it should be my planet, then from the planet you see your islands with previews, then go into the island you want") | The home menu says My planet (with a Carry on at <island> link straight in); picking your planet in the galaxy shows a window of your islands drawn from above; My planet's screen lists every island as its map (an edited island shows its own ground and track), Go in, rename, copy, delete, New island | `islands/my-planet.tsx`, `new-island.tsx` `mapOfBundle` |
+| Every planet has a window | Goblin Racing's live window, any other activity's window on the same island, My planet's islands; a loading bar until a live window's island has drawn; the leader line follows whichever window is up | `goblin-front.tsx` `GoblinPreview`, `shell.tsx` |
+| The preview spilling a tool window | The home's window never opens studio windows or turns into the studio, whatever mode your island was left in | `island.tsx` |
+| The official Goblin Racing island (H7 step 1) | Build it in Goblin Racing's track editor, Map code, Copy my map code, give the code to Claude: it goes in `maker/official-racing.ts` and every player without a Goblin Racing island starts on it. Loading a map code in the editor (and Start over) only touches that editor's own island | `official-racing.ts`, `storage.ts` `seedMap`, `useMapCode(code, rt)` |
+| B15 the tour and the interface | Tour steps point at `data-ui` names on real controls (tabs, the presets button, the PBR button); the tour card rings that control; the e2e test fails if a step points at a control that is not there; hints are key names, not capitals | `tutorial/tour-card.tsx`, `island-steps.ts`, `hud.tsx` |
 
 ## 6. The design batch: all front-end work, done together
 

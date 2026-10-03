@@ -30,7 +30,8 @@ export function GalaxyBar(props: {
   return (
     <>
       <div className="galaxy-bar-edge" onPointerEnter={() => setHover(true)} aria-hidden="true" />
-      <div className={`galaxy-bar${shown ? ' open' : ''}`} role="navigation" aria-label="Where you are" onPointerLeave={() => setHover(false)}>
+      {/* folded away it is out of reach: no Tab stops on buttons nobody can see */}
+      <div className={`galaxy-bar${shown ? ' open' : ''}`} role="navigation" aria-label="Where you are" inert={!shown} onPointerLeave={() => setHover(false)}>
         <button className="go" onClick={onBackToGalaxy}>Back to galaxy</button>
         <button aria-label="Up one level" title="Up one level" onClick={up}><ChevronLeft size={16} strokeWidth={1.6} /></button>
         <ol>{crumbs.map((c, i) => (

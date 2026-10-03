@@ -588,7 +588,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
           <button className="go" onClick={onExit}>{exitLabel}</button>
-          {onIslands ? <button onClick={onIslands}>My islands</button> : null}
+          {onIslands ? <button onClick={onIslands}>My planet</button> : null}
           <button onClick={onMenu}>Home</button>
           <button onClick={onCommunity}>Community</button>
           <button onClick={() => setJump(false)}>Keep building</button>

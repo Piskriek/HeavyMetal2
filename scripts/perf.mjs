@@ -71,7 +71,7 @@ try {
   await page.waitForSelector('.sm-home');
   await page.waitForTimeout(1500);
 
-  await page.evaluate(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => /My island/.test(b.textContent ?? ''))?.click(); });
+  await page.evaluate(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.classList.contains('sm-sub'))?.click(); });
   await page.waitForSelector('.hotbar');
   await page.waitForTimeout(6000); // the arrival flight
   await skin('Flat');

@@ -9,12 +9,12 @@ const ROWS: readonly (readonly [string, string])[] = [
 /** The first-run welcome and the shortcut sheet. Esc or a click anywhere closes it. */
 export function HelpOverlay({ onClose, firstRun }: { readonly onClose: () => void; readonly firstRun: boolean }): ReactElement {
   return (
-    <div className="help" role="dialog" aria-modal="true" aria-label="Map Maker help" onClick={onClose}>
+    <div className="help" role="dialog" aria-modal="true" aria-label="Track editor help" onClick={onClose}>
       <div className="help-card" onClick={(e) => e.stopPropagation()}>
-        <h2>{firstRun ? 'Welcome to the Map Maker' : 'Shortcuts'}</h2>
+        <h2>{firstRun ? 'Welcome to the track editor' : 'Shortcuts'}</h2>
         {firstRun ? <p className="hint">Build a track, dress the island, then press <b>Test drive</b> to race it. Everything is a preset: every setting can be edited, driven by a wobble or a timeline, and it all saves itself.</p> : null}
         <table><tbody>{ROWS.map(([k, v]) => <tr key={k}><th><kbd>{k}</kbd></th><td>{v}</td></tr>)}</tbody></table>
-        <p className="hint">Mouse: left button uses the tool · right or middle drag orbits · wheel zooms.</p>
+        <p className="hint">The left button uses the tool. Drag with the right or middle button to turn the view; the wheel zooms.</p>
         <p className="hint">Select a prop, then <b>Drive a setting…</b> to make it move; <b>▶ Preview</b> runs the scene; <b>🎚 Sounds</b> changes every sound.</p>
         <button className="go" autoFocus onClick={onClose}>{firstRun ? 'Let’s build' : 'Close'}</button>
       </div>

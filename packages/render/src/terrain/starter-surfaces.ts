@@ -86,7 +86,7 @@ const RACING_FILE: Readonly<Record<number, string>> = {
 const RACING_REPEAT: Readonly<Record<number, number>> = { [SURF.grass]: 0.8, [SURF.moss]: 1.5, [SURF.lava]: 4 };
 
 /** Tiles with a direction: never turned to hide their repeats. */
-const DIRECTIONAL: ReadonlySet<number> = new Set([SURF.startLine, SURF.boostPad, SURF.rumble, SURF.boardwalk, SURF.dunes, SURF.strata, SURF.cliffColumns]);
+const DIRECTIONAL: ReadonlySet<number> = new Set([SURF.startLine, SURF.boostPad, SURF.rumble, SURF.boardwalk, SURF.dunes, SURF.strata, SURF.cliffColumns, SURF.cobble]);
 
 const finish = (d: SurfaceDef): SurfaceDef => ({ ...d, flat: FLAT_PALETTES[d.id] ?? [d.fallback], ...(d.id === SURF.lava ? { glow: 1.6 } : {}), ...(DIRECTIONAL.has(d.id) ? { directional: true } : {}) });
 

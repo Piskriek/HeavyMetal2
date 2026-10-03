@@ -5,7 +5,7 @@ import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
 import { PAINTS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
-import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
+import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
 import { cropTerrain, heightAt, type Terrain } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget, type Quality } from '@hm/game';
@@ -55,7 +55,8 @@ let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = 
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
 /** The palette's surfaces for the ways to paint. */
-const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: { kind: 'swatch', colors: surfaceColours(s.id) } }));
+// the palette shows each surface's own tile (SetMix's graph-made set), its colours until the picture loads
+const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: SETMIX_FILE[s.id] ? { kind: 'image', url: `textures/setmix/${SETMIX_FILE[s.id]}.webp`, colors: surfaceColours(s.id) } : { kind: 'swatch', colors: surfaceColours(s.id) } }));
 
 const WIN = {
   presets: { w: 560, h: 620 },

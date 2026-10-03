@@ -131,6 +131,8 @@ export function PresetPreview({ p, size = 48 }: { readonly p: Preview; readonly 
     case 'icon': { const I = iconByName(p.icon); return <span className="pv-icon" style={{ width: size, height: size }}><I size={Math.round(size * 0.45)} strokeWidth={1.5} /></span>; }
     case 'swatch':
       return <span className="pv-swatch" style={{ width: size, height: size }}>{[0, 1, 2, 3].map((i) => <i key={i} style={{ background: p.colors[i % p.colors.length] }} />)}</span>;
+    case 'image':
+      return <span className="pv-swatch pv-tile" style={{ width: size, height: size }}>{[0, 1, 2, 3].map((i) => <i key={i} style={{ background: p.colors[i % p.colors.length] }} />)}<img alt="" src={p.url} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; }} /></span>;
     case 'model': { const src = thumb(voxelModelById(p.model)); return src ? <img className="pv-img" alt="" width={size} height={size} src={src} /> : <span className="pv-icon" style={{ width: size, height: size }} />; }
     case 'sky':
       return <span className="pv-sky" style={{ width: size, height: size, background: `linear-gradient(180deg, ${p.top} 0%, ${p.horizon} 62%, ${p.ground} 100%)` }}><b style={{ background: p.sun }} /></span>;

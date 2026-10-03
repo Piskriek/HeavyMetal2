@@ -14,6 +14,8 @@ import { STARTER_SURFACES } from '@hm/render';
 export type Preview =
   | { readonly kind: 'icon'; readonly icon: string }
   | { readonly kind: 'swatch'; readonly colors: readonly string[] }
+  /** A picture (a surface's tile); the swatch colours show until it loads and if it cannot. */
+  | { readonly kind: 'image'; readonly url: string; readonly colors: readonly string[] }
   | { readonly kind: 'model'; readonly model: string }
   | { readonly kind: 'sky'; readonly top: string; readonly horizon: string; readonly ground: string; readonly sun: string }
   | { readonly kind: 'anim'; readonly anim: AnimPreset }

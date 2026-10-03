@@ -54,6 +54,8 @@ export function IslandWalk(props: {
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
   /** The tour's thank-you (in-game credits, never money). */
   readonly onCredits?: (amount: number) => void;
+  /** Mouse speed, invert, field of view (Settings). */
+  readonly controls?: { readonly sensitivity: number; readonly invertY: boolean; readonly fov: number };
   /** Behind the main menu: no HUD, no controls, the camera circles your island and your goblin. When it turns off the camera flies down to the goblin. */
   readonly showcase?: boolean;
   readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
@@ -66,6 +68,8 @@ export function IslandWalk(props: {
   const skinRef = useRef(skin);
   skinRef.current = skin;
   useEffect(() => { terrainView.current?.setLook({ skin }); }, [skin]);
+  const controlsRef = useRef(props.controls ?? { sensitivity: 1, invertY: false, fov: 75 });
+  controlsRef.current = props.controls ?? { sensitivity: 1, invertY: false, fov: 75 };
   const qualityRef = useRef(props.quality ?? 'auto');
   qualityRef.current = props.quality ?? 'auto';
   const activities = useMemo(() => props.activities ?? [], [props.activities]);
@@ -396,12 +400,13 @@ export function IslandWalk(props: {
       if (live.current.menu) return;
       if ((pointerLocked || looking) && performance.now() - lastLookEvent > 400) { lastLookEvent = performance.now(); tourEvent('looked'); }
       if (pointerLocked) {
-        camYaw -= e.movementX * 0.0026;
-        camPitch = Math.min(1.3, Math.max(player().view === 'first' ? -1.3 : -0.55, camPitch + e.movementY * 0.0022));
+        const c = controlsRef.current, ys = c.invertY ? -1 : 1;
+        camYaw -= e.movementX * 0.0026 * c.sensitivity;
+        camPitch = Math.min(1.3, Math.max(player().view === 'first' ? -1.3 : -0.55, camPitch + e.movementY * 0.0022 * c.sensitivity * ys));
         return;
       }
       if (!looking) return;
-      const dx = e.clientX - looking.x, dy = e.clientY - looking.y;
+      const sens = controlsRef.current.sensitivity, dx = (e.clientX - looking.x) * sens, dy = (e.clientY - looking.y) * sens * (controlsRef.current.invertY ? -1 : 1);
       looking = { x: e.clientX, y: e.clientY };
       if (live.current.focusId) { orbit = { ...orbit, yaw: orbit.yaw - dx * 0.008, pitch: Math.min(1.45, Math.max(-0.2, orbit.pitch + dy * 0.006)) }; return; }
       if (fly) { fly.yaw -= dx * 0.004; fly.pitch = Math.min(1.5, Math.max(-1.5, fly.pitch - dy * 0.004)); return; }
@@ -566,7 +571,8 @@ export function IslandWalk(props: {
       const snap = (fpv || st) && !overview && !ft;
       const k = snap ? 1 : Math.min(1, dt * (overview ? 3 : 10));
       eye = eye && !snap ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
-      renderer.setFov(fpv ? 75 : st ? 65 : 60);
+      const fov = controlsRef.current.fov;
+      renderer.setFov(fpv ? fov : st ? fov - 10 : fov - 15);
       // camera-shake plugs wobble the view (never the stored eye, so the camera settles back exactly)
       let sx = 0, sy = 0, sz = 0;
       for (let i = shakes.length - 1; i >= 0; i--) {

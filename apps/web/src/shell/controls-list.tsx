@@ -1,4 +1,27 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { defineSchema, type Params } from '@hm/contracts';
+import { Inspector } from '@hm/ui';
+import { DEFAULT_CONTROLS, normalizeControls, type Controls } from './profile';
+
+/** The mouse and view settings as a preset: the same sliders as everywhere (they grow when pushed, with a number box). */
+const CONTROLS_SCHEMA = defineSchema({
+  kind: 'controls', version: 1, label: 'Controls', doc: 'How the mouse and the view feel.', slots: [],
+  variables: [
+    { key: 'sensitivity', type: 'number', label: 'Mouse speed', doc: 'How fast the view turns with the mouse (1 = as made).', tier: 'play', default: 1, min: 0.25, max: 3, step: 0.05, hardMin: 0.05, hardMax: 20, group: 'Mouse' },
+    { key: 'invertY', type: 'boolean', label: 'Invert up and down', doc: 'Mouse forward looks down, like a plane.', tier: 'play', default: false, group: 'Mouse' },
+    { key: 'fov', type: 'number', label: 'Field of view', doc: 'How wide you see in first person (third person and studio are a little narrower).', tier: 'play', default: 75, min: 55, max: 100, step: 1, hardMin: 30, hardMax: 120, unit: '°', group: 'View' },
+  ],
+});
+
+export function ControlsSettings(props: { readonly value: Controls; readonly onChange: (c: Controls) => void }): ReactElement {
+  const own = useMemo(() => Object.fromEntries(Object.entries(props.value).filter(([k, v]) => v !== DEFAULT_CONTROLS[k as keyof Controls])) as Params, [props.value]);
+  return (
+    <section className="controls-settings" aria-label="Mouse and view">
+      <h4>Mouse and view</h4>
+      <Inspector schema={CONTROLS_SCHEMA} params={own} resolved={props.value as unknown as Params} tier="play" onChange={(k, v) => props.onChange(normalizeControls({ ...props.value, [k]: v }))} />
+    </section>
+  );
+}
 
 /**
  * Controls live here, in Settings, not on the screen: the screen only says what the tool in your hand does.

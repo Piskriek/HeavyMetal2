@@ -492,3 +492,10 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 @keyframes reveal-flash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .reveal-flash { animation-duration: .01s; } .tour-bar i { transition: none; } }
 @media (max-width: 640px) { .tour { bottom: 150px; width: auto; right: 16px; } }
+
+/* settings: one label column, one control column */
+.shell-window > label.row { display: grid; grid-template-columns: 8.5em 1fr; gap: 10px; align-items: center; font-size: 13px; }
+.shell-window > label.row:has(> input[type="checkbox"]) { display: flex; gap: 8px; }
+.shell-window > label.row > select, .shell-window > label.row > input:not([type="checkbox"]) { width: 100%; min-width: 0; }
+.shell-window > .controls-settings, .shell-window > .controls-list { margin: 14px 16px 0; }
+.controls-settings h4 { margin: 0 0 4px; font-size: 10px; font-weight: 600; color: var(--dim); }

@@ -16,10 +16,27 @@ export interface Profile {
   readonly quality: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   readonly activities: readonly Activity[];
   readonly tournament: TournamentState | null;
+  /** How the mouse and the view feel (Settings, Controls). */
+  readonly controls: Controls;
+}
+
+/** Mouse and view settings: a preset like everything else (Settings shows it in the inspector). */
+export interface Controls {
+  /** 1 = as made; 2 turns twice as fast. */
+  readonly sensitivity: number;
+  readonly invertY: boolean;
+  /** Field of view in first person, in degrees (third person and studio sit a little narrower). */
+  readonly fov: number;
+}
+export const DEFAULT_CONTROLS: Controls = { sensitivity: 1, invertY: false, fov: 75 };
+export function normalizeControls(v: unknown): Controls {
+  const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  const n = (x: unknown, d: number, lo: number, hi: number): number => (typeof x === 'number' && Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d);
+  return { sensitivity: n(o.sensitivity, 1, 0.05, 20), invertY: o.invertY === true, fov: n(o.fov, 75, 30, 120) };
 }
 
 const KEY = 'hm.profile.v2';
-export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', activities: ActivityRegistry.withDefaults().all(), tournament: null };
+export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
 
 export function loadProfile(): Profile {
   try {
@@ -28,7 +45,7 @@ export function loadProfile(): Profile {
     const reg = new ActivityRegistry(Array.isArray(raw.activities) ? (raw.activities as Activity[]) : []);
     const acts = reg.get('goblin-racing') ? reg.all() : ActivityRegistry.withDefaults().all().concat(reg.all());
     const t = raw.tournament ? Tournament.fromJSON(raw.tournament) : null;
-    return { ...DEFAULT_PROFILE, ...raw, activities: acts, tournament: t ? t.toJSON() : null } as Profile;
+    return { ...DEFAULT_PROFILE, ...raw, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

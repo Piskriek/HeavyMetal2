@@ -34,6 +34,30 @@ export const SURFACE_SLOTS = 256;
 export const recipe = (lum: number, sat = 0, green = 0, contrast = 1): HeightRecipe => ({ lum, sat, green, contrast });
 
 /** Height of a tile at each texel, 0..1: what stands "high" differs per surface, stretched to the tile's own 2nd..98th percentile. */
+/**
+ * Make a square tile seamless in place: near its edges each pixel is blended toward the tile shifted by half (whose middle is clean), so a
+ * painted tile with soft or dark borders stops repeating as a visible grid. The middle (beyond `band` of the size from every edge) is left
+ * as it was; the very edge is all shifted copy, which lines up with the neighbouring tile exactly.
+ */
+export function makeSeamless(px: Uint8ClampedArray | Uint8Array, size: number, band = 0.22): void {
+  // two passes: across (blend toward the copy shifted half a tile sideways), then down; each copy's own seam lands in the untouched middle
+  const half = size >> 1, span = Math.max(1, size * band);
+  const weight = (d: number): number => { const t = Math.min(1, Math.max(0, d / span)); return 1 - t * t * (3 - 2 * t); };
+  for (const axis of [0, 1]) {
+    const src = px.slice();
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const along = axis === 0 ? x : y;
+        const w = weight(Math.min(along, size - 1 - along));
+        if (w <= 0) continue;
+        const o = (y * size + x) * 4;
+        const so = axis === 0 ? (y * size + ((x + half) % size)) * 4 : (((y + half) % size) * size + x) * 4;
+        for (let k = 0; k < 4; k++) px[o + k] = Math.round(src[o + k]! * (1 - w) + src[so + k]! * w);
+      }
+    }
+  }
+}
+
 export function writeTileHeight(rgba: Uint8ClampedArray | Uint8Array, r: HeightRecipe): void {
   const n = rgba.length / 4;
   const h = new Float32Array(n);
@@ -161,11 +185,11 @@ export class SurfaceArray {
       const base = layer * LAYER_SIZE * LAYER_SIZE * 4;
       if (img) {
         const px = this.pixels(img);
-        if (px) { writeTileHeight(px, d.height); this.data.set(px, base); this.texture.needsUpdate = true; }
+        if (px) { makeSeamless(px, LAYER_SIZE); writeTileHeight(px, d.height); this.data.set(px, base); this.texture.needsUpdate = true; }
       }
       if (pbrImg) {
         const px = this.pixels(pbrImg);
-        if (px) { for (let i = 3; i < px.length; i += 4) px[i] = 255; this.pbr.set(px, base); this.pbrTexture.needsUpdate = true; }
+        if (px) { makeSeamless(px, LAYER_SIZE); for (let i = 3; i < px.length; i += 4) px[i] = 255; this.pbr.set(px, base); this.pbrTexture.needsUpdate = true; }
       }
       this.progress = ++done / this.defs.length;
     }));

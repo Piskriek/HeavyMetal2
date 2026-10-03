@@ -54,6 +54,12 @@ export const tourSkip = (): void => live((t, now) => t.skip(now));
 export function tourLater(): void { later = true; try { sessionStorage.setItem(LATER, '1'); } catch { /* ignore */ } changed(); }
 /** Close it for good (the menu can still start it again). */
 export function tourNever(): void { mode = 'never'; changed(); }
+/** Forget the tour (Settings: Replay the tour, Reset progress): the next island visit starts it from the first step. */
+export function resetTour(): void {
+  tour = null; mode = 'on'; later = false;
+  try { localStorage.removeItem(KEY); sessionStorage.removeItem(LATER); } catch { /* ignore */ }
+  rev++; listeners.forEach((l) => l());
+}
 /** Start the tour again from the first step. */
 export function tourReplay(): void {
   mode = 'on'; later = false;

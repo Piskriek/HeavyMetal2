@@ -222,8 +222,11 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
       gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
     } else {
       tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);
+      // far away a small tile repeats like a checkerboard: blend in the same surface at three times the size, and vary its tone in big patches
+      float far = smoothstep(18.0, 80.0, length(cameraPosition - vTWorld));
+      if (far > 0.01) tile = mix(tile, islTriplanar(la, lb, lw, wp * 0.31 + 17.3, gnrm, dwx * 0.31, dwy * 0.31), far * 0.55);
       if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
-      tile.rgb *= 0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7);
+      tile.rgb *= mix(0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7), 0.8 + 0.4 * surfNoise(wp.xz / 31.0 + 9.1), far);
     }
     diffuseColor.rgb = tile.rgb;
     gRough = islRough(la, lb, lw);

@@ -1,4 +1,5 @@
-import { ControlsList } from './controls-list';
+import { ControlsList, ControlsSettings } from './controls-list';
+import { resetTour } from '../tutorial/tour';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { Copy, Pencil, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import type { Runtime } from '@hm/engine';
@@ -160,7 +161,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+          <IslandWalk key={world!.id} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
             onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}
@@ -293,8 +294,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
             <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel goblin)</option><option value="pbr">PBR (full relief)</option></select></label>
             <label className="row">Graphics <select value={profile.quality} onChange={(e) => update((p) => ({ ...p, quality: e.target.value as typeof profile.quality }))}><option value="auto">Auto (best the device can hold)</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low (phones)</option></select></label>
+            <ControlsSettings value={profile.controls} onChange={(c) => update((p) => ({ ...p, controls: c }))} />
             <ControlsList />
-            <div className="btns"><button onClick={() => update((p) => ({ ...p, tutorialDone: false }))}>Replay the tutorial</button><button className="danger" onClick={() => { update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', tournament: null })); }}>Reset progress</button></div>
+            <div className="btns"><button onClick={() => { resetTour(); update((p) => ({ ...p, tutorialDone: false })); setNote('The tour starts again next time you are on your island'); }}>Replay the tour</button><button className="danger" onClick={() => { resetTour(); update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', tournament: null })); }}>Reset progress</button></div>
           </div>
         </div>
       ) : null}

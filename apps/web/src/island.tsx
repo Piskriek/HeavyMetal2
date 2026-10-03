@@ -18,7 +18,7 @@ import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
 import { focusTargetOf } from './maker/focus';
 import { fx } from './maker/feedback';
-import { BuildController, type Aim } from './build/build-controller';
+import { BuildController, type Aim, type Selected } from './build/build-controller';
 import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
@@ -297,6 +297,17 @@ export function IslandWalk(props: {
   const openLayers = (): void => { win.open('layers', 'Layers', { x: Math.max(12, window.innerWidth - 380), y: 70, w: 350, h: 560 }); };
   const openLayersRef = useRef(openLayers);
   openLayersRef.current = openLayers;
+  /** Select picked something: open what changes it (the ground its look, a plant its kind's behaviour, the sea the world rules, a thing its layer). */
+  const openSelected = (w: Selected): void => {
+    if (w.kind === 'ground') {
+      const s = PAINTS.find((x) => x.id === w.surface);
+      if (s && props.ground !== 'racing') win.open(`surface:${s.id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 });
+    } else if (w.kind === 'plant') win.open(`plant:${w.plant}`, `Behaviour: ${w.plant}`, { x: 80, y: 110, ...WIN.editor });
+    else if (w.kind === 'water') win.open('world', 'World rules', { x: 60, y: 90, ...WIN.editor });
+    else { setLayerSel(w.ref); openLayers(); }
+  };
+  const openSelectedRef = useRef(openSelected);
+  openSelectedRef.current = openSelected;
   const [layerSel, setLayerSel] = useState<PresetId | null>(null);
   const [plantsShown, setPlantsShown] = useState(true);
   const pickPreset = (id: string): void => {
@@ -379,6 +390,7 @@ export function IslandWalk(props: {
       onFocus: (id) => { setFocusId(id); if (id) { setMode('studio'); say('Focused: drag with the right mouse button to look round it, Esc to leave'); } },
       onIsolate: (id) => { setIsolateId(id); say(id ? 'Everything else is hidden (Hide others again, or Esc, to show it)' : 'Everything is shown'); },
       onAnim: (id) => { if (!studio()) animator.play(animOf(player(), id)); },
+      onSelect: (w) => { openSelectedRef.current(w); unlock(); },
       onShake: (id, amount) => { shakes.push({ s: shakeById(id), t0: performance.now(), amount }); if (shakes.length > 6) shakes.shift(); },
     });
     const shakes: { s: ShakePreset; t0: number; amount: number }[] = [];

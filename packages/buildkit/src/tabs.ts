@@ -17,7 +17,7 @@ export interface TabDef {
 }
 
 export const TABS: readonly TabDef[] = [
-  { id: 'select', label: 'Select', key: 'F1', icon: 'MousePointer2', doc: 'Look at, move, turn, size, copy and delete the things on your island; focus on one and hide the rest.' },
+  { id: 'select', label: 'Select', key: 'F1', icon: 'MousePointer2', doc: 'Select anything and change it (the ground, a plant, the sea, a thing); move, turn, size, copy and delete the things on your island; focus on one and hide the rest.' },
   { id: 'paint', label: 'Paint', key: 'F2', icon: 'Paintbrush', doc: 'Paint the ground with any surface.' },
   { id: 'sculpt', label: 'Sculpt', key: 'F3', icon: 'Mountain', doc: 'Raise, lower, smooth and shape the ground. The world rules decide what digging uncovers and what the plants do.' },
   { id: 'animate', label: 'Animate', key: 'F4', icon: 'Activity', doc: 'Moves for your goblin: play one, or change how it walks, runs and jumps.' },

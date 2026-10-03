@@ -101,7 +101,7 @@ const paintTool = (way: PaintWayId, name: string, icon: string, doc: string, lef
 const swings = (a: ToolAction): boolean => a !== 'inspect' && a !== 'focus' && a !== 'isolate';
 
 export const TOOLS: readonly ToolPreset[] = [
-  tool('inspect', 'Look at', 'select', 'inspect', 'MousePointer2', 'Point at something to see what it is and what it is made of.', 'Show what it is', 'Show what it is', { sound: 'select' }),
+  tool('inspect', 'Select', 'select', 'inspect', 'MousePointer2', 'Point at anything to see what it is and change it: the ground opens its look, a plant how its kind grows, the sea the world rules, a thing its layer.', 'Select it', 'Select it', { sound: 'select' }),
   tool('move', 'Move', 'select', 'move', 'Move', 'Pick up a thing you placed and put it down somewhere else.', 'Pick it up, then put it down', 'Drop it back where it was', { sound: 'snap' }),
   tool('turn', 'Turn', 'select', 'turn', 'RotateCcw', 'Turn a thing you placed.', 'Turn it left', 'Turn it right', { sound: 'snap', strength: 0.25 }),
   tool('resize', 'Size', 'select', 'resize', 'Maximize', 'Make a thing you placed bigger or smaller.', 'Bigger', 'Smaller', { sound: 'snap', strength: 0.15 }),

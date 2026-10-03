@@ -44,7 +44,15 @@ export interface ControllerHooks {
   readonly onAnim: (id: string) => void;
   /** A camera-shake plug. */
   readonly onShake: (id: string, amount: number) => void;
+  /** Select picked something (docs/HOTBAR.md, Select: "select anything and change it"): the island opens what changes it. */
+  readonly onSelect?: (what: Selected) => void;
 }
+/** What Select picked where you pointed. */
+export type Selected =
+  | { readonly kind: 'thing'; readonly ref: PresetId }
+  | { readonly kind: 'plant'; readonly plant: string }
+  | { readonly kind: 'water' }
+  | { readonly kind: 'ground'; readonly surface: number; readonly height: number };
 export interface FireOptions {
   /** Scales sprite counts (a big stamp bursts more than one brush tick). */
   readonly scale?: number;
@@ -102,6 +110,17 @@ export class BuildController {
     }
     return best ? { ref: best.ref, index: best.index } : null;
   }
+  /** The plant nearest where you point (within about a metre), by kind. */
+  private plantAt(a: Aim): string | null {
+    const d = this.rt.binder.decor();
+    if (!d) return null;
+    let best: { kind: string; dist: number } | null = null;
+    for (const p of d.placements) {
+      const dist = Math.hypot(p.x - a.point[0], p.z - a.point[2]);
+      if (dist < Math.max(0.9, p.scale * 1.2) && (!best || dist < best.dist)) best = { kind: p.kind, dist };
+    }
+    return best?.kind ?? null;
+  }
   private param(ref: PresetId, key: string, fallback: number): number { const v = Number(this.rt.store.resolve(ref).params[key]); return Number.isFinite(v) ? v : fallback; }
 
   /** Called every frame the button is held (and once on press). `alt` is the right button: the opposite action. */
@@ -117,9 +136,18 @@ export class BuildController {
     const x = aim.point[0], z = aim.point[2];
     switch (tool.action) {
       case 'inspect': {
+        // Select: a thing you placed, else a plant, else the sea, else the ground (its surface); the island opens what changes it
         const m = this.modelAt(aim);
-        const ground = ts ? GROUND_NAMES[surfaceAt(ts.terrain, x, z) - 1] ?? 'ground' : 'ground';
-        this.hooks.say(m ? `${this.rt.store.get(m.ref)?.name ?? 'A thing'}, on ${ground}` : `${ground[0]!.toUpperCase()}${ground.slice(1)}, ${aim.point[1].toFixed(1)} m up`);
+        const surface = ts ? surfaceAt(ts.terrain, x, z) : 0;
+        const ground = GROUND_NAMES[surface - 1] ?? 'ground';
+        const plant = m ? null : this.plantAt(aim);
+        const water = !m && !plant && aim.point[1] < rulesOf(this.rt, this.sceneId).waterLevel;
+        const picked: Selected = m ? { kind: 'thing', ref: m.ref } : plant ? { kind: 'plant', plant } : water ? { kind: 'water' } : { kind: 'ground', surface, height: aim.point[1] };
+        this.hooks.say(m ? `${this.rt.store.get(m.ref)?.name ?? 'A thing'}, on ${ground}`
+          : plant ? `A ${plant.replace(/-/g, ' ')}: how this kind of plant grows`
+          : water ? 'The sea: the world rules'
+          : `${ground[0]!.toUpperCase()}${ground.slice(1)}, ${aim.point[1].toFixed(1)} m up`);
+        this.hooks.onSelect?.(picked);
         this.fire(tool, on, aim, { scale: 0.5 });
         return;
       }

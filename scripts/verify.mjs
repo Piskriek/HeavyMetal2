@@ -5,7 +5,7 @@
  * The build must produce ONE static html file (RUN loads a static build; there is no server).
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -20,8 +20,15 @@ const run = (label, cmd, args) => {
   }
 };
 run('typecheck', 'npm', ['run', 'typecheck']);
-const patterns = only.length ? only.map((p) => `packages/${p}/tests/*.test.ts`) : ['packages/*/tests/*.test.ts'];
-run(`tests (${only.length ? only.join(', ') : 'all packages'})`, 'node', ['--import', 'tsx', '--test', ...patterns]);
+const packages = only.length ? only : readdirSync(fileURLToPath(new URL('../packages', import.meta.url)));
+const patterns = packages.map((p) => `packages/${p}/tests/*.test.ts`);
+run(`tests (${only.length ? only.join(', ') : 'all packages'})`, 'node', ['--import', 'tsx', '--test', '--test-skip-pattern=^performance:', ...(only.length ? patterns : ['packages/*/tests/*.test.ts'])]);
+// speed tests (named `performance: ...`) run alone afterwards: timed while every other test file runs at once they swing by 4x
+const timed = packages.flatMap((p) => {
+  const dir = fileURLToPath(new URL(`../packages/${p}/tests`, import.meta.url));
+  return existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.test.ts') && /test\('performance:/.test(readFileSync(`${dir}/${f}`, 'utf8'))).map((f) => `packages/${p}/tests/${f}`) : [];
+});
+if (timed.length) run('speed tests, one at a time', 'node', ['--import', 'tsx', '--test', '--test-concurrency=1', '--test-name-pattern=^performance:', ...timed]);
 run('build', 'npm', ['run', 'build']);
 const html = fileURLToPath(new URL('../apps/web/dist/index.html', import.meta.url));
 if (!existsSync(html)) {

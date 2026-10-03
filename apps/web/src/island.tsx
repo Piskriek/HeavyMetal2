@@ -7,6 +7,7 @@ import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
+import { noteGpu, powerPreferenceOf, type GpuChoice } from './shell/profile';
 import type { SfxId } from '@hm/audio';
 import { followLighting, pickLook } from './look';
 import { decorInstances } from './maker/dress';
@@ -51,6 +52,8 @@ const WIN = {
 export function IslandWalk(props: {
   readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean;
   readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+  /** Which graphics chip to ask for (Settings); read when the view opens. */
+  readonly gpu?: GpuChoice;
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
   /** The tour's thank-you (in-game credits, never money). */
   readonly onCredits?: (amount: number) => void;
@@ -213,11 +216,12 @@ export function IslandWalk(props: {
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const renderer: ThreeRenderer = createThreeRenderer({ shadows: true, background: 'sky' });
+    const renderer: ThreeRenderer = createThreeRenderer({ shadows: true, background: 'sky', powerPreference: powerPreferenceOf(props.gpu) });
     renderer.mount(el, rt.world, rt.store);
+    noteGpu(renderer.gpu);
     // graphics: a chosen tier is kept; auto starts at what the device can probably do and drops a tier when frames run slow
     const chosen = parseQuality(qualityRef.current);
-    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }), { locked: chosen !== null });
+    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu }), { locked: chosen !== null });
     renderer.setQuality(adaptive.current);
     const offFrame = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) renderer.setQuality(q); });
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})

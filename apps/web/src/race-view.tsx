@@ -11,6 +11,7 @@ import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
 import { followLighting } from './look';
 import { decorInstances } from './maker/dress';
 import { attachRaceAudio, type RaceAudio } from './sound/race-audio';
+import { loadProfile, powerPreferenceOf } from './shell/profile';
 
 /** On phones the HUD gets a second pass: the same layout with the parts scaled down so nothing collides. */
 const narrow = (l: HudLayout): HudLayout => ({ ...l, elements: l.elements.map((e) => ({ ...e, scale: Math.min(e.scale, e.kind === 'minimap' ? 0.65 : 0.85) })) });
@@ -58,12 +59,13 @@ export function RaceView(props: {
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const renderer = createThreeRenderer({ shadows: true, background: 'sky' });
+    const renderer = createThreeRenderer({ shadows: true, background: 'sky', powerPreference: powerPreferenceOf(loadProfile().gpu) });
     renderer.mount(el, rt.world, rt.store);
     // quality: a chosen tier is respected; "auto" guesses from the device and drops a tier if frames run slow
     const chosen = (() => { try { return parseQuality(new URLSearchParams(location.search).get('q')) ?? parseQuality(live.current.settings.quality); } catch { return null; } })();
     const touchy = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }), { locked: chosen !== null });
+    const device = { touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu };
+    const adaptive = createAdaptiveQuality(chosen ?? guessQuality(device), { locked: chosen !== null });
     renderer.setQuality(adaptive.current);
     let appliedQuality = live.current.settings.quality;
     const surfaces = new SurfaceArray(STARTER_SURFACES);
@@ -101,7 +103,7 @@ export function RaceView(props: {
       if (L.settings.quality !== appliedQuality) {
         appliedQuality = L.settings.quality;
         const q = parseQuality(appliedQuality);
-        renderer.setQuality(q ?? guessQuality({ touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth }));
+        renderer.setQuality(q ?? guessQuality(device));
       }
       const lower = adaptive.frame(rawDt);
       if (lower && parseQuality(L.settings.quality) === null) renderer.setQuality(lower);

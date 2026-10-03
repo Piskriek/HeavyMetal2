@@ -8,6 +8,8 @@ import { AvatarView, type Rig } from './avatar-view';
 import type { VoxelModel } from '@hm/voxel';
 import type { Pose } from '@hm/anim';
 import { PostChain } from './post-chain';
+import { pixelRatioFor } from './pixel-ratio';
+import { DECOR_DETAIL_RADIUS } from './decor-lod';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
 import type { LookLike } from './environment';
@@ -69,6 +71,10 @@ export type ThreeRenderer = RenderService & {
    * shadows, contact shadows, smooth edges; ultra = supersampled, 4096 shadows, all effects.
    */
   setQuality(q: Quality): void;
+  /** The graphics chip the browser gave this page, as it names it (null before the first mount or when the browser hides it). */
+  readonly gpu: string | null;
+  /** For profiling from the console (draw calls, triangles, hiding parts of the scene); null while unmounted. */
+  readonly debug: { readonly webgl: THREE.WebGLRenderer; readonly scene: THREE.Scene; readonly camera: THREE.PerspectiveCamera; readonly post: boolean } | null;
 };
 
 export type LightAnchors = Partial<Record<'focus' | 'lantern' | 'torch' | 'campfire' | 'barrel', Vec3>>;
@@ -78,9 +84,23 @@ export interface RenderOptions {
   readonly pixelRatio?: number;
   readonly shadows?: boolean;
   readonly background?: 'sky' | 'dark';
+  /**
+   * Which graphics chip to ask for on machines with two (default 'high-performance'). Only a request: the browser and the operating
+   * system decide (on Windows, Settings > System > Display > Graphics can force the fast chip for the browser). `gpu` says what came.
+   */
+  readonly powerPreference?: 'default' | 'high-performance' | 'low-power';
 }
 
 const miss = (): Pick => ({ entity: null, point: null, normal: null, distance: Infinity });
+
+/** The graphics chip's name: the unmasked one where the browser shares it (Chrome, Edge), else the plain one (Firefox gives a real name there too). */
+function readGpuName(gl: WebGLRenderingContext | WebGL2RenderingContext): string | null {
+  try {
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    return typeof name === 'string' && name ? name : null;
+  } catch { return null; }
+}
 const finiteNumber = (value: Value | undefined, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
@@ -100,6 +120,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let resizeObserver: ResizeObserver | null = null;
   let removeWindowResize: (() => void) | null = null;
   let previousFrame: number | null = null;
+  let gpuName: string | null = null;
   const listeners = new Set<(dtMs: number) => void>();
 
   const resize = (): void => {
@@ -107,6 +128,9 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     const rect = hostElement.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width || hostElement.clientWidth || 1));
     const height = Math.max(1, Math.round(rect.height || hostElement.clientHeight || 1));
+    // the tier's pixel ratio depends on the canvas size (low keeps to a pixel budget)
+    const ratio = pixelRatioFor(quality, width, height, opts.pixelRatio ?? (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
+    if (Math.abs(webgl.getPixelRatio() - ratio) > 1e-3) webgl.setPixelRatio(ratio);
     webgl.setSize(width, height, false);
     post?.setSize(width, height, webgl.getPixelRatio());
     viewCamera.aspect = width / height;
@@ -212,6 +236,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     if (environment && webgl && scene && pendingSetup) {
       rig = new LightingRig(scene, webgl, environment, pendingSetup);
       rig.setShadowCap(quality === 'low' ? 0 : quality === 'ultra' ? 4096 : quality === 'high' ? 2048 : 1024);
+      rig.setReflections(quality !== 'low');
     }
     buildPost();
   };
@@ -233,7 +258,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   const applyDecor = (): void => {
     decorView?.dispose();
     decorView = null;
-    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); scene.add(decorView.group); }
+    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); decorView.setDetailRadius(DECOR_DETAIL_RADIUS[quality]); scene.add(decorView.group); }
   };
   let terrainView: TerrainView | null = null;
   let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
@@ -256,7 +281,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       unmount();
       hostElement = host;
       presetStore = store;
-      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: opts.powerPreference ?? 'high-performance' });
+      gpuName = readGpuName(renderer.getContext());
       const deviceRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio;
       renderer.setPixelRatio(Math.min(2, Math.max(0.5, opts.pixelRatio ?? deviceRatio)));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -280,6 +306,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       bursts = new Bursts();
       scene.add(bursts.points);
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
+      environment.setLowDetail(quality === 'low');
       applyTerrain();
       applyDecor();
       applyRoad();
@@ -334,14 +361,11 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     setQuality(q: Quality): void {
       const changed = q !== quality;
       quality = q;
-      const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-      const wanted = opts.pixelRatio ?? dpr;
-      // ultra supersamples on ordinary screens: it renders more pixels than the screen has and the picture comes out smoother
-      const ratio = q === 'ultra' ? Math.min(2, Math.max(1.5, wanted)) : Math.min(q === 'low' ? 1 : q === 'medium' ? 1.5 : 2, Math.max(0.5, wanted));
-      webgl?.setPixelRatio(ratio);
       const shadowSize = q === 'ultra' ? 4096 : q === 'high' ? 2048 : 1024;
-      if (rig) rig.setShadowCap(q === 'low' ? 0 : shadowSize);
+      if (rig) { rig.setShadowCap(q === 'low' ? 0 : shadowSize); rig.setReflections(q !== 'low'); }
       else environment?.setShadows(q !== 'low', shadowSize);
+      environment?.setLowDetail(q === 'low');
+      decorView?.setDetailRadius(DECOR_DETAIL_RADIUS[q]);
       if (changed) buildPost();
       resize();
       postStale = true;
@@ -385,6 +409,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       roadView?.animate(performance.now());
       bursts?.update(previousFrame === null ? 16 : performance.now() - previousFrame);
       updateView();
+      decorView?.update(viewCamera.position);
       const frameSeconds = previousFrame === null ? 0.016 : Math.min(0.1, (performance.now() - previousFrame) / 1000);
       if (rig) {
         const changed = rig.update(frameSeconds, { focus: lightFocus, anchors: lightAnchors, time: performance.now() / 1000 });
@@ -465,6 +490,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     onFrame(listener: (dtMs: number) => void): () => void {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    get gpu() {
+      return gpuName;
+    },
+    get debug() {
+      return webgl && scene && viewCamera ? { webgl, scene, camera: viewCamera, post: !!post } : null;
     },
   };
   return service;

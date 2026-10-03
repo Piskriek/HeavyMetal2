@@ -14,6 +14,11 @@ export interface Profile {
   readonly skin: 'flat' | 'pbr';
   /** Graphics tier for the island and the editor; auto starts at the best the device can probably do and drops a tier if frames run slow. */
   readonly quality: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+  /**
+   * Which graphics chip to ask for on a machine with two (a laptop's built-in one and a faster one). Only a request: the browser and
+   * Windows decide (Settings, System, Display, Graphics can set the browser to High performance for good). Read when a view opens.
+   */
+  readonly gpu: GpuChoice;
   readonly activities: readonly Activity[];
   readonly tournament: TournamentState | null;
   /** How the mouse and the view feel (Settings, Controls). */
@@ -35,8 +40,19 @@ export function normalizeControls(v: unknown): Controls {
   return { sensitivity: n(o.sensitivity, 1, 0.05, 20), invertY: o.invertY === true, fov: n(o.fov, 75, 30, 120) };
 }
 
+export type GpuChoice = 'fast' | 'saver' | 'browser';
+/** The WebGL request for a choice: the fast chip, the battery-saving one, or whatever the browser picks. */
+export function powerPreferenceOf(choice: GpuChoice | undefined): 'high-performance' | 'low-power' | 'default' {
+  return choice === 'saver' ? 'low-power' : choice === 'browser' ? 'default' : 'high-performance';
+}
+
+let gpuSeen: string | null = null;
+/** Views note which chip the browser gave them, so Settings can say what is in use. */
+export function noteGpu(name: string | null): void { if (name) gpuSeen = name; }
+export const gpuInUse = (): string | null => gpuSeen;
+
 const KEY = 'hm.profile.v2';
-export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
+export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
 
 export function loadProfile(): Profile {
   try {
@@ -45,7 +61,8 @@ export function loadProfile(): Profile {
     const reg = new ActivityRegistry(Array.isArray(raw.activities) ? (raw.activities as Activity[]) : []);
     const acts = reg.get('goblin-racing') ? reg.all() : ActivityRegistry.withDefaults().all().concat(reg.all());
     const t = raw.tournament ? Tournament.fromJSON(raw.tournament) : null;
-    return { ...DEFAULT_PROFILE, ...raw, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
+    const gpu: GpuChoice = raw.gpu === 'saver' || raw.gpu === 'browser' ? raw.gpu : 'fast';
+    return { ...DEFAULT_PROFILE, ...raw, gpu, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

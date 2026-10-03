@@ -12,7 +12,8 @@ import { PROP_CARDS, propSeed, type MakerScene } from './scene';
 import { saveMap, clearSavedMap } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
-import { buildRoad } from '@hm/game';
+import { buildRoad, createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
+import { loadProfile, noteGpu, powerPreferenceOf } from '../shell/profile';
 import { DriversPanel, driverInputs } from './drivers';
 import { placementsOf } from './models-panel';
 import { ensureRules } from './race-rules';
@@ -94,8 +95,14 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const renderer = createThreeRenderer({ shadows: true, background: 'sky' });
+    const renderer = createThreeRenderer({ shadows: true, background: 'sky', powerPreference: powerPreferenceOf(loadProfile().gpu) });
     renderer.mount(el, rt.world, rt.store);
+    noteGpu(renderer.gpu);
+    // graphics: the tier chosen in Settings, or auto (a guess from the graphics chip, dropping a tier when frames run slow), as on the island
+    const chosenQuality = parseQuality(loadProfile().quality);
+    const adaptive = createAdaptiveQuality(chosenQuality ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu }), { locked: chosenQuality !== null });
+    renderer.setQuality(adaptive.current);
+    const offQuality = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) renderer.setQuality(q); });
     rendererRef.current = renderer;
     setRend(renderer);
     const surfaces = new SurfaceArray(STARTER_SURFACES);
@@ -404,7 +411,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
       el.removeEventListener('pointerdown', onDown, true); el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp); el.removeEventListener('pointercancel', onUp);
       window.removeEventListener('keydown', onKey);
-      offTerrain(); offDecor(); detach(); renderer.unmount();
+      offTerrain(); offDecor(); offQuality(); detach(); renderer.unmount();
     };
   }, [rt, scene]);
 

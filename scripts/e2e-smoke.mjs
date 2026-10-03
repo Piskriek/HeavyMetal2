@@ -2,6 +2,7 @@
  * Browser smoke test of the PRODUCTION build with the installed Chrome (no download): it must boot with no page error, and no screen may be a trap.
  *   node scripts/e2e-smoke.mjs          (serves apps/web/dist itself on a free port; run `npm run build` first)
  * Skipped with a note when Chrome is not installed. Software rendering is slow, so the timeouts are generous.
+ * On a slower PC multiply every wait (`E2E_SLOW=3`) and/or render on the graphics card (`E2E_GPU=1`), e.g. `E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`.
  */
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -12,13 +13,18 @@ if (!chromePaths.some(existsSync)) { console.log('e2e-smoke: Chrome not found, s
 const { chromium } = await import('playwright-core');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const port = 8197;
+const slow = Math.max(1, Number(process.env.E2E_SLOW) || 1);
+const T = (ms) => Math.round(ms * slow);
 const server = spawn(process.execPath, ['scripts/serve.mjs'], { cwd: root, env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
 await new Promise((r) => setTimeout(r, 1200));
 const failures = [];
 const check = (name, ok, extra = '') => { if (!ok) failures.push(`${name}${extra ? ` (${extra})` : ''}`); console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`); };
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// software rendering by default (same picture on every PC); E2E_GPU=1 uses the real graphics card (a slow CPU cannot render the island in software)
+const gpu = process.env.E2E_GPU === '1';
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: gpu ? ['--ignore-gpu-blocklist', '--enable-gpu'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  page.setDefaultTimeout(T(30000));
   // NEVER let a test hold the real pointer lock: on Windows a locked headless Chrome clips the user's real mouse cursor to its window
   await page.addInitScript(() => { Element.prototype.requestPointerLock = function () { return Promise.reject(new Error('pointer lock is stubbed in tests')); }; });
   const errors = [];
@@ -26,8 +32,9 @@ try {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
-  await page.waitForSelector('.shell-menu', { timeout: 30000 });
+  await page.waitForSelector('.shell-menu', { timeout: T(30000) });
   check('boots to the main menu with no page error', errors.length === 0, errors.join(' | '));
+  console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
   check('main menu order', JSON.stringify(await page.$$eval('.shell-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Multiplayer', 'My Island', 'Settings']));
 
   const text = (sel, t) => page.locator(sel, { hasText: t }).first();
@@ -39,45 +46,45 @@ try {
   const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
   // Play: the first time it asks you to make your goblin (look and name), then takes you to your island
   await text('.shell-menu button', 'Play').click();
-  await page.waitForSelector('.create-goblin', { timeout: 15000 });
+  await page.waitForSelector('.create-goblin', { timeout: T(15000) });
   check('Play asks you to create your goblin first', true);
   check('the creator offers ready-made looks', await page.locator('.cg-looks button').count() >= 6);
   check('and parts to wear in five places', await page.locator('.parts-picker .pp-row').count() === 5);
   await page.locator('.pp-row[aria-label="Hat"] .pp-cards button').nth(1).click();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(T(200));
   check('picking a hat puts it on', await page.locator('.pp-row[aria-label="Hat"] button.on:not(.none)').count() === 1);
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('a goblin needs a name', await page.locator('.create-goblin').count() === 1 && await page.locator('.cg-panel .warn').count() === 1);
   await page.locator('.cg-name input').fill('Snik');
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForSelector('.hotbar', { timeout: 60000 });
+  await page.waitForSelector('.hotbar', { timeout: T(60000) });
   check('Done takes you to your island', true);
-  await page.waitForSelector('.tour', { timeout: 15000 }).catch(() => undefined);
+  await page.waitForSelector('.tour', { timeout: T(15000) }).catch(() => undefined);
   check('the island tour starts on your first visit', await page.locator('.tour h3').count() === 1);
-  for (let i = 0; i < 12 && await page.locator('.tour-reveal').count() === 0; i++) { await page.locator('.tour button', { hasText: 'Skip' }).click(); await page.waitForTimeout(120); }
+  for (let i = 0; i < 12 && await page.locator('.tour-reveal').count() === 0; i++) { await page.locator('.tour button', { hasText: 'Skip' }).click(); await page.waitForTimeout(T(120)); }
   check('the tour ends on the PBR reveal', await page.locator('.tour-reveal').count() === 1);
   await page.locator('.tour-reveal').click();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(T(400));
   check('Show me switches the ground to PBR', await page.locator('.mode-bar button.on', { hasText: 'PBR' }).count() === 1);
   await page.locator('.tour button', { hasText: 'Not now' }).click();
   check('Not now hides the tour', await page.locator('.tour').count() === 0);
   await dom(() => { [...document.querySelectorAll('.mode-bar button')].find((b) => b.textContent === 'Flat')?.click(); });
-  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Activities')?.click(); });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(T(400));
   check('the jump menu opens the activities window', await page.locator('[aria-label="Activities"]').count() === 1);
   await dom(() => { [...document.querySelectorAll('.shell-activity button')].find((b) => b.textContent === 'Play')?.click(); });
   await page.waitForSelector('.shell-racing');
   for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Settings', 'My Goblin', 'The Bookie', 'Quick Race']) await dom((t) => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === t)?.click(); }, s);
   check('every Goblin Racing section opens', true);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('Esc leaves the activity menu', await page.locator('.shell-racing').count() === 0);
   for (let i = 0; i < 4 && await page.locator('.shell-menu').count() === 0; i++) {
     if (await page.locator('.island-menu').count() === 1) await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Main menu')?.click(); });
     else await page.keyboard.press('Escape');
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(T(500));
   }
   check('and you can get back to the main menu', await page.locator('.shell-menu').count() === 1);
 
@@ -85,7 +92,7 @@ try {
   await page.waitForSelector('.shell-top');
   const vp = page.viewportSize() ?? { width: 1280, height: 800 };
   await page.mouse.move(vp.width * 0.5, vp.height * 0.42);
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(T(600));
   check('a planet near the pointer shows its card', await page.locator('.planet-card').count() === 1);
   await text('.shell-top .tabs button', 'Community').click();
   check('community tab lists presets', await page.locator('.shell-window.wide .shell-activity').count() > 0);
@@ -93,96 +100,96 @@ try {
   check('hub returns to the main menu', await page.locator('.shell-menu').count() === 1);
 
   await text('.shell-menu button', 'My Island').click();
-  await page.waitForSelector('.hotbar', { timeout: 60000 });
+  await page.waitForSelector('.hotbar', { timeout: T(60000) });
   check('My Island reaches the island with the hotbar', true);
   // the first Esc skips the arrival cinematic (slow under software rendering); keep pressing until the menu shows
-  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
   check('Esc opens the jump menu on the island', await page.locator('.island-menu').count() === 1);
   check('and the galaxy bar comes down', await page.locator('.galaxy-bar.open').count() === 1);
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'My islands')?.click(); });
-  await page.waitForSelector('[aria-label="My islands"]', { timeout: 5000 }).catch(() => undefined);
+  await page.waitForSelector('[aria-label="My islands"]', { timeout: T(5000) }).catch(() => undefined);
   check('My islands lists the first island', await page.locator('[aria-label="My islands"] article').count() >= 1);
   await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => /Create new/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('Create new adds an island', await page.locator('[aria-label="My islands"] article').count() >= 2);
   await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('Undo takes it away again', await page.locator('[aria-label="My islands"] article').count() === 1);
   await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.textContent === 'Close')?.click(); });
-  await page.waitForSelector('.hotbar', { timeout: 30000 });
+  await page.waitForSelector('.hotbar', { timeout: T(30000) });
   check('Close returns to the island', true);
-  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(700); }
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Share my island')?.click(); });
-  await page.waitForSelector('.share', { timeout: 5000 }).catch(() => undefined);
+  await page.waitForSelector('.share', { timeout: T(5000) }).catch(() => undefined);
   check('Share my island asks who gets it', await page.locator('.share-vis button').count() === 4);
   await page.locator('.share-vis button', { hasText: 'Up for sale' }).click();
   await page.locator('.share input[type=number]').fill('0');
   check('a price of 0 is refused with a reason', await page.locator('.share .go').isDisabled() && /whole number of credits/.test(await page.locator('.share-problems').textContent() ?? ''));
   await page.locator('.share-vis button', { hasText: 'Share freely' }).click();
   await page.locator('.share .go').click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('sharing closes the dialog and says where it went', await page.locator('.share').count() === 0 && /Your shares/.test(await page.locator('.island-note').textContent() ?? ''));
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
   check('ten tabs on the tab strip', await page.locator('.tab-strip button').count() === 10);
   await page.keyboard.press('F2');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
   check('the paint slots show ground swatches', await page.locator('.hotbar .pv-swatch').count() >= 9);
   await page.keyboard.press('e');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(T(500));
   check('E opens your presets', await page.locator('.fwin[aria-label="Your presets"]').count() === 1);
   check('every paint preset has a card', await page.locator('.pw-card').count() >= 20);
   await dom(() => { [...document.querySelectorAll('.pw-tabs button')].find((b) => /Animate/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(T(400));
   check('animations preview as moving figures', await page.locator('.pw-card .pv-anim').count() >= 8);
   await dom(() => { [...document.querySelectorAll('.pw-card .pw-edit')][0]?.click(); });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(T(400));
   check('Edit opens an attribute editor window', await page.locator('.fwin').count() >= 2);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(T(200));
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('Esc closes the windows one at a time', await page.locator('.fwin').count() === 0 && await page.locator('.island-menu').count() === 0);
   await page.keyboard.press('1');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   await page.keyboard.press('b');
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(T(800));
   check('B switches to studio mode', /Studio/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
   check('studio opens the settings of what you hold', await page.locator('.fwin').count() >= 1);
   await page.keyboard.press('F3');
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(T(300));
   check('a tool shows what it sets off (sprite, sound, swing)', await page.locator('.fwin .plugs .plug').count() === 3);
   await page.locator('.fwin .plug-add').click();
   await page.locator('.fwin .plug-menu .plug-point').last().locator('button', { hasText: 'Camera shake' }).click();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(T(200));
   check('+ attribute adds a camera shake when you let go', await page.locator('.fwin .plugs .plug').count() === 4 && await page.locator('.fwin .plug-choose button').count() === 4);
   await page.locator('.fwin .plugs .plug').last().locator('button.x').click();
   check('and x takes it off again', await page.locator('.fwin .plugs .plug').count() === 3);
   check('the ground has Flat and PBR buttons', await page.locator('.mode-bar button', { hasText: 'PBR' }).count() === 1);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(T(200));
   await page.keyboard.press('b');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(T(400));
   check('B goes back to walking', /Walk/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
-  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(600); }
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(600)); }
   await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Up one level')?.click(); });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(T(400));
   check('up one level shows the island overview', await page.locator('.galaxy-bar.open').count() === 1);
   await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Into the selected')?.click(); });
-  await page.waitForTimeout(300);
-  for (let i = 0; i < 6 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
+  await page.waitForTimeout(T(300));
+  for (let i = 0; i < 6 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(500)); }
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Race track editor')?.click(); });
-  await page.waitForSelector('.maker', { timeout: 30000 });
+  await page.waitForSelector('.maker', { timeout: T(30000) });
   check('the race track editor opens inside the shell', true);
-  for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(400); }
+  for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(400)); }
   check('Esc opens the menu in build mode', await page.locator('.maker .island-menu').count() === 1);
   await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Island')?.click(); });
-  await page.waitForSelector('.hotbar', { timeout: 30000 });
+  await page.waitForSelector('.hotbar', { timeout: T(30000) });
   check('Back to Island returns from build mode', true);
-  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(600); }
+  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(600)); }
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Main menu')?.click(); });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(T(600));
   check('jump menu returns to the main menu', await page.locator('.shell-menu').count() === 1);
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {

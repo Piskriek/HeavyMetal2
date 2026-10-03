@@ -34,6 +34,13 @@ export interface EnvironmentRig {
    * out, and foam rolling in where it is under a metre deep. Call again after the ground changes; null forgets it.
    */
   setSeaFloor(floor: { readonly heights: Float32Array; readonly cols: number; readonly rows: number; readonly cell: number; readonly originX: number; readonly originZ: number } | null): void;
+  /**
+   * Low tier: the sea's foam bands roll in without the noise that breaks them up (the sea covers most of the screen), and with no sky
+   * reflections the water takes the sky colour by viewing angle instead (`setSeaSky`).
+   */
+  setLowDetail(on: boolean): void;
+  /** The sky colour the water shows at a glancing angle on the low tier. */
+  setSeaSky(color: THREE.Color): void;
   dispose(): void;
 }
 
@@ -44,7 +51,9 @@ uniform vec2 uSeaOrigin;
 uniform vec2 uSeaSize;
 uniform float uSeaTime;
 uniform float uSeaHasFloor;
+uniform vec3 uSeaSky;
 varying vec3 vSeaWorld;
+float gSeaSky = 0.0;
 float seaHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float seaNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
@@ -67,10 +76,20 @@ const SEA_COLOR = /* glsl */ `
   diffuseColor.rgb = mix(shallow, diffuseColor.rgb * 0.72, deepK);
   diffuseColor.a = mix(0.5, min(0.97, diffuseColor.a + 0.2), smoothstep(0.0, 3.5, depth));
   // foam: broken bands that roll in towards the beach, and a bright lip where the water meets the sand
+#ifdef SEA_LOW
+  float band = 0.5 + 0.5 * sin(depth * 22.0 - uSeaTime * 1.5);
+  float foam = (1.0 - smoothstep(0.02, 0.35, depth)) * smoothstep(0.78, 0.95, band) * 0.7;
+  foam += (1.0 - smoothstep(0.0, 0.05, depth)) * 0.75;
+  // no reflection map on the low tier: the water shows the sky by viewing angle (Fresnel), as the reflection would
+  gSeaSky = pow(1.0 - clamp(normalize(cameraPosition - vSeaWorld).y, 0.0, 1.0), 3.0) * 0.85;
+  diffuseColor.rgb *= 1.0 - gSeaSky;
+  diffuseColor.a = max(diffuseColor.a, gSeaSky);
+#else
   float n = seaNoise(vSeaWorld.xz * 0.28 + vec2(uSeaTime * 0.07, -uSeaTime * 0.05));
   float band = 0.5 + 0.5 * sin(depth * 22.0 - uSeaTime * 1.5 + n * 6.0);
   float foam = (1.0 - smoothstep(0.02, 0.35, depth)) * smoothstep(0.78, 0.95, band) * (0.4 + 0.6 * n);
   foam += (1.0 - smoothstep(0.0, 0.05, depth)) * (0.5 + 0.5 * seaNoise(vSeaWorld.xz * 2.1 + uSeaTime * 0.35));
+#endif
   foam = clamp(foam, 0.0, 1.0) * inner;
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.96, 0.98, 0.97), foam * 0.8);
   diffuseColor.a = max(diffuseColor.a, foam * 0.85);
@@ -160,7 +179,8 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
     });
     sky = new THREE.Mesh(new THREE.SphereGeometry(4500, 48, 24), material);
     sky.frustumCulled = false;
-    sky.renderOrder = -100;
+    // last of the solid objects (before the see-through sea): drawn first, its cloud shader ran for every pixel the island then covered
+    sky.renderOrder = 1000;
     scene.add(sky);
     scene.fog = new THREE.FogExp2(0xaebdc3, 0.0022);
   } else {
@@ -183,7 +203,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
   // sea mode: depth colour and foam from the ground under the water (see SEA_COLOR)
   const seaUniforms = {
     uSeaFloor: { value: null as THREE.Texture | null }, uSeaOrigin: { value: new THREE.Vector2() }, uSeaSize: { value: new THREE.Vector2(1, 1) },
-    uSeaTime: { value: 0 }, uSeaHasFloor: { value: 0 },
+    uSeaTime: { value: 0 }, uSeaHasFloor: { value: 0 }, uSeaSky: { value: new THREE.Color(0.75, 0.85, 0.92) },
   };
   groundMaterial.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, seaUniforms);
@@ -192,9 +212,10 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${SEA_HEADER}`)
-      .replace('#include <color_fragment>', SEA_COLOR);
+      .replace('#include <color_fragment>', SEA_COLOR)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef SEA_LOW\ntotalEmissiveRadiance += uSeaSky * gSeaSky;\n#endif');
   };
-  groundMaterial.customProgramCacheKey = () => (groundMaterial.defines?.['SEA'] ? 'sea' : 'ground');
+  groundMaterial.customProgramCacheKey = () => (groundMaterial.defines?.['SEA'] ? (groundMaterial.defines?.['SEA_LOW'] ? 'sea-low' : 'sea') : 'ground');
   let seaFloor: THREE.DataTexture | null = null;
   const ground = new THREE.Mesh(new THREE.CircleGeometry(100, 128), groundMaterial);
   ground.rotation.x = -Math.PI / 2;
@@ -347,6 +368,15 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       groundMaterial.depthWrite = !on;
       ground.position.y = on ? 0 : -0.012;
       ground.scale.set(on ? 30 : 1, on ? 30 : 1, 1);
+      groundMaterial.needsUpdate = true;
+    },
+    setSeaSky(color: THREE.Color): void {
+      seaUniforms.uSeaSky.value.copy(color);
+    },
+    setLowDetail(on: boolean): void {
+      if (on === !!groundMaterial.defines?.['SEA_LOW']) return;
+      groundMaterial.defines = { ...(groundMaterial.defines ?? {}) };
+      if (on) groundMaterial.defines['SEA_LOW'] = 1; else delete groundMaterial.defines['SEA_LOW'];
       groundMaterial.needsUpdate = true;
     },
     update(target: Vec3): void {

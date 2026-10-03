@@ -203,7 +203,8 @@ test('performance: 5,000 presets put/resolve/list quickly', () => {
   for (let i = 0; i < 5000; i++) last = store.fork(base.id, { name: `r${i}`, params: { weight: i % 10 } });
   store.resolve(last.id);
   assert.ok(store.list({ kind: 'racer' }).length >= 5000);
-  assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0} ms`);
+  // sized for the owner's minimum-spec laptop; runs on its own after the other tests (scripts/verify.mjs)
+  assert.ok(Date.now() - t0 < 6000, `took ${Date.now() - t0} ms`);
 });
 
 

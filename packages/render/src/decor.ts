@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { VoxelModel } from '@hm/voxel';
 import { voxelGeometry } from './voxel-view';
+import { halveModel } from './decor-lod';
 
 /** One drawable primitive of a prop, in the prop's local space (a prop is a few of these: a palm = trunk + crown ...). */
 export interface DecorPart {
@@ -17,8 +18,22 @@ export interface DecorPart {
 export interface DecorVoxel { readonly id: string; readonly model: VoxelModel; readonly block: number }
 export interface DecorInstance { readonly parts: readonly DecorPart[]; readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly scale: number; readonly voxel?: DecorVoxel }
 
-/** Meshed voxel props by id, kept for the life of the page (a handful of small meshes). */
+/** Meshed voxel props by id (and `id@half` for the distant copy), kept for the life of the page (a handful of small meshes). */
 const VOXEL_GEOMETRY = new Map<string, THREE.BufferGeometry | null>();
+const meshed = (key: string, model: () => VoxelModel): THREE.BufferGeometry | null => {
+  let g = VOXEL_GEOMETRY.get(key);
+  if (g === undefined) { g = voxelGeometry(model(), { ao: true, greedy: true }); VOXEL_GEOMETRY.set(key, g); }
+  return g;
+};
+
+/** One voxel prop's copies: every voxel near the camera, the halved model further out. */
+interface VoxelLod {
+  readonly near: THREE.InstancedMesh;
+  readonly far: THREE.InstancedMesh | null;
+  readonly full: readonly THREE.Matrix4[];
+  readonly half: readonly THREE.Matrix4[];
+  readonly at: readonly THREE.Vector3[];
+}
 
 /**
  * The scale that turns the unit geometry into the part, by the recipe convention (see @hm/scatter): a sphere's radius is `size`, a box's edge is
@@ -39,6 +54,9 @@ export class DecorView {
   readonly group = new THREE.Group();
   private readonly geometries: THREE.BufferGeometry[] = [];
   private readonly materials: THREE.Material[] = [];
+  private readonly lods: VoxelLod[] = [];
+  private detailRadius = Infinity;
+  private readonly lastAt = new THREE.Vector3(Infinity, Infinity, Infinity);
 
   constructor(instances: readonly DecorInstance[]) {
     this.group.name = 'decor';
@@ -68,19 +86,24 @@ export class DecorView {
     }
     for (const { voxel, matrices } of voxelBuckets.values()) {
       // meshing a voxel model is the slow part: do it once per model and share it between rebuilds (the plants are re-laid while you sculpt)
-      let geometry = VOXEL_GEOMETRY.get(voxel.id);
-      if (geometry === undefined) { geometry = voxelGeometry(voxel.model, { ao: true, greedy: true }); VOXEL_GEOMETRY.set(voxel.id, geometry); }
+      const geometry = meshed(voxel.id, () => voxel.model);
       if (!geometry) continue;
+      const halfGeometry = meshed(`${voxel.id}@half`, () => halveModel(voxel.model));
       const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
-      const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
-      matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.frustumCulled = false;
-      this.group.add(mesh);
+      const instanced = (g: THREE.BufferGeometry): THREE.InstancedMesh => {
+        const mesh = new THREE.InstancedMesh(g, material, matrices.length);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        this.group.add(mesh);
+        return mesh;
+      };
+      const half = matrices.map((m) => m.clone().scale(new THREE.Vector3(2, 2, 2)));
+      const at = matrices.map((m) => new THREE.Vector3().setFromMatrixPosition(m));
+      this.lods.push({ near: instanced(geometry), far: halfGeometry ? instanced(halfGeometry) : null, full: matrices, half, at });
       this.materials.push(material);
     }
+    this.layOut(new THREE.Vector3(Infinity, 0, 0));
     for (const { part, matrices } of buckets.values()) {
       // unit geometry, matching partScale: sphere radius 1, box edge 1, cylinder radius 1 and height 1
       const geometry = part.shape === 'sphere' ? new THREE.SphereGeometry(1, 12, 8) : part.shape === 'box' ? new THREE.BoxGeometry(1, 1, 1) : new THREE.CylinderGeometry(1, 1, 1, 10);
@@ -94,6 +117,40 @@ export class DecorView {
       this.group.add(mesh);
       this.geometries.push(geometry);
       this.materials.push(material);
+    }
+  }
+
+  /**
+   * Plants nearer than `radius` metres to the camera show every voxel, the rest their halved model (Infinity = all full detail).
+   * Set from the quality tier; weak graphics chips spend most of the plants' cost on vertices.
+   */
+  setDetailRadius(radius: number): void {
+    if (radius === this.detailRadius) return;
+    this.detailRadius = radius;
+    if (radius === Infinity) this.layOut(new THREE.Vector3(Infinity, 0, 0));
+    else this.lastAt.set(-Infinity, 0, 0); // lay out again on the next update
+  }
+
+  /** Call every frame with the camera position: copies move between the near and far meshes once the camera has moved a few metres. */
+  update(camera: THREE.Vector3): void {
+    if (this.detailRadius === Infinity && this.lastAt.x === Infinity) return; // all at full detail already
+    const step = Math.min(3, this.detailRadius * 0.15);
+    if (this.lastAt.distanceToSquared(camera) < step * step) return;
+    this.layOut(camera);
+  }
+
+  private layOut(camera: THREE.Vector3): void {
+    this.lastAt.copy(camera);
+    const r2 = this.detailRadius * this.detailRadius;
+    for (const l of this.lods) {
+      let n = 0, f = 0;
+      for (let i = 0; i < l.full.length; i++) {
+        if (!l.far || l.at[i]!.distanceToSquared(camera) <= r2) l.near.setMatrixAt(n++, l.full[i]!);
+        else l.far.setMatrixAt(f++, l.half[i]!);
+      }
+      l.near.count = n;
+      l.near.instanceMatrix.needsUpdate = true;
+      if (l.far) { l.far.count = f; l.far.instanceMatrix.needsUpdate = true; }
     }
   }
 

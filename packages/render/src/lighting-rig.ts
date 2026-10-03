@@ -1,12 +1,16 @@
 import * as THREE from 'three';
+import { LightProbeGenerator } from 'three/examples/jsm/lights/LightProbeGenerator.js';
 import type { Vec3 } from '@hm/contracts';
 import { lerpSetup, sunDirection, type LampAnchor, type LightSetup, type ToneMappingName } from '@hm/lighting';
 import type { EnvironmentRig } from './environment';
 
 /**
  * The lighting rig: turns a LightSetup (a preset) into the actual lights, sky, haze, sea tint, tone mapping and sky reflections of a scene.
- * It keeps a fixed pool of lamps (4 point, 2 spot) so the number of lights never changes and shaders never recompile. A change of setup is a
- * short blend rather than a pop. Sky and reflections share one gradient shader, so reflective surfaces pick up the sky colour they sit under.
+ * It keeps a fixed pool of lamps (4 point, 2 spot); lamps that are dark are left out of the scene, because three.js shades every light for
+ * every pixel even at zero brightness (on integrated graphics the dark pool cost a third of the frame). Shaders recompile once when a setup
+ * gains or loses lamps. A change of setup is a short blend rather than a pop. Sky and reflections share one gradient shader, so reflective
+ * surfaces pick up the sky colour they sit under. On the low tier the sky's soft light comes from a light probe (9 numbers) instead of the
+ * reflection map.
  */
 export interface LightingContext {
   /** The point of interest (the player's chest, the thing being edited): lamps without a prop hang near it, the fill light aims at it. */
@@ -40,7 +44,8 @@ export function createSkyMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    depthTest: false,
+    // drawn after the solid objects with the depth test on, so its clouds are only worked out for the sky you can see (see environment.ts)
+    depthTest: true,
     fog: false,
     uniforms: {
       top: { value: new THREE.Color('#2a78dc') },
@@ -126,6 +131,16 @@ export class LightingRig {
   private blendSeconds = 0.0001;
   private clock = 0;
   private shadowCap = 2048;
+  private reflections = true;
+  /** Low tier: the sky's soft light as spherical harmonics, measured from the same sky the reflection map is made of. */
+  private readonly probe = new THREE.LightProbe();
+  private probeTarget: THREE.WebGLCubeRenderTarget | null = null;
+  private probeCamera: THREE.CubeCamera | null = null;
+  private probeSig = '';
+  private probeTime = -1;
+  private probeBusy = false;
+  private readonly seaSky = new THREE.Color();
+  private readonly skyTop = new THREE.Color();
   private dirty = true;
   /** The setup as it stands this frame (mid-blend values included). */
   current: LightSetup;
@@ -140,6 +155,8 @@ export class LightingRig {
     this.envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 48, 24), this.envSkyMat));
     this.pmrem = new THREE.PMREMGenerator(renderer);
     scene.add(this.ambient, this.fill, this.fill.target);
+    this.probe.visible = false;
+    scene.add(this.probe);
     for (let i = 0; i < 4; i++) { const p = new THREE.PointLight('#ffffff', 0, 10, 2); this.points.push(p); scene.add(p); }
     for (let i = 0; i < 2; i++) { const s = new THREE.SpotLight('#ffffff', 0, 16, 0.55, 0.6, 2); this.spots.push(s); scene.add(s, s.target); }
   }
@@ -158,6 +175,17 @@ export class LightingRig {
   setShadowCap(size: number): void {
     if (size === this.shadowCap) return;
     this.shadowCap = size;
+    this.dirty = true;
+  }
+
+  /**
+   * Sky reflections (an environment map lighting every PBR material). Off on the low tier: on a laptop's integrated graphics it costs
+   * about a third of the frame. A light probe gives the same soft sky light instead (no shine), so colours stay as they were.
+   */
+  setReflections(on: boolean): void {
+    if (on === this.reflections) return;
+    this.reflections = on;
+    this.envSig = '';
     this.dirty = true;
   }
 
@@ -193,6 +221,12 @@ export class LightingRig {
 
   private updateEnvironmentMap(s: LightSetup): void {
     const sig = [s.sky.top, s.sky.horizon, s.sky.bottom, s.sky.sunGlow.toFixed(2), (s.sky.clouds ?? 0.3).toFixed(2), s.fog.color, s.sun.color, s.sun.azimuthDeg.toFixed(0), s.sun.elevationDeg.toFixed(0), s.fog.density.toFixed(3)].join('|');
+    this.probe.visible = !this.reflections;
+    if (!this.reflections) {
+      if (this.scene.environment) { this.scene.environment = null; this.envTarget?.dispose(); this.envTarget = null; }
+      this.updateProbe(s, sig);
+      return;
+    }
     if (sig === this.envSig && this.envTarget) return;
     const settled = this.blend >= 1;
     if (this.envTarget && !settled && this.clock - this.envTime < 0.12) return;
@@ -203,6 +237,27 @@ export class LightingRig {
     this.envSig = sig;
     this.envTime = this.clock;
     this.scene.environment = rt.texture;
+  }
+
+  /** Measure the sky into the light probe: a tiny cube render, read back off the main path; throttled while a setup blends. */
+  private updateProbe(s: LightSetup, sig: string): void {
+    if (sig === this.probeSig || this.probeBusy) return;
+    if (this.blend < 1 && this.clock - this.probeTime < 0.25) return;
+    this.setSkyUniforms(this.envSkyMat, s);
+    if (!this.probeTarget || !this.probeCamera) {
+      this.probeTarget = new THREE.WebGLCubeRenderTarget(16, { type: THREE.HalfFloatType });
+      this.probeCamera = new THREE.CubeCamera(0.1, 200, this.probeTarget);
+      this.envScene.add(this.probeCamera);
+    }
+    this.probeCamera.update(this.renderer, this.envScene);
+    this.probeBusy = true;
+    this.probeSig = sig;
+    this.probeTime = this.clock;
+    const target = this.probeTarget;
+    LightProbeGenerator.fromCubeRenderTarget(this.renderer, target)
+      .then((p) => { if (target === this.probeTarget) this.probe.sh.copy(p.sh); })
+      .catch(() => { this.probeSig = ''; })
+      .finally(() => { this.probeBusy = false; });
   }
 
   private apply(s: LightSetup, ctx: LightingContext): void {
@@ -246,6 +301,9 @@ export class LightingRig {
     }
     for (; pi < this.points.length; pi++) this.points[pi]!.intensity = 0;
     for (; si < this.spots.length; si++) this.spots[si]!.intensity = 0;
+    // a dark light still costs every pixel of every lit material (three.js shades all lights in the scene): leave dark ones out.
+    // Switching one on or off recompiles the materials once, which only happens when a setup gains or loses its lamps.
+    for (const l of [this.fill, ...this.points, ...this.spots]) l.visible = l.intensity > 0;
 
     this.setSkyUniforms(this.skyMat, s);
     this.skyMat.uniforms.time!.value = ctx.time;
@@ -254,6 +312,8 @@ export class LightingRig {
 
     this.updateEnvironmentMap(s);
     this.scene.environmentIntensity = Math.min(2, s.hemi.intensity * 0.5);
+    this.probe.intensity = this.scene.environmentIntensity;
+    this.env.setSeaSky(this.seaSky.set(s.sky.horizon).lerp(this.skyTop.set(s.sky.top), 0.25));
 
     this.renderer.toneMapping = TONE[s.toneMapping] ?? THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = s.exposure;
@@ -265,7 +325,9 @@ export class LightingRig {
   dispose(): void {
     const sky = this.env.parts.sky;
     if (sky && this.legacySkyMaterial) sky.material = this.legacySkyMaterial;
-    this.scene.remove(this.ambient, this.fill, this.fill.target, ...this.points, ...this.spots, ...this.spots.map((s) => s.target));
+    this.scene.remove(this.ambient, this.fill, this.fill.target, this.probe, ...this.points, ...this.spots, ...this.spots.map((s) => s.target));
+    this.probeTarget?.dispose();
+    this.probeTarget = null;
     this.scene.environment = this.prevEnvironment;
     this.scene.environmentIntensity = this.prevEnvironmentIntensity;
     this.envTarget?.dispose();

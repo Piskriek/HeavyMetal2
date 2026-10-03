@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SurfaceArray } from './surface-set';
 import { COLOR_STAGE_GLSL, EMISSIVE_STAGE_GLSL, GLOBALS_GLSL, NOISE_GLSL, NORMAL_STAGE_GLSL, ROUGH_STAGE_GLSL, tileGlsl, uniformsGlsl } from './terrain-glsl';
+import { bakeFlatBlocks, blockGridFor, type BlockGrid } from './flat-blocks';
 
 /** What the renderer needs of a terrain (structurally the terrain package's Terrain; no import, so render stays independent). */
 export interface TerrainLike {
@@ -33,9 +34,22 @@ export class TerrainView {
   private readonly material: THREE.MeshStandardMaterial;
   private uniforms: Record<string, THREE.IUniform> | null = null;
   readonly look: TerrainLook = { cliffSurface: 0, soft: 0.6, normalStrength: 1, scale: 1.8 };
+  /** The flat skin's surfaces per half-metre block (see flat-blocks.ts); baked while the flat skin shows. */
+  private readonly blockGrid: BlockGrid;
+  private readonly blockData: Uint8Array;
+  private readonly blocks: THREE.DataTexture;
+  private blocksStale = true;
+  private blocksFullPending = true;
 
   constructor(private readonly t: TerrainLike, private readonly surfaces: SurfaceArray) {
     const { cols, rows, cell, originX, originZ } = t.spec;
+    this.blockGrid = blockGridFor(t.spec);
+    this.blockData = new Uint8Array(this.blockGrid.w * this.blockGrid.h * 4);
+    this.blocks = new THREE.DataTexture(this.blockData, this.blockGrid.w, this.blockGrid.h, THREE.RGBAFormat, THREE.UnsignedByteType);
+    this.blocks.magFilter = this.blocks.minFilter = THREE.NearestFilter;
+    this.blocks.generateMipmaps = false;
+    this.blocks.flipY = false;
+    this.blocks.onUpdate = () => { this.blocksFullPending = false; };
     const pos = new Float32Array(cols * rows * 3);
     const idx = new Uint32Array((cols - 1) * (rows - 1) * 6);
     // diagonal a-d, the same split the physics heightfield uses: (a,d,b) and (a,c,d), counter-clockwise seen from above
@@ -75,11 +89,12 @@ export class TerrainView {
       const u: Record<string, THREE.IUniform> = {
         islSurfaces: { value: this.surfaces.texture }, islPbr: { value: this.surfaces.pbrTexture }, islFlatPalette: { value: this.surfaces.flatTexture },
         islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: this.surfaces.layerOf },
-        islFlat: { value: this.look.skin === 'flat' ? 1 : 0 },
         islParams: { value: this.surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
         islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
         paintMask: { value: this.mask }, paintRes: { value: new THREE.Vector2(cols, rows) },
         paintOrigin: { value: new THREE.Vector2(originX, originZ) }, paintCell: { value: cell },
+        islBlocks: { value: this.blocks }, islBlockOrigin: { value: new THREE.Vector2(this.blockGrid.x0, this.blockGrid.z0) },
+        islBlockMax: { value: new THREE.Vector2(this.blockGrid.w - 1, this.blockGrid.h - 1) },
       };
       Object.assign(shader.uniforms, u);
       this.uniforms = shader.uniforms;
@@ -95,7 +110,18 @@ export class TerrainView {
         .replace('#include <normal_fragment_maps>', NORMAL_STAGE_GLSL);
     };
     m.customProgramCacheKey = () => `terrain-${layers}`;
+    this.applySkinDefine(m);
     return m;
+  }
+
+  /** The flat skin is its own shader program (ISL_FLAT), so it carries none of the PBR path's cost. Switching skins compiles once. */
+  private applySkinDefine(m: THREE.MeshStandardMaterial): void {
+    const flat = this.look.skin === 'flat';
+    const defines: Record<string, unknown> = { ...(m.defines ?? {}) };
+    if (flat === ('ISL_FLAT' in defines)) return;
+    if (flat) defines['ISL_FLAT'] = ''; else delete defines['ISL_FLAT'];
+    m.defines = defines;
+    m.needsUpdate = true;
   }
 
   private applyLook(): void {
@@ -104,13 +130,24 @@ export class TerrainView {
     this.uniforms['islCliffLayer']!.value = layer;
     this.uniforms['islSoft']!.value = this.look.soft;
     this.uniforms['islNormalStrength']!.value = this.look.normalStrength;
-    this.uniforms['islFlat']!.value = this.look.skin === 'flat' ? 1 : 0;
     this.uniforms['islScale']!.value = this.look.scale;
   }
 
   setLook(look: Partial<TerrainLook>): void {
     Object.assign(this.look, look);
+    this.applySkinDefine(this.material);
     this.applyLook();
+    if (this.look.skin === 'flat' && this.blocksStale) this.bakeBlocks(null);
+  }
+
+  /** Bake the flat skin's blocks for the nodes in `dirty` (all when null) and upload only the rows that changed. */
+  private bakeBlocks(dirty: DirtyRectLike | null): void {
+    const { v0, v1 } = bakeFlatBlocks(this.t, this.blockGrid, this.blockData, dirty);
+    // row uploads only once the whole texture is on the GPU (a range upload before the first one would leave the other rows empty)
+    if (dirty && !this.blocksFullPending) for (let v = v0; v <= v1; v++) this.blocks.addUpdateRange(v * this.blockGrid.w * 4, this.blockGrid.w * 4);
+    else { this.blocks.clearUpdateRanges(); this.blocksFullPending = true; }
+    this.blocks.needsUpdate = true;
+    this.blocksStale = false;
   }
 
   /** Re-upload the nodes inside `dirty` (or everything when null): positions, normals and the paint mask. */
@@ -142,11 +179,15 @@ export class TerrainView {
     nor.needsUpdate = true;
     this.mask.needsUpdate = true;
     if (!dirty) this.geometry.computeBoundingSphere();
+    // the PBR skin reads the mask per pixel; the flat skin's blocks are baked when it shows
+    if (this.look.skin === 'flat') this.bakeBlocks(this.blocksStale ? null : dirty);
+    else this.blocksStale = true;
   }
 
   dispose(): void {
     this.geometry.dispose();
     this.mask.dispose();
+    this.blocks.dispose();
     this.material.dispose();
   }
 }

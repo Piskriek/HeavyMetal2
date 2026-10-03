@@ -213,10 +213,11 @@ test('replay: record a session, replay it, get the same final hash; a tampered i
   assert.ok(bad.firstMismatchTick !== null && bad.firstMismatchTick >= 160 && bad.firstMismatchTick <= 200, `first mismatch ${bad.firstMismatchTick}`);
 });
 
-test('performance: 10,000 entities for 120 ticks stays under 3 s', () => {
+// sized for the owner's minimum-spec laptop (2.4 s there); runs on its own after the other tests (scripts/verify.mjs)
+test('performance: 10,000 entities for 120 ticks stays under 6 s', () => {
   const sim = buildSim(1, [{ name: 'move', order: 0, update: (w, ctx) => { for (const id of w.query('pos')) w.set(id, 'pos', { x: Number(w.get(id, 'pos')!['x']) + ctx.dt }); } }]);
   for (let i = 0; i < 10_000; i++) sim.world.spawn(undefined, { pos: {} });
   const t0 = Date.now();
   for (let i = 0; i < 120; i++) sim.step();
-  assert.ok(Date.now() - t0 < 3000, `took ${Date.now() - t0} ms`);
+  assert.ok(Date.now() - t0 < 6000, `took ${Date.now() - t0} ms`);
 });

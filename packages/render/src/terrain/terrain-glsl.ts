@@ -36,7 +36,6 @@ uniform sampler2DArray islSurfaces;
 uniform sampler2DArray islPbr;
 uniform sampler2D islFlatPalette;
 uniform float islNormalStrength;
-uniform float islFlat;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 uniform vec4 islParams[${layers}];
 uniform float islSoft;
@@ -47,45 +46,55 @@ uniform sampler2D paintMask;
 uniform vec2 paintRes;
 uniform vec2 paintOrigin;
 uniform float paintCell;
+uniform sampler2D islBlocks;
+uniform vec2 islBlockOrigin;
+uniform vec2 islBlockMax;
 `;
 
 export const tileGlsl = (layers: number): string => /* glsl */ `
+// total weight of surface \`id\` over the eight slots (four texels x two surfaces)
+float islTotal(float id, vec4 ida, vec4 idb, vec4 wa, vec4 wb) {
+  return dot(vec4(equal(ida, vec4(id))), wa) + dot(vec4(equal(idb, vec4(id))), wb);
+}
+void islKeep(float id, float w, inout float bestId, inout float bestW) {
+  if (w > bestW) { bestW = w; bestId = id; }
+}
+// The two strongest surfaces among the four mask texels around the pixel, and the weight of the second.
+// Written with vectors and no indexed arrays: ANGLE turns indexed local arrays into slow D3D temp arrays (it halved the frame rate on Intel HD graphics).
 vec3 islGather(sampler2D mask, vec2 size, vec2 coord) {
   vec2 p = coord - 0.5;
   vec2 i = floor(p);
   vec2 f = p - i;
-  float cid[8] = float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-  float cw[8] = float[8](0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-  int n = 0;
-  for (int k = 0; k < 4; k++) {
-    vec2 o = vec2(float(k & 1), float(k >> 1));
-    vec4 t = surfTexel(mask, size, i + o);
-    float bw = (o.x > 0.5 ? f.x : 1.0 - f.x) * (o.y > 0.5 ? f.y : 1.0 - f.y);
-    float a = floor(t.r * 255.0 + 0.5);
-    float b = floor(t.g * 255.0 + 0.5);
-    bool solid = a == b;
-    for (int s = 0; s < 2; s++) {
-      float id = s == 0 ? a : b;
-      float ww = solid ? (s == 0 ? bw : 0.0) : (s == 0 ? bw * (1.0 - t.b) : bw * t.b);
-      if (ww <= 0.0) continue;
-      bool found = false;
-      for (int j = 0; j < 8; j++) {
-        if (j >= n) break;
-        if (cid[j] == id) { cw[j] += ww; found = true; break; }
-      }
-      if (!found && n < 8) { cid[n] = id; cw[n] = ww; n++; }
-    }
-  }
-  if (n == 0) return vec3(0.0, 0.0, 0.0);
-  int ia = 0;
-  int ib = -1;
-  for (int j = 1; j < 8; j++) {
-    if (j >= n) break;
-    if (cw[j] > cw[ia]) { ib = ia; ia = j; }
-    else if (ib < 0 || cw[j] > cw[ib]) ib = j;
-  }
-  if (ib < 0) return vec3(cid[ia], cid[ia], 0.0);
-  return vec3(cid[ia], cid[ib], cw[ib] / max(cw[ia] + cw[ib], 1e-5));
+  vec4 t0 = surfTexel(mask, size, i);
+  vec4 t1 = surfTexel(mask, size, i + vec2(1.0, 0.0));
+  vec4 t2 = surfTexel(mask, size, i + vec2(0.0, 1.0));
+  vec4 t3 = surfTexel(mask, size, i + vec2(1.0, 1.0));
+  vec4 bw = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+  vec4 ida = floor(vec4(t0.r, t1.r, t2.r, t3.r) * 255.0 + 0.5);
+  vec4 idb = floor(vec4(t0.g, t1.g, t2.g, t3.g) * 255.0 + 0.5);
+  vec4 bl = vec4(t0.b, t1.b, t2.b, t3.b);
+  vec4 solid = vec4(equal(ida, idb));
+  vec4 wa = bw * mix(1.0 - bl, vec4(1.0), solid);
+  vec4 wb = bw * bl * (1.0 - solid);
+  vec4 ta = vec4(islTotal(ida.x, ida, idb, wa, wb), islTotal(ida.y, ida, idb, wa, wb), islTotal(ida.z, ida, idb, wa, wb), islTotal(ida.w, ida, idb, wa, wb));
+  vec4 tb = vec4(islTotal(idb.x, ida, idb, wa, wb), islTotal(idb.y, ida, idb, wa, wb), islTotal(idb.z, ida, idb, wa, wb), islTotal(idb.w, ida, idb, wa, wb));
+  // the strongest, earliest slot first on a tie (texel order, first surface before second)
+  float aId = 0.0, aW = 0.0;
+  islKeep(ida.x, ta.x, aId, aW); islKeep(idb.x, tb.x, aId, aW);
+  islKeep(ida.y, ta.y, aId, aW); islKeep(idb.y, tb.y, aId, aW);
+  islKeep(ida.z, ta.z, aId, aW); islKeep(idb.z, tb.z, aId, aW);
+  islKeep(ida.w, ta.w, aId, aW); islKeep(idb.w, tb.w, aId, aW);
+  if (aW <= 0.0) return vec3(0.0, 0.0, 0.0);
+  // the strongest other surface
+  vec4 ma = vec4(notEqual(ida, vec4(aId))), mb = vec4(notEqual(idb, vec4(aId)));
+  ta *= ma; tb *= mb;
+  float bId = -1.0, bW = 0.0;
+  islKeep(ida.x, ta.x, bId, bW); islKeep(idb.x, tb.x, bId, bW);
+  islKeep(ida.y, ta.y, bId, bW); islKeep(idb.y, tb.y, bId, bW);
+  islKeep(ida.z, ta.z, bId, bW); islKeep(idb.z, tb.z, bId, bW);
+  islKeep(ida.w, ta.w, bId, bW); islKeep(idb.w, tb.w, bId, bW);
+  if (bId < 0.0) return vec3(aId, aId, 0.0);
+  return vec3(aId, bId, bW / max(aW + bW, 1e-5));
 }
 
 float islLayer(float id) {
@@ -189,20 +198,28 @@ float gGlow = 0.0;
 vec3 gBump = vec3(0.0);
 `;
 
-/** Replaces `#include <color_fragment>`: the island surface at this pixel becomes the diffuse colour. */
+/**
+ * Replaces `#include <color_fragment>`: the island surface at this pixel becomes the diffuse colour.
+ * ISL_FLAT (defined for the flat skin) compiles only the flat path: a runtime switch kept the whole PBR path in the program,
+ * and weak graphics chips paid for it.
+ */
 export const COLOR_STAGE_GLSL = /* glsl */ `
 #include <color_fragment>
 {
-  // the flat skin samples the ground in half-metre blocks, like the voxel goblin; the PBR skin samples it smoothly
-  vec3 wp = islFlat > 0.5 ? floor(vTWorld / 0.5) * 0.5 + 0.25 : vTWorld;
   vec3 gnrm = normalize(vTNormal);
-  // flat: ask for a very coarse mip so each block is the average colour of its surface, then vary blocks a little
-  float flatLod = islFlat > 0.5 ? 40.0 : 1.0;
-  vec3 dwx = dFdx(vTWorld) * flatLod;
-  vec3 dwy = dFdy(vTWorld) * flatLod;
+#ifdef ISL_FLAT
+  // the flat skin shows the ground in half-metre blocks, like the voxel goblin; each block's two surfaces are baked (flat-blocks.ts)
+  vec3 wp = floor(vTWorld / 0.5) * 0.5 + 0.25;
+  vec4 bs = texelFetch(islBlocks, ivec2(clamp(floor(vTWorld.xz / 0.5) - islBlockOrigin, vec2(0.0), islBlockMax)), 0);
+  vec3 sm = vec3(floor(bs.rg * 255.0 + 0.5), bs.b);
+#else
+  vec3 wp = vTWorld;
+  vec3 dwx = dFdx(vTWorld);
+  vec3 dwy = dFdy(vTWorld);
   vec2 coord = (wp.xz - paintOrigin) / paintCell + 0.5;
   vec2 mwarp = vec2(surfNoise(wp.xz / 9.0), surfNoise(wp.xz / 9.0 + 19.7)) - 0.5;
   vec3 sm = islGather(paintMask, paintRes, coord + mwarp * 1.4);
+#endif
   float la = islLayer(sm.x);
   float lb = islLayer(sm.y);
   float lw = sm.x == sm.y ? 0.0 : sm.z;
@@ -211,28 +228,29 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
   if (la >= 0.0) {
     float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
     vec4 tile;
-    if (islFlat > 0.5) {
-      // voxel look: every half-metre block takes one tone of its surface's hand-picked palette; where two surfaces meet, each block picks one of them
-      vec3 bk = floor(vTWorld / 0.5);
-      float hTone = fract(sin(dot(bk, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-      float hMix = fract(sin(dot(bk, vec3(39.346, 11.135, 83.155))) * 24634.6345);
-      float layer = hMix < lw ? lb : la;
-      if (islCliffLayer >= 0.0 && hMix < steep) layer = islCliffLayer;
-      tile = vec4(texelFetch(islFlatPalette, ivec2(int(floor(hTone * 5.0)), int(layer + 0.5)), 0).rgb, 1.0);
-      gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
-    } else {
-      tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);
-      // far away a small tile repeats like a checkerboard: blend in the same surface at three times the size, and vary its tone in big patches
-      float far = smoothstep(18.0, 80.0, length(cameraPosition - vTWorld));
-      if (far > 0.01) tile = mix(tile, islTriplanar(la, lb, lw, wp * 0.31 + 17.3, gnrm, dwx * 0.31, dwy * 0.31), far * 0.55);
-      if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
-      tile.rgb *= mix(0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7), 0.8 + 0.4 * surfNoise(wp.xz / 31.0 + 9.1), far);
-    }
+#ifdef ISL_FLAT
+    // voxel look: every half-metre block takes one tone of its surface's hand-picked palette; where two surfaces meet, each block picks one of them
+    vec3 bk = floor(vTWorld / 0.5);
+    float hTone = fract(sin(dot(bk, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float hMix = fract(sin(dot(bk, vec3(39.346, 11.135, 83.155))) * 24634.6345);
+    float layer = hMix < lw ? lb : la;
+    if (islCliffLayer >= 0.0 && hMix < steep) layer = islCliffLayer;
+    tile = vec4(texelFetch(islFlatPalette, ivec2(int(floor(hTone * 5.0)), int(layer + 0.5)), 0).rgb, 1.0);
+    gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
+    diffuseColor.rgb = tile.rgb;
+    gRough = 0.92;
+#else
+    tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);
+    // far away a small tile repeats like a checkerboard: blend in the same surface at three times the size, and vary its tone in big patches
+    float far = smoothstep(18.0, 80.0, length(cameraPosition - vTWorld));
+    if (far > 0.01) tile = mix(tile, islTriplanar(la, lb, lw, wp * 0.31 + 17.3, gnrm, dwx * 0.31, dwy * 0.31), far * 0.55);
+    if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
+    tile.rgb *= mix(0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7), 0.8 + 0.4 * surfNoise(wp.xz / 31.0 + 9.1), far);
     diffuseColor.rgb = tile.rgb;
     gRough = islRough(la, lb, lw);
-    vec4 pbrTile = islFlat > 0.5 ? vec4(0.0, 0.0, 0.0, -1.0) : islPbrAt(la, lb, lw, wp, gnrm, dwx, dwy);
+    vec4 pbrTile = islPbrAt(la, lb, lw, wp, gnrm, dwx, dwy);
     if (pbrTile.w >= 0.0) { gRough = pbrTile.w; gBump = pbrTile.xyz; }
-    if (islFlat > 0.5) { gRough = 0.92; gBump = vec3(0.0); }
+#endif
     float wet = 1.0 - smoothstep(0.0, 1.3, wp.y);
     diffuseColor.rgb *= 1.0 - 0.32 * wet;
     gRough = gRough * (1.0 - 0.45 * wet);

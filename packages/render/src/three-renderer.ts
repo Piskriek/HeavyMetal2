@@ -238,6 +238,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       rig = new LightingRig(scene, webgl, environment, pendingSetup);
       rig.setShadowCap(shadowMapSize(graphics));
       rig.setReflections(graphics.reflections);
+      rig.setClouds(graphics.clouds);
     }
     buildPost();
   };
@@ -265,6 +266,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     v.setDetailRadius(graphics.plantDetail > 0 ? graphics.plantDetail : Infinity);
     v.setCulling(plantsCulled(graphics));
     v.setLowCost(graphics.simpleLighting);
+    v.setDrawDistance(graphics.plantDistance > 0 ? graphics.plantDistance : Infinity);
   };
   let terrainView: TerrainView | null = null;
   let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
@@ -275,6 +277,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     if (scene && pendingTerrain) {
       terrainView = new TerrainView(pendingTerrain.data, pendingTerrain.surfaces);
       terrainView.setLowCost(graphics.simpleLighting);
+      terrainView.setForceFlat(graphics.flatGround);
       scene.add(terrainView.mesh);
     }
     environment?.setSea(!!terrainView);
@@ -372,11 +375,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       const rebuildPost = g.effects !== graphics.effects || g.smoothEdges !== graphics.smoothEdges;
       graphics = g;
       const shadowSize = shadowMapSize(g);
-      if (rig) { rig.setShadowCap(shadowSize); rig.setReflections(g.reflections); }
+      if (rig) { rig.setShadowCap(shadowSize); rig.setReflections(g.reflections); rig.setClouds(g.clouds); }
       else environment?.setShadows(shadowSize > 0, Math.max(256, shadowSize));
       environment?.setLowDetail(g.simpleSea);
       if (decorView) decorGraphics(decorView);
       terrainView?.setLowCost(g.simpleLighting);
+      terrainView?.setForceFlat(g.flatGround);
       if (rebuildPost) buildPost();
       resize();
       postStale = true;

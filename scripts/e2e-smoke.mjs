@@ -179,9 +179,17 @@ try {
   await dom(() => { [...document.querySelectorAll('.galaxy-bar button')].find((b) => b.getAttribute('aria-label') === 'Into the selected')?.click(); });
   await page.waitForTimeout(T(300));
   for (let i = 0; i < 6 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(500)); }
-  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Race track editor')?.click(); });
+  const escMenu = await page.locator('.island-menu button').allInnerTexts();
+  check('the Esc menu has Settings and no race track editor', escMenu.includes('Settings') && !escMenu.includes('Race track editor') && !escMenu.includes('Lighting'), escMenu.join(', '));
+  // the race track editor lives in the Goblin Racing menu now
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Activities')?.click(); });
+  await page.waitForTimeout(T(400));
+  await dom(() => { [...document.querySelectorAll('.shell-activity button')].find((b) => b.textContent === 'Play')?.click(); });
+  await page.waitForSelector('.shell-racing');
+  await dom(() => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === 'Track editor')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.shell-racing-main button')].find((b) => b.textContent === 'Open the track editor')?.click(); });
   await page.waitForSelector('.maker', { timeout: T(30000) });
-  check('the race track editor opens inside the shell', true);
+  check('the race track editor opens from the Goblin Racing menu', true);
   for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(400)); }
   check('Esc opens the menu in build mode', await page.locator('.maker .island-menu').count() === 1);
   await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Island')?.click(); });

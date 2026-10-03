@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { Coins, Eye, Flag, Gauge, Settings2, Trophy, UserRound } from 'lucide-react';
+import { Coins, Eye, Flag, Gauge, Route, Settings2, Trophy, UserRound } from 'lucide-react';
 import { humanizeDelta, type Activity } from '@hm/activities';
 import { currentTournament, withTournament, type Profile } from './profile';
 
@@ -7,10 +7,10 @@ import { currentTournament, withTournament, type Profile } from './profile';
  * The menu of one activity (Goblin Racing). It is a separate game inside the game: its own sections, its own profile page.
  * Tournaments, rankings and the bookie run on a simulated community until the platform backend is connected, so the whole flow can be tried offline.
  */
-type Section = 'quick' | 'tournaments' | 'spectate' | 'rankings' | 'settings' | 'goblin' | 'bookie';
+type Section = 'quick' | 'tournaments' | 'spectate' | 'rankings' | 'tracks' | 'settings' | 'goblin' | 'bookie';
 const SECTIONS: readonly { id: Section; label: string; Icon: typeof Flag }[] = [
   { id: 'quick', label: 'Quick Race', Icon: Flag }, { id: 'tournaments', label: 'Tournaments', Icon: Trophy }, { id: 'spectate', label: 'Spectate', Icon: Eye },
-  { id: 'rankings', label: 'Rankings', Icon: Gauge }, { id: 'settings', label: 'Settings', Icon: Settings2 }, { id: 'goblin', label: 'My Goblin', Icon: UserRound }, { id: 'bookie', label: 'The Bookie', Icon: Coins },
+  { id: 'rankings', label: 'Rankings', Icon: Gauge }, { id: 'tracks', label: 'Track editor', Icon: Route }, { id: 'settings', label: 'Settings', Icon: Settings2 }, { id: 'goblin', label: 'My Goblin', Icon: UserRound }, { id: 'bookie', label: 'The Bookie', Icon: Coins },
 ];
 const SIM_PLAYERS = ['Snaggle', 'Mudwick', 'Grizzle', 'Pip', 'Bogra', 'Nettle', 'Skrit', 'Ormund', 'Fizzle'];
 const ratingOf = (n: string): number => 900 + ([...n].reduce((a, c) => a + c.charCodeAt(0), 0) % 7) * 55;
@@ -18,8 +18,10 @@ const ratingOf = (n: string): number => 900 + ([...n].reduce((a, c) => a + c.cha
 export function GoblinRacingMenu(props: {
   readonly profile: Profile; readonly activity: Activity; readonly onBack: () => void;
   readonly onQuickRace: () => void; readonly onMyGoblin: () => void; readonly onProfile: (fn: (p: Profile) => Profile) => void;
+  /** Open the race track editor on your island. */
+  readonly onTrackEditor: () => void;
 }): ReactElement {
-  const { profile, activity, onBack, onQuickRace, onMyGoblin, onProfile } = props;
+  const { profile, activity, onBack, onQuickRace, onMyGoblin, onProfile, onTrackEditor } = props;
   const [section, setSection] = useState<Section>('quick');
   const [stake, setStake] = useState(50);
   const [pick, setPick] = useState(SIM_PLAYERS[0]!);
@@ -46,6 +48,7 @@ export function GoblinRacingMenu(props: {
         <button onClick={onBack}>Back</button>
       </aside>
       <section className="shell-racing-main">
+        {section === 'tracks' ? (<><h2>Track editor</h2><p>Draw the race track on your island: lay out the road, shape the ground under it, dress it, set the race rules, then test drive it.</p><button className="go" onClick={onTrackEditor}>Open the track editor</button></>) : null}
         {section === 'quick' ? (<><h2>Quick Race</h2><p>Pick your goblin and race round the island, three laps against the field.</p><button className="go" onClick={onQuickRace}>Choose a goblin and race</button></>) : null}
         {section === 'tournaments' ? (
           <>

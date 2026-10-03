@@ -132,6 +132,7 @@ export class LightingRig {
   private clock = 0;
   private shadowCap = 2048;
   private reflections = true;
+  private cloudsOn = true;
   /** Low tier: the sky's soft light as spherical harmonics, measured from the same sky the reflection map is made of. */
   private readonly probe = new THREE.LightProbe();
   private probeTarget: THREE.WebGLCubeRenderTarget | null = null;
@@ -182,6 +183,15 @@ export class LightingRig {
    * Sky reflections (an environment map lighting every PBR material). Off on the low tier: on a laptop's integrated graphics it costs
    * about a third of the frame. A light probe gives the same soft sky light instead (no shine), so colours stay as they were.
    */
+  /** Graphics 'clouds': off, the sky is the plain gradient (the lightest tier). */
+  setClouds(on: boolean): void {
+    if (on === this.cloudsOn) return;
+    this.cloudsOn = on;
+    this.envSig = '';
+    this.probeSig = '';
+    this.dirty = true;
+  }
+
   setReflections(on: boolean): void {
     if (on === this.reflections) return;
     this.reflections = on;
@@ -216,7 +226,8 @@ export class LightingRig {
     (u.sunDir!.value as THREE.Vector3).set(d[0], d[1], d[2]);
     (u.sunColor!.value as THREE.Color).set(s.sun.color);
     u.sunGlow!.value = s.sky.sunGlow;
-    u.clouds!.value = s.sky.clouds ?? 0.3;
+    // with clouds off the sky shader skips its cloud noise altogether (it only runs while clouds > 0)
+    u.clouds!.value = this.cloudsOn ? s.sky.clouds ?? 0.3 : 0;
   }
 
   private updateEnvironmentMap(s: LightSetup): void {

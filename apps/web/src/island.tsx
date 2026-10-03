@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { createPortal } from 'react-dom';
 import type { Params, PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
@@ -6,8 +7,9 @@ import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, type Sha
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
-import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget } from '@hm/game';
-import { noteGpu, powerPreferenceOf, showTier, type GpuChoice } from './shell/profile';
+import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget, type Quality } from '@hm/game';
+import { noteGpu, powerPreferenceOf, showTier, type GpuChoice, type Profile } from './shell/profile';
+import { SettingsBody } from './shell/settings-body';
 import type { SfxId } from '@hm/audio';
 import { followLighting, pickLook } from './look';
 import { decorInstances } from './maker/dress';
@@ -51,13 +53,16 @@ const WIN = {
 
 export function IslandWalk(props: {
   readonly rt: Runtime; readonly scene: MakerScene; readonly intro?: boolean; readonly level?: 'goblin' | 'island'; readonly onMenuChange?: (open: boolean) => void; readonly grownUp?: boolean;
-  readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+  readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | Quality;
   /** Which graphics chip to ask for (Settings); read when the view opens. */
   readonly gpu?: GpuChoice;
   /** The frame rate auto quality aims for (Settings): 15 prettier, 60 smoother. */
   readonly fpsTarget?: FpsTarget;
   /** The player's own changes to the graphics preset, on top of whichever tier draws (Settings). */
   readonly graphics?: Params;
+  /** The whole profile and its updater, for the Settings window (Esc, Settings). */
+  readonly profile?: Profile; readonly onProfile?: (fn: (p: Profile) => Profile) => void;
+  readonly onReplayTour?: () => void; readonly onResetProgress?: () => void;
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
   /** The tour's thank-you (in-game credits, never money). */
   readonly onCredits?: (amount: number) => void;
@@ -65,9 +70,9 @@ export function IslandWalk(props: {
   readonly controls?: { readonly sensitivity: number; readonly invertY: boolean; readonly fov: number };
   /** Behind the main menu: no HUD, no controls, the camera circles your island and your goblin. When it turns off the camera flies down to the goblin. */
   readonly showcase?: boolean;
-  readonly onEdit: () => void; readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
+  readonly onActivities: () => void; readonly onIslands?: () => void; readonly onHub: () => void; readonly onMainMenu: () => void; readonly onIntroDone?: () => void;
 }): ReactElement {
-  const { rt, onEdit, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
+  const { rt, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
   const host = useRef<HTMLDivElement>(null);
   const introRef = useRef(props.intro === true);
   const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr' }) => void } | null>(null);
@@ -681,14 +686,21 @@ export function IslandWalk(props: {
     if (!win.isOpen('held')) win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor });
   }, [p.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Esc, Settings: the settings presets in a window of their own; Lighting presets (and the clock) are one click away inside it
+  const openLighting = (): void => { setTab('lights'); win.open('edit:lights:light', 'Lighting', { x: Math.max(12, window.innerWidth - 400), y: 64, w: 372, h: 640 }); };
+  const openSettings = (): void => { win.open('settings', 'Settings', { x: Math.max(12, window.innerWidth - 470), y: 64, w: 448, h: Math.min(720, window.innerHeight - 90) }); };
   const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
   const showHud = buildOn && !menu && level !== 'island' && !showcase;
+  // the toggles go into the shell's slot above the galaxy bar (studio keeps that bar down), else they sit in place
+  const [topSlot, setTopSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => { setTopSlot(document.getElementById('hud-top')); }, [showHud]);
+  const inTopSlot = (node: ReactElement): ReactElement => (topSlot ? createPortal(node, topSlot) : node);
   const free = !locked || p.mode === 'studio';
   return (
     <div className={`island${p.mode === 'studio' ? ' studio' : ''}`} style={{ position: 'absolute', inset: 0 }}>
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       {showHud && p.mode === 'walk' ? <Crosshair active={locked} /> : null}
-      {showHud ? <ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR ground: full detail' : 'Flat ground: voxel blocks that match the goblin'); }} /> : null}
+      {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR ground: full detail' : 'Flat ground: voxel blocks that match the goblin'); }} />) : null}
       {showHud ? <ToolSay {...say2} /> : null}
       {showHud ? <TabStrip tab={p.tab} onPick={pickTab} /> : null}
       {showHud ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} /> : null}
@@ -697,6 +709,7 @@ export function IslandWalk(props: {
         <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (heldItem ? `${tabDef(p.tab).label}: ${heldItem.name}` : 'What you hold') : w.title} className={w.id === 'presets' ? 'wide' : ''}>
           {w.id === 'presets' ? <PresetWindowBody activities={activities} onEdit={openEditor} onWorld={() => win.open('world', 'World rules', { x: 60, y: 90, ...WIN.editor })} onPlant={(kind) => win.open(`plant:${kind}`, `Behaviour: ${kind}`, { x: 80, y: 110, ...WIN.editor })} onMoves={() => win.open('moves', 'How my goblin moves', { x: 60, y: 90, ...WIN.editor })} />
             : w.id === 'held' ? (heldItem ? <EditorFor tab={p.tab} id={heldItem.id} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} /> : <p className="hint">Pick a slot, or press E to put a preset in it.</p>)
+            : w.id === 'settings' ? (props.profile && props.onProfile ? <SettingsBody profile={props.profile} update={props.onProfile} onReplayTour={() => props.onReplayTour?.()} onReset={() => props.onResetProgress?.()} top={<div className="btns settings-jump"><button onClick={openLighting}>Lighting presets and time of day</button></div>} /> : null)
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
@@ -715,8 +728,7 @@ export function IslandWalk(props: {
           <h3>Menu</h3>
           <button className="go" onClick={onMainMenu}>Main menu</button>
           {buildOn ? <button onClick={() => { setMenu(false); setMode('studio'); }}>Studio mode</button> : null}
-          {buildOn ? <button onClick={onEdit}>Race track editor</button> : null}
-          <button onClick={() => { setMenu(false); setTab('lights'); win.open('edit:lights:light', 'Lighting', { x: Math.max(12, window.innerWidth - 400), y: 64, w: 372, h: 640 }); }}>Lighting</button>
+          <button onClick={() => { setMenu(false); openSettings(); }}>Settings</button>
           <button onClick={() => { setMenu(false); setTab('avatar'); openPresets(); }}>My Avatar</button>
           {buildOn ? <button onClick={() => { setMenu(false); openShare('island', scene.sceneId); }}>Share my island</button> : null}
           {!tourView.visible ? <button onClick={() => { setMenu(false); tourReplay(); }}>Show the tour</button> : null}

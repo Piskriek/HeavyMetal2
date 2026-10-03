@@ -3,9 +3,10 @@
  * Pure (no DOM): the shell feeds it the device facts and the frame times, and applies whatever it answers.
  */
 
-export type Quality = 'low' | 'medium' | 'high' | 'ultra';
+/** Lightest first. `calculator` is the lightest the game can be: chosen by hand, or by auto only when low runs far too slow. */
+export type Quality = 'calculator' | 'low' | 'medium' | 'high' | 'ultra';
 
-const ORDER: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
+const ORDER: readonly Quality[] = ['calculator', 'low', 'medium', 'high', 'ultra'];
 
 export interface DeviceFacts {
   readonly touch: boolean;
@@ -45,7 +46,8 @@ export function gpuClass(name: string | null | undefined): GpuClass | null {
  */
 export function guessQuality(d: DeviceFacts): Quality {
   const g = gpuClass(d.gpu);
-  if (g === 'software' || g === 'weak') return 'low';
+  if (g === 'software') return 'calculator';
+  if (g === 'weak') return 'low';
   if (!d.touch) {
     if (g === 'mid') return 'medium';
     if (g === 'strong') return d.cores >= 8 ? 'ultra' : 'high';
@@ -57,7 +59,7 @@ export function guessQuality(d: DeviceFacts): Quality {
 }
 
 export function parseQuality(v: unknown): Quality | null {
-  return v === 'low' || v === 'medium' || v === 'high' || v === 'ultra' ? v : null;
+  return v === 'calculator' || v === 'low' || v === 'medium' || v === 'high' || v === 'ultra' ? v : null;
 }
 
 export interface AdaptiveQuality {
@@ -118,7 +120,10 @@ export function createAdaptiveQuality(start: Quality, o: AdaptiveOptions = {}): 
       const i = ORDER.indexOf(current);
       if (avg > slowMs) {
         tooSlow.add(current);
-        return i > 0 ? change(ORDER[Math.max(0, i - (avg > slowMs * 2.5 ? 2 : 1))]!) : null;
+        const verySlow = avg > slowMs * 2.5;
+        // two tiers at once when very slow; the calculator tier only then (low a little slow is still better than calculator)
+        const next = Math.max(verySlow ? 0 : 1, i - (verySlow ? 2 : 1));
+        return next < i ? change(ORDER[next]!) : null;
       }
       const up = ORDER[i + 1];
       if (budget && avg < roomMs && up && !tooSlow.has(up)) {

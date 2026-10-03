@@ -57,11 +57,15 @@ export interface LightSetup {
   };
 }
 
-/** Render quality tiers. The tier caps what a setup may ask for; it never changes what the setup says. */
-export type Quality = 'low' | 'medium' | 'high' | 'ultra';
-export const QUALITIES: readonly Quality[] = ['low', 'medium', 'high', 'ultra'];
+/**
+ * Render quality tiers, lightest first. The tier caps what a setup may ask for; it never changes what the setup says. `calculator` is the
+ * lightest the game can be (owner, 2026-10-03: "scale down to the calculator version with the click of a preset button").
+ */
+export type Quality = 'calculator' | 'low' | 'medium' | 'high' | 'ultra';
+export const QUALITIES: readonly Quality[] = ['calculator', 'low', 'medium', 'high', 'ultra'];
 export interface QualitySpec { label: string; pixelRatio: number; shadowMap: number; ssao: boolean; bloom: boolean; aoSamples: number }
 export const QUALITY: Readonly<Record<Quality, QualitySpec>> = {
+  calculator: { label: 'Calculator', pixelRatio: 0.5, shadowMap: 0, ssao: false, bloom: false, aoSamples: 4 },
   low: { label: 'Low', pixelRatio: 0.75, shadowMap: 1024, ssao: false, bloom: false, aoSamples: 8 },
   medium: { label: 'Medium', pixelRatio: 1, shadowMap: 2048, ssao: false, bloom: true, aoSamples: 8 },
   high: { label: 'High', pixelRatio: 1.5, shadowMap: 2048, ssao: true, bloom: true, aoSamples: 12 },

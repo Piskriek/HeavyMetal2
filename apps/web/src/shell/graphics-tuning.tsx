@@ -4,7 +4,7 @@ import type { Quality } from '@hm/game';
 import { graphicsSchema, resolveGraphics } from '@hm/render';
 import { Inspector } from '@hm/ui';
 
-const TIER_NAME: Readonly<Record<Quality, string>> = { low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
+const TIER_NAME: Readonly<Record<Quality, string>> = { calculator: 'Calculator', low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
 
 /**
  * The graphics preset in Settings: the values of the tier drawing now, with your own changes on top. A change applies to every tier

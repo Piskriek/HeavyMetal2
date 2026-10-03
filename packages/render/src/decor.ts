@@ -69,6 +69,7 @@ export class DecorView {
   private readonly lods: VoxelLod[] = [];
   private detailRadius = Infinity;
   private cull = false;
+  private drawDistance = Infinity;
   private readonly frustum = new THREE.Frustum();
   private readonly lastAt = new THREE.Vector3(Infinity, Infinity, Infinity);
   private readonly lastLook = new THREE.Vector3();
@@ -154,6 +155,14 @@ export class DecorView {
     else this.lastAt.set(-Infinity, 0, 0); // lay out again on the next update
   }
 
+  /** Plants further than this (metres) are not drawn at all (Infinity = every plant). */
+  setDrawDistance(distance: number): void {
+    if (distance === this.drawDistance) return;
+    this.drawDistance = distance;
+    this.lastAt.set(-Infinity, 0, 0);
+    if (distance === Infinity && this.detailRadius === Infinity && !this.cull) this.layOut(null);
+  }
+
   /** Low tier: the voxel plants draw with plain diffuse lighting instead of the full PBR model. */
   setLowCost(on: boolean): void {
     for (const l of this.lods) {
@@ -178,7 +187,7 @@ export class DecorView {
    * and with culling on, copies out of view are skipped; it is worked out again once the camera has moved half a metre or turned 2 degrees.
    */
   update(camera: THREE.Camera): void {
-    if (this.detailRadius === Infinity && !this.cull) return; // everything at full detail, nothing skipped: laid out once
+    if (this.detailRadius === Infinity && !this.cull && this.drawDistance === Infinity) return; // everything at full detail, nothing skipped: laid out once
     camera.getWorldDirection(look);
     const step = this.cull ? 0.5 : 2;
     const moved = this.lastAt.distanceToSquared(camera.position) > step * step;
@@ -195,7 +204,7 @@ export class DecorView {
       viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       this.frustum.setFromProjectionMatrix(viewProjection);
     } else this.lastAt.set(Infinity, Infinity, Infinity);
-    const r = this.detailRadius, near2 = r * r, far2 = 9 * r * r;
+    const r = this.detailRadius, near2 = r * r, far2 = 9 * r * r, draw2 = this.drawDistance * this.drawDistance;
     for (const l of this.lods) {
       let n = 0, f = 0, ff = 0;
       for (let i = 0; i < l.full.length; i++) {
@@ -206,6 +215,7 @@ export class DecorView {
           if (!this.frustum.intersectsSphere(sphere)) continue;
         }
         const d2 = camera ? l.at[i]!.distanceToSquared(camera.position) : 0;
+        if (d2 > draw2) continue;
         if (!l.far || d2 <= near2) l.near.setMatrixAt(n++, l.full[i]!);
         else if (!l.farthest || d2 <= far2) l.far.setMatrixAt(f++, l.half[i]!);
         else l.farthest.setMatrixAt(ff++, l.quarter[i]!);

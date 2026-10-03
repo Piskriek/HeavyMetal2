@@ -1,4 +1,3 @@
-import { ControlsList, ControlsSettings } from './controls-list';
 import { resetTour } from '../tutorial/tour';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { Copy, Pencil, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
@@ -15,9 +14,8 @@ import { GalaxyCanvas, type GalaxyHandle, type PlanetDef } from './galaxy';
 import { GalaxyBar, type Level } from './galaxy-bar';
 import { GoblinRacingMenu } from './racing-menu';
 import { Community } from './community';
-import { createActivity, duplicateActivity, gpuInUse, loadProfile, tierInUse, removeActivity, saveProfile, unhideAll, type GpuChoice, type Profile } from './profile';
-import { FPS_TARGETS, parseQuality, tidyGpuName } from '@hm/game';
-import { GraphicsTuning } from './graphics-tuning';
+import { createActivity, duplicateActivity, loadProfile, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
+import { SettingsBody } from './settings-body';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
 
@@ -79,6 +77,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   screenRef.current = screen;
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
   const update = useCallback((fn: (p: Profile) => Profile) => setProfile((p) => { const n = fn(p); saveProfile(n); return n; }), []);
+  const replayTour = useCallback(() => { resetTour(); update((p) => ({ ...p, tutorialDone: false })); setNote('The tour starts again next time you are on your island'); }, [update]);
+  const resetProgress = useCallback(() => { resetTour(); update((p) => ({ ...p, credits: 500, tutorialDone: false, skin: 'flat', tournament: null })); }, [update]);
 
   const visible = profile.activities.filter((a) => !a.hidden);
   const planets = useMemo(() => [HOME, ...visible.map(toPlanet)], [profile.activities]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,6 +104,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const go = useCallback((to: Screen) => { setScreen(to); setGalaxyOpacity(to === 'island' || to === 'build' || to === 'racing' ? 0 : 1); }, []);
   const toMenu = useCallback(() => { go('menu'); setPicked('goblin-racing'); setIslandMenu(false); }, [go]);
   const toIsland = useCallback(() => { setIntro(false); setLevel('goblin'); setIslandMenu(false); go('island'); }, [go]);
+  /** The race track editor (the older Maker) on your island: reached from the Goblin Racing menu, since it edits race tracks. */
+  const toTrackEditor = useCallback(() => { if (!world) { const id = activeIslandId(); if (!id || !openWorld(id)) return; } setSession(true); go('build'); }, [world, openWorld, go]);
   const remember = (): void => { const s = screenRef.current; if (s === 'menu' || s === 'island' || s === 'build' || s === 'zoom') origin.current = s === 'menu' ? 'menu' : 'island'; };
   const toHub = useCallback((tab: 'hub' | 'community' = 'hub') => { remember(); setHubTab(tab); go('hub'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   const toActivities = useCallback(() => { remember(); go('activities'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -163,11 +165,13 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
-            onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
+          <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} profile={profile} onProfile={update} onReplayTour={replayTour} onResetProgress={resetProgress} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+            onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}
-      {screen === 'island' || screen === 'zoom' ? <GalaxyBar open={islandMenu || level === 'island'} level={level} onLevel={setLevel} onBackToGalaxy={() => toHub()} /> : null}
+      {screen === 'island' || screen === 'zoom' ? <GalaxyBar open={islandMenu || level === 'island'} island={screen === 'island'} level={level} onLevel={setLevel} onBackToGalaxy={() => toHub()} /> : null}
+      {/* above the galaxy bar: the island's Walk/Studio, 1st/3rd and Flat/PBR toggles are drawn here, so the bar never covers them */}
+      {screen === 'island' ? <div className="hud-top" id="hud-top" /> : null}
       {galaxyOn ? (
         <div className="shell-layer" style={{ zIndex: 2, opacity: galaxyOpacity, transition: 'opacity .9s ease', pointerEvents: galaxyOpacity < 0.5 ? 'none' : 'auto' }}>
           <GalaxyCanvas ref={galaxy} planets={planets} mode={screen === 'hub' ? 'hub' : 'backdrop'} focusId={screen === 'hub' ? 'goblin-racing' : undefined} highlightId={screen === 'hub' ? 'goblin-racing' : undefined} reducedMotion={reduced} onPick={(id) => { setPicked(id); }} />
@@ -248,7 +252,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         <div className="shell-layer" style={{ zIndex: 3 }}>
           <GoblinRacingMenu profile={profile} activity={visible.find((a) => a.id === activityId) ?? visible[0] ?? profile.activities[0]!} onBack={() => go('hub')}
             onQuickRace={() => { startRace('select'); }} onMyGoblin={() => { startRace('custom'); }}
-            onProfile={(fn) => update(fn)} />
+            onProfile={(fn) => update(fn)} onTrackEditor={toTrackEditor} />
         </div>
       ) : null}
 
@@ -291,24 +295,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
           <div className="shell-window narrow" role="dialog" aria-label="Settings">
             <header><h3>Settings</h3><button onClick={toMenu}>Close</button></header>
-            <label className="row"><input type="checkbox" checked={profile.grownUp} onChange={(e) => update((p) => ({ ...p, grownUp: e.target.checked }))} /> Grown-up mode (build mode on)</label>
-            <p className="hint">Build mode is for adults. Switch it off for a kid profile: My Island and the activities stay, building is hidden.</p>
-            <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
-            <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel goblin)</option><option value="pbr">PBR (full relief)</option></select></label>
-            <label className="row">Graphics <select value={profile.quality} onChange={(e) => update((p) => ({ ...p, quality: e.target.value as typeof profile.quality }))}><option value="auto">Auto (best the device can hold)</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low (phones and older laptops)</option></select></label>
-            {profile.quality === 'auto' ? (
-              <div className="row fps-target" role="group" aria-label="Aim for">
-                <span>Aim for</span>
-                <span className="seg">{FPS_TARGETS.map((f) => <button key={f} className={profile.fpsTarget === f ? 'on' : ''} aria-pressed={profile.fpsTarget === f} onClick={() => update((p) => ({ ...p, fpsTarget: f }))}>{f} fps</button>)}</span>
-              </div>
-            ) : null}
-            {profile.quality === 'auto' ? <p className="hint">15 fps looks best and moves slower, 60 fps moves smoothly and looks plainer. Auto raises or lowers the graphics until your machine keeps up.</p> : null}
-            <GraphicsTuning tier={parseQuality(profile.quality) ?? tierInUse() ?? 'medium'} own={profile.graphics} onChange={(g) => update((p) => ({ ...p, graphics: g }))} />
-            <label className="row">Graphics card <select value={profile.gpu} onChange={(e) => update((p) => ({ ...p, gpu: e.target.value as GpuChoice }))}><option value="fast">Ask for the fast one</option><option value="saver">Ask for the battery saver</option><option value="browser">Let the browser choose</option></select></label>
-            <p className="hint">In use: {gpuInUse() ? tidyGpuName(gpuInUse()!) : 'not known yet'}. A page can only ask: on a laptop with two graphics cards, Windows decides. To always get the fast one, open Windows Settings, System, Display, Graphics, pick your browser and choose High performance.</p>
-            <ControlsSettings value={profile.controls} onChange={(c) => update((p) => ({ ...p, controls: c }))} />
-            <ControlsList />
-            <div className="btns"><button onClick={() => { resetTour(); update((p) => ({ ...p, tutorialDone: false })); setNote('The tour starts again next time you are on your island'); }}>Replay the tour</button><button className="danger" onClick={() => { resetTour(); update(() => ({ ...profile, credits: 500, tutorialDone: false, skin: 'flat', tournament: null })); }}>Reset progress</button></div>
+            <SettingsBody profile={profile} update={update} onReplayTour={replayTour} onReset={resetProgress} />
           </div>
         </div>
       ) : null}

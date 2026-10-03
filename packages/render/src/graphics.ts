@@ -29,13 +29,20 @@ export interface GraphicsSettings {
   readonly skipHiddenPlants: boolean;
   /** Foam without the ripples that break it up, and the sea shows the sky by angle instead of reflecting it. */
   readonly simpleSea: boolean;
+  /** Plants further than this (metres) are not drawn at all. 0 = every plant. */
+  readonly plantDistance: number;
+  /** Clouds drifting across the sky. */
+  readonly clouds: boolean;
+  /** Show the flat block ground even when the island is set to PBR (the PBR ground is the heaviest thing to draw). */
+  readonly flatGround: boolean;
 }
 
 export const GRAPHICS_TIERS: Readonly<Record<Quality, GraphicsSettings>> = {
-  low: { pictureSize: 720, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 18, skipHiddenPlants: true, simpleSea: true },
-  medium: { pictureSize: 0, sharpness: 1.5, supersample: false, effects: true, glow: true, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'on', reflections: true, simpleLighting: false, plantDetail: 35, skipHiddenPlants: false, simpleSea: false },
-  high: { pictureSize: 0, sharpness: 2, supersample: false, effects: true, glow: true, contactShadows: true, contactShadowSamples: 12, smoothEdges: true, shadows: 'detailed', reflections: true, simpleLighting: false, plantDetail: 70, skipHiddenPlants: false, simpleSea: false },
-  ultra: { pictureSize: 0, sharpness: 2, supersample: true, effects: true, glow: true, contactShadows: true, contactShadowSamples: 16, smoothEdges: true, shadows: 'finest', reflections: true, simpleLighting: false, plantDetail: 0, skipHiddenPlants: false, simpleSea: false },
+  calculator: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true },
+  low: { pictureSize: 720, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 18, skipHiddenPlants: true, simpleSea: true, plantDistance: 0, clouds: true, flatGround: false },
+  medium: { pictureSize: 0, sharpness: 1.5, supersample: false, effects: true, glow: true, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'on', reflections: true, simpleLighting: false, plantDetail: 35, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false },
+  high: { pictureSize: 0, sharpness: 2, supersample: false, effects: true, glow: true, contactShadows: true, contactShadowSamples: 12, smoothEdges: true, shadows: 'detailed', reflections: true, simpleLighting: false, plantDetail: 70, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false },
+  ultra: { pictureSize: 0, sharpness: 2, supersample: true, effects: true, glow: true, contactShadows: true, contactShadowSamples: 16, smoothEdges: true, shadows: 'finest', reflections: true, simpleLighting: false, plantDetail: 0, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false },
 };
 
 const SHADOW_SIZE: Readonly<Record<GraphicsSettings['shadows'], number>> = { off: 0, on: 1024, detailed: 2048, finest: 4096 };
@@ -65,6 +72,9 @@ export const graphicsSchema = defineSchema({
     { key: 'plantDetail', type: 'number', label: 'Full-detail plants within', doc: 'Plants nearer than this show every block; further ones show a coarser copy. 0 shows every block everywhere.', tier: 'play', default: 70, min: 0, max: 150, step: 1, hardMin: 0, unit: 'm', group: 'World' },
     { key: 'skipHiddenPlants', type: 'boolean', label: 'Skip plants out of view', doc: 'Plants behind you are not drawn. Only while shadows are off, because their shadows could still show.', tier: 'play', default: false, group: 'World' },
     { key: 'simpleSea', type: 'boolean', label: 'Simple sea', doc: 'Foam rolls in without the ripples that break it up.', tier: 'play', default: false, group: 'World' },
+    { key: 'plantDistance', type: 'number', label: 'Plants drawn within', doc: 'Plants further away than this are not drawn at all. 0 draws every plant.', tier: 'play', default: 0, min: 0, max: 300, step: 5, hardMin: 0, unit: 'm', group: 'World' },
+    { key: 'clouds', type: 'boolean', label: 'Clouds', doc: 'Clouds drift across the sky.', tier: 'play', default: true, group: 'World' },
+    { key: 'flatGround', type: 'boolean', label: 'Always flat ground', doc: 'Show the flat block ground even when the island is set to PBR. The PBR ground is the heaviest thing to draw.', tier: 'play', default: false, group: 'World' },
   ],
 });
 

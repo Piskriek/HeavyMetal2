@@ -16,7 +16,7 @@ export interface Profile {
   readonly tutorialDone: boolean;
   readonly skin: 'flat' | 'pbr';
   /** Graphics tier for the island and the editor; auto starts at the best the device can probably do and drops a tier if frames run slow. */
-  readonly quality: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
+  readonly quality: 'auto' | Quality;
   /** What auto aims for: 15 fps (as pretty as the machine allows), 30, or 60 (as smooth as it can be). */
   readonly fpsTarget: FpsTarget;
   /** Your own changes to the graphics preset (`graphics` kind), used on top of whichever tier draws. Empty = the tiers as made. */

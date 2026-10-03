@@ -320,6 +320,10 @@ the main menu needs to be a stunning orbiting view of your current island and fa
 
 - 2026-10-03 (laptop): theoretically this game should run on a calculator since its all math, lol you know what i mean?
 
+- 2026-10-03 (laptop): We can call the harnes "SetMix Harness" so its easier for you to diliniate what goblin and whats the harness, the players avatar in the harness is many avatars, in the goblin racing which is the one that needs the play/multiplayer//settings style menu orbiting the goblin racing island, the setmix harness with a new cyberpunk modern font main menu is the galaxy view with the goblin racing already selected and its menu in a preview for easy enlage and to star using that menu so the feeling of the world is the harness and gbolin stuff is for goblins, it just so happens the first game you play creates the first avatar and its a goblin but you should be able to create a new human or whatever avatar
+
+- 2026-10-03 (laptop): graphical settings should be a button on the menu when i press escape while on the island as agoblin, and a hyerarch dropdown covers the walk/studio buttons when it dtop down, have it there in studio doe with the walk/studio togels on top of it and fix the black hilight on the hyrearchy which makes the selected preset look blacked ouyt. racktrack editor in the esc menu shoiuld not be there, lighting button should be the settings button with a button in there to jomp to lighing presets, maybe to a day night cycle preset. but settings should be where the settings presets is, the current settings needs to give you the abilit to scale down to the calculator version with the click of a preset button. make sure that will happen when you start working next and finish all the implimentation and polish
+
 - 2026-10-03 (laptop): make auto have target fps buttons like 15/30/60 fps? that way you choose to have it preyy and laggy or fast and les pretty / cos everything is a preset lol
 
 ## The studio prompt the owner gave the design AI (it defines the interface)

@@ -144,6 +144,29 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 
 ---
 
+## 6a. SetMix Harness: the harness and the goblin game are two different things (owner, 2026-10-03, latest)
+
+The harness is called **SetMix Harness** (so it is clear what is harness and what is goblin). The world you enter is the harness; goblin stuff is for goblins.
+
+| ID | Ask | Status | Plan |
+|---|---|---|---|
+| H1 | Name: "SetMix Harness" everywhere the harness speaks (title, menus, docs); goblin words only inside Goblin Racing | NOT STARTED | Main menu wordmark, page title, docs/README, the AI guide (B12). |
+| H2 | The harness main menu is the **galaxy view**, with a new **modern cyberpunk display font**, Goblin Racing already selected and **its menu shown as a preview** you can enlarge to start using it | NOT STARTED | Galaxy star chart as the home screen; a live preview card of the Goblin Racing menu beside the selected planet; enlarge = open it full screen. Font from Google Fonts (allowed on RUN), chosen in a design pass. |
+| H3 | **Goblin Racing** owns the Play / Multiplayer / Settings style menu that orbits **the Goblin Racing island** (today's main menu moves into the activity) | NOT STARTED | Today's menu-over-the-island becomes the Goblin Racing activity's front menu; the racing sections (quick race, tournaments, track editor ...) sit under it. |
+| H4 | The player has **many avatars**: the first game you play creates the first one (a goblin), and you can make a new human or any other avatar | NOT STARTED | An avatar list in the harness (create, pick, rename); each avatar has a kind (goblin, human, ...) with its own base model; the human base model is new voxel art (Arena job). |
+| H5 | The harness carries the world (galaxy, your planets and islands, avatars, building tools, settings); activities are games inside it | NOT STARTED | Esc menu, galaxy bar and Settings become harness-level; activity menus stay inside their activity. |
+
+## 6b. The owner's 2026-10-03 laptop list (S1 to S6), do these first
+
+| ID | Ask | Status | Where / what is left |
+|---|---|---|---|
+| S1 | Esc menu on the island (as the goblin): a **Settings** button replaces Lighting; Settings holds the settings presets (graphics, controls ...) and a button that jumps to the lighting presets (maybe a day/night cycle preset) | DONE (day/night cycle NOT STARTED) | Esc, Settings opens a movable Settings window on the island (`shell/settings-body.tsx`, shared with the main menu's Settings) with "Lighting presets and time of day" at the top. A day/night cycle preset (the clock moving on its own) is still to do. |
+| S2 | **Graphics presets as one-click buttons** in Settings, down to a "calculator" version (the lightest possible) | DONE | A `calculator` graphics preset below Low (smaller picture, no clouds, plants drawn only nearby ...) plus Low/Medium/High/Ultra/Auto as buttons; extra variables in `render/graphics.ts` where Low cannot go lower yet. |
+| S3 | The hierarchy (galaxy bar) drops down over the Walk/Studio buttons: in studio mode show it there with the Walk/Studio toggles on top of it, nothing covered | DONE | `shell/galaxy-bar.tsx`, the mode bar in `island.tsx`, `studio.css`. |
+| S4 | The selected item in the hierarchy shows as a black block ("blacked out") | DONE | `.galaxy-bar ol button.on` loses to the global `button.on` dark fill (and hover). |
+| S5 | Race track editor must not be in the Esc menu | DONE | Move its entrance to the Goblin Racing activity menu (it edits race tracks); update the e2e walk. |
+| S6 | Finish all the implementation and polish | ONGOING | Everything in this file marked PARTIAL or NOT STARTED, performance first. |
+
 ## 7. Honest quality assessment
 
 1. **Ground level** looked at this session in both skins: flat reads as voxel blocks that match the goblin; PBR is a painted jungle floor, now without seams.
@@ -164,6 +187,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 
 ## 9. What to do next (in order)
 
+00. **The owner's laptop list S1 to S6 (section 6b)**: Settings in the Esc menu with graphics preset buttons down to a calculator version, the hierarchy bar and Walk/Studio toggles not covering each other, the hierarchy highlight, the race track editor out of the Esc menu.
 0. **Performance first, every session** (owner, 2026-10-03: "continue with optimization as a priority going forward"). Smooth on low on the owner's laptop (P11): 60 fps on low, auto picks the right tier, GPU choice in Settings (D16); every new feature (the satellite islands with coral and fish, D15) is built cheap on low from the start and measured with `scripts/perf.mjs`.
 1. **Owner test pass on the laptop** (`docs/REPORT.md`, "How testing starts"): pointer lock, z-fighting, the tour, plugs, share, galaxy. Fix what they report first.
 2. Avatar parts in the creator: rig assembled goblins (joints from the assembler's part boxes), then a parts picker in Create your goblin and the Avatar tab.

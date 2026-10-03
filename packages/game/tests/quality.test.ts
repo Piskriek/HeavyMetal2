@@ -80,6 +80,15 @@ test('with a 60 target the screen cap hides any room, so it only ever drops', ()
   assert.equal(Array.from({ length: 40 }, () => q.frame(24)).find(Boolean), 'low');
 });
 
+test('the calculator tier: software rendering starts there; auto drops into it only when low runs far too slow', () => {
+  assert.equal(guessQuality({ touch: false, cores: 8, dpr: 1, width: 1920, gpu: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)' }), 'calculator');
+  assert.equal(parseQuality('calculator'), 'calculator');
+  const bitSlow = createAdaptiveQuality('low', { targetFps: 60, window: 10, warmup: 5 });
+  assert.deepEqual(Array.from({ length: 100 }, () => bitSlow.frame(24)).filter(Boolean), [], 'low at 42 fps stays low');
+  const farTooSlow = createAdaptiveQuality('low', { targetFps: 60, window: 10, warmup: 5 });
+  assert.equal(Array.from({ length: 40 }, () => farTooSlow.frame(70)).find(Boolean), 'calculator', 'low at 14 fps drops to calculator');
+});
+
 test('targets read from storage fall back to 60', () => {
   assert.equal(parseFpsTarget(15), 15);
   assert.equal(parseFpsTarget(30), 30);

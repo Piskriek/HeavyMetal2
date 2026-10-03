@@ -35,6 +35,7 @@ export class TerrainView {
   /** Low tier, flat skin: plain diffuse lighting. The flat ground is matte (roughness 0.92), so it looks the same for much less work. */
   private lambert: THREE.MeshLambertMaterial | null = null;
   private lowCost = false;
+  private forceFlat = false;
   /** Shared by both materials, so a change of look reaches whichever is drawing. */
   private readonly uniforms: Record<string, THREE.IUniform>;
   readonly look: TerrainLook = { cliffSurface: 0, soft: 0.6, normalStrength: 1, scale: 1.8 };
@@ -115,6 +116,18 @@ export class TerrainView {
     return m;
   }
 
+  /** Graphics 'flatGround': draw the flat skin whatever the look says (the PBR skin is the heaviest thing to draw). */
+  setForceFlat(on: boolean): void {
+    if (on === this.forceFlat) return;
+    this.forceFlat = on;
+    this.setLook({});
+  }
+
+  /** The skin actually drawn. */
+  private flat(): boolean {
+    return this.forceFlat || this.look.skin === 'flat';
+  }
+
   /** Low tier: the flat skin draws with plain diffuse lighting (the PBR skin keeps full lighting: its bumps and shine are the point). */
   setLowCost(on: boolean): void {
     this.lowCost = on;
@@ -122,7 +135,7 @@ export class TerrainView {
   }
 
   private pickMaterial(): void {
-    if (this.lowCost && this.look.skin === 'flat') {
+    if (this.lowCost && this.flat()) {
       this.lambert ??= this.hook(new THREE.MeshLambertMaterial({ color: 0xffffff }), 'terrain-lambert');
       this.mesh.material = this.lambert;
     } else this.mesh.material = this.material;
@@ -130,7 +143,7 @@ export class TerrainView {
 
   /** The flat skin is its own shader program (ISL_FLAT), so it carries none of the PBR path's cost. Switching skins compiles once. */
   private applySkinDefine(m: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial): void {
-    const flat = this.look.skin === 'flat';
+    const flat = this.flat();
     const defines: Record<string, unknown> = { ...(m.defines ?? {}) };
     if (flat === ('ISL_FLAT' in defines)) return;
     if (flat) defines['ISL_FLAT'] = ''; else delete defines['ISL_FLAT'];
@@ -152,7 +165,7 @@ export class TerrainView {
     if (this.lambert) this.applySkinDefine(this.lambert);
     this.pickMaterial();
     this.applyLook();
-    if (this.look.skin === 'flat' && this.blocksStale) this.bakeBlocks(null);
+    if (this.flat() && this.blocksStale) this.bakeBlocks(null);
   }
 
   /** Bake the flat skin's blocks for the nodes in `dirty` (all when null) and upload only the rows that changed. */
@@ -195,7 +208,7 @@ export class TerrainView {
     this.mask.needsUpdate = true;
     if (!dirty) this.geometry.computeBoundingSphere();
     // the PBR skin reads the mask per pixel; the flat skin's blocks are baked when it shows
-    if (this.look.skin === 'flat') this.bakeBlocks(this.blocksStale ? null : dirty);
+    if (this.flat()) this.bakeBlocks(this.blocksStale ? null : dirty);
     else this.blocksStale = true;
   }
 

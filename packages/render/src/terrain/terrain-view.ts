@@ -32,7 +32,11 @@ export class TerrainView {
   private readonly mask: THREE.DataTexture;
   private readonly maskData: Uint8Array;
   private readonly material: THREE.MeshStandardMaterial;
-  private uniforms: Record<string, THREE.IUniform> | null = null;
+  /** Low tier, flat skin: plain diffuse lighting. The flat ground is matte (roughness 0.92), so it looks the same for much less work. */
+  private lambert: THREE.MeshLambertMaterial | null = null;
+  private lowCost = false;
+  /** Shared by both materials, so a change of look reaches whichever is drawing. */
+  private readonly uniforms: Record<string, THREE.IUniform>;
   readonly look: TerrainLook = { cliffSurface: 0, soft: 0.6, normalStrength: 1, scale: 1.8 };
   /** The flat skin's surfaces per half-metre block (see flat-blocks.ts); baked while the flat skin shows. */
   private readonly blockGrid: BlockGrid;
@@ -71,7 +75,17 @@ export class TerrainView {
     this.mask.minFilter = THREE.NearestFilter;
     this.mask.generateMipmaps = false;
     this.mask.flipY = false;
-    this.material = this.buildMaterial();
+    this.uniforms = {
+      islSurfaces: { value: surfaces.texture }, islPbr: { value: surfaces.pbrTexture }, islFlatPalette: { value: surfaces.flatTexture },
+      islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: surfaces.layerOf },
+      islParams: { value: surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
+      islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
+      paintMask: { value: this.mask }, paintRes: { value: new THREE.Vector2(cols, rows) },
+      paintOrigin: { value: new THREE.Vector2(originX, originZ) }, paintCell: { value: cell },
+      islBlocks: { value: this.blocks }, islBlockOrigin: { value: new THREE.Vector2(this.blockGrid.x0, this.blockGrid.z0) },
+      islBlockMax: { value: new THREE.Vector2(this.blockGrid.w - 1, this.blockGrid.h - 1) },
+    };
+    this.material = this.hook(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 }), 'terrain');
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = true;
@@ -81,24 +95,11 @@ export class TerrainView {
     surfaces.ready.then(() => { this.material.needsUpdate = false; });
   }
 
-  private buildMaterial(): THREE.MeshStandardMaterial {
+  /** Teach a three.js material the island surface (its colour, roughness, bump and glow stages). Lambert simply has no roughness stage. */
+  private hook<M extends THREE.MeshStandardMaterial | THREE.MeshLambertMaterial>(m: M, key: string): M {
     const layers = Math.max(1, this.surfaces.defs.length);
-    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0 });
-    const { cols, rows, cell, originX, originZ } = this.t.spec;
     m.onBeforeCompile = (shader) => {
-      const u: Record<string, THREE.IUniform> = {
-        islSurfaces: { value: this.surfaces.texture }, islPbr: { value: this.surfaces.pbrTexture }, islFlatPalette: { value: this.surfaces.flatTexture },
-        islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: this.surfaces.layerOf },
-        islParams: { value: this.surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
-        islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
-        paintMask: { value: this.mask }, paintRes: { value: new THREE.Vector2(cols, rows) },
-        paintOrigin: { value: new THREE.Vector2(originX, originZ) }, paintCell: { value: cell },
-        islBlocks: { value: this.blocks }, islBlockOrigin: { value: new THREE.Vector2(this.blockGrid.x0, this.blockGrid.z0) },
-        islBlockMax: { value: new THREE.Vector2(this.blockGrid.w - 1, this.blockGrid.h - 1) },
-      };
-      Object.assign(shader.uniforms, u);
-      this.uniforms = shader.uniforms;
-      this.applyLook();
+      Object.assign(shader.uniforms, this.uniforms);
       shader.vertexShader = shader.vertexShader
         .replace('void main() {', 'varying vec3 vTWorld;\nvarying vec3 vTNormal;\nvoid main() {')
         .replace('#include <project_vertex>', '#include <project_vertex>\nvTWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvTNormal = normalize(mat3(modelMatrix) * objectNormal);');
@@ -109,13 +110,26 @@ export class TerrainView {
         .replace('#include <emissivemap_fragment>', EMISSIVE_STAGE_GLSL)
         .replace('#include <normal_fragment_maps>', NORMAL_STAGE_GLSL);
     };
-    m.customProgramCacheKey = () => `terrain-${layers}`;
+    m.customProgramCacheKey = () => `${key}-${layers}`;
     this.applySkinDefine(m);
     return m;
   }
 
+  /** Low tier: the flat skin draws with plain diffuse lighting (the PBR skin keeps full lighting: its bumps and shine are the point). */
+  setLowCost(on: boolean): void {
+    this.lowCost = on;
+    this.pickMaterial();
+  }
+
+  private pickMaterial(): void {
+    if (this.lowCost && this.look.skin === 'flat') {
+      this.lambert ??= this.hook(new THREE.MeshLambertMaterial({ color: 0xffffff }), 'terrain-lambert');
+      this.mesh.material = this.lambert;
+    } else this.mesh.material = this.material;
+  }
+
   /** The flat skin is its own shader program (ISL_FLAT), so it carries none of the PBR path's cost. Switching skins compiles once. */
-  private applySkinDefine(m: THREE.MeshStandardMaterial): void {
+  private applySkinDefine(m: THREE.MeshStandardMaterial | THREE.MeshLambertMaterial): void {
     const flat = this.look.skin === 'flat';
     const defines: Record<string, unknown> = { ...(m.defines ?? {}) };
     if (flat === ('ISL_FLAT' in defines)) return;
@@ -125,7 +139,6 @@ export class TerrainView {
   }
 
   private applyLook(): void {
-    if (!this.uniforms) return;
     const layer = this.look.cliffSurface > 0 ? this.surfaces.layerOf[this.look.cliffSurface] ?? -1 : -1;
     this.uniforms['islCliffLayer']!.value = layer;
     this.uniforms['islSoft']!.value = this.look.soft;
@@ -136,6 +149,8 @@ export class TerrainView {
   setLook(look: Partial<TerrainLook>): void {
     Object.assign(this.look, look);
     this.applySkinDefine(this.material);
+    if (this.lambert) this.applySkinDefine(this.lambert);
+    this.pickMaterial();
     this.applyLook();
     if (this.look.skin === 'flat' && this.blocksStale) this.bakeBlocks(null);
   }
@@ -189,5 +204,6 @@ export class TerrainView {
     this.mask.dispose();
     this.blocks.dispose();
     this.material.dispose();
+    this.lambert?.dispose();
   }
 }

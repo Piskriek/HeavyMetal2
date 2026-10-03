@@ -26,14 +26,26 @@ const meshed = (key: string, model: () => VoxelModel): THREE.BufferGeometry | nu
   return g;
 };
 
-/** One voxel prop's copies: every voxel near the camera, the halved model further out. */
+/** One voxel prop's copies: every voxel near the camera, the halved model further out, the quartered one far away. */
 interface VoxelLod {
   readonly near: THREE.InstancedMesh;
   readonly far: THREE.InstancedMesh | null;
+  readonly farthest: THREE.InstancedMesh | null;
   readonly full: readonly THREE.Matrix4[];
   readonly half: readonly THREE.Matrix4[];
+  readonly quarter: readonly THREE.Matrix4[];
   readonly at: readonly THREE.Vector3[];
+  /** Bounding sphere of each copy (for skipping the ones out of view). */
+  readonly centre: readonly THREE.Vector3[];
+  readonly radius: readonly number[];
+  readonly standard: THREE.MeshStandardMaterial;
+  /** Low tier: plain diffuse lighting (the plants are matte, so they look the same for less work). Made on first use. */
+  lambert: THREE.MeshLambertMaterial | null;
 }
+
+const sphere = new THREE.Sphere();
+const viewProjection = new THREE.Matrix4();
+const look = new THREE.Vector3();
 
 /**
  * The scale that turns the unit geometry into the part, by the recipe convention (see @hm/scatter): a sphere's radius is `size`, a box's edge is
@@ -56,7 +68,10 @@ export class DecorView {
   private readonly materials: THREE.Material[] = [];
   private readonly lods: VoxelLod[] = [];
   private detailRadius = Infinity;
+  private cull = false;
+  private readonly frustum = new THREE.Frustum();
   private readonly lastAt = new THREE.Vector3(Infinity, Infinity, Infinity);
+  private readonly lastLook = new THREE.Vector3();
 
   constructor(instances: readonly DecorInstance[]) {
     this.group.name = 'decor';
@@ -89,6 +104,7 @@ export class DecorView {
       const geometry = meshed(voxel.id, () => voxel.model);
       if (!geometry) continue;
       const halfGeometry = meshed(`${voxel.id}@half`, () => halveModel(voxel.model));
+      const quarterGeometry = halfGeometry ? meshed(`${voxel.id}@quarter`, () => halveModel(halveModel(voxel.model))) : null;
       const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0 });
       const instanced = (g: THREE.BufferGeometry): THREE.InstancedMesh => {
         const mesh = new THREE.InstancedMesh(g, material, matrices.length);
@@ -99,11 +115,18 @@ export class DecorView {
         return mesh;
       };
       const half = matrices.map((m) => m.clone().scale(new THREE.Vector3(2, 2, 2)));
+      const quarter = matrices.map((m) => m.clone().scale(new THREE.Vector3(4, 4, 4)));
       const at = matrices.map((m) => new THREE.Vector3().setFromMatrixPosition(m));
-      this.lods.push({ near: instanced(geometry), far: halfGeometry ? instanced(halfGeometry) : null, full: matrices, half, at });
+      // a sphere round each copy that holds it whatever way it is turned: the model's own sphere, its centre lifted, its sideways offset added
+      if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+      const bs = geometry.boundingSphere!;
+      const k = matrices.map((m) => m.getMaxScaleOnAxis());
+      const centre = at.map((p, i) => new THREE.Vector3(p.x, p.y + bs.center.y * k[i]!, p.z));
+      const radius = k.map((s) => (bs.radius + Math.hypot(bs.center.x, bs.center.z)) * s);
+      this.lods.push({ near: instanced(geometry), far: halfGeometry ? instanced(halfGeometry) : null, farthest: quarterGeometry ? instanced(quarterGeometry) : null, full: matrices, half, quarter, at, centre, radius, standard: material, lambert: null });
       this.materials.push(material);
     }
-    this.layOut(new THREE.Vector3(Infinity, 0, 0));
+    this.layOut(null);
     for (const { part, matrices } of buckets.values()) {
       // unit geometry, matching partScale: sphere radius 1, box edge 1, cylinder radius 1 and height 1
       const geometry = part.shape === 'sphere' ? new THREE.SphereGeometry(1, 12, 8) : part.shape === 'box' ? new THREE.BoxGeometry(1, 1, 1) : new THREE.CylinderGeometry(1, 1, 1, 10);
@@ -127,30 +150,70 @@ export class DecorView {
   setDetailRadius(radius: number): void {
     if (radius === this.detailRadius) return;
     this.detailRadius = radius;
-    if (radius === Infinity) this.layOut(new THREE.Vector3(Infinity, 0, 0));
+    if (radius === Infinity && !this.cull) this.layOut(null);
     else this.lastAt.set(-Infinity, 0, 0); // lay out again on the next update
   }
 
-  /** Call every frame with the camera position: copies move between the near and far meshes once the camera has moved a few metres. */
-  update(camera: THREE.Vector3): void {
-    if (this.detailRadius === Infinity && this.lastAt.x === Infinity) return; // all at full detail already
-    const step = Math.min(3, this.detailRadius * 0.15);
-    if (this.lastAt.distanceToSquared(camera) < step * step) return;
+  /** Low tier: the voxel plants draw with plain diffuse lighting instead of the full PBR model. */
+  setLowCost(on: boolean): void {
+    for (const l of this.lods) {
+      if (on && !l.lambert) { l.lambert = new THREE.MeshLambertMaterial({ vertexColors: true }); this.materials.push(l.lambert); }
+      const m = on ? l.lambert! : l.standard;
+      for (const mesh of [l.near, l.far, l.farthest]) if (mesh) mesh.material = m;
+    }
+  }
+
+  /**
+   * Skip the copies outside the camera's view (low tier). Only without shadows: a palm behind the camera can throw its shadow into view.
+   */
+  setCulling(on: boolean): void {
+    if (on === this.cull) return;
+    this.cull = on;
+    if (!on && this.detailRadius === Infinity) this.layOut(null);
+    else this.lastAt.set(-Infinity, 0, 0);
+  }
+
+  /**
+   * Call every frame with the camera. Copies move between the full, halved and quartered meshes (beyond `radius` and three times it),
+   * and with culling on, copies out of view are skipped; it is worked out again once the camera has moved half a metre or turned 2 degrees.
+   */
+  update(camera: THREE.Camera): void {
+    if (this.detailRadius === Infinity && !this.cull) return; // everything at full detail, nothing skipped: laid out once
+    camera.getWorldDirection(look);
+    const step = this.cull ? 0.5 : 2;
+    const moved = this.lastAt.distanceToSquared(camera.position) > step * step;
+    const turned = this.cull && look.dot(this.lastLook) < 0.9994;
+    if (!moved && !turned) return;
+    this.lastLook.copy(look);
     this.layOut(camera);
   }
 
-  private layOut(camera: THREE.Vector3): void {
-    this.lastAt.copy(camera);
-    const r2 = this.detailRadius * this.detailRadius;
+  private layOut(camera: THREE.Camera | null): void {
+    if (camera) {
+      this.lastAt.copy(camera.position);
+      camera.updateMatrixWorld();
+      viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      this.frustum.setFromProjectionMatrix(viewProjection);
+    } else this.lastAt.set(Infinity, Infinity, Infinity);
+    const r = this.detailRadius, near2 = r * r, far2 = 9 * r * r;
     for (const l of this.lods) {
-      let n = 0, f = 0;
+      let n = 0, f = 0, ff = 0;
       for (let i = 0; i < l.full.length; i++) {
-        if (!l.far || l.at[i]!.distanceToSquared(camera) <= r2) l.near.setMatrixAt(n++, l.full[i]!);
-        else l.far.setMatrixAt(f++, l.half[i]!);
+        if (camera && this.cull) {
+          // a margin round each copy so nothing pops in at the edge of the screen between two layouts
+          sphere.center.copy(l.centre[i]!);
+          sphere.radius = l.radius[i]! * 1.15 + 1.5;
+          if (!this.frustum.intersectsSphere(sphere)) continue;
+        }
+        const d2 = camera ? l.at[i]!.distanceToSquared(camera.position) : 0;
+        if (!l.far || d2 <= near2) l.near.setMatrixAt(n++, l.full[i]!);
+        else if (!l.farthest || d2 <= far2) l.far.setMatrixAt(f++, l.half[i]!);
+        else l.farthest.setMatrixAt(ff++, l.quarter[i]!);
       }
       l.near.count = n;
       l.near.instanceMatrix.needsUpdate = true;
       if (l.far) { l.far.count = f; l.far.instanceMatrix.needsUpdate = true; }
+      if (l.farthest) { l.farthest.count = ff; l.farthest.instanceMatrix.needsUpdate = true; }
     }
   }
 

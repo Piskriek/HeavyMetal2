@@ -258,7 +258,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   const applyDecor = (): void => {
     decorView?.dispose();
     decorView = null;
-    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); decorView.setDetailRadius(DECOR_DETAIL_RADIUS[quality]); scene.add(decorView.group); }
+    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); decorView.setDetailRadius(DECOR_DETAIL_RADIUS[quality]); decorView.setCulling(quality === 'low'); decorView.setLowCost(quality === 'low'); scene.add(decorView.group); }
   };
   let terrainView: TerrainView | null = null;
   let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
@@ -268,6 +268,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     terrainView = null;
     if (scene && pendingTerrain) {
       terrainView = new TerrainView(pendingTerrain.data, pendingTerrain.surfaces);
+      terrainView.setLowCost(quality === 'low');
       scene.add(terrainView.mesh);
     }
     environment?.setSea(!!terrainView);
@@ -366,6 +367,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       else environment?.setShadows(q !== 'low', shadowSize);
       environment?.setLowDetail(q === 'low');
       decorView?.setDetailRadius(DECOR_DETAIL_RADIUS[q]);
+      // low has no shadows, so plants out of view can be skipped (with shadows a palm behind you still throws one into view)
+      decorView?.setCulling(q === 'low');
+      decorView?.setLowCost(q === 'low');
+      terrainView?.setLowCost(q === 'low');
       if (changed) buildPost();
       resize();
       postStale = true;
@@ -409,7 +414,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       roadView?.animate(performance.now());
       bursts?.update(previousFrame === null ? 16 : performance.now() - previousFrame);
       updateView();
-      decorView?.update(viewCamera.position);
+      decorView?.update(viewCamera);
       const frameSeconds = previousFrame === null ? 0.016 : Math.min(0.1, (performance.now() - previousFrame) / 1000);
       if (rig) {
         const changed = rig.update(frameSeconds, { focus: lightFocus, anchors: lightAnchors, time: performance.now() / 1000 });

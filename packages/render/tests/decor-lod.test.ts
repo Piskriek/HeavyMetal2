@@ -27,18 +27,23 @@ test('thin parts keep their silhouette and each group takes its most common colo
   assert.deepEqual([...halveModel(mixed).cells], [1]);
 });
 
-test('plants far from the camera switch to the halved model, near ones keep every voxel', () => {
-  const palm = fillBox(createModel('lod-palm', 'palm', [4, 8, 4]), [1, 0, 1], [2, 7, 2], 1);
+test('plants far from the camera switch to coarser models, near ones keep every voxel; culling skips the ones out of view', () => {
+  const palm = fillBox(createModel('lod-palm', 'palm', [8, 16, 8]), [3, 0, 3], [4, 15, 4], 1);
   const at = (x: number) => ({ parts: [], x, y: 0, z: 0, yaw: 0, scale: 1, voxel: { id: 'lod-palm', model: palm, block: 0.25 } });
-  const view = new DecorView([at(0), at(5), at(40), at(90)]);
-  const [near, far] = view.group.children as THREE.InstancedMesh[];
-  assert.equal(near!.count, 4, 'full detail everywhere until a tier sets a radius');
+  const view = new DecorView([at(0), at(5), at(40), at(90), at(-60)]);
+  const [near, far, farthest] = view.group.children as THREE.InstancedMesh[];
+  assert.equal(near!.count, 5, 'full detail everywhere until a tier sets a radius');
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+  camera.position.set(0, 2, 0);
+  camera.lookAt(100, 2, 0);
   view.setDetailRadius(18);
-  view.update(new THREE.Vector3(0, 0, 0));
-  assert.equal(near!.count, 2);
-  assert.equal(far!.count, 2);
+  view.update(camera);
+  assert.deepEqual([near!.count, far!.count, farthest!.count], [2, 1, 2], 'within 18 m full, within 54 m halved, beyond quartered');
+  view.setCulling(true);
+  view.update(camera);
+  assert.deepEqual([near!.count, far!.count, farthest!.count], [2, 1, 1], 'the palm behind the camera is skipped (the one at the camera stays)');
+  view.setCulling(false);
   view.setDetailRadius(Infinity);
-  assert.equal(near!.count, 4);
-  assert.equal(far!.count, 0);
+  assert.deepEqual([near!.count, far!.count, farthest!.count], [5, 0, 0]);
   view.dispose();
 });

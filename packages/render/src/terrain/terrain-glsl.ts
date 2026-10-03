@@ -35,6 +35,9 @@ export const uniformsGlsl = (layers: number): string => /* glsl */ `
 uniform sampler2DArray islSurfaces;
 uniform sampler2DArray islPbr;
 uniform sampler2D islFlatPalette;
+uniform sampler2DArray islVoxel;
+uniform sampler2DArray islVoxelPbr;
+uniform float islVoxelVariants;
 uniform float islNormalStrength;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 uniform vec4 islParams[${layers}];
@@ -229,22 +232,34 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
     vec4 tile;
 #ifdef ISL_FLAT
-    // voxel look: every half-metre block takes one tone of its surface's hand-picked palette; where two surfaces meet, each block picks one of them
+    // voxel look: every half-metre block shows one face of its surface (one of a few variants, picked per block); where two surfaces meet,
+    // each block picks one of them. The faces are their own pixel-art tiles (the voxel set), not the painted ground's.
     vec3 bk = floor(vTWorld / 0.5);
     float hTone = fract(sin(dot(bk, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
     float hMix = fract(sin(dot(bk, vec3(39.346, 11.135, 83.155))) * 24634.6345);
     float layer = hMix < lw ? lb : la;
     if (islCliffLayer >= 0.0 && hMix < steep) layer = islCliffLayer;
-    tile = vec4(texelFetch(islFlatPalette, ivec2(int(floor(hTone * 5.0)), int(layer + 0.5)), 0).rgb, 1.0);
+    // the face: the plane the ground faces most, in half-metre cells; on walls the tile's top is up
+    vec3 an = abs(gnrm);
+    bool vTop = an.y > 0.55;
+    bool vXdom = an.x > an.z;
+    vec2 fp = (vTop ? vTWorld.xz : (vXdom ? vec2(vTWorld.z, -vTWorld.y) : vec2(vTWorld.x, -vTWorld.y))) / 0.5;
+    vec2 fdx = dFdx(fp), fdy = dFdy(fp);
+    float faceLayer = floor(layer + 0.5) * islVoxelVariants + min(floor(hTone * islVoxelVariants), islVoxelVariants - 1.0);
+    tile = textureGrad(islVoxel, vec3(fract(fp), faceLayer), fdx, fdy);
     gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
     diffuseColor.rgb = tile.rgb;
     gRough = 0.92;
 #ifdef ISL_DETAIL
-    // voxel blocks with the PBR detail: each block keeps its palette colour and takes its surface's bumps, shine and height shading
-    vec3 vdx = dFdx(vTWorld), vdy = dFdy(vTWorld);
-    vec4 vp = islPbrAt(layer, layer, 0.0, vTWorld, gnrm, vdx, vdy);
-    if (vp.w >= 0.0) { gRough = vp.w; gBump = vp.xyz; }
-    diffuseColor.rgb *= 0.86 + 0.28 * islVaried(layer, vTWorld.xz, vdx.xz, vdy.xz).a;
+    // voxel blocks with the detail: each face's own bumps and shine
+    vec4 vp = textureGrad(islVoxelPbr, vec3(fract(fp), faceLayer), fdx, fdy);
+    if (vp.a > 0.5) {
+      vec3 vU = vTop ? vec3(1.0, 0.0, 0.0) : (vXdom ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0));
+      vec3 vV = vTop ? vec3(0.0, 0.0, 1.0) : vec3(0.0, -1.0, 0.0);
+      vec2 vt = (vp.rg - 0.5) * 2.0 * islNormalStrength;
+      gBump = vU * vt.x + vV * vt.y;
+      gRough = vp.b;
+    }
 #endif
 #else
     tile = islTriplanar(la, lb, lw, wp, gnrm, dwx, dwy);

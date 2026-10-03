@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
-import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
+import { attachOrbitControls, createThreeRenderer, SurfaceArray, RACING_SURFACES, SETMIX_VOXEL, SURF } from '@hm/render';
 import { BALL_RADIUS, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
 import { Animator } from '@hm/anim';
 import type { AvatarLook } from '@hm/avatarlook';
@@ -74,7 +74,7 @@ export function RaceView(props: {
     const ownGraphics = loadProfile().graphics;
     showTier(renderer, adaptive.current, ownGraphics);
     let appliedQuality = live.current.settings.quality;
-    const surfaces = new SurfaceArray(STARTER_SURFACES);
+    const surfaces = new SurfaceArray(RACING_SURFACES, undefined, SETMIX_VOXEL);
     const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, items: setup.fromMap ? itemsOf(rt) : undefined, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }), ...(setup.rider ? { rider: { name: setup.rider.name } } : {}) });
     // your goblin in your ball: the same voxel avatar and animations as on your island, upright inside the rolling glass
     const riding = setup.rider ? avatarRigged(setup.rider) : null;

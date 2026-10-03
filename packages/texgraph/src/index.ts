@@ -17,7 +17,6 @@ export interface TexGraph {
 
 type ValueType = "scalar" | "colour";
 type Color = [number, number, number];
-type Value = number | Color;
 type NodeRecord = Record<string, unknown>;
 
 const NODE_TYPES = new Set([
@@ -51,131 +50,143 @@ function isColorValue(value: unknown): value is [number, number, number] {
   );
 }
 
+/*
+ * The evaluator works on whole images (one Float32Array per node), which is what makes it fast enough to run in the game.
+ * Conventions (the ones the stylised set from the Arena agents was authored against, docs/prompts/arena-pbr-textures.md):
+ * - u = (x + 0.5) / size, v = (y + 0.5) / size; v grows downward (image rows); everything wraps at the tile edge.
+ * - noise: tileable value noise, quintic fade; octave o has period scale * 2^o, seed + 101 o and weight gain^o, normalised by the weights.
+ * - cellular: one point per cell at its centre + (hash - 0.5) * jitter, 3 x 3 search, raw distances in cell units clamped to 1
+ *   (f1 is 0 at a cell's point and grows outwards); edge = f2 - f1.
+ * - stripes: 0.5 + 0.5 sin(2 pi count t), t = u when vertical; softness below 1 sharpens it with a smoothstep of width softness / 2.
+ * - warp: u' = u + (w(u, v) - 0.5) amount, v' = v + (w(u + 0.37, v + 0.21) - 0.5) amount, sampled bilinearly.
+ * - blend: lerp(a, op(a, b), amount * mask); overlay = a < 0.5 ? 2ab : 1 - 2(1 - a)(1 - b).
+ * - levels: t = clamp((x - inLow) / (inHigh - inLow)), t^gamma, lerp(outLow, outHigh, t).
+ * Only the outputs are clamped to 0..1; values in between may leave it (a scaleBias above 1 then a levels brings them back).
+ */
 function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
-function wrap01(value: number): number {
-  const wrapped = value - Math.floor(value);
-  return wrapped >= 1 ? 0 : wrapped;
-}
-
-function modInt(value: number, period: number): number {
-  const result = value % period;
-  return result < 0 ? result + period : result;
+  return value < 0 ? 0 : value > 1 ? 1 : value;
 }
 
 function fade(value: number): number {
   return value * value * value * (value * (value * 6 - 15) + 10);
 }
 
-function lerp(a: number, b: number, amount: number): number {
-  return a + (b - a) * amount;
-}
-
 function hash2(x: number, y: number, seed: number): number {
-  let h = Math.imul((x | 0) ^ 0x9e3779b9, 0x85ebca6b);
-  h = Math.imul(h ^ (y | 0), 0xc2b2ae35);
-  h = Math.imul(h ^ (Math.trunc(seed) | 0), 0x27d4eb2d);
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1442695041)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  h = Math.imul(h, 2246822519);
   h ^= h >>> 15;
-  h = Math.imul(h, 0x2c1b3c6d);
-  h ^= h >>> 12;
-  return (h >>> 0) / 4294967295;
+  return (h >>> 0) / 4294967296;
 }
 
-function valueNoise(
-  u: number,
-  v: number,
-  scale: number,
-  octaves: number,
-  gain: number,
-  seed: number,
-): number {
-  let amplitude = 1;
-  let total = 0;
-  let normalizer = 0;
-
-  for (let octave = 0; octave < octaves; octave += 1) {
-    const period = scale * 2 ** octave;
-    const px = u * period;
-    const py = v * period;
-    const ix = Math.floor(px);
-    const iy = Math.floor(py);
-    const tx = fade(px - ix);
-    const ty = fade(py - iy);
-
-    const x0 = modInt(ix, period);
-    const x1 = modInt(ix + 1, period);
-    const y0 = modInt(iy, period);
-    const y1 = modInt(iy + 1, period);
-
-    const top = lerp(
-      hash2(x0, y0, seed + octave * 1013),
-      hash2(x1, y0, seed + octave * 1013),
-      tx,
-    );
-    const bottom = lerp(
-      hash2(x0, y1, seed + octave * 1013),
-      hash2(x1, y1, seed + octave * 1013),
-      tx,
-    );
-
-    total += lerp(top, bottom, ty) * amplitude;
-    normalizer += amplitude;
-    amplitude *= gain;
-  }
-
-  return normalizer === 0 ? 0 : clamp01(total / normalizer);
-}
-
-function cellularNoise(
-  u: number,
-  v: number,
-  scale: number,
-  jitter: number,
-  mode: "f1" | "f2" | "edge",
-  seed: number,
-): number {
-  const px = u * scale;
-  const py = v * scale;
-  const baseX = Math.floor(px);
-  const baseY = Math.floor(py);
-  const localX = px - baseX;
-  const localY = py - baseY;
-  let first = Number.POSITIVE_INFINITY;
-  let second = Number.POSITIVE_INFINITY;
-
-  for (let dy = -1; dy <= 1; dy += 1) {
-    for (let dx = -1; dx <= 1; dx += 1) {
-      const cellX = modInt(baseX + dx, scale);
-      const cellY = modInt(baseY + dy, scale);
-      const randomX = hash2(cellX, cellY, seed + 17);
-      const randomY = hash2(cellX, cellY, seed + 53);
-      const featureX = 0.5 + (randomX - 0.5) * jitter;
-      const featureY = 0.5 + (randomY - 0.5) * jitter;
-      const distanceX = dx + featureX - localX;
-      const distanceY = dy + featureY - localY;
-      const distance = Math.hypot(distanceX, distanceY);
-
-      if (distance < first) {
-        second = first;
-        first = distance;
-      } else if (distance < second) {
-        second = distance;
+function noiseImage(size: number, scale: number, octaves: number, gain: number, seed: number): Float32Array {
+  const out = new Float32Array(size * size);
+  const xa = new Int32Array(size), xb = new Int32Array(size), tx = new Float32Array(size);
+  let amplitude = 1, norm = 0, period = Math.max(1, Math.round(scale));
+  const count = Math.max(1, Math.min(6, Math.round(octaves || 1)));
+  for (let octave = 0; octave < count; octave += 1) {
+    const lattice = new Float32Array(period * period);
+    const octaveSeed = (seed | 0) + octave * 101;
+    for (let j = 0; j < period; j += 1) for (let i = 0; i < period; i += 1) lattice[j * period + i] = hash2(i, j, octaveSeed);
+    for (let x = 0; x < size; x += 1) {
+      const f = ((x + 0.5) / size) * period, i0 = Math.floor(f);
+      xa[x] = i0 % period; xb[x] = (i0 + 1) % period; tx[x] = fade(f - i0);
+    }
+    for (let y = 0; y < size; y += 1) {
+      const f = ((y + 0.5) / size) * period, j0 = Math.floor(f);
+      const ya = (j0 % period) * period, yb = ((j0 + 1) % period) * period, ty = fade(f - j0);
+      for (let x = 0; x < size; x += 1) {
+        const a = lattice[ya + xa[x]!]!, b = lattice[ya + xb[x]!]!, c = lattice[yb + xa[x]!]!, d = lattice[yb + xb[x]!]!;
+        const top = a + (b - a) * tx[x]!, bottom = c + (d - c) * tx[x]!;
+        out[y * size + x]! += (top + (bottom - top) * ty) * amplitude;
       }
     }
+    norm += amplitude;
+    amplitude *= gain;
+    period *= 2;
   }
-
-  if (mode === "f1") {
-    return clamp01(1 - first / Math.SQRT2);
-  }
-
-  if (mode === "f2") {
-    return clamp01(1 - second / Math.SQRT2);
-  }
-
-  return clamp01(((second - first) / Math.SQRT2) * 1.5);
+  for (let i = 0; i < out.length; i += 1) out[i] = norm > 0 ? out[i]! / norm : 0;
+  return out;
 }
+
+function cellularImage(size: number, scale: number, jitter: number, mode: string, seed: number): Float32Array {
+  const cells = Math.max(1, Math.round(scale)), spread = clamp01(jitter);
+  const px = new Float32Array(cells * cells), py = new Float32Array(cells * cells);
+  for (let j = 0; j < cells; j += 1) for (let i = 0; i < cells; i += 1) {
+    px[j * cells + i] = 0.5 + (hash2(i, j, seed) - 0.5) * spread;
+    py[j * cells + i] = 0.5 + (hash2(i, j, (seed | 0) + 7919) - 0.5) * spread;
+  }
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    const fy = ((y + 0.5) / size) * cells, yi = Math.floor(fy);
+    for (let x = 0; x < size; x += 1) {
+      const fx = ((x + 0.5) / size) * cells, xi = Math.floor(fx);
+      let f1 = 1e9, f2 = 1e9;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        const cy = yi + dy, wy = ((cy % cells) + cells) % cells;
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const cx = xi + dx, wx = ((cx % cells) + cells) % cells, k = wy * cells + wx;
+          const ax = cx + px[k]! - fx, ay = cy + py[k]! - fy, d = Math.sqrt(ax * ax + ay * ay);
+          if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+        }
+      }
+      const v = mode === "f2" ? f2 : mode === "edge" ? f2 - f1 : f1;
+      out[y * size + x] = v > 1 ? 1 : v;
+    }
+  }
+  return out;
+}
+
+function stripesImage(size: number, count: number, softness: number, vertical: boolean): Float32Array {
+  const bands = Math.max(1, Math.round(count)), soft = clamp01(softness), width = Math.max(0.0025, soft * 0.5);
+  const line = new Float32Array(size);
+  for (let i = 0; i < size; i += 1) {
+    const s = 0.5 + 0.5 * Math.sin(Math.PI * 2 * ((i + 0.5) / size) * bands);
+    if (soft >= 0.999) line[i] = s;
+    else { const k = clamp01((s - (0.5 - width)) / (2 * width)); line[i] = k * k * (3 - 2 * k); }
+  }
+  const out = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) out[y * size + x] = vertical ? line[x]! : line[y]!;
+  return out;
+}
+
+/** Bilinear, wrapping sample of an image with `channels` channels at pixel position (sx, sy), written to out[at..]. */
+function sampleInto(image: Float32Array, size: number, channels: number, sx: number, sy: number, out: Float32Array, at: number): void {
+  let x0 = Math.floor(sx), y0 = Math.floor(sy);
+  const tx = sx - x0, ty = sy - y0;
+  x0 = ((x0 % size) + size) % size; y0 = ((y0 % size) + size) % size;
+  const x1 = (x0 + 1) % size, y1 = (y0 + 1) % size;
+  for (let c = 0; c < channels; c += 1) {
+    const a = image[(y0 * size + x0) * channels + c]!, b = image[(y0 * size + x1) * channels + c]!;
+    const d = image[(y1 * size + x0) * channels + c]!, e = image[(y1 * size + x1) * channels + c]!;
+    out[at + c] = (a + (b - a) * tx) * (1 - ty) + (d + (e - d) * tx) * ty;
+  }
+}
+
+/** A ramp as a 2048-step lookup (stops sorted by `at`; equal stops make a hard step). */
+function rampTable(stops: readonly NodeRecord[]): Float32Array {
+  const sorted = stops.slice().sort((p, q) => Number(p.at) - Number(q.at));
+  const steps = 2048, table = new Float32Array(steps * 3);
+  const colour = (s: NodeRecord): Color => [Number(s.r), Number(s.g), Number(s.b)];
+  for (let j = 0; j < steps; j += 1) {
+    const x = j / (steps - 1);
+    let c: Color;
+    if (!sorted.length) c = [0, 0, 0];
+    else if (x <= Number(sorted[0]!.at)) c = colour(sorted[0]!);
+    else if (x >= Number(sorted[sorted.length - 1]!.at)) c = colour(sorted[sorted.length - 1]!);
+    else {
+      let i = 0;
+      while (i < sorted.length - 1 && Number(sorted[i + 1]!.at) < x) i += 1;
+      const a = sorted[i]!, b = sorted[i + 1]!, span = Number(b.at) - Number(a.at), t = span <= 0 ? 1 : (x - Number(a.at)) / span;
+      const ca = colour(a), cb = colour(b);
+      c = [ca[0] + (cb[0] - ca[0]) * t, ca[1] + (cb[1] - ca[1]) * t, ca[2] + (cb[2] - ca[2]) * t];
+    }
+    table[j * 3] = c[0]; table[j * 3 + 1] = c[1]; table[j * 3 + 2] = c[2];
+  }
+  return table;
+}
+
 
 function referencesFor(node: NodeRecord): string[] {
   const type = typeof node.type === "string" ? node.type : "";
@@ -332,7 +343,8 @@ function checkNodeParameters(node: NodeRecord, errors: string[]): void {
 
   if (type === "levels") {
     const inLow = checkedNumber(node, "inLow", errors, 0, 1);
-    const inHigh = checkedNumber(node, "inHigh", errors, 0, 1);
+    // above 1 is allowed: it softens the contrast (the evaluator clamps the result)
+    const inHigh = checkedNumber(node, "inHigh", errors, 0, 2);
     checkedNumber(node, "gamma", errors, 0.000001);
     checkedNumber(node, "outLow", errors, 0, 1);
     checkedNumber(node, "outHigh", errors, 0, 1);
@@ -620,90 +632,32 @@ export function validateGraph(g: unknown): { ok: boolean; errors: string[] } {
   }
 }
 
-function asScalar(value: Value): number {
-  if (typeof value === "number") {
-    return value;
-  }
-  return (value[0] + value[1] + value[2]) / 3;
+/** One evaluated node: a scalar image (size * size) or a colour image (size * size * 3). */
+interface Image { readonly colour: boolean; readonly data: Float32Array }
+
+export interface EvaluateOptions {
+  /** Pixels across the tile (default 64). */
+  size?: number;
+  /** Added to every node's seed: the same graph with a different look. */
+  seed?: number;
+  /**
+   * How steep the normal is: height units to pixel widths. 1 is very gentle. The game's stylised relief is 0.3 m of height on a 3 m ground tile
+   * (size * 0.1) and 0.1 m on a 0.5 m voxel face (size * 0.2).
+   */
+  relief?: number;
 }
 
-function mapValue(value: Value, mapper: (channel: number) => number): Value {
-  if (typeof value === "number") {
-    return clamp01(mapper(value));
-  }
-
-  return [
-    clamp01(mapper(value[0])),
-    clamp01(mapper(value[1])),
-    clamp01(mapper(value[2])),
-  ];
-}
-
-function blendChannel(
-  a: number,
-  b: number,
-  amount: number,
-  mode: string,
-): number {
-  let target: number;
-
-  if (mode === "add") {
-    target = a + b;
-  } else if (mode === "multiply") {
-    target = a * b;
-  } else if (mode === "min") {
-    target = Math.min(a, b);
-  } else if (mode === "max") {
-    target = Math.max(a, b);
-  } else if (mode === "overlay") {
-    target = a < 0.5
-      ? 2 * a * b
-      : 1 - 2 * (1 - a) * (1 - b);
-  } else {
-    target = b;
-  }
-
-  return clamp01(lerp(a, target, amount));
-}
-
-function blendValue(
-  a: Value,
-  b: Value,
-  amount: number,
-  mode: string,
-): Value {
-  if (typeof a === "number" && typeof b === "number") {
-    return blendChannel(a, b, amount, mode);
-  }
-
-  const colorA = a as Color;
-  const colorB = b as Color;
-
-  return [
-    blendChannel(colorA[0], colorB[0], amount, mode),
-    blendChannel(colorA[1], colorB[1], amount, mode),
-    blendChannel(colorA[2], colorB[2], amount, mode),
-  ];
-}
-
-function stopColor(stop: NodeRecord): Color {
-  return [
-    clamp01(Number(stop.r)),
-    clamp01(Number(stop.g)),
-    clamp01(Number(stop.b)),
-  ];
-}
-
-export function evaluateGraph(
-  graph: TexGraph,
-  opts?: { size?: number; seed?: number },
-): {
+export interface EvaluatedTexture {
   size: number;
+  /** Linear colour, 3 per pixel. */
   albedo?: Float32Array;
   height?: Float32Array;
+  /** The tangent-space normal from the height: x and y at 0.5 + 0.5 n, 2 per pixel (z is rebuilt from them). */
   normal?: Float32Array;
   roughness?: Float32Array;
-} {
+}
+
+export function evaluateGraph(graph: TexGraph, opts?: EvaluateOptions): EvaluatedTexture {
   const validation = validateGraph(graph);
   if (!validation.ok) {
     throw new Error(
@@ -721,285 +675,223 @@ export function evaluateGraph(
     throw new Error("Evaluation seed must be a finite number");
   }
 
-  const nodeMap = new Map<string, TexNode>(
-    graph.nodes.map((node) => [node.id, node]),
-  );
-
-  const nodeSeed = (node: TexNode): number => {
-    const seed = typeof node.seed === "number" ? Math.trunc(node.seed) : 0;
-    return seed + Math.trunc(optionSeed);
+  const count = size * size;
+  const nodeMap = new Map<string, TexNode>(graph.nodes.map((node) => [node.id, node]));
+  const memo = new Map<string, Image>();
+  const nodeSeed = (node: TexNode): number =>
+    (typeof node.seed === "number" ? Math.trunc(node.seed) : 0) + Math.trunc(optionSeed);
+  const num = (params: NodeRecord, key: string, fallback: number): number => {
+    const value = params[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  };
+  const scalarOf = (image: Image): Float32Array => {
+    if (!image.colour) return image.data;
+    const out = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) out[i] = (image.data[i * 3]! + image.data[i * 3 + 1]! + image.data[i * 3 + 2]!) / 3;
+    return out;
+  };
+  const colourOf = (image: Image): Float32Array => {
+    if (image.colour) return image.data;
+    const out = new Float32Array(count * 3);
+    for (let i = 0; i < count; i += 1) out[i * 3] = out[i * 3 + 1] = out[i * 3 + 2] = image.data[i]!;
+    return out;
   };
 
-  const sample = (
-    id: string,
-    u: number,
-    v: number,
-    cache: Map<string, Value>,
-  ): Value => {
-    const uu = wrap01(u);
-    const vv = wrap01(v);
-    const key = `${id}|${uu}|${vv}`;
-    const cached = cache.get(key);
-    if (cached !== undefined) {
-      return cached;
-    }
-
+  const get = (id: string): Image => {
+    const hit = memo.get(id);
+    if (hit) return hit;
     const node = nodeMap.get(id);
-    if (!node) {
-      throw new Error(`Cannot evaluate missing node '${id}'`);
-    }
-
+    if (!node) throw new Error(`Cannot evaluate missing node '${id}'`);
     const params = node as NodeRecord;
-    let result: Value;
+    let result: Image;
 
     switch (node.type) {
       case "noise":
-        result = valueNoise(
-          uu,
-          vv,
-          Number(params.scale),
-          Number(params.octaves),
-          Number(params.gain),
-          nodeSeed(node),
-        );
+        result = { colour: false, data: noiseImage(size, num(params, "scale", 1), num(params, "octaves", 1), num(params, "gain", 0.5), nodeSeed(node)) };
         break;
 
       case "cellular":
-        result = cellularNoise(
-          uu,
-          vv,
-          Number(params.scale),
-          Number(params.jitter),
-          params.mode as "f1" | "f2" | "edge",
-          nodeSeed(node),
-        );
+        result = { colour: false, data: cellularImage(size, num(params, "scale", 1), num(params, "jitter", 0.8), String(params.mode), nodeSeed(node)) };
         break;
 
       case "grain": {
-        const period = Math.max(1, size - 1);
-        const x = size === 1 ? 0 : modInt(Math.floor(uu * size), period);
-        const y = size === 1 ? 0 : modInt(Math.floor(vv * size), period);
-        result = hash2(x, y, nodeSeed(node));
+        const data = new Float32Array(count);
+        const seed = nodeSeed(node);
+        for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) data[y * size + x] = hash2(x, y, seed);
+        result = { colour: false, data };
         break;
       }
 
-      case "stripes": {
-        const coordinate = params.vertical ? uu : vv;
-        const phase = wrap01(coordinate * Number(params.count));
-        const hard = phase < 0.5 ? 1 : 0;
-        const soft = 0.5 + 0.5 * Math.cos(phase * Math.PI * 2);
-        const softness = Number(params.softness);
-        result = clamp01(lerp(hard, soft, softness));
+      case "stripes":
+        result = { colour: false, data: stripesImage(size, num(params, "count", 1), num(params, "softness", 1), params.vertical === true) };
         break;
-      }
 
       case "checker": {
-        const x = Math.floor(uu * Number(params.countX));
-        const y = Math.floor(vv * Number(params.countY));
-        result = (x + y) % 2 === 0 ? 1 : 0;
+        const data = new Float32Array(count);
+        const cx = Math.max(1, Math.round(num(params, "countX", 1))), cy = Math.max(1, Math.round(num(params, "countY", 1)));
+        for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
+          data[y * size + x] = (Math.floor(((x + 0.5) / size) * cx) + Math.floor(((y + 0.5) / size) * cy)) & 1;
+        }
+        result = { colour: false, data };
         break;
       }
 
       case "constant": {
         if (isColorValue(params.value)) {
-          result = [
-            clamp01(params.value[0]),
-            clamp01(params.value[1]),
-            clamp01(params.value[2]),
-          ];
+          const data = new Float32Array(count * 3);
+          const [r, g, b] = params.value;
+          for (let i = 0; i < count; i += 1) { data[i * 3] = r; data[i * 3 + 1] = g; data[i * 3 + 2] = b; }
+          result = { colour: true, data };
         } else {
-          result = clamp01(Number(params.value));
+          result = { colour: false, data: new Float32Array(count).fill(Number(params.value)) };
         }
         break;
       }
 
       case "warp": {
-        const warpValue = asScalar(
-          sample(String(params.warp), uu, vv, cache),
-        );
-        const offset = Number(params.amount) * (warpValue - 0.5);
-        result = sample(
-          String(params.in),
-          uu + offset,
-          vv + offset,
-          cache,
-        );
+        const source = get(String(params.in));
+        const field = scalarOf(get(String(params.warp)));
+        const amount = Math.min(0.15, Math.max(0, num(params, "amount", 0))) * size;
+        const ox = Math.floor(size * 0.37), oy = Math.floor(size * 0.21);
+        const channels = source.colour ? 3 : 1;
+        const data = new Float32Array(count * channels);
+        for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
+          const i = y * size + x;
+          const w1 = field[i]!, w2 = field[((y + oy) % size) * size + ((x + ox) % size)]!;
+          sampleInto(source.data, size, channels, x + (w1 - 0.5) * amount, y + (w2 - 0.5) * amount, data, i * channels);
+        }
+        result = { colour: source.colour, data };
         break;
       }
 
       case "blend": {
-        const a = sample(String(params.a), uu, vv, cache);
-        const b = sample(String(params.b), uu, vv, cache);
-        const mask =
-          params.mask === undefined
-            ? 1
-            : clamp01(asScalar(sample(String(params.mask), uu, vv, cache)));
-        result = blendValue(
-          a,
-          b,
-          Number(params.amount) * mask,
-          String(params.mode),
-        );
+        const first = get(String(params.a));
+        const colour = first.colour;
+        const a = colour ? colourOf(first) : first.data;
+        const second = get(String(params.b));
+        const b = colour ? colourOf(second) : scalarOf(second);
+        const mask = params.mask === undefined ? null : scalarOf(get(String(params.mask)));
+        const amount = clamp01(num(params, "amount", 0.5));
+        const mode = String(params.mode);
+        const op =
+          mode === "add" ? (x: number, y: number) => x + y
+          : mode === "multiply" ? (x: number, y: number) => x * y
+          : mode === "min" ? (x: number, y: number) => (x < y ? x : y)
+          : mode === "max" ? (x: number, y: number) => (x > y ? x : y)
+          : mode === "overlay" ? (x: number, y: number) => (x < 0.5 ? 2 * x * y : 1 - 2 * (1 - x) * (1 - y))
+          : (_x: number, y: number) => y;
+        const channels = colour ? 3 : 1;
+        const data = new Float32Array(count * channels);
+        for (let i = 0; i < count; i += 1) {
+          const t = mask ? amount * clamp01(mask[i]!) : amount;
+          for (let c = 0; c < channels; c += 1) {
+            const k = i * channels + c, x = a[k]!;
+            data[k] = x + (op(x, b[k]!) - x) * t;
+          }
+        }
+        result = { colour, data };
         break;
       }
 
       case "levels": {
-        const input = asScalar(sample(String(params.in), uu, vv, cache));
-        const low = Number(params.inLow);
-        const high = Number(params.inHigh);
-        const gamma = Number(params.gamma);
-        const t = clamp01((input - low) / (high - low));
-        const adjusted = Math.pow(t, gamma);
-        result = clamp01(
-          Number(params.outLow) +
-            adjusted * (Number(params.outHigh) - Number(params.outLow)),
-        );
+        const input = scalarOf(get(String(params.in)));
+        const low = num(params, "inLow", 0), high = num(params, "inHigh", 1), gamma = num(params, "gamma", 1);
+        const outLow = num(params, "outLow", 0), outHigh = num(params, "outHigh", 1), span = high - low;
+        const data = new Float32Array(count);
+        for (let i = 0; i < count; i += 1) {
+          let t = span === 0 ? (input[i]! >= high ? 1 : 0) : clamp01((input[i]! - low) / span);
+          if (gamma !== 1) t = Math.pow(t, gamma);
+          data[i] = outLow + (outHigh - outLow) * t;
+        }
+        result = { colour: false, data };
         break;
       }
 
-      case "invert":
-        result = mapValue(
-          sample(String(params.in), uu, vv, cache),
-          (value) => 1 - value,
-        );
+      case "invert": {
+        const input = get(String(params.in));
+        const data = new Float32Array(input.data.length);
+        for (let i = 0; i < data.length; i += 1) data[i] = 1 - input.data[i]!;
+        result = { colour: input.colour, data };
         break;
+      }
 
       case "ramp": {
-        const input = clamp01(asScalar(sample(String(params.in), uu, vv, cache)));
-        const stops = params.stops as unknown[];
-        const first = stops[0] as NodeRecord;
-        const last = stops[stops.length - 1] as NodeRecord;
-
-        if (input <= Number(first.at)) {
-          result = stopColor(first);
-          break;
+        const input = scalarOf(get(String(params.in)));
+        const table = rampTable(params.stops as NodeRecord[]);
+        const data = new Float32Array(count * 3);
+        for (let i = 0; i < count; i += 1) {
+          const j = Math.round(clamp01(input[i]!) * 2047) * 3;
+          data[i * 3] = table[j]!; data[i * 3 + 1] = table[j + 1]!; data[i * 3 + 2] = table[j + 2]!;
         }
-
-        if (input >= Number(last.at)) {
-          result = stopColor(last);
-          break;
-        }
-
-        let lower = first;
-        let upper = last;
-
-        for (let index = 1; index < stops.length; index += 1) {
-          const candidate = stops[index] as NodeRecord;
-          if (input <= Number(candidate.at)) {
-            lower = stops[index - 1] as NodeRecord;
-            upper = candidate;
-            break;
-          }
-        }
-
-        const range = Number(upper.at) - Number(lower.at);
-        const amount =
-          range === 0
-            ? 0
-            : (input - Number(lower.at)) / range;
-        const lowerColor = stopColor(lower);
-        const upperColor = stopColor(upper);
-
-        result = [
-          clamp01(lerp(lowerColor[0], upperColor[0], amount)),
-          clamp01(lerp(lowerColor[1], upperColor[1], amount)),
-          clamp01(lerp(lowerColor[2], upperColor[2], amount)),
-        ];
+        result = { colour: true, data };
         break;
       }
 
-      case "scaleBias":
-        result = mapValue(
-          sample(String(params.in), uu, vv, cache),
-          (value) => value * Number(params.scale) + Number(params.bias),
-        );
+      case "scaleBias": {
+        const input = get(String(params.in));
+        const scale = num(params, "scale", 1), bias = num(params, "bias", 0);
+        const data = new Float32Array(input.data.length);
+        for (let i = 0; i < data.length; i += 1) data[i] = input.data[i]! * scale + bias;
+        result = { colour: input.colour, data };
         break;
+      }
 
       default:
         throw new Error(`Cannot evaluate unknown node type '${node.type}'`);
     }
 
-    cache.set(key, result);
+    memo.set(id, result);
     return result;
   };
 
-  const render = (id: string, channels: 1 | 3): Float32Array => {
-    const data = new Float32Array(size * size * channels);
-
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        const u = (x + 0.5) / size;
-        const v = (y + 0.5) / size;
-        const value = sample(id, u, v, new Map());
-        const offset = (y * size + x) * channels;
-
-        if (channels === 1) {
-          data[offset] = clamp01(asScalar(value));
-        } else if (typeof value === "number") {
-          const scalar = clamp01(value);
-          data[offset] = scalar;
-          data[offset + 1] = scalar;
-          data[offset + 2] = scalar;
-        } else {
-          data[offset] = clamp01(value[0]);
-          data[offset + 1] = clamp01(value[1]);
-          data[offset + 2] = clamp01(value[2]);
-        }
-      }
-    }
-
-    return data;
-  };
-
-  const result: {
-    size: number;
-    albedo?: Float32Array;
-    height?: Float32Array;
-    normal?: Float32Array;
-    roughness?: Float32Array;
-  } = { size };
+  const result: EvaluatedTexture = { size };
 
   if (graph.out.albedo !== undefined) {
-    result.albedo = render(graph.out.albedo, 3);
+    const colour = colourOf(get(graph.out.albedo));
+    result.albedo = new Float32Array(count * 3);
+    for (let i = 0; i < count * 3; i += 1) result.albedo[i] = clamp01(colour[i]!);
   }
 
   if (graph.out.height !== undefined) {
-    result.height = render(graph.out.height, 1);
-    result.normal = new Float32Array(size * size * 2);
-
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        const left = ((y * size + (x + size - 1) % size));
-        const right = ((y * size + (x + 1) % size));
-        const up = ((((y + size - 1) % size) * size + x));
-        const down = ((((y + 1) % size) * size + x));
-
-        const dx = (result.height![right]! - result.height![left]!) * 0.5;
-        const dy = (result.height![down]! - result.height![up]!) * 0.5;
-        const nx = -dx;
-        const ny = -dy;
-        const nz = 1;
-        const inverseLength = 1 / Math.hypot(nx, ny, nz);
-        const offset = (y * size + x) * 2;
-
-        result.normal[offset] = clamp01(0.5 + 0.5 * nx * inverseLength);
-        result.normal[offset + 1] = clamp01(0.5 + 0.5 * ny * inverseLength);
-      }
-    }
+    const height = scalarOf(get(graph.out.height));
+    result.height = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) result.height[i] = clamp01(height[i]!);
+    result.normal = normalFromHeight(result.height, size, opts?.relief ?? 1);
   }
 
   if (graph.out.roughness !== undefined) {
-    result.roughness = render(graph.out.roughness, 1);
+    const roughness = scalarOf(get(graph.out.roughness));
+    result.roughness = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) result.roughness[i] = clamp01(roughness[i]!);
   }
 
   return result;
 }
 
+/** The tangent-space normal of a wrapping height image (x and y at 0.5 + 0.5 n; rows grow downward, so a rise down the image tips y negative). */
+export function normalFromHeight(height: Float32Array, size: number, relief = 1): Float32Array {
+  const normal = new Float32Array(size * size * 2);
+  for (let y = 0; y < size; y += 1) {
+    const up = ((y + size - 1) % size) * size, down = ((y + 1) % size) * size, row = y * size;
+    for (let x = 0; x < size; x += 1) {
+      const left = (x + size - 1) % size, right = (x + 1) % size;
+      const dx = (height[row + right]! - height[row + left]!) * 0.5 * relief;
+      const dy = (height[down + x]! - height[up + x]!) * 0.5 * relief;
+      const inverseLength = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+      const offset = (row + x) * 2;
+      normal[offset] = clamp01(0.5 - 0.5 * dx * inverseLength);
+      normal[offset + 1] = clamp01(0.5 - 0.5 * dy * inverseLength);
+    }
+  }
+  return normal;
+}
+
+
 export function channelStats(
   data: Float32Array,
   size: number,
   channels = 1,
-): { mean: number[]; std: number[]; seam: number } {
+): { mean: number[]; std: number[]; seam: number; neighbour: number } {
   if (!Number.isInteger(size) || size < 1) {
     throw new Error("Stats size must be a positive integer");
   }
@@ -1060,10 +952,33 @@ export function channelStats(
     }
   }
 
+  // the same difference between neighbours inside the tile: a seamless tile's edge differs no more than its inside does
+  let insideTotal = 0;
+  let insideSamples = 0;
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x + 1 < size; x += 1) {
+      for (let channel = 0; channel < channels; channel += 1) {
+        insideTotal += Math.abs(data[(y * size + x) * channels + channel]! - data[(y * size + x + 1) * channels + channel]!);
+        insideSamples += 1;
+      }
+    }
+  }
+
+  for (let y = 0; y + 1 < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      for (let channel = 0; channel < channels; channel += 1) {
+        insideTotal += Math.abs(data[(y * size + x) * channels + channel]! - data[((y + 1) * size + x) * channels + channel]!);
+        insideSamples += 1;
+      }
+    }
+  }
+
   return {
     mean,
     std: variance,
     seam: seamSamples === 0 ? 0 : seamTotal / seamSamples,
+    neighbour: insideSamples === 0 ? 0 : insideTotal / insideSamples,
   };
 }
 

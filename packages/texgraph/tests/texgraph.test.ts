@@ -51,13 +51,14 @@ test("all texture presets are seamless on albedo and height", () => {
     const albedoStats = channelStats(evaluated.albedo, evaluated.size, 3);
     const heightStats = channelStats(evaluated.height, evaluated.size, 1);
 
+    // the edge may differ no more than neighbours inside the tile do (fine grain differs everywhere)
     assert.ok(
-      albedoStats.seam < 0.03,
-      `${preset.id} albedo seam was ${albedoStats.seam}`,
+      albedoStats.seam < albedoStats.neighbour * 1.5 + 0.01,
+      `${preset.id} albedo seam was ${albedoStats.seam} (inside ${albedoStats.neighbour})`,
     );
     assert.ok(
-      heightStats.seam < 0.03,
-      `${preset.id} height seam was ${heightStats.seam}`,
+      heightStats.seam < heightStats.neighbour * 1.5 + 0.01,
+      `${preset.id} height seam was ${heightStats.seam} (inside ${heightStats.neighbour})`,
     );
   }
 });

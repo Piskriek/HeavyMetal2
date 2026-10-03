@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { cmd, type PresetId, type Tier } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
-import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
+import { attachOrbitControls, createThreeRenderer, SurfaceArray, RACING_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { Inspector, Palette, BrushPanel, PresetBrowser, Toolbar, type BrushState, type Manip, type PresetFilter, type PaletteItem } from '@hm/ui';
 import { applyStroke, encodeTerrain, heightAt, normalYAtCell, type DirtyRect } from '@hm/terrain';
 import { carveTrack, resample } from '@hm/trackgen';
@@ -42,7 +42,7 @@ const TOOLS = [
   { id: 'delete', label: 'Delete', icon: '✕', hotkey: 'X' },
 ] as const;
 const BRUSH_COLOR: Record<string, string> = { paint: '#ffd24a', raise: '#62e08a', lower: '#ff7a5e', smooth: '#6ab7ff', flatten: '#d59bff' };
-const PALETTE: PaletteItem[] = STARTER_SURFACES.map((s) => ({ id: s.id, name: s.name, swatch: s.fallback, image: s.url }));
+const PALETTE: PaletteItem[] = RACING_SURFACES.map((s) => ({ id: s.id, name: s.name, swatch: s.fallback, image: s.url }));
 
 const readDraft = (rt: Runtime, trackId: PresetId): TrackDraft => {
   const p = rt.store.get(trackId);
@@ -112,7 +112,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
     const offQuality = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) showTier(renderer, q, profile.graphics); });
     rendererRef.current = renderer;
     setRend(renderer);
-    const surfaces = new SurfaceArray(STARTER_SURFACES);
+    const surfaces = new SurfaceArray(RACING_SURFACES, undefined, SETMIX_VOXEL);
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
       if (!st) return;
@@ -157,7 +157,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
       const ts = terrainState();
       const pulse = stroking ? 1 + 0.07 * Math.sin((now - t0) / 55) : 1 + 0.015 * Math.sin((now - t0) / 400);
       if (L.tool === 'brush' && hover.point) {
-        const c = L.brush.kind === 'paint' ? (STARTER_SURFACES.find((s) => s.id === L.brush.surface)?.fallback ?? '#ffd24a') : BRUSH_COLOR[L.brush.kind]!;
+        const c = L.brush.kind === 'paint' ? (RACING_SURFACES.find((s) => s.id === L.brush.surface)?.fallback ?? '#ffd24a') : BRUSH_COLOR[L.brush.kind]!;
         const [x, y, z] = hover.point;
         renderer.overlay.show('brush', [
           { type: 'ring', center: [x, y + 0.08, z], normal: [0, 1, 0], radius: L.brush.radius * pulse, color: BRUSH_COLOR[L.brush.kind]! },
@@ -358,7 +358,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
       if (sculpting) { const sc = sculpting; sculpting = null; if (sc.end()) feedback('success', 'Sculpted'); return; }
       if (stroking) {
         const s = stroking; stroking = null;
-        if (s.dirty) { const b = live.current.brush; const name = b.kind === 'paint' ? `Paint ${STARTER_SURFACES.find((x) => x.id === b.surface)?.name ?? ''}` : `Sculpt (${b.kind})`; commitTerrain(name); feedback('success'); toasts.push(name, 'ok', 1400); }
+        if (s.dirty) { const b = live.current.brush; const name = b.kind === 'paint' ? `Paint ${RACING_SURFACES.find((x) => x.id === b.surface)?.name ?? ''}` : `Sculpt (${b.kind})`; commitTerrain(name); feedback('success'); toasts.push(name, 'ok', 1400); }
       }
       if (drag) {
         const d = drag; drag = null;
@@ -388,7 +388,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
       if (tools[k]) { setTool(tools[k]!); feedback('tool'); return; }
       if (k === '[') setBrush((b) => ({ ...b, radius: Math.max(1, b.radius - (b.radius > 12 ? 2 : 1)) }));
       if (k === ']') setBrush((b) => ({ ...b, radius: Math.min(60, b.radius + (b.radius >= 12 ? 2 : 1)) }));
-      if (/^[1-9]$/.test(k)) { const s = STARTER_SURFACES[Number(k) - 1]; if (s) { setBrush((b) => ({ ...b, surface: s.id, kind: 'paint' })); setTool('brush'); fx('select'); } }
+      if (/^[1-9]$/.test(k)) { const s = RACING_SURFACES[Number(k) - 1]; if (s) { setBrush((b) => ({ ...b, surface: s.id, kind: 'paint' })); setTool('brush'); fx('select'); } }
       if ((k === 'delete' || k === 'backspace') && L.tool === 'track' && trackHover >= 0) {
         const draft = readDraft(rt, scene.trackId);
         writeDraft(rt, scene.trackId, deletePoint(draft, trackHover), 'Delete track point'); feedback('deleted'); trackHover = -1;

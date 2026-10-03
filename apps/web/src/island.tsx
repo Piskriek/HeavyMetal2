@@ -5,7 +5,7 @@ import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
 import { PAINTS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
-import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
+import { createThreeRenderer, SurfaceArray, RACING_SURFACES, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { cropTerrain, heightAt, type Terrain } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget, type Quality } from '@hm/game';
 import { noteGpu, powerPreferenceOf, showTier, type GpuChoice, type Profile } from './shell/profile';
@@ -65,6 +65,8 @@ export function IslandWalk(props: {
   readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | Quality;
   /** The style: voxel blocks or the painted ground (the Flat / PBR detail is `skin`). */
   readonly style?: 'voxel' | 'painted'; readonly onStyle?: (style: 'voxel' | 'painted') => void;
+  /** Whose ground tiles: SetMix's graph-made set (the default) or Goblin Racing's image set. */
+  readonly ground?: 'setmix' | 'racing';
   /** Which graphics chip to ask for (Settings); read when the view opens. */
   readonly gpu?: GpuChoice;
   /** The frame rate auto quality aims for (Settings): 15 prettier, 60 smoother. */
@@ -96,7 +98,9 @@ export function IslandWalk(props: {
   const skin = props.skin ?? 'flat';
   const style = props.style ?? 'voxel';
   // the renderer's look: its skin is the style (voxel blocks or painted), its detail the Flat / PBR buttons
-  const groundLook = { skin: style === 'voxel' ? 'flat' as const : 'pbr' as const, detail: skin === 'pbr' };
+  // PBR always draws the smooth ground (owner, 2026-10-03: "the pbr mode should use the smooth meshes ... texturing in blocks might work for
+  // voxel but won't for pbr"); the voxel blocks are the Flat look of the voxel style
+  const groundLook = { skin: style === 'voxel' && skin !== 'pbr' ? 'flat' as const : 'pbr' as const, detail: skin === 'pbr' };
   const lookRef = useRef(groundLook);
   lookRef.current = groundLook;
   useEffect(() => { terrainView.current?.setLook(lookRef.current); }, [skin, style]);
@@ -307,7 +311,11 @@ export function IslandWalk(props: {
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})
     // console and tests: count what the ground is made of (read only)
     (window as unknown as { hmGround: unknown }).hmGround = { surfaces: (): Record<number, number> => { const t = rt.binder.terrain()?.terrain; const out: Record<number, number> = {}; if (t) for (const s of t.surfaceA) out[s] = (out[s] ?? 0) + 1; return out; } };
-    const surfaces = new SurfaceArray(STARTER_SURFACES);
+    // the ground's tiles: SetMix's graph-made set, or Goblin Racing's image set (the high end); the voxel blocks always wear the graph set's faces
+    // sharp 512-pixel tiles unless the graphics start low (they are resampled to 256 there: a quarter of the memory)
+    const startTier = graphicsRef.current.adaptive.current;
+    const tileSize = startTier === 'potato' || startTier === 'low' ? 256 : 512;
+    const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
       if (!st) return;
@@ -729,6 +737,9 @@ export function IslandWalk(props: {
         wantEye = [px + rgx * shoulder + Math.sin(camYaw) * Math.cos(camPitch) * camDist, py + head + 0.25 + Math.sin(camPitch) * camDist, pz + rgz * shoulder + Math.cos(camYaw) * Math.cos(camPitch) * camDist];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 0.6);
       }
+      // tests and look reviews: hold the camera at a given eye and target (window.hmPinView = { eye, target }, null lets go)
+      const pin = (window as unknown as { hmPinView?: { eye: [number, number, number]; target: [number, number, number] } | null }).hmPinView;
+      if (pin) { wantEye = pin.eye; target = pin.target; }
       if (!ft && !live.current.focusId) renderer.setFocus(null);
       if (live.current.showcase) {
         // the main menu's view: the camera sways round your goblin on the side away from the middle of the island, so the goblin stands in

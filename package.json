@@ -17,7 +17,8 @@
     "serve": "node scripts/serve.mjs",
     "e2e": "node scripts/e2e-smoke.mjs",
     "ui-map": "node --import tsx scripts/ui-map.mjs",
-    "perf": "node scripts/perf.mjs"
+    "perf": "node scripts/perf.mjs",
+    "bake:setmix": "node --import tsx scripts/bake-setmix.mjs"
   },
   "devDependencies": {
     "@types/node": "22.19.17",

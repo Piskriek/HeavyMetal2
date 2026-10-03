@@ -290,7 +290,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         <div ref={stageEl} className={`gr-stage${stageFull ? ' full' : ''}${arriving ? ' arrive' : ''}`} style={{ zIndex: 3 }}>
           {/* the scene is always screen-sized and stays put: the window is an opening onto it, so growing never resizes the 3D view (no flicker) */}
           <div className="gr-scene">
-            <IslandWalk key={`race-${profile.gpu}`} rt={raceWorld.rt} scene={raceWorld.scene} showcase frame={screen === 'home' ? windowFrame() : undefined} clipTo={stageEl} grownUp={profile.grownUp} skin={profile.skin}
+            <IslandWalk key={`race-${profile.gpu}`} rt={raceWorld.rt} scene={raceWorld.scene} showcase ground="racing" style="painted" frame={screen === 'home' ? windowFrame() : undefined} clipTo={stageEl} grownUp={profile.grownUp} skin={profile.skin}
               quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} controls={profile.controls} activities={activityInfos}
               onActivities={toActivities} onHub={() => toHub()} onMainMenu={toHome} onReady={() => setStageReady(true)} />
           </div>

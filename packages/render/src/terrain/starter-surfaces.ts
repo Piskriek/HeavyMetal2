@@ -1,6 +1,6 @@
-import { recipe, type SurfaceDef } from './surface-set';
+import { recipe, type SurfaceDef, type VoxelSet } from './surface-set';
 
-/** The starter island palette: 16 tiles from the art pipeline's base-island library (public/textures/island + island-pbr). */
+/** Goblin Racing's ground: image tiles from the art pipeline's material library (public/textures/island + island-pbr), the high end. */
 const S = (id: number, name: string, file: string, repeat: number, roughness: number, fallback: string, h = recipe(1)): SurfaceDef =>
   ({ id, name, url: `textures/island/${file}.webp`, pbrUrl: `textures/island-pbr/${file}.webp`, repeat, roughness, fallback, height: h });
 
@@ -8,7 +8,7 @@ export const SURF = { seabed: 1, sand: 2, wetSand: 3, grass: 4, rock: 5, cliff: 
   /* racing surfaces (texture agent M668-M677) */
   tarmac: 17, tarmacWet: 18, startLine: 19, boostPad: 20, rumble: 21, dirtRoad: 22, boardwalk: 23, cobble: 24, dustyRoad: 25, cliffColumns: 26 } as const;
 
-const BASE_SURFACES: readonly SurfaceDef[] = [
+const IMAGE_SURFACES: readonly SurfaceDef[] = [
   S(SURF.seabed, 'Shallows', 'shallows-shallow-tropical-water-m051', 7, 0.25, '#2a7f8a', recipe(0.3, 0, 0, 0.5)),
   S(SURF.sand, 'Beach sand', 'sand-tropical-beach-sand-m006', 5, 0.9, '#d8c79a'),
   S(SURF.wetSand, 'Wet sand', 'wetsand-wet-compact-sand-m281', 5, 0.5, '#9a8a66', recipe(1, 0.4)),
@@ -70,4 +70,45 @@ export const FLAT_PALETTES: Readonly<Record<number, readonly string[]>> = {
   [SURF.cliffColumns]: ['#555960', '#4c5057', '#5e626a', '#44484f'],
 };
 
-export const STARTER_SURFACES: readonly SurfaceDef[] = BASE_SURFACES.map((d) => ({ ...d, flat: FLAT_PALETTES[d.id] ?? [d.fallback], ...(d.id === SURF.lava ? { glow: 1.6 } : {}) }));
+const finish = (d: SurfaceDef): SurfaceDef => ({ ...d, flat: FLAT_PALETTES[d.id] ?? [d.fallback], ...(d.id === SURF.lava ? { glow: 1.6 } : {}) });
+
+/** Goblin Racing's ground: the image tiles, the high end (the owner, 2026-10-03: "stunning PBR" there, to show what images can do). */
+export const RACING_SURFACES: readonly SurfaceDef[] = IMAGE_SURFACES.map(finish);
+
+/**
+ * The graph set's file name for each surface (packages/texgraph/sets/setmix-ground.json and setmix-voxel.json, baked by
+ * scripts/bake-setmix.mjs into public/textures/setmix).
+ */
+export const SETMIX_FILE: Readonly<Record<number, string>> = {
+  [SURF.seabed]: 'shallows', [SURF.sand]: 'sand', [SURF.wetSand]: 'wet-sand', [SURF.grass]: 'grass', [SURF.rock]: 'rock', [SURF.cliff]: 'cliff',
+  [SURF.basalt]: 'basalt', [SURF.dunes]: 'dunes', [SURF.mud]: 'mud', [SURF.strata]: 'ochre-strata', [SURF.moss]: 'moss', [SURF.coral]: 'coral',
+  [SURF.lava]: 'lava', [SURF.scree]: 'scree', [SURF.pumice]: 'pumice', [SURF.soil]: 'soil', [SURF.tarmac]: 'tarmac', [SURF.tarmacWet]: 'wet-tarmac',
+  [SURF.startLine]: 'start-line', [SURF.boostPad]: 'boost-pad', [SURF.rumble]: 'kerb', [SURF.dirtRoad]: 'dirt-road', [SURF.boardwalk]: 'boardwalk',
+  [SURF.cobble]: 'cobbles', [SURF.dustyRoad]: 'dusty-road', [SURF.cliffColumns]: 'basalt-columns',
+};
+
+/** Metres one SetMix ground tile covers before the look's scale (1.8): about 2 m on the ground, so a grass tuft is a hand across. */
+export const SETMIX_TILE_METRES = 1.1;
+
+/**
+ * SetMix's own ground, the default everywhere but Goblin Racing: every tile is made from a texture graph (math, no photos), so it is small,
+ * seamless and can be changed in the game. Same surfaces, names and palettes as the image set.
+ */
+export const SETMIX_SURFACES: readonly SurfaceDef[] = IMAGE_SURFACES.map((d) => {
+  const file = SETMIX_FILE[d.id]!;
+  const { pbrUrl: _image, ...rest } = d;
+  return finish({ ...rest, url: `textures/setmix/${file}.webp`, mapsUrl: `textures/setmix/maps/${file}.webp`, repeat: SETMIX_TILE_METRES });
+});
+
+/** The voxel blocks' faces from the graph set: every style's voxel look (rows in the order of setmix-voxel.json). */
+export const SETMIX_VOXEL: VoxelSet = {
+  url: 'textures/setmix/voxel.webp',
+  mapsUrl: 'textures/setmix/voxel-maps.webp',
+  variants: 3,
+  rows: [SURF.grass, SURF.sand, SURF.wetSand, SURF.rock, SURF.moss, SURF.soil, SURF.lava, SURF.basalt, SURF.dunes, SURF.mud, SURF.scree, SURF.pumice,
+    SURF.coral, SURF.strata, SURF.cliff, SURF.seabed, SURF.tarmac, SURF.tarmacWet, SURF.startLine, SURF.boostPad, SURF.rumble, SURF.dirtRoad,
+    SURF.boardwalk, SURF.cobble, SURF.dustyRoad, SURF.cliffColumns],
+};
+
+/** The default: SetMix's graph-made ground. */
+export const STARTER_SURFACES: readonly SurfaceDef[] = SETMIX_SURFACES;

@@ -139,7 +139,7 @@ Rule 6 applies: load the frontend-design skill at the start; every screen is che
 
 ## 7. The order of work
 
-1. **The screen map (B14)**: the crawler that presses every button, screenshots every screen and draws the map. It turns section 2 into the real thing and checks every link after each change.
+1. **The tests that keep it connected (section 8)**: the UI contract and the names (T2), then the screen map crawler (B14: T3, T5, T6). It turns section 2 into the real map and checks every button after each change.
 2. **The owner's decisions** Q1 to Q5.
 3. **The design system** (6.1).
 4. **The design batch** (6.2), in journey order, each step reviewed on the map.
@@ -148,9 +148,35 @@ Rule 6 applies: load the frontend-design skill at the start; every screen is che
 
 ---
 
-## 8. How it stays connected
+## 8. Automated testing: everything hooked up, every button there and doing its job
 
-- Every screen in `ROUTES` (`shell/shell.tsx`) has a way back (unit test and e2e).
-- The map (B14): no dead ends, every button does something, every screen screenshotted and reviewed.
-- The tour (B15): every step's button exists and leads where it says.
-- The e2e walk covers journeys J1 to J8.
+The owner (2026-10-03): "plan the automated testing as well please, we need scripts that test that everything is hooked up, that buttons exist and do what they are supposed to do".
+
+**The idea: every button has a declared job, and scripts check the job gets done.** Today the 60-check e2e walk tests one path by hand-written steps; a button nobody wrote a step for can break unnoticed. From now on every control is named and declared, and a crawler checks all of them.
+
+**8.1 The UI contract** (`apps/web/src/ui-contract.ts`). Every button, tab, menu item and window gets a stable name on the page (`data-ui="home.my-island"`, `island.esc.settings`, `goblin.play`) and one line in the contract: which screen it is on, when it shows (kids mode, studio, first visit ...), and what it must do, as one of a few kinds of outcome:
+
+| Outcome | Example | Checked by |
+|---|---|---|
+| Goes to a screen | `home.community` goes to `hub` | the screen after the press |
+| Opens a window | `island.esc.settings` opens window `settings` | the window is there, on screen, closable, Esc closes it |
+| Changes a setting or a preset | `settings.graphics.potato` sets graphics to Potato | the saved profile and the renderer's tier |
+| Starts something | `goblin.play` starts a race (or the maker the first time) | the race view or the maker |
+| Acts in the world | `island.tab.sculpt`, slot 1, left click raises the ground | the island's data changed, undo puts it back |
+
+**8.2 The layers of tests**
+
+| Layer | What it proves | Script | When it runs |
+|---|---|---|---|
+| T1 Unit | The packages' logic (presets, sims, quality, looks ...) | existing `*.test.ts` (1150+) | `npm run verify`, every change |
+| T2 Contract | The contract itself holds together: every screen in `ROUTES` has a way back, every target screen and window exists, every name is unique, no screen without a way in | `ui-contract.test.ts` | `npm run verify` |
+| T3 Screen map (B14) | **Every declared button exists and does its job; every button on screen is declared.** The crawler visits every screen (in each mode: first visit, returning, kids, studio), presses every control in a fresh copy of that state, and compares what happened with the contract. It fails on: a declared button missing, an undeclared button, a button that does nothing, the wrong destination, a dead end (no way back, Esc does nothing), a page error, a control off screen, covered by another, or with text spilling out. It writes `ui-map/index.html`: the real map with a screenshot per screen, failures in red | `scripts/ui-map.mjs` | `npm run check:ui`, after every UI change and before every commit that touches the UI |
+| T4 Journeys | Each journey in section 3 works start to finish with its real outcome (J2: a race starts with your goblin riding; J4: what you built is still there after a reload; J6: a submitted evolution shows in the vote) | `scripts/journeys/j1-first-launch.mjs` ... (today's `e2e-smoke.mjs` split by journey) | `npm run check:journeys`, before every commit |
+| T5 Tour | Every tour step's button exists on its screen and leads where the step says (B15) | part of T3 (the tour preset names its buttons) | with T3 |
+| T6 Looks | Every screen at three sizes (1920x1080, 1366x768, a phone 390x844), reviewed by Claude against `docs/DESIGN.md`; stable screens (menus, windows, the 3D masked) compared with the last approved picture, so an accidental change shows | `ui-map.mjs --shots` | with T3; review after every UI change |
+| T7 Speed | Each screen on Potato and Low on the owner's laptop: frame rate, the slowest frames, mouse look without stalls; fails under the target | `scripts/perf.mjs`, `scripts/look-probe.mjs` (moved in from the scratchpad) | `npm run check:perf`, after anything that draws |
+| T8 Saves | Old saves load (renamed values such as `calculator` to `potato`, older profile and island versions); a save survives a reload | unit tests per store, plus J4 and J9 | `npm run verify` |
+
+**8.3 Rules for every browser test**: installed Chrome, headless, the real graphics card (`E2E_GPU=1`), slow-machine timing (`E2E_SLOW`); never take the owner's mouse (mouse capture stubbed, the cursor clip released); no network; each test starts from its own clean storage.
+
+**8.4 The order**: the contract and names first (T2), then the crawler (T3, T5, T6) on today's screens, then the journeys split (T4), then the speed thresholds (T7). From then on a new button is not done until it is in the contract and the crawler passes.

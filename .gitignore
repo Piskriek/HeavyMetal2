@@ -1,3 +1,19 @@
 node_modules
 dist
 *.log
+
+# Archive & temporary local files
+archive/
+backups/
+temp/
+scratch/
+baseline/
+3DTrack/
+NewPatches/
+art-src/
+*.zip
+
+# Local environment & IDE configs
+.env*.local
+.claude/
+.gemini/

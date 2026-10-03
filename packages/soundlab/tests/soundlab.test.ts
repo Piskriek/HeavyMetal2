@@ -11,9 +11,9 @@ const near = (a: number, b: number, e = 1e-9): void => assert.ok(Math.abs(a - b)
 
 test('validation: good recipes pass, bad ones say what is wrong in sentences', () => {
   assert.deepEqual(validateRecipe(beep), { ok: true, errors: [] });
-  const bad = validateRecipe({ ...beep, layers: [beep.layers[0], { ...beep.layers[0]!, gain: 2 }] });
+  const bad = validateRecipe({ ...beep, layers: [beep.layers[0], { ...beep.layers[0]!, gain: 3 }] });
   assert.equal(bad.ok, false);
-  assert.match(bad.errors.join(' '), /layer 2: gain must be between 0 and 1/);
+  assert.match(bad.errors.join(' '), /layer 2: gain must be between 0 and 2/);
   assert.equal(validateRecipe(null).ok, false);
   assert.equal(validateRecipe('x').ok, false);
   assert.equal(validateRecipe({ ...beep, layers: [] }).ok, false);
@@ -27,10 +27,10 @@ test('normalise clamps into the limits, keeps one to eight layers and covers eve
   const wild = normalizeRecipe({ id: '', category: 'race', durationMs: 5, layers: [{ wave: 'sine', freq: [1, 99999], gain: 9, attackMs: -4, decayMs: 99999, delayMs: 100, detune: 5000, filter: { type: 'lowpass', freq: [0, 1e9], q: 100 } }] });
   const l = wild.layers[0]!;
   assert.ok(l.freq[0] >= LIMITS.freq.min && l.freq[1] <= LIMITS.freq.max);
-  assert.equal(l.gain, 1); assert.equal(l.attackMs, 0);
-  assert.ok(l.detune! <= 1200);
-  assert.ok(l.filter!.q <= 20 && l.filter!.freq[1] <= 20000 && l.filter!.freq[0] >= 20);
-  assert.ok(wild.durationMs <= 1600 && wild.durationMs >= (l.delayMs ?? 0) + l.attackMs + l.decayMs);
+  assert.equal(l.gain, LIMITS.gain.max); assert.equal(l.attackMs, 0);
+  assert.ok(l.detune! <= LIMITS.detune.max);
+  assert.ok(l.filter!.q <= LIMITS.q.max && l.filter!.freq[1] <= 20000 && l.filter!.freq[0] >= 20);
+  assert.ok(wild.durationMs <= LIMITS.durationMs.max && wild.durationMs >= (l.delayMs ?? 0) + l.attackMs + l.decayMs);
   assert.equal(wild.id, 'sound');
   assert.equal(validateRecipe(wild).ok, true);
   assert.equal(normalizeRecipe({ ...beep, layers: [] }).layers.length, 1);

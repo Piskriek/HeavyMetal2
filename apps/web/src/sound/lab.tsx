@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import type { Tier } from '@hm/contracts';
+import { defineSchema, type Params, type Tier, type VariableDef } from '@hm/contracts';
+import { Inspector } from '@hm/ui';
 import {
-  CATEGORIES, FILTER_TYPES, SFX_KINDS, WAVES, describeLayer, describeMusicSpec, describeRecipe, engineSpecToPoints, mutateRecipe, normalizeRecipe, randomEngineSpec,
+  CATEGORIES, FILTER_TYPES, LIMITS, RANGES, SFX_KINDS, WAVES, describeLayer, describeMusicSpec, describeRecipe, engineSpecToPoints, mutateRecipe, normalizeRecipe, randomEngineSpec,
   randomMusicSpec, randomRecipe, recipeFromJson, recipeToJson, renderRecipe, waveformBins, MOODS, moodDefaults,
   type EngineSpec, type MusicSpec, type SfxKind, type SfxLayer, type SfxRecipe,
 } from '@hm/soundlab';
@@ -12,10 +13,6 @@ export const sliderToHz = (v: number): number => Math.round(20 * Math.pow(1000, 
 
 const Slider = (p: { label: string; value: number; min: number; max: number; step: number; unit?: string; onChange: (v: number) => void; show?: (v: number) => string }): ReactElement => (
   <label className="row">{p.label} <input type="range" min={p.min} max={p.max} step={p.step} value={p.value} onChange={(e) => p.onChange(Number(e.target.value))} /> <span>{p.show ? p.show(p.value) : `${Math.round(p.value * 100) / 100}${p.unit ?? ''}`}</span></label>
-);
-
-const FreqSlider = (p: { label: string; hz: number; onChange: (hz: number) => void }): ReactElement => (
-  <Slider label={p.label} value={hzToSlider(p.hz)} min={0} max={1} step={0.005} onChange={(v) => p.onChange(sliderToHz(v))} show={() => `${Math.round(p.hz)} Hz`} />
 );
 
 /** The drawn waveform of a recipe (min and max per column). */
@@ -29,9 +26,53 @@ function Wave({ recipe }: { readonly recipe: SfxRecipe }): ReactElement {
   );
 }
 
+/** One layer's numbers as presets variables: comfortable ranges for the sliders (they grow when pushed), hard limits only where sound stops making sense. */
+const v = (key: string, label: string, doc: string, r: { min: number; max: number }, hard: { min: number; max: number }, step: number, tier: Tier, unit?: string): VariableDef =>
+  ({ key, type: 'number', label, doc, tier, default: r.min, min: r.min, max: r.max, step, hardMin: hard.min, hardMax: hard.max, group: 'Layer', ...(unit ? { unit } : {}) });
+function layerSchema(layer: SfxLayer): ReturnType<typeof defineSchema> {
+  const vars: VariableDef[] = [v('gain', 'Volume', 'How loud this layer is.', RANGES.gain, LIMITS.gain, 0.01, 'play')];
+  if (layer.wave !== 'noise') {
+    vars.push(v('freqStart', 'Pitch start', 'Where the pitch starts.', RANGES.freq, LIMITS.freq, 1, 'play', 'Hz'));
+    vars.push(v('freqEnd', 'Pitch end', 'Where the pitch ends (a slide from start to end).', RANGES.freq, LIMITS.freq, 1, 'play', 'Hz'));
+  }
+  vars.push(v('attackMs', 'Fade in', 'How long it takes to reach full volume.', RANGES.attackMs, LIMITS.attackMs, 1, 'play', 'ms'));
+  vars.push(v('decayMs', 'Fade out', 'How long it takes to die away.', RANGES.decayMs, LIMITS.decayMs, 1, 'play', 'ms'));
+  vars.push(v('delayMs', 'Starts after', 'Wait this long before this layer plays.', RANGES.delayMs, LIMITS.delayMs, 1, 'build', 'ms'));
+  if (layer.wave !== 'noise') vars.push(v('detune', 'Detune', 'Shift the pitch by cents (100 = a semitone).', RANGES.detune, LIMITS.detune, 1, 'build', 'ct'));
+  vars.push({ key: 'filterOn', type: 'boolean', label: 'Filter', doc: 'Shape the tone with a filter.', tier: 'build', default: false, group: 'Filter' });
+  if (layer.filter) {
+    vars.push({ key: 'filterType', type: 'enum', label: 'Type', doc: 'lowpass keeps the lows, highpass the highs, bandpass a band.', tier: 'build', default: layer.filter.type, options: [...FILTER_TYPES], group: 'Filter' });
+    vars.push({ ...v('cutoffStart', 'Cutoff start', 'Where the filter starts.', RANGES.freq, LIMITS.freq, 1, 'build', 'Hz'), group: 'Filter' });
+    vars.push({ ...v('cutoffEnd', 'Cutoff end', 'Where the filter ends.', RANGES.freq, LIMITS.freq, 1, 'build', 'Hz'), group: 'Filter' });
+    vars.push({ ...v('q', 'Sharpness', 'How sharp the filter is.', RANGES.q, LIMITS.q, 0.1, 'build'), group: 'Filter' });
+  }
+  return defineSchema({ kind: 'sound-layer', version: 1, label: 'Layer', doc: 'One layer of a sound.', variables: vars, slots: [] });
+}
+const layerParams = (l: SfxLayer): Params => ({
+  gain: l.gain, freqStart: l.freq[0], freqEnd: l.freq[1], attackMs: l.attackMs, decayMs: l.decayMs, delayMs: l.delayMs ?? 0, detune: l.detune ?? 0,
+  filterOn: !!l.filter, ...(l.filter ? { filterType: l.filter.type, cutoffStart: l.filter.freq[0], cutoffEnd: l.filter.freq[1], q: l.filter.q } : {}),
+});
+function applyLayerEdit(l: SfxLayer, key: string, value: unknown): SfxLayer {
+  const n = Number(value);
+  switch (key) {
+    case 'gain': return { ...l, gain: n };
+    case 'freqStart': return { ...l, freq: [n, l.freq[1]] };
+    case 'freqEnd': return { ...l, freq: [l.freq[0], n] };
+    case 'attackMs': return { ...l, attackMs: n };
+    case 'decayMs': return { ...l, decayMs: n };
+    case 'delayMs': return { ...l, delayMs: n };
+    case 'detune': return { ...l, detune: n };
+    case 'filterOn': { const { filter: _drop, ...rest } = l; void _drop; return value === true ? { ...rest, filter: { type: 'lowpass', freq: [2000, 2000], q: 1 } } : rest; }
+    case 'filterType': return l.filter ? { ...l, filter: { ...l.filter, type: value as NonNullable<SfxLayer['filter']>['type'] } } : l;
+    case 'cutoffStart': return l.filter ? { ...l, filter: { ...l.filter, freq: [n, l.filter.freq[1]] } } : l;
+    case 'cutoffEnd': return l.filter ? { ...l, filter: { ...l.filter, freq: [l.filter.freq[0], n] } } : l;
+    case 'q': return l.filter ? { ...l, filter: { ...l.filter, q: n } } : l;
+    default: return l;
+  }
+}
+
 function LayerCard({ layer, index, count, tier, onChange, onRemove, onDuplicate }: { layer: SfxLayer; index: number; count: number; tier: Tier; onChange: (l: SfxLayer) => void; onRemove: () => void; onDuplicate: () => void }): ReactElement {
   const set = (patch: Partial<SfxLayer>): void => onChange({ ...layer, ...patch });
-  const advanced = tier !== 'play';
   return (
     <section className="layer" data-layer={index}>
       <div className="layer-head">
@@ -41,30 +82,7 @@ function LayerCard({ layer, index, count, tier, onChange, onRemove, onDuplicate 
         <button data-action="remove-layer" title="Remove this layer" onClick={onRemove} disabled={count <= 1}>✕</button>
       </div>
       <p className="hint">{describeLayer(layer)}</p>
-      <Slider label="Volume" value={layer.gain} min={0} max={1} step={0.01} onChange={(v) => set({ gain: v })} />
-      {layer.wave !== 'noise' ? (
-        <>
-          <FreqSlider label="Pitch start" hz={layer.freq[0]} onChange={(hz) => set({ freq: [hz, layer.freq[1]] })} />
-          <FreqSlider label="Pitch end" hz={layer.freq[1]} onChange={(hz) => set({ freq: [layer.freq[0], hz] })} />
-        </>
-      ) : null}
-      <Slider label="Fade in" value={layer.attackMs} min={0} max={500} step={1} unit=" ms" onChange={(v) => set({ attackMs: v })} />
-      <Slider label="Fade out" value={layer.decayMs} min={1} max={1600} step={1} unit=" ms" onChange={(v) => set({ decayMs: v })} />
-      {advanced ? (
-        <>
-          <Slider label="Starts after" value={layer.delayMs ?? 0} min={0} max={1500} step={1} unit=" ms" onChange={(v) => set({ delayMs: v })} />
-          {layer.wave !== 'noise' ? <Slider label="Detune" value={layer.detune ?? 0} min={-1200} max={1200} step={1} unit=" ct" onChange={(v) => set({ detune: v })} /> : null}
-          <label className="row"><input type="checkbox" checked={!!layer.filter} onChange={(e) => { const { filter: _drop, ...rest } = layer; void _drop; onChange(e.target.checked ? { ...rest, filter: { type: 'lowpass', freq: [2000, 2000], q: 1 } } : rest); }} /> Filter</label>
-          {layer.filter ? (
-            <>
-              <label className="row">Type <select value={layer.filter.type} onChange={(e) => set({ filter: { ...layer.filter!, type: e.target.value as NonNullable<SfxLayer['filter']>['type'] } })}>{FILTER_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
-              <FreqSlider label="Cutoff start" hz={layer.filter.freq[0]} onChange={(hz) => set({ filter: { ...layer.filter!, freq: [hz, layer.filter!.freq[1]] } })} />
-              <FreqSlider label="Cutoff end" hz={layer.filter.freq[1]} onChange={(hz) => set({ filter: { ...layer.filter!, freq: [layer.filter!.freq[0], hz] } })} />
-              <Slider label="Sharpness" value={layer.filter.q} min={0.1} max={20} step={0.1} onChange={(v) => set({ filter: { ...layer.filter!, q: v } })} />
-            </>
-          ) : null}
-        </>
-      ) : null}
+      <Inspector schema={layerSchema(layer)} params={layerParams(layer)} resolved={layerParams(layer)} tier={tier} onChange={(k, v) => onChange(applyLayerEdit(layer, k, v))} />
     </section>
   );
 }

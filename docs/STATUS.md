@@ -36,10 +36,10 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 | P2 | **The goblin racer is only an example**; the harness is the product. | Guiding rule. |
 | P3 | **Textures are hard stops**: replace file textures with math presets (texgraph). | PARTIAL. Flat skin is palettes (no files). The PBR skin still loads 256 px `.webp` tiles (now made seamless at load and blended with a macro tile; they look fine but are files). `@hm/texgraph` and `@hm/pbrgrass` are not wired. |
 | P4 | **Models are presets** (voxel); pro sculpt tools. | PARTIAL. Voxel model presets everywhere (palms, rocks, bushes, flowers, grass, goblin). Island Select tools move, turn, size, copy, delete, focus, hide. No 3D gizmos. |
-| P5 | Sound, animation and every root have good tools and are presets. | PARTIAL. Animation presets with live stick-figure previews and an editor; every sound is a preset: the Sound tab editor sets volume, pitch, on/off and reshapes it layer by layer (the Sound Lab: roll, wiggle, layers, JSON), saved with the island; sprite and shake presets. No timeline editor; the Sound Lab's own sliders still stop at their ends. |
+| P5 | Sound, animation and every root have good tools and are presets. | PARTIAL. Animation presets with live stick-figure previews and an editor; every sound is a preset: the Sound tab editor sets volume, pitch, on/off and reshapes it layer by layer (the Sound Lab: roll, wiggle, layers, JSON; every layer number on the shared never-locking slider, hard limits widened to 12 s fades, 20 s sounds, two octaves of detune), saved with the island; sprite and shake presets. No timeline editor. |
 | P6 | Modular; platform ports (`LocalSim` + `Run`), never the RUN SDK directly. | PARTIAL. `@hm/platform` exists, the app does not use it yet (shares and the community are local). |
 | P7 | Launch on **run.studio** (one static file). | Build is one html file under the size budget. **OWNER**: deploy needs the owner's login. |
-| P8 | **Sliders never lock.** | DONE in the shared inspector (every editor on the island and Settings uses it). Bespoke sliders remain in the Sound Lab layers, the racing menu and the Maker's sculpt bar. |
+| P8 | **Sliders never lock.** | DONE in the shared inspector (every editor on the island and Settings uses it). Bespoke sliders remain in the Sound Lab's wiggle amount, the engine and music labs, the racing menu and the Maker's sculpt bar. |
 | P9, P10 | Reasoned steps; keep Arena busy; ask only for outward actions. | Process rules. |
 
 ---

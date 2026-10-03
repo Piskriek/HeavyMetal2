@@ -23,16 +23,28 @@ export interface SfxLayer {
 }
 export interface SfxRecipe { id: string; durationMs: number; layers: readonly SfxLayer[]; category: (typeof CATEGORIES)[number] }
 
-export const LIMITS = {
-  layers: { min: 1, max: 8 },
-  freq: { min: 20, max: 20000 },
+/** Where the sliders sit comfortably (a slider grows past its end when pushed; these are not limits). */
+export const RANGES = {
+  freq: { min: 20, max: 4000 },
   q: { min: 0.1, max: 20 },
   gain: { min: 0, max: 1 },
   attackMs: { min: 0, max: 500 },
   decayMs: { min: 1, max: 1600 },
   delayMs: { min: 0, max: 1500 },
   detune: { min: -1200, max: 1200 },
-  durationMs: { min: 1, max: 1600 },
+} as const;
+
+/** What a value may never pass: only where it stops making sense (inaudible, or longer than a game sound should hold the channel). */
+export const LIMITS = {
+  layers: { min: 1, max: 8 },
+  freq: { min: 20, max: 20000 },
+  q: { min: 0.1, max: 60 },
+  gain: { min: 0, max: 2 },
+  attackMs: { min: 0, max: 5000 },
+  decayMs: { min: 1, max: 12000 },
+  delayMs: { min: 0, max: 8000 },
+  detune: { min: -4800, max: 4800 },
+  durationMs: { min: 1, max: 20000 },
 } as const;
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -99,7 +111,7 @@ function normalizeLayer(l: SfxLayer): SfxLayer {
   const hz = (v: unknown, d: number): number => clamp(num(v, d), LIMITS.freq.min, LIMITS.freq.max);
   const delayMs = clamp(num(l.delayMs, 0), LIMITS.delayMs.min, LIMITS.delayMs.max);
   const attackMs = clamp(num(l.attackMs, 0), LIMITS.attackMs.min, LIMITS.attackMs.max);
-  const decayMs = clamp(num(l.decayMs, 100), LIMITS.decayMs.min, Math.max(1, LIMITS.durationMs.max - delayMs - attackMs));
+  const decayMs = clamp(num(l.decayMs, 100), LIMITS.decayMs.min, Math.min(LIMITS.decayMs.max, Math.max(1, LIMITS.durationMs.max - delayMs - attackMs)));
   const out: SfxLayer = {
     wave, freq: [hz(l.freq?.[0], 440), hz(l.freq?.[1], 440)], gain: clamp(num(l.gain, 0.2), LIMITS.gain.min, LIMITS.gain.max), attackMs, decayMs,
     ...(delayMs > 0 ? { delayMs } : {}),

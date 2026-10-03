@@ -503,6 +503,10 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .fps-target .seg button, .fps-target .seg button:first-child, .fps-target .seg button:last-child { flex: 1; border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 0; font-size: 12px; }
 .fps-target .seg button:last-child { border-right: 0; }
 .fps-target .seg button.on, .fps-target .seg button.on:hover:not(:disabled) { background: var(--text); color: var(--paper); }
+.shell-window > .graphics-tuning { margin: 12px 16px 0; padding-top: 10px; border-top: 1px solid var(--line); }
+.graphics-tuning summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; font-size: 13px; }
+.graphics-tuning summary span { color: var(--dim); font-size: 12px; }
+.graphics-tuning .graphics-reset { margin-top: 8px; }
 .controls-settings h4 { margin: 0 0 4px; font-size: 10px; font-weight: 600; color: var(--dim); }
 
 /* the Sound Lab inside an island window */

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Pick, PresetStore, RenderService, Value, Vec3, World } from '@hm/contracts';
 import { MAX_DIST, MIN_DIST, orbitPosition, project, rayFromPixel, stateFromPositionTarget, type OrbitState } from './camera-math';
-import { QUALITY, type LightSetup, type Quality } from '@hm/lighting';
+import type { LightSetup, Quality } from '@hm/lighting';
 import { createEnvironment, type EnvironmentRig } from './environment';
 import { LightingRig } from './lighting-rig';
 import { AvatarView, type Rig } from './avatar-view';
@@ -9,7 +9,7 @@ import type { VoxelModel } from '@hm/voxel';
 import type { Pose } from '@hm/anim';
 import { PostChain } from './post-chain';
 import { pixelRatioFor } from './pixel-ratio';
-import { DECOR_DETAIL_RADIUS } from './decor-lod';
+import { GRAPHICS_TIERS, plantsCulled, qualitySpecOf, shadowMapSize, type GraphicsSettings } from './graphics';
 import { OverlayManager } from './overlay';
 import { pickScene } from './pick-math';
 import type { LookLike } from './environment';
@@ -66,11 +66,11 @@ export type ThreeRenderer = RenderService & {
   setAvatarPose(x: number, y: number, z: number, yaw: number, pose: Pose | null, visible?: boolean): void;
   /** The lighting setup as it is right now (mid-blend values included), or null while a plain look is in charge. */
   readonly lighting: LightSetup | null;
-  /**
-   * Quality tier. low = pixel ratio 1, no shadows and no picture effects; medium = up to 1.5, 1024 shadows, glow; high = up to 2, 2048
-   * shadows, contact shadows, smooth edges; ultra = supersampled, 4096 shadows, all effects.
-   */
+  /** A ready-made graphics tier (`GRAPHICS_TIERS` in graphics.ts says what each one decides). Same as `setGraphics(GRAPHICS_TIERS[q])`. */
   setQuality(q: Quality): void;
+  /** Draw with these graphics settings: a tier, maybe with the player's own changes on top (`resolveGraphics`). */
+  setGraphics(g: GraphicsSettings): void;
+  readonly graphics: GraphicsSettings;
   /** The graphics chip the browser gave this page, as it names it (null before the first mount or when the browser hides it). */
   readonly gpu: string | null;
   /** For profiling from the console (draw calls, triangles, hiding parts of the scene); null while unmounted. */
@@ -129,7 +129,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     const width = Math.max(1, Math.round(rect.width || hostElement.clientWidth || 1));
     const height = Math.max(1, Math.round(rect.height || hostElement.clientHeight || 1));
     // the tier's pixel ratio depends on the canvas size (low keeps to a pixel budget)
-    const ratio = pixelRatioFor(quality, width, height, opts.pixelRatio ?? (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
+    const ratio = pixelRatioFor(graphics, width, height, opts.pixelRatio ?? (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1));
     if (Math.abs(webgl.getPixelRatio() - ratio) > 1e-3) webgl.setPixelRatio(ratio);
     webgl.setSize(width, height, false);
     post?.setSize(width, height, webgl.getPixelRatio());
@@ -204,7 +204,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   };
 
   let pendingLook: LookLike | null = null;
-  let quality: Quality = 'high';
+  /** What the current graphics preset decides (a tier, maybe with the player's own changes on top). */
+  let graphics: GraphicsSettings = GRAPHICS_TIERS.high;
   let pendingSetup: LightSetup | null = null;
   let rig: LightingRig | null = null;
   let post: PostChain | null = null;
@@ -218,12 +219,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     avatar = null;
     if (scene && pendingAvatar) { avatar = new AvatarView(pendingAvatar.model, pendingAvatar.rig, pendingAvatar.block); scene.add(avatar.group); }
   };
-  /** Picture effects need the lighting rig and a tier above low. Rebuilt when the tier changes (multisampling is fixed at creation). */
+  /** Picture effects need the lighting rig and `effects` on. Rebuilt when those or smooth edges change (multisampling is fixed at creation). */
   const buildPost = (): void => {
     post?.dispose();
     post = null;
-    if (!webgl || !scene || !viewCamera || !rig || quality === 'low') return;
-    post = new PostChain(webgl, scene, viewCamera, quality === 'high' || quality === 'ultra' ? 4 : 0);
+    if (!webgl || !scene || !viewCamera || !rig || !graphics.effects) return;
+    post = new PostChain(webgl, scene, viewCamera, graphics.smoothEdges ? 4 : 0);
     const sky = rig.skyMesh;
     post.hideForAo = sky ? [sky] : [];
     const rect = hostElement?.getBoundingClientRect();
@@ -235,8 +236,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     rig = null;
     if (environment && webgl && scene && pendingSetup) {
       rig = new LightingRig(scene, webgl, environment, pendingSetup);
-      rig.setShadowCap(quality === 'low' ? 0 : quality === 'ultra' ? 4096 : quality === 'high' ? 2048 : 1024);
-      rig.setReflections(quality !== 'low');
+      rig.setShadowCap(shadowMapSize(graphics));
+      rig.setReflections(graphics.reflections);
     }
     buildPost();
   };
@@ -258,7 +259,12 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   const applyDecor = (): void => {
     decorView?.dispose();
     decorView = null;
-    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); decorView.setDetailRadius(DECOR_DETAIL_RADIUS[quality]); decorView.setCulling(quality === 'low'); decorView.setLowCost(quality === 'low'); scene.add(decorView.group); }
+    if (scene && pendingDecor && pendingDecor.length) { decorView = new DecorView(pendingDecor); decorGraphics(decorView); scene.add(decorView.group); }
+  };
+  const decorGraphics = (v: DecorView): void => {
+    v.setDetailRadius(graphics.plantDetail > 0 ? graphics.plantDetail : Infinity);
+    v.setCulling(plantsCulled(graphics));
+    v.setLowCost(graphics.simpleLighting);
   };
   let terrainView: TerrainView | null = null;
   let pendingTerrain: { data: TerrainLike; surfaces: SurfaceArray } | null = null;
@@ -268,7 +274,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     terrainView = null;
     if (scene && pendingTerrain) {
       terrainView = new TerrainView(pendingTerrain.data, pendingTerrain.surfaces);
-      terrainView.setLowCost(quality === 'low');
+      terrainView.setLowCost(graphics.simpleLighting);
       scene.add(terrainView.mesh);
     }
     environment?.setSea(!!terrainView);
@@ -307,7 +313,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       bursts = new Bursts();
       scene.add(bursts.points);
       environment = createEnvironment(scene, renderer, opts.background ?? 'sky', opts.shadows !== false);
-      environment.setLowDetail(quality === 'low');
+      environment.setLowDetail(graphics.simpleSea);
       applyTerrain();
       applyDecor();
       applyRoad();
@@ -360,20 +366,23 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyRoad();
     },
     setQuality(q: Quality): void {
-      const changed = q !== quality;
-      quality = q;
-      const shadowSize = q === 'ultra' ? 4096 : q === 'high' ? 2048 : 1024;
-      if (rig) { rig.setShadowCap(q === 'low' ? 0 : shadowSize); rig.setReflections(q !== 'low'); }
-      else environment?.setShadows(q !== 'low', shadowSize);
-      environment?.setLowDetail(q === 'low');
-      decorView?.setDetailRadius(DECOR_DETAIL_RADIUS[q]);
-      // low has no shadows, so plants out of view can be skipped (with shadows a palm behind you still throws one into view)
-      decorView?.setCulling(q === 'low');
-      decorView?.setLowCost(q === 'low');
-      terrainView?.setLowCost(q === 'low');
-      if (changed) buildPost();
+      service.setGraphics(GRAPHICS_TIERS[q]);
+    },
+    setGraphics(g: GraphicsSettings): void {
+      const rebuildPost = g.effects !== graphics.effects || g.smoothEdges !== graphics.smoothEdges;
+      graphics = g;
+      const shadowSize = shadowMapSize(g);
+      if (rig) { rig.setShadowCap(shadowSize); rig.setReflections(g.reflections); }
+      else environment?.setShadows(shadowSize > 0, Math.max(256, shadowSize));
+      environment?.setLowDetail(g.simpleSea);
+      if (decorView) decorGraphics(decorView);
+      terrainView?.setLowCost(g.simpleLighting);
+      if (rebuildPost) buildPost();
       resize();
       postStale = true;
+    },
+    get graphics(): GraphicsSettings {
+      return graphics;
     },
     setLighting(setup: LightSetup | null, blendSeconds = 0.6): void {
       pendingSetup = setup;
@@ -418,7 +427,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       const frameSeconds = previousFrame === null ? 0.016 : Math.min(0.1, (performance.now() - previousFrame) / 1000);
       if (rig) {
         const changed = rig.update(frameSeconds, { focus: lightFocus, anchors: lightAnchors, time: performance.now() / 1000 });
-        if (post && (changed || postStale)) { post.apply(rig.current.post, QUALITY[quality]); postStale = false; }
+        if (post && (changed || postStale)) { post.apply(rig.current.post, qualitySpecOf(graphics)); postStale = false; }
       }
       if (post) post.render(frameSeconds);
       else webgl.render(scene, viewCamera);

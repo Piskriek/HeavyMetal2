@@ -29,6 +29,3 @@ export function halveModel(m: VoxelModel): VoxelModel {
   }
   return { ...m, id: `${m.id}@half`, size: [hx, hy, hz], pivot: [m.pivot[0] / 2, m.pivot[1] / 2, m.pivot[2] / 2], cells };
 }
-
-/** How near a plant must be to the camera to show every voxel, per quality tier (metres). Beyond it the halved model shows. */
-export const DECOR_DETAIL_RADIUS: Readonly<Record<'low' | 'medium' | 'high' | 'ultra', number>> = { low: 18, medium: 35, high: 70, ultra: Infinity };

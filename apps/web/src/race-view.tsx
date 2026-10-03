@@ -11,7 +11,7 @@ import { IntroOverlay, type ResultRow, type Settings } from '@hm/screens';
 import { followLighting } from './look';
 import { decorInstances } from './maker/dress';
 import { attachRaceAudio, type RaceAudio } from './sound/race-audio';
-import { loadProfile, powerPreferenceOf } from './shell/profile';
+import { loadProfile, powerPreferenceOf, showTier } from './shell/profile';
 
 /** On phones the HUD gets a second pass: the same layout with the parts scaled down so nothing collides. */
 const narrow = (l: HudLayout): HudLayout => ({ ...l, elements: l.elements.map((e) => ({ ...e, scale: Math.min(e.scale, e.kind === 'minimap' ? 0.65 : 0.85) })) });
@@ -66,7 +66,8 @@ export function RaceView(props: {
     const touchy = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const device = { touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu };
     const adaptive = createAdaptiveQuality(chosen ?? guessQuality(device), { locked: chosen !== null, targetFps: loadProfile().fpsTarget });
-    renderer.setQuality(adaptive.current);
+    const ownGraphics = loadProfile().graphics;
+    showTier(renderer, adaptive.current, ownGraphics);
     let appliedQuality = live.current.settings.quality;
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, items: setup.fromMap ? itemsOf(rt) : undefined, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
@@ -103,10 +104,10 @@ export function RaceView(props: {
       if (L.settings.quality !== appliedQuality) {
         appliedQuality = L.settings.quality;
         const q = parseQuality(appliedQuality);
-        renderer.setQuality(q ?? guessQuality(device));
+        showTier(renderer, q ?? guessQuality(device), ownGraphics);
       }
       const lower = adaptive.frame(rawDt);
-      if (lower && parseQuality(L.settings.quality) === null) renderer.setQuality(lower);
+      if (lower && parseQuality(L.settings.quality) === null) showTier(renderer, lower, ownGraphics);
       game.invertSteer = L.settings.invertSteer;
       gamepads();
       let alpha = 1;

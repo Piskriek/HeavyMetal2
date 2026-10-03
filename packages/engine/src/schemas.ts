@@ -1,5 +1,6 @@
 import { defineSchema, type ChildSlot, type SchemaRegistry, type VariableDef } from '@hm/contracts';
 import { LEGACY_SETUP_IDS, LIGHT_VARIABLES, SETUP_IDS } from '@hm/lighting';
+import { graphicsSchema } from '@hm/render';
 import { PLANT_VARIABLES, RULE_VARIABLES } from '@hm/worldrules';
 
 /** The core preset kinds the harness ships with. Games add their own kinds on top (racer, track-piece, item ...). */
@@ -406,7 +407,7 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema] as const;
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

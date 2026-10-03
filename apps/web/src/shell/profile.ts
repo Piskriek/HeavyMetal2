@@ -1,5 +1,7 @@
 import { ActivityRegistry, Tournament, isActivityError, type Activity, type TournamentState } from '@hm/activities';
-import { parseFpsTarget, type FpsTarget } from '@hm/game';
+import { parseFpsTarget, type FpsTarget, type Quality } from '@hm/game';
+import type { Params } from '@hm/contracts';
+import { resolveGraphics, type ThreeRenderer } from '@hm/render';
 
 /**
  * The player profile the shell keeps: credits, the grown-up switch, tutorial progress, the skin, the activities (an ActivityRegistry) and the
@@ -17,6 +19,8 @@ export interface Profile {
   readonly quality: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   /** What auto aims for: 15 fps (as pretty as the machine allows), 30, or 60 (as smooth as it can be). */
   readonly fpsTarget: FpsTarget;
+  /** Your own changes to the graphics preset (`graphics` kind), used on top of whichever tier draws. Empty = the tiers as made. */
+  readonly graphics: Params;
   /**
    * Which graphics chip to ask for on a machine with two (a laptop's built-in one and a faster one). Only a request: the browser and
    * Windows decide (Settings, System, Display, Graphics can set the browser to High performance for good). Read when a view opens.
@@ -54,8 +58,16 @@ let gpuSeen: string | null = null;
 export function noteGpu(name: string | null): void { if (name) gpuSeen = name; }
 export const gpuInUse = (): string | null => gpuSeen;
 
+let tierSeen: Quality | null = null;
+/** Draw a tier with the player's own graphics changes on top, and note it so Settings can show what is drawing. */
+export function showTier(renderer: ThreeRenderer, tier: Quality, own: Params): void {
+  tierSeen = tier;
+  renderer.setGraphics(resolveGraphics(tier, own));
+}
+export const tierInUse = (): Quality | null => tierSeen;
+
 const KEY = 'hm.profile.v2';
-export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', fpsTarget: 60, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
+export const DEFAULT_PROFILE: Profile = { name: 'Goblin', credits: 500, grownUp: true, tutorialDone: false, skin: 'flat', quality: 'auto', fpsTarget: 60, graphics: {}, gpu: 'fast', activities: ActivityRegistry.withDefaults().all(), tournament: null, controls: DEFAULT_CONTROLS };
 
 export function loadProfile(): Profile {
   try {
@@ -65,7 +77,8 @@ export function loadProfile(): Profile {
     const acts = reg.get('goblin-racing') ? reg.all() : ActivityRegistry.withDefaults().all().concat(reg.all());
     const t = raw.tournament ? Tournament.fromJSON(raw.tournament) : null;
     const gpu: GpuChoice = raw.gpu === 'saver' || raw.gpu === 'browser' ? raw.gpu : 'fast';
-    return { ...DEFAULT_PROFILE, ...raw, gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
+    const graphics = raw.graphics && typeof raw.graphics === 'object' && !Array.isArray(raw.graphics) ? raw.graphics : {};
+    return { ...DEFAULT_PROFILE, ...raw, gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

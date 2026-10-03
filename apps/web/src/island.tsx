@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import type { PresetId } from '@hm/contracts';
+import type { Params, PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
 import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
@@ -7,7 +7,7 @@ import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget } from '@hm/game';
-import { noteGpu, powerPreferenceOf, type GpuChoice } from './shell/profile';
+import { noteGpu, powerPreferenceOf, showTier, type GpuChoice } from './shell/profile';
 import type { SfxId } from '@hm/audio';
 import { followLighting, pickLook } from './look';
 import { decorInstances } from './maker/dress';
@@ -56,6 +56,8 @@ export function IslandWalk(props: {
   readonly gpu?: GpuChoice;
   /** The frame rate auto quality aims for (Settings): 15 prettier, 60 smoother. */
   readonly fpsTarget?: FpsTarget;
+  /** The player's own changes to the graphics preset, on top of whichever tier draws (Settings). */
+  readonly graphics?: Params;
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
   /** The tour's thank-you (in-game credits, never money). */
   readonly onCredits?: (amount: number) => void;
@@ -77,6 +79,8 @@ export function IslandWalk(props: {
   controlsRef.current = props.controls ?? { sensitivity: 1, invertY: false, fov: 75 };
   const qualityRef = useRef(props.quality ?? 'auto');
   qualityRef.current = props.quality ?? 'auto';
+  const ownGraphicsRef = useRef<Params>(props.graphics ?? {});
+  ownGraphicsRef.current = props.graphics ?? {};
   const fpsRef = useRef<FpsTarget>(props.fpsTarget ?? 60);
   fpsRef.current = props.fpsTarget ?? 60;
   const graphicsRef = useRef<{ readonly renderer: ThreeRenderer; readonly device: DeviceFacts; adaptive: AdaptiveQuality } | null>(null);
@@ -90,8 +94,8 @@ export function IslandWalk(props: {
     if (!g) return;
     const chosen = parseQuality(mode);
     g.adaptive = createAdaptiveQuality(chosen ?? (wasAuto ? g.adaptive.current : guessQuality(g.device)), { locked: chosen !== null, targetFps: props.fpsTarget ?? 60 });
-    g.renderer.setQuality(g.adaptive.current);
-  }, [props.quality, props.fpsTarget]);
+    showTier(g.renderer, g.adaptive.current, ownGraphicsRef.current);
+  }, [props.quality, props.fpsTarget, props.graphics]);
   const activities = useMemo(() => props.activities ?? [], [props.activities]);
   useEffect(() => { setActivities(activities); }, [activities]);
 
@@ -240,8 +244,8 @@ export function IslandWalk(props: {
     const device: DeviceFacts = { touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu };
     const chosen = parseQuality(qualityRef.current);
     graphicsRef.current = { renderer, device, adaptive: createAdaptiveQuality(chosen ?? guessQuality(device), { locked: chosen !== null, targetFps: fpsRef.current }) };
-    renderer.setQuality(graphicsRef.current.adaptive.current);
-    const offFrame = renderer.onFrame((dt) => { const q = graphicsRef.current?.adaptive.frame(dt); if (q) renderer.setQuality(q); });
+    showTier(renderer, graphicsRef.current.adaptive.current, ownGraphicsRef.current);
+    const offFrame = renderer.onFrame((dt) => { const q = graphicsRef.current?.adaptive.frame(dt); if (q) showTier(renderer, q, ownGraphicsRef.current); });
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const showTerrain = (): void => {

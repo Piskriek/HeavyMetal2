@@ -19,8 +19,8 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 |---|---|
 | Dev server (owner tests here, from the laptop) | `npx vite --port 5192 --host 0.0.0.0 apps/web` in `E:\AI\hm2-art\harness\repo`, then `http://192.168.0.5:5192` (this PC: `http://127.0.0.1:5192`). |
 | Production build as one html file | `npm run build` gives `apps/web/dist/index.html` (about 3.9 MB). `npm run host` serves it on 8080. |
-| Gate before every commit | `npm run verify` (typecheck + every package test + build to ONE html) then `npm run build && npm run e2e` (e2e drives the **built** file in the installed Chrome: build first or it tests the old one; it stubs pointer lock and releases the mouse clip; it must never hold the owner's real mouse). **1121 tests and 60 e2e checks pass** at the end of the 2026-10-03 session. |
-| Repo | `E:\AI\hm2-art\harness\repo` (git, npm workspaces `packages/*`, app in `apps/web`). Pushed to GitHub as `main` at the end of 2026-10-03 (see `docs/REPORT.md`, "Hand-over"). `C:\Work\repo` is NOT this project. |
+| Gate before every commit | `npm run verify` (typecheck + every package test + build to ONE html) then `npm run build && npm run e2e` (e2e drives the **built** file in the installed Chrome: build first or it tests the old one; it stubs pointer lock and releases the mouse clip; it must never hold the owner's real mouse). **1126 tests and 52 e2e checks pass** at the end of the 2026-10-03 session. |
+| Repo | `E:\AI\hm2-art\harness\repo` (git, npm workspaces `packages/*`, app in `apps/web`). On GitHub as `Piskriek/HeavyMetal2` `main` since 2026-10-03; the old game code is on `archive/main-2026-10-03` (see `docs/REPORT.md` section 5). `C:\Work\repo` is NOT this project. |
 | Arena (battle models) | Chat URLs are in `docs/NEXT_PHASE.md` section 4. Max TWO new chats at a time or captchas appear; the owner clicks captchas. NEVER sign in to Google/Arena. Send prompts by setting the textarea value and clicking `Send message`. |
 | Getting code OUT of an Arena tab | Arena blocks fetch and images to localhost. Read each file from CodeMirror (`document.querySelector('.cm-content').cmTile.view.state.doc.toString()` after clicking the file), base64url a JSON `{path: text}` and set `location.href = 'http://127.0.0.1:8791/put?dir=NAME&name=bundle&i=0&n=1&unpack=1&d=...'`; `node prompts/recv.mjs` writes the files to `E:\AI\hm2-art\harness\arena-out\NAME`. That navigates the tab away: open the chat again afterwards. |
 | Prompts for Arena | `prompts/battle/*.txt`, preambles `prompts/preambles/{engineering,ui-design}.txt`. |
@@ -135,7 +135,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 | N8 | Previews wherever possible | DONE | Ground swatches, model thumbnails, sky gradients, moving stick figures, sound envelopes, planets, goblin looks, sprite bursts, camera shakes, tool icons. |
 | N9 | F1..F12 tabs; E opens the preset window; wheel clickable | DONE | F1..F10 (F11 fullscreen and F12 dev tools belong to the browser), P = Avatar. |
 | N10 | Studio mode: no goblin, fly, windows, attribute editors you open/close/move, focus, hide others | DONE | B or the Studio button. |
-| N11 | Full report; push to main and archive the old main | DONE when `docs/REPORT.md` and the push are in | `docs/REPORT.md`. |
+| N11 | Full report; push to main and archive the old main | DONE | `docs/REPORT.md`; pushed to `Piskriek/HeavyMetal2` `main`, the old main kept on `archive/main-2026-10-03`. |
 
 ---
 

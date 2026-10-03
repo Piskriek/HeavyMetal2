@@ -27,7 +27,7 @@ import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
 
 /**
- * The shell of **SetMix Harness**: a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
+ * The shell of **SetMix Multiverse** (first called SetMix Harness): a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
  * in a window beside it; open that window and it grows into Goblin Racing's own menu (Play, Race modes, Settings) orbiting the Goblin Racing
  * island. Your own island is harness level: My island dives galaxy -> planet -> island -> your avatar and hands over to walking; from then on Esc
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
@@ -42,7 +42,7 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   create: { back: 'origin', doc: 'Make an avatar (look and name). The first game you play makes the first one: Goblin Racing makes a goblin.' },
   avatars: { back: 'origin', doc: 'Avatars: everyone you can be (any kind); use, change, remove, make a new one.' },
   zoom: { back: 'island', doc: 'The dive. Esc skips to your avatar.' },
-  island: { back: 'home', doc: 'Walking your own island (harness level). Esc opens the jump menu and the galaxy bar.' },
+  island: { back: 'home', doc: 'Walking your own island (SetMix level). Esc opens the jump menu and the galaxy bar.' },
   activities: { back: 'origin', doc: 'The activities window.' },
   hub: { back: 'origin', doc: 'Community: shared presets and your shares.' },
   activity: { back: 'goblin', doc: "Goblin Racing's sections: tournaments, spectate, rankings, track editor, the bookie." },

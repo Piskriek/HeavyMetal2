@@ -81,7 +81,8 @@ const weight = (kind: Brush['falloff'], d: number, radius: number): number => {
   return kind === 'smooth' ? 1 - (3 * t * t - 2 * t * t * t) : kind === 'linear' ? 1 - t : 1;
 };
 
-function paintNode(t: Terrain, i: number, surface: number, k: number): void {
+/** Blend a surface into one node by k (0..1): the two-surface mix every paint tool uses. */
+export function paintNode(t: Terrain, i: number, surface: number, k: number): void {
   const a = t.surfaceA[i]!, b = t.surfaceB[i]!;
   let wB = t.blend[i]! / 255;
   let A = a, B = b;

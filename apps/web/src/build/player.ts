@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { MOVE_SLOTS, animById, type MoveSlot } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { SLOTS, TAB_IDS, assignSlot, normalizeHotbars, type Hotbars, type TabId } from '@hm/buildkit';
+import { PAINTS, SLOTS, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
 import { defaultHotbars, validFor, type ActivityInfo, type CatalogPlayer } from './catalog';
 
 /**
@@ -22,6 +22,10 @@ export interface PlayerState extends CatalogPlayer {
   readonly mode: 'walk' | 'studio';
   /** Changes to the ready-made sprite bursts, by sprite id. */
   readonly sprites: Readonly<Record<string, Record<string, unknown>>>;
+  /** How deep the hotbar goes: Easy, Pro or Studio (docs/HOTBAR.md). */
+  readonly level: HotbarLevel;
+  /** What each tab's tools apply, picked in the palette strip (Paint: a surface id). */
+  readonly palette: Readonly<Partial<Record<TabId, string>>>;
 }
 
 const KEY = 'hm.player.v1';
@@ -33,6 +37,7 @@ const blank = (): PlayerState => {
   return {
     ...p, tab: 'sculpt', slots: Object.fromEntries(TAB_IDS.map((t) => [t, 0])) as Record<TabId, number>, hotbars: defaultHotbars(activities, p),
     moves: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', fall: 'fall' }, lookId: LOOKS[0]!.id, created: false, view: 'third', mode: 'walk', sprites: {},
+    level: 'easy', palette: { paint: '4' },
   };
 };
 
@@ -51,14 +56,27 @@ function load(): PlayerState {
   const allLooks = [...looks, ...LOOKS];
   return {
     ...p, tab, slots, moves,
-    hotbars: normalizeHotbars(raw.hotbars, defaultHotbars(activities, p), (t, id) => validFor(t, id, p, activities)),
+    hotbars: freshTabs(normalizeHotbars(raw.hotbars, defaultHotbars(activities, p), (t, id) => validFor(t, id, p, activities)), defaultHotbars(activities, p)),
     lookId: typeof raw.lookId === 'string' && allLooks.some((l) => l.id === raw.lookId) ? raw.lookId : looks[0]?.id ?? base.lookId,
     created: raw.created === true,
     view: raw.view === 'first' ? 'first' : 'third',
     mode: raw.mode === 'studio' ? 'studio' : 'walk',
     sprites: obj(raw.sprites),
+    level: raw.level === 'pro' || raw.level === 'studio' ? raw.level : 'easy',
+    palette: { ...base.palette, ...paletteOf(raw.palette) },
   };
 }
+/** A tab whose saved slots no longer name any tool (Paint's slots held surfaces before its tools became ways to paint) starts from the ready-made row. */
+function freshTabs(h: Hotbars, defaults: Hotbars): Hotbars {
+  const out = { ...h };
+  for (const t of TAB_IDS) if (out[t].every((id) => id === null) && defaults[t].some((id) => id !== null)) out[t] = [...defaults[t]];
+  return out;
+}
+const paletteOf = (v: unknown): Partial<Record<TabId, string>> => {
+  const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  const paint = typeof o.paint === 'string' && PAINTS.some((s) => String(s.id) === o.paint) ? o.paint : undefined;
+  return paint ? { paint } : {};
+};
 
 let state: PlayerState | null = null;
 const get = (): PlayerState => (state ??= load());
@@ -132,3 +150,13 @@ export const setMode = (mode: 'walk' | 'studio'): void => { const s = get(); if 
 export const markCreated = (): void => { const s = get(); if (!s.created) set({ ...s, created: true }); };
 /** For tests and "reset progress". */
 export function resetPlayer(): void { state = blank(); try { localStorage.removeItem(KEY); } catch { /* ignore */ } listeners.forEach((l) => l()); }
+
+/** Easy, Pro or Studio: how deep the hotbar goes. */
+export const setLevel = (level: HotbarLevel): void => { const s = get(); if (s.level !== level) set({ ...s, level }); };
+/** Pick what a tab's tools apply from the palette strip (Paint: a surface). */
+export const pickPalette = (tab: TabId, id: string): void => { const s = get(); if (s.palette[tab] !== id) set({ ...s, palette: { ...s.palette, [tab]: id } }); };
+/** Set a tool to one of its presets: its values become your tool's (one change, kept like any edit). */
+export function applyVariant(toolId: string, patch: Readonly<Record<string, unknown>>): void {
+  const s = get();
+  set({ ...s, tools: { ...s.tools, [toolId]: { ...(s.tools[toolId] ?? {}), ...patch } } });
+}

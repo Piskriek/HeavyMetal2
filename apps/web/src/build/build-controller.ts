@@ -3,10 +3,10 @@ import type { DecorPlacement, Runtime } from '@hm/engine';
 import type { SfxId } from '@hm/audio';
 import { plugsFor, type PlugEvent, type PlugKind, type ToolPreset } from '@hm/buildkit';
 import type { ThreeRenderer } from '@hm/render';
-import { applyStroke, encodeTerrain, heightAt, type DirtyRect } from '@hm/terrain';
+import { applyStroke, encodeTerrain, heightAt, paintWay, type DirtyRect } from '@hm/terrain';
 import { stamp, type StampKind } from '@hm/terrainops';
 import { encodeModel } from '@hm/voxel';
-import { GROUND_NAMES, packDecor, rectToArea, respondToSculpt, settlePlants, surfaceAt } from '@hm/worldrules';
+import { GROUND_NAMES, SURFACE_IDS, packDecor, rectToArea, respondToSculpt, settlePlants, surfaceAt, type WorldRules } from '@hm/worldrules';
 import { fx } from '../maker/feedback';
 import { saveMap } from '../maker/storage';
 import { focusTargetOf } from '../maker/focus';
@@ -25,6 +25,14 @@ export interface Aim { readonly point: readonly [number, number, number]; readon
 /** Metres per voxel for each placeable model (size 1 on the tool). */
 const PLACE_BLOCK: Readonly<Record<string, number>> = { goblin: 0.04, 'goblin-ball-racer': 0.05, palm: 0.13, barrel: 0.08, rock: 0.12, trophy: 0.1, 'statue-plinth': 0.2, bush: 0.17, 'grass-clump': 0.11, flowers: 0.1 };
 const STAMPS: Readonly<Partial<Record<ToolPreset['action'], StampKind>>> = { mound: 'mound', crater: 'crater', plateau: 'plateau', ridge: 'ridge', dune: 'dune' };
+const union = (a: DirtyRect | null, b: DirtyRect | null): DirtyRect | null => (!a ? b : !b ? a : { c0: Math.min(a.c0, b.c0), r0: Math.min(a.r0, b.r0), c1: Math.max(a.c1, b.c1), r1: Math.max(a.r1, b.r1) });
+/** What the island grows by itself (the Eraser puts it back): under the sea what sunk ground becomes, sand at the waterline, rock on the steep, grass elsewhere. */
+export function naturalSurface(height: number, flatness: number, rules: WorldRules): number {
+  if (height < rules.waterLevel) return rules.underwaterBecomes;
+  if (height < rules.waterLevel + 0.9) return SURFACE_IDS.sand;
+  if (flatness < 0.72) return SURFACE_IDS.rock;
+  return SURFACE_IDS.grass;
+}
 
 export interface ControllerHooks {
   readonly onModels: () => void;
@@ -56,6 +64,9 @@ export class BuildController {
   private lastPreview = 0;
   /** The thing the Move tool is carrying. */
   carrying: PresetId | null = null;
+  /** Clone: where it copies from (right-click), and the offset fixed when a stroke starts. */
+  private cloneSource: { x: number; z: number } | null = null;
+  private cloneOffset: { dx: number; dz: number } | null = null;
 
   constructor(private readonly rt: Runtime, private readonly renderer: ThreeRenderer, private readonly sceneId: PresetId, private readonly terrainId: PresetId, private readonly hooks: ControllerHooks) {}
 
@@ -177,6 +188,8 @@ export class BuildController {
         return;
       }
     }
+    // ways to paint (the surface is the palette's, set on the tool by the island)
+    if (tool.action === 'paint' && tool.way) { this.paintWithWay(tool, aim, alt, now, first, on); return; }
     // brushes: paint and sculpt
     if (!ts) return;
     if (first) { this.dirty = null; this.last = null; this.flattenTo = tool.action === 'flatten' ? heightAt(ts.terrain, x, z) : null; this.strokeLabel = tool.name; this.before = ts.terrain.heights.slice(); }
@@ -198,6 +211,41 @@ export class BuildController {
       if (d) this.hooks.onDecorPreview(settlePlants(d.placements, ts.terrain, rectToArea(ts.terrain, this.dirty, 1), { ...rulesOf(this.rt, this.sceneId), plantsReact: false }, plantsOf(this.rt, this.sceneId)).items);
     }
     this.fire(tool, on, aim, { scale: kind === 'paint' ? 0.4 : 0.6, first, sound: { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 } });
+  }
+
+  /** One tick of a way to paint, dabbed along the stroke so a quick drag leaves no gaps. Fill and Stamp act once per press. */
+  private paintWithWay(tool: ToolPreset, aim: Aim, alt: boolean, now: number, first: boolean, on: PlugEvent): void {
+    const ts = this.rt.binder.terrain();
+    if (!ts || !tool.way) return;
+    const way = tool.way, x = aim.point[0], z = aim.point[2];
+    if (way === 'clone' && alt) {
+      if (first) { this.cloneSource = { x, z }; this.hooks.say('Copying from here. Now paint where the copy goes.'); this.fire(tool, on, aim, { only: ['sound'] }); }
+      return;
+    }
+    if ((way === 'fill' || way === 'stamp') && !first) return;
+    if (way === 'clone' && !this.cloneSource) { if (first) this.hooks.say('Right-click where to copy from first'); return; }
+    if (first) {
+      this.dirty = null; this.last = null; this.strokeLabel = tool.name; this.before = ts.terrain.heights.slice();
+      this.cloneOffset = way === 'clone' && this.cloneSource ? { dx: this.cloneSource.x - x, dz: this.cloneSource.z - z } : null;
+    }
+    const radius = alt && way !== 'fill' ? tool.size * 0.5 : tool.size;
+    const rules = rulesOf(this.rt, this.sceneId);
+    const dab = (px: number, pz: number): DirtyRect | null => paintWay(ts.terrain, {
+      way, x: px, z: pz, radius, strength: alt && way === 'smudge' ? tool.strength * 0.5 : tool.strength, falloff: tool.falloff, surface: tool.surface,
+      seed: (Math.floor(now) ^ Math.floor(px * 7.3 + pz * 13.1)) >>> 0,
+      ...(tool.shape ? { shape: tool.shape } : {}), ...(tool.pattern ? { pattern: tool.pattern } : {}), ...(this.cloneOffset ? { from: this.cloneOffset } : {}),
+      natural: (h: number, flat: number) => naturalSurface(h, flat, rules),
+    });
+    const from = this.last ?? { x, z };
+    const steps = way === 'fill' || way === 'stamp' ? 0 : Math.min(40, Math.floor(Math.hypot(x - from.x, z - from.z) / Math.max(0.5, radius * 0.35)));
+    let rect: DirtyRect | null = null;
+    for (let k = 1; k <= steps; k++) rect = union(rect, dab(from.x + ((x - from.x) * k) / (steps + 1), from.z + ((z - from.z) * k) / (steps + 1)));
+    rect = union(rect, dab(x, z));
+    this.last = { x, z };
+    if (!rect) return;
+    this.dirty = union(this.dirty, rect);
+    this.renderer.refreshTerrain(rect);
+    this.fire(tool, on, aim, { scale: way === 'fill' ? 1.4 : 0.4, first, sound: { minGapMs: 85, volume: 0.6, pitch: 0.9 + Math.random() * 0.2 } });
   }
 
   private done(tool: ToolPreset, aim: Aim, text: string, on: PlugEvent = 'use'): void {

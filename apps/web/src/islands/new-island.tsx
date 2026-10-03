@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { decodeTerrain, generateIsland, type Terrain } from '@hm/terrain';
 import type { PresetBundle } from '@hm/contracts';
-import { SURF } from '@hm/render';
+import { STARTER_SURFACES, SURF } from '@hm/render';
 import { DRAFT_PRESETS } from '@hm/trackedit';
 import { TEMPLATE_SHAPES, type TemplateShape } from '../maker/scene';
 import { NewChooser, type NewWay } from '../shell/new-thing';
@@ -21,11 +21,6 @@ const GROUNDS = [
 const PLANTS = [{ id: 'bare', name: 'Bare', dress: 0 }, { id: 'some', name: 'Some', dress: 0.6 }, { id: 'lush', name: 'Lush', dress: 1.2 }] as const;
 const STEPS = ['Size', 'Ground', 'Plants', 'Race track', 'Name'] as const;
 
-/** Paint an island's map from above: sea by depth, sand, grass, rock, lava, with light from the north-west, and its track. */
-const SURF_RGB: Record<number, [number, number, number]> = {
-  [SURF.sand]: [226, 208, 152], [SURF.grass]: [111, 160, 74], [SURF.rock]: [139, 132, 120], [SURF.cliff]: [109, 101, 92], [SURF.lava]: [176, 70, 44],
-  [SURF.scree]: [154, 146, 134], [SURF.basalt]: [74, 70, 66], [SURF.soil]: [138, 106, 72], [SURF.seabed]: [196, 186, 150],
-};
 /** What a map is drawn from: a template's shape (generated) or an island's own saved ground and track. */
 export type MapSource = { readonly shape: TemplateShape } | { readonly terrain: Terrain; readonly track: readonly (readonly [number, number])[] };
 const terrainOf = (shape: TemplateShape): Terrain => generateIsland({ cols: 129, rows: 129, cell: 2, originX: -128, originZ: -128 }, shape.seed, {
@@ -44,29 +39,58 @@ export function mapOfBundle(json: string): MapSource | null {
     return { terrain, track: pts };
   } catch { return null; }
 }
-function drawIsland(canvas: HTMLCanvasElement, src: MapSource): void {
+const hexRgb = (c: string): [number, number, number] => { const n = parseInt(c.replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+/** Every surface's colour in each look: Voxel uses the block colour, PBR the averaged texture colour. */
+const LOOK_RGB: Record<'flat' | 'pbr', Map<number, [number, number, number]>> = { flat: new Map(), pbr: new Map() };
+for (const d of STARTER_SURFACES) { LOOK_RGB.flat.set(d.id, hexRgb(d.flat?.[0] ?? d.fallback)); LOOK_RGB.pbr.set(d.id, hexRgb(d.fallback)); }
+/**
+ * An island from above, in the look you use (owner: "show my instances in voxel or whatever graphical preset I last used"): Voxel is one
+ * block per ground cell; PBR is four times finer, blended smoothly, with stronger relief and a little grain, like the full ground.
+ */
+function drawIsland(canvas: HTMLCanvasElement, src: MapSource, look: 'flat' | 'pbr' = 'flat'): void {
   const t = 'shape' in src ? terrainOf(src.shape) : src.terrain;
   const { cols, rows } = t.spec;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  canvas.width = cols; canvas.height = rows;
-  const img = ctx.createImageData(cols, rows);
+  const palette = LOOK_RGB[look];
+  const relief = look === 'pbr' ? 0.14 : 0.09;
+  // each node's colour: the sea by depth, the ground by its surfaces (mixed by blend) and lit from the north-west
+  const col = new Float32Array(cols * rows * 3);
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const i = r * cols + c, h = t.heights[i]!;
     const hx = t.heights[r * cols + Math.min(cols - 1, c + 1)]! - t.heights[r * cols + Math.max(0, c - 1)]!;
     const hz = t.heights[Math.min(rows - 1, r + 1) * cols + c]! - t.heights[Math.max(0, r - 1) * cols + c]!;
-    const shade = Math.max(0.55, Math.min(1.25, 1 - (hx + hz) * 0.09));
+    const shade = Math.max(0.5, Math.min(1.3, 1 - (hx + hz) * relief));
     let rgb: [number, number, number];
-    if (h < 0.35) { const d = Math.min(1, Math.max(0, (0.35 - h) / 6)); rgb = [Math.round(92 - 60 * d), Math.round(196 - 90 * d), Math.round(210 - 40 * d)]; }
-    else { const base = SURF_RGB[t.surfaceA[i]!] ?? SURF_RGB[SURF.grass]!; rgb = [base[0] * shade, base[1] * shade, base[2] * shade]; }
-    img.data[i * 4] = rgb[0]; img.data[i * 4 + 1] = rgb[1]; img.data[i * 4 + 2] = rgb[2]; img.data[i * 4 + 3] = 255;
+    if (h < 0.35) { const d = Math.min(1, Math.max(0, (0.35 - h) / 6)); rgb = [92 - 60 * d, 196 - 90 * d, 210 - 40 * d]; }
+    else {
+      const A = palette.get(t.surfaceA[i]!) ?? [111, 160, 74], B = palette.get(t.surfaceB[i]!) ?? A, w = t.blend[i]! / 255;
+      rgb = [(A[0] + (B[0] - A[0]) * w) * shade, (A[1] + (B[1] - A[1]) * w) * shade, (A[2] + (B[2] - A[2]) * w) * shade];
+    }
+    col[i * 3] = rgb[0]; col[i * 3 + 1] = rgb[1]; col[i * 3 + 2] = rgb[2];
+  }
+  const k = look === 'pbr' ? 4 : 1;
+  const W = cols * k, H = rows * k;
+  canvas.width = W; canvas.height = H;
+  canvas.classList.toggle('smooth', look === 'pbr');
+  const img = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const o = (y * W + x) * 4;
+    if (k === 1) { const i = y * cols + x; img.data[o] = col[i * 3]!; img.data[o + 1] = col[i * 3 + 1]!; img.data[o + 2] = col[i * 3 + 2]!; img.data[o + 3] = 255; continue; }
+    const fx = Math.min(cols - 1.001, x / k), fy = Math.min(rows - 1.001, y / k), c0 = Math.floor(fx), r0 = Math.floor(fy), u = fx - c0, v = fy - r0;
+    const grain = (((x * 73856093) ^ (y * 19349663)) & 15) - 7.5;
+    for (let ch = 0; ch < 3; ch++) {
+      const a = col[(r0 * cols + c0) * 3 + ch]!, bb = col[(r0 * cols + c0 + 1) * 3 + ch]!, cc = col[((r0 + 1) * cols + c0) * 3 + ch]!, dd = col[((r0 + 1) * cols + c0 + 1) * 3 + ch]!;
+      img.data[o + ch] = (a * (1 - u) + bb * u) * (1 - v) + (cc * (1 - u) + dd * u) * v + grain * 0.8;
+    }
+    img.data[o + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  const track: readonly (readonly [number, number])[] = 'shape' in src ? (src.shape.track ? DRAFT_PRESETS[0]!.draft.points.map((p) => [p.x, p.z] as const) : []) : src.track;
+  const track: readonly (readonly [number, number])[] = 'shape' in src ? (src.shape.track ? DRAFT_PRESETS[0]!.draft.points.map((pt) => [pt.x, pt.z] as const) : []) : src.track;
   if (track.length > 2) {
-    const sx = cols / ((cols - 1) * t.spec.cell), ox = t.spec.originX, oz = t.spec.originZ;
-    ctx.strokeStyle = 'rgba(40,36,30,.85)'; ctx.lineWidth = 2.5; ctx.beginPath();
-    track.forEach(([px, pz], k) => { const x = (px - ox) * sx, y = (pz - oz) * sx; if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    const sx = (cols * k) / ((cols - 1) * t.spec.cell), ox = t.spec.originX, oz = t.spec.originZ;
+    ctx.strokeStyle = 'rgba(40,36,30,.85)'; ctx.lineWidth = 2.5 * k; ctx.beginPath();
+    track.forEach(([px, pz], j) => { const x = (px - ox) * sx, y = (pz - oz) * sx; if (j) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
     ctx.closePath(); ctx.stroke();
   }
 }
@@ -83,10 +107,10 @@ function later(job: () => void): () => void {
   }
   return () => { live = false; };
 }
-export function IslandMap(props: ({ readonly shape: TemplateShape } | { readonly source: MapSource }) & { readonly size: number; readonly label: string }): ReactElement {
+export function IslandMap(props: ({ readonly shape: TemplateShape } | { readonly source: MapSource }) & { readonly size: number; readonly label: string; /** Voxel or PBR (default Voxel). */ readonly look?: 'flat' | 'pbr' }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null);
   const src: MapSource = 'source' in props ? props.source : { shape: props.shape };
-  useEffect(() => later(() => { if (ref.current) drawIsland(ref.current, src); }), ['source' in props ? props.source : props.shape]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => later(() => { if (ref.current) drawIsland(ref.current, src, props.look); }), ['source' in props ? props.source : props.shape, props.look]); // eslint-disable-line react-hooks/exhaustive-deps
   return <canvas ref={ref} className="island-map" style={{ width: props.size, height: props.size }} role="img" aria-label={props.label} />;
 }
 

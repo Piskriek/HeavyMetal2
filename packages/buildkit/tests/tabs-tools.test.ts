@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PAINTS, SLOTS, TABS, TAB_IDS, THINGS, TOOLS, assignSlot, normalizeHotbars, normalizeTool, stepSlot, tabForKey, toolEdit, toolParams, toolVariables, toolsFor, type Hotbars } from '../src';
+import { PAINTS, SLOTS, TABS, TAB_IDS, THINGS, TOOLS, TOOL_VARIANTS, assignSlot, normalizeHotbars, normalizeTool, stepSlot, tabForKey, toolById, toolEdit, toolParams, toolVariables, toolsFor, variantNow, variantsOf, type Hotbars } from '../src';
 
 const empty = (): Hotbars => Object.fromEntries(TAB_IDS.map((t) => [t, []])) as unknown as Hotbars;
 
@@ -37,10 +37,15 @@ test('assigning a slot swaps with the slot that already held the preset', () => 
   assert.equal(stepSlot(0, -1), 8);
 });
 
-test('the tool library: unique ids, every tab of tools filled, every paint and thing has a tool', () => {
+test('the tool library: unique ids, every tab of tools filled, Paint holds the ways to paint (the surfaces are the palette), every thing has a tool', () => {
   assert.equal(new Set(TOOLS.map((t) => t.id)).size, TOOLS.length);
   for (const tab of ['select', 'paint', 'sculpt', 'things'] as const) assert.ok(toolsFor(tab).length >= 8, tab);
-  for (const p of PAINTS) assert.ok(TOOLS.some((t) => t.action === 'paint' && t.surface === p.id), p.name);
+  for (const w of ['brush', 'spray', 'fill', 'gradient', 'stamp', 'pattern', 'clone', 'smudge', 'eraser']) {
+    const t = toolById(`paint-${w}`);
+    assert.ok(t && t.way === w && t.surface === 0, `paint-${w} is a way to paint, its surface comes from the palette`);
+    assert.ok(variantsOf(t!.id, 'pro').length >= 2 && variantsOf(t!.id, 'easy').length >= 1, `paint-${w} has presets, the best ones in Easy`);
+  }
+  assert.ok(PAINTS.length >= 20, 'the palette has the surfaces');
   for (const m of THINGS) assert.ok(TOOLS.some((t) => t.action === 'place' && t.model === m.id), m.name);
   for (const t of TOOLS) { assert.ok(t.left && t.right && t.doc, t.id); }
 });
@@ -54,20 +59,30 @@ test('a tool with the player changes on top is legal; junk falls back; tools onl
   assert.equal(raise.surface, 0, 'a sculpt tool does not paint');
   assert.equal(raise.model, '');
   assert.equal(raise.name, 'Big lift');
-  const paint = normalizeTool('paint-4', { surface: 2 })!;
-  assert.equal(paint.surface, 2);
-  assert.equal(normalizeTool('paint-4', { surface: 999 })!.surface, 4);
+  assert.equal(normalizeTool('paint-stamp', { shape: 'star' })!.shape, 'star');
+  assert.equal(normalizeTool('paint-stamp', { shape: 'blobby' })!.shape, 'blob', 'junk shapes fall back');
+  assert.equal(normalizeTool('paint-pattern', { pattern: 'dots' })!.pattern, 'dots');
+  assert.equal(normalizeTool('paint-brush', { shape: 'star' })!.shape, undefined, 'a brush has no shape');
+});
+
+test('a tool is set to one of its presets by taking its values; Easy shows the best ones', () => {
+  const stamp = normalizeTool('paint-stamp', {})!;
+  assert.equal(variantNow(stamp)?.id, 'blob');
+  const star = TOOL_VARIANTS['paint-stamp']!.find((v) => v.id === 'star')!;
+  assert.equal(variantNow(normalizeTool('paint-stamp', star.patch)!)?.id, 'star');
+  assert.ok(variantsOf('paint-brush', 'easy').every((v) => v.best));
+  assert.ok(variantsOf('paint-brush', 'pro').length > variantsOf('paint-brush', 'easy').length);
+  assert.deepEqual(variantsOf('raise', 'pro'), [], 'tools without presets show none');
 });
 
 test('a tool shows only the variables that matter to it, and edits come back as ids', () => {
   const sounds = ['place', 'select'];
   const keys = (id: string): string[] => toolVariables(normalizeTool(id, {})!, sounds).map((v) => v.key);
   assert.ok(keys('raise').includes('strength') && !keys('raise').includes('surface'));
-  assert.ok(keys('paint-4').includes('surface'));
+  assert.ok(keys('paint-brush').includes('size') && !keys('paint-brush').includes('surface'), 'a way to paint takes its surface from the palette');
   assert.ok(keys('place-palm').includes('model') && !keys('place-palm').includes('falloff'));
   assert.ok(!keys('delete').includes('size'));
-  const params = toolParams(normalizeTool('paint-4', {})!);
-  assert.equal(params.surface, 'Grass');
+  assert.equal(toolParams(normalizeTool('place-palm', {})!).model, 'Palm');
   assert.deepEqual(toolEdit('surface', 'Sand'), ['surface', 2]);
   assert.deepEqual(toolEdit('model', 'Rock'), ['model', 'rock']);
   assert.deepEqual(toolEdit('size', 3), ['size', 3]);

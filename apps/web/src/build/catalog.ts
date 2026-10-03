@@ -52,7 +52,7 @@ export interface CatalogPlayer {
   readonly looks: readonly AvatarLook[];
 }
 
-const surfaceColours = (id: number): string[] => [...(STARTER_SURFACES.find((s) => s.id === id)?.flat ?? ['#888888'])];
+export const surfaceColours = (id: number): string[] => [...(STARTER_SURFACES.find((s) => s.id === id)?.flat ?? ['#888888'])];
 
 export function toolOf(player: CatalogPlayer, id: string): ToolPreset | null { return normalizeTool(id, player.tools[id]); }
 export function animOf(player: CatalogPlayer, id: string): AnimPreset {
@@ -63,7 +63,8 @@ export const lookOf = (player: CatalogPlayer, id: string): AvatarLook => player.
 export const setupOfId = (id: string): LightSetup => setupById(id);
 
 function toolCard(tab: TabId, t: ToolPreset, edited: boolean): CatalogItem {
-  const preview: Preview = t.action === 'paint' ? { kind: 'swatch', colors: surfaceColours(t.surface) } : t.action === 'place' ? { kind: 'model', model: t.model } : { kind: 'icon', icon: t.icon };
+  // ways to paint show their icon (what they put down is the palette's); a surface-holding paint tool (older saves) its colours
+  const preview: Preview = t.action === 'paint' && !t.way ? { kind: 'swatch', colors: surfaceColours(t.surface) } : t.action === 'place' ? { kind: 'model', model: t.model } : { kind: 'icon', icon: t.icon };
   return { tab, id: t.id, name: t.name, doc: t.doc, preview, edited };
 }
 
@@ -98,7 +99,7 @@ export function defaultHotbars(activities: readonly ActivityInfo[], player: Cata
   const out = {} as Hotbars;
   for (const tab of TAB_IDS) out[tab] = [];
   out.select = ids(['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate']);
-  out.paint = ids(['paint-4', 'paint-2', 'paint-3', 'paint-5', 'paint-11', 'paint-16', 'paint-13', 'paint-7', 'paint-8']);
+  out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']);
   out.sculpt = ids(['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']);
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
   out.sound = ids(['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']);

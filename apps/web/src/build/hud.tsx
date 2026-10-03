@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { TABS, type TabId } from '@hm/buildkit';
 import type { CatalogItem } from './catalog';
 import { PresetPreview } from './cards';
@@ -30,7 +30,7 @@ export function TabStrip(props: { readonly tab: TabId; readonly onPick: (t: TabI
 }
 
 /** Nine slots of the open tab (keys 1 to 9, or the wheel). Each shows its preset. E opens the preset window to fill them. */
-export function Hotbar(props: { readonly items: readonly (CatalogItem | null)[]; readonly selected: number; readonly onSelect: (i: number) => void; readonly onOpen: () => void }): ReactElement {
+export function Hotbar(props: { readonly items: readonly (CatalogItem | null)[]; readonly selected: number; readonly onSelect: (i: number) => void; readonly onOpen: () => void; /** At the far end: Easy / Pro / Studio. */ readonly end?: ReactNode }): ReactElement {
   return (
     <div className="hotbar" role="toolbar" aria-label="Hotbar" data-ui="island.hotbar">
       {props.items.map((it, i) => (
@@ -40,6 +40,7 @@ export function Hotbar(props: { readonly items: readonly (CatalogItem | null)[];
         </button>
       ))}
       <button className="inv-btn" data-ui="island.presets" data-label="Your presets: pick what goes in these slots, change any of them (E)" aria-label="Open your presets" onClick={props.onOpen}>E</button>
+      {props.end}
     </div>
   );
 }

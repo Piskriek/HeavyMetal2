@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import type { Params, PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { PAINTS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
-import { heightAt } from '@hm/terrain';
+import { cropTerrain, heightAt, type Terrain } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget, type Quality } from '@hm/game';
 import { noteGpu, powerPreferenceOf, showTier, type GpuChoice, type Profile } from './shell/profile';
 import { SettingsBody } from './shell/settings-body';
@@ -19,13 +19,15 @@ import { focusTargetOf } from './maker/focus';
 import { fx } from './maker/feedback';
 import { BuildController, type Aim } from './build/build-controller';
 import { Crosshair, Hotbar, ModeBar, TabStrip, TabWheel, ToolSay } from './build/hud';
-import { animOf, catalog, lookOf, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { PaletteStrip, type StripItem } from './build/palette-strip';
+import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { avatarRigged } from './build/cards';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
 import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
-import { player, putInSlot, setActivities, setMode, setSlot, setTab, setView, usePlayer, wearLook } from './build/player';
+import { applyVariant, editTool, pickPalette, player, putInSlot, setActivities, setLevel, setMode, setSlot, setTab, setView, usePlayer, wearLook } from './build/player';
 import { spriteOf } from './build/sprites';
 import { ShareDialog } from './share/share-dialog';
 import type { ShareKind } from './share/shares';
@@ -48,6 +50,9 @@ import type { AvatarLook } from '@hm/avatarlook';
  */
 let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = null; // where the goblin stood when the island was last left
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
+
+/** The palette's surfaces for the ways to paint. */
+const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: { kind: 'swatch', colors: surfaceColours(s.id) } }));
 
 const WIN = {
   presets: { w: 560, h: 620 },
@@ -150,7 +155,9 @@ export function IslandWalk(props: {
   useEffect(() => { onMenuChange?.(menu); if (menu) tourEvent('opened-menu'); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void } | null>(null);
+  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void; groundPeek: () => Terrain | null } | null>(null);
+  /** A small copy of the ground you are looking at (the tool presets draw on it). */
+  const peekGround = useCallback((): Terrain | null => api.current?.groundPeek() ?? null, []);
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
   // studio keeps the mouse free; walking takes it back when you click the world
@@ -282,6 +289,8 @@ export function IslandWalk(props: {
     showTier(renderer, graphicsRef.current.adaptive.current, ownGraphicsRef.current);
     const offFrame = renderer.onFrame((dt) => { const q = graphicsRef.current?.adaptive.frame(dt); if (q) showTier(renderer, q, ownGraphicsRef.current); });
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})
+    // console and tests: count what the ground is made of (read only)
+    (window as unknown as { hmGround: unknown }).hmGround = { surfaces: (): Record<number, number> => { const t = rt.binder.terrain()?.terrain; const out: Record<number, number> = {}; if (t) for (const s of t.surfaceA) out[s] = (out[s] ?? 0) + 1; return out; } };
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
@@ -378,6 +387,7 @@ export function IslandWalk(props: {
       lock, unlock, refreshModels,
       playAnim: (id) => { animator.play(animOf(player(), id)); },
       setAvatarLook, previewLook,
+      groundPeek: () => { const ts = rt.binder.terrain(); if (!ts) return null; const a = aim(); const pt = a?.point ?? [px, py, pz]; return cropTerrain(ts.terrain, pt[0], pt[2], 24); },
       pick: (tab, id) => {
         if (tab !== 'select' && tab !== 'paint' && tab !== 'sculpt' && tab !== 'things') return;
         const tool = toolOf(player(), id);
@@ -519,7 +529,9 @@ export function IslandWalk(props: {
       const id = s.hotbars[s.tab][s.slots[s.tab]];
       if (!id) { if (first) say('This slot is empty: press E to put a preset in it'); return; }
       if (s.tab === 'select' || s.tab === 'paint' || s.tab === 'sculpt' || s.tab === 'things') {
-        const tool: ToolPreset | null = toolOf(s, id);
+        const own: ToolPreset | null = toolOf(s, id);
+        // a way to paint puts down what the palette has picked (top middle)
+        const tool: ToolPreset | null = own && own.action === 'paint' && own.way ? { ...own, surface: Number(s.palette.paint ?? 4) || 4 } : own;
         const a = aim();
         if (tool && a) {
           builder.use(tool, a, alt, now, first);
@@ -758,8 +770,11 @@ export function IslandWalk(props: {
   /** My avatar: the Avatar tab with your avatars and its presets. */
   const openAvatar = (): void => { const cur = player().tab; if (cur !== 'avatar') beforeAvatar.current = cur; setTab('avatar'); };
   const openSettings = (): void => { win.open('settings', 'Settings', { x: Math.max(12, window.innerWidth - 470), y: 64, w: 448, h: Math.min(720, window.innerHeight - 90) }); };
+  // the tool in your hand and its presets row (a tool with presets of its own shows them above the hotbar instead of the words)
+  const heldTool = heldItem && (p.tab === 'select' || p.tab === 'paint' || p.tab === 'sculpt' || p.tab === 'things') ? toolOf(p, heldItem.id) : null;
   const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
   const showHud = buildOn && !menu && level !== 'island' && !showcase;
+  const showPresets = showHud && !avatarMode && !!heldTool && variantsOf(heldTool.id, 'pro').length > 0;
   // the toggles go into the shell's slot above the galaxy bar (studio keeps that bar down), else they sit in place
   const [topSlot, setTopSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -776,9 +791,17 @@ export function IslandWalk(props: {
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       {showHud && p.mode === 'walk' && !avatarMode ? <Crosshair active={locked} /> : null}
       {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR ground: full detail' : 'Flat ground: voxel blocks that match the goblin'); }} />) : null}
-      {showHud && !avatarMode ? <ToolSay {...say2} /> : null}
+      {showHud && !avatarMode && !showPresets ? <ToolSay {...say2} /> : null}
+      {showPresets && heldTool ? (
+        <ToolPresetsRow tool={heldTool} level={p.level} surface={Number(p.palette.paint ?? 4) || 4} peek={peekGround} words={say2}
+          onPick={(v) => { applyVariant(heldTool.id, v.patch); fx('select', { volume: 0.5 }); }}
+          onEdit={(k, val) => editTool(heldTool.id, k, val)}
+          onAll={() => win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor })} />
+      ) : null}
+      {/* the palette: what the tool in your hand puts down (top middle) */}
+      {showHud && !avatarMode && p.tab === 'paint' ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} /> : null}
       {showHud ? <TabStrip tab={p.tab} onPick={pickTab} /> : null}
-      {showHud && !avatarMode ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} /> : null}
+      {showHud && !avatarMode ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} end={<LevelSwitch level={p.level} onLevel={(l) => { setLevel(l); fx('ui-toggle', { volume: 0.5 }); }} />} /> : null}
       {avatarMode && !menu ? <AvatarDock actions={actions} onPreview={(l) => api.current?.previewLook(l)} onDone={leaveAvatar} /> : null}
       {showHud && wheelOpen ? <TabWheel title={tabDef(p.tab).label} items={items} index={wheelIndex} clickable={free} onPick={pickWheel} /> : null}
       {showcase ? null : win.list.map((w) => (

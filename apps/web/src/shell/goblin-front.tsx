@@ -77,7 +77,7 @@ export function SetMixHome(props: {
   return (
     <div className="sm-home">
       <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
-      <div className="sm-brand"><b>SetMix</b><i>Harness</i></div>
+      <div className="sm-brand"><b>SetMix</b><i>Multiverse</i></div>
       <nav className="sm-menu" aria-label="SetMix">
         {HARNESS_MENU.map((m, i) => (
           <Fragment key={m.id}>

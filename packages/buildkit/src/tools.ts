@@ -41,7 +41,25 @@ export interface ToolPreset {
   sound: string;
   /** What it sets off, and when: sprites, sounds, goblin moves, camera shakes (the "+ attribute" list). */
   plugs: readonly ToolPlug[];
+  /** Paint tools: the way they paint (the surface comes from the palette). */
+  way?: PaintWayId;
+  /** Paint, Stamp: the shape pressed. */
+  shape?: StampShape;
+  /** Paint, Pattern: what repeats. */
+  pattern?: PatternId;
 }
+
+/** The ways to paint (the same names as @hm/terrain's paintWay). */
+export type PaintWayId = 'brush' | 'spray' | 'fill' | 'gradient' | 'stamp' | 'pattern' | 'clone' | 'smudge' | 'eraser';
+export type StampShape = 'blob' | 'square' | 'star' | 'ring';
+export type PatternId = 'checker' | 'stripes' | 'dots';
+/** How deep the hotbar goes (docs/HOTBAR.md section 2): Easy shows the best few presets; Pro all of them and the sliders; Studio every setting. */
+export type HotbarLevel = 'easy' | 'pro' | 'studio';
+export const HOTBAR_LEVELS: readonly { readonly id: HotbarLevel; readonly name: string; readonly says: string }[] = [
+  { id: 'easy', name: 'Easy', says: 'The best few presets of each tool, nothing to set.' },
+  { id: 'pro', name: 'Pro', says: 'Every preset of each tool, with size and strength beside the hotbar.' },
+  { id: 'studio', name: 'Studio', says: 'Everything: every setting of the tool and what it is made of.' },
+];
 
 /** The ground you can paint, by id (the same numbers as the island's surfaces). */
 export const PAINTS: readonly { readonly id: number; readonly name: string }[] = [
@@ -59,9 +77,10 @@ export const THINGS: readonly { readonly id: string; readonly name: string; read
   { id: 'goblin-ball-racer', name: 'Ball racer', icon: 'Circle' },
 ];
 
-type Base = Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'surface' | 'model' | 'sprite' | 'sound'>;
+type Base = Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'surface' | 'model' | 'sprite' | 'sound'> & Pick<ToolPreset, 'shape' | 'pattern'>;
 const B: Base = { size: 1, strength: 0.5, falloff: 'smooth', surface: 0, model: '', sprite: 'pop', sound: 'select' };
 const tool = (id: string, name: string, tab: ToolTab, action: ToolAction, icon: string, doc: string, left: string, right: string, v: Partial<Base> = {}): ToolPreset => { const b = { ...B, ...v }; return { id, name, tab, action, icon, doc, left, right, ...b, plugs: defaultPlugs(b.sprite, b.sound, swings(action) ? 'swing' : undefined) }; };
+const paintTool = (way: PaintWayId, name: string, icon: string, doc: string, left: string, right: string, v: Partial<Base>): ToolPreset => ({ ...tool(`paint-${way}`, name, 'paint', 'paint', icon, doc, left, right, { sprite: 'sparkle', sound: 'paint-tick', ...v }), way });
 /** Tools that change the world make the goblin swing its arm; looking, focusing and hiding do not. */
 const swings = (a: ToolAction): boolean => a !== 'inspect' && a !== 'focus' && a !== 'isolate';
 
@@ -74,7 +93,16 @@ export const TOOLS: readonly ToolPreset[] = [
   tool('delete', 'Delete', 'select', 'delete', 'Trash2', 'Take away a thing you placed.', 'Take it away', 'Take it away', { sound: 'delete', sprite: 'debris' }),
   tool('focus', 'Focus', 'select', 'focus', 'Focus', 'Fly to a thing and see it from every side; the world fades away around it.', 'Focus on it', 'Leave focus', { sound: 'ui-toggle' }),
   tool('isolate', 'Hide others', 'select', 'isolate', 'Layers', 'Hide everything except the thing you point at (point at nothing to show it all again).', 'Hide the rest', 'Show everything', { sound: 'ui-toggle' }),
-  ...PAINTS.map((p) => tool(`paint-${p.id}`, p.name, 'paint', 'paint', 'Paintbrush', `Paint the ground with ${p.name.toLowerCase()}.`, 'Paint', 'Paint with a smaller brush', { size: 4, strength: 1, surface: p.id, sprite: 'sparkle', sound: 'paint-tick' })),
+  // ways to paint: what they put down is picked in the palette (top middle), not here
+  paintTool('brush', 'Brush', 'Paintbrush', 'Paint a round patch wherever you drag.', 'Paint', 'Paint with a smaller brush', { size: 3, strength: 0.8 }),
+  paintTool('spray', 'Spray', 'SprayCan', 'Scatter little dabs round the brush: clusters, speckles, patches of flowers.', 'Spray', 'Spray finer', { size: 4, strength: 1, falloff: 'flat' }),
+  paintTool('fill', 'Fill', 'PaintBucket', 'Fill the whole patch of one surface you click on.', 'Fill the patch', 'Fill the patch', { size: 1, strength: 1, falloff: 'flat' }),
+  paintTool('gradient', 'Gradient', 'Blend', 'Blend softly into what is there: a long fading edge.', 'Blend in', 'Blend in less', { size: 6, strength: 0.5, falloff: 'linear' }),
+  paintTool('stamp', 'Stamp', 'Stamp', 'Press a shape: a blob, a square, a star, a ring.', 'Stamp it', 'Stamp it smaller', { size: 3, strength: 1, falloff: 'flat', shape: 'blob' }),
+  paintTool('pattern', 'Pattern', 'Grid3x3', 'Paint a repeating pattern: a checker, stripes or dots.', 'Paint the pattern', 'Paint it smaller', { size: 4, strength: 1, falloff: 'flat', pattern: 'checker' }),
+  paintTool('clone', 'Clone', 'Copy', 'Copy the ground from one place to another: right-click where to copy from, then paint.', 'Paint the copy', 'Copy from here', { size: 3, strength: 1, falloff: 'flat' }),
+  paintTool('smudge', 'Smudge', 'Wind', 'Mix the edges between surfaces, like a finger in wet paint.', 'Smudge', 'Smudge gently', { size: 3, strength: 0.6 }),
+  paintTool('eraser', 'Eraser', 'Eraser', 'Put back what the island would grow there by itself: sand by the sea, grass on the flat, rock on the steep.', 'Erase', 'Erase smaller', { size: 3, strength: 1, falloff: 'flat' }),
   tool('raise', 'Raise', 'sculpt', 'raise', 'ArrowUpFromLine', 'Pull the ground up.', 'Raise the ground', 'Lower it', { size: 5, strength: 0.4, sprite: 'dust', sound: 'sculpt-tick' }),
   tool('lower', 'Lower', 'sculpt', 'lower', 'ArrowDownToLine', 'Push the ground down.', 'Lower the ground', 'Raise it', { size: 5, strength: 0.4, sprite: 'dust', sound: 'sculpt-tick' }),
   tool('smooth', 'Smooth', 'sculpt', 'smooth', 'Waves', 'Soften bumps and edges.', 'Smooth', 'Smooth', { size: 6, strength: 0.5, sprite: 'sparkle', sound: 'sculpt-tick' }),
@@ -88,6 +116,30 @@ export const TOOLS: readonly ToolPreset[] = [
   ...THINGS.map((t) => tool(`place-${t.id}`, t.name, 'things', 'place', t.icon, `Place a ${t.name.toLowerCase()} where you point.`, 'Place it', 'Take away the thing you point at', { model: t.id, size: 1, sprite: t.id === 'palm' || t.id === 'bush' || t.id === 'flowers' || t.id === 'grass-clump' ? 'leaf' : 'pop', sound: 'place' })),
 ];
 export const toolById = (id: string): ToolPreset | undefined => TOOLS.find((t) => t.id === id);
+
+/**
+ * A tool's own presets (docs/HOTBAR.md section 1): picking a tool shows these in a row above the hotbar, each previewed on what you are
+ * looking at; picking one sets the tool to it. `best` ones show in Easy; Pro and Studio show all.
+ */
+export interface ToolVariant { readonly id: string; readonly name: string; readonly patch: Partial<Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'shape' | 'pattern'>>; readonly best?: boolean }
+const v = (id: string, name: string, patch: ToolVariant['patch'], best = false): ToolVariant => ({ id, name, patch, ...(best ? { best } : {}) });
+export const TOOL_VARIANTS: Readonly<Record<string, readonly ToolVariant[]>> = {
+  'paint-brush': [v('soft', 'Soft', { size: 3, strength: 0.8, falloff: 'smooth' }, true), v('hard', 'Hard', { size: 3, strength: 1, falloff: 'flat' }, true), v('fine', 'Fine', { size: 1.2, strength: 1, falloff: 'flat' }, true), v('wide', 'Wide', { size: 7, strength: 0.7, falloff: 'smooth' }, true), v('faint', 'Faint', { size: 4, strength: 0.25, falloff: 'smooth' }), v('edge', 'Hard edge, soft middle', { size: 4, strength: 0.9, falloff: 'linear' })],
+  'paint-spray': [v('speckle', 'Speckles', { size: 3, strength: 1 }, true), v('patches', 'Patches', { size: 6, strength: 1 }, true), v('mist', 'Mist', { size: 5, strength: 0.4 }, true), v('wide', 'Wide', { size: 10, strength: 0.8 })],
+  'paint-fill': [v('patch', 'The patch', { size: 1, strength: 1 }, true), v('soft', 'Soft fill', { size: 1, strength: 0.6 }, true)],
+  'paint-gradient': [v('short', 'Short fade', { size: 3, strength: 0.6 }, true), v('long', 'Long fade', { size: 9, strength: 0.5 }, true), v('gentle', 'Gentle', { size: 6, strength: 0.25 }, true)],
+  'paint-stamp': [v('blob', 'Blob', { shape: 'blob', size: 3 }, true), v('square', 'Square', { shape: 'square', size: 3 }, true), v('star', 'Star', { shape: 'star', size: 4 }, true), v('ring', 'Ring', { shape: 'ring', size: 4 }, true), v('big-blob', 'Big blob', { shape: 'blob', size: 8 })],
+  'paint-pattern': [v('checker', 'Checker', { pattern: 'checker' }, true), v('stripes', 'Stripes', { pattern: 'stripes' }, true), v('dots', 'Dots', { pattern: 'dots' }, true), v('big-checker', 'Big checker', { pattern: 'checker', size: 8 })],
+  'paint-clone': [v('small', 'Small', { size: 2 }, true), v('big', 'Big', { size: 6 }, true)],
+  'paint-smudge': [v('gentle', 'Gentle', { size: 3, strength: 0.35 }, true), v('strong', 'Strong', { size: 3, strength: 0.9 }, true), v('wide', 'Wide', { size: 7, strength: 0.6 })],
+  'paint-eraser': [v('small', 'Small', { size: 2 }, true), v('big', 'Big', { size: 6 }, true)],
+};
+/** The presets a tool shows at a level: Easy the best few, Pro and Studio all. */
+export const variantsOf = (toolId: string, level: HotbarLevel = 'pro'): readonly ToolVariant[] => (TOOL_VARIANTS[toolId] ?? []).filter((x) => level !== 'easy' || x.best);
+/** Which of a tool's presets it is set to now (its values match), or null. */
+export function variantNow(tool: ToolPreset): ToolVariant | null {
+  return (TOOL_VARIANTS[tool.id] ?? []).find((x) => Object.entries(x.patch).every(([k, val]) => (tool as unknown as Record<string, unknown>)[k] === val)) ?? null;
+}
 export const toolsFor = (tab: ToolTab): readonly ToolPreset[] => TOOLS.filter((t) => t.tab === tab);
 
 const num = (v: unknown, d: number, lo: number, hi: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
@@ -108,6 +160,8 @@ export function normalizeTool(id: string, overrides: unknown): ToolPreset | null
     size: num(o.size, base.size, 0.05, 500),
     strength: num(o.strength, base.strength, 0, 10),
     falloff: o.falloff === 'linear' || o.falloff === 'flat' || o.falloff === 'smooth' ? o.falloff : base.falloff,
+    ...(base.shape ? { shape: o.shape === 'blob' || o.shape === 'square' || o.shape === 'star' || o.shape === 'ring' ? o.shape : base.shape } : {}),
+    ...(base.pattern ? { pattern: o.pattern === 'checker' || o.pattern === 'stripes' || o.pattern === 'dots' ? o.pattern : base.pattern } : {}),
     surface: base.action === 'paint' && typeof o.surface === 'number' && PAINTS.some((p) => p.id === o.surface) ? o.surface : base.surface,
     model: base.action === 'place' && typeof o.model === 'string' && THINGS.some((t) => t.id === o.model) ? o.model : base.model,
     sprite: firstUse('sprite') ?? sprite,
@@ -127,7 +181,7 @@ export function toolVariables(t: ToolPreset, sounds: readonly string[]): Variabl
   }
   if (t.action === 'place') vars.push({ key: 'size', type: 'number', label: 'Size', doc: 'How big the thing is (1 = as it was made).', tier: 'play', default: t.size, min: 0.25, max: 4, step: 0.05, hardMin: 0.05, group: 'Tool' });
   if (t.action === 'turn' || t.action === 'resize') vars.push({ key: 'strength', type: 'number', label: t.action === 'turn' ? 'Turn by' : 'Grow by', doc: t.action === 'turn' ? 'How far one click turns it (1 = a full turn).' : 'How much one click grows it.', tier: 'play', default: t.strength, min: 0, max: 1, step: 0.01, hardMin: 0, group: 'Tool' });
-  if (t.action === 'paint') vars.push({ key: 'surface', type: 'enum', label: 'Paints', doc: 'The ground it paints.', tier: 'play', default: PAINTS.find((p) => p.id === t.surface)?.name ?? 'Grass', options: PAINTS.map((p) => p.name), group: 'Tool' });
+  if (t.action === 'paint' && !t.way) vars.push({ key: 'surface', type: 'enum', label: 'Paints', doc: 'The ground it paints.', tier: 'play', default: PAINTS.find((p) => p.id === t.surface)?.name ?? 'Grass', options: PAINTS.map((p) => p.name), group: 'Tool' });
   if (t.action === 'place') vars.push({ key: 'model', type: 'enum', label: 'Places', doc: 'The thing it places.', tier: 'play', default: THINGS.find((m) => m.id === t.model)?.name ?? 'Palm', options: THINGS.map((m) => m.name), group: 'Tool' });
   void sounds; // sprites and sounds are plugs now (see plugs.ts), edited in the tool's "When you use it" list
   return vars;

@@ -35,7 +35,7 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix with the harness menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My planet', 'Avatars', 'Community', 'Settings']));
+  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My planet', 'Avatars', 'Community', 'Settings']));
   await page.waitForSelector('.gr-preview', { timeout: T(30000) });
   check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings']));
   check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
@@ -180,11 +180,34 @@ try {
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
-  check('the paint slots show ground swatches', await page.locator('.hotbar .pv-swatch').count() >= 9);
+  check('Paint holds ways to paint (Brush, Fill, Clone ...), not surfaces', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Brush', 'Fill', 'Stamp', 'Clone', 'Eraser'].every((w) => t.includes(w)); }));
+  check('the surfaces are in the palette film strip, top middle', await page.locator('.palette-strip .ps-frame').count() >= 20);
+  check('the tool in hand shows its own presets, drawn on the ground', await page.locator('.tool-presets canvas.tp-pv').count() >= 4);
+  check('the hotbar has Easy, Pro and Studio', JSON.stringify(await page.$$eval('.level-switch button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Easy', 'Pro', 'Studio']));
+  await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
+  await page.waitForTimeout(T(300));
+  check('Pro adds size and strength beside the presets', await page.locator('.tp-knobs input[type=range]').count() === 2);
+  await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
+  // paint for real: the palette's lava, the Fill way, one click on the ground (in studio the mouse is free)
+  await page.keyboard.press('b');
+  await page.waitForTimeout(T(900));
+  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Lava/.test(b.textContent ?? ''))?.click(); });
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Fill/.test(b.textContent ?? ''))?.click(); });
+  const lavaBefore = await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0);
+  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(150)); await page.mouse.up();
+  await page.waitForTimeout(T(600));
+  const lavaAfter = await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0);
+  check('Fill with lava from the palette paints the ground', lavaAfter > lavaBefore, `lava cells ${lavaBefore} to ${lavaAfter}`);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(T(300));
+  check('and Ctrl+Z takes it back', (await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0)) === lavaBefore);
+  await page.keyboard.press('b');
+  await page.waitForTimeout(T(500));
+  for (let i = 0; i < 3 && await page.locator('.fwin').count() > 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(250)); }
   await page.keyboard.press('e');
   await page.waitForTimeout(T(500));
   check('E opens your presets', await page.locator('.fwin[aria-label="Your presets"]').count() === 1);
-  check('every paint preset has a card', await page.locator('.pw-card').count() >= 20);
+  check('every way to paint has a card', await page.locator('.pw-card').count() >= 9);
   await dom(() => { [...document.querySelectorAll('.pw-tabs button')].find((b) => /Animate/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(T(400));
   check('animations preview as moving figures', await page.locator('.pw-card .pv-anim').count() >= 8);

@@ -166,9 +166,9 @@ The hotbar is how you edit everything, and it is where the game is still thinnes
 
 | Step | What | Gaps it closes |
 |---|---|---|
-| H-a | The hotbar audit in the screen map (every kind of thing × every tab: selectable? which tool edits it? at which level?) | measures the rest |
-| H-b | The skeleton: the hotbar preset with Easy / Pro / Studio, the tool-presets row with previews on the selection, the palette film strip, More… in the Inspector | the loop |
-| H-c | Paint as ways to paint (Brush, Spray, Fill, Gradient, Stamp, Pattern, Clone, Smudge, Eraser), the surfaces moved into the palette | owner's example |
+| H-a | The hotbar audit in the screen map (every kind of thing × every tab: selectable? which tool edits it? at which level?) | measures the rest. **DONE** (static audit: `buildkit` `hotbarCoverage`, printed at the top of `ui-map/index.html`); next: the crawler points Select at each kind on the island |
+| H-b | The skeleton: the hotbar preset with Easy / Pro / Studio, the tool-presets row with previews on the selection, the palette film strip, More… in the Inspector | the loop. **Mostly done**: Easy / Pro / Studio on the hotbar (Easy: the best presets; Pro: all, with size and strength; Studio: Every setting); the presets row draws each preset on the ground you look at; the palette film strip (top middle, scroll buttons, a Community part). To do: More… in the Inspector, the hotbar as a stored preset kind |
+| H-c | Paint as ways to paint (Brush, Spray, Fill, Gradient, Stamp, Pattern, Clone, Smudge, Eraser), the surfaces moved into the palette | owner's example. **DONE**: `@hm/terrain` `paintWay` (tested), each way with its presets, the 26 surfaces in the palette; old saves get the new paint slots |
 | H-d | Sculpt as ways to sculpt (Raise, Lower, Smooth, Flatten, Grab, Clay, Crease, Stamp, Terrace; + Inflate, Pinch, Twist, Noise, Erode, Bridge …), stamps and patterns in the palette, the toggles | |
 | H-e | Select picks anything (ground areas, a surface's wand, things, parts, blocks), Move's ways to move a thing and the ways to move yourself (shared with the Camera tab) | "select anything and change it" |
 | H-f | Things (Scatter, Row, Swap), Lights (sun and time, place a light, day and night), Animate (Pose, Keys, Blend), Sound (Attach, Zone) | |

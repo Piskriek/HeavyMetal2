@@ -170,3 +170,12 @@ export function applyVariant(toolId: string, patch: Readonly<Record<string, unkn
   const s = get();
   set({ ...s, tools: { ...s.tools, [toolId]: { ...(s.tools[toolId] ?? {}), ...patch } } });
 }
+
+/** Settings, Hotbar: replace a tab's row (up to nine slots; empty slots are null). */
+export function setRow(tab: TabId, row: readonly (string | null)[]): void {
+  const s = get();
+  const next = Array.from({ length: SLOTS }, (_, i) => row[i] ?? null);
+  set({ ...s, hotbars: { ...s.hotbars, [tab]: next } });
+}
+/** Settings, Hotbar: back to the ready-made row of a tab. */
+export function resetRow(tab: TabId): void { const s = get(); set({ ...s, hotbars: { ...s.hotbars, [tab]: [...defaultHotbars(activities, s)[tab]] } }); }

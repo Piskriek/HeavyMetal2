@@ -45,6 +45,14 @@ try {
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
   check('with graphics presets from Potato to Auto', await page.locator('.graphics-presets button').count() === 6);
+  // Settings, Hotbar: the hotbar is a preset you manage (grown-up profiles)
+  if (await page.locator('.hotbar-settings').count()) {
+    await dom(() => document.querySelector('[aria-label="Take Brush off"]')?.click());
+    const off = await page.$$eval('.hs-row .hs-name', (s) => s[0]?.textContent);
+    await dom(() => [...document.querySelectorAll('.hotbar-settings .btns button')].find((b) => /ready-made/.test(b.textContent ?? ''))?.click());
+    const back = await page.$$eval('.hs-row .hs-name', (s) => s[0]?.textContent);
+    check('Settings, Hotbar: a tool comes off its slot and the ready-made row comes back', off === 'Empty' && back === 'Brush');
+  }
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 

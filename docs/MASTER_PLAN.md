@@ -173,7 +173,7 @@ The hotbar is how you edit everything, and it is where the game is still thinnes
 | H-e | Select picks anything (ground areas, a surface's wand, things, parts, blocks), Move's ways to move a thing and the ways to move yourself (shared with the Camera tab) | "select anything and change it" |
 | H-f | Things (Scatter, Row, Swap), Lights (sun and time, place a light, day and night), Animate (Pose, Keys, Blend), Sound (Attach, Zone) | |
 | H-g | Editing a thing's blocks on the island (paint, sculpt, select parts and faces) | |
-| H-h | Settings, Hotbar: add, remove, reorder tools per tab, back to ready-made, share | "hotbar management in the settings" |
+| H-h | Settings, Hotbar: add, remove, reorder tools per tab, back to ready-made, share | "hotbar management in the settings". **DONE** (2026-10-04, but sharing): Settings has a Hotbar section (grown-up profiles): pick a tab, its nine slots with previews, move left or right, take off, + Add from the tab's presets, back to the ready-made row, and the level. Next: share a hotbar (it becomes a preset kind) |
 
 ---
 

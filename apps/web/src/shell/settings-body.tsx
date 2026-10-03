@@ -4,6 +4,7 @@ import { ControlsList, ControlsSettings } from './controls-list';
 import { GraphicsTuning } from './graphics-tuning';
 import { gpuInUse, tierInUse, type GpuChoice, type Profile } from './profile';
 import { setPlaySettings, usePlaySettings } from './play-settings';
+import { HotbarSettings } from '../build/hotbar-settings';
 
 type Choice = 'auto' | Quality;
 /** The graphics presets, lightest first, as one-click buttons (owner: "scale down to the calculator version with the click of a preset button", since renamed Potato). */
@@ -66,6 +67,12 @@ export function SettingsBody(props: {
         <ControlsSettings value={profile.controls} onChange={(c) => update((p) => ({ ...p, controls: c }))} />
         <ControlsList />
       </section>
+      {props.profile.grownUp ? (
+        <section aria-label="Hotbar">
+          <h4>Hotbar</h4>
+          <HotbarSettings />
+        </section>
+      ) : null}
       <section aria-label="Racing">
         <h4>Racing</h4>
         <div className="row" role="group" aria-label="Touch controls">

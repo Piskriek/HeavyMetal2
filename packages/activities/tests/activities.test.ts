@@ -300,7 +300,7 @@ test('describeActivity and activityCard', () => {
   assert.equal(describeActivity(a, 0), 'Goblin Racing: 8 players hosting a tournament, next event in 2 days');
   assert.equal(describeActivity({ ...a, hosting: { tournament: false, players: 1, nextEventAt: null } }, 0), 'Goblin Racing: 1 player in play');
   assert.equal(describeActivity({ ...a, hosting: { tournament: false, players: 0, nextEventAt: 0 } }, 0), 'Goblin Racing: quiet right now, next event in now');
-  assert.deepEqual(activityCard(a), { title: 'Goblin Racing', subtitle: 'Race hand-reared goblins around a muddy track.', badge: 'Built-in' });
+  assert.deepEqual(activityCard(a), { title: 'Goblin Racing', subtitle: 'Race goblins in glass balls round an island, with items, heats and a weekly cup.', badge: 'Built-in' });
   assert.equal(activityCard({ ...a, builtin: false, forkOf: 'goblin-racing' }).badge, 'Fork');
   assert.equal(activityCard({ ...a, builtin: false, hidden: true }).badge, 'Hidden');
   assert.equal(activityCard(mk('x', { doc: 'line one\nline two' })).subtitle, 'line one');

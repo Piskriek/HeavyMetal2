@@ -12,6 +12,12 @@ let pinned: string | null = null;
 export function pinMapKey(key: string | null): void { pinned = key; }
 const currentKey = (): string => pinned ?? bundleKey(activeIslandId() ?? 'orphan');
 
+/**
+ * The map each runtime was loaded from. A save goes back there, never to whatever is pinned or active at the moment of saving: with the
+ * Goblin Racing island and your own island both reachable from SetMix, a late (debounced) save must not land in the other one.
+ */
+const homeOf = new WeakMap<Runtime, { readonly pinned: string | null; readonly island: string | null }>();
+
 const isRef = (v: Value | undefined): v is { ref: string } => typeof v === 'object' && v !== null && !Array.isArray(v) && typeof (v as { ref?: unknown }).ref === 'string';
 
 /** The map as one bundle: the scene plus everything its params reference (track, camera, materials). */
@@ -32,9 +38,17 @@ export function mapBundle(rt: Runtime, sceneId: PresetId): PresetBundle {
 /** Save the map to the player's storage (the cloud save in RUN, localStorage elsewhere). */
 export function saveMap(rt: Runtime, sceneId: PresetId): boolean {
   try {
+    const home = homeOf.get(rt) ?? { pinned, island: activeIslandId() };
+    // the runtime's own island is no longer the active one: skip rather than write into another island
+    if (home.pinned === null && home.island !== activeIslandId()) return false;
     const json = JSON.stringify(mapBundle(rt, sceneId));
-    if (pinned === null) return persistActive(json).ok;
-    localStorage.setItem(pinned, json);
+    if (home.pinned === null) {
+      const ok = persistActive(json).ok;
+      // the first edit of a template forks it into an island of your own: this runtime belongs to that one from now on
+      homeOf.set(rt, { pinned: null, island: activeIslandId() });
+      return ok;
+    }
+    localStorage.setItem(home.pinned, json);
     return true;
   } catch {
     return false;
@@ -82,6 +96,7 @@ export function clearSavedMap(): void {
 
 /** Import the saved map into the runtime and bind its scene. Returns the scene description, or null when there is none. */
 export function loadMap(rt: Runtime): MakerScene | null {
+  homeOf.set(rt, { pinned, island: activeIslandId() });
   try {
     const raw = localStorage.getItem(currentKey());
     if (!raw) return null;

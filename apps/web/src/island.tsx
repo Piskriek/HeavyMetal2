@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { Params, PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
@@ -58,6 +58,10 @@ export function IslandWalk(props: {
   readonly gpu?: GpuChoice;
   /** The frame rate auto quality aims for (Settings): 15 prettier, 60 smoother. */
   readonly fpsTarget?: FpsTarget;
+  /** Only this element's area of the view is seen (the SetMix home's window): the renderer shades just that part. */
+  readonly clipTo?: RefObject<HTMLElement | null>;
+  /** Showcase only: where on the screen (0..1 across and down) the goblin should stand, when only part of the view is seen (the SetMix home's window). */
+  readonly frame?: { readonly x: number; readonly y: number };
   /** The player's own changes to the graphics preset, on top of whichever tier draws (Settings). */
   readonly graphics?: Params;
   /** The whole profile and its updater, for the Settings window (Esc, Settings). */
@@ -86,6 +90,10 @@ export function IslandWalk(props: {
   qualityRef.current = props.quality ?? 'auto';
   const ownGraphicsRef = useRef<Params>(props.graphics ?? {});
   ownGraphicsRef.current = props.graphics ?? {};
+  const clipRef = useRef(props.clipTo);
+  clipRef.current = props.clipTo;
+  const frameRef = useRef(props.frame);
+  frameRef.current = props.frame;
   const fpsRef = useRef<FpsTarget>(props.fpsTarget ?? 60);
   fpsRef.current = props.fpsTarget ?? 60;
   const graphicsRef = useRef<{ readonly renderer: ThreeRenderer; readonly device: DeviceFacts; adaptive: AdaptiveQuality } | null>(null);
@@ -642,8 +650,15 @@ export function IslandWalk(props: {
         const a = menuAngle(now);
         // aim a little to the goblin's left so it stands in the right third of the screen, clear of the menu
         const rx = Math.cos(a), rz = -Math.sin(a);
-        target = [px - rx * 2, py + 1.9, pz - rz * 2];
-        wantEye = [px + Math.sin(a) * MENU_DIST, py + 2.3, pz + Math.cos(a) * MENU_DIST];
+        const fr = frameRef.current;
+        // a window onto this view (the SetMix home): stand back so the island shows round the goblin, and aim so the goblin stands across the
+        // screen where the window is; the camera stays level, so the horizon and the sky sit in the middle of the window
+        const dist = fr ? MENU_DIST * 1.6 : MENU_DIST;
+        const vf = Math.tan(((controlsRef.current.fov - 15) * Math.PI) / 360), aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        const off = fr ? (fr.x - 0.5) * 2 * vf * aspect * dist : 2;
+        // in a window, look down a touch at the goblin's middle: it stands mid-window with the horizon and sky above it
+        target = [px - rx * off, py + (fr ? 1.45 : 1.9), pz - rz * off];
+        wantEye = [px + Math.sin(a) * dist, py + (fr ? 2.6 : 2.3), pz + Math.cos(a) * dist];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 1.2);
       } else if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
       const snap = (fpv || st) && !overview && !ft;
@@ -661,6 +676,10 @@ export function IslandWalk(props: {
       if (sx || sy || sz) renderer.camera.set([eye[0] + sx, eye[1] + sy, eye[2] + sz], [target[0] + sx * 0.5, target[1] + sy * 0.5, target[2] + sz * 0.5]);
       else renderer.camera.set(eye, target);
       renderer.step();
+      // seen through a window (the SetMix home): shade only what the window shows
+      const clipEl = clipRef.current?.current;
+      if (clipEl && el) { const r = clipEl.getBoundingClientRect(), c = el.getBoundingClientRect(); const full = r.width >= c.width - 2 && r.height >= c.height - 2; renderer.setClip(full ? null : { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height }); }
+      else renderer.setClip(null);
       renderer.render(1);
       raf = requestAnimationFrame(loop);
     };
@@ -726,7 +745,7 @@ export function IslandWalk(props: {
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
-          <button className="go" onClick={onMainMenu}>Main menu</button>
+          <button className="go" onClick={onMainMenu}>Home</button>
           {buildOn ? <button onClick={() => { setMenu(false); setMode('studio'); }}>Studio mode</button> : null}
           <button onClick={() => { setMenu(false); openSettings(); }}>Settings</button>
           <button onClick={() => { setMenu(false); setTab('avatar'); openPresets(); }}>My Avatar</button>
@@ -734,7 +753,7 @@ export function IslandWalk(props: {
           {!tourView.visible ? <button onClick={() => { setMenu(false); tourReplay(); }}>Show the tour</button> : null}
           <button onClick={onActivities}>Activities</button>
           {onIslands ? <button onClick={onIslands}>My islands</button> : null}
-          <button onClick={onHub}>Multiplayer</button>
+          <button onClick={onHub}>Community</button>
           <button onClick={() => { setMenu(false); if (p.mode === 'walk') api.current?.lock(); }}>Back to {p.mode === 'studio' ? 'the studio' : 'walking'}</button>
         </div>
       ) : null}

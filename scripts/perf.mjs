@@ -23,10 +23,14 @@ try {
   await page.addInitScript(() => { Element.prototype.requestPointerLock = function () { return Promise.reject(new Error('pointer lock is stubbed in tests')); }; });
   await page.goto(`http://127.0.0.1:${port}/`);
   const gpu = await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? String(g.getParameter(x.UNMASKED_RENDERER_WEBGL)) : 'unknown'; });
-  // a returning player: tour done, quality fixed by hand (so auto does not change it under the measurement)
-  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('hm.profile.v2', JSON.stringify({ name: 'Perf', tutorialDone: true, quality: 'low' })); });
+  // a returning player: an avatar made, tour done, quality fixed by hand (so auto does not change it under the measurement)
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('hm.profile.v2', JSON.stringify({ name: 'Perf', tutorialDone: true, quality: 'low' }));
+    localStorage.setItem('hm.player.v1', JSON.stringify({ created: true }));
+  });
   await page.reload();
-  await page.waitForSelector('.shell-menu');
+  await page.waitForSelector('.sm-home');
 
   const measure = async (screen, tier) => {
     await page.evaluate((q) => { (window).hmRenderer?.setQuality(q); }, tier);
@@ -57,9 +61,17 @@ try {
 
   console.log(`renderer: ${gpu}\n`);
   await page.waitForTimeout(4000);
-  for (const t of tiers) await measure('main menu', t);
+  // the SetMix home: the galaxy and Goblin Racing's island (behind its window) both draw every frame
+  for (const t of tiers) await measure('SetMix home', t);
+  await page.evaluate(() => document.querySelector('.gr-open')?.click());
+  await page.waitForSelector('.gr-front');
+  await page.waitForTimeout(2500);
+  for (const t of tiers) await measure('Goblin Racing menu', t);
+  await page.evaluate(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Back to SetMix')?.click(); });
+  await page.waitForSelector('.sm-home');
+  await page.waitForTimeout(1500);
 
-  await page.evaluate(() => { [...document.querySelectorAll('.shell-menu button')].find((b) => b.textContent === 'My Island')?.click(); });
+  await page.evaluate(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => /My island/.test(b.textContent ?? ''))?.click(); });
   await page.waitForSelector('.hotbar');
   await page.waitForTimeout(6000); // the arrival flight
   await skin('Flat');

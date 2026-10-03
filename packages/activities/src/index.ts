@@ -104,7 +104,7 @@ export function goblinRacing(): Activity {
   return {
     id: 'goblin-racing',
     name: 'Goblin Racing',
-    doc: 'Race hand-reared goblins around a muddy track.',
+    doc: 'Race goblins in glass balls round an island, with items, heats and a weekly cup.',
     builtin: true,
     hidden: false,
     planet: { hue: 96, size: 4, ring: true },

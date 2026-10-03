@@ -57,6 +57,10 @@ export const GalaxyCanvas = forwardRef<GalaxyHandle, {
   readonly highlightId?: string;
   readonly onPick?: (id: string | null) => void;
   readonly reducedMotion?: boolean;
+  /** Every frame in hub mode: where the focused planet is on screen and its radius there (CSS pixels), for annotations such as a leader line. */
+  readonly onFocusScreen?: (x: number, y: number, radius: number) => void;
+  /** Hub mode: frame the focused planet this many units left of centre (room for an annotation on its right). */
+  readonly focusShift?: number;
 }>(function GalaxyCanvas(props, ref) {
   const host = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
@@ -220,7 +224,12 @@ export const GalaxyCanvas = forwardRef<GalaxyHandle, {
     };
 
     let raf = 0, last = performance.now();
+    const focusAt = new THREE.Vector3(), focusRight = new THREE.Vector3();
+    let lastMode = live.current.mode;
     const loop = (now: number): void => {
+      // untouched, the galaxy only drifts: draw it at 30 fps and leave the rest of the frame to the island behind Goblin Racing's window
+      // (full rate while you point at it, drag it, dive, or it changes mode)
+      if (!diving && !pointer && live.current.mode === lastMode && now - last < 30) { raf = requestAnimationFrame(loop); return; }
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       const L = live.current;
       syncControls();
@@ -229,8 +238,10 @@ export const GalaxyCanvas = forwardRef<GalaxyHandle, {
         camera.position.set(Math.sin(a) * 230, 150, Math.cos(a) * 230);
         camera.lookAt(0, 8, 0);
       }
+      // back from the backdrop (the community, the activities window ...): frame the focused planet again, not wherever the orbit left the camera
+      if (L.mode !== lastMode) { if (L.mode === 'hub') (controls as unknown as { _focused?: string })._focused = undefined; lastMode = L.mode; }
       if (L.mode === 'hub' && L.focusId && !diving && !(controls as unknown as { _focused?: string })._focused) {
-        const p = positions.get(L.focusId); if (p) { controls.target.set(p.x, LIFT * 0.6, p.z); camera.position.set(p.x + 40, 70, p.z + 90); (controls as unknown as { _focused?: string })._focused = L.focusId; }
+        const p = positions.get(L.focusId), k = L.focusShift ?? 0; if (p) { controls.target.set(p.x + k, LIFT * 0.6, p.z); camera.position.set(p.x + k + 40, 70, p.z + 90); (controls as unknown as { _focused?: string })._focused = L.focusId; }
       }
       stars.rotation.y += dt * 0.003;
       chartGroup.rotation.y = stars.rotation.y;
@@ -253,6 +264,14 @@ export const GalaxyCanvas = forwardRef<GalaxyHandle, {
       }
       controls.update();
       renderer.render(scene, camera);
+      if (L.mode === 'hub' && L.focusId && L.onFocusScreen) {
+        const m = markers.get(L.focusId);
+        if (m) {
+          const s = screenOf(m.planet.getWorldPosition(focusAt));
+          const edge = screenOf(focusAt.add(focusRight.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(PLANET_R * m.scale)));
+          L.onFocusScreen(s.x, s.y, Math.hypot(edge.x - s.x, edge.y - s.y));
+        }
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);

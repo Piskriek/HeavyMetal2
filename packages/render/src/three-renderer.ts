@@ -70,6 +70,11 @@ export type ThreeRenderer = RenderService & {
   setQuality(q: Quality): void;
   /** Draw with these graphics settings: a tier, maybe with the player's own changes on top (`resolveGraphics`). */
   setGraphics(g: GraphicsSettings): void;
+  /**
+   * Only this part of the canvas is seen (CSS pixels from its top-left), e.g. a window onto the view: pixels outside it are not shaded.
+   * null draws everything. Used without picture effects (the effects pass draws the whole frame).
+   */
+  setClip(rect: { readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null): void;
   readonly graphics: GraphicsSettings;
   /** The graphics chip the browser gave this page, as it names it (null before the first mount or when the browser hides it). */
   readonly gpu: string | null;
@@ -121,6 +126,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let removeWindowResize: (() => void) | null = null;
   let previousFrame: number | null = null;
   let gpuName: string | null = null;
+  let clip: { readonly x: number; readonly y: number; readonly w: number; readonly h: number } | null = null;
   const listeners = new Set<(dtMs: number) => void>();
 
   const resize = (): void => {
@@ -434,7 +440,14 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
         if (post && (changed || postStale)) { post.apply(rig.current.post, qualitySpecOf(graphics)); postStale = false; }
       }
       if (post) post.render(frameSeconds);
-      else webgl.render(scene, viewCamera);
+      else if (clip) {
+        // only part of the view is seen (a window onto it): shade just those pixels, the rest of the canvas is hidden anyway
+        const h = webgl.domElement.clientHeight;
+        webgl.setScissorTest(true);
+        webgl.setScissor(clip.x, h - clip.y - clip.h, clip.w, clip.h);
+        webgl.render(scene, viewCamera);
+        webgl.setScissorTest(false);
+      } else webgl.render(scene, viewCamera);
       const now = performance.now();
       const dt = previousFrame === null ? 0 : now - previousFrame;
       previousFrame = now;
@@ -511,6 +524,9 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     },
     get gpu() {
       return gpuName;
+    },
+    setClip(rect): void {
+      clip = rect && rect.w > 0 && rect.h > 0 ? rect : null;
     },
     get debug() {
       return webgl && scene && viewCamera ? { webgl, scene, camera: viewCamera, post: !!post } : null;

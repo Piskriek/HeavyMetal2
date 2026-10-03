@@ -549,3 +549,92 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .pp-cards button { flex: 0 0 auto; padding: 2px; line-height: 0; background: var(--panel); border: 1px solid var(--line); }
 .pp-cards button.none { line-height: 1; font-size: 11px; padding: 0 8px; min-height: 50px; color: var(--dim); }
 .pp-cards button.on { outline: 2px solid var(--accent); outline-offset: -2px; color: var(--text); }
+
+/* ---- SetMix Harness home (shell/goblin-front.tsx) --------------------------------------------------------------------------------
+   The galaxy star chart is the home. SetMix speaks in Oxanium; Goblin Racing keeps its own voice (Bricolage). One bold element:
+   Goblin Racing's live window, tied to its planet by a leader line like a note on a chart. Everything else stays quiet. */
+:root { --font-setmix: 'Oxanium', Inter, 'Helvetica Neue', Arial, sans-serif; --ease-out: cubic-bezier(.2, .8, .2, 1); }
+.sm-layer { pointer-events: none; }
+.sm-layer > * { pointer-events: auto; }
+.sm-home { position: absolute; inset: 0; pointer-events: none; }
+.sm-home > * { pointer-events: auto; }
+.sm-leader { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.sm-leader circle { fill: none; stroke: var(--text); stroke-width: 1; transition: opacity .25s; }
+.sm-leader line { stroke: var(--text); stroke-width: 1; transition: opacity .25s; }
+.sm-brand { position: absolute; left: clamp(20px, 5vw, 72px); top: clamp(22px, 7vh, 72px); display: flex; flex-direction: column; gap: 6px; color: var(--text); animation: sm-in .6s var(--ease-out) both; }
+.sm-brand b { font-family: var(--font-setmix); font-weight: 800; font-size: clamp(48px, 7vw, 104px); letter-spacing: -0.02em; line-height: .86; }
+.sm-brand i { font-family: var(--font-setmix); font-style: normal; font-weight: 500; font-size: clamp(14px, 1.3vw, 18px); color: var(--dim); padding-left: .15em; }
+.sm-brand.small { position: static; flex-direction: row; align-items: baseline; gap: 10px; animation: none; }
+.sm-brand.small b { font-size: 22px; }
+.sm-brand.small i { font-size: 13px; }
+.sm-menu { position: absolute; left: clamp(20px, 5vw, 72px); top: calc(clamp(22px, 7vh, 72px) + clamp(84px, 11vw, 160px)); display: grid; gap: 4px; width: min(340px, 80vw); }
+.sm-menu button { display: grid; gap: 1px; text-align: left; padding: 8px 0 8px 0; border: 0; border-left: 2px solid transparent; background: none; color: var(--text);
+  transition: padding-left .22s var(--ease-out), border-color .22s, color .22s; animation: sm-in .6s var(--ease-out) both; animation-delay: calc(120ms + var(--i, 0) * 70ms); }
+.sm-menu button b { font-family: var(--font-setmix); font-weight: 600; font-size: clamp(20px, 2vw, 26px); line-height: 1.15; }
+.sm-menu button small { font-size: 12px; color: var(--dim); transition: color .22s; }
+.sm-menu button:hover:not(:disabled), .sm-menu button:focus-visible { background: none; padding-left: 12px; border-left-color: var(--accent); color: var(--text); outline: none; }
+.sm-menu button:hover small, .sm-menu button:focus-visible small { color: var(--text); }
+.sm-menu button:active { padding-left: 16px; }
+.sm-foot { position: absolute; left: clamp(20px, 5vw, 72px); bottom: 18px; margin: 0; font-size: 12px; color: var(--dim); animation: sm-in .6s var(--ease-out) .35s both; }
+.sm-credits { position: absolute; right: 24px; top: 22px; font-family: var(--font-setmix); font-weight: 600; font-size: 14px; color: var(--text); }
+.sm-layer .shell-card { left: clamp(20px, 5vw, 72px); right: auto; top: auto; bottom: 56px; width: min(320px, 80vw); animation: sm-in .35s var(--ease-out) both; }
+.sm-layer .shell-card .quiet { margin-left: 8px; }
+@keyframes sm-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Goblin Racing's stage: a live window beside its planet on the home; open it and the same window grows to fill the screen */
+/* The window: --gr-l / --gr-t are where it sits; the scene inside is moved back by the same amount on the same curve, so the 3D view stays put */
+.gr-stage { --gr-w: min(42vw, 640px); --gr-l: calc(96vw - var(--gr-w)); --gr-t: 16vh; position: absolute; left: var(--gr-l); top: var(--gr-t); width: var(--gr-w); height: min(58vh, 470px);
+  border: 1px solid var(--text); background: var(--paper); overflow: hidden;
+  transition: top .75s var(--ease-out), left .75s var(--ease-out), width .75s var(--ease-out), height .75s var(--ease-out), border-color .75s; }
+.gr-scene { position: absolute; left: calc(-1 * var(--gr-l) - 1px); top: calc(-1 * var(--gr-t) - 1px); width: 100vw; height: 100vh; transition: top .75s var(--ease-out), left .75s var(--ease-out); }
+.gr-stage.full .gr-scene { left: 0; top: 0; }
+/* slides in once, when it first appears (not again each time Goblin Racing shrinks back into it) */
+.gr-stage.arrive { animation: gr-in .8s var(--ease-out) .25s both; }
+.gr-stage.full { left: 0; top: 0; width: 100%; height: 100%; border-color: transparent; }
+@keyframes gr-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+.gr-preview { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr auto auto; pointer-events: none; }
+.gr-preview > * { pointer-events: auto; }
+.gr-preview header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 8px 10px 14px; background: var(--paper); border-bottom: 1px solid var(--text); }
+.gr-preview-title { display: grid; gap: 2px; min-width: 0; }
+.gr-preview-name { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: -0.015em; line-height: 1; }
+.gr-preview-doc { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gr-open { border: 1px solid transparent; background: none; padding: 7px; transition: border-color .18s; }
+.gr-open:hover:not(:disabled) { background: none; border-color: var(--text); }
+.gr-preview-hit { position: relative; border: 0; background: transparent; cursor: zoom-in; display: grid; place-items: center; }
+.gr-preview-hit:hover:not(:disabled) { background: transparent; }
+.gr-cue { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; background: var(--paper); border: 1px solid var(--text); font-size: 12px; font-weight: 600; color: var(--text);
+  opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s var(--ease-out); }
+.gr-preview-hit:hover .gr-cue, .gr-preview-hit:focus-visible .gr-cue { opacity: 1; transform: none; }
+.gr-preview-you { margin: 0; padding: 7px 14px; font-size: 12px; color: var(--text); background: var(--paper); border-top: 1px solid var(--text); }
+.gr-preview-menu { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--paper); border-top: 1px solid var(--line); }
+.gr-preview-menu button { font-family: var(--font-display); font-weight: 700; font-size: 16px; padding: 12px 0; border: 0; border-right: 1px solid var(--line); background: none; transition: background .18s, color .18s; }
+.gr-preview-menu button:last-child { border-right: 0; }
+.gr-preview-menu button:hover:not(:disabled) { background: var(--text); color: var(--paper); }
+.gr-preview-menu button.go { color: var(--accent); }
+.gr-preview-menu button.go:hover:not(:disabled) { background: var(--accent); color: #fff; }
+
+/* Goblin Racing's front menu, over its island */
+.gr-front { position: absolute; inset: 0; pointer-events: none; }
+.gr-front > * { pointer-events: auto; }
+/* keeps the words readable over bright sky and grass: dark on the left where the menu sits, clear where the goblin stands */
+.gr-front .gr-scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(14, 18, 14, .52) 0%, rgba(14, 18, 14, .28) 32%, rgba(14, 18, 14, 0) 58%); animation: gr-fade .6s ease .35s both; }
+.gr-brand { position: absolute; left: clamp(20px, 6vw, 90px); top: clamp(24px, 8vh, 80px); display: flex; flex-direction: column; color: #f6f5ef; animation: gr-rise .6s var(--ease-out) .45s both; }
+.gr-brand b { font-family: var(--font-display); font-weight: 800; font-size: clamp(56px, 8.5vw, 124px); letter-spacing: -0.035em; line-height: .86; }
+.gr-brand b.second { font-weight: 700; font-size: clamp(30px, 4.2vw, 62px); letter-spacing: -0.02em; line-height: 1; margin-top: 2px; }
+.gr-brand i { font-family: var(--font-setmix); font-style: normal; font-weight: 500; font-size: 14px; margin-top: 10px; color: #dcdacf; }
+.gr-front .shell-menu { animation: gr-rise .6s var(--ease-out) .55s both; }
+.gr-front .shell-menu button { transition: padding-left .22s var(--ease-out), color .22s; }
+.gr-front .shell-menu button.quiet { font-size: clamp(16px, 1.8vw, 20px); color: #d6d4c9; }
+.gr-front .shell-foot { color: #e4e2d8; animation: gr-fade .6s ease .7s both; }
+@keyframes gr-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes gr-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 760px) {
+  .gr-stage { --gr-w: calc(100vw - 32px); --gr-l: 16px; --gr-t: calc(56vh - 16px); height: 44vh; }
+  .sm-foot, .sm-leader { display: none; }
+  .gr-preview-doc { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gr-stage, .gr-scene, .sm-menu button { transition: none; }
+  .sm-brand, .sm-menu button, .sm-foot, .gr-stage, .gr-front .gr-scrim, .gr-brand, .gr-front .shell-menu, .gr-front .shell-foot, .sm-layer .shell-card { animation: none; }
+}

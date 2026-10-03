@@ -499,3 +499,13 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .shell-window > label.row > select, .shell-window > label.row > input:not([type="checkbox"]) { width: 100%; min-width: 0; }
 .shell-window > .controls-settings, .shell-window > .controls-list { margin: 14px 16px 0; }
 .controls-settings h4 { margin: 0 0 4px; font-size: 10px; font-weight: 600; color: var(--dim); }
+
+/* the Sound Lab inside an island window */
+.fwin .lab { display: grid; gap: 6px; }
+.fwin .lab .wave { width: 100%; height: 56px; color: var(--accent); background: #fff; border: 1px solid var(--line); display: block; }
+.fwin .lab .layer { border: 1px solid var(--line); padding: 6px 8px; display: grid; gap: 4px; }
+.fwin .lab .layer-head { display: flex; align-items: center; gap: 6px; }
+.fwin .lab .layer-head b { flex: 1; font-size: 12px; }
+.fwin .lab .row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.fwin .lab .row input[type="range"] { flex: 1; min-width: 0; }
+.fwin .lab textarea.code { width: 100%; box-sizing: border-box; font: 11px/1.35 ui-monospace, Consolas, monospace; }

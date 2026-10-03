@@ -1,4 +1,5 @@
-import { SFX, SFX_IDS, type SfxId } from '@hm/audio';
+import { SFX, SFX_IDS, type SfxId, type SfxRecipe } from '@hm/audio';
+type SfxRecipeLayers = SfxRecipe['layers'];
 import { ANIMATIONS, animById, animToParams, normalizeAnim, type AnimPreset } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
 import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset } from '@hm/buildkit';
@@ -16,7 +17,7 @@ export type Preview =
   | { readonly kind: 'model'; readonly model: string }
   | { readonly kind: 'sky'; readonly top: string; readonly horizon: string; readonly ground: string; readonly sun: string }
   | { readonly kind: 'anim'; readonly anim: AnimPreset }
-  | { readonly kind: 'sound'; readonly id: SfxId }
+  | { readonly kind: 'sound'; readonly id: SfxId; readonly recipe?: { readonly layers: SfxRecipeLayers; readonly durationMs?: number } }
   | { readonly kind: 'planet'; readonly hue: number; readonly ring: boolean }
   | { readonly kind: 'look'; readonly look: AvatarLook }
   | { readonly kind: 'sprite'; readonly sprite: SpritePreset }
@@ -73,7 +74,7 @@ export function catalog(tab: TabId, player: CatalogPlayer, activities: readonly 
     case 'animate':
       return ANIMATIONS.map((a) => { const p = animOf(player, a.id); return { tab, id: a.id, name: p.name, doc: `${p.loop ? 'Repeats' : 'Plays once'}: ${p.style}.`, preview: { kind: 'anim', anim: p }, edited: !!player.anims[a.id] }; });
     case 'sound':
-      return SFX_IDS.map((id) => ({ tab, id, name: soundName(id), doc: `A ${SFX[id].category} sound, ${SFX[id].durationMs} ms. Change it in the Sound Lab.`, preview: { kind: 'sound', id }, edited: false }));
+      return SFX_IDS.map((id) => ({ tab, id, name: soundName(id), doc: `A ${SFX[id].category} sound, ${SFX[id].durationMs} ms. Edit changes its volume, pitch and layers.`, preview: { kind: 'sound', id }, edited: false }));
     case 'lights':
       return SETUPS.map((s) => ({ tab, id: s.id, name: s.name, doc: 'A lighting look: sun, sky, haze and picture effects.', preview: { kind: 'sky', top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color }, edited: false }));
     case 'activities':

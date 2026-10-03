@@ -26,7 +26,7 @@ import { spriteOf } from './build/sprites';
 import { ShareDialog } from './share/share-dialog';
 import type { ShareKind } from './share/shares';
 import type { Preview } from './build/catalog';
-import { mapBundle } from './maker/storage';
+import { mapBundle, saveMap } from './maker/storage';
 import { spriteDef } from './build/sprites';
 import { TourCard } from './tutorial/tour-card';
 import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
@@ -109,6 +109,14 @@ export function IslandWalk(props: {
   useEffect(() => { if (p.mode === 'studio') api.current?.unlock(); }, [p.mode]);
   useEffect(() => { api.current?.setAvatarLook(); }, [p.lookId, p.looks]);
   useEffect(() => { api.current?.refreshModels(); }, [isolateId]);
+  // every change on the island saves itself a moment later (lighting, world rules, plants, sounds, redo: not only the tools)
+  useEffect(() => {
+    if (showcase) return;
+    let t = 0;
+    const off = rt.commands.subscribe(() => { window.clearTimeout(t); t = window.setTimeout(() => { saveMap(rt, scene.sceneId); }, 1200); });
+    return () => { off(); window.clearTimeout(t); };
+  }, [rt, scene, showcase]);
+
   // the tour: runs on your island (not behind the main menu); its effects are carried out here
   const tourOn = !showcase && level === 'goblin';
   const tourView = useTour();

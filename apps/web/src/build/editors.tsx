@@ -8,7 +8,10 @@ import { SFX, type SfxId } from '@hm/audio';
 import { Inspector } from '@hm/ui';
 import { PLANT_VARIABLES, plantToParams, rulesToParams, RULE_VARIABLES, PLANTS } from '@hm/worldrules';
 import { LightingPanel } from '../lighting/lighting-window';
-import { fx } from '../maker/feedback';
+import { audio, fx } from '../maker/feedback';
+import { builtInRecipe, ensureOverride, hasOverride, overrideId, removeOverride } from '../sound/bank';
+import { SoundLab } from '../sound/lab';
+import { normalizeRecipe, recipeToJson, type SfxRecipe } from '@hm/soundlab';
 import { ensurePlant, ensureRules, plantsOf, rulesOf } from '../world';
 import { useRev } from '../use-rev';
 import { CAMERAS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
@@ -181,16 +184,39 @@ export function MovesEditor({ actions }: { readonly actions: EditorActions }): R
   );
 }
 
-export function SoundEditor({ id }: { readonly id: string }): ReactElement {
-  const r = SFX[id as SfxId];
-  if (!r) return <p className="hint">Unknown sound.</p>;
+const SOUND_SCHEMA = schemaOf('sound', 'Sound', [
+  { key: 'volume', type: 'number', label: 'Volume', doc: 'How loud it plays (1 = as made).', tier: 'play', default: 1, min: 0, max: 2, step: 0.01, hardMin: 0, group: 'Sound' },
+  { key: 'pitch', type: 'number', label: 'Pitch', doc: 'Higher or lower (1 = as made, 2 = an octave up).', tier: 'play', default: 1, min: 0.25, max: 4, step: 0.01, hardMin: 0.05, hardMax: 16, group: 'Sound' },
+  { key: 'enabled', type: 'boolean', label: 'Plays', doc: 'Switch it off to mute this sound everywhere on the island.', tier: 'play', default: true, group: 'Sound' },
+]);
+
+/** A sound preset on this island: volume, pitch, on or off, and its shape layer by layer (the Sound Lab). Saved with the island. */
+export function SoundEditor({ id, rt }: { readonly id: string; readonly rt: Runtime }): ReactElement {
+  useRev(rt);
+  const slot = id as SfxId;
+  if (!SFX[slot]) return <p className="hint">Unknown sound.</p>;
+  const own = hasOverride(rt, slot) ? rt.store.get(overrideId(slot)) : undefined;
+  const recipe = soundRecipeOf(rt, slot);
+  const params = own?.params ?? {};
+  const resolved = { volume: Number(params['volume'] ?? 1), pitch: Number(params['pitch'] ?? 1), enabled: params['enabled'] !== false };
+  const write = (key: string, v: unknown, label: string): void => { const pid = ensureOverride(rt, slot); rt.commands.execute(cmd.setParam(`${pid}.${key}`, v as never, label)); };
+  const preview = (r: SfxRecipe): void => { const eng = audio(); if (eng) eng.playRecipe(r, { volume: resolved.volume, pitch: resolved.pitch }); };
   return (
     <div className="editor">
-      <div className="ed-top"><PresetPreview p={{ kind: 'sound', id: id as SfxId }} size={120} /><div><p>{soundName(id)}: {r.layers.length} layer{r.layers.length === 1 ? '' : 's'}, {r.durationMs} ms.</p><button className="go" onClick={() => fx(id as SfxId)}>Play</button></div></div>
-      <ul className="ed-layers">{r.layers.map((l, i) => <li key={i}>{l.wave} from {Math.round(l.freq[0])} Hz to {Math.round(l.freq[1])} Hz, rises in {l.attackMs} ms, fades in {l.decayMs} ms</li>)}</ul>
-      <p className="hint">Every sound is a preset: open Build mode, Sounds, to change its layers, or drive it with a randomizer.</p>
+      <div className="ed-top"><PresetPreview p={{ kind: 'sound', id: slot, recipe }} size={120} /><div><p>{soundName(id)}: {recipe.layers.length} layer{recipe.layers.length === 1 ? '' : 's'}.{own ? ' This island has its own version.' : ''}</p><button className="go" onClick={() => fx(slot)}>Play</button></div></div>
+      <Inspector schema={SOUND_SCHEMA} params={own ? { volume: resolved.volume, pitch: resolved.pitch, enabled: resolved.enabled } : {}} resolved={resolved} tier="play"
+        onChange={(k, v) => { write(k, v, `Sound ${soundName(id)}: ${k}`); fx(slot, { minGapMs: 180 }); }} />
+      <h4>Shape</h4>
+      <SoundLab recipe={recipe} tier="build" onChange={(r) => write('recipe', JSON.stringify(JSON.parse(recipeToJson(r))), `Reshape ${soundName(id)}`)} onPreview={preview} />
+      {own ? <button onClick={() => { removeOverride(rt, slot); fx('undo'); }}>Back to the ready-made sound</button> : null}
     </div>
   );
+}
+
+function soundRecipeOf(rt: Runtime, slot: SfxId): SfxRecipe {
+  const raw = hasOverride(rt, slot) ? rt.store.get(overrideId(slot))?.params['recipe'] : undefined;
+  try { if (typeof raw === 'string' && raw) return normalizeRecipe(JSON.parse(raw) as SfxRecipe); } catch { /* fall back to the ready-made one */ }
+  return normalizeRecipe((builtInRecipe(slot) ?? SFX[slot]) as unknown as SfxRecipe);
 }
 
 export function LookEditor({ id, actions }: { readonly id: string; readonly actions: EditorActions }): ReactElement {
@@ -267,7 +293,7 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
   switch (tab) {
     case 'select': case 'paint': case 'sculpt': case 'things': return <ToolEditor id={id} actions={props.actions} />;
     case 'animate': return <AnimEditor id={id} actions={props.actions} />;
-    case 'sound': return <SoundEditor id={id} />;
+    case 'sound': return <SoundEditor id={id} rt={props.rt} />;
     case 'lights': return <LightingPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'activities': { const a = props.activities.find((x) => x.id === id); return a ? <ActivityEditor a={a} actions={props.actions} /> : <p className="hint">Unknown activity.</p>; }
     case 'avatar': return <LookEditor id={id} actions={props.actions} />;

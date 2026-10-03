@@ -67,8 +67,8 @@ function AnimPreview({ anim, size }: { readonly anim: AnimPreset; readonly size:
   );
 }
 
-function SoundPreview({ id, size }: { readonly id: SfxId; readonly size: number }): ReactElement {
-  const r = SFX[id];
+function SoundPreview({ id, size, recipe }: { readonly id: SfxId; readonly size: number; readonly recipe?: { readonly layers: (typeof SFX)[SfxId]['layers']; readonly durationMs?: number } }): ReactElement {
+  const r = recipe ? { layers: recipe.layers, durationMs: recipe.durationMs ?? Math.max(...recipe.layers.map((l) => (l.delayMs ?? 0) + l.attackMs + l.decayMs), 1) } : SFX[id];
   const total = Math.max(1, r.durationMs);
   const hue = (f: number): number => Math.round(220 - Math.min(1, Math.log2(Math.max(40, f) / 40) / 8) * 200);
   return (
@@ -130,7 +130,7 @@ export function PresetPreview({ p, size = 48 }: { readonly p: Preview; readonly 
     case 'sky':
       return <span className="pv-sky" style={{ width: size, height: size, background: `linear-gradient(180deg, ${p.top} 0%, ${p.horizon} 62%, ${p.ground} 100%)` }}><b style={{ background: p.sun }} /></span>;
     case 'anim': return <AnimPreview anim={p.anim} size={size} />;
-    case 'sound': return <SoundPreview id={p.id} size={size} />;
+    case 'sound': return <SoundPreview id={p.id} size={size} {...(p.recipe ? { recipe: p.recipe } : {})} />;
     case 'planet':
       return (
         <svg viewBox="0 0 40 40" width={size} height={size} className="pv-planet" aria-hidden="true">

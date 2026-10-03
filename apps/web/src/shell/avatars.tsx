@@ -1,6 +1,7 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
-import { AVATAR_KINDS, kindOf, type AvatarLook } from '@hm/avatarlook';
+import { AVATAR_KINDS, kindOf, type AvatarKind, type AvatarLook } from '@hm/avatarlook';
+import { NewAvatar } from '../avatar/avatar-dock';
 import { PresetPreview } from '../build/cards';
 import { removeLook, usePlayer, wearLook } from '../build/player';
 import { fx } from '../maker/feedback';
@@ -11,12 +12,17 @@ const kindName = (l: AvatarLook): string => AVATAR_KINDS.find((k) => k.id === ki
  * Avatars (SetMix, harness level): everyone you can be. The one in use walks your island; Goblin Racing races as your goblin. Make a new one
  * of any kind, change one, or remove one (your last stays).
  */
-export function AvatarsWindow(props: { readonly onClose: () => void; readonly onNew: () => void; readonly onEdit: (look: AvatarLook) => void }): ReactElement {
+export function AvatarsWindow(props: { readonly onClose: () => void; readonly onNew: (kind: AvatarKind) => void; readonly onEdit: (look: AvatarLook) => void }): ReactElement {
   const p = usePlayer();
+  // New avatar: Quick setup and the wizard happen right here; Manual opens the full maker
+  const [making, setMaking] = useState(false);
   const goblinId = p.looks.find((l) => kindOf(l) === 'goblin')?.id ?? null;
   return (
     <div className="shell-window" role="dialog" aria-label="Avatars">
       <header><h3>Avatars</h3><button onClick={props.onClose}>Close</button></header>
+      {making ? (
+        <div className="avatar-new"><NewAvatar big kind="goblin" onCancel={() => setMaking(false)} onMade={() => setMaking(false)} onManual={(k) => { setMaking(false); props.onNew(k); }} /></div>
+      ) : (<>
       <p className="hint">The avatar in use walks your island. Goblin Racing races as your goblin.</p>
       <div className="shell-cards avatar-cards">
         {p.looks.map((l) => {
@@ -35,8 +41,9 @@ export function AvatarsWindow(props: { readonly onClose: () => void; readonly on
             </article>
           );
         })}
-        <button className="shell-activity new" onClick={props.onNew}><Plus size={18} strokeWidth={1.4} />New avatar</button>
+        <button className="shell-activity new" onClick={() => setMaking(true)}><Plus size={18} strokeWidth={1.4} />New avatar</button>
       </div>
+      </>)}
     </div>
   );
 }

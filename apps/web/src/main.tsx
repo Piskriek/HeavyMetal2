@@ -2,7 +2,7 @@
  * The deployable shell: ONE static html file. Wires the harness runtime to the renderer and the inspector.
  * Packages that use Node APIs (the script type-checker) are intentionally not imported here.
  *
- * Always the main menu over the galaxy (Play, Multiplayer, My Island, Settings); every other place is a screen of the shell.   #race = straight into a quick race on the saved map (what "Test drive" does).   no hash = the game from the title screen.
+ * Always the main menu over the galaxy (SetMix: My island, Avatars, Community, Settings; Goblin Racing's window); every other place is a screen of the shell.   #race = straight into a quick race on the saved map (what "Test drive" does).   no hash = the game from the title screen.
  */
 import { createRoot } from 'react-dom/client';
 import { createRuntime } from '@hm/engine';

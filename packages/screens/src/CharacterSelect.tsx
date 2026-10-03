@@ -14,18 +14,23 @@ const Bars = ({ c }: { readonly c: Pick<RacerCard, 'weight' | 'speed' | 'bounce'
 export function CharacterSelect(props: {
   racers: readonly RacerCard[]; selected: string | null; onSelect: (id: string) => void; onConfirm: () => void; onBack: () => void;
   custom?: RacerCard | null; onCustomChange?: (c: RacerCard) => void; reducedMotion?: boolean;
+  /** Your own goblin rides whichever ball you pick (SetMix): the cards are balls, named after the goblins who built them. */
+  rider?: string;
 }): ReactElement {
+  const rider = props.rider;
+  const ballOf = (name: string): string => (rider ? `${name.split(' ')[0]}'s ball` : name);
   const { racers, selected, custom, onCustomChange } = props;
   const all = custom ? [...racers, custom] : racers;
   const chosen = all.find((r) => r.id === selected) ?? null;
   const left = custom ? budgetLeft(custom) : 0;
   return (
     <div className={rootClass('bg', props.reducedMotion)} data-screen="select" style={{ justifyContent: 'flex-start' }}>
-      <h2>Choose your goblin</h2>
+      <h2>{rider ? `Pick a ball for ${rider}` : 'Choose your goblin'}</h2>
+      {rider ? <p className="hms-hint">Each ball rolls its own way: heavy ones push, light ones dart, bouncy ones jump. {rider} rides whichever you pick.</p> : null}
       <div className="hms-grid">
         {racers.map((r) => (
           <button key={r.id} type="button" className="hms-card" data-racer={r.id} aria-pressed={selected === r.id} onClick={() => props.onSelect(r.id)}>
-            <div className="hms-row" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap' }}><GoblinFace color={r.color} accent={r.accent} size={46} /><span className="hms-name">{r.name}</span></div>
+            <div className="hms-row" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap' }}><GoblinFace color={r.color} accent={r.accent} size={46} /><span className="hms-name">{ballOf(r.name)}</span></div>
             <Bars c={r} />
             <span className="hms-hint" style={{ fontSize: 12 }}>{tradeoffText(r)}</span>
           </button>
@@ -33,14 +38,14 @@ export function CharacterSelect(props: {
       </div>
       {chosen ? (
         <div className="hms-panel" data-panel="detail">
-          <div className="hms-row" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap' }}><GoblinFace color={chosen.color} accent={chosen.accent} size={64} /><div><h3>{chosen.name}</h3><p className="hms-hint">{chosen.blurb ?? tradeoffText(chosen)}</p></div></div>
+          <div className="hms-row" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap' }}><GoblinFace color={chosen.color} accent={chosen.accent} size={64} /><div><h3>{ballOf(chosen.name)}</h3><p className="hms-hint">{chosen.blurb ?? tradeoffText(chosen)}</p></div></div>
           <div style={{ marginTop: 10 }}><Bars c={chosen} /></div>
         </div>
-      ) : <p className="hms-hint">Tap a goblin to see what it is good at.</p>}
+      ) : <p className="hms-hint">{rider ? 'Tap a ball to see what it is good at.' : 'Tap a goblin to see what it is good at.'}</p>}
       {custom && onCustomChange ? (
         <div className="hms-panel" data-panel="custom">
           <div className="hms-row" style={{ justifyContent: 'space-between' }}>
-            <h3>Build your own</h3>
+            <h3>{rider ? 'Build your own ball' : 'Build your own'}</h3>
             <button type="button" className="hms-card" data-racer={custom.id} aria-pressed={selected === custom.id} onClick={() => props.onSelect(custom.id)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><GoblinFace color={custom.color} accent={custom.accent} size={34} /> Use it</button>
           </div>
           {(['weight', 'speed', 'bounce'] as StatKey[]).map((k) => (
@@ -55,8 +60,8 @@ export function CharacterSelect(props: {
           ))}
           <p data-field="budget" style={{ color: left === 0 ? 'var(--bad)' : 'var(--ok)', fontWeight: 700 }}>{left} point{left === 1 ? '' : 's'} left</p>
           <div className="hms-row" style={{ justifyContent: 'flex-start' }}>
-            <label className="hms-hint">Body <input type="color" value={custom.color} onChange={(e) => onCustomChange({ ...custom, color: e.target.value })} /></label>
-            <label className="hms-hint">Headband <input type="color" value={custom.accent} onChange={(e) => onCustomChange({ ...custom, accent: e.target.value })} /></label>
+            <label className="hms-hint">{rider ? 'Ball' : 'Body'} <input type="color" value={custom.color} onChange={(e) => onCustomChange({ ...custom, color: e.target.value })} /></label>
+            <label className="hms-hint">{rider ? 'Stripe' : 'Headband'} <input type="color" value={custom.accent} onChange={(e) => onCustomChange({ ...custom, accent: e.target.value })} /></label>
           </div>
         </div>
       ) : null}

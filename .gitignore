@@ -17,3 +17,6 @@ art-src/
 .env*.local
 .claude/
 .gemini/
+
+# the screen map (scripts/ui-map.mjs): regenerated on every run
+ui-map/

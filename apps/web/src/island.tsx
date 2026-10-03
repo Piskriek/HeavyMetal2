@@ -35,6 +35,8 @@ import { spriteDef } from './build/sprites';
 import { TourCard } from './tutorial/tour-card';
 import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
 import { captureMouse, lookFilter } from './shell/capture-mouse';
+import { AvatarDock } from './avatar/avatar-dock';
+import type { AvatarLook } from '@hm/avatarlook';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
@@ -131,8 +133,12 @@ export function IslandWalk(props: {
   const row: (CatalogItem | null)[] = p.hotbars[p.tab].map((id) => (id ? byId.get(id) ?? null : null));
   const heldItem = row[p.slots[p.tab]] ?? null;
   const showcase = props.showcase === true;
-  const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase });
-  live.current = { menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase };
+  /** Avatar mode: the Avatar tab (P) turns the camera to face your avatar, with your characters and its presets beside it (E11). */
+  const avatarMode = p.tab === 'avatar' && level === 'goblin' && !showcase;
+  const live = useRef({ menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase, avatarMode });
+  live.current = { menu, buildOn, level, wheelOpen, wheelIndex, items, focusId, isolateId, win, showcase, avatarMode };
+  /** The tab you were on before avatar mode: Done, Esc or P again goes back to it. */
+  const beforeAvatar = useRef<TabId>('select');
   const landRef = useRef<(() => void) | null>(null);
   const wasShowcase = useRef(showcase);
   // leaving the menu: fly down from the orbit to the goblin
@@ -140,12 +146,14 @@ export function IslandWalk(props: {
   useEffect(() => { onMenuChange?.(menu); if (menu) tourEvent('opened-menu'); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void } | null>(null);
+  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void } | null>(null);
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
   // studio keeps the mouse free; walking takes it back when you click the world
   useEffect(() => { if (p.mode === 'studio') api.current?.unlock(); }, [p.mode]);
   useEffect(() => { api.current?.setAvatarLook(); }, [p.lookId, p.looks]);
+  // entering avatar mode: the mouse is free to click the dock, and the studio (which has no avatar) goes back to walking
+  useEffect(() => { if (!avatarMode) return; api.current?.unlock(); if (player().mode === 'studio') setMode('walk'); tourEvent('opened-avatar'); }, [avatarMode]);
   useEffect(() => { api.current?.refreshModels(); }, [isolateId]);
   // every change on the island saves itself a moment later (lighting, world rules, plants, sounds, redo: not only the tools)
   useEffect(() => {
@@ -207,7 +215,16 @@ export function IslandWalk(props: {
     if (id === 'island') { say('Esc, then the up arrow in the bar, shows the whole island'); return; }
     setMode('walk'); setView(id === 'first' ? 'first' : 'third');
   };
-  const pickTab = (t: TabId): void => { setTab(t); fx('tool-switch', { volume: 0.5 }); tourEvent('tab-selected'); };
+  const pickTab = (t: TabId): void => {
+    const cur = player().tab;
+    // the Avatar tab is a mode: P (or its tab) again goes back to what you held
+    if (t === 'avatar' && cur === 'avatar') { leaveAvatar(); return; }
+    if (t === 'avatar') beforeAvatar.current = cur;
+    setTab(t); fx('tool-switch', { volume: 0.5 }); tourEvent('tab-selected');
+  };
+  const leaveAvatar = (): void => { setTab(beforeAvatar.current === 'avatar' ? 'select' : beforeAvatar.current); fx('ui-toggle', { volume: 0.5 }); };
+  const leaveAvatarRef = useRef(leaveAvatar);
+  leaveAvatarRef.current = leaveAvatar;
   const pickSlot = (i: number): void => { const s = player(); setSlot(s.tab, i); fx('tool-switch', { volume: 0.5 }); applyNow(s.tab, s.hotbars[s.tab][i] ?? null); tourEvent('slot-selected'); };
   const openPresets = (): void => { api.current?.unlock(); if (!win.isOpen('presets')) tourEvent('opened-presets'); win.toggle('presets', 'Your presets', { x: Math.max(12, window.innerWidth - WIN.presets.w - 24), y: 64, ...WIN.presets }); };
   const openEditor = (tab: TabId, id: string): void => {
@@ -280,7 +297,10 @@ export function IslandWalk(props: {
 
     // your goblin: the voxel goblin in the look you wear, split into bones so the animation presets move it
     // your active avatar, whatever its kind (goblin, human ...): its model, its size, its bones
-    const setAvatarLook = (): void => { const pl = player(); const look = lookOf(pl, pl.lookId); const g = avatarRigged(look); renderer.setAvatar(g?.model ?? null, kindDef(look).block, g?.rig); };
+    const showLook = (look: AvatarLook): void => { const g = avatarRigged(look); renderer.setAvatar(g?.model ?? null, kindDef(look).block, g?.rig); };
+    let previewing: AvatarLook | null = null;
+    const setAvatarLook = (): void => { if (previewing) return; const pl = player(); showLook(lookOf(pl, pl.lookId)); };
+    const previewLook = (look: AvatarLook | null): void => { previewing = look; if (look) showLook(look); else setAvatarLook(); };
     setAvatarLook();
     const animator = new Animator();
     const moves = (): MoveSet => { const pl = player(); return { idle: animOf(pl, pl.moves.idle), walk: animOf(pl, pl.moves.walk), run: animOf(pl, pl.moves.run), jump: animOf(pl, pl.moves.jump), fall: animOf(pl, pl.moves.fall) }; };
@@ -321,6 +341,8 @@ export function IslandWalk(props: {
     // studio camera: where it is and where it looks
     let fly: { x: number; y: number; z: number; yaw: number; pitch: number } | null = null;
     let orbit = { yaw: 0.8, pitch: 0.4, dist: 8 };
+    // avatar mode's mirror: how far round from straight in front the camera stands, how far away, how high it looks
+    let mirror = { turn: 0.38, dist: 3.4, lift: 0.1 };
     const down = new Set<string>();
     let mouse = 0; // bit 1 = left, 2 = right
     let firstUse = false;
@@ -351,7 +373,7 @@ export function IslandWalk(props: {
     api.current = {
       lock, unlock, refreshModels,
       playAnim: (id) => { animator.play(animOf(player(), id)); },
-      setAvatarLook,
+      setAvatarLook, previewLook,
       pick: (tab, id) => {
         if (tab !== 'select' && tab !== 'paint' && tab !== 'sculpt' && tab !== 'things') return;
         const tool = toolOf(player(), id);
@@ -388,6 +410,7 @@ export function IslandWalk(props: {
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
       if (live.current.isolateId) { setIsolateId(null); return; }
       if (builder.carrying) { builder.carrying = null; say('Put back'); return; }
+      if (live.current.avatarMode) { leaveAvatarRef.current(); return; }
       if (document.pointerLockElement) { suppressMenu = true; document.exitPointerLock(); }
       if (intro.on) { intro.t = intro.ms; return; }
       setMenu((m) => !m);
@@ -434,6 +457,8 @@ export function IslandWalk(props: {
       if (live.current.menu || intro.on || live.current.showcase) return;
       cursor = { x: e.clientX, y: e.clientY };
       if (!pointerLocked && overUi(e)) return;
+      // avatar mode: the right button turns you round in the mirror; the left one never uses a tool here
+      if (live.current.avatarMode) { if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } } return; }
       if (studio() || live.current.level === 'island') {
         // the mouse is free: right button looks around, left button uses what you hold where the cursor points
         if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
@@ -459,6 +484,7 @@ export function IslandWalk(props: {
       if (!looking) return;
       const sens = controlsRef.current.sensitivity, dx = (e.clientX - looking.x) * sens, dy = (e.clientY - looking.y) * sens * (controlsRef.current.invertY ? -1 : 1);
       looking = { x: e.clientX, y: e.clientY };
+      if (live.current.avatarMode) { mirror = { ...mirror, turn: mirror.turn - dx * 0.008, lift: Math.min(0.9, Math.max(-0.25, mirror.lift + dy * 0.004)) }; return; }
       if (live.current.focusId) { orbit = { ...orbit, yaw: orbit.yaw - dx * 0.008, pitch: Math.min(1.45, Math.max(-0.2, orbit.pitch + dy * 0.006)) }; return; }
       if (fly) { fly.yaw -= dx * 0.004; fly.pitch = Math.min(1.5, Math.max(-1.5, fly.pitch - dy * 0.004)); return; }
       camYaw -= dx * 0.006;
@@ -473,6 +499,7 @@ export function IslandWalk(props: {
       if (live.current.showcase) return;
       if (live.current.wheelOpen) { const n = live.current.items.length; if (n) setWheelIndex((i) => (i + (e.deltaY > 0 ? 1 : -1) + n) % n); return; }
       if (!pointerLocked && overUi(e)) return;
+      if (live.current.avatarMode) { mirror = { ...mirror, dist: Math.min(7, Math.max(1.4, mirror.dist * (e.deltaY > 0 ? 1.08 : 0.92))) }; return; }
       if (live.current.focusId) { orbit = { ...orbit, dist: Math.min(60, Math.max(1.5, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))) }; return; }
       if (live.current.buildOn && (pointerLocked || softAim || studio())) { const s = player(); pickSlot(stepSlot(s.slots[s.tab], e.deltaY)); return; }
       camDist = Math.min(14, Math.max(2.2, camDist * (e.deltaY > 0 ? 1.08 : 0.92)));
@@ -556,8 +583,9 @@ export function IslandWalk(props: {
       }
       const overview = live.current.level === 'island' || live.current.showcase;
       const st = studio();
-      const fpv = player().view === 'first' && !st;
-      const paused = live.current.menu || overview;
+      const mirrorOn = live.current.avatarMode && !overview && !st;
+      const fpv = player().view === 'first' && !st && !mirrorOn;
+      const paused = live.current.menu || overview || mirrorOn;
       let grounded = true;
       if (!paused && !st) {
         const fwx = -Math.sin(camYaw), fwz = -Math.cos(camYaw), rx = -fwz, rz = fwx;
@@ -665,6 +693,17 @@ export function IslandWalk(props: {
         wantEye = [px + Math.sin(a) * dist, py + (fr ? 2.6 : 2.3), pz + Math.cos(a) * dist];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 1.2);
       } else if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
+      else if (mirrorOn && !ft) {
+        // the mirror: in front of your avatar, a little round to one side; aimed so it stands left of the middle, clear of the dock on the right
+        const a = face + mirror.turn, d = mirror.dist;
+        const vf = Math.tan(((controlsRef.current.fov - 15) * Math.PI) / 360), aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        const off = window.innerWidth > 760 ? 0.26 * vf * aspect * d : 0;
+        const rx = Math.cos(a), rz = -Math.sin(a);
+        const mid = py + 0.92;
+        target = [px + rx * off, mid, pz + rz * off];
+        wantEye = [px + Math.sin(a) * d, mid + 0.25 + mirror.lift * d * 0.6, pz + Math.cos(a) * d];
+        wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 0.4);
+      }
       const snap = (fpv || st) && !overview && !ft;
       const k = snap ? 1 : Math.min(1, dt * (overview ? 3 : 10));
       eye = eye && !snap ? [eye[0] + (wantEye[0] - eye[0]) * k, eye[1] + (wantEye[1] - eye[1]) * k, eye[2] + (wantEye[2] - eye[2]) * k] : wantEye;
@@ -711,6 +750,8 @@ export function IslandWalk(props: {
 
   // Esc, Settings: the settings presets in a window of their own; Lighting presets (and the clock) are one click away inside it
   const openLighting = (): void => { setTab('lights'); win.open('edit:lights:light', 'Lighting', { x: Math.max(12, window.innerWidth - 400), y: 64, w: 372, h: 640 }); };
+  /** My avatar: the Avatar tab with your avatars and its presets. */
+  const openAvatar = (): void => { const cur = player().tab; if (cur !== 'avatar') beforeAvatar.current = cur; setTab('avatar'); };
   const openSettings = (): void => { win.open('settings', 'Settings', { x: Math.max(12, window.innerWidth - 470), y: 64, w: 448, h: Math.min(720, window.innerHeight - 90) }); };
   const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
   const showHud = buildOn && !menu && level !== 'island' && !showcase;
@@ -720,13 +761,14 @@ export function IslandWalk(props: {
   const inTopSlot = (node: ReactElement): ReactElement => (topSlot ? createPortal(node, topSlot) : node);
   const free = !locked || p.mode === 'studio';
   return (
-    <div className={`island${p.mode === 'studio' ? ' studio' : ''}`} style={{ position: 'absolute', inset: 0 }}>
+    <div className={`island${p.mode === 'studio' ? ' studio' : ''}${avatarMode ? ' avatar-mode' : ''}${showHud ? ' hud' : ''}`} style={{ position: 'absolute', inset: 0, ['--win-bottom' as string]: showHud && !avatarMode ? '172px' : '12px' }}>
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
-      {showHud && p.mode === 'walk' ? <Crosshair active={locked} /> : null}
+      {showHud && p.mode === 'walk' && !avatarMode ? <Crosshair active={locked} /> : null}
       {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR ground: full detail' : 'Flat ground: voxel blocks that match the goblin'); }} />) : null}
-      {showHud ? <ToolSay {...say2} /> : null}
+      {showHud && !avatarMode ? <ToolSay {...say2} /> : null}
       {showHud ? <TabStrip tab={p.tab} onPick={pickTab} /> : null}
-      {showHud ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} /> : null}
+      {showHud && !avatarMode ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} /> : null}
+      {avatarMode && !menu ? <AvatarDock actions={actions} onPreview={(l) => api.current?.previewLook(l)} onDone={leaveAvatar} /> : null}
       {showHud && wheelOpen ? <TabWheel title={tabDef(p.tab).label} items={items} index={wheelIndex} clickable={free} onPick={pickWheel} /> : null}
       {win.list.map((w) => (
         <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (heldItem ? `${tabDef(p.tab).label}: ${heldItem.name}` : 'What you hold') : w.title} className={w.id === 'presets' ? 'wide' : ''}>
@@ -745,20 +787,25 @@ export function IslandWalk(props: {
       {note && !showcase ? <div className="island-note" role="status">{note}</div> : null}
       {tourOn && !menu ? <TourCard /> : null}
       {revealing ? <div className="reveal-flash" key={revealing} aria-hidden="true" /> : null}
-      {!menu && !showcase ? <p className="island-hint">{hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
+      {!menu && !showcase ? <p className="island-hint">{avatarMode ? 'Hold the right button to turn round. Wheel zooms. Esc or Done goes back.' : hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
       {menu ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
-          <h3>Menu</h3>
-          <button className="go" onClick={onMainMenu}>Home</button>
-          {buildOn ? <button onClick={() => { setMenu(false); setMode('studio'); }}>Studio mode</button> : null}
-          <button onClick={() => { setMenu(false); openSettings(); }}>Settings</button>
-          <button onClick={() => { setMenu(false); setTab('avatar'); openPresets(); }}>My Avatar</button>
-          {buildOn ? <button onClick={() => { setMenu(false); openShare('island', scene.sceneId); }}>Share my island</button> : null}
-          {!tourView.visible ? <button onClick={() => { setMenu(false); tourReplay(); }}>Show the tour</button> : null}
-          <button onClick={onActivities}>Activities</button>
-          {onIslands ? <button onClick={onIslands}>My islands</button> : null}
-          <button onClick={onHub}>Community</button>
-          <button onClick={() => { setMenu(false); if (p.mode === 'walk') api.current?.lock(); }}>Back to {p.mode === 'studio' ? 'the studio' : 'walking'}</button>
+          <button className="go" onClick={() => { setMenu(false); if (p.mode === 'walk') api.current?.lock(); }}>Back to {p.mode === 'studio' ? 'the studio' : 'walking'}</button>
+          <div className="im-group" role="group" aria-label="On this island">
+            <h4>On this island</h4>
+            {buildOn ? <button onClick={() => { setMenu(false); setMode(p.mode === 'studio' ? 'walk' : 'studio'); }}>{p.mode === 'studio' ? 'Walk as your avatar' : 'Studio mode'}</button> : null}
+            <button onClick={() => { setMenu(false); openAvatar(); }}>My avatar</button>
+            {buildOn ? <button onClick={() => { setMenu(false); openShare('island', scene.sceneId); }}>Share this island</button> : null}
+            {!tourView.visible ? <button onClick={() => { setMenu(false); tourReplay(); }}>Show the tour</button> : null}
+          </div>
+          <div className="im-group" role="group" aria-label="SetMix">
+            <h4>SetMix</h4>
+            <button onClick={onMainMenu}>Home</button>
+            {onIslands ? <button onClick={onIslands}>My islands</button> : null}
+            <button onClick={onActivities}>Activities</button>
+            <button onClick={onHub}>Community</button>
+            <button onClick={() => { setMenu(false); openSettings(); }}>Settings</button>
+          </div>
         </div>
       ) : null}
     </div>

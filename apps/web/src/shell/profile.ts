@@ -104,3 +104,16 @@ export function currentTournament(p: Profile, now: number): Tournament {
   return t;
 }
 export function withTournament(p: Profile, t: Tournament): Profile { return { ...p, tournament: t.toJSON() }; }
+
+/**
+ * A new activity (B13): a copy of another (Quick setup copies Goblin Racing: same races, its own name and planet) or a plain one, with its
+ * name, what it is, and how its planet looks. Returns the profile with it added.
+ */
+export function makeActivity(p: Profile, o: { readonly name: string; readonly doc?: string; readonly from?: string; readonly planet?: { readonly hue: number; readonly ring: boolean } }): Profile {
+  const before = new Set(p.activities.map((a) => a.id));
+  let next = o.from ? duplicateActivity(p, o.from) : createActivity(p, o.name, o.doc);
+  const made = next.activities.find((a) => !before.has(a.id));
+  if (!made) return next;
+  if (o.from) next = apply(next, (r) => r.rename(made.id, o.name));
+  return { ...next, activities: next.activities.map((a) => (a.id === made.id ? { ...a, ...(o.doc ? { doc: o.doc } : {}), ...(o.planet ? { planet: { ...a.planet, hue: o.planet.hue, ring: o.planet.ring } } : {}) } : a)) };
+}

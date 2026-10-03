@@ -57,7 +57,7 @@ export function FloatingWindow(props: { readonly win: Windows; readonly id: stri
   };
   const up = (e: RPointerEvent<HTMLElement>): void => { drag.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* not captured */ } };
   return (
-    <section className={`fwin ${props.className ?? ''}`} role="dialog" aria-label={props.title} style={{ left: info.rect.x, top: info.rect.y, width: info.rect.w, maxHeight: Math.max(160, window.innerHeight - info.rect.y - 12), zIndex: 50 + info.z }}
+    <section className={`fwin ${props.className ?? ''}`} role="dialog" aria-label={props.title} style={{ left: info.rect.x, top: info.rect.y, width: info.rect.w, maxHeight: `max(160px, calc(100vh - ${info.rect.y}px - var(--win-bottom, 12px)))`, zIndex: 50 + info.z }}
       onPointerDown={() => { if (win.wm.focused() !== id) { win.wm.bringToFront(id); win.bump(); } }}>
       <header onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         <h3>{props.title}</h3>

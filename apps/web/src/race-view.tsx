@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { Runtime } from '@hm/engine';
 import { attachOrbitControls, createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF } from '@hm/render';
-import { createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
+import { BALL_RADIUS, createAdaptiveQuality, createRaceGame, guessQuality, parseQuality, rulesOf, itemsOf, type Hud as HudData, type RaceGame } from '@hm/game';
+import { Animator } from '@hm/anim';
+import type { AvatarLook } from '@hm/avatarlook';
+import { avatarRigged } from './build/cards';
 import { attachKeyboard, TouchControls } from '@hm/input';
 import { Minimap } from '@hm/ui';
 import type { HudLayout } from '@hm/hudlayout';
@@ -21,6 +24,8 @@ export interface RaceSetup {
   /** Index into the goblin library, or a custom goblin. */
   readonly playerIndex?: number;
   readonly player?: { readonly name: string; readonly params: Readonly<Record<string, number | boolean | string | null>> };
+  /** Your goblin: it rides your ball (the racer you picked sets the ball's weight, speed, bounce and colour). */
+  readonly rider?: AvatarLook;
 }
 
 /**
@@ -70,7 +75,11 @@ export function RaceView(props: {
     showTier(renderer, adaptive.current, ownGraphics);
     let appliedQuality = live.current.settings.quality;
     const surfaces = new SurfaceArray(STARTER_SURFACES);
-    const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, items: setup.fromMap ? itemsOf(rt) : undefined, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }) });
+    const game = createRaceGame(rt, { seed: 7, rules: setup.fromMap ? rulesOf(rt) : {}, items: setup.fromMap ? itemsOf(rt) : undefined, fromScene: setup.fromMap, ...(setup.player ? { player: setup.player } : { playerIndex: setup.playerIndex ?? 0 }), ...(setup.rider ? { rider: { name: setup.rider.name } } : {}) });
+    // your goblin in your ball: the same voxel avatar and animations as on your island, upright inside the rolling glass
+    const riding = setup.rider ? avatarRigged(setup.rider) : null;
+    const riderAnim = new Animator();
+    if (riding) renderer.setAvatar(riding.model, (BALL_RADIUS * 1.25) / Math.max(1, riding.model.size[1]), riding.rig);
     gameRef.current = game;
     (window as unknown as { hmGame: unknown }).hmGame = game; // console: hmGame.hud(), hmGame.racerIds ...
     const stopLighting = rt.binder.sceneId ? followLighting(rt.store, rt.binder.sceneId, renderer) : () => undefined;
@@ -113,6 +122,7 @@ export function RaceView(props: {
       let alpha = 1;
       if (L.active && !L.paused) { alpha = game.update(dt); raceAudio.tick(dt); } else raceAudio.tick(0, true);
       const pose = game.playerPose();
+      if (riding) renderer.setAvatarPose(pose.x, pose.y - BALL_RADIUS * 0.62, pose.z, Math.atan2(pose.hx, pose.hz) + Math.PI, riderAnim.update(dt / 1000, { speed: pose.speed * 0.6, grounded: true, vy: 0 }), true);
       const shot = cam.step(dt, pose);
       renderer.setFov(shot.fov);
       renderer.camera.set(shot.eye, shot.target);
@@ -150,7 +160,7 @@ export function RaceView(props: {
       detachKeys(); detachOrbit(); offTick(); offDecor(); stopLighting(); raceAudio.dispose(); renderer.unmount();
       gameRef.current = null;
     };
-  }, [rt, setup.fromMap, setup.playerIndex, setup.player]);
+  }, [rt, setup.fromMap, setup.playerIndex, setup.player, setup.rider]);
 
   const game = gameRef.current;
   const showTouch = props.settings.touchControls === 'on' || (props.settings.touchControls === 'auto' && touchDevice);

@@ -9,7 +9,7 @@ import { addPoint, analyse, deletePoint, DRAFT_PRESETS, hitTest, insertOnSegment
 import { manipulateMove, DEFAULT_MANIPULATION } from '@hm/tools';
 import { applyLighting, LOOKS, setupOf } from '../look';
 import { PROP_CARDS, propSeed, type MakerScene } from './scene';
-import { saveMap, clearSavedMap } from './storage';
+import { saveMap, clearMapOf } from './storage';
 import { clearDress, commitDress, decorInstances, dress } from './dress';
 import { rampBetween, stamp, type StampKind } from '@hm/terrainops';
 import { buildRoad, createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
@@ -58,7 +58,13 @@ function useRev(rt: Runtime): number {
 }
 const useToasts = (): readonly { id: number; text: string; kind: string }[] => useSyncExternalStore(toasts.subscribe, toasts.get);
 
-export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, onCommunity }: { readonly rt: Runtime; readonly scene: MakerScene; readonly onTestDrive: () => void; readonly onExit: () => void; readonly onMenu: () => void; readonly onIslands?: () => void; readonly onCommunity: () => void }): ReactElement {
+export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, onCommunity, exitLabel = 'Back to Island', place = 'Island' }: {
+  readonly rt: Runtime; readonly scene: MakerScene; readonly onTestDrive: () => void; readonly onExit: () => void; readonly onMenu: () => void; readonly onIslands?: () => void; readonly onCommunity: () => void;
+  /** Where Exit goes, in words ("Back to Goblin Racing" when it edits the Goblin Racing island). */
+  readonly exitLabel?: string;
+  /** Which island this is, for the breadcrumbs. */
+  readonly place?: string;
+}): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<ToolId>('brush');
   const [tier, setTier] = useState<Tier>('build');
@@ -488,9 +494,9 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
   return (
     <div className="maker" style={themeOf(rt).vars}>
       <header className="bar">
-        <button className="go" title="Back to walking on your island (Esc opens the menu)" onClick={onExit}>Back to Island</button>
-        <div className="brand"><b>GOBLIN</b><i>PRESET STUDIO</i></div>
-        <div className="crumbs" aria-label="Where you are"><span>Island</span>{focus ? <><span>/</span><b>{focus.name}</b><button title="Back to the island" onClick={() => { setFocus(null); fx('ui-toggle'); }}>esc</button></> : <><span>/</span><b>{rt.store.get(scene.sceneId)?.name ?? 'My map'}</b></>}</div>
+        <button className="go" title={`${exitLabel} (Esc opens the menu)`} onClick={onExit}>{exitLabel}</button>
+        <div className="brand"><b>Track editor</b><i>{place}</i></div>
+        <div className="crumbs" aria-label="Where you are"><span>{place}</span>{focus ? <><span>/</span><b>{focus.name}</b><button title="Back to the island" onClick={() => { setFocus(null); fx('ui-toggle'); }}>esc</button></> : <><span>/</span><b>{rt.store.get(scene.sceneId)?.name ?? 'My map'}</b></>}</div>
         <button onClick={doUndo} disabled={!rt.commands.canUndo}><Undo2 size={14} strokeWidth={1.6} style={{ verticalAlign: '-2px' }} /> Undo</button>
         <button onClick={doRedo} disabled={!rt.commands.canRedo}><Redo2 size={14} strokeWidth={1.6} style={{ verticalAlign: '-2px' }} /> Redo</button>
         <span className="hist" title={history.map((h) => h.label).join('\n')}>{history.length ? `${history.filter((h) => !h.undone).length} steps` : 'no edits yet'}</span>
@@ -503,7 +509,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
         <button title="Copy a map code to send to someone, or load one" onClick={() => { setSharing(true); fx('ui-click'); }}>Map code</button>
         <button onClick={save}>Save</button>
         {confirmNew
-          ? (<span className="confirm">Replace your saved map? <button className="danger" onClick={() => { clearSavedMap(); location.reload(); }}>Yes, start over</button> <button onClick={() => setConfirmNew(false)}>Keep it</button></span>)
+          ? (<span className="confirm">Replace your saved map? <button className="danger" onClick={() => { clearMapOf(rt); location.reload(); }}>Yes, start over</button> <button onClick={() => setConfirmNew(false)}>Keep it</button></span>)
           : <button onClick={() => { setConfirmNew(true); fx('ui-click'); }}>New</button>}
         <button className="go" onClick={() => { if (!analysis.valid) { feedback('error', analysis.issues[0] ?? 'Draw a closed track first'); return; } carve(); save(); fx('go'); onTestDrive(); }}>Test drive</button>
       </header>
@@ -581,9 +587,9 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
       {jump ? (
         <div className="island-menu" role="dialog" aria-label="Menu">
           <h3>Menu</h3>
-          <button className="go" onClick={onExit}>Back to Island</button>
+          <button className="go" onClick={onExit}>{exitLabel}</button>
           {onIslands ? <button onClick={onIslands}>My islands</button> : null}
-          <button onClick={onMenu}>Main menu</button>
+          <button onClick={onMenu}>Home</button>
           <button onClick={onCommunity}>Community</button>
           <button onClick={() => setJump(false)}>Keep building</button>
         </div>

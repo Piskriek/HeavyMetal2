@@ -12,7 +12,7 @@ export const SCREEN_CSS = `
 .hms-dim { background: rgba(7, 12, 17, 0.72); backdrop-filter: blur(5px); }
 .hms h1, .hms h2, .hms h3, .hms p { margin: 0; }
 .hms-logo { font-size: clamp(34px, 9vw, 76px); font-weight: 900; letter-spacing: 0.04em; line-height: 0.95; background: linear-gradient(180deg, #fff3b8 0%, var(--a) 55%, #d98a1f 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 0 rgba(0,0,0,0.35)); }
-.hms-sub { color: var(--d); letter-spacing: 0.4em; text-transform: uppercase; font-size: 13px; }
+.hms-sub { color: var(--d); font-size: 13px; }
 .hms-btn { appearance: none; min-height: 52px; min-width: 220px; padding: 10px 26px; font: inherit; font-size: 18px; font-weight: 700; color: var(--t); background: linear-gradient(180deg, #243845, #172531); border: 1px solid #36505f; border-radius: 14px; cursor: pointer; box-shadow: 0 5px 0 #0b141b, 0 10px 22px rgba(0,0,0,0.35); transition: transform .08s, background .15s, box-shadow .08s; }
 .hms-btn:hover { background: linear-gradient(180deg, #2c4656, #1c2f3d); }
 .hms-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #0b141b, 0 4px 10px rgba(0,0,0,0.35); }

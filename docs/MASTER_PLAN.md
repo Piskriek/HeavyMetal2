@@ -111,7 +111,25 @@ Each journey: what happens today, where it breaks, what finishing it needs.
 | Q4 | Goblin Racing's track editor edits | **The Goblin Racing island, as your proposal for this week's evolution** (H7) / Your own island's track |
 | Q5 | In the universe (H8), a star is | **A creator** (you, the Goblin Racing studio, each player) with their planets round it / **A game** (Goblin Racing's star, its planets = its islands and modes) |
 
+**Defaults in use until the owner decides** (2026-10-03: the owner asked to carry on to a beta without answering; each is easy to change): Q1 as the owner described the home (H2): Goblin Racing selected, its Play is the suggested first step and makes your first avatar; My island is the other way in; the progression story (H9) comes later. Q2 phones race and walk, building is desktop. Q3 "Race modes". Q4 the Goblin Racing island (your track is your proposal for the weekly vote). Q5 a star is a creator.
+
 ---
+
+## 5b. Progress toward the beta (owner, 2026-10-03: "lets see if we can get it all the way to beta test version so i can build the maps, and tweak it a bit")
+
+| Gap / ask | Done | Where |
+|---|---|---|
+| G2 your avatar in the race | Your goblin rides your ball (voxel avatar, animated, upright in the glass); the racer you pick sets the ball (the select screen says "Pick a ball for ...") | `race-view.tsx`, `race-game.ts` `rider`, `CharacterSelect` `rider` |
+| G3 one Settings | The race's pause Settings is the same Settings window; Settings has Graphics, Sound, Controls, Racing, You; sound and racing settings are one shared store; the race uses the profile's graphics preset | `shell/settings-body.tsx`, `shell/play-settings.ts`, `app.tsx` |
+| G4 "Multiplayer" | Renamed Race modes (Q3 default) | `goblin-front.tsx` |
+| G5 track editor | Opens the Goblin Racing island (Q4 default); its exit says Back to Goblin Racing; its Start over only ever clears its own island's map (it used to clear whichever island was active) | `shell.tsx` `editing`, `maker.tsx`, `storage.ts` `clearMapOf` |
+| G6 My islands from the home | A line under My island: "All my islands, or a new one" | `goblin-front.tsx` `SetMixHome` |
+| G9 carry on | My island says "Carry on at <island>, where you left off" once you have been there | same |
+| G12 Esc menu | Back to walking first, then "On this island" and "SetMix" groups; readable headings | `island.tsx`, `studio.css` |
+| E11 avatar mode | P / the Avatar tab: the camera faces your avatar (right-drag turns, wheel zooms), a dock with your characters (one click swaps), + New avatar, and this one's Looks, Colours, Wears, Moves; Esc, Done or P goes back | `avatar/avatar-dock.tsx`, `island.tsx` |
+| B13 three ways in | `NewChooser` (remembers your last way); New avatar (island dock and the Avatars window) and New island (ready-made maps drawn from above; a five-question wizard whose map redraws as you answer; Manual opens a plain island) | `shell/new-thing.tsx`, `islands/new-island.tsx` |
+| B14/B16 screen map | `scripts/ui-map.mjs`: every screen, every control pressed, outcomes, Esc checks, layout flags, screenshots, `ui-map/index.html`; `--approve` / `--check` against `tests/ui-contract.json` | |
+| 6.1 design system | `docs/DESIGN.md` | |
 
 ## 6. The design batch: all front-end work, done together
 

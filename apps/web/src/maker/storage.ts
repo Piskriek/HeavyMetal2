@@ -93,6 +93,12 @@ export function hasSavedMap(): boolean {
 export function clearSavedMap(): void {
   try { localStorage.removeItem(currentKey()); } catch { /* ignore */ }
 }
+/** Forget the saved map this runtime was loaded from (its own island or Goblin Racing's), never whichever island happens to be active. */
+export function clearMapOf(rt: Runtime): void {
+  const home = homeOf.get(rt);
+  const key = home ? home.pinned ?? bundleKey(home.island ?? 'orphan') : currentKey();
+  try { localStorage.removeItem(key); } catch { /* ignore */ }
+}
 
 /** Import the saved map into the runtime and bind its scene. Returns the scene description, or null when there is none. */
 export function loadMap(rt: Runtime): MakerScene | null {

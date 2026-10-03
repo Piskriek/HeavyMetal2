@@ -3,20 +3,22 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Copy, Pencil, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import type { Runtime } from '@hm/engine';
 import { goblinRacing, type Activity } from '@hm/activities';
-import { kindOf, type AvatarLook } from '@hm/avatarlook';
+import { kindOf, type AvatarKind, type AvatarLook } from '@hm/avatarlook';
 import { AvatarsWindow } from './avatars';
 import { App } from '../app';
 import { IslandWalk } from '../island';
 import { MapMaker } from '../maker/maker';
 import { buildMakerScene, TEMPLATE_SHAPES, type MakerScene } from '../maker/scene';
-import { loadMap, pinMapKey } from '../maker/storage';
-import { activeIslandId, createIsland, duplicateIsland, islands, onFork, openIsland, redoIslands, removeIsland, renameIsland, subscribe, templates, undoIslands } from '../islands/island-store';
+import { loadMap, mapBundle, pinMapKey } from '../maker/storage';
+import { NewIsland, type NewIslandChoice } from '../islands/new-island';
+import { NewActivity } from './new-activity';
+import { activeIslandId, createIslandWithMap, duplicateIsland, islands, onFork, openIsland, redoIslands, removeIsland, renameIsland, subscribe, undoIslands } from '../islands/island-store';
 import { describeIsland } from '@hm/islands';
 import { GalaxyCanvas, type GalaxyHandle, type PlanetDef } from './galaxy';
 import { GalaxyBar, type Level } from './galaxy-bar';
 import { GoblinRacingMenu } from './racing-menu';
 import { Community } from './community';
-import { createActivity, duplicateActivity, loadProfile, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
+import { duplicateActivity, loadProfile, makeActivity, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
 import { SettingsBody } from './settings-body';
 import { GoblinFront, GoblinPreview, SetMixHome } from './goblin-front';
 import { captureMouse } from './capture-mouse';
@@ -25,7 +27,7 @@ import { player } from '../build/player';
 
 /**
  * The shell of **SetMix Harness**: a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
- * in a window beside it; open that window and it grows into Goblin Racing's own menu (Play, Multiplayer, Settings) orbiting the Goblin Racing
+ * in a window beside it; open that window and it grows into Goblin Racing's own menu (Play, Race modes, Settings) orbiting the Goblin Racing
  * island. Your own island is harness level: My island dives galaxy -> planet -> island -> your avatar and hands over to walking; from then on Esc
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
@@ -35,7 +37,7 @@ export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
   home: { back: null, doc: 'The SetMix home: the galaxy, Goblin Racing selected with its menu live beside it. The only root.' },
-  goblin: { back: 'home', doc: "Goblin Racing's own menu (Play, Multiplayer, Settings) orbiting the Goblin Racing island." },
+  goblin: { back: 'home', doc: "Goblin Racing's own menu (Play, Race modes, Settings) orbiting the Goblin Racing island." },
   create: { back: 'origin', doc: 'Make an avatar (look and name). The first game you play makes the first one: Goblin Racing makes a goblin.' },
   avatars: { back: 'origin', doc: 'Avatars: everyone you can be (any kind); use, change, remove, make a new one.' },
   zoom: { back: 'island', doc: 'The dive. Esc skips to your avatar.' },
@@ -46,7 +48,7 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   racing: { back: 'activity', doc: 'A race. Esc pauses; quitting returns to where it was started.' },
   settings: { back: 'origin', doc: 'Settings (the settings presets).' },
   islands: { back: 'origin', doc: 'My islands: open, duplicate, rename, delete, undo.' },
-  build: { back: 'island', doc: 'Build mode. Esc opens the jump menu; Back to Island returns.' },
+  build: { back: 'activity', doc: "Goblin Racing's track editor, on the Goblin Racing island. Esc opens its menu; Back to Goblin Racing returns." },
 };
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your avatar, build, host.' };
@@ -65,7 +67,10 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const registry = useSyncExternalStore(subscribe, () => islands(), () => islands());
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
-  const [newTemplate, setNewTemplate] = useState('volcano');
+  /** My islands is making a new island (quick, wizard or manual) instead of listing them. */
+  const [newIsland, setNewIsland] = useState(false);
+  /** The activities window is making a new activity (quick, wizard or manual). */
+  const [newActivity, setNewActivity] = useState(false);
   useEffect(() => onFork((m) => { setNote(`This island is now yours: "${m.name}". Rename it in My islands.`); window.setTimeout(() => setNote(''), 6000); }), []);
   const [screen, setScreen] = useState<Screen>('home');
   // where the hub / activities / settings / the avatar maker were opened from: their Back and Esc return there, never to each other
@@ -76,6 +81,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const [createFor, setCreateFor] = useState<'race' | 'island' | 'avatars'>('race');
   /** The Avatars window's maker: the avatar being changed, or null for a new one. */
   const [editLook, setEditLook] = useState<AvatarLook | null>(null);
+  /** The kind a manual new avatar starts as (picked in the New avatar chooser). */
+  const [newKind, setNewKind] = useState<AvatarKind>('goblin');
   const createForRef = useRef(createFor);
   createForRef.current = createFor;
   /** The galaxy stays a moment while Goblin Racing's window grows to fill the screen, then goes (it is a 3D view of its own). */
@@ -91,6 +98,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const [raceEntry, setRaceEntry] = useState<'select' | 'custom'>('select');
   const [raceAuto, setRaceAuto] = useState(false);
   const [raceBack, setRaceBack] = useState<Screen>('activity');
+  /** Which island the track editor has open: Goblin Racing's (its track editor, owner default Q4) or your own. */
+  const [editing, setEditing] = useState<'racing' | 'home'>('racing');
   const galaxy = useRef<GalaxyHandle>(null);
   // the leader line that ties Goblin Racing's window to its planet: drawn every frame from the galaxy's loop, straight on the SVG (no React render)
   const leaderLine = useRef<SVGLineElement>(null);
@@ -165,8 +174,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     go('goblin');
   }, [go]);
   const toIsland = useCallback(() => { setIntro(false); setLevel('goblin'); setIslandMenu(false); go('island'); }, [go]);
-  /** The race track editor (the older Maker) on your island: reached from the Goblin Racing menu, since it edits race tracks. */
-  const toTrackEditor = useCallback(() => { if (!world) { const id = activeIslandId(); if (!id || !openWorld(id)) return; } setSession(true); go('build'); }, [world, openWorld, go]);
+  /** Goblin Racing's track editor: the Goblin Racing island itself (your changes are your proposal for its weekly evolution, H7). */
+  const toTrackEditor = useCallback(() => { if (!raceWorld) openRaceWorld(); setEditing('racing'); go('build'); }, [raceWorld, openRaceWorld, go]);
   const remember = (): void => { const s = screenRef.current; origin.current = s === 'home' ? 'home' : s === 'goblin' || s === 'activity' ? 'goblin' : s === 'island' || s === 'build' || s === 'zoom' ? 'island' : origin.current; };
   /** Community: shared presets and your shares (the galaxy itself is the home now). */
   const toHub = useCallback(() => { remember(); go('hub'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -214,7 +223,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   /** What Goblin Racing's window and menu say: the game in one line, and what Play does for you (a new player learns it makes their first avatar). */
   const goblinStatus = { doc: goblinRacing().doc, you: yourGoblin() ? `You race as ${yourGoblin()!.name}.` : player().created ? 'Play makes you a goblin to race as.' : 'Play makes your first avatar: a goblin.' };
   /** An activity: Goblin Racing opens its own menu (the window grows); others open their sections. */
-  /** Goblin Racing's sections (tournaments, spectate, rankings, track editor, the bookie): its Multiplayer. */
+  /** Goblin Racing's sections (tournaments, spectate, rankings, track editor, the bookie): its Race modes (Multiplayer returns with online play). */
   const openSections = (): void => { origin.current = 'goblin'; setActivityId('goblin-racing'); go('activity'); };
   const openActivity = (id: string): void => { setActivityId(id); if (id === 'goblin-racing') toGoblin(); else { origin.current = 'home'; go('activity'); } };
   /** Goblin Racing's Play: the first game you play makes your first avatar (a goblin); then, and every time after, it is a race. */
@@ -232,6 +241,25 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   };
 
   const islandRows = registry.list();
+  /** The island My island opens (the home says its name, and "carry on" once you have been there). */
+  const homeIsland = registry.get(activeIslandId() ?? '') ?? null;
+  /** Open one of your islands and walk it (from My islands). */
+  const openIslandNow = (id: string): void => {
+    // you walk an island as an avatar: a new player makes one first, then lands on this island
+    if (!player().created) { openIsland(id); setWorld(null); remember(); setCreateFor('island'); go('create'); return; }
+    const w = openWorld(id); if (w) { setSession(true); setLevel('goblin'); setIntro(false); go('island'); }
+  };
+  /** A new island from My islands: a template as it is, or the wizard's own shape built now; Manual and the wizard open it straight away. */
+  const makeIsland = (c: NewIslandChoice): void => {
+    let json: string | null = null;
+    if (c.shape) { pinMapKey(null); const rt = makeRuntime(); const sc = buildMakerScene(rt, c.shape.seed, c.shape); json = JSON.stringify(mapBundle(rt, sc.sceneId)); }
+    const made = createIslandWithMap(c.name, c.template, json);
+    setNewIsland(false);
+    if (made.error) { setNote(made.error); return; }
+    if (c.open && made.id) openIslandNow(made.id); else setNote(`Made ${c.name}. Open it from the list.`);
+  };
+  /** The island the track editor (and its test drive) works on. */
+  const editWorld = editing === 'racing' ? raceWorld : world;
   const submitRename = (): void => { if (renaming) { const err = renameIsland(renaming, draft); if (err) setNote(err); setRenaming(null); } };
 
   return (
@@ -250,8 +278,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
               quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} controls={profile.controls} activities={activityInfos}
               onActivities={toActivities} onHub={() => toHub()} onMainMenu={toHome} />
           </div>
-          {screen === 'home' ? <GoblinPreview {...goblinStatus} onOpen={toGoblin} onPlay={() => { toGoblin(); play(); }} onMultiplayer={() => { toGoblin(); openSections(); }} onSettings={() => { toGoblin(); toSettings(); }} /> : null}
-          {screen === 'goblin' ? <GoblinFront {...goblinStatus} onPlay={play} onMultiplayer={openSections} onSettings={toSettings} onHome={toHome} /> : null}
+          {screen === 'home' ? <GoblinPreview {...goblinStatus} onOpen={toGoblin} onPlay={() => { toGoblin(); play(); }} onModes={() => { toGoblin(); openSections(); }} onSettings={() => { toGoblin(); toSettings(); }} /> : null}
+          {screen === 'goblin' ? <GoblinFront {...goblinStatus} onPlay={play} onModes={openSections} onSettings={toSettings} onHome={toHome} /> : null}
         </div>
       ) : null}
       {screen === 'island' || screen === 'zoom' ? <GalaxyBar open={islandMenu || level === 'island'} island={screen === 'island'} level={level} onLevel={setLevel} onBackToGalaxy={() => toHub()} /> : null}
@@ -272,7 +300,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
           ) : createFor === 'island' ? (
             <CreateGoblin voice="setmix" chooseKind title="Your avatar" doneLabel="Done: to my island" onBack={back} onDone={(look) => { update((pr) => ({ ...pr, name: look.name })); void myIsland(); }} />
           ) : (
-            <CreateGoblin voice="setmix" key={editLook?.id ?? 'new'} {...(editLook ? { edit: editLook } : { chooseKind: true, fresh: true })} title={editLook ? `Change ${editLook.name}` : 'New avatar'} doneLabel="Save"
+            <CreateGoblin voice="setmix" key={editLook?.id ?? 'new'} {...(editLook ? { edit: editLook } : { chooseKind: true, fresh: true, kind: newKind })} title={editLook ? `Change ${editLook.name}` : 'New avatar'} doneLabel="Save"
               onBack={() => go('avatars')} onDone={() => go('avatars')} />
           )}
         </div>
@@ -280,7 +308,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
-          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onMyIsland={() => void myIsland()} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings} />
+          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onMyIsland={() => void myIsland()} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
+            onIslands={toIslands} island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null} />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {picks && picks.id !== 'goblin-racing' ? (
             <aside className="shell-card" aria-live="polite">
@@ -294,7 +323,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'avatars' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
-          <AvatarsWindow onClose={back} onNew={() => { setEditLook(null); setCreateFor('avatars'); go('create'); }} onEdit={(l) => { setEditLook(l); setCreateFor('avatars'); go('create'); }} />
+          <AvatarsWindow onClose={back} onNew={(k) => { setEditLook(null); setNewKind(k); setCreateFor('avatars'); go('create'); }} onEdit={(l) => { setEditLook(l); setCreateFor('avatars'); go('create'); }} />
         </div>
       ) : null}
 
@@ -315,6 +344,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
           <div className="shell-window" role="dialog" aria-label="Activities">
             <header><h3>Activities</h3><button onClick={back}>Close</button></header>
+            {newActivity ? <NewActivity onCancel={() => setNewActivity(false)} onMake={(c) => { update((pr) => makeActivity(pr, c)); setNewActivity(false); setNote(`Made ${c.name}. Its planet is in the galaxy.`); }} /> : (
             <div className="shell-cards">
               {visible.map((a) => (
                 <article key={a.id} className="shell-activity">
@@ -327,8 +357,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
                   </div>
                 </article>
               ))}
-              <button className="shell-activity new" onClick={() => update((p) => createActivity(p, `New activity ${p.activities.length}`))}><Plus size={18} strokeWidth={1.4} />Create new</button>
+              <button className="shell-activity new" onClick={() => setNewActivity(true)}><Plus size={18} strokeWidth={1.4} />New activity</button>
             </div>
+            )}
             {profile.activities.some((a) => a.hidden) ? <button className="quiet" onClick={() => update(unhideAll)}>Show hidden activities</button> : null}
           </div>
         </div>
@@ -351,6 +382,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
               <button aria-label="Redo" title="Redo" disabled={!registry.canRedo} onClick={() => { const e = redoIslands(); if (e) setNote(e); }}><Redo2 size={14} strokeWidth={1.6} /></button>
               <button onClick={back}>Close</button>
             </header>
+            {newIsland ? <NewIsland onCancel={() => setNewIsland(false)} onMake={makeIsland} /> : (
             <div className="shell-cards">
               {islandRows.map((m) => (
                 <article key={m.id} className={`shell-activity${m.id === activeIslandId() ? ' current' : ''}`}>
@@ -359,18 +391,16 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
                   ) : <h4>{m.name}</h4>}
                   <p>{describeIsland(m, Date.now())}</p>
                   <div className="btns">
-                    <button className="go" onClick={() => { const w = openWorld(m.id); if (w) { setSession(true); setLevel('goblin'); setIntro(false); go('island'); } }}>Open</button>
+                    <button className="go" onClick={() => openIslandNow(m.id)}>Open</button>
                     <button title="Rename" aria-label="Rename" onClick={() => { setRenaming(m.id); setDraft(m.name); }}><Pencil size={13} strokeWidth={1.6} /></button>
                     <button title="Duplicate" aria-label="Duplicate" onClick={() => { const e = duplicateIsland(m.id); if (e) setNote(e); }}><Copy size={13} strokeWidth={1.6} /></button>
                     <button title="Delete (you can undo)" aria-label="Delete" onClick={() => { const e = removeIsland(m.id); if (e) setNote(e); if (world?.id === m.id) setWorld(null); }}><Trash2 size={13} strokeWidth={1.6} /></button>
                   </div>
                 </article>
               ))}
-              <div className="shell-activity new">
-                <select aria-label="Start from" value={newTemplate} onChange={(e) => setNewTemplate(e.target.value)}>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-                <button onClick={() => { const e = createIsland(TEMPLATE_SHAPES[newTemplate]?.name ?? 'My Island', newTemplate); if (e) setNote(e); }}><Plus size={14} strokeWidth={1.4} /> Create new</button>
-              </div>
+              <button className="shell-activity new" onClick={() => setNewIsland(true)}><Plus size={18} strokeWidth={1.4} />New island</button>
             </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -386,15 +416,16 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         </div>
       ) : null}
 
-      {screen === 'build' && world ? (
+      {screen === 'build' && editWorld ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <MapMaker key={world.id} rt={world.rt} scene={world.scene} onTestDrive={() => { setRaceEntry('select'); setRaceAuto(true); setRaceBack('build'); setRaceRt(null); go('racing'); }} onExit={toIsland} onMenu={toHome} onIslands={toIslands} onCommunity={() => toHub()} />
+          <MapMaker key={editWorld.id} rt={editWorld.rt} scene={editWorld.scene} onTestDrive={() => { setRaceEntry('select'); setRaceAuto(true); setRaceBack('build'); setRaceRt(null); go('racing'); }}
+            onExit={editing === 'racing' ? openSections : toIsland} onMenu={toHome} {...(editing === 'racing' ? { exitLabel: 'Back to Goblin Racing', place: 'Goblin Racing island' } : { onIslands: toIslands })} onCommunity={() => toHub()} />
         </div>
       ) : null}
 
-      {screen === 'racing' && (raceAuto ? world : raceRt) ? (
+      {screen === 'racing' && (raceAuto ? editWorld : raceRt) ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
-          <App rt={(raceAuto ? world! : raceRt!).rt} fromMap={raceAuto ? true : raceRt!.fromMap} {...(raceAuto ? { autoStart: true } : { entry: raceEntry })} onExit={() => { pinMapKey(null); go(raceBack); }} />
+          <App profile={profile} onProfile={update} rt={(raceAuto ? editWorld! : raceRt!).rt} fromMap={raceAuto ? true : raceRt!.fromMap} {...(raceAuto ? { autoStart: true } : { entry: raceEntry })} onExit={() => { pinMapKey(null); go(raceBack); }} />
         </div>
       ) : null}
     </div>

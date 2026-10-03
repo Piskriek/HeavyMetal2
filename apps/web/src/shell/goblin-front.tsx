@@ -1,8 +1,8 @@
-import type { ReactElement, Ref } from 'react';
+import { Fragment, type ReactElement, type Ref } from 'react';
 import { Maximize2 } from 'lucide-react';
 
 /**
- * Goblin Racing's front: its own menu (Play, Multiplayer, Settings) over its island. On the SetMix home it is a live window beside its planet
+ * Goblin Racing's front: its own menu (Play, Race modes, Settings) over its island. On the SetMix home it is a live window beside its planet
  * (GoblinPreview); opening it lets the same window grow to fill the screen (GoblinFront). Goblin words live here, not in the harness.
  * Every line on these screens tells the player something they need: what the game is, what Play will do, who they race as.
  */
@@ -13,7 +13,7 @@ export interface GoblinStatus {
   readonly you: string;
 }
 
-export function GoblinPreview(props: GoblinStatus & { readonly onOpen: () => void; readonly onPlay: () => void; readonly onMultiplayer: () => void; readonly onSettings: () => void }): ReactElement {
+export function GoblinPreview(props: GoblinStatus & { readonly onOpen: () => void; readonly onPlay: () => void; readonly onModes: () => void; readonly onSettings: () => void }): ReactElement {
   return (
     <div className="gr-preview">
       <header>
@@ -25,21 +25,21 @@ export function GoblinPreview(props: GoblinStatus & { readonly onOpen: () => voi
       <p className="gr-preview-you">{props.you}</p>
       <nav className="gr-preview-menu" aria-label="Goblin Racing menu">
         <button className="go" onClick={props.onPlay}>Play</button>
-        <button onClick={props.onMultiplayer}>Multiplayer</button>
+        <button onClick={props.onModes}>Race modes</button>
         <button onClick={props.onSettings}>Settings</button>
       </nav>
     </div>
   );
 }
 
-export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void; readonly onMultiplayer: () => void; readonly onSettings: () => void; readonly onHome: () => void }): ReactElement {
+export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void; readonly onModes: () => void; readonly onSettings: () => void; readonly onHome: () => void }): ReactElement {
   return (
     <div className="gr-front">
       <div className="gr-scrim" aria-hidden="true" />
       <div className="gr-brand"><b>Goblin</b><b className="second">Racing</b><i>a SetMix game</i></div>
       <nav className="shell-menu" aria-label="Goblin Racing menu">
         <button className="go" onClick={props.onPlay}>Play</button>
-        <button onClick={props.onMultiplayer}>Multiplayer</button>
+        <button onClick={props.onModes}>Race modes</button>
         <button onClick={props.onSettings}>Settings</button>
         <button className="quiet" onClick={props.onHome}>Back to SetMix</button>
       </nav>
@@ -61,6 +61,10 @@ const HARNESS_MENU: readonly { readonly id: 'island' | 'avatars' | 'community' |
  */
 export function SetMixHome(props: {
   readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
+  /** Your islands: switch to another or make a new one. */
+  readonly onIslands: () => void;
+  /** The island My island opens, and whether you have been there before (then it says you carry on where you left off). */
+  readonly island: { readonly name: string; readonly visited: boolean } | null;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
 }): ReactElement {
   const act = { island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
@@ -70,7 +74,10 @@ export function SetMixHome(props: {
       <div className="sm-brand"><b>SetMix</b><i>Harness</i></div>
       <nav className="sm-menu" aria-label="SetMix">
         {HARNESS_MENU.map((m, i) => (
-          <button key={m.id} style={{ ['--i' as string]: i }} onClick={act[m.id]}><b>{m.label}</b><small>{m.says}</small></button>
+          <Fragment key={m.id}>
+            <button style={{ ['--i' as string]: i }} onClick={act[m.id]}><b>{m.label}</b><small>{m.id === 'island' && props.island ? (props.island.visited ? `Carry on at ${props.island.name}, where you left off.` : `Walk and build ${props.island.name}.`) : m.says}</small></button>
+            {m.id === 'island' ? <button className="sm-sub" style={{ ['--i' as string]: i }} onClick={props.onIslands}>All my islands, or a new one</button> : null}
+          </Fragment>
         ))}
       </nav>
       <p className="sm-foot">Drag to look round the galaxy. Pick a planet to see what is played there.</p>

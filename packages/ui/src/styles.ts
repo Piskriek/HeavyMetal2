@@ -4,7 +4,7 @@ export const CSS = `
 .hmi *,.hmi *::before,.hmi *::after{box-sizing:border-box}
 .hmi-group{margin:0 0 16px}
 .hmi-group:last-child{margin-bottom:0}
-.hmi-h{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8ea3b5}
+.hmi-h{margin:0 0 8px;font-size:11px;font-weight:700;color:#8ea3b5}
 .hmi-rows,.hmi-list{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
 .hmi-row,.hmi-slot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:8px 10px;background:#1b2229;border:1px solid #242e37;border-left:3px solid #242e37;border-radius:8px}
 .hmi-ov{border-left-color:#4ea1ff}
@@ -34,7 +34,7 @@ export const CSS = `
 .hmi-swatch{width:56px;height:34px;padding:2px;background:#0e1216;border:1px solid #2f3b46;border-radius:6px}
 .hmi-vec{display:flex;gap:6px;width:100%}
 .hmi-axis{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:4px}
-.hmi-axis span{color:#8ea3b5;font-size:.85em;text-transform:uppercase}
+.hmi-axis span{color:#8ea3b5;font-size:.85em;}
 .hmi-exprwrap{display:flex;align-items:center;gap:6px;width:100%}
 .hmi-fx{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:1.6em;padding:0 6px;border-radius:999px;background:#2b3a52;color:#9fd0ff;font-style:italic;font-weight:700}
 .hmi-sum{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:.9em ui-monospace,SFMono-Regular,Menlo,monospace;color:#9fb0bf}

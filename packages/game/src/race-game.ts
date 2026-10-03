@@ -31,6 +31,11 @@ export interface RaceGameOptions {
   readonly player?: { readonly name: string; readonly params: Readonly<Record<string, number | boolean | string | null>> };
   /** Race on the map already loaded in the runtime (terrain + track preset) instead of generating one. */
   readonly fromScene?: boolean;
+  /**
+   * The player's own avatar rides in their ball (drawn by the app from the player's look): the player's racer takes this name and its ball
+   * carries no built-in goblin. The chosen racer still sets the ball's weight, speed, bounce and colour.
+   */
+  readonly rider?: { readonly name: string };
 }
 
 export interface Hud {
@@ -181,9 +186,12 @@ export function createRaceGame(rt: Runtime, opts: RaceGameOptions = {}): RaceGam
     const ball = world.spawn();
     rt.physics.addBody(ball, { kind: 'dynamic', collider: { shape: 'sphere', radius: BALL_RADIUS }, mass: phys.mass, friction: 0.6, restitution: phys.restitution, linearDamping: 0.03, angularDamping: 0.3, position: [slot.x, y, slot.z], tier: 'racing' });
     world.add(ball, 'renderable', { shape: 'sphere', size: BALL_RADIUS, color: '#bfe8ff', roughness: 0.05, metalness: 0, opacity: 0.22 });
-    world.add(ball, 'racer', { name: seedI.name, controller: i === 0 ? 'player' : 'ai', actor: 'p1', weight: stats.weight, speed: stats.speed, bounce: stats.bounce, hx: slot.hx, hz: slot.hz, skill: Math.min(1, Math.max(0, Number(p['skill'] ?? 0.6) * (i === 0 ? 1 : rules.aiSkill))) });
+    const ridden = i === 0 && !!opts.rider;
+    world.add(ball, 'racer', { name: ridden ? opts.rider!.name : seedI.name, controller: i === 0 ? 'player' : 'ai', actor: 'p1', weight: stats.weight, speed: stats.speed, bounce: stats.bounce, hx: slot.hx, hz: slot.hz, skill: Math.min(1, Math.max(0, Number(p['skill'] ?? 0.6) * (i === 0 ? 1 : rules.aiSkill))) });
     world.add(ball, 'race', {});
     colors.set(ball, String(p['color']));
+    // the player's own avatar rides this ball (the app draws it): no built-in goblin inside
+    if (ridden) return ball;
     const look = lookFromParams(p as Record<string, unknown>);
     for (const part of goblinParts(look, BALL_RADIUS) as Part[]) {
       if (part.role === 'glass') continue;

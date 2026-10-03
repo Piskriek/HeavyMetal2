@@ -37,7 +37,7 @@ try {
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
   check('the home is SetMix with the harness menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My island', 'Avatars', 'Community', 'Settings']));
   await page.waitForSelector('.gr-preview', { timeout: T(30000) });
-  check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Multiplayer', 'Settings']));
+  check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings']));
   check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
 
   const text = (sel, t) => page.locator(sel, { hasText: t }).first();
@@ -48,13 +48,13 @@ try {
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 
-  // Goblin Racing: its window grows into its own menu; Multiplayer holds its sections; Esc steps back out to SetMix
+  // Goblin Racing: its window grows into its own menu; Race modes holds its sections; Esc steps back out to SetMix
   await dom(() => document.querySelector('.gr-open')?.click());
   await page.waitForSelector('.gr-front', { timeout: T(15000) });
-  check('opening the window shows Goblin Racing\'s own menu', JSON.stringify(await page.$$eval('.gr-front .shell-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Multiplayer', 'Settings', 'Back to SetMix']));
-  await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Multiplayer')?.click(); });
+  check('opening the window shows Goblin Racing\'s own menu', JSON.stringify(await page.$$eval('.gr-front .shell-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings', 'Back to SetMix']));
+  await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Race modes')?.click(); });
   await page.waitForSelector('.shell-racing');
-  for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Track editor', 'Settings', 'My Goblin', 'The Bookie', 'Quick Race']) await dom((t) => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === t)?.click(); }, s);
+  for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Track editor', 'Settings', 'My goblin', 'The Bookie', 'Quick race']) await dom((t) => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === t)?.click(); }, s);
   check('every Goblin Racing section opens', true);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(400));
@@ -122,9 +122,15 @@ try {
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'My islands')?.click(); });
   await page.waitForSelector('[aria-label="My islands"]', { timeout: T(5000) }).catch(() => undefined);
   check('My islands lists the first island', await page.locator('[aria-label="My islands"] article').count() >= 1);
-  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => /Create new/.test(b.textContent ?? ''))?.click(); });
+  await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => /New island/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(T(300));
-  check('Create new adds an island', await page.locator('[aria-label="My islands"] article').count() >= 2);
+  check('New island offers Quick setup, Setup wizard and Manual', JSON.stringify(await page.$$eval('.nc-way b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Quick setup', 'Setup wizard', 'Manual']));
+  await dom(() => { [...document.querySelectorAll('.nc-way')].find((b) => /Quick setup/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(600));
+  check('Quick setup shows the ready-made islands as maps', await page.locator('.ni-grid canvas.island-map').count() >= 5);
+  await dom(() => { document.querySelector('.ni-grid button')?.click(); });
+  await page.waitForTimeout(T(400));
+  check('one click makes the island', await page.locator('[aria-label="My islands"] article').count() >= 2);
   await dom(() => { [...document.querySelectorAll('[aria-label="My islands"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
   await page.waitForTimeout(T(300));
   check('Undo takes it away again', await page.locator('[aria-label="My islands"] article').count() === 1);
@@ -132,9 +138,9 @@ try {
   await page.waitForSelector('.hotbar', { timeout: T(30000) });
   check('Close returns to the island', true);
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
-  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Share my island')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Share this island')?.click(); });
   await page.waitForSelector('.share', { timeout: T(5000) }).catch(() => undefined);
-  check('Share my island asks who gets it', await page.locator('.share-vis button').count() === 4);
+  check('Share this island asks who gets it', await page.locator('.share-vis button').count() === 4);
   await page.locator('.share-vis button', { hasText: 'Up for sale' }).click();
   await page.locator('.share input[type=number]').fill('0');
   check('a price of 0 is refused with a reason', await page.locator('.share .go').isDisabled() && /whole number of credits/.test(await page.locator('.share-problems').textContent() ?? ''));
@@ -142,6 +148,27 @@ try {
   await page.locator('.share .go').click();
   await page.waitForTimeout(T(300));
   check('sharing closes the dialog and says where it went', await page.locator('.share').count() === 0 && /Your shares/.test(await page.locator('.island-note').textContent() ?? ''));
+
+  // avatar mode (P): the camera faces your avatar, the dock shows your characters and this one's presets; a new one is made three ways
+  await page.keyboard.press('p');
+  await page.waitForTimeout(T(600));
+  check('P opens avatar mode with your characters and New avatar', await page.locator('.avatar-dock').count() === 1 && await page.locator('.ad-row button').count() === 2);
+  check('and the hotbar steps aside', await page.locator('.hotbar').count() === 0);
+  await dom(() => { document.querySelector('.ad-row .ad-new')?.click(); });
+  await page.waitForTimeout(T(300));
+  await dom(() => { [...document.querySelectorAll('.avatar-dock .nc-way')].find((b) => /Quick setup/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(300));
+  await dom(() => { document.querySelectorAll('.avatar-dock .ad-looks button')[2]?.click(); });
+  await page.waitForTimeout(T(300));
+  await dom(() => { [...document.querySelectorAll('.avatar-dock .btns .go')].find((b) => /^Make/.test(b.textContent ?? ''))?.click(); });
+  await page.waitForTimeout(T(500));
+  check('Quick setup makes a second character and wears it', await page.locator('.ad-row button').count() === 3 && await page.locator('.ad-row button.on').count() === 1);
+  await dom(() => { document.querySelectorAll('.ad-row button')[1]?.click(); });
+  await page.waitForTimeout(T(300));
+  check('one click swaps back to the first', await page.locator('.ad-row button.on').count() === 1);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(T(500));
+  check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
   check('ten tabs on the tab strip', await page.locator('.tab-strip button').count() === 10);
@@ -199,21 +226,20 @@ try {
   await page.waitForTimeout(T(400));
   await dom(() => { [...document.querySelectorAll('.shell-activity button')].find((b) => b.textContent === 'Play')?.click(); });
   await page.waitForSelector('.gr-front', { timeout: T(30000) });
-  await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Multiplayer')?.click(); });
+  await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Race modes')?.click(); });
   await page.waitForSelector('.shell-racing');
   await dom(() => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === 'Track editor')?.click(); });
   await dom(() => { [...document.querySelectorAll('.shell-racing-main button')].find((b) => b.textContent === 'Open the track editor')?.click(); });
   await page.waitForSelector('.maker', { timeout: T(30000) });
   check('the race track editor opens from the Goblin Racing menu', true);
+  check('on the Goblin Racing island', /Goblin Racing island/.test(await page.locator('.maker .crumbs').textContent() ?? ''));
   for (let i = 0; i < 3 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(400)); }
-  check('Esc opens the menu in build mode', await page.locator('.maker .island-menu').count() === 1);
-  await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Island')?.click(); });
-  await page.waitForSelector('.hotbar', { timeout: T(30000) });
-  check('Back to Island returns from build mode', true);
-  for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(600)); }
-  await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Home')?.click(); });
-  await page.waitForTimeout(T(600));
-  check('the jump menu returns home', await page.locator('.sm-home').count() === 1);
+  check('Esc opens the menu in the track editor', await page.locator('.maker .island-menu').count() === 1);
+  await dom(() => { [...document.querySelectorAll('.maker .island-menu button')].find((b) => b.textContent === 'Back to Goblin Racing')?.click(); });
+  await page.waitForSelector('.shell-racing', { timeout: T(30000) });
+  check('Back to Goblin Racing returns to its race modes', true);
+  for (let i = 0; i < 4 && await page.locator('.sm-home').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(900)); }
+  check('Esc steps back out to the SetMix home', await page.locator('.sm-home').count() === 1);
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {
   try { const pg = browser.contexts()[0]?.pages()[0]; if (pg) console.log('screen at failure:', await pg.evaluate(() => `${document.querySelector('.shell')?.getAttribute('data-screen')} | ${document.body.innerText.slice(0, 160).split(String.fromCharCode(10)).join(' / ')}`)); } catch { /* ignore */ }

@@ -75,6 +75,15 @@ function apply(f: (r: IslandRegistry) => IslandRegistry): string | null {
   try { registry = f(islands()); if (!activeId || !registry.get(activeId)) activeId = registry.defaultId(); save(); return null; } catch (e) { return (e as { message?: string }).message ?? 'That did not work'; }
 }
 export const createIsland = (name: string, template: string): string | null => apply((r) => r.create(name, template, Date.now()));
+/** A new island with its map already made (the setup wizard's own shape): created from `template`, then given that map. Returns its id. */
+export function createIslandWithMap(name: string, template: string, json: string | null): { readonly error: string | null; readonly id: string | null } {
+  const before = new Set(islands().list().map((m) => m.id));
+  const error = createIsland(name, template);
+  if (error) return { error, id: null };
+  const made = islands().list().find((m) => !before.has(m.id)) ?? null;
+  if (made && json) write(bundleKey(made.id), json);
+  return { error: null, id: made?.id ?? null };
+}
 export const renameIsland = (id: string, name: string): string | null => apply((r) => r.rename(id, name));
 export const removeIsland = (id: string): string | null => apply((r) => r.remove(id, Date.now()));
 export const undoIslands = (): string | null => apply((r) => r.undo());

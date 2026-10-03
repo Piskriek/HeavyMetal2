@@ -9,8 +9,8 @@ import { currentTournament, withTournament, type Profile } from './profile';
  */
 type Section = 'quick' | 'tournaments' | 'spectate' | 'rankings' | 'tracks' | 'settings' | 'goblin' | 'bookie';
 const SECTIONS: readonly { id: Section; label: string; Icon: typeof Flag }[] = [
-  { id: 'quick', label: 'Quick Race', Icon: Flag }, { id: 'tournaments', label: 'Tournaments', Icon: Trophy }, { id: 'spectate', label: 'Spectate', Icon: Eye },
-  { id: 'rankings', label: 'Rankings', Icon: Gauge }, { id: 'tracks', label: 'Track editor', Icon: Route }, { id: 'settings', label: 'Settings', Icon: Settings2 }, { id: 'goblin', label: 'My Goblin', Icon: UserRound }, { id: 'bookie', label: 'The Bookie', Icon: Coins },
+  { id: 'quick', label: 'Quick race', Icon: Flag }, { id: 'tournaments', label: 'Tournaments', Icon: Trophy }, { id: 'spectate', label: 'Spectate', Icon: Eye },
+  { id: 'rankings', label: 'Rankings', Icon: Gauge }, { id: 'tracks', label: 'Track editor', Icon: Route }, { id: 'settings', label: 'Settings', Icon: Settings2 }, { id: 'goblin', label: 'My goblin', Icon: UserRound }, { id: 'bookie', label: 'The Bookie', Icon: Coins },
 ];
 const SIM_PLAYERS = ['Snaggle', 'Mudwick', 'Grizzle', 'Pip', 'Bogra', 'Nettle', 'Skrit', 'Ormund', 'Fizzle'];
 const ratingOf = (n: string): number => 900 + ([...n].reduce((a, c) => a + c.charCodeAt(0), 0) % 7) * 55;
@@ -39,7 +39,7 @@ export function GoblinRacingMenu(props: {
   return (
     <div className="shell-racing">
       <aside className="shell-racing-nav">
-        <div className="shell-brand small"><b>{activity.name.toUpperCase()}</b><i>ACTIVITY</i></div>
+        <div className="shell-brand small"><b>{activity.name}</b><i>Race modes</i></div>
         <nav>
           {SECTIONS.map(({ id, label, Icon }) => <button key={id} className={section === id ? 'on' : ''} onClick={() => setSection(id)}><Icon size={15} strokeWidth={1.6} />{label}</button>)}
         </nav>
@@ -49,7 +49,7 @@ export function GoblinRacingMenu(props: {
       </aside>
       <section className="shell-racing-main">
         {section === 'tracks' ? (<><h2>Track editor</h2><p>Draw the race track on your island: lay out the road, shape the ground under it, dress it, set the race rules, then test drive it.</p><button className="go" onClick={onTrackEditor}>Open the track editor</button></>) : null}
-        {section === 'quick' ? (<><h2>Quick Race</h2><p>Pick your goblin and race round the island, three laps against the field.</p><button className="go" onClick={onQuickRace}>Choose a goblin and race</button></>) : null}
+        {section === 'quick' ? (<><h2>Quick race</h2><p>Pick your goblin and race round the island, three laps against the field.</p><button className="go" onClick={onQuickRace}>Choose a goblin and race</button></>) : null}
         {section === 'tournaments' ? (
           <>
             <h2>Tournaments</h2>

@@ -31,6 +31,21 @@ export const HERO_GOBLIN_RIG: Rig = {
   joints: { body: [14, 13, 10], head: [14, 30, 10], armL: [6, 27.5, 10], armR: [22, 27.5, 10], legL: [10.5, 13, 10], legR: [17.5, 13, 10] },
 };
 
+/**
+ * The voxel human of `@hm/voxelart` (28 x 47 x 20, mirrored about x = 14): head and neck from y 36 up, arms outside x 8..19 below the
+ * neckerchief, legs below the hips (y 19), everything else the body. Joints at the hips, the neck, the shoulders and the tops of the legs.
+ */
+export const HUMAN_RIG: Rig = {
+  boneOf: (x, y) => {
+    if (y >= 36) return 'head';
+    if ((x <= 7 || x >= 20) && y <= 34) return x <= 7 ? 'armL' : 'armR';
+    if (y <= 19 && x >= 9 && x <= 12) return 'legL';
+    if (y <= 19 && x >= 15 && x <= 18) return 'legR';
+    return 'body';
+  },
+  joints: { body: [14, 20, 9.5], head: [14, 36, 10], armL: [6.5, 34.5, 9.5], armR: [21.5, 34.5, 9.5], legL: [11, 20, 10], legR: [17, 20, 10] },
+};
+
 /** A part to add to a character: its cells (1-based into its own palette), the cell that sits on the anchor, the anchor, and the bone it moves with. */
 export interface DressItem {
   readonly size: Vec3;

@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import * as THREE from 'three';
 import { Animator, animById } from '@hm/anim';
-import { LOOKS, LOOK_VARIABLES, nameProblem, randomLook, type AvatarLook, type LookSlot, type PartPlace } from '@hm/avatarlook';
+import { AVATAR_KINDS, kindOf, lookVariablesFor, looksFor, nameProblem, randomLook, type AvatarKind, type AvatarLook, type LookSlot, type PartPlace } from '@hm/avatarlook';
 import { PLACES, partsFor } from './accessories';
 import { AvatarView } from '@hm/render';
-import { goblinRigged } from '../build/cards';
+import { avatarRigged } from '../build/cards';
 import { PartsPicker } from './parts-picker';
 import { PresetPreview } from '../build/cards';
 import { fx } from '../maker/feedback';
 import { player, saveLook } from '../build/player';
 
 /**
- * Create your goblin: the first thing Play asks. A turntable shows your goblin alive (breathing, waving when you change it); pick a ready-made
- * look, change any colour, roll the dice, give it a name. Done takes you to your island. Everything here is the avatar preset; the same
- * editor opens later from the Avatar tab (P).
+ * The avatar maker: a turntable shows your avatar alive (breathing, waving when you change it); pick its kind (goblin, human ...) when you are
+ * choosing, a ready-made look of that kind, change any colour, roll the dice, give it a name. The first game you play makes a goblin
+ * (Goblin Racing's Play); SetMix's Avatars window makes any kind and edits the ones you have. Everything here is the avatar preset; the
+ * same look opens later in the Avatar tab (P).
  */
 function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: number }): ReactElement {
   const host = useRef<HTMLDivElement>(null);
@@ -42,7 +43,7 @@ function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: numb
     let tall = 1.76; // metres: the camera frames the goblin with whatever it wears
     const setLook = (l: AvatarLook): void => {
       view?.dispose();
-      const m = goblinRigged(l);
+      const m = avatarRigged(l);
       if (!m) return;
       tall = m.model.size[1] * 0.04;
       view = new AvatarView(m.model, m.rig, 0.04);
@@ -72,10 +73,11 @@ function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: numb
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { api.current?.setLook(props.look); }, [props.look]);
   useEffect(() => { if (props.wave) api.current?.wave(); }, [props.wave]);
-  return <div ref={host} className="turntable" aria-label="Your goblin, turning slowly" role="img" />;
+  return <div ref={host} className="turntable" aria-label="Your avatar, turning slowly" role="img" />;
 }
 
-const QUICK: readonly LookSlot[] = ['skin', 'eyes', 'vest', 'shield'];
+/** The colours shown right in the maker, per kind (the rest are in the Avatar tab). */
+const QUICK: Readonly<Record<AvatarKind, readonly LookSlot[]>> = { goblin: ['skin', 'eyes', 'vest', 'shield'], human: ['skin', 'speckle', 'vest', 'cloth'] };
 /** The dice also dress the goblin: each place gets a part about half the time. */
 function randomParts(): Partial<Record<PartPlace, string>> {
   const out: Partial<Record<PartPlace, string>> = {};
@@ -84,14 +86,36 @@ function randomParts(): Partial<Record<PartPlace, string>> {
   return out;
 }
 
-export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => void; readonly onBack: () => void }): ReactElement {
+export function CreateGoblin(props: {
+  readonly onDone: (look: AvatarLook) => void; readonly onBack: () => void;
+  /** Which kind to make (default: a goblin, or the kind of the avatar being edited). */
+  readonly kind?: AvatarKind;
+  /** Show the kind tabs (making a new avatar in SetMix). */
+  readonly chooseKind?: boolean;
+  /** An avatar to edit instead of making a new one. */
+  readonly edit?: AvatarLook;
+  /** A brand-new avatar beside the ones you have (a fresh id), not your current one changed. */
+  readonly fresh?: boolean;
+  readonly title?: string;
+  readonly doneLabel?: string;
+  /** Whose voice the maker speaks in: SetMix (the harness's avatars) or Goblin Racing's own (its first goblin). */
+  readonly voice?: 'setmix' | 'goblin';
+}): ReactElement {
   const start = player();
-  const first = start.looks.find((l) => l.id === start.lookId) ?? LOOKS[0]!;
-  const [look, setLook] = useState<AvatarLook>({ ...first, name: start.created ? first.name : '' });
+  const startKind: AvatarKind = props.edit ? kindOf(props.edit) : props.kind ?? 'goblin';
+  const [look, setLook] = useState<AvatarLook>(() => {
+    if (props.edit) return props.edit;
+    if (props.fresh) return { ...looksFor(startKind)[0]!, id: `avatar-${Date.now().toString(36)}`, name: '' };
+    const first = start.looks.find((l) => l.id === start.lookId && kindOf(l) === startKind) ?? looksFor(startKind)[0]!;
+    return { ...first, name: start.created ? first.name : '' };
+  });
+  const kind = kindOf(look);
   const [wave, setWave] = useState(0);
   const [touched, setTouched] = useState(false);
   const problem = nameProblem(look.name);
   const change = (patch: Partial<AvatarLook>): void => { setLook((l) => ({ ...l, ...patch })); setWave((w) => w + 1); };
+  /** Another kind: its first ready-made look, keeping the name and the id being made. */
+  const pickKind = (k: AvatarKind): void => { const base = looksFor(k)[0]!; const next: AvatarLook = { ...base, id: look.id, name: look.name }; if (k === 'goblin') delete next.kind; setLook(next); setWave((w) => w + 1); fx('ui-toggle'); };
   const done = (): void => {
     if (problem) { setTouched(true); fx('ui-error'); return; }
     const saved = saveLook({ ...look, name: look.name.trim() });
@@ -99,10 +123,15 @@ export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => voi
     props.onDone(saved);
   };
   return (
-    <div className="create-goblin" role="dialog" aria-label="Create your goblin">
+    <div className={`create-goblin${props.voice === 'setmix' ? ' setmix' : ''}`} role="dialog" aria-label={props.title ?? 'Make your avatar'}>
       <GoblinTurntable look={look} wave={wave} />
       <section className="cg-panel">
-        <h2>Your goblin</h2>
+        <h2>{props.title ?? (kind === 'goblin' ? 'Your goblin' : 'Your avatar')}</h2>
+        {props.chooseKind ? (
+          <div className="cg-kinds" role="group" aria-label="Kind">
+            {AVATAR_KINDS.map((k) => <button key={k.id} className={kind === k.id ? 'on' : ''} aria-pressed={kind === k.id} onClick={() => pickKind(k.id)}><b>{k.name}</b><small>{k.says}</small></button>)}
+          </div>
+        ) : null}
         <label className="cg-name">
           <span>Name</span>
           <input autoFocus value={look.name} maxLength={20} placeholder="Give it a name" onChange={(e) => { setLook((l) => ({ ...l, name: e.target.value })); setTouched(true); }} onKeyDown={(e) => { if (e.key === 'Enter') done(); }} />
@@ -110,7 +139,7 @@ export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => voi
         {touched && problem ? <p className="hint warn" role="alert">{problem}</p> : null}
         <h4>Looks</h4>
         <div className="cg-looks">
-          {LOOKS.map((l) => (
+          {looksFor(kind).map((l) => (
             <button key={l.id} className={l.skin === look.skin && l.vest === look.vest ? 'on' : ''} onClick={() => change({ ...l, id: look.id, name: look.name, ...(look.parts ? { parts: look.parts } : {}) })} title={l.name}>
               <PresetPreview p={{ kind: 'look', look: l }} size={64} /><span>{l.name}</span>
             </button>
@@ -120,16 +149,16 @@ export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => voi
         <PartsPicker look={look} onChange={(parts) => change({ parts })} />
         <h4>Colours</h4>
         <div className="cg-colours">
-          {LOOK_VARIABLES.filter((v) => QUICK.includes(v.key as LookSlot)).map((v) => (
+          {lookVariablesFor(kind).filter((v) => QUICK[kind].includes(v.key as LookSlot)).map((v) => (
             <label key={v.key}><input type="color" value={look[v.key as LookSlot]} onChange={(e) => change({ [v.key]: e.target.value } as Partial<AvatarLook>)} /><span>{v.label}</span></label>
           ))}
         </div>
-        <p className="hint">More colours, and how your goblin walks and runs, are in the Avatar and Animate tabs once you are on your island.</p>
+        <p className="hint">More colours, and how your avatar walks and runs, are in the Avatar and Animate tabs once you are on your island.</p>
         <div className="btns">
-          <button onClick={() => { change({ ...randomLook(Math.floor(Math.random() * 1e9), look.name), id: look.id, parts: randomParts() }); fx('ui-toggle'); }}>Roll the dice</button>
+          <button onClick={() => { change({ ...randomLook(Math.floor(Math.random() * 1e9), look.name, kind), id: look.id, parts: randomParts() }); fx('ui-toggle'); }}>Roll the dice</button>
           <span className="grow" />
           <button onClick={props.onBack}>Back</button>
-          <button className="go" onClick={done}>Done: to my island</button>
+          <button className="go" onClick={done}>{props.doneLabel ?? 'Done: to my island'}</button>
         </div>
       </section>
     </div>

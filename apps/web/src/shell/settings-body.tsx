@@ -5,9 +5,9 @@ import { GraphicsTuning } from './graphics-tuning';
 import { gpuInUse, tierInUse, type GpuChoice, type Profile } from './profile';
 
 type Choice = 'auto' | Quality;
-/** The graphics presets, lightest first, as one-click buttons (owner: "scale down to the calculator version with the click of a preset button"). */
+/** The graphics presets, lightest first, as one-click buttons (owner: "scale down to the calculator version with the click of a preset button", since renamed Potato). */
 const PRESETS: readonly { readonly id: Choice; readonly name: string; readonly says: string }[] = [
-  { id: 'calculator', name: 'Calculator', says: 'The lightest the game can be: a small picture, flat ground, no clouds or shadows, and plants only nearby. For very old or very busy machines.' },
+  { id: 'potato', name: 'Potato', says: 'The lightest the game can be: a small picture, flat ground, no clouds or shadows, and plants only nearby. For very old or very busy machines.' },
   { id: 'low', name: 'Low', says: 'Light: a 720p picture, no shadows or picture effects, simple lighting. Smooth on older laptops.' },
   { id: 'medium', name: 'Medium', says: 'Sun shadows, glow and sky reflections.' },
   { id: 'high', name: 'High', says: 'Sharper shadows, contact shadows and smooth edges.' },
@@ -17,7 +17,7 @@ const PRESETS: readonly { readonly id: Choice; readonly name: string; readonly s
 
 /**
  * Settings: the settings presets. One body for the main menu's Settings and the island's Settings window (Esc, Settings): graphics presets
- * first (one click from Calculator to Ultra, or Auto with a frame-rate target), then fine-tuning, the graphics card, the profile and controls.
+ * first (one click from Potato to Ultra, or Auto with a frame-rate target), then fine-tuning, the graphics card, the profile and controls.
  */
 export function SettingsBody(props: {
   readonly profile: Profile; readonly update: (fn: (p: Profile) => Profile) => void;

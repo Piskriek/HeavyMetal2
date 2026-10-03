@@ -14,6 +14,7 @@ import {
 describe('Voxel Art Models Suite', () => {
   const EXPECTED_SPECS: Record<string, { size: [number, number, number]; pivot: [number, number, number]; minVoxels: number; maxVoxels: number }> = {
     goblin: { size: [28, 44, 20], pivot: [14, 0, 10], minVoxels: 3000, maxVoxels: 9000 },
+    human: { size: [28, 47, 20], pivot: [14, 0, 10], minVoxels: 2500, maxVoxels: 8000 },
     'goblin-ball-racer': { size: [36, 36, 36], pivot: [18, 18, 18], minVoxels: 4000, maxVoxels: 14000 },
     palm: { size: [36, 44, 36], pivot: [18, 0, 18], minVoxels: 800, maxVoxels: 5000 },
     barrel: { size: [14, 16, 14], pivot: [7, 0, 7], minVoxels: 400, maxVoxels: 1500 },
@@ -22,10 +23,10 @@ describe('Voxel Art Models Suite', () => {
     'statue-plinth': { size: [24, 8, 24], pivot: [12, 0, 12], minVoxels: 600, maxVoxels: 3000 },
   };
 
-  it('declares 7 unique models with valid ids and names', () => {
-    assert.equal(MODELS.length, 7);
+  it('declares 8 unique models with valid ids and names', () => {
+    assert.equal(MODELS.length, 8);
     const ids = new Set(MODELS.map((m) => m.id));
-    assert.equal(ids.size, 7);
+    assert.equal(ids.size, 8);
     for (const id of Object.keys(EXPECTED_SPECS)) {
       assert.ok(ids.has(id), `Missing model id: ${id}`);
     }
@@ -86,6 +87,20 @@ describe('Voxel Art Models Suite', () => {
       });
     });
   }
+
+  describe('Human Specific Requirements', () => {
+    const human = MODELS.find((m) => m.id === 'human')!.build();
+    it('is exactly left-right symmetric (nothing carried, unlike the goblin with its shield)', () => {
+      const [sx, sy, sz] = human.size;
+      for (let z = 0; z < sz; z++) for (let y = 0; y < sy; y++) for (let x = 0; x < sx; x++) assert.equal(get(human, x, y, z), get(human, sx - 1 - x, y, z), `at ${x},${y},${z}`);
+    });
+    it('stands on its feet with its head on top: shoes at the bottom, hair at the top', () => {
+      const name = (v: number): string | undefined => human.palette[v - 1]?.name;
+      assert.equal(name(get(human, 10, 0, 9)), 'shoes');
+      assert.equal(name(get(human, 11, 46, 10)), 'hair');
+      assert.equal(name(get(human, 11, 41, 7)), 'eyes');
+    });
+  });
 
   describe('Goblin Specific Requirements', () => {
     const goblinEntry = MODELS.find((m) => m.id === 'goblin')!;

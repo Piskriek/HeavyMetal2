@@ -319,6 +319,51 @@ export function ascii(m: Model, y: number): string {
   return lines.join('\n');
 }
 
+/**
+ * A human avatar (28 x 47 x 20 cells, 1.88 m at 4 cm a cell, facing -Z like the goblin): shoes, trousers, belt, short-sleeved shirt,
+ * a neckerchief, a head with eyes, nose, mouth, ears and hair. Built as the left half and mirrored. Its palette names are what the avatar
+ * looks recolour (`@hm/avatarlook` HUMAN_SLOTS), and its parts line up with HUMAN_RIG in `@hm/render`.
+ */
+function buildHuman(): Model {
+  const e = (name: string, color: V3, roughness = 0.8, metalness = 0): Entry => ({ name, color, roughness, metalness, emissive: 0, alpha: 1 });
+  const palette: Entry[] = [
+    e('skin', [0.78, 0.55, 0.42], 0.7), e('skin-shade', [0.66, 0.44, 0.33], 0.75), e('hair', [0.23, 0.16, 0.12], 0.9), e('eyes', [0.23, 0.16, 0.11], 0.3),
+    e('shirt', [0.85, 0.79, 0.64], 0.9), e('belt', [0.35, 0.23, 0.13], 0.8), e('buckle', [0.8, 0.7, 0.35], 0.3, 0.9), e('trousers', [0.37, 0.42, 0.29], 0.9),
+    e('shoes', [0.24, 0.17, 0.12], 0.7), e('scarf', [0.75, 0.22, 0.17], 0.85),
+  ];
+  const SKIN = 1, SHADE = 2, HAIR = 3, EYES = 4, SHIRT = 5, BELT = 6, BUCKLE = 7, TROUSERS = 8, SHOES = 9, SCARF = 10;
+  const m = createModel('human', 'Human', [28, 47, 20], [14, 0, 10], palette);
+  // feet and legs
+  box(m, [9, 0, 6], [12, 2, 12], SHOES);
+  box(m, [9, 3, 8], [12, 19, 12], TROUSERS);
+  box(m, [8, 17, 7], [13, 21, 12], TROUSERS);
+  // belt with its buckle a step out in front
+  box(m, [8, 22, 7], [13, 22, 12], BELT);
+  set(m, 13, 22, 6, BUCKLE);
+  // shirt, short sleeves, bare forearms and hands
+  box(m, [8, 23, 7], [13, 33, 12], SHIRT);
+  box(m, [5, 28, 8], [7, 33, 11], SHIRT);
+  box(m, [5, 21, 8], [7, 27, 11], SKIN);
+  box(m, [5, 18, 8], [7, 20, 10], SKIN);
+  // neckerchief with its knot in front, then the neck
+  box(m, [9, 34, 7], [13, 35, 12], SCARF);
+  set(m, 13, 33, 6, SCARF);
+  box(m, [11, 36, 9], [13, 36, 11], SKIN);
+  // head: face on the front plane (z = 7), ears at the sides, hair on top, at the back and over the ears
+  box(m, [9, 37, 7], [13, 45, 13], SKIN);
+  set(m, 11, 41, 7, EYES);
+  set(m, 13, 40, 6, SHADE); // nose, a step out
+  box(m, [12, 38, 7], [13, 38, 7], SHADE); // mouth
+  box(m, [8, 40, 9], [8, 41, 10], SHADE); // ear
+  box(m, [9, 46, 7], [13, 46, 13], HAIR);
+  box(m, [9, 39, 13], [13, 46, 13], HAIR);
+  box(m, [9, 43, 8], [9, 45, 13], HAIR);
+  box(m, [9, 45, 7], [13, 45, 7], HAIR); // fringe
+  box(m, [10, 42, 7], [11, 42, 7], HAIR); // eyebrow
+  mirrorX(m);
+  return m;
+}
+
 function buildGoblin(): Model {
   const palette: Entry[] = [
     { name: 'skin', color: [0.32, 0.58, 0.22], roughness: 0.7, metalness: 0.0, emissive: 0.0, alpha: 1.0 },
@@ -812,6 +857,12 @@ const RAW_MODELS: { id: string; name: string; doc: string; build: () => Model }[
     build: buildGoblin,
   },
   {
+    id: 'human',
+    name: 'Human',
+    doc: 'A 28x47x20 person in a short-sleeved shirt, trousers, belt and shoes, with a neckerchief, eyes, nose, ears and hair: the human avatar.',
+    build: buildHuman,
+  },
+  {
     id: 'goblin-ball-racer',
     name: 'Goblin Ball Racer',
     doc: 'A 36x36x36 crouched goblin in a round wooden spherical barrel-ball with open top hatch, head, ears, and clawed hands exposed.',
@@ -902,4 +953,4 @@ export function weld(m: Model, symmetricX = false): Model {
 }
 
 /** The ready-made models. Every build is deterministic and one connected piece. */
-export const MODELS: { id: string; name: string; doc: string; build: () => Model }[] = RAW_MODELS.map((e) => ({ ...e, build: () => (e.id === 'goblin' ? weld(weld(e.build(), true)) : weld(e.build())) }));
+export const MODELS: { id: string; name: string; doc: string; build: () => Model }[] = RAW_MODELS.map((e) => ({ ...e, build: () => (e.id === 'goblin' || e.id === 'human' ? weld(weld(e.build(), true)) : weld(e.build())) }));

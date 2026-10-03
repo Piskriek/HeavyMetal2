@@ -30,7 +30,7 @@ export function SettingsScreen(props: { settings: Settings; onChange: (patch: Pa
         <Volume field="master" label="Master volume" value={s.master} onChange={set} />
         <Volume field="sfx" label="Effects" value={s.sfx} onChange={set} />
         <Volume field="music" label="Music" value={s.music} onChange={set} />
-        <Segment field="quality" label="Graphics" value={s.quality} options={['auto', 'calculator', 'low', 'medium', 'high', 'ultra']} onChange={set} />
+        <Segment field="quality" label="Graphics" value={s.quality} options={['auto', 'potato', 'low', 'medium', 'high', 'ultra']} onChange={set} />
         <Segment field="touchControls" label="Touch controls" value={s.touchControls} options={['auto', 'on', 'off']} onChange={set} />
         <Check field="showMinimap" label="Show the minimap" value={s.showMinimap} onChange={set} />
         <Check field="invertSteer" label="Invert steering" value={s.invertSteer} onChange={set} />

@@ -1,5 +1,5 @@
 import { ActivityRegistry, Tournament, isActivityError, type Activity, type TournamentState } from '@hm/activities';
-import { parseFpsTarget, type FpsTarget, type Quality } from '@hm/game';
+import { parseFpsTarget, parseQuality, type FpsTarget, type Quality } from '@hm/game';
 import type { Params } from '@hm/contracts';
 import { resolveGraphics, type ThreeRenderer } from '@hm/render';
 
@@ -78,7 +78,7 @@ export function loadProfile(): Profile {
     const t = raw.tournament ? Tournament.fromJSON(raw.tournament) : null;
     const gpu: GpuChoice = raw.gpu === 'saver' || raw.gpu === 'browser' ? raw.gpu : 'fast';
     const graphics = raw.graphics && typeof raw.graphics === 'object' && !Array.isArray(raw.graphics) ? raw.graphics : {};
-    return { ...DEFAULT_PROFILE, ...raw, gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
+    return { ...DEFAULT_PROFILE, ...raw, quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

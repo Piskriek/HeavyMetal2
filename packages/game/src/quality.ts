@@ -3,10 +3,10 @@
  * Pure (no DOM): the shell feeds it the device facts and the frame times, and applies whatever it answers.
  */
 
-/** Lightest first. `calculator` is the lightest the game can be: chosen by hand, or by auto only when low runs far too slow. */
-export type Quality = 'calculator' | 'low' | 'medium' | 'high' | 'ultra';
+/** Lightest first. `potato` is the lightest the game can be: chosen by hand, or by auto only when low runs far too slow. */
+export type Quality = 'potato' | 'low' | 'medium' | 'high' | 'ultra';
 
-const ORDER: readonly Quality[] = ['calculator', 'low', 'medium', 'high', 'ultra'];
+const ORDER: readonly Quality[] = ['potato', 'low', 'medium', 'high', 'ultra'];
 
 export interface DeviceFacts {
   readonly touch: boolean;
@@ -46,7 +46,7 @@ export function gpuClass(name: string | null | undefined): GpuClass | null {
  */
 export function guessQuality(d: DeviceFacts): Quality {
   const g = gpuClass(d.gpu);
-  if (g === 'software') return 'calculator';
+  if (g === 'software') return 'potato';
   if (g === 'weak') return 'low';
   if (!d.touch) {
     if (g === 'mid') return 'medium';
@@ -58,8 +58,10 @@ export function guessQuality(d: DeviceFacts): Quality {
   return g === 'mid' && phone === 'high' ? 'medium' : phone;
 }
 
+/** A saved tier name, or null for auto. `calculator` was Potato's first name (renamed 2026-10-03), so old saves keep their choice. */
 export function parseQuality(v: unknown): Quality | null {
-  return v === 'calculator' || v === 'low' || v === 'medium' || v === 'high' || v === 'ultra' ? v : null;
+  if (v === 'calculator') return 'potato';
+  return v === 'potato' || v === 'low' || v === 'medium' || v === 'high' || v === 'ultra' ? v : null;
 }
 
 export interface AdaptiveQuality {
@@ -121,7 +123,7 @@ export function createAdaptiveQuality(start: Quality, o: AdaptiveOptions = {}): 
       if (avg > slowMs) {
         tooSlow.add(current);
         const verySlow = avg > slowMs * 2.5;
-        // two tiers at once when very slow; the calculator tier only then (low a little slow is still better than calculator)
+        // two tiers at once when very slow; the potato tier only then (low a little slow is still better than potato)
         const next = Math.max(verySlow ? 0 : 1, i - (verySlow ? 2 : 1));
         return next < i ? change(ORDER[next]!) : null;
       }

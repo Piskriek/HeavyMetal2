@@ -38,7 +38,7 @@ export interface GraphicsSettings {
 }
 
 export const GRAPHICS_TIERS: Readonly<Record<Quality, GraphicsSettings>> = {
-  calculator: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true },
+  potato: { pictureSize: 480, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 4, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 10, skipHiddenPlants: true, simpleSea: true, plantDistance: 60, clouds: false, flatGround: true },
   low: { pictureSize: 720, sharpness: 1, supersample: false, effects: false, glow: false, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'off', reflections: false, simpleLighting: true, plantDetail: 18, skipHiddenPlants: true, simpleSea: true, plantDistance: 0, clouds: true, flatGround: false },
   medium: { pictureSize: 0, sharpness: 1.5, supersample: false, effects: true, glow: true, contactShadows: false, contactShadowSamples: 8, smoothEdges: false, shadows: 'on', reflections: true, simpleLighting: false, plantDetail: 35, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false },
   high: { pictureSize: 0, sharpness: 2, supersample: false, effects: true, glow: true, contactShadows: true, contactShadowSamples: 12, smoothEdges: true, shadows: 'detailed', reflections: true, simpleLighting: false, plantDetail: 70, skipHiddenPlants: false, simpleSea: false, plantDistance: 0, clouds: true, flatGround: false },

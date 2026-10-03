@@ -35,7 +35,7 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix with the harness menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My island', 'Community', 'Settings']));
+  check('the home is SetMix with the harness menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My island', 'Avatars', 'Community', 'Settings']));
   await page.waitForSelector('.gr-preview', { timeout: T(30000) });
   check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Multiplayer', 'Settings']));
   check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
@@ -44,7 +44,7 @@ try {
   const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
-  check('with graphics presets from Calculator to Auto', await page.locator('.graphics-presets button').count() === 6);
+  check('with graphics presets from Potato to Auto', await page.locator('.graphics-presets button').count() === 6);
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 

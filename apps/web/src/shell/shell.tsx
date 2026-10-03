@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Copy, Pencil, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import type { Runtime } from '@hm/engine';
 import { goblinRacing, type Activity } from '@hm/activities';
+import { kindOf, type AvatarLook } from '@hm/avatarlook';
+import { AvatarsWindow } from './avatars';
 import { App } from '../app';
 import { IslandWalk } from '../island';
 import { MapMaker } from '../maker/maker';
@@ -17,6 +19,7 @@ import { Community } from './community';
 import { createActivity, duplicateActivity, loadProfile, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
 import { SettingsBody } from './settings-body';
 import { GoblinFront, GoblinPreview, SetMixHome } from './goblin-front';
+import { captureMouse } from './capture-mouse';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
 
@@ -27,13 +30,14 @@ import { player } from '../build/player';
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
  */
-export type Screen = 'home' | 'goblin' | 'create' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands';
+export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
   home: { back: null, doc: 'The SetMix home: the galaxy, Goblin Racing selected with its menu live beside it. The only root.' },
   goblin: { back: 'home', doc: "Goblin Racing's own menu (Play, Multiplayer, Settings) orbiting the Goblin Racing island." },
   create: { back: 'origin', doc: 'Make an avatar (look and name). The first game you play makes the first one: Goblin Racing makes a goblin.' },
+  avatars: { back: 'origin', doc: 'Avatars: everyone you can be (any kind); use, change, remove, make a new one.' },
   zoom: { back: 'island', doc: 'The dive. Esc skips to your avatar.' },
   island: { back: 'home', doc: 'Walking your own island (harness level). Esc opens the jump menu and the galaxy bar.' },
   activities: { back: 'origin', doc: 'The activities window.' },
@@ -69,7 +73,11 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   /** The Goblin Racing island: the world its menu orbits (its own map, never mixed with your islands). */
   const [raceWorld, setRaceWorld] = useState<World | null>(null);
   /** What the avatar maker leads to when done: a race (Goblin Racing's Play) or your island (My island). */
-  const [createFor, setCreateFor] = useState<'race' | 'island'>('race');
+  const [createFor, setCreateFor] = useState<'race' | 'island' | 'avatars'>('race');
+  /** The Avatars window's maker: the avatar being changed, or null for a new one. */
+  const [editLook, setEditLook] = useState<AvatarLook | null>(null);
+  const createForRef = useRef(createFor);
+  createForRef.current = createFor;
   /** The galaxy stays a moment while Goblin Racing's window grows to fill the screen, then goes (it is a 3D view of its own). */
   const [growing, setGrowing] = useState(false);
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
@@ -118,7 +126,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const stageOn = screen === 'home' || screen === 'goblin' || (screen === 'create' && createFor === 'race') || (screen === 'settings' && (fromGoblin || origin.current === 'home'));
   const stageFull = stageOn && screen !== 'home' && !(screen === 'settings' && !fromGoblin);
   const galaxyOn = screen === 'home' || screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'activity' || growing
-    || (screen === 'create' && createFor === 'island') || (screen === 'settings' && !fromGoblin);
+    || screen === 'avatars' || (screen === 'create' && createFor !== 'race') || (screen === 'settings' && !fromGoblin);
   const islandMounted = world !== null && (screen === 'island' || (screen === 'zoom' && session));
 
   /** Open an island as a fresh world: load its saved map, or build it from its template (a template instance has no saved map until it is edited). */
@@ -165,6 +173,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const toActivities = useCallback(() => { remember(); go('activities'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   const toIslands = useCallback(() => { remember(); go('islands'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   const toSettings = useCallback(() => { remember(); go('settings'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toAvatars = useCallback(() => { remember(); go('avatars'); }, [go]); // eslint-disable-line react-hooks/exhaustive-deps
   /** "Back" for the hub, the activities window and settings: return to where they were opened from. */
   const back = useCallback(() => { if (origin.current === 'island' && session) toIsland(); else if (origin.current === 'goblin') toGoblin(); else toHome(); }, [session, toIsland, toGoblin, toHome]);
 
@@ -174,7 +183,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     // you walk your island as an avatar: the first time, make one
     if (!player().created) { remember(); setCreateFor('island'); go('create'); return; }
     // capture the mouse now, while the click still counts as a user gesture: mouse look is on from the first frame on the island
-    try { const r = (document.querySelector('.shell') as HTMLElement | null)?.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => undefined); } catch { /* not available */ }
+    const shellEl = document.querySelector('.shell') as HTMLElement | null;
+    if (shellEl) captureMouse(shellEl);
     if (!world) { const id = activeIslandId(); if (!id || !openWorld(id)) return; }
     setSession(true); setLevel('goblin'); setIslandMenu(false);
     setScreen('zoom'); setIntro(!reduced);
@@ -190,22 +200,25 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       const s = screenRef.current;
       if (s === 'activity') toGoblin();
       else if (s === 'goblin') toHome();
-      else if (s === 'hub' || s === 'activities' || s === 'islands' || s === 'settings' || s === 'create') back();
+      else if (s === 'create' && createForRef.current === 'avatars') go('avatars');
+      else if (s === 'hub' || s === 'activities' || s === 'islands' || s === 'settings' || s === 'create' || s === 'avatars') back();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [back, toGoblin, toHome]);
+  }, [back, go, toGoblin, toHome]);
 
   const picks = planets.find((p) => p.id === picked) ?? null;
   const pickedRow = visible.find((a) => a.id === picked) ?? null;
+  /** Goblin Racing races as your goblin (your first avatar of that kind), whatever avatar walks your island. */
+  const yourGoblin = (): AvatarLook | null => player().looks.find((l) => kindOf(l) === 'goblin') ?? null;
   /** What Goblin Racing's window and menu say: the game in one line, and what Play does for you (a new player learns it makes their first avatar). */
-  const goblinStatus = { doc: goblinRacing().doc, you: player().created ? `You race as ${profile.name}.` : 'Play makes your first avatar: a goblin.' };
+  const goblinStatus = { doc: goblinRacing().doc, you: yourGoblin() ? `You race as ${yourGoblin()!.name}.` : player().created ? 'Play makes you a goblin to race as.' : 'Play makes your first avatar: a goblin.' };
   /** An activity: Goblin Racing opens its own menu (the window grows); others open their sections. */
   /** Goblin Racing's sections (tournaments, spectate, rankings, track editor, the bookie): its Multiplayer. */
   const openSections = (): void => { origin.current = 'goblin'; setActivityId('goblin-racing'); go('activity'); };
   const openActivity = (id: string): void => { setActivityId(id); if (id === 'goblin-racing') toGoblin(); else { origin.current = 'home'; go('activity'); } };
   /** Goblin Racing's Play: the first game you play makes your first avatar (a goblin); then, and every time after, it is a race. */
-  const play = (): void => { if (!player().created) { origin.current = 'goblin'; setCreateFor('race'); go('create'); } else startRace('select', 'goblin'); };
+  const play = (): void => { if (!yourGoblin()) { origin.current = 'goblin'; setCreateFor('race'); go('create'); } else startRace('select', 'goblin'); };
   const activityInfos = useMemo(() => visible.map((a) => ({ id: a.id, name: a.name, doc: a.doc, hue: a.planet.hue, ring: a.planet.ring })), [visible]);
   /** The racing activity has its own map (the racetrack island), pinned to its own key so it never mixes with your islands. */
   const startRace = (entry: 'select' | 'custom', from: Screen = 'activity'): void => {
@@ -252,13 +265,22 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'create' ? (
         <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
-          <CreateGoblin onBack={back} onDone={(look) => { update((pr) => ({ ...pr, name: look.name })); if (createFor === 'race') startRace('select', 'goblin'); else void myIsland(); }} />
+          {createFor === 'race' ? (
+            // the first game you play makes your first avatar: Goblin Racing makes a goblin (a new one beside any others you have)
+            <CreateGoblin kind="goblin" fresh={player().created} title="Your goblin" doneLabel="Done: to the race" onBack={back}
+              onDone={(look) => { if (!player().looks.some((l) => l.id !== look.id)) update((pr) => ({ ...pr, name: look.name })); startRace('select', 'goblin'); }} />
+          ) : createFor === 'island' ? (
+            <CreateGoblin voice="setmix" chooseKind title="Your avatar" doneLabel="Done: to my island" onBack={back} onDone={(look) => { update((pr) => ({ ...pr, name: look.name })); void myIsland(); }} />
+          ) : (
+            <CreateGoblin voice="setmix" key={editLook?.id ?? 'new'} {...(editLook ? { edit: editLook } : { chooseKind: true, fresh: true })} title={editLook ? `Change ${editLook.name}` : 'New avatar'} doneLabel="Save"
+              onBack={() => go('avatars')} onDone={() => go('avatars')} />
+          )}
         </div>
       ) : null}
 
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
-          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onMyIsland={() => void myIsland()} onCommunity={() => toHub()} onSettings={toSettings} />
+          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onMyIsland={() => void myIsland()} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings} />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {picks && picks.id !== 'goblin-racing' ? (
             <aside className="shell-card" aria-live="polite">
@@ -267,6 +289,12 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
               <button className="quiet" onClick={() => setPicked('goblin-racing')}>Back to Goblin Racing</button>
             </aside>
           ) : null}
+        </div>
+      ) : null}
+
+      {screen === 'avatars' ? (
+        <div className="shell-layer shell-ui" style={{ zIndex: 3 }}>
+          <AvatarsWindow onClose={back} onNew={() => { setEditLook(null); setCreateFor('avatars'); go('create'); }} onEdit={(l) => { setEditLook(l); setCreateFor('avatars'); go('create'); }} />
         </div>
       ) : null}
 

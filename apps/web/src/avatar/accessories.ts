@@ -1,6 +1,6 @@
-import type { AvatarLook, PartPlace } from '@hm/avatarlook';
+import { kindOf, type AvatarKind, type AvatarLook, type PartPlace } from '@hm/avatarlook';
 import type { Bone } from '@hm/anim';
-import { HERO_GOBLIN_RIG, dressAvatar, type DressItem, type Rig } from '@hm/render';
+import { HERO_GOBLIN_RIG, HUMAN_RIG, dressAvatar, type DressItem, type Rig } from '@hm/render';
 import { HEAD_PARTS } from '@hm/voxpartshead';
 import { BODY_PARTS } from '@hm/voxpartsbody';
 import type { PaletteEntry, VoxelModel } from '@hm/voxel';
@@ -18,6 +18,18 @@ const LIBRARY = [...(HEAD_PARTS as unknown as LibPart[]), ...(BODY_PARTS as unkn
 const HERO_ANCHORS: Readonly<Record<string, V3>> = {
   hatSeat: [14, 41, 9], noseBase: [14, 34, 4], eyeL: [16, 36, 4], eyeR: [11, 36, 4], mouthSeat: [14, 33, 4], palm: [22, 9, 8], backMount: [14, 24, 15],
 };
+/** The same points on the voxel human (28 x 47 x 20): top of the hair, the nose, the eyes, the mouth, the right hand, the middle of the back. */
+const HUMAN_ANCHORS: Readonly<Record<string, V3>> = {
+  hatSeat: [14, 47, 10], noseBase: [14, 40, 6], eyeL: [16, 41, 6], eyeR: [11, 41, 6], mouthSeat: [14, 38, 6], palm: [21, 18, 9], backMount: [14, 28, 13],
+};
+
+/** Each kind of avatar: its voxel model, its bones, its size (metres a cell), where parts go, and how tall it stands (for framing). */
+export interface AvatarKindDef { readonly modelId: string; readonly rig: Rig; readonly block: number; readonly anchors: Readonly<Record<string, V3>>; readonly tall: number }
+export const KINDS: Readonly<Record<AvatarKind, AvatarKindDef>> = {
+  goblin: { modelId: 'goblin', rig: HERO_GOBLIN_RIG, block: 0.04, anchors: HERO_ANCHORS, tall: 1.76 },
+  human: { modelId: 'human', rig: HUMAN_RIG, block: 0.04, anchors: HUMAN_ANCHORS, tall: 1.88 },
+};
+export const kindDef = (look: AvatarLook): AvatarKindDef => KINDS[kindOf(look)];
 export const PLACES: readonly { readonly place: PartPlace; readonly label: string; readonly bone: Bone; readonly anchor: string }[] = [
   { place: 'hat', label: 'Hat', bone: 'head', anchor: 'hatSeat' },
   { place: 'hair', label: 'Hair', bone: 'head', anchor: 'hatSeat' },
@@ -46,7 +58,8 @@ function entryFor(slot: string, look: AvatarLook): PaletteEntry {
     case 'metal': return { name: slot, color: hex01('#b9bcc4'), ...m(0.35, 0.85) };
     case 'leather': return { name: slot, color: hex01(look.belt), ...m(0.8) };
     case 'glow': return { name: slot, color: hex01(look.eyes), ...m(0.5, 0, 1) };
-    case 'hair': return { name: slot, color: hex01('#2b2118'), ...m(0.85) };
+    // a human's hair part matches its own hair; a goblin's is dark
+    case 'hair': return { name: slot, color: hex01(kindOf(look) === 'human' ? look.speckle : '#2b2118'), ...m(0.85) };
     case 'teeth': return { name: slot, color: hex01('#f2e9d0'), ...m(0.4) };
     case 'eyeWhite': return { name: slot, color: hex01('#fdfdfd'), ...m(0.3) };
     case 'pupil': return { name: slot, color: hex01('#101014'), ...m(0.35) };
@@ -61,16 +74,17 @@ export function dressItems(look: AvatarLook): DressItem[] {
     const id = look.parts?.[pl.place];
     const part = id ? partById(id) : undefined;
     if (!part || part.slot !== pl.place) continue;
-    const at = HERO_ANCHORS[part.attachTo] ?? HERO_ANCHORS[pl.anchor]!;
+    const anchors = kindDef(look).anchors;
+    const at = anchors[part.attachTo] ?? anchors[pl.anchor]!;
     const root = (part.anchors['root'] ?? [0, 0, 0]) as V3;
     out.push({ size: [part.size[0]!, part.size[1]!, part.size[2]!], cells: part.cells, palette: part.palette.map((s) => entryFor(s, look)), root: [root[0], root[1], root[2]], at, bone: pl.bone });
   }
   return out;
 }
 
-/** The goblin in a look with its parts on, and the rig that animates it. */
+/** An avatar in a look with its parts on, and the rig that animates it (the rig of its kind). */
 export function dress(model: VoxelModel, look: AvatarLook): { model: VoxelModel; rig: Rig } {
-  return dressAvatar(model, HERO_GOBLIN_RIG, dressItems(look));
+  return dressAvatar(model, kindDef(look).rig, dressItems(look));
 }
 
 /** One part as a small voxel model in the look's colours (for its thumbnail). */

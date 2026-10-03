@@ -48,8 +48,9 @@ export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void;
   );
 }
 
-const HARNESS_MENU: readonly { readonly id: 'island' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
+const HARNESS_MENU: readonly { readonly id: 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
   { id: 'island', label: 'My island', says: 'Walk and build your own island.' },
+  { id: 'avatars', label: 'Avatars', says: 'Who you are: goblins, humans and more.' },
   { id: 'community', label: 'Community', says: 'Presets other players share, and yours.' },
   { id: 'settings', label: 'Settings', says: 'Graphics, controls and your profile.' },
 ];
@@ -59,10 +60,10 @@ const HARNESS_MENU: readonly { readonly id: 'island' | 'community' | 'settings';
  * Racing's window to its planet on the star chart (drawn by the shell every frame through `leader`).
  */
 export function SetMixHome(props: {
-  readonly onMyIsland: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
+  readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
 }): ReactElement {
-  const act = { island: props.onMyIsland, community: props.onCommunity, settings: props.onSettings };
+  const act = { island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
   return (
     <div className="sm-home">
       <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>

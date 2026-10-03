@@ -20,7 +20,8 @@ import { fx } from './maker/feedback';
 import { BuildController, type Aim } from './build/build-controller';
 import { Crosshair, Hotbar, ModeBar, TabStrip, TabWheel, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
-import { goblinRigged } from './build/cards';
+import { avatarRigged } from './build/cards';
+import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
 import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
@@ -33,6 +34,7 @@ import { mapBundle, saveMap } from './maker/storage';
 import { spriteDef } from './build/sprites';
 import { TourCard } from './tutorial/tour-card';
 import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
+import { captureMouse, lookFilter } from './shell/capture-mouse';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
@@ -42,7 +44,6 @@ import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from '.
  * button, the mouse stays free, tools act where the cursor points, every setting opens in a movable window, F focuses on a thing, H hides
  * the rest. Esc closes one thing at a time and then opens the jump menu.
  */
-const GOBLIN_BLOCK = 0.04;
 let lastPose: { px: number; pz: number; face: number; camYaw: number } | null = null; // where the goblin stood when the island was last left
 const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
@@ -278,7 +279,8 @@ export function IslandWalk(props: {
     const offDecor = rt.binder.onDecor(showDecor);
 
     // your goblin: the voxel goblin in the look you wear, split into bones so the animation presets move it
-    const setAvatarLook = (): void => { const pl = player(); const g = goblinRigged(lookOf(pl, pl.lookId)); renderer.setAvatar(g?.model ?? null, GOBLIN_BLOCK, g?.rig); };
+    // your active avatar, whatever its kind (goblin, human ...): its model, its size, its bones
+    const setAvatarLook = (): void => { const pl = player(); const look = lookOf(pl, pl.lookId); const g = avatarRigged(look); renderer.setAvatar(g?.model ?? null, kindDef(look).block, g?.rig); };
     setAvatarLook();
     const animator = new Animator();
     const moves = (): MoveSet => { const pl = player(); return { idle: animOf(pl, pl.moves.idle), walk: animOf(pl, pl.moves.walk), run: animOf(pl, pl.moves.run), jump: animOf(pl, pl.moves.jump), fall: animOf(pl, pl.moves.fall) }; };
@@ -329,6 +331,7 @@ export function IslandWalk(props: {
     let cursor = { x: 0, y: 0 };
     let looking: { x: number; y: number } | null = null;
     let lastLookEvent = 0, lastMoveEvent = 0, lastTourTick = 0;
+    const realMove = lookFilter();
 
     // the whole shell is the pointer-lock target, so the mouse stays captured through the dive and the menus
     const root = (el.closest('.shell') as HTMLElement | null) ?? el;
@@ -342,7 +345,7 @@ export function IslandWalk(props: {
     const failLock = (): void => { if (++lockFails >= 3) { softAim = true; setLocked(true); } };
     const lock = (): void => {
       if (document.pointerLockElement || studio()) return;
-      try { const r = root.requestPointerLock() as unknown as Promise<void> | undefined; r?.catch?.(() => failLock()); } catch { failLock(); }
+      captureMouse(root, failLock);
     };
     const unlock = (): void => { softAim = false; suppressMenu = true; if (document.pointerLockElement) document.exitPointerLock(); else { suppressMenu = false; setLocked(false); } };
     api.current = {
@@ -447,6 +450,7 @@ export function IslandWalk(props: {
       if (live.current.menu) return;
       if ((pointerLocked || looking) && performance.now() - lastLookEvent > 400) { lastLookEvent = performance.now(); tourEvent('looked'); }
       if (pointerLocked) {
+        if (!realMove(e.movementX, e.movementY)) return;
         const c = controlsRef.current, ys = c.invertY ? -1 : 1;
         camYaw -= e.movementX * 0.0026 * c.sensitivity;
         camPitch = Math.min(1.3, Math.max(player().view === 'first' ? -1.3 : -0.55, camPitch + e.movementY * 0.0022 * c.sensitivity * ys));

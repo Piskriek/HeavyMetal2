@@ -28,6 +28,13 @@ function save(): void {
 }
 function changed(): void { rev++; save(); listeners.forEach((l) => l()); }
 function deliver(effects: readonly Effect[]): void { for (const e of effects) handler?.(e); if (effects.length || tour) changed(); }
+let lastStep = -1, lastWrite = 0;
+/** A player event: redraw only when the tour moved on (looking round reports every 400 ms and most reports only count); the counts are written down at most every few seconds. */
+function deliverIfMoved(t: Tutorial, effects: readonly Effect[]): void {
+  const step = t.index(), now = performance.now();
+  if (effects.length || step !== lastStep) { lastStep = step; lastWrite = now; deliver(effects); return; }
+  if (now - lastWrite > 3000) { lastWrite = now; save(); }
+}
 
 /** Open the tour for this island visit (build tour for grown-ups, the short one otherwise). Effects queued on entering a step are delivered. */
 export function startTour(k: 'build' | 'walk', onEffect: (e: Effect) => void): void {
@@ -46,7 +53,7 @@ export function stopTour(): void { handler = null; }
 
 const visible = (): boolean => !!tour && !tour.done() && mode === 'on' && !later;
 const live = (fn: (t: Tutorial, now: number) => Effect[]): void => { if (tour && visible()) deliver(fn(tour, performance.now())); };
-export const tourEvent = (name: string): void => live((t, now) => t.event(name, now));
+export const tourEvent = (name: string): void => { if (tour && visible()) deliverIfMoved(tour, tour.event(name, performance.now())); };
 export const tourButton = (id: string): void => live((t, now) => t.button(id, now));
 export const tourTick = (): void => { if (tour && visible()) { const fx = tour.tick(performance.now()); if (fx.length) deliver(fx); } };
 export const tourSkip = (): void => live((t, now) => t.skip(now));

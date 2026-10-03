@@ -110,7 +110,7 @@ export function editAnim(id: string, key: string, value: unknown): void {
 export function resetAnim(id: string): void { const s = get(); const { [id]: _drop, ...rest } = s.anims; set({ ...s, anims: rest }); }
 export function setMove(slot: MoveSlot, animId: string): void { const s = get(); set({ ...s, moves: { ...s.moves, [slot]: animId } }); }
 
-/** Save a look as one of your goblins (new id for a ready-made look you changed) and wear it. */
+/** Save a look as one of your avatars (new id for a ready-made look you changed, or a new avatar) and wear it. */
 export function saveLook(look: AvatarLook): AvatarLook {
   const s = get();
   const mine = s.looks.some((l) => l.id === look.id);
@@ -119,6 +119,14 @@ export function saveLook(look: AvatarLook): AvatarLook {
   return l;
 }
 export const wearLook = (id: string): void => { const s = get(); set({ ...s, lookId: id }); };
+/** Remove one of your avatars. Your last one stays; removing the one you use switches to the next. Returns false when it cannot go. */
+export function removeLook(id: string): boolean {
+  const s = get();
+  if (s.looks.length <= 1 || !s.looks.some((l) => l.id === id)) return false;
+  const looks = s.looks.filter((l) => l.id !== id);
+  set({ ...s, looks, lookId: s.lookId === id ? looks[0]!.id : s.lookId });
+  return true;
+}
 export const setView = (view: 'third' | 'first'): void => { const s = get(); if (s.view !== view) set({ ...s, view }); };
 export const setMode = (mode: 'walk' | 'studio'): void => { const s = get(); if (s.mode !== mode) set({ ...s, mode }); };
 export const markCreated = (): void => { const s = get(); if (!s.created) set({ ...s, created: true }); };

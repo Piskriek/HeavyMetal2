@@ -15,7 +15,7 @@ import { normalizeRecipe, recipeToJson, type SfxRecipe } from '@hm/soundlab';
 import { ensurePlant, ensureRules, plantsOf, rulesOf } from '../world';
 import { useRev } from '../use-rev';
 import { CAMERAS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
-import { PresetPreview, goblinWearing } from './cards';
+import { PresetPreview, avatarWearing } from './cards';
 import { editAnim, editSprite, editTool, resetAnim, resetSprite, resetTool, saveLook, setMove, usePlayer, wearLook } from './player';
 import { spriteOf } from './sprites';
 import { PartsPicker } from '../avatar/parts-picker';
@@ -229,7 +229,7 @@ export function LookEditor({ id, actions }: { readonly id: string; readonly acti
   return (
     <div className="editor">
       <div className="ed-top big">
-        {goblinWearing(look) ? <PresetPreview p={{ kind: 'look', look }} size={120} /> : null}
+        {avatarWearing(look) ? <PresetPreview p={{ kind: 'look', look }} size={120} /> : null}
         <div>
           <label className="row">Name <input value={look.name} maxLength={20} onChange={(e) => change({ name: e.target.value })} /></label>
           {problem ? <p className="hint warn">{problem}</p> : null}

@@ -29,8 +29,54 @@ export interface EnvironmentRig {
   setWater(color: THREE.Color, opacity: number, roughness: number): void;
   /** Haze colour and density; kept while the focus veil is on and restored after. */
   setFog(color: THREE.Color, density: number): void;
+  /**
+   * The ground under the sea (the island's height grid). The water reads its depth from it: turquoise where it is shallow, deep blue further
+   * out, and foam rolling in where it is under a metre deep. Call again after the ground changes; null forgets it.
+   */
+  setSeaFloor(floor: { readonly heights: Float32Array; readonly cols: number; readonly rows: number; readonly cell: number; readonly originX: number; readonly originZ: number } | null): void;
   dispose(): void;
 }
+
+/** The sea's depth colour and shoreline foam, added to the standard material (only while sea mode is on). */
+const SEA_HEADER = /* glsl */ `
+uniform sampler2D uSeaFloor;
+uniform vec2 uSeaOrigin;
+uniform vec2 uSeaSize;
+uniform float uSeaTime;
+uniform float uSeaHasFloor;
+varying vec3 vSeaWorld;
+float seaHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float seaNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  float a = seaHash(i), b = seaHash(i + vec2(1.0, 0.0)), c = seaHash(i + vec2(0.0, 1.0)), d = seaHash(i + vec2(1.0, 1.0));
+  return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+}
+`;
+const SEA_COLOR = /* glsl */ `
+#include <color_fragment>
+#ifdef SEA
+{
+  vec2 suv = (vSeaWorld.xz - uSeaOrigin) / uSeaSize;
+  bool onGrid = uSeaHasFloor > 0.5 && suv.x > 0.0 && suv.y > 0.0 && suv.x < 1.0 && suv.y < 1.0;
+  float depth = onGrid ? max(0.0, vSeaWorld.y - texture2D(uSeaFloor, suv).r) : 12.0;
+  // the height grid ends in a square: fade to open sea in a circle inside it so no edge shows
+  float inner = onGrid ? 1.0 - smoothstep(0.36, 0.48, length(suv - 0.5)) : 0.0;
+  depth = mix(12.0, depth, inner);
+  float deepK = smoothstep(0.4, 8.0, depth);
+  vec3 shallow = mix(diffuseColor.rgb, vec3(0.16, 0.72, 0.74), 0.55);
+  diffuseColor.rgb = mix(shallow, diffuseColor.rgb * 0.72, deepK);
+  diffuseColor.a = mix(0.5, min(0.97, diffuseColor.a + 0.2), smoothstep(0.0, 3.5, depth));
+  // foam: broken bands that roll in towards the beach, and a bright lip where the water meets the sand
+  float n = seaNoise(vSeaWorld.xz * 0.28 + vec2(uSeaTime * 0.07, -uSeaTime * 0.05));
+  float band = 0.5 + 0.5 * sin(depth * 22.0 - uSeaTime * 1.5 + n * 6.0);
+  float foam = (1.0 - smoothstep(0.02, 0.35, depth)) * smoothstep(0.78, 0.95, band) * (0.4 + 0.6 * n);
+  foam += (1.0 - smoothstep(0.0, 0.05, depth)) * (0.5 + 0.5 * seaNoise(vSeaWorld.xz * 2.1 + uSeaTime * 0.35));
+  foam = clamp(foam, 0.0, 1.0) * inner;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.96, 0.98, 0.97), foam * 0.8);
+  diffuseColor.a = max(diffuseColor.a, foam * 0.85);
+}
+#endif
+`;
 
 const skyVertex = `
   varying vec3 vWorld;
@@ -134,6 +180,22 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -2,
   });
+  // sea mode: depth colour and foam from the ground under the water (see SEA_COLOR)
+  const seaUniforms = {
+    uSeaFloor: { value: null as THREE.Texture | null }, uSeaOrigin: { value: new THREE.Vector2() }, uSeaSize: { value: new THREE.Vector2(1, 1) },
+    uSeaTime: { value: 0 }, uSeaHasFloor: { value: 0 },
+  };
+  groundMaterial.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, seaUniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSeaWorld;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSeaWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${SEA_HEADER}`)
+      .replace('#include <color_fragment>', SEA_COLOR);
+  };
+  groundMaterial.customProgramCacheKey = () => (groundMaterial.defines?.['SEA'] ? 'sea' : 'ground');
+  let seaFloor: THREE.DataTexture | null = null;
   const ground = new THREE.Mesh(new THREE.CircleGeometry(100, 128), groundMaterial);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.012;
@@ -253,8 +315,29 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       sun.castShadow = shadowsOn && lastSunUp;
       if (sun.shadow.mapSize.x !== mapSize) { sun.shadow.mapSize.set(mapSize, mapSize); sun.shadow.map?.dispose(); sun.shadow.map = null; }
     },
+    setSeaFloor(floor): void {
+      if (!floor) { seaFloor?.dispose(); seaFloor = null; seaUniforms.uSeaFloor.value = null; seaUniforms.uSeaHasFloor.value = 0; return; }
+      const n = floor.cols * floor.rows;
+      if (!seaFloor || seaFloor.image.width !== floor.cols || seaFloor.image.height !== floor.rows) {
+        seaFloor?.dispose();
+        seaFloor = new THREE.DataTexture(new Uint16Array(n), floor.cols, floor.rows, THREE.RedFormat, THREE.HalfFloatType);
+        seaFloor.magFilter = seaFloor.minFilter = THREE.LinearFilter;
+        seaFloor.wrapS = seaFloor.wrapT = THREE.ClampToEdgeWrapping;
+        seaFloor.generateMipmaps = false;
+      }
+      const data = seaFloor.image.data as Uint16Array;
+      for (let i = 0; i < n; i++) data[i] = THREE.DataUtils.toHalfFloat(floor.heights[i] ?? 0);
+      seaFloor.needsUpdate = true;
+      // texel centres sit on the grid nodes: node 0 at origin, node cols-1 at origin + (cols-1) * cell
+      seaUniforms.uSeaOrigin.value.set(floor.originX - floor.cell / 2, floor.originZ - floor.cell / 2);
+      seaUniforms.uSeaSize.value.set(floor.cols * floor.cell, floor.rows * floor.cell);
+      seaUniforms.uSeaFloor.value = seaFloor;
+      seaUniforms.uSeaHasFloor.value = 1;
+    },
     setSea(on: boolean): void {
       deepSea.visible = on;
+      groundMaterial.defines = { ...(groundMaterial.defines ?? {}) };
+      if (on) groundMaterial.defines['SEA'] = 1; else delete groundMaterial.defines['SEA'];
       groundMaterial.map = on ? null : gridTexture;
       groundMaterial.color.copy(on ? (seaColor ?? seaTint) : new THREE.Color(0xffffff));
       groundMaterial.transparent = on;
@@ -267,6 +350,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       groundMaterial.needsUpdate = true;
     },
     update(target: Vec3): void {
+      seaUniforms.uSeaTime.value = performance.now() / 1000;
       sun.target.position.fromArray(target);
       sun.position.set(target[0] + sunDirNow.x * 60, target[1] + sunDirNow.y * 60, target[2] + sunDirNow.z * 60);
       sun.target.updateMatrixWorld();
@@ -281,6 +365,7 @@ export function createEnvironment(scene: THREE.Scene, renderer: THREE.WebGLRende
       deepSea.material.dispose();
       ground.geometry.dispose();
       groundMaterial.dispose();
+      seaFloor?.dispose();
       gridTexture.dispose();
       if (sky) {
         scene.remove(sky);

@@ -144,7 +144,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 1. **Ground level** looked at this session in both skins: flat reads as voxel blocks that match the goblin; PBR is a painted jungle floor, now without seams.
 2. **Trees**: grounded, voxel, follow the ground, grow in groves and drifts; one palm shape, no shoreline props.
 3. **The cone** is a smooth cone with a crater; no terraces, gullies, lava flow or steam.
-4. **The sea** is a flat disc: no shore foam or waves. **No clouds.**
+4. **The sea** reads its depth from the island's height grid: turquoise shallows, deep blue further out, foam bands rolling in where it is under ~35 cm and a bright lip at the sand (shader in `render/environment.ts`). No real waves (the surface is flat). **No clouds.**
 5. **The goblin** animates from presets now; it is the old hero model and the rig only fits that model.
 6. **UI**: consistent white-wall style and previews; no goblin doodle art; the old Maker (Race track editor) still has its own older look.
 7. Known test gaps: pointer lock (laptop only), golden-image tests for looks, the Maker's panels.

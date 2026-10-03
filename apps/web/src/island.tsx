@@ -469,7 +469,36 @@ export function IslandWalk(props: {
     };
 
     /** The main menu's camera angle round the goblin: it sways on the side away from the middle of the island. */
-    const menuAngle = (now: number): number => (Math.hypot(px, pz) > 1 ? Math.atan2(px, pz) : 0.6) + Math.sin(now * 0.00007) * 0.75;
+    // it starts from the side away from the island's middle and turns to the nearest angle whose whole sway sees the goblin past every plant
+    const SWAY = 0.5, MENU_DIST = 7;
+    let menuBase: number | null = null;
+    const shotBlocked = (a: number): number => {
+      const d = rt.binder.decor()?.placements ?? [];
+      const ex = px + Math.sin(a) * MENU_DIST, ez = pz + Math.cos(a) * MENU_DIST;
+      let hits = 0;
+      for (const p of d) {
+        if (p.kind !== 'palm' && p.kind !== 'bush' && p.kind !== 'boulder') continue;
+        // distance from the plant to the camera-goblin segment, on the ground plane
+        const vx = px - ex, vz = pz - ez, wx = p.x - ex, wz = p.z - ez;
+        const t = Math.max(0, Math.min(1, (wx * vx + wz * vz) / (vx * vx + vz * vz)));
+        if (Math.hypot(wx - vx * t, wz - vz * t) < 1.4 + p.scale * 0.6) hits++;
+      }
+      return hits;
+    };
+    const menuAngle = (now: number): number => {
+      if (menuBase === null) {
+        const out = Math.hypot(px, pz) > 1 ? Math.atan2(px, pz) : 0.6;
+        let best = out, bestCost = Infinity;
+        for (let i = 0; i < 24; i++) {
+          const a = out + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 12);
+          let cost = Math.ceil(i / 2) * 0.01;
+          for (const k of [-1, -0.5, 0, 0.5, 1]) cost += shotBlocked(a + k * SWAY);
+          if (cost < bestCost) { bestCost = cost; best = a; }
+        }
+        menuBase = best;
+      }
+      return menuBase + Math.sin(now * 0.00007) * SWAY;
+    };
 
     let raf = 0, last = performance.now();
     let prevX = px, prevZ = pz;
@@ -530,6 +559,7 @@ export function IslandWalk(props: {
       const pose = animator.update(dt, { speed: paused ? 0 : speed, grounded, vy });
       // behind the main menu the goblin turns three-quarters toward the camera
       if (live.current.showcase) face = menuAngle(now) - 0.45;
+      else menuBase = null;
       renderer.setAvatarPose(px, py, pz, face + Math.PI, pose, !fpv && !st);
       renderer.setLightFocus([px, py + 1.2, pz]);
 
@@ -582,7 +612,7 @@ export function IslandWalk(props: {
         // aim a little to the goblin's left so it stands in the right third of the screen, clear of the menu
         const rx = Math.cos(a), rz = -Math.sin(a);
         target = [px - rx * 2, py + 1.9, pz - rz * 2];
-        wantEye = [px + Math.sin(a) * 7, py + 2.3, pz + Math.cos(a) * 7];
+        wantEye = [px + Math.sin(a) * MENU_DIST, py + 2.3, pz + Math.cos(a) * MENU_DIST];
         wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 1.2);
       } else if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
       const snap = (fpv || st) && !overview && !ft;

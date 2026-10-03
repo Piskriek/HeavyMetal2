@@ -246,7 +246,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       scene.add(terrainView.mesh);
     }
     environment?.setSea(!!terrainView);
+    environment?.setSeaFloor(pendingTerrain ? seaFloorOf(pendingTerrain.data) : null);
   };
+  const seaFloorOf = (t: TerrainLike): { heights: Float32Array; cols: number; rows: number; cell: number; originX: number; originZ: number } =>
+    ({ heights: t.heights, cols: t.spec.cols, rows: t.spec.rows, cell: t.spec.cell, originX: t.spec.originX, originZ: t.spec.originZ });
 
   const service: ThreeRenderer = {
     mount(host: HTMLElement, world: World, store: PresetStore): void {
@@ -371,6 +374,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     },
     refreshTerrain(dirty?: DirtyRectLike | null): void {
       terrainView?.refresh(dirty ?? null);
+      if (pendingTerrain) environment?.setSeaFloor(seaFloorOf(pendingTerrain.data));
     },
     get terrain(): TerrainView | null {
       return terrainView;

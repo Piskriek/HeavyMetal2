@@ -17,7 +17,7 @@ import { fx } from './maker/feedback';
 import { BuildController, type Aim } from './build/build-controller';
 import { Crosshair, Hotbar, ModeBar, TabStrip, TabWheel, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
-import { goblinWearing } from './build/cards';
+import { goblinRigged } from './build/cards';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
 import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
@@ -239,7 +239,7 @@ export function IslandWalk(props: {
     const offDecor = rt.binder.onDecor(showDecor);
 
     // your goblin: the voxel goblin in the look you wear, split into bones so the animation presets move it
-    const setAvatarLook = (): void => { const pl = player(); renderer.setAvatar(goblinWearing(lookOf(pl, pl.lookId)), GOBLIN_BLOCK); };
+    const setAvatarLook = (): void => { const pl = player(); const g = goblinRigged(lookOf(pl, pl.lookId)); renderer.setAvatar(g?.model ?? null, GOBLIN_BLOCK, g?.rig); };
     setAvatarLook();
     const animator = new Animator();
     const moves = (): MoveSet => { const pl = player(); return { idle: animOf(pl, pl.moves.idle), walk: animOf(pl, pl.moves.walk), run: animOf(pl, pl.moves.run), jump: animOf(pl, pl.moves.jump), fall: animOf(pl, pl.moves.fall) }; };
@@ -468,6 +468,9 @@ export function IslandWalk(props: {
       firstUse = false;
     };
 
+    /** The main menu's camera angle round the goblin: it sways on the side away from the middle of the island. */
+    const menuAngle = (now: number): number => (Math.hypot(px, pz) > 1 ? Math.atan2(px, pz) : 0.6) + Math.sin(now * 0.00007) * 0.75;
+
     let raf = 0, last = performance.now();
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
@@ -525,6 +528,8 @@ export function IslandWalk(props: {
       prevX = px; prevZ = pz;
       animator.setMoves(moves());
       const pose = animator.update(dt, { speed: paused ? 0 : speed, grounded, vy });
+      // behind the main menu the goblin turns three-quarters toward the camera
+      if (live.current.showcase) face = menuAngle(now) - 0.45;
       renderer.setAvatarPose(px, py, pz, face + Math.PI, pose, !fpv && !st);
       renderer.setLightFocus([px, py + 1.2, pz]);
 
@@ -571,10 +576,14 @@ export function IslandWalk(props: {
       }
       if (!ft && !live.current.focusId) renderer.setFocus(null);
       if (live.current.showcase) {
-        // the main menu's view: a slow circle round the island, low enough to see the goblin standing on it
-        const a = now * 0.00005 + 0.6;
-        target = [px * 0.55, py * 0.55 + 6, pz * 0.55];
-        wantEye = [target[0] + Math.sin(a) * 62, target[1] + 24, target[2] + Math.cos(a) * 62];
+        // the main menu's view: the camera sways round your goblin on the side away from the middle of the island, so the goblin stands in
+        // front and the volcano (or whatever is in the middle) rises behind it; it never passes through a hill
+        const a = menuAngle(now);
+        // aim a little to the goblin's left so it stands in the right third of the screen, clear of the menu
+        const rx = Math.cos(a), rz = -Math.sin(a);
+        target = [px - rx * 2, py + 1.9, pz - rz * 2];
+        wantEye = [px + Math.sin(a) * 7, py + 2.3, pz + Math.cos(a) * 7];
+        wantEye[1] = Math.max(wantEye[1], ground(wantEye[0], wantEye[2]) + 1.2);
       } else if (overview) { const a = now * 0.00008; target = [0, 6, 0]; wantEye = [Math.sin(a) * 150, 85, Math.cos(a) * 150]; }
       const snap = (fpv || st) && !overview && !ft;
       const k = snap ? 1 : Math.min(1, dt * (overview ? 3 : 10));

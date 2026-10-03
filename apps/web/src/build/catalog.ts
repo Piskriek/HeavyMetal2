@@ -21,6 +21,7 @@ export type Preview =
   | { readonly kind: 'planet'; readonly hue: number; readonly ring: boolean }
   | { readonly kind: 'look'; readonly look: AvatarLook }
   | { readonly kind: 'sprite'; readonly sprite: SpritePreset }
+  | { readonly kind: 'part'; readonly id: string; readonly look: AvatarLook }
   | { readonly kind: 'shake'; readonly amp: number };
 
 export interface CatalogItem { readonly tab: TabId; readonly id: string; readonly name: string; readonly doc: string; readonly preview: Preview; readonly edited: boolean }

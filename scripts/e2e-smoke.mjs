@@ -42,6 +42,10 @@ try {
   await page.waitForSelector('.create-goblin', { timeout: 15000 });
   check('Play asks you to create your goblin first', true);
   check('the creator offers ready-made looks', await page.locator('.cg-looks button').count() >= 6);
+  check('and parts to wear in five places', await page.locator('.parts-picker .pp-row').count() === 5);
+  await page.locator('.pp-row[aria-label="Hat"] .pp-cards button').nth(1).click();
+  await page.waitForTimeout(200);
+  check('picking a hat puts it on', await page.locator('.pp-row[aria-label="Hat"] button.on:not(.none)').count() === 1);
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(300);
   check('a goblin needs a name', await page.locator('.create-goblin').count() === 1 && await page.locator('.cg-panel .warn').count() === 1);

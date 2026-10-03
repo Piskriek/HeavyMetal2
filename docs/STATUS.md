@@ -51,7 +51,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 | C1 | Always boot to the main menu: Play, Multiplayer, My Island, Settings | DONE | `shell/shell.tsx`. |
 | C2 | My Island zooms to your goblin, third person (V = first) | DONE | From the menu it flies down from the orbit to the goblin. |
 | C3 | Galaxy bar on Esc with Back to galaxy and hierarchy navigation | DONE | `shell/galaxy-bar.tsx`. |
-| C4 | Main menu = a stunning orbiting view of your current island and favourite preset | PARTIAL | DONE: the menu sits over your own island (IslandWalk `showcase`), slow orbit, your goblin standing on it, Play/My Island fly down to it. Missing: the "favourite preset" part (no favourite is chosen or shown yet; idea: the most used preset of the week as a statue/prop in the shot). |
+| C4 | Main menu = a stunning orbiting view of your current island and favourite preset | PARTIAL | DONE: the menu sits over your own island (IslandWalk `showcase`): the camera sways round your goblin on the side away from the island's middle, so the goblin stands in the right third facing the camera with the volcano rising behind (it used to clip through the cone); Play/My Island fly down to it. Missing: the "favourite preset" part (no favourite is chosen or shown yet; idea: the most used preset of the week as a statue/prop in the shot). |
 | C5 | Galaxy: no big glow; inverse black-and-white star field; planets in colour as markers above the field with a line to their star and a small box round the star; planet grows near the mouse and shows a card | DONE | `shell/galaxy.tsx` rewritten as a star chart (white paper, black stars in four arms, pinned planets, square box round each star, hover grows the planet and shows a card with what is played there and who is playing). e2e checks the card. |
 | C6 | Play, then create and name your goblin, then your island | DONE | `avatar/create-goblin.tsx` (turntable with the animated goblin, 6 ready-made looks, colours, dice, a checked name). |
 | C7 | Esc menu: Main menu, Build/Studio, Activities, Multiplayer, My islands, My Avatar | DONE | Plus Lighting, Race track editor, Share my island, Show the tour. |
@@ -108,7 +108,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 
 | ID | Ask | Status | Where / what is left |
 |---|---|---|---|
-| E1 | My Avatar: a cool 3D voxel goblin creator | PARTIAL | Create your goblin (looks, colours, name) and the Avatar tab (P). Missing: picking head/body parts (`@hm/assembler` + parts exist; the animation rig only knows the hero goblin's shape). |
+| E1 | My Avatar: a cool 3D voxel goblin creator | PARTIAL | Create your goblin and the Avatar tab (P): 6 looks, colours, name, dice, and **parts to wear** in five places (hat, hair, face, in hand, on the back: 32 parts from the voxel library) added to the hero goblin at measured anchor points; each part moves with its bone (`render` `dressAvatar`). Missing: swapping the body itself (heads, torsos, legs): the assembled goblins have odd proportions (tiny heads, missing arms) and are not used. |
 | E2 | Avatar / rider split | NOT STARTED | |
 | E3 | Defaults are presets; first edit forks | PARTIAL | Tools, animations, sprites and looks keep your changes over the ready-made preset (reset button on each). Islands and lighting fork on first edit. |
 | E4 | Goblin Racing menu = live shot of the island + spectate | NOT STARTED | Needs input replays. |

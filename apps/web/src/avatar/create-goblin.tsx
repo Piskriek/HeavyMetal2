@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import * as THREE from 'three';
 import { Animator, animById } from '@hm/anim';
-import { LOOKS, LOOK_VARIABLES, nameProblem, randomLook, type AvatarLook, type LookSlot } from '@hm/avatarlook';
+import { LOOKS, LOOK_VARIABLES, nameProblem, randomLook, type AvatarLook, type LookSlot, type PartPlace } from '@hm/avatarlook';
+import { PLACES, partsFor } from './accessories';
 import { AvatarView } from '@hm/render';
-import { goblinWearing } from '../build/cards';
+import { goblinRigged } from '../build/cards';
+import { PartsPicker } from './parts-picker';
 import { PresetPreview } from '../build/cards';
 import { fx } from '../maker/feedback';
 import { player, saveLook } from '../build/player';
@@ -37,11 +39,13 @@ function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: numb
     scene.add(floor);
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
     let view: AvatarView | null = null;
+    let tall = 1.76; // metres: the camera frames the goblin with whatever it wears
     const setLook = (l: AvatarLook): void => {
       view?.dispose();
-      const m = goblinWearing(l);
+      const m = goblinRigged(l);
       if (!m) return;
-      view = new AvatarView(m, undefined, 0.04);
+      tall = m.model.size[1] * 0.04;
+      view = new AvatarView(m.model, m.rig, 0.04);
       view.group.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh) mesh.castShadow = true; });
       scene.add(view.group);
     };
@@ -56,8 +60,9 @@ function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: numb
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       const a = now * 0.00035;
-      camera.position.set(Math.sin(a) * 4.6, 1.35, Math.cos(a) * 4.6);
-      camera.lookAt(0, 0.95, 0);
+      const dist = Math.max(4.6, tall * 2.6);
+      camera.position.set(Math.sin(a) * dist, tall * 0.75, Math.cos(a) * dist);
+      camera.lookAt(0, tall * 0.53, 0);
       if (view) { view.place(0, 0, 0, Math.PI, true); view.setPose(animator.update(dt, { speed: 0, grounded: true, vy: 0 })); }
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
@@ -71,6 +76,13 @@ function GoblinTurntable(props: { readonly look: AvatarLook; readonly wave: numb
 }
 
 const QUICK: readonly LookSlot[] = ['skin', 'eyes', 'vest', 'shield'];
+/** The dice also dress the goblin: each place gets a part about half the time. */
+function randomParts(): Partial<Record<PartPlace, string>> {
+  const out: Partial<Record<PartPlace, string>> = {};
+  for (const pl of PLACES) { const list = partsFor(pl.place); if (list.length && Math.random() < 0.5) out[pl.place] = list[Math.floor(Math.random() * list.length)]!.id; }
+  if (out.hat && out.hair) delete out.hair;
+  return out;
+}
 
 export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => void; readonly onBack: () => void }): ReactElement {
   const start = player();
@@ -99,11 +111,13 @@ export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => voi
         <h4>Looks</h4>
         <div className="cg-looks">
           {LOOKS.map((l) => (
-            <button key={l.id} className={l.skin === look.skin && l.vest === look.vest ? 'on' : ''} onClick={() => change({ ...l, id: look.id, name: look.name })} title={l.name}>
+            <button key={l.id} className={l.skin === look.skin && l.vest === look.vest ? 'on' : ''} onClick={() => change({ ...l, id: look.id, name: look.name, ...(look.parts ? { parts: look.parts } : {}) })} title={l.name}>
               <PresetPreview p={{ kind: 'look', look: l }} size={64} /><span>{l.name}</span>
             </button>
           ))}
         </div>
+        <h4>What it wears</h4>
+        <PartsPicker look={look} onChange={(parts) => change({ parts })} />
         <h4>Colours</h4>
         <div className="cg-colours">
           {LOOK_VARIABLES.filter((v) => QUICK.includes(v.key as LookSlot)).map((v) => (
@@ -112,7 +126,7 @@ export function CreateGoblin(props: { readonly onDone: (look: AvatarLook) => voi
         </div>
         <p className="hint">More colours, and how your goblin walks and runs, are in the Avatar and Animate tabs once you are on your island.</p>
         <div className="btns">
-          <button onClick={() => { change({ ...randomLook(Math.floor(Math.random() * 1e9), look.name), id: look.id }); fx('ui-toggle'); }}>Roll the dice</button>
+          <button onClick={() => { change({ ...randomLook(Math.floor(Math.random() * 1e9), look.name), id: look.id, parts: randomParts() }); fx('ui-toggle'); }}>Roll the dice</button>
           <span className="grow" />
           <button onClick={props.onBack}>Back</button>
           <button className="go" onClick={done}>Done: to my island</button>

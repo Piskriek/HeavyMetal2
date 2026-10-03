@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { VoxelModel } from '@hm/voxel';
+import type { PaletteEntry, VoxelModel } from '@hm/voxel';
 import { BONES, type Bone, type Pose } from '@hm/anim';
 import { voxelGeometry } from './voxel-view';
 
@@ -30,6 +30,78 @@ export const HERO_GOBLIN_RIG: Rig = {
   },
   joints: { body: [14, 13, 10], head: [14, 30, 10], armL: [6, 27.5, 10], armR: [22, 27.5, 10], legL: [10.5, 13, 10], legR: [17.5, 13, 10] },
 };
+
+/** A part to add to a character: its cells (1-based into its own palette), the cell that sits on the anchor, the anchor, and the bone it moves with. */
+export interface DressItem {
+  readonly size: Vec3;
+  readonly cells: ArrayLike<number>;
+  readonly palette: readonly PaletteEntry[];
+  /** The part's own attach point (its cell coordinates). */
+  readonly root: Vec3;
+  /** Where that point goes on the character (the character's cell coordinates). */
+  readonly at: Vec3;
+  readonly bone: Bone;
+}
+
+const MAX_DIM = 96;
+
+/**
+ * Add parts (a hat, a held club, a backpack ...) to a voxel character. The grid grows to hold them; a part's cells cover what was there; every
+ * part cell moves with the part's bone whatever its position (a long braid hangs from the head, it does not split at the neck); everything
+ * else keeps the character's own rig. Pure: the base model and rig are not changed.
+ */
+export function dressAvatar(base: VoxelModel, rig: Rig, items: readonly DressItem[]): { model: VoxelModel; rig: Rig } {
+  if (!items.length) return { model: base, rig };
+  const [bx, by, bz] = base.size;
+  let x0 = 0, y0 = 0, z0 = 0, x1 = bx, y1 = by, z1 = bz;
+  for (const it of items) {
+    const o = [it.at[0] - it.root[0], it.at[1] - it.root[1], it.at[2] - it.root[2]];
+    x0 = Math.min(x0, o[0]!); y0 = Math.min(y0, o[1]!); z0 = Math.min(z0, o[2]!);
+    x1 = Math.max(x1, o[0]! + it.size[0]); y1 = Math.max(y1, o[1]! + it.size[1]); z1 = Math.max(z1, o[2]! + it.size[2]);
+  }
+  const d: Vec3 = [-x0, -y0, -z0];
+  const size: Vec3 = [Math.min(MAX_DIM, x1 - x0), Math.min(MAX_DIM, y1 - y0), Math.min(MAX_DIM, z1 - z0)];
+  const [sx, sy, sz] = size;
+  const cells = new Uint8Array(sx * sy * sz);
+  const put = (x: number, y: number, z: number, v: number): number => {
+    if (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) return -1;
+    const i = x + sx * (y + sy * z);
+    cells[i] = v;
+    return i;
+  };
+  for (let z = 0; z < bz; z++) for (let y = 0; y < by; y++) for (let x = 0; x < bx; x++) {
+    const v = base.cells[x + bx * (y + by * z)] ?? 0;
+    if (v) put(x + d[0], y + d[1], z + d[2], v);
+  }
+  // palette: the character's entries, then each part's (an identical entry is shared)
+  const palette: PaletteEntry[] = base.palette.map((e) => ({ ...e, color: [...e.color] as Vec3 }));
+  const key = (e: PaletteEntry): string => `${e.name}|${e.color.map((c) => c.toFixed(3)).join(',')}|${e.roughness}|${e.metalness}|${e.emissive}`;
+  const index = new Map(palette.map((e, i) => [key(e), i + 1]));
+  const labels = new Map<number, Bone>();
+  for (const it of items) {
+    const map = it.palette.map((e) => {
+      const k = key(e);
+      let i = index.get(k);
+      if (i === undefined && palette.length < 255) { palette.push({ ...e, color: [...e.color] as Vec3 }); i = palette.length; index.set(k, i); }
+      return i ?? 0;
+    });
+    const ox = it.at[0] - it.root[0] + d[0], oy = it.at[1] - it.root[1] + d[1], oz = it.at[2] - it.root[2] + d[2];
+    const [px, py, pz] = it.size;
+    for (let z = 0; z < pz; z++) for (let y = 0; y < py; y++) for (let x = 0; x < px; x++) {
+      const v = it.cells[x + px * (y + py * z)] ?? 0;
+      const pv = v > 0 ? map[v - 1] ?? 0 : 0;
+      if (!pv) continue;
+      const i = put(x + ox, y + oy, z + oz, pv);
+      if (i >= 0) labels.set(i, it.bone);
+    }
+  }
+  const joints = Object.fromEntries(BONES.map((b) => [b, [rig.joints[b][0] + d[0], rig.joints[b][1] + d[1], rig.joints[b][2] + d[2]]])) as Record<Bone, Vec3>;
+  const dressed: Rig = {
+    boneOf: (x, y, z) => labels.get(x + sx * (y + sy * z)) ?? rig.boneOf(x - d[0], y - d[1], z - d[2]),
+    joints,
+  };
+  return { model: { ...base, size, pivot: [base.pivot[0] + d[0], base.pivot[1] + d[1], base.pivot[2] + d[2]], palette, cells }, rig: dressed };
+}
 
 /** Split a model's cells by bone. Every filled cell goes to exactly one bone. */
 export function splitBones(model: VoxelModel, rig: Rig): Record<Bone, Uint8Array> {

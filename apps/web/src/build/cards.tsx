@@ -7,6 +7,8 @@ import type { VoxelModel } from '@hm/voxel';
 import { MODELS } from '@hm/voxelart';
 import { NATURE_MODELS } from '@hm/voxelnature';
 import { renderThumb } from '../avatar/thumbs';
+import { dress, partModel } from '../avatar/accessories';
+import type { Rig } from '@hm/render';
 import type { Preview } from './catalog';
 import { iconByName } from './icons';
 
@@ -28,10 +30,13 @@ export function voxelModelById(id: string): VoxelModel | null {
   return m;
 }
 
-export function goblinWearing(look: AvatarLook): VoxelModel | null {
+/** Your goblin in a look: recoloured, with its parts on, and the rig that animates it (parts move with their bone). */
+export function goblinRigged(look: AvatarLook): { model: VoxelModel; rig: Rig } | null {
   const g = voxelModelById('goblin');
-  return g ? { ...g, palette: recolour(g.palette as unknown as { name: string; color: [number, number, number] }[], look) as unknown as VoxelModel['palette'] } : null;
+  if (!g) return null;
+  return dress({ ...g, palette: recolour(g.palette as unknown as { name: string; color: [number, number, number] }[], look) as unknown as VoxelModel['palette'] }, look);
 }
+export const goblinWearing = (look: AvatarLook): VoxelModel | null => goblinRigged(look)?.model ?? null;
 
 const thumb = (m: VoxelModel | null, yaw = 35): string => {
   if (!m) return '';
@@ -140,6 +145,7 @@ export function PresetPreview({ p, size = 48 }: { readonly p: Preview; readonly 
       );
     case 'sprite': return <SpritePreview s={p.sprite} size={size} />;
     case 'shake': return <ShakePreview amp={p.amp} size={size} />;
+    case 'part': { const src = thumb(partModel(p.id, p.look), 30); return src ? <img className="pv-img" alt="" width={size} height={size} src={src} /> : <span className="pv-icon" style={{ width: size, height: size }} />; }
     case 'look': { const src = thumb(goblinWearing(p.look), 20); return src ? <img className="pv-img" alt="" width={size} height={size} src={src} /> : <span className="pv-icon" style={{ width: size, height: size }} />; }
   }
 }

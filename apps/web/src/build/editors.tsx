@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { cmd, defineSchema, type Params, type PresetId, type PresetSchema, type VariableDef } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { ANIMATIONS, ANIM_VARIABLES, MOVE_SLOTS, animToParams, type AnimPreset, type MoveSlot } from '@hm/anim';
-import { LOOK_VARIABLES, nameProblem, type AvatarLook } from '@hm/avatarlook';
+import { LOOK_VARIABLES, nameProblem, type AvatarLook, type LookSlot } from '@hm/avatarlook';
 import { PLUG_KINDS, PLUG_POINTS, SHAKES, SPRITE_PRESETS, SPRITE_VARIABLES, addPlug, addable, changePlug, removePlug, spriteToParams, toolEdit, toolParams, toolVariables, type PlugKind, type TabId, type ToolPlug, type ToolPreset } from '@hm/buildkit';
 import { SFX, type SfxId } from '@hm/audio';
 import { Inspector } from '@hm/ui';
@@ -18,6 +18,7 @@ import { CAMERAS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInf
 import { PresetPreview, goblinWearing } from './cards';
 import { editAnim, editSprite, editTool, resetAnim, resetSprite, resetTool, saveLook, setMove, usePlayer, wearLook } from './player';
 import { spriteOf } from './sprites';
+import { PartsPicker } from '../avatar/parts-picker';
 import type { Preview } from './catalog';
 
 /**
@@ -235,7 +236,9 @@ export function LookEditor({ id, actions }: { readonly id: string; readonly acti
           {p.lookId === id ? <p className="hint">Your goblin is wearing this.</p> : <button className="go" onClick={() => { wearLook(id); actions.applyLook(id); }}>Wear it</button>}
         </div>
       </div>
-      <Inspector schema={schemaOf('avatar', look.name, LOOK_VARIABLES)} params={mine ? Object.fromEntries(LOOK_VARIABLES.map((v) => [v.key, look[v.key as keyof AvatarLook]])) : {}} resolved={look as unknown as Record<string, string>} tier="build"
+      <h4>What it wears</h4>
+      <PartsPicker look={look} onChange={(parts) => change({ parts })} />
+      <Inspector schema={schemaOf('avatar', look.name, LOOK_VARIABLES)} params={mine ? Object.fromEntries(LOOK_VARIABLES.map((v) => [v.key, look[v.key as LookSlot]])) : {}} resolved={look as unknown as Record<string, string>} tier="build"
         onChange={(k, v) => { if (typeof v === 'string') change({ [k]: v } as Partial<AvatarLook>); }} />
       {!mine ? <p className="hint">Change any colour and it becomes a goblin of your own.</p> : <div className="btns"><span className="grow" /><button onClick={() => actions.share('look', id)}>Share…</button></div>}
     </div>

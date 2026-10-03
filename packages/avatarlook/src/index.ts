@@ -17,10 +17,16 @@ export interface AvatarLook {
   cloth: string;
   claws: string;
   shield: string;
+  /** Parts added to the goblin, by place: hat, hair, face, in hand, on the back (part ids from the parts library). */
+  parts?: Readonly<Partial<Record<PartPlace, string>>>;
 }
 
+/** Where parts can go on your goblin. */
+export const PART_PLACES = ['hat', 'hair', 'face-extra', 'handheld', 'back'] as const;
+export type PartPlace = (typeof PART_PLACES)[number];
+
 /** Which palette entry of the voxel goblin each colour paints (by entry name). */
-export const LOOK_SLOTS: Readonly<Record<keyof Omit<AvatarLook, 'id' | 'name'>, readonly string[]>> = {
+export const LOOK_SLOTS: Readonly<Record<keyof Omit<AvatarLook, 'id' | 'name' | 'parts'>, readonly string[]>> = {
   skin: ['skin'], speckle: ['skin-speckle'], eyes: ['eye-glow'], vest: ['leather-vest'], belt: ['belt', 'buckle'], cloth: ['loincloth'], claws: ['claws', 'fangs'],
   shield: ['shield-wood'],
 };
@@ -61,7 +67,10 @@ export function normalizeLook(raw: unknown): AvatarLook {
   const base = LOOKS[0]!;
   const out = { ...base, id: typeof r.id === 'string' && r.id ? r.id : 'mine', name: nameProblem(r.name) === null ? String(r.name).trim() : 'Goblin' };
   for (const k of LOOK_SLOT_KEYS) out[k] = typeof r[k] === 'string' && HEX.test(r[k] as string) ? (r[k] as string).toLowerCase() : base[k];
-  return out;
+  const rp = r.parts && typeof r.parts === 'object' && !Array.isArray(r.parts) ? (r.parts as Record<string, unknown>) : {};
+  const parts: Partial<Record<PartPlace, string>> = {};
+  for (const place of PART_PLACES) { const v = rp[place]; if (typeof v === 'string' && /^[a-z0-9_-]{1,40}$/.test(v)) parts[place] = v; }
+  return Object.keys(parts).length ? { ...out, parts } : out;
 }
 
 export const LOOK_VARIABLES: readonly VariableDef[] = [

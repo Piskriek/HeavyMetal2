@@ -6,6 +6,7 @@ import { Animator, type MoveSet } from '@hm/anim';
 import { PAINTS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
+import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
 import { cropTerrain, heightAt, type Terrain } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget, type Quality } from '@hm/game';
 import { noteGpu, powerPreferenceOf, showTier, type GpuChoice, type Profile } from './shell/profile';
@@ -23,6 +24,7 @@ import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, typ
 import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
+import { SurfaceEditor } from './build/surface-editor';
 import { avatarRigged } from './build/cards';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
@@ -170,7 +172,9 @@ export function IslandWalk(props: {
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
   const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void; groundPeek: () => Terrain | null;
     /** Layers: carry a thing with the Move tool, place one where you look, show or hide the plants. */
-    carry: (ref: PresetId) => void; addThing: (modelId: string) => PresetId | null; showPlants: (on: boolean) => void } | null>(null);
+    carry: (ref: PresetId) => void; addThing: (modelId: string) => PresetId | null; showPlants: (on: boolean) => void;
+    /** The surface editor: draw surface `id` from this texture graph (SetMix's graph-made ground only; false for the image set). */
+    setSurfaceLook: (id: number, graph: TexGraph) => boolean } | null>(null);
   /** A small copy of the ground you are looking at (the tool presets draw on it). */
   const peekGround = useCallback((): Terrain | null => api.current?.groundPeek() ?? null, []);
   // the island overview needs the cursor: let go of the mouse when the level goes up
@@ -315,6 +319,16 @@ export function IslandWalk(props: {
     // sharp 512-pixel tiles unless the graphics start low (they are resampled to 256 there: a quarter of the memory)
     const tileSize = tileSizeFor(graphicsRef.current.adaptive.current);
     const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
+    (window as unknown as { hmGround: { tile?: (id: number) => number } }).hmGround.tile = (id) => surfaces.checksum(id);
+    // the player's own looks for SetMix surfaces (the surface editor) replace the baked tiles once they have loaded
+    if (props.ground !== 'racing') {
+      const looks = props.profile?.groundLooks ?? {};
+      void surfaces.ready.then(() => {
+        for (const [id, graph] of Object.entries(looks)) {
+          try { const t = evaluateGraph(graph, { size: surfaces.size }); const b = tileBytes(t); surfaces.setTile(Number(id), b.colour, b.maps); } catch { /* a broken look keeps the baked tile */ }
+        }
+      });
+    }
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
       if (!st) return;
@@ -432,6 +446,13 @@ export function IslandWalk(props: {
         return refs[refs.length - 1]?.ref ?? null;
       },
       showPlants: (on) => { plantsHidden = !on; showDecor(); },
+      setSurfaceLook: (id, graph) => {
+        if (props.ground === 'racing') return false;
+        const t = evaluateGraph(graph, { size: surfaces.size });
+        const { colour, maps } = tileBytes(t);
+        surfaces.setTile(id, colour, maps);
+        return true;
+      },
       groundPeek: () => { const ts = rt.binder.terrain(); if (!ts) return null; const a = aim(); const pt = a?.point ?? [px, py, pz]; return cropTerrain(ts.terrain, pt[0], pt[2], 24); },
       pick: (tab, id) => {
         if (tab !== 'select' && tab !== 'paint' && tab !== 'sculpt' && tab !== 'things') return;
@@ -848,7 +869,8 @@ export function IslandWalk(props: {
       {/* the palette: what the tool in your hand puts down (top middle) */}
       {showHud && !avatarMode && paletteOpen ? (
         p.tab === 'paint'
-          ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
+          ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
+              onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
           // a tab without materials shows its own presets here: one click puts it in the slot you are on
           : <PaletteStrip title={tabDef(p.tab).label} items={items.map((c) => ({ id: c.id, name: c.name, preview: c.preview }))} community={[]} selected={heldItem?.id} onLayers={openLayers} onPick={pickPreset} />
       ) : null}
@@ -862,6 +884,9 @@ export function IslandWalk(props: {
             : w.id === 'settings' ? (props.profile && props.onProfile ? <SettingsBody profile={props.profile} update={props.onProfile} onReplayTour={() => props.onReplayTour?.()} onReset={() => props.onResetProgress?.()} top={<div className="btns settings-jump"><button onClick={openLighting}>Lighting presets and time of day</button></div>} /> : null)
             : w.id === 'layers' ? <LayersPanel rt={rt} sceneId={scene.sceneId} selected={layerSel} onSelect={setLayerSel} plantsShown={plantsShown} onPlants={(on) => { setPlantsShown(on); api.current?.showPlants(on); }}
                 onMove={(ref) => api.current?.carry(ref)} onShow={(ref) => { setFocusId(ref); }} onAdd={(id) => api.current?.addThing(id) ?? null} onGround={() => pickTab('paint')} />
+            : w.id.startsWith('surface:') ? (() => { const sid = Number(w.id.slice(8)); const s = PAINTS.find((x) => x.id === sid); return <SurfaceEditor surfaceId={sid} name={s?.name ?? 'This surface'} saved={props.profile?.groundLooks?.[String(sid)]}
+                onApply={(g) => api.current?.setSurfaceLook(sid, g) ?? false}
+                onSave={(g) => props.onProfile?.((pr) => { const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[String(sid)] = g; else delete looks[String(sid)]; return { ...pr, groundLooks: looks }; })} />; })()
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />

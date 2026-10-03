@@ -844,3 +844,19 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .ly-attrs input[type=number] { width: 100%; }
 .ly-add { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px; }
 .ly-add button { display: grid; justify-items: center; gap: 2px; padding: 4px 2px; font-size: 11px; }
+
+/* the surface editor: the tile itself is the loud thing; the controls under it stay quiet */
+.surface-editor { display: grid; gap: 8px; }
+.surface-editor h4 { margin: 4px 0 0; font-family: var(--font-setmix); font-size: 14px; font-weight: 700; }
+.surface-editor .hint { margin: 0; }
+.se-preview { width: 220px; max-width: 100%; aspect-ratio: 1; justify-self: center; border: 1px solid var(--line); display: block; }
+.se-styles { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.se-style { flex: 0 0 auto; display: grid; justify-items: center; gap: 3px; width: 66px; padding: 4px; border: 1px solid var(--line); background: var(--panel); font-size: 11px; line-height: 1.2; color: var(--text); text-align: center; }
+.se-style canvas { width: 48px; height: 48px; display: block; }
+.se-style.on { outline: 2px solid var(--text); outline-offset: -2px; background: var(--hm-inset); color: var(--text); }
+.se-ramp { display: flex; gap: 0; border: 1px solid var(--line); }
+.se-swatch { flex: 1; height: 28px; cursor: pointer; position: relative; }
+.se-swatch input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.se-swatch:focus-within { outline: 2px solid var(--text); outline-offset: -2px; }
+.se-size { display: grid; grid-template-columns: 76px 1fr 72px; align-items: center; gap: 8px; font-size: 12px; }
+.se-size output { color: var(--dim); font-size: 11px; text-align: right; }

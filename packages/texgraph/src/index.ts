@@ -1211,3 +1211,36 @@ export const TEXTURE_PRESETS: TexGraph[] = [
     },
   },
 ];
+const toSrgbByte = (v: number): number => Math.round(255 * clamp01(v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055));
+
+/**
+ * An evaluated tile as the terrain stores it: colour as sRGB RGBA bytes, and maps as RGBA bytes with R = height, G = roughness (the terrain
+ * makes the normal from the height). Shared by the bake (scripts/bake-setmix.mjs) and the in-game surface editor.
+ */
+export function tileBytes(t: EvaluatedTexture): { colour: Uint8Array; maps: Uint8Array } {
+  const n = t.size * t.size;
+  const colour = new Uint8Array(n * 4), maps = new Uint8Array(n * 4);
+  for (let i = 0; i < n; i += 1) {
+    colour[i * 4] = t.albedo ? toSrgbByte(t.albedo[i * 3]!) : 128;
+    colour[i * 4 + 1] = t.albedo ? toSrgbByte(t.albedo[i * 3 + 1]!) : 128;
+    colour[i * 4 + 2] = t.albedo ? toSrgbByte(t.albedo[i * 3 + 2]!) : 128;
+    colour[i * 4 + 3] = 255;
+    maps[i * 4] = Math.round(255 * clamp01(t.height?.[i] ?? 0.5));
+    maps[i * 4 + 1] = Math.round(255 * clamp01(t.roughness?.[i] ?? 0.85));
+    maps[i * 4 + 3] = 255;
+  }
+  return { colour, maps };
+}
+
+/** An evaluated tile lit by a sun from the top left (40 degrees up), as sRGB RGBA bytes: how it will look on the ground, for previews. */
+export function litPreview(t: EvaluatedTexture): Uint8ClampedArray {
+  const n = t.size * t.size, out = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i += 1) {
+    const nx = t.normal ? (t.normal[i * 2]! - 0.5) * 2 : 0, ny = t.normal ? (t.normal[i * 2 + 1]! - 0.5) * 2 : 0;
+    const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+    const lit = 0.3 * (0.55 + 0.45 * nz) + (0.7 / 0.64) * Math.max(0, nx * -0.54 + ny * -0.54 + nz * 0.64);
+    for (let c = 0; c < 3; c += 1) out[i * 4 + c] = toSrgbByte((t.albedo?.[i * 3 + c] ?? 0.5) * lit);
+    out[i * 4 + 3] = 255;
+  }
+  return out;
+}

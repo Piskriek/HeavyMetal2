@@ -321,6 +321,16 @@ export class SurfaceArray {
     this.pbrTexture.needsUpdate = true;
   }
 
+  /** Tests: a fingerprint of surface `id`'s colour tile (changes when its look does). */
+  checksum(id: number): number {
+    const layer = this.layerOf[id] ?? -1;
+    if (layer < 0) return -1;
+    let sum = 0;
+    const base = layer * this.size * this.size * 4;
+    for (let i = 0; i < this.size * this.size * 4; i += 97) sum = (sum * 31 + this.data[base + i]!) % 1000000007;
+    return sum;
+  }
+
   dispose(): void {
     this.texture.dispose(); this.pbrTexture.dispose(); this.flatTexture.dispose(); this.voxelTexture.dispose(); this.voxelPbrTexture.dispose();
   }

@@ -186,6 +186,20 @@ try {
   await page.waitForTimeout(T(300));
   check('Tab opens the palette: the surfaces in a film strip, top middle', await page.locator('.palette-strip .ps-frame').count() >= 20);
   check('the tool in hand shows its own presets, drawn on the ground', await page.locator('.tool-presets canvas.tp-pv').count() >= 4);
+  // the surface editor: SetMix's ground is made from graphs, so a surface's look can be changed live
+  await dom(() => document.querySelector('[data-ui="island.surface-look"]')?.click());
+  await page.waitForSelector('.surface-editor .se-style', { timeout: 20000 }).catch(() => null);
+  check('Edit look opens the surface editor with its styles as previews', await page.locator('.surface-editor .se-style canvas').count() >= 3);
+  const lookBefore = await page.evaluate(() => window.hmGround?.tile?.(4));
+  await dom(() => document.querySelectorAll('.surface-editor .se-style')[1]?.click());
+  await page.waitForTimeout(T(300));
+  await dom(() => document.querySelector('.surface-editor button.go')?.click());
+  await page.waitForFunction(() => /uses this look/.test(document.querySelector('.surface-editor [role=status]')?.textContent ?? ''), null, { timeout: 30000 }).catch(() => null);
+  check('Use on this island redraws the surface and keeps the look for the player', lookBefore !== await page.evaluate(() => window.hmGround?.tile?.(4))
+    && await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('hm.profile.v2') || '{}').groundLooks ?? {}).length > 0));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(T(300));
+  check('Esc closes the surface editor', await page.locator('.surface-editor').count() === 0);
   check('the hotbar has Easy, Pro and Studio', JSON.stringify(await page.$$eval('.level-switch button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Easy', 'Pro', 'Studio']));
   await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
   await page.waitForTimeout(T(300));

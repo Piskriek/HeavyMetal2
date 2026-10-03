@@ -1,4 +1,5 @@
 import { ActivityRegistry, Tournament, isActivityError, type Activity, type TournamentState } from '@hm/activities';
+import { validateGraph, type TexGraph } from '@hm/texgraph';
 import { parseFpsTarget, parseQuality, type FpsTarget, type Quality } from '@hm/game';
 import type { Params } from '@hm/contracts';
 import { resolveGraphics, type ThreeRenderer } from '@hm/render';
@@ -20,6 +21,8 @@ export interface Profile {
   readonly skin: 'flat' | 'pbr';
   /** Islands you starred to try (ready-made templates and community islands, by id): they come first under Try an island. */
   readonly favIslands: readonly string[];
+  /** Your own looks for SetMix's ground surfaces (the surface editor), by surface id: a texture graph each. Left out = the SetMix default. */
+  readonly groundLooks?: Readonly<Record<string, TexGraph>>;
   /** Graphics tier for the island and the editor; auto starts at the best the device can probably do and drops a tier if frames run slow. */
   readonly quality: 'auto' | Quality;
   /** What auto aims for: 15 fps (as pretty as the machine allows), 30, or 60 (as smooth as it can be). */
@@ -83,10 +86,12 @@ export function loadProfile(): Profile {
     const t = raw.tournament ? Tournament.fromJSON(raw.tournament) : null;
     const gpu: GpuChoice = raw.gpu === 'saver' || raw.gpu === 'browser' ? raw.gpu : 'fast';
     const graphics = raw.graphics && typeof raw.graphics === 'object' && !Array.isArray(raw.graphics) ? raw.graphics : {};
+    // only well-formed graphs survive a load (a broken one would leave a surface blank)
+    const looks = raw.groundLooks && typeof raw.groundLooks === 'object' ? Object.fromEntries(Object.entries(raw.groundLooks as Record<string, unknown>).filter(([k, g]) => /^d+$/.test(k) && validateGraph(g).ok)) as Record<string, TexGraph> : {};
     const favIslands = Array.isArray(raw.favIslands) ? raw.favIslands.filter((x): x is string => typeof x === 'string').slice(0, 40) : [];
     // before style and detail were two choices, PBR meant the painted ground: keep what each player saw
     const style = raw.style === 'voxel' || raw.style === 'painted' ? raw.style : raw.skin === 'pbr' ? 'painted' : 'voxel';
-    return { ...DEFAULT_PROFILE, ...raw, favIslands, style, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
+    return { ...DEFAULT_PROFILE, ...raw, favIslands, groundLooks: looks, style, skin: raw.skin === 'pbr' ? 'pbr' : 'flat', quality: parseQuality(raw.quality) ?? 'auto', gpu, fpsTarget: parseFpsTarget(raw.fpsTarget), graphics, activities: acts, tournament: t ? t.toJSON() : null, controls: normalizeControls(raw.controls) } as Profile;
   } catch { return DEFAULT_PROFILE; }
 }
 export function saveProfile(p: Profile): void { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ } }

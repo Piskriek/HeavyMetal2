@@ -123,7 +123,7 @@ test('tropical preset: spec values, valid surface ids, and reeds find a wet shor
   assert.deepEqual(TROPICAL_RULES.map((r) => r.id), ['palm', 'bush', 'tuft', 'boulder', 'reeds', 'tiki']);
   const palmRule = TROPICAL_RULES[0]!;
   assert.deepEqual([...palmRule.surfaces].sort((a, b) => a - b), [2, 4, 8]);
-  assert.deepEqual([palmRule.density, palmRule.minSpacing, palmRule.clusterRadius, palmRule.minHeight, palmRule.maxHeight], [3.5, 7, 18, 0.8, 9]);
+  assert.deepEqual([palmRule.density, palmRule.minSpacing, palmRule.clump, palmRule.minHeight, palmRule.maxHeight], [34, 4.2, { size: 38, cover: 0.25 }, 0.8, 9]);
   for (const r of TROPICAL_RULES) assert.ok(r.surfaces.every((s) => s >= 1 && s <= 16), r.id);
   const shore = scatter(flat(65, 2, 0.5, 3), TROPICAL_RULES, { seed: 3 }); // wet sand, 0.5 m, flat: only reeds fit
   assert.ok(shore.length > 10 && shore.every((p) => p.rule === 'reeds'), `${shore.length}`);

@@ -73,7 +73,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 |---|---|---|---|
 | D1 | Starting island textures match the voxel goblin (flat) | DONE | Flat skin from hand-picked palettes, half-metre blocks. |
 | D2 | The default island should look great (volcano) | PARTIAL | Owner, 10-03: "the island looks nice, I can work with that". Volcano Isle is the default; every template is dressed. Still plain: groves, shoreline, clouds (section 6). |
-| D3 | Trees floating, ugly | PARTIAL | Floating fixed (scale bug), voxel plants, and plants now follow the ground (N4). Still: uniform scatter, one palm shape, no groves. |
+| D3 | Trees floating, ugly | PARTIAL | Floating fixed (scale bug), voxel plants, plants follow the ground (N4), and scatter rules now grow in **patches** (`clump`: palm groves, bush thickets, flower drifts with meadows between; bigger plants in the thick middle). Still: one palm shape, no shoreline props (driftwood, rocks in the shallows). |
 | D4 | Mouse captured on click, released on Esc | PARTIAL / **OWNER** | Works in code; the built-in browser cannot do pointer lock, so the owner must confirm on the laptop. |
 | D6 | Walk / third person / fly toggle | DONE | Walk/Studio buttons top right (and B); 1st/3rd (and V). Studio flies. |
 | D7 | Painting changes the ground | DONE | Paint tab (F2): 26 ground presets with swatches; brush size/strength/edge are tool variables. Owner to confirm it reads clearly. |
@@ -142,7 +142,7 @@ Status words: **DONE** (works, tested, seen in a browser) / **PARTIAL** (some of
 ## 7. Honest quality assessment
 
 1. **Ground level** looked at this session in both skins: flat reads as voxel blocks that match the goblin; PBR is a painted jungle floor, now without seams.
-2. **Trees**: grounded, voxel, follow the ground; but uniform scatter and one palm shape. Needs groves, variants, shoreline props.
+2. **Trees**: grounded, voxel, follow the ground, grow in groves and drifts; one palm shape, no shoreline props.
 3. **The cone** is a smooth cone with a crater; no terraces, gullies, lava flow or steam.
 4. **The sea** is a flat disc: no shore foam or waves. **No clouds.**
 5. **The goblin** animates from presets now; it is the old hero model and the rig only fits that model.

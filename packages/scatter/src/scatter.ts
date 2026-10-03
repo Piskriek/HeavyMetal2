@@ -38,6 +38,36 @@ interface Context {
 }
 
 const finiteOr = (v: number | undefined, fallback: number): number => (v !== undefined && Number.isFinite(v) ? v : fallback);
+/** Outside a patch a clumped rule keeps this share of its density (stragglers). */
+const OUTSIDE_PATCH = 0.08;
+
+/** Smooth value noise in 0..1 (two octaves), deterministic in the seed. */
+function patchNoise(seed: number, x: number, z: number): number {
+  const lattice = (ix: number, iz: number, o: number): number => {
+    let h = Math.imul(ix, 374761393) ^ Math.imul(iz, 668265263) ^ Math.imul(seed + o, 982451653);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  const octave = (px: number, pz: number, o: number): number => {
+    const ix = Math.floor(px), iz = Math.floor(pz), fx = px - ix, fz = pz - iz;
+    const ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+    const a = lattice(ix, iz, o), b = lattice(ix + 1, iz, o), c = lattice(ix, iz + 1, o), d = lattice(ix + 1, iz + 1, o);
+    return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+  };
+  return octave(x, z, 0) * 0.7 + octave(x * 2.3 + 17.1, z * 2.3 - 9.4, 1) * 0.3;
+}
+const smooth = (a: number, b: number, v: number): number => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/** How thick a clumped rule grows here, 0..1 (1 = the middle of a patch). Rules without `clump` are 1 everywhere. */
+export function patchAt(rule: ScatterRule, seed: number, ruleIndex: number, x: number, z: number): number {
+  const c = rule.clump;
+  if (!c || !(c.size > 0)) return 1;
+  const cover = Math.min(1, Math.max(0, c.cover));
+  // the noise is roughly uniform round 0.5 with this spread, so the threshold for a given cover sits on its quantile
+  const n = patchNoise(seed ^ Math.imul(ruleIndex + 1, 2654435761), x / c.size, z / c.size);
+  const edge = 0.5 + (0.5 - cover) * 0.62;
+  return smooth(edge - 0.06, edge + 0.08, n);
+}
 
 /** Chance that a candidate survives the density test: density / densest-possible, clamped to 0..1. */
 function keepProbability(rule: ScatterRule): number {
@@ -75,7 +105,8 @@ function runRule(c: Context, rule: ScatterRule, index: number): boolean {
     if (allowed.size > 0 && !allowed.has(dominantSurface(t, x, z))) continue;
     if (c.bands.some((b) => distanceToLoop(b.points, [x, z]) <= b.limit)) continue;
 
-    let p = base;
+    const patch = patchAt(rule, c.seed, index, x, z);
+    let p = rule.clump ? base * (OUTSIDE_PATCH + (1 - OUTSIDE_PATCH) * patch) : base;
     if (groves) {
       const nearGrove = groves.some(x, z, grove, (s) => (s.x - x) ** 2 + (s.z - z) ** 2 <= grove * grove);
       p = nearGrove ? NEAR_GROVE_P : p * FAR_FROM_GROVE;
@@ -91,7 +122,8 @@ function runRule(c: Context, rule: ScatterRule, index: number): boolean {
     const spot: Spot = { x, z, spacing };
     placed.add(spot);
     groves?.add(spot);
-    out.push({ rule: rule.id, x, y, z, yaw: yawRoll * Math.PI * 2, scale: Math.min(hi, lo + (hi - lo) * scaleRoll) });
+    const size = rule.clump ? lo + (hi - lo) * (scaleRoll * 0.6 + patch * 0.4) : lo + (hi - lo) * scaleRoll;
+    out.push({ rule: rule.id, x, y, z, yaw: yawRoll * Math.PI * 2, scale: Math.min(hi, size) });
     if (out.length >= c.cap) return true;
   }
   return false;

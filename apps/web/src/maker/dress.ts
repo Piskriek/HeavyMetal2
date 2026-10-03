@@ -42,7 +42,7 @@ export function decorInstances(placements: readonly DecorPlacement[]): DecorInst
 }
 
 /** Flowers: colour in the meadow, on grass and moss, never on slopes. */
-const FLOWERS: ScatterRule = { id: 'flowers', surfaces: [4, 11], minHeight: 0.8, maxHeight: 30, maxSlopeDeg: 22, density: 6, minSpacing: 3.2, scale: [0.8, 1.4] };
+const FLOWERS: ScatterRule = { id: 'flowers', surfaces: [4, 11], minHeight: 0.8, maxHeight: 30, maxSlopeDeg: 22, density: 14, minSpacing: 2.2, scale: [0.8, 1.4], clump: { size: 14, cover: 0.2 } };
 
 /** Scatter foliage over the island with the tropical rules, keeping clear of the track. Returns the flat arrays the decor preset stores. */
 export function dress(terrain: Terrain, draft: TrackDraft, seed: number, density: number): { kinds: string[]; items: number[]; count: number } {

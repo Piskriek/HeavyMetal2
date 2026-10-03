@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAdaptiveQuality, gpuClass, guessQuality, parseQuality, tidyGpuName } from '../src/quality';
+import { createAdaptiveQuality, gpuClass, guessQuality, parseFpsTarget, parseQuality, tidyGpuName } from '../src/quality';
 
 test('graphics chips by name: the owner\'s laptop chips are weak, software is software, unknown is null', () => {
   assert.equal(gpuClass('ANGLE (Intel, Intel(R) HD Graphics 530 (0x0000191B) Direct3D11 vs_5_0 ps_5_0, D3D11)'), 'weak');
@@ -61,6 +61,30 @@ test('very slow frames drop two tiers at once, within seconds rather than hundre
   while (first === null && t < 10_000) { first = q.frame(130); t += 130; }
   assert.equal(first, 'medium');
   assert.ok(t <= 4500, `dropped after ${t} ms`);
+});
+
+test('a frame-rate target: drops below it, rises with room to spare, and never retries a tier that was too slow', () => {
+  const q = createAdaptiveQuality('low', { targetFps: 30, window: 10, warmup: 5 });
+  const feed = (n: number, ms: number): (string | null)[] => Array.from({ length: n }, () => q.frame(ms));
+  // 60 fps on low with a 30 target: room to spare, so it tries medium after two roomy windows
+  assert.deepEqual(feed(25, 16.7).filter(Boolean), ['medium']);
+  // medium runs at 20 fps: too slow for 30, back to low, and medium is never tried again
+  assert.deepEqual(feed(30, 50).filter(Boolean), ['low']);
+  assert.deepEqual(feed(200, 16.7).filter(Boolean), []);
+  assert.equal(q.current, 'low');
+});
+
+test('with a 60 target the screen cap hides any room, so it only ever drops', () => {
+  const q = createAdaptiveQuality('medium', { targetFps: 60, window: 10, warmup: 5 });
+  assert.deepEqual(Array.from({ length: 200 }, () => q.frame(16.7)).filter(Boolean), []);
+  assert.equal(Array.from({ length: 40 }, () => q.frame(24)).find(Boolean), 'low');
+});
+
+test('targets read from storage fall back to 60', () => {
+  assert.equal(parseFpsTarget(15), 15);
+  assert.equal(parseFpsTarget(30), 30);
+  assert.equal(parseFpsTarget('30'), 60);
+  assert.equal(parseFpsTarget(undefined), 60);
 });
 
 test('the warmup frames and absurd frame times are ignored; a locked tier never moves', () => {

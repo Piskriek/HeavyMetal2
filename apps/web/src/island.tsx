@@ -6,7 +6,7 @@ import { shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, type Sha
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, STARTER_SURFACES, SURF, type ThreeRenderer } from '@hm/render';
 import { heightAt } from '@hm/terrain';
-import { createAdaptiveQuality, guessQuality, parseQuality } from '@hm/game';
+import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget } from '@hm/game';
 import { noteGpu, powerPreferenceOf, type GpuChoice } from './shell/profile';
 import type { SfxId } from '@hm/audio';
 import { followLighting, pickLook } from './look';
@@ -54,6 +54,8 @@ export function IslandWalk(props: {
   readonly skin?: 'flat' | 'pbr'; readonly onSkin?: (skin: 'flat' | 'pbr') => void; readonly quality?: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
   /** Which graphics chip to ask for (Settings); read when the view opens. */
   readonly gpu?: GpuChoice;
+  /** The frame rate auto quality aims for (Settings): 15 prettier, 60 smoother. */
+  readonly fpsTarget?: FpsTarget;
   readonly activities?: readonly ActivityInfo[]; readonly onActivity?: (id: string) => void;
   /** The tour's thank-you (in-game credits, never money). */
   readonly onCredits?: (amount: number) => void;
@@ -75,6 +77,21 @@ export function IslandWalk(props: {
   controlsRef.current = props.controls ?? { sensitivity: 1, invertY: false, fov: 75 };
   const qualityRef = useRef(props.quality ?? 'auto');
   qualityRef.current = props.quality ?? 'auto';
+  const fpsRef = useRef<FpsTarget>(props.fpsTarget ?? 60);
+  fpsRef.current = props.fpsTarget ?? 60;
+  const graphicsRef = useRef<{ readonly renderer: ThreeRenderer; readonly device: DeviceFacts; adaptive: AdaptiveQuality } | null>(null);
+  // a change in Settings applies at once: a chosen tier is set; switching to auto starts from the guess, a new target keeps the tier it is on
+  const modeRef = useRef(props.quality ?? 'auto');
+  useEffect(() => {
+    const g = graphicsRef.current;
+    const mode = props.quality ?? 'auto';
+    const wasAuto = parseQuality(modeRef.current) === null;
+    modeRef.current = mode;
+    if (!g) return;
+    const chosen = parseQuality(mode);
+    g.adaptive = createAdaptiveQuality(chosen ?? (wasAuto ? g.adaptive.current : guessQuality(g.device)), { locked: chosen !== null, targetFps: props.fpsTarget ?? 60 });
+    g.renderer.setQuality(g.adaptive.current);
+  }, [props.quality, props.fpsTarget]);
   const activities = useMemo(() => props.activities ?? [], [props.activities]);
   useEffect(() => { setActivities(activities); }, [activities]);
 
@@ -219,11 +236,12 @@ export function IslandWalk(props: {
     const renderer: ThreeRenderer = createThreeRenderer({ shadows: true, background: 'sky', powerPreference: powerPreferenceOf(props.gpu) });
     renderer.mount(el, rt.world, rt.store);
     noteGpu(renderer.gpu);
-    // graphics: a chosen tier is kept; auto starts at what the device can probably do and drops a tier when frames run slow
+    // graphics: a chosen tier is kept; auto starts at what the graphics chip can probably do and keeps the frames at the target (Settings)
+    const device: DeviceFacts = { touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu };
     const chosen = parseQuality(qualityRef.current);
-    const adaptive = createAdaptiveQuality(chosen ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu }), { locked: chosen !== null });
-    renderer.setQuality(adaptive.current);
-    const offFrame = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) renderer.setQuality(q); });
+    graphicsRef.current = { renderer, device, adaptive: createAdaptiveQuality(chosen ?? guessQuality(device), { locked: chosen !== null, targetFps: fpsRef.current }) };
+    renderer.setQuality(graphicsRef.current.adaptive.current);
+    const offFrame = renderer.onFrame((dt) => { const q = graphicsRef.current?.adaptive.frame(dt); if (q) renderer.setQuality(q); });
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})
     const surfaces = new SurfaceArray(STARTER_SURFACES);
     const showTerrain = (): void => {
@@ -646,7 +664,7 @@ export function IslandWalk(props: {
       window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
-      offTerrain(); offDecor(); offFrame(); stopLighting();
+      offTerrain(); offDecor(); offFrame(); stopLighting(); graphicsRef.current = null;
       lastPose = { px, pz, face, camYaw };
       api.current = null;
       renderer.unmount();

@@ -99,8 +99,9 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
     renderer.mount(el, rt.world, rt.store);
     noteGpu(renderer.gpu);
     // graphics: the tier chosen in Settings, or auto (a guess from the graphics chip, dropping a tier when frames run slow), as on the island
-    const chosenQuality = parseQuality(loadProfile().quality);
-    const adaptive = createAdaptiveQuality(chosenQuality ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu }), { locked: chosenQuality !== null });
+    const profile = loadProfile();
+    const chosenQuality = parseQuality(profile.quality);
+    const adaptive = createAdaptiveQuality(chosenQuality ?? guessQuality({ touch: matchMedia('(pointer: coarse)').matches, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu }), { locked: chosenQuality !== null, targetFps: profile.fpsTarget });
     renderer.setQuality(adaptive.current);
     const offQuality = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) renderer.setQuality(q); });
     rendererRef.current = renderer;

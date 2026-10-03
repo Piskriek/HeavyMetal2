@@ -16,7 +16,7 @@ import { GalaxyBar, type Level } from './galaxy-bar';
 import { GoblinRacingMenu } from './racing-menu';
 import { Community } from './community';
 import { createActivity, duplicateActivity, gpuInUse, loadProfile, removeActivity, saveProfile, unhideAll, type GpuChoice, type Profile } from './profile';
-import { tidyGpuName } from '@hm/game';
+import { FPS_TARGETS, tidyGpuName } from '@hm/game';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
 
@@ -162,7 +162,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
     <div className="shell" data-screen={screen}>
       {islandMounted ? (
         <div className="shell-layer" style={{ zIndex: 1 }}>
-          <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} gpu={profile.gpu} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
+          <IslandWalk key={`${world!.id}-${profile.gpu}`} rt={world!.rt} scene={world!.scene} intro={intro} level={level === 'island' ? 'island' : 'goblin'} showcase={showcase} grownUp={profile.grownUp} skin={profile.skin} onSkin={(sk) => update((p) => ({ ...p, skin: sk }))} onCredits={(n) => update((p) => ({ ...p, credits: p.credits + Math.max(0, n) }))} quality={profile.quality} fpsTarget={profile.fpsTarget} gpu={profile.gpu} controls={profile.controls} activities={activityInfos} onActivity={openActivity} onIntroDone={() => setIntro(false)} onMenuChange={setIslandMenu}
             onEdit={() => go('build')} onActivities={toActivities} onIslands={toIslands} onHub={() => toHub()} onMainMenu={toMenu} />
         </div>
       ) : null}
@@ -295,6 +295,13 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
             <label className="row">Name <input value={profile.name} maxLength={20} onChange={(e) => update((p) => ({ ...p, name: e.target.value }))} /></label>
             <label className="row">Island skin <select value={profile.skin} onChange={(e) => update((p) => ({ ...p, skin: e.target.value as 'flat' | 'pbr' }))}><option value="flat">Flat (matches the voxel goblin)</option><option value="pbr">PBR (full relief)</option></select></label>
             <label className="row">Graphics <select value={profile.quality} onChange={(e) => update((p) => ({ ...p, quality: e.target.value as typeof profile.quality }))}><option value="auto">Auto (best the device can hold)</option><option value="ultra">Ultra</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low (phones and older laptops)</option></select></label>
+            {profile.quality === 'auto' ? (
+              <div className="row fps-target" role="group" aria-label="Aim for">
+                <span>Aim for</span>
+                <span className="seg">{FPS_TARGETS.map((f) => <button key={f} className={profile.fpsTarget === f ? 'on' : ''} aria-pressed={profile.fpsTarget === f} onClick={() => update((p) => ({ ...p, fpsTarget: f }))}>{f} fps</button>)}</span>
+              </div>
+            ) : null}
+            {profile.quality === 'auto' ? <p className="hint">15 fps looks best and moves slower, 60 fps moves smoothly and looks plainer. Auto raises or lowers the graphics until your machine keeps up.</p> : null}
             <label className="row">Graphics card <select value={profile.gpu} onChange={(e) => update((p) => ({ ...p, gpu: e.target.value as GpuChoice }))}><option value="fast">Ask for the fast one</option><option value="saver">Ask for the battery saver</option><option value="browser">Let the browser choose</option></select></label>
             <p className="hint">In use: {gpuInUse() ? tidyGpuName(gpuInUse()!) : 'not known yet'}. A page can only ask: on a laptop with two graphics cards, Windows decides. To always get the fast one, open Windows Settings, System, Display, Graphics, pick your browser and choose High performance.</p>
             <ControlsSettings value={profile.controls} onChange={(c) => update((p) => ({ ...p, controls: c }))} />

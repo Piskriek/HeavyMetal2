@@ -65,7 +65,7 @@ export function RaceView(props: {
     const chosen = (() => { try { return parseQuality(new URLSearchParams(location.search).get('q')) ?? parseQuality(live.current.settings.quality); } catch { return null; } })();
     const touchy = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const device = { touch: touchy, cores: navigator.hardwareConcurrency || 0, dpr: window.devicePixelRatio || 1, width: window.innerWidth, gpu: renderer.gpu };
-    const adaptive = createAdaptiveQuality(chosen ?? guessQuality(device), { locked: chosen !== null });
+    const adaptive = createAdaptiveQuality(chosen ?? guessQuality(device), { locked: chosen !== null, targetFps: loadProfile().fpsTarget });
     renderer.setQuality(adaptive.current);
     let appliedQuality = live.current.settings.quality;
     const surfaces = new SurfaceArray(STARTER_SURFACES);

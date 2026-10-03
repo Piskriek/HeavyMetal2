@@ -66,28 +66,46 @@ export interface AdaptiveQuality {
   frame(dtMs: number): Quality | null;
 }
 
+/** The frame rate "auto" aims for (Settings): 15 = as pretty as the machine allows, 60 = as smooth, 30 between. */
+export type FpsTarget = 15 | 30 | 60;
+export const FPS_TARGETS: readonly FpsTarget[] = [15, 30, 60];
+export function parseFpsTarget(v: unknown): FpsTarget {
+  return v === 15 || v === 30 ? v : 60;
+}
+
 export interface AdaptiveOptions {
   /** Frames per judging window (default 90), or `windowMs` of frames (default 1500 ms), whichever comes first. */
   readonly window?: number;
   readonly windowMs?: number;
-  /** Frames ignored at the start and after each drop (default 120), or `warmupMs` (default 2500 ms), whichever comes first. */
+  /** Frames ignored at the start and after each change (default 120), or `warmupMs` (default 2500 ms), whichever comes first. */
   readonly warmup?: number;
   readonly warmupMs?: number;
-  /** Average frame time above which the tier drops (default 24 ms, about 42 fps). */
+  /** Average frame time above which the tier drops (default from `targetFps`, else 24 ms, about 42 fps). */
   readonly slowMs?: number;
+  /**
+   * The frame rate to hold. The tier drops when frames run slower than about 80% of it, and rises when two windows in a row run with
+   * 40% to spare (browsers cap frames at the screen's 60 Hz, so at 60 there is never visible room and it only drops).
+   */
+  readonly targetFps?: FpsTarget;
   readonly locked?: boolean;
 }
 
 /**
- * Drops a tier when the average frame time over a window stays above `slowMs`, after a warmup (shader compiles and texture uploads are
- * slow and do not count). Very slow frames (over 2.5x `slowMs`) drop two tiers at once. Windows and warmups end by frame count or by
- * time, whichever comes first, so a slow machine is rescued in seconds rather than after hundreds of slow frames. Never rises on its own:
- * a tier that was too heavy once is not tried again this session. A manual choice (`locked`) disables adapting.
+ * Keeps the tier where the frames hold the target. Drops a tier when the average frame time over a window is too slow, after a warmup
+ * (shader compiles and texture uploads are slow and do not count); very slow frames (over 2.5x the limit) drop two tiers at once. With a
+ * target it also rises one tier when there is room to spare; a tier that ever ran too slow is never tried again this session, so it does
+ * not bounce between two tiers (each change recompiles shaders, a short hitch). Windows and warmups end by frame count or by time,
+ * whichever comes first, so a slow machine is rescued in seconds. A manual choice (`locked`) disables adapting.
  */
 export function createAdaptiveQuality(start: Quality, o: AdaptiveOptions = {}): AdaptiveQuality {
-  const window = o.window ?? 90, warmup = o.warmup ?? 120, slowMs = o.slowMs ?? 24;
+  const window = o.window ?? 90, warmup = o.warmup ?? 120;
+  const budget = o.targetFps ? 1000 / o.targetFps : null;
+  const slowMs = o.slowMs ?? (budget ? budget * 1.25 : 24);
+  const roomMs = budget ? budget * 0.6 : 0;
   const windowMs = o.windowMs ?? 1500, warmupMs = o.warmupMs ?? 2500;
-  let current = start, seen = 0, seenMs = 0, sum = 0, n = 0;
+  const tooSlow = new Set<Quality>();
+  let current = start, seen = 0, seenMs = 0, sum = 0, n = 0, roomy = 0;
+  const change = (q: Quality): Quality => { current = q; seen = 0; seenMs = 0; roomy = 0; return q; };
   return {
     get current() { return current; },
     frame(dtMs) {
@@ -98,11 +116,14 @@ export function createAdaptiveQuality(start: Quality, o: AdaptiveOptions = {}): 
       const avg = sum / n;
       sum = 0; n = 0;
       const i = ORDER.indexOf(current);
-      if (avg > slowMs && i > 0) {
-        current = ORDER[Math.max(0, i - (avg > slowMs * 2.5 ? 2 : 1))]!;
-        seen = 0; seenMs = 0;
-        return current;
+      if (avg > slowMs) {
+        tooSlow.add(current);
+        return i > 0 ? change(ORDER[Math.max(0, i - (avg > slowMs * 2.5 ? 2 : 1))]!) : null;
       }
+      const up = ORDER[i + 1];
+      if (budget && avg < roomMs && up && !tooSlow.has(up)) {
+        if (++roomy >= 2) return change(up);
+      } else roomy = 0;
       return null;
     },
   };

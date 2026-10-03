@@ -498,6 +498,11 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .shell-window > label.row:has(> input[type="checkbox"]) { display: flex; gap: 8px; }
 .shell-window > label.row > select, .shell-window > label.row > input:not([type="checkbox"]) { width: 100%; min-width: 0; }
 .shell-window > .controls-settings, .shell-window > .controls-list { margin: 14px 16px 0; }
+.shell-window > .row.fps-target { display: grid; grid-template-columns: 8.5em 1fr; gap: 10px; align-items: center; font-size: 13px; }
+.fps-target .seg { display: flex; border: 1px solid var(--line); }
+.fps-target .seg button, .fps-target .seg button:first-child, .fps-target .seg button:last-child { flex: 1; border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 0; font-size: 12px; }
+.fps-target .seg button:last-child { border-right: 0; }
+.fps-target .seg button.on, .fps-target .seg button.on:hover:not(:disabled) { background: var(--text); color: var(--paper); }
 .controls-settings h4 { margin: 0 0 4px; font-size: 10px; font-weight: 600; color: var(--dim); }
 
 /* the Sound Lab inside an island window */

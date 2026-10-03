@@ -41,6 +41,7 @@ uniform float islVoxelVariants;
 uniform float islNormalStrength;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 uniform vec4 islParams[${layers}];
+uniform float islTurn[${layers}];
 uniform float islSoft;
 uniform float islScale;
 uniform float islCliffLayer;
@@ -105,19 +106,30 @@ float islLayer(float id) {
   return (i >= 1 && i < ${SURFACE_SLOTS}) ? islLayerOf[i] : -1.0;
 }
 
-vec4 islTap(float layer, vec2 uv, vec2 off, vec2 dx, vec2 dy) {
-  int il = int(clamp(layer + 0.5, 0.0, float(${layers} - 1)));
-  float rep = max(islParams[il].x * islScale, 0.05);
-  return textureGrad(islSurfaces, vec3(uv / rep + off, float(il)), dx / rep, dy / rep);
+// a quarter turn k (0..3) of a 2D vector: anti-clockwise, k times
+vec2 islRot(vec2 p, float k) {
+  return k < 0.5 ? p : (k < 1.5 ? vec2(-p.y, p.x) : (k < 2.5 ? -p : vec2(p.y, -p.x)));
+}
+// how many quarter turns patch ia of a layer takes: none for directional surfaces (planks, stripes, strata)
+float islTurns(int il, float ia) {
+  return islTurn[il] > 0.5 ? floor(fract(sin(ia * 91.7 + 0.3) * 4375.85) * 4.0) : 0.0;
 }
 
+vec4 islTap(float layer, vec2 uv, vec2 off, float k, vec2 dx, vec2 dy) {
+  int il = int(clamp(layer + 0.5, 0.0, float(${layers} - 1)));
+  float rep = max(islParams[il].x * islScale, 0.05);
+  return textureGrad(islSurfaces, vec3(islRot(uv / rep, k) + off, float(il)), islRot(dx / rep, k), islRot(dy / rep, k));
+}
+
+// no visible repeats: the ground is cut into noise-shaped patches; each takes the tile at its own offset and, where the surface allows, its
+// own quarter turn, and neighbouring patches blend where their heights agree
 vec4 islVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
   int il = int(clamp(layer + 0.5, 0.0, float(${layers} - 1)));
   float rep = max(islParams[il].x * islScale, 0.05);
   float l = surfNoise(uv / (rep * 2.7) + layer * 3.1) * 8.0;
   float ia = floor(l);
-  vec4 a = islTap(layer, uv, sin(vec2(3.0, 7.0) * ia), dx, dy);
-  vec4 b = islTap(layer, uv, sin(vec2(3.0, 7.0) * (ia + 1.0)), dx, dy);
+  vec4 a = islTap(layer, uv, sin(vec2(3.0, 7.0) * ia), islTurns(il, ia), dx, dy);
+  vec4 b = islTap(layer, uv, sin(vec2(3.0, 7.0) * (ia + 1.0)), islTurns(il, ia + 1.0), dx, dy);
   return mix(a, b, smoothstep(0.2, 0.8, fract(l) + (b.a - a.a) * 0.25));
 }
 
@@ -161,10 +173,16 @@ vec4 islPbrVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
   float l = surfNoise(uv / (rep * 2.7) + layer * 3.1) * 8.0;
   float ia = floor(l);
   vec2 oa = sin(vec2(3.0, 7.0) * ia), ob = sin(vec2(3.0, 7.0) * (ia + 1.0));
-  float ha = textureGrad(islSurfaces, vec3(uv / rep + oa, float(il)), dx / rep, dy / rep).a;
-  float hb = textureGrad(islSurfaces, vec3(uv / rep + ob, float(il)), dx / rep, dy / rep).a;
-  vec4 a = textureGrad(islPbr, vec3(uv / rep + oa, float(il)), dx / rep, dy / rep);
-  vec4 b = textureGrad(islPbr, vec3(uv / rep + ob, float(il)), dx / rep, dy / rep);
+  float ka = islTurns(il, ia), kb = islTurns(il, ia + 1.0);
+  vec2 ua = islRot(uv / rep, ka) + oa, ub = islRot(uv / rep, kb) + ob;
+  vec2 dxa = islRot(dx / rep, ka), dya = islRot(dy / rep, ka), dxb = islRot(dx / rep, kb), dyb = islRot(dy / rep, kb);
+  float ha = textureGrad(islSurfaces, vec3(ua, float(il)), dxa, dya).a;
+  float hb = textureGrad(islSurfaces, vec3(ub, float(il)), dxb, dyb).a;
+  vec4 a = textureGrad(islPbr, vec3(ua, float(il)), dxa, dya);
+  vec4 b = textureGrad(islPbr, vec3(ub, float(il)), dxb, dyb);
+  // a turned tile's bumps turn back with it: the normal's x/y are a direction in the tile, so they take the opposite turn
+  a.rg = islRot(a.rg - 0.5, mod(4.0 - ka, 4.0)) + 0.5;
+  b.rg = islRot(b.rg - 0.5, mod(4.0 - kb, 4.0)) + 0.5;
   return mix(a, b, smoothstep(0.2, 0.8, fract(l) + (hb - ha) * 0.25));
 }
 
@@ -268,6 +286,8 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     if (far > 0.01) tile = mix(tile, islTriplanar(la, lb, lw, wp * 0.31 + 17.3, gnrm, dwx * 0.31, dwy * 0.31), far * 0.55);
     if (steep > 0.01) tile = mix(tile, islTriplanar(islCliffLayer, islCliffLayer, 0.0, wp, gnrm, dwx, dwy), steep);
     tile.rgb *= mix(0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7), 0.8 + 0.4 * surfNoise(wp.xz / 31.0 + 9.1), far);
+    // and over a few metres, so no two tiles side by side look the same (the image tiles have their own big patches taken out on import)
+    tile.rgb *= 0.9 + 0.2 * surfNoise(wp.xz / 6.0 + 1.9);
     diffuseColor.rgb = tile.rgb;
 #ifdef ISL_PLAIN
     // the painted ground without the detail: matte, no bumps

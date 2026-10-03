@@ -70,10 +70,34 @@ export const FLAT_PALETTES: Readonly<Record<number, readonly string[]>> = {
   [SURF.cliffColumns]: ['#555960', '#4c5057', '#5e626a', '#44484f'],
 };
 
-const finish = (d: SurfaceDef): SurfaceDef => ({ ...d, flat: FLAT_PALETTES[d.id] ?? [d.fallback], ...(d.id === SURF.lava ? { glow: 1.6 } : {}) });
+/**
+ * Goblin Racing's 512-pixel tiles, imported from the material library's PBR sheets by scripts/import-material-sheets.mjs (colour, normal +
+ * roughness, and the sheet's own height).
+ */
+const RACING_FILE: Readonly<Record<number, string>> = {
+  [SURF.seabed]: 'shallows-m051', [SURF.sand]: 'sand-m006', [SURF.wetSand]: 'wetsand-m516', [SURF.grass]: 'grass-m513', [SURF.rock]: 'rock-m017',
+  [SURF.cliff]: 'cliff-m001', [SURF.basalt]: 'basalt-m005', [SURF.dunes]: 'dunes-m282', [SURF.mud]: 'mud-m283', [SURF.strata]: 'strata-m002',
+  [SURF.moss]: 'moss-m029', [SURF.coral]: 'coral-m284', [SURF.lava]: 'lava-m509', [SURF.scree]: 'scree-m014', [SURF.pumice]: 'pumice-m289',
+  [SURF.soil]: 'soil-m007', [SURF.tarmac]: 'tarmac-m668', [SURF.tarmacWet]: 'tarmac-wet-m669', [SURF.startLine]: 'start-m670',
+  [SURF.boostPad]: 'boost-m671', [SURF.rumble]: 'kerb-m672', [SURF.dirtRoad]: 'dirt-road-m673', [SURF.boardwalk]: 'boardwalk-m674',
+  [SURF.cobble]: 'cobble-m675', [SURF.dustyRoad]: 'dusty-road-m676', [SURF.cliffColumns]: 'columns-m677',
+};
+/** Metres per repeat where the new sheets differ from the old tiles: the short grass shows real blades, so it is drawn smaller. */
+const RACING_REPEAT: Readonly<Record<number, number>> = { [SURF.grass]: 0.8, [SURF.moss]: 1.5, [SURF.lava]: 4 };
+
+/** Tiles with a direction: never turned to hide their repeats. */
+const DIRECTIONAL: ReadonlySet<number> = new Set([SURF.startLine, SURF.boostPad, SURF.rumble, SURF.boardwalk, SURF.dunes, SURF.strata, SURF.cliffColumns]);
+
+const finish = (d: SurfaceDef): SurfaceDef => ({ ...d, flat: FLAT_PALETTES[d.id] ?? [d.fallback], ...(d.id === SURF.lava ? { glow: 1.6 } : {}), ...(DIRECTIONAL.has(d.id) ? { directional: true } : {}) });
 
 /** Goblin Racing's ground: the image tiles, the high end (the owner, 2026-10-03: "stunning PBR" there, to show what images can do). */
-export const RACING_SURFACES: readonly SurfaceDef[] = IMAGE_SURFACES.map(finish);
+export const RACING_SURFACES: readonly SurfaceDef[] = IMAGE_SURFACES.map((d) => {
+  const file = RACING_FILE[d.id]!;
+  return finish({
+    ...d, url: `textures/racing/${file}.webp`, pbrUrl: `textures/racing-pbr/${file}.webp`, heightUrl: `textures/racing-height/${file}.webp`,
+    repeat: RACING_REPEAT[d.id] ?? d.repeat,
+  });
+});
 
 /**
  * The graph set's file name for each surface (packages/texgraph/sets/setmix-ground.json and setmix-voxel.json, baked by

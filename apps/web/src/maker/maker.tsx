@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { cmd, type PresetId, type Tier } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
-import { attachOrbitControls, createThreeRenderer, SurfaceArray, RACING_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
+import { attachOrbitControls, createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { Inspector, Palette, BrushPanel, PresetBrowser, Toolbar, type BrushState, type Manip, type PresetFilter, type PaletteItem } from '@hm/ui';
 import { applyStroke, encodeTerrain, heightAt, normalYAtCell, type DirtyRect } from '@hm/terrain';
 import { carveTrack, resample } from '@hm/trackgen';
@@ -112,7 +112,7 @@ export function MapMaker({ rt, scene, onTestDrive, onExit, onMenu, onIslands, on
     const offQuality = renderer.onFrame((dt) => { const q = adaptive.frame(dt); if (q) showTier(renderer, q, profile.graphics); });
     rendererRef.current = renderer;
     setRend(renderer);
-    const surfaces = new SurfaceArray(RACING_SURFACES, undefined, SETMIX_VOXEL);
+    const surfaces = new SurfaceArray(RACING_SURFACES, undefined, SETMIX_VOXEL, tileSizeFor(adaptive.current));
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
       if (!st) return;

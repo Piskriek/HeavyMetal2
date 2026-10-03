@@ -5,7 +5,7 @@ import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
 import { PAINTS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
-import { createThreeRenderer, SurfaceArray, RACING_SURFACES, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
+import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { cropTerrain, heightAt, type Terrain } from '@hm/terrain';
 import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality, type DeviceFacts, type FpsTarget, type Quality } from '@hm/game';
 import { noteGpu, powerPreferenceOf, showTier, type GpuChoice, type Profile } from './shell/profile';
@@ -313,8 +313,7 @@ export function IslandWalk(props: {
     (window as unknown as { hmGround: unknown }).hmGround = { surfaces: (): Record<number, number> => { const t = rt.binder.terrain()?.terrain; const out: Record<number, number> = {}; if (t) for (const s of t.surfaceA) out[s] = (out[s] ?? 0) + 1; return out; } };
     // the ground's tiles: SetMix's graph-made set, or Goblin Racing's image set (the high end); the voxel blocks always wear the graph set's faces
     // sharp 512-pixel tiles unless the graphics start low (they are resampled to 256 there: a quarter of the memory)
-    const startTier = graphicsRef.current.adaptive.current;
-    const tileSize = startTier === 'potato' || startTier === 'low' ? 256 : 512;
+    const tileSize = tileSizeFor(graphicsRef.current.adaptive.current);
     const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
     const showTerrain = (): void => {
       const st = rt.binder.terrain();

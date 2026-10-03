@@ -85,7 +85,7 @@ export class TerrainView {
       islSurfaces: { value: surfaces.texture }, islPbr: { value: surfaces.pbrTexture }, islFlatPalette: { value: surfaces.flatTexture },
       islVoxel: { value: surfaces.voxelTexture }, islVoxelPbr: { value: surfaces.voxelPbrTexture }, islVoxelVariants: { value: surfaces.voxelVariants },
       islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: surfaces.layerOf },
-      islParams: { value: surfaces.params }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
+      islParams: { value: surfaces.params }, islTurn: { value: surfaces.turn }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
       islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
       paintMask: { value: this.mask }, paintRes: { value: new THREE.Vector2(cols, rows) },
       paintOrigin: { value: new THREE.Vector2(originX, originZ) }, paintCell: { value: cell },

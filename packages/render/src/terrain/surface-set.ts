@@ -20,6 +20,8 @@ export interface SurfaceDef {
    * height goes in the colour tile's alpha. Such tiles are seamless by construction, so their edges are not blended.
    */
   readonly mapsUrl?: string;
+  /** A grey height image for an image tile (its pbrUrl holds the normal): surfaces then meet by their real height, not one guessed from colour. */
+  readonly heightUrl?: string;
   /** Metres per repeat of the tile. */
   readonly repeat: number;
   readonly roughness: number;
@@ -28,11 +30,15 @@ export interface SurfaceDef {
   readonly fallback: string;
   /** The flat (voxel) skin: up to FLAT_COLORS hand-picked tones. Each half-metre block of the ground takes one of them, so no texture file is involved. */
   readonly flat?: readonly string[];
+  /** The tile has a direction (planks, stripes, strata): it is never turned to hide its repeats. */
+  readonly directional?: boolean;
   /** Light the surface gives off (lava): 0 or left out for none. The bright tones of its palette glow, the dark ones stay dark. */
   readonly glow?: number;
 }
 
 export const LAYER_SIZE = 256;
+/** Pixels across a ground tile for a graphics tier: sharp 512 unless the tier is low (a quarter of the memory there). */
+export const tileSizeFor = (tier: string): number => (tier === 'potato' || tier === 'low' ? 256 : 512);
 /** The voxel blocks' faces: pixels across one half-metre face. */
 export const VOXEL_SIZE = 32;
 /**
@@ -83,10 +89,12 @@ export function makeSeamless(px: Uint8ClampedArray | Uint8Array, size: number, b
   }
 }
 
-export function writeTileHeight(rgba: Uint8ClampedArray | Uint8Array, r: HeightRecipe): void {
+/** Write a tile's height into its alpha: guessed from its colour by the recipe, or taken from `given` (a grey image of the same size). */
+export function writeTileHeight(rgba: Uint8ClampedArray | Uint8Array, r: HeightRecipe, given?: ArrayLike<number>): void {
   const n = rgba.length / 4;
   const h = new Float32Array(n);
   for (let i = 0; i < n; i++) {
+    if (given) { h[i] = given[i * 4]! / 255; continue; }
     const R = rgba[i * 4]! / 255, G = rgba[i * 4 + 1]! / 255, B = rgba[i * 4 + 2]! / 255;
     const lum = 0.299 * R + 0.587 * G + 0.114 * B;
     const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
@@ -177,6 +185,8 @@ export class SurfaceArray {
   readonly layerOf = new Float32Array(SURFACE_SLOTS).fill(-1);
   /** (metres per repeat, roughness, height contrast, glow) per layer. */
   readonly params: THREE.Vector4[];
+  /** 1 where a layer may be turned a quarter at a time to hide its repeats, 0 for directional tiles. */
+  readonly turn: Float32Array;
   readonly ready: Promise<void>;
   progress = 0;
   private readonly data: Uint8Array;
@@ -213,6 +223,7 @@ export class SurfaceArray {
       }
     });
     this.params = defs.map((d) => new THREE.Vector4(d.repeat, d.roughness, d.height.contrast, d.glow ?? 0));
+    this.turn = Float32Array.from(defs.map((d) => (d.directional ? 0 : 1)));
     this.flatTexture = makeFlatTexture(defs);
     this.texture = this.makeArray(this.data, this.size, layers, true);
     this.pbrTexture = this.makeArray(this.pbr, this.size, layers, false);
@@ -249,13 +260,15 @@ export class SurfaceArray {
     let done = 0;
     await Promise.all(this.defs.map(async (d, layer) => {
       const extra = d.mapsUrl ?? d.pbrUrl;
-      const [img, extraImg] = await Promise.all([decode(assetUrl(d.url)), extra ? decode(assetUrl(extra)) : Promise.resolve(null)]);
+      const [img, extraImg, heightImg] = await Promise.all([decode(assetUrl(d.url)), extra ? decode(assetUrl(extra)) : Promise.resolve(null), d.heightUrl ? decode(assetUrl(d.heightUrl)) : Promise.resolve(null)]);
       const colour = img ? this.pixels(img) : null;
       const more = extraImg ? this.pixels(extraImg) : null;
+      const given = heightImg ? this.pixels(heightImg) : null;
+      if (given) makeSeamless(given, this.size);
       if (d.mapsUrl && colour && more) this.setTile(d.id, colour, more);
       else {
         const base = layer * this.size * this.size * 4;
-        if (colour) { makeSeamless(colour, this.size); writeTileHeight(colour, d.height); this.data.set(colour, base); this.texture.needsUpdate = true; }
+        if (colour) { makeSeamless(colour, this.size); writeTileHeight(colour, d.height, given ?? undefined); this.data.set(colour, base); this.texture.needsUpdate = true; }
         if (more && !d.mapsUrl) { makeSeamless(more, this.size); for (let i = 3; i < more.length; i += 4) more[i] = 255; this.pbr.set(more, base); this.pbrTexture.needsUpdate = true; }
       }
       this.progress = ++done / (this.defs.length + (this.voxel ? 1 : 0));

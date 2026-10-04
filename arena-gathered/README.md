@@ -14,3 +14,5 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | kinematic | `docs/handoff/prompts/battle/kinematic.txt` | **B** | 11/11 tests, strict typecheck clean. A fails 5 of 10, including the wall acceptance tests (kept for reference). |
 | musicbox | `docs/handoff/prompts/battle/musicbox.txt` | **X** (the one answer posted in the chat) | 9/9 tests, strict typecheck clean. |
 | chunkworld | `docs/handoff/prompts/battle/chunkworld.txt` | **X** (the first answer finished) | 9/9 tests, strict typecheck clean. |
+| pixels | `docs/handoff/prompts/battle/pixels.txt` | **B** | 9/9 tests, strict typecheck clean. A: 7/8 (its place test fails). |
+| questline | `docs/handoff/prompts/battle/questline.txt` | **A** | 8/8, strict clean; B also 8/8 (A has the larger test file). |

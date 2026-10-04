@@ -1,0 +1,45 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: turn a voxel model into a light triangle mesh for a toy-world game. Greedy meshing merges same-colour faces into big quads; then the mesh is welded and its triangle count reported, so a 32x32x32 model costs hundreds of triangles, not tens of thousands.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/remesh.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Deterministic output order.
+
+## API (implement exactly)
+
+```ts
+export interface Volume { sx: number; sy: number; sz: number; cells: Uint8Array } // 0 = empty, else a palette index; index x + y*sx + z*sx*sy
+export interface Quad { axis: 0 | 1 | 2; dir: 1 | -1; plane: number; u0: number; v0: number; u1: number; v1: number; color: number } // plane: the cell boundary along axis; u, v: the other two axes in order (x->y,z; y->x,z; z->x,y), [u0,u1) x [v0,v1)
+/** Greedy meshing: only faces between a solid cell and an empty (or outside) cell; per axis, direction and plane, merge same-colour faces into maximal rectangles (grow along u first, then v). */
+export function greedy(v: Volume): Quad[];
+export interface Mesh { positions: Float32Array; normals: Float32Array; colors: Uint8Array; indices: Uint32Array } // colors: one palette index per vertex
+/** Two triangles per quad, counter-clockwise seen from outside; vertices not shared between quads of different colours or normals; vertices of the same position, normal and colour are welded. */
+export function toMesh(quads: readonly Quad[]): Mesh;
+/** Triangles in the mesh. */
+export function triangles(m: Mesh): number;
+/** Faces a naive mesher would make (one quad per exposed cell face), for the before/after number. */
+export function naiveFaces(v: Volume): number;
+```
+
+## Acceptance tests (copy unchanged, then add your own: an L shape, two colours side by side stay separate, a hollow box has inside faces, faces at the volume edge count as exposed, normals point outward, welding)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { greedy, naiveFaces, toMesh, triangles, type Volume } from '../src/index';
+const solid = (n: number, c = 1): Volume => ({ sx: n, sy: n, sz: n, cells: new Uint8Array(n * n * n).fill(c) });
+test('a solid cube becomes six quads', () => {
+  const q = greedy(solid(8));
+  assert.equal(q.length, 6);
+  assert.equal(naiveFaces(solid(8)), 6 * 64);
+  const m = toMesh(q);
+  assert.equal(triangles(m), 12);
+  assert.equal(m.positions.length / 3, 24);
+});
+test('a single cell', () => {
+  const v: Volume = { sx: 3, sy: 3, sz: 3, cells: new Uint8Array(27) };
+  v.cells[13] = 5;
+  const q = greedy(v);
+  assert.equal(q.length, 6);
+  assert.ok(q.every((x) => x.color === 5 && x.u1 - x.u0 === 1 && x.v1 - x.v0 === 1));
+});
+```

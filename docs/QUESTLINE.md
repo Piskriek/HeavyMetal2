@@ -38,14 +38,15 @@ You start on your own island in SetMix. A **questline teaches you to build**: fi
 
 1. **Wake up on your island** (today's tour: walk, look, hop).
 2. **Make a base**: sculpt a flat spot, place walls and a roof from building blocks (F3), paint them (F2), a door on a wire (F7).
-3. **Dig**: mine pixels, see the pixel store fill, move a hill.
-4. **Your first machine**: place a Noise machine, feed it pixels, turn its knobs, get a texture, use it on your base.
-5. **A chain**: Noise into Stamp normals into Palette; compare looks against cost.
-6. **Sell**: put your texture up for sale, get your first credits.
-7. **The rocket**: buy the ready-made one, or build it (hull, engine, fuel, a launch button on a wire). "Ship ready".
-8. **Fly**: out of your system to the goblin world's star (H8).
-9. **Crash, revival, goblin**: the Shaman, your goblin self.
-10. **Goblin Racing's questline** begins; it ends with the Shaman class.
+3. **Your first machine and a portal** (owner, 2026-10-04: "the questline shows you in the beginning how to do with a machine then hook it up to a portal and then step into voxel worlds on the other side"): place the Importer machine, import the starter model (a CC0 .vox we ship), wire the Importer to a portal (Magic Cord), step through to the open-source world the owner picks, bring one thing back. After this the player finds their own sources (their own files; links to worlds whose hosts allow it). Built in `RELEASE_PLAN.md` Milestone 2.
+4. **Dig**: mine pixels, see the pixel store fill, move a hill.
+5. **Your second machine**: place a Noise machine, feed it pixels, turn its knobs, get a texture, use it on your base.
+6. **A chain**: Noise into Stamp normals into Palette; compare looks against cost.
+7. **Sell**: put your texture up for sale, get your first credits.
+8. **The rocket**: buy the ready-made one, or build it (hull, engine, fuel, a launch button on a wire). "Ship ready".
+9. **Fly**: out of your system to the goblin world's star (H8).
+10. **Crash, revival, goblin**: the Shaman, your goblin self.
+11. **Goblin Racing's questline** begins; it ends with the Shaman class.
 
 Each chapter teaches one hotbar tab (V3) and ends with something you keep. The new game mode (the questline) is the tour: B15's rule holds, every step points at a real `data-ui` name and the screen map checks it.
 

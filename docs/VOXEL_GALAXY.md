@@ -7,6 +7,8 @@
 
 ---
 
+> **Update, 2026-10-04 (owner, later):** "lets make it possible to bring in the voxel models from other games so the user can bring them in themselves ... a machine then hook it up to a portal and then step into voxel worlds on the other side, ill find an opensource one they can connect to the first time and then do their own research". So the first step is player-driven: the Importer machine, portals, the owner's first open-source world. Planned in `RELEASE_PLAN.md` Milestone 2 and `QUESTLINE.md` chapter 3. The curated galaxy below stays later (H11).
+
 ## 1. The Owner's Vision (2026-10-04, 19:13)
 
 > *"im thinking we have another galaxy? voxel galaxy where you can find all the big minecraft, roblox, voxel builds and explore them and on those worlds the preset suggestions link to opensource voxel content"*

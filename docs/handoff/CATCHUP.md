@@ -396,3 +396,56 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
 1. D20: the dither between surfaces in voxel flat (STATUS 00a, `docs/QUESTLINE.md` 5b). A side session planned this at the owner's ask, 18:33: "update the plans in a way that the other claude session picks up on it".
 2. The coming V3 buttons. The Arena takes the big ones first: B1 decals (stickers and decals), B6/B7 juice for Game Mode, C5 remesh (DynMesh, Retopo), and new prompts for Live Puppet, Go-Kart, Echo Dome, mood filters, the camera placer and tracks. The small ones are glue.
 3. The questline, QL1 to QL10, in `docs/QUESTLINE.md` order.
+
+## 12ag. 2026-10-04, night: the session ends here (usage); the next one may be on ANOTHER PC. READ THIS FIRST.
+
+**The owner:** "im gona change sessions to another pc ... id like the catchup updated so you can continue where you left off". Then: "make the most of the last 10% by planing out the next steps untill polished release down to the last detail", and "do a full critique of the plan".
+
+**The plan from now on: `docs/RELEASE_PLAN.md`.**
+- Its section 11 is the critique: twenty questions the plan was not asking, each with an answer.
+- Its order is: Milestone 0.5 (foundations) first, then Game Mode, then import and portal, then the questline's first hour, and on to release.
+- Section 10 has the owner questions to ask as each milestone comes up.
+
+**State:** `main` at the commit after `6435c7d9`, everything pushed.
+- `npm run verify`: 1456 unit tests.
+- e2e: 139 checks (`E2E_GPU=1 E2E_SLOW=2` on the laptop).
+- Since 12af:
+  - **D20 dither** in the voxel look: an ordered 4x4 pattern, 8 pixels to a face, with a slow wobble.
+  - **Dither distance** in Settings, Graphics: 2 m to 200 m and Unlimited. It is the graphics preset's `ditherDistance`; 0 means everywhere.
+  - **The filtered dither**: far away it blends smoothly, so there is no moire flicker as you walk. An e2e measure keeps the frame-to-frame change under 7 (it was 10.4, now 4.1).
+  - The importer, machine and portal ask was planned (RELEASE_PLAN Milestone 2, QUESTLINE chapter 3).
+  - `BETA.md` describes the V3 hotbar.
+
+**On a new PC (do this first):**
+1. Get the repo: `git clone` the GitHub repo, or `git pull` if it is there.
+2. Install: Node 24, then `npm ci`.
+3. Chrome installed at the usual path: `scripts/e2e-smoke.mjs` looks in Program Files.
+4. Run `npm run verify`.
+5. Run `E2E_GPU=1 node scripts/e2e-smoke.mjs`: `E2E_SLOW=1` on a fast PC, 2 on the laptop.
+6. Run `node scripts/perf.mjs low 6` twice (the first run warms up), and note the PC's numbers in STATUS P11. The minimum spec is still the owner's laptop.
+7. The Arena routine (12ad) needs the owner to open arena.ai in the browser pane and click any captcha; never sign in.
+
+**The memory notes live on the laptop, not in git. They are restated here:**
+- **The hotbar is the spec V3 exactly**, never a hybrid with the old one. My additions go in the spec's V3.1 section and in the test's ADDED list.
+- **Load the frontend-design skill at the start of every design task**, even if it was loaded earlier.
+- **The owner's laptop (i7-6700HQ, GTX 950M) is the minimum spec:** smooth on Low.
+- **Loading bars:** preload behind a visible loading bar; never start a screen choppy.
+- **No lane paint** on race roads.
+- **Basalt Isle must read as one natural place** (`ISLAND_PLAN` section 0b).
+- **Art agents:**
+  - check which branch they can reach;
+  - they cannot see images;
+  - they leak references (never ship third-party reference images);
+  - always review the art yourself.
+- **Hand each agent a full copy-paste prompt.** Handed over counts as dispatched.
+- **Browser save stubs vanish when Vite reloads.** Re-check `window.__blocked` after every edit, and keep test props out of `backups/island/`.
+- **The Goblin Creator's look** is "the goblin at the tinker's mirror": brass plates, recessed wells, Cinzel in sentence case. Reuse it for related screens.
+
+**Pitfalls that cost time this session:**
+- Bash heredocs and `node -e` strings eat quotes and backticks. Write scripts and long text with the Write tool, then run them.
+- Voxel palettes are 0..1.
+- The tour switches the island to painted, so shots of the voxel look come before it.
+- `walkerAt` runs on island time, so sample walks over a few seconds.
+- The first perf run after a heavy job is slow.
+
+**Next action:** RELEASE_PLAN Milestone 0.5, starting with the ways registry (it makes every later button small).

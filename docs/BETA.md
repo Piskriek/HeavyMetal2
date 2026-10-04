@@ -22,29 +22,29 @@ Graphics: Settings, Graphics. **Potato** is the lightest, **Auto** aims for the 
 
 **Your own islands**
 - Home, **My planet**: every island drawn from above. **Go in** walks it; **New island** offers Quick setup (ready-made islands), a Setup wizard (size, ground, plants, a race track, a name, the map redrawing as you answer) or Manual (a plain island, opened at once).
-- On an island: F1 to F10 pick what you hold (Select, Paint, Sculpt, Animate, Sound, Lights, Activities, Avatar, Things, Camera); 1 to 9 the slot; E every preset with Edit on each; B studio mode (fly, every setting in a window); V first or third person; Esc closes one thing at a time, then the menu.
+- On an island the hotbar is the owner's spec V3 (`HOTBAR_V3_SPEC.md`), explained below. B is studio mode (fly; every setting in a window); V is first or third person; L lists everything on the island (Layers); Esc closes one thing at a time, then opens the menu.
 - **Carry on at ...** under My planet on the home goes straight back to the island you were last on.
 
 **Avatars**
-- On an island press **P**: the camera turns to face your avatar. Your characters are in a row (one click swaps), **New avatar** makes one (Quick, Wizard, Manual), and below are this one's Looks, Colours, Wears, Moves. Right-drag turns you round, the wheel zooms, Esc or Done goes back.
+- On an island press **My avatar** (top right; also in the Esc menu): the camera turns to face your avatar. Your characters are in a row (one click swaps), **New avatar** makes one (Quick, Wizard, Manual), and below are this one's Looks, Colours, Wears, Moves. Right-drag turns you round.
 - Home, **Avatars** does the same from the menu.
 - In Goblin Racing your goblin rides inside your ball; the racer you pick is the ball (its weight, speed and bounce).
 
-**Settings** are the same everywhere (home, Goblin Racing, the island's Esc menu, a paused race): Graphics, Sound, Controls, Hotbar (grown-up profiles), Racing, You.
+**Settings** are the same everywhere (home, Goblin Racing, the island's Esc menu, a paused race): Graphics, Sound, Controls, Racing, You.
 
 **The ground's look (new, 2026-10-04)**
 - Top right on an island: **Flat / PBR**. PBR is always the smooth painted ground; Flat with the Voxel style is the block look. The style itself is in Settings, You.
 - Your islands wear SetMix's own textures, made from math (texture graphs). Goblin Racing's island wears the high-end picture textures.
-- **Change a surface's look**: Paint (F2), Tab opens the palette, **Edit look**. It edits what the island shows: **Blocks** (voxel style, Flat) or the **Painted ground**. **Paint and sculpt it by hand** steps into the texture: the hotbar's Paint and Sculpt work on it, Animate's palette makes it move (flow, sway, pulse, shimmer, molten), Ctrl+Z undoes, Esc steps out. Pick a style, change its colours and sizes, watch the preview, **Use on this island**. Your look is kept. **Copy** puts it on the clipboard: paste it to me and it can become the SetMix default. Select (F1, slot 1) on the ground opens the same window for whatever surface you point at.
+- **Change a surface's look**: Simplified Mode, F2 Paint, **Ground Material**, pick the surface, **Edit this ground's look** (Advanced: F2 PBR Surface Paint has the same button). It edits **Blocks** (voxel style, Flat) or the **Painted ground**. **Paint and sculpt it by hand** steps into the texture.
+- **Dither distance** (Settings, Graphics): in the voxel look, where two surfaces meet (a shore) the blocks blend pixel by pixel within this distance of you; its far end is **Unlimited**. Far away the blend is smooth, so it does not shimmer as you walk.
 
-**The hotbar (new, 2026-10-04)**
-- Every tab holds ways of working; Tab opens the palette with what they use: Paint (surfaces), Sculpt (shapes to stamp), Lights (looks), Things (things to place).
-- Sculpt: Raise, Lower, Smooth, Flatten, Grab (pull the ground along), Clay (flat layers), Crease (cuts and ridges), Stamp (the palette's shape), Terrace (steps); Roughen, Sharpen, Erode one + away. Pro adds Symmetry and Smooth after.
-- Things: Place, Scatter (a grove in one click), Row (click the start, then the end), Swap (turn a thing into the palette's).
-- Lights: Look (the palette's), Sun (an hour a click), Day and night, Haze, Clouds.
-- Select on a plant opens how that kind of plant grows; on the sea, the world rules; on a thing, its layer.
-- Settings, Hotbar: put tools in any slot, take them off, back to the ready-made row.
-- **Logic** (the backtick key, left of 1): pick a ready-made rule in the palette (Tab), **Add rule** on a thing (Touch: spin, Keep spinning, Only at night ...). **Rules** lists them; Pro shows their blocks to change, Studio the script each equals.
+**The hotbar (V3, 2026-10-04)**
+- **Three modes**, switched at the end of the hotbar or with the backtick key (left of 1): **Game** (numbered presets, big number keys), **Simplified** (sub-tools with presets and plain sliders, the gizmo on what you pick), **Advanced** (every tool, its options, filters and keys).
+- **F1 to F12** pick the tab (F11 and F12 also on Shift+F1 and Shift+F2); each F-key is the same topic in all three modes (F3: Blocks and Clay, Shapes and Sculpt, Geometry). 1 to 9 or the wheel pick the slot. Left uses it, right does the opposite.
+- **Tab** frees the mouse while you walk, to reach the sliders and presets. **/** finds any tool by name. **[ ]** size what you hold. The end of the hotbar has Undo and Redo.
+- A button with a small square in its corner is **coming**: it says so when you use it (87 of 258 for now; `RELEASE_PLAN.md` Milestone 1 builds them).
+- New since the spec (V3.1): **Prop Box** (Game F3) and **Place Props** (Simplified F3) place the island's own things; **Ground Material** paints the ground; **Paths & Water** and **Creek Digger** lay roads and streams; **Visual Wire Graph** (Advanced F7) shows every zone and wire.
+- **World rules and plants** and **How my goblin moves** are in the Esc menu (they were in the old E window).
 
 ## Not built yet (so nobody is surprised)
 

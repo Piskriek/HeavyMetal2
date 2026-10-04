@@ -1,0 +1,71 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the bookkeeping for streaming a big voxel world in chunks (behind a portal in a toy-world game). It decides which chunks to fetch, in what order, which to keep, and turns fetched chunk bytes into meshes-ready data. It does no network itself: the caller passes in fetch results.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/chunkworld.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Untrusted input: parsing never throws past the exported functions.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+/** A world manifest (JSON a portal links to). */
+export interface Manifest { name: string; license: string; source: string; chunkSize: number; spawn: Vec3; chunks: { [key: string]: string } } // key "cx,cz" -> URL (columns: a chunk is chunkSize x height x chunkSize)
+/** Check a manifest from untrusted JSON text: name, license and source non-empty strings, chunkSize an integer 8..64, spawn three finite numbers, at most 100000 chunks, every key "int,int", every URL http(s). */
+export function parseManifest(text: string): { manifest: Manifest | null; errors: string[] };
+export interface StreamLimits { radius: number; maxLoaded: number; maxInFlight: number } // radius in chunks
+/** Low-end defaults: radius 4, maxLoaded 96, maxInFlight 4; high: radius 8, maxLoaded 400, maxInFlight 8. */
+export const LIMITS: { low: StreamLimits; high: StreamLimits };
+export type ChunkState = 'wanted' | 'loading' | 'ready' | 'failed';
+export class ChunkStreamer {
+  constructor(manifest: Manifest, limits: StreamLimits);
+  /** Tell it where the camera is (world x, z) and which way it looks (yaw degrees, 0 = +z). */
+  setView(x: number, z: number, yaw: number): void;
+  /** The next chunk keys to fetch now, at most maxInFlight minus those loading: the nearest first; at equal distance the ones in front (within 60 degrees of the view) first; only chunks inside the radius that exist in the manifest and are not loaded, loading or failed. Each returned key becomes 'loading'. */
+  next(): string[];
+  /** A fetch finished: bytes or an error. Failed chunks are retried at most twice, then stay 'failed'. */
+  done(key: string, bytes: Uint8Array | null): void;
+  /** Chunks to drop: when more than maxLoaded are ready, the farthest beyond the radius first (never one inside the radius). They become unknown again. */
+  evict(): string[];
+  state(key: string): ChunkState | null;
+  readonly loaded: number;
+}
+/** Chunk bytes format (ours): 4 bytes "SMCK", uint8 version 1, uint16 size, uint16 height (little-endian), then size*height*size cells (index x + size*(y + height*z)) run-length coded as pairs (uint8 value, uint8 count 1..255). Returns the cells or an error. */
+export function decodeChunk(bytes: Uint8Array): { size: number; height: number; cells: Uint8Array | null; error: string | null };
+export function encodeChunk(size: number, height: number, cells: Uint8Array): Uint8Array;
+/** The visible faces of a chunk's cells (a cell's face is visible when the neighbour in that direction is 0 or outside the chunk): count per direction +x -x +y -y +z -z. */
+export function visibleFaces(size: number, height: number, cells: Uint8Array): [number, number, number, number, number, number];
+```
+
+## Acceptance tests (copy unchanged, then add your own: bad manifests, retry then failed, eviction keeps the radius, front-first ordering, RLE round trip of random data, truncated chunk bytes)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { ChunkStreamer, decodeChunk, encodeChunk, parseManifest, visibleFaces } from '../src/index';
+const chunks: Record<string, string> = {};
+for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) chunks[`${x},${z}`] = `https://example.org/c/${x}_${z}.bin`;
+const text = JSON.stringify({ name: 'Test', license: 'CC0', source: 'example.org', chunkSize: 16, spawn: [0, 10, 0], chunks });
+test('manifest checks', () => {
+  assert.equal(parseManifest(text).errors.length, 0);
+  assert.ok(parseManifest('{').errors.length > 0);
+  assert.ok(parseManifest(JSON.stringify({ ...JSON.parse(text), chunkSize: 3 })).errors.length > 0);
+});
+test('nearest first, limited in flight', () => {
+  const s = new ChunkStreamer(parseManifest(text).manifest!, { radius: 2, maxLoaded: 50, maxInFlight: 3 });
+  s.setView(8, 8, 0); // inside chunk 0,0
+  const first = s.next();
+  assert.equal(first.length, 3);
+  assert.equal(first[0], '0,0');
+  assert.equal(s.next().length, 0);
+  s.done('0,0', encodeChunk(2, 1, new Uint8Array([1, 0, 0, 1])));
+  assert.equal(s.state('0,0'), 'ready');
+  assert.equal(s.next().length, 1);
+});
+test('chunk bytes round trip and faces', () => {
+  const cells = new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]);
+  const d = decodeChunk(encodeChunk(2, 2, cells));
+  assert.equal(d.error, null); assert.deepEqual([...d.cells!], [...cells]);
+  assert.deepEqual(visibleFaces(2, 2, cells), [1, 1, 1, 1, 1, 1]);
+  assert.ok(decodeChunk(new Uint8Array([1, 2, 3])).error);
+});
+```

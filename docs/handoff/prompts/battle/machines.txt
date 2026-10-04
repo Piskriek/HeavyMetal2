@@ -1,0 +1,70 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: machines that turn resources into textures in a toy-world game. A machine is a node with typed input and output ports and a few knobs; machines are chained by wires into a graph; the module checks the chain, orders it, works out what each machine produces (as data, not pixels), and estimates the cost of the final texture.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/machines.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type PortType = 'pixels' | 'mask' | 'texture';
+export interface Knob { id: string; min: number; max: number; value: number }
+export interface MachineKind { kind: string; inputs: { id: string; type: PortType }[]; outputs: { id: string; type: PortType }[]; knobs: Knob[]; costMs: number } // costMs: bake time per 256x256 at default knobs
+/** The ready-made machines. */
+export const KINDS: readonly MachineKind[];
+// at least: 'importer' (no inputs; out 'pixels'), 'noise' (in pixels; out texture; knobs scale 1..64, octaves 1..6, seed 0..9999), 'stamp-normals' (in texture; out texture; knob strength 0..2), 'palette' (in texture, in pixels; out texture; knob colours 2..16), 'blur' (in texture; out texture; knob radius 0..8), 'mask-slope' (in texture; out mask; knob angle 0..90), 'mix' (in texture a, in texture b, in mask; out texture), 'output' (in texture; no outputs)
+export interface Machine { id: string; kind: string; knobs: Record<string, number> }
+export interface Wire { from: { machine: string; port: string }; to: { machine: string; port: string } }
+export interface Chain { machines: Machine[]; wires: Wire[] }
+/** Problems: unknown kinds or ports, a wire between different port types, an input with two wires, a cycle, a knob out of its range, no 'output' machine, an output with nothing wired in. Empty = good. */
+export function check(c: Chain): string[];
+/** Machines in an order where every machine comes after the machines feeding it (stable: ties keep the chain's order); null on a cycle. */
+export function order(c: Chain): string[] | null;
+/** The recipe the game bakes: for the 'output' machine, a nested description { kind, knobs, inputs: { portId: recipe } } built from the wires. */
+export interface Recipe { kind: string; knobs: Record<string, number>; inputs: Record<string, Recipe> }
+export function recipe(c: Chain): Recipe | null;
+/** Cost of baking at a size (pixels per side): the sum of the machines' costMs, scaled by (size/256)^2, and noise also by octaves/2, blur by (1 + radius/4); bytes = size*size*4 (colour) + size*size*4 if any stamp-normals is in the recipe. */
+export function cost(c: Chain, size: number): { ms: number; bytes: number };
+/** A short fingerprint of a recipe (the same recipe gives the same string; knob order does not matter), for caching and for selling identical textures. */
+export function fingerprint(r: Recipe): string;
+```
+
+## Acceptance tests (copy unchanged, then add your own: cycles, two wires into one input, type mismatch, knob range, cost of noise and blur, fingerprint ignores knob order)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { check, cost, fingerprint, order, recipe, type Chain } from '../src/index';
+const chain: Chain = {
+  machines: [
+    { id: 'out', kind: 'output', knobs: {} },
+    { id: 'imp', kind: 'importer', knobs: {} },
+    { id: 'n', kind: 'noise', knobs: { scale: 8, octaves: 4, seed: 1 } },
+    { id: 's', kind: 'stamp-normals', knobs: { strength: 1 } },
+  ],
+  wires: [
+    { from: { machine: 'imp', port: 'pixels' }, to: { machine: 'n', port: 'pixels' } },
+    { from: { machine: 'n', port: 'texture' }, to: { machine: 's', port: 'texture' } },
+    { from: { machine: 's', port: 'texture' }, to: { machine: 'out', port: 'texture' } },
+  ],
+};
+test('a good chain checks, orders and makes a recipe', () => {
+  assert.deepEqual(check(chain), []);
+  assert.deepEqual(order(chain), ['imp', 'n', 's', 'out']);
+  const r = recipe(chain)!;
+  assert.equal(r.kind, 'output');
+  assert.equal(r.inputs['texture']!.kind, 'stamp-normals');
+  assert.equal(r.inputs['texture']!.inputs['texture']!.knobs['octaves'], 4);
+});
+test('cost and fingerprint', () => {
+  assert.equal(cost(chain, 256).bytes, 256 * 256 * 8);
+  assert.equal(cost(chain, 512).bytes, 512 * 512 * 8);
+  assert.ok(cost(chain, 512).ms > cost(chain, 256).ms);
+  assert.equal(fingerprint(recipe(chain)!), fingerprint(recipe(chain)!));
+});
+test('problems are found', () => {
+  const bad: Chain = { ...chain, wires: [...chain.wires, { from: { machine: 'out', port: 'x' }, to: { machine: 'n', port: 'pixels' } }] };
+  assert.ok(check(bad).length > 0);
+  assert.ok(check({ machines: [], wires: [] }).length > 0);
+});
+```

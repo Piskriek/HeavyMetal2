@@ -91,6 +91,8 @@ export const sceneSchema = defineSchema({
     { key: 'soundscape', label: 'Placed sounds', doc: 'Sounds placed on the island: ambience zones you hear when you are near (birds, wind, waves ...) and sounds that repeat from a spot.', kinds: ['sound-spot'], min: 0, max: null, tier: 'play' },
     { key: 'characters', label: 'Characters', doc: 'Goblins that go about the island by themselves: wander, patrol, follow you, chase you, run away.', kinds: ['character'], min: 0, max: null, tier: 'play' },
     { key: 'lamps', label: 'Lamps', doc: 'Lamps placed on the island: bulbs, spotlights, campfire glows, candles, strobes, neon. They shine at dusk and at night.', kinds: ['lamp'], min: 0, max: null, tier: 'play' },
+    { key: 'zones', label: 'Trigger zones', doc: 'Boxes on the island that notice a goblin walking in or out (the Logic tab, F7).', kinds: ['logic-zone'], min: 0, max: null, tier: 'play' },
+    { key: 'wires', label: 'Wires', doc: 'What a trigger zone (or a clock) does to a thing or a lamp: hide it, show it, light it, play a sound, say something, send you there.', kinds: ['logic-wire'], min: 0, max: null, tier: 'play' },
   ] as readonly ChildSlot[],
 });
 
@@ -505,7 +507,40 @@ export const lampSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, soundSpotSchema, characterSchema, lampSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
+export const logicZoneSchema = defineSchema({
+  kind: 'logic-zone',
+  version: 1,
+  label: 'Trigger zone',
+  doc: 'A box on the island that notices a goblin walking in or out (the Logic tab, F7). Wire it to things and lamps.',
+  icon: 'scan',
+  variables: [
+    { key: 'x', type: 'number', label: 'X', doc: 'Its middle, east-west.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'y', type: 'number', label: 'Y', doc: 'Its middle, up.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'z', type: 'number', label: 'Z', doc: 'Its middle, north-south.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'half', type: 'number', label: 'Size', doc: 'How far it reaches from its middle.', tier: 'play', default: 2, min: 0.5, max: 30, step: 0.5, unit: 'm' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const logicWireSchema = defineSchema({
+  kind: 'logic-wire',
+  version: 1,
+  label: 'Wire',
+  doc: 'When something happens (a goblin walks into a zone, walks out, or a clock ticks), do something to a thing, a lamp or you.',
+  icon: 'cable',
+  variables: [
+    { key: 'from', type: 'string', label: 'From', doc: 'The trigger zone it starts at (empty: a clock).', tier: 'build', default: '' },
+    { key: 'when', type: 'enum', label: 'When', doc: 'What sets it off.', tier: 'play', default: 'enter', options: ['enter', 'leave', 'every'] },
+    { key: 'every', type: 'number', label: 'Every', doc: 'A clock: how often.', tier: 'play', default: 3, min: 0.2, max: 600, step: 0.1, unit: 's' },
+    { key: 'to', type: 'string', label: 'To', doc: 'The thing or lamp it acts on.', tier: 'build', default: '' },
+    { key: 'do', type: 'enum', label: 'Do', doc: 'What it does.', tier: 'play', default: 'toggle', options: ['toggle', 'hide', 'show', 'light-on', 'light-off', 'sound', 'say', 'teleport'] },
+    { key: 'sound', type: 'string', label: 'Sound', doc: 'Do a sound: which one.', tier: 'build', default: 'item-pickup' },
+    { key: 'text', type: 'string', label: 'Words', doc: 'Do say: what is said.', tier: 'build', default: 'Hello!' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, soundSpotSchema, characterSchema, lampSchema, logicZoneSchema, logicWireSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

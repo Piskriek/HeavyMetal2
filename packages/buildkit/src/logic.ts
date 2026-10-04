@@ -27,9 +27,24 @@ export interface LogicRule {
 
 /** The Logic tab's ways (its hotbar): put the palette's rule on what you point at, take rules off it, see every rule of the island. */
 export const LOGIC_WAYS: readonly { readonly id: string; readonly name: string; readonly icon: string; readonly doc: string; readonly left: string; readonly right: string }[] = [
+  // trigger zones and wires (hotbar spec V3, F7 Magic cord): holding Wire, the palette shows what a wire does
+  { id: 'logic-zone', name: 'Zone', icon: 'Scan', doc: 'Put a trigger zone where you point: a box that notices a goblin walking in or out. Then wire it to something.', left: 'Put a zone here', right: 'Take away the nearest zone' },
+  { id: 'logic-wire', name: 'Wire', icon: 'Cable', doc: 'Click a zone, then the thing or lamp it should act on: walking in does what the palette says (open a door, light a lamp, a sound, words, a teleport).', left: 'Click the zone, then the thing', right: 'Take away the wires of what you point at' },
   { id: 'logic-attach', name: 'Add rule', icon: 'Zap', doc: 'Put the palette\'s rule on the thing you point at (or on the island, for rules like a welcome sign).', left: 'Add the rule', right: 'Take its rules off' },
   { id: 'logic-remove', name: 'Remove rules', icon: 'Trash2', doc: 'Take every rule off the thing you point at.', left: 'Take its rules off', right: 'Take its rules off' },
   { id: 'logic-rules', name: 'Rules', icon: 'Network', doc: 'Every rule of this island, in words; Pro changes their blocks, Studio shows the script each one equals.', left: 'Open the rules', right: 'Open the rules' },
+];
+
+/** What a wire does (the palette while you hold Wire). `toggle` hides a shown thing and shows a hidden one: a door that opens and shuts. */
+export const WIRE_DOS: readonly { readonly id: string; readonly name: string; readonly icon: string; readonly doc: string }[] = [
+  { id: 'toggle', name: 'Open and shut', icon: 'DoorOpen', doc: 'Walking in opens it (it goes); walking in again shuts it.' },
+  { id: 'hide', name: 'Hide it', icon: 'EyeOff', doc: 'Walking in makes it go.' },
+  { id: 'show', name: 'Show it', icon: 'Eye', doc: 'Walking in brings it back.' },
+  { id: 'light-on', name: 'Light on', icon: 'Lightbulb', doc: 'Walking in switches the lamp on.' },
+  { id: 'light-off', name: 'Light off', icon: 'LightbulbOff', doc: 'Walking in switches the lamp off.' },
+  { id: 'sound', name: 'A sound', icon: 'Bell', doc: 'Walking in plays a chime.' },
+  { id: 'say', name: 'Say hello', icon: 'Type', doc: 'Walking in shows a hello.' },
+  { id: 'teleport', name: 'Teleport', icon: 'Orbit', doc: 'Walking in sends you to the thing it is wired to.' },
 ];
 
 /** The ready-made rules (Easy): the palette of the Logic tab. */

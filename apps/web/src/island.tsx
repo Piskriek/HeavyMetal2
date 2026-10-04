@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { PHYS_ITEMS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { WIRE_DOS, PHYS_ITEMS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -48,6 +48,7 @@ import { rulesOf } from './world';
 import { CharactersRuntime, type PlacedChar } from './build/characters-runtime';
 import { PhysicsRuntime, type PhysThing } from './build/physics-runtime';
 import { carvePath, pathPreview, rainOn, ROAD_SURFACE, RIVER_SURFACE } from './build/paths';
+import { WiresRuntime, type PlacedWire, type PlacedZone, type WireEffect } from './build/wires-runtime';
 import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
@@ -475,6 +476,26 @@ export function IslandWalk(props: {
     };
     let physSettled = 0;
     let rainTick = 0;
+    // trigger zones and wires (the Logic tab, F7)
+    const wires = new WiresRuntime();
+    const placedZones = (): PlacedZone[] => (rt.store.get(scene.sceneId)?.children['zones'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => { const pr = rt.store.resolve(r.ref).params as Record<string, unknown>; return { ref: r.ref, x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), half: Number(pr['half'] ?? 2) }; });
+    const placedWires = (): PlacedWire[] => (rt.store.get(scene.sceneId)?.children['wires'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => { const pr = rt.store.resolve(r.ref).params as Record<string, unknown>; const when = String(pr['when'] ?? 'enter'); return { ref: r.ref, from: String(pr['from'] ?? ''), when: when === 'leave' || when === 'every' ? when : 'enter', every: Number(pr['every'] ?? 3), to: String(pr['to'] ?? ''), do: String(pr['do'] ?? 'toggle'), sound: String(pr['sound'] ?? 'item-pickup'), text: String(pr['text'] ?? 'Hello!') }; });
+    const wireHidden = new Set<string>(), wirePosed = new Set<string>(), lampsOff = new Set<string>();
+    let wireFrom: string | null = null, wiresShown = false, wiresFired = 0, wiresKey = '';
+    const thingAt = (ref: string): [number, number, number] | null => { if (!rt.store.get(ref as PresetId)) return null; const pr = rt.store.resolve(ref as PresetId).params as Record<string, unknown>; return [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0), Number(pr['z'] ?? 0)]; };
+    const applyWire = (e: WireEffect): void => {
+      wiresFired++;
+      if (e.kind === 'hide') wireHidden.add(e.thing);
+      else if (e.kind === 'show') wireHidden.delete(e.thing);
+      else if (e.kind === 'toggle') { if (wireHidden.has(e.thing)) wireHidden.delete(e.thing); else wireHidden.add(e.thing); fx('item-pickup', { volume: 0.4 }); }
+      else if (e.kind === 'light-on') lampsOff.delete(e.lamp);
+      else if (e.kind === 'light-off') lampsOff.add(e.lamp);
+      else if (e.kind === 'sound') fx(e.sound as SfxId);
+      else if (e.kind === 'say') say(e.text);
+      else if (e.kind === 'teleport') { const to = thingAt(e.to); if (to) { px = to[0] + 1.5; pz = to[2] + 1.5; py = ground(px, pz); vy = 0; fx('boost', { volume: 0.5 }); } }
+    };
+    (window as unknown as { hmWires: unknown }).hmWires = () => ({ zones: placedZones().length, wires: placedWires().length, hidden: [...wireHidden], fired: wiresFired, from: wireFrom,
+      walkInto: (ref: string) => { const z = placedZones().find((q) => q.ref === ref) ?? placedZones()[0]; if (!z) return 0; const out = wires.step(0.05, placedZones(), placedWires(), [[z.x, z.y, z.z]]); out.forEach(applyWire); return out.length; } });
     // a road or a river being drawn (the Terrain tab, F10): its points so far, shown as a ribbon
     let path: { kind: 'road' | 'river'; width: number; pts: [number, number][] } | null = null;
     let pathShown = false, pathsLaid = 0;
@@ -500,6 +521,9 @@ export function IslandWalk(props: {
       pathsLaid++; fx('place', { volume: 0.6 }); say(kind === 'road' ? 'Road laid' : 'River dug: it runs downhill all the way');
     };
     let lastLaid: [number, number][] = [];
+    // tests: the placed things and where a world point lands on the screen
+    (window as unknown as { hmThings: unknown }).hmThings = () => (rt.store.get(scene.sceneId)?.children['models'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => { const pr = rt.store.resolve(r.ref).params as Record<string, unknown>; return { ref: r.ref, x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0) }; });
+    (window as unknown as { hmProject: unknown }).hmProject = (x: number, y: number, z: number) => { const q = renderer.camera.project([x, y, z]), r = el.getBoundingClientRect(); return [q[0] + r.left, q[1] + r.top]; };
     (window as unknown as { hmPath: unknown }).hmPath = () => ({ points: path?.pts.length ?? 0, laid: pathsLaid, last: lastLaid });
     const lastCharAt = new Map<string, [number, number]>();
     let charBase = 0, charRefs: string[] = [];
@@ -718,6 +742,7 @@ export function IslandWalk(props: {
     const escape = (): void => {
       if (gizmo.dragging) { gizmo.cancel(); return; }
       if (path) { path = null; showPath(); say('Let go of the path'); return; }
+      if (wireFrom) { wireFrom = null; say('Let go of the wire'); return; }
       if (texRef.current) { if (live.current.win.closeTop()) return; stepOutRef.current(); return; }
       if (live.current.win.closeTop()) return;
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
@@ -881,6 +906,61 @@ export function IslandWalk(props: {
       // the Logic tab's ways: add the palette's rule to what you point at, take rules off it, open the island's rules
       if (s.tab === 'logic') {
         if (!first) return;
+        if (id === 'logic-zone' || id === 'logic-wire') {
+          const a = aim();
+          if (!a) { say('Point at the ground'); return; }
+          const zs = placedZones();
+          const zoneNear = zs.map((z) => ({ z, d: Math.hypot(z.x - a.point[0], z.z - a.point[2]) })).filter((q) => q.d <= q.z.half + 1).sort((p, q) => p.d - q.d)[0]?.z ?? null;
+          if (id === 'logic-zone') {
+            if (alt) {
+              if (!zoneNear) { say('No zone there'); return; }
+              const zrefs = rt.store.get(scene.sceneId)?.children['zones'] ?? [], wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
+              rt.commands.transaction('Remove a zone', () => {
+                wrefs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['from'] === zoneNear.ref).reverse().forEach(({ i }) => rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Remove a zone')));
+                const zi = zrefs.findIndex((r) => r.ref === zoneNear.ref); if (zi >= 0) rt.commands.execute(cmd.removeChild(scene.sceneId, 'zones', zi, 'Remove a zone'));
+              });
+              saveMap(rt, scene.sceneId); say('Zone taken away, with its wires'); fx('delete', { volume: 0.5 });
+              return;
+            }
+            const zid = `zone-${Date.now().toString(36)}`;
+            rt.commands.transaction('Zone', () => {
+              rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: 'Zone', params: { x: a.point[0], y: a.point[1], z: a.point[2], half: 2 } as never, tier: 'play' }, 'Zone'));
+              rt.commands.execute(cmd.addChild(scene.sceneId, 'zones', zid, undefined, 'Zone'));
+            });
+            saveMap(rt, scene.sceneId); say('A zone: now take Wire, click it, then click what it acts on'); fx('place', { volume: 0.5 });
+            return;
+          }
+          // Wire: the zone first, then what it acts on
+          const m = builder.modelAt(a);
+          const lampNear = placedLamps().map((l) => ({ l, d: Math.hypot(l.x - a.point[0], l.z - a.point[2]) })).filter((q) => q.d < 2).sort((p, q) => p.d - q.d)[0]?.l ?? null;
+          const target = m?.ref ?? lampNear?.ref ?? null;
+          if (alt) {
+            if (!target) { say('Point at a wired thing or lamp'); return; }
+            const wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
+            const mine = wrefs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['to'] === target);
+            if (!mine.length) { say('No wires to that'); return; }
+            rt.commands.transaction('Remove wires', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Remove wires')); });
+            saveMap(rt, scene.sceneId); say(mine.length === 1 ? 'Its wire is off' : `Its ${mine.length} wires are off`); fx('delete', { volume: 0.5 });
+            return;
+          }
+          if (!wireFrom) {
+            if (!zoneNear) { say(zs.length ? 'Click a zone first (the purple boxes)' : 'Put a zone down first (Zone)'); return; }
+            wireFrom = zoneNear.ref; say('Now click the thing or lamp it acts on'); fx('select', { volume: 0.5 });
+            return;
+          }
+          const does = s.palette.wire ?? 'toggle';
+          if (!target) { say('Click a thing or a lamp (Esc lets go of the wire)'); return; }
+          if ((does === 'light-on' || does === 'light-off') && !lampNear) { say('Light on and off need a lamp: click a lamp'); return; }
+          const wid = `wire-${Date.now().toString(36)}`;
+          const from = wireFrom; wireFrom = null;
+          rt.commands.transaction('Wire', () => {
+            rt.commands.execute(cmd.put({ id: wid, kind: 'logic-wire', name: 'Wire', params: { from, when: 'enter', every: 3, to: target, do: does, sound: 'item-pickup', text: 'Hello!' } as never, tier: 'play' }, 'Wire'));
+            rt.commands.execute(cmd.addChild(scene.sceneId, 'wires', wid, undefined, 'Wire'));
+          });
+          saveMap(rt, scene.sceneId);
+          say(`Wired: walking into the zone does this: ${WIRE_DOS.find((d) => d.id === does)?.name.toLowerCase() ?? does}`); fx('place', { volume: 0.5 });
+          return;
+        }
         if (id === 'logic-rules') { live.current.win.open('logic', 'Rules', { x: 60, y: 80, ...WIN.editor }); unlock(); return; }
         const a = aim();
         const thing = a ? builder.modelAt(a)?.ref ?? null : null;
@@ -1140,13 +1220,41 @@ export function IslandWalk(props: {
         const lamps = placedLamps();
         if (lamps.length || lampsLit) {
           const t = now / 1000;
-          const lit = lamps.flatMap((l, i) => { const p = l.on ? lampById(l.preset) : undefined; return p ? [{ l, p, intensity: p.intensity * l.brightness * flicker(p.flicker, p.rate, t, i * 7919 + 13) }] : []; });
+          const lit = lamps.flatMap((l, i) => { const p = l.on && !lampsOff.has(l.ref) ? lampById(l.preset) : undefined; return p ? [{ l, p, intensity: p.intensity * l.brightness * flicker(p.flicker, p.rate, t, i * 7919 + 13) }] : []; });
           const ear: [number, number, number] = eye ? [eye[0], eye[1], eye[2]] : [px, py, pz];
           const best = pickLights(lit.map((x) => ({ pos: [x.l.x, x.l.y, x.l.z] as [number, number, number], intensity: x.intensity, range: x.p.range, on: true })), ear, renderer.lampSlots);
           renderer.setLamps(best.map((i) => { const x = lit[i]!; const yaw = (x.l.yaw * Math.PI) / 180, pitch = (x.l.pitch * Math.PI) / 180;
             return { kind: x.p.kind, pos: [x.l.x, x.l.y, x.l.z] as const, dir: [Math.cos(pitch) * Math.sin(yaw), -Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)] as const, color: x.p.color, intensity: x.intensity, range: x.p.range, angle: x.p.angle, penumbra: x.p.penumbra }; }));
           lampsLit = best.length;
         }
+      }
+      {
+        const zs = placedZones(), ws = placedWires();
+        // the wires changed (an undo, a new wire): what they did starts over
+        const wkey = ws.map((w) => w.ref + w.do + w.to + w.from).join('|');
+        if (wkey !== wiresKey) { wiresKey = wkey; wireHidden.clear(); lampsOff.clear(); }
+        if (ws.length) {
+          const ts = rt.binder.terrain();
+          const actors: [number, number, number][] = [[px, py, pz], ...[...lastCharAt.values()].map(([x, z]) => [x, ts ? heightAt(ts.terrain, x, z) : py, z] as [number, number, number])];
+          wires.step(dt, zs, ws, actors).forEach(applyWire);
+        }
+        // hidden by a wire: only for show, like the rules (the island never changes)
+        for (const ref of [...wireHidden, ...wirePosed]) {
+          const at = thingAt(ref), i = drawnIndex(ref as PresetId);
+          if (!at || i < 0) continue;
+          const yaw = Number(rt.store.resolve(ref as PresetId).params['yaw'] ?? 0);
+          if (wireHidden.has(ref)) { renderer.setModelPose(i, at[0], at[1] - 9999, at[2], yaw); wirePosed.add(ref); }
+          else { renderer.setModelPose(i, at[0], at[1], at[2], yaw); wirePosed.delete(ref); }
+        }
+        const showWires = live.current.buildOn && player().tab === 'logic' && (zs.length > 0 || !!wireFrom);
+        if (showWires) {
+          const lampPos = (ref: string): [number, number, number] | null => { const l = placedLamps().find((q) => q.ref === ref); return l ? [l.x, l.y, l.z] : null; };
+          renderer.overlay.show('wires', [
+            ...zs.map((z) => ({ type: 'box' as const, center: [z.x, z.y + 1, z.z] as [number, number, number], half: [z.half, Math.max(1, z.half / 2), z.half] as [number, number, number], color: z.ref === wireFrom ? '#ffc53d' : '#8e6be8' })),
+            ...ws.flatMap((w) => { const z = zs.find((q) => q.ref === w.from); const to = thingAt(w.to) ?? lampPos(w.to); return z && to ? [{ type: 'line' as const, from: [z.x, z.y + 1.5, z.z] as [number, number, number], to: [to[0], to[1] + 1, to[2]] as [number, number, number], color: '#8e6be8' }] : []; }),
+          ]);
+          wiresShown = true;
+        } else if (wiresShown) { renderer.overlay.hide('wires'); wiresShown = false; }
       }
       // a path being drawn lets go when you put the Road or River down
       if (path) { const pl = player(); const held = toolOf(pl, pl.hotbars[pl.tab][pl.slots[pl.tab]] ?? ''); if (pl.tab !== 'sculpt' || held?.action !== path.kind) { path = null; showPath(); } }
@@ -1424,6 +1532,8 @@ export function IslandWalk(props: {
         p.tab === 'paint'
           ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'logic' && heldItem?.id === 'logic-wire'
+          ? <PaletteStrip title="Does" items={WIRE_DOS.map((d) => ({ id: d.id, name: d.name, preview: { kind: 'icon' as const, icon: d.icon } }))} community={[]} selected={p.palette.wire ?? 'toggle'} onLayers={openLayers} onPick={(id) => { pickPalette('wire', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'logic'
           ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'physics'

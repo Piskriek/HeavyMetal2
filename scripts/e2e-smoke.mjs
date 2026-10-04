@@ -409,6 +409,28 @@ try {
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(T(400));
   check('and Ctrl+Z takes the road back', (await page.evaluate(() => window.hmGround?.heights?.())) === groundBefore[0]);
+  // Logic wires (F7): a zone, a wire from it to the barrel that hides it; walking into the zone hides the barrel; two Ctrl+Z take it all back
+  await page.keyboard.press('F7');
+  await page.waitForTimeout(T(300));
+  const clickWay = (name) => dom((n) => { [...document.querySelectorAll('.hotbar > button')].find((b) => (b.textContent ?? '').trim().endsWith(n))?.click(); }, name);
+  const clickWorld = async (x, y) => { await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(T(80)); await page.mouse.up(); await page.waitForTimeout(T(250)); };
+  await clickWay('Zone'); await clickWorld(640, 470);
+  check('Zone puts a trigger zone down', (await page.evaluate(() => window.hmWires?.()))?.zones === 1);
+  await clickWay('Wire'); await page.waitForTimeout(T(200));
+  check('holding Wire, the palette shows what a wire does', await page.locator('.palette-strip .ps-frame').count() === 8);
+  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Hide it/.test(b.textContent ?? ''))?.click(); });
+  await clickWorld(640, 470);
+  const barrelAt = await page.evaluate(() => { const t = window.hmThings?.()[0]; return t ? window.hmProject?.(t.x, t.y + 0.05, t.z) : null; });
+  if (barrelAt) await clickWorld(barrelAt[0], barrelAt[1]);
+  const wired = await page.evaluate(() => window.hmWires?.());
+  check('Wire: the zone, then the barrel', wired?.wires === 1, JSON.stringify(wired) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
+  const walked = await page.evaluate(() => { const w = window.hmWires?.(); return w ? w.walkInto('') : -1; });
+  check('walking into the zone hides the barrel', walked >= 0 && (await page.evaluate(() => window.hmWires?.()))?.hidden.length === 1, String(walked));
+  // undo exactly the steps made (a step that did not happen must not cost an earlier one)
+  for (let i = 0; i < (wired?.wires ?? 0) + (wired?.zones ?? 0); i++) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
+  await page.waitForTimeout(T(200));
+  const after = await page.evaluate(() => window.hmWires?.());
+  check('two Ctrl+Z take the wire and the zone back, and the barrel shows again', after?.zones === 0 && after.wires === 0 && after.hidden.length === 0, JSON.stringify(after));
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

@@ -110,6 +110,7 @@ export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly
   sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge'], ['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']],
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
+  logic: [['logic-attach', 'logic-remove', 'logic-rules', null, null, null, null, null, null]],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
 };
 

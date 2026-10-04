@@ -102,7 +102,9 @@ try {
   await page.locator('.tour-reveal').click();
   await page.waitForTimeout(T(400));
   check('Show me switches the ground to PBR', await page.locator('.mode-bar button.on', { hasText: 'PBR' }).count() === 1);
-  await page.locator('.tour button', { hasText: 'Not now' }).click();
+  // the last step closes by itself after 7 s: Not now only while it is still up
+  if (await page.locator('.tour button', { hasText: 'Not now' }).count()) await dom(() => { [...document.querySelectorAll('.tour button')].find((b) => b.textContent === 'Not now')?.click(); });
+  await page.waitForTimeout(T(300));
   check('Not now hides the tour', await page.locator('.tour').count() === 0);
   await dom(() => { [...document.querySelectorAll('.mode-bar button')].find((b) => b.textContent === 'Flat')?.click(); });
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
@@ -187,7 +189,7 @@ try {
   check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
-  check('eleven tabs on the tab strip in the V3 order (F1 to F10, and Effects on F12)', await page.locator('.tab-strip button').count() === 11);
+  check('twelve tabs on the tab strip in the V3 order (F1 to F10, Effects on F12, your Avatar on P)', await page.locator('.tab-strip button').count() === 12);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
@@ -335,6 +337,23 @@ try {
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(T(400));
   check('and Ctrl+Z takes the zone away', (await page.evaluate(() => window.hmSounds?.()))?.placed === 0);
+  // Characters (F9): spawn a goblin that wanders; it walks off by itself; Ctrl+Z takes it away
+  await page.keyboard.press('F9');
+  await page.waitForTimeout(T(400));
+  check('F9 opens Characters, its palette holds six behaviours', /Characters/.test(await page.locator('.tab-strip button.on').first().textContent() ?? '') && await page.locator('.palette-strip .ps-frame').count() === 6);
+  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Wander/.test(b.textContent ?? ''))?.click(); });
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Spawn/.test(b.textContent ?? ''))?.click(); });
+  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
+  await page.waitForTimeout(T(1500));
+  const ch = await page.evaluate(() => window.hmChars?.());
+  check('Spawn puts a goblin down and it wanders off by itself', ch?.count === 1 && ch.drawn === 1 && ch.moved > 0.3, JSON.stringify(ch));
+  if (ch?.first) { await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 2.4, p[1] + 1.6, p[2] + 2.4], target: [p[0], p[1] + 0.6, p[2]] }; }, ch.first); }
+  await page.waitForTimeout(T(500));
+  await shot('characters-wander');
+  await page.evaluate(() => { window.hmPinView = null; });
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(T(400));
+  check('and Ctrl+Z takes the goblin away', (await page.evaluate(() => window.hmChars?.()))?.count === 0);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

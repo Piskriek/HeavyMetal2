@@ -159,6 +159,12 @@
       "@hm/physmat": [
         "packages/physmat/src/index.ts"
       ],
+      "@hm/lightplace": [
+        "packages/lightplace/src/index.ts"
+      ],
+      "@hm/voxelcsg": [
+        "packages/voxelcsg/src/index.ts"
+      ],
       "@hm/soundscape": [
         "packages/soundscape/src/index.ts"
       ],

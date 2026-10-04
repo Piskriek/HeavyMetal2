@@ -1,0 +1,94 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: camera tracks for a toy-world game's photo and film tools: camera keys in time (where the camera is, what it looks at, its lens), eased and optionally smooth in between, a ready-made orbit shot round a point, a slow-motion clock that ramps smoothly, and the yaw and pitch that look from one point at another.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/camtrack.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface CamKey { t: number; pos: Vec3; target: Vec3; fov: number }   // keys sorted by t (seconds)
+export type Ease = 'linear' | 'in' | 'out' | 'in-out';
+export interface CamTrack { keys: CamKey[]; ease: Ease; smooth: boolean; loop: boolean }
+export interface CamShot { pos: Vec3; target: Vec3; fov: number }
+
+/** linear: u; in: u^2; out: 1 - (1 - u)^2; in-out: 3u^2 - 2u^3. u is clamped to 0..1 first. */
+export function ease(kind: Ease, u: number): number;
+/** Last key's t minus first key's t (0 with fewer than two keys). */
+export function trackDuration(track: CamTrack): number;
+/**
+ * The shot at time t. Before the first key: the first key; after the last: the last key; with loop, t wraps into [first.t, last.t).
+ * Between keys k and k+1: s = ease((t - tk) / (tk+1 - tk)). target and fov: straight blends by s. pos: a straight blend by s, or with
+ * smooth a uniform Catmull-Rom (tension 0.5) through the key positions at s, the missing end points mirrored: p[-1] = 2 p[0] - p[1],
+ * p[n] = 2 p[n-1] - p[n-2].
+ */
+export function sampleTrack(track: CamTrack, t: number): CamShot;
+/**
+ * A ready-made orbit: keys every 45 degrees of turning, `turns` times round (turns * 8 + 1 keys), evenly spaced over `seconds`, each at
+ * centre + (radius sin a, height, radius cos a) with a = startDeg + the turning so far, looking at centre, lens fov. smooth, linear, no loop.
+ */
+export function orbitShot(centre: Vec3, radius: number, height: number, seconds: number, startDeg: number, turns: number, fov: number): CamTrack;
+/** The yaw (atan2(dx, dz)) and pitch (atan2(dy, horizontal distance)) in degrees that look from `from` at `to`. */
+export function lookYawPitch(from: Vec3, to: Vec3): { yaw: number; pitch: number };
+/**
+ * Slow motion: the time scale starts at 1; setScale moves it in a straight line to `scale` over `rampSeconds` of real time (0: at once).
+ * tick(realDt) returns the game time that passed: realDt times the mean scale over that step (the ramp may end inside the step).
+ */
+export class SlowMo {
+  setScale(scale: number, rampSeconds: number): void;
+  tick(realDt: number): number;
+  readonly scale: number;
+}
+```
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { SlowMo, ease, lookYawPitch, orbitShot, sampleTrack, trackDuration, type CamTrack, type Vec3 } from '../src/index';
+const near = (a: number, b: number, e = 1e-9): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const nearV = (a: Vec3, b: Vec3, e = 1e-9): void => { near(a[0], b[0], e); near(a[1], b[1], e); near(a[2], b[2], e); };
+const two: CamTrack = { keys: [{ t: 0, pos: [0, 0, 0], target: [0, 0, 10], fov: 60 }, { t: 2, pos: [10, 0, 0], target: [10, 0, 10], fov: 80 }], ease: 'linear', smooth: false, loop: false };
+
+test('the eases', () => {
+  near(ease('linear', 0.5), 0.5); near(ease('in', 0.5), 0.25); near(ease('out', 0.5), 0.75); near(ease('in-out', 0.25), 0.15625);
+  near(ease('in', 2), 1); near(ease('out', -1), 0);
+});
+test('a straight track blends its keys, holds its ends and loops', () => {
+  near(trackDuration(two), 2);
+  const s = sampleTrack(two, 1); nearV(s.pos, [5, 0, 0]); nearV(s.target, [5, 0, 10]); near(s.fov, 70);
+  nearV(sampleTrack(two, -1).pos, [0, 0, 0]); nearV(sampleTrack(two, 5).pos, [10, 0, 0]);
+  nearV(sampleTrack({ ...two, loop: true }, 3).pos, [5, 0, 0]);
+  nearV(sampleTrack({ ...two, ease: 'in' }, 1).pos, [2.5, 0, 0]);
+});
+test('a smooth track is a Catmull-Rom through its keys', () => {
+  const k = (t: number, pos: Vec3) => ({ t, pos, target: [0, 0, 0] as Vec3, fov: 60 });
+  const line: CamTrack = { keys: [k(0, [0, 0, 0]), k(1, [5, 0, 0]), k(2, [10, 0, 0])], ease: 'linear', smooth: true, loop: false };
+  nearV(sampleTrack(line, 0.5).pos, [2.5, 0, 0]);
+  const corner: CamTrack = { keys: [k(0, [0, 0, 0]), k(1, [10, 0, 0]), k(2, [10, 0, 10])], ease: 'linear', smooth: true, loop: false };
+  nearV(sampleTrack(corner, 1).pos, [10, 0, 0]);
+  nearV(sampleTrack(corner, 0.5).pos, [5.625, 0, -0.625]);
+});
+test('the orbit shot goes round its centre', () => {
+  const o = orbitShot([0, 0, 0], 10, 5, 8, 0, 1, 50);
+  assert.equal(o.keys.length, 9); assert.equal(o.smooth, true); near(o.keys[8]!.t, 8);
+  nearV(o.keys[0]!.pos, [0, 5, 10]); nearV(o.keys[2]!.pos, [10, 5, 0], 1e-9); nearV(o.keys[4]!.target, [0, 0, 0]); near(o.keys[3]!.fov, 50);
+  nearV(sampleTrack(o, 2).pos, [10, 5, 0], 1e-9);
+});
+test('looking from one point at another', () => {
+  const a = lookYawPitch([0, 0, 0], [1, 0, 1]); near(a.yaw, 45); near(a.pitch, 0);
+  const b = lookYawPitch([0, 0, 0], [0, 1, 1]); near(b.yaw, 0); near(b.pitch, 45);
+});
+test('slow motion ramps in and out', () => {
+  const s = new SlowMo();
+  near(s.scale, 1); near(s.tick(0.5), 0.5);
+  s.setScale(0.25, 0.5);
+  near(s.tick(0.25), 0.203125); near(s.scale, 0.625);
+  near(s.tick(0.25), 0.109375); near(s.scale, 0.25);
+  near(s.tick(1), 0.25);
+  s.setScale(1, 0.5); near(s.tick(1), 0.8125); near(s.scale, 1);
+  s.setScale(0.5, 0); near(s.tick(1), 0.5);
+});
+```

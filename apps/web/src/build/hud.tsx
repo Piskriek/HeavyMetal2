@@ -21,7 +21,7 @@ export function TabStrip(props: { readonly tab: TabId; readonly onPick: (t: TabI
         const I = iconByName(t.icon);
         return (
           <button key={t.id} data-ui={`island.tab.${t.id}`} role="tab" aria-selected={props.tab === t.id} className={props.tab === t.id ? 'on' : ''} data-label={`${t.label} (${t.key}${t.alt ? ` or ${t.alt.toUpperCase()}` : ''}): ${t.doc}`} onClick={() => props.onPick(t.id)}>
-            <I size={15} strokeWidth={1.6} /><span>{t.label}</span><kbd>{t.key}</kbd>
+            <I size={15} strokeWidth={1.6} /><span>{t.label}</span><kbd>{t.key.length === 1 ? t.key.toUpperCase() : t.key}</kbd>
           </button>
         );
       })}

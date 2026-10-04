@@ -129,3 +129,4 @@ export * from './coverage';
 export * from './logic';
 export * from './effects';
 export * from './sounds';
+export * from './characters';

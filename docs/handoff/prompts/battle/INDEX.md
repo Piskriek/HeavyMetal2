@@ -12,9 +12,11 @@ The plan is `docs/ARENA_PLAN.md`; the protocol is `docs/handoff/CATCHUP.md` sect
 | A6 | `npcbrain.txt` | `@hm/npcbrain` | F9 simple character AI | MERGED 2026-10-04 (answer A; one flawed extra test dropped: radius-0 wander walking home is right; 28 tests) |
 | A7 | `physmat.txt` | `@hm/physmat` | F11 physical materials, toy physics, push hammer | MERGED 2026-10-04 (answer A, 7 tests) |
 | A8 | `particles.txt` | `@hm/particles` | F12 particle system and 12 presets | MERGED 2026-10-04 (second chat; 17 tests) |
-| B2 | `voxelcsg.txt` | `@hm/voxelcsg` | F3 join, carve, cut, crop, hollow, fill, pieces | sent 2026-10-04: https://arena.ai/c/01a1066d-b29d-78ea-b28e-d625d240aa7f |
-| B4 | `lightplace.txt` | `@hm/lightplace` | F6 light presets, fall-off, cone, flicker, pick the lights that matter | sent 2026-10-04: https://arena.ai/c/01a1066e-430a-712b-87e2-0e1bddcd0a84 |
-| B1, B3, B5-B7, C1-C5 | (to write; see ARENA_PLAN section 2) | | | planned |
+| B2 | `voxelcsg.txt` | `@hm/voxelcsg` | F3 join, carve, cut, crop, hollow, fill, pieces | MERGED 2026-10-04 (answer B, 18 tests; A failed hollow) |
+| B4 | `lightplace.txt` | `@hm/lightplace` | F6 light presets, fall-off, cone, flicker, pick the lights that matter | MERGED 2026-10-04 (answer B, 11 tests; both passed ours) |
+| B3 | `walkpath.txt` | `@hm/walkpath` | F4 paths with waits; once, loop, ping-pong; smooth curves | sent 2026-10-04: https://arena.ai/c/01a1067f-3404-7f24-bfbc-b654fcb04452 |
+| B5 | `camtrack.txt` | `@hm/camtrack` | F8 camera keys, eases, orbit shot, slow motion | sent 2026-10-04: https://arena.ai/c/01a1067f-c74b-7b8c-aded-d2a03b7a8870 |
+| B1, B6, B7, C1-C5 | (to write; see ARENA_PLAN section 2) | | | planned |
 
 Each prompt's acceptance tests were worked through by hand (numbers checked); still, when a test fails against a good implementation, check my arithmetic before blaming the model (CATCHUP 11).
 

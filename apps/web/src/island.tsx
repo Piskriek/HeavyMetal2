@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { CHAR_BRAINS, CHAR_WAYS, isCharBrain, AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -42,6 +42,10 @@ import type { StampKind } from '@hm/terrainops';
 import { LIGHT_WAYS, isLightWay, applyLightWay } from './build/light-ways';
 import { SETUPS } from '@hm/lighting';
 import { avatarRigged } from './build/cards';
+import { encodeModel } from '@hm/voxel';
+import { rulesOf } from './world';
+import { CharactersRuntime, type PlacedChar } from './build/characters-runtime';
+import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
 import { PresetWindowBody } from './build/preset-window';
@@ -57,11 +61,11 @@ import { TourCard } from './tutorial/tour-card';
 import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
 import { captureMouse, lookFilter } from './shell/capture-mouse';
 import { AvatarDock } from './avatar/avatar-dock';
-import type { AvatarLook } from '@hm/avatarlook';
+import { LOOKS as AVATAR_LOOKS, type AvatarLook } from '@hm/avatarlook';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
- * Build HUD (grown-up switch on): F1..F10 pick a tab in the V3 order (Select, Paint, Things, Animate, Sound, Lights, Logic, Camera, Avatar, Terrain), 1..9
+ * Build HUD (grown-up switch on): F1..F10 and F12 pick a tab in the V3 order (Select, Paint, Things, Animate, Sound, Lights, Logic, Camera, Characters, Terrain, Effects; P your avatar), 1..9
  * or the wheel pick a slot, left click uses it, right click does the opposite, E opens your presets (mouse free) with previews and editors,
  * hold Tab for the quick wheel. Studio mode (B, or the button top right): no goblin, fly with W A S D, Space and C, look with the right mouse
  * button, the mouse stays free, tools act where the cursor points, every setting opens in a movable window, F focuses on a thing, H hides
@@ -451,11 +455,35 @@ export function IslandWalk(props: {
     const animator = new Animator();
     const moves = (): MoveSet => { const pl = player(); return { idle: animOf(pl, pl.moves.idle), walk: animOf(pl, pl.moves.walk), run: animOf(pl, pl.moves.run), jump: animOf(pl, pl.moves.jump), fall: animOf(pl, pl.moves.fall) }; };
 
+    // characters (the Characters tab, F9): goblins drawn after the placed things, walked by their brains each frame
+    const chars = new CharactersRuntime();
+    const lastCharAt = new Map<string, [number, number]>();
+    let charBase = 0, charRefs: string[] = [];
+    // a character wears a ready-made avatar look (dressed like your own goblin, not a statue): its model, once per look
+    const lookData = new Map<string, { data: string; block: number } | null>();
+    const charLook = (id: string, ref: string): { data: string; block: number } | null => {
+      const look = AVATAR_LOOKS.find((l) => l.id === id) ?? AVATAR_LOOKS[[...ref].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % AVATAR_LOOKS.length]!;
+      if (!lookData.has(look.id)) { const g = avatarRigged(look); lookData.set(look.id, g ? { data: encodeModel(g.model as never), block: kindDef(look).block } : null); }
+      return lookData.get(look.id) ?? null;
+    };
+    const placedChars = (): PlacedChar[] => (rt.store.get(scene.sceneId)?.children['characters'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => {
+      const pr = rt.store.resolve(r.ref).params as Record<string, unknown>;
+      const brain = String(pr['brain'] ?? 'wander');
+      return { ref: r.ref, brain: isCharBrain(brain) ? brain : 'wander', x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), yaw: Number(pr['yaw'] ?? 0) };
+    });
     const refreshModels = (): void => {
       const iso = live.current.isolateId;
       const all = placementsOf(rt, scene.sceneId);
       const refs = rt.store.get(scene.sceneId)?.children['models'] ?? [];
-      renderer.setModels(iso ? all.filter((_, i) => refs[i]?.ref === iso) : all);
+      const shown = iso ? all.filter((_, i) => refs[i]?.ref === iso) : all;
+      const cs = iso ? [] : placedChars();
+      charBase = shown.length; charRefs = cs.map((c) => c.ref);
+      const charModels = cs.map((c) => {
+        const pr = rt.store.resolve(c.ref as PresetId).params as Record<string, unknown>;
+        const m = charLook(String(pr['look'] ?? ''), c.ref);
+        return { params: { data: m?.data ?? '', scale: (m?.block ?? 0.04) * Number(pr['size'] ?? 1) }, x: c.x, y: c.y, z: c.z, yawDeg: c.yaw + 180 };
+      });
+      renderer.setModels([...shown, ...charModels]);
       showDecor();
     };
     refreshModels();
@@ -529,6 +557,8 @@ export function IslandWalk(props: {
       return { ref: r.ref, what: String(pr['what'] ?? ''), x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), size: Number(pr['size'] ?? 8), volume: Number(pr['volume'] ?? 0.8), every: Number(pr['every'] ?? 4), on: pr['on'] !== false };
     });
     let soundOverlay = false;
+    let charMoved = 0;
+    (window as unknown as { hmChars: unknown }).hmChars = () => ({ count: placedChars().length, drawn: charRefs.length, moved: charMoved, first: (() => { const at = charRefs[0] ? lastCharAt.get(charRefs[0]) : undefined; const ts = rt.binder.terrain(); return at ? [at[0], ts ? heightAt(ts.terrain, at[0], at[1]) : 0, at[1]] : null; })() });
     (window as unknown as { hmSounds: unknown }).hmSounds = () => ({ placed: placedSounds().length, zones: placedSounds().filter((p) => isAmbience(p.what)).length });
     // tests: what the gizmo shows, where a point along its arrow lands on screen, and the target's place
     (window as unknown as { hmGizmo: unknown }).hmGizmo = () => {
@@ -801,6 +831,40 @@ export function IslandWalk(props: {
         fx('place', { volume: 0.5 });
         return;
       }
+      // the Characters tab's ways: spawn a goblin with the palette's behaviour, give the one you point at that behaviour, take one away
+      if (s.tab === 'characters') {
+        if (!first) return;
+        const a = aim();
+        if (!a) { say('Point at the ground'); return; }
+        const brain = s.palette.characters && isCharBrain(s.palette.characters) ? s.palette.characters : 'wander';
+        const bname = CHAR_BRAINS.find((b) => b.id === brain)?.name ?? brain;
+        const refs = rt.store.get(scene.sceneId)?.children['characters'] ?? [];
+        // the character nearest where you point (where it walks to now, not where it was put)
+        let near = -1, nearD = 1.6;
+        refs.forEach((r, i) => { const di = charRefs.indexOf(r.ref); const pr = rt.store.get(r.ref) ? rt.store.resolve(r.ref).params : null; if (!pr) return; const at = di >= 0 ? lastCharAt.get(r.ref) : undefined; const x = at?.[0] ?? Number(pr['x'] ?? 0), z = at?.[1] ?? Number(pr['z'] ?? 0); const d = Math.hypot(x - a.point[0], z - a.point[2]); if (d < nearD) { nearD = d; near = i; } });
+        if (id === 'chars-remove' || (alt && id === 'chars-spawn')) {
+          if (near < 0) { say('Point at a character'); return; }
+          rt.commands.execute(cmd.removeChild(scene.sceneId, 'characters', near, 'Remove a character'));
+          saveMap(rt, scene.sceneId); refreshModels(); say('Character taken away'); fx('delete', { volume: 0.5 });
+          return;
+        }
+        if (id === 'chars-change') {
+          const r = refs[near];
+          if (!r) { say('Point at a character'); return; }
+          rt.commands.execute(cmd.setParam(`${r.ref}.brain`, brain as never, `Behaves: ${bname}`));
+          saveMap(rt, scene.sceneId); say(`It does this now: ${bname}`); fx('select', { volume: 0.5 });
+          return;
+        }
+        const charId = `char-${Date.now().toString(36)}`;
+        const yaw = (Math.atan2(px - a.point[0], pz - a.point[2]) * 180) / Math.PI;
+        rt.commands.transaction(`Character: ${bname}`, () => {
+          rt.commands.execute(cmd.put({ id: charId, kind: 'character', name: 'Goblin', params: { brain, look: AVATAR_LOOKS[Math.floor(Math.random() * AVATAR_LOOKS.length)]!.id, x: a.point[0], y: a.point[1], z: a.point[2], yaw, size: 1 } as never, tier: 'play' }, `Character: ${bname}`));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'characters', charId, undefined, `Character: ${bname}`));
+        });
+        saveMap(rt, scene.sceneId); refreshModels();
+        say(`A goblin: ${CHAR_BRAINS.find((b) => b.id === brain)?.doc ?? bname}`); fx('place', { volume: 0.5 });
+        return;
+      }
       // the Sound tab's ways: play the palette's pick, place it (an ambience becomes a zone, a sound repeats from its spot), take the nearest away, list them
       if (s.tab === 'sound' && id.startsWith('sound-')) {
         if (!first) return;
@@ -923,6 +987,16 @@ export function IslandWalk(props: {
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const allChars = live.current.isolateId ? [] : placedChars();
+      // added or taken away (a panel, undo): draw the list again
+      if (!live.current.isolateId && (allChars.length !== charRefs.length || allChars.some((c, i) => c.ref !== charRefs[i]))) refreshModels();
+      if (charRefs.length) {
+        const list = allChars;
+        const ts = rt.binder.terrain(), sea = rulesOf(rt, scene.sceneId).waterLevel;
+        const poses = chars.step(dt, list, [px, py, pz], (x, z) => { if (!ts) return 0; const h = heightAt(ts.terrain, x, z); return h < sea + 0.1 ? null : h; });
+        charMoved = 0;
+        poses.forEach((q, k) => { lastCharAt.set(q.ref, [q.x, q.z]); const i = charRefs.indexOf(q.ref); if (i >= 0) renderer.setModelPose(charBase + i, q.x, q.y, q.z, q.yaw + 180); const home = list[k]; if (home) charMoved = Math.max(charMoved, Math.hypot(q.x - home.x, q.z - home.z)); });
+      }
       effects.sync(placedEffects());
       {
         const spots = placedSounds();
@@ -1199,6 +1273,8 @@ export function IslandWalk(props: {
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'logic'
           ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'characters'
+          ? <PaletteStrip title="Behaves" items={CHAR_BRAINS.map((b) => ({ id: b.id, name: b.name, preview: { kind: 'icon' as const, icon: b.icon } }))} community={[]} selected={p.palette.characters ?? 'wander'} onLayers={openLayers} onPick={(id) => { pickPalette('characters', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'sound'
           ? <PaletteStrip title="Sounds" items={[...AMBIENCES.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon' as const, icon: AMBIENCE_ICONS[a.id] ?? 'Music' } })), ...SFX_IDS.map((id) => ({ id, name: soundName(id), preview: { kind: 'sound' as const, id } }))]} community={[]} selected={p.palette.sound ?? 'forest-birds'} onLayers={openLayers} onPick={(id) => { pickPalette('sound', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'effects'
@@ -1229,6 +1305,7 @@ export function IslandWalk(props: {
             : w.id === 'logic' ? <LogicPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'effects' ? <EffectsPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'soundscape' ? <SoundSpotsPanel rt={rt} sceneId={scene.sceneId} />
+            : w.id === 'characters' ? <CharactersPanel rt={rt} sceneId={scene.sceneId} onChange={() => api.current?.refreshModels()} />
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
@@ -1285,6 +1362,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
     case 'logic': { const w = LOGIC_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     case 'effects': { const w = EFFECT_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
+    case 'characters': { const w = CHAR_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     default: return { title, line: item.doc, left: 'Use it', right: 'The opposite' };
   }
 }

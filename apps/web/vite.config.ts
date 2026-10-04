@@ -60,6 +60,8 @@ export default defineConfig(({ mode }) => ({
       '@hm/triggers': p('../../packages/triggers/src/index.ts'),
       '@hm/primitives': p('../../packages/primitives/src/index.ts'),
       '@hm/physmat': p('../../packages/physmat/src/index.ts'),
+      '@hm/lightplace': p('../../packages/lightplace/src/index.ts'),
+      '@hm/voxelcsg': p('../../packages/voxelcsg/src/index.ts'),
       '@hm/soundscape': p('../../packages/soundscape/src/index.ts'),
       '@hm/npcbrain': p('../../packages/npcbrain/src/index.ts'),
       '@hm/particles': p('../../packages/particles/src/index.ts'),

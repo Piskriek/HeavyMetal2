@@ -175,6 +175,26 @@ The hotbar is how you edit everything, and it is where the game is still thinnes
 | H-g | Editing a thing's blocks on the island (paint, sculpt, select parts and faces) | |
 | H-h | Settings, Hotbar: add, remove, reorder tools per tab, back to ready-made, share | "hotbar management in the settings". **DONE** (2026-10-04, but sharing): Settings has a Hotbar section (grown-up profiles): pick a tab, its nine slots with previews, move left or right, take off, + Add from the tab's presets, back to the ready-made row, and the level. Next: share a hotbar (it becomes a preset kind) |
 
+**6.4 The hotbar works on whatever you are in** (owner and his brother, 2026-10-04: "apply the hotbar to whatever preset you're in as your tools"; "a texture editor where I can use the sculpting tools to paint directly on the normals, and use animate to animate the textures, with just presets"; "where is the logic section to manipulate code?")
+
+The hotbar is one set of ways of working, and **what it works on is whatever you are in**. On the island it edits the island. Step into a preset (double-click it, or Select it and press Enter) and the same tabs edit that preset; Esc steps back out, and the breadcrumb shows where you are (Galaxy › My planet › My island › Grass texture). So:
+
+| You are in | Paint | Sculpt | Animate | Sound | Logic |
+|---|---|---|---|---|---|
+| the island | the ground's surfaces | the ground's height | plays moves on your avatar | plays sounds | the island's rules |
+| a texture (a surface's look) | its colours, with the same brushes, fills, stamps | its height, so its bumps (the normals): Raise, Crease, Clay, Terrace ... | presets that make it move: flow, pulse, shimmer, sway, glow | a sound the surface makes underfoot | when it changes (wet after rain, lava cools) |
+| the sea, a river | its colour | its waves and swell | its flow and tide | its sound (waves, a stream) | what it does to what falls in |
+| a thing | its blocks' colours | its blocks (add, remove, smooth) | its moves | sounds attached to it | what it does when touched, at night ... |
+| an avatar | its colours | its shape | its moves | its voice and footsteps | its brain |
+
+The level decides how deep each tab goes (Easy: presets only; Pro: the presets' knobs; Studio: what they are made of). "If you want to change something but can't, go one level more advanced."
+
+**Logic (a tab of its own):** Easy holds ready-made rules as presets you drop on whatever you are in ("when a goblin touches this, play a sound", "at night, light up", "when the race starts, open"); Pro shows a rule as blocks (when / if / do) you can rearrange; Studio opens the script behind it (presets can already hold scripts: `cmd.setScript`). Considered and logical like Sculpt: a few ways of working (Trigger, Condition, Action, Timer, Variable, Send), the rules themselves in the palette.
+
+Order: (1) step into a texture: Paint and Sculpt edit its colour and height on a big tile in front of you, Animate's presets make it move (the terrain shader gets a per-surface flow and pulse); (2) the breadcrumb and Esc stepping out, the same for the sea; (3) Logic with its Easy presets; (4) things, avatars.
+
+**The sceptic's pass (2026-10-04)**, testing from the brother's side with real inputs (scratchpad script, to become `npm run sceptic`): Scatter, Row and a sculpt stroke are each one undo step; Select opens the look of the ground you point at (it opened a palm's behaviour from grass two metres away: fixed, the plant must be under the pointer); a look you use survives a reload (it did not: the saved looks were dropped on load by a broken check; fixed); Potato opens the island cleanly. Still true and on the list: the hotbar does not yet follow what you are in (above); no Logic tab; the look editor is sliders on a recipe, not brushes on the texture; a look has no undo (only Back to the default); Row shows no marker where it starts; Haze and Clouds quietly turn the look into your own copy.
+
 ---
 
 ## 7. The order of work

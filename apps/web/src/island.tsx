@@ -345,6 +345,7 @@ export function IslandWalk(props: {
     const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
     (window as unknown as { hmGround: { tile?: (id: number) => number } }).hmGround.tile = (id) => surfaces.checksum(id);
     (window as unknown as { hmGround: { things?: () => number } }).hmGround.things = () => rt.store.get(scene.sceneId)?.children['models']?.length ?? 0;
+    (window as unknown as { hmGround: { heights?: () => number } }).hmGround.heights = () => { const t = rt.binder.terrain()?.terrain; let s = 0; if (t) for (let i = 0; i < t.heights.length; i++) s += t.heights[i]! * ((i % 97) + 1); return Math.round(s * 1000) / 1000; };
     /** Draw a surface from a texture graph: its painted-ground tile, or (blocks) its voxel faces, three seeds like the baked ones. */
     const applyLook = (id: number, graph: TexGraph, blocks: boolean): void => {
       if (blocks) surfaces.setVoxelFaces(id, [0, 1000, 2000].map((seed) => tileBytes(evaluateGraph(graph, { size: 32, seed }))));

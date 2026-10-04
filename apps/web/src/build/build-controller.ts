@@ -125,7 +125,8 @@ export class BuildController {
     let best: { kind: string; dist: number } | null = null;
     for (const p of d.placements) {
       const dist = Math.hypot(p.x - a.point[0], p.z - a.point[2]);
-      if (dist < Math.max(0.9, p.scale * 1.2) && (!best || dist < best.dist)) best = { kind: p.kind, dist };
+      // about the plant itself (a trunk, a tuft), not the ground round it: grass beside a palm is still grass
+      if (dist < 0.35 + 0.3 * p.scale && (!best || dist < best.dist)) best = { kind: p.kind, dist };
     }
     return best?.kind ?? null;
   }

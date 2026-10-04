@@ -1,0 +1,87 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: an NBT reader and a reader for Minecraft build files (Sponge .schem, MCEdit .schematic, structure .nbt) that turns them into a simple coloured voxel model for a toy-world game. It must NOT use any Minecraft textures: each block becomes one flat colour from block-name rules.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/schematic.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Node APIs in src (Uint8Array, DataView, TextDecoder only), no imports in src. Input is untrusted: never throw past the exported readers (return errors), never loop forever, limit nesting depth to 64, refuse lists or arrays longer than 50 million, refuse builds over 16 million blocks. Gzip is NOT handled here: the caller decompresses; `isGzip(bytes)` only reports whether bytes start with 1f 8b.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface PaletteEntry { name: string; color: Vec3; roughness: number; metalness: number; emissive: number; alpha: number } // 0..1
+export interface VoxelModel { id: string; name: string; size: Vec3; pivot: Vec3; palette: PaletteEntry[]; cells: Uint8Array }
+// cells: index x + size[0] * (y + size[1] * z), Y IS UP (Minecraft is y-up too); 0 = empty; v = palette[v - 1]; at most 255 palette entries
+
+export type Nbt = { type: 'byte' | 'short' | 'int' | 'long' | 'float' | 'double'; value: number | bigint }
+  | { type: 'string'; value: string } | { type: 'byteArray'; value: Int8Array } | { type: 'intArray'; value: Int32Array }
+  | { type: 'longArray'; value: BigInt64Array } | { type: 'list'; value: Nbt[] } | { type: 'compound'; value: Record<string, Nbt> };
+/** Big-endian NBT (Java edition): returns the root compound and its name, or an error. */
+export function readNbt(bytes: Uint8Array): { name: string; root: Nbt | null; error: string | null };
+export const isGzip: (bytes: Uint8Array) => boolean;
+export interface BuildResult { model: VoxelModel | null; format: 'sponge' | 'mcedit' | 'structure' | null; blocks: number; unknown: string[]; errors: string[] }
+/** Detect the format from the root and read it. Air (minecraft:air, cave_air, void_air, structure_void) is empty. */
+export function readBuild(bytes: Uint8Array, name?: string): BuildResult;
+/** The flat colour (0..1) and alpha for a block name like "minecraft:oak_planks[axis=y]" (properties ignored). */
+export function blockColour(name: string): { color: Vec3; alpha: number; emissive: number; known: boolean };
+```
+
+## Formats
+- Sponge v2: root has Width, Height, Length (shorts), Palette (compound: block state string -> int id), BlockData (byteArray of VARINTS, one per block, order index = x + z * Width + y * Width * Length). Sponge v3: the same inside root compound "Schematic" -> "Blocks" { Palette, Data }.
+- MCEdit .schematic: Width, Height, Length, Blocks (byteArray of legacy numeric ids, same order), optional Data. Map legacy ids with a small table: 0 air, 1 stone, 2 grass_block, 3 dirt, 4 cobblestone, 5 oak_planks, 8/9 water, 10/11 lava, 12 sand, 13 gravel, 17 oak_log, 18 oak_leaves, 20 glass, 24 sandstone, 35 white_wool, 45 bricks, 49 obsidian, 98 stone_bricks; others "legacy:<id>" (unknown).
+- Structure .nbt: size (list of 3 ints), palette (list of compounds with Name), blocks (list of compounds: pos list of 3 ints, state int).
+
+## Colours (no textures): `blockColour`
+- Exact table for at least these: stone, cobblestone, stone_bricks, dirt, grass_block (green top: use green), sand, red_sand, gravel, clay, oak/spruce/birch/jungle/acacia/dark_oak planks and logs, leaves (green, alpha 1), glass (light blue, alpha 0.35), water (blue, alpha 0.6), lava (orange, emissive 1), glowstone and sea_lantern (emissive 1), bricks, sandstone, obsidian, netherrack, snow, ice (alpha 0.8), quartz, terracotta, iron/gold/diamond/emerald blocks.
+- Then keyword rules: the 16 dye colours (white orange magenta light_blue yellow lime pink gray light_gray cyan purple blue brown green red black) in any name (wool, concrete, carpet, stained_glass with alpha 0.5, terracotta slightly darker); words wood/plank/log -> brown; stone/brick/deepslate -> grey; leaves/grass/vine/moss -> green; else grey 0.5 with known false.
+- Palette entries: one per distinct colour used (merge equal colours), name = the first block name that used it; roughness 0.8, metalness 0.5 for iron/gold blocks; more than 255 distinct -> merge the nearest colours.
+- pivot = [floor(size[0]/2), 0, floor(size[2]/2)].
+
+## Acceptance tests (copy unchanged, then add your own: Sponge v3, MCEdit, truncated input, a huge claimed length, unknown blocks, more than 255 colours)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { blockColour, isGzip, readBuild, readNbt } from '../src/index';
+const s16 = (n: number): number[] => [(n >> 8) & 255, n & 255];
+const s32 = (n: number): number[] => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const name = (s: string): number[] => [...s16(s.length), ...[...s].map((c) => c.charCodeAt(0))];
+const tag = (type: number, key: string, payload: number[]): number[] => [type, ...name(key), ...payload];
+// Sponge v2: 2 wide, 1 high, 1 long; block 0 = stone (id 1), block 1 = air (id 0)
+function sponge(): Uint8Array {
+  const palette = [10, ...name('Palette'), ...tag(3, 'minecraft:air', s32(0)), ...tag(3, 'minecraft:stone', s32(1)), 0];
+  const data = tag(7, 'BlockData', [...s32(2), 1, 0]);
+  return new Uint8Array([10, ...name('Schematic'), ...tag(2, 'Width', s16(2)), ...tag(2, 'Height', s16(1)), ...tag(2, 'Length', s16(1)), ...palette, ...data, ...tag(3, 'Version', s32(2)), 0]);
+}
+test('reads NBT', () => {
+  const r = readNbt(sponge());
+  assert.equal(r.error, null);
+  assert.equal(r.name, 'Schematic');
+  assert.equal(r.root?.type, 'compound');
+});
+test('reads a Sponge schematic into a coloured model', () => {
+  const b = readBuild(sponge(), 'tiny');
+  assert.deepEqual(b.errors, []);
+  assert.equal(b.format, 'sponge');
+  assert.deepEqual(b.model?.size, [2, 1, 1]);
+  assert.equal(b.blocks, 1);
+  assert.equal(b.model?.cells[0], 1);
+  assert.equal(b.model?.cells[1], 0);
+  assert.equal(b.model?.palette[0]?.name, 'minecraft:stone');
+});
+test('colours come from names, not textures', () => {
+  const w = blockColour('minecraft:red_wool');
+  assert.ok(w.known && w.color[0] > w.color[1] && w.color[0] > w.color[2]);
+  assert.ok(blockColour('minecraft:glass').alpha < 1);
+  assert.equal(blockColour('minecraft:lava').emissive, 1);
+  assert.equal(blockColour('minecraft:oak_planks[axis=y]').known, true);
+  assert.equal(blockColour('mod:mystery_block').known, false);
+});
+test('garbage never throws', () => {
+  for (const b of [new Uint8Array(0), new Uint8Array([10, 0]), sponge().slice(0, 20), new Uint8Array(64).fill(9)]) {
+    const r = readBuild(b);
+    assert.equal(r.model, null);
+    assert.ok(r.errors.length > 0);
+  }
+  assert.equal(isGzip(new Uint8Array([0x1f, 0x8b, 8])), true);
+});
+```

@@ -18,3 +18,4 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | questline | `docs/handoff/prompts/battle/questline.txt` | **A** | 8/8, strict clean; B also 8/8 (A has the larger test file). |
 | machines | `docs/handoff/prompts/battle/machines.txt` | **B** | 11/11, strict clean. A: 12/14. |
 | market | `docs/handoff/prompts/battle/market.txt` | **B** | 10/10, strict clean. A: 8/9. |
+| rocket | `docs/handoff/prompts/battle/rocket.txt` | **B** | 10/10, strict clean. A: 12/13 (its floating-part test expects exactly one problem). |

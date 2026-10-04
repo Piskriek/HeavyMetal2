@@ -1,0 +1,50 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a small ragdoll for a toy-world game's characters (goblins knocked over by a hit or a fall). Verlet particles joined by distance sticks, joint angle limits, a ground plane, and a blend back to the animated pose when the character gets up.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/ragdoll.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Deterministic: the same inputs give the same results.
+
+## API (implement exactly)
+
+```ts
+export type V3 = [number, number, number];
+export interface Particle { pos: V3; prev: V3; mass: number }       // mass 0 = pinned
+export interface Stick { a: number; b: number; length: number; stiffness: number } // stiffness 0..1
+export interface Limit { a: number; mid: number; b: number; min: number; max: number } // angle at mid between mid->a and mid->b, radians
+export interface Ragdoll { particles: Particle[]; sticks: Stick[]; limits: Limit[] }
+/** A goblin ragdoll from joint positions (names: head, neck, pelvis, lHand, lElbow, rHand, rElbow, lFoot, lKnee, rFoot, rKnee): sticks between connected joints at their current distances, elbows and knees limited to 0.1..PI. Particle order = the names order above. */
+export const JOINTS: readonly string[];
+export function goblin(pose: Record<string, V3>): Ragdoll;
+/** Push every particle (not pinned) by an impulse in metres per second: prev -= impulse * dt. */
+export function kick(r: Ragdoll, impulse: V3, dt: number, only?: number[]): Ragdoll;
+/** One step: verlet with gravity (0, -9.8, 0) and damping 0.99, then `iterations` passes of sticks, limits and the ground (y >= ground, with friction 0.8 on x and z while touching). */
+export function step(r: Ragdoll, dt: number, iterations: number, ground: number): Ragdoll;
+/** Is it at rest? every particle moved less than eps in the last step. */
+export function resting(r: Ragdoll, eps: number): boolean;
+/** Blend the ragdoll toward an animated pose: t = 0 the ragdoll, t = 1 the pose (both positions and prev, so it stops moving). */
+export function blend(r: Ragdoll, pose: Record<string, V3>, t: number): Ragdoll;
+```
+
+## Acceptance tests (copy unchanged, then add your own: sticks keep their length, a knee never bends backwards, pinned particles stay, friction stops sliding, blend at 0 and 1, inputs not mutated)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { JOINTS, goblin, kick, resting, step, type V3 } from '../src/index';
+const pose: Record<string, V3> = {
+  head: [0, 1.6, 0], neck: [0, 1.4, 0], pelvis: [0, 0.9, 0],
+  lElbow: [-0.3, 1.2, 0], lHand: [-0.5, 1.0, 0], rElbow: [0.3, 1.2, 0], rHand: [0.5, 1.0, 0],
+  lKnee: [-0.1, 0.5, 0], lFoot: [-0.1, 0.05, 0], rKnee: [0.1, 0.5, 0], rFoot: [0.1, 0.05, 0],
+};
+test('eleven joints', () => {
+  assert.equal(JOINTS.length, 11);
+  assert.equal(goblin(pose).particles.length, 11);
+});
+test('it falls and comes to rest on the ground', () => {
+  let r = kick(goblin(pose), [2, 0, 0], 1 / 60);
+  for (let i = 0; i < 600; i++) r = step(r, 1 / 60, 8, 0);
+  assert.ok(r.particles.every((p) => p.pos[1] >= -1e-6));
+  assert.ok(r.particles.every((p) => p.pos[1] < 0.6));
+  assert.ok(resting(r, 1e-3));
+});
+```

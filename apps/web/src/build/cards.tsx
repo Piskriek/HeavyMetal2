@@ -6,6 +6,7 @@ import type { SpritePreset } from '@hm/buildkit';
 import type { VoxelModel } from '@hm/voxel';
 import { MODELS } from '@hm/voxelart';
 import { NATURE_MODELS } from '@hm/voxelnature';
+import { BLOCKS } from '@hm/primitives';
 import { renderThumb } from '../avatar/thumbs';
 import { dress, kindDef, partModel } from '../avatar/accessories';
 import type { Rig } from '@hm/render';
@@ -20,12 +21,27 @@ import { iconByName } from './icons';
 const THUMB = 96; // one size for every thumbnail: the shared offscreen renderer is rebuilt when the size changes
 
 const modelCache = new Map<string, VoxelModel>();
+
+/** Toy colours for the building blocks (@hm/primitives numbers its blocks' materials 1..9 in BLOCKS order). */
+const BLOCK_PAINT: readonly (readonly [string, [number, number, number], number])[] = [
+  ['red', [214, 72, 64], 0.55], ['yellow', [242, 192, 54], 0.5], ['blue', [62, 110, 214], 0.5], ['orange', [238, 128, 46], 0.55], ['stone', [150, 146, 140], 0.9],
+  ['green', [82, 168, 92], 0.6], ['sand', [214, 190, 142], 0.85], ['wood', [156, 104, 62], 0.8], ['marble', [236, 232, 224], 0.35],
+];
+/** A building block (F3, hotbar spec V3) as a voxel model: `block-<id>` of @hm/primitives at scale 2 (8 cells wide), standing on its base. */
+function blockModel(id: string): VoxelModel | null {
+  const b = BLOCKS.find((x) => x.id === id);
+  if (!b) return null;
+  const v = b.make(2);
+  const [sx, sy, sz] = v.size;
+  return { id: `block-${id}`, name: b.name, size: [sx, sy, sz], pivot: [sx / 2, 0, sz / 2], cells: v.cells,
+    palette: BLOCK_PAINT.map(([name, color, roughness]) => ({ name, color, roughness, metalness: 0, emissive: 0, alpha: 1 })) };
+}
 export function voxelModelById(id: string): VoxelModel | null {
   const hit = modelCache.get(id);
   if (hit) return hit;
   const e = MODELS.find((m) => m.id === id) ?? NATURE_MODELS.find((m) => m.id === id);
-  if (!e) return null;
-  const m = e.build() as unknown as VoxelModel;
+  const m = e ? e.build() as unknown as VoxelModel : id.startsWith('block-') ? blockModel(id.slice(6)) : null;
+  if (!m) return null;
   modelCache.set(id, m);
   return m;
 }

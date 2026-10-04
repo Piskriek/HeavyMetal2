@@ -16,5 +16,6 @@ export * from './decor-lod';
 export * from './road-decals';
 export * from './voxel-view';
 export * from './bursts';
+export * from './particle-view';
 export * from './lighting-rig';
 export * from './avatar-view';

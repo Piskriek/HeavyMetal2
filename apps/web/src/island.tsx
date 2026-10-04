@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -20,6 +20,8 @@ import { focusTargetOf } from './maker/focus';
 import { fx } from './maker/feedback';
 import { BuildController, type Aim, type Selected } from './build/build-controller';
 import { GizmoControl, gizmoModeFor, type GizmoTarget } from './build/gizmo-control';
+import { EffectsRuntime, type PlacedEffect } from './build/effects-runtime';
+import { PARTICLE_PRESETS } from '@hm/particles';
 import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
@@ -27,6 +29,7 @@ import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
 import { SurfaceEditor } from './build/surface-editor';
 import { LogicPanel } from './build/logic-panel';
+import { EffectsPanel } from './build/effects-panel';
 import { TextureBench } from './build/texture-bench';
 import { TEX_ANIMS, draftColours, draftFromTile, draftToTile, newHistory, type DraftHistory, type TexDraft } from './build/texture-draft';
 import { decodeBlob, encodeWebp, loadTextures, saveTexture } from './build/texture-store';
@@ -499,6 +502,20 @@ export function IslandWalk(props: {
     // the transform gizmo (Pro and Studio, on Select's tab; docs/ARENA_PLAN.md)
     const gizmo = new GizmoControl(rt, scene.sceneId, renderer.overlay, (i, p) => renderer.setModelPose(i, p.x, p.y, p.z, p.yaw, p.scale));
     let gizmoTgt: GizmoTarget | null = null, gizmoFov = 60;
+    /** Shift snaps moves to half metres and sizes to quarter steps, Ctrl snaps turns to 15 degrees (hotbar spec V3). */
+    const gizmoSnap = (): { move?: number; turn?: number; scale?: number } => {
+      const snap: { move?: number; turn?: number; scale?: number } = {};
+      if (down.has('shift')) { snap.move = 0.5; snap.scale = 0.25; }
+      if (down.has('control')) snap.turn = 15;
+      return snap;
+    };
+    // placed particle effects (the Effects tab, F12): running emitters that follow the island's list
+    const effects = new EffectsRuntime(3000);
+    const placedEffects = (): PlacedEffect[] => (rt.store.get(scene.sceneId)?.children['effects'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => {
+      const pr = rt.store.resolve(r.ref).params as Record<string, unknown>;
+      return { ref: r.ref, preset: String(pr['preset'] ?? 'campfire'), x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), scale: Number(pr['scale'] ?? 1), on: pr['on'] !== false };
+    });
+    (window as unknown as { hmEffects: unknown }).hmEffects = () => ({ placed: placedEffects().length, particles: effects.count });
     // tests: what the gizmo shows, where a point along its arrow lands on screen, and the target's place
     (window as unknown as { hmGizmo: unknown }).hmGizmo = () => {
       const g = gizmo.seen;
@@ -515,9 +532,11 @@ export function IslandWalk(props: {
     const isLocked = (): boolean => !!document.pointerLockElement && root.contains(document.pointerLockElement);
     const studio = (): boolean => player().mode === 'studio';
     const centre = (): { x: number; y: number } => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+    /** The tools act at the cursor whenever the mouse is free (Studio, the island view), at the crosshair while you walk with it captured or soft-aimed. */
+    const atCursor = (): boolean => !(pointerLocked || softAim) || studio() || live.current.level === 'island';
     /** Where the tool acts: the crosshair while the mouse is captured, the cursor when it is free. */
     const gizmoRay = (): { origin: [number, number, number]; dir: [number, number, number] } | null => {
-      const c = pointerLocked || softAim ? centre() : cursor; const r = renderer.ray(c.x, c.y);
+      const c = atCursor() ? cursor : centre(); const r = renderer.ray(c.x, c.y);
       return r ? { origin: [r.origin[0], r.origin[1], r.origin[2]], dir: [r.direction[0], r.direction[1], r.direction[2]] } : null;
     };
     /** The index the renderer drew a placed thing at (hidden layers are not drawn; isolate draws one). */
@@ -526,10 +545,10 @@ export function IslandWalk(props: {
       const refs = (rt.store.get(scene.sceneId)?.children['models'] ?? []).filter((r) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['hidden'] !== true);
       return refs.findIndex((r) => r.ref === ref);
     };
-    const aim = (): Aim | null => { const c = pointerLocked || softAim ? centre() : cursor; const h = renderer.pick(c.x, c.y); return h.point ? { point: h.point, normal: h.normal ?? null } : null; };
+    const aim = (): Aim | null => { const c = atCursor() ? cursor : centre(); const h = renderer.pick(c.x, c.y); return h.point ? { point: h.point, normal: h.normal ?? null } : null; };
 
     // the browser refuses a re-lock for a moment after Esc: only give up on the mouse after three refusals in a row
-    const failLock = (): void => { if (++lockFails >= 3) { softAim = true; setLocked(true); } };
+    const failLock = (): void => { if (studio()) return; if (++lockFails >= 3) { softAim = true; setLocked(true); } };
     const lock = (): void => {
       if (document.pointerLockElement || studio()) return;
       captureMouse(root, failLock);
@@ -622,7 +641,7 @@ export function IslandWalk(props: {
       if (typing) return;
       if (live.current.menu) return;
       if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTgt && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
-      const tab = tabForKey(e.key);
+      const tab = tabForKey(e.key, e.shiftKey);
       if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
       if (k === 'tab') {
         e.preventDefault();
@@ -675,6 +694,7 @@ export function IslandWalk(props: {
     const onPointerMove = (e: PointerEvent): void => {
       cursor = { x: e.clientX, y: e.clientY };
       if (live.current.menu) return;
+      if (gizmo.dragging && atCursor()) gizmo.track(gizmoRay(), gizmoSnap());
       if ((pointerLocked || looking) && performance.now() - lastLookEvent > 400) { lastLookEvent = performance.now(); tourEvent('looked'); }
       if (pointerLocked) {
         if (!realMove(e.movementX, e.movementY)) return;
@@ -693,7 +713,10 @@ export function IslandWalk(props: {
       camPitch = Math.min(1.3, Math.max(0.05, camPitch + dy * 0.004));
     };
     const onPointerUp = (e: PointerEvent): void => {
-      if (gizmo.dragging && e.button === 0) { const said = gizmo.up(); if (said) say(said); fx('place', { volume: 0.5 }); return; }
+      if (gizmo.dragging && e.button === 0) {
+        if (atCursor()) cursor = { x: e.clientX, y: e.clientY };
+        const said = gizmo.up(gizmoRay()); if (said) say(said); fx('place', { volume: 0.5 }); return;
+      }
       if (looking && e.button === 2) { looking = null; try { el.releasePointerCapture(e.pointerId); } catch { /* not captured */ } return; }
       looking = null;
       if (mouse) { mouse &= e.button === 2 && !softAim ? ~2 : ~1; if (!mouse) builder.end(); }
@@ -764,6 +787,32 @@ export function IslandWalk(props: {
         fx('place', { volume: 0.5 });
         return;
       }
+      // the Effects tab's ways: place the palette's effect where you point, play it once, or take the nearest away
+      if (s.tab === 'effects') {
+        if (!first) return;
+        const a = aim();
+        if (!a) { say('Point at the ground'); return; }
+        const kind = s.palette.effects ?? 'campfire';
+        const name = PARTICLE_PRESETS.find((p) => p.id === kind)?.name ?? kind;
+        if (id === 'effects-once') { effects.once(kind, [a.point[0], a.point[1], a.point[2]]); fx('select', { volume: 0.4 }); return; }
+        const refs = rt.store.get(scene.sceneId)?.children['effects'] ?? [];
+        if (id === 'effects-remove' || alt) {
+          let best = -1, bestD = 3;
+          refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
+          if (best < 0) { say('No effect near there'); return; }
+          rt.commands.execute(cmd.removeChild(scene.sceneId, 'effects', best, 'Remove an effect'));
+          saveMap(rt, scene.sceneId); say('Effect taken away'); fx('delete', { volume: 0.5 });
+          return;
+        }
+        const effectId = `effect-${Date.now().toString(36)}`;
+        rt.commands.transaction(`Effect: ${name}`, () => {
+          rt.commands.execute(cmd.put({ id: effectId, kind: 'effect', name, params: { preset: kind, x: a.point[0], y: a.point[1], z: a.point[2], scale: 1, on: true } as never, tier: 'play' }, `Effect: ${name}`));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'effects', effectId, undefined, `Effect: ${name}`));
+        });
+        saveMap(rt, scene.sceneId);
+        say(`${name} placed`); fx('place', { volume: 0.5 });
+        return;
+      }
       // the Lights tab's ways act on the light where you are (the Sun keeps moving while held)
       if (s.tab === 'lights' && isLightWay(id)) {
         const holds = LIGHT_WAYS.find((w) => w.id === id)?.hold === true;
@@ -824,6 +873,10 @@ export function IslandWalk(props: {
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      effects.sync(placedEffects());
+      effects.step(dt);
+      renderer.setParticles('glow', effects.glow.buffer, effects.glow.count);
+      renderer.setParticles('plain', effects.plain.buffer, effects.plain.count);
       if (now - lastTourTick > 250) { lastTourTick = now; tourTick(); }
       if (intro.on) {
         intro.t += dt * 1000;
@@ -995,10 +1048,7 @@ export function IslandWalk(props: {
         const idx = on && sel ? drawnIndex(sel) : -1;
         gizmoTgt = sel && idx >= 0 ? { ref: sel, index: idx } : null;
         gizmoFov = fpv ? fov : st ? fov - 10 : fov - 15;
-        const snap: { move?: number; turn?: number; scale?: number } = {};
-        if (down.has('shift')) { snap.move = 0.5; snap.scale = 0.25; }
-        if (down.has('control')) snap.turn = 15;
-        gizmo.frame(gizmoTgt, gizmoModeFor(pl.hotbars.select[pl.slots.select]), gizmoRay(), gizmoFov, snap);
+        gizmo.frame(gizmoTgt, gizmoModeFor(pl.hotbars.select[pl.slots.select]), gizmoRay(), gizmoFov, gizmoSnap());
       }
       renderer.step();
       // seen through a window (the SetMix home): shade only what the window shows
@@ -1087,6 +1137,8 @@ export function IslandWalk(props: {
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'logic'
           ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'effects'
+          ? <PaletteStrip title="Effects" items={PARTICLE_PRESETS.map((e) => ({ id: e.id, name: e.name, preview: { kind: 'icon', icon: EFFECT_ICONS[e.id] ?? 'Sparkles' } }))} community={[]} selected={p.palette.effects ?? 'campfire'} onLayers={openLayers} onPick={(id) => { pickPalette('effects', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'lights'
           ? <PaletteStrip title="Light" items={LIGHT_ITEMS} community={[]} selected={p.palette.lights} onLayers={openLayers} onPick={(id) => { pickPalette('lights', id); pickLook(rt, scene.sceneId, id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'things'
@@ -1111,6 +1163,7 @@ export function IslandWalk(props: {
                 onApply={(g, target) => api.current?.setSurfaceLook(sid, g, target === 'blocks') ?? false}
                 onSave={(g, target) => props.onProfile?.((pr) => { const key = target === 'blocks' ? `b${sid}` : String(sid); const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[key] = g; else delete looks[key]; return { ...pr, groundLooks: looks }; })} />; })()
             : w.id === 'logic' ? <LogicPanel rt={rt} sceneId={scene.sceneId} />
+            : w.id === 'effects' ? <EffectsPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
@@ -1166,6 +1219,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
     case 'logic': { const w = LOGIC_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
+    case 'effects': { const w = EFFECT_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     default: return { title, line: item.doc, left: 'Use it', right: 'The opposite' };
   }
 }

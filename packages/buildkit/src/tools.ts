@@ -95,6 +95,10 @@ export const THINGS: readonly { readonly id: string; readonly name: string; read
   { id: 'flowers', name: 'Flowers', icon: 'Flower2' }, { id: 'grass-clump', name: 'Grass clump', icon: 'Sprout' }, { id: 'barrel', name: 'Barrel', icon: 'Package' },
   { id: 'trophy', name: 'Trophy', icon: 'Trophy' }, { id: 'statue-plinth', name: 'Plinth', icon: 'Square' }, { id: 'goblin', name: 'Goblin statue', icon: 'Smile' },
   { id: 'goblin-ball-racer', name: 'Ball racer', icon: 'Circle' },
+  // building blocks (F3 of the hotbar spec V3; @hm/primitives)
+  { id: 'block-cube', name: 'Cube', icon: 'Box' }, { id: 'block-ball', name: 'Ball', icon: 'Circle' }, { id: 'block-cylinder', name: 'Cylinder', icon: 'Cylinder' },
+  { id: 'block-wedge', name: 'Wedge', icon: 'Triangle' }, { id: 'block-stairs', name: 'Stairs', icon: 'ChartNoAxesColumnIncreasing' }, { id: 'block-hollow-box', name: 'Hollow box', icon: 'Square' },
+  { id: 'block-arch', name: 'Arch', icon: 'DoorOpen' }, { id: 'block-plank', name: 'Plank', icon: 'RectangleHorizontal' }, { id: 'block-pillar', name: 'Pillar', icon: 'Columns2' },
 ];
 
 type Base = Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'surface' | 'model' | 'sprite' | 'sound'> & Pick<ToolPreset, 'shape' | 'pattern'>;

@@ -23,7 +23,7 @@ import { spriteDef } from './sprites';
 export interface Aim { readonly point: readonly [number, number, number]; readonly normal: readonly [number, number, number] | null }
 
 /** Metres per voxel for each placeable model (size 1 on the tool). */
-const PLACE_BLOCK: Readonly<Record<string, number>> = { goblin: 0.04, 'goblin-ball-racer': 0.05, palm: 0.13, barrel: 0.08, rock: 0.12, trophy: 0.1, 'statue-plinth': 0.2, bush: 0.17, 'grass-clump': 0.11, flowers: 0.1 };
+const PLACE_BLOCK: Readonly<Record<string, number>> = { 'block-cube': 0.125, 'block-ball': 0.125, 'block-cylinder': 0.125, 'block-wedge': 0.125, 'block-stairs': 0.125, 'block-hollow-box': 0.125, 'block-arch': 0.125, 'block-plank': 0.125, 'block-pillar': 0.125, goblin: 0.04, 'goblin-ball-racer': 0.05, palm: 0.13, barrel: 0.08, rock: 0.12, trophy: 0.1, 'statue-plinth': 0.2, bush: 0.17, 'grass-clump': 0.11, flowers: 0.1 };
 const STAMPS: Readonly<Partial<Record<ToolPreset['action'], StampKind>>> = { mound: 'mound', crater: 'crater', plateau: 'plateau', ridge: 'ridge', dune: 'dune' };
 /** A small seeded random (mulberry32). */
 function mulberry(seed: number): () => number {

@@ -127,3 +127,4 @@ export * from './tools';
 export * from './plugs';
 export * from './coverage';
 export * from './logic';
+export * from './effects';

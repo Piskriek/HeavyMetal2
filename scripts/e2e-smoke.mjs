@@ -184,7 +184,7 @@ try {
   check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
-  check('ten tabs on the tab strip in the V3 order (F1 to F10)', await page.locator('.tab-strip button').count() === 10);
+  check('eleven tabs on the tab strip in the V3 order (F1 to F10, and Effects on F12)', await page.locator('.tab-strip button').count() === 11);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
@@ -290,7 +290,8 @@ try {
     await page.mouse.move(g1.xFar[0], g1.xFar[1], { steps: 6 }); await page.waitForTimeout(T(200));
     await page.mouse.up(); await page.waitForTimeout(T(300));
     const g2 = await page.evaluate(() => window.hmGizmo?.());
-    check('dragging the x arrow moves the thing along x only', !!g2 && g2.x - g1.x > 0.2 && Math.abs(g2.z - g1.z) < 1e-6 && Math.abs(g2.y - g1.y) < 1e-6, `x ${g1.x} to ${g2?.x}`);
+    check('dragging the x arrow moves the thing along x only', !!g2 && g2.x - g1.x > 0.2 && Math.abs(g2.z - g1.z) < 1e-6 && Math.abs(g2.y - g1.y) < 1e-6, `x ${g1.x} to ${g2?.x}; before ${JSON.stringify(g1)}; after ${JSON.stringify(g2)}`);
+    console.log(`     gizmo drag: x ${g1.x.toFixed(3)} to ${g2?.x.toFixed(3)} (arrow ${g1.len.toFixed(3)} m long)`);
     await page.keyboard.press('Control+z');
     await page.waitForTimeout(T(300));
     const g3 = await page.evaluate(() => window.hmGizmo?.());
@@ -300,6 +301,21 @@ try {
   await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
   await page.waitForTimeout(T(200));
   check('Easy has no gizmo', !(await page.evaluate(() => window.hmGizmo?.())));
+  await page.keyboard.press('F2');
+  await page.waitForTimeout(T(200));
+  // Effects (F12, or Shift+F2): place a campfire from the palette, it burns; Ctrl+Z takes it away
+  await page.keyboard.press('Shift+F2');
+  await page.waitForTimeout(T(400));
+  check('Shift+F2 opens Effects, its palette holds the twelve effects', /Effects/.test(await page.locator('.tab-strip button.on').first().textContent() ?? '') && await page.locator('.palette-strip .ps-frame').count() === 12);
+  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Campfire/i.test(b.textContent ?? ''))?.click(); });
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Place/.test(b.textContent ?? ''))?.click(); });
+  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
+  await page.waitForTimeout(T(900));
+  const fx1 = await page.evaluate(() => window.hmEffects?.());
+  check('Place puts a campfire on the island and it burns', fx1?.placed === 1 && fx1.particles > 0, JSON.stringify(fx1));
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(T(400));
+  check('and Ctrl+Z takes it away', (await page.evaluate(() => window.hmEffects?.()))?.placed === 0);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

@@ -90,14 +90,8 @@ export class GizmoControl {
     const pivot: Vec3 = this.grab && this.last ? [this.last.x, this.last.y, this.last.z] : [base.x, base.y, base.z];
     const len = this.grab?.len ?? worldLength(pivot, ray.origin, fovDeg, this.size);
     const state = { mode: this.grab ? modeOfHandle(this.grab.handle) : mode, pivot };
-    if (this.grab) {
-      const g = this.grab;
-      const r = drag({ mode: state.mode, pivot: [g.from.x, g.from.y, g.from.z] }, g.handle, g.start, ray, g.len, snap);
-      this.last = posed(g.from, r);
-      this.pose(g.target.index, this.last);
-    } else {
-      this.hot = allowed(mode, hitTest(state, ray, len));
-    }
+    if (this.grab) this.track(ray, snap);
+    else this.hot = allowed(mode, hitTest(state, ray, len));
     this.overlay.show('gizmo', gizmoShapes(state.mode, pivot, len, this.grab?.handle ?? this.hot));
     this.seen = { ref: t.ref, mode: state.mode, pivot, len, hot: this.grab?.handle ?? this.hot };
     this.shown = true;
@@ -116,8 +110,23 @@ export class GizmoControl {
     return true;
   }
 
-  /** Let go: one undo step (Move, Turn, Size, or a copy left behind with Alt). Returns what was done, for the island to say. */
-  up(): string | null {
+  /**
+   * Follow the pointer now. The frame calls it, and so do pointer moves and letting go: a slow frame (a low-end laptop) never drops the end
+   * of a quick drag. The snap stays as last given.
+   */
+  track(ray: Ray | null, snap?: Snap): void {
+    const g = this.grab;
+    if (!g || !ray) return;
+    if (snap) this.snap = snap;
+    const r = drag({ mode: modeOfHandle(g.handle), pivot: [g.from.x, g.from.y, g.from.z] }, g.handle, g.start, ray, g.len, this.snap);
+    this.last = posed(g.from, r);
+    this.pose(g.target.index, this.last);
+  }
+  private snap: Snap = {};
+
+  /** Let go (with the pointer's last ray): one undo step (Move, Turn, Size, or a copy left behind with Alt). Returns what was done, for the island to say. */
+  up(ray?: Ray | null): string | null {
+    this.track(ray ?? null);
     const g = this.grab, p = this.last;
     this.grab = null; this.last = null;
     if (!g || !p) return null;

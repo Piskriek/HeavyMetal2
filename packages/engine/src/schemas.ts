@@ -87,6 +87,7 @@ export const sceneSchema = defineSchema({
     { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
     { key: 'logic', label: 'Logic', doc: 'The island\'s rules: when something happens (a goblin touches a thing, a timer, night falls), what is done (a sound, a spin, a jump, hide, say).', kinds: ['logic-rule'], min: 0, max: null, tier: 'play' },
+    { key: 'effects', label: 'Effects', doc: 'Particle effects placed on the island: campfires, smoke, snow, rain, sparks, fireworks, bubbles ...', kinds: ['effect'], min: 0, max: null, tier: 'play' },
   ] as readonly ChildSlot[],
 });
 
@@ -427,7 +428,24 @@ export const logicRuleSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
+export const effectSchema = defineSchema({
+  kind: 'effect',
+  version: 1,
+  label: 'Effect',
+  doc: 'A particle effect placed in the world (the Effects tab, F12): one of the ready-made emitters, where it stands and how big it is.',
+  icon: 'sparkles',
+  variables: [
+    { key: 'preset', type: 'enum', label: 'Effect', doc: 'Which effect.', tier: 'play', default: 'campfire', options: ['campfire', 'smoke', 'snow', 'rain', 'sparks', 'firework', 'bubbles', 'dust', 'glitter', 'embers', 'splash', 'confetti'] },
+    { key: 'x', type: 'number', label: 'X', doc: 'Where it stands, east-west.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'y', type: 'number', label: 'Y', doc: 'Where it stands, up.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'z', type: 'number', label: 'Z', doc: 'Where it stands, north-south.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'scale', type: 'number', label: 'Size', doc: 'Bigger spreads it wider and makes its particles bigger.', tier: 'play', default: 1, min: 0.2, max: 5, step: 0.1 },
+    { key: 'on', type: 'boolean', label: 'On', doc: 'Switch it off without taking it away.', tier: 'play', default: true },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

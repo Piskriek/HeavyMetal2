@@ -17,6 +17,7 @@ import { DecorView, type DecorInstance } from './decor';
 import { RoadDecalView, type RoadDecalDef } from './road-decals';
 import { ModelsView, type ModelPlacement } from './voxel-view';
 import { Bursts, type BurstDef } from './bursts';
+import { ParticleLayer, type ParticleLayerId } from './particle-view';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -43,6 +44,8 @@ export type ThreeRenderer = RenderService & {
   setModelPose(index: number, x: number, y: number, z: number, yawDeg: number, scale?: number): void;
   /** A puff, spark or chip burst at a point in the world (the juice on every edit). */
   burst(def: BurstDef): void;
+  /** Placed particle effects: a particle system's buffer (8 floats a particle) and how many are live; the glow layer adds light. null clears. */
+  setParticles(layer: ParticleLayerId, buffer: Float32Array | null, count: number): void;
   /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
   setFov(deg: number): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
@@ -179,6 +182,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     modelsView = null;
     bursts?.dispose();
     bursts = null;
+    for (const l of particleLayers.values()) { l.points.removeFromParent(); l.dispose(); }
+    particleLayers.clear();
     roadView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
@@ -255,6 +260,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     if (scene && pendingRoad && pendingRoad.length) { roadView = new RoadDecalView(pendingRoad); scene.add(roadView.group); }
   };
   let bursts: Bursts | null = null;
+  const particleLayers = new Map<ParticleLayerId, ParticleLayer>();
+  const particleCounts = new Map<ParticleLayerId, number>();
   let modelsView: ModelsView | null = null;
   let pendingModels: readonly ModelPlacement[] | null = null;
   const applyModels = (): void => {
@@ -355,6 +362,13 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyDecor();
     },
     burst(def: BurstDef): void { bursts?.emit(def); },
+    setParticles(layer: ParticleLayerId, buffer: Float32Array | null, count: number): void {
+      const old = particleLayers.get(layer);
+      if (old && old.buffer !== buffer) { old.points.removeFromParent(); old.dispose(); particleLayers.delete(layer); }
+      if (!buffer) return;
+      if (!particleLayers.has(layer)) particleLayers.set(layer, new ParticleLayer(buffer, layer === 'glow'));
+      particleCounts.set(layer, count);
+    },
     setModelPose(index: number, x: number, y: number, z: number, yawDeg: number, scale?: number): void {
       modelsView?.pose(index, x, y, z, yawDeg, scale);
     },
@@ -432,6 +446,10 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       sceneSync?.present(alpha);
       roadView?.animate(performance.now());
       bursts?.update(previousFrame === null ? 16 : performance.now() - previousFrame);
+      if (particleLayers.size) {
+        const pxPerMetre = webgl.domElement.clientHeight / (2 * Math.tan((orbitState.fov * Math.PI) / 360));
+        for (const [id, l] of particleLayers) { if (!l.points.parent) scene.add(l.points); l.update(particleCounts.get(id) ?? 0, pxPerMetre); }
+      }
       updateView();
       decorView?.update(viewCamera);
       const frameSeconds = previousFrame === null ? 0.016 : Math.min(0.1, (performance.now() - previousFrame) / 1000);

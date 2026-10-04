@@ -156,6 +156,21 @@
       "@hm/primitives": [
         "packages/primitives/src/index.ts"
       ],
+      "@hm/physmat": [
+        "packages/physmat/src/index.ts"
+      ],
+      "@hm/soundscape": [
+        "packages/soundscape/src/index.ts"
+      ],
+      "@hm/npcbrain": [
+        "packages/npcbrain/src/index.ts"
+      ],
+      "@hm/particles": [
+        "packages/particles/src/index.ts"
+      ],
+      "@hm/selectset": [
+        "packages/selectset/src/index.ts"
+      ],
       "@hm/voxelnature": [
         "packages/voxelnature/src/index.ts"
       ],

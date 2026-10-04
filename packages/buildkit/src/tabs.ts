@@ -3,7 +3,7 @@
  * F12 belong to the browser, so tabs 11 and 12 will also open with Shift+F1 and Shift+F2), each tab has nine slots (keys 1 to 9) holding presets
  * of that tab, and E opens the preset window for the tab. Activities are not on the hotbar (the galaxy and the Esc menu open them). Pure data.
  */
-export type TabId = 'select' | 'paint' | 'things' | 'animate' | 'sound' | 'lights' | 'logic' | 'camera' | 'avatar' | 'sculpt';
+export type TabId = 'select' | 'paint' | 'things' | 'animate' | 'sound' | 'lights' | 'logic' | 'camera' | 'avatar' | 'sculpt' | 'effects';
 
 export interface TabDef {
   readonly id: TabId;
@@ -12,6 +12,8 @@ export interface TabDef {
   readonly key: string;
   /** A second key (Avatar also opens with P). */
   readonly alt?: string;
+  /** A key pressed with Shift (tabs 11 and 12: browsers keep F11 and F12 for themselves). */
+  readonly shift?: string;
   /** lucide icon name */
   readonly icon: string;
   readonly doc: string;
@@ -29,14 +31,16 @@ export const TABS: readonly TabDef[] = [
   { id: 'camera', label: 'Camera', key: 'F8', icon: 'Camera', doc: 'How you see the world: over the shoulder, first person, studio, from above.' },
   { id: 'avatar', label: 'Avatar', key: 'F9', alt: 'p', icon: 'User', doc: 'Your goblin: how it looks and how it moves.' },
   { id: 'sculpt', label: 'Terrain', key: 'F10', icon: 'Mountain', doc: 'Raise, lower, smooth and shape the ground. The world rules decide what digging uncovers and what the plants do.' },
+  { id: 'effects', label: 'Effects', key: 'F12', shift: 'F2', icon: 'Sparkles', doc: 'Particle effects: place a campfire, smoke, snow, rain, sparks, fireworks or bubbles where you point, or play one once.' },
 ];
 export const TAB_IDS: readonly TabId[] = TABS.map((t) => t.id);
 export const tabDef = (id: TabId): TabDef => TABS.find((t) => t.id === id) ?? TABS[0]!;
 
 /** The tab a key opens (F1..F10, the backtick for Logic and P for the avatar), or null. Case-insensitive for letters. */
-export function tabForKey(key: string): TabId | null {
+export function tabForKey(key: string, shift = false): TabId | null {
   if (typeof key !== 'string' || !key) return null;
   const k = key.length === 1 ? key.toLowerCase() : key;
+  if (shift) { const s = TABS.find((d) => d.shift === k); if (s) return s.id; }
   const t = TABS.find((d) => d.key === k || d.alt === k);
   return t ? t.id : null;
 }

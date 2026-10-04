@@ -159,6 +159,12 @@
       "@hm/physmat": [
         "packages/physmat/src/index.ts"
       ],
+      "@hm/camtrack": [
+        "packages/camtrack/src/index.ts"
+      ],
+      "@hm/walkpath": [
+        "packages/walkpath/src/index.ts"
+      ],
       "@hm/lightplace": [
         "packages/lightplace/src/index.ts"
       ],

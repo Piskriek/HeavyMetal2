@@ -65,6 +65,8 @@ Hard, self-contained logic goes to the Arena (pure TypeScript packages with acce
 
 ## 4. Order of work
 
+> **Status 2026-10-04:** wave A merged (all eight), B2 voxelcsg, B3 walkpath, B4 lightplace, B5 camtrack merged; glue done for the V3 tab order, the gizmo, F3 blocks, F5 sounds, F9 characters, F12 effects. Glue next: F6 lamps, F11 physics, F1 box select, F7 wires, F4 paths, F8 camera tracks. Live status: `docs/handoff/prompts/battle/INDEX.md` and CATCHUP 12ad.
+
 Two battles at a time (captcha limit). While they run I write glue for the previous ones, never the battle's own module.
 
 1. **Wave A, foundations (8 battles, prompts ready in `docs/handoff/prompts/battle/`):** A1 `gizmo`, A2 `selectset`, A3 `primitives`, A4 `soundscape`, A5 `triggers`, A6 `npcbrain`, A7 `physmat`, A8 `particles`. Glue after each: the F-key move to V3 order (one change, with old hotbars migrated), the gizmo in the renderer, blocks on F3, sounds and zones, Logic on F7, characters on F9, bodies for things, the particle renderer and F12.

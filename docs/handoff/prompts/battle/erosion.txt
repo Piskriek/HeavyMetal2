@@ -1,0 +1,60 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: erosion for a terrain heightfield in a toy-world editor: thermal erosion (steep slopes slump until they are stable), hydraulic erosion (raindrops carry soil downhill and drop it in the valleys), and where water flows (how many cells drain through each cell: rivers). Deterministic; soil is never created or destroyed.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/erosion.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (use mulberry32 with the given seed), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Never change the input: return new arrays.
+
+## API (implement exactly)
+
+```ts
+export interface Heightfield { cols: number; rows: number; cell: number; heights: Float32Array }   // height of cell (c, r) = heights[c + r * cols]
+export interface DropOptions { inertia: number; capacity: number; minSlope: number; deposit: number; erode: number; evaporation: number; gravity: number; maxSteps: number }
+export const DROP_DEFAULTS: DropOptions; // { inertia: 0.05, capacity: 4, minSlope: 0.01, deposit: 0.3, erode: 0.3, evaporation: 0.01, gravity: 4, maxSteps: 64 }
+export function mulberry32(seed: number): () => number;
+export function thermal(h: Heightfield, iterations: number, talus: number, rate?: number): Float32Array;            // rate defaults to 0.5
+export function hydraulic(h: Heightfield, drops: number, seed: number, opts?: Partial<DropOptions>): Float32Array;
+export function flowAccumulation(h: Heightfield): Float32Array;
+```
+
+## Rules
+- thermal: each iteration works from the heights at its start. For every cell, its drop to each of its 4 neighbours (N, E, S, W; off the map ignored) is d_i = h - h_i and its excess e_i = d_i - talus * cell where that is positive. With excesses, the cell moves rate * max(e_i) / 2 of height in total, shared among those neighbours in proportion to e_i. All moves of the iteration are applied together at its end.
+- hydraulic: for each of `drops` raindrops (positions from the seeded random): start at a random point (x in [0, cols - 1), z in [0, rows - 1), in cells), direction (0, 0), speed 1, water 1, sediment 0. Each step (at most maxSteps): the gradient at the point (bilinear over the 4 surrounding cells); dir = dir * inertia - gradient * (1 - inertia), normalised (a random unit direction when zero); next = point + dir. If next is off the map (outside [0, cols - 1) x [0, rows - 1)) the drop puts down all its sediment in its current cell and stops. dh = height(next) - height(point) (bilinear). capacity = max(-dh, minSlope) * speed * water * opts.capacity. If sediment > capacity or dh > 0, it deposits into the cell it is in (floor of the point): dh > 0 ? min(dh, sediment) : (sediment - capacity) * opts.deposit. Otherwise it erodes that cell: min((capacity - sediment) * opts.erode, -dh). speed = sqrt(max(0, speed^2 - dh * gravity)); water *= 1 - evaporation; point = next. When it stops (steps used up, or water < 0.01) it puts down what it still carries where it is. So the total of all heights never changes.
+- flowAccumulation: every cell drains to the neighbour (of its 8) with the steepest descent (h - h_n) / distance (1 or sqrt 2), only if that is positive; ties: the first in the order N, NE, E, SE, S, SW, W, NW (N is r - 1). Each cell's value is 1 plus the values of every cell draining into it.
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { flowAccumulation, hydraulic, thermal, type Heightfield } from '../src/index';
+const field = (cols: number, rows: number, f: (c: number, r: number) => number): Heightfield => { const heights = new Float32Array(cols * rows); for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) heights[c + r * cols] = f(c, r); return { cols, rows, cell: 1, heights }; };
+const sum = (a: Float32Array): number => a.reduce((s, v) => s + v, 0);
+
+test('thermal: a flat field stays flat, a spike slumps into a stable heap and nothing is lost', () => {
+  const flat = field(9, 9, () => 3);
+  assert.deepEqual(Array.from(thermal(flat, 20, 1)), Array.from(flat.heights));
+  const spike = field(41, 41, (c, r) => (c === 20 && r === 20 ? 10 : 0));
+  const out = thermal(spike, 1000, 1);
+  assert.ok(Math.abs(sum(out) - 10) < 1e-3, String(sum(out)));
+  assert.ok(out[20 + 20 * 41]! < 10 && out[21 + 20 * 41]! > 0);
+  let worst = 0;
+  for (let r = 0; r < 41; r++) for (let c = 0; c < 41; c++) { const h = out[c + r * 41]!; if (c < 40) worst = Math.max(worst, Math.abs(h - out[c + 1 + r * 41]!)); if (r < 40) worst = Math.max(worst, Math.abs(h - out[c + (r + 1) * 41]!)); }
+  assert.ok(worst <= 1.05, String(worst));
+  assert.equal(spike.heights[20 + 20 * 41], 10);
+});
+test('hydraulic: raindrops wear the peak down, keep every grain, and do it the same way each time', () => {
+  const cone = field(41, 41, (c, r) => Math.max(0, 10 - Math.hypot(c - 20, r - 20)));
+  const a = hydraulic(cone, 2000, 1), b = hydraulic(cone, 2000, 1);
+  assert.deepEqual(Array.from(a), Array.from(b));
+  assert.ok(Math.abs(sum(a) - sum(cone.heights)) < 1e-3 * sum(cone.heights), `${sum(a)} vs ${sum(cone.heights)}`);
+  assert.ok(a.some((v, i) => Math.abs(v - cone.heights[i]!) > 1e-4));
+  assert.notDeepEqual(Array.from(hydraulic(cone, 2000, 2)), Array.from(a));
+});
+test('water collects down a slope and into a pit', () => {
+  const ramp = field(5, 21, (_c, r) => 20 - r);
+  const acc = flowAccumulation(ramp);
+  assert.equal(acc[2 + 20 * 5], 21); assert.equal(acc[2 + 0 * 5], 1);
+  const pit = field(5, 5, (c, r) => (c === 2 && r === 2 ? -1 : 0));
+  assert.equal(flowAccumulation(pit)[2 + 2 * 5], 9);
+});
+```

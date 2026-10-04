@@ -1,0 +1,76 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the maths of an animation timeline (a dope sheet) for a toy-world editor: tracks of keys in time, the value between keys (step, straight, smooth, or curves with tangent handles), and the edits a dope sheet makes (add, remove, move and stretch keys, snap to frames, bake to samples).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/keyframes.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Never change an input track: every edit returns a new one, its keys sorted by time.
+
+## API (implement exactly)
+
+```ts
+export type Interp = 'step' | 'linear' | 'smooth' | 'bezier';
+export interface Key { t: number; v: number; interp: Interp; inTan?: number; outTan?: number }  // tangents: value per second
+export interface Track { id: string; keys: Key[] }                                              // keys sorted by t
+
+/**
+ * The value at time t. Before the first key: its value; after the last: its value; no keys: 0. Between key k and k+1, by k.interp:
+ * step: k.v; linear: straight; smooth: cubic Hermite whose tangent at each key is (v[k+1] - v[k-1]) / (t[k+1] - t[k-1]) (at the first
+ * and last key one-sided: towards its only neighbour); bezier: cubic Hermite with k.outTan and (k+1).inTan (missing tangents: 0).
+ * Hermite on s = (t - tk) / (tk+1 - tk): h00 vk + h10 (tk+1 - tk) mk + h01 vk+1 + h11 (tk+1 - tk) mk+1.
+ */
+export function valueAt(track: Track, t: number): number;
+/** The key added in time order; a key already within 1e-6 of its time is replaced. */
+export function addKey(track: Track, key: Key): Track;
+/** The key within 1e-6 of t taken out (unchanged if none). */
+export function removeKey(track: Track, t: number): Track;
+/** The keys at these indices moved by dt (then sorted again). */
+export function moveKeys(track: Track, indices: number[], dt: number): Track;
+/** The keys at these indices stretched round pivot: t' = pivot + (t - pivot) * factor (then sorted again). */
+export function scaleKeys(track: Track, indices: number[], pivot: number, factor: number): Track;
+/** Samples every 1 / fps seconds from `from` to `to`, both ends included. */
+export function bake(track: Track, fps: number, from: number, to: number): number[];
+/** t rounded to the nearest frame. */
+export function snapTime(t: number, fps: number): number;
+/** Last key time minus first key time over all tracks (0 when there are no keys). */
+export function duration(tracks: readonly Track[]): number;
+```
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { addKey, bake, duration, moveKeys, removeKey, scaleKeys, snapTime, valueAt, type Interp, type Track } from '../src/index';
+const near = (a: number, b: number, e = 1e-9): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const tr = (interp: Interp, keys: [number, number][]): Track => ({ id: 'x', keys: keys.map(([t, v]) => ({ t, v, interp })) });
+
+test('step, straight and the ends', () => {
+  const s = tr('step', [[0, 0], [1, 10]]); near(valueAt(s, 0.9), 0); near(valueAt(s, 1), 10);
+  const l = tr('linear', [[0, 0], [2, 10]]); near(valueAt(l, 0.5), 2.5); near(valueAt(l, -1), 0); near(valueAt(l, 9), 10);
+  near(valueAt({ id: 'e', keys: [] }, 3), 0);
+});
+test('smooth goes through every key with automatic tangents', () => {
+  const s = tr('smooth', [[0, 0], [1, 1], [2, 0]]);
+  near(valueAt(s, 1), 1); near(valueAt(s, 0.5), 0.625); near(valueAt(s, 1.5), 0.625);
+});
+test('bezier follows its tangent handles', () => {
+  const flat: Track = { id: 'b', keys: [{ t: 0, v: 0, interp: 'bezier', outTan: 0 }, { t: 1, v: 1, interp: 'bezier', inTan: 0 }] };
+  near(valueAt(flat, 0.5), 0.5); near(valueAt(flat, 0.25), 0.15625);
+  const steady: Track = { id: 'b', keys: [{ t: 0, v: 0, interp: 'bezier', outTan: 1 }, { t: 1, v: 1, interp: 'bezier', inTan: 1 }] };
+  near(valueAt(steady, 0.25), 0.25);
+});
+test('adding, removing, moving and stretching keys', () => {
+  let t = tr('linear', [[0, 0], [2, 2]]);
+  t = addKey(t, { t: 1, v: 5, interp: 'linear' }); assert.deepEqual(t.keys.map((k) => k.t), [0, 1, 2]); near(valueAt(t, 1), 5);
+  t = addKey(t, { t: 1, v: 7, interp: 'linear' }); assert.equal(t.keys.length, 3); near(valueAt(t, 1), 7);
+  assert.deepEqual(removeKey(t, 1).keys.map((k) => k.t), [0, 2]);
+  assert.deepEqual(moveKeys(t, [0], 1.5).keys.map((k) => [k.t, k.v]), [[1, 7], [1.5, 0], [2, 2]]);
+  assert.deepEqual(scaleKeys(t, [1, 2], 0, 2).keys.map((k) => k.t), [0, 2, 4]);
+  assert.deepEqual(t.keys.map((k) => k.t), [0, 1, 2]);
+});
+test('bake, snap and duration', () => {
+  assert.deepEqual(bake(tr('linear', [[0, 0], [1, 1]]), 4, 0, 1), [0, 0.25, 0.5, 0.75, 1]);
+  near(snapTime(0.26, 24), 0.25);
+  near(duration([tr('linear', [[0.5, 0], [2, 1]]), tr('step', [[1, 0], [3, 1]])]), 2.5);
+  near(duration([]), 0);
+});
+```

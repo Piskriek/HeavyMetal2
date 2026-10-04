@@ -16,9 +16,11 @@ The plan is `docs/ARENA_PLAN.md`; the protocol is `docs/handoff/CATCHUP.md` sect
 | B4 | `lightplace.txt` | `@hm/lightplace` | F6 light presets, fall-off, cone, flicker, pick the lights that matter | MERGED 2026-10-04 (answer B, 11 tests; both passed ours) |
 | B3 | `walkpath.txt` | `@hm/walkpath` | F4 paths with waits; once, loop, ping-pong; smooth curves | MERGED 2026-10-04 (answer A, 11 tests) |
 | B5 | `camtrack.txt` | `@hm/camtrack` | F8 camera keys, eases, orbit shot, slow motion | MERGED 2026-10-04 (answer A, 26 tests) |
-| C2 | `splineroad.txt` | `@hm/splineroad` | F10 roads and rivers carved along a path | sent 2026-10-04: https://arena.ai/c/01a106a0-c31f-7033-9357-89000c5026d4 |
-| C4 | `wiregraph.txt` | `@hm/wiregraph` | F7 node-and-wire model: check, columns, layout, ports, curves | sent 2026-10-04: https://arena.ai/c/01a106a1-450b-7d15-a3c4-2b281f3bb472 |
-| B1, B6, B7, C1, C3, C5 | (to write; see ARENA_PLAN section 2) | | | planned |
+| C2 | `splineroad.txt` | `@hm/splineroad` | F10 roads and rivers carved along a path | MERGED 2026-10-04 (answer A, 6 tests) |
+| C4 | `wiregraph.txt` | `@hm/wiregraph` | F7 node-and-wire model: check, columns, layout, ports, curves | MERGED 2026-10-04 (answer A, 16 tests) |
+| C1 | `erosion.txt` | `@hm/erosion` | F10 thermal and raindrop erosion, where water flows | sent 2026-10-04: https://arena.ai/c/01a106bf-b81c-7925-a188-306a34660b6e |
+| C3 | `keyframes.txt` | `@hm/keyframes` | F4 Advanced: tracks, keys, interpolation, dope sheet edits | sent 2026-10-04: https://arena.ai/c/01a106c0-385b-706b-932f-468a3c606de6 |
+| B1, B6, B7, C5 | (to write; see ARENA_PLAN section 2) | | | planned |
 
 Each prompt's acceptance tests were worked through by hand (numbers checked); still, when a test fails against a good implementation, check my arithmetic before blaming the model (CATCHUP 11).
 

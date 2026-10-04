@@ -60,6 +60,8 @@ export default defineConfig(({ mode }) => ({
       '@hm/triggers': p('../../packages/triggers/src/index.ts'),
       '@hm/primitives': p('../../packages/primitives/src/index.ts'),
       '@hm/physmat': p('../../packages/physmat/src/index.ts'),
+      '@hm/wiregraph': p('../../packages/wiregraph/src/index.ts'),
+      '@hm/splineroad': p('../../packages/splineroad/src/index.ts'),
       '@hm/camtrack': p('../../packages/camtrack/src/index.ts'),
       '@hm/walkpath': p('../../packages/walkpath/src/index.ts'),
       '@hm/lightplace': p('../../packages/lightplace/src/index.ts'),

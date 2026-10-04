@@ -159,6 +159,12 @@
       "@hm/physmat": [
         "packages/physmat/src/index.ts"
       ],
+      "@hm/wiregraph": [
+        "packages/wiregraph/src/index.ts"
+      ],
+      "@hm/splineroad": [
+        "packages/splineroad/src/index.ts"
+      ],
       "@hm/camtrack": [
         "packages/camtrack/src/index.ts"
       ],

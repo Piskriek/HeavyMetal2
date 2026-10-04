@@ -47,6 +47,7 @@ import { encodeModel } from '@hm/voxel';
 import { rulesOf } from './world';
 import { CharactersRuntime, type PlacedChar } from './build/characters-runtime';
 import { PhysicsRuntime, type PhysThing } from './build/physics-runtime';
+import { carvePath, pathPreview, rainOn, ROAD_SURFACE, RIVER_SURFACE } from './build/paths';
 import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
@@ -406,6 +407,7 @@ export function IslandWalk(props: {
     const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
     (window as unknown as { hmGround: { tile?: (id: number) => number } }).hmGround.tile = (id) => surfaces.checksum(id);
     (window as unknown as { hmGround: { things?: () => number } }).hmGround.things = () => rt.store.get(scene.sceneId)?.children['models']?.length ?? 0;
+    (window as unknown as { hmGround: { heightAt?: (x: number, z: number) => number } }).hmGround.heightAt = (x, z) => { const t = rt.binder.terrain()?.terrain; return t ? heightAt(t, x, z) : 0; };
     (window as unknown as { hmGround: { heights?: () => number } }).hmGround.heights = () => { const t = rt.binder.terrain()?.terrain; let s = 0; if (t) for (let i = 0; i < t.heights.length; i++) s += t.heights[i]! * ((i % 97) + 1); return Math.round(s * 1000) / 1000; };
     /** Draw a surface from a texture graph: its painted-ground tile, or (blocks) its voxel faces, three seeds like the baked ones. */
     const applyLook = (id: number, graph: TexGraph, blocks: boolean): void => {
@@ -472,6 +474,33 @@ export function IslandWalk(props: {
       return { ref, base: [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0), Number(pr['z'] ?? 0)], size, material: String(pr['phys'] ?? 'wood') };
     };
     let physSettled = 0;
+    let rainTick = 0;
+    // a road or a river being drawn (the Terrain tab, F10): its points so far, shown as a ribbon
+    let path: { kind: 'road' | 'river'; width: number; pts: [number, number][] } | null = null;
+    let pathShown = false, pathsLaid = 0;
+    const showPath = (): void => {
+      const ts = rt.binder.terrain();
+      if (!path || !path.pts.length || !ts) { if (pathShown) { renderer.overlay.hide('path'); pathShown = false; } return; }
+      const lift = (x: number, z: number): [number, number, number] => [x, heightAt(ts.terrain, x, z) + 0.15, z];
+      const line = pathPreview(path.pts).map(([x, z]) => lift(x, z));
+      renderer.overlay.show('path', [
+        ...(line.length > 1 ? [{ type: 'ribbon' as const, points: line, width: path.width, color: path.kind === 'road' ? '#c8a26b' : '#3e8fd6', opacity: 0.55 }] : []),
+        ...path.pts.map(([x, z], i) => ({ type: 'handle' as const, id: `p${i}`, position: lift(x, z), color: '#ffffff', size: 0.25 })),
+      ]);
+      pathShown = true;
+    };
+    const layPath = (): void => {
+      const ts = rt.binder.terrain();
+      if (!path || path.pts.length < 2 || !ts) { say('Click at least two points first'); return; }
+      lastLaid = [...path.pts];
+      const kind = path.kind, made = carvePath(ts.terrain, path.pts, kind, path.width);
+      path = null; showPath();
+      if (!made) { say('Nothing to change there'); return; }
+      builder.applyHeights(made.heights, made.rect, kind === 'road' ? 'Road' : 'River', { cells: made.paint, surface: kind === 'road' ? ROAD_SURFACE : RIVER_SURFACE });
+      pathsLaid++; fx('place', { volume: 0.6 }); say(kind === 'road' ? 'Road laid' : 'River dug: it runs downhill all the way');
+    };
+    let lastLaid: [number, number][] = [];
+    (window as unknown as { hmPath: unknown }).hmPath = () => ({ points: path?.pts.length ?? 0, laid: pathsLaid, last: lastLaid });
     const lastCharAt = new Map<string, [number, number]>();
     let charBase = 0, charRefs: string[] = [];
     // a character wears a ready-made avatar look (dressed like your own goblin, not a statue): its model, once per look
@@ -688,6 +717,7 @@ export function IslandWalk(props: {
     /** Esc closes exactly one thing: the wheel, the front window, focus, hide-others, what Move carries; then it opens the menu. */
     const escape = (): void => {
       if (gizmo.dragging) { gizmo.cancel(); return; }
+      if (path) { path = null; showPath(); say('Let go of the path'); return; }
       if (texRef.current) { if (live.current.win.closeTop()) return; stepOutRef.current(); return; }
       if (live.current.win.closeTop()) return;
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
@@ -707,6 +737,7 @@ export function IslandWalk(props: {
       if (k === 'escape') { escape(); return; }
       if (typing) return;
       if (live.current.menu) return;
+      if (e.key === 'Enter' && path && path.pts.length >= 2) { e.preventDefault(); layPath(); return; }
       if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTgt && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
       const tab = tabForKey(e.key, e.shiftKey);
       if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
@@ -817,6 +848,28 @@ export function IslandWalk(props: {
           const m = builder.modelAt(a);
           if (m) { setLayerSel(m.ref); say(`${rt.store.get(m.ref)?.name ?? 'A thing'}: drag the gizmo; + and - size it, Shift and Ctrl snap, Alt leaves a copy`); fx('select', { volume: 0.5 }); }
           else say('Point at something you placed');
+          return;
+        }
+        if (tool && a && (tool.action === 'road' || tool.action === 'river')) {
+          if (!first) return;
+          const kind = tool.action;
+          const width = Math.max(1.5, tool.size);
+          if (!path || path.kind !== kind) path = { kind, width, pts: [] };
+          if (alt) { path.pts.pop(); say(path.pts.length ? `${path.pts.length} points` : 'No points yet'); showPath(); return; }
+          const last = path.pts[path.pts.length - 1];
+          if (last && path.pts.length >= 2 && Math.hypot(a.point[0] - last[0], a.point[2] - last[1]) < Math.max(1.2, width / 2)) { layPath(); return; }
+          path.pts.push([a.point[0], a.point[2]]);
+          fx('select', { volume: 0.4 });
+          say(path.pts.length === 1 ? `${tool.name}: click the next point, then the last one again to lay it` : `${path.pts.length} points: the last one again (or Enter) lays it, Esc lets go`);
+          showPath();
+          return;
+        }
+        if (tool && a && tool.action === 'rain') {
+          if (!first && now - rainTick < 250) return;
+          rainTick = now;
+          const ts = rt.binder.terrain();
+          const wet = ts ? rainOn(ts.terrain, a.point[0], a.point[2], Math.max(4, tool.size * 1.5), alt ? 0.2 : tool.strength, Math.floor(now) % 99991) : null;
+          if (wet) { builder.applyHeights(wet.heights, wet.rect, 'Rain'); if (first) say('Rain: gullies form, soil washes into the hollows'); fx('splash', { volume: 0.3, minGapMs: 200 }); }
           return;
         }
         if (tool && a) {
@@ -1095,6 +1148,8 @@ export function IslandWalk(props: {
           lampsLit = best.length;
         }
       }
+      // a path being drawn lets go when you put the Road or River down
+      if (path) { const pl = player(); const held = toolOf(pl, pl.hotbars[pl.tab][pl.slots[pl.tab]] ?? ''); if (pl.tab !== 'sculpt' || held?.action !== path.kind) { path = null; showPath(); } }
       effects.sync(placedEffects());
       {
         const spots = placedSounds();

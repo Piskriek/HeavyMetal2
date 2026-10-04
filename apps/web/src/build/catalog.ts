@@ -107,7 +107,7 @@ export function validFor(tab: TabId, id: string, player: CatalogPlayer, activiti
 
 /** Rows that were once the ready-made ones: a player who never changed them gets today's (Sculpt held shapes before it held ways). */
 export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly (string | null)[])[]>>> = {
-  sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']],
+  sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge'], ['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']],
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
@@ -121,7 +121,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   out.select = ids(['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate']);
   out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']);
   // ways to sculpt; the shapes Stamp presses are in the palette (docs/HOTBAR.md)
-  out.sculpt = ids(['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']);
+  out.sculpt = ids(['raise', 'smooth', 'sculpt-grab', 'sculpt-clay', 'sculpt-stamp', 'sculpt-terrace', 'terrain-road', 'terrain-river', 'terrain-rain']);
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
   out.sound = [...ids(SOUND_WAYS.map((w) => w.id)), null, null, null, null, null];
   // ways to change the light; the looks are the palette (docs/HOTBAR.md)

@@ -34,6 +34,7 @@ const ACTS: Readonly<Record<ToolAction, { readonly selects?: readonly string[]; 
   raise: { changes: ['ground-height'] }, lower: { changes: ['ground-height'] }, smooth: { changes: ['ground-height'] }, flatten: { changes: ['ground-height'] },
   dig: { changes: ['ground-height'] }, mound: { changes: ['ground-height'] }, crater: { changes: ['ground-height'] }, plateau: { changes: ['ground-height'] },
   ridge: { changes: ['ground-height'] }, dune: { changes: ['ground-height'] }, sculpt: { changes: ['ground-height'] },
+  road: { changes: ['ground-height', 'ground-surface'] }, river: { changes: ['ground-height', 'ground-surface'] }, rain: { changes: ['ground-height'] },
   place: { changes: ['thing'] }, things: { selects: ['thing'], changes: ['thing'] },
 };
 /** The tabs that hold presets rather than tools: what picking one of their slots changes today. */

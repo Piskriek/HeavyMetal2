@@ -348,6 +348,19 @@ export class BuildController {
    * The button was released. The world responds (world-rules and plant presets): dug ground shows soil or rock, sunk ground becomes sea bed,
    * plants follow the ground or go when their ground no longer suits them. Ground and plants are committed together as ONE undo step.
    */
+  /** A ground change made elsewhere (a road, a river, rain): put it in, paint what it paints, let the world respond: one undo step. */
+  applyHeights(next: Float32Array, rect: DirtyRect, label: string, paint?: { readonly cells: readonly number[]; readonly surface: number }): void {
+    const ts = this.rt.binder.terrain();
+    if (!ts || next.length !== ts.terrain.heights.length) return;
+    this.before = ts.terrain.heights.slice();
+    ts.terrain.heights.set(next);
+    if (paint) for (const i of paint.cells) { ts.terrain.surfaceA[i] = paint.surface; ts.terrain.blend[i] = 0; }
+    this.dirty = rect;
+    this.strokeLabel = label;
+    this.renderer.refreshTerrain(rect);
+    this.end();
+  }
+
   end(): void {
     if (this.pressed) { this.fire(this.pressed, 'release', this.lastAim); this.pressed = null; }
     if (!this.dirty) return;
@@ -360,24 +373,26 @@ export class BuildController {
     const decor = this.rt.binder.decor();
     const settled = decor ? settlePlants(decor.placements, ts.terrain, rectToArea(ts.terrain, dirty, 1), rules, plantsOf(this.rt, this.sceneId), before ?? undefined) : null;
     const label = this.strokeLabel || 'Sculpt';
+    const moves = this.settleMoves(ts.terrain, dirty);
     this.rt.commands.transaction(label, () => {
       this.rt.commands.execute(cmd.setParam(`${this.terrainId}.data`, encodeTerrain(ts.terrain) as never, label));
+      for (const [ref, g] of moves) this.rt.commands.execute(cmd.setParam(`${ref}.y`, g, label));
       if (decor && settled && (settled.removed > 0 || settled.moved > 0)) {
         const packed = packDecor(settled.items);
         this.rt.commands.execute(cmd.setParam(`${decor.presetId}.kinds`, packed.kinds as never, label));
         this.rt.commands.execute(cmd.setParam(`${decor.presetId}.items`, packed.items as never, label));
       }
     });
-    // placed models stand on the ground too
-    this.settleModels(ts.terrain, dirty, label);
+    // placed models stand on the ground too (moved inside the step above)
+    if (moves.length) this.hooks.onModels();
     this.hooks.onDecorPreview(null);
     if (settled && settled.removed > 0) this.hooks.say(settled.removed === 1 ? 'One plant dug up' : `${settled.removed} plants dug up`);
     saveMap(this.rt, this.sceneId);
   }
 
   /** Things you placed by hand follow the ground under them (they are props: they never disappear on their own). */
-  private settleModels(terrain: Parameters<typeof heightAt>[0], dirty: DirtyRect, label: string): void {
-    if (!rulesOf(this.rt, this.sceneId).plantsFollowGround) return;
+  private settleMoves(terrain: Parameters<typeof heightAt>[0], dirty: DirtyRect): [PresetId, number][] {
+    if (!rulesOf(this.rt, this.sceneId).plantsFollowGround) return [];
     const area = rectToArea(terrain, dirty, 1);
     const refs = this.rt.store.get(this.sceneId)?.children['models'] ?? [];
     const moves: [PresetId, number][] = [];
@@ -387,9 +402,7 @@ export class BuildController {
       const g = heightAt(terrain, x, z);
       if (Math.abs(g - y) > 1e-3) moves.push([r.ref, g]);
     }
-    if (!moves.length) return;
-    this.rt.commands.transaction(label, () => { for (const [ref, g] of moves) this.rt.commands.execute(cmd.setParam(`${ref}.y`, g, label)); });
-    this.hooks.onModels();
+    return moves;
   }
 
   /** Put one model into the scene (inside the caller's transaction). */

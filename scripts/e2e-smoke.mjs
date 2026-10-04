@@ -236,7 +236,7 @@ try {
   // Sculpt holds ways to sculpt; the shapes its Stamp presses are the palette
   await page.keyboard.press('F10');
   await page.waitForTimeout(T(300));
-  check('Sculpt holds ways to sculpt (Grab, Clay, Crease, Stamp, Terrace ...)', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Raise', 'Smooth', 'Grab', 'Clay', 'Crease', 'Stamp', 'Terrace'].every((w) => t.includes(w)); }));
+  check('Terrain holds ways to shape the ground (Grab, Clay, Stamp, Terrace, Road, River, Rain ...)', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Raise', 'Smooth', 'Grab', 'Clay', 'Stamp', 'Terrace', 'Road', 'River', 'Rain'].every((w) => t.includes(w)); }));
   check('the Sculpt palette holds the shapes to stamp', JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Hill', 'Crater', 'Plateau', 'Ridge', 'Dune', 'Volcano']));
   // Things and Lights hold ways too; what they use is the palette
   await page.keyboard.press('F3');
@@ -395,6 +395,20 @@ try {
   check('the push hammer sends things flying and they land for good', ph?.settled === 1 && !ph.moving, JSON.stringify(ph) + ' ' + phNote);
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(T(400));
+  // Terrain (F10): a road from two points, laid by clicking the last one again; it reshapes and repaints the ground; Ctrl+Z takes it back
+  await page.keyboard.press('F10');
+  await page.waitForTimeout(T(300));
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Road$/.test((b.textContent ?? '').trim()))?.click(); });
+  const groundBefore = await page.evaluate(() => [window.hmGround?.heights?.(), window.hmGround?.surfaces()[16] ?? 0]);
+  for (const [x, y] of [[520, 440], [760, 440], [760, 440]]) { await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(T(80)); await page.mouse.up(); await page.waitForTimeout(T(250)); }
+  await page.waitForTimeout(T(400));
+  const road = await page.evaluate(() => [window.hmPath?.(), window.hmGround?.heights?.(), window.hmGround?.surfaces()[16] ?? 0]);
+  const laid = road[0]?.last ?? [];
+  if (laid.length >= 2) { await page.evaluate((pts) => { const mx = (pts[0][0] + pts[pts.length - 1][0]) / 2, mz = (pts[0][1] + pts[pts.length - 1][1]) / 2; const g = window.hmGround?.heightAt?.(mx, mz) ?? 5; window.hmPinView = { eye: [mx + 6, g + 9, mz + 6], target: [mx, g, mz] }; }, laid); await page.waitForTimeout(T(600)); await shot('road'); await page.evaluate(() => { window.hmPinView = null; }); }
+  check('Road: two points and the last again lay a road that reshapes and repaints the ground', road[0]?.laid === 1 && road[1] !== groundBefore[0] && road[2] > groundBefore[1], JSON.stringify([groundBefore, road]));
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(T(400));
+  check('and Ctrl+Z takes the road back', (await page.evaluate(() => window.hmGround?.heights?.())) === groundBefore[0]);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

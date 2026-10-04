@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Params, PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { PAINTS, STAMP_SHAPES, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -25,6 +25,8 @@ import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
 import { SurfaceEditor } from './build/surface-editor';
+import { LIGHT_WAYS, isLightWay, applyLightWay } from './build/light-ways';
+import { SETUPS } from '@hm/lighting';
 import { avatarRigged } from './build/cards';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
@@ -56,11 +58,16 @@ const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 
 /** The palette's surfaces for the ways to paint. */
 // the palette shows each surface's own tile (SetMix's graph-made set), its colours until the picture loads
+/** Lights' palette: the looks. */
+const LIGHT_ITEMS: readonly StripItem[] = SETUPS.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'sky', top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color } }));
+/** Things' palette: what its ways place. */
+const THING_ITEMS: readonly StripItem[] = THINGS.map((t) => ({ id: t.id, name: t.name, preview: { kind: 'model', model: t.id } }));
 /** Sculpt's palette: the shapes its Stamp presses. */
 const SHAPE_ITEMS: readonly StripItem[] = STAMP_SHAPES.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'icon', icon: s.icon } }));
 /** A sculpt tool takes its shape (Stamp) from the palette and the toggles from beside the hotbar. */
 const withSculptPalette = (tool: ToolPreset, s: { readonly palette: Readonly<Partial<Record<TabId, string>>>; readonly sculptToggles: { readonly mirror: boolean; readonly smoothAfter: boolean } }): ToolPreset =>
-  tool.tab === 'sculpt' ? { ...tool, stampShape: s.palette.sculpt ?? 'mound', mirror: s.sculptToggles.mirror, smoothAfter: s.sculptToggles.smoothAfter } : tool;
+  tool.tab === 'sculpt' ? { ...tool, stampShape: s.palette.sculpt ?? 'mound', mirror: s.sculptToggles.mirror, smoothAfter: s.sculptToggles.smoothAfter }
+    : tool.action === 'things' ? { ...tool, model: s.palette.things ?? 'palm' } : tool;
 const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: SETMIX_FILE[s.id] ? { kind: 'image', url: `textures/setmix/${SETMIX_FILE[s.id]}.webp`, colors: surfaceColours(s.id) } : { kind: 'swatch', colors: surfaceColours(s.id) } }));
 
 const WIN = {
@@ -240,7 +247,7 @@ export function IslandWalk(props: {
   const applyNow = useCallback((tab: TabId, id: string | null) => {
     if (!id) return;
     const pl = player();
-    if (tab === 'lights') { pickLook(rt, scene.sceneId, id); say(`Light: ${byIdName(tab, id)}`); }
+    if (tab === 'lights') { if (isLightWay(id)) say(`${byIdName(tab, id)}: ${LIGHT_WAYS.find((w) => w.id === id)?.left ?? ''} with the left button`); else { pickLook(rt, scene.sceneId, id); say(`Light: ${byIdName(tab, id)}`); } }
     else if (tab === 'animate') api.current?.playAnim(id);
     else if (tab === 'sound') fx(id as SfxId);
     else if (tab === 'avatar') { wearLook(id); say(`Wearing ${lookOf(pl, id).name}`); }
@@ -337,6 +344,7 @@ export function IslandWalk(props: {
     const tileSize = tileSizeFor(graphicsRef.current.adaptive.current);
     const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
     (window as unknown as { hmGround: { tile?: (id: number) => number } }).hmGround.tile = (id) => surfaces.checksum(id);
+    (window as unknown as { hmGround: { things?: () => number } }).hmGround.things = () => rt.store.get(scene.sceneId)?.children['models']?.length ?? 0;
     // the player's own looks for SetMix surfaces (the surface editor) replace the baked tiles once they have loaded
     if (props.ground !== 'racing') {
       const looks = props.profile?.groundLooks ?? {};
@@ -408,6 +416,8 @@ export function IslandWalk(props: {
     landRef.current = () => { intro.on = true; intro.t = 0; camPitch = 1.3; camDist = 150; };
     let eye: [number, number, number] | null = null;
     // studio camera: where it is and where it looks
+    /** The Lights tab's Sun: when it last moved (it keeps moving while held). */
+    let lightTick = 0;
     let fly: { x: number; y: number; z: number; yaw: number; pitch: number } | null = null;
     let orbit = { yaw: 0.8, pitch: 0.4, dist: 8 };
     // avatar mode's mirror: how far round from straight in front the camera stands, how far away, how high it looks
@@ -621,6 +631,16 @@ export function IslandWalk(props: {
           builder.use(tool, a, alt, now, first);
           if (first) tourEvent(tool.action === 'place' && !alt ? 'placed' : tool.tab === 'sculpt' ? 'used-sculpt' : tool.tab === 'paint' ? 'used-paint' : 'used-select');
         }
+        return;
+      }
+      // the Lights tab's ways act on the light where you are (the Sun keeps moving while held)
+      if (s.tab === 'lights' && isLightWay(id)) {
+        const holds = LIGHT_WAYS.find((w) => w.id === id)?.hold === true;
+        if (!first && (!holds || now - lightTick < 120)) return;
+        lightTick = now;
+        const said = applyLightWay(rt, scene.sceneId, id, alt, s.palette.lights);
+        if (said) say(said);
+        if (first) fx('ui-toggle', { volume: 0.4 });
         return;
       }
       if (!first) return;
@@ -891,6 +911,10 @@ export function IslandWalk(props: {
         p.tab === 'paint'
           ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'lights'
+          ? <PaletteStrip title="Light" items={LIGHT_ITEMS} community={[]} selected={p.palette.lights} onLayers={openLayers} onPick={(id) => { pickPalette('lights', id); pickLook(rt, scene.sceneId, id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'things'
+          ? <PaletteStrip title="Place" items={THING_ITEMS} community={[]} selected={p.palette.things ?? 'palm'} onLayers={openLayers} onPick={(id) => { pickPalette('things', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'sculpt'
           ? <PaletteStrip title="Stamp" items={SHAPE_ITEMS} community={[]} selected={p.palette.sculpt ?? 'mound'} onLayers={openLayers} onPick={(id) => { pickPalette('sculpt', id); fx('select', { volume: 0.5 }); }} />
           // a tab without materials shows its own presets here: one click puts it in the slot you are on
@@ -960,7 +984,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
   switch (tab) {
     case 'animate': return { title, line: item.doc, left: 'Play it', right: 'Stop' };
     case 'sound': return { title, line: item.doc, left: 'Play it', right: 'Play it' };
-    case 'lights': return { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' };
+    case 'lights': { const w = LIGHT_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' }; }
     case 'activities': return { title, line: item.doc, left: 'Open it', right: 'Nothing' };
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };

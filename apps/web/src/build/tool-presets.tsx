@@ -108,6 +108,38 @@ function drawSculptPreview(canvas: HTMLCanvasElement, ground: Terrain, tool: Too
   ctx.putImageData(img, 0, 0);
 }
 
+/**
+ * A way to place, seen from above on the ground you look at: where its things would land (one, a scatter, a row), each a dot as wide as the
+ * thing would be.
+ */
+function drawThingsPreview(canvas: HTMLCanvasElement, ground: Terrain, tool: ToolPreset, variant: ToolVariant): void {
+  const t2 = { ...tool, ...variant.patch };
+  const n = 33, span = 14, g = ground.spec;
+  const gx = g.originX + ((g.cols - 1) * g.cell) / 2, gz = g.originZ + ((g.rows - 1) * g.cell) / 2;
+  canvas.width = n; canvas.height = n;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const img = ctx.createImageData(n, n);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const gc = Math.max(0, Math.min(g.cols - 1, Math.round((gx - span / 2 + (c * span) / (n - 1) - g.originX) / g.cell)));
+    const gr = Math.max(0, Math.min(g.rows - 1, Math.round((gz - span / 2 + (r * span) / (n - 1) - g.originZ) / g.cell)));
+    const a = rgb(ground.surfaceA[gr * g.cols + gc]!), i = (r * n + c) * 4;
+    img.data[i] = a[0]; img.data[i + 1] = a[1]; img.data[i + 2] = a[2]; img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const px = (m: number): number => (m / span) * (n - 1) + (n - 1) / 2;
+  const dot = (x: number, z: number, size: number): void => { ctx.beginPath(); ctx.arc(px(x), px(z), Math.max(1, (size * 0.9 * (n - 1)) / span), 0, Math.PI * 2); ctx.fill(); };
+  ctx.fillStyle = '#242722';
+  const way = t2.placeWay ?? 'one';
+  if (way === 'scatter') {
+    const count = Math.max(2, Math.round(3 + t2.strength * 9)), radius = 2 + t2.strength * 5;
+    for (let k = 0; k < count; k++) { const a = k * 2.39996, r = radius * Math.sqrt((k + 0.5) / count); dot(Math.cos(a) * r, Math.sin(a) * r, t2.size * 0.85); }
+  } else if (way === 'row') {
+    const gap = 1 + (1 - t2.strength) * 4 * Math.max(0.5, t2.size), count = Math.max(2, Math.floor(10 / gap) + 1);
+    for (let k = 0; k < count; k++) dot(-5 + (10 * k) / (count - 1), 0, t2.size * 0.85);
+  } else dot(0, 0, t2.size * 1.6);
+}
+
 function VariantTile(props: { readonly v: ToolVariant; readonly on: boolean; readonly draw: (c: HTMLCanvasElement) => void; readonly onPick: () => void }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null);
   const { draw } = props;
@@ -150,7 +182,7 @@ export function ToolPresetsRow(props: {
       <div className="tp-list">
         {list.map((v) => (
           <VariantTile key={`${tool.id}-${v.id}-${surface}-${tool.stampShape ?? ""}-${ground ? ground.spec.originX + ',' + ground.spec.originZ : ''}`} v={v} on={now?.id === v.id} onPick={() => props.onPick(v)}
-            draw={(c) => { if (ground) { if (tool.tab === 'sculpt') drawSculptPreview(c, ground, tool, v); else drawPreview(c, ground, tool, v, surface); } }} />
+            draw={(c) => { if (ground) { if (tool.tab === 'sculpt') drawSculptPreview(c, ground, tool, v); else if (tool.action === 'things') drawThingsPreview(c, ground, tool, v); else drawPreview(c, ground, tool, v, surface); } }} />
         ))}
       </div>
       {level !== 'easy' ? (

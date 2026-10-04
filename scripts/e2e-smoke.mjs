@@ -213,6 +213,15 @@ try {
   await page.waitForTimeout(T(300));
   check('Sculpt holds ways to sculpt (Grab, Clay, Crease, Stamp, Terrace ...)', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Raise', 'Smooth', 'Grab', 'Clay', 'Crease', 'Stamp', 'Terrace'].every((w) => t.includes(w)); }));
   check('the Sculpt palette holds the shapes to stamp', JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Hill', 'Crater', 'Plateau', 'Ridge', 'Dune', 'Volcano']));
+  // Things and Lights hold ways too; what they use is the palette
+  await page.keyboard.press('F9');
+  await page.waitForTimeout(T(300));
+  check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Place', 'Scatter', 'Row', 'Swap'].every((w) => t.includes(w)); })
+    && await page.locator('.palette-strip .ps-frame').count() >= 10);
+  await page.keyboard.press('F6');
+  await page.waitForTimeout(T(300));
+  check('Lights holds ways (Look, Sun, Day and night, Haze, Clouds) and the looks are the palette', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Look', 'Sun', 'Day and night', 'Haze', 'Clouds'].every((w) => t.includes(w)); })
+    && await page.locator('.palette-strip .ps-frame').count() >= 10);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('the hotbar has Easy, Pro and Studio', JSON.stringify(await page.$$eval('.level-switch button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Easy', 'Pro', 'Studio']));

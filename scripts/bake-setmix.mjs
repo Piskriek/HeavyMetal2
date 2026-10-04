@@ -6,6 +6,7 @@
 //   voxel.webp       the voxel blocks' colour: one row per surface, VARIANTS block faces of 32 px across (seeds 0, 1000, 2000)
 //   voxel-maps.webp  the same layout, R = height, G = roughness
 //   graphs.json      both sets, for the in-game surface editor
+// and packages/render/src/terrain/setmix-colours.ts: each tile's average colour (the maps of your islands, and what shows while a tile loads)
 // --only <id> bakes just that ground tile (no voxel atlas); --graph <file.json> bakes it from that graph instead of its first style (trying a look).
 // Every graph's own seeds and whole-number scales make the tiles seamless; nothing here blends edges.
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -57,6 +58,15 @@ async function webp(rgba, w, h, quality) {
   return Buffer.from(b64, 'base64');
 }
 
+/** The average colour of an evaluated tile, as sRGB hex (averaged in linear light). */
+const average = (t) => {
+  const n = t.size * t.size, sum = [0, 0, 0];
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) sum[c] += t.albedo[i * 3 + c];
+  return '#' + sum.map((v) => srgb(v / n).toString(16).padStart(2, '0')).join('');
+};
+const coloursFile = `${root}packages/render/src/terrain/setmix-colours.ts`;
+const known = existsSync(coloursFile) ? JSON.parse(/= (\{.*\});/.exec(readFileSync(coloursFile, 'utf8'))?.[1] ?? '{}') : {};
+const colours = { ground: { ...(known.ground ?? {}) }, voxel: { ...(known.voxel ?? {}) } };
 const arg = (name) => { const i = process.argv.indexOf(name); return i > 0 ? process.argv[i + 1] : undefined; };
 const only = arg('--only'), tryGraph = arg('--graph');
 mkdirSync(`${out}maps`, { recursive: true });
@@ -68,19 +78,27 @@ for (const s of ground.surfaces) {
   const t = shrink(evaluateGraph(graph, { size: SIZE * SUPER }), SUPER);
   const colour = new Uint8Array(SIZE * SIZE * 4), maps = new Uint8Array(SIZE * SIZE * 4);
   put(t, colour, maps, SIZE, 0, 0);
+  colours.ground[s.id] = average(t);
   const c = await webp(colour, SIZE, SIZE, 0.9), m = await webp(maps, SIZE, SIZE, 1);
   writeFileSync(`${out}${s.id}.webp`, c); writeFileSync(`${out}maps/${s.id}.webp`, m);
   bytes += c.length + m.length;
 }
-if (only) { await browser.close(); console.log(`bake-setmix: ${only} only`); process.exit(0); }
+const writeColours = () => writeFileSync(coloursFile, `// Written by scripts/bake-setmix.mjs (do not edit): the average colour of each SetMix ground tile and of each voxel face variant, by surface.
+// The maps of your islands draw with these, and they show while a tile loads.
+export const SETMIX_COLOURS: { readonly ground: Readonly<Record<string, string>>; readonly voxel: Readonly<Record<string, readonly string[]>> } = ${JSON.stringify(colours)};
+`);
+if (only) { writeColours(); await browser.close(); console.log(`bake-setmix: ${only} only`); process.exit(0); }
 const vw = VOXEL * VARIANTS, vh = VOXEL * voxel.graphs.length;
 const vc = new Uint8Array(vw * vh * 4), vm = new Uint8Array(vw * vh * 4);
 voxel.graphs.forEach((g, row) => {
-  for (let v = 0; v < VARIANTS; v++) put(evaluateGraph(g, { size: VOXEL, seed: v * 1000 }), vc, vm, vw, v * VOXEL, row * VOXEL);
+  const tones = [];
+  for (let v = 0; v < VARIANTS; v++) { const t = evaluateGraph(g, { size: VOXEL, seed: v * 1000 }); put(t, vc, vm, vw, v * VOXEL, row * VOXEL); tones.push(average(t)); }
+  colours.voxel[g.id.replace(/^voxel-/, '')] = tones;
 });
 const vcw = await webp(vc, vw, vh, 1), vmw = await webp(vm, vw, vh, 1);
 writeFileSync(`${out}voxel.webp`, vcw); writeFileSync(`${out}voxel-maps.webp`, vmw);
 bytes += vcw.length + vmw.length;
 writeFileSync(`${out}graphs.json`, JSON.stringify({ ground, voxel }));
+writeColours();
 await browser.close();
 console.log(`bake-setmix: ${ground.surfaces.length} ground tiles and ${voxel.graphs.length} x ${VARIANTS} voxel faces, ${Math.round(bytes / 1024)} KB, ${Math.round(performance.now() - t0)} ms`);

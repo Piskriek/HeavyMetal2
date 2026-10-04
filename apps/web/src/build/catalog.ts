@@ -1,4 +1,5 @@
 import { SFX, SFX_IDS, type SfxId, type SfxRecipe } from '@hm/audio';
+import { LIGHT_WAYS } from './light-ways';
 type SfxRecipeLayers = SfxRecipe['layers'];
 import { ANIMATIONS, animById, animToParams, normalizeAnim, type AnimPreset } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
@@ -80,7 +81,8 @@ export function catalog(tab: TabId, player: CatalogPlayer, activities: readonly 
     case 'sound':
       return SFX_IDS.map((id) => ({ tab, id, name: soundName(id), doc: `A ${SFX[id].category} sound, ${SFX[id].durationMs} ms. Edit changes its volume, pitch and layers.`, preview: { kind: 'sound', id }, edited: false }));
     case 'lights':
-      return SETUPS.map((s) => ({ tab, id: s.id, name: s.name, doc: 'A lighting look: sun, sky, haze and picture effects.', preview: { kind: 'sky', top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color }, edited: false }));
+      // ways to change the light first; the looks (also in the palette) after, so older hotbars that hold looks stay valid
+      return [...LIGHT_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false })), ...SETUPS.map((s) => ({ tab, id: s.id, name: s.name, doc: 'A lighting look: sun, sky, haze and picture effects.', preview: { kind: 'sky' as const, top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color }, edited: false }))];
     case 'activities':
       return activities.map((a) => ({ tab, id: a.id, name: a.name, doc: a.doc, preview: { kind: 'planet', hue: a.hue, ring: a.ring }, edited: false }));
     case 'avatar':
@@ -98,6 +100,8 @@ export function validFor(tab: TabId, id: string, player: CatalogPlayer, activiti
 /** Rows that were once the ready-made ones: a player who never changed them gets today's (Sculpt held shapes before it held ways). */
 export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly string[])[]>>> = {
   sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']],
+  lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat']],
+  things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
 };
 
 /** The hotbars a new player starts with: the nine most useful presets of each tab. */
@@ -111,10 +115,12 @@ export function defaultHotbars(activities: readonly ActivityInfo[], player: Cata
   out.sculpt = ids(['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']);
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
   out.sound = ids(['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']);
-  out.lights = ids(['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat']);
+  // ways to change the light; the looks are the palette (docs/HOTBAR.md)
+  out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds']), null, null, null, null];
   out.activities = ids(activities.map((a) => a.id));
   out.avatar = ids([...player.looks.map((l) => l.id), ...LOOKS.map((l) => l.id)]);
-  out.things = ids(['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']);
+  // ways to place; the things themselves are in the palette (docs/HOTBAR.md)
+  out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];
   out.camera = ids(CAMERAS.map((c) => c.id));
   return out;
 }

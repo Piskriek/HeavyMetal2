@@ -30,7 +30,20 @@ Graphics: Settings, Graphics. **Potato** is the lightest, **Auto** aims for the 
 - Home, **Avatars** does the same from the menu.
 - In Goblin Racing your goblin rides inside your ball; the racer you pick is the ball (its weight, speed and bounce).
 
-**Settings** are the same everywhere (home, Goblin Racing, the island's Esc menu, a paused race): Graphics, Sound, Controls, Racing, You.
+**Settings** are the same everywhere (home, Goblin Racing, the island's Esc menu, a paused race): Graphics, Sound, Controls, Hotbar (grown-up profiles), Racing, You.
+
+**The ground's look (new, 2026-10-04)**
+- Top right on an island: **Flat / PBR**. PBR is always the smooth painted ground; Flat with the Voxel style is the block look. The style itself is in Settings, You.
+- Your islands wear SetMix's own textures, made from math (texture graphs). Goblin Racing's island wears the high-end picture textures.
+- **Change a surface's look**: Paint (F2), Tab opens the palette, **Edit look**. Pick a style, change its colours and sizes, watch the preview, **Use on this island**. Your look is kept. **Copy** puts it on the clipboard: paste it to me and it can become the SetMix default. Select (F1, slot 1) on the ground opens the same window for whatever surface you point at.
+
+**The hotbar (new, 2026-10-04)**
+- Every tab holds ways of working; Tab opens the palette with what they use: Paint (surfaces), Sculpt (shapes to stamp), Lights (looks), Things (things to place).
+- Sculpt: Raise, Lower, Smooth, Flatten, Grab (pull the ground along), Clay (flat layers), Crease (cuts and ridges), Stamp (the palette's shape), Terrace (steps); Roughen, Sharpen, Erode one + away. Pro adds Symmetry and Smooth after.
+- Things: Place, Scatter (a grove in one click), Row (click the start, then the end), Swap (turn a thing into the palette's).
+- Lights: Look (the palette's), Sun (an hour a click), Day and night, Haze, Clouds.
+- Select on a plant opens how that kind of plant grows; on the sea, the world rules; on a thing, its layer.
+- Settings, Hotbar: put tools in any slot, take them off, back to the ready-made row.
 
 ## Not built yet (so nobody is surprised)
 

@@ -1,4 +1,5 @@
 import { recipe, type SurfaceDef, type VoxelSet } from './surface-set';
+import { SETMIX_COLOURS } from './setmix-colours';
 
 /** The surfaces every ground set shares: ids, names, roughness, height blending and the colour shown until a tile loads. Each set gives the tiles. */
 const S = (id: number, name: string, repeat: number, roughness: number, fallback: string, h = recipe(1)): SurfaceDef =>
@@ -121,7 +122,10 @@ export const SETMIX_TILE_METRES = 1.1;
 export const SETMIX_SURFACES: readonly SurfaceDef[] = BASE_SURFACES.map((d) => {
   const file = SETMIX_FILE[d.id]!;
   const { pbrUrl: _image, ...rest } = d;
-  return finish({ ...rest, url: `textures/setmix/${file}.webp`, mapsUrl: `textures/setmix/maps/${file}.webp`, repeat: SETMIX_TILE_METRES });
+  const own = finish({ ...rest, url: `textures/setmix/${file}.webp`, mapsUrl: `textures/setmix/maps/${file}.webp`, repeat: SETMIX_TILE_METRES });
+  // the set's own colours (the bake measures them): the maps of your islands and the loading colour match the tiles
+  const ground = SETMIX_COLOURS.ground[file], blocks = SETMIX_COLOURS.voxel[file];
+  return { ...own, ...(ground ? { fallback: ground } : {}), ...(blocks?.length ? { flat: blocks } : {}) };
 });
 
 /** The voxel blocks' faces from the graph set: every style's voxel look (rows in the order of setmix-voxel.json). */

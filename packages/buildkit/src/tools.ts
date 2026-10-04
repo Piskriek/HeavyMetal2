@@ -11,6 +11,7 @@ export type ToolAction =
   | 'paint'
   | 'raise' | 'lower' | 'smooth' | 'flatten' | 'dig' | 'mound' | 'crater' | 'plateau' | 'ridge' | 'dune'
   | 'sculpt'
+  | 'things'
   | 'place';
 
 /** The ready-made sprite bursts (their editable values are in `plugs.ts`). */
@@ -50,6 +51,8 @@ export interface ToolPreset {
   pattern?: PatternId;
   /** Sculpt tools: the way they sculpt (Stamp presses the palette's shape). */
   sculpt?: SculptWayId;
+  /** Things tools: the way they place (the thing comes from the palette). */
+  placeWay?: PlaceWayId;
   /** Sculpt, Stamp: the palette's shape (set by the island from the palette, not stored). */
   stampShape?: string;
   /** Sculpt toggles (Pro, beside the hotbar; set by the island, not stored): mirror every dab across the island's middle; smooth after each one. */
@@ -61,6 +64,8 @@ export interface ToolPreset {
 export type PaintWayId = 'brush' | 'spray' | 'fill' | 'gradient' | 'stamp' | 'pattern' | 'clone' | 'smudge' | 'eraser';
 export type StampShape = 'blob' | 'square' | 'star' | 'ring';
 export type PatternId = 'checker' | 'stripes' | 'dots';
+/** The ways to place things (docs/HOTBAR.md, Things): one where you point, a scatter round it, a row between two clicks, or swap the one you point at. */
+export type PlaceWayId = 'one' | 'scatter' | 'row' | 'swap';
 /** The ways to sculpt (the same names as @hm/terrain's sculptWay, plus Stamp, which presses a shape from the palette). */
 export type SculptWayId = 'grab' | 'clay' | 'crease' | 'terrace' | 'noise' | 'pinch' | 'erode' | 'stamp';
 /** The shapes Sculpt's Stamp presses (the palette of the Sculpt tab; the same names as @hm/terrainops' stamp). */
@@ -96,6 +101,7 @@ type Base = Pick<ToolPreset, 'size' | 'strength' | 'falloff' | 'surface' | 'mode
 const B: Base = { size: 1, strength: 0.5, falloff: 'smooth', surface: 0, model: '', sprite: 'pop', sound: 'select' };
 const tool = (id: string, name: string, tab: ToolTab, action: ToolAction, icon: string, doc: string, left: string, right: string, v: Partial<Base> = {}): ToolPreset => { const b = { ...B, ...v }; return { id, name, tab, action, icon, doc, left, right, ...b, plugs: defaultPlugs(b.sprite, b.sound, swings(action) ? 'swing' : undefined) }; };
 const sculptTool = (way: SculptWayId, name: string, icon: string, doc: string, left: string, right: string, v: Partial<Base>): ToolPreset => ({ ...tool(`sculpt-${way}`, name, 'sculpt', 'sculpt', icon, doc, left, right, { sprite: 'dust', sound: 'sculpt-tick', ...v }), sculpt: way });
+const thingsTool = (way: PlaceWayId, name: string, icon: string, doc: string, left: string, right: string, v: Partial<Base>): ToolPreset => ({ ...tool(`things-${way}`, name, 'things', 'things', icon, doc, left, right, { model: 'palm', sprite: 'leaf', sound: 'place', ...v }), placeWay: way });
 const paintTool = (way: PaintWayId, name: string, icon: string, doc: string, left: string, right: string, v: Partial<Base>): ToolPreset => ({ ...tool(`paint-${way}`, name, 'paint', 'paint', icon, doc, left, right, { sprite: 'sparkle', sound: 'paint-tick', ...v }), way });
 /** Tools that change the world make the goblin swing its arm; looking, focusing and hiding do not. */
 const swings = (a: ToolAction): boolean => a !== 'inspect' && a !== 'focus' && a !== 'isolate';
@@ -138,6 +144,11 @@ export const TOOLS: readonly ToolPreset[] = [
   sculptTool('noise', 'Roughen', 'Sparkles', 'Make the ground bumpy and natural: pebbles and lumps.', 'Roughen', 'Roughen gently', { size: 4, strength: 0.4 }),
   sculptTool('pinch', 'Sharpen', 'Gem', 'Make edges and ridges crisp (the opposite of Smooth).', 'Sharpen', 'Soften', { size: 4, strength: 0.4 }),
   sculptTool('erode', 'Erode', 'Droplet', 'Let steep ground slide and settle, as rain and time would.', 'Erode', 'Erode gently', { size: 6, strength: 0.6 }),
+  // ways to place things (docs/HOTBAR.md): the thing comes from the palette
+  thingsTool('one', 'Place', 'PlusCircle', 'Put the thing from the palette where you point.', 'Place it', 'Take away the thing you point at', { size: 1, strength: 0.5 }),
+  thingsTool('scatter', 'Scatter', 'Sprout', 'Scatter a few of the palette\'s thing round where you point, each turned and sized a little differently: a grove, a rock field, a patch of flowers.', 'Scatter', 'Scatter fewer', { size: 1, strength: 0.4 }),
+  thingsTool('row', 'Row', 'MoveHorizontal', 'A line of the palette\'s thing: click where the row starts, then where it ends. A fence of palms, barrels along the track.', 'Start, then end the row', 'Cancel the row', { size: 1, strength: 0.5 }),
+  thingsTool('swap', 'Swap', 'Repeat', 'Turn the thing you point at into the palette\'s thing, in the same place and turn.', 'Swap it', 'Swap it', { size: 1, strength: 0.5, sprite: 'sparkle' }),
   ...THINGS.map((t) => tool(`place-${t.id}`, t.name, 'things', 'place', t.icon, `Place a ${t.name.toLowerCase()} where you point.`, 'Place it', 'Take away the thing you point at', { model: t.id, size: 1, sprite: t.id === 'palm' || t.id === 'bush' || t.id === 'flowers' || t.id === 'grass-clump' ? 'leaf' : 'pop', sound: 'place' })),
 ];
 export const toolById = (id: string): ToolPreset | undefined => TOOLS.find((t) => t.id === id);
@@ -169,6 +180,9 @@ export const TOOL_VARIANTS: Readonly<Record<string, readonly ToolVariant[]>> = {
   'sculpt-noise': [v('pebbly', 'Pebbly', { size: 3, strength: 0.25 }, true), v('lumpy', 'Lumpy', { size: 5, strength: 0.6 }, true), v('rocky', 'Rocky', { size: 6, strength: 1 }, true)],
   'sculpt-pinch': [v('gentle', 'Gentle', { strength: 0.25 }, true), v('crisp', 'Crisp', { strength: 0.7 }, true)],
   'sculpt-erode': [v('gentle', 'Gentle', { strength: 0.3 }, true), v('strong', 'Strong', { strength: 1 }, true), v('wide', 'Wide', { size: 12, strength: 0.6 })],
+  'things-one': [v('small', 'Small', { size: 0.6 }, true), v('as-made', 'As made', { size: 1 }, true), v('big', 'Big', { size: 1.8 }, true)],
+  'things-scatter': [v('few', 'A few', { strength: 0.2 }, true), v('grove', 'A grove', { strength: 0.5 }, true), v('dense', 'Dense', { strength: 0.9 }, true), v('small-ones', 'Small ones', { size: 0.6, strength: 0.6 })],
+  'things-row': [v('tight', 'Close together', { strength: 0.85 }, true), v('spaced', 'Spaced out', { strength: 0.4 }, true), v('far', 'Far apart', { strength: 0.1 }, true)],
   'paint-eraser': [v('small', 'Small', { size: 2 }, true), v('big', 'Big', { size: 6 }, true)],
 };
 /** The presets a tool shows at a level: Easy the best few, Pro and Studio all. */
@@ -200,7 +214,7 @@ export function normalizeTool(id: string, overrides: unknown): ToolPreset | null
     ...(base.shape ? { shape: o.shape === 'blob' || o.shape === 'square' || o.shape === 'star' || o.shape === 'ring' ? o.shape : base.shape } : {}),
     ...(base.pattern ? { pattern: o.pattern === 'checker' || o.pattern === 'stripes' || o.pattern === 'dots' ? o.pattern : base.pattern } : {}),
     surface: base.action === 'paint' && typeof o.surface === 'number' && PAINTS.some((p) => p.id === o.surface) ? o.surface : base.surface,
-    model: base.action === 'place' && typeof o.model === 'string' && THINGS.some((t) => t.id === o.model) ? o.model : base.model,
+    model: (base.action === 'place' || base.action === 'things') && typeof o.model === 'string' && THINGS.some((t) => t.id === o.model) ? o.model : base.model,
     sprite: firstUse('sprite') ?? sprite,
     sound: firstUse('sound') ?? sound,
     plugs,

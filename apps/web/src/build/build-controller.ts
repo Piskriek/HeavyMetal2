@@ -1,7 +1,7 @@
 import { cmd, type PresetId } from '@hm/contracts';
 import type { DecorPlacement, Runtime } from '@hm/engine';
 import type { SfxId } from '@hm/audio';
-import { plugsFor, type PlugEvent, type PlugKind, type ToolPreset } from '@hm/buildkit';
+import { THINGS, plugsFor, type PlugEvent, type PlugKind, type ToolPreset } from '@hm/buildkit';
 import type { ThreeRenderer } from '@hm/render';
 import { applyStroke, encodeTerrain, heightAt, mirroredDab, paintWay, sculptWay, type DirtyRect, type SculptDab } from '@hm/terrain';
 import { stamp, type StampKind } from '@hm/terrainops';
@@ -25,6 +25,11 @@ export interface Aim { readonly point: readonly [number, number, number]; readon
 /** Metres per voxel for each placeable model (size 1 on the tool). */
 const PLACE_BLOCK: Readonly<Record<string, number>> = { goblin: 0.04, 'goblin-ball-racer': 0.05, palm: 0.13, barrel: 0.08, rock: 0.12, trophy: 0.1, 'statue-plinth': 0.2, bush: 0.17, 'grass-clump': 0.11, flowers: 0.1 };
 const STAMPS: Readonly<Partial<Record<ToolPreset['action'], StampKind>>> = { mound: 'mound', crater: 'crater', plateau: 'plateau', ridge: 'ridge', dune: 'dune' };
+/** A small seeded random (mulberry32). */
+function mulberry(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
 const union = (a: DirtyRect | null, b: DirtyRect | null): DirtyRect | null => (!a ? b : !b ? a : { c0: Math.min(a.c0, b.c0), r0: Math.min(a.r0, b.r0), c1: Math.max(a.c1, b.c1), r1: Math.max(a.r1, b.r1) });
 /** What the island grows by itself (the Eraser puts it back): under the sea what sunk ground becomes, sand at the waterline, rock on the steep, grass elsewhere. */
 export function naturalSurface(height: number, flatness: number, rules: WorldRules): number {
@@ -75,6 +80,9 @@ export class BuildController {
   /** Clone: where it copies from (right-click), and the offset fixed when a stroke starts. */
   private cloneSource: { x: number; z: number } | null = null;
   private cloneOffset: { dx: number; dz: number } | null = null;
+  /** Things, Row: where the row starts (the next click ends it). */
+  private rowFrom: [number, number] | null = null;
+  private seq = 0;
   /** Grab: where the press began (the ground there follows the pointer). */
   private grabFrom: { x: number; z: number } | null = null;
 
@@ -200,6 +208,10 @@ export class BuildController {
           this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, 'Copy'));
         });
         this.done(tool, aim, `${src.name} copied`, on);
+        return;
+      }
+      case 'things': {
+        this.thingsWithWay(tool, aim, alt);
         return;
       }
       case 'place': {
@@ -377,6 +389,75 @@ export class BuildController {
     if (!moves.length) return;
     this.rt.commands.transaction(label, () => { for (const [ref, g] of moves) this.rt.commands.execute(cmd.setParam(`${ref}.y`, g, label)); });
     this.hooks.onModels();
+  }
+
+  /** Put one model into the scene (inside the caller's transaction). */
+  private putModel(modelId: string, size: number, x: number, y: number, z: number, yaw: number, label: string): PresetId | null {
+    const model = voxelModelById(modelId);
+    if (!model) return null;
+    const id = `model-${Date.now().toString(36)}-${(this.seq++).toString(36)}`;
+    const name = THINGS.find((t) => t.id === modelId)?.name ?? 'Thing';
+    const block = (PLACE_BLOCK[modelId] ?? 0.1) * size;
+    this.rt.commands.execute(cmd.put({ id, kind: 'model', name, params: { data: encodeModel(model), scale: block, x, y, z, yaw, ao: true, greedy: true, castShadow: true } as never, tier: 'build' }, label));
+    this.rt.commands.execute(cmd.addChild(this.sceneId, 'models', id, undefined, label));
+    return id;
+  }
+
+  /**
+   * The ways to place (docs/HOTBAR.md, Things), the thing from the palette: Place one where you point; Scatter a few round it, each turned
+   * and sized a little differently; Row, between two clicks; Swap the thing you point at for the palette's, in its place and turn. Each is
+   * one undo step.
+   */
+  private thingsWithWay(tool: ToolPreset, aim: Aim, alt: boolean): void {
+    const way = tool.placeWay ?? 'one', name = THINGS.find((t) => t.id === tool.model)?.name ?? 'Thing';
+    const ts = this.rt.binder.terrain();
+    const groundY = (x: number, z: number): number => (ts ? heightAt(ts.terrain, x, z) : aim.point[1]);
+    const done = (text: string): void => { this.hooks.onModels(); this.fire(tool, 'use', aim, { scale: 1.2 }); saveMap(this.rt, this.sceneId); this.hooks.say(text); };
+    if (way === 'one') {
+      if (alt) { if (!this.removeAt(aim, tool)) this.hooks.say('Nothing here to take away'); return; }
+      this.rt.commands.transaction(`Place ${name}`, () => { this.putModel(tool.model, tool.size, aim.point[0], aim.point[1], aim.point[2], Math.round(Math.random() * 360 - 180), `Place ${name}`); });
+      done(`${name} placed`);
+      return;
+    }
+    if (way === 'scatter') {
+      const count = Math.max(2, Math.round((alt ? 2 : 3) + tool.strength * (alt ? 3 : 9)));
+      const radius = 2 + tool.strength * 5;
+      const rnd = mulberry(Math.floor(performance.now()) >>> 0);
+      this.rt.commands.transaction(`Scatter ${name}`, () => {
+        for (let k = 0; k < count; k++) {
+          // spread evenly round the point (a sunflower spiral), each one nudged, turned and sized a little differently
+          const a = k * 2.39996 + rnd() * 0.6, r = radius * Math.sqrt((k + 0.5) / count) * (0.8 + rnd() * 0.4);
+          const x = aim.point[0] + Math.cos(a) * r, z = aim.point[2] + Math.sin(a) * r;
+          this.putModel(tool.model, tool.size * (0.75 + rnd() * 0.5), x, groundY(x, z), z, Math.round(rnd() * 360 - 180), `Scatter ${name}`);
+        }
+      });
+      done(`${count} ${name.toLowerCase()}s scattered`);
+      return;
+    }
+    if (way === 'row') {
+      if (alt) { this.rowFrom = null; this.hooks.say('Row cancelled'); return; }
+      if (!this.rowFrom) { this.rowFrom = [aim.point[0], aim.point[2]]; this.hooks.say('The row starts here: click where it ends'); this.fire(tool, 'use', aim, { only: ['sound'] }); return; }
+      const [x0, z0] = this.rowFrom, x1 = aim.point[0], z1 = aim.point[2];
+      this.rowFrom = null;
+      const len = Math.hypot(x1 - x0, z1 - z0), gap = 1 + (1 - tool.strength) * 4 * Math.max(0.5, tool.size);
+      const count = Math.min(60, Math.max(2, Math.floor(len / gap) + 1));
+      const yaw = Math.round((Math.atan2(x1 - x0, z1 - z0) * 180) / Math.PI);
+      this.rt.commands.transaction(`Row of ${name}`, () => {
+        for (let k = 0; k < count; k++) { const f = count === 1 ? 0 : k / (count - 1), x = x0 + (x1 - x0) * f, z = z0 + (z1 - z0) * f; this.putModel(tool.model, tool.size, x, groundY(x, z), z, yaw, `Row of ${name}`); }
+      });
+      done(`A row of ${count}`);
+      return;
+    }
+    // swap: the same place and turn, the palette's thing
+    const m = this.modelAt(aim);
+    if (!m) { this.hooks.say('Point at a thing you placed to swap it'); return; }
+    const x = this.param(m.ref, 'x', aim.point[0]), y = this.param(m.ref, 'y', aim.point[1]), z = this.param(m.ref, 'z', aim.point[2]), yaw = this.param(m.ref, 'yaw', 0);
+    const was = this.rt.store.get(m.ref)?.name ?? 'it';
+    this.rt.commands.transaction(`Swap for ${name}`, () => {
+      this.rt.commands.execute(cmd.removeChild(this.sceneId, 'models', m.index, `Swap for ${name}`));
+      this.putModel(tool.model, tool.size, x, y, z, yaw, `Swap for ${name}`);
+    });
+    done(`${was} became a ${name.toLowerCase()}`);
   }
 
   private place(tool: ToolPreset, aim: Aim): void {

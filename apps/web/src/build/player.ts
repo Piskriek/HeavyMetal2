@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { MOVE_SLOTS, animById, type MoveSlot } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { PAINTS, SLOTS, STAMP_SHAPES, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
+import { PAINTS, SLOTS, STAMP_SHAPES, THINGS, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
 import { OLD_DEFAULT_ROWS, defaultHotbars, validFor, type ActivityInfo, type CatalogPlayer } from './catalog';
 
 /**
@@ -39,7 +39,7 @@ const blank = (): PlayerState => {
   return {
     ...p, tab: 'sculpt', slots: Object.fromEntries(TAB_IDS.map((t) => [t, 0])) as Record<TabId, number>, hotbars: defaultHotbars(activities, p),
     moves: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', fall: 'fall' }, lookId: LOOKS[0]!.id, created: false, view: 'third', mode: 'walk', sprites: {},
-    level: 'easy', palette: { paint: '4', sculpt: 'mound' }, sculptToggles: { mirror: false, smoothAfter: false },
+    level: 'easy', palette: { paint: '4', sculpt: 'mound', things: 'palm' }, sculptToggles: { mirror: false, smoothAfter: false },
   };
 };
 
@@ -83,7 +83,9 @@ const paletteOf = (v: unknown): Partial<Record<TabId, string>> => {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
   const paint = typeof o.paint === 'string' && PAINTS.some((s) => String(s.id) === o.paint) ? o.paint : undefined;
   const sculpt = typeof o.sculpt === 'string' && STAMP_SHAPES.some((s) => s.id === o.sculpt) ? o.sculpt : undefined;
-  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}) };
+  const things = typeof o.things === 'string' && THINGS.some((t) => t.id === o.things) ? o.things : undefined;
+  const lights = typeof o.lights === 'string' && /^[a-z0-9-]{1,40}$/.test(o.lights) ? o.lights : undefined;
+  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}) };
 };
 
 let state: PlayerState | null = null;

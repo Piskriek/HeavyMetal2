@@ -39,7 +39,7 @@ const text = (page, sel, t) => page.locator(sel, { hasText: t }).first();
 const dom = (page, fn, a) => page.evaluate(fn, a);
 const clickText = (page, sel, t) => dom(page, ([s, x]) => { [...document.querySelectorAll(s)].find((b) => (b.textContent ?? '').trim().startsWith(x))?.click(); }, [sel, t]);
 const settle = (page, ms = 700) => page.waitForTimeout(T(ms));
-const toIsland = async (page) => { await dom(page, () => document.querySelector('.sm-menu .sm-sub')?.click()); await page.waitForSelector('.hotbar', { timeout: T(60000) }); await settle(page, 5000); };
+const toIsland = async (page) => { await dom(page, () => document.querySelector('.sm-menu .sm-sub')?.click()); await page.waitForSelector('.hotbar, .island-hint', { timeout: T(60000) }); await settle(page, 5000); };
 const toGoblin = async (page) => { await dom(page, () => document.querySelector('.gr-open')?.click()); await page.waitForSelector('.gr-front', { timeout: T(15000) }); await settle(page, 1400); };
 
 /** Each state: the storage it starts from, how to get there from the home, and what tells it is ready. */
@@ -98,7 +98,7 @@ function readControls() {
     const n = (seen.get(base) ?? 0) + 1; seen.set(base, n);
     const id = n > 1 ? `${base} #${n}` : base;
     const kind = el.tagName === 'SELECT' ? 'select' : el.tagName === 'INPUT' ? `input:${el.type || 'text'}` : el.getAttribute('role') ?? (el.tagName === 'A' ? 'link' : el.tagName === 'SUMMARY' ? 'summary' : 'button');
-    const on = el.classList.contains('on') || el.getAttribute('aria-pressed') === 'true' || el.getAttribute('aria-selected') === 'true' || (el.tagName === 'INPUT' && el.checked) || (el.tagName === 'SUMMARY' && el.parentElement?.open);
+    const on = el.classList.contains('on') || el.getAttribute('aria-pressed') === 'true' || el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-checked') === 'true' || (el.tagName === 'INPUT' && el.checked) || (el.tagName === 'SUMMARY' && el.parentElement?.open);
     // what a player sees of it: off screen, covered by something else, text cut off, too small to hit
     const flags = [];
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;

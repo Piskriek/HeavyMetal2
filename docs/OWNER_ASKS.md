@@ -394,6 +394,16 @@ the main menu needs to be a stunning orbiting view of your current island and fa
 
 - 2026-10-04 18:33 (laptop, side session): can you update the plans in a way that the other claude session picks up on it and adds it to hisl work schedule?
 
+- 2026-10-04 18:57 (laptop, side session): would it be possible to create a way of letting user import mincraft voxel builds into our game?
+
+- 2026-10-04 19:00 (laptop, side session): what about roblox stuff? and what kind of opensource voxel stuf fis altedy out there that we can populate the players starting solar sytem with?
+
+- 2026-10-04 19:04 (laptop, side session): ok, give me a report on what is out there, can we get the middle earth minecraft build? what is possible, want this in the planning but let me get all the info first, id also like the planing to include employing battle arena ai to do any heavy lifing
+
+- 2026-10-04 19:09 (laptop, side session): is there a way to link to the builds and stream the content instead of downloading it all?
+
+- 2026-10-04 19:13 (laptop, side session; planned in `docs/VOXEL_GALAXY.md`, tracked in STATUS H11 / 9b): ok then lets add it to the claude session so he plans it out and does not go on our plan but knows this is new and needs some consideration. im thinking we have another galaxy? voxel galaxy where you can find all the big minecraft, roblox, voxel builds and explore them and on those worlds the preset suggestions link to opensource voxel content
+
 ## The studio prompt the owner gave the design AI (it defines the interface)
 
 create a example of a all in one 3d/2d/anim/sound studio program where everything is a nested preset in a preset, like inception. create the most simple preset hirarchy of a cube in ball world, very low poly where cube lives on a planet the cube, his model, their faces, the vertexes the compose of all just presets in presets, let the users double click zoom into/trough the hirarchy until he gets to the raw input and select a gear icont to change it and esc backward/out  interface ubtil he sees the planet in orbit around a sun, one up and it asks if he wants to go to galaxy mode, in which case you show that.  a minimalist whit wall design, with vibrant 3d dreamworks cyberpunk warcraft inspired goblin character painting doodles on the clean walls, no web3 or ai slop styles like rounded corenrs, bevel emboss drop/innershadows, glows or cartoony font, clean with a stylish modern font and preset examples rather than text, shelves that auto hide, a toolbar with a pointer/brush/hand/timeline/speaker/camera/person and delete icons. when selected, pointer toolbar spawn a slide out toolbar with more icons for "the 3d manipulator gizmos, scale, move and rotate, marque tools and tools to select in other ways like in photoshop" if you have the brush selected the slide out toolbar changes t photoshop painting tools like stamp(research the logical tools) and if sculpting selected the slide out toolbar is zbrush sculpting tools(research the logical tools) to edit 3d models, same for time line needs animation edit tools and speaker sound edit tools, camera needs video and camera tools, and the icon of the person takes you to your character the cube where you have a seperate branch of presets covering all his characteristics. dont wory about the cube, it must look next level cool and run smooth and satifying

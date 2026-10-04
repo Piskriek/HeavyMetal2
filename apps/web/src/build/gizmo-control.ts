@@ -7,14 +7,17 @@ import { drag, gizmoGrow, hitTest, worldLength, type DragResult, type GizmoMode,
  * the playful click-to-carry. Select's slots pick its mode (Move: arrows and planes, Turn: the ring round the up axis, Resize: the middle
  * handle), + and - grow and shrink it, Shift snaps moves to half metres (and sizes to quarter steps), Ctrl snaps turns to 15 degrees, Alt-drag
  * leaves a copy behind. A drag shows live and lands as one undo step. A placed thing has a position, a yaw and one size, so the gizmo offers
- * exactly those: no tilt rings, no stretching along one axis.
+ * exactly those: no tilt rings, no stretching along one axis. It stands in the middle of the thing (a thing's own origin is its foot, often
+ * in the grass or behind the hints at the bottom of the screen).
  */
 export interface GizmoTarget { readonly ref: PresetId; readonly index: number }
 interface Pose { x: number; y: number; z: number; yaw: number; scale: number }
-interface Grab { readonly handle: Handle; readonly start: Ray; readonly from: Pose; readonly target: GizmoTarget; readonly copy: boolean; readonly len: number }
+interface Grab { readonly handle: Handle; readonly start: Ray; readonly from: Pose; readonly target: GizmoTarget; readonly copy: boolean; readonly len: number; readonly lift: number }
 
 const COLOR = { x: '#e5484d', y: '#46a758', z: '#3e63dd', hot: '#ffc53d', ring: '#46a758', uniform: '#f4f4f5' } as const;
 const AXES: Record<'x' | 'y' | 'z', Vec3> = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
+/** How big it is at size 1: about a seventh of the screen's height per arrow. */
+const BASE = 1.4;
 
 /** What a held Select preset makes the gizmo do. */
 export const gizmoModeFor = (heldId: string | null | undefined): GizmoMode => (heldId === 'turn' ? 'rotate' : heldId === 'resize' ? 'scale' : 'move');
@@ -22,6 +25,7 @@ export const gizmoModeFor = (heldId: string | null | undefined): GizmoMode => (h
 export const allowed = (mode: GizmoMode, h: Handle | null): Handle | null =>
   !h ? null : mode === 'move' ? (h.kind === 'axis' || h.kind === 'plane' ? h : null) : mode === 'rotate' ? (h.kind === 'ring' && h.axis === 'y' ? h : null) : h.kind === 'uniform' ? h : null;
 const same = (a: Handle | null, b: Handle | null): boolean => JSON.stringify(a) === JSON.stringify(b);
+const modeOfHandle = (h: Handle): GizmoMode => (h.kind === 'ring' || h.kind === 'view-ring' ? 'rotate' : h.kind === 'uniform' ? 'scale' : 'move');
 
 /** The shapes to draw (the overlay layer, always on top). */
 export function gizmoShapes(mode: GizmoMode, p: Vec3, len: number, hot: Handle | null): OverlayShape[] {
@@ -30,20 +34,21 @@ export function gizmoShapes(mode: GizmoMode, p: Vec3, len: number, hot: Handle |
   if (mode === 'move') {
     for (const k of ['x', 'y', 'z'] as const) {
       const c = same(hot, { kind: 'axis', axis: k }) ? COLOR.hot : COLOR[k];
-      out.push({ type: 'tube', from: at(AXES[k], 0.12 * len), to: at(AXES[k], len), radius: 0.025 * len, color: c });
-      out.push({ type: 'handle', id: `tip-${k}`, position: at(AXES[k], len), color: c, size: 0.06 * len });
+      out.push({ type: 'tube', from: at(AXES[k], 0.1 * len), to: at(AXES[k], 0.78 * len), radius: 0.03 * len, color: c });
+      out.push({ type: 'cone', from: at(AXES[k], 0.76 * len), to: at(AXES[k], len), radius: 0.08 * len, color: c });
     }
     for (const [a, b] of [['x', 'y'], ['x', 'z'], ['y', 'z']] as const) {
       const lo = 0.2 * len, hi = 0.45 * len, A = AXES[a], B = AXES[b];
       const c = (u: number, v: number): Vec3 => [p[0] + A[0] * u + B[0] * v, p[1] + A[1] * u + B[1] * v, p[2] + A[2] * u + B[2] * v];
       const third = (['x', 'y', 'z'] as const).find((k) => k !== a && k !== b)!;
-      out.push({ type: 'quad', corners: [c(lo, lo), c(hi, lo), c(hi, hi), c(lo, hi)], color: same(hot, { kind: 'plane', axes: [a, b] }) ? COLOR.hot : COLOR[third], opacity: 0.45 });
+      out.push({ type: 'quad', corners: [c(lo, lo), c(hi, lo), c(hi, hi), c(lo, hi)], color: same(hot, { kind: 'plane', axes: [a, b] }) ? COLOR.hot : COLOR[third], opacity: 0.5 });
     }
   } else if (mode === 'rotate') {
-    out.push({ type: 'ring', center: p, normal: [0, 1, 0], radius: len, width: 0.05 * len, color: same(hot, { kind: 'ring', axis: 'y' }) ? COLOR.hot : COLOR.ring });
+    out.push({ type: 'ring', center: p, normal: [0, 1, 0], radius: len, width: 0.06 * len, color: same(hot, { kind: 'ring', axis: 'y' }) ? COLOR.hot : COLOR.ring });
   } else {
-    out.push({ type: 'handle', id: 'uniform', position: p, color: same(hot, { kind: 'uniform' }) ? COLOR.hot : COLOR.uniform, size: 0.15 * len });
-    out.push({ type: 'ring', center: p, normal: [0, 1, 0], radius: 0.15 * len, color: COLOR.uniform });
+    const c = same(hot, { kind: 'uniform' }) ? COLOR.hot : COLOR.uniform;
+    out.push({ type: 'handle', id: 'uniform', position: p, color: c, size: 0.15 * len });
+    out.push({ type: 'ring', center: p, normal: [0, 1, 0], radius: 0.24 * len, width: 0.03 * len, color: c });
   }
   return out;
 }
@@ -65,11 +70,14 @@ export class GizmoControl {
   private grab: Grab | null = null;
   private shown = false;
   private last: Pose | null = null;
+  private snap: Snap = {};
+  /** How high the middle of each thing is above its foot, by its size (measuring decodes the model: once, not every frame). */
+  private readonly lifts = new Map<string, { scale: number; lift: number }>();
   /** What was drawn last (tests and the island's hints). */
   seen: { readonly ref: PresetId; readonly mode: GizmoMode; readonly pivot: Vec3; readonly len: number; readonly hot: Handle | null } | null = null;
 
   constructor(private readonly rt: Runtime, private readonly sceneId: PresetId, private readonly overlay: { show(id: string, shapes: readonly OverlayShape[]): void; hide(id: string): void },
-    private readonly pose: (index: number, p: Pose) => void) {}
+    private readonly pose: (index: number, p: Pose) => void, private readonly measure: (ref: PresetId) => number) {}
 
   get dragging(): boolean { return this.grab !== null; }
   get hovering(): boolean { return this.hot !== null; }
@@ -79,6 +87,13 @@ export class GizmoControl {
     const pr = this.rt.store.resolve(ref).params as Record<string, unknown>;
     return { x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), yaw: Number(pr['yaw'] ?? 0), scale: Number(pr['scale'] ?? 0.1) };
   }
+  private liftOf(ref: PresetId, scale: number): number {
+    const hit = this.lifts.get(ref);
+    if (hit && hit.scale === scale) return hit.lift;
+    const lift = Math.max(0, this.measure(ref));
+    this.lifts.set(ref, { scale, lift });
+    return lift;
+  }
 
   grow(steps: number): void { this.size = gizmoGrow(this.size, steps); }
 
@@ -87,13 +102,22 @@ export class GizmoControl {
     const t = this.grab?.target ?? target;
     const base = t ? this.poseOf(t.ref) : null;
     if (!t || !base || !ray) { this.hide(); return; }
-    const pivot: Vec3 = this.grab && this.last ? [this.last.x, this.last.y, this.last.z] : [base.x, base.y, base.z];
-    const len = this.grab?.len ?? worldLength(pivot, ray.origin, fovDeg, this.size);
-    const state = { mode: this.grab ? modeOfHandle(this.grab.handle) : mode, pivot };
-    if (this.grab) this.track(ray, snap);
-    else this.hot = allowed(mode, hitTest(state, ray, len));
-    this.overlay.show('gizmo', gizmoShapes(state.mode, pivot, len, this.grab?.handle ?? this.hot));
-    this.seen = { ref: t.ref, mode: state.mode, pivot, len, hot: this.grab?.handle ?? this.hot };
+    const g = this.grab;
+    let pivot: Vec3, len: number;
+    if (g) {
+      this.track(ray, snap);
+      // a moved thing takes its gizmo along; turning and sizing keep it where the drag began
+      const at = modeOfHandle(g.handle) === 'move' && this.last ? this.last : g.from;
+      pivot = [at.x, at.y + g.lift, at.z];
+      len = g.len;
+    } else {
+      pivot = [base.x, base.y + this.liftOf(t.ref, base.scale), base.z];
+      len = worldLength(pivot, ray.origin, fovDeg, this.size * BASE);
+      this.hot = allowed(mode, hitTest({ mode, pivot }, ray, len));
+    }
+    const shownMode = g ? modeOfHandle(g.handle) : mode;
+    this.overlay.show('gizmo', gizmoShapes(shownMode, pivot, len, g?.handle ?? this.hot));
+    this.seen = { ref: t.ref, mode: shownMode, pivot, len, hot: g?.handle ?? this.hot };
     this.shown = true;
   }
 
@@ -104,25 +128,25 @@ export class GizmoControl {
     if (!target || !ray || !this.hot) return false;
     const from = this.poseOf(target.ref);
     if (!from) return false;
-    const len = worldLength([from.x, from.y, from.z], ray.origin, fovDeg, this.size);
-    this.grab = { handle: this.hot, start: ray, from, target, copy: alt && modeOfHandle(this.hot) === 'move', len };
+    const lift = this.liftOf(target.ref, from.scale);
+    const len = worldLength([from.x, from.y + lift, from.z], ray.origin, fovDeg, this.size * BASE);
+    this.grab = { handle: this.hot, start: ray, from, target, copy: alt && modeOfHandle(this.hot) === 'move', len, lift };
     this.last = from;
     return true;
   }
 
   /**
    * Follow the pointer now. The frame calls it, and so do pointer moves and letting go: a slow frame (a low-end laptop) never drops the end
-   * of a quick drag. The snap stays as last given.
+   * of a quick drag. The snap stays as last given. The maths runs on the gizmo's pivot (the thing's middle); the result moves the thing.
    */
   track(ray: Ray | null, snap?: Snap): void {
     const g = this.grab;
     if (!g || !ray) return;
     if (snap) this.snap = snap;
-    const r = drag({ mode: modeOfHandle(g.handle), pivot: [g.from.x, g.from.y, g.from.z] }, g.handle, g.start, ray, g.len, this.snap);
+    const r = drag({ mode: modeOfHandle(g.handle), pivot: [g.from.x, g.from.y + g.lift, g.from.z] }, g.handle, g.start, ray, g.len, this.snap);
     this.last = posed(g.from, r);
     this.pose(g.target.index, this.last);
   }
-  private snap: Snap = {};
 
   /** Let go (with the pointer's last ray): one undo step (Move, Turn, Size, or a copy left behind with Alt). Returns what was done, for the island to say. */
   up(ray?: Ray | null): string | null {
@@ -157,5 +181,3 @@ export class GizmoControl {
   /** Esc while dragging: put it back. */
   cancel(): void { const g = this.grab; this.grab = null; this.last = null; if (g) this.pose(g.target.index, g.from); }
 }
-
-const modeOfHandle = (h: Handle): GizmoMode => (h.kind === 'ring' || h.kind === 'view-ring' ? 'rotate' : h.kind === 'uniform' ? 'scale' : 'move');

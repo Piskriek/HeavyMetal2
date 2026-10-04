@@ -87,6 +87,8 @@ export interface RenderService {
 export type OverlayShape =
   | { readonly type: 'line'; readonly from: Vec3; readonly to: Vec3; readonly color: Color }
   | { readonly type: 'ring'; readonly center: Vec3; readonly normal: Vec3; readonly radius: number; readonly color: Color; /** a solid band this thick (metres) instead of a thin line */ readonly width?: number }
+  /** A solid cone from its base centre to its tip (a gizmo's arrowhead). */
+  | { readonly type: 'cone'; readonly from: Vec3; readonly to: Vec3; readonly radius: number; readonly color: Color }
   /** A solid rod (a gizmo's arrow shaft). */
   | { readonly type: 'tube'; readonly from: Vec3; readonly to: Vec3; readonly radius: number; readonly color: Color; readonly opacity?: number }
   /** A filled four-cornered patch (a gizmo's plane handle). */

@@ -2,6 +2,7 @@
  * Browser smoke test of the PRODUCTION build with the installed Chrome (no download): it must boot with no page error, and no screen may be a trap.
  *   node scripts/e2e-smoke.mjs          (serves apps/web/dist itself on a free port; run `npm run build` first)
  * Skipped with a note when Chrome is not installed. Software rendering is slow, so the timeouts are generous.
+ * E2E_SHOTS=<folder> also saves screenshots of a few screens there (the gizmo, the Things palette, a campfire) for looking at them.
  * On a slower PC multiply every wait (`E2E_SLOW=3`) and/or render on the graphics card (`E2E_GPU=1`), e.g. `E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`.
  */
 import { spawn } from 'node:child_process';
@@ -41,6 +42,8 @@ try {
   check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
 
   const text = (sel, t) => page.locator(sel, { hasText: t }).first();
+  const shotDir = process.env.E2E_SHOTS;
+  const shot = async (name) => { if (shotDir) await page.screenshot({ path: `${shotDir}/${name}.png` }); };
   const dom = (fn, arg) => page.evaluate(fn, arg); // software rendering starves the page: click through the DOM instead of waiting for Playwright stability checks
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
@@ -232,6 +235,7 @@ try {
   await page.waitForTimeout(T(300));
   const thingsRow = await page.evaluate(() => [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent));
   const thingsFrames = await page.locator('.palette-strip .ps-frame').count();
+  await shot('things-palette');
   check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', ['Place', 'Scatter', 'Row', 'Swap'].every((w) => thingsRow.includes(w)) && thingsFrames >= 10, `${thingsRow.join(',')} / ${thingsFrames} frames`);
   await page.keyboard.press('F7');
   await page.waitForTimeout(T(300));
@@ -285,6 +289,7 @@ try {
     await page.mouse.move(g1.xArrow[0], g1.xArrow[1]);
     await page.waitForTimeout(T(300));
     const hot = (await page.evaluate(() => window.hmGizmo?.()))?.hot;
+    await shot('gizmo-hover-x');
     check('pointing at the x arrow lights it', hot?.kind === 'axis' && hot?.axis === 'x', JSON.stringify(hot));
     await page.mouse.down(); await page.waitForTimeout(T(100));
     await page.mouse.move(g1.xFar[0], g1.xFar[1], { steps: 6 }); await page.waitForTimeout(T(200));
@@ -312,6 +317,7 @@ try {
   await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
   await page.waitForTimeout(T(900));
   const fx1 = await page.evaluate(() => window.hmEffects?.());
+  await shot('effects-campfire');
   check('Place puts a campfire on the island and it burns', fx1?.placed === 1 && fx1.particles > 0, JSON.stringify(fx1));
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(T(400));

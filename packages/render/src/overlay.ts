@@ -29,6 +29,17 @@ const makeTube = (shape: Extract<OverlayShape, { type: 'tube' }>): THREE.Mesh =>
   return mesh;
 };
 
+const makeCone = (shape: Extract<OverlayShape, { type: 'cone' }>): THREE.Mesh => {
+  const a = vector(shape.from), b = vector(shape.to);
+  const dir = b.clone().sub(a);
+  const len = Math.max(1e-6, dir.length());
+  // a cone points along +y from its middle: put its middle halfway, its tip on `to`
+  const mesh = new THREE.Mesh(new THREE.ConeGeometry(shape.radius, len, 16), solid(shape.color));
+  mesh.position.copy(a).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return mesh;
+};
+
 const makeQuad = (shape: Extract<OverlayShape, { type: 'quad' }>): THREE.Mesh => {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(shape.corners.flatMap((c) => [c[0], c[1], c[2]]), 3));
@@ -129,7 +140,7 @@ export class OverlayManager {
     group.renderOrder = 10000;
     for (const shape of shapes) {
       const object = shape.type === 'line' ? makeLine(shape)
-        : shape.type === 'tube' ? makeTube(shape) : shape.type === 'quad' ? makeQuad(shape)
+        : shape.type === 'tube' ? makeTube(shape) : shape.type === 'cone' ? makeCone(shape) : shape.type === 'quad' ? makeQuad(shape)
         : shape.type === 'ring' ? makeRing(shape)
           : shape.type === 'box' ? makeBox(shape) : shape.type === 'ribbon' ? makeRibbon(shape) : makeHandle(shape);
       object.renderOrder = 10000;

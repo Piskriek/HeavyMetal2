@@ -500,7 +500,8 @@ export function IslandWalk(props: {
     let cursor = { x: 0, y: 0 };
     let looking: { x: number; y: number } | null = null;
     // the transform gizmo (Pro and Studio, on Select's tab; docs/ARENA_PLAN.md)
-    const gizmo = new GizmoControl(rt, scene.sceneId, renderer.overlay, (i, p) => renderer.setModelPose(i, p.x, p.y, p.z, p.yaw, p.scale));
+    const gizmo = new GizmoControl(rt, scene.sceneId, renderer.overlay, (i, p) => renderer.setModelPose(i, p.x, p.y, p.z, p.yaw, p.scale),
+      (ref) => { const t = focusTargetOf(rt, ref); return t ? t.center[1] - Number(rt.store.resolve(ref).params['y'] ?? 0) : 0; });
     let gizmoTgt: GizmoTarget | null = null, gizmoFov = 60;
     /** Shift snaps moves to half metres and sizes to quarter steps, Ctrl snaps turns to 15 degrees (hotbar spec V3). */
     const gizmoSnap = (): { move?: number; turn?: number; scale?: number } => {

@@ -3,7 +3,7 @@ import { LIGHT_WAYS } from './light-ways';
 type SfxRecipeLayers = SfxRecipe['layers'];
 import { ANIMATIONS, animById, animToParams, normalizeAnim, type AnimPreset } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset, LOGIC_WAYS, EFFECT_WAYS } from '@hm/buildkit';
+import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset, LOGIC_WAYS, EFFECT_WAYS, SOUND_WAYS } from '@hm/buildkit';
 import { SETUPS, setupById, type LightSetup } from '@hm/lighting';
 import { STARTER_SURFACES } from '@hm/render';
 
@@ -79,7 +79,9 @@ export function catalog(tab: TabId, player: CatalogPlayer, _activities: readonly
     case 'animate':
       return ANIMATIONS.map((a) => { const p = animOf(player, a.id); return { tab, id: a.id, name: p.name, doc: `${p.loop ? 'Repeats' : 'Plays once'}: ${p.style}.`, preview: { kind: 'anim', anim: p }, edited: !!player.anims[a.id] }; });
     case 'sound':
-      return SFX_IDS.map((id) => ({ tab, id, name: soundName(id), doc: `A ${SFX[id].category} sound, ${SFX[id].durationMs} ms. Edit changes its volume, pitch and layers.`, preview: { kind: 'sound', id }, edited: false }));
+      // ways first; the sounds after, so hotbars that hold sounds stay valid
+      return [...SOUND_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false })),
+        ...SFX_IDS.map((id) => ({ tab, id, name: soundName(id), doc: `A ${SFX[id].category} sound, ${SFX[id].durationMs} ms. Edit changes its volume, pitch and layers.`, preview: { kind: 'sound' as const, id }, edited: false }))];
     case 'lights':
       // ways to change the light first; the looks (also in the palette) after, so older hotbars that hold looks stay valid
       return [...LIGHT_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false })), ...SETUPS.map((s) => ({ tab, id: s.id, name: s.name, doc: 'A lighting look: sun, sky, haze and picture effects.', preview: { kind: 'sky' as const, top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color }, edited: false }))];
@@ -103,6 +105,7 @@ export function validFor(tab: TabId, id: string, player: CatalogPlayer, activiti
 export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly string[])[]>>> = {
   sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']],
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat']],
+  sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
 };
 
@@ -116,7 +119,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   // ways to sculpt; the shapes Stamp presses are in the palette (docs/HOTBAR.md)
   out.sculpt = ids(['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']);
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
-  out.sound = ids(['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']);
+  out.sound = [...ids(SOUND_WAYS.map((w) => w.id)), null, null, null, null, null];
   // ways to change the light; the looks are the palette (docs/HOTBAR.md)
   out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds']), null, null, null, null];
   out.avatar = ids([...player.looks.map((l) => l.id), ...LOOKS.map((l) => l.id)]);

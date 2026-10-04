@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { LogicPanel } from './logic-panel';
 import { EffectsPanel } from './effects-panel';
+import { SoundSpotsPanel } from './sound-spots-panel';
 import { cmd, defineSchema, type Params, type PresetId, type PresetSchema, type VariableDef } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { ANIMATIONS, ANIM_VARIABLES, MOVE_SLOTS, animToParams, type AnimPreset, type MoveSlot } from '@hm/anim';
@@ -298,7 +299,7 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
   switch (tab) {
     case 'select': case 'paint': case 'sculpt': case 'things': return <ToolEditor id={id} actions={props.actions} />;
     case 'animate': return <AnimEditor id={id} actions={props.actions} />;
-    case 'sound': return <SoundEditor id={id} rt={props.rt} />;
+    case 'sound': return id.startsWith('sound-') ? <SoundSpotsPanel rt={props.rt} sceneId={props.sceneId} /> : <SoundEditor id={id} rt={props.rt} />;
     case 'lights': return <LightingPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'logic': return <LogicPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'effects': return <EffectsPanel rt={props.rt} sceneId={props.sceneId} />;

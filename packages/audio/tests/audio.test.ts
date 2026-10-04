@@ -88,3 +88,17 @@ test('player: engine nodes are created once and then only updated; music schedul
   const p: MusicPattern = musicPattern(3, 2); const o = log.osc + log.src; e.playMusic(p); assert.ok(log.osc + log.src - o >= p.notes.length);
   e.stopMusic(); assert.ok(log.stopped > 0);
 });
+
+test('an ambience bed starts its layers once, follows its gain, and stops when faded to nothing', () => {
+  const { ctx, log } = fakeCtx(); const e = createAudioEngine(ctx);
+  const layers = [
+    { wave: 'noise' as const, freq: 200, gain: 0.4, lfoHz: 0.1, lfoDepth: 0.5, filter: 'lowpass' as const, cutoff: 800 },
+    { wave: 'sine' as const, freq: 3000, gain: 0.2, lfoHz: 8, lfoDepth: 0.9, filter: 'bandpass' as const, cutoff: 3000 },
+  ];
+  e.setBed('forest', layers, 0); assert.equal(log.started, 0, 'silent: nothing starts');
+  e.setBed('forest', layers, 0.7); const started = log.started; assert.equal(started, 4, 'two sources and two wobbles');
+  e.setBed('forest', layers, 0.4); assert.equal(log.started, started, 'a new gain reuses the bed');
+  e.setBed('forest', layers, 0); assert.equal(log.stopped, 4);
+  e.setBed('forest', layers, 0.5); assert.equal(log.started, 8, 'it can come back');
+  e.dispose(); assert.equal(log.stopped, 8);
+});

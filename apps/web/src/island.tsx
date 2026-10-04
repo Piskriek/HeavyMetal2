@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -21,9 +21,14 @@ import { fx } from './maker/feedback';
 import { BuildController, type Aim, type Selected } from './build/build-controller';
 import { GizmoControl, gizmoModeFor, type GizmoTarget } from './build/gizmo-control';
 import { EffectsRuntime, type PlacedEffect } from './build/effects-runtime';
+import { SoundscapeRuntime, zoneOf, emitterOf, type PlacedSound } from './build/soundscape-runtime';
+import { SoundSpotsPanel } from './build/sound-spots-panel';
+import { AMBIENCES } from '@hm/soundscape';
+import { audio } from './maker/feedback';
 import { PARTICLE_PRESETS } from '@hm/particles';
 import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
-import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { animOf, catalog, lookOf, soundName, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { SFX_IDS } from '@hm/audio';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
@@ -261,7 +266,7 @@ export function IslandWalk(props: {
     const pl = player();
     if (tab === 'lights') { if (isLightWay(id)) say(`${byIdName(tab, id)}: ${LIGHT_WAYS.find((w) => w.id === id)?.left ?? ''} with the left button`); else { pickLook(rt, scene.sceneId, id); say(`Light: ${byIdName(tab, id)}`); } }
     else if (tab === 'animate') api.current?.playAnim(id);
-    else if (tab === 'sound') fx(id as SfxId);
+    else if (tab === 'sound') { if (!id.startsWith('sound-')) fx(id as SfxId); }
     else if (tab === 'avatar') { wearLook(id); say(`Wearing ${lookOf(pl, id).name}`); }
     else if (tab === 'camera') switchCamera(id);
   }, [rt, scene.sceneId, say]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -517,6 +522,14 @@ export function IslandWalk(props: {
       return { ref: r.ref, preset: String(pr['preset'] ?? 'campfire'), x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), scale: Number(pr['scale'] ?? 1), on: pr['on'] !== false };
     });
     (window as unknown as { hmEffects: unknown }).hmEffects = () => ({ placed: placedEffects().length, particles: effects.count });
+    // placed sounds (the Sound tab, F5): ambience zones as live synth beds, sounds repeating from their spots
+    const soundscape = new SoundscapeRuntime();
+    const placedSounds = (): PlacedSound[] => (rt.store.get(scene.sceneId)?.children['soundscape'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => {
+      const pr = rt.store.resolve(r.ref).params as Record<string, unknown>;
+      return { ref: r.ref, what: String(pr['what'] ?? ''), x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), size: Number(pr['size'] ?? 8), volume: Number(pr['volume'] ?? 0.8), every: Number(pr['every'] ?? 4), on: pr['on'] !== false };
+    });
+    let soundOverlay = false;
+    (window as unknown as { hmSounds: unknown }).hmSounds = () => ({ placed: placedSounds().length, zones: placedSounds().filter((p) => isAmbience(p.what)).length });
     // tests: what the gizmo shows, where a point along its arrow lands on screen, and the target's place
     (window as unknown as { hmGizmo: unknown }).hmGizmo = () => {
       const g = gizmo.seen;
@@ -788,6 +801,42 @@ export function IslandWalk(props: {
         fx('place', { volume: 0.5 });
         return;
       }
+      // the Sound tab's ways: play the palette's pick, place it (an ambience becomes a zone, a sound repeats from its spot), take the nearest away, list them
+      if (s.tab === 'sound' && id.startsWith('sound-')) {
+        if (!first) return;
+        if (id === 'sound-list') { live.current.win.open('soundscape', 'Sounds here', { x: 60, y: 80, ...WIN.editor }); unlock(); return; }
+        const what = s.palette.sound ?? 'forest-birds';
+        const name = isAmbience(what) ? AMBIENCES.find((a) => a.id === what)?.name ?? what : soundName(what);
+        if (id === 'sound-play') {
+          if (isAmbience(what)) {
+            const amb = AMBIENCES.find((a) => a.id === what);
+            const eng = audio();
+            if (amb && eng) { eng.setBed(`preview-${what}`, amb.layers, 0.5); window.setTimeout(() => eng.setBed(`preview-${what}`, amb.layers, 0), 3000); }
+          } else fx(what as SfxId);
+          say(name);
+          return;
+        }
+        const a = aim();
+        if (!a) { say('Point at the ground'); return; }
+        const refs = rt.store.get(scene.sceneId)?.children['soundscape'] ?? [];
+        if (id === 'sound-remove' || alt) {
+          let best = -1, bestD = 4;
+          refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
+          if (best < 0) { say('No placed sound near there'); return; }
+          rt.commands.execute(cmd.removeChild(scene.sceneId, 'soundscape', best, 'Remove a placed sound'));
+          saveMap(rt, scene.sceneId); say('Sound taken away'); fx('delete', { volume: 0.5 });
+          return;
+        }
+        const spotId = `sound-${Date.now().toString(36)}`;
+        const zone = isAmbience(what);
+        rt.commands.transaction(`Sound: ${name}`, () => {
+          rt.commands.execute(cmd.put({ id: spotId, kind: 'sound-spot', name, params: { what, x: a.point[0], y: a.point[1], z: a.point[2], size: zone ? 8 : 10, volume: 0.8, every: 4, on: true } as never, tier: 'play' }, `Sound: ${name}`));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'soundscape', spotId, undefined, `Sound: ${name}`));
+        });
+        saveMap(rt, scene.sceneId);
+        say(zone ? `${name}: a zone, you hear it when you are near` : `${name}: it plays from here every few seconds`); fx('place', { volume: 0.5 });
+        return;
+      }
       // the Effects tab's ways: place the palette's effect where you point, play it once, or take the nearest away
       if (s.tab === 'effects') {
         if (!first) return;
@@ -875,6 +924,18 @@ export function IslandWalk(props: {
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       effects.sync(placedEffects());
+      {
+        const spots = placedSounds();
+        const ear: [number, number, number] = eye ? [eye[0], eye[1], eye[2]] : [px, py, pz];
+        soundscape.update(dt, ear, (camYaw * 180) / Math.PI, spots, audio(), (sound, volume) => fx(sound as SfxId, { volume }));
+        const showSpots = live.current.buildOn && player().tab === 'sound' && spots.length > 0;
+        if (showSpots) {
+          renderer.overlay.show('soundscape', spots.map((sp) => isAmbience(sp.what)
+            ? { type: 'box' as const, center: zoneOf(sp).centre, half: zoneOf(sp).half, color: sp.on ? '#2bb3a3' : '#9a9a9a' }
+            : { type: 'ring' as const, center: emitterOf(sp).pos, normal: [0, 1, 0] as [number, number, number], radius: Math.max(0.6, emitterOf(sp).radius), width: 0.12, color: sp.on ? '#f08a24' : '#9a9a9a' }));
+          soundOverlay = true;
+        } else if (soundOverlay) { renderer.overlay.hide('soundscape'); soundOverlay = false; }
+      }
       effects.step(dt);
       renderer.setParticles('glow', effects.glow.buffer, effects.glow.count);
       renderer.setParticles('plain', effects.plain.buffer, effects.plain.count);
@@ -1138,6 +1199,8 @@ export function IslandWalk(props: {
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'logic'
           ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'sound'
+          ? <PaletteStrip title="Sounds" items={[...AMBIENCES.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon' as const, icon: AMBIENCE_ICONS[a.id] ?? 'Music' } })), ...SFX_IDS.map((id) => ({ id, name: soundName(id), preview: { kind: 'sound' as const, id } }))]} community={[]} selected={p.palette.sound ?? 'forest-birds'} onLayers={openLayers} onPick={(id) => { pickPalette('sound', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'effects'
           ? <PaletteStrip title="Effects" items={PARTICLE_PRESETS.map((e) => ({ id: e.id, name: e.name, preview: { kind: 'icon', icon: EFFECT_ICONS[e.id] ?? 'Sparkles' } }))} community={[]} selected={p.palette.effects ?? 'campfire'} onLayers={openLayers} onPick={(id) => { pickPalette('effects', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'lights'
@@ -1165,6 +1228,7 @@ export function IslandWalk(props: {
                 onSave={(g, target) => props.onProfile?.((pr) => { const key = target === 'blocks' ? `b${sid}` : String(sid); const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[key] = g; else delete looks[key]; return { ...pr, groundLooks: looks }; })} />; })()
             : w.id === 'logic' ? <LogicPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'effects' ? <EffectsPanel rt={rt} sceneId={scene.sceneId} />
+            : w.id === 'soundscape' ? <SoundSpotsPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
@@ -1215,7 +1279,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
   if (tool) return { title, line: tool.doc, left: tool.left, right: tool.right };
   switch (tab) {
     case 'animate': return { title, line: item.doc, left: 'Play it', right: 'Stop' };
-    case 'sound': return { title, line: item.doc, left: 'Play it', right: 'Play it' };
+    case 'sound': { const w = SOUND_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: item.doc, left: 'Play it', right: 'Play it' }; }
     case 'lights': { const w = LIGHT_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' }; }
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };

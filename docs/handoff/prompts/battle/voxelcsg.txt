@@ -1,0 +1,99 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: boolean and cutting tools for voxel models in a toy-building game: join two models, carve one out of another, keep the overlap, cut a model in two, crop it to its contents, hollow it out, flood-fill a colour, and count its separate pieces.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/voxelcsg.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Never change an input model: every function returns a new one.
+
+## The voxel model
+
+```ts
+export interface Voxels {
+  size: [number, number, number];  // cells along x, y, z (y is up)
+  cells: Uint8Array;               // index = x + y*sx + z*sx*sy; 0 = empty, otherwise a material number 1..255
+}
+export type Vec3i = [number, number, number];
+export type Axis = 'x' | 'y' | 'z';
+```
+
+## API (implement exactly)
+
+```ts
+export function emptyModel(sx: number, sy: number, sz: number): Voxels;
+export function get(m: Voxels, x: number, y: number, z: number): number;          // 0 outside
+export function set(m: Voxels, x: number, y: number, z: number, v: number): void; // ignored outside
+export function countFilled(m: Voxels): number;
+/** a with every filled cell of b (placed with its corner at `offset` in a) painted in; cells of b outside a's box are dropped. */
+export function union(a: Voxels, b: Voxels, offset: Vec3i): Voxels;
+/** a with every cell under a filled cell of b (at `offset`) emptied. */
+export function subtract(a: Voxels, b: Voxels, offset: Vec3i): Voxels;
+/** a's filled cells that lie under a filled cell of b (at `offset`), keeping a's materials; everything else empty. */
+export function intersect(a: Voxels, b: Voxels, offset: Vec3i): Voxels;
+/** Cut along a plane: [cells with coordinate < at, cells with coordinate >= at], both the size of m. */
+export function split(m: Voxels, axis: Axis, at: number): [Voxels, Voxels];
+/** The smallest box holding every filled cell, as a new model, and where its corner was in m; null when m is empty. */
+export function crop(m: Voxels): { model: Voxels; offset: Vec3i } | null;
+/** Keep only the shell: a filled cell stays when an empty cell or the outside of the box is within `wall` steps along x, y or z (6-neighbour steps). */
+export function hollow(m: Voxels, wall: number): Voxels;
+/** Recolour the cells 6-connected to `start` that have the same material as it (start empty or outside: m unchanged, as a copy). */
+export function floodFill(m: Voxels, start: Vec3i, mat: number): Voxels;
+/** How many separate pieces (6-connected groups of filled cells, any material). */
+export function components(m: Voxels): number;
+/** Every piece as its own model of m's size, largest first (ties: the piece holding the lowest cell index first). */
+export function pieces(m: Voxels): Voxels[];
+```
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { components, countFilled, crop, emptyModel, floodFill, get, hollow, intersect, pieces, set, split, subtract, union, type Voxels } from '../src/index';
+const box = (sx: number, sy: number, sz: number, mat = 1): Voxels => { const m = emptyModel(sx, sy, sz); m.cells.fill(mat); return m; };
+
+test('union paints b into a and drops what falls outside', () => {
+  const a = emptyModel(4, 4, 4);
+  const u = union(a, box(2, 2, 2, 3), [1, 1, 1]);
+  assert.equal(countFilled(u), 8); assert.equal(get(u, 1, 1, 1), 3); assert.equal(get(u, 2, 2, 2), 3);
+  assert.equal(countFilled(union(a, box(2, 2, 2, 3), [3, 3, 3])), 1);
+  assert.equal(countFilled(a), 0);
+});
+test('subtract carves, intersect keeps the overlap with a\'s colours', () => {
+  const a = box(4, 4, 4, 2);
+  assert.equal(countFilled(subtract(a, box(2, 2, 2), [1, 1, 1])), 56);
+  const i = intersect(a, box(2, 2, 2, 9), [1, 1, 1]);
+  assert.equal(countFilled(i), 8); assert.equal(get(i, 1, 1, 1), 2); assert.equal(get(i, 0, 0, 0), 0);
+  assert.equal(countFilled(subtract(a, box(2, 2, 2), [-1, -1, -1])), 63);
+});
+test('split cuts along a plane', () => {
+  const [lo, hi] = split(box(4, 4, 4), 'x', 1);
+  assert.equal(countFilled(lo), 16); assert.equal(countFilled(hi), 48);
+  assert.deepEqual(lo.size, [4, 4, 4]); assert.equal(get(lo, 0, 3, 3), 1); assert.equal(get(lo, 1, 0, 0), 0);
+  const [below, above] = split(box(2, 3, 2), 'y', 2);
+  assert.equal(countFilled(below), 8); assert.equal(countFilled(above), 4);
+});
+test('crop finds the contents and where they were', () => {
+  const m = emptyModel(6, 6, 6); set(m, 2, 3, 4, 5); set(m, 3, 3, 5, 6);
+  const c = crop(m)!;
+  assert.deepEqual(c.model.size, [2, 1, 2]); assert.deepEqual(c.offset, [2, 3, 4]);
+  assert.equal(countFilled(c.model), 2); assert.equal(get(c.model, 0, 0, 0), 5); assert.equal(get(c.model, 1, 0, 1), 6);
+  assert.equal(crop(emptyModel(3, 3, 3)), null);
+});
+test('hollow keeps a shell', () => {
+  assert.equal(countFilled(hollow(box(5, 5, 5), 1)), 98);
+  assert.equal(countFilled(hollow(box(5, 5, 5), 2)), 124);
+  assert.equal(countFilled(hollow(box(2, 2, 2), 1)), 8);
+});
+test('flood fill follows one colour', () => {
+  const m = emptyModel(3, 1, 1); set(m, 0, 0, 0, 1); set(m, 1, 0, 0, 1); set(m, 2, 0, 0, 2);
+  const f = floodFill(m, [0, 0, 0], 5);
+  assert.deepEqual(Array.from(f.cells), [5, 5, 2]);
+  assert.deepEqual(Array.from(floodFill(m, [9, 0, 0], 5).cells), [1, 1, 2]);
+});
+test('pieces: separate blobs are separate pieces, largest first', () => {
+  const m = emptyModel(6, 1, 1); set(m, 0, 0, 0, 1); set(m, 2, 0, 0, 1); set(m, 3, 0, 0, 4); set(m, 4, 0, 0, 1);
+  assert.equal(components(m), 2);
+  const p = pieces(m);
+  assert.equal(p.length, 2); assert.equal(countFilled(p[0]!), 3); assert.equal(countFilled(p[1]!), 1); assert.equal(get(p[0]!, 3, 0, 0), 4);
+  assert.equal(components(emptyModel(2, 2, 2)), 0);
+});
+```

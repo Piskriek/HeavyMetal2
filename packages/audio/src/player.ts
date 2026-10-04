@@ -66,12 +66,17 @@ export interface AudioEngine {
   setEngine(key: string, p: EngineParams): void;
   stopEngine(key: string): void;
   setRoll(key: string, p: RollParams): void;
+  /** An ambience bed (a forest, wind, rain ...): looping synth layers at `gain`; it fades to each new gain, and 0 fades it out and stops it. */
+  setBed(key: string, layers: readonly AmbienceLayer[], gain: number): void;
   playMusic(p: MusicPattern): void;
   stopMusic(): void;
   setVolumes(v: Partial<{ master: number; sfx: number; music: number }>): void;
   readonly volumes: { master: number; sfx: number; music: number };
   dispose(): void;
 }
+
+/** One layer of an ambience bed (the shape of @hm/soundscape's Layer): a wave or noise, its level, a slow wobble, a filter. */
+export interface AmbienceLayer { readonly wave: 'sine' | 'triangle' | 'noise'; readonly freq: number; readonly gain: number; readonly lfoHz: number; readonly lfoDepth: number; readonly filter: 'lowpass' | 'bandpass' | 'highpass'; readonly cutoff: number }
 
 /** The part of a recipe the player needs (sound presets may carry any id). */
 export type PlayableRecipe = Pick<SfxRecipe, 'layers'> & { readonly durationMs?: number };
@@ -102,6 +107,7 @@ export function createAudioEngine(
       setEngine: () => {},
       stopEngine: () => {},
       setRoll: () => {},
+      setBed: () => {},
       playMusic: () => {},
       stopMusic: () => {},
       setVolumes: (v) => {
@@ -143,6 +149,9 @@ export function createAudioEngine(
     }
     return noiseBuf;
   }
+
+  // Ambience beds: persistent per key until faded out
+  const bedMap = new Map<string, { out: GainLike; parts: { stop(t?: number): void }[] }>();
 
   // Engine state: persistent per-key
   interface EngineVoice {
@@ -310,6 +319,51 @@ export function createAudioEngine(
       }
     },
 
+    setBed(key: string, layers: readonly AmbienceLayer[], gain: number) {
+      const t = ctx.currentTime;
+      const g = clamp(gain, 0, 1);
+      let bed = bedMap.get(key);
+      if (!bed) {
+        if (g <= 0.001) return;
+        const out = ctx.createGain();
+        out.gain.setValueAtTime(0, t);
+        out.connect(sfxGain);
+        const parts: { stop(t?: number): void }[] = [];
+        for (const l of layers) {
+          const level = clamp(l.gain, 0, 1), depth = clamp(l.lfoDepth, 0, 1);
+          let src: OscLike | BufferSourceLike;
+          if (l.wave === 'noise') { const n = ctx.createBufferSource(); n.buffer = getNoiseBuffer(); n.loop = true; src = n; }
+          else { const o = ctx.createOscillator(); o.type = l.wave; o.frequency.setValueAtTime(clampFreq(l.freq), t); src = o; }
+          const filter = ctx.createBiquadFilter();
+          filter.type = l.filter;
+          filter.frequency.setValueAtTime(clampFreq(l.cutoff), t);
+          // the wobble swings the layer's level between level * (1 - depth) and level
+          const lg = ctx.createGain();
+          lg.gain.setValueAtTime(level * (1 - depth / 2), t);
+          src.connect(filter); filter.connect(lg); lg.connect(out);
+          src.start(t); parts.push(src);
+          if (l.lfoHz > 0 && depth > 0) {
+            const lfo = ctx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(Math.min(20, l.lfoHz), t);
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.setValueAtTime((level * depth) / 2, t);
+            lfo.connect(lfoGain); lfoGain.connect(lg.gain);
+            lfo.start(t); parts.push(lfo);
+          }
+        }
+        bed = { out, parts };
+        bedMap.set(key, bed);
+      }
+      bed.out.gain.cancelScheduledValues?.(t);
+      bed.out.gain.setValueAtTime(bed.out.gain.value, t);
+      bed.out.gain.linearRampToValueAtTime(g, t + 0.3);
+      if (g <= 0.001) {
+        for (const p of bed.parts) { try { p.stop(t + 0.35); } catch { /* already stopped */ } }
+        bedMap.delete(key);
+      }
+    },
+
     setRoll(key: string, p: RollParams) {
       let voice = rollMap.get(key);
       const t = ctx.currentTime;
@@ -474,6 +528,8 @@ export function createAudioEngine(
         }
       }
       rollMap.clear();
+      for (const [, bed] of bedMap) for (const p of bed.parts) { try { p.stop(); } catch { /* ignore */ } }
+      bedMap.clear();
       if (ctx.close) {
         ctx.close();
       }

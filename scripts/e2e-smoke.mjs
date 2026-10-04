@@ -322,6 +322,19 @@ try {
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(T(400));
   check('and Ctrl+Z takes it away', (await page.evaluate(() => window.hmEffects?.()))?.placed === 0);
+  // Sound (F5): the palette holds the ambiences and the sounds; Place puts Beach Waves down as a zone; Ctrl+Z takes it away
+  await page.keyboard.press('F5');
+  await page.waitForTimeout(T(400));
+  check('Sound holds ways (Play, Place, Remove, Sounds here) and its palette the eight ambiences first', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((x) => x.textContent); return ['Play', 'Place', 'Remove', 'Sounds here'].every((w) => t.includes(w)); })
+    && JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.slice(0, 2).map((x) => x.textContent))) === JSON.stringify(['Forest Birds', 'Windy Hill']));
+  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Beach Waves/.test(b.textContent ?? ''))?.click(); });
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Place/.test(b.textContent ?? ''))?.click(); });
+  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
+  await page.waitForTimeout(T(400));
+  check('Place puts Beach Waves down as a zone', (await page.evaluate(() => window.hmSounds?.()))?.zones === 1, JSON.stringify(await page.evaluate(() => window.hmSounds?.())));
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(T(400));
+  check('and Ctrl+Z takes the zone away', (await page.evaluate(() => window.hmSounds?.()))?.placed === 0);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

@@ -1,0 +1,99 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: lights you place in a toy world (a bulb, a spotlight, a floating flashlight orb, a campfire glow, a candle, a strobe, a lantern, neon, a disco light, a torch) as data, how bright each is at a point (fall-off and a spot's cone), how it flickers over time, and which few lights matter most to the viewer (a renderer can only afford a handful).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/lightplace.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (use a seeded hash or mulberry32), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export type Flicker = 'none' | 'candle' | 'fire' | 'strobe' | 'pulse' | 'faulty';
+export interface LightPreset {
+  id: string; name: string;
+  kind: 'point' | 'spot';
+  color: string;        // '#rrggbb'
+  intensity: number;    // 0..10
+  range: number;        // metres, 0.5..60 (no light at or beyond it)
+  angle: number;        // spot: half-angle of the cone in degrees, 1..90 (points: 0)
+  penumbra: number;     // spot: 0..1, the share of the cone that fades at its edge (points: 0)
+  flicker: Flicker;
+  rate: number;         // flickers or flashes per second (> 0 unless flicker is 'none')
+  castShadow: boolean;
+}
+export const LIGHT_PRESETS: readonly LightPreset[];
+export function presetById(id: string): LightPreset | undefined;
+/**
+ * Brightness multiplier at time t seconds. none: 1. pulse: 0.5 + 0.5 * sin(2 pi rate t). strobe: 1 while (t * rate) mod 1 < 0.2, else 0.
+ * candle: smooth seeded noise of t * rate, always within [0.75, 1.05]. fire: rougher, within [0.55, 1.15]. faulty: 1 most of the time with
+ * short random drop-outs to 0. Same kind, rate, t and seed: same value.
+ */
+export function flicker(kind: Flicker, rate: number, t: number, seed: number): number;
+/**
+ * How much of a light reaches `point`: intensity * (1 - d / range)^2 for d < range, else 0. A spot also multiplies by its cone: 1 when the
+ * angle between `dir` (unit) and the direction to the point is at most inner = angle * (1 - penumbra), 0 at angle or beyond, linear between.
+ */
+export function lightAt(p: LightPreset, pos: Vec3, dir: Vec3, point: Vec3): number;
+/** The lights worth drawing: indices of the `max` best by score intensity * range / max(1, distance to eye), lights that are off left out; ties: lower index first. */
+export function pickLights(lights: readonly { pos: Vec3; intensity: number; range: number; on: boolean }[], eye: Vec3, max: number): number[];
+```
+
+`LIGHT_PRESETS` must hold exactly these ids, every value in its range: `bulb` (warm white point, none), `spotlight` (white spot, 25 degrees, soft edge), `flashlight-orb` (cool white spot, narrow), `campfire` (orange point, fire), `candle` (small warm point, candle), `strobe` (white point, strobe), `lantern` (warm point, candle, slow), `neon` (pink point, faulty), `disco` (purple point, pulse), `torch` (orange point, fire, casts shadows).
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LIGHT_PRESETS, flicker, lightAt, pickLights, presetById, type LightPreset } from '../src/index';
+const near = (a: number, b: number, e = 1e-9): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const bulb: LightPreset = { id: 'b', name: 'B', kind: 'point', color: '#ffffff', intensity: 1, range: 10, angle: 0, penumbra: 0, flicker: 'none', rate: 0, castShadow: false };
+const spot: LightPreset = { ...bulb, kind: 'spot', angle: 30, penumbra: 0.2 };
+
+test('a point light fades with distance and stops at its range', () => {
+  near(lightAt(bulb, [0, 0, 0], [0, -1, 0], [0, 0, 0]), 1);
+  near(lightAt(bulb, [0, 0, 0], [0, -1, 0], [5, 0, 0]), 0.25);
+  near(lightAt(bulb, [0, 0, 0], [0, -1, 0], [10, 0, 0]), 0);
+  near(lightAt(bulb, [0, 0, 0], [0, -1, 0], [0, 12, 0]), 0);
+});
+test('a spot lights its cone and fades at the edge', () => {
+  near(lightAt(spot, [0, 0, 0], [0, 0, 1], [0, 0, 5]), 0.25);
+  const a = (27 * Math.PI) / 180;
+  near(lightAt(spot, [0, 0, 0], [0, 0, 1], [5 * Math.sin(a), 0, 5 * Math.cos(a)]), 0.125);
+  near(lightAt(spot, [0, 0, 0], [0, 0, 1], [0, 0, -5]), 0);
+});
+test('flicker: none, pulse and strobe follow their formulas', () => {
+  assert.equal(flicker('none', 3, 1.234, 7), 1);
+  near(flicker('pulse', 1, 0, 1), 0.5); near(flicker('pulse', 1, 0.25, 1), 1); near(flicker('pulse', 1, 0.75, 1), 0);
+  assert.equal(flicker('strobe', 2, 0.05, 1), 1); assert.equal(flicker('strobe', 2, 0.2, 1), 0); assert.equal(flicker('strobe', 2, 0.55, 1), 1);
+});
+test('candle, fire and faulty stay in their ranges, move, and repeat with the seed', () => {
+  for (const [kind, lo, hi] of [['candle', 0.75, 1.05], ['fire', 0.55, 1.15]] as const) {
+    const v = Array.from({ length: 1000 }, (_, i) => flicker(kind, 3, i * 0.01, 42));
+    assert.ok(v.every((x) => x >= lo - 1e-9 && x <= hi + 1e-9), kind);
+    assert.ok(Math.max(...v) - Math.min(...v) > 0.05, kind);
+    assert.equal(flicker(kind, 3, 1.5, 42), flicker(kind, 3, 1.5, 42));
+  }
+  const f = Array.from({ length: 1000 }, (_, i) => flicker('faulty', 2, i * 0.01, 9));
+  assert.ok(f.filter((x) => x >= 0.9).length >= 800 && f.some((x) => x === 0));
+});
+test('pick the lights that matter, off ones never', () => {
+  const lights = [
+    { pos: [10, 0, 0] as [number, number, number], intensity: 1, range: 10, on: true },
+    { pos: [2, 0, 0] as [number, number, number], intensity: 1, range: 5, on: true },
+    { pos: [1, 0, 0] as [number, number, number], intensity: 9, range: 9, on: false },
+    { pos: [0, 0, 1] as [number, number, number], intensity: 0.5, range: 2, on: true },
+  ];
+  assert.deepEqual(pickLights(lights, [0, 0, 0], 3), [1, 0, 3]);
+  assert.deepEqual(pickLights(lights, [0, 0, 0], 2), [1, 0]);
+});
+test('ten legal presets', () => {
+  assert.deepEqual(LIGHT_PRESETS.map((p) => p.id).sort(), ['bulb', 'campfire', 'candle', 'disco', 'flashlight-orb', 'lantern', 'neon', 'spotlight', 'strobe', 'torch']);
+  for (const p of LIGHT_PRESETS) {
+    assert.ok(/^#[0-9a-f]{6}$/i.test(p.color) && p.intensity >= 0 && p.intensity <= 10 && p.range >= 0.5 && p.range <= 60 && p.penumbra >= 0 && p.penumbra <= 1, p.id);
+    assert.ok(p.kind === 'spot' ? p.angle >= 1 && p.angle <= 90 : p.angle === 0, p.id);
+    assert.ok(p.flicker === 'none' || p.rate > 0, p.id);
+  }
+  assert.equal(presetById('spotlight')!.kind, 'spot'); assert.equal(presetById('torch')!.castShadow, true); assert.equal(presetById('nope'), undefined);
+});
+```

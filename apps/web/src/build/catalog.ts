@@ -110,6 +110,7 @@ export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly
   sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge'], ['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']],
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
+  select: [['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate', null]],
   logic: [['logic-attach', 'logic-remove', 'logic-rules', null, null, null, null, null, null]],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
 };
@@ -119,7 +120,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   const ids = (list: readonly string[]): (string | null)[] => list.slice(0, 9);
   const out = {} as Hotbars;
   for (const tab of TAB_IDS) out[tab] = [];
-  out.select = ids(['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate']);
+  out.select = ids(['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate', 'select-box']);
   out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']);
   // ways to sculpt; the shapes Stamp presses are in the palette (docs/HOTBAR.md)
   out.sculpt = ids(['raise', 'smooth', 'sculpt-grab', 'sculpt-clay', 'sculpt-stamp', 'sculpt-terrace', 'terrain-road', 'terrain-river', 'terrain-rain']);

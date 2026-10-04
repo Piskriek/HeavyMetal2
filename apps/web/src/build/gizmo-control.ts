@@ -3,16 +3,17 @@ import type { Runtime } from '@hm/engine';
 import { drag, gizmoGrow, hitTest, worldLength, type DragResult, type GizmoMode, type Handle, type Ray, type Snap, type Vec3 } from '@hm/gizmo';
 
 /**
- * The transform gizmo on the selected thing (hotbar spec V3, "Global transform gizmo"; docs/ARENA_PLAN.md). Pro and Studio only: Easy keeps
- * the playful click-to-carry. Select's slots pick its mode (Move: arrows and planes, Turn: the ring round the up axis, Resize: the middle
- * handle), + and - grow and shrink it, Shift snaps moves to half metres (and sizes to quarter steps), Ctrl snaps turns to 15 degrees, Alt-drag
- * leaves a copy behind. A drag shows live and lands as one undo step. A placed thing has a position, a yaw and one size, so the gizmo offers
- * exactly those: no tilt rings, no stretching along one axis. It stands in the middle of the thing (a thing's own origin is its foot, often
- * in the grass or behind the hints at the bottom of the screen).
+ * The transform gizmo on the selected things (hotbar spec V3, "Global transform gizmo"; docs/ARENA_PLAN.md). Pro and Studio only: Easy
+ * keeps the playful click-to-carry. Select's slots pick its mode (Move: arrows and planes, Turn: the ring round the up axis, Resize: the
+ * middle handle), + and - grow and shrink it, Shift snaps moves to half metres (and sizes to quarter steps), Ctrl snaps turns to 15
+ * degrees, Alt-drag leaves copies behind. A drag shows live and lands as one undo step. One thing or a group (box select, F1): a group
+ * moves together, turns round its middle and grows from it. A placed thing has a position, a yaw and one size, so the gizmo offers exactly
+ * those: no tilt rings, no stretching along one axis. It stands in the middle of the things (a thing's own origin is its foot).
  */
 export interface GizmoTarget { readonly ref: PresetId; readonly index: number }
 interface Pose { x: number; y: number; z: number; yaw: number; scale: number }
-interface Grab { readonly handle: Handle; readonly start: Ray; readonly from: Pose; readonly target: GizmoTarget; readonly copy: boolean; readonly len: number; readonly lift: number }
+interface Held { readonly target: GizmoTarget; readonly from: Pose }
+interface Grab { readonly handle: Handle; readonly start: Ray; readonly held: readonly Held[]; readonly pivot: Vec3; readonly copy: boolean; readonly len: number }
 
 const COLOR = { x: '#e5484d', y: '#46a758', z: '#3e63dd', hot: '#ffc53d', ring: '#46a758', uniform: '#f4f4f5' } as const;
 const AXES: Record<'x' | 'y' | 'z', Vec3> = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
@@ -53,7 +54,7 @@ export function gizmoShapes(mode: GizmoMode, p: Vec3, len: number, hot: Handle |
   return out;
 }
 
-/** The pose a drag gives (pure, so it can be tested). */
+/** The pose a drag gives one thing (pure, so it can be tested). */
 export function posed(from: Pose, r: DragResult): Pose {
   const yaw = from.yaw + (r.rotateAxis ? r.rotateAxis[1] * r.rotateDeg : 0);
   return {
@@ -63,18 +64,31 @@ export function posed(from: Pose, r: DragResult): Pose {
   };
 }
 
+/**
+ * The pose a drag gives one thing of a group round the group's middle `pivot` (pure): moved by the move, turned round the pivot (and on
+ * its own yaw) by the turn, its distance from the pivot (across the ground) grown with its size.
+ */
+export function groupPosed(from: Pose, pivot: Vec3, r: DragResult): Pose {
+  const p = posed(from, r);
+  const turn = r.rotateAxis ? (r.rotateAxis[1] * r.rotateDeg * Math.PI) / 180 : 0;
+  const k = r.scale[0];
+  let dx = (from.x - pivot[0]) * k, dz = (from.z - pivot[2]) * k;
+  if (turn) { const c = Math.cos(turn), s = Math.sin(turn); [dx, dz] = [dx * c + dz * s, -dx * s + dz * c]; }
+  return { ...p, x: pivot[0] + dx + r.translate[0], z: pivot[2] + dz + r.translate[2] };
+}
+
 export class GizmoControl {
   /** The +/- size (1 = normal). */
   size = 1;
   private hot: Handle | null = null;
   private grab: Grab | null = null;
   private shown = false;
-  private last: Pose | null = null;
+  private last: Pose[] = [];
   private snap: Snap = {};
   /** How high the middle of each thing is above its foot, by its size (measuring decodes the model: once, not every frame). */
   private readonly lifts = new Map<string, { scale: number; lift: number }>();
-  /** What was drawn last (tests and the island's hints). */
-  seen: { readonly ref: PresetId; readonly mode: GizmoMode; readonly pivot: Vec3; readonly len: number; readonly hot: Handle | null } | null = null;
+  /** What was drawn last (tests and the island's hints): `ref` is the first thing. */
+  seen: { readonly ref: PresetId; readonly count: number; readonly mode: GizmoMode; readonly pivot: Vec3; readonly len: number; readonly hot: Handle | null } | null = null;
 
   constructor(private readonly rt: Runtime, private readonly sceneId: PresetId, private readonly overlay: { show(id: string, shapes: readonly OverlayShape[]): void; hide(id: string): void },
     private readonly pose: (index: number, p: Pose) => void, private readonly measure: (ref: PresetId) => number) {}
@@ -94,90 +108,110 @@ export class GizmoControl {
     this.lifts.set(ref, { scale, lift });
     return lift;
   }
+  /** The things that still exist, with their poses, and the middle of them all (each thing's own middle, not its foot). */
+  private gather(targets: readonly GizmoTarget[]): { held: Held[]; pivot: Vec3 } | null {
+    const held: Held[] = [];
+    let x = 0, y = 0, z = 0;
+    for (const t of targets) {
+      const from = this.poseOf(t.ref);
+      if (!from) continue;
+      held.push({ target: t, from });
+      x += from.x; y += from.y + this.liftOf(t.ref, from.scale); z += from.z;
+    }
+    return held.length ? { held, pivot: [x / held.length, y / held.length, z / held.length] } : null;
+  }
 
   grow(steps: number): void { this.size = gizmoGrow(this.size, steps); }
 
-  /** Each frame: draw it on the target (or hide it), find the handle under the ray, move what is being dragged. */
-  frame(target: GizmoTarget | null, mode: GizmoMode, ray: Ray | null, fovDeg: number, snap: Snap): void {
-    const t = this.grab?.target ?? target;
-    const base = t ? this.poseOf(t.ref) : null;
-    if (!t || !base || !ray) { this.hide(); return; }
+  /** Each frame: draw it on the targets (or hide it), find the handle under the ray, move what is being dragged. */
+  frame(targets: readonly GizmoTarget[], mode: GizmoMode, ray: Ray | null, fovDeg: number, snap: Snap): void {
     const g = this.grab;
+    const now = g ? null : this.gather(targets);
+    if ((!g && !now) || !ray) { this.hide(); return; }
     let pivot: Vec3, len: number;
     if (g) {
       this.track(ray, snap);
-      // a moved thing takes its gizmo along; turning and sizing keep it where the drag began
-      const at = modeOfHandle(g.handle) === 'move' && this.last ? this.last : g.from;
-      pivot = [at.x, at.y + g.lift, at.z];
+      // a moved group takes its gizmo along; turning and sizing keep it where the drag began
+      const r = drag({ mode: modeOfHandle(g.handle), pivot: g.pivot }, g.handle, g.start, ray, g.len, this.snap);
+      pivot = modeOfHandle(g.handle) === 'move' ? [g.pivot[0] + r.translate[0], g.pivot[1] + r.translate[1], g.pivot[2] + r.translate[2]] : g.pivot;
       len = g.len;
     } else {
-      pivot = [base.x, base.y + this.liftOf(t.ref, base.scale), base.z];
+      pivot = now!.pivot;
       len = worldLength(pivot, ray.origin, fovDeg, this.size * BASE);
       this.hot = allowed(mode, hitTest({ mode, pivot }, ray, len));
     }
     const shownMode = g ? modeOfHandle(g.handle) : mode;
     this.overlay.show('gizmo', gizmoShapes(shownMode, pivot, len, g?.handle ?? this.hot));
-    this.seen = { ref: t.ref, mode: shownMode, pivot, len, hot: g?.handle ?? this.hot };
+    const first = (g?.held[0] ?? now!.held[0])!;
+    this.seen = { ref: first.target.ref, count: g ? g.held.length : now!.held.length, mode: shownMode, pivot, len, hot: g?.handle ?? this.hot };
     this.shown = true;
   }
 
   hide(): void { if (this.shown) { this.overlay.hide('gizmo'); this.shown = false; } this.hot = null; this.seen = null; }
 
   /** The left button went down: start dragging the handle under the pointer. True when the gizmo took the click. */
-  down(target: GizmoTarget | null, ray: Ray | null, alt: boolean, fovDeg: number): boolean {
-    if (!target || !ray || !this.hot) return false;
-    const from = this.poseOf(target.ref);
-    if (!from) return false;
-    const lift = this.liftOf(target.ref, from.scale);
-    const len = worldLength([from.x, from.y + lift, from.z], ray.origin, fovDeg, this.size * BASE);
-    this.grab = { handle: this.hot, start: ray, from, target, copy: alt && modeOfHandle(this.hot) === 'move', len, lift };
-    this.last = from;
+  down(targets: readonly GizmoTarget[], ray: Ray | null, alt: boolean, fovDeg: number): boolean {
+    if (!targets.length || !ray || !this.hot) return false;
+    const got = this.gather(targets);
+    if (!got) return false;
+    const len = worldLength(got.pivot, ray.origin, fovDeg, this.size * BASE);
+    this.grab = { handle: this.hot, start: ray, held: got.held, pivot: got.pivot, copy: alt && modeOfHandle(this.hot) === 'move', len };
+    this.last = got.held.map((h) => h.from);
     return true;
   }
 
   /**
    * Follow the pointer now. The frame calls it, and so do pointer moves and letting go: a slow frame (a low-end laptop) never drops the end
-   * of a quick drag. The snap stays as last given. The maths runs on the gizmo's pivot (the thing's middle); the result moves the thing.
+   * of a quick drag. The snap stays as last given. The maths runs on the group's middle; the result moves every thing.
    */
   track(ray: Ray | null, snap?: Snap): void {
     const g = this.grab;
     if (!g || !ray) return;
     if (snap) this.snap = snap;
-    const r = drag({ mode: modeOfHandle(g.handle), pivot: [g.from.x, g.from.y + g.lift, g.from.z] }, g.handle, g.start, ray, g.len, this.snap);
-    this.last = posed(g.from, r);
-    this.pose(g.target.index, this.last);
+    const r = drag({ mode: modeOfHandle(g.handle), pivot: g.pivot }, g.handle, g.start, ray, g.len, this.snap);
+    this.last = g.held.map((h) => (g.held.length === 1 ? posed(h.from, r) : groupPosed(h.from, g.pivot, r)));
+    g.held.forEach((h, i) => this.pose(h.target.index, this.last[i]!));
   }
 
-  /** Let go (with the pointer's last ray): one undo step (Move, Turn, Size, or a copy left behind with Alt). Returns what was done, for the island to say. */
+  /** Let go (with the pointer's last ray): one undo step (Move, Turn, Size, or copies left behind with Alt). Returns what to say, if anything. */
   up(ray?: Ray | null): string | null {
     this.track(ray ?? null);
-    const g = this.grab, p = this.last;
-    this.grab = null; this.last = null;
-    if (!g || !p) return null;
-    const moved = Math.hypot(p.x - g.from.x, p.y - g.from.y, p.z - g.from.z) > 1e-4, turned = Math.abs(p.yaw - g.from.yaw) > 1e-3, sized = Math.abs(p.scale - g.from.scale) > 1e-5;
-    if (!moved && !turned && !sized) { this.pose(g.target.index, g.from); return null; }
-    const ref = g.target.ref, c = this.rt.commands;
+    const g = this.grab, last = this.last;
+    this.grab = null; this.last = [];
+    if (!g || last.length !== g.held.length) return null;
+    const changed = g.held.map((h, i) => {
+      const p = last[i]!;
+      return { h, p, moved: Math.hypot(p.x - h.from.x, p.y - h.from.y, p.z - h.from.z) > 1e-4, turned: Math.abs(p.yaw - h.from.yaw) > 1e-3, sized: Math.abs(p.scale - h.from.scale) > 1e-5 };
+    });
+    if (!changed.some((c) => c.moved || c.turned || c.sized)) { for (const { h } of changed) this.pose(h.target.index, h.from); return null; }
+    const c = this.rt.commands;
     if (g.copy) {
-      const src = this.rt.store.get(ref);
-      if (!src) return null;
-      const id = `model-${Date.now().toString(36)}`;
-      const params = { ...this.rt.store.resolve(ref).params, x: p.x, y: p.y, z: p.z };
-      this.pose(g.target.index, g.from);
+      const made: string[] = [];
+      for (const { h } of changed) this.pose(h.target.index, h.from);
       c.transaction('Copy', () => {
-        c.execute(cmd.put({ id, kind: 'model', name: src.name, params: params as never, tier: 'build' }, 'Copy'));
-        c.execute(cmd.addChild(this.sceneId, 'models', id, undefined, 'Copy'));
+        changed.forEach(({ h, p }, i) => {
+          const src = this.rt.store.get(h.target.ref);
+          if (!src) return;
+          const id = `model-${Date.now().toString(36)}-${i}`;
+          c.execute(cmd.put({ id, kind: 'model', name: src.name, params: { ...this.rt.store.resolve(h.target.ref).params, x: p.x, y: p.y, z: p.z, yaw: p.yaw } as never, tier: 'build' }, 'Copy'));
+          c.execute(cmd.addChild(this.sceneId, 'models', id, undefined, 'Copy'));
+          made.push(src.name);
+        });
       });
-      return `${src.name} copied`;
+      return made.length === 1 ? `${made[0]} copied` : `${made.length} things copied`;
     }
-    const label = moved ? 'Move' : turned ? 'Turn' : 'Size';
+    const label = changed.some((x) => x.moved) ? 'Move' : changed.some((x) => x.turned) ? 'Turn' : 'Size';
     c.transaction(label, () => {
-      if (moved) { c.execute(cmd.setParam(`${ref}.x`, p.x, label)); c.execute(cmd.setParam(`${ref}.y`, p.y, label)); c.execute(cmd.setParam(`${ref}.z`, p.z, label)); }
-      if (turned) c.execute(cmd.setParam(`${ref}.yaw`, p.yaw, label));
-      if (sized) c.execute(cmd.setParam(`${ref}.scale`, p.scale, label));
+      for (const { h, p, moved, turned, sized } of changed) {
+        const ref = h.target.ref;
+        if (moved) { c.execute(cmd.setParam(`${ref}.x`, p.x, label)); c.execute(cmd.setParam(`${ref}.y`, p.y, label)); c.execute(cmd.setParam(`${ref}.z`, p.z, label)); }
+        if (turned) c.execute(cmd.setParam(`${ref}.yaw`, p.yaw, label));
+        if (sized) c.execute(cmd.setParam(`${ref}.scale`, p.scale, label));
+      }
     });
     return null;
   }
 
-  /** Esc while dragging: put it back. */
-  cancel(): void { const g = this.grab; this.grab = null; this.last = null; if (g) this.pose(g.target.index, g.from); }
+  /** Esc while dragging: put them back. */
+  cancel(): void { const g = this.grab; this.grab = null; this.last = []; if (g) for (const h of g.held) this.pose(h.target.index, h.from); }
 }

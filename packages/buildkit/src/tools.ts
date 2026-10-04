@@ -7,7 +7,7 @@ import { SPRITE_PRESETS, defaultPlugs, normalizePlugs, type ToolPlug } from './p
  */
 export type ToolTab = 'select' | 'paint' | 'sculpt' | 'things';
 export type ToolAction =
-  | 'inspect' | 'move' | 'turn' | 'resize' | 'copy' | 'delete' | 'focus' | 'isolate'
+  | 'inspect' | 'move' | 'turn' | 'resize' | 'copy' | 'delete' | 'focus' | 'isolate' | 'box'
   | 'paint'
   | 'raise' | 'lower' | 'smooth' | 'flatten' | 'dig' | 'mound' | 'crater' | 'plateau' | 'ridge' | 'dune'
   | 'sculpt'
@@ -119,6 +119,7 @@ export const TOOLS: readonly ToolPreset[] = [
   tool('copy', 'Copy', 'select', 'copy', 'Copy', 'Make a copy of a thing you placed, right next to it.', 'Copy it', 'Copy it', { sound: 'place', sprite: 'sparkle' }),
   tool('delete', 'Delete', 'select', 'delete', 'Trash2', 'Take away a thing you placed.', 'Take it away', 'Take it away', { sound: 'delete', sprite: 'debris' }),
   tool('focus', 'Focus', 'select', 'focus', 'Focus', 'Fly to a thing and see it from every side; the world fades away around it.', 'Focus on it', 'Leave focus', { sound: 'ui-toggle' }),
+  tool('select-box', 'Box', 'select', 'box', 'SquareDashedMousePointer', 'Pro and Studio: drag a box over things to pick them all; the gizmo then moves, turns and sizes them together. Ctrl and a click with Select adds or takes one away; Esc lets go.', 'Drag a box', 'Drag a box (adds to the group)', { sprite: 'pop', sound: 'select' }),
   tool('isolate', 'Hide others', 'select', 'isolate', 'Layers', 'Hide everything except the thing you point at (point at nothing to show it all again).', 'Hide the rest', 'Show everything', { sound: 'ui-toggle' }),
   // ways to paint: what they put down is picked in the palette (top middle), not here
   paintTool('brush', 'Brush', 'Paintbrush', 'Paint a round patch wherever you drag.', 'Paint', 'Paint with a smaller brush', { size: 3, strength: 0.8 }),

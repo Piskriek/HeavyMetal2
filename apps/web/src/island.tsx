@@ -49,6 +49,7 @@ import { CharactersRuntime, type PlacedChar } from './build/characters-runtime';
 import { PhysicsRuntime, type PhysThing } from './build/physics-runtime';
 import { carvePath, pathPreview, rainOn, ROAD_SURFACE, RIVER_SURFACE } from './build/paths';
 import { WiresRuntime, type PlacedWire, type PlacedZone, type WireEffect } from './build/wires-runtime';
+import { boxSelect, type Item as SelItem } from '@hm/selectset';
 import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
@@ -603,7 +604,32 @@ export function IslandWalk(props: {
     // the transform gizmo (Pro and Studio, on Select's tab; docs/ARENA_PLAN.md)
     const gizmo = new GizmoControl(rt, scene.sceneId, renderer.overlay, (i, p) => renderer.setModelPose(i, p.x, p.y, p.z, p.yaw, p.scale),
       (ref) => { const t = focusTargetOf(rt, ref); return t ? t.center[1] - Number(rt.store.resolve(ref).params['y'] ?? 0) : 0; });
-    let gizmoTgt: GizmoTarget | null = null, gizmoFov = 60;
+    let gizmoTargets: GizmoTarget[] = [], gizmoFov = 60;
+    // a group of things picked together (Box, or Ctrl and a click with Select): the gizmo moves them as one
+    let group: PresetId[] = [];
+    let boxing: { x0: number; y0: number; add: boolean; div: HTMLDivElement } | null = null;
+    const sizes = new Map<string, { scale: number; size: [number, number, number] }>();
+    const sizeOf = (ref: PresetId): [number, number, number] => {
+      const pr = rt.store.resolve(ref).params as Record<string, unknown>; const sc = Number(pr['scale'] ?? 0.1);
+      const hit = sizes.get(ref); if (hit && hit.scale === sc) return hit.size;
+      const m = typeof pr['data'] === 'string' && pr['data'] ? decodeModel(pr['data'] as string).model : null;
+      const size: [number, number, number] = m ? [m.size[0] * sc, m.size[1] * sc, m.size[2] * sc] : [1, 1, 1];
+      sizes.set(ref, { scale: sc, size }); return size;
+    };
+    /** The placed things as they look on screen now (for box select). */
+    const screenItems = (): SelItem[] => {
+      const r = el.getBoundingClientRect(), cam = eye ?? [px, py, pz];
+      return (rt.store.get(scene.sceneId)?.children['models'] ?? []).filter((q) => rt.store.get(q.ref) && rt.store.resolve(q.ref).params['hidden'] !== true).flatMap((q) => {
+        const pr = rt.store.resolve(q.ref).params as Record<string, unknown>; const x = Number(pr['x'] ?? 0), y = Number(pr['y'] ?? 0), z = Number(pr['z'] ?? 0);
+        const [sx, sy, sz] = sizeOf(q.ref);
+        const pts = [-1, 1].flatMap((a) => [0, 1].flatMap((b) => [-1, 1].map((c) => renderer.camera.project([x + a * sx / 2, y + b * sy, z + c * sz / 2])))).filter((p) => p[0] >= 0 || p[1] >= 0);
+        if (!pts.length) return [];
+        const xs = pts.map((p) => p[0] + r.left), ys = pts.map((p) => p[1] + r.top);
+        const c = renderer.camera.project([x, y + sy / 2, z]);
+        return [{ id: q.ref as string, centre: [c[0] + r.left, c[1] + r.top] as [number, number], bounds: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] as [number, number, number, number], depth: Math.hypot(x - cam[0], y - cam[1], z - cam[2]), kind: 'prop' }];
+      });
+    };
+    let groupShown = false;
     /** Shift snaps moves to half metres and sizes to quarter steps, Ctrl snaps turns to 15 degrees (hotbar spec V3). */
     const gizmoSnap = (): { move?: number; turn?: number; scale?: number } => {
       const snap: { move?: number; turn?: number; scale?: number } = {};
@@ -642,7 +668,7 @@ export function IslandWalk(props: {
       if (!g) return null;
       const pr = rt.store.get(g.ref) ? rt.store.resolve(g.ref).params : {};
       const along = (k: 0 | 1 | 2, f: number): readonly [number, number] => { const p: [number, number, number] = [g.pivot[0], g.pivot[1], g.pivot[2]]; p[k] += g.len * f; const q = renderer.camera.project(p), r = el.getBoundingClientRect(); return [q[0] + r.left, q[1] + r.top]; };
-      return { mode: g.mode, hot: g.hot, len: g.len, size: gizmo.size, x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), xArrow: along(0, 0.7), xFar: along(0, 1.4) };
+      return { mode: g.mode, hot: g.hot, len: g.len, size: gizmo.size, count: g.count, group: [...group], x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), xArrow: along(0, 0.7), xFar: along(0, 1.4) };
     };
     let lastLookEvent = 0, lastMoveEvent = 0, lastTourTick = 0;
     const realMove = lookFilter();
@@ -743,6 +769,8 @@ export function IslandWalk(props: {
       if (gizmo.dragging) { gizmo.cancel(); return; }
       if (path) { path = null; showPath(); say('Let go of the path'); return; }
       if (wireFrom) { wireFrom = null; say('Let go of the wire'); return; }
+      if (boxing) { boxing.div.remove(); boxing = null; return; }
+      if (group.length) { group = []; say('Let go of the group'); return; }
       if (texRef.current) { if (live.current.win.closeTop()) return; stepOutRef.current(); return; }
       if (live.current.win.closeTop()) return;
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
@@ -763,7 +791,7 @@ export function IslandWalk(props: {
       if (typing) return;
       if (live.current.menu) return;
       if (e.key === 'Enter' && path && path.pts.length >= 2) { e.preventDefault(); layPath(); return; }
-      if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTgt && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
+      if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTargets.length && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
       const tab = tabForKey(e.key, e.shiftKey);
       if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
       if (k === 'tab') {
@@ -801,8 +829,17 @@ export function IslandWalk(props: {
       if (!pointerLocked && overUi(e)) return;
       // avatar mode: the right button turns you round in the mirror; the left one never uses a tool here
       if (live.current.avatarMode) { if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } } return; }
+      // Box (Select): drag a rectangle over things
+      if (e.button === 0 && live.current.buildOn && atCursor() && !gizmo.hovering && player().tab === 'select' && player().hotbars.select[player().slots.select] === 'select-box') {
+        if (player().level === 'easy') { say('Box picks groups in Pro and Studio (beside the hotbar)'); return; }
+        const div = document.createElement('div');
+        div.className = 'box-select';
+        el.appendChild(div);
+        boxing = { x0: e.clientX, y0: e.clientY, add: e.ctrlKey || e.shiftKey, div };
+        return;
+      }
       // a gizmo handle under the pointer takes the left button
-      if (e.button === 0 && live.current.buildOn && gizmo.hovering && gizmo.down(gizmoTgt, gizmoRay(), e.altKey, gizmoFov)) { fx('select', { volume: 0.4 }); return; }
+      if (e.button === 0 && live.current.buildOn && gizmo.hovering && gizmo.down(gizmoTargets, gizmoRay(), e.altKey, gizmoFov)) { fx('select', { volume: 0.4 }); return; }
       if (studio() || live.current.level === 'island') {
         // the mouse is free: right button looks around, left button uses what you hold where the cursor points
         if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
@@ -818,6 +855,7 @@ export function IslandWalk(props: {
       cursor = { x: e.clientX, y: e.clientY };
       if (live.current.menu) return;
       if (gizmo.dragging && atCursor()) gizmo.track(gizmoRay(), gizmoSnap());
+      if (boxing) { const r = el.getBoundingClientRect(); Object.assign(boxing.div.style, { left: `${Math.min(boxing.x0, e.clientX) - r.left}px`, top: `${Math.min(boxing.y0, e.clientY) - r.top}px`, width: `${Math.abs(e.clientX - boxing.x0)}px`, height: `${Math.abs(e.clientY - boxing.y0)}px` }); }
       if ((pointerLocked || looking) && performance.now() - lastLookEvent > 400) { lastLookEvent = performance.now(); tourEvent('looked'); }
       if (pointerLocked) {
         if (!realMove(e.movementX, e.movementY)) return;
@@ -836,6 +874,15 @@ export function IslandWalk(props: {
       camPitch = Math.min(1.3, Math.max(0.05, camPitch + dy * 0.004));
     };
     const onPointerUp = (e: PointerEvent): void => {
+      if (boxing && e.button === 0) {
+        const b = boxing; boxing = null; b.div.remove();
+        const picked = boxSelect(screenItems(), [b.x0, b.y0], [e.clientX, e.clientY], 'touch') as PresetId[];
+        const next = b.add ? [...new Set([...group, ...(gizmoSel.current && !group.length ? [gizmoSel.current] : []), ...picked])] : picked;
+        if (next.length === 1) { group = []; setLayerSel(next[0]!); } else group = next;
+        say(next.length === 0 ? 'Nothing in the box' : next.length === 1 ? `${rt.store.get(next[0]!)?.name ?? 'One thing'} picked` : `${next.length} things picked: the gizmo moves them together (Esc lets go)`);
+        fx('select', { volume: 0.5 });
+        return;
+      }
       if (gizmo.dragging && e.button === 0) {
         if (atCursor()) cursor = { x: e.clientX, y: e.clientY };
         const said = gizmo.up(gizmoRay()); if (said) say(said); fx('place', { volume: 0.5 }); return;
@@ -868,6 +915,16 @@ export function IslandWalk(props: {
         const tool: ToolPreset | null = own && own.action === 'paint' && own.way ? { ...own, surface: Number(s.palette.paint ?? 4) || 4 } : own ? withSculptPalette(own, s) : own;
         const a = aim();
         // Pro and Studio: Move, Turn and Resize pick the thing; the gizmo on it does the rest (Easy keeps click-to-carry)
+        if (s.tab === 'select' && s.level !== 'easy' && tool && a && tool.action === 'inspect' && down.has('control')) {
+          if (!first) return;
+          const m = builder.modelAt(a);
+          if (!m) { say('Point at something you placed'); return; }
+          const base = group.length ? group : gizmoSel.current ? [gizmoSel.current] : [];
+          const next = base.includes(m.ref) ? base.filter((r) => r !== m.ref) : [...base, m.ref];
+          if (next.length === 1) { group = []; setLayerSel(next[0]!); } else group = next;
+          say(next.length > 1 ? `${next.length} things in the group` : next.length === 1 ? 'One thing picked' : 'Nothing picked'); fx('select', { volume: 0.5 });
+          return;
+        }
         if (s.tab === 'select' && s.level !== 'easy' && tool && a && (tool.action === 'move' || tool.action === 'turn' || tool.action === 'resize')) {
           if (!first || gizmo.dragging) return;
           const m = builder.modelAt(a);
@@ -1442,10 +1499,15 @@ export function IslandWalk(props: {
       {
         const pl = player(), sel = gizmoSel.current;
         const on = live.current.buildOn && pl.level !== 'easy' && pl.tab === 'select' && !live.current.menu && !live.current.avatarMode && !texRef.current;
-        const idx = on && sel ? drawnIndex(sel) : -1;
-        gizmoTgt = sel && idx >= 0 ? { ref: sel, index: idx } : null;
+        group = group.filter((r) => rt.store.get(r));
+        const refs = group.length > 1 ? group : sel ? [sel] : [];
+        gizmoTargets = on ? refs.map((ref) => ({ ref, index: drawnIndex(ref) })).filter((t) => t.index >= 0) : [];
+        if (on && group.length > 1) {
+          renderer.overlay.show('group', group.flatMap((ref) => { if (!rt.store.get(ref)) return []; const pr = rt.store.resolve(ref).params as Record<string, unknown>; const [sx, sy, sz] = sizeOf(ref); return [{ type: 'box' as const, center: [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0) + sy / 2, Number(pr['z'] ?? 0)] as [number, number, number], half: [sx / 2 + 0.05, sy / 2 + 0.05, sz / 2 + 0.05] as [number, number, number], color: '#ffc53d' }]; }));
+          groupShown = true;
+        } else if (groupShown) { renderer.overlay.hide('group'); groupShown = false; }
         gizmoFov = fpv ? fov : st ? fov - 10 : fov - 15;
-        gizmo.frame(gizmoTgt, gizmoModeFor(pl.hotbars.select[pl.slots.select]), gizmoRay(), gizmoFov, gizmoSnap());
+        gizmo.frame(gizmoTargets, gizmoModeFor(pl.hotbars.select[pl.slots.select]), gizmoRay(), gizmoFov, gizmoSnap());
       }
       renderer.step();
       // seen through a window (the SetMix home): shade only what the window shows

@@ -439,6 +439,42 @@ try {
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Remove"]')?.click(); });
   await page.waitForTimeout(T(300));
   check('and the bin removes it again', await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count() === things);
+  // a group (Box, F1, Pro): two barrels boxed together move together with the gizmo, as one undo step
+  await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
+  await page.keyboard.press('F1');
+  await page.waitForTimeout(T(300));
+  for (let i = 0; i < 2; i++) {
+    await dom(() => { [...document.querySelectorAll('.layers .ly-head button')].find((b) => /Add/.test(b.textContent ?? ''))?.click(); });
+    await page.waitForTimeout(T(200));
+    await dom(() => { [...document.querySelectorAll('.layers .ly-add button')].find((b) => /Barrel/.test(b.textContent ?? ''))?.click(); });
+    await page.waitForTimeout(T(400));
+  }
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => (b.textContent ?? '').trim().endsWith('Box'))?.click(); });
+  await page.waitForTimeout(T(200));
+  const twoAt = await page.evaluate(() => (window.hmThings?.() ?? []).map((t) => window.hmProject?.(t.x, t.y + 0.3, t.z)));
+  const xs = twoAt.map((p) => p?.[0] ?? 640), ys = twoAt.map((p) => p?.[1] ?? 400);
+  await page.mouse.move(Math.min(...xs) - 60, Math.min(...ys) - 60); await page.mouse.down();
+  await page.mouse.move(Math.max(...xs) + 60, Math.max(...ys) + 60, { steps: 5 }); await page.mouse.up();
+  await page.waitForTimeout(T(400));
+  const gg = await page.evaluate(() => window.hmGizmo?.());
+  check('Box picks both barrels and the gizmo stands on the group', gg?.count === 2, JSON.stringify(gg?.group) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
+  if (gg && gg.count === 2) {
+    const before2 = await page.evaluate(() => window.hmThings?.());
+    await page.mouse.move(gg.xArrow[0], gg.xArrow[1]); await page.waitForTimeout(T(300));
+    await page.mouse.down(); await page.waitForTimeout(T(100));
+    await page.mouse.move(gg.xFar[0], gg.xFar[1], { steps: 6 }); await page.waitForTimeout(T(200));
+    await page.mouse.up(); await page.waitForTimeout(T(300));
+    const after2 = await page.evaluate(() => window.hmThings?.());
+    const d = after2.map((t, i) => t.x - before2[i].x);
+    check('dragging the arrow moves the whole group the same way', d.length === 2 && d[0] > 0.1 && Math.abs(d[0] - d[1]) < 1e-6, JSON.stringify(d));
+    await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
+  }
+  await page.keyboard.press('Escape'); await page.waitForTimeout(T(200));
+  for (let i = 0; i < 2; i++) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
+  check('and undo takes the move and both barrels back', (await page.evaluate(() => window.hmGround?.things?.())) === things);
+  await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
+  await page.keyboard.press('F2');
+  await page.waitForTimeout(T(200));
   await page.keyboard.press('Tab');
   await page.waitForTimeout(T(300));
   check('Tab again closes the palette', await page.locator('.palette-strip').count() === 0);

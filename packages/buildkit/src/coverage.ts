@@ -29,7 +29,7 @@ export const WORLD_KINDS: readonly WorldKind[] = [
 const ACTS: Readonly<Record<ToolAction, { readonly selects?: readonly string[]; readonly changes?: readonly string[] }>> = {
   inspect: { selects: ['thing'] }, move: { selects: ['thing'], changes: ['thing'] }, turn: { selects: ['thing'], changes: ['thing'] },
   resize: { selects: ['thing'], changes: ['thing'] }, copy: { selects: ['thing'], changes: ['thing'] }, delete: { selects: ['thing'], changes: ['thing'] },
-  focus: { selects: ['thing'] }, isolate: { selects: ['thing'] },
+  focus: { selects: ['thing'] }, isolate: { selects: ['thing'] }, box: { selects: ['thing'] },
   paint: { changes: ['ground-surface'] },
   raise: { changes: ['ground-height'] }, lower: { changes: ['ground-height'] }, smooth: { changes: ['ground-height'] }, flatten: { changes: ['ground-height'] },
   dig: { changes: ['ground-height'] }, mound: { changes: ['ground-height'] }, crater: { changes: ['ground-height'] }, plateau: { changes: ['ground-height'] },

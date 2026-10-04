@@ -916,3 +916,6 @@ body:has(.galaxy-bar.open) .palette-strip { top: 62px; }
 .lp-block.do { border-left: 3px solid var(--green); }
 .lp-block input[type="number"] { width: 56px; }
 .lp-script { margin: 0; padding: 8px; background: #1d1f1b; color: #e8e6dc; font-size: 11px; line-height: 1.45; overflow-x: auto; white-space: pre; }
+
+/* Box (Select, F1): the rectangle you drag over things */
+.box-select { position: absolute; border: 1px solid #ffc53d; background: rgba(255, 197, 61, .12); pointer-events: none; z-index: 14; }

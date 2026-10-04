@@ -20,3 +20,4 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | market | `docs/handoff/prompts/battle/market.txt` | **B** | 10/10, strict clean. A: 8/9. |
 | rocket | `docs/handoff/prompts/battle/rocket.txt` | **B** | 10/10, strict clean. A: 12/13 (its floating-part test expects exactly one problem). |
 | ragdoll | `docs/handoff/prompts/battle/ragdoll.txt` | **A** | 9/9, strict clean. B: 8/9 (blend). Cross-run: A fails B's "sticks keep their length" (tolerance; raise iterations or loosen to 2%), B fails A's knee limit. |
+| navgrid | `docs/handoff/prompts/battle/navgrid.txt` | **B** | 9/9, strict clean. A: 10/13 on its own tests (water, box snap, reachable), and A passes B's 9/9. B fails A's water/reachable tests and its cellOf test (A floors; the spec puts cell centres at c*cell, so B rounding is right). Check water handling with a real island before merging. |

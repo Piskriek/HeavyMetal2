@@ -199,7 +199,7 @@ try {
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
-  check('Paint holds ways to paint (Brush, Fill, Clone ...), not surfaces', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Brush', 'Fill', 'Stamp', 'Clone', 'Eraser'].every((w) => t.includes(w)); }));
+  check('Paint holds ways to paint (Brush, Fill, Stamp, Eraser, Paint a thing ...), not surfaces', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Brush', 'Fill', 'Stamp', 'Eraser', 'Paint a thing'].every((w) => t.includes(w)); }));
   check('the palette starts closed', await page.locator('.palette-strip').count() === 0);
   await page.keyboard.press('Tab');
   await page.waitForTimeout(T(300));
@@ -462,6 +462,28 @@ try {
     check('Walk a path: the barrel walks its path by itself', wk?.count === 1 && wk.moved > 0.3, JSON.stringify(wk) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
     if (wk?.count === 1) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
     check('and Ctrl+Z stops it', (await page.evaluate(() => window.hmWalks?.()))?.count === 0);
+    await page.evaluate(() => { window.hmPinView = null; });
+  }
+  // Paint a thing (F2) and Carve (F3): the barrel's blocks under the pointer; each is one undo step
+  const bt = (await page.evaluate(() => window.hmThings?.() ?? []))[0];
+  if (bt) {
+    await page.evaluate((t) => { window.hmPinView = { eye: [t.x + 3, t.y + 2.5, t.z + 3], target: [t.x, t.y + 0.5, t.z] }; }, bt);
+    await page.waitForTimeout(T(400));
+    const mid = await page.evaluate((t) => window.hmProject?.(t.x, t.y + 0.5, t.z), bt);
+    await page.keyboard.press('F2'); await page.waitForTimeout(T(300));
+    await clickWay('Paint a thing'); await page.waitForTimeout(T(200));
+    check('holding Paint a thing, the palette shows twelve colours', await page.locator('.palette-strip .ps-frame').count() === 12);
+    await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Blue/.test(b.textContent ?? ''))?.click(); });
+    const e0 = (await page.evaluate(() => window.hmBlocks?.()))?.edits ?? 0;
+    if (mid) await clickWorld(mid[0], mid[1]);
+    check('Paint a thing paints the part of the barrel you click', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 1, await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
+    await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
+    await page.keyboard.press('F3'); await page.waitForTimeout(T(300));
+    await clickWay('Carve'); await page.waitForTimeout(T(200));
+    if (mid) await clickWorld(mid[0], mid[1]);
+    check('Carve digs a hole in the barrel', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 2, JSON.stringify(await page.evaluate(() => window.hmBlocks?.())) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? '') + ' | ' + await dom(() => document.querySelector('.hotbar > button.on')?.textContent ?? '') + ' | ' + await dom(() => document.querySelector('.tab-strip button.on')?.textContent ?? ''));
+    await shot('carve');
+    await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
     await page.evaluate(() => { window.hmPinView = null; });
   }
   await page.keyboard.press('F2');

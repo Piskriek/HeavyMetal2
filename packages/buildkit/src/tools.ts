@@ -12,6 +12,7 @@ export type ToolAction =
   | 'raise' | 'lower' | 'smooth' | 'flatten' | 'dig' | 'mound' | 'crater' | 'plateau' | 'ridge' | 'dune'
   | 'sculpt'
   | 'road' | 'river' | 'rain'
+  | 'tint' | 'carve'
   | 'things'
   | 'place';
 
@@ -149,6 +150,8 @@ export const TOOLS: readonly ToolPreset[] = [
   sculptTool('terrace', 'Terrace', 'BarChart3', 'Turn slopes into steps, like rice terraces or a stepped cliff. Strength sets the step height.', 'Make steps', 'Make steps', { size: 5, strength: 0.5, falloff: 'flat' }),
   sculptTool('noise', 'Roughen', 'Sparkles', 'Make the ground bumpy and natural: pebbles and lumps.', 'Roughen', 'Roughen gently', { size: 4, strength: 0.4 }),
   sculptTool('pinch', 'Sharpen', 'Gem', 'Make edges and ridges crisp (the opposite of Smooth).', 'Sharpen', 'Soften', { size: 4, strength: 0.4 }),
+  tool('paint-thing', 'Paint a thing', 'paint', 'tint', 'PaintBucket', 'Click a part of a thing you placed: every block of that colour takes the palette\'s colour (the barrel\'s bands, a statue\'s cloak).', 'Paint that part', 'Paint that part', { sprite: 'pop', sound: 'paint-tick' }),
+  tool('things-carve', 'Carve', 'things', 'carve', 'Shovel', 'Dig a round hole into the thing you point at, a click at a time, like clay; the right button adds clay instead.', 'Dig a hole', 'Add clay', { size: 1, strength: 0.5, sprite: 'dust', sound: 'sculpt-tick' }),
   tool('terrain-road', 'Road', 'sculpt', 'road', 'Route', 'Click along where the road goes, then click the last point again (or press Enter): a smooth level road with a dirt top that follows the ground.', 'Add a point (the last again: lay the road)', 'Take the last point back', { size: 4, strength: 0.5, sprite: 'dust', sound: 'place' }),
   tool('terrain-river', 'River', 'sculpt', 'river', 'Waves', 'Click from where it starts to where it ends, then the last point again (or Enter): a channel with a mud bed that always runs downhill.', 'Add a point (the last again: dig the river)', 'Take the last point back', { size: 3, strength: 0.5, sprite: 'dust', sound: 'place' }),
   tool('terrain-rain', 'Rain', 'sculpt', 'rain', 'CloudRain', 'Rain where you point: little gullies form and soil washes down into the hollows. Hold to keep it raining.', 'Rain here', 'A light shower', { size: 8, strength: 0.6, sprite: 'dust', sound: 'sculpt-tick' }),

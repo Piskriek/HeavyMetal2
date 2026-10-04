@@ -125,10 +125,11 @@ export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
   camera: [['third', 'first', 'studio', 'island']],
+  paint: [['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']],
   animate: [['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']],
   select: [['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate', null]],
   logic: [['logic-attach', 'logic-remove', 'logic-rules', null, null, null, null, null, null]],
-  things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
+  things: [['things-one', 'things-scatter', 'things-row', 'things-swap', null, null, null, null, null], ['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
 };
 
 /** The hotbars a new player starts with: the nine most useful presets of each tab. */
@@ -137,7 +138,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   const out = {} as Hotbars;
   for (const tab of TAB_IDS) out[tab] = [];
   out.select = ids(['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate', 'select-box']);
-  out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']);
+  out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-smudge', 'paint-eraser', 'paint-thing']);
   // ways to sculpt; the shapes Stamp presses are in the palette (docs/HOTBAR.md)
   out.sculpt = ids(['raise', 'smooth', 'sculpt-grab', 'sculpt-clay', 'sculpt-stamp', 'sculpt-terrace', 'terrain-road', 'terrain-river', 'terrain-rain']);
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'anim-path', 'anim-stop']);
@@ -146,7 +147,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', 'light-lamp', 'light-lamp-remove']), null, null];
   out.avatar = ids([...player.looks.map((l) => l.id), ...LOOKS.map((l) => l.id)]);
   // ways to place; the things themselves are in the palette (docs/HOTBAR.md)
-  out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];
+  out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap', 'things-carve']), null, null, null, null];
   out.camera = ids([...CAMERAS.map((c) => c.id), ...CAMERA_WAYS.map((w) => w.id)]);
   out.logic = [...ids(LOGIC_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   out.physics = [...ids(PHYS_WAYS.map((w) => w.id)), null, null, null, null, null, null];

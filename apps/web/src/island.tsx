@@ -52,6 +52,8 @@ import { WiresRuntime, type PlacedWire, type PlacedZone, type WireEffect } from 
 import { boxSelect, type Item as SelItem } from '@hm/selectset';
 import { SlowMo, orbitShot, sampleTrack, trackDuration, type CamTrack } from '@hm/camtrack';
 import { walkerAt, type WalkPath } from '@hm/walkpath';
+import { cellAt, hitThings, recolour, sculptBlocks, type V3 as HitV3 } from './build/voxel-hit';
+import type { VoxelModel } from '@hm/voxel';
 import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
@@ -85,6 +87,13 @@ const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 /** The palette's surfaces for the ways to paint. */
 // the palette shows each surface's own tile (SetMix's graph-made set), its colours until the picture loads
 /** Lights' palette: the looks. */
+/** Paint a thing (F2): toy colours. */
+const TINTS: readonly { readonly id: string; readonly name: string; readonly rgb: [number, number, number] }[] = [
+  { id: 'red', name: 'Red', rgb: [214, 62, 56] }, { id: 'orange', name: 'Orange', rgb: [238, 128, 46] }, { id: 'yellow', name: 'Yellow', rgb: [242, 196, 54] },
+  { id: 'lime', name: 'Lime', rgb: [150, 206, 64] }, { id: 'green', name: 'Green', rgb: [62, 150, 82] }, { id: 'teal', name: 'Teal', rgb: [40, 160, 160] },
+  { id: 'blue', name: 'Blue', rgb: [58, 104, 214] }, { id: 'purple', name: 'Purple', rgb: [128, 82, 200] }, { id: 'pink', name: 'Pink', rgb: [236, 120, 170] },
+  { id: 'white', name: 'White', rgb: [240, 238, 232] }, { id: 'grey', name: 'Grey', rgb: [130, 128, 124] }, { id: 'black', name: 'Black', rgb: [38, 36, 40] },
+];
 const LAMP_ICONS: Readonly<Record<string, string>> = { bulb: 'Lightbulb', spotlight: 'Flashlight', 'flashlight-orb': 'Flashlight', campfire: 'Flame', candle: 'Flame', strobe: 'Zap', lantern: 'Lamp', neon: 'Zap', disco: 'Sparkles', torch: 'Flame' };
 const LIGHT_ITEMS: readonly StripItem[] = SETUPS.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'sky', top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color } }));
 /** Things' palette: what its ways place. */
@@ -640,6 +649,16 @@ export function IslandWalk(props: {
     // walk paths (the Animate tab, F4): things that walk by themselves, only for show
     let walkDraw: { who: PresetId; pts: [number, number][] } | null = null;
     let walkClock = 0, walkShown = false, walkMoved = 0;
+    // pointing at a thing's blocks (F2 Paint a thing, F3 Carve)
+    const modelCache = new Map<string, VoxelModel | null>();
+    const blockUnder = (): { ref: PresetId; model: VoxelModel; cell: HitV3; normal: HitV3 } | null => {
+      const r = gizmoRay(); if (!r) return null;
+      const things = (rt.store.get(scene.sceneId)?.children['models'] ?? []).filter((q) => rt.store.get(q.ref) && rt.store.resolve(q.ref).params['hidden'] !== true).map((q) => { const pr = rt.store.resolve(q.ref).params as Record<string, unknown>; return { ref: q.ref as string, data: String(pr['data'] ?? ''), pose: { x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), yaw: Number(pr['yaw'] ?? 0), scale: Number(pr['scale'] ?? 0.1) } }; });
+      const h = hitThings(things, r.origin, r.dir, modelCache);
+      return h ? { ref: h.ref as PresetId, model: h.model, cell: h.hit.cell, normal: h.hit.normal } : null;
+    };
+    let blockEdits = 0;
+    (window as unknown as { hmBlocks: unknown }).hmBlocks = () => ({ edits: blockEdits, under: blockUnder()?.ref ?? null });
     const walkPosed = new Set<string>();
     const placedWalks = (): { ref: string; who: string; path: WalkPath }[] => (rt.store.get(scene.sceneId)?.children['paths'] ?? []).filter((r) => rt.store.get(r.ref)).flatMap((r) => {
       const pr = rt.store.resolve(r.ref).params as Record<string, unknown>;
@@ -975,6 +994,30 @@ export function IslandWalk(props: {
           const m = builder.modelAt(a);
           if (m) { setLayerSel(m.ref); say(`${rt.store.get(m.ref)?.name ?? 'A thing'}: drag the gizmo; + and - size it, Shift and Ctrl snap, Alt leaves a copy`); fx('select', { volume: 0.5 }); }
           else say('Point at something you placed');
+          return;
+        }
+        if (tool && (tool.action === 'tint' || tool.action === 'carve')) {
+          // one click, one change, one undo step (a held stroke would make one step per repeat)
+          if (!first) return;
+          const b = blockUnder();
+          if (!b) { if (first) say('Point at a thing you placed'); return; }
+          const mat = cellAt(b.model, b.cell[0], b.cell[1], b.cell[2]);
+          let data: string | null;
+          if (tool.action === 'tint') {
+            const c = TINTS.find((t) => t.id === (s.palette.tint ?? 'red')) ?? TINTS[0]!;
+            data = recolour(b.model, mat, c.rgb);
+          } else {
+            const sc = Number(rt.store.resolve(b.ref).params['scale'] ?? 0.1);
+            const radius = Math.max(1, (0.25 * Math.max(0.3, tool.size)) / sc);
+            // dig into the block you point at; clay goes on the face you point at
+            const at: HitV3 = alt ? [b.cell[0] + 0.5 + b.normal[0], b.cell[1] + 0.5 + b.normal[1], b.cell[2] + 0.5 + b.normal[2]] : [b.cell[0] + 0.5, b.cell[1] + 0.5, b.cell[2] + 0.5];
+            data = sculptBlocks(b.model, at, radius, alt, mat);
+          }
+          if (!data) return;
+          const label = tool.action === 'tint' ? 'Paint a thing' : alt ? 'Add clay' : 'Carve';
+          rt.commands.execute(cmd.setParam(`${b.ref}.data`, data as never, label));
+          blockEdits++; refreshModels(); saveMap(rt, scene.sceneId);
+          fx(tool.action === 'tint' ? 'paint-tick' : 'sculpt-tick', { volume: 0.5, minGapMs: 80 });
           return;
         }
         if (tool && a && (tool.action === 'road' || tool.action === 'river')) {
@@ -1712,7 +1755,9 @@ export function IslandWalk(props: {
           ? <PaletteStrip title="Colour" items={tex.colours.map((c, i) => ({ id: String(i), name: `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`, preview: { kind: 'swatch', colors: [`rgb(${c.join(',')})`] } }))} community={[]} selected={String(texColour)} onPick={(id) => { setTexColour(Number(id)); fx('select', { volume: 0.5 }); }} />
           : <PaletteStrip title="Moves" items={TEX_ANIMS.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon', icon: a.icon } }))} community={[]} selected={undefined} onPick={(id) => { const a = TEX_ANIMS.find((x) => x.id === id); if (!a) return; api.current?.setAnim(tex.id, a.v); void saveTexture(tex.id, { anim: a.v }); say(`${tex.name}: ${a.name.toLowerCase()} (step out to see it on the island)`); fx('select', { volume: 0.5 }); }} />
       ) : showHud && !avatarMode && paletteOpen ? (
-        p.tab === 'paint'
+        p.tab === 'paint' && heldItem?.id === 'paint-thing'
+          ? <PaletteStrip title="Colour" items={TINTS.map((t) => ({ id: t.id, name: t.name, preview: { kind: 'swatch' as const, colors: [`rgb(${t.rgb.join(',')})`] } }))} community={[]} selected={p.palette.tint ?? 'red'} onLayers={openLayers} onPick={(id) => { pickPalette('tint', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'paint'
           ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'logic' && heldItem?.id === 'logic-wire'

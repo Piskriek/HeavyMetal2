@@ -1,0 +1,49 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a walkable grid and path finding for characters in a toy-world game. The island is a height grid with water below a sea level and solid boxes standing on it; characters can climb small steps but not steep slopes; some areas cost more (mud, sand). A* finds paths; paths are smoothed.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/navgrid.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. A* must stop after `maxNodes` expansions (default 20000) and return null.
+
+## API (implement exactly)
+
+```ts
+export interface Heights { cols: number; rows: number; cell: number; originX: number; originZ: number; heights: Float32Array } // (c, r) at x = originX + c*cell, z = originZ + r*cell
+export interface Box { minX: number; minZ: number; maxX: number; maxZ: number }   // blocks the cells whose centres are inside
+export interface NavOptions { sea: number; maxStep: number; costs?: { x: number; z: number; radius: number; cost: number }[] } // maxStep: largest height change between neighbour cells; costs: extra cost areas (cost >= 1 multiplies)
+export interface NavGrid { cols: number; rows: number; walkable: Uint8Array; cost: Float32Array; h: Heights }
+export function build(h: Heights, boxes: readonly Box[], o: NavOptions): NavGrid;
+/** A* over the 8 neighbours (diagonals cost sqrt 2 and only when both side cells are walkable; a move between cells whose heights differ by more than maxStep is not allowed), cost = distance * the destination cell's cost. Returns the cell path from start to goal (inclusive) or null. Start or goal unwalkable: the nearest walkable cell within 3 cells is used instead, else null. */
+export function findPath(g: NavGrid, from: [number, number], to: [number, number], maxNodes?: number): [number, number][] | null;
+/** World x, z to the cell, and back (cell centres). */
+export function cellOf(g: NavGrid, x: number, z: number): [number, number];
+export function worldOf(g: NavGrid, c: number, r: number): [number, number];
+/** Remove points that can be skipped: keep a point only if the straight line from the last kept point to the next one would cross an unwalkable cell (check cells along the line every half cell). */
+export function smooth(g: NavGrid, path: [number, number][]): [number, number][];
+/** Cells reachable from a start (flood fill with the same move rules): the islands of walkable ground, for spawning characters where they can get home. */
+export function reachable(g: NavGrid, from: [number, number]): Set<number>; // index c + r * cols
+```
+
+## Acceptance tests (copy unchanged, then add your own: water blocks, a cliff blocks, costly mud is walked round, the node limit, start inside a box snaps to a free cell, reachable)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { build, findPath, smooth, type Heights } from '../src/index';
+const flat = (cols: number, rows: number): Heights => ({ cols, rows, cell: 1, originX: 0, originZ: 0, heights: new Float32Array(cols * rows).fill(1) });
+test('a straight path on flat ground', () => {
+  const g = build(flat(5, 5), [], { sea: 0, maxStep: 0.5 });
+  const p = findPath(g, [0, 0], [4, 0])!;
+  assert.deepEqual(p, [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]]);
+  assert.deepEqual(smooth(g, p), [[0, 0], [4, 0]]);
+});
+test('a wall makes it go round', () => {
+  const g = build(flat(5, 5), [{ minX: 1.5, minZ: -1, maxX: 2.5, maxZ: 3.5 }], { sea: 0, maxStep: 0.5 });
+  const p = findPath(g, [0, 0], [4, 0])!;
+  assert.ok(p.every(([c, r]) => !(c === 2 && r <= 3)));
+  assert.deepEqual(p[p.length - 1], [4, 0]);
+});
+test('no way through returns null', () => {
+  const g = build(flat(5, 5), [{ minX: 1.5, minZ: -1, maxX: 2.5, maxZ: 9 }], { sea: 0, maxStep: 0.5 });
+  assert.equal(findPath(g, [0, 0], [4, 0]), null);
+});
+```

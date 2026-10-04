@@ -93,6 +93,7 @@ export const sceneSchema = defineSchema({
     { key: 'lamps', label: 'Lamps', doc: 'Lamps placed on the island: bulbs, spotlights, campfire glows, candles, strobes, neon. They shine at dusk and at night.', kinds: ['lamp'], min: 0, max: null, tier: 'play' },
     { key: 'zones', label: 'Trigger zones', doc: 'Boxes on the island that notice a goblin walking in or out (the Logic tab, F7).', kinds: ['logic-zone'], min: 0, max: null, tier: 'play' },
     { key: 'wires', label: 'Wires', doc: 'What a trigger zone (or a clock) does to a thing or a lamp: hide it, show it, light it, play a sound, say something, send you there.', kinds: ['logic-wire'], min: 0, max: null, tier: 'play' },
+    { key: 'paths', label: 'Walk paths', doc: 'Things that walk a path by themselves (the Animate tab, F4): only for show, never saved where they walked.', kinds: ['walk-path'], min: 0, max: null, tier: 'play' },
   ] as readonly ChildSlot[],
 });
 
@@ -540,7 +541,23 @@ export const logicWireSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, soundSpotSchema, characterSchema, lampSchema, logicZoneSchema, logicWireSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
+export const walkPathSchema = defineSchema({
+  kind: 'walk-path',
+  version: 1,
+  label: 'Walk path',
+  doc: 'A path a thing walks by itself (the Animate tab, F4): its points, there and back or round and round, how fast, how long it waits at each point.',
+  icon: 'route',
+  variables: [
+    { key: 'who', type: 'string', label: 'Who', doc: 'The thing that walks it.', tier: 'build', default: '' },
+    { key: 'points', type: 'string', label: 'Points', doc: 'The points, as [x, z] pairs (JSON).', tier: 'pro', default: '[]' },
+    { key: 'mode', type: 'enum', label: 'Goes', doc: 'There and back, round and round, or once.', tier: 'play', default: 'ping-pong', options: ['ping-pong', 'loop', 'once'] },
+    { key: 'speed', type: 'number', label: 'Speed', doc: 'How fast it walks.', tier: 'play', default: 1.5, min: 0.2, max: 10, step: 0.1, unit: 'm/s' },
+    { key: 'wait', type: 'number', label: 'Waits', doc: 'How long it stops at each point.', tier: 'play', default: 0.5, min: 0, max: 30, step: 0.1, unit: 's' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, soundSpotSchema, characterSchema, lampSchema, logicZoneSchema, logicWireSchema, walkPathSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

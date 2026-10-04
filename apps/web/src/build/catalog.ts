@@ -37,6 +37,12 @@ export const CAMERA_WAYS: readonly { readonly id: string; readonly name: string;
   { id: 'cam-slowmo', name: 'Slow motion', icon: 'Timer', doc: 'Slow the world down (characters, flying things, effects) or bring it back to speed.', left: 'Slow down or speed up', right: 'Slow down or speed up' },
 ];
 
+/** The Animate tab's ways (F4; hotbar spec V3, Puppet show): a thing walks a path. */
+export const ANIM_WAYS: readonly { readonly id: string; readonly name: string; readonly icon: string; readonly doc: string; readonly left: string; readonly right: string }[] = [
+  { id: 'anim-path', name: 'Walk a path', icon: 'Route', doc: 'Click a thing, then points along its way, then the last point again (or Enter): it walks there and back by itself (only for show).', left: 'The thing, then each point (the last again: go)', right: 'Take the last point back' },
+  { id: 'anim-stop', name: 'Stop walking', icon: 'CircleStop', doc: 'The thing you point at stops walking its path.', left: 'Stop it', right: 'Stop it' },
+];
+
 export const CAMERAS: readonly CameraPreset[] = [
   { id: 'third', name: 'Over the shoulder', icon: 'User', doc: 'The camera follows behind your goblin.' },
   { id: 'first', name: 'First person', icon: 'Focus', doc: 'See the world through your goblin\'s eyes.' },
@@ -84,7 +90,8 @@ export function catalog(tab: TabId, player: CatalogPlayer, _activities: readonly
     case 'select': case 'paint': case 'sculpt': case 'things':
       return toolsFor(tab).map((t) => toolCard(tab, toolOf(player, t.id) ?? t, !!player.tools[t.id]));
     case 'animate':
-      return ANIMATIONS.map((a) => { const p = animOf(player, a.id); return { tab, id: a.id, name: p.name, doc: `${p.loop ? 'Repeats' : 'Plays once'}: ${p.style}.`, preview: { kind: 'anim', anim: p }, edited: !!player.anims[a.id] }; });
+      return [...ANIMATIONS.map((a) => { const p = animOf(player, a.id); return { tab, id: a.id, name: p.name, doc: `${p.loop ? 'Repeats' : 'Plays once'}: ${p.style}.`, preview: { kind: 'anim' as const, anim: p }, edited: !!player.anims[a.id] }; }),
+        ...ANIM_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false }))];
     case 'sound':
       // ways first; the sounds after, so hotbars that hold sounds stay valid
       return [...SOUND_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false })),
@@ -118,6 +125,7 @@ export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
   camera: [['third', 'first', 'studio', 'island']],
+  animate: [['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']],
   select: [['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate', null]],
   logic: [['logic-attach', 'logic-remove', 'logic-rules', null, null, null, null, null, null]],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
@@ -132,7 +140,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   out.paint = ids(['paint-brush', 'paint-spray', 'paint-fill', 'paint-gradient', 'paint-stamp', 'paint-pattern', 'paint-clone', 'paint-smudge', 'paint-eraser']);
   // ways to sculpt; the shapes Stamp presses are in the palette (docs/HOTBAR.md)
   out.sculpt = ids(['raise', 'smooth', 'sculpt-grab', 'sculpt-clay', 'sculpt-stamp', 'sculpt-terrace', 'terrain-road', 'terrain-river', 'terrain-rain']);
-  out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
+  out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'anim-path', 'anim-stop']);
   out.sound = [...ids(SOUND_WAYS.map((w) => w.id)), null, null, null, null, null];
   // ways to change the light; the looks are the palette (docs/HOTBAR.md)
   out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', 'light-lamp', 'light-lamp-remove']), null, null];

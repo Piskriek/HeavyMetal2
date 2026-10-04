@@ -447,6 +447,23 @@ try {
   check('Slow motion slows the world to a quarter', sm?.slow === true && Math.abs(sm.scale - 0.25) < 1e-6, JSON.stringify(sm));
   await clickWorld(640, 470); await page.waitForTimeout(T(800));
   check('and again brings it back to speed', (await page.evaluate(() => window.hmCamera?.()))?.scale === 1);
+  // Walk a path (F4): click the barrel, two points, the last again: it walks there and back by itself; Ctrl+Z stops it
+  await page.keyboard.press('F4');
+  await page.waitForTimeout(T(300));
+  await clickWay('Walk a path');
+  const wt = (await page.evaluate(() => window.hmThings?.() ?? []))[0];
+  if (wt) {
+    await page.evaluate((t) => { window.hmPinView = { eye: [t.x + 5, t.y + 5, t.z + 5], target: [t.x + 1, t.y, t.z + 1] }; }, wt);
+    await page.waitForTimeout(T(400));
+    const scr = await page.evaluate((t) => { const g = (x, z) => window.hmGround?.heightAt?.(x, z) ?? t.y; return [window.hmProject?.(t.x, t.y + 0.05, t.z), window.hmProject?.(t.x + 2, g(t.x + 2, t.z), t.z), window.hmProject?.(t.x + 2, g(t.x + 2, t.z + 2), t.z + 2)]; }, wt);
+    for (const p of [scr[0], scr[1], scr[2], scr[2]]) if (p) await clickWorld(p[0], p[1]);
+    await page.waitForTimeout(T(1500));
+    const wk = await page.evaluate(() => window.hmWalks?.());
+    check('Walk a path: the barrel walks its path by itself', wk?.count === 1 && wk.moved > 0.3, JSON.stringify(wk) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
+    if (wk?.count === 1) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
+    check('and Ctrl+Z stops it', (await page.evaluate(() => window.hmWalks?.()))?.count === 0);
+    await page.evaluate(() => { window.hmPinView = null; });
+  }
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

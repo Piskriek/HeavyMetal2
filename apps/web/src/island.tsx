@@ -28,7 +28,7 @@ import { AMBIENCES } from '@hm/soundscape';
 import { audio } from './maker/feedback';
 import { PARTICLE_PRESETS } from '@hm/particles';
 import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
-import { CAMERA_WAYS, animOf, catalog, lookOf, soundName, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { ANIM_WAYS, CAMERA_WAYS, animOf, catalog, lookOf, soundName, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { SFX_IDS } from '@hm/audio';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
@@ -51,6 +51,7 @@ import { carvePath, pathPreview, rainOn, ROAD_SURFACE, RIVER_SURFACE } from './b
 import { WiresRuntime, type PlacedWire, type PlacedZone, type WireEffect } from './build/wires-runtime';
 import { boxSelect, type Item as SelItem } from '@hm/selectset';
 import { SlowMo, orbitShot, sampleTrack, trackDuration, type CamTrack } from '@hm/camtrack';
+import { walkerAt, type WalkPath } from '@hm/walkpath';
 import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
@@ -277,7 +278,7 @@ export function IslandWalk(props: {
     if (!id) return;
     const pl = player();
     if (tab === 'lights') { if (isLightWay(id)) say(`${byIdName(tab, id)}: ${LIGHT_WAYS.find((w) => w.id === id)?.left ?? ''} with the left button`); else { pickLook(rt, scene.sceneId, id); say(`Light: ${byIdName(tab, id)}`); } }
-    else if (tab === 'animate') api.current?.playAnim(id);
+    else if (tab === 'animate') { if (!id.startsWith('anim-')) api.current?.playAnim(id); }
     else if (tab === 'sound') { if (!id.startsWith('sound-')) fx(id as SfxId); }
     else if (tab === 'avatar') { wearLook(id); say(`Wearing ${lookOf(pl, id).name}`); }
     else if (tab === 'camera') { if (!id.startsWith('cam-')) switchCamera(id); }
@@ -636,6 +637,40 @@ export function IslandWalk(props: {
     let photoNext = false, photos = 0;
     const slow = new SlowMo();
     let slowOn = false;
+    // walk paths (the Animate tab, F4): things that walk by themselves, only for show
+    let walkDraw: { who: PresetId; pts: [number, number][] } | null = null;
+    let walkClock = 0, walkShown = false, walkMoved = 0;
+    const walkPosed = new Set<string>();
+    const placedWalks = (): { ref: string; who: string; path: WalkPath }[] => (rt.store.get(scene.sceneId)?.children['paths'] ?? []).filter((r) => rt.store.get(r.ref)).flatMap((r) => {
+      const pr = rt.store.resolve(r.ref).params as Record<string, unknown>;
+      let pts: [number, number][] = [];
+      try { const v = JSON.parse(String(pr['points'] ?? '[]')) as unknown; if (Array.isArray(v)) pts = v.filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === 'number')); } catch { /* bad points: no walk */ }
+      if (pts.length < 2) return [];
+      const mode = String(pr['mode'] ?? 'ping-pong'); const wait = Number(pr['wait'] ?? 0.5);
+      return [{ ref: r.ref, who: String(pr['who'] ?? ''), path: { points: pts.map(([x, z]) => ({ pos: [x, 0, z] as [number, number, number], wait })), mode: mode === 'loop' || mode === 'once' ? mode : 'ping-pong', speed: Number(pr['speed'] ?? 1.5), smooth: true } }];
+    });
+    const showWalkDraw = (): void => {
+      const ts = rt.binder.terrain();
+      if (!walkDraw || !walkDraw.pts.length || !ts) { if (walkShown) { renderer.overlay.hide('walkpath'); walkShown = false; } return; }
+      const lift = (x: number, z: number): [number, number, number] => [x, heightAt(ts.terrain, x, z) + 0.12, z];
+      const line = pathPreview(walkDraw.pts).map(([x, z]) => lift(x, z));
+      renderer.overlay.show('walkpath', [...(line.length > 1 ? [{ type: 'ribbon' as const, points: line, width: 0.35, color: '#ffc53d', opacity: 0.8 }] : []), ...walkDraw.pts.map(([x, z], i) => ({ type: 'handle' as const, id: `w${i}`, position: lift(x, z), color: '#ffffff', size: 0.22 }))]);
+      walkShown = true;
+    };
+    const layWalk = (): void => {
+      if (!walkDraw || walkDraw.pts.length < 1) { say('Click points along its way first'); return; }
+      const at = rt.store.get(walkDraw.who) ? rt.store.resolve(walkDraw.who).params as Record<string, unknown> : null;
+      // it starts where it stands
+      const pts = at ? [[Number(at['x'] ?? 0), Number(at['z'] ?? 0)] as [number, number], ...walkDraw.pts] : walkDraw.pts;
+      const who = walkDraw.who; walkDraw = null; showWalkDraw();
+      const pid = `walk-${Date.now().toString(36)}`;
+      rt.commands.transaction('Walk a path', () => {
+        rt.commands.execute(cmd.put({ id: pid, kind: 'walk-path', name: 'Walk', params: { who, points: JSON.stringify(pts.map(([x, z]) => [Math.round(x * 100) / 100, Math.round(z * 100) / 100])), mode: 'ping-pong', speed: 1.5, wait: 0.5 } as never, tier: 'play' }, 'Walk a path'));
+        rt.commands.execute(cmd.addChild(scene.sceneId, 'paths', pid, undefined, 'Walk a path'));
+      });
+      saveMap(rt, scene.sceneId); say(`${rt.store.get(who)?.name ?? 'It'} walks its path, there and back`); fx('place', { volume: 0.5 });
+    };
+    (window as unknown as { hmWalks: unknown }).hmWalks = () => ({ count: placedWalks().length, drawing: walkDraw?.pts.length ?? -1, moved: walkMoved });
     (window as unknown as { hmCamera: unknown }).hmCamera = () => ({ shot: !!shot, photos, slow: slowOn, scale: slow.scale });
     /** Shift snaps moves to half metres and sizes to quarter steps, Ctrl snaps turns to 15 degrees (hotbar spec V3). */
     const gizmoSnap = (): { move?: number; turn?: number; scale?: number } => {
@@ -775,6 +810,7 @@ export function IslandWalk(props: {
     const escape = (): void => {
       if (gizmo.dragging) { gizmo.cancel(); return; }
       if (shot) { shot = null; return; }
+      if (walkDraw) { walkDraw = null; showWalkDraw(); say('Let go of the path'); return; }
       if (path) { path = null; showPath(); say('Let go of the path'); return; }
       if (wireFrom) { wireFrom = null; say('Let go of the wire'); return; }
       if (boxing) { boxing.div.remove(); boxing = null; return; }
@@ -799,6 +835,7 @@ export function IslandWalk(props: {
       if (typing) return;
       if (live.current.menu) return;
       if (e.key === 'Enter' && path && path.pts.length >= 2) { e.preventDefault(); layPath(); return; }
+      if (e.key === 'Enter' && walkDraw && walkDraw.pts.length >= 1) { e.preventDefault(); layWalk(); return; }
       if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTargets.length && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
       const tab = tabForKey(e.key, e.shiftKey);
       if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
@@ -1050,6 +1087,33 @@ export function IslandWalk(props: {
         saveMap(rt, scene.sceneId);
         say(ruleSentence(rule, thing ? (rt.store.get(thing)?.name ?? 'it').toLowerCase() : 'the island'));
         fx('place', { volume: 0.5 });
+        return;
+      }
+      // the Animate tab's ways: a thing walks a path, or stops
+      if (s.tab === 'animate' && id.startsWith('anim-')) {
+        if (!first) return;
+        const a = aim();
+        if (!a) { say('Point at the ground'); return; }
+        if (id === 'anim-stop') {
+          const m = builder.modelAt(a);
+          const refs = rt.store.get(scene.sceneId)?.children['paths'] ?? [];
+          const mine = m ? refs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['who'] === m.ref) : [];
+          if (!mine.length) { say('Point at a thing that walks'); return; }
+          rt.commands.transaction('Stop walking', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'paths', i, 'Stop walking')); });
+          saveMap(rt, scene.sceneId); say('It stays put now'); fx('delete', { volume: 0.5 });
+          return;
+        }
+        if (!walkDraw) {
+          const m = builder.modelAt(a);
+          if (!m) { say('Click the thing that should walk'); return; }
+          walkDraw = { who: m.ref, pts: [] };
+          say(`${rt.store.get(m.ref)?.name ?? 'It'}: now click points along its way, the last one again (or Enter) to go`); fx('select', { volume: 0.5 });
+          return;
+        }
+        if (alt) { walkDraw.pts.pop(); showWalkDraw(); return; }
+        const lastPt = walkDraw.pts[walkDraw.pts.length - 1];
+        if (lastPt && Math.hypot(a.point[0] - lastPt[0], a.point[2] - lastPt[1]) < 1) { layWalk(); return; }
+        walkDraw.pts.push([a.point[0], a.point[2]]); showWalkDraw(); fx('select', { volume: 0.3 });
         return;
       }
       // the Camera tab's ways: an orbit shot, a photo, slow motion
@@ -1338,6 +1402,24 @@ export function IslandWalk(props: {
       }
       // a path being drawn lets go when you put the Road or River down
       if (path) { const pl = player(); const held = toolOf(pl, pl.hotbars[pl.tab][pl.slots[pl.tab]] ?? ''); if (pl.tab !== 'sculpt' || held?.action !== path.kind) { path = null; showPath(); } }
+      {
+        walkClock += worldDt;
+        const walks = placedWalks();
+        const ts = rt.binder.terrain();
+        const walking = new Set<string>();
+        walkMoved = 0;
+        for (const w of walks) {
+          const at = thingAt(w.who), i = drawnIndex(w.who as PresetId);
+          if (!at || i < 0) continue;
+          const s = walkerAt(w.path, walkClock);
+          const gy = ts ? heightAt(ts.terrain, s.pos[0], s.pos[2]) : at[1];
+          renderer.setModelPose(i, s.pos[0], gy + (s.moving ? Math.abs(Math.sin(walkClock * 8)) * 0.05 : 0), s.pos[2], s.yaw);
+          walking.add(w.who); walkPosed.add(w.who);
+          walkMoved = Math.max(walkMoved, Math.hypot(s.pos[0] - at[0], s.pos[2] - at[2]));
+        }
+        for (const ref of [...walkPosed]) if (!walking.has(ref)) { walkPosed.delete(ref); const at = thingAt(ref), i = drawnIndex(ref as PresetId); if (at && i >= 0) renderer.setModelPose(i, at[0], at[1], at[2], Number(rt.store.resolve(ref as PresetId).params['yaw'] ?? 0)); }
+        if (walkDraw) { const pl = player(); if (pl.tab !== 'animate' || pl.hotbars.animate[pl.slots.animate] !== 'anim-path') { walkDraw = null; showWalkDraw(); } }
+      }
       effects.sync(placedEffects());
       {
         const spots = placedSounds();
@@ -1723,7 +1805,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
   const title = `${tabDef(tab).label}: ${item.name}`;
   if (tool) return { title, line: tool.doc, left: tool.left, right: tool.right };
   switch (tab) {
-    case 'animate': return { title, line: item.doc, left: 'Play it', right: 'Stop' };
+    case 'animate': { const w = ANIM_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: item.doc, left: 'Play it', right: 'Stop' }; }
     case 'sound': { const w = SOUND_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: item.doc, left: 'Play it', right: 'Play it' }; }
     case 'lights': { const w = LIGHT_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' }; }
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };

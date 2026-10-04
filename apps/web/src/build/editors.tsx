@@ -18,7 +18,7 @@ import { SoundLab } from '../sound/lab';
 import { normalizeRecipe, recipeToJson, type SfxRecipe } from '@hm/soundlab';
 import { ensurePlant, ensureRules, plantsOf, rulesOf } from '../world';
 import { useRev } from '../use-rev';
-import { CAMERAS, CAMERA_WAYS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
+import { ANIM_WAYS, CAMERAS, CAMERA_WAYS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
 import { PresetPreview, avatarWearing } from './cards';
 import { editAnim, editSprite, editTool, resetAnim, resetSprite, resetTool, saveLook, setMove, usePlayer, wearLook } from './player';
 import { spriteOf } from './sprites';
@@ -299,7 +299,7 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
   const { tab, id } = props;
   switch (tab) {
     case 'select': case 'paint': case 'sculpt': case 'things': return <ToolEditor id={id} actions={props.actions} />;
-    case 'animate': return <AnimEditor id={id} actions={props.actions} />;
+    case 'animate': return id.startsWith('anim-') ? <p className="hint">{ANIM_WAYS.find((w) => w.id === id)?.doc ?? ''}</p> : <AnimEditor id={id} actions={props.actions} />;
     case 'sound': return id.startsWith('sound-') ? <SoundSpotsPanel rt={props.rt} sceneId={props.sceneId} /> : <SoundEditor id={id} rt={props.rt} />;
     case 'lights': return <LightingPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'logic': return <LogicPanel rt={props.rt} sceneId={props.sceneId} />;

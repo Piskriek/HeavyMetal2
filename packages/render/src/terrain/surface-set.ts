@@ -187,6 +187,8 @@ export class SurfaceArray {
   readonly params: THREE.Vector4[];
   /** 1 where a layer may be turned a quarter at a time to hide its repeats, 0 for directional tiles. */
   readonly turn: Float32Array;
+  /** How each layer moves (texture mode, Animate): flow x, y in tiles a second; pulse a second (negative: the flow sways back and forth instead); pulse strength. */
+  readonly anim: THREE.Vector4[];
   readonly ready: Promise<void>;
   progress = 0;
   private readonly data: Uint8Array;
@@ -224,6 +226,7 @@ export class SurfaceArray {
     });
     this.params = defs.map((d) => new THREE.Vector4(d.repeat, d.roughness, d.height.contrast, d.glow ?? 0));
     this.turn = Float32Array.from(defs.map((d) => (d.directional ? 0 : 1)));
+    this.anim = defs.map(() => new THREE.Vector4(0, 0, 0, 0));
     this.flatTexture = makeFlatTexture(defs);
     this.texture = this.makeArray(this.data, this.size, layers, true);
     this.pbrTexture = this.makeArray(this.pbr, this.size, layers, false);
@@ -326,6 +329,20 @@ export class SurfaceArray {
     }
     this.voxelTexture.needsUpdate = true;
     this.voxelPbrTexture.needsUpdate = true;
+  }
+
+  /** Make surface `id` move on the ground (see `anim`); all zeros keeps it still. */
+  setAnim(id: number, flowX: number, flowY: number, pulseHz: number, pulse: number): void {
+    const layer = this.layerOf[id] ?? -1;
+    if (layer >= 0) this.anim[layer]!.set(flowX, flowY, pulseHz, pulse);
+  }
+
+  /** A copy of surface `id`'s tile as the ground draws it now: colour (alpha = height) and the PBR map (normal x, y, roughness), `size` square. */
+  readTile(id: number): { colour: Uint8Array; pbr: Uint8Array } | null {
+    const layer = this.layerOf[id] ?? -1;
+    if (layer < 0) return null;
+    const n = this.size * this.size * 4, base = layer * n;
+    return { colour: this.data.slice(base, base + n), pbr: this.pbr.slice(base, base + n) };
   }
 
   setTile(id: number, colour: ArrayLike<number>, maps: ArrayLike<number>): void {

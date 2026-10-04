@@ -42,6 +42,8 @@ uniform float islNormalStrength;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 uniform vec4 islParams[${layers}];
 uniform float islTurn[${layers}];
+uniform vec4 islAnim[${layers}];
+uniform float islTime;
 uniform float islSoft;
 uniform float islScale;
 uniform float islCliffLayer;
@@ -115,10 +117,19 @@ float islTurns(int il, float ia) {
   return islTurn[il] > 0.5 ? floor(fract(sin(ia * 91.7 + 0.3) * 4375.85) * 4.0) : 0.0;
 }
 
+// texture mode's Animate: how a layer moves
+vec4 islAnimOf(float layer) { return islAnim[int(clamp(layer + 0.5, 0.0, float(${layers} - 1)))]; }
+
+// texture mode's Animate: a layer flows (or sways back and forth) across the ground
+vec2 islFlow(int il) {
+  vec4 a = islAnim[il];
+  return a.z < 0.0 ? a.xy * sin(islTime * -a.z * 6.2832) : a.xy * islTime;
+}
+
 vec4 islTap(float layer, vec2 uv, vec2 off, float k, vec2 dx, vec2 dy) {
   int il = int(clamp(layer + 0.5, 0.0, float(${layers} - 1)));
   float rep = max(islParams[il].x * islScale, 0.05);
-  return textureGrad(islSurfaces, vec3(islRot(uv / rep, k) + off, float(il)), islRot(dx / rep, k), islRot(dy / rep, k));
+  return textureGrad(islSurfaces, vec3(islRot(uv / rep + islFlow(il), k) + off, float(il)), islRot(dx / rep, k), islRot(dy / rep, k));
 }
 
 // no visible repeats: the ground is cut into noise-shaped patches; each takes the tile at its own offset and, where the surface allows, its
@@ -174,7 +185,7 @@ vec4 islPbrVaried(float layer, vec2 uv, vec2 dx, vec2 dy) {
   float ia = floor(l);
   vec2 oa = sin(vec2(3.0, 7.0) * ia), ob = sin(vec2(3.0, 7.0) * (ia + 1.0));
   float ka = islTurns(il, ia), kb = islTurns(il, ia + 1.0);
-  vec2 ua = islRot(uv / rep, ka) + oa, ub = islRot(uv / rep, kb) + ob;
+  vec2 ua = islRot(uv / rep + islFlow(il), ka) + oa, ub = islRot(uv / rep + islFlow(il), kb) + ob;
   vec2 dxa = islRot(dx / rep, ka), dya = islRot(dy / rep, ka), dxb = islRot(dx / rep, kb), dyb = islRot(dy / rep, kb);
   float ha = textureGrad(islSurfaces, vec3(ua, float(il)), dxa, dya).a;
   float hb = textureGrad(islSurfaces, vec3(ub, float(il)), dxb, dyb).a;
@@ -288,6 +299,8 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     tile.rgb *= mix(0.9 + 0.2 * surfNoise(wp.xz / 70.0 + 3.7), 0.8 + 0.4 * surfNoise(wp.xz / 31.0 + 9.1), far);
     // and over a few metres, so no two tiles side by side look the same (the image tiles have their own big patches taken out on import)
     tile.rgb *= 0.9 + 0.2 * surfNoise(wp.xz / 6.0 + 1.9);
+    // texture mode's Animate: a pulse brightens and dims the surface (and lights glowing ones)
+    { vec4 an = islAnimOf(la); if (an.z > 0.0 && an.w > 0.0) { float p = 0.5 + 0.5 * sin(islTime * an.z * 6.2832); tile.rgb *= 1.0 + an.w * (p - 0.5); gGlow += an.w * p * 0.6; } }
     diffuseColor.rgb = tile.rgb;
 #ifdef ISL_PLAIN
     // the painted ground without the detail: matte, no bumps

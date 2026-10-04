@@ -25,6 +25,10 @@ import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
 import { SurfaceEditor } from './build/surface-editor';
+import { TextureBench } from './build/texture-bench';
+import { TEX_ANIMS, draftColours, draftFromTile, draftToTile, newHistory, type DraftHistory, type TexDraft } from './build/texture-draft';
+import { decodeBlob, encodeWebp, loadTextures, saveTexture } from './build/texture-store';
+import type { StampKind } from '@hm/terrainops';
 import { LIGHT_WAYS, isLightWay, applyLightWay } from './build/light-ways';
 import { SETUPS } from '@hm/lighting';
 import { avatarRigged } from './build/cards';
@@ -109,7 +113,7 @@ export function IslandWalk(props: {
   const { rt, onActivities, onIslands, onHub, onMainMenu, onIntroDone, onMenuChange } = props;
   const host = useRef<HTMLDivElement>(null);
   const introRef = useRef(props.intro === true);
-  const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr'; detail?: boolean }) => void } | null>(null);
+  const terrainView = useRef<{ setLook: (l: { skin?: 'flat' | 'pbr'; detail?: boolean }) => void; tick: (seconds: number) => void } | null>(null);
   const skin = props.skin ?? 'flat';
   const style = props.style ?? 'voxel';
   // the renderer's look: its skin is the style (voxel blocks or painted), its detail the Flat / PBR buttons
@@ -187,7 +191,10 @@ export function IslandWalk(props: {
     /** Layers: carry a thing with the Move tool, place one where you look, show or hide the plants. */
     carry: (ref: PresetId) => void; addThing: (modelId: string) => PresetId | null; showPlants: (on: boolean) => void;
     /** The surface editor: draw surface `id` from this texture graph (SetMix's graph-made ground only; false for the image set). */
-    setSurfaceLook: (id: number, graph: TexGraph, blocks?: boolean) => boolean } | null>(null);
+    setSurfaceLook: (id: number, graph: TexGraph, blocks?: boolean) => boolean;
+    /** Texture mode: a surface's tile as drawn now, put one back, make it move. */
+    readTile: (id: number) => { colour: Uint8Array; pbr: Uint8Array; size: number } | null; putTile: (id: number, colour: Uint8Array, maps: Uint8Array) => void;
+    setAnim: (id: number, v: readonly [number, number, number, number]) => void } | null>(null);
   /** A small copy of the ground you are looking at (the tool presets draw on it). */
   const peekGround = useCallback((): Terrain | null => api.current?.groundPeek() ?? null, []);
   // the island overview needs the cursor: let go of the mouse when the level goes up
@@ -316,6 +323,39 @@ export function IslandWalk(props: {
   const openSelectedRef = useRef(openSelected);
   openSelectedRef.current = openSelected;
   const [layerSel, setLayerSel] = useState<PresetId | null>(null);
+  /** Texture mode (MASTER_PLAN 6.4): the surface you stepped into, its draft, and the colour Paint puts on. */
+  const [tex, setTex] = useState<{ readonly id: number; readonly name: string; readonly draft: TexDraft; readonly history: DraftHistory; readonly colours: [number, number, number][] } | null>(null);
+  const [texColour, setTexColour] = useState(0);
+  const texApply = useRef(0);
+  const stepIntoTexture = (id: number): void => {
+    const t = api.current?.readTile(id);
+    const s = PAINTS.find((x) => x.id === id);
+    if (!t || !s) return;
+    const draft = draftFromTile(t.colour, t.pbr, t.size);
+    win.list.filter((w) => w.id.startsWith('surface:')).forEach((w) => win.close(w.id));
+    setTex({ id, name: s.name, draft, history: newHistory(), colours: draftColours(draft) });
+    api.current?.unlock();
+    setTexColour(Math.min(5, draftColours(draft).length - 1));
+    say(`${s.name}: paint and sculpt it with the hotbar; Animate makes it move. Esc steps out.`);
+  };
+  /** Texture mode: show the edit on the island a moment after the last dab. */
+  const texChanged = (): void => {
+    window.clearTimeout(texApply.current);
+    texApply.current = window.setTimeout(() => { if (tex) { const b = draftToTile(tex.draft); api.current?.putTile(tex.id, b.colour, b.maps); } }, 220);
+  };
+  const stepOutOfTexture = (): void => {
+    if (!tex) return;
+    window.clearTimeout(texApply.current);
+    const b = draftToTile(tex.draft), size = tex.draft.size, id = tex.id;
+    api.current?.putTile(id, b.colour, b.maps);
+    setTex(null);
+    void Promise.all([encodeWebp(b.colour, size, 0.92), encodeWebp(b.maps, size, 1)]).then(([colour, maps]) => { if (colour && maps) void saveTexture(id, { colour, maps }); });
+    say(`${PAINTS.find((x) => x.id === id)?.name ?? 'The texture'} kept`);
+  };
+  const stepOutRef = useRef(stepOutOfTexture);
+  stepOutRef.current = stepOutOfTexture;
+  const texRef = useRef(tex);
+  texRef.current = tex;
   const [plantsShown, setPlantsShown] = useState(true);
   const pickPreset = (id: string): void => {
     const s = player();
@@ -360,6 +400,17 @@ export function IslandWalk(props: {
         }
       });
     }
+    void surfaces.ready.then(async () => {
+      const stored = await loadTextures();
+      for (const [id, t] of stored) {
+        if (t.colour && t.maps) {
+          const [c, m] = await Promise.all([decodeBlob(t.colour, surfaces.size), decodeBlob(t.maps, surfaces.size)]);
+          if (c && m) surfaces.setTile(id, c, m);
+        }
+        if (t.anim) surfaces.setAnim(id, t.anim[0], t.anim[1], t.anim[2], t.anim[3]);
+      }
+    });
+    const offClock = renderer.onFrame(() => { terrainView.current?.tick(performance.now() / 1000); });
     const showTerrain = (): void => {
       const st = rt.binder.terrain();
       if (!st) return;
@@ -480,6 +531,9 @@ export function IslandWalk(props: {
         return refs[refs.length - 1]?.ref ?? null;
       },
       showPlants: (on) => { plantsHidden = !on; showDecor(); },
+      readTile: (id) => { const t = surfaces.readTile(id); return t ? { ...t, size: surfaces.size } : null; },
+      putTile: (id, colour, maps) => surfaces.setTile(id, colour, maps),
+      setAnim: (id, v) => surfaces.setAnim(id, v[0], v[1], v[2], v[3]),
       setSurfaceLook: (id, graph, blocks = false) => {
         // the racing ground's painted tiles are pictures; its blocks are SetMix's and can change
         if (props.ground === 'racing' && !blocks) return false;
@@ -518,6 +572,7 @@ export function IslandWalk(props: {
 
     /** Esc closes exactly one thing: the wheel, the front window, focus, hide-others, what Move carries; then it opens the menu. */
     const escape = (): void => {
+      if (texRef.current) { if (live.current.win.closeTop()) return; stepOutRef.current(); return; }
       if (live.current.win.closeTop()) return;
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
       if (live.current.isolateId) { setIsolateId(null); return; }
@@ -864,7 +919,7 @@ export function IslandWalk(props: {
       window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', onBlur);
       window.removeEventListener('pointerdown', onPointerDown); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('wheel', onWheel); el.removeEventListener('contextmenu', onContext);
-      offTerrain(); offDecor(); offFrame(); stopLighting(); graphicsRef.current = null;
+      offTerrain(); offDecor(); offFrame(); offClock(); stopLighting(); graphicsRef.current = null;
       lastPose = { px, pz, face, camYaw };
       api.current = null;
       renderer.unmount();
@@ -911,8 +966,23 @@ export function IslandWalk(props: {
           toggles={{ mirror: p.sculptToggles.mirror, smoothAfter: p.sculptToggles.smoothAfter, onToggle: (k) => { toggleSculpt(k); fx('ui-toggle', { volume: 0.5 }); } }}
           onAll={() => win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor })} />
       ) : null}
+      {/* texture mode: the tile you stepped into, in front of you; the hotbar works on it */}
+      {tex && showHud ? (
+        <>
+          <TextureBench name={tex.name} draft={tex.draft} history={tex.history} tool={heldTool} tab={p.tab} colour={tex.colours[texColour] ?? [128, 128, 128]} shape={(p.palette.sculpt ?? 'mound') as StampKind} onChange={texChanged} onSay={say} />
+          <div className="tb-head" role="navigation" aria-label="Where you are">
+            <span>My island</span><span aria-hidden="true">›</span><b>{tex.name} texture</b>
+            <button className="go" onClick={stepOutOfTexture}>Back to the island</button>
+            <label className="tb-any" title="Paint with any colour">Any colour <input type="color" value={`#${(tex.colours[texColour] ?? [128, 128, 128]).map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`} onChange={(e) => { const h = e.target.value.slice(1); const c: [number, number, number] = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; setTex((t) => (t ? { ...t, colours: [...t.colours.slice(0, 8), c] } : t)); setTexColour(8); }} /></label>
+          </div>
+        </>
+      ) : null}
       {/* the palette: what the tool in your hand puts down (top middle) */}
-      {showHud && !avatarMode && paletteOpen ? (
+      {showHud && !avatarMode && tex && (p.tab === 'paint' || p.tab === 'animate') ? (
+        p.tab === 'paint'
+          ? <PaletteStrip title="Colour" items={tex.colours.map((c, i) => ({ id: String(i), name: `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`, preview: { kind: 'swatch', colors: [`rgb(${c.join(',')})`] } }))} community={[]} selected={String(texColour)} onPick={(id) => { setTexColour(Number(id)); fx('select', { volume: 0.5 }); }} />
+          : <PaletteStrip title="Moves" items={TEX_ANIMS.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon', icon: a.icon } }))} community={[]} selected={undefined} onPick={(id) => { const a = TEX_ANIMS.find((x) => x.id === id); if (!a) return; api.current?.setAnim(tex.id, a.v); void saveTexture(tex.id, { anim: a.v }); say(`${tex.name}: ${a.name.toLowerCase()} (step out to see it on the island)`); fx('select', { volume: 0.5 }); }} />
+      ) : showHud && !avatarMode && paletteOpen ? (
         p.tab === 'paint'
           ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
@@ -936,7 +1006,7 @@ export function IslandWalk(props: {
             : w.id === 'layers' ? <LayersPanel rt={rt} sceneId={scene.sceneId} selected={layerSel} onSelect={setLayerSel} plantsShown={plantsShown} onPlants={(on) => { setPlantsShown(on); api.current?.showPlants(on); }}
                 onMove={(ref) => api.current?.carry(ref)} onShow={(ref) => { setFocusId(ref); }} onAdd={(id) => api.current?.addThing(id) ?? null} onGround={() => pickTab('paint')} />
             : w.id.startsWith('surface:') ? (() => { const sid = Number(w.id.slice(8)); const s = PAINTS.find((x) => x.id === sid); return <SurfaceEditor surfaceId={sid} name={s?.name ?? 'This surface'}
-                startOn={style === 'voxel' && skin !== 'pbr' ? 'blocks' : 'ground'} savedGround={props.profile?.groundLooks?.[String(sid)]} savedBlocks={props.profile?.groundLooks?.[`b${sid}`]}
+                startOn={style === 'voxel' && skin !== 'pbr' ? 'blocks' : 'ground'} onStepIn={props.ground === 'racing' ? undefined : () => stepIntoTexture(sid)} savedGround={props.profile?.groundLooks?.[String(sid)]} savedBlocks={props.profile?.groundLooks?.[`b${sid}`]}
                 onApply={(g, target) => api.current?.setSurfaceLook(sid, g, target === 'blocks') ?? false}
                 onSave={(g, target) => props.onProfile?.((pr) => { const key = target === 'blocks' ? `b${sid}` : String(sid); const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[key] = g; else delete looks[key]; return { ...pr, groundLooks: looks }; })} />; })()
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />

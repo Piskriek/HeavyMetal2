@@ -886,3 +886,13 @@ body:has(.galaxy-bar.open) .palette-strip { top: 62px; }
 .hs-add button { display: grid; justify-items: center; gap: 3px; padding: 6px 4px; font-size: 11px; }
 .se-target { justify-self: start; }
 .se-preview.blocky, .se-style canvas { image-rendering: pixelated; }
+
+/* texture mode (MASTER_PLAN 6.4): the island waits behind a white wall; the texture you stepped into is the work, three by three */
+.tex-bench { position: absolute; inset: 0; display: grid; place-items: center; padding: 64px 16px 236px; background: rgba(244, 243, 238, .9); }
+.tex-bench .tb-view { width: min(100%, calc(100vh - 300px)); aspect-ratio: 1; border: 1px solid var(--text); cursor: crosshair; image-rendering: auto; touch-action: none; }
+.tb-head { position: absolute; top: 14px; left: 14px; display: grid; grid-template-columns: auto auto auto; align-items: center; justify-items: start; gap: 6px 8px; max-width: calc(50vw - 340px); font-family: var(--font-setmix); font-size: 14px; color: var(--dim); }
+.tb-head b { color: var(--text); font-weight: 700; }
+.tb-head .go { grid-column: 1 / -1; font-family: inherit; }
+.se-step { justify-self: start; }
+.tb-head .tb-any { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-family: Inter, sans-serif; font-size: 12px; color: var(--text); }
+.tb-head .tb-any input { width: 36px; height: 24px; padding: 0; border: 1px solid var(--line); background: none; }

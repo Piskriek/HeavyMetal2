@@ -58,6 +58,8 @@ export function SurfaceEditor(props: {
   readonly onApply: (graph: TexGraph, target: LookTarget) => boolean;
   /** Keep the look for this player (null = back to the SetMix default). */
   readonly onSave: (graph: TexGraph | null, target: LookTarget) => void;
+  /** Step into the texture: paint and sculpt it with the hotbar, animate it (texture mode). */
+  readonly onStepIn?: () => void;
 }): ReactElement {
   const file = SETMIX_FILE[props.surfaceId];
   const [set, setSet] = useState<GroundSet | null | undefined>(undefined);
@@ -153,6 +155,7 @@ export function SurfaceEditor(props: {
         <button disabled={busy} onClick={reset}>Back to the default</button>
         <button onClick={copy}>Copy</button>
       </div>
+      {props.onStepIn && !blocks ? <button className="se-step" data-ui="island.texture-step-in" onClick={props.onStepIn}>Paint and sculpt it by hand</button> : null}
       {note ? <p className="hint" role="status">{note}</p> : null}
     </div>
   );

@@ -35,7 +35,7 @@ Graphics: Settings, Graphics. **Potato** is the lightest, **Auto** aims for the 
 **The ground's look (new, 2026-10-04)**
 - Top right on an island: **Flat / PBR**. PBR is always the smooth painted ground; Flat with the Voxel style is the block look. The style itself is in Settings, You.
 - Your islands wear SetMix's own textures, made from math (texture graphs). Goblin Racing's island wears the high-end picture textures.
-- **Change a surface's look**: Paint (F2), Tab opens the palette, **Edit look**. Pick a style, change its colours and sizes, watch the preview, **Use on this island**. Your look is kept. **Copy** puts it on the clipboard: paste it to me and it can become the SetMix default. Select (F1, slot 1) on the ground opens the same window for whatever surface you point at.
+- **Change a surface's look**: Paint (F2), Tab opens the palette, **Edit look**. It edits what the island shows: **Blocks** (voxel style, Flat) or the **Painted ground**. **Paint and sculpt it by hand** steps into the texture: the hotbar's Paint and Sculpt work on it, Animate's palette makes it move (flow, sway, pulse, shimmer, molten), Ctrl+Z undoes, Esc steps out. Pick a style, change its colours and sizes, watch the preview, **Use on this island**. Your look is kept. **Copy** puts it on the clipboard: paste it to me and it can become the SetMix default. Select (F1, slot 1) on the ground opens the same window for whatever surface you point at.
 
 **The hotbar (new, 2026-10-04)**
 - Every tab holds ways of working; Tab opens the palette with what they use: Paint (surfaces), Sculpt (shapes to stamp), Lights (looks), Things (things to place).

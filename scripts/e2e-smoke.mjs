@@ -208,6 +208,20 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(300));
   check('Esc closes the surface editor', await page.locator('.surface-editor').count() === 0);
+  // texture mode (MASTER_PLAN 6.4): step into the texture; the hotbar paints it; Esc steps out and the island keeps it
+  await dom(() => document.querySelector('[data-ui="island.surface-look"]')?.click());
+  await page.waitForSelector('[data-ui="island.texture-step-in"]', { timeout: 20000 }).catch(() => null);
+  await dom(() => document.querySelector('[data-ui="island.texture-step-in"]')?.click());
+  await page.waitForSelector('.tex-bench canvas', { timeout: 20000 }).catch(() => null);
+  check('Paint and sculpt it by hand steps into the texture', await page.locator('.tex-bench canvas').count() === 1);
+  const texBefore = await page.evaluate(() => window.hmGround?.tile?.(4));
+  const tb = await page.locator('.tex-bench canvas').boundingBox();
+  if (tb) { await page.mouse.move(tb.x + tb.width * 0.3, tb.y + tb.height * 0.4); await page.mouse.down(); for (let k = 1; k <= 8; k++) await page.mouse.move(tb.x + tb.width * (0.3 + k * 0.05), tb.y + tb.height * 0.4); await page.mouse.up(); }
+  await page.waitForTimeout(T(600));
+  check('the hotbar paints the texture and the island shows it', texBefore !== await page.evaluate(() => window.hmGround?.tile?.(4)));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(T(400));
+  check('Esc steps out of the texture', await page.locator('.tex-bench').count() === 0);
   // Sculpt holds ways to sculpt; the shapes its Stamp presses are the palette
   await page.keyboard.press('F3');
   await page.waitForTimeout(T(300));

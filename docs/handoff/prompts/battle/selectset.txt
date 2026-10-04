@@ -1,0 +1,83 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: selection maths for a 3D editor, in screen space: box select, lasso select, filters, groups, locks, and combining selections.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/selectset.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Results keep the order of the `items` array and contain no duplicates.
+
+## API (implement exactly)
+
+```ts
+export type Pt = [number, number];                 // screen pixels
+export interface Item {
+  id: string;
+  centre: Pt;                                      // projected centre
+  bounds: [number, number, number, number];        // minX, minY, maxX, maxY on screen
+  depth: number;                                   // metres from the camera
+  kind: string;                                    // 'prop', 'light', 'character', 'trigger' ...
+  group?: string;                                  // items sharing a group select together
+  locked?: boolean;                                // never selected by any of these functions
+}
+export interface Query { filter?: string; maxDepth?: number } // filter = a kind ('all' or undefined: any)
+export type Combine = 'replace' | 'add' | 'subtract' | 'toggle';
+
+/** Items in the rectangle a..b (any corner order). 'enclosed': the whole bounds inside; 'touch': the bounds overlap it (edges count). */
+export function boxSelect(items: readonly Item[], a: Pt, b: Pt, mode: 'enclosed' | 'touch', q?: Query): string[];
+/** Items whose centre is inside the polygon (even-odd rule). */
+export function lassoSelect(items: readonly Item[], poly: readonly Pt[], q?: Query): string[];
+export function pointInPolygon(p: Pt, poly: readonly Pt[]): boolean;
+/** The item under a click: the nearest (smallest depth) whose bounds contain the point (edges count), passing the query; null if none. */
+export function pickAt(items: readonly Item[], p: Pt, q?: Query): string | null;
+/** Any selected member of a group brings in its whole group (unlocked members only). Order follows `items`. */
+export function expandGroups(ids: readonly string[], items: readonly Item[]): string[];
+/** replace: picked; add: current then new picked; subtract: current minus picked; toggle: current minus picked-that-were-in, plus picked-that-were-not (current order first, then new ones in picked order). */
+export function combine(current: readonly string[], picked: readonly string[], how: Combine): string[];
+/** Every unlocked item of the same kind (or the same group) as `id`, in items order (including itself). */
+export function selectSimilar(items: readonly Item[], id: string, by: 'kind' | 'group'): string[];
+```
+
+Locked items never appear in any result. Query: `filter` keeps only that kind; `maxDepth` drops items deeper than it.
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { boxSelect, combine, expandGroups, lassoSelect, pickAt, pointInPolygon, selectSimilar, type Item } from '../src/index';
+const it = (id: string, x: number, y: number, kind = 'prop', extra: Partial<Item> = {}): Item =>
+  ({ id, centre: [x, y], bounds: [x - 5, y - 5, x + 5, y + 5], depth: 10, kind, ...extra });
+const items: Item[] = [
+  it('a', 20, 20), it('b', 60, 20, 'light'), it('c', 20, 60, 'prop', { group: 'g1' }),
+  it('d', 100, 100, 'prop', { group: 'g1' }), it('e', 40, 40, 'prop', { locked: true }), it('f', 68, 58, 'character', { depth: 50 }),
+];
+
+test('box: enclosed and touching', () => {
+  assert.deepEqual(boxSelect(items, [0, 0], [70, 70], 'enclosed'), ['a', 'b', 'c']);
+  assert.deepEqual(boxSelect(items, [70, 70], [0, 0], 'touch'), ['a', 'b', 'c', 'f']);
+  assert.deepEqual(boxSelect(items, [0, 0], [70, 70], 'touch', { filter: 'light' }), ['b']);
+  assert.deepEqual(boxSelect(items, [0, 0], [70, 70], 'touch', { maxDepth: 20 }), ['a', 'b', 'c']);
+});
+test('lasso by the centre, even-odd', () => {
+  assert.equal(pointInPolygon([5, 5], [[0, 0], [10, 0], [10, 10], [0, 10]]), true);
+  assert.equal(pointInPolygon([15, 5], [[0, 0], [10, 0], [10, 10], [0, 10]]), false);
+  assert.deepEqual(lassoSelect(items, [[0, 0], [90, 0], [0, 90]]), ['a', 'b', 'c']);
+});
+test('pick the nearest under the pointer, never a locked one', () => {
+  const stacked = [...items, it('near', 60, 20, 'prop', { depth: 2 })];
+  assert.equal(pickAt(stacked, [61, 21]), 'near');
+  assert.equal(pickAt(items, [40, 40]), null);
+});
+test('groups come together; locks stay out', () => {
+  assert.deepEqual(expandGroups(['c'], items), ['c', 'd']);
+  assert.deepEqual(expandGroups(['e', 'a'], items), ['a']);
+});
+test('combining selections', () => {
+  assert.deepEqual(combine(['a', 'b'], ['c'], 'replace'), ['c']);
+  assert.deepEqual(combine(['a', 'b'], ['b', 'c'], 'add'), ['a', 'b', 'c']);
+  assert.deepEqual(combine(['a', 'b'], ['b'], 'subtract'), ['a']);
+  assert.deepEqual(combine(['a', 'b'], ['b', 'c'], 'toggle'), ['a', 'c']);
+});
+test('select similar', () => {
+  assert.deepEqual(selectSimilar(items, 'a', 'kind'), ['a', 'c', 'd']);
+  assert.deepEqual(selectSimilar(items, 'c', 'group'), ['c', 'd']);
+});
+```

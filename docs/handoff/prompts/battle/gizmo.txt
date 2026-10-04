@@ -1,0 +1,92 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the maths of a 3D editor's transform gizmo (move arrows and planes, rotate rings, scale handles), with hit tests, drag results and snapping.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/gizmo.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export type Axis = 'x' | 'y' | 'z';
+export type GizmoMode = 'move' | 'rotate' | 'scale';
+export type Handle =
+  | { kind: 'axis'; axis: Axis }          // move or scale along one axis
+  | { kind: 'plane'; axes: [Axis, Axis] } // move in a plane; axes in x,y,z order
+  | { kind: 'ring'; axis: Axis }          // rotate round an axis
+  | { kind: 'view-ring' }                 // rotate round the view direction
+  | { kind: 'uniform' };                  // scale all axes together
+export interface Ray { origin: Vec3; dir: Vec3 } // dir is unit length
+export interface GizmoState { mode: GizmoMode; pivot: Vec3 }
+export interface Snap { move?: number; turn?: number; scale?: number } // metres, degrees, scale steps
+export interface DragResult { translate: Vec3; rotateAxis: Vec3 | null; rotateDeg: number; scale: Vec3 }
+
+/** The +/- keys: each step multiplies by 1.15 (negative steps divide); clamped to 0.2..5. */
+export function gizmoGrow(scale: number, steps: number): number;
+/** World length of one arrow so the gizmo keeps its size on screen: distance(camera, pivot) * tan(fovDeg/2) * 0.18 * scale. */
+export function worldLength(pivot: Vec3, camera: Vec3, fovDeg: number, scale: number): number;
+export function hitTest(state: GizmoState, ray: Ray, len: number): Handle | null;
+export function drag(state: GizmoState, handle: Handle, start: Ray, now: Ray, len: number, snap?: Snap): DragResult;
+```
+
+## Geometry (pivot P, arrow length L = len, unit axes X, Y, Z)
+- Move mode: axis arrows are segments P..P+axis*L, hit when the ray passes within 0.08*L of the segment. Plane quads: the square from 0.2*L to 0.45*L along both axes in that plane (e.g. xz: x and z in [0.2L, 0.45L], y = P.y), hit when the ray meets the plane inside the square. When several handles are hit, a plane beats an axis; otherwise the one nearest along the ray wins.
+- Rotate mode: ring for axis A lies in the plane through P with normal A, radius L; hit when the ray meets that plane at a point whose distance from P is within 0.08*L of L. The view ring: plane through P with normal -ray.dir, radius 1.2*L, same tolerance. Axis rings beat the view ring. A ray parallel to a plane (|dot(dir, normal)| < 1e-9) never hits it.
+- Scale mode: axis handles as move-mode arrows; uniform: a sphere of radius 0.15*L at P (beats axes).
+- Drag, axis move: the point on the axis line through P closest to each ray; translate = (now - start) along that axis, other components 0; snap.move rounds the distance to the nearest step.
+- Drag, plane move: intersect both rays with the plane; translate = difference (the third component 0); snap each component.
+- Drag, ring: intersect both rays with the ring's plane; rotateDeg = signed angle from (start hit - P) to (now hit - P) round the axis (right-handed, degrees); rotateAxis = that axis; snap.turn rounds the angle. View ring: the plane's normal is -start.dir, rotateAxis that normal.
+- Drag, scale axis: ratio of the now-distance to the start-distance along the axis (from P) for that component, others 1; snap.scale rounds the ratio to steps. Uniform: plane through P with normal -start.dir; ratio of the distances from P of the two hits, all three components.
+- Unused fields: translate [0,0,0], rotateAxis null, rotateDeg 0, scale [1,1,1].
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { drag, gizmoGrow, hitTest, worldLength, type Ray } from '../src/index';
+const near = (a: number, b: number, e = 1e-6): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const down = (x: number, z: number): Ray => ({ origin: [x, 5, z], dir: [0, -1, 0] });
+const fwd = (x: number, y: number): Ray => ({ origin: [x, y, 5], dir: [0, 0, -1] });
+const M = { mode: 'move' as const, pivot: [0, 0, 0] as [number, number, number] };
+const R = { mode: 'rotate' as const, pivot: [0, 0, 0] as [number, number, number] };
+const S = { mode: 'scale' as const, pivot: [0, 0, 0] as [number, number, number] };
+
+test('+ and - size the gizmo, clamped', () => {
+  near(gizmoGrow(1, 2), 1.3225); near(gizmoGrow(1, -1), 1 / 1.15);
+  assert.equal(gizmoGrow(1, 100), 5); assert.equal(gizmoGrow(1, -100), 0.2);
+  near(worldLength([0, 0, 0], [0, 0, 10], 90, 1), 1.8);
+});
+test('move: an arrow, a plane, a miss', () => {
+  assert.deepEqual(hitTest(M, down(0.5, 0), 1), { kind: 'axis', axis: 'x' });
+  assert.deepEqual(hitTest(M, down(0.3, 0.3), 1), { kind: 'plane', axes: ['x', 'z'] });
+  assert.equal(hitTest(M, down(3, 3), 1), null);
+});
+test('rotate: the z ring', () => {
+  assert.deepEqual(hitTest(R, fwd(1, 0), 1), { kind: 'ring', axis: 'z' });
+});
+test('scale: the uniform handle beats the axes', () => {
+  assert.deepEqual(hitTest(S, fwd(0.05, 0.05), 1), { kind: 'uniform' });
+});
+test('drag along x, with and without the grid', () => {
+  assert.deepEqual(drag(M, { kind: 'axis', axis: 'x' }, down(0.5, 0), down(2.5, 0), 1).translate, [2, 0, 0]);
+  const t = drag(M, { kind: 'axis', axis: 'x' }, down(0.5, 0), down(2.3, 0), 1, { move: 0.5 }).translate;
+  near(t[0], 2); near(t[1], 0); near(t[2], 0);
+});
+test('drag in the xz plane', () => {
+  const t = drag(M, { kind: 'plane', axes: ['x', 'z'] }, down(0.3, 0.3), down(1.3, -0.7), 1).translate;
+  near(t[0], 1); near(t[1], 0); near(t[2], -1);
+});
+test('turn the z ring a quarter, and snap 50 degrees to 45', () => {
+  const r = drag(R, { kind: 'ring', axis: 'z' }, fwd(1, 0), fwd(0, 1), 1);
+  assert.deepEqual(r.rotateAxis, [0, 0, 1]); near(r.rotateDeg, 90);
+  const a = (50 * Math.PI) / 180;
+  near(drag(R, { kind: 'ring', axis: 'z' }, fwd(1, 0), fwd(Math.cos(a), Math.sin(a)), 1, { turn: 45 }).rotateDeg, 45);
+});
+test('scale along x doubles; uniform doubles all', () => {
+  const s = drag(S, { kind: 'axis', axis: 'x' }, down(0.5, 0), down(1, 0), 1).scale;
+  near(s[0], 2); near(s[1], 1); near(s[2], 1);
+  const u = drag(S, { kind: 'uniform' }, fwd(0.1, 0), fwd(0.2, 0), 1).scale;
+  near(u[0], 2); near(u[1], 2); near(u[2], 2);
+});
+```

@@ -1,0 +1,95 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a game editor's logic wires. Trigger zones, a press-E switch and timers feed AND / OR / NOT / delay / gate / once / toggle nodes, which fire actions (open a door, light on, play a sound, teleport, say ...). Evaluated frame by frame, deterministic.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/triggers.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export type Node =
+  | { id: string; kind: 'inside'; centre: Vec3; half: Vec3 }        // level: some actor is in the box
+  | { id: string; kind: 'enter'; centre: Vec3; half: Vec3 }         // pulse: the first frame an actor is in it (after none was)
+  | { id: string; kind: 'leave'; centre: Vec3; half: Vec3 }         // pulse: the first frame none is (after one was)
+  | { id: string; kind: 'press'; key: string }                       // pulse: that key was pressed this frame
+  | { id: string; kind: 'timer'; every: number }                     // pulse every `every` seconds (first at t = every)
+  | { id: string; kind: 'and' | 'or'; inputs: string[] }             // true if all / any input is true this frame
+  | { id: string; kind: 'not'; inputs: [string] }
+  | { id: string; kind: 'delay'; inputs: [string]; seconds: number } // its input's value from `seconds` ago (false before that)
+  | { id: string; kind: 'gate'; inputs: [string, string] }           // the first input, passed only while the second is true
+  | { id: string; kind: 'once'; inputs: [string] }                   // true on the first frame its input is true, never again
+  | { id: string; kind: 'toggle'; inputs: [string] }                 // a level that flips on each rising edge of its input
+  | { id: string; kind: 'action'; inputs: [string]; action: Action; repeat: number }; // fires on each rising edge, at most `repeat` times (0: no limit)
+export type Action =
+  | { kind: 'open' | 'close' | 'light-on' | 'light-off' | 'show' | 'hide'; target: string }
+  | { kind: 'sound'; sound: string }
+  | { kind: 'teleport'; to: Vec3 }
+  | { kind: 'damage'; amount: number }
+  | { kind: 'say'; text: string };
+export interface Frame { dt: number; actors: Vec3[]; pressed: string[] }
+export interface Fired { node: string; action: Action }
+
+/** Problems in words (empty when fine): an unknown input id, a cycle through inputs, a wrong number of inputs, a negative time. */
+export function validate(nodes: readonly Node[]): string[];
+export class LogicGraph {
+  constructor(nodes: readonly Node[]);   // throws when validate() finds problems
+  /** One frame: every node's value in input order (inputs before the nodes that read them), then the actions that fire. */
+  step(f: Frame): Fired[];
+  /** A node's value on the last frame (false before the first). */
+  value(id: string): boolean;
+  /** Back to the first frame. */
+  reset(): void;
+}
+```
+
+Boxes include their faces. A rising edge is true now, false on the previous frame. Time is the sum of the frames' dt; every time comparison allows 1e-9 (ten frames of 0.1 s reach 1 s). A timer pulses on the frame its count floor((t + 1e-9) / every) goes up. Delay keeps a history of (time, value) and reads the value at now - seconds (the most recent sample at or before that time, with the same tolerance).
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { LogicGraph, validate, type Node } from '../src/index';
+const box = { centre: [0, 0, 0] as [number, number, number], half: [1, 1, 1] as [number, number, number] };
+const at = (x: number) => ({ dt: 0.1, actors: [[x, 0, 0] as [number, number, number]], pressed: [] as string[] });
+
+test('stepping into a zone opens the door once per entry', () => {
+  const g = new LogicGraph([{ id: 'in', kind: 'enter', ...box }, { id: 'door', kind: 'action', inputs: ['in'], action: { kind: 'open', target: 'door1' }, repeat: 0 }]);
+  assert.equal(g.step(at(5)).length, 0);
+  assert.deepEqual(g.step(at(0.5)), [{ node: 'door', action: { kind: 'open', target: 'door1' } }]);
+  assert.equal(g.step(at(0.6)).length, 0);
+  g.step(at(5));
+  assert.equal(g.step(at(0)).length, 1);
+});
+test('repeat limits an action', () => {
+  const g = new LogicGraph([{ id: 'p', kind: 'press', key: 'e' }, { id: 'a', kind: 'action', inputs: ['p'], action: { kind: 'say', text: 'hi' }, repeat: 1 }]);
+  assert.equal(g.step({ dt: 0.1, actors: [], pressed: ['e'] }).length, 1);
+  g.step({ dt: 0.1, actors: [], pressed: [] });
+  assert.equal(g.step({ dt: 0.1, actors: [], pressed: ['e'] }).length, 0);
+});
+test('and, not, toggle', () => {
+  const g = new LogicGraph([
+    { id: 'in', kind: 'inside', ...box }, { id: 'p', kind: 'press', key: 'e' },
+    { id: 'both', kind: 'and', inputs: ['in', 'p'] }, { id: 'out', kind: 'not', inputs: ['in'] }, { id: 't', kind: 'toggle', inputs: ['both'] },
+  ]);
+  g.step({ dt: 0.1, actors: [[0, 0, 0]], pressed: ['e'] });
+  assert.equal(g.value('both'), true); assert.equal(g.value('out'), false); assert.equal(g.value('t'), true);
+  g.step({ dt: 0.1, actors: [[0, 0, 0]], pressed: [] });
+  assert.equal(g.value('t'), true);
+  g.step({ dt: 0.1, actors: [[0, 0, 0]], pressed: ['e'] });
+  assert.equal(g.value('t'), false);
+});
+test('a timer and a delay', () => {
+  const g = new LogicGraph([{ id: 'tick', kind: 'timer', every: 1 }, { id: 'later', kind: 'delay', inputs: ['tick'], seconds: 0.5 }]);
+  const seen: string[] = [];
+  for (let i = 1; i <= 20; i++) { g.step({ dt: 0.1, actors: [], pressed: [] }); if (g.value('tick')) seen.push(`tick@${i}`); if (g.value('later')) seen.push(`later@${i}`); }
+  assert.deepEqual(seen, ['tick@10', 'later@15', 'tick@20']);
+});
+test('validate finds unknown inputs and cycles', () => {
+  assert.equal(validate([{ id: 'a', kind: 'not', inputs: ['missing'] }]).length > 0, true);
+  assert.equal(validate([{ id: 'a', kind: 'not', inputs: ['b'] }, { id: 'b', kind: 'not', inputs: ['a'] }]).length > 0, true);
+  assert.deepEqual(validate([{ id: 'p', kind: 'press', key: 'e' }, { id: 'n', kind: 'not', inputs: ['p'] }]), []);
+  assert.throws(() => new LogicGraph([{ id: 'a', kind: 'not', inputs: ['a'] }] as Node[]));
+});
+```

@@ -1,0 +1,70 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: physical materials and toy physics for things in a building game: how bouncy, slippery, heavy or floaty a thing is, its collision body, a simple ground-plane integrator to preview it, and the push hammer's impulse.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/physmat.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface PhysMaterial { id: string; name: string; bounce: number; friction: number; density: number; drag: number; lift: number }
+// bounce 0..1 (share of speed kept on a bounce), friction 0..1 (ground grip), density kg per cubic metre, drag 0..1 (air), lift -1..1 (1 = floats up like a balloon)
+export type Solidity = 'ghost' | 'solid' | 'barrier' | 'ladder';
+export interface Body { shape: 'box' | 'sphere'; half: Vec3; radius: number; mass: number; material: string; solidity: Solidity; dynamic: boolean }
+export interface Motion { pos: Vec3; vel: Vec3 }
+
+export const PHYS_MATERIALS: readonly PhysMaterial[];
+export function materialById(id: string): PhysMaterial;   // unknown id: the 'wood' material
+/** A body that fits a thing's bounds: a sphere (radius = the mean half size) when the three half sizes are within 20% of each other, otherwise a box. mass = density * volume (box: 8 * hx * hy * hz; sphere: 4/3 pi r^3). */
+export function bodyFor(min: Vec3, max: Vec3, materialId: string, solidity: Solidity, dynamic: boolean): Body;
+/**
+ * One preview step on flat ground at groundY (the body's lowest point rests on it). Gravity -9.81 on y, scaled by (1 - lift)
+ * (lift 1: weightless, above: rises). Air drag: vel *= (1 - drag * dt). The body rests on the ground when its centre is at groundY + (sphere: radius, box: half y) or lower. Hitting the ground while falling: vy = -vy * bounce
+ * (and 0 when that is below 0.05 m/s); on the ground horizontal speed loses friction * 9.81 * dt (never past zero).
+ * Static bodies (dynamic false) and ghosts never move.
+ */
+export function stepBody(b: Body, m: Motion, dt: number, groundY: number): Motion;
+/** The push hammer: every dynamic body within radius of centre gets a velocity change away from centre (horizontal, plus a small upward kick of 30% of it), strength * (1 - d / radius) / mass * 1000, none at or beyond radius. Returns the new velocities in order. */
+export function hammer(centre: Vec3, radius: number, strength: number, bodies: readonly { body: Body; motion: Motion }[]): Vec3[];
+```
+
+`PHYS_MATERIALS` must hold at least these ids with these characters: `wood` (bounce 0.3, friction 0.6, density 600), `rubber` (bounce 0.9, super bouncy), `ice` (friction 0.02), `metal` (density 7800), `anvil` (density so high a 1 m cube weighs 10,000 kg), `balloon` (lift 1.2, density 1, drag 0.2), `cork` (light, bouncy 0.5), `stone` (density 2500, bounce 0.15), `jelly` (bounce 0.6, friction 0.9, density 1100). Every value inside its range.
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { PHYS_MATERIALS, bodyFor, hammer, materialById, stepBody, type Body, type Motion } from '../src/index';
+const sim = (b: Body, m: Motion, seconds: number): Motion => { let cur = m; for (let i = 0; i < seconds * 120; i++) cur = stepBody(b, cur, 1 / 120, 0); return cur; };
+
+test('materials are legal and the anvil is heavy', () => {
+  for (const id of ['wood', 'rubber', 'ice', 'metal', 'anvil', 'balloon', 'cork', 'stone', 'jelly']) assert.equal(materialById(id).id, id);
+  assert.equal(materialById('nope').id, 'wood');
+  for (const p of PHYS_MATERIALS) assert.ok(p.bounce >= 0 && p.bounce <= 1 && p.friction >= 0 && p.friction <= 1 && p.drag >= 0 && p.drag <= 1 && p.lift >= -1 && p.lift <= 1.5 && p.density > 0, p.id);
+  assert.ok(Math.abs(materialById('anvil').density - 10000) < 1);
+});
+test('a near-cube becomes a sphere, a plank a box', () => {
+  assert.equal(bodyFor([0, 0, 0], [1, 1.1, 1], 'wood', 'solid', true).shape, 'sphere');
+  const plank = bodyFor([0, 0, 0], [4, 0.2, 1], 'wood', 'solid', true);
+  assert.equal(plank.shape, 'box'); assert.ok(Math.abs(plank.mass - 600 * 4 * 0.2 * 1) < 1e-6);
+});
+test('rubber bounces high, stone hardly, a balloon floats up, ghosts stay', () => {
+  const ball = (mat: string): Body => bodyFor([-0.5, 0, -0.5], [0.5, 1, 0.5], mat, 'solid', true);
+  const peak = (mat: string): number => { let cur: Motion = { pos: [0, 5, 0], vel: [0, 0, 0] }, top = 0, landed = false;
+    for (let i = 0; i < 600; i++) { cur = stepBody(ball(mat), cur, 1 / 120, 0); if (cur.vel[1] > 0) landed = true; if (landed) top = Math.max(top, cur.pos[1]); } return top; };
+  assert.ok(peak('rubber') > 3); assert.ok(peak('stone') < 1);
+  assert.ok(sim(ball('balloon'), { pos: [0, 1, 0], vel: [0, 0, 0] }, 1).pos[1] > 1.5);
+  assert.deepEqual(sim({ ...ball('wood'), solidity: 'ghost' }, { pos: [0, 5, 0], vel: [0, 0, 0] }, 1).pos, [0, 5, 0]);
+});
+test('ice slides much farther than wood', () => {
+  const slide = (mat: string): number => sim(bodyFor([0, 0, 0], [1, 0.2, 1], mat, 'solid', true), { pos: [0, 0, 0], vel: [5, 0, 0] }, 3).pos[0];
+  assert.ok(slide('ice') > 3 * slide('wood'));
+});
+test('the hammer pushes near things away and leaves far ones', () => {
+  const b = bodyFor([0, 0, 0], [1, 1, 1], 'wood', 'solid', true);
+  const v = hammer([0, 0, 0], 5, 1, [{ body: b, motion: { pos: [2, 0, 0], vel: [0, 0, 0] } }, { body: b, motion: { pos: [9, 0, 0], vel: [0, 0, 0] } }]);
+  assert.ok(v[0]![0] > 0 && v[0]![1] > 0 && Math.abs(v[0]![2]) < 1e-9); assert.deepEqual(v[1], [0, 0, 0]);
+});
+```

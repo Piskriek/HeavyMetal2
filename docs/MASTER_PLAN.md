@@ -160,6 +160,8 @@ Rule 6 applies: load the frontend-design skill at the start; every screen is che
 | 7 | Track editor in the studio look | G5, Q4 |
 | 8 | Community: where shares land | G8 |
 
+> **Superseded for the work ahead (2026-10-04):** the owner's hotbar spec V3 (`docs/HOTBAR_V3_SPEC.md`) is the target, and `docs/ARENA_PLAN.md` is the plan from here on (V3 against what is built, the gaps, the Arena modules in waves, the order of work). 6.3 and 6.4 below record what is built.
+
 **6.3 The hotbar: how everything is edited** (owner, 2026-10-03; the full design is `docs/HOTBAR.md`)
 
 The hotbar is how you edit everything, and it is where the game is still thinnest. The owner's instructions, all in HOTBAR.md: Select can select anything (the ground, a surface, a thing, its parts, its blocks: faces, edges and vertices) and change it; each tab holds ways of working, not materials (Paint = brushes, fills, sprays, stamps, clone; Sculpt = the brushes sculptors use most, with symmetry, more/less detail and smoothing toggles); materials go in a **palette**, a film strip at the top middle with the community's presets and scroll buttons; picking a tool shows **its presets previewed on your selection**; **Move** has ways to move a thing and, with nothing selected, the ways to move yourself (walk, fly, orbit, pan, zoom, map, focus, follow, jump to); the hotbar has **Easy / Pro / Studio** built in, arrives with the tour and stays; it is a preset, managed in Settings, Hotbar; deep preset trees (a racing ball's physics) sit behind **More…** in Studio; the screen map audits what the hotbar cannot edit yet.

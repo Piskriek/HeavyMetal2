@@ -1,0 +1,94 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: parametric building blocks (cube, ball, cylinder, wedge, staircase, hollow box, arch) as voxel models for a toy-building game, plus a few edit helpers.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/primitives.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## The voxel model
+
+```ts
+export interface Voxels {
+  size: [number, number, number];  // cells along x, y, z (y is up)
+  cells: Uint8Array;               // index = x + y*sx + z*sx*sy; 0 = empty, otherwise a material number 1..255
+}
+```
+
+## API (implement exactly; every size is a whole number of cells, at least 1; mat defaults to 1)
+
+```ts
+export function emptyModel(sx: number, sy: number, sz: number): Voxels;
+export function get(m: Voxels, x: number, y: number, z: number): number;      // 0 outside
+export function set(m: Voxels, x: number, y: number, z: number, v: number): void; // ignored outside
+export function countFilled(m: Voxels): number;
+export function cube(w: number, h: number, d: number, mat?: number): Voxels;
+/** Diameter 2r cells each way; a cell is filled when its centre (i + 0.5) is within r of the model's centre (r, r, r). */
+export function ball(r: number, mat?: number): Voxels;
+/** 2r by h by 2r; a cell is filled when its centre is within r of the vertical axis through (r, *, r). */
+export function cylinder(r: number, h: number, mat?: number): Voxels;
+/** A ramp rising along +x: column x is filled up to height round(h * (x + 1) / w), the whole depth d. */
+export function wedge(w: number, h: number, d: number, mat?: number): Voxels;
+/** `steps` equal steps along +x in a w by h by d box: column x is filled up to height round(h * (floor(x * steps / w) + 1) / steps). */
+export function stairs(w: number, h: number, d: number, steps: number, mat?: number): Voxels;
+/** A box with walls `wall` cells thick on all six sides and an empty inside. */
+export function hollowBox(w: number, h: number, d: number, wall: number, mat?: number): Voxels;
+/** A w by h by d block with a doorway: the cells with x in [wall, w - wall) and y < h - wall are empty. */
+export function arch(w: number, h: number, d: number, wall: number, mat?: number): Voxels;
+/** A copy turned a quarter round the y axis (x, z) -> (sz - 1 - z, x); size becomes [sz, sy, sx]. */
+export function rotateY90(m: Voxels): Voxels;
+/** A copy mirrored along x. */
+export function mirrorX(m: Voxels): Voxels;
+/** Paint every filled cell of `b` into `a` at offset (ox, oy, oz) (cells outside `a` are dropped). Returns a. */
+export function stamp(a: Voxels, b: Voxels, ox: number, oy: number, oz: number): Voxels;
+/** The smallest box holding every filled cell, as [minX, minY, minZ, maxX, maxY, maxZ] (inclusive), or null when empty. */
+export function bounds(m: Voxels): [number, number, number, number, number, number] | null;
+/** The ready-made blocks for a palette: id, name, and a function making it at a given scale (1 = a 4-cell-wide toy brick). */
+export const BLOCKS: readonly { id: string; name: string; make: (scale: number) => Voxels }[];
+```
+
+`BLOCKS` must hold at least: cube, ball, cylinder, wedge, stairs, hollow-box, arch, plank (long thin cube), pillar (tall thin cylinder), with every made model non-empty at scale 1 and 2.
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { BLOCKS, arch, ball, bounds, countFilled, cube, cylinder, emptyModel, get, hollowBox, mirrorX, rotateY90, set, stairs, stamp, wedge } from '../src/index';
+
+test('cube, ball and cylinder fill the right number of cells', () => {
+  assert.equal(countFilled(cube(3, 2, 4)), 24);
+  assert.equal(countFilled(ball(2)), 32);
+  assert.equal(countFilled(cylinder(2, 3)), 36);
+});
+test('wedge, stairs, hollow box and arch', () => {
+  assert.equal(countFilled(wedge(4, 4, 1)), 10);
+  assert.equal(countFilled(stairs(4, 4, 2, 4)), 20);
+  assert.equal(countFilled(hollowBox(5, 5, 5, 1)), 98);
+  assert.equal(countFilled(arch(5, 4, 1, 1)), 11);
+});
+test('get and set stay inside the model', () => {
+  const m = emptyModel(2, 2, 2);
+  set(m, 1, 1, 1, 7); set(m, 5, 0, 0, 3);
+  assert.equal(get(m, 1, 1, 1), 7); assert.equal(get(m, 5, 0, 0), 0); assert.equal(countFilled(m), 1);
+});
+test('a quarter turn and a mirror move cells where they should', () => {
+  const m = emptyModel(3, 1, 2); set(m, 0, 0, 0, 1);
+  const r = rotateY90(m);
+  assert.deepEqual(r.size, [2, 1, 3]); assert.equal(get(r, 1, 0, 0), 1);
+  const f = mirrorX(m);
+  assert.equal(get(f, 2, 0, 0), 1); assert.equal(get(f, 0, 0, 0), 0);
+});
+test('stamp and bounds', () => {
+  const a = emptyModel(6, 6, 6);
+  stamp(a, cube(2, 2, 2, 5), 1, 0, 3);
+  assert.equal(countFilled(a), 8); assert.equal(get(a, 2, 1, 4), 5);
+  assert.deepEqual(bounds(a), [1, 0, 3, 2, 1, 4]);
+  assert.equal(bounds(emptyModel(2, 2, 2)), null);
+});
+test('every ready-made block is non-empty at scale 1 and 2', () => {
+  for (const id of ['cube', 'ball', 'cylinder', 'wedge', 'stairs', 'hollow-box', 'arch', 'plank', 'pillar']) {
+    const b = BLOCKS.find((x) => x.id === id);
+    assert.ok(b, id);
+    assert.ok(countFilled(b!.make(1)) > 0 && countFilled(b!.make(2)) > countFilled(b!.make(1)), id);
+  }
+});
+```

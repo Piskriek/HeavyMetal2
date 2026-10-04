@@ -1,0 +1,94 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a deterministic CPU particle system for a cartoon game (campfire, smoke, snow, rain, sparks, fireworks, bubbles ...) that fills a flat Float32Array a renderer can upload each frame, plus 12 art-directed presets.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/particles.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (use the seeded mulberry32 below), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface EmitterSpec {
+  id: string; name: string;
+  rate: number;                 // particles per second while running (0: bursts only)
+  burst: number;                // particles at the start
+  duration: number;             // seconds it emits (0: until stopped; with rate 0 an emitter is done once its burst is out)
+  life: [number, number];       // seconds, min..max
+  speed: [number, number];      // m/s
+  dir: Vec3; spread: number;    // unit direction and cone half-angle in degrees (180: any direction)
+  gravity: number;              // m/s^2 added on y (negative falls)
+  drag: number;                 // 0..1 per second
+  size: [number, number];       // metres at birth and at death (linear)
+  colors: string[];             // '#rrggbb', spread evenly over the life
+  alpha: [number, number];      // at birth and at death
+  area: Vec3;                   // spawn box half extents round the emitter
+  additive: boolean;            // glows (fire, sparks) or not (smoke, snow)
+}
+export function mulberry32(seed: number): () => number;
+export const STRIDE = 8; // per particle in `buffer`: x, y, z, size, r, g, b, a (colours 0..1)
+export class ParticleSystem {
+  constructor(maxParticles: number);
+  /** Start an emitter at pos; returns its handle. Same seed and same steps give the same particles. */
+  spawn(spec: EmitterSpec, pos: Vec3, seed: number): number;
+  stop(handle: number): void;   // no new particles; live ones finish their life
+  move(handle: number, pos: Vec3): void;
+  /** Advance: emit (rate * dt, carrying fractions over: emit floor(carry + 1e-9) and keep the rest), age, move (velocity, gravity, drag), drop the dead. New particles beyond maxParticles are not made. */
+  step(dt: number): void;
+  readonly count: number;       // live particles
+  readonly buffer: Float32Array; // maxParticles * STRIDE; the first count * STRIDE values are the live particles
+  /** Emitters still emitting or with live particles. */
+  readonly active: number;
+}
+export const PARTICLE_PRESETS: readonly EmitterSpec[];
+export function presetById(id: string): EmitterSpec | undefined;
+```
+
+`PARTICLE_PRESETS` must hold these 12 ids, all legal (life and speed min <= max, sizes > 0, 1 to 6 colours, alpha 0..1, drag 0..1, spread 0..180): `campfire` (orange-yellow additive flames rising), `smoke` (grey, grows, slow, not additive), `snow` (white, falls slowly, wide area), `rain` (thin blue-white, fast down), `sparks` (bright additive, fast, gravity), `firework` (one burst of 120, no rate, every direction, colourful, additive), `bubbles` (light blue, float up), `dust` (beige puff, burst, short), `glitter` (gold and pink twinkles, additive), `embers` (red-orange, rising, long life), `splash` (water droplets, burst, gravity), `confetti` (many colours, burst, falls with drag).
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { PARTICLE_PRESETS, ParticleSystem, STRIDE, presetById, type EmitterSpec } from '../src/index';
+const base: EmitterSpec = { id: 't', name: 'T', rate: 0, burst: 0, duration: 0, life: [1, 1], speed: [0, 0], dir: [0, 1, 0], spread: 0,
+  gravity: 0, drag: 0, size: [1, 1], colors: ['#ff0000'], alpha: [1, 1], area: [0, 0, 0], additive: false };
+
+test('a burst, then the particles die at the end of their life', () => {
+  const s = new ParticleSystem(100);
+  s.spawn({ ...base, burst: 10 }, [0, 0, 0], 1);
+  s.step(0.5); assert.equal(s.count, 10);
+  s.step(0.6); assert.equal(s.count, 0); assert.equal(s.active, 0);
+});
+test('a rate carries fractions over and stops when told', () => {
+  const s = new ParticleSystem(100);
+  const h = s.spawn({ ...base, rate: 10, life: [10, 10] }, [0, 0, 0], 1);
+  for (let i = 0; i < 4; i++) s.step(0.025);
+  assert.equal(s.count, 1);
+  s.step(0.9); assert.equal(s.count, 10);
+  s.stop(h); s.step(1); assert.equal(s.count, 10);
+});
+test('never more than the cap', () => {
+  const s = new ParticleSystem(5);
+  s.spawn({ ...base, burst: 50 }, [0, 0, 0], 1); s.step(0.1);
+  assert.equal(s.count, 5);
+});
+test('speed, gravity and colour reach the buffer', () => {
+  const s = new ParticleSystem(10);
+  s.spawn({ ...base, burst: 1, speed: [2, 2], gravity: -2, life: [5, 5] }, [0, 1, 0], 1);
+  for (let i = 0; i < 50; i++) s.step(0.01);
+  const y = s.buffer[1]!;
+  assert.ok(y > 1 && y < 2, String(y));
+  assert.ok(Math.abs(s.buffer[4]! - 1) < 1e-6 && Math.abs(s.buffer[5]!) < 1e-6);
+  assert.equal(STRIDE, 8);
+});
+test('same seed, same particles', () => {
+  const run = (): number[] => { const s = new ParticleSystem(200); s.spawn(presetById('firework')!, [0, 5, 0], 42); s.step(0.3); return Array.from(s.buffer.slice(0, s.count * STRIDE)); };
+  assert.deepEqual(run(), run());
+});
+test('twelve legal presets', () => {
+  assert.deepEqual(PARTICLE_PRESETS.map((p) => p.id).sort(), ['bubbles', 'campfire', 'confetti', 'dust', 'embers', 'firework', 'glitter', 'rain', 'smoke', 'snow', 'sparks', 'splash']);
+  for (const p of PARTICLE_PRESETS) assert.ok(p.life[0] <= p.life[1] && p.speed[0] <= p.speed[1] && p.size[0] > 0 && p.size[1] > 0 && p.colors.length >= 1 && p.colors.length <= 6 && p.drag >= 0 && p.drag <= 1 && p.spread >= 0 && p.spread <= 180, p.id);
+  assert.equal(presetById('firework')!.burst, 120); assert.equal(presetById('firework')!.rate, 0);
+});
+```

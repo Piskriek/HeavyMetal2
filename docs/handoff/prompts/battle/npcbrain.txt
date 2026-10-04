@@ -1,0 +1,92 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: simple character AI for a toy-world game, as pure steering. Behaviours: stand, wander, patrol, chase, flee, follow, walk to a point. Sight distance and a reaction delay make it feel alive. Deterministic (seeded).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/npcbrain.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (use the seeded random below), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Work on the ground plane: y is ignored for distances and moves (copy the agent's y through).
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface Agent { pos: Vec3; yaw: number; speed: number; sight: number; reaction: number } // yaw degrees, facing (sin yaw, 0, cos yaw); speed m/s; sight m; reaction s
+export type Behaviour =
+  | { kind: 'stand' }
+  | { kind: 'wander'; home: Vec3; radius: number; seed: number }
+  | { kind: 'patrol'; points: Vec3[]; mode: 'loop' | 'back-and-forth'; wait: number }
+  | { kind: 'chase' }                         // run at the target while it is within sight
+  | { kind: 'flee' }                          // run straight away from the target while it is within sight
+  | { kind: 'follow'; distance: number }      // stay about `distance` behind the target (always, whatever the sight)
+  | { kind: 'walk-to'; point: Vec3 };
+export interface Brain { readonly kind: string; [k: string]: unknown } // your own state, opaque to callers
+export interface Step { pos: Vec3; yaw: number; moving: boolean; brain: Brain }
+
+export function mulberry32(seed: number): () => number;   // the standard mulberry32, values in [0, 1)
+export function newBrain(b: Behaviour): Brain;
+/** One tick: where the agent is after dt seconds. `target` is the player (or null). Never moves farther than speed * dt. */
+export function think(a: Agent, b: Behaviour, brain: Brain, target: Vec3 | null, dt: number): Step;
+```
+
+## Behaviour details
+- Arriving: a point counts as reached within 0.3 m; the agent then stops on it (moving false).
+- Moving turns the agent to face its movement (yaw = atan2(dx, dz) in degrees); standing keeps its yaw.
+- Chase and flee react only after the target has been within sight for `reaction` seconds in a row (the timer resets when it leaves sight); out of sight they stand.
+- Follow: if farther than distance + 0.5 walk towards the target, if nearer than distance stop; between, keep going as before.
+- Patrol: walk to points[0], [1], ...; wait `wait` seconds on each before going on; 'loop' goes back to [0] after the last, 'back-and-forth' reverses.
+- Wander: pick a random point within `radius` of home (seeded), walk to it, pause 1 s, pick the next.
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mulberry32, newBrain, think, type Agent, type Behaviour, type Vec3 } from '../src/index';
+const agent = (x = 0, z = 0): Agent => ({ pos: [x, 0, z], yaw: 0, speed: 2, sight: 10, reaction: 0.5 });
+const run = (a: Agent, b: Behaviour, target: Vec3 | null, steps: number, dt = 0.1): Agent => {
+  let brain = newBrain(b), cur = a;
+  for (let i = 0; i < steps; i++) { const s = think(cur, b, brain, target, dt); brain = s.brain; cur = { ...cur, pos: s.pos, yaw: s.yaw }; }
+  return cur;
+};
+const dist = (p: Vec3, q: Vec3): number => Math.hypot(p[0] - q[0], p[2] - q[2]);
+
+test('the seeded random is mulberry32', () => {
+  const r = mulberry32(1); const a = r(), b = r();
+  assert.ok(a >= 0 && a < 1 && b >= 0 && b < 1 && a !== b);
+  assert.equal(mulberry32(1)(), a);
+});
+test('walk-to moves at speed, faces the way, stops on arrival', () => {
+  const b: Behaviour = { kind: 'walk-to', point: [0, 0, 10] };
+  const s = think(agent(), b, newBrain(b), null, 1);
+  assert.ok(Math.abs(s.pos[2] - 2) < 1e-9 && s.moving); assert.ok(Math.abs(s.yaw) < 1e-9);
+  const end = run(agent(), b, null, 80);
+  assert.ok(dist(end.pos, [0, 0, 10]) <= 0.3);
+});
+test('chase waits for the reaction time, then closes in; out of sight it stands', () => {
+  const b: Behaviour = { kind: 'chase' };
+  let brain = newBrain(b);
+  const first = think(agent(), b, brain, [6, 0, 0], 0.1); brain = first.brain;
+  assert.equal(first.moving, false);
+  const later = run(agent(), b, [6, 0, 0], 20);
+  assert.ok(dist(later.pos, [6, 0, 0]) < 6);
+  const far = run(agent(), b, [50, 0, 0], 20);
+  assert.ok(dist(far.pos, [0, 0, 0]) < 1e-9);
+});
+test('flee runs away', () => {
+  const end = run(agent(), { kind: 'flee' }, [3, 0, 0], 30);
+  assert.ok(end.pos[0] < -1);
+});
+test('patrol visits its points in order and comes back', () => {
+  const b: Behaviour = { kind: 'patrol', points: [[4, 0, 0], [4, 0, 4]], mode: 'loop', wait: 3 };
+  assert.ok(dist(run(agent(), b, null, 25).pos, [4, 0, 0]) <= 0.31);
+  assert.ok(dist(run(agent(), b, null, 75).pos, [4, 0, 4]) <= 0.31);
+});
+test('follow keeps its distance', () => {
+  const end = run(agent(), { kind: 'follow', distance: 3 }, [10, 0, 0], 100);
+  const d = dist(end.pos, [10, 0, 0]);
+  assert.ok(d >= 2.7 && d <= 3.6, String(d));
+});
+test('wander stays near home and is repeatable', () => {
+  const b: Behaviour = { kind: 'wander', home: [0, 0, 0], radius: 5, seed: 7 };
+  const a = run(agent(), b, null, 200), c = run(agent(), b, null, 200);
+  assert.deepEqual(a.pos, c.pos); assert.ok(dist(a.pos, [0, 0, 0]) <= 5.3);
+});
+```

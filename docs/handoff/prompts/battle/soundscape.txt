@@ -1,0 +1,79 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: where sounds are in a 3D world and how loud each is where you stand. Point emitters with a fall-off, ambience zones (boxes that fade at their edges), a mix for the listener with left/right pan and a voice limit, and 8 ambience presets as synth data.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/soundscape.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface Emitter { id: string; pos: Vec3; sound: string; volume: number; radius: number; falloff: number; loop: boolean }
+export interface Zone { id: string; centre: Vec3; half: Vec3; fade: number; ambience: string; volume: number }
+export interface Voice { id: string; sound: string; gain: number; pan: number }
+export interface Bed { ambience: string; gain: number }
+export interface Mix { voices: Voice[]; beds: Bed[] }
+
+/** volume inside `radius`, falling linearly to 0 at radius + falloff (falloff 0: a hard edge), 0 beyond. */
+export function emitterGain(e: Emitter, listener: Vec3): number;
+/** 1 inside the box (centre +- half), falling linearly to 0 at `fade` metres outside it (distance to the box), times volume. */
+export function zoneGain(z: Zone, listener: Vec3): number;
+/** -1 hard left .. +1 hard right. Facing direction (sin yaw, 0, cos yaw) for yaw in degrees; right = (cos yaw, 0, -sin yaw). pan = the horizontal unit direction to the source dotted with right; 0 when the source is on the listener. */
+export function panOf(listener: Vec3, yawDeg: number, source: Vec3): number;
+/**
+ * The mix: every emitter with gain > 0 as a voice, loudest first, at most maxVoices (ties: emitter order).
+ * Beds: one per ambience name, its gain the largest of that name's zones; when the beds' gains add up to more than 1 they are all scaled
+ * so they add up to 1. Beds with gain 0 are left out; beds sorted by gain, loudest first.
+ */
+export function mixAt(listener: Vec3, yawDeg: number, emitters: readonly Emitter[], zones: readonly Zone[], maxVoices?: number): Mix;
+
+/** A synth layer: a wave or noise, a level, a slow wobble, and a filter: enough to play an ambience live. */
+export interface Layer { wave: 'sine' | 'triangle' | 'noise'; freq: number; gain: number; lfoHz: number; lfoDepth: number; filter: 'lowpass' | 'bandpass' | 'highpass'; cutoff: number }
+export const AMBIENCES: readonly { id: string; name: string; layers: Layer[] }[];
+```
+
+`AMBIENCES` must hold exactly these 8 ids, each with 2 to 5 layers, every gain in (0, 1] and the layer gains of one ambience adding up to at most 1, every freq and cutoff 20..16000, lfoHz 0..20, lfoDepth 0..1: `forest-birds`, `windy-hill`, `creepy-cave`, `busy-city`, `rainy-day`, `beach-waves`, `campfire-night`, `lava-rumble`. Make them sound like their names (birds: high sine chirps with fast wobble over soft noise; wind: low-passed noise with a slow wobble; cave: deep sine drone and band-passed drips; city: mid noise and low hum; rain: high-passed noise; waves: low-passed noise with a 0.1 to 0.2 Hz swell; campfire: crackle band and low warmth; lava: very low rumble).
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { AMBIENCES, emitterGain, mixAt, panOf, zoneGain, type Emitter, type Zone } from '../src/index';
+const near = (a: number, b: number, e = 1e-9): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const em = (id: string, x: number, volume = 1): Emitter => ({ id, pos: [x, 0, 0], sound: id, volume, radius: 2, falloff: 4, loop: true });
+const zone = (id: string, ambience: string, x: number, volume = 1): Zone => ({ id, centre: [x, 0, 0], half: [5, 5, 5], fade: 10, ambience, volume });
+
+test('an emitter is full inside its radius and fades to nothing', () => {
+  near(emitterGain(em('a', 0), [1, 0, 0]), 1);
+  near(emitterGain(em('a', 0), [4, 0, 0]), 0.5);
+  near(emitterGain(em('a', 0), [6, 0, 0]), 0);
+  near(emitterGain(em('a', 0, 0.4), [0, 0, 0]), 0.4);
+  near(emitterGain({ ...em('a', 0), falloff: 0 }, [2.5, 0, 0]), 0);
+});
+test('a zone is full inside and fades over its edge', () => {
+  near(zoneGain(zone('z', 'forest-birds', 0), [3, 0, 0]), 1);
+  near(zoneGain(zone('z', 'forest-birds', 0), [10, 0, 0]), 0.5);
+  near(zoneGain(zone('z', 'forest-birds', 0), [16, 0, 0]), 0);
+});
+test('pan: right is +1, left -1, ahead 0', () => {
+  near(panOf([0, 0, 0], 0, [5, 0, 0]), 1);
+  near(panOf([0, 0, 0], 0, [-5, 0, 0]), -1);
+  near(panOf([0, 0, 0], 0, [0, 0, 5]), 0);
+  near(panOf([0, 0, 0], 90, [0, 0, -5]), 1);
+});
+test('the mix: loudest voices first, limited; beds merged and normalised', () => {
+  const mix = mixAt([0, 0, 0], 0, [em('far', 5), em('near', 1), em('mid', 3), em('gone', 50)], [zone('z1', 'rainy-day', 0), zone('z2', 'rainy-day', 0, 0.5), zone('z3', 'windy-hill', 0)], 2);
+  assert.deepEqual(mix.voices.map((v) => v.id), ['near', 'mid']);
+  assert.equal(mix.beds.length, 2);
+  near(mix.beds[0]!.gain + mix.beds[1]!.gain, 1);
+});
+test('eight ambiences, each a legal synth recipe', () => {
+  assert.deepEqual(AMBIENCES.map((a) => a.id).sort(), ['beach-waves', 'busy-city', 'campfire-night', 'creepy-cave', 'forest-birds', 'lava-rumble', 'rainy-day', 'windy-hill']);
+  for (const a of AMBIENCES) {
+    assert.ok(a.layers.length >= 2 && a.layers.length <= 5, a.id);
+    assert.ok(a.layers.reduce((s, l) => s + l.gain, 0) <= 1 + 1e-9, a.id);
+    for (const l of a.layers) assert.ok(l.gain > 0 && l.freq >= 20 && l.freq <= 16000 && l.cutoff >= 20 && l.cutoff <= 16000 && l.lfoHz >= 0 && l.lfoHz <= 20, a.id);
+  }
+});
+```

@@ -362,4 +362,6 @@ Animation presets: clips/timelines/curves on any variable (transform, model part
 
 **Also landed (same day, later):** F7 Logic wires (Zone and Wire ways; kinds logic-zone and logic-wire; `wires-runtime.ts` runs `@hm/triggers`; hide/show only for show, lamps on/off, sound, words, teleport); F1 groups (Box way, Ctrl+click adds, Esc lets go; the gizmo moves, turns and sizes a group round its middle; one undo step); F8 Camera ways (Orbit shot, Photo, Slow motion: the world's time, not yours). e2e 133 checks (run it twice when a check is new: two flakes this session came from where the camera happened to be; pin the view with `hmPinView` instead).
 
-**Next glue (in this order):** F4 walk paths for things (`@hm/walkpath`) and a dope sheet in Studio (`@hm/keyframes`), F3 carve and cut a thing (`@hm/voxelcsg`), the wire graph window in Studio (`@hm/wiregraph`). Then the Arena's B6/B7 juice data for Easy mode, B1 decals, C5 remesh.
+**Then:** F4 Walk a path (kind walk-path; things walk for show), F2 Paint a thing and F3 Carve (`voxel-hit.ts`: a voxel ray walk to the block under the pointer; one click, one undo step). e2e 138.
+
+**Next glue (in this order):** the wire graph window in Studio (`@hm/wiregraph`), a dope sheet in Studio (`@hm/keyframes`), F3 join/cut in two (`@hm/voxelcsg`). Then the Arena's B6/B7 juice data for Easy mode, B1 decals, C5 remesh.

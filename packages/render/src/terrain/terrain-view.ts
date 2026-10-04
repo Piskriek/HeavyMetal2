@@ -83,7 +83,7 @@ export class TerrainView {
     this.mask.flipY = false;
     this.uniforms = {
       islSurfaces: { value: surfaces.texture }, islPbr: { value: surfaces.pbrTexture }, islFlatPalette: { value: surfaces.flatTexture },
-      islVoxel: { value: surfaces.voxelTexture }, islVoxelPbr: { value: surfaces.voxelPbrTexture }, islVoxelVariants: { value: surfaces.voxelVariants },
+      islVoxel: { value: surfaces.voxelTexture }, islVoxelPbr: { value: surfaces.voxelPbrTexture }, islVoxelVariants: { value: surfaces.voxelVariants }, islDitherReach: { value: 45 },
       islNormalStrength: { value: this.look.normalStrength }, islLayerOf: { value: surfaces.layerOf },
       islParams: { value: surfaces.params }, islTurn: { value: surfaces.turn }, islAnim: { value: surfaces.anim }, islTime: { value: 0 }, islSoft: { value: this.look.soft }, islScale: { value: this.look.scale },
       islCliffLayer: { value: -1 }, islCliffNy: { value: new THREE.Vector2(0.55, 0.3) },
@@ -120,6 +120,11 @@ export class TerrainView {
     m.customProgramCacheKey = () => `${key}-${layers}`;
     this.applySkinDefine(m);
     return m;
+  }
+
+  /** Graphics 'ditherDistance': within this many metres the voxel ground dithers between two surfaces; 0 = everywhere. */
+  setDitherReach(metres: number): void {
+    (this.uniforms['islDitherReach'] as { value: number }).value = Number.isFinite(metres) && metres > 0 ? metres : 0;
   }
 
   /** Graphics 'flatGround': draw the flat skin whatever the look says (the PBR skin is the heaviest thing to draw). */

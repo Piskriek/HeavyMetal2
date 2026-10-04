@@ -30,3 +30,10 @@ test('your own changes sit on top of whichever tier draws, and junk is ignored',
   assert.equal(resolveGraphics('ultra', own).shadows, 'on');
   assert.equal(resolveGraphics('high', { shadows: 'blinding' }).shadows, 'detailed');
 });
+
+test('the dither distance: each tier has one, ultra blends everywhere (0), your own wins, below 0 is refused', () => {
+  assert.deepEqual(['potato', 'low', 'medium', 'high', 'ultra'].map((x) => GRAPHICS_TIERS[x as 'low'].ditherDistance), [20, 30, 45, 60, 0]);
+  assert.equal(resolveGraphics('low', { ditherDistance: 0 }).ditherDistance, 0, 'unlimited');
+  assert.equal(resolveGraphics('potato', { ditherDistance: 150 }).ditherDistance, 150);
+  assert.equal(resolveGraphics('low', { ditherDistance: -5 }).ditherDistance, 30, 'a negative distance is junk');
+});

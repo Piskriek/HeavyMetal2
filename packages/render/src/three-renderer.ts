@@ -298,6 +298,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       terrainView = new TerrainView(pendingTerrain.data, pendingTerrain.surfaces);
       terrainView.setLowCost(graphics.simpleLighting);
       terrainView.setForceFlat(graphics.flatGround);
+      terrainView.setDitherReach(graphics.ditherDistance);
       scene.add(terrainView.mesh);
     }
     environment?.setSea(!!terrainView);
@@ -421,6 +422,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       if (decorView) decorGraphics(decorView);
       terrainView?.setLowCost(g.simpleLighting);
       terrainView?.setForceFlat(g.flatGround);
+      terrainView?.setDitherReach(g.ditherDistance);
       if (rebuildPost) buildPost();
       resize();
       postStale = true;

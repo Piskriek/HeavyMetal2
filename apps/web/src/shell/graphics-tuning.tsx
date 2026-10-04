@@ -4,6 +4,8 @@ import type { Quality } from '@hm/game';
 import { graphicsSchema, resolveGraphics } from '@hm/render';
 import { Inspector } from '@hm/ui';
 
+/** The fine-tuning shows every knob but the dither distance, which has its own slider above it (its far end reads Unlimited). */
+const TUNED = { ...graphicsSchema, variables: graphicsSchema.variables.filter((v) => v.key !== 'ditherDistance') };
 const TIER_NAME: Readonly<Record<Quality, string>> = { potato: 'Potato', low: 'Low', medium: 'Medium', high: 'High', ultra: 'Ultra' };
 
 /**
@@ -17,7 +19,7 @@ export function GraphicsTuning(props: { readonly tier: Quality; readonly own: Pa
   return (
     <details className="graphics-tuning">
       <summary>Fine-tune graphics<span>Drawing {TIER_NAME[props.tier]}{changes ? `, with ${changes} of your changes` : ''}</span></summary>
-      <Inspector schema={graphicsSchema} params={props.own} resolved={resolved} tier="play" onChange={(k, v) => props.onChange({ ...props.own, [k]: v })} onReset={reset} />
+      <Inspector schema={TUNED} params={props.own} resolved={resolved} tier="play" onChange={(k, v) => props.onChange({ ...props.own, [k]: v })} onReset={reset} />
       {changes ? <button className="graphics-reset" onClick={() => props.onChange({})}>Use the tiers as made</button> : null}
     </details>
   );

@@ -38,6 +38,8 @@ uniform sampler2D islFlatPalette;
 uniform sampler2DArray islVoxel;
 uniform sampler2DArray islVoxelPbr;
 uniform float islVoxelVariants;
+// the voxel ground dithers between two surfaces within this distance of the camera (metres; 0 or less: everywhere)
+uniform float islDitherReach;
 uniform float islNormalStrength;
 uniform float islLayerOf[${SURFACE_SLOTS}];
 uniform vec4 islParams[${layers}];
@@ -281,10 +283,10 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     vec2 fp = (vTop ? vTWorld.xz : (vXdom ? vec2(vTWorld.z, -vTWorld.y) : vec2(vTWorld.x, -vTWorld.y))) / 0.5;
     vec2 fdx = dFdx(fp), fdy = dFdy(fp);
     // where two surfaces meet (and where rock shows on a cliff) the block's pixels dither between them: an ordered 4x4 pattern, 8 pixels
-    // to a face (chunky, like the voxel goblin), on one grid across all blocks (D20; it was one whole surface per block, a scatter of squares). Far away, where a dither
-    // pixel is smaller than a screen pixel and would shimmer, each block picks one surface as before. A block of one surface stays whole.
+    // to a face (chunky, like the voxel goblin), on one grid across all blocks (D20; it was one whole surface per block, a scatter of squares).
+    // Within the dither distance (Settings, Graphics; none = everywhere); further away each block picks one surface. A block of one surface stays whole.
     vec2 dpx = floor(fp * 8.0);
-    bool dither = (1.0 / 8.0) / max(max(length(fdx), length(fdy)), 1e-6) > 1.5;
+    bool dither = islDitherReach <= 0.0 || length(cameraPosition - vTWorld) < islDitherReach;
     // a slow wobble moves the mix about inside the blend, so half and half is a wandering edge, not a checkerboard
     float lwd = lw > 0.0 && lw < 1.0 ? clamp(lw + (surfNoise(vTWorld.xz * 1.1 + 5.3) - 0.5) * 0.7, 0.02, 0.98) : lw;
     float layer = (dither ? islBayer4(dpx) : hMix) < (dither ? lwd : lw) ? lb : la;

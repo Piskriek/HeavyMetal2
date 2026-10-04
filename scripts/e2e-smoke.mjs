@@ -48,6 +48,10 @@ try {
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
   check('with graphics presets from Potato to Auto', await page.locator('.graphics-presets button').count() === 6);
+  // the dither distance (owner: it looked good at his feet and crappy 2 m away): its far end blends everywhere
+  await dom(() => { const el = document.querySelector('[data-ui="settings.dither"] input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; if (el) { set?.call(el, el.max); el.dispatchEvent(new Event('input', { bubbles: true })); } });
+  await page.waitForTimeout(T(200));
+  check('Graphics has a dither distance slider whose far end is Unlimited', /^Unlimited$/.test(await dom(() => document.querySelector('[data-ui="settings.dither"] output')?.textContent ?? '')));
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 
@@ -85,6 +89,7 @@ try {
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
   await page.waitForSelector('.v3', { timeout: T(60000) });
   check('Done takes you to your island', true);
+  check('the island draws with the dither distance from Settings (Unlimited)', await page.evaluate(() => window.hmRenderer?.graphics?.ditherDistance) === 0, String(await page.evaluate(() => window.hmRenderer?.graphics?.ditherDistance)));
   // D20 (the island starts in the voxel look; the tour reveal below switches to painted): in the voxel look, where two surfaces meet the blocks dither between them (a pixel-art blend, not a scatter of whole squares)
   const edge = await page.evaluate(() => window.hmGround?.edge?.());
   check('the island has a place where two surfaces meet half and half', !!edge);

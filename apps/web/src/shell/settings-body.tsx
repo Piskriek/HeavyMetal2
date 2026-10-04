@@ -1,11 +1,15 @@
 import type { ReactElement, ReactNode } from 'react';
 import { FPS_TARGETS, parseQuality, tidyGpuName, type Quality } from '@hm/game';
+import { resolveGraphics } from '@hm/render';
 import { ControlsList, ControlsSettings } from './controls-list';
 import { GraphicsTuning } from './graphics-tuning';
 import { gpuInUse, tierInUse, type GpuChoice, type Profile } from './profile';
 import { setPlaySettings, usePlaySettings } from './play-settings';
 
 type Choice = 'auto' | Quality;
+/** The dither distance's stops in metres, finer close by; the last one blends everywhere (stored as 0, as the graphics preset says). */
+const DITHER_STOPS: readonly number[] = [2, 3, 4, 6, 8, 10, 15, 20, 30, 45, 60, 80, 100, 150, 200, 0];
+const ditherStop = (m: number): number => (m <= 0 ? DITHER_STOPS.length - 1 : DITHER_STOPS.reduce((best, s, i) => (s > 0 && Math.abs(s - m) < Math.abs((DITHER_STOPS[best] ?? 0) - m) ? i : best), 0));
 /** The graphics presets, lightest first, as one-click buttons (owner: "scale down to the calculator version with the click of a preset button", since renamed Potato). */
 const PRESETS: readonly { readonly id: Choice; readonly name: string; readonly says: string }[] = [
   { id: 'potato', name: 'Potato', says: 'The lightest the game can be: a small picture, flat ground, no clouds or shadows, and plants only nearby. For very old or very busy machines.' },
@@ -32,6 +36,9 @@ export function SettingsBody(props: {
   const play = usePlaySettings();
   const picked = PRESETS.find((p) => p.id === profile.quality) ?? PRESETS[PRESETS.length - 1]!;
   const gpu = gpuInUse();
+  // the dither distance as the tier in use draws it, with your change on top
+  const dither = resolveGraphics(parseQuality(profile.quality) ?? tierInUse() ?? 'medium', profile.graphics).ditherDistance;
+  const ditherSays = dither <= 0 ? 'Unlimited' : `${dither} m`;
   const volume = (field: 'master' | 'sfx' | 'music', label: string): ReactElement => (
     <label className="row slider">{label}<input type="range" min={0} max={100} step={1} value={Math.round(play[field] * 100)} aria-label={label} onChange={(e) => setPlaySettings({ [field]: Number(e.target.value) / 100 })} /><output>{Math.round(play[field] * 100)}%</output></label>
   );
@@ -51,6 +58,9 @@ export function SettingsBody(props: {
           </div>
         ) : null}
         {profile.quality === 'auto' ? <p className="hint">15 fps looks best and moves slower, 60 fps moves smoothly and looks plainer.</p> : null}
+        <label className="row slider" data-ui="settings.dither">Dither distance<input type="range" min={0} max={DITHER_STOPS.length - 1} step={1} value={ditherStop(dither)} aria-label="Dither distance" aria-valuetext={ditherSays}
+          onChange={(e) => { const m = DITHER_STOPS[Number(e.target.value)] ?? 0; update((p) => ({ ...p, graphics: { ...p.graphics, ditherDistance: m } })); }} /><output>{ditherSays}</output></label>
+        <p className="hint">How far from you the voxel ground blends two surfaces pixel by pixel. Past it, each block shows one surface. Unlimited blends everywhere; far away it can shimmer.</p>
         <GraphicsTuning tier={parseQuality(profile.quality) ?? tierInUse() ?? 'medium'} own={profile.graphics} onChange={(g) => update((p) => ({ ...p, graphics: g }))} />
         <label className="row">Graphics card <select value={profile.gpu} onChange={(e) => update((p) => ({ ...p, gpu: e.target.value as GpuChoice }))}><option value="fast">Ask for the fast one</option><option value="saver">Ask for the battery saver</option><option value="browser">Let the browser choose</option></select></label>
         <p className="hint">In use: {gpu ? tidyGpuName(gpu) : 'not known yet'}. A page can only ask: on a laptop with two graphics cards, Windows decides. To always get the fast one, open Windows Settings, System, Display, Graphics, pick your browser and choose High performance.</p>

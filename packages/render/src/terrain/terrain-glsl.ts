@@ -289,10 +289,20 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     bool dither = islDitherReach <= 0.0 || length(cameraPosition - vTWorld) < islDitherReach;
     // a slow wobble moves the mix about inside the blend, so half and half is a wandering edge, not a checkerboard
     float lwd = lw > 0.0 && lw < 1.0 ? clamp(lw + (surfNoise(vTWorld.xz * 1.1 + 5.3) - 0.5) * 0.7, 0.02, 0.98) : lw;
-    float layer = (dither ? islBayer4(dpx) : hMix) < (dither ? lwd : lw) ? lb : la;
-    if (islCliffLayer >= 0.0 && (dither ? islBayer4(dpx + vec2(2.0, 1.0)) : hMix) < steep) layer = islCliffLayer;
-    float faceLayer = floor(layer + 0.5) * islVoxelVariants + min(floor(hTone * islVoxelVariants), islVoxelVariants - 1.0);
-    tile = textureGrad(islVoxel, vec3(fract(fp), faceLayer), fdx, fdy);
+    // a filtered dither: where a dither pixel is under about three screen pixels it would beat against the screen's own pixels and
+    // flicker in waves as you move (owner, 2026-10-04), so there the block blends its two surfaces smoothly (what the dither averages to);
+    // close by it stays crisp pixel art. How much of surface b (and of the cliff's rock) this pixel shows: 0 or 1 when crisp, the share
+    // of the blend when smooth; past the dither distance each block shows one surface as before.
+    float crisp = smoothstep(1.5, 3.0, (1.0 / 8.0) / max(max(length(fdx), length(fdy)), 1e-6));
+    float wB = dither ? mix(lwd, islBayer4(dpx) < lwd ? 1.0 : 0.0, crisp) : (hMix < lw ? 1.0 : 0.0);
+    float wC = islCliffLayer < 0.0 ? 0.0 : dither ? mix(steep, islBayer4(dpx + vec2(2.0, 1.0)) < steep ? 1.0 : 0.0, crisp) : (hMix < steep ? 1.0 : 0.0);
+    float layer = wC >= 0.5 ? islCliffLayer : wB >= 0.5 ? lb : la;
+    float vVar = min(floor(hTone * islVoxelVariants), islVoxelVariants - 1.0);
+    float faceLayer = floor(layer + 0.5) * islVoxelVariants + vVar;
+    // one tile read for a whole surface; the second (and the cliff's) only where this pixel blends
+    tile = textureGrad(islVoxel, vec3(fract(fp), floor((wB >= 1.0 ? lb : la) + 0.5) * islVoxelVariants + vVar), fdx, fdy);
+    if (wB > 0.0 && wB < 1.0) tile = mix(tile, textureGrad(islVoxel, vec3(fract(fp), floor(lb + 0.5) * islVoxelVariants + vVar), fdx, fdy), wB);
+    if (wC > 0.0) { vec4 rock = textureGrad(islVoxel, vec3(fract(fp), floor(islCliffLayer + 0.5) * islVoxelVariants + vVar), fdx, fdy); tile = wC >= 1.0 ? rock : mix(tile, rock, wC); }
     gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));
     diffuseColor.rgb = tile.rgb;
     gRough = 0.92;

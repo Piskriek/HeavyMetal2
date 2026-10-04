@@ -6,12 +6,13 @@
  * On a slower PC multiply every wait (`E2E_SLOW=3`) and/or render on the graphics card (`E2E_GPU=1`), e.g. `E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`.
  */
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import fs, { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const chromePaths = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome'];
 if (!chromePaths.some(existsSync)) { console.log('e2e-smoke: Chrome not found, skipped'); process.exit(0); }
 const { chromium } = await import('playwright-core');
+const { PNG } = await import('pngjs');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const port = 8197;
 const slow = Math.max(1, Number(process.env.E2E_SLOW) || 1);
@@ -94,6 +95,22 @@ try {
   const edge = await page.evaluate(() => window.hmGround?.edge?.());
   check('the island has a place where two surfaces meet half and half', !!edge);
   if (edge) { await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 2.2, p[1] + 2.4, p[2] + 2.2], target: [p[0], p[1], p[2]] }; }, edge); await page.waitForTimeout(T(800)); await shot('flat-shore'); await page.evaluate(() => { window.hmPinView = null; }); }
+  // the dither does not flicker as you move (owner, 2026-10-04): two pictures of the far shore, the camera 3 cm apart, differ little
+  if (edge) {
+    const pics = [];
+    for (const d of [0, 0.03]) {
+      await page.evaluate(([p, dd]) => { window.hmPinView = { eye: [p[0] + 9 + dd, p[1] + 6, p[2] + 9], target: [p[0], p[1], p[2]] }; }, [edge, d]);
+      await page.waitForTimeout(T(600));
+      pics.push(PNG.sync.read(await page.screenshot({ clip: { x: 440, y: 280, width: 400, height: 160 } })));
+    }
+    await page.evaluate(() => { window.hmPinView = null; });
+    const [p0, p1] = pics; let diff = 0;
+    for (let i = 0; i < p0.data.length; i += 4) diff += Math.abs(p0.data[i] - p1.data[i]) + Math.abs(p0.data[i + 1] - p1.data[i + 1]) + Math.abs(p0.data[i + 2] - p1.data[i + 2]);
+    diff /= p0.width * p0.height * 3;
+    console.log(`     dither flicker: ${diff.toFixed(2)} (mean colour change, 0..255, the camera moved 3 cm)`);
+    check('the far dither does not shimmer as you move (filtered: it was 10.4 before)', diff < 7, diff.toFixed(2));
+    if (shotDir) { fs.writeFileSync(`${shotDir}/flicker-a.png`, PNG.sync.write(p0)); fs.writeFileSync(`${shotDir}/flicker-b.png`, PNG.sync.write(p1)); }
+  }
   await page.waitForSelector('.tour', { timeout: T(15000) }).catch(() => undefined);
   check('the island tour starts on your first visit', await page.locator('.tour h3').count() === 1);
   const missing = await page.evaluate(() => (window.hmTourTargets ?? ['(none published)']).filter((t) => !document.querySelector(`[data-ui="${t}"]`)));

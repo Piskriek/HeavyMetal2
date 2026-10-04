@@ -1,0 +1,56 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: moving a walking character (an upright capsule) through a toy world without passing through solid things: axis-aligned boxes, a height-grid ground, step-ups, ladders, and walls the player can mark as walk-through ghosts.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/kinematic.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Deterministic; never loops forever (at most 4 slide iterations per move).
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export type Solid = 'solid' | 'ghost' | 'invisible' | 'ladder';    // ghost: no collision; invisible: collides (drawn by nobody); ladder: collides at its sides, climbable
+export interface Box { min: Vec3; max: Vec3; kind: Solid }
+export interface Ground { heightAt(x: number, z: number): number }
+export interface Capsule { radius: number; height: number }        // feet at pos, top at pos.y + height
+export interface MoveResult { pos: Vec3; onGround: boolean; climbing: boolean; hitWall: boolean; vy: number }
+/** Move from pos by the wanted horizontal motion (dx, dz) plus vertical speed vy over dt seconds (gravity 9.8 applied here). Rules below. */
+export function move(pos: Vec3, dx: number, dz: number, vy: number, dt: number, cap: Capsule, boxes: readonly Box[], ground: Ground, stepUp?: number): MoveResult;
+/** Boxes near a point (a cheap broad phase for the game): those whose box grown by `margin` contains the point. */
+export function near(boxes: readonly Box[], p: Vec3, margin: number): Box[];
+```
+
+## Rules
+- Horizontal: the capsule is a circle of `radius` in x-z, spanning feet to top. It may not overlap any box of kind solid, invisible or ladder that overlaps its vertical span (boxes whose top is at or below feet + stepUp do not block: they are stepped onto). It slides along walls: the blocked component of the motion is removed (per axis), the rest kept. hitWall = true if any motion was removed.
+- Step up: default stepUp 0.3. Ending over a box top within stepUp above the feet lifts the feet onto it.
+- Vertical: vy -= 9.8 * dt; y += vy * dt; the floor under the feet is the higher of ground.heightAt(x, z) and the tops of boxes under the circle's centre (solid, invisible or ladder) that are not above the feet before the move + stepUp. Landing on it: y = floor, vy = 0, onGround true. Hitting a box's underside with the head: vy = 0, y stays below it.
+- Ladder: when the capsule touches a ladder box horizontally and the wanted motion points into it, climbing = true: y rises at 2 m/s instead of moving horizontally, vy = 0, no gravity; at the top it steps onto the ladder's top.
+- ghost boxes never collide.
+
+## Acceptance tests (copy unchanged, then add your own: sliding along a wall keeps the parallel motion, step onto a 0.25 box, a 0.5 box blocks, head bump, ghost walls, ladder top)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { move, type Box, type Capsule } from '../src/index';
+const flat = { heightAt: () => 0 };
+const cap: Capsule = { radius: 0.3, height: 1.6 };
+const wall = (kind: Box['kind']): Box => ({ min: [1, 0, -5], max: [2, 3, 5], kind });
+test('stands on flat ground', () => {
+  const r = move([0, 0, 0], 0, 0, 0, 0.1, cap, [], flat);
+  assert.equal(r.onGround, true); assert.equal(r.pos[1], 0); assert.equal(r.vy, 0);
+});
+test('a solid wall stops you at its face, a ghost does not', () => {
+  const r = move([0, 0, 0], 2, 0, 0, 0.1, cap, [wall('solid')], flat);
+  assert.ok(Math.abs(r.pos[0] - 0.7) < 1e-6, String(r.pos[0])); assert.equal(r.hitWall, true);
+  const g = move([0, 0, 0], 2, 0, 0, 0.1, cap, [wall('ghost')], flat);
+  assert.ok(Math.abs(g.pos[0] - 2) < 1e-6); assert.equal(g.hitWall, false);
+});
+test('slides along a wall', () => {
+  const r = move([0, 0, 0], 2, 1, 0, 0.1, cap, [wall('invisible')], flat);
+  assert.ok(Math.abs(r.pos[0] - 0.7) < 1e-6); assert.ok(Math.abs(r.pos[2] - 1) < 1e-6);
+});
+test('falls and lands on a box', () => {
+  const r = move([0, 2, 0], 0, 0, -10, 0.5, cap, [{ min: [-1, 0, -1], max: [1, 1, 1], kind: 'solid' }], flat);
+  assert.equal(r.pos[1], 1); assert.equal(r.onGround, true);
+});
+```

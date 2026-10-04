@@ -1,0 +1,53 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a toy go-kart for a toy-world game. Arcade handling on a bumpy height-grid ground: throttle, brake, steer, a little drift, gravity, bumps. A pure, deterministic step function.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/kart.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface KartSpec { maxSpeed: number; accel: number; brake: number; turnRate: number; grip: number; mass: number } // m/s, m/s^2, m/s^2, degrees/s at full steer, 0..1 (1 = no drift), kg
+export const DEFAULT_KART: KartSpec; // maxSpeed 12, accel 8, brake 16, turnRate 120, grip 0.85, mass 80
+export interface KartState { pos: Vec3; vel: Vec3; yaw: number; onGround: boolean; airTime: number } // yaw degrees, 0 faces +z, 90 faces +x
+export interface KartInput { throttle: number; steer: number; brake: boolean } // throttle -1..1 (negative = reverse, at most 40% of maxSpeed), steer -1..1 (positive turns right = yaw increases)
+export interface Ground { heightAt(x: number, z: number): number; isWater?(x: number, z: number): boolean }
+export function spawnKart(pos: Vec3, yaw: number): KartState;
+/** Advance by dt (at most 0.05 s; longer dt is split into steps of 0.05 or less). Rules below. */
+export function stepKart(s: KartState, input: KartInput, dt: number, ground: Ground, spec?: KartSpec): KartState;
+/** Speed along the facing direction (negative when reversing). */
+export function forwardSpeed(s: KartState): number;
+/** Tilt (pitch, roll in degrees) for drawing: from the ground slope under the kart's front, back, left and right wheels (0.6 m apart lengthwise, 0.5 m across). */
+export function tilt(s: KartState, ground: Ground): { pitch: number; roll: number };
+```
+
+## Rules
+- On the ground: throttle accelerates along the facing (accel * throttle), capped at maxSpeed forward, 40% backward; no throttle rolls to a stop (deceleration 3 m/s^2); brake decelerates at `brake` toward 0 (never reverses).
+- Steering turns yaw at turnRate * steer * min(1, |forwardSpeed| / 3) (no turning while standing; reversing turns the other way).
+- Grip: each step the sideways part of the velocity is multiplied by (1 - grip) ** (dt / 0.05) (so grip 1 removes it, lower grip drifts).
+- Gravity 9.8. The kart's bottom follows the ground: if pos.y is at or below heightAt, snap to it and onGround = true, vertical speed 0; if the ground drops away faster than the kart falls (a ramp edge), the kart flies (onGround false, airTime counts up; no steering or throttle in the air). Landing resets airTime.
+- Water (isWater true under the kart): maxSpeed halves.
+
+## Acceptance tests (copy unchanged, then add your own: brake to stop, reverse cap, drift with low grip, a ramp jump lands, water slows, dt splitting gives the same result)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DEFAULT_KART, forwardSpeed, spawnKart, stepKart } from '../src/index';
+const flat = { heightAt: () => 0 };
+const run = (steps: number, input: { throttle: number; steer: number; brake: boolean }) => { let s = spawnKart([0, 0, 0], 0); for (let i = 0; i < steps; i++) s = stepKart(s, input, 0.05, flat); return s; };
+test('full throttle reaches but never passes max speed, straight along +z', () => {
+  const s = run(100, { throttle: 1, steer: 0, brake: false });
+  assert.ok(Math.abs(forwardSpeed(s) - DEFAULT_KART.maxSpeed) < 1e-6);
+  assert.ok(s.pos[2] > 40 && Math.abs(s.pos[0]) < 1e-9);
+  assert.equal(s.onGround, true);
+});
+test('after 1 s of throttle it goes 8 m/s', () => {
+  assert.ok(Math.abs(forwardSpeed(run(20, { throttle: 1, steer: 0, brake: false })) - 8) < 1e-6);
+});
+test('no turning while standing; steering right turns yaw up while moving', () => {
+  assert.equal(run(10, { throttle: 0, steer: 1, brake: false }).yaw, 0);
+  assert.ok(run(30, { throttle: 1, steer: 1, brake: false }).yaw > 0);
+});
+```

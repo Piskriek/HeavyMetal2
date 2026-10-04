@@ -184,7 +184,7 @@ try {
   check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
-  check('ten tabs on the tab strip', await page.locator('.tab-strip button').count() === 10);
+  check('eleven tabs on the tab strip (F1 to F10, and Logic on the backtick key)', await page.locator('.tab-strip button').count() === 11);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
@@ -233,6 +233,10 @@ try {
   const thingsRow = await page.evaluate(() => [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent));
   const thingsFrames = await page.locator('.palette-strip .ps-frame').count();
   check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', ['Place', 'Scatter', 'Row', 'Swap'].every((w) => thingsRow.includes(w)) && thingsFrames >= 10, `${thingsRow.join(',')} / ${thingsFrames} frames`);
+  await page.keyboard.press('`');
+  await page.waitForTimeout(T(300));
+  check('Logic (the backtick key) holds Add rule, Remove rules, Rules, and its palette the ready-made rules', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Add rule', 'Remove rules', 'Rules'].every((w) => t.includes(w)); })
+    && await page.locator('.palette-strip .ps-frame').count() >= 8);
   await page.keyboard.press('F6');
   await page.waitForTimeout(T(300));
   check('Lights holds ways (Look, Sun, Day and night, Haze, Clouds) and the looks are the palette', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Look', 'Sun', 'Day and night', 'Haze', 'Clouds'].every((w) => t.includes(w)); })

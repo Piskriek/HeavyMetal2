@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import type { Params, PresetId } from '@hm/contracts';
+import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -25,6 +25,7 @@ import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
 import { SurfaceEditor } from './build/surface-editor';
+import { LogicPanel } from './build/logic-panel';
 import { TextureBench } from './build/texture-bench';
 import { TEX_ANIMS, draftColours, draftFromTile, draftToTile, newHistory, type DraftHistory, type TexDraft } from './build/texture-draft';
 import { decodeBlob, encodeWebp, loadTextures, saveTexture } from './build/texture-store';
@@ -475,6 +476,9 @@ export function IslandWalk(props: {
     // studio camera: where it is and where it looks
     /** The Lights tab's Sun: when it last moved (it keeps moving while held). */
     let lightTick = 0;
+    /** Logic: the island's rules, run frame by frame, and the things they have posed (put back when a move ends). */
+    const logic = new LogicRunner();
+    const logicPosed = new Set<string>();
     let fly: { x: number; y: number; z: number; yaw: number; pitch: number } | null = null;
     let orbit = { yaw: 0.8, pitch: 0.4, dist: 8 };
     // avatar mode's mirror: how far round from straight in front the camera stands, how far away, how high it looks
@@ -693,6 +697,35 @@ export function IslandWalk(props: {
         }
         return;
       }
+      // the Logic tab's ways: add the palette's rule to what you point at, take rules off it, open the island's rules
+      if (s.tab === 'logic') {
+        if (!first) return;
+        if (id === 'logic-rules') { live.current.win.open('logic', 'Rules', { x: 60, y: 80, ...WIN.editor }); unlock(); return; }
+        const a = aim();
+        const thing = a ? builder.modelAt(a)?.ref ?? null : null;
+        const refs = rt.store.get(scene.sceneId)?.children['logic'] ?? [];
+        if (id === 'logic-remove' || alt) {
+          if (!thing) { say('Point at a thing to take its rules off'); return; }
+          const mine = refs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && String(rt.store.resolve(r.ref).params['thing'] ?? '') === thing);
+          if (!mine.length) { say('No rules on that'); return; }
+          rt.commands.transaction('Remove rules', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'logic', i, 'Remove rules')); });
+          say(mine.length === 1 ? 'Its rule is off' : `Its ${mine.length} rules are off`); fx('delete', { volume: 0.5 });
+          return;
+        }
+        const preset = LOGIC_PRESETS.find((x) => x.id === s.palette.logic) ?? LOGIC_PRESETS[0]!;
+        if (preset.needsThing && !thing) { say(`${preset.name}: point at a thing you placed`); return; }
+        const rule = normalizeRule({ ...preset.rule, thing: preset.needsThing ? thing : '' }, 'new');
+        const ruleId = `rule-${Date.now().toString(36)}`;
+        const { id: _new, ...params } = rule;
+        rt.commands.transaction(`Rule: ${preset.name}`, () => {
+          rt.commands.execute(cmd.put({ id: ruleId, kind: 'logic-rule', name: preset.name, params: params as never, tier: 'play' }, `Rule: ${preset.name}`));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'logic', ruleId, undefined, `Rule: ${preset.name}`));
+        });
+        saveMap(rt, scene.sceneId);
+        say(ruleSentence(rule, thing ? (rt.store.get(thing)?.name ?? 'it').toLowerCase() : 'the island'));
+        fx('place', { volume: 0.5 });
+        return;
+      }
       // the Lights tab's ways act on the light where you are (the Sun keeps moving while held)
       if (s.tab === 'lights' && isLightWay(id)) {
         const holds = LIGHT_WAYS.find((w) => w.id === id)?.hold === true;
@@ -813,6 +846,24 @@ export function IslandWalk(props: {
       else menuBase = null;
       renderer.setAvatarPose(px, py, pz, face + Math.PI, pose, !fpv && !st);
       renderer.setLightFocus([px, py + 1.2, pz]);
+      // Logic: the island's rules run as you play (they only pose things for show: the island itself never changes)
+      {
+        const rr = rt.store.get(scene.sceneId)?.children['logic'] ?? [];
+        if (rr.length || logicPosed.size) {
+          const rules = rr.filter((r) => rt.store.get(r.ref)).map((r) => normalizeRule(rt.store.resolve(r.ref).params, r.ref));
+          const modelRefs = (rt.store.get(scene.sceneId)?.children['models'] ?? []).filter((r) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['hidden'] !== true);
+          const things = new Map<string, { x: number; y: number; z: number; yaw: number; index: number }>();
+          modelRefs.forEach((r, index) => { const pr = rt.store.resolve(r.ref).params; things.set(r.ref, { x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), yaw: Number(pr['yaw'] ?? 0), index }); });
+          const out = logic.step(rules, { player: [px, py, pz], things, hour: Number(rt.store.resolve(scene.sceneId).params['timeOfDay'] ?? -1), now: now / 1000 });
+          for (const ev of out.events) { if (ev.kind === 'sound') fx(ev.id as SfxId); else say(ev.text); }
+          if (!live.current.isolateId) for (const [ref, pose] of out.poses) {
+            const t = things.get(ref);
+            if (!t) continue;
+            renderer.setModelPose(t.index, t.x, pose.hidden ? t.y - 9999 : t.y + pose.dy, t.z, t.yaw + pose.dyaw);
+            if (pose.dy || pose.dyaw || pose.hidden) logicPosed.add(ref); else logicPosed.delete(ref);
+          }
+        }
+      }
 
       const head = fpv ? 1.62 : 0.9;
       let wantEye: [number, number, number], target: [number, number, number];
@@ -986,6 +1037,8 @@ export function IslandWalk(props: {
         p.tab === 'paint'
           ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'logic'
+          ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'lights'
           ? <PaletteStrip title="Light" items={LIGHT_ITEMS} community={[]} selected={p.palette.lights} onLayers={openLayers} onPick={(id) => { pickPalette('lights', id); pickLook(rt, scene.sceneId, id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'things'
@@ -1009,6 +1062,7 @@ export function IslandWalk(props: {
                 startOn={style === 'voxel' && skin !== 'pbr' ? 'blocks' : 'ground'} onStepIn={props.ground === 'racing' ? undefined : () => stepIntoTexture(sid)} savedGround={props.profile?.groundLooks?.[String(sid)]} savedBlocks={props.profile?.groundLooks?.[`b${sid}`]}
                 onApply={(g, target) => api.current?.setSurfaceLook(sid, g, target === 'blocks') ?? false}
                 onSave={(g, target) => props.onProfile?.((pr) => { const key = target === 'blocks' ? `b${sid}` : String(sid); const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[key] = g; else delete looks[key]; return { ...pr, groundLooks: looks }; })} />; })()
+            : w.id === 'logic' ? <LogicPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
@@ -1064,6 +1118,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
     case 'activities': return { title, line: item.doc, left: 'Open it', right: 'Nothing' };
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
+    case 'logic': { const w = LOGIC_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     default: return { title, line: item.doc, left: 'Use it', right: 'The opposite' };
   }
 }

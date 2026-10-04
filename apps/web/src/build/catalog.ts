@@ -3,7 +3,7 @@ import { LIGHT_WAYS } from './light-ways';
 type SfxRecipeLayers = SfxRecipe['layers'];
 import { ANIMATIONS, animById, animToParams, normalizeAnim, type AnimPreset } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset, LOGIC_WAYS } from '@hm/buildkit';
 import { SETUPS, setupById, type LightSetup } from '@hm/lighting';
 import { STARTER_SURFACES } from '@hm/render';
 
@@ -87,6 +87,8 @@ export function catalog(tab: TabId, player: CatalogPlayer, activities: readonly 
       return activities.map((a) => ({ tab, id: a.id, name: a.name, doc: a.doc, preview: { kind: 'planet', hue: a.hue, ring: a.ring }, edited: false }));
     case 'avatar':
       return [...player.looks, ...LOOKS].map((l) => ({ tab, id: l.id, name: l.name, doc: player.looks.some((m) => m.id === l.id) ? 'Your goblin.' : 'A ready-made goblin look: pick it, then change any colour.', preview: { kind: 'look', look: l }, edited: player.looks.some((m) => m.id === l.id) }));
+    case 'logic':
+      return LOGIC_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false }));
     case 'camera':
       return CAMERAS.map((c) => ({ tab, id: c.id, name: c.name, doc: c.doc, preview: { kind: 'icon', icon: c.icon }, edited: false }));
   }
@@ -122,6 +124,7 @@ export function defaultHotbars(activities: readonly ActivityInfo[], player: Cata
   // ways to place; the things themselves are in the palette (docs/HOTBAR.md)
   out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];
   out.camera = ids(CAMERAS.map((c) => c.id));
+  out.logic = [...ids(LOGIC_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   return out;
 }
 

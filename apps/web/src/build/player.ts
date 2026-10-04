@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { MOVE_SLOTS, animById, type MoveSlot } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { PAINTS, SLOTS, STAMP_SHAPES, THINGS, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
+import { LOGIC_PRESETS, PAINTS, SLOTS, STAMP_SHAPES, THINGS, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
 import { OLD_DEFAULT_ROWS, defaultHotbars, validFor, type ActivityInfo, type CatalogPlayer } from './catalog';
 
 /**
@@ -84,8 +84,9 @@ const paletteOf = (v: unknown): Partial<Record<TabId, string>> => {
   const paint = typeof o.paint === 'string' && PAINTS.some((s) => String(s.id) === o.paint) ? o.paint : undefined;
   const sculpt = typeof o.sculpt === 'string' && STAMP_SHAPES.some((s) => s.id === o.sculpt) ? o.sculpt : undefined;
   const things = typeof o.things === 'string' && THINGS.some((t) => t.id === o.things) ? o.things : undefined;
+  const logic = typeof o.logic === 'string' && LOGIC_PRESETS.some((r) => r.id === o.logic) ? o.logic : undefined;
   const lights = typeof o.lights === 'string' && /^[a-z0-9-]{1,40}$/.test(o.lights) ? o.lights : undefined;
-  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}) };
+  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}) };
 };
 
 let state: PlayerState | null = null;

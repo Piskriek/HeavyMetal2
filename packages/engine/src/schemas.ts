@@ -86,6 +86,7 @@ export const sceneSchema = defineSchema({
     { key: 'rules', label: 'Race rules', doc: 'How the race is run: laps, field size, items, boost pads. Change it to make your own kind of race.', kinds: ['race'], min: 0, max: 1, tier: 'play' },
     { key: 'sounds', label: 'Sounds', doc: 'Edited sound effects, engine hums and music for this scene. Anything not listed uses the built-in sound.', kinds: ['sound', 'engine-sound', 'music'], min: 0, max: null, tier: 'play' },
     { key: 'mechanics', label: 'Behaviours', doc: 'Scripts that run every tick: rules, controls, items, AI.', kinds: ['mechanic', 'rule', 'item', 'ai-driver', 'racer'], min: 0, max: null, tier: 'build' },
+    { key: 'logic', label: 'Logic', doc: 'The island\'s rules: when something happens (a goblin touches a thing, a timer, night falls), what is done (a sound, a spin, a jump, hide, say).', kinds: ['logic-rule'], min: 0, max: null, tier: 'play' },
   ] as readonly ChildSlot[],
 });
 
@@ -407,7 +408,26 @@ export const musicSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
+export const logicRuleSchema = defineSchema({
+  kind: 'logic-rule',
+  version: 1,
+  label: 'Rule',
+  doc: 'One rule of the Logic tab: when something happens, do something. Easy picks a ready-made rule, Pro changes its blocks, Studio shows the script it equals.',
+  icon: 'zap',
+  variables: [
+    { key: 'when', type: 'enum', label: 'When', doc: 'What starts it.', tier: 'play', default: 'touch', options: ['touch', 'every', 'night', 'day', 'start'], group: 'When' },
+    { key: 'near', type: 'number', label: 'How close', doc: 'Touch: how close a goblin comes.', tier: 'build', default: 1.5, min: 0.3, max: 20, step: 0.1, unit: 'm', group: 'When' },
+    { key: 'every', type: 'number', label: 'Every', doc: 'Every: how often.', tier: 'build', default: 3, min: 0.2, max: 600, step: 0.1, unit: 's', group: 'When' },
+    { key: 'do', type: 'enum', label: 'Do', doc: 'What happens.', tier: 'play', default: 'sound', options: ['sound', 'spin', 'jump', 'hide', 'show', 'say'], group: 'Do' },
+    { key: 'sound', type: 'string', label: 'Sound', doc: 'Do sound: which sound.', tier: 'build', default: 'item-pickup', group: 'Do' },
+    { key: 'text', type: 'string', label: 'Words', doc: 'Do say: what is said.', tier: 'build', default: 'Hello!', group: 'Do' },
+    { key: 'amount', type: 'number', label: 'How much', doc: 'Spin: turns; jump: metres.', tier: 'build', default: 1, min: 0, max: 20, step: 0.1, group: 'Do' },
+    { key: 'thing', type: 'string', label: 'On', doc: 'The thing the rule is on (empty: the whole island).', tier: 'pro', default: '', group: 'On' },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

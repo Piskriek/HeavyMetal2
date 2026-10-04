@@ -44,6 +44,7 @@ Graphics: Settings, Graphics. **Potato** is the lightest, **Auto** aims for the 
 - Lights: Look (the palette's), Sun (an hour a click), Day and night, Haze, Clouds.
 - Select on a plant opens how that kind of plant grows; on the sea, the world rules; on a thing, its layer.
 - Settings, Hotbar: put tools in any slot, take them off, back to the ready-made row.
+- **Logic** (the backtick key, left of 1): pick a ready-made rule in the palette (Tab), **Add rule** on a thing (Touch: spin, Keep spinning, Only at night ...). **Rules** lists them; Pro shows their blocks to change, Studio the script each equals.
 
 ## Not built yet (so nobody is surprised)
 

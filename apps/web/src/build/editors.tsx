@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
+import { LogicPanel } from './logic-panel';
 import { cmd, defineSchema, type Params, type PresetId, type PresetSchema, type VariableDef } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { ANIMATIONS, ANIM_VARIABLES, MOVE_SLOTS, animToParams, type AnimPreset, type MoveSlot } from '@hm/anim';
@@ -298,6 +299,7 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
     case 'animate': return <AnimEditor id={id} actions={props.actions} />;
     case 'sound': return <SoundEditor id={id} rt={props.rt} />;
     case 'lights': return <LightingPanel rt={props.rt} sceneId={props.sceneId} />;
+    case 'logic': return <LogicPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'activities': { const a = props.activities.find((x) => x.id === id); return a ? <ActivityEditor a={a} actions={props.actions} /> : <p className="hint">Unknown activity.</p>; }
     case 'avatar': return <LookEditor id={id} actions={props.actions} />;
     case 'camera': return <CameraEditor id={id} actions={props.actions} />;

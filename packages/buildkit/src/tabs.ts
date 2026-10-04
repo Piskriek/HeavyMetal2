@@ -2,7 +2,7 @@
  * The build HUD's tabs. Each tab is a kind of thing you can hold: F1 to F10 switch tabs (F11 and F12 belong to the browser), each tab has nine
  * slots (keys 1 to 9) holding presets of that tab, and E opens the preset window for the tab. Pure data and functions.
  */
-export type TabId = 'select' | 'paint' | 'sculpt' | 'animate' | 'sound' | 'lights' | 'activities' | 'avatar' | 'things' | 'camera';
+export type TabId = 'select' | 'paint' | 'sculpt' | 'animate' | 'sound' | 'lights' | 'activities' | 'avatar' | 'things' | 'camera' | 'logic';
 
 export interface TabDef {
   readonly id: TabId;
@@ -27,6 +27,8 @@ export const TABS: readonly TabDef[] = [
   { id: 'avatar', label: 'Avatar', key: 'F8', alt: 'p', icon: 'User', doc: 'Your goblin: how it looks and how it moves.' },
   { id: 'things', label: 'Things', key: 'F9', icon: 'Package', doc: 'Place palms, bushes, rocks, flowers, barrels and statues.' },
   { id: 'camera', label: 'Camera', key: 'F10', icon: 'Camera', doc: 'How you see the world: over the shoulder, first person, studio, from above.' },
+  // the coders' tab (MASTER_PLAN 6.4): the backtick key, F11 and F12 being the browser's
+  { id: 'logic', label: 'Logic', key: '`', icon: 'Zap', doc: 'Rules: when something happens (a goblin touches a thing, a timer, night falls), do something (a sound, a spin, a jump, hide, say). Easy drops ready-made rules on things, Pro changes their blocks, Studio shows the script.' },
 ];
 export const TAB_IDS: readonly TabId[] = TABS.map((t) => t.id);
 export const tabDef = (id: TabId): TabDef => TABS.find((t) => t.id === id) ?? TABS[0]!;

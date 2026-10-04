@@ -896,3 +896,17 @@ body:has(.galaxy-bar.open) .palette-strip { top: 62px; }
 .se-step { justify-self: start; }
 .tb-head .tb-any { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-family: Inter, sans-serif; font-size: 12px; color: var(--text); }
 .tb-head .tb-any input { width: 36px; height: 24px; padding: 0; border: 1px solid var(--line); background: none; }
+
+/* the island's rules (the Logic tab): a sentence each; Pro adds the blocks, Studio the script */
+.logic-panel { display: grid; gap: 8px; }
+.lp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lp-rule { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.lp-say { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.4; }
+.lp-say span { flex: 1; }
+.lp-say button { min-width: 28px; min-height: 28px; padding: 4px; border-color: transparent; }
+.lp-blocks { display: flex; flex-wrap: wrap; gap: 4px; }
+.lp-block { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border: 1px solid var(--line); background: var(--panel); font-size: 12px; }
+.lp-block.when { border-left: 3px solid var(--gold); }
+.lp-block.do { border-left: 3px solid var(--green); }
+.lp-block input[type="number"] { width: 56px; }
+.lp-script { margin: 0; padding: 8px; background: #1d1f1b; color: #e8e6dc; font-size: 11px; line-height: 1.45; overflow-x: auto; white-space: pre; }

@@ -108,3 +108,13 @@ test('examples', () => {
   assert.ok(b.palette.some(p => p.metalness === 0.9));
   assert.ok(V.modelStats(b).paletteUse[1] > 0 && V.modelStats(c).paletteUse[1] > 0);
 });
+test('a model whose colours were written as 0..255 (Paint a thing, 2026-10-04) still loads, read as 0..1', () => {
+  const m = V.setVoxel(base(), 0, 0, 0, 1);
+  const o = JSON.parse(V.encodeModel(m));
+  o.palette[0].color = [214, 62, 56];
+  const back = V.decodeModel(JSON.stringify(o));
+  assert.ok(back.model, back.errors.join(' '));
+  assert.deepEqual(back.model.palette[0].color.map((c) => Math.round(c * 255)), [214, 62, 56]);
+  o.palette[0].color = [300, 0, 0];
+  assert.equal(V.decodeModel(JSON.stringify(o)).model, null, 'past 255 is still refused');
+});

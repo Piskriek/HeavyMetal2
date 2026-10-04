@@ -419,3 +419,45 @@ ADVANCED_MODE:
     Filters: [LUT Color Grading, Depth of Field Bokeh, GTAO, Cel-Shade, Niagara GPU]
     Modifiers: [Shift+Click Propagate Material, Spacebar Re-trigger Particle Burst]
 ```
+
+## V3.1: what Claude added and changed (2026-10-04)
+
+The owner, after "no hybrid": "now is the time to make changes if you feel the hotbar can be improved, is there somthing were missing, add or adjust and get to work". The spec above stays as written; these are the changes on top of it. `packages/buildkit/src/v3.ts` holds the result as data (the names above, word for word, plus what is listed here).
+
+### Buttons V3 had no place for
+
+- **Props.** V3 places blocks, plants and creatures, but nowhere the island's own things: barrels, trophies, plinths, goblin statues, ball racers, bushes, rocks.
+  - Game F3 gets preset 8, **Prop Box**: a row of props pops up while you hold it, and the next click drops the one you picked with a POOF.
+  - Simplified F3 gets sub-tool 4, **Place Props**: sliders Size (50 to 200%) and Random Turn; presets Palm, Bush, Rock, Flowers, Barrel, Trophy, Plinth, Goblin Statue, Ball Racer.
+  - Advanced F3 gets the tool **Prop Placer**, with the whole catalogue in its options row.
+- **Ground materials.** "Color & Material Painter" (Simplified F2) painted things but not the ground. It gets sub-tool 4, **Ground Material**: sliders Brush Size and Softness; presets Grass, Sand, Rock, Moss, Mud, Lava, Cobbles, Dirt Road.
+- **Paths and water.** Roads, rivers and rain wear were built for Advanced F10 only.
+  - Simplified F10 gets sub-tool 3, **Paths & Water**: Dirt Path, Stone Road, River, Rain Wear.
+  - Game F10 gets preset 6, **Creek Digger**: click along, then click the last spot again, and a stream fills it.
+- **Save as Toy** (Simplified F1, Group Linker; coming): a linked group becomes one of your toys in the Prop Box, under My Toys.
+- **Undo and Redo buttons** at the end of the hotbar in every mode. Ctrl+Z and Ctrl+Y work as always.
+- **Find a tool**: `/` searches every button of the mode by name, and Enter takes you there.
+- **Dress up**: the goblin mirror (the old Avatar tab) moves to a Dress up button in the top bar and the Esc menu. This frees P for the spec's own P keys.
+
+### Keys changed (a browser game: some of the spec's keys belong to the browser or to walking)
+
+- F8 Advanced, **Ctrl+1..9** switches browser tabs, so **Shift+1..9** saves a camera slot instead. 1..9 recall a slot only while Viewport Bookmark is held; with any other tool, 1..9 pick tools.
+- F8 Advanced, **Ctrl+Shift+P** opens a private window in Firefox, so **Alt+P** starts Pilot Mode.
+- F12 Advanced, **Spacebar** jumps (and flies up), so **R** re-triggers a particle burst.
+- F6 Advanced, **C** flies down, so **Alt+C** pilots a light as the camera.
+- **F11 and F12** belong to the browser (full screen, developer tools), so **Shift+F1** and **Shift+F2** open them. Every tab can also be clicked.
+- **E** stays the player's interact key (the spec's "Player Presses 'E'"). It no longer opens a presets window.
+- **Backtick (`)** switches mode: Game, then Simplified, then Advanced.
+- **Tab** frees the mouse for the sliders, presets and filters while you walk. Tab again, or a click in the world, takes it back.
+
+### Rules added
+
+- **Switching mode keeps your tab.** Each F-key is one topic in all three modes: F3 is Blocks and Clay, Shapes and Sculpt, and Geometry.
+- **Left does, right does the opposite**: dig and add, paint and sponge, place and take away. Every button's tooltip says both.
+- **The wheel** steps through the slots. Coming: while Grab carries a toy, the wheel turns it and Shift+wheel sizes it, because Game Mode has no gizmo. The carried toy has to show in your hands first.
+- **The gizmo follows the selection in every tab** of Simplified and Advanced, not only F1.
+- **Each tab remembers** its slot and preset in each mode. Simplified's sliders remember their values per sub-tool and have a Reset.
+- **No custom rows.** The buttons are the spec's and they are fixed; the old Hotbar settings and the E window go.
+- **Nothing is a dead click.** A button whose engine is not built yet shows as coming (a dot on it) and says so when used.
+- **Comfort and safety**: nothing flashes more than three times a second, anywhere. Party Strobe sweeps without strobing, and the shutter flash is a soft fade. Reduce motion turns screen shakes and wobbles off.
+- **Low-end (GTX 950M, the minimum)**: on Low, Glow Paint's through-wall rings, volumetric light cones, GTAO and depth of field step down or switch off.

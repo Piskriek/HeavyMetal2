@@ -198,6 +198,8 @@ export function decodeModel(text: string): { model: VoxelModel | null; errors: s
   try {
     let o: any;
     try { o = JSON.parse(text); } catch { return { model: null, errors: ['The text is not valid JSON.'] }; }
+    // colours once written as 0..255 (Paint a thing, 2026-10-04, fixed the same day) are read as 0..1
+    if (o && Array.isArray(o.palette)) for (const e of o.palette) if (e && Array.isArray(e.color) && e.color.length === 3 && e.color.every((c: unknown) => typeof c === 'number' && c >= 0 && c <= 255) && e.color.some((c: number) => c > 1)) e.color = e.color.map((c: number) => c / 255);
     if (!checkCommon(o, errors)) return { model: null, errors };
     if (typeof o.rle !== 'string') return { model: null, errors: ['The cell data (rle) is missing.'] };
     const bytes = fromB64(o.rle);

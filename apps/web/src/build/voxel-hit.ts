@@ -78,9 +78,10 @@ export function hitThings(things: readonly { readonly ref: string; readonly pose
   return best ? { ref: best.ref, model: best.model, hit: best.hit } : null;
 }
 
-/** The model with every cell of one material recoloured (its palette entry), as new data. */
+/** The model with every cell of one material recoloured (its palette entry), as new data. `rgb` is 0..255; a palette keeps 0..1 (a model with more does not load). */
 export function recolour(m: VoxelModel, material: number, rgb: V3): string {
-  const palette = m.palette.map((p, i) => (i === material - 1 ? { ...p, color: rgb } : p));
+  const unit = (c: number): number => Math.round(Math.min(1, Math.max(0, c / 255)) * 1000) / 1000;
+  const palette = m.palette.map((p, i) => (i === material - 1 ? { ...p, color: [unit(rgb[0]), unit(rgb[1]), unit(rgb[2])] as V3 } : p));
   return encodeModel({ ...m, palette });
 }
 

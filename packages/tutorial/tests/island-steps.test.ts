@@ -10,7 +10,7 @@ test('the island tour and the short tour are valid presets with exactly one reve
   }
 });
 
-test('playing the island tour: events move it on, the sculpt step hands you Raise, the reveal switches to PBR then reveals, credits once', () => {
+test('playing the island tour: events move it on, the sculpt step hands you Mound Builder, the reveal switches to PBR then reveals, credits once', () => {
   const t = new Tutorial(ISLAND_STEPS);
   let now = 1000;
   const all: string[] = [];
@@ -21,11 +21,11 @@ test('playing the island tour: events move it on, the sculpt step hands you Rais
   assert.equal(t.current()!.id, 'jump');
   run(t.event('jumped', now++) as never);
   assert.equal(t.current()!.id, 'sculpt');
-  assert.ok(all.includes('give:raise'));
+  assert.ok(all.includes('give:mound-builder'));
   for (let i = 0; i < 3; i++) run(t.event('used-sculpt', now++) as never);
   assert.equal(t.current()!.id, 'place');
-  assert.ok(all.includes('give:things-one'));
-  for (const e of ['placed', 'undo', 'opened-presets', 'edited', 'opened-menu']) run(t.event(e, now++) as never);
+  assert.ok(all.includes('give:plant-oak'));
+  for (const e of ['placed', 'undo', 'mode-switched', 'edited', 'opened-menu']) run(t.event(e, now++) as never);
   assert.equal(t.current()!.id, 'reveal');
   run(t.event('moved', now++) as never);
   assert.equal(t.current()!.id, 'reveal', 'only the button reveals');

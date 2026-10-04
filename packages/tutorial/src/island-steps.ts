@@ -1,11 +1,12 @@
 import type { Step } from './index';
 
 /**
- * The island tour, written for the build HUD as it is now (tabs on F1..F10, slots on 1..9, E for presets, Esc for the menu). Every step is
+ * The island tour, written for the V3 hotbar (docs/HOTBAR_V3_SPEC.md: tabs on F1..F12, slots on 1..9, Game, Simplified and Advanced on the
+ * backtick, Esc for the menu). Every step is
  * a preset: change the words, the keys, the order or what it gives you without touching code. It ends with the big reveal: the island
  * switches from the flat voxel paint that matches your goblin to the full PBR ground.
  *
- * Events the island sends: moved, looked, jumped, slot-selected, tab-selected, used-sculpt, used-paint, placed, undo, opened-presets,
+ * Events the island sends: moved, looked, jumped, slot-selected, tab-selected, used-sculpt, used-paint, placed, undo, mode-switched,
  * edited, opened-menu. The reveal step waits for the 'show-pbr' button on the tour card.
  */
 export const ISLAND_STEPS: Step[] = [
@@ -18,54 +19,54 @@ export const ISLAND_STEPS: Step[] = [
   },
   {
     id: 'jump', title: 'Hop',
-    text: 'Your avatar jumps too. Every move it makes is an animation preset you can change later (P opens your avatar).',
+    text: 'Your avatar jumps too. Every move it makes is an animation preset you can change later (My avatar, top right).',
     hint: 'Space',
     advance: { type: 'event', name: 'jumped' },
     skippable: true,
   },
   {
     id: 'sculpt', title: 'Shape the ground',
-    text: 'You hold Raise from the Terrain tab. Click the ground three times; the right button lowers it.',
+    text: 'You hold Mound Builder from Dirt and Trees (F10). Click the ground three times; the right button digs it back down.',
     hint: 'F10 Click',
     advance: { type: 'event', name: 'used-sculpt', count: 3 },
     skippable: true,
-    highlight: 'island.tab.sculpt',
-    onEnter: [{ type: 'give', item: 'raise' }],
+    highlight: 'island.tab.F10',
+    onEnter: [{ type: 'give', item: 'mound-builder' }],
   },
   {
-    id: 'place', title: 'Plant a palm',
-    text: 'Things you place stand on the ground and follow it when you dig or raise it.',
-    hint: 'F3 Click',
+    id: 'place', title: 'Plant a tree',
+    text: 'You hold Plant Oak Tree. Things you place stand on the ground and follow it when you dig or raise it.',
+    hint: 'Click',
     advance: { type: 'event', name: 'placed' },
     skippable: true,
-    highlight: 'island.tab.things',
-    onEnter: [{ type: 'give', item: 'things-one' }],
+    highlight: 'island.tab.F10',
+    onEnter: [{ type: 'give', item: 'plant-oak' }],
   },
   {
     id: 'undo', title: 'Take it back',
-    text: 'Every change can be undone. Break things, nothing is lost.',
+    text: 'Every change can be undone (Ctrl+Z, or the arrow at the end of the hotbar). Break things, nothing is lost.',
     hint: 'Ctrl+Z',
     advance: { type: 'event', name: 'undo' },
     skippable: true,
   },
   {
-    id: 'presets', title: 'Your presets',
-    text: 'E opens every preset of the tab you are on, with a preview of each. Click one to put it in your hand.',
-    hint: 'E',
-    advance: { type: 'event', name: 'opened-presets' },
+    id: 'modes', title: 'Three ways to build',
+    text: 'Game keeps it playful. Simplified adds plain sliders and the gizmo; Advanced has every tool. Try one: the switch is at the end of the hotbar (or press the backtick). F3 is the same topic in all three.',
+    hint: '`',
+    advance: { type: 'event', name: 'mode-switched' },
     skippable: true,
-    highlight: 'island.presets',
+    highlight: 'island.mode.simplified',
   },
   {
     id: 'tweak', title: 'Change a preset',
-    text: 'Click Edit on any card and move a slider, or add a sprite or sound with + attribute. Your copy keeps the change.',
-    hint: 'Edit',
+    text: 'In Simplified, move a slider above the hotbar (Tab frees the mouse while you walk). Your tool keeps the change.',
+    hint: 'Tab',
     advance: { type: 'event', name: 'edited' },
     skippable: true,
   },
   {
     id: 'menu', title: 'The menu',
-    text: 'Esc closes one window at a time, then opens the menu: studio mode, your avatar, settings, and SetMix: home, your islands, activities like Goblin Racing.',
+    text: 'Esc closes one window at a time, then opens the menu: studio mode, your avatar, world rules, settings, and SetMix: home, your islands, activities like Goblin Racing.',
     hint: 'Esc',
     advance: { type: 'event', name: 'opened-menu' },
     skippable: true,

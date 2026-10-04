@@ -48,14 +48,6 @@ try {
   await text('.sm-menu button', 'Settings').click();
   check('settings opens', await page.locator('[aria-label="Settings"]').count() === 1);
   check('with graphics presets from Potato to Auto', await page.locator('.graphics-presets button').count() === 6);
-  // Settings, Hotbar: the hotbar is a preset you manage (grown-up profiles)
-  if (await page.locator('.hotbar-settings').count()) {
-    await dom(() => document.querySelector('[aria-label="Take Brush off"]')?.click());
-    const off = await page.$$eval('.hs-row .hs-name', (s) => s[0]?.textContent);
-    await dom(() => [...document.querySelectorAll('.hotbar-settings .btns button')].find((b) => /ready-made/.test(b.textContent ?? ''))?.click());
-    const back = await page.$$eval('.hs-row .hs-name', (s) => s[0]?.textContent);
-    check('Settings, Hotbar: a tool comes off its slot and the ready-made row comes back', off === 'Empty' && back === 'Brush');
-  }
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 
@@ -91,7 +83,7 @@ try {
   check('an avatar needs a name', await page.locator('.create-goblin').count() === 1 && await page.locator('.cg-panel .warn').count() === 1);
   await page.locator('.cg-name input').fill('Snik');
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForSelector('.hotbar', { timeout: T(60000) });
+  await page.waitForSelector('.v3', { timeout: T(60000) });
   check('Done takes you to your island', true);
   await page.waitForSelector('.tour', { timeout: T(15000) }).catch(() => undefined);
   check('the island tour starts on your first visit', await page.locator('.tour h3').count() === 1);
@@ -131,7 +123,7 @@ try {
   check('a planet near the pointer shows its card', await page.locator('.planet-card').count() === 1);
 
   await page.locator('.sm-menu .sm-sub').click();
-  await page.waitForSelector('.hotbar', { timeout: T(60000) });
+  await page.waitForSelector('.v3', { timeout: T(60000) });
   check('My island reaches the island with the hotbar', true);
   // the first Esc skips the arrival cinematic (slow under software rendering); keep pressing until the menu shows
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
@@ -153,7 +145,7 @@ try {
   await page.waitForTimeout(T(300));
   check('Undo takes it away again', await page.locator('[aria-label="My planet"] article.planet-island').count() === 1);
   await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.textContent === 'Close')?.click(); });
-  await page.waitForSelector('.hotbar', { timeout: T(30000) });
+  await page.waitForSelector('.v3', { timeout: T(30000) });
   check('Close returns to the island', true);
   for (let i = 0; i < 8 && await page.locator('.island-menu').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(700)); }
   await dom(() => { [...document.querySelectorAll('.island-menu button')].find((b) => b.textContent === 'Share this island')?.click(); });
@@ -167,11 +159,11 @@ try {
   await page.waitForTimeout(T(300));
   check('sharing closes the dialog and says where it went', await page.locator('.share').count() === 0 && /Your shares/.test(await page.locator('.island-note').textContent() ?? ''));
 
-  // avatar mode (P): the camera faces your avatar, the dock shows your characters and this one's presets; a new one is made three ways
-  await page.keyboard.press('p');
+  // avatar mode (My avatar, top right): the camera faces your avatar, the dock shows your characters and this one's presets; a new one is made three ways
+  await dom(() => document.querySelector('[data-ui="island.avatar"]')?.click());
   await page.waitForTimeout(T(600));
-  check('P opens avatar mode with your characters and New avatar', await page.locator('.avatar-dock').count() === 1 && await page.locator('.ad-row button').count() === 2);
-  check('and the hotbar steps aside', await page.locator('.hotbar').count() === 0);
+  check('My avatar opens avatar mode with your characters and New avatar', await page.locator('.avatar-dock').count() === 1 && await page.locator('.ad-row button').count() === 2);
+  check('and the hotbar steps aside', await page.locator('.v3').count() === 0);
   await dom(() => { document.querySelector('.ad-row .ad-new')?.click(); });
   await page.waitForTimeout(T(300));
   await dom(() => { [...document.querySelectorAll('.avatar-dock .nc-way')].find((b) => /Quick setup/.test(b.textContent ?? ''))?.click(); });
@@ -186,29 +178,79 @@ try {
   check('one click swaps back to the first', await page.locator('.ad-row button.on').count() === 1);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(500));
-  check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
+  check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.v3').count() === 1);
 
-  // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
-  check('thirteen tabs on the tab strip in the V3 order (F1 to F12, your Avatar on P)', await page.locator('.tab-strip button').count() === 13);
-  const stripFits = () => dom(() => { const r = document.querySelector('.tab-strip')?.getBoundingClientRect(); return !!r && r.left >= 0 && r.right <= innerWidth; });
-  check('the tab strip fits a 1280 px screen', await stripFits());
+  // the V3 hotbar (docs/HOTBAR_V3_SPEC.md): twelve tabs with each mode's names, each mode's own layout under them
+  const clickWorld = async (x, y) => { await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(T(80)); await page.mouse.up(); await page.waitForTimeout(T(250)); };
+  const slots = () => page.$$eval('.v3-slot > span', (b) => b.map((x) => x.textContent));
+  const tabNames = () => page.$$eval('.v3-tabs button', (b) => b.map((x) => (x.getAttribute('data-label') ?? '').replace(/ \(.*$/, '')));
+  const tabOn = () => dom(() => document.querySelector('.v3-tabs button.on')?.textContent ?? '');
+  const mode = async (id) => { await dom((m) => document.querySelector(`[data-ui="island.mode.${m}"]`)?.click(), id); await page.waitForTimeout(T(250)); };
+  const slot = async (name) => { await dom((n) => { [...document.querySelectorAll('.v3-slot')].find((b) => b.querySelector('span')?.textContent === n)?.click(); }, name); await page.waitForTimeout(T(200)); };
+  const chip = async (name) => { await dom((n) => { [...document.querySelectorAll('.v3-chips button')].find((b) => (b.textContent ?? '').trim() === n)?.click(); }, name); await page.waitForTimeout(T(200)); };
+  const key = async (k) => { await page.keyboard.press(k); await page.waitForTimeout(T(300)); };
+  const note = () => dom(() => document.querySelector('.island-note')?.textContent ?? '');
+  check('twelve tabs on the hotbar, F1 to F12', await page.locator('.v3-tabs button').count() === 12);
+  check('Game Mode names its tabs as the spec does', JSON.stringify(await tabNames()) === JSON.stringify(['Grab Tool', 'Color Spray', 'Blocks and Clay', 'Puppet Show', 'Boombox', 'Lantern', 'Magic Cord', 'Photo Cam', 'Toy Box', 'Dirt and Trees', 'Physics Play', 'Magic Wand']), JSON.stringify(await tabNames()));
+  check('the switch at the end reads Game, Simplified, Advanced', JSON.stringify(await page.$$eval('.v3-modes button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Game', 'Simplified', 'Advanced']));
+  const stripFits = () => dom(() => { const r = document.querySelector('.v3-tabs')?.getBoundingClientRect(); return !!r && r.left >= 0 && r.right <= innerWidth; });
+  check('the tabs fit a 1280 px screen', await stripFits());
   await page.setViewportSize({ width: 900, height: 700 }); await page.waitForTimeout(T(400));
-  check('and a 900 px one (the open tab keeps its name)', await stripFits() && await dom(() => { const label = document.querySelector('.tab-strip button.on > span'); return !!label && getComputedStyle(label).display !== 'none'; }));
+  check('and a 900 px one (the open tab keeps its name)', await stripFits() && await dom(() => { const label = document.querySelector('.v3-tabs button.on > span'); return !!label && getComputedStyle(label).display !== 'none'; }));
   await shot('tabs-900');
   await page.setViewportSize({ width: 1280, height: 720 }); await page.waitForTimeout(T(400));
-  await page.keyboard.press('F2');
-  await page.waitForTimeout(T(300));
-  check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
-  check('Paint holds ways to paint (Brush, Fill, Stamp, Eraser, Paint a thing ...), not surfaces', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Brush', 'Fill', 'Stamp', 'Eraser', 'Paint a thing'].every((w) => t.includes(w)); }));
-  check('the palette starts closed', await page.locator('.palette-strip').count() === 0);
-  await page.keyboard.press('Tab');
-  await page.waitForTimeout(T(300));
-  check('Tab opens the palette: the surfaces in a film strip, top middle', await page.locator('.palette-strip .ps-frame').count() >= 20);
-  check('the tool in hand shows its own presets, drawn on the ground', await page.locator('.tool-presets canvas.tp-pv').count() >= 4);
-  // the surface editor: SetMix's ground is made from graphs, so a surface's look can be changed live
+  await key('F3');
+  check('Game Mode F3 holds Blocks and Clay\'s numbered presets (Prop Box added in V3.1)', JSON.stringify(await slots()) === JSON.stringify(['Toy Brick', 'Smooth Ball', 'Ramp / Slide', 'Clay Plump', 'Clay Scoop', 'Clay Flatten', 'Punch Hole', 'Prop Box']), JSON.stringify(await slots()));
+  check('a preset that is coming carries its pip', await page.locator('.v3-slot.coming .v3-pip').count() >= 1);
+  await shot('v3-game');
+  await key('`');
+  check('the backtick switches to Simplified: F3 is Shapes and Sculpt, its sub-tools on the hotbar', /Shapes and Sculpt/.test(await tabOn()) && JSON.stringify(await slots()) === JSON.stringify(['Add Building Block', 'Clay Modeling', 'Cut & Carve (Booleans)', 'Place Props']), `${await tabOn()} ${JSON.stringify(await slots())}`);
+  check('Simplified shows the sub-tool\'s presets and its sliders under the tab\'s own name', /Basic Shapes & Clay Sculpt/.test(await dom(() => document.querySelector('.v3-panel header b')?.textContent ?? '')) && await page.locator('.v3-chips button').count() === 6 && await page.locator('.v3-sliders input[type=range]').count() >= 2);
+  await dom(() => { const el = document.querySelector('.v3-range input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; set?.call(el, '3'); el?.dispatchEvent(new Event('input', { bubbles: true })); el?.dispatchEvent(new Event('change', { bubbles: true })); });
+  await page.waitForTimeout(T(200));
+  const moved = await dom(() => document.querySelector('.v3-range output')?.textContent ?? '');
+  await dom(() => { [...document.querySelectorAll('.v3-reset')].find((b) => b.textContent === 'Reset')?.click(); });
+  await page.waitForTimeout(T(200));
+  check('a slider moves, and Reset puts it back', moved === '3.0 m' && await dom(() => document.querySelector('.v3-range output')?.textContent ?? '') === '1.0 m', moved);
+  await shot('v3-simplified');
+  await key('`');
+  check('again: Advanced, F3 is Geometry with its tools, seven presets and its keys', /Geometry/.test(await tabOn()) && (await slots()).includes('Primitive Generator') && await page.locator('.v3-panel .v3-chips button').count() === 7 && await page.locator('.v3-keys > div').count() === 3);
+  await shot('v3-advanced');
+  await key('F1');
+  check('Advanced F1 shows the Selection filters, the ones coming dashed', await page.locator('.v3-filters button').count() === 6 && await page.locator('.v3-filters button.coming').count() === 5);
+  const flip = () => dom(() => { [...document.querySelectorAll('.v3-filters button')].find((b) => /Static Mesh/.test(b.textContent ?? ''))?.click(); });
+  await flip(); await page.waitForTimeout(T(150));
+  const offNow = await page.locator('.v3-filters button[aria-pressed="false"]').count();
+  await flip(); await page.waitForTimeout(T(150));
+  check('a filter switches off and on again', offNow === 1 && await page.locator('.v3-filters button[aria-pressed="false"]').count() === 0);
+  await key('F3');
+  await key('`');
+  check('and again: back to Game', await page.locator('.v3-modes button.on', { hasText: 'Game' }).count() === 1);
+  await slot('Prop Box');
+  check('Prop Box (V3.1) opens the box of the island props above the hotbar', await page.locator('.v3-options button').count() === 10, String(await page.locator('.v3-options button').count()));
+  await shot('v3-prop-box');
+  // Find a tool (/): type a few letters, Enter puts it in your hand
+  await key('/');
+  await page.keyboard.type('flat'); await page.waitForTimeout(T(200));
+  check('/ finds a tool by the start of its words', (await page.$$eval('.v3-find li b', (b) => b.map((x) => x.textContent))).includes('Clay Flatten'));
+  await page.keyboard.press('Enter'); await page.waitForTimeout(T(300));
+  check('and Enter puts it in your hand', /Clay Flatten/.test(await dom(() => document.querySelector('.v3-slot.on')?.textContent ?? '')) && await page.locator('.v3-find').count() === 0);
+  // paint the ground for real: Simplified, Ground Material (V3.1), Lava, one dab where the cursor is (in studio the mouse is free)
+  await key('b'); await page.waitForTimeout(T(600));
+  await mode('simplified');
+  await key('F2');
+  await slot('Ground Material'); await chip('Lava');
+  const lavaBefore = await page.evaluate(() => window.hmGround?.shows?.(13) ?? 0);
+  await clickWorld(640, 420); await page.waitForTimeout(T(400));
+  const lavaAfter = await page.evaluate(() => window.hmGround?.shows?.(13) ?? 0);
+  check('Ground Material: Lava paints the ground where you click', lavaAfter > lavaBefore, `lava cells ${lavaBefore} to ${lavaAfter}; ${await note()}`);
+  await key('Control+z');
+  check('and Ctrl+Z takes it back', (await page.evaluate(() => window.hmGround?.shows?.(13) ?? 0)) === lavaBefore);
+  // the surface editor: SetMix's ground is made from graphs, so a surface's look can be changed live (Edit this ground's look)
+  await chip('Grass');
   await dom(() => document.querySelector('[data-ui="island.surface-look"]')?.click());
   await page.waitForSelector('.surface-editor .se-style', { timeout: 20000 }).catch(() => null);
-  check('Edit look opens the surface editor with its styles as previews', await page.locator('.surface-editor .se-style canvas').count() >= 3);
+  check('Edit this ground\'s look opens the surface editor with its styles as previews', await page.locator('.surface-editor .se-style canvas').count() >= 3);
   const lookBefore = await page.evaluate(() => window.hmGround?.tile?.(4));
   await dom(() => document.querySelectorAll('.surface-editor .se-style')[1]?.click());
   await page.waitForTimeout(T(300));
@@ -216,8 +258,7 @@ try {
   await page.waitForFunction(() => /uses this look/.test(document.querySelector('.surface-editor [role=status]')?.textContent ?? ''), null, { timeout: 30000 }).catch(() => null);
   check('Use on this island redraws the surface and keeps the look for the player', lookBefore !== await page.evaluate(() => window.hmGround?.tile?.(4))
     && await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('hm.profile.v2') || '{}').groundLooks ?? {}).length > 0));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(T(300));
+  await key('Escape');
   check('Esc closes the surface editor', await page.locator('.surface-editor').count() === 0);
   // texture mode (MASTER_PLAN 6.4): step into the texture; the hotbar paints it; Esc steps out and the island keeps it
   await dom(() => document.querySelector('[data-ui="island.surface-look"]')?.click());
@@ -230,68 +271,24 @@ try {
   if (tb) { await page.mouse.move(tb.x + tb.width * 0.3, tb.y + tb.height * 0.4); await page.mouse.down(); for (let k = 1; k <= 8; k++) await page.mouse.move(tb.x + tb.width * (0.3 + k * 0.05), tb.y + tb.height * 0.4); await page.mouse.up(); }
   await page.waitForTimeout(T(600));
   check('the hotbar paints the texture and the island shows it', texBefore !== await page.evaluate(() => window.hmGround?.tile?.(4)));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(T(400));
+  for (let i = 0; i < 3 && await page.locator('.tex-bench').count() > 0; i++) await key('Escape');
   check('Esc steps out of the texture', await page.locator('.tex-bench').count() === 0);
-  // Sculpt holds ways to sculpt; the shapes its Stamp presses are the palette
-  await page.keyboard.press('F10');
-  await page.waitForTimeout(T(300));
-  check('Terrain holds ways to shape the ground (Grab, Clay, Stamp, Terrace, Road, River, Rain ...)', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Raise', 'Smooth', 'Grab', 'Clay', 'Stamp', 'Terrace', 'Road', 'River', 'Rain'].every((w) => t.includes(w)); }));
-  check('the Sculpt palette holds the shapes to stamp', JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Hill', 'Crater', 'Plateau', 'Ridge', 'Dune', 'Volcano']));
-  // Things and Lights hold ways too; what they use is the palette
-  await page.keyboard.press('F3');
-  await page.waitForTimeout(T(300));
-  const thingsRow = await page.evaluate(() => [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent));
-  const thingsFrames = await page.locator('.palette-strip .ps-frame').count();
-  await shot('things-palette');
-  check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', ['Place', 'Scatter', 'Row', 'Swap'].every((w) => thingsRow.includes(w)) && thingsFrames >= 10, `${thingsRow.join(',')} / ${thingsFrames} frames`);
-  await page.keyboard.press('F7');
-  await page.waitForTimeout(T(300));
-  check('Logic (F7, and the backtick key) holds Add rule, Remove rules, Rules, and its palette the ready-made rules', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Add rule', 'Remove rules', 'Rules'].every((w) => t.includes(w)); })
-    && await page.locator('.palette-strip .ps-frame').count() >= 8);
-  await page.keyboard.press('F6');
-  await page.waitForTimeout(T(300));
-  check('Lights holds ways (Look, Sun, Day and night, Haze, Clouds) and the looks are the palette', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Look', 'Sun', 'Day and night', 'Haze', 'Clouds'].every((w) => t.includes(w)); })
-    && await page.locator('.palette-strip .ps-frame').count() >= 10);
-  await page.keyboard.press('F2');
-  await page.waitForTimeout(T(300));
-  check('the hotbar has Easy, Pro and Studio', JSON.stringify(await page.$$eval('.level-switch button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Easy', 'Pro', 'Studio']));
-  await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
-  await page.waitForTimeout(T(300));
-  check('Pro adds size and strength beside the presets', await page.locator('.tp-knobs input[type=range]').count() === 2);
-  await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
-  // paint for real: the palette's lava, the Fill way, one click on the ground (in studio the mouse is free)
-  await page.keyboard.press('b');
-  await page.waitForTimeout(T(900));
-  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Lava/.test(b.textContent ?? ''))?.click(); });
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Fill/.test(b.textContent ?? ''))?.click(); });
-  const lavaBefore = await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0);
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(150)); await page.mouse.up();
-  await page.waitForTimeout(T(600));
-  const lavaAfter = await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0);
-  check('Fill with lava from the palette paints the ground', lavaAfter > lavaBefore, `lava cells ${lavaBefore} to ${lavaAfter}`);
-  await page.keyboard.press('Control+z');
-  await page.waitForTimeout(T(300));
-  check('and Ctrl+Z takes it back', (await page.evaluate(() => window.hmGround?.surfaces()[13] ?? 0)) === lavaBefore);
-  // Layers: what the island is made of; + Add puts a thing where you look, the eye hides it, the bin removes it
-  await dom(() => document.querySelector('[data-ui="island.layers"]')?.click());
-  await page.waitForTimeout(T(400));
-  check('the Layers button on the palette opens Layers', await page.locator('.fwin[aria-label="Layers"] .layers').count() === 1);
+  // Layers (L): what the island is made of; + Add puts a thing where you look, the eye hides it, the bin removes it
+  await key('l');
+  check('L opens Layers', await page.locator('.fwin[aria-label="Layers"] .layers').count() === 1);
   const things = await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count();
+  await page.mouse.move(640, 470); await page.waitForTimeout(T(200));
   await dom(() => { [...document.querySelectorAll('.layers .ly-head button')].find((b) => /Add/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(T(200));
   await dom(() => { [...document.querySelectorAll('.layers .ly-add button')].find((b) => /Barrel/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(T(500));
   check('+ Add puts a thing in as a new layer, picked', await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count() === things + 1 && await page.locator('.layers .ly-row.on .ly-attrs').count() === 1);
-  // the gizmo (hotbar spec V3): Pro shows it on the picked thing on Select's tab; drag the x arrow, one undo step puts it back
-  await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
-  await page.keyboard.press('F1');
-  await page.waitForTimeout(T(500));
+  // the gizmo (Simplified and Advanced): on the picked thing; drag the x arrow, one undo step puts it back
+  await key('F1');
   const g0 = await page.evaluate(() => window.hmGizmo?.());
-  check('Pro shows the move gizmo on the picked thing', !!g0 && g0.mode === 'move', JSON.stringify(g0));
+  check('Simplified shows the move gizmo on the picked thing', !!g0 && g0.mode === 'move', JSON.stringify(g0));
   if (g0) {
-    await page.keyboard.press('+');
-    await page.waitForTimeout(T(200));
+    await key('+');
     const g1 = await page.evaluate(() => window.hmGizmo?.());
     check('+ grows the gizmo', !!g1 && g1.size > 1.1, String(g1?.size));
     await page.mouse.move(g1.xArrow[0], g1.xArrow[1]);
@@ -305,152 +302,143 @@ try {
     const g2 = await page.evaluate(() => window.hmGizmo?.());
     check('dragging the x arrow moves the thing along x only', !!g2 && g2.x - g1.x > 0.2 && Math.abs(g2.z - g1.z) < 1e-6 && Math.abs(g2.y - g1.y) < 1e-6, `x ${g1.x} to ${g2?.x}; before ${JSON.stringify(g1)}; after ${JSON.stringify(g2)}`);
     console.log(`     gizmo drag: x ${g1.x.toFixed(3)} to ${g2?.x.toFixed(3)} (arrow ${g1.len.toFixed(3)} m long)`);
-    await page.keyboard.press('Control+z');
-    await page.waitForTimeout(T(300));
+    await key('Control+z');
     const g3 = await page.evaluate(() => window.hmGizmo?.());
     check('one Ctrl+Z puts it back', !!g3 && Math.abs(g3.x - g1.x) < 1e-6, `x ${g3?.x}`);
-    await page.keyboard.press('-');
+    await key('F5');
+    check('the gizmo stays on the picked thing in every tab (V3.1)', !!(await page.evaluate(() => window.hmGizmo?.())));
+    await key('-');
   }
-  await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
-  await page.waitForTimeout(T(200));
-  check('Easy has no gizmo', !(await page.evaluate(() => window.hmGizmo?.())));
-  await page.keyboard.press('F2');
-  await page.waitForTimeout(T(200));
-  // Effects (F12, or Shift+F2): place a campfire from the palette, it burns; Ctrl+Z takes it away
-  await page.keyboard.press('Shift+F2');
-  await page.waitForTimeout(T(400));
-  check('Shift+F2 opens Effects, its palette holds the twelve effects', /Effects/.test(await page.locator('.tab-strip button.on').first().textContent() ?? '') && await page.locator('.palette-strip .ps-frame').count() === 12);
-  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Campfire/i.test(b.textContent ?? ''))?.click(); });
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Place/.test(b.textContent ?? ''))?.click(); });
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
-  await page.waitForTimeout(T(900));
+  await mode('game');
+  check('Game Mode has no gizmo', !(await page.evaluate(() => window.hmGizmo?.())));
+  // the tools below click the ground: let go of the barrel so its gizmo is not in the way
+  await page.evaluate(() => window.hmSelect?.(null));
+  // Magic Wand (F12, or Shift+F2): Bonfire Flame burns where you click; Ctrl+Z takes it away
+  await key('Shift+F2');
+  check('Shift+F2 opens Magic Wand', /Magic Wand/.test(await tabOn()));
+  await slot('Bonfire Flame');
+  await clickWorld(640, 420); await page.waitForTimeout(T(700));
   const fx1 = await page.evaluate(() => window.hmEffects?.());
   await shot('effects-campfire');
-  check('Place puts a campfire on the island and it burns', fx1?.placed === 1 && fx1.particles > 0, JSON.stringify(fx1));
-  await page.keyboard.press('Control+z');
-  await page.waitForTimeout(T(400));
+  check('Bonfire Flame puts a campfire on the island and it burns', fx1?.placed === 1 && fx1.particles > 0, JSON.stringify(fx1) + ' ' + await note());
+  await key('Control+z');
   check('and Ctrl+Z takes it away', (await page.evaluate(() => window.hmEffects?.()))?.placed === 0);
-  // Sound (F5): the palette holds the ambiences and the sounds; Place puts Beach Waves down as a zone; Ctrl+Z takes it away
-  await page.keyboard.press('F5');
-  await page.waitForTimeout(T(400));
-  check('Sound holds ways (Play, Place, Remove, Sounds here) and its palette the eight ambiences first', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((x) => x.textContent); return ['Play', 'Place', 'Remove', 'Sounds here'].every((w) => t.includes(w)); })
-    && JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.slice(0, 2).map((x) => x.textContent))) === JSON.stringify(['Forest Birds', 'Windy Hill']));
-  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Beach Waves/.test(b.textContent ?? ''))?.click(); });
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Place/.test(b.textContent ?? ''))?.click(); });
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
-  await page.waitForTimeout(T(400));
-  check('Place puts Beach Waves down as a zone', (await page.evaluate(() => window.hmSounds?.()))?.zones === 1, JSON.stringify(await page.evaluate(() => window.hmSounds?.())));
-  await page.keyboard.press('Control+z');
-  await page.waitForTimeout(T(400));
+  // Audio (Simplified F5): Forest Birds as an ambience zone; Ctrl+Z takes it away
+  await mode('simplified');
+  await key('F5');
+  await slot('Background Ambience Zone'); await chip('Forest Birds');
+  await clickWorld(640, 420);
+  check('Background Ambience Zone puts Forest Birds down as a zone', (await page.evaluate(() => window.hmSounds?.()))?.zones === 1, JSON.stringify(await page.evaluate(() => window.hmSounds?.())) + ' ' + await note());
+  await key('Control+z');
   check('and Ctrl+Z takes the zone away', (await page.evaluate(() => window.hmSounds?.()))?.placed === 0);
-  // Characters (F9): spawn a goblin that wanders; it walks off by itself; Ctrl+Z takes it away
-  await page.keyboard.press('F9');
-  await page.waitForTimeout(T(400));
-  check('F9 opens Characters, its palette holds six behaviours', /Characters/.test(await page.locator('.tab-strip button.on').first().textContent() ?? '') && await page.locator('.palette-strip .ps-frame').count() === 6);
-  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Wander/.test(b.textContent ?? ''))?.click(); });
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Spawn/.test(b.textContent ?? ''))?.click(); });
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
-  await page.waitForTimeout(T(1500));
+  // Characters (Simplified F9): a Wandering Animal walks off by itself; Ctrl+Z takes it away
+  await key('F9');
+  await slot('Spawn Character'); await chip('Wandering Animal');
+  await clickWorld(640, 420); await page.waitForTimeout(T(1300));
   const ch = await page.evaluate(() => window.hmChars?.());
-  check('Spawn puts a goblin down and it wanders off by itself', ch?.count === 1 && ch.drawn === 1 && ch.moved > 0.3, JSON.stringify(ch));
+  check('Spawn Character puts a goblin down and it wanders off by itself', ch?.count === 1 && ch.drawn === 1 && ch.moved > 0.3, JSON.stringify(ch));
   if (ch?.first) { await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 2.4, p[1] + 1.6, p[2] + 2.4], target: [p[0], p[1] + 0.6, p[2]] }; }, ch.first); }
   await page.waitForTimeout(T(500));
   await shot('characters-wander');
   await page.evaluate(() => { window.hmPinView = null; });
-  await page.keyboard.press('Control+z');
-  await page.waitForTimeout(T(400));
+  await key('Control+z');
   check('and Ctrl+Z takes the goblin away', (await page.evaluate(() => window.hmChars?.()))?.count === 0);
-  // Lamps (F6): holding Lamp the palette shows the lamps; a bulb placed at night lights up; two Ctrl+Z take night and the lamp back
-  await page.keyboard.press('F6');
-  await page.waitForTimeout(T(300));
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /^\d?Lamp$/.test((b.textContent ?? '').trim()) || (b.textContent ?? '').trim().endsWith('Lamp'))?.click(); });
-  await page.waitForTimeout(T(300));
-  check('holding Lamp, the Lights palette shows the ten lamps', await page.locator('.palette-strip .ps-frame').count() === 10);
+  // Lantern (Game F6): a Sticky Flashlight lights up; Turn to Night; two Ctrl+Z take the night and the light back
+  await mode('game');
+  await key('F6');
+  await slot('Sticky Flashlight');
   check('the island note never catches a click', await dom(() => { const n = document.querySelector('.island-note'); return !n || getComputedStyle(n).pointerEvents === 'none'; }));
-  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Bulb/i.test(b.textContent ?? ''))?.click(); });
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
-  await page.waitForTimeout(T(400));
+  await clickWorld(640, 420);
   const lamp = await page.evaluate(() => window.hmLamps?.());
-  const lampWhy = await dom(() => [document.querySelector('.island-note')?.textContent ?? '', document.querySelector('.tab-strip button.on')?.textContent ?? '', document.querySelector('.hotbar > button.on')?.textContent ?? ''].join(' | '));
-  check('Lamp puts a bulb down and it is lit', lamp?.placed === 1 && (lamp.slots === 0 || lamp.lit === 1), JSON.stringify(lamp) + ' ' + lampWhy + ' ' + errors.join(' / '));
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Day and night/.test(b.textContent ?? ''))?.click(); });
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
-  await page.waitForTimeout(T(1500));
+  check('Sticky Flashlight puts a light orb down and it is lit', lamp?.placed === 1 && (lamp.slots === 0 || lamp.lit === 1), JSON.stringify(lamp) + ' ' + await note() + ' ' + errors.join(' / '));
+  await slot('Turn to Night');
+  await clickWorld(640, 420); await page.waitForTimeout(T(1300));
   if (lamp?.first) await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 5, p[1] + 4, p[2] + 5], target: [p[0], p[1] - 1, p[2]] }; }, lamp.first);
   await page.waitForTimeout(T(600));
   await shot('lamp-night');
   await page.evaluate(() => { window.hmPinView = null; });
-  await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
-  await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
-  check('two Ctrl+Z take the night and the lamp back', (await page.evaluate(() => window.hmLamps?.()))?.placed === 0);
-  // Physics (F11, or Shift+F1): the push hammer sends the barrel flying; it lands for good as one undo step; Ctrl+Z puts it back
-  await page.keyboard.press('Shift+F1');
-  await page.waitForTimeout(T(400));
-  check('Shift+F1 opens Physics, its palette holds nine materials', /Physics/.test(await page.locator('.tab-strip button.on').first().textContent() ?? '') && await page.locator('.palette-strip .ps-frame').count() === 9);
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Push hammer/.test(b.textContent ?? ''))?.click(); });
-  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
-  await page.waitForTimeout(T(4500));
+  await key('Control+z'); await key('Control+z');
+  check('two Ctrl+Z take the night and the light back', (await page.evaluate(() => window.hmLamps?.()))?.placed === 0);
+  // Physics Play (Game F11, or Shift+F1): the Push Hammer sends the barrel flying; it lands for good as one undo step
+  await key('Shift+F1');
+  check('Shift+F1 opens Physics Play', /Physics Play/.test(await tabOn()));
+  await slot('Push Hammer');
+  await clickWorld(640, 420); await page.waitForTimeout(T(4300));
   const ph = await page.evaluate(() => window.hmPhysics?.());
-  const phNote = await dom(() => document.querySelector('.island-note')?.textContent ?? '');
-  check('the push hammer sends things flying and they land for good', ph?.settled === 1 && !ph.moving, JSON.stringify(ph) + ' ' + phNote);
-  await page.keyboard.press('Control+z');
+  check('the Push Hammer sends things flying and they land for good', ph?.settled === 1 && !ph.moving, JSON.stringify(ph) + ' ' + await note());
+  await key('Control+z');
+  // Terrain (Simplified F10): Paths & Water (V3.1), a Stone Road from two points, laid by clicking the last one again; Ctrl+Z takes it back
+  await mode('simplified');
+  await key('F10');
+  await slot('Paths & Water'); await chip('Stone Road');
+  const groundBefore = await page.evaluate(() => [window.hmGround?.heights?.(), window.hmGround?.surfaces()[24] ?? 0]);
+  for (const [x, y] of [[520, 410], [760, 410], [760, 410]]) await clickWorld(x, y);
   await page.waitForTimeout(T(400));
-  // Terrain (F10): a road from two points, laid by clicking the last one again; it reshapes and repaints the ground; Ctrl+Z takes it back
-  await page.keyboard.press('F10');
-  await page.waitForTimeout(T(300));
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Road$/.test((b.textContent ?? '').trim()))?.click(); });
-  const groundBefore = await page.evaluate(() => [window.hmGround?.heights?.(), window.hmGround?.surfaces()[16] ?? 0]);
-  for (const [x, y] of [[520, 440], [760, 440], [760, 440]]) { await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(T(80)); await page.mouse.up(); await page.waitForTimeout(T(250)); }
-  await page.waitForTimeout(T(400));
-  const road = await page.evaluate(() => [window.hmPath?.(), window.hmGround?.heights?.(), window.hmGround?.surfaces()[16] ?? 0]);
+  const road = await page.evaluate(() => [window.hmPath?.(), window.hmGround?.heights?.(), window.hmGround?.surfaces()[24] ?? 0]);
   const laid = road[0]?.last ?? [];
   if (laid.length >= 2) { await page.evaluate((pts) => { const mx = (pts[0][0] + pts[pts.length - 1][0]) / 2, mz = (pts[0][1] + pts[pts.length - 1][1]) / 2; const g = window.hmGround?.heightAt?.(mx, mz) ?? 5; window.hmPinView = { eye: [mx + 6, g + 9, mz + 6], target: [mx, g, mz] }; }, laid); await page.waitForTimeout(T(600)); await shot('road'); await page.evaluate(() => { window.hmPinView = null; }); }
-  check('Road: two points and the last again lay a road that reshapes and repaints the ground', road[0]?.laid === 1 && road[1] !== groundBefore[0] && road[2] > groundBefore[1], JSON.stringify([groundBefore, road]));
-  await page.keyboard.press('Control+z');
-  await page.waitForTimeout(T(400));
+  check('Stone Road: two points and the last again lay a cobbled road that reshapes the ground', road[0]?.laid === 1 && road[1] !== groundBefore[0] && road[2] > groundBefore[1], JSON.stringify([groundBefore, road]));
+  await key('Control+z');
   check('and Ctrl+Z takes the road back', (await page.evaluate(() => window.hmGround?.heights?.())) === groundBefore[0]);
-  // Logic wires (F7): a zone, a wire from it to the barrel that hides it; walking into the zone hides the barrel; two Ctrl+Z take it all back
-  await page.keyboard.press('F7');
-  await page.waitForTimeout(T(300));
-  const clickWay = (name) => dom((n) => { [...document.querySelectorAll('.hotbar > button')].find((b) => (b.textContent ?? '').trim().endsWith(n))?.click(); }, name);
-  const clickWorld = async (x, y) => { await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(T(80)); await page.mouse.up(); await page.waitForTimeout(T(250)); };
-  await clickWay('Zone'); await clickWorld(640, 470);
-  check('Zone puts a trigger zone down', (await page.evaluate(() => window.hmWires?.()))?.zones === 1);
-  await clickWay('Wire'); await page.waitForTimeout(T(200));
-  check('holding Wire, the palette shows what a wire does', await page.locator('.palette-strip .ps-frame').count() === 8);
-  await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Hide it/.test(b.textContent ?? ''))?.click(); });
-  await clickWorld(640, 470);
+  // Rules (Simplified F7): a zone (Player Enters Area), an Action Link from it to the barrel (Open Door); walking in hides the barrel; undo takes it all back
+  await key('F7');
+  await slot('Trigger Zones'); await chip('Player Enters Area');
+  await clickWorld(640, 420);
+  check('Player Enters Area puts a trigger zone down', (await page.evaluate(() => window.hmWires?.()))?.zones === 1);
+  await slot('Action Links'); await chip('Open Door');
+  await clickWorld(640, 420);
   const barrelAt = await page.evaluate(() => { const t = window.hmThings?.()[0]; return t ? window.hmProject?.(t.x, t.y + 0.05, t.z) : null; });
   if (barrelAt) await clickWorld(barrelAt[0], barrelAt[1]);
   const wired = await page.evaluate(() => window.hmWires?.());
-  check('Wire: the zone, then the barrel', wired?.wires === 1, JSON.stringify(wired) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
+  check('Action Links: the zone, then the barrel', wired?.wires === 1, JSON.stringify(wired) + ' ' + await note());
   const walked = await page.evaluate(() => { const w = window.hmWires?.(); return w ? w.walkInto('') : -1; });
-  check('walking into the zone hides the barrel', walked >= 0 && (await page.evaluate(() => window.hmWires?.()))?.hidden.length === 1, String(walked));
+  check('walking into the zone opens (hides) the barrel', walked >= 0 && (await page.evaluate(() => window.hmWires?.()))?.hidden.length === 1, String(walked));
+  // Advanced F7: the Visual Wire Graph draws the zone, the barrel and the cord between them
+  await mode('advanced');
+  await key('F7');
+  await slot('Visual Wire Graph');
+  await page.waitForTimeout(T(300));
+  check('Visual Wire Graph shows the zone and the barrel joined by a cord', await page.locator('.wg .node.zone').count() === 1 && await page.locator('.wg .cord').count() === 1, `${await page.locator('.wg .node').count()} nodes, ${await page.locator('.wg .cord').count()} cords`);
+  await shot('wire-graph');
+  await key('Escape');
+  await mode('simplified');
   // undo exactly the steps made (a step that did not happen must not cost an earlier one)
-  for (let i = 0; i < (wired?.wires ?? 0) + (wired?.zones ?? 0); i++) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
-  await page.waitForTimeout(T(200));
+  for (let i = 0; i < (wired?.wires ?? 0) + (wired?.zones ?? 0); i++) await key('Control+z');
   const after = await page.evaluate(() => window.hmWires?.());
-  check('two Ctrl+Z take the wire and the zone back, and the barrel shows again', after?.zones === 0 && after.wires === 0 && after.hidden.length === 0, JSON.stringify(after));
-  // Camera (F8): an orbit shot flies round (Esc stops it), a photo is saved, slow motion slows the world and comes back
-  await page.keyboard.press('F8');
-  await page.waitForTimeout(T(300));
-  await clickWay('Orbit shot'); await clickWorld(640, 470);
-  await page.waitForTimeout(T(600));
-  check('Orbit shot flies the camera round', (await page.evaluate(() => window.hmCamera?.()))?.shot === true);
-  await shot('orbit-shot');
-  await page.keyboard.press('Escape'); await page.waitForTimeout(T(200));
-  check('and Esc stops it', (await page.evaluate(() => window.hmCamera?.()))?.shot === false);
-  await clickWay('Photo'); await clickWorld(640, 470); await page.waitForTimeout(T(300));
-  check('Photo saves a picture of the view', (await page.evaluate(() => window.hmCamera?.()))?.photos === 1);
-  await clickWay('Slow motion'); await clickWorld(640, 470); await page.waitForTimeout(T(800));
+  check('Ctrl+Z takes the link and the zone back, and the barrel shows again', after?.zones === 0 && after.wires === 0 && after.hidden.length === 0, JSON.stringify(after));
+  // Magic Cord (Game F7): Step-Pad to Door, the pad then the barrel; the Wire Cutter snips it
+  await mode('game');
+  await key('F7');
+  await slot('Step-Pad to Door');
+  await clickWorld(640, 420);
+  const barrelAt2 = await page.evaluate(() => { const t = window.hmThings?.()[0]; return t ? window.hmProject?.(t.x, t.y + 0.05, t.z) : null; });
+  if (barrelAt2) await clickWorld(barrelAt2[0], barrelAt2[1]);
+  const cord = await page.evaluate(() => window.hmWires?.());
+  check('Step-Pad to Door: a pad, then the barrel, joined by a cord', cord?.zones === 1 && cord.wires === 1, JSON.stringify(cord) + ' ' + await note());
+  await slot('Wire Cutter');
+  if (barrelAt2) await clickWorld(barrelAt2[0], barrelAt2[1]);
+  check('the Wire Cutter snips it', (await page.evaluate(() => window.hmWires?.()))?.wires === 0, await note());
+  for (let i = 0; i < 3; i++) await key('Control+z');
+  check('and undo takes the pad away', (await page.evaluate(() => window.hmWires?.()))?.zones === 0, JSON.stringify(await page.evaluate(() => window.hmWires?.())));
+  // Photo Cam (Game F8): Instant Polaroid saves a picture; Slow-Mo Cam drops the world to 20% and back; (Simplified) Spin Around Object flies round
+  await key('F8');
+  await slot('Instant Polaroid'); await clickWorld(640, 420); await page.waitForTimeout(T(300));
+  check('Instant Polaroid saves a picture of the view', (await page.evaluate(() => window.hmCamera?.()))?.photos === 1);
+  await slot('Slow-Mo Cam'); await clickWorld(640, 420); await page.waitForTimeout(T(800));
   const sm = await page.evaluate(() => window.hmCamera?.());
-  check('Slow motion slows the world to a quarter', sm?.slow === true && Math.abs(sm.scale - 0.25) < 1e-6, JSON.stringify(sm));
-  await clickWorld(640, 470); await page.waitForTimeout(T(800));
+  check('Slow-Mo Cam slows the world to 20%', sm?.slow === true && Math.abs(sm.scale - 0.2) < 1e-6, JSON.stringify(sm));
+  await clickWorld(640, 420); await page.waitForTimeout(T(800));
   check('and again brings it back to speed', (await page.evaluate(() => window.hmCamera?.()))?.scale === 1);
-  // Walk a path (F4): click the barrel, two points, the last again: it walks there and back by itself; Ctrl+Z stops it
-  await page.keyboard.press('F4');
-  await page.waitForTimeout(T(300));
-  await clickWay('Walk a path');
+  await mode('simplified');
+  await slot('Fly-Through Track'); await chip('Spin Around Object');
+  await clickWorld(640, 420); await page.waitForTimeout(T(600));
+  check('Spin Around Object flies the camera round', (await page.evaluate(() => window.hmCamera?.()))?.shot === true);
+  await shot('orbit-shot');
+  await key('Escape');
+  check('and Esc stops it', (await page.evaluate(() => window.hmCamera?.()))?.shot === false);
+  // Walk Path Creator (Simplified F4): click the barrel, two points, the last again: it walks there and back by itself; Ctrl+Z stops it
+  await key('F4');
+  await slot('Walk Path Creator'); await chip('Back & Forth Loop');
   const wt = (await page.evaluate(() => window.hmThings?.() ?? []))[0];
   if (wt) {
     await page.evaluate((t) => { window.hmPinView = { eye: [t.x + 5, t.y + 5, t.z + 5], target: [t.x + 1, t.y, t.z + 1] }; }, wt);
@@ -459,45 +447,48 @@ try {
     for (const p of [scr[0], scr[1], scr[2], scr[2]]) if (p) await clickWorld(p[0], p[1]);
     await page.waitForTimeout(T(1500));
     const wk = await page.evaluate(() => window.hmWalks?.());
-    check('Walk a path: the barrel walks its path by itself', wk?.count === 1 && wk.moved > 0.3, JSON.stringify(wk) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
-    if (wk?.count === 1) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
+    check('Walk Path Creator: the barrel walks its path by itself', wk?.count === 1 && wk.moved > 0.3, JSON.stringify(wk) + ' ' + await note());
+    if (wk?.count === 1) await key('Control+z');
     check('and Ctrl+Z stops it', (await page.evaluate(() => window.hmWalks?.()))?.count === 0);
     await page.evaluate(() => { window.hmPinView = null; });
   }
-  // Paint a thing (F2) and Carve (F3): the barrel's blocks under the pointer; each is one undo step
+  // Color Spray (Game F2) and Clay Scoop (Game F3): the barrel's blocks under the pointer; each is one undo step
   const bt = (await page.evaluate(() => window.hmThings?.() ?? []))[0];
   if (bt) {
+    await mode('game');
     await page.evaluate((t) => { window.hmPinView = { eye: [t.x + 3, t.y + 2.5, t.z + 3], target: [t.x, t.y + 0.5, t.z] }; }, bt);
     await page.waitForTimeout(T(400));
     const mid = await page.evaluate((t) => window.hmProject?.(t.x, t.y + 0.5, t.z), bt);
-    await page.keyboard.press('F2'); await page.waitForTimeout(T(300));
-    await clickWay('Paint a thing'); await page.waitForTimeout(T(200));
-    check('holding Paint a thing, the palette shows twelve colours', await page.locator('.palette-strip .ps-frame').count() === 12);
-    await dom(() => { [...document.querySelectorAll('.palette-strip .ps-frame')].find((b) => /Blue/.test(b.textContent ?? ''))?.click(); });
+    await key('F2');
+    await slot('Rainbow Spray');
     const e0 = (await page.evaluate(() => window.hmBlocks?.()))?.edits ?? 0;
     if (mid) await clickWorld(mid[0], mid[1]);
-    check('Paint a thing paints the part of the barrel you click', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 1, await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
-    await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
-    await page.keyboard.press('F3'); await page.waitForTimeout(T(300));
-    await clickWay('Carve'); await page.waitForTimeout(T(200));
+    check('Rainbow Spray paints the part of the barrel you click', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 1, await note());
+    await slot('Water Sponge');
     if (mid) await clickWorld(mid[0], mid[1]);
-    check('Carve digs a hole in the barrel', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 2, JSON.stringify(await page.evaluate(() => window.hmBlocks?.())) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? '') + ' | ' + await dom(() => document.querySelector('.hotbar > button.on')?.textContent ?? '') + ' | ' + await dom(() => document.querySelector('.tab-strip button.on')?.textContent ?? ''));
+    check('the Water Sponge wipes it back to the colours it was made with', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 2, await note());
+    await key('Control+z'); await key('Control+z');
+    await key('F3');
+    await slot('Clay Scoop');
+    if (mid) await clickWorld(mid[0], mid[1]);
+    check('Clay Scoop takes a bite out of the barrel', (await page.evaluate(() => window.hmBlocks?.()))?.edits === e0 + 3, JSON.stringify(await page.evaluate(() => window.hmBlocks?.())) + ' ' + await note());
     await shot('carve');
-    await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
+    await key('Control+z');
     await page.evaluate(() => { window.hmPinView = null; });
   }
-  await page.keyboard.press('F2');
-  await page.waitForTimeout(T(200));
+  // the barrel again in Layers: its eye hides it, the bin removes it
+  if (await page.locator('.fwin[aria-label="Layers"]').count() === 0) await key('l');
+  await dom(() => { const rows = document.querySelectorAll('.layers .ly-list[aria-label="Things"] .ly-row'); const last = rows[rows.length - 1]; if (last && !last.classList.contains('on')) last.querySelector('.ly-name')?.click(); });
+  await page.waitForTimeout(T(300));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });
   await page.waitForTimeout(T(200));
   check('its eye hides it', await page.locator('.layers .ly-row.hidden').count() === 1);
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Remove"]')?.click(); });
   await page.waitForTimeout(T(300));
   check('and the bin removes it again', await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count() === things);
-  // a group (Box, F1, Pro): two barrels boxed together move together with the gizmo, as one undo step
-  await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
-  await page.keyboard.press('F1');
-  await page.waitForTimeout(T(300));
+  // a group (Simplified F1, Box Drag): two barrels boxed together move together with the gizmo, as one undo step
+  await mode('simplified');
+  await key('F1');
   // the new things go where the pointer is: a few metres ahead, so the gizmo's arrows stay on the screen
   await page.mouse.move(640, 360); await page.waitForTimeout(T(200));
   for (let i = 0; i < 2; i++) {
@@ -510,19 +501,18 @@ try {
   const t0 = (await page.evaluate(() => window.hmThings?.() ?? []))[0];
   if (t0) await page.evaluate((t) => { window.hmPinView = { eye: [t.x + 5, t.y + 4, t.z + 5], target: [t.x, t.y + 0.5, t.z] }; }, t0);
   await page.waitForTimeout(T(400));
-  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => (b.textContent ?? '').trim().endsWith('Box'))?.click(); });
-  await page.waitForTimeout(T(200));
+  await slot('Box Drag'); await chip('Touch Any Part');
   const twoAt = await page.evaluate(() => (window.hmThings?.() ?? []).map((t) => window.hmProject?.(t.x, t.y + 0.3, t.z)));
   const xs = twoAt.map((p) => p?.[0] ?? 640), ys = twoAt.map((p) => p?.[1] ?? 400);
   await page.mouse.move(Math.min(...xs) - 60, Math.min(...ys) - 60); await page.mouse.down();
   await page.mouse.move(Math.max(...xs) + 60, Math.max(...ys) + 60, { steps: 5 }); await page.mouse.up();
   await page.waitForTimeout(T(400));
   const gg = await page.evaluate(() => window.hmGizmo?.());
-  check('Box picks both barrels and the gizmo stands on the group', gg?.count === 2, JSON.stringify(gg?.group) + ' ' + await dom(() => document.querySelector('.island-note')?.textContent ?? ''));
+  check('Box Drag picks both barrels and the gizmo stands on the group', gg?.count === 2, JSON.stringify(gg?.group) + ' ' + await note());
   if (gg && gg.count === 2) {
     const before2 = await page.evaluate(() => window.hmThings?.());
     // drag whichever arrow sits in a clear part of the screen (where the arrows point depends on the camera)
-    const clear = (p) => p[0] > 430 && p[0] < 870 && p[1] > 170 && p[1] < 460;
+    const clear = (p) => p[0] > 430 && p[0] < 870 && p[1] > 170 && p[1] < 430;
     const axis = ['x', 'z', 'y'].find((k) => clear(gg.arrows[k][0]) && clear(gg.arrows[k][1])) ?? 'x';
     const [from2, to2] = gg.arrows[axis];
     await page.mouse.move(from2[0], from2[1]); await page.waitForTimeout(T(300));
@@ -533,36 +523,18 @@ try {
     const after2 = await page.evaluate(() => window.hmThings?.());
     const d = after2.map((t, i) => t[axis] - before2[i][axis]);
     check('dragging the arrow moves the whole group the same way', d.length === 2 && d[0] > 0.1 && Math.abs(d[0] - d[1]) < 1e-6, axis + ' ' + JSON.stringify(d) + ' ' + JSON.stringify(hot2) + ' ' + JSON.stringify(gg.arrows));
-    await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
+    await key('Control+z');
   }
-  await page.keyboard.press('Escape'); await page.waitForTimeout(T(200));
-  for (let i = 0; i < 2; i++) { await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300)); }
+  await key('Escape');
+  for (let i = 0; i < 2; i++) await key('Control+z');
   await page.evaluate(() => { window.hmPinView = null; });
   check('and undo takes the move and both barrels back', (await page.evaluate(() => window.hmGround?.things?.())) === things);
-  await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
-  await page.keyboard.press('F2');
-  await page.waitForTimeout(T(200));
-  await page.keyboard.press('Tab');
-  await page.waitForTimeout(T(300));
-  check('Tab again closes the palette', await page.locator('.palette-strip').count() === 0);
-  await page.keyboard.press('b');
-  await page.waitForTimeout(T(500));
-  for (let i = 0; i < 3 && await page.locator('.fwin').count() > 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(250)); }
-  await page.keyboard.press('e');
-  await page.waitForTimeout(T(500));
-  check('E opens your presets', await page.locator('.fwin[aria-label="Your presets"]').count() === 1);
-  check('every way to paint has a card', await page.locator('.pw-card').count() >= 9);
-  await dom(() => { [...document.querySelectorAll('.pw-tabs button')].find((b) => /Animate/.test(b.textContent ?? ''))?.click(); });
-  await page.waitForTimeout(T(400));
-  check('animations preview as moving figures', await page.locator('.pw-card .pv-anim').count() >= 8);
-  await dom(() => { [...document.querySelectorAll('.pw-card .pw-edit')][0]?.click(); });
-  await page.waitForTimeout(T(400));
-  check('Edit opens an attribute editor window', await page.locator('.fwin').count() >= 2);
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(T(200));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(T(300));
-  check('Esc closes the windows one at a time', await page.locator('.fwin').count() === 0 && await page.locator('.island-menu').count() === 0);
+  await mode('game');
+  await key('b');
+  // Esc closes the windows one at a time (Layers, what you hold), and only then the menu
+  const wins = await page.locator('.fwin').count();
+  for (let i = 0; i < wins; i++) await key('Escape');
+  check('Esc closes the windows one at a time', await page.locator('.fwin').count() === 0 && await page.locator('.island-menu').count() === 0, `${wins} windows`);
   await page.keyboard.press('1');
   await page.waitForTimeout(T(300));
   await page.keyboard.press('b');

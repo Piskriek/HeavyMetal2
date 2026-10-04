@@ -91,7 +91,8 @@ export const LIGHT_PRESETS: readonly LightPreset[] = [
     angle: 0,
     penumbra: 0,
     flicker: 'strobe',
-    rate: 4.0,
+    // never more than three flashes a second (photosensitive players; hotbar spec V3.1, comfort and safety)
+    rate: 2.5,
     castShadow: false,
   },
   {

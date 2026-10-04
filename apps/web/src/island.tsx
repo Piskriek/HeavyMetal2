@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { WIRE_DOS, PHYS_ITEMS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { V3_MODES, V3_TABS, levelOfMode, modeOfLevel, nextMode, v3Button, v3Slots, v3TabForKey, v3TabName, type V3Button, type V3Drive, type V3Found, type V3Mode, type V3Slider, type V3Source, type V3SubTool, type V3Tab, WIRE_DOS, PHYS_ITEMS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, THINGS, shakeById, shakeOffset, toolById, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -12,7 +12,7 @@ import { createAdaptiveQuality, guessQuality, parseQuality, type AdaptiveQuality
 import { noteGpu, powerPreferenceOf, showTier, type GpuChoice, type Profile } from './shell/profile';
 import { SettingsBody } from './shell/settings-body';
 import type { SfxId } from '@hm/audio';
-import { followLighting, pickLook } from './look';
+import { ensureLightPreset, followLighting, pickLook } from './look';
 import { decorInstances } from './maker/dress';
 import type { MakerScene } from './maker/scene';
 import { placementsOf } from './maker/models-panel';
@@ -23,15 +23,17 @@ import { GizmoControl, gizmoModeFor, type GizmoTarget } from './build/gizmo-cont
 import { EffectsRuntime, type PlacedEffect } from './build/effects-runtime';
 import { SoundscapeRuntime, zoneOf, emitterOf, type PlacedSound } from './build/soundscape-runtime';
 import { SoundSpotsPanel } from './build/sound-spots-panel';
-import { LIGHT_PRESETS, flicker, pickLights, presetById as lampById } from '@hm/lightplace';
+import { flicker, pickLights, presetById as lampById } from '@hm/lightplace';
 import { AMBIENCES } from '@hm/soundscape';
 import { audio } from './maker/feedback';
 import { PARTICLE_PRESETS } from '@hm/particles';
-import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
+import { Crosshair, ModeBar } from './build/hud';
+import { V3Hud, type V3OptionItem } from './build/v3-hud';
+import { WireGraph } from './build/wire-graph';
+import { PLANTS } from '@hm/worldrules';
 import { ANIM_WAYS, CAMERA_WAYS, animOf, catalog, lookOf, soundName, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { SFX_IDS } from '@hm/audio';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
-import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
 import { LayersPanel } from './build/layers';
 import { SurfaceEditor } from './build/surface-editor';
 import { LogicPanel } from './build/logic-panel';
@@ -41,8 +43,7 @@ import { TEX_ANIMS, draftColours, draftFromTile, draftToTile, newHistory, type D
 import { decodeBlob, encodeWebp, loadTextures, saveTexture } from './build/texture-store';
 import type { StampKind } from '@hm/terrainops';
 import { LIGHT_WAYS, isLightWay, applyLightWay } from './build/light-ways';
-import { SETUPS } from '@hm/lighting';
-import { avatarRigged } from './build/cards';
+import { avatarRigged, voxelModelById } from './build/cards';
 import { encodeModel } from '@hm/voxel';
 import { rulesOf } from './world';
 import { CharactersRuntime, type PlacedChar } from './build/characters-runtime';
@@ -58,9 +59,8 @@ import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
-import { PresetWindowBody } from './build/preset-window';
 import { FloatingWindow, useWindows } from './build/windows';
-import { applyVariant, editTool, pickPalette, player, putInSlot, setActivities, setLevel, setMode, setSlot, setTab, setView, toggleSculpt, usePlayer, wearLook } from './build/player';
+import { editTool, holdWay, pickPalette, player, putInSlot, resetV3Sliders, setActivities, setLevel, setMode, setSlot, setTab, setV3Filter, setV3Preset, setV3Slider, setV3Slot, setV3Tab, setView, usePlayer, wearLook, type PlayerState } from './build/player';
 import { spriteOf } from './build/sprites';
 import { ShareDialog } from './share/share-dialog';
 import type { ShareKind } from './share/shares';
@@ -75,9 +75,9 @@ import { LOOKS as AVATAR_LOOKS, type AvatarLook } from '@hm/avatarlook';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
- * Build HUD (grown-up switch on): F1..F10 and F12 pick a tab in the V3 order (Select, Paint, Things, Animate, Sound, Lights, Logic, Camera, Characters, Terrain, Effects; P your avatar), 1..9
- * or the wheel pick a slot, left click uses it, right click does the opposite, E opens your presets (mouse free) with previews and editors,
- * hold Tab for the quick wheel. Studio mode (B, or the button top right): no goblin, fly with W A S D, Space and C, look with the right mouse
+ * Build HUD (grown-up switch on): the hotbar of the owner's spec V3 (build/v3-hud.tsx, docs/HOTBAR_V3_SPEC.md): F1..F12 pick a tab (Shift+F1
+ * and Shift+F2 for F11 and F12), 1..9 or the wheel pick a slot, left click uses it, right click does the opposite, the backtick switches
+ * Game, Simplified and Advanced, Tab frees the mouse for the sliders, / finds a tool. Studio mode (B, or the button top right): no goblin, fly with W A S D, Space and C, look with the right mouse
  * button, the mouse stays free, tools act where the cursor points, every setting opens in a movable window, F focuses on a thing, H hides
  * the rest. Esc closes one thing at a time and then opens the jump menu.
  */
@@ -94,16 +94,58 @@ const TINTS: readonly { readonly id: string; readonly name: string; readonly rgb
   { id: 'blue', name: 'Blue', rgb: [58, 104, 214] }, { id: 'purple', name: 'Purple', rgb: [128, 82, 200] }, { id: 'pink', name: 'Pink', rgb: [236, 120, 170] },
   { id: 'white', name: 'White', rgb: [240, 238, 232] }, { id: 'grey', name: 'Grey', rgb: [130, 128, 124] }, { id: 'black', name: 'Black', rgb: [38, 36, 40] },
 ];
-const LAMP_ICONS: Readonly<Record<string, string>> = { bulb: 'Lightbulb', spotlight: 'Flashlight', 'flashlight-orb': 'Flashlight', campfire: 'Flame', candle: 'Flame', strobe: 'Zap', lantern: 'Lamp', neon: 'Zap', disco: 'Sparkles', torch: 'Flame' };
-const LIGHT_ITEMS: readonly StripItem[] = SETUPS.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'sky', top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color } }));
-/** Things' palette: what its ways place. */
-const THING_ITEMS: readonly StripItem[] = THINGS.map((t) => ({ id: t.id, name: t.name, preview: { kind: 'model', model: t.id } }));
-/** Sculpt's palette: the shapes its Stamp presses. */
-const SHAPE_ITEMS: readonly StripItem[] = STAMP_SHAPES.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'icon', icon: s.icon } }));
 /** A sculpt tool takes its shape (Stamp) from the palette and the toggles from beside the hotbar. */
 const withSculptPalette = (tool: ToolPreset, s: { readonly palette: Readonly<Partial<Record<TabId, string>>>; readonly sculptToggles: { readonly mirror: boolean; readonly smoothAfter: boolean } }): ToolPreset =>
   tool.tab === 'sculpt' ? { ...tool, stampShape: s.palette.sculpt ?? 'mound', mirror: s.sculptToggles.mirror, smoothAfter: s.sculptToggles.smoothAfter }
     : tool.action === 'things' ? { ...tool, model: s.palette.things ?? 'palm' } : tool;
+
+/** The V3 button in hand (docs/HOTBAR_V3_SPEC.md): the mode, the tab, its slot, the preset picked in it, and Simplified's sub-tool. */
+interface V3Now { readonly mode: V3Mode; readonly t: V3Tab; readonly tab: number; readonly slot: number; readonly preset: number; readonly slotId: string; readonly button: V3Button | null; readonly sub: V3SubTool | null }
+function v3Now(s: PlayerState): V3Now {
+  const mode = modeOfLevel(s.level), tab = s.v3.tab, t = V3_TABS[tab] ?? V3_TABS[0]!;
+  const slot = s.v3.slots[mode][tab] ?? 0, slotId = v3Slots(t, mode)[slot]?.id ?? '';
+  const preset = s.v3.presets[`${mode}:${t.key}:${slotId}`] ?? (mode === 'advanced' ? -1 : 0);
+  return { mode, t, tab, slot, preset, slotId, button: v3Button(t, mode, slot, preset), sub: mode === 'simplified' ? t.simplified.subtools[slot] ?? null : null };
+}
+/** A Simplified slider's value for what it drives, or null when the tool in hand has no such slider (then the tool's own value stands). */
+function v3Drive(s: PlayerState, d: V3Drive): number | null {
+  const n = v3Now(s);
+  const sl = n.sub?.sliders.find((x) => x.drives === d);
+  if (!n.sub || !sl) return null;
+  return s.v3.sliders[`${n.t.key}:${n.sub.id}:${sl.id}`] ?? sl.value ?? null;
+}
+/** Where a button lives in a mode: by its id, else the first button of the mode that does the same (the tour hands over Game Mode's). */
+function v3Locate(mode: V3Mode, id: string): { tab: number; slot: number; preset: number } | null {
+  const all = (t: V3Tab): V3Button[] => [...t.game.presets, ...t.simplified.subtools.flatMap((x) => x.presets), ...t.advanced.tools];
+  const same = V3_TABS.flatMap(all).find((b) => b.id === id)?.bind;
+  for (const pass of [0, 1]) {
+    const hit = (b: V3Button): boolean => (pass === 0 ? b.id === id : !!same && !b.bind.todo && b.bind.way === same.way && (b.bind.palette?.things ?? '') === (same.palette?.things ?? ''));
+    for (let ti = 0; ti < V3_TABS.length; ti++) {
+      const t = V3_TABS[ti]!;
+      if (mode === 'game') { const i = t.game.presets.findIndex(hit); if (i >= 0) return { tab: ti, slot: i, preset: 0 }; }
+      else if (mode === 'simplified') { for (let i = 0; i < t.simplified.subtools.length; i++) { const j = t.simplified.subtools[i]!.presets.findIndex(hit); if (j >= 0) return { tab: ti, slot: i, preset: j }; } }
+      else { const i = t.advanced.tools.findIndex(hit); if (i >= 0) return { tab: ti, slot: i, preset: -1 }; }
+    }
+  }
+  return null;
+}
+/** The internal tools a way works through (Clay Plump and Scoop carve things, and raise or lower the ground). */
+const toolsOfWay = (way: string): string[] => (way === 'v3-clay-plump' ? ['things-carve', 'raise'] : way === 'v3-clay-scoop' ? ['things-carve', 'lower'] : toolById(way) ? [way] : []);
+/** A colour of Paint a thing: a toy colour, a picked one (c-rrggbb), or a bright new one every time (rainbow). */
+function tintRgb(id: string | undefined): [number, number, number] {
+  if (id && /^c-[0-9a-f]{6}$/.test(id)) { const n = parseInt(id.slice(2), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  if (id === 'rainbow') {
+    // a saturated hue at random: hsl(h, 85%, 55%)
+    const h = Math.random() * 6, c = 0.85 * (1 - Math.abs(2 * 0.55 - 1)), x = c * (1 - Math.abs((h % 2) - 1)), m = 0.55 - c / 2;
+    const [r, g, b] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+  return (TINTS.find((t) => t.id === id) ?? TINTS[0]!).rgb;
+}
+/** Game Mode's Boombox: the funny sounds it picks from. */
+const FUNNY: readonly SfxId[] = ['jump', 'boost', 'splash', 'item-pickup', 'oil', 'respawn', 'freeze', 'snap'];
+/** Reduce motion (the system setting): no screen shakes. */
+const reducedMotion = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: SETMIX_FILE[s.id] ? { kind: 'image', url: `textures/setmix/${SETMIX_FILE[s.id]}.webp`, colors: surfaceColours(s.id) } : { kind: 'swatch', colors: surfaceColours(s.id) } }));
 
 const WIN = {
@@ -203,6 +245,8 @@ export function IslandWalk(props: {
   const byId = useMemo(() => new Map(items.map((c) => [c.id, c])), [items]);
   const row: (CatalogItem | null)[] = p.hotbars[p.tab].map((id) => (id ? byId.get(id) ?? null : null));
   const heldItem = row[p.slots[p.tab]] ?? null;
+  const v3 = v3Now(p);
+  const [findOpen, setFindOpen] = useState(false);
   const showcase = props.showcase === true;
   const readyRef = useRef(props.onReady);
   readyRef.current = props.onReady;
@@ -219,7 +263,7 @@ export function IslandWalk(props: {
   useEffect(() => { onMenuChange?.(menu); if (menu) tourEvent('opened-menu'); }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
   const noteTimer = useRef(0);
   const say = useCallback((t: string) => { setNote(t); window.clearTimeout(noteTimer.current); noteTimer.current = window.setTimeout(() => setNote(''), 2200); }, []);
-  const api = useRef<{ lock: () => void; unlock: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void; groundPeek: () => Terrain | null;
+  const api = useRef<{ lock: () => void; unlock: () => void; undo: () => void; redo: () => void; playAnim: (id: string) => void; setAvatarLook: () => void; previewLook: (look: AvatarLook | null) => void; refreshModels: () => void; pick: (tab: TabId, id: string) => void; reveal: () => void; groundPeek: () => Terrain | null;
     /** Layers: carry a thing with the Move tool, place one where you look, show or hide the plants. */
     carry: (ref: PresetId) => void; addThing: (modelId: string) => PresetId | null; showPlants: (on: boolean) => void;
     /** The surface editor: draw surface `id` from this texture graph (SetMix's graph-made ground only; false for the image set). */
@@ -228,12 +272,12 @@ export function IslandWalk(props: {
     readTile: (id: number) => { colour: Uint8Array; pbr: Uint8Array; size: number } | null; putTile: (id: number, colour: Uint8Array, maps: Uint8Array) => void;
     setAnim: (id: number, v: readonly [number, number, number, number]) => void } | null>(null);
   /** A small copy of the ground you are looking at (the tool presets draw on it). */
-  const peekGround = useCallback((): Terrain | null => api.current?.groundPeek() ?? null, []);
   // the island overview needs the cursor: let go of the mouse when the level goes up
   useEffect(() => { if (level === 'island') api.current?.unlock(); lightingRef.current?.refresh(); }, [level]);
   // studio keeps the mouse free; walking takes it back when you click the world
   useEffect(() => { if (p.mode === 'studio') api.current?.unlock(); }, [p.mode]);
   useEffect(() => { api.current?.setAvatarLook(); }, [p.lookId, p.looks]);
+  useEffect(() => { applyV3(false, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // entering avatar mode: the mouse is free to click the dock, and the studio (which has no avatar) goes back to walking
   useEffect(() => { if (!avatarMode) return; api.current?.unlock(); if (player().mode === 'studio') setMode('walk'); tourEvent('opened-avatar'); }, [avatarMode]);
   useEffect(() => { api.current?.refreshModels(); }, [isolateId]);
@@ -256,6 +300,9 @@ export function IslandWalk(props: {
       switch (a.type) {
         case 'say': say(a.text); break;
         case 'give': {
+          // the tour hands over a V3 button (or one that does the same in this mode)
+          const mode = modeOfLevel(player().level), at = v3Locate(mode, a.item);
+          if (at) { const t = V3_TABS[at.tab]!; setV3Tab(at.tab); setV3Slot(mode, at.tab, at.slot); const id = v3Slots(t, mode)[at.slot]?.id; if (id && mode !== 'game') setV3Preset(`${mode}:${t.key}:${id}`, at.preset); applyV3(false); break; }
           const tool = toolById(a.item);
           if (!tool) break;
           const s = player();
@@ -298,23 +345,86 @@ export function IslandWalk(props: {
     if (id === 'island') { say('Esc, then the up arrow in the bar, shows the whole island'); return; }
     setMode('walk'); setView(id === 'first' ? 'first' : 'third');
   };
-  const pickTab = (t: TabId): void => {
-    const cur = player().tab;
-    // the Avatar tab is a mode: P (or its tab) again goes back to what you held
-    if (t === 'avatar' && cur === 'avatar') { leaveAvatar(); return; }
-    if (t === 'avatar') beforeAvatar.current = cur;
-    setTab(t); fx('tool-switch', { volume: 0.5 }); tourEvent('tab-selected');
-  };
   const leaveAvatar = (): void => { setTab(beforeAvatar.current === 'avatar' ? 'select' : beforeAvatar.current); fx('ui-toggle', { volume: 0.5 }); };
   const leaveAvatarRef = useRef(leaveAvatar);
   leaveAvatarRef.current = leaveAvatar;
-  const pickSlot = (i: number): void => { const s = player(); setSlot(s.tab, i); fx('tool-switch', { volume: 0.5 }); applyNow(s.tab, s.hotbars[s.tab][i] ?? null); tourEvent('slot-selected'); };
-  const openPresets = (): void => { api.current?.unlock(); if (!win.isOpen('presets')) tourEvent('opened-presets'); win.toggle('presets', 'Your presets', { x: Math.max(12, window.innerWidth - WIN.presets.w - 24), y: 64, ...WIN.presets }); };
-  const openEditor = (tab: TabId, id: string): void => {
-    api.current?.unlock();
-    const name = catalog(tab, player(), activities).find((c) => c.id === id)?.name ?? id;
-    win.open(`edit:${tab}:${id}`, `${tabDef(tab).label}: ${name}`, { x: 24 + (win.list.length % 4) * 28, y: 70 + (win.list.length % 4) * 28, ...WIN.editor });
+  /** The V3 hotbar: put the button in hand's binding in hand (its internal tab, way and palette picks) and, unless only syncing, do what picking it does. */
+  const applyV3 = (announce = true, act = true): void => {
+    const n = v3Now(player());
+    const b = n.button;
+    if (!b) return;
+    if (b.bind.todo) { holdWay(b.bind.tab, null); if (announce) say(`${b.name}: coming`); return; }
+    holdWay(b.bind.tab, b.bind.way, b.bind.palette ?? {});
+    // Simplified's sliders that set the tool's own size and strength
+    if (n.sub) for (const sl of n.sub.sliders) { const v = player().v3.sliders[`${n.t.key}:${n.sub.id}:${sl.id}`]; if (v !== undefined) driveTool(sl, v); }
+    if (!act) return;
+    const way = b.bind.way;
+    if (way === 'light-look' && b.bind.palette?.lights) pickLook(rt, scene.sceneId, b.bind.palette.lights);
+    else if (way === 'logic-graph') openWireGraph();
+    else if (b.bind.tab === 'animate' && !way.startsWith('anim-') && !way.startsWith('v3-')) api.current?.playAnim(way);
+    else if (b.bind.tab === 'camera' && !way.startsWith('cam-') && !way.startsWith('v3-')) switchCamera(way);
   };
+  /** A slider that changes the tool in hand (size, strength, colour): the tools its way works through take the value. */
+  const driveTool = (sl: V3Slider, v: number): void => {
+    const s = player(), way = s.hotbars[s.tab][s.slots[s.tab]] ?? '';
+    for (const id of toolsOfWay(way)) {
+      if (sl.drives === 'tool-size') editTool(id, 'size', Math.max(0.1, v));
+      else if (sl.drives === 'tool-width') editTool(id, 'size', Math.min(30, Math.max(0.5, v / 2)));
+      else if (sl.drives === 'tool-strength' || sl.drives === 'density') editTool(id, 'strength', Math.min(1, Math.max(0.01, v / 100)));
+    }
+    if (sl.drives === 'tint-colour') pickPalette('tint', `c-${Math.round(v).toString(16).padStart(6, '0')}`);
+  };
+  const pickV3Tab = (i: number): void => { if (i === player().v3.tab && !live.current.avatarMode) return; setV3Tab(i); applyV3(false); fx('tool-switch', { volume: 0.5 }); tourEvent('tab-selected'); };
+  const pickV3Slot = (i: number): void => {
+    const n = v3Now(player());
+    if (i < 0 || i >= v3Slots(n.t, n.mode).length) return;
+    setV3Slot(n.mode, n.tab, i); applyV3(); fx('tool-switch', { volume: 0.5 }); tourEvent('slot-selected');
+  };
+  const pickV3Preset = (i: number): void => {
+    const n = v3Now(player());
+    if (!n.slotId) return;
+    setV3Preset(`${n.mode}:${n.t.key}:${n.slotId}`, i); applyV3(); fx('select', { volume: 0.5 });
+  };
+  const pickV3Mode = (m: V3Mode): void => {
+    if (modeOfLevel(player().level) === m) return;
+    setLevel(levelOfMode(m)); applyV3(false); fx('ui-toggle', { volume: 0.5 }); tourEvent('mode-switched');
+    say(`${V3_MODES.find((x) => x.id === m)?.name ?? m} Mode`);
+  };
+  const pickFound = (f: V3Found): void => {
+    const m = modeOfLevel(player().level), t = V3_TABS[f.tab]!;
+    setV3Tab(f.tab); setV3Slot(m, f.tab, f.slot);
+    const id = v3Slots(t, m)[f.slot]?.id;
+    if (id && m !== 'game') setV3Preset(`${m}:${t.key}:${id}`, f.preset);
+    applyV3(); fx('tool-switch', { volume: 0.5 });
+  };
+  const onV3Slider = (sl: V3Slider, key: string, v: number, done: boolean): void => {
+    setV3Slider(key, v);
+    driveTool(sl, v);
+    if (done && sl.drives === 'hour') rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, Math.round(v * 4) / 4, 'Time of day'));
+    if (done && sl.drives === 'clouds') { const ref = ensureLightPreset(rt, scene.sceneId); rt.commands.execute(cmd.setParam(`${ref}.skyClouds`, Math.round(v) / 100, 'Cloudiness')); }
+    if (done) tourEvent('edited');
+  };
+  const onV3Reset = (prefix: string, sub: V3SubTool): void => { resetV3Sliders(prefix); for (const sl of sub.sliders) if (sl.drives && sl.value !== undefined) driveTool(sl, sl.value); fx('ui-click', { volume: 0.4 }); };
+  /** The lists a tool picks from (Advanced's options, Game's Prop Box). */
+  const v3Options = (source: V3Source): readonly V3OptionItem[] => {
+    const icon = (i: string): Preview => ({ kind: 'icon', icon: i });
+    switch (source) {
+      case 'blocks': return THINGS.filter((t) => t.id.startsWith('block-')).map((t) => ({ id: t.id, name: t.name, preview: icon(t.icon) }));
+      case 'props': return THINGS.filter((t) => !t.id.startsWith('block-')).map((t) => ({ id: t.id, name: t.name, preview: icon(t.icon) }));
+      case 'plants': return THINGS.filter((t) => ['palm', 'bush', 'rock', 'flowers', 'grass-clump'].includes(t.id)).map((t) => ({ id: t.id, name: t.name, preview: icon(t.icon) }));
+      case 'sounds': return SFX_IDS.map((id) => ({ id, name: soundName(id), preview: icon('Volume2') }));
+      case 'effects': return PARTICLE_PRESETS.map((e) => ({ id: e.id, name: e.name, preview: icon(EFFECT_ICONS[e.id] ?? 'Sparkles') }));
+      case 'paints': return PAINT_ITEMS;
+      case 'tints': return TINTS.map((t) => ({ id: t.id, name: t.name, preview: { kind: 'swatch', colors: [`rgb(${t.rgb.join(',')})`] } }));
+      case 'brains': return CHAR_BRAINS.map((b) => ({ id: b.id, name: b.name, preview: icon(b.icon) }));
+      case 'wires': return WIRE_DOS.map((d) => ({ id: d.id, name: d.name, preview: icon(d.icon) }));
+    }
+  };
+  const openWireGraph = (): void => { api.current?.unlock(); live.current.win.open('wiregraph', 'Visual Wire Graph', { x: 60, y: 80, w: 520, h: 470 }); };
+  const openWireGraphRef = useRef(openWireGraph);
+  openWireGraphRef.current = openWireGraph;
+
+
   const actions: EditorActions = {
     playAnim: (a) => api.current?.playAnim(a.id),
     openActivity: (id) => props.onActivity?.(id),
@@ -392,12 +502,6 @@ export function IslandWalk(props: {
   const texRef = useRef(tex);
   texRef.current = tex;
   const [plantsShown, setPlantsShown] = useState(true);
-  const pickPreset = (id: string): void => {
-    const s = player();
-    putInSlot(s.tab, s.slots[s.tab], id);
-    applyNow(s.tab, id);
-    fx('select');
-  };
 
   useEffect(() => {
     const el = host.current;
@@ -413,7 +517,9 @@ export function IslandWalk(props: {
     const offFrame = renderer.onFrame((dt) => { const q = graphicsRef.current?.adaptive.frame(dt); if (q) showTier(renderer, q, ownGraphicsRef.current); });
     (window as unknown as { hmRenderer: unknown }).hmRenderer = renderer; // console: hmRenderer.burst({...})
     // console and tests: count what the ground is made of (read only)
-    (window as unknown as { hmGround: unknown }).hmGround = { surfaces: (): Record<number, number> => { const t = rt.binder.terrain()?.terrain; const out: Record<number, number> = {}; if (t) for (const s of t.surfaceA) out[s] = (out[s] ?? 0) + 1; return out; } };
+    (window as unknown as { hmGround: unknown }).hmGround = { surfaces: (): Record<number, number> => { const t = rt.binder.terrain()?.terrain; const out: Record<number, number> = {}; if (t) for (const s of t.surfaceA) out[s] = (out[s] ?? 0) + 1; return out; },
+      /** The cells that show a surface at all: as their own, or blended in over another (a soft brush paints the second layer). */
+      shows: (id: number): number => { const t = rt.binder.terrain()?.terrain; let n = 0; if (t) for (let i = 0; i < t.surfaceA.length; i++) if (t.surfaceA[i] === id || (t.surfaceB[i] === id && t.blend[i]! > 0)) n++; return n; } };
     // the ground's tiles: SetMix's graph-made set, or Goblin Racing's image set (the high end); the voxel blocks always wear the graph set's faces
     // sharp 512-pixel tiles unless the graphics start low (they are resampled to 256 there: a quarter of the memory)
     const tileSize = tileSizeFor(graphicsRef.current.adaptive.current);
@@ -529,7 +635,7 @@ export function IslandWalk(props: {
       const kind = path.kind, made = carvePath(ts.terrain, path.pts, kind, path.width);
       path = null; showPath();
       if (!made) { say('Nothing to change there'); return; }
-      builder.applyHeights(made.heights, made.rect, kind === 'road' ? 'Road' : 'River', { cells: made.paint, surface: kind === 'road' ? ROAD_SURFACE : RIVER_SURFACE });
+      builder.applyHeights(made.heights, made.rect, kind === 'road' ? 'Road' : 'River', { cells: made.paint, surface: kind === 'road' ? Number(player().palette.road ?? ROAD_SURFACE) || ROAD_SURFACE : RIVER_SURFACE });
       pathsLaid++; fx('place', { volume: 0.6 }); say(kind === 'road' ? 'Road laid' : 'River dug: it runs downhill all the way');
     };
     let lastLaid: [number, number][] = [];
@@ -577,7 +683,7 @@ export function IslandWalk(props: {
       onIsolate: (id) => { setIsolateId(id); say(id ? 'Everything else is hidden (Hide others again, or Esc, to show it)' : 'Everything is shown'); },
       onAnim: (id) => { if (!studio()) animator.play(animOf(player(), id)); },
       onSelect: (w) => { openSelectedRef.current(w); unlock(); },
-      onShake: (id, amount) => { shakes.push({ s: shakeById(id), t0: performance.now(), amount }); if (shakes.length > 6) shakes.shift(); },
+      onShake: (id, amount) => { if (reducedMotion()) return; shakes.push({ s: shakeById(id), t0: performance.now(), amount }); if (shakes.length > 6) shakes.shift(); },
     });
     const shakes: { s: ShakePreset; t0: number; amount: number }[] = [];
     // start at the middle when it is low, flat-ish land; on a mountain or in the sea, walk out east to the first low ground
@@ -684,11 +790,13 @@ export function IslandWalk(props: {
       const who = walkDraw.who; walkDraw = null; showWalkDraw();
       const pid = `walk-${Date.now().toString(36)}`;
       rt.commands.transaction('Walk a path', () => {
-        rt.commands.execute(cmd.put({ id: pid, kind: 'walk-path', name: 'Walk', params: { who, points: JSON.stringify(pts.map(([x, z]) => [Math.round(x * 100) / 100, Math.round(z * 100) / 100])), mode: 'ping-pong', speed: 1.5, wait: 0.5 } as never, tier: 'play' }, 'Walk a path'));
+        rt.commands.execute(cmd.put({ id: pid, kind: 'walk-path', name: 'Walk', params: { who, points: JSON.stringify(pts.map(([x, z]) => [Math.round(x * 100) / 100, Math.round(z * 100) / 100])), mode: (['ping-pong', 'loop', 'once'] as const).find((x) => x === player().palette.walk) ?? 'ping-pong', speed: Math.min(10, Math.max(0.2, (v3Drive(player(), 'walk-speed') ?? 5.4) / 3.6)), wait: Math.min(30, v3Drive(player(), 'walk-wait') ?? 0.5) } as never, tier: 'play' }, 'Walk a path'));
         rt.commands.execute(cmd.addChild(scene.sceneId, 'paths', pid, undefined, 'Walk a path'));
       });
-      saveMap(rt, scene.sceneId); say(`${rt.store.get(who)?.name ?? 'It'} walks its path, there and back`); fx('place', { volume: 0.5 });
+      saveMap(rt, scene.sceneId); say(`${rt.store.get(who)?.name ?? 'It'} walks its path${player().palette.walk === 'loop' ? ', round and round' : player().palette.walk === 'once' ? ', once' : ', there and back'}`); fx('place', { volume: 0.5 });
     };
+    // tests: pick a thing as Layers or a click would (null lets go)
+    (window as unknown as { hmSelect: unknown }).hmSelect = (ref: PresetId | null) => setLayerSel(ref);
     (window as unknown as { hmWalks: unknown }).hmWalks = () => ({ count: placedWalks().length, drawing: walkDraw?.pts.length ?? -1, moved: walkMoved });
     (window as unknown as { hmCamera: unknown }).hmCamera = () => ({ shot: !!shot, photos, slow: slowOn, scale: slow.scale });
     /** Shift snaps moves to half metres and sizes to quarter steps, Ctrl snaps turns to 15 degrees (hotbar spec V3). */
@@ -765,6 +873,8 @@ export function IslandWalk(props: {
       lock, unlock, refreshModels,
       playAnim: (id) => { animator.play(animOf(player(), id)); },
       setAvatarLook, previewLook,
+      undo: () => { builder.undo(); tourEvent('undo'); refreshModels(); },
+      redo: () => { rt.commands.redo(); refreshModels(); },
       carry: (ref) => {
         builder.carrying = ref;
         // hand over the Move tool so the next click puts it down where you point
@@ -839,6 +949,8 @@ export function IslandWalk(props: {
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
       if (live.current.isolateId) { setIsolateId(null); return; }
       if (builder.carrying) { builder.carrying = null; say('Put back'); return; }
+      // the picked thing (its gizmo): let go of it
+      if (gizmoSel.current) { setLayerSel(null); say('Let go'); return; }
       if (live.current.avatarMode) { leaveAvatarRef.current(); return; }
       if (document.pointerLockElement) { suppressMenu = true; document.exitPointerLock(); }
       if (intro.on) { intro.t = intro.ms; return; }
@@ -856,8 +968,17 @@ export function IslandWalk(props: {
       if (e.key === 'Enter' && path && path.pts.length >= 2) { e.preventDefault(); layPath(); return; }
       if (e.key === 'Enter' && walkDraw && walkDraw.pts.length >= 1) { e.preventDefault(); layWalk(); return; }
       if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTargets.length && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
-      const tab = tabForKey(e.key, e.shiftKey);
-      if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
+      const v3tab = v3TabForKey(e.key, e.shiftKey);
+      if (v3tab !== null && live.current.buildOn) { e.preventDefault(); pickV3Tab(v3tab); return; }
+      // the backtick switches Game, Simplified and Advanced; / finds a tool; [ and ] size what you hold
+      if (e.key === '`' && live.current.buildOn && !e.ctrlKey) { e.preventDefault(); pickV3Mode(nextMode(modeOfLevel(player().level))); return; }
+      if (e.key === '/' && live.current.buildOn && !live.current.avatarMode) { e.preventDefault(); setFindOpen(true); unlock(); return; }
+      if ((e.key === '[' || e.key === ']') && live.current.buildOn) {
+        const s = player(), way = s.hotbars[s.tab][s.slots[s.tab]] ?? '';
+        for (const id of toolsOfWay(way)) { const t = toolOf(s, id); if (t) editTool(id, 'size', Math.min(30, Math.max(0.1, Math.round(t.size * (e.key === ']' ? 1.25 : 0.8) * 10) / 10))); }
+        const t = toolOf(player(), toolsOfWay(way)[0] ?? ''); if (t) say(`Size ${t.size}`);
+        return;
+      }
       if (k === 'tab') {
         e.preventDefault();
         if (live.current.buildOn && !intro.on && !e.repeat) {
@@ -870,8 +991,7 @@ export function IslandWalk(props: {
       }
       if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); if (e.shiftKey) rt.commands.redo(); else { builder.undo(); tourEvent('undo'); } refreshModels(); return; }
       if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); rt.commands.redo(); refreshModels(); return; }
-      if (k >= '1' && k <= '9' && live.current.buildOn) { pickSlot(Number(k) - 1); return; }
-      if (k === 'e' && live.current.buildOn) { openPresets(); return; }
+      if (k >= '1' && k <= '9' && live.current.buildOn && !live.current.avatarMode) { pickV3Slot(Number(k) - 1); return; }
       if (k === 'l' && live.current.buildOn) { openLayersRef.current(); return; }
       if (k === 'b' && live.current.buildOn) { const to = studio() ? 'walk' : 'studio'; setMode(to); if (to === 'walk') { fly = null; setFocusId(null); renderer.setFocus(null); } fx('ui-toggle'); return; }
       if (k === 'v' && !studio()) { const s = player(); setView(s.view === 'first' ? 'third' : 'first'); fx('ui-toggle', { volume: 0.5 }); return; }
@@ -940,7 +1060,7 @@ export function IslandWalk(props: {
     const onPointerUp = (e: PointerEvent): void => {
       if (boxing && e.button === 0) {
         const b = boxing; boxing = null; b.div.remove();
-        const picked = boxSelect(screenItems(), [b.x0, b.y0], [e.clientX, e.clientY], 'touch') as PresetId[];
+        const picked = (player().v3.filters['F1:Static Mesh'] === false ? [] : boxSelect(screenItems(), [b.x0, b.y0], [e.clientX, e.clientY], player().palette.box === 'enclosed' ? 'enclosed' : 'touch')) as PresetId[];
         const next = b.add ? [...new Set([...group, ...(gizmoSel.current && !group.length ? [gizmoSel.current] : []), ...picked])] : picked;
         if (next.length === 1) { group = []; setLayerSel(next[0]!); } else group = next;
         say(next.length === 0 ? 'Nothing in the box' : next.length === 1 ? `${rt.store.get(next[0]!)?.name ?? 'One thing'} picked` : `${next.length} things picked: the gizmo moves them together (Esc lets go)`);
@@ -960,7 +1080,7 @@ export function IslandWalk(props: {
       if (!pointerLocked && overUi(e)) return;
       if (live.current.avatarMode) { mirror = { ...mirror, dist: Math.min(7, Math.max(1.4, mirror.dist * (e.deltaY > 0 ? 1.08 : 0.92))) }; return; }
       if (live.current.focusId) { orbit = { ...orbit, dist: Math.min(60, Math.max(1.5, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))) }; return; }
-      if (live.current.buildOn && (pointerLocked || softAim || studio())) { const s = player(); pickSlot(stepSlot(s.slots[s.tab], e.deltaY)); return; }
+      if (live.current.buildOn && (pointerLocked || softAim || studio())) { const n = v3Now(player()), c = v3Slots(n.t, n.mode).length; if (c) pickV3Slot((((n.slot + (e.deltaY > 0 ? 1 : -1)) % c) + c) % c); return; }
       camDist = Math.min(14, Math.max(2.2, camDist * (e.deltaY > 0 ? 1.08 : 0.92)));
     };
     const onContext = (e: Event): void => e.preventDefault();
@@ -968,11 +1088,136 @@ export function IslandWalk(props: {
     window.addEventListener('pointerdown', onPointerDown); window.addEventListener('pointermove', onPointerMove); window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('wheel', onWheel, { passive: true }); el.addEventListener('contextmenu', onContext);
 
+    type Under = NonNullable<ReturnType<typeof blockUnder>>;
+    /** Paint a thing (F2): every block of the colour you point at takes the palette's colour; the sponge puts back the colours it was made with. One undo step. */
+    const tintThing = (b: Under, tint: string | undefined): void => {
+      let data: string;
+      if (tint === 'sponge') {
+        const name = rt.store.get(b.ref)?.name ?? '';
+        const made = voxelModelById(THINGS.find((t) => t.name === name)?.id ?? '');
+        if (!made) { say('This one has no colours to go back to'); return; }
+        data = encodeModel({ ...b.model, palette: b.model.palette.map((q, i) => (made.palette[i] ? { ...q, color: made.palette[i]!.color } : q)) });
+      } else data = recolour(b.model, cellAt(b.model, b.cell[0], b.cell[1], b.cell[2]), tintRgb(tint));
+      rt.commands.execute(cmd.setParam(`${b.ref}.data`, data as never, tint === 'sponge' ? 'Wipe the paint off' : 'Paint a thing'));
+      blockEdits++; refreshModels(); saveMap(rt, scene.sceneId);
+      fx('paint-tick', { volume: 0.5, minGapMs: 80 });
+    };
+    /** Carve (F3) and clay: a round hole into the block you point at, or clay on the face you point at. One undo step. */
+    const carveThing = (b: Under, add: boolean, size: number): void => {
+      const mat = cellAt(b.model, b.cell[0], b.cell[1], b.cell[2]);
+      const sc = Number(rt.store.resolve(b.ref).params['scale'] ?? 0.1);
+      const radius = Math.max(1, (0.25 * Math.max(0.3, size)) / sc);
+      // dig into the block you point at; clay goes on the face you point at
+      const at: HitV3 = add ? [b.cell[0] + 0.5 + b.normal[0], b.cell[1] + 0.5 + b.normal[1], b.cell[2] + 0.5 + b.normal[2]] : [b.cell[0] + 0.5, b.cell[1] + 0.5, b.cell[2] + 0.5];
+      const data = sculptBlocks(b.model, at, radius, add, mat);
+      if (!data) return;
+      rt.commands.execute(cmd.setParam(`${b.ref}.data`, data as never, add ? 'Add clay' : 'Carve'));
+      blockEdits++; refreshModels(); saveMap(rt, scene.sceneId);
+      fx('sculpt-tick', { volume: 0.5, minGapMs: 80 });
+    };
+    /** Put a zone down where you point (a step-pad, a switch, a bell): small, noticing a goblin walking in. */
+    const putZone = (a: Aim, half: number, label: string): PresetId => {
+      const zid = `zone-${Date.now().toString(36)}` as PresetId;
+      rt.commands.transaction(label, () => {
+        rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: label, params: { x: a.point[0], y: a.point[1], z: a.point[2], half, when: 'enter' } as never, tier: 'play' }, label));
+        rt.commands.execute(cmd.addChild(scene.sceneId, 'zones', zid, undefined, label));
+      });
+      return zid;
+    };
+    const putWire = (from: string, to: string, does: string, label: string, sound = 'item-pickup'): void => {
+      const wid = `wire-${Date.now().toString(36)}`;
+      const when = String(rt.store.get(from as PresetId) ? rt.store.resolve(from as PresetId).params['when'] ?? 'enter' : 'enter');
+      rt.commands.transaction(label, () => {
+        rt.commands.execute(cmd.put({ id: wid, kind: 'logic-wire', name: 'Wire', params: { from, when: when === 'leave' ? 'leave' : 'enter', every: 3, to, do: does, sound, text: 'Hello!' } as never, tier: 'play' }, label));
+        rt.commands.execute(cmd.addChild(scene.sceneId, 'wires', wid, undefined, label));
+      });
+      saveMap(rt, scene.sceneId);
+    };
+    /** Snip every cord of the zone, thing or lamp you point at. */
+    const snipAt = (a: Aim): number => {
+      const zone = placedZones().map((z) => ({ z, d: Math.hypot(z.x - a.point[0], z.z - a.point[2]) })).filter((q) => q.d <= q.z.half + 1).sort((p1, p2) => p1.d - p2.d)[0]?.z.ref ?? null;
+      const thing = builder.modelAt(a)?.ref ?? placedLamps().map((l) => ({ l, d: Math.hypot(l.x - a.point[0], l.z - a.point[2]) })).filter((q) => q.d < 2).sort((p1, p2) => p1.d - p2.d)[0]?.l.ref ?? null;
+      const wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
+      const mine = wrefs.map((r, i) => ({ r, i })).filter(({ r }) => { if (!rt.store.get(r.ref)) return false; const pr = rt.store.resolve(r.ref).params; return (!!zone && pr['from'] === zone) || (!!thing && pr['to'] === thing); });
+      if (!mine.length) return 0;
+      rt.commands.transaction('Snip the cords', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Snip the cords')); });
+      saveMap(rt, scene.sceneId);
+      return mine.length;
+    };
+    let clayOn: 'thing' | 'ground' | null = null;
+    /** The V3 buttons the island does itself (docs/HOTBAR_V3_SPEC.md): clay on the ground or a thing, funny sounds and a roar, noon and night, cords, the cutter, a doorbell, the Hierarchy list, the wire graph. */
+    const useV3Way = (id: string, alt: boolean, now: number, first: boolean): void => {
+      const s = player();
+      if (id === 'v3-clay-plump' || id === 'v3-clay-scoop') {
+        const add = (id === 'v3-clay-plump') !== alt;
+        if (first) { const b = blockUnder(); clayOn = b ? 'thing' : 'ground'; if (b) { carveThing(b, add, toolOf(s, 'things-carve')?.size ?? 1); return; } }
+        if (clayOn !== 'ground') return;
+        const a = aim(), base = toolOf(s, add ? 'raise' : 'lower');
+        if (!a || !base) return;
+        builder.use(withSculptPalette(base, s), a, false, now, first);
+        if (first) tourEvent('used-sculpt');
+        return;
+      }
+      if (!first) return;
+      const a = aim();
+      switch (id) {
+        case 'v3-hierarchy': openLayersRef.current(); return;
+        case 'logic-graph': openWireGraphRef.current(); return;
+        case 'v3-noon': case 'v3-night': {
+          const noon = id === 'v3-noon';
+          rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, noon ? 12 : 22, noon ? 'Noon' : 'Night'));
+          say(noon ? 'Noon: the sun is high' : 'Night: the moon is up'); fx(noon ? 'ui-success' : 'ui-toggle', { volume: 0.5 });
+          return;
+        }
+        case 'v3-funny': {
+          fx(FUNNY[Math.floor(Math.random() * FUNNY.length)]!, { volume: 0.7 });
+          if (a) renderer.burst({ ...spriteDef('stars'), count: 12, position: [a.point[0], a.point[1] + 1, a.point[2]] });
+          return;
+        }
+        case 'v3-roar': {
+          fx('shockwave', { volume: 0.9 }); fx('hit-wall', { volume: 0.6 });
+          if (!reducedMotion()) { shakes.push({ s: shakeById('rumble'), t0: performance.now(), amount: 1 }); if (shakes.length > 6) shakes.shift(); }
+          if (a) renderer.burst({ ...spriteDef('embers'), count: 40, position: [a.point[0], a.point[1] + 0.4, a.point[2]] });
+          say('ROAR!');
+          return;
+        }
+        case 'v3-doorbell': {
+          if (!a) { say('Point at the ground'); return; }
+          if (alt) { const n = snipAt(a); say(n ? 'Bell taken off' : 'No bell there'); return; }
+          const zid = putZone(a, 0.8, 'Doorbell');
+          putWire(zid, '', 'sound', 'Doorbell', 'ui-success');
+          say('A doorbell: it chimes when a goblin steps on it'); fx('place', { volume: 0.5 });
+          return;
+        }
+        case 'v3-cord': {
+          if (!a) { say('Point at the ground'); return; }
+          if (alt) { const n = snipAt(a); say(n ? (n === 1 ? 'Snip: one cord cut' : `Snip: ${n} cords cut`) : 'No cords there'); fx(n ? 'delete' : 'ui-error', { volume: 0.5 }); return; }
+          const does = s.palette.wire ?? 'toggle';
+          if (!wireFrom) { wireFrom = putZone(a, 0.9, does === 'light-on' ? 'Switch' : 'Step-pad'); say(does === 'light-on' ? 'Now click the lamp it lights' : 'Now click the thing it opens'); fx('place', { volume: 0.5 }); return; }
+          const m = builder.modelAt(a);
+          const lamp = placedLamps().map((l) => ({ l, d: Math.hypot(l.x - a.point[0], l.z - a.point[2]) })).filter((q) => q.d < 2).sort((p1, p2) => p1.d - p2.d)[0]?.l ?? null;
+          const target = does === 'light-on' ? lamp?.ref ?? null : m?.ref ?? lamp?.ref ?? null;
+          if (!target) { say(does === 'light-on' ? 'Click a lamp (Esc lets go of the cord)' : 'Click a thing (Esc lets go of the cord)'); return; }
+          const from = wireFrom; wireFrom = null;
+          putWire(from, target, does, 'Magic cord');
+          say(does === 'light-on' ? 'ZAP! Step on the switch to light it' : 'ZAP! Step on the pad to open it'); fx('place', { volume: 0.6 });
+          return;
+        }
+        case 'v3-cutter': {
+          if (!a) { say('Point at a pad, a thing or a lamp'); return; }
+          const n = snipAt(a);
+          say(n ? (n === 1 ? 'Snip: one cord cut' : `Snip: ${n} cords cut`) : 'No cords there'); fx(n ? 'delete' : 'ui-error', { volume: 0.5 });
+          return;
+        }
+      }
+    };
     /** Using what you hold: tools act on the world; the other tabs act on a left click too (play, light, open, wear, switch). */
     const useHeld = (alt: boolean, now: number, first: boolean): void => {
       const s = player();
       const id = s.hotbars[s.tab][s.slots[s.tab]];
-      if (!id) { if (first) say('This slot is empty: press E to put a preset in it'); return; }
+      const v3b = v3Now(s).button;
+      if (v3b?.bind.todo || !id) { if (first) say(v3b ? `${v3b.name}: coming. ${v3b.doc}` : 'Pick something on the hotbar'); return; }
+      if (id.startsWith('v3-') || id === 'logic-graph') { useV3Way(id, alt, now, first); return; }
       if (s.tab === 'select' || s.tab === 'paint' || s.tab === 'sculpt' || s.tab === 'things') {
         const own: ToolPreset | null = toolOf(s, id);
         // a way to paint puts down what the palette has picked (top middle)
@@ -1000,24 +1245,8 @@ export function IslandWalk(props: {
           // one click, one change, one undo step (a held stroke would make one step per repeat)
           if (!first) return;
           const b = blockUnder();
-          if (!b) { if (first) say('Point at a thing you placed'); return; }
-          const mat = cellAt(b.model, b.cell[0], b.cell[1], b.cell[2]);
-          let data: string | null;
-          if (tool.action === 'tint') {
-            const c = TINTS.find((t) => t.id === (s.palette.tint ?? 'red')) ?? TINTS[0]!;
-            data = recolour(b.model, mat, c.rgb);
-          } else {
-            const sc = Number(rt.store.resolve(b.ref).params['scale'] ?? 0.1);
-            const radius = Math.max(1, (0.25 * Math.max(0.3, tool.size)) / sc);
-            // dig into the block you point at; clay goes on the face you point at
-            const at: HitV3 = alt ? [b.cell[0] + 0.5 + b.normal[0], b.cell[1] + 0.5 + b.normal[1], b.cell[2] + 0.5 + b.normal[2]] : [b.cell[0] + 0.5, b.cell[1] + 0.5, b.cell[2] + 0.5];
-            data = sculptBlocks(b.model, at, radius, alt, mat);
-          }
-          if (!data) return;
-          const label = tool.action === 'tint' ? 'Paint a thing' : alt ? 'Add clay' : 'Carve';
-          rt.commands.execute(cmd.setParam(`${b.ref}.data`, data as never, label));
-          blockEdits++; refreshModels(); saveMap(rt, scene.sceneId);
-          fx(tool.action === 'tint' ? 'paint-tick' : 'sculpt-tick', { volume: 0.5, minGapMs: 80 });
+          if (!b) { say('Point at a thing you placed'); return; }
+          if (tool.action === 'tint') tintThing(b, s.palette.tint); else carveThing(b, alt, tool.size);
           return;
         }
         if (tool && a && (tool.action === 'road' || tool.action === 'river')) {
@@ -1043,7 +1272,10 @@ export function IslandWalk(props: {
           return;
         }
         if (tool && a) {
-          builder.use(tool, a, alt, now, first);
+          // Simplified's sliders: a block as wide as Width, a prop at Size
+          const block = tool.action === 'things' && tool.placeWay === 'one' && tool.model.startsWith('block-') ? v3Drive(s, 'block-size') : null;
+          const prop = tool.action === 'things' && tool.placeWay === 'one' && !tool.model.startsWith('block-') ? v3Drive(s, 'prop-size') : null;
+          builder.use(block !== null ? { ...tool, size: Math.max(0.1, block) } : prop !== null ? { ...tool, size: tool.size * prop / 100 } : tool, a, alt, now, first);
           if (first) tourEvent((tool.action === 'place' || tool.action === 'things') && !alt ? 'placed' : tool.tab === 'sculpt' ? 'used-sculpt' : tool.tab === 'paint' ? 'used-paint' : 'used-select');
         }
         return;
@@ -1069,7 +1301,7 @@ export function IslandWalk(props: {
             }
             const zid = `zone-${Date.now().toString(36)}`;
             rt.commands.transaction('Zone', () => {
-              rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: 'Zone', params: { x: a.point[0], y: a.point[1], z: a.point[2], half: 2 } as never, tier: 'play' }, 'Zone'));
+              rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: 'Zone', params: { x: a.point[0], y: a.point[1], z: a.point[2], half: Math.max(0.5, (v3Drive(s, 'zone-size') ?? 4) / 2), when: s.palette.zone === 'leave' ? 'leave' : 'enter' } as never, tier: 'play' }, 'Zone'));
               rt.commands.execute(cmd.addChild(scene.sceneId, 'zones', zid, undefined, 'Zone'));
             });
             saveMap(rt, scene.sceneId); say('A zone: now take Wire, click it, then click what it acts on'); fx('place', { volume: 0.5 });
@@ -1099,7 +1331,7 @@ export function IslandWalk(props: {
           const wid = `wire-${Date.now().toString(36)}`;
           const from = wireFrom; wireFrom = null;
           rt.commands.transaction('Wire', () => {
-            rt.commands.execute(cmd.put({ id: wid, kind: 'logic-wire', name: 'Wire', params: { from, when: 'enter', every: 3, to: target, do: does, sound: 'item-pickup', text: 'Hello!' } as never, tier: 'play' }, 'Wire'));
+            rt.commands.execute(cmd.put({ id: wid, kind: 'logic-wire', name: 'Wire', params: { from, when: rt.store.get(from as PresetId) && rt.store.resolve(from as PresetId).params['when'] === 'leave' ? 'leave' : 'enter', every: 3, to: target, do: does, sound: 'item-pickup', text: 'Hello!' } as never, tier: 'play' }, 'Wire'));
             rt.commands.execute(cmd.addChild(scene.sceneId, 'wires', wid, undefined, 'Wire'));
           });
           saveMap(rt, scene.sceneId);
@@ -1163,12 +1395,12 @@ export function IslandWalk(props: {
       if (s.tab === 'camera' && id.startsWith('cam-')) {
         if (!first) return;
         if (id === 'cam-photo') { photoNext = true; return; }
-        if (id === 'cam-slowmo') { slowOn = !slowOn; slow.setScale(slowOn ? 0.25 : 1, 0.4); say(slowOn ? 'Slow motion' : 'Back to speed'); fx('ui-toggle', { volume: 0.4 }); return; }
+        if (id === 'cam-slowmo') { slowOn = !slowOn; slow.setScale(slowOn ? 0.2 : 1, 0.4); say(slowOn ? 'Slow motion' : 'Back to speed'); fx('ui-toggle', { volume: 0.4 }); return; }
         const a = aim();
         const m = a ? builder.modelAt(a) : null;
         const at = m && rt.store.get(m.ref) ? (() => { const pr = rt.store.resolve(m.ref).params as Record<string, unknown>; return [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0) + 1, Number(pr['z'] ?? 0)] as [number, number, number]; })() : [px, py + 1, pz] as [number, number, number];
         const from = eye ? (Math.atan2(eye[0] - at[0], eye[2] - at[2]) * 180) / Math.PI : 0;
-        shot = { track: orbitShot(at, 6, 2.5, 8, from, 1, 55), t: 0 };
+        shot = { track: orbitShot(at, 6, 2.5, Math.max(1, v3Drive(s, 'orbit-time') ?? 8), from, 1, 55), t: 0 };
         say(m ? `Flying round ${rt.store.get(m.ref)?.name ?? 'it'} (Esc stops)` : 'Flying round you (Esc stops)'); fx('ui-toggle', { volume: 0.4 });
         return;
       }
@@ -1262,7 +1494,7 @@ export function IslandWalk(props: {
         const spotId = `sound-${Date.now().toString(36)}`;
         const zone = isAmbience(what);
         rt.commands.transaction(`Sound: ${name}`, () => {
-          rt.commands.execute(cmd.put({ id: spotId, kind: 'sound-spot', name, params: { what, x: a.point[0], y: a.point[1], z: a.point[2], size: zone ? 8 : 10, volume: 0.8, every: 4, on: true } as never, tier: 'play' }, `Sound: ${name}`));
+          rt.commands.execute(cmd.put({ id: spotId, kind: 'sound-spot', name, params: { what, x: a.point[0], y: a.point[1], z: a.point[2], size: zone ? 8 : Math.max(1, v3Drive(s, 'hearing') ?? 10), volume: Math.min(1, Math.max(0, (v3Drive(s, zone ? 'amb-volume' : 'loudness') ?? 80) / 100)), every: 4, on: true } as never, tier: 'play' }, `Sound: ${name}`));
           rt.commands.execute(cmd.addChild(scene.sceneId, 'soundscape', spotId, undefined, `Sound: ${name}`));
         });
         saveMap(rt, scene.sceneId);
@@ -1288,7 +1520,7 @@ export function IslandWalk(props: {
         }
         const effectId = `effect-${Date.now().toString(36)}`;
         rt.commands.transaction(`Effect: ${name}`, () => {
-          rt.commands.execute(cmd.put({ id: effectId, kind: 'effect', name, params: { preset: kind, x: a.point[0], y: a.point[1], z: a.point[2], scale: 1, on: true } as never, tier: 'play' }, `Effect: ${name}`));
+          rt.commands.execute(cmd.put({ id: effectId, kind: 'effect', name, params: { preset: kind, x: a.point[0], y: a.point[1], z: a.point[2], scale: Math.min(5, Math.max(0.2, (v3Drive(s, 'effect-size') ?? 2) / 2)), on: true } as never, tier: 'play' }, `Effect: ${name}`));
           rt.commands.execute(cmd.addChild(scene.sceneId, 'effects', effectId, undefined, `Effect: ${name}`));
         });
         saveMap(rt, scene.sceneId);
@@ -1315,7 +1547,7 @@ export function IslandWalk(props: {
         const lift = lp.kind === 'spot' ? 3 : kind === 'campfire' ? 0.4 : kind === 'candle' ? 0.5 : kind === 'torch' ? 1.6 : 1.2;
         const lampId = `lamp-${Date.now().toString(36)}`;
         rt.commands.transaction(`Lamp: ${lp.name}`, () => {
-          rt.commands.execute(cmd.put({ id: lampId, kind: 'lamp', name: lp.name, params: { preset: kind, x: a.point[0], y: a.point[1] + lift, z: a.point[2], yaw: 0, pitch: 90, brightness: 1, on: true } as never, tier: 'play' }, `Lamp: ${lp.name}`));
+          rt.commands.execute(cmd.put({ id: lampId, kind: 'lamp', name: lp.name, params: { preset: kind, x: a.point[0], y: a.point[1] + lift, z: a.point[2], yaw: 0, pitch: 90, brightness: Math.min(3, Math.max(0, (v3Drive(s, 'lamp-brightness') ?? 50) / 50)), on: true } as never, tier: 'play' }, `Lamp: ${lp.name}`));
           rt.commands.execute(cmd.addChild(scene.sceneId, 'lamps', lampId, undefined, `Lamp: ${lp.name}`));
         });
         saveMap(rt, scene.sceneId);
@@ -1651,7 +1883,7 @@ export function IslandWalk(props: {
       else renderer.camera.set(eye, target);
       {
         const pl = player(), sel = gizmoSel.current;
-        const on = live.current.buildOn && pl.level !== 'easy' && pl.tab === 'select' && !live.current.menu && !live.current.avatarMode && !texRef.current;
+        const on = live.current.buildOn && pl.level !== 'easy' && !live.current.menu && !live.current.avatarMode && !texRef.current;
         group = group.filter((r) => rt.store.get(r));
         const refs = group.length > 1 ? group : sel ? [sel] : [];
         gizmoTargets = on ? refs.map((ref) => ({ ref, index: drawnIndex(ref) })).filter((t) => t.index >= 0) : [];
@@ -1660,7 +1892,7 @@ export function IslandWalk(props: {
           groupShown = true;
         } else if (groupShown) { renderer.overlay.hide('group'); groupShown = false; }
         gizmoFov = fpv ? fov : st ? fov - 10 : fov - 15;
-        gizmo.frame(gizmoTargets, gizmoModeFor(pl.hotbars.select[pl.slots.select]), gizmoRay(), gizmoFov, gizmoSnap());
+        gizmo.frame(gizmoTargets, gizmoModeFor(pl.tab === 'select' ? pl.hotbars.select[pl.slots.select] : 'move'), gizmoRay(), gizmoFov, gizmoSnap());
       }
       renderer.step();
       // seen through a window (the SetMix home): shade only what the window shows
@@ -1712,9 +1944,13 @@ export function IslandWalk(props: {
   // the tool in your hand and its presets row (a tool with presets of its own shows them above the hotbar instead of the words)
   const heldOwn = heldItem && (p.tab === 'select' || p.tab === 'paint' || p.tab === 'sculpt' || p.tab === 'things') ? toolOf(p, heldItem.id) : null;
   const heldTool = heldOwn ? withSculptPalette(heldOwn, p) : null;
-  const say2 = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : { title: tabDef(p.tab).label, line: 'This slot is empty: press E to choose what goes in it.', left: 'Nothing yet', right: 'Nothing yet' };
+  const inner = heldItem ? heldWords(p.tab, heldItem, toolOf(p, heldItem.id)) : null;
+  const v3words = { title: v3.button?.name ?? v3TabName(v3.t, v3.mode), line: v3.button ? `${v3.button.bind.todo ? 'Coming: ' : ''}${v3.button.doc}` : '', left: v3.button?.bind.todo ? 'Nothing yet' : v3.button?.left ?? inner?.left ?? 'Use it', right: v3.button?.bind.todo ? 'Nothing yet' : v3.button?.right ?? inner?.right ?? 'The opposite' };
+  // the sliders as they stand: what you set, else the tool's own size and strength
+  const v3Sliders: Record<string, number> = { ...p.v3.sliders };
+  if (v3.sub) { const own = toolsOfWay(p.hotbars[p.tab][p.slots[p.tab]] ?? ''), tool = toolOf(p, own.find((x) => x !== 'things-carve') ?? own[0] ?? ''); if (tool) for (const sl of v3.sub.sliders) { const k = `${v3.t.key}:${v3.sub.id}:${sl.id}`; if (v3Sliders[k] !== undefined) continue; if (sl.drives === 'tool-size') v3Sliders[k] = tool.size; else if (sl.drives === 'tool-width') v3Sliders[k] = tool.size * 2; else if (sl.drives === 'tool-strength' || sl.drives === 'density') v3Sliders[k] = Math.round(tool.strength * 100); } }
   const showHud = buildOn && !menu && level !== 'island' && !showcase;
-  const showPresets = showHud && !avatarMode && !!heldTool && variantsOf(heldTool.id, 'pro').length > 0;
+
   // the toggles go into the shell's slot above the galaxy bar (studio keeps that bar down), else they sit in place
   const [topSlot, setTopSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
@@ -1726,18 +1962,10 @@ export function IslandWalk(props: {
   }, [showHud]);
   const inTopSlot = (node: ReactElement): ReactElement => (topSlot ? createPortal(node, topSlot) : node);
   return (
-    <div className={`island${p.mode === 'studio' ? ' studio' : ''}${avatarMode ? ' avatar-mode' : ''}${showHud ? ' hud' : ''}`} style={{ position: 'absolute', inset: 0, ['--win-bottom' as string]: showHud && !avatarMode ? '172px' : '12px' }}>
+    <div className={`island${p.mode === 'studio' ? ' studio' : ''}${avatarMode ? ' avatar-mode' : ''}${showHud ? ' hud' : ''}`} style={{ position: 'absolute', inset: 0, ['--win-bottom' as string]: showHud && !avatarMode ? (v3.mode === 'game' ? '210px' : '270px') : '12px' }}>
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       {showHud && p.mode === 'walk' && !avatarMode ? <Crosshair active={locked} /> : null}
-      {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR: bumps, shine and height detail on' : 'Flat: plain colours, no bumps or shine'); }} />) : null}
-      {showHud && !avatarMode && !showPresets ? <ToolSay {...say2} /> : null}
-      {showPresets && heldTool ? (
-        <ToolPresetsRow tool={heldTool} level={p.level} surface={Number(p.palette.paint ?? 4) || 4} peek={peekGround} words={say2}
-          onPick={(v) => { applyVariant(heldTool.id, v.patch); fx('select', { volume: 0.5 }); }}
-          onEdit={(k, val) => editTool(heldTool.id, k, val)}
-          toggles={{ mirror: p.sculptToggles.mirror, smoothAfter: p.sculptToggles.smoothAfter, onToggle: (k) => { toggleSculpt(k); fx('ui-toggle', { volume: 0.5 }); } }}
-          onAll={() => win.open('held', 'What you hold', { x: 24, y: 70, ...WIN.editor })} />
-      ) : null}
+      {showHud ? inTopSlot(<ModeBar mode={p.mode} view={p.view} skin={skin} onAvatar={buildOn ? openAvatar : undefined} onMode={(m) => { setMode(m); fx('ui-toggle'); }} onView={(v) => { setView(v); fx('ui-toggle'); }} onSkin={(s) => { props.onSkin?.(s); fx('ui-toggle'); say(s === 'pbr' ? 'PBR: bumps, shine and height detail on' : 'Flat: plain colours, no bumps or shine'); }} />) : null}
       {/* texture mode: the tile you stepped into, in front of you; the hotbar works on it */}
       {tex && showHud ? (
         <>
@@ -1754,45 +1982,26 @@ export function IslandWalk(props: {
         p.tab === 'paint'
           ? <PaletteStrip title="Colour" items={tex.colours.map((c, i) => ({ id: String(i), name: `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`, preview: { kind: 'swatch', colors: [`rgb(${c.join(',')})`] } }))} community={[]} selected={String(texColour)} onPick={(id) => { setTexColour(Number(id)); fx('select', { volume: 0.5 }); }} />
           : <PaletteStrip title="Moves" items={TEX_ANIMS.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon', icon: a.icon } }))} community={[]} selected={undefined} onPick={(id) => { const a = TEX_ANIMS.find((x) => x.id === id); if (!a) return; api.current?.setAnim(tex.id, a.v); void saveTexture(tex.id, { anim: a.v }); say(`${tex.name}: ${a.name.toLowerCase()} (step out to see it on the island)`); fx('select', { volume: 0.5 }); }} />
-      ) : showHud && !avatarMode && paletteOpen ? (
-        p.tab === 'paint' && heldItem?.id === 'paint-thing'
-          ? <PaletteStrip title="Colour" items={TINTS.map((t) => ({ id: t.id, name: t.name, preview: { kind: 'swatch' as const, colors: [`rgb(${t.rgb.join(',')})`] } }))} community={[]} selected={p.palette.tint ?? 'red'} onLayers={openLayers} onPick={(id) => { pickPalette('tint', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'paint'
-          ? <PaletteStrip title="Paint with" items={PAINT_ITEMS} community={[]} selected={p.palette.paint} onLayers={openLayers}
-              onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'logic' && heldItem?.id === 'logic-wire'
-          ? <PaletteStrip title="Does" items={WIRE_DOS.map((d) => ({ id: d.id, name: d.name, preview: { kind: 'icon' as const, icon: d.icon } }))} community={[]} selected={p.palette.wire ?? 'toggle'} onLayers={openLayers} onPick={(id) => { pickPalette('wire', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'logic'
-          ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'physics'
-          ? <PaletteStrip title="Made of" items={PHYS_ITEMS.map((m) => ({ id: m.id, name: m.name, preview: { kind: 'icon' as const, icon: m.icon } }))} community={[]} selected={p.palette.physics ?? 'rubber'} onLayers={openLayers} onPick={(id) => { pickPalette('physics', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'characters'
-          ? <PaletteStrip title="Behaves" items={CHAR_BRAINS.map((b) => ({ id: b.id, name: b.name, preview: { kind: 'icon' as const, icon: b.icon } }))} community={[]} selected={p.palette.characters ?? 'wander'} onLayers={openLayers} onPick={(id) => { pickPalette('characters', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'sound'
-          ? <PaletteStrip title="Sounds" items={[...AMBIENCES.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon' as const, icon: AMBIENCE_ICONS[a.id] ?? 'Music' } })), ...SFX_IDS.map((id) => ({ id, name: soundName(id), preview: { kind: 'sound' as const, id } }))]} community={[]} selected={p.palette.sound ?? 'forest-birds'} onLayers={openLayers} onPick={(id) => { pickPalette('sound', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'effects'
-          ? <PaletteStrip title="Effects" items={PARTICLE_PRESETS.map((e) => ({ id: e.id, name: e.name, preview: { kind: 'icon', icon: EFFECT_ICONS[e.id] ?? 'Sparkles' } }))} community={[]} selected={p.palette.effects ?? 'campfire'} onLayers={openLayers} onPick={(id) => { pickPalette('effects', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'lights' && (heldItem?.id === 'light-lamp' || heldItem?.id === 'light-lamp-remove')
-          ? <PaletteStrip title="Lamps" items={LIGHT_PRESETS.map((l) => ({ id: l.id, name: l.name, preview: { kind: 'icon' as const, icon: LAMP_ICONS[l.id] ?? 'Lightbulb' } }))} community={[]} selected={p.palette.lamp ?? 'bulb'} onLayers={openLayers} onPick={(id) => { pickPalette('lamp', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'lights'
-          ? <PaletteStrip title="Light" items={LIGHT_ITEMS} community={[]} selected={p.palette.lights} onLayers={openLayers} onPick={(id) => { pickPalette('lights', id); pickLook(rt, scene.sceneId, id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'things'
-          ? <PaletteStrip title="Place" items={THING_ITEMS} community={[]} selected={p.palette.things ?? 'palm'} onLayers={openLayers} onPick={(id) => { pickPalette('things', id); fx('select', { volume: 0.5 }); }} />
-          : p.tab === 'sculpt'
-          ? <PaletteStrip title="Stamp" items={SHAPE_ITEMS} community={[]} selected={p.palette.sculpt ?? 'mound'} onLayers={openLayers} onPick={(id) => { pickPalette('sculpt', id); fx('select', { volume: 0.5 }); }} />
-          // a tab without materials shows its own presets here: one click puts it in the slot you are on
-          : <PaletteStrip title={tabDef(p.tab).label} items={items.map((c) => ({ id: c.id, name: c.name, preview: c.preview }))} community={[]} selected={heldItem?.id} onLayers={openLayers} onPick={pickPreset} />
       ) : null}
-      {showHud ? <TabStrip tab={p.tab} onPick={pickTab} /> : null}
-      {showHud && !avatarMode ? <Hotbar items={row} selected={p.slots[p.tab]} onSelect={(i) => pickSlot(i)} onOpen={openPresets} end={<LevelSwitch level={p.level} onLevel={(l) => { setLevel(l); fx('ui-toggle', { volume: 0.5 }); }} />} /> : null}
+      {showHud && !avatarMode ? (
+        <V3Hud mode={v3.mode} tab={v3.tab} slot={v3.slot} preset={v3.preset} sliders={v3Sliders} filters={p.v3.filters} palette={p.palette} options={v3Options} words={v3words}
+          drivesLive={(sl) => sl.drives !== 'hour' && sl.drives !== 'clouds'}
+          onTab={pickV3Tab} onSlot={pickV3Slot} onPreset={pickV3Preset} onSlider={onV3Slider} onReset={onV3Reset}
+          onFilter={(key, on) => { setV3Filter(key, on); fx('ui-click', { volume: 0.4 }); }}
+          onOption={(key, id) => { pickPalette(key, id); fx('select', { volume: 0.5 }); }}
+          onMode={pickV3Mode} onUndo={() => { api.current?.undo(); }} onRedo={() => { api.current?.redo(); }}
+          findOpen={findOpen} onFind={(open) => { setFindOpen(open); if (open) api.current?.unlock(); }} onFound={pickFound}
+          onComing={(what) => say(`${what}: coming`)} note={note && !showcase ? note : ''}
+          onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const sf = PAINTS.find((x) => x.id === id); if (sf) { api.current?.unlock(); win.open(`surface:${id}`, `Look: ${sf.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); } }} />
+      ) : null}
       {avatarMode && !menu ? <AvatarDock actions={actions} onPreview={(l) => api.current?.previewLook(l)} onDone={leaveAvatar} /> : null}
       {showcase ? null : win.list.map((w) => (
-        <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (heldItem ? `${tabDef(p.tab).label}: ${heldItem.name}` : 'What you hold') : w.title} className={w.id === 'presets' ? 'wide' : ''}>
-          {w.id === 'presets' ? <PresetWindowBody activities={activities} onEdit={openEditor} onWorld={() => win.open('world', 'World rules', { x: 60, y: 90, ...WIN.editor })} onPlant={(kind) => win.open(`plant:${kind}`, `Behaviour: ${kind}`, { x: 80, y: 110, ...WIN.editor })} onMoves={() => win.open('moves', 'How my goblin moves', { x: 60, y: 90, ...WIN.editor })} />
-            : w.id === 'held' ? (heldItem ? <EditorFor tab={p.tab} id={heldItem.id} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} /> : <p className="hint">Pick a slot, or press E to put a preset in it.</p>)
+        <FloatingWindow key={w.id} win={win} id={w.id} title={w.id === 'held' ? (v3.button ? `${v3TabName(v3.t, v3.mode)}: ${v3.button.name}` : 'What you hold') : w.title} className={w.id === 'wiregraph' ? 'wide' : ''}>
+          {w.id === 'wiregraph' ? <WireGraph rt={rt} sceneId={scene.sceneId} does={p.palette.wire ?? 'toggle'} />
+            : w.id === 'held' ? (heldItem ? <EditorFor tab={p.tab} id={heldItem.id} rt={rt} sceneId={scene.sceneId} activities={activities} actions={actions} /> : <p className="hint">Pick something on the hotbar.</p>)
             : w.id === 'settings' ? (props.profile && props.onProfile ? <SettingsBody profile={props.profile} update={props.onProfile} onReplayTour={() => props.onReplayTour?.()} onReset={() => props.onResetProgress?.()} top={<div className="btns settings-jump"><button onClick={openLighting}>Lighting presets and time of day</button></div>} /> : null)
             : w.id === 'layers' ? <LayersPanel rt={rt} sceneId={scene.sceneId} selected={layerSel} onSelect={setLayerSel} plantsShown={plantsShown} onPlants={(on) => { setPlantsShown(on); api.current?.showPlants(on); }}
-                onMove={(ref) => api.current?.carry(ref)} onShow={(ref) => { setFocusId(ref); }} onAdd={(id) => api.current?.addThing(id) ?? null} onGround={() => pickTab('paint')} />
+                onMove={(ref) => api.current?.carry(ref)} onShow={(ref) => { setFocusId(ref); }} onAdd={(id) => api.current?.addThing(id) ?? null} onGround={() => pickV3Tab(1)} />
             : w.id.startsWith('surface:') ? (() => { const sid = Number(w.id.slice(8)); const s = PAINTS.find((x) => x.id === sid); return <SurfaceEditor surfaceId={sid} name={s?.name ?? 'This surface'}
                 startOn={style === 'voxel' && skin !== 'pbr' ? 'blocks' : 'ground'} onStepIn={props.ground === 'racing' ? undefined : () => stepIntoTexture(sid)} savedGround={props.profile?.groundLooks?.[String(sid)]} savedBlocks={props.profile?.groundLooks?.[`b${sid}`]}
                 onApply={(g, target) => api.current?.setSurfaceLook(sid, g, target === 'blocks') ?? false}
@@ -1801,7 +2010,7 @@ export function IslandWalk(props: {
             : w.id === 'effects' ? <EffectsPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'soundscape' ? <SoundSpotsPanel rt={rt} sceneId={scene.sceneId} />
             : w.id === 'characters' ? <CharactersPanel rt={rt} sceneId={scene.sceneId} onChange={() => api.current?.refreshModels()} />
-            : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
+            : w.id === 'world' ? <><WorldRulesEditor rt={rt} sceneId={scene.sceneId} /><div className="btns world-plants" role="group" aria-label="How the plants behave">{PLANTS.map((pl) => <button key={pl.kind} onClick={() => win.open(`plant:${pl.kind}`, `Behaviour: ${pl.name}`, { x: 80, y: 110, ...WIN.editor })}>{pl.name}</button>)}</div></>
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />
             : w.id.startsWith('sprite:') ? <SpriteEditor id={w.id.slice(7)} actions={actions} />
@@ -1810,7 +2019,7 @@ export function IslandWalk(props: {
             : null}
         </FloatingWindow>
       ))}
-      {note && !showcase ? <div className="island-note" role="status">{note}</div> : null}
+      {note && !showcase && !(showHud && !avatarMode) ? <div className="island-note" role="status">{note}</div> : null}
       {tourOn && !menu ? <TourCard /> : null}
       {revealing ? <div className="reveal-flash" key={revealing} aria-hidden="true" /> : null}
       {!menu && !showcase ? <p className="island-hint">{avatarMode ? 'Hold the right button to turn round. Wheel zooms. Esc or Done goes back.' : hint(buildOn, locked, p.mode, focusId !== null)}</p> : null}
@@ -1821,6 +2030,8 @@ export function IslandWalk(props: {
             <h4>On this island</h4>
             {buildOn ? <button onClick={() => { setMenu(false); setMode(p.mode === 'studio' ? 'walk' : 'studio'); }}>{p.mode === 'studio' ? 'Walk as your avatar' : 'Studio mode'}</button> : null}
             <button onClick={() => { setMenu(false); openAvatar(); }}>My avatar</button>
+            {buildOn ? <button onClick={() => { setMenu(false); win.open('world', 'World rules and plants', { x: 60, y: 90, ...WIN.editor }); }}>World rules and plants</button> : null}
+            {buildOn ? <button onClick={() => { setMenu(false); win.open('moves', 'How my goblin moves', { x: 60, y: 90, ...WIN.editor }); }}>How my goblin moves</button> : null}
             {buildOn ? <button onClick={() => { setMenu(false); openShare('island', scene.sceneId); }}>Share this island</button> : null}
             {!tourView.visible ? <button onClick={() => { setMenu(false); tourReplay(); }}>Show the tour</button> : null}
           </div>
@@ -1842,12 +2053,12 @@ function hint(buildOn: boolean, locked: boolean, mode: 'walk' | 'studio', focus:
   if (focus) return 'Right mouse button looks round it. Wheel zooms. Esc leaves focus.';
   if (mode === 'studio') return 'Fly with W A S D, Space and C. Hold the right button to look. F focus, H hide, B walk.';
   if (!buildOn) return locked ? 'Esc opens the menu.' : 'Click to capture the mouse. Esc opens the menu.';
-  return locked ? 'F1 to F10 tabs, 1 to 9 slots, Tab palette, E presets, L layers, B studio, Esc menu.' : 'Click the world to look around. Tab palette, E presets, L layers, Esc menu.';
+  return locked ? 'Tab frees the mouse, / finds a tool, ` switches mode, B studio, Esc menu.' : 'Click the world to look around. / finds a tool, Esc menu.';
 }
 
 /** The words about what you hold. */
 function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { title: string; line: string; left: string; right: string } {
-  const title = `${tabDef(tab).label}: ${item.name}`;
+  const title = item.name;
   if (tool) return { title, line: tool.doc, left: tool.left, right: tool.right };
   switch (tab) {
     case 'animate': { const w = ANIM_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: item.doc, left: 'Play it', right: 'Stop' }; }

@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { MOVE_SLOTS, animById, type MoveSlot } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { LOGIC_PRESETS, PAINTS, SLOTS, STAMP_SHAPES, THINGS, TAB_IDS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId } from '@hm/buildkit';
+import { LOGIC_PRESETS, PAINTS, SLOTS, STAMP_SHAPES, THINGS, TAB_IDS, V3_TABS, assignSlot, normalizeHotbars, type HotbarLevel, type Hotbars, type TabId, type V3Mode, type V3PaletteKey } from '@hm/buildkit';
 import { OLD_DEFAULT_ROWS, defaultHotbars, validFor, type ActivityInfo, type CatalogPlayer } from './catalog';
 
 /**
@@ -24,10 +24,38 @@ export interface PlayerState extends CatalogPlayer {
   readonly sprites: Readonly<Record<string, Record<string, unknown>>>;
   /** How deep the hotbar goes: Easy, Pro or Studio (docs/HOTBAR.md). */
   readonly level: HotbarLevel;
-  /** What each tab's tools apply, picked in the palette strip (Paint: a surface id). */
-  readonly palette: Readonly<Partial<Record<TabId | 'lamp' | 'wire' | 'tint', string>>>;
+  /** What the tool in hand applies (a surface, a thing, a lamp, a material ...): set by the V3 button you pick, or its options row. */
+  readonly palette: Readonly<Partial<Record<TabId | V3PaletteKey, string>>>;
+  /** The V3 hotbar (docs/HOTBAR_V3_SPEC.md): the tab (0..11 for F1..F12), its slot in each mode, the preset picked in each slot, Simplified's slider values and Advanced's filters. */
+  readonly v3: V3State;
   /** Sculpt's toggles (Pro, beside the hotbar): mirror every stroke across the island's middle; smooth gently behind it. */
   readonly sculptToggles: { readonly mirror: boolean; readonly smoothAfter: boolean };
+}
+
+export interface V3State {
+  readonly tab: number;
+  /** The slot of each tab, per mode. */
+  readonly slots: Readonly<Record<V3Mode, readonly number[]>>;
+  /** The preset picked in a slot (`mode:F3:slot-id`): Simplified's preset of the sub-tool, Advanced's F3 preset (-1: the tool itself). */
+  readonly presets: Readonly<Record<string, number>>;
+  /** Simplified's sliders (`F3:sub-tool-id:slider-id`). */
+  readonly sliders: Readonly<Record<string, number>>;
+  /** Advanced's filters (`F1:Static Mesh`): off when false. */
+  readonly filters: Readonly<Record<string, boolean>>;
+}
+const V3_MODE_IDS: readonly V3Mode[] = ['game', 'simplified', 'advanced'];
+const blankV3 = (): V3State => ({ tab: 9, slots: { game: V3_TABS.map(() => 0), simplified: V3_TABS.map(() => 0), advanced: V3_TABS.map(() => 0) }, presets: {}, sliders: {}, filters: {} });
+/** Stored V3 state back into shape: a tab in range, a slot per tab in range of that tab's slots, plain numbers and booleans. Never throws. */
+export function normalizeV3(raw: unknown): V3State {
+  const base = blankV3();
+  const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const tab = Number.isInteger(r.tab) && (r.tab as number) >= 0 && (r.tab as number) < V3_TABS.length ? (r.tab as number) : base.tab;
+  const sr = r.slots && typeof r.slots === 'object' ? (r.slots as Record<string, unknown>) : {};
+  const count = (t: number, mode: V3Mode): number => { const x = V3_TABS[t]!; return mode === 'game' ? x.game.presets.length : mode === 'simplified' ? x.simplified.subtools.length : x.advanced.tools.length; };
+  const slots = Object.fromEntries(V3_MODE_IDS.map((mode) => { const row = Array.isArray(sr[mode]) ? (sr[mode] as unknown[]) : []; return [mode, V3_TABS.map((_, t) => { const n = Number(row[t]); return Number.isInteger(n) && n >= 0 && n < count(t, mode) ? n : 0; })]; })) as unknown as Record<V3Mode, number[]>;
+  const nums = (v: unknown, ok: (n: number) => boolean): Record<string, number> => { const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}; return Object.fromEntries(Object.entries(o).filter(([k, n]) => k.length <= 80 && typeof n === 'number' && Number.isFinite(n) && ok(n))) as Record<string, number>; };
+  const fo = r.filters && typeof r.filters === 'object' && !Array.isArray(r.filters) ? (r.filters as Record<string, unknown>) : {};
+  return { tab, slots, presets: nums(r.presets, (n) => Number.isInteger(n) && n >= -1 && n < 64), sliders: nums(r.sliders, () => true), filters: Object.fromEntries(Object.entries(fo).filter(([k, v]) => k.length <= 80 && typeof v === 'boolean')) as Record<string, boolean> };
 }
 
 const KEY = 'hm.player.v1';
@@ -39,7 +67,7 @@ const blank = (): PlayerState => {
   return {
     ...p, tab: 'sculpt', slots: Object.fromEntries(TAB_IDS.map((t) => [t, 0])) as Record<TabId, number>, hotbars: defaultHotbars(activities, p),
     moves: { idle: 'idle', walk: 'walk', run: 'run', jump: 'jump', fall: 'fall' }, lookId: LOOKS[0]!.id, created: false, view: 'third', mode: 'walk', sprites: {},
-    level: 'easy', palette: { paint: '4', sculpt: 'mound', things: 'palm' }, sculptToggles: { mirror: false, smoothAfter: false },
+    level: 'easy', palette: { paint: '4', sculpt: 'mound', things: 'palm' }, sculptToggles: { mirror: false, smoothAfter: false }, v3: blankV3(),
   };
 };
 
@@ -67,6 +95,7 @@ function load(): PlayerState {
     level: raw.level === 'pro' || raw.level === 'studio' ? raw.level : 'easy',
     sculptToggles: { mirror: (raw.sculptToggles as { mirror?: unknown } | undefined)?.mirror === true, smoothAfter: (raw.sculptToggles as { smoothAfter?: unknown } | undefined)?.smoothAfter === true },
     palette: { ...base.palette, ...paletteOf(raw.palette) },
+    v3: normalizeV3(raw.v3),
   };
 }
 /** A tab whose saved slots no longer name any tool (Paint's slots held surfaces before its tools became ways to paint) starts from the ready-made row. */
@@ -79,7 +108,7 @@ function freshTabs(h: Hotbars, defaults: Hotbars): Hotbars {
   }
   return out;
 }
-const paletteOf = (v: unknown): Partial<Record<TabId | 'lamp' | 'wire' | 'tint', string>> => {
+const paletteOf = (v: unknown): Partial<Record<TabId | V3PaletteKey, string>> => {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
   const paint = typeof o.paint === 'string' && PAINTS.some((s) => String(s.id) === o.paint) ? o.paint : undefined;
   const sculpt = typeof o.sculpt === 'string' && STAMP_SHAPES.some((s) => s.id === o.sculpt) ? o.sculpt : undefined;
@@ -88,7 +117,7 @@ const paletteOf = (v: unknown): Partial<Record<TabId | 'lamp' | 'wire' | 'tint',
   const lights = typeof o.lights === 'string' && /^[a-z0-9-]{1,40}$/.test(o.lights) ? o.lights : undefined;
   // the rest are plain ids, checked again where they are used
   const plain = (k: string): Record<string, string> => (typeof o[k] === 'string' && /^[a-z0-9-]{1,40}$/.test(o[k] as string) ? { [k]: o[k] as string } : {});
-  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}), ...plain('effects'), ...plain('sound'), ...plain('characters'), ...plain('physics'), ...plain('lamp'), ...plain('wire'), ...plain('tint') };
+  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}), ...plain('effects'), ...plain('sound'), ...plain('characters'), ...plain('physics'), ...plain('lamp'), ...plain('wire'), ...plain('tint'), ...plain('zone'), ...plain('walk'), ...plain('box') };
 };
 
 let state: PlayerState | null = null;
@@ -163,7 +192,7 @@ export const setLevel = (level: HotbarLevel): void => { const s = get(); if (s.l
 /** Pick what a tab's tools apply from the palette strip (Paint: a surface). */
 /** Sculpt's toggles: switch one on or off. */
 export const toggleSculpt = (key: 'mirror' | 'smoothAfter'): void => { const s = get(); set({ ...s, sculptToggles: { ...s.sculptToggles, [key]: !s.sculptToggles[key] } }); };
-export const pickPalette = (tab: TabId | 'lamp' | 'wire' | 'tint', id: string): void => { const s = get(); if (s.palette[tab] !== id) set({ ...s, palette: { ...s.palette, [tab]: id } }); };
+export const pickPalette = (tab: TabId | V3PaletteKey, id: string): void => { const s = get(); if (s.palette[tab] !== id) set({ ...s, palette: { ...s.palette, [tab]: id } }); };
 /** Set a tool to one of its presets: its values become your tool's (one change, kept like any edit). */
 export function applyVariant(toolId: string, patch: Readonly<Record<string, unknown>>): void {
   const s = get();
@@ -178,3 +207,31 @@ export function setRow(tab: TabId, row: readonly (string | null)[]): void {
 }
 /** Settings, Hotbar: back to the ready-made row of a tab. */
 export function resetRow(tab: TabId): void { const s = get(); set({ ...s, hotbars: { ...s.hotbars, [tab]: [...defaultHotbars(activities, s)[tab]] } }); }
+
+/* ------------------------------ the V3 hotbar ------------------------------ */
+
+const setV3 = (patch: Partial<V3State>): void => { const s = get(); set({ ...s, v3: { ...s.v3, ...patch } }); };
+/** Open a tab (0..11 for F1..F12). */
+export const setV3Tab = (tab: number): void => { if (tab >= 0 && tab < V3_TABS.length && get().v3.tab !== tab) setV3({ tab }); };
+/** Pick a slot of a tab in a mode. */
+export function setV3Slot(mode: V3Mode, tab: number, slot: number): void {
+  const s = get(); const row = [...s.v3.slots[mode]]; row[tab] = slot;
+  setV3({ slots: { ...s.v3.slots, [mode]: row } });
+}
+export const setV3Preset = (key: string, preset: number): void => { const s = get(); setV3({ presets: { ...s.v3.presets, [key]: preset } }); };
+export const setV3Slider = (key: string, value: number): void => { const s = get(); setV3({ sliders: { ...s.v3.sliders, [key]: value } }); };
+/** Simplified's Reset: the sliders of a sub-tool (`F3:sub-tool-id:`) back to the spec's values. */
+export function resetV3Sliders(prefix: string): void {
+  const s = get();
+  setV3({ sliders: Object.fromEntries(Object.entries(s.v3.sliders).filter(([k]) => !k.startsWith(prefix))) });
+}
+export const setV3Filter = (key: string, on: boolean): void => { const s = get(); setV3({ filters: { ...s.v3.filters, [key]: on } }); };
+/**
+ * Put an internal way in hand (what a V3 button binds to): its tab, the way in the tab's first slot (the island reads what you hold from
+ * there), and the palette picks the button sets. One change, so the HUD redraws once. `way` null holds nothing (a button that is coming).
+ */
+export function holdWay(tab: TabId, way: string | null, palette: Readonly<Partial<Record<V3PaletteKey, string>>> = {}): void {
+  const s = get();
+  const row = Array.from({ length: SLOTS }, (_, i) => (i === 0 ? way : s.hotbars[tab]?.[i] ?? null));
+  set({ ...s, tab, hotbars: { ...s.hotbars, [tab]: row }, slots: { ...s.slots, [tab]: 0 }, palette: { ...s.palette, ...palette } });
+}

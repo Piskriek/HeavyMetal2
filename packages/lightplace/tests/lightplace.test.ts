@@ -159,3 +159,6 @@ test('flicker seed repeatability and divergence across different seeds', () => {
   assert.ok(flicker('fire', 0, 1, 1) >= 0.55);
   assert.equal(flicker('faulty', 0, 1, 1), 1);
 });
+test('no lamp flashes more than three times a second (photosensitive players; hotbar spec V3.1)', () => {
+  for (const p of LIGHT_PRESETS) if (p.flicker === 'strobe' || p.flicker === 'faulty') assert.ok(p.rate <= 3, `${p.id} flashes ${p.rate} times a second`);
+});

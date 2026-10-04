@@ -519,6 +519,7 @@ export const logicZoneSchema = defineSchema({
     { key: 'y', type: 'number', label: 'Y', doc: 'Its middle, up.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
     { key: 'z', type: 'number', label: 'Z', doc: 'Its middle, north-south.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
     { key: 'half', type: 'number', label: 'Size', doc: 'How far it reaches from its middle.', tier: 'play', default: 2, min: 0.5, max: 30, step: 0.5, unit: 'm' },
+    { key: 'when', type: 'enum', label: 'Notices', doc: 'What its wires go off on: a goblin walking in, or walking out (Rules, Player Leaves Area).', tier: 'play', default: 'enter', options: ['enter', 'leave'] },
   ],
   slots: [] as readonly ChildSlot[],
 });

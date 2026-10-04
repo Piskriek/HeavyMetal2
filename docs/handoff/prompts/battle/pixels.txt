@@ -1,0 +1,51 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: "pixels", a resource the player digs out of their island in a toy-world game. The island's ground is a height grid where every cell has a surface type; digging removes height and puts pixels of that surface into the player's store; placing pixels raises ground; the island has a budget, and the ground can slowly regrow.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/pixels.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Pure functions: inputs are never mutated; outputs are new objects.
+
+## API (implement exactly)
+
+```ts
+export interface Grid { cols: number; rows: number; cell: number; heights: Float32Array; surface: Uint8Array; floor: Float32Array } // per cell; floor = the height digging cannot go below (bedrock)
+export interface Store { pixels: Record<number, number> }            // surface id -> count (whole pixels)
+/** One pixel = PIXEL cubic metres of ground. */
+export const PIXEL = 0.125;
+export interface Budget { maxDug: number; dug: number }               // pixels dug from this island so far
+/** Dig a round hole: every cell within radius of (x, z) (cell centres at c*cell, r*cell) loses up to `depth` metres, scaled by (1 - d/radius) (a soft bowl), never below its floor. The removed volume (cell area * height lost) becomes whole pixels of each cell's surface (fractions are carried: return them in `remainder` by surface); the budget stops digging once maxDug is reached (partial dig of the last cells allowed). */
+export function dig(g: Grid, s: Store, b: Budget, x: number, z: number, radius: number, depth: number): { grid: Grid; store: Store; budget: Budget; remainder: Record<number, number> };
+/** Place `count` pixels of surface `id` as a mound at (x, z) within radius: the volume count*PIXEL spread over the cells like dig's bowl; the store must hold them (else place what it holds); the cells take that surface where they rose more than 5 cm. */
+export function place(g: Grid, s: Store, id: number, count: number, x: number, z: number, radius: number): { grid: Grid; store: Store; placed: number };
+/** Regrow: every cell below its original height (from `original`) rises by rate * dt metres, never above the original; returns the grid. */
+export function regrow(g: Grid, original: Float32Array, rate: number, dt: number): Grid;
+/** The store's worth in credits from a price per surface (missing = 1 credit per 10 pixels, rounded down). */
+export function worth(s: Store, prices: Record<number, number>): number;
+/** Total pixels in the store. */
+export function total(s: Store): number;
+```
+
+## Acceptance tests (copy unchanged, then add your own: the floor stops digging, the budget stops digging, place needs the store, place sets the surface, regrow never overshoots, worth with and without prices, inputs are not mutated)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { PIXEL, dig, place, total, type Grid } from '../src/index';
+const grid = (): Grid => ({ cols: 5, rows: 5, cell: 1, heights: new Float32Array(25).fill(2), surface: new Uint8Array(25).fill(4), floor: new Float32Array(25).fill(0) });
+test('a dig at one cell with radius under one cell takes that cell only', () => {
+  const r = dig(grid(), { pixels: {} }, { maxDug: 1000, dug: 0 }, 2, 2, 0.5, 1);
+  assert.ok(Math.abs(r.grid.heights[12]! - 1) < 1e-6);
+  assert.equal(r.grid.heights[11], 2);
+  assert.equal(r.store.pixels[4], 8); // 1 m^3 = 8 pixels
+  assert.equal(r.budget.dug, 8);
+  assert.equal(total(r.store), 8);
+});
+test('place puts them back', () => {
+  const g = grid();
+  const r = place(g, { pixels: { 4: 8 } }, 4, 8, 2, 2, 0.5);
+  assert.equal(r.placed, 8);
+  assert.ok(Math.abs(r.grid.heights[12]! - 3) < 1e-6);
+  assert.equal(total(r.store), 0);
+  assert.equal(g.heights[12], 2, 'the input grid is not changed');
+  assert.equal(PIXEL, 0.125);
+});
+```

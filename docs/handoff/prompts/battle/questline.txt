@@ -1,0 +1,66 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: quests, questlines and unlocks as plain data with a pure evaluator, for a toy-world game where a questline teaches the player to build (a base, machines, a portal, a rocket).
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/questline.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no `eval` or `Function`, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+/** What the game knows about the player: counters (events seen, things placed, credits ...), owned preset ids, finished quests. */
+export interface PlayerState { counts: Record<string, number>; owns: string[]; done: string[] }
+/** A condition, as data (never code). */
+export type Cond =
+  | { all: Cond[] } | { any: Cond[] } | { not: Cond }
+  | { count: string; atLeast: number }        // counts[count] >= atLeast (missing = 0)
+  | { owns: string } | { done: string };
+export interface Reward { credits?: number; presets?: string[]; unlock?: string[] } // unlock: names of features (e.g. "portal", "class:shaman")
+export interface Step { id: string; text: string; target?: string; until: Cond } // target: a UI name the game highlights
+export interface Quest { id: string; title: string; requires?: Cond; steps: Step[]; reward: Reward }
+export interface Questline { id: string; title: string; quests: Quest[] }
+export interface Progress { quest: string | null; step: number; finished: string[]; rewarded: string[] }
+export function check(c: Cond, s: PlayerState): boolean;
+/** Validate untrusted questline data: unique quest and step ids, every quest has at least one step, conditions well formed (depth at most 16), no `done` naming an unknown quest, rewards non-negative. Returns problems (empty = good). */
+export function validate(q: Questline): string[];
+/** The first quest that is not finished and whose `requires` holds (in order), or null. */
+export function current(q: Questline, s: PlayerState, p: Progress): string | null;
+/** Advance: while the current step's `until` holds, move to the next step; a finished quest goes into `finished` (and `s.done` is the caller's job), then the next quest starts at step 0. Returns the new progress and the rewards earned this time (each quest pays once: `rewarded`). Never loops forever. */
+export function advance(q: Questline, s: PlayerState, p: Progress): { progress: Progress; rewards: Reward[] };
+/** Skip the current step (the tour's Skip button). */
+export function skip(q: Questline, p: Progress): Progress;
+/** Every UI target named in the questline (the game checks each exists on screen). */
+export function targets(q: Questline): string[];
+export const START: Progress; // { quest: null, step: 0, finished: [], rewarded: [] }
+```
+
+## Acceptance tests (copy unchanged, then add your own: requires gates a quest, skip, validate finds duplicates and bad conds, rewards pay once, nested all/any/not)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { START, advance, check, current, targets, validate, type PlayerState, type Questline } from '../src/index';
+const line: Questline = { id: 'main', title: 'Main', quests: [
+  { id: 'wake', title: 'Wake up', steps: [{ id: 'walk', text: 'Walk', until: { count: 'moved', atLeast: 3 } }], reward: { credits: 10 } },
+  { id: 'base', title: 'A base', steps: [
+    { id: 'block', text: 'Place a block', target: 'island.slot.toy-brick', until: { count: 'placed', atLeast: 1 } },
+    { id: 'paint', text: 'Paint it', target: 'island.tab.F2', until: { count: 'painted', atLeast: 1 } }], reward: { credits: 20, unlock: ['portal'] } },
+] };
+const st = (counts: Record<string, number>): PlayerState => ({ counts, owns: [], done: [] });
+test('conditions', () => {
+  assert.equal(check({ all: [{ count: 'a', atLeast: 1 }, { not: { owns: 'x' } }] }, st({ a: 1 })), true);
+  assert.equal(check({ any: [{ count: 'a', atLeast: 2 }, { done: 'q' }] }, st({ a: 1 })), false);
+});
+test('advances through steps and quests, paying once', () => {
+  assert.deepEqual(validate(line), []);
+  let r = advance(line, st({ moved: 3 }), START);
+  assert.equal(r.progress.quest, 'base'); assert.equal(r.progress.step, 0);
+  assert.deepEqual(r.rewards, [{ credits: 10 }]);
+  r = advance(line, st({ moved: 3, placed: 1 }), r.progress);
+  assert.equal(r.progress.step, 1); assert.deepEqual(r.rewards, []);
+  r = advance(line, st({ moved: 3, placed: 1, painted: 1 }), r.progress);
+  assert.equal(r.progress.quest, null); assert.deepEqual(r.progress.finished, ['wake', 'base']);
+  assert.deepEqual(r.rewards, [{ credits: 20, unlock: ['portal'] }]);
+  assert.equal(current(line, st({}), r.progress), null);
+  assert.deepEqual(targets(line), ['island.slot.toy-brick', 'island.tab.F2']);
+});
+```

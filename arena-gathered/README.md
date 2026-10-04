@@ -12,3 +12,5 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | decals | `docs/handoff/prompts/battle/decals.txt` | **B** | 11/11 tests after its own slope test was fixed (lifting 1 cm along a tilted normal also moves x: `pos[0]` is `1 - 0.01 * SQRT1_2`); strict typecheck clean. A wrote into its own project (not collected). |
 | kart | `docs/handoff/prompts/battle/kart.txt` | **B** | 9/9 tests, strict typecheck clean (A was still writing when collected). |
 | kinematic | `docs/handoff/prompts/battle/kinematic.txt` | **B** | 11/11 tests, strict typecheck clean. A fails 5 of 10, including the wall acceptance tests (kept for reference). |
+| musicbox | `docs/handoff/prompts/battle/musicbox.txt` | **X** (the one answer posted in the chat) | 9/9 tests, strict typecheck clean. |
+| chunkworld | `docs/handoff/prompts/battle/chunkworld.txt` | **X** (the first answer finished) | 9/9 tests, strict typecheck clean. |

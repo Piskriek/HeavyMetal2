@@ -9,7 +9,9 @@ import { fx } from '../maker/feedback';
  * per player; "Copy" puts the graph on the clipboard so a good look can become the SetMix default.
  */
 interface Style { readonly key: string; readonly label: string; readonly note: string; readonly graph: TexGraph }
-interface GroundSet { readonly ground: { readonly surfaces: readonly { readonly id: string; readonly name: string; readonly styles: readonly Style[] }[] } }
+interface GroundSet { readonly ground: { readonly surfaces: readonly { readonly id: string; readonly name: string; readonly styles: readonly Style[] }[] }; readonly voxel: { readonly graphs: readonly TexGraph[] } }
+/** What the editor changes: the painted ground's tile, or the voxel blocks' faces (what the island shows in the voxel style with Flat). */
+export type LookTarget = 'ground' | 'blocks';
 
 let graphsOnce: Promise<GroundSet | null> | null = null;
 /** The graph sets the bake wrote next to the tiles (fetched once, when the editor first opens). */
@@ -19,7 +21,7 @@ const toHex = (v: number): string => { const s = v <= 0.0031308 ? v * 12.92 : 1.
 const fromHex = (h: string): number => { const c = parseInt(h, 16) / 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
 const stopHex = (st: { r: number; g: number; b: number }): string => `#${toHex(st.r)}${toHex(st.g)}${toHex(st.b)}`;
 
-/** Draw a graph lit into a canvas, tiled `tiles` x `tiles` (2 shows that it repeats without a seam). */
+/** Draw a graph lit into a canvas, tiled `tiles` x `tiles` (it shows that it repeats without a seam). */
 function draw(canvas: HTMLCanvasElement | null, graph: TexGraph, size: number, tiles: number): void {
   if (!canvas) return;
   let px: Uint8ClampedArray;
@@ -31,9 +33,9 @@ function draw(canvas: HTMLCanvasElement | null, graph: TexGraph, size: number, t
   for (let y = 0; y < tiles; y++) for (let x = 0; x < tiles; x++) ctx.putImageData(img, x * size, y * size);
 }
 
-function StyleTile(props: { readonly style: Style; readonly on: boolean; readonly onPick: () => void }): ReactElement {
+function StyleTile(props: { readonly style: Style; readonly on: boolean; readonly blocks: boolean; readonly onPick: () => void }): ReactElement {
   const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => { draw(ref.current, props.style.graph, 48, 1); }, [props.style]);
+  useEffect(() => { draw(ref.current, props.style.graph, props.blocks ? 32 : 48, 1); }, [props.style, props.blocks]);
   return (
     <button className={`se-style${props.on ? ' on' : ''}`} aria-pressed={props.on} title={props.style.note} onClick={props.onPick}>
       <canvas ref={ref} width={48} height={48} aria-hidden="true" />
@@ -47,29 +49,38 @@ const SIZE_NAMES: Record<string, string> = { noise: 'Patches', cellular: 'Cells'
 export function SurfaceEditor(props: {
   readonly surfaceId: number;
   readonly name: string;
-  /** The player's saved look for this surface, if any. */
-  readonly saved?: TexGraph;
-  /** Draw the island's surface from this graph; false when this ground cannot take a graph (an image set). */
-  readonly onApply: (graph: TexGraph) => boolean;
+  /** What it opens on: what the island shows now (the voxel style with Flat shows the blocks). */
+  readonly startOn: LookTarget;
+  /** The player's saved looks for this surface, if any. */
+  readonly savedGround?: TexGraph;
+  readonly savedBlocks?: TexGraph;
+  /** Draw the island's surface from this graph; false when it cannot take a graph (the picture ground). */
+  readonly onApply: (graph: TexGraph, target: LookTarget) => boolean;
   /** Keep the look for this player (null = back to the SetMix default). */
-  readonly onSave: (graph: TexGraph | null) => void;
+  readonly onSave: (graph: TexGraph | null, target: LookTarget) => void;
 }): ReactElement {
   const file = SETMIX_FILE[props.surfaceId];
   const [set, setSet] = useState<GroundSet | null | undefined>(undefined);
-  const [graph, setGraph] = useState<TexGraph | null>(props.saved ?? null);
+  const [target, setTarget] = useState<LookTarget>(props.startOn);
+  const blocks = target === 'blocks';
+  const [graph, setGraph] = useState<TexGraph | null>((props.startOn === 'blocks' ? props.savedBlocks : props.savedGround) ?? null);
   const [styleKey, setStyleKey] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const big = useRef<HTMLCanvasElement>(null);
   useEffect(() => { void loadGraphs().then(setSet); }, []);
-  const surface = set?.ground.surfaces.find((s) => s.id === file);
+  const groundSurface = set?.ground.surfaces.find((s) => s.id === file);
+  const blockGraph = set?.voxel.graphs.find((g) => g.id === `voxel-${file}`);
+  // the blocks have one look per surface (their face); the painted ground has a few styles
+  const surface = !set ? undefined : blocks ? (blockGraph ? { styles: [{ key: 'blocks', label: 'Blocks', note: 'The face of one half-metre block: pixel art with a painted bevel.', graph: blockGraph }] } : undefined) : groundSurface;
+  const switchTo = (t: LookTarget): void => { if (t === target) return; setTarget(t); setGraph((t === 'blocks' ? props.savedBlocks : props.savedGround) ? structuredClone((t === 'blocks' ? props.savedBlocks : props.savedGround)!) : null); setStyleKey(null); setNote(''); };
   useEffect(() => { if (surface && !graph) { setGraph(structuredClone(surface.styles[0]!.graph)); setStyleKey(surface.styles[0]!.key); } }, [surface, graph]);
   // the big preview follows every change, at a quick size (the island gets the full one on "Use on this island")
   useEffect(() => {
     if (!graph) return;
-    const id = requestAnimationFrame(() => draw(big.current, graph, 128, 2));
+    const id = requestAnimationFrame(() => draw(big.current, graph, blocks ? 32 : 128, blocks ? 4 : 2));
     return () => cancelAnimationFrame(id);
-  }, [graph]);
+  }, [graph, blocks]);
 
   const ramps = useMemo(() => (graph?.nodes ?? []).filter((n) => n.type === 'ramp'), [graph]);
   const sized = useMemo(() => (graph?.nodes ?? []).filter((n) => typeof n.scale === 'number' && (n.type === 'noise' || n.type === 'cellular') || typeof n.count === 'number'), [graph]);
@@ -84,17 +95,17 @@ export function SurfaceEditor(props: {
     setBusy(true);
     // let the busy state paint before the island draws the full-size tile
     setTimeout(() => {
-      const done = props.onApply(graph);
+      const done = props.onApply(graph, target);
       setBusy(false);
-      if (done) { props.onSave(graph); setNote(`${props.name} uses this look now.`); fx('save', { volume: 0.5 }); }
-      else setNote('This island\'s ground is made from pictures, so it keeps its look.');
+      if (done) { props.onSave(graph, target); setNote(`${props.name} ${blocks ? 'blocks use' : 'uses'} this look now.${blocks ? '' : ' It shows with PBR or the painted style.'}`); fx('save', { volume: 0.5 }); }
+      else setNote('This island\'s painted ground is made from pictures, so it keeps its look. Its blocks can change.');
     }, 30);
   };
   const reset = (): void => {
     const g = structuredClone(surface.styles[0]!.graph);
     setGraph(g); setStyleKey(surface.styles[0]!.key);
     setBusy(true);
-    setTimeout(() => { props.onApply(g); props.onSave(null); setBusy(false); setNote(`${props.name} is back to the SetMix look.`); }, 30);
+    setTimeout(() => { props.onApply(g, target); props.onSave(null, target); setBusy(false); setNote(`${props.name} is back to the SetMix look.`); }, 30);
   };
   const copy = (): void => {
     void navigator.clipboard?.writeText(JSON.stringify(graph)).then(() => setNote('Copied the look. Paste it anywhere to keep or share it.'), () => setNote('The clipboard is not available here.'));
@@ -102,9 +113,12 @@ export function SurfaceEditor(props: {
 
   return (
     <div className="surface-editor">
-      <canvas ref={big} className="se-preview" width={256} height={256} aria-label={`${props.name}, as it tiles`} />
+      <div className="seg se-target" role="group" aria-label="What to change">
+        {(['blocks', 'ground'] as const).map((t) => <button key={t} className={target === t ? 'on' : ''} aria-pressed={target === t} title={t === 'blocks' ? 'The voxel blocks (the voxel style with Flat)' : 'The painted ground (PBR, or the painted style)'} onClick={() => switchTo(t)}>{t === 'blocks' ? 'Blocks' : 'Painted ground'}</button>)}
+      </div>
+      <canvas ref={big} className={`se-preview${blocks ? ' blocky' : ''}`} width={256} height={256} aria-label={`${props.name}, as it tiles`} />
       <div className="se-styles" role="group" aria-label="Styles">
-        {surface.styles.map((st) => <StyleTile key={st.key} style={st} on={styleKey === st.key} onPick={() => { setGraph(structuredClone(st.graph)); setStyleKey(st.key); fx('select', { volume: 0.4 }); }} />)}
+        {surface.styles.map((st) => <StyleTile key={st.key} style={st} blocks={blocks} on={styleKey === st.key} onPick={() => { setGraph(structuredClone(st.graph)); setStyleKey(st.key); fx('select', { volume: 0.4 }); }} />)}
       </div>
       {ramps.length ? <h4>Colours</h4> : null}
       {ramps.map((r, ri) => (

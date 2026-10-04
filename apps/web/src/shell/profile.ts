@@ -87,7 +87,7 @@ export function loadProfile(): Profile {
     const gpu: GpuChoice = raw.gpu === 'saver' || raw.gpu === 'browser' ? raw.gpu : 'fast';
     const graphics = raw.graphics && typeof raw.graphics === 'object' && !Array.isArray(raw.graphics) ? raw.graphics : {};
     // only well-formed graphs survive a load (a broken one would leave a surface blank)
-    const looks = raw.groundLooks && typeof raw.groundLooks === 'object' ? Object.fromEntries(Object.entries(raw.groundLooks as Record<string, unknown>).filter(([k, g]) => /^d+$/.test(k) && validateGraph(g).ok)) as Record<string, TexGraph> : {};
+    const looks = raw.groundLooks && typeof raw.groundLooks === 'object' ? Object.fromEntries(Object.entries(raw.groundLooks as Record<string, unknown>).filter(([k, g]) => /^b?\d+$/.test(k) && validateGraph(g).ok)) as Record<string, TexGraph> : {};
     const favIslands = Array.isArray(raw.favIslands) ? raw.favIslands.filter((x): x is string => typeof x === 'string').slice(0, 40) : [];
     // before style and detail were two choices, PBR meant the painted ground: keep what each player saw
     const style = raw.style === 'voxel' || raw.style === 'painted' ? raw.style : raw.skin === 'pbr' ? 'painted' : 'voxel';

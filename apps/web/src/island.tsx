@@ -187,7 +187,7 @@ export function IslandWalk(props: {
     /** Layers: carry a thing with the Move tool, place one where you look, show or hide the plants. */
     carry: (ref: PresetId) => void; addThing: (modelId: string) => PresetId | null; showPlants: (on: boolean) => void;
     /** The surface editor: draw surface `id` from this texture graph (SetMix's graph-made ground only; false for the image set). */
-    setSurfaceLook: (id: number, graph: TexGraph) => boolean } | null>(null);
+    setSurfaceLook: (id: number, graph: TexGraph, blocks?: boolean) => boolean } | null>(null);
   /** A small copy of the ground you are looking at (the tool presets draw on it). */
   const peekGround = useCallback((): Terrain | null => api.current?.groundPeek() ?? null, []);
   // the island overview needs the cursor: let go of the mouse when the level goes up
@@ -345,12 +345,17 @@ export function IslandWalk(props: {
     const surfaces = new SurfaceArray(props.ground === 'racing' ? RACING_SURFACES : SETMIX_SURFACES, undefined, SETMIX_VOXEL, tileSize);
     (window as unknown as { hmGround: { tile?: (id: number) => number } }).hmGround.tile = (id) => surfaces.checksum(id);
     (window as unknown as { hmGround: { things?: () => number } }).hmGround.things = () => rt.store.get(scene.sceneId)?.children['models']?.length ?? 0;
-    // the player's own looks for SetMix surfaces (the surface editor) replace the baked tiles once they have loaded
+    /** Draw a surface from a texture graph: its painted-ground tile, or (blocks) its voxel faces, three seeds like the baked ones. */
+    const applyLook = (id: number, graph: TexGraph, blocks: boolean): void => {
+      if (blocks) surfaces.setVoxelFaces(id, [0, 1000, 2000].map((seed) => tileBytes(evaluateGraph(graph, { size: 32, seed }))));
+      else { const b = tileBytes(evaluateGraph(graph, { size: surfaces.size })); surfaces.setTile(id, b.colour, b.maps); }
+    };
+    // the player's own looks for SetMix surfaces (the surface editor) replace the baked tiles once they have loaded ("b4": grass's blocks)
     if (props.ground !== 'racing') {
       const looks = props.profile?.groundLooks ?? {};
       void surfaces.ready.then(() => {
-        for (const [id, graph] of Object.entries(looks)) {
-          try { const t = evaluateGraph(graph, { size: surfaces.size }); const b = tileBytes(t); surfaces.setTile(Number(id), b.colour, b.maps); } catch { /* a broken look keeps the baked tile */ }
+        for (const [key, graph] of Object.entries(looks)) {
+          try { applyLook(Number(key.replace(/^b/, '')), graph, key.startsWith('b')); } catch { /* a broken look keeps the baked tile */ }
         }
       });
     }
@@ -474,11 +479,10 @@ export function IslandWalk(props: {
         return refs[refs.length - 1]?.ref ?? null;
       },
       showPlants: (on) => { plantsHidden = !on; showDecor(); },
-      setSurfaceLook: (id, graph) => {
-        if (props.ground === 'racing') return false;
-        const t = evaluateGraph(graph, { size: surfaces.size });
-        const { colour, maps } = tileBytes(t);
-        surfaces.setTile(id, colour, maps);
+      setSurfaceLook: (id, graph, blocks = false) => {
+        // the racing ground's painted tiles are pictures; its blocks are SetMix's and can change
+        if (props.ground === 'racing' && !blocks) return false;
+        applyLook(id, graph, blocks);
         return true;
       },
       groundPeek: () => { const ts = rt.binder.terrain(); if (!ts) return null; const a = aim(); const pt = a?.point ?? [px, py, pz]; return cropTerrain(ts.terrain, pt[0], pt[2], 24); },
@@ -629,7 +633,7 @@ export function IslandWalk(props: {
         const a = aim();
         if (tool && a) {
           builder.use(tool, a, alt, now, first);
-          if (first) tourEvent(tool.action === 'place' && !alt ? 'placed' : tool.tab === 'sculpt' ? 'used-sculpt' : tool.tab === 'paint' ? 'used-paint' : 'used-select');
+          if (first) tourEvent((tool.action === 'place' || tool.action === 'things') && !alt ? 'placed' : tool.tab === 'sculpt' ? 'used-sculpt' : tool.tab === 'paint' ? 'used-paint' : 'used-select');
         }
         return;
       }
@@ -930,9 +934,10 @@ export function IslandWalk(props: {
             : w.id === 'settings' ? (props.profile && props.onProfile ? <SettingsBody profile={props.profile} update={props.onProfile} onReplayTour={() => props.onReplayTour?.()} onReset={() => props.onResetProgress?.()} top={<div className="btns settings-jump"><button onClick={openLighting}>Lighting presets and time of day</button></div>} /> : null)
             : w.id === 'layers' ? <LayersPanel rt={rt} sceneId={scene.sceneId} selected={layerSel} onSelect={setLayerSel} plantsShown={plantsShown} onPlants={(on) => { setPlantsShown(on); api.current?.showPlants(on); }}
                 onMove={(ref) => api.current?.carry(ref)} onShow={(ref) => { setFocusId(ref); }} onAdd={(id) => api.current?.addThing(id) ?? null} onGround={() => pickTab('paint')} />
-            : w.id.startsWith('surface:') ? (() => { const sid = Number(w.id.slice(8)); const s = PAINTS.find((x) => x.id === sid); return <SurfaceEditor surfaceId={sid} name={s?.name ?? 'This surface'} saved={props.profile?.groundLooks?.[String(sid)]}
-                onApply={(g) => api.current?.setSurfaceLook(sid, g) ?? false}
-                onSave={(g) => props.onProfile?.((pr) => { const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[String(sid)] = g; else delete looks[String(sid)]; return { ...pr, groundLooks: looks }; })} />; })()
+            : w.id.startsWith('surface:') ? (() => { const sid = Number(w.id.slice(8)); const s = PAINTS.find((x) => x.id === sid); return <SurfaceEditor surfaceId={sid} name={s?.name ?? 'This surface'}
+                startOn={style === 'voxel' && skin !== 'pbr' ? 'blocks' : 'ground'} savedGround={props.profile?.groundLooks?.[String(sid)]} savedBlocks={props.profile?.groundLooks?.[`b${sid}`]}
+                onApply={(g, target) => api.current?.setSurfaceLook(sid, g, target === 'blocks') ?? false}
+                onSave={(g, target) => props.onProfile?.((pr) => { const key = target === 'blocks' ? `b${sid}` : String(sid); const looks = { ...(pr.groundLooks ?? {}) }; if (g) looks[key] = g; else delete looks[key]; return { ...pr, groundLooks: looks }; })} />; })()
             : w.id === 'world' ? <WorldRulesEditor rt={rt} sceneId={scene.sceneId} />
             : w.id === 'moves' ? <MovesEditor actions={actions} />
             : w.id.startsWith('plant:') ? <PlantEditor rt={rt} sceneId={scene.sceneId} kind={w.id.slice(6)} />

@@ -24,7 +24,7 @@ test('playing the island tour: events move it on, the sculpt step hands you Rais
   assert.ok(all.includes('give:raise'));
   for (let i = 0; i < 3; i++) run(t.event('used-sculpt', now++) as never);
   assert.equal(t.current()!.id, 'place');
-  assert.ok(all.includes('give:place-palm'));
+  assert.ok(all.includes('give:things-one'));
   for (const e of ['placed', 'undo', 'opened-presets', 'edited', 'opened-menu']) run(t.event(e, now++) as never);
   assert.equal(t.current()!.id, 'reveal');
   run(t.event('moved', now++) as never);

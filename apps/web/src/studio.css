@@ -884,3 +884,5 @@ body:has(.galaxy-bar.open) .palette-strip { top: 62px; }
 .hs-acts button { min-width: 24px; min-height: 24px; padding: 2px; border-color: transparent; }
 .hs-add { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 4px; }
 .hs-add button { display: grid; justify-items: center; gap: 3px; padding: 6px 4px; font-size: 11px; }
+.se-target { justify-self: start; }
+.se-preview.blocky, .se-style canvas { image-rendering: pixelated; }

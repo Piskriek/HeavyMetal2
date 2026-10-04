@@ -308,6 +308,26 @@ export class SurfaceArray {
    * Put a graph-made tile in surface `id`'s layer: `colour` is RGBA (sRGB; its alpha is ignored), `maps` R = height, G = roughness, both
    * `size` square. The surface editor calls this live.
    */
+  /**
+   * Put graph-made block faces in surface `id`'s voxel layers: one colour and one maps image (R = height, G = roughness) per variant, each
+   * VOXEL_SIZE square. The surface editor calls this when the island shows voxel blocks.
+   */
+  setVoxelFaces(id: number, faces: readonly { readonly colour: ArrayLike<number>; readonly maps: ArrayLike<number> }[]): void {
+    const layer = this.layerOf[id] ?? -1;
+    if (layer < 0 || !faces.length) return;
+    const face = VOXEL_SIZE * VOXEL_SIZE * 4;
+    for (let k = 0; k < this.voxelVariants; k++) {
+      const f = faces[k % faces.length]!, at = (layer * this.voxelVariants + k) * face;
+      for (let i = 0; i < VOXEL_SIZE * VOXEL_SIZE; i++) {
+        const o = at + i * 4;
+        this.voxelData[o] = f.colour[i * 4]!; this.voxelData[o + 1] = f.colour[i * 4 + 1]!; this.voxelData[o + 2] = f.colour[i * 4 + 2]!; this.voxelData[o + 3] = f.maps[i * 4]!;
+      }
+      pbrFromHeight(f.maps, VOXEL_SIZE, BLOCK_RELIEF * VOXEL_SIZE, this.voxelPbr, at);
+    }
+    this.voxelTexture.needsUpdate = true;
+    this.voxelPbrTexture.needsUpdate = true;
+  }
+
   setTile(id: number, colour: ArrayLike<number>, maps: ArrayLike<number>): void {
     const layer = this.layerOf[id] ?? -1;
     if (layer < 0) return;

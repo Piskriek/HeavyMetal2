@@ -39,7 +39,7 @@ export const ISLAND_STEPS: Step[] = [
     advance: { type: 'event', name: 'placed' },
     skippable: true,
     highlight: 'island.tab.things',
-    onEnter: [{ type: 'give', item: 'place-palm' }],
+    onEnter: [{ type: 'give', item: 'things-one' }],
   },
   {
     id: 'undo', title: 'Take it back',

@@ -216,8 +216,9 @@ try {
   // Things and Lights hold ways too; what they use is the palette
   await page.keyboard.press('F9');
   await page.waitForTimeout(T(300));
-  check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Place', 'Scatter', 'Row', 'Swap'].every((w) => t.includes(w)); })
-    && await page.locator('.palette-strip .ps-frame').count() >= 10);
+  const thingsRow = await page.evaluate(() => [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent));
+  const thingsFrames = await page.locator('.palette-strip .ps-frame').count();
+  check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', ['Place', 'Scatter', 'Row', 'Swap'].every((w) => thingsRow.includes(w)) && thingsFrames >= 10, `${thingsRow.join(',')} / ${thingsFrames} frames`);
   await page.keyboard.press('F6');
   await page.waitForTimeout(T(300));
   check('Lights holds ways (Look, Sun, Day and night, Haze, Clouds) and the looks are the palette', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Look', 'Sun', 'Day and night', 'Haze', 'Clouds'].every((w) => t.includes(w)); })

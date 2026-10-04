@@ -19,6 +19,7 @@ import { placementsOf } from './maker/models-panel';
 import { focusTargetOf } from './maker/focus';
 import { fx } from './maker/feedback';
 import { BuildController, type Aim, type Selected } from './build/build-controller';
+import { GizmoControl, gizmoModeFor, type GizmoTarget } from './build/gizmo-control';
 import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
 import { animOf, catalog, lookOf, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
@@ -52,7 +53,7 @@ import type { AvatarLook } from '@hm/avatarlook';
 
 /**
  * My Island. Walk mode: you are the goblin (third person, or first person with V); the mouse is captured for looking and the crosshair aims.
- * Build HUD (grown-up switch on): F1..F10 pick a tab (Select, Paint, Sculpt, Animate, Sound, Lights, Activities, Avatar, Things, Camera), 1..9
+ * Build HUD (grown-up switch on): F1..F10 pick a tab in the V3 order (Select, Paint, Things, Animate, Sound, Lights, Logic, Camera, Avatar, Terrain), 1..9
  * or the wheel pick a slot, left click uses it, right click does the opposite, E opens your presets (mouse free) with previews and editors,
  * hold Tab for the quick wheel. Studio mode (B, or the button top right): no goblin, fly with W A S D, Space and C, look with the right mouse
  * button, the mouse stays free, tools act where the cursor points, every setting opens in a movable window, F focuses on a thing, H hides
@@ -324,6 +325,9 @@ export function IslandWalk(props: {
   const openSelectedRef = useRef(openSelected);
   openSelectedRef.current = openSelected;
   const [layerSel, setLayerSel] = useState<PresetId | null>(null);
+  // the gizmo follows the selected thing (read by the frame loop)
+  const gizmoSel = useRef<PresetId | null>(null);
+  gizmoSel.current = layerSel;
   /** Texture mode (MASTER_PLAN 6.4): the surface you stepped into, its draft, and the colour Paint puts on. */
   const [tex, setTex] = useState<{ readonly id: number; readonly name: string; readonly draft: TexDraft; readonly history: DraftHistory; readonly colours: [number, number, number][] } | null>(null);
   const [texColour, setTexColour] = useState(0);
@@ -492,6 +496,17 @@ export function IslandWalk(props: {
     let suppressMenu = false;
     let cursor = { x: 0, y: 0 };
     let looking: { x: number; y: number } | null = null;
+    // the transform gizmo (Pro and Studio, on Select's tab; docs/ARENA_PLAN.md)
+    const gizmo = new GizmoControl(rt, scene.sceneId, renderer.overlay, (i, p) => renderer.setModelPose(i, p.x, p.y, p.z, p.yaw, p.scale));
+    let gizmoTgt: GizmoTarget | null = null, gizmoFov = 60;
+    // tests: what the gizmo shows, where a point along its arrow lands on screen, and the target's place
+    (window as unknown as { hmGizmo: unknown }).hmGizmo = () => {
+      const g = gizmo.seen;
+      if (!g) return null;
+      const pr = rt.store.get(g.ref) ? rt.store.resolve(g.ref).params : {};
+      const along = (k: 0 | 1 | 2, f: number): readonly [number, number] => { const p: [number, number, number] = [g.pivot[0], g.pivot[1], g.pivot[2]]; p[k] += g.len * f; const q = renderer.camera.project(p), r = el.getBoundingClientRect(); return [q[0] + r.left, q[1] + r.top]; };
+      return { mode: g.mode, hot: g.hot, len: g.len, size: gizmo.size, x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), xArrow: along(0, 0.7), xFar: along(0, 1.4) };
+    };
     let lastLookEvent = 0, lastMoveEvent = 0, lastTourTick = 0;
     const realMove = lookFilter();
 
@@ -501,6 +516,16 @@ export function IslandWalk(props: {
     const studio = (): boolean => player().mode === 'studio';
     const centre = (): { x: number; y: number } => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
     /** Where the tool acts: the crosshair while the mouse is captured, the cursor when it is free. */
+    const gizmoRay = (): { origin: [number, number, number]; dir: [number, number, number] } | null => {
+      const c = pointerLocked || softAim ? centre() : cursor; const r = renderer.ray(c.x, c.y);
+      return r ? { origin: [r.origin[0], r.origin[1], r.origin[2]], dir: [r.direction[0], r.direction[1], r.direction[2]] } : null;
+    };
+    /** The index the renderer drew a placed thing at (hidden layers are not drawn; isolate draws one). */
+    const drawnIndex = (ref: PresetId): number => {
+      if (live.current.isolateId) return live.current.isolateId === ref ? 0 : -1;
+      const refs = (rt.store.get(scene.sceneId)?.children['models'] ?? []).filter((r) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['hidden'] !== true);
+      return refs.findIndex((r) => r.ref === ref);
+    };
     const aim = (): Aim | null => { const c = pointerLocked || softAim ? centre() : cursor; const h = renderer.pick(c.x, c.y); return h.point ? { point: h.point, normal: h.normal ?? null } : null; };
 
     // the browser refuses a re-lock for a moment after Esc: only give up on the mouse after three refusals in a row
@@ -576,6 +601,7 @@ export function IslandWalk(props: {
 
     /** Esc closes exactly one thing: the wheel, the front window, focus, hide-others, what Move carries; then it opens the menu. */
     const escape = (): void => {
+      if (gizmo.dragging) { gizmo.cancel(); return; }
       if (texRef.current) { if (live.current.win.closeTop()) return; stepOutRef.current(); return; }
       if (live.current.win.closeTop()) return;
       if (live.current.focusId) { setFocusId(null); renderer.setFocus(null); return; }
@@ -595,6 +621,7 @@ export function IslandWalk(props: {
       if (k === 'escape') { escape(); return; }
       if (typing) return;
       if (live.current.menu) return;
+      if ((e.key === '+' || e.key === '=' || e.key === '-') && gizmoTgt && !e.ctrlKey) { gizmo.grow(e.key === '-' ? -1 : 1); return; }
       const tab = tabForKey(e.key);
       if (tab && live.current.buildOn && (e.key.startsWith('F') || !e.ctrlKey)) { e.preventDefault(); pickTab(tab); return; }
       if (k === 'tab') {
@@ -632,6 +659,8 @@ export function IslandWalk(props: {
       if (!pointerLocked && overUi(e)) return;
       // avatar mode: the right button turns you round in the mirror; the left one never uses a tool here
       if (live.current.avatarMode) { if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } } return; }
+      // a gizmo handle under the pointer takes the left button
+      if (e.button === 0 && live.current.buildOn && gizmo.hovering && gizmo.down(gizmoTgt, gizmoRay(), e.altKey, gizmoFov)) { fx('select', { volume: 0.4 }); return; }
       if (studio() || live.current.level === 'island') {
         // the mouse is free: right button looks around, left button uses what you hold where the cursor points
         if (e.button === 2) { looking = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch { /* synthetic */ } return; }
@@ -664,6 +693,7 @@ export function IslandWalk(props: {
       camPitch = Math.min(1.3, Math.max(0.05, camPitch + dy * 0.004));
     };
     const onPointerUp = (e: PointerEvent): void => {
+      if (gizmo.dragging && e.button === 0) { const said = gizmo.up(); if (said) say(said); fx('place', { volume: 0.5 }); return; }
       if (looking && e.button === 2) { looking = null; try { el.releasePointerCapture(e.pointerId); } catch { /* not captured */ } return; }
       looking = null;
       if (mouse) { mouse &= e.button === 2 && !softAim ? ~2 : ~1; if (!mouse) builder.end(); }
@@ -691,6 +721,14 @@ export function IslandWalk(props: {
         // a way to paint puts down what the palette has picked (top middle)
         const tool: ToolPreset | null = own && own.action === 'paint' && own.way ? { ...own, surface: Number(s.palette.paint ?? 4) || 4 } : own ? withSculptPalette(own, s) : own;
         const a = aim();
+        // Pro and Studio: Move, Turn and Resize pick the thing; the gizmo on it does the rest (Easy keeps click-to-carry)
+        if (s.tab === 'select' && s.level !== 'easy' && tool && a && (tool.action === 'move' || tool.action === 'turn' || tool.action === 'resize')) {
+          if (!first || gizmo.dragging) return;
+          const m = builder.modelAt(a);
+          if (m) { setLayerSel(m.ref); say(`${rt.store.get(m.ref)?.name ?? 'A thing'}: drag the gizmo; + and - size it, Shift and Ctrl snap, Alt leaves a copy`); fx('select', { volume: 0.5 }); }
+          else say('Point at something you placed');
+          return;
+        }
         if (tool && a) {
           builder.use(tool, a, alt, now, first);
           if (first) tourEvent((tool.action === 'place' || tool.action === 'things') && !alt ? 'placed' : tool.tab === 'sculpt' ? 'used-sculpt' : tool.tab === 'paint' ? 'used-paint' : 'used-select');
@@ -737,7 +775,6 @@ export function IslandWalk(props: {
         return;
       }
       if (!first) return;
-      if (s.tab === 'activities') { if (alt) return; props.onActivity?.(id); return; }
       if (s.tab === 'animate' && alt) { animator.stop(); return; }
       applyNow(s.tab, id);
     };
@@ -952,6 +989,17 @@ export function IslandWalk(props: {
       }
       if (sx || sy || sz) renderer.camera.set([eye[0] + sx, eye[1] + sy, eye[2] + sz], [target[0] + sx * 0.5, target[1] + sy * 0.5, target[2] + sz * 0.5]);
       else renderer.camera.set(eye, target);
+      {
+        const pl = player(), sel = gizmoSel.current;
+        const on = live.current.buildOn && pl.level !== 'easy' && pl.tab === 'select' && !live.current.menu && !live.current.avatarMode && !texRef.current;
+        const idx = on && sel ? drawnIndex(sel) : -1;
+        gizmoTgt = sel && idx >= 0 ? { ref: sel, index: idx } : null;
+        gizmoFov = fpv ? fov : st ? fov - 10 : fov - 15;
+        const snap: { move?: number; turn?: number; scale?: number } = {};
+        if (down.has('shift')) { snap.move = 0.5; snap.scale = 0.25; }
+        if (down.has('control')) snap.turn = 15;
+        gizmo.frame(gizmoTgt, gizmoModeFor(pl.hotbars.select[pl.slots.select]), gizmoRay(), gizmoFov, snap);
+      }
       renderer.step();
       // seen through a window (the SetMix home): shade only what the window shows
       const clipEl = clipRef.current?.current;
@@ -1115,7 +1163,6 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
     case 'animate': return { title, line: item.doc, left: 'Play it', right: 'Stop' };
     case 'sound': return { title, line: item.doc, left: 'Play it', right: 'Play it' };
     case 'lights': { const w = LIGHT_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' }; }
-    case 'activities': return { title, line: item.doc, left: 'Open it', right: 'Nothing' };
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
     case 'logic': { const w = LOGIC_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }

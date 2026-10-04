@@ -100,15 +100,9 @@ export const subscribePlayer = (cb: () => void): (() => void) => { listeners.add
 export const player = get;
 export const usePlayer = (): PlayerState => useSyncExternalStore(subscribePlayer, get, get);
 
-/** Tell the store which activities exist (the shell's registry); hotbars pick them up. */
+/** Tell the store which activities exist (the shell's registry). They are not on the hotbar any more (V3); the galaxy and the Esc menu open them. */
 export function setActivities(list: readonly ActivityInfo[]): void {
-  if (JSON.stringify(list) === JSON.stringify(activities)) return;
   activities = list;
-  const s = get();
-  const known = new Set(list.map((a) => a.id));
-  const row: (string | null)[] = s.hotbars.activities.map((id) => (id && known.has(id) ? id : null));
-  if (!row.some((x) => x !== null)) list.slice(0, SLOTS).forEach((a, i) => { row[i] = a.id; });
-  set({ ...s, hotbars: { ...s.hotbars, activities: row } });
 }
 export const currentActivities = (): readonly ActivityInfo[] => activities;
 

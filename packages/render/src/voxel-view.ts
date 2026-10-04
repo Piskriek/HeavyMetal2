@@ -79,11 +79,12 @@ export class ModelsView {
     }
   }
   /** Move one placed model without rebuilding it (index = position in the list given to the constructor). */
-  pose(i: number, x: number, y: number, z: number, yawDeg: number): void {
+  pose(i: number, x: number, y: number, z: number, yawDeg: number, scale?: number): void {
     const v = this.slots[i];
     if (!v) return;
     v.group.position.set(x, y, z);
     v.group.rotation.y = (yawDeg * Math.PI) / 180;
+    if (scale !== undefined && scale > 0) v.group.scale.setScalar(scale);
   }
   dispose(): void { for (const v of this.views) v.dispose(); this.views.length = 0; this.slots.length = 0; this.group.clear(); }
 }

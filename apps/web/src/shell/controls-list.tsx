@@ -33,7 +33,7 @@ const ROWS: readonly (readonly [string, string])[] = [
   ['Run', 'Hold Shift'],
   ['Jump', 'Space'],
   ['First person or over the shoulder', 'V, or the 1st and 3rd buttons top right'],
-  ['Tabs: Select, Paint, Sculpt, Animate, Sound, Lights, Activities, Avatar, Things, Camera', 'F1 to F10 (Avatar also on P)'],
+  ['Tabs: Select, Paint, Things, Animate, Sound, Lights, Logic, Camera, Avatar, Terrain', 'F1 to F10 (Logic also on the backtick, Avatar on P)'],
   ['Pick a slot', '1 to 9, or the mouse wheel'],
   ['Use what you hold', 'Left mouse button'],
   ['The opposite (lower, take away, smaller)', 'Right mouse button'],

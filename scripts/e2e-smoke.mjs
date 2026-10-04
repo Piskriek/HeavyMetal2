@@ -184,7 +184,7 @@ try {
   check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
-  check('eleven tabs on the tab strip (F1 to F10, and Logic on the backtick key)', await page.locator('.tab-strip button').count() === 11);
+  check('ten tabs on the tab strip in the V3 order (F1 to F10)', await page.locator('.tab-strip button').count() === 10);
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
@@ -223,19 +223,19 @@ try {
   await page.waitForTimeout(T(400));
   check('Esc steps out of the texture', await page.locator('.tex-bench').count() === 0);
   // Sculpt holds ways to sculpt; the shapes its Stamp presses are the palette
-  await page.keyboard.press('F3');
+  await page.keyboard.press('F10');
   await page.waitForTimeout(T(300));
   check('Sculpt holds ways to sculpt (Grab, Clay, Crease, Stamp, Terrace ...)', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Raise', 'Smooth', 'Grab', 'Clay', 'Crease', 'Stamp', 'Terrace'].every((w) => t.includes(w)); }));
   check('the Sculpt palette holds the shapes to stamp', JSON.stringify(await page.$$eval('.palette-strip .ps-frame', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Hill', 'Crater', 'Plateau', 'Ridge', 'Dune', 'Volcano']));
   // Things and Lights hold ways too; what they use is the palette
-  await page.keyboard.press('F9');
+  await page.keyboard.press('F3');
   await page.waitForTimeout(T(300));
   const thingsRow = await page.evaluate(() => [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent));
   const thingsFrames = await page.locator('.palette-strip .ps-frame').count();
   check('Things holds ways to place (Place, Scatter, Row, Swap) and the things are the palette', ['Place', 'Scatter', 'Row', 'Swap'].every((w) => thingsRow.includes(w)) && thingsFrames >= 10, `${thingsRow.join(',')} / ${thingsFrames} frames`);
-  await page.keyboard.press('`');
+  await page.keyboard.press('F7');
   await page.waitForTimeout(T(300));
-  check('Logic (the backtick key) holds Add rule, Remove rules, Rules, and its palette the ready-made rules', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Add rule', 'Remove rules', 'Rules'].every((w) => t.includes(w)); })
+  check('Logic (F7, and the backtick key) holds Add rule, Remove rules, Rules, and its palette the ready-made rules', await page.evaluate(() => { const t = [...document.querySelectorAll('.hotbar > button span')].map((s) => s.textContent); return ['Add rule', 'Remove rules', 'Rules'].every((w) => t.includes(w)); })
     && await page.locator('.palette-strip .ps-frame').count() >= 8);
   await page.keyboard.press('F6');
   await page.waitForTimeout(T(300));
@@ -271,6 +271,37 @@ try {
   await dom(() => { [...document.querySelectorAll('.layers .ly-add button')].find((b) => /Barrel/.test(b.textContent ?? ''))?.click(); });
   await page.waitForTimeout(T(500));
   check('+ Add puts a thing in as a new layer, picked', await page.locator('.layers .ly-list[aria-label="Things"] .ly-row').count() === things + 1 && await page.locator('.layers .ly-row.on .ly-attrs').count() === 1);
+  // the gizmo (hotbar spec V3): Pro shows it on the picked thing on Select's tab; drag the x arrow, one undo step puts it back
+  await dom(() => document.querySelector('[data-ui="island.level.pro"]')?.click());
+  await page.keyboard.press('F1');
+  await page.waitForTimeout(T(500));
+  const g0 = await page.evaluate(() => window.hmGizmo?.());
+  check('Pro shows the move gizmo on the picked thing', !!g0 && g0.mode === 'move', JSON.stringify(g0));
+  if (g0) {
+    await page.keyboard.press('+');
+    await page.waitForTimeout(T(200));
+    const g1 = await page.evaluate(() => window.hmGizmo?.());
+    check('+ grows the gizmo', !!g1 && g1.size > 1.1, String(g1?.size));
+    await page.mouse.move(g1.xArrow[0], g1.xArrow[1]);
+    await page.waitForTimeout(T(300));
+    const hot = (await page.evaluate(() => window.hmGizmo?.()))?.hot;
+    check('pointing at the x arrow lights it', hot?.kind === 'axis' && hot?.axis === 'x', JSON.stringify(hot));
+    await page.mouse.down(); await page.waitForTimeout(T(100));
+    await page.mouse.move(g1.xFar[0], g1.xFar[1], { steps: 6 }); await page.waitForTimeout(T(200));
+    await page.mouse.up(); await page.waitForTimeout(T(300));
+    const g2 = await page.evaluate(() => window.hmGizmo?.());
+    check('dragging the x arrow moves the thing along x only', !!g2 && g2.x - g1.x > 0.2 && Math.abs(g2.z - g1.z) < 1e-6 && Math.abs(g2.y - g1.y) < 1e-6, `x ${g1.x} to ${g2?.x}`);
+    await page.keyboard.press('Control+z');
+    await page.waitForTimeout(T(300));
+    const g3 = await page.evaluate(() => window.hmGizmo?.());
+    check('one Ctrl+Z puts it back', !!g3 && Math.abs(g3.x - g1.x) < 1e-6, `x ${g3?.x}`);
+    await page.keyboard.press('-');
+  }
+  await dom(() => document.querySelector('[data-ui="island.level.easy"]')?.click());
+  await page.waitForTimeout(T(200));
+  check('Easy has no gizmo', !(await page.evaluate(() => window.hmGizmo?.())));
+  await page.keyboard.press('F2');
+  await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });
   await page.waitForTimeout(T(200));
   check('its eye hides it', await page.locator('.layers .ly-row.hidden').count() === 1);
@@ -305,7 +336,7 @@ try {
   check('B switches to studio mode', /Studio/.test(await page.locator('.mode-bar .seg button.on').first().textContent() ?? ''));
   check('studio opens the settings of what you hold', await page.locator('.fwin').count() >= 1);
   check('in studio the Walk/Studio toggles sit on top of the open hierarchy bar (S3)', await page.evaluate(() => { const b = document.querySelector('.mode-bar button'); if (!b) return false; const r = b.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!top && !!top.closest('.mode-bar'); }));
-  await page.keyboard.press('F3');
+  await page.keyboard.press('F10');
   await page.waitForTimeout(T(300));
   check('a tool shows what it sets off (sprite, sound, swing)', await page.locator('.fwin .plugs .plug').count() === 3);
   await page.locator('.fwin .plug-add').click();

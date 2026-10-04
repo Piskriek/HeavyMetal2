@@ -13,7 +13,7 @@ export function Crosshair(props: { readonly active: boolean }): ReactElement {
   );
 }
 
-/** The tabs: F1 to F10 (Avatar also on P). Click works when the mouse is free. */
+/** The tabs: F1 to F10 in the V3 order (Logic also on the backtick, Avatar on P). Click works when the mouse is free. */
 export function TabStrip(props: { readonly tab: TabId; readonly onPick: (t: TabId) => void }): ReactElement {
   return (
     <nav className="tab-strip" role="tablist" aria-label="What you hold">

@@ -67,7 +67,7 @@ export function LayersPanel(props: {
           {THINGS.map((t) => <button key={t.id} title={`Add a ${t.name.toLowerCase()} where you are looking`} onClick={() => { const ref = props.onAdd(t.id); setAdding(false); if (ref) props.onSelect(ref); }}><PresetPreview p={{ kind: 'model', model: t.id }} size={34} /><span>{t.name}</span></button>)}
         </div>
       ) : null}
-      {refs.length === 0 ? <p className="hint">Nothing placed yet. Add a thing, or place one with the Things tab (F9).</p> : null}
+      {refs.length === 0 ? <p className="hint">Nothing placed yet. Add a thing, or place one with the Things tab (F3).</p> : null}
       <ul className="ly-list" aria-label="Things">
         {refs.map((r, i) => {
           const p = rt.store.get(r.ref);

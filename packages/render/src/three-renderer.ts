@@ -40,7 +40,7 @@ export type ThreeRenderer = RenderService & {
   /** The world ray under a screen point (for tools that edit things the picker does not know, like voxels). */
   ray(clientX: number, clientY: number): { readonly origin: Vec3; readonly direction: Vec3 } | null;
   /** Move one of the models given to setModels (an avatar walking about) without rebuilding it. */
-  setModelPose(index: number, x: number, y: number, z: number, yawDeg: number): void;
+  setModelPose(index: number, x: number, y: number, z: number, yawDeg: number, scale?: number): void;
   /** A puff, spark or chip burst at a point in the world (the juice on every edit). */
   burst(def: BurstDef): void;
   /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
@@ -355,8 +355,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyDecor();
     },
     burst(def: BurstDef): void { bursts?.emit(def); },
-    setModelPose(index: number, x: number, y: number, z: number, yawDeg: number): void {
-      modelsView?.pose(index, x, y, z, yawDeg);
+    setModelPose(index: number, x: number, y: number, z: number, yawDeg: number, scale?: number): void {
+      modelsView?.pose(index, x, y, z, yawDeg, scale);
     },
     setFov(deg: number): void {
       orbitState = { ...orbitState, fov: Math.min(150, Math.max(10, deg)) };

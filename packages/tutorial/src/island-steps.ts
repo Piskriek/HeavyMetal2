@@ -25,8 +25,8 @@ export const ISLAND_STEPS: Step[] = [
   },
   {
     id: 'sculpt', title: 'Shape the ground',
-    text: 'You hold Raise from the Sculpt tab. Click the ground three times; the right button lowers it.',
-    hint: 'F3 Click',
+    text: 'You hold Raise from the Terrain tab. Click the ground three times; the right button lowers it.',
+    hint: 'F10 Click',
     advance: { type: 'event', name: 'used-sculpt', count: 3 },
     skippable: true,
     highlight: 'island.tab.sculpt',
@@ -35,7 +35,7 @@ export const ISLAND_STEPS: Step[] = [
   {
     id: 'place', title: 'Plant a palm',
     text: 'Things you place stand on the ground and follow it when you dig or raise it.',
-    hint: 'F9 Click',
+    hint: 'F3 Click',
     advance: { type: 'event', name: 'placed' },
     skippable: true,
     highlight: 'island.tab.things',
@@ -81,7 +81,7 @@ export const ISLAND_STEPS: Step[] = [
   },
   {
     id: 'finish', title: 'All yours',
-    text: 'Flat and PBR (top right) switch the bumps and shine on and off; the style, voxel or painted, is on My planet. Goblin Racing waits in the Activities tab (F7). Here are 100 credits.',
+    text: 'Flat and PBR (top right) switch the bumps and shine on and off; the style, voxel or painted, is on My planet. Goblin Racing waits under Activities in the Esc menu. Here are 100 credits.',
     advance: { type: 'time', ms: 7000 },
     skippable: true,
     onDone: [{ type: 'credits', amount: 100 }],

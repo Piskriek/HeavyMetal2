@@ -4,8 +4,9 @@ import { PAINTS, SLOTS, TABS, TAB_IDS, THINGS, TOOLS, TOOL_VARIANTS, assignSlot,
 
 const empty = (): Hotbars => Object.fromEntries(TAB_IDS.map((t) => [t, []])) as unknown as Hotbars;
 
-test('F1 to F10 open the ten tabs in the order the owner gave, the backtick opens Logic; P opens the avatar; F11 and F12 stay with the browser', () => {
-  assert.deepEqual(TABS.map((t) => t.id), ['select', 'paint', 'sculpt', 'animate', 'sound', 'lights', 'activities', 'avatar', 'things', 'camera', 'logic']);
+test('F1 to F10 open the tabs in the order of the hotbar spec V3, the backtick still opens Logic; P opens the avatar; F11 and F12 stay with the browser', () => {
+  assert.deepEqual(TABS.map((t) => t.id), ['select', 'paint', 'things', 'animate', 'sound', 'lights', 'logic', 'camera', 'avatar', 'sculpt']);
+  assert.equal(tabForKey('F7'), 'logic'); assert.equal(tabForKey('F10'), 'sculpt');
   assert.equal(tabForKey('`'), 'logic');
   for (let i = 1; i <= 10; i++) assert.equal(tabForKey(`F${i}`), TABS[i - 1]!.id);
   assert.equal(tabForKey('p'), 'avatar');

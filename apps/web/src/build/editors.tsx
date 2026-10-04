@@ -300,7 +300,6 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
     case 'sound': return <SoundEditor id={id} rt={props.rt} />;
     case 'lights': return <LightingPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'logic': return <LogicPanel rt={props.rt} sceneId={props.sceneId} />;
-    case 'activities': { const a = props.activities.find((x) => x.id === id); return a ? <ActivityEditor a={a} actions={props.actions} /> : <p className="hint">Unknown activity.</p>; }
     case 'avatar': return <LookEditor id={id} actions={props.actions} />;
     case 'camera': return <CameraEditor id={id} actions={props.actions} />;
   }

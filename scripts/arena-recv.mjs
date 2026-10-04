@@ -11,7 +11,8 @@ const root = join(fileURLToPath(new URL('../', import.meta.url)), 'arena-out');
 const PORT = 8791;
 const safe = (s) => /^[a-z0-9][a-z0-9-]{0,40}$/.test(s);
 
-createServer((req, res) => {
+// maxHeaderSize: a reply travels in the URL (tens of KB), past Node's 16 KB default
+createServer({ maxHeaderSize: 4 * 1024 * 1024 }, (req, res) => {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`);
   const reply = (code, text) => { res.writeHead(code, { 'content-type': 'text/html; charset=utf-8' }); res.end(`<!doctype html><meta charset="utf-8"><body style="font:14px Inter,sans-serif;padding:24px">${text}</body>`); };
   if (url.pathname === '/ping') return reply(200, 'arena-recv is running');

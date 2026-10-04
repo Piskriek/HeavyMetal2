@@ -17,10 +17,36 @@ const makeLine = (shape: Extract<OverlayShape, { type: 'line' }>): THREE.Line =>
   return new THREE.Line(geometry, lineMaterial(shape.color));
 };
 
-const makeRing = (shape: Extract<OverlayShape, { type: 'ring' }>): THREE.LineLoop => {
+const solid = (color: string, opacity = 0.95): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity, depthTest: false, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+
+const makeTube = (shape: Extract<OverlayShape, { type: 'tube' }>): THREE.Mesh => {
+  const a = vector(shape.from), b = vector(shape.to);
+  const dir = b.clone().sub(a);
+  const len = Math.max(1e-6, dir.length());
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(shape.radius, shape.radius, len, 10), solid(shape.color, shape.opacity));
+  mesh.position.copy(a).addScaledVector(dir, 0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  return mesh;
+};
+
+const makeQuad = (shape: Extract<OverlayShape, { type: 'quad' }>): THREE.Mesh => {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(shape.corners.flatMap((c) => [c[0], c[1], c[2]]), 3));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  return new THREE.Mesh(g, solid(shape.color, shape.opacity ?? 0.5));
+};
+
+const makeRing = (shape: Extract<OverlayShape, { type: 'ring' }>): THREE.Object3D => {
   const normal = vector(shape.normal);
   if (normal.lengthSq() < 1e-12) normal.set(0, 1, 0);
   normal.normalize();
+  if (shape.width) {
+    // a torus lies in its xy plane: turn its z axis onto the normal
+    const band = new THREE.Mesh(new THREE.TorusGeometry(shape.radius, shape.width / 2, 8, 64), solid(shape.color));
+    band.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    band.position.fromArray(shape.center);
+    return band;
+  }
   const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
   const points: THREE.Vector3[] = [];
   for (let i = 0; i < 48; i += 1) {
@@ -103,6 +129,7 @@ export class OverlayManager {
     group.renderOrder = 10000;
     for (const shape of shapes) {
       const object = shape.type === 'line' ? makeLine(shape)
+        : shape.type === 'tube' ? makeTube(shape) : shape.type === 'quad' ? makeQuad(shape)
         : shape.type === 'ring' ? makeRing(shape)
           : shape.type === 'box' ? makeBox(shape) : shape.type === 'ribbon' ? makeRibbon(shape) : makeHandle(shape);
       object.renderOrder = 10000;

@@ -72,7 +72,7 @@ function toolCard(tab: TabId, t: ToolPreset, edited: boolean): CatalogItem {
 }
 
 /** Every card for a tab. */
-export function catalog(tab: TabId, player: CatalogPlayer, activities: readonly ActivityInfo[]): CatalogItem[] {
+export function catalog(tab: TabId, player: CatalogPlayer, _activities: readonly ActivityInfo[]): CatalogItem[] {
   switch (tab) {
     case 'select': case 'paint': case 'sculpt': case 'things':
       return toolsFor(tab).map((t) => toolCard(tab, toolOf(player, t.id) ?? t, !!player.tools[t.id]));
@@ -83,8 +83,6 @@ export function catalog(tab: TabId, player: CatalogPlayer, activities: readonly 
     case 'lights':
       // ways to change the light first; the looks (also in the palette) after, so older hotbars that hold looks stay valid
       return [...LIGHT_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false })), ...SETUPS.map((s) => ({ tab, id: s.id, name: s.name, doc: 'A lighting look: sun, sky, haze and picture effects.', preview: { kind: 'sky' as const, top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color }, edited: false }))];
-    case 'activities':
-      return activities.map((a) => ({ tab, id: a.id, name: a.name, doc: a.doc, preview: { kind: 'planet', hue: a.hue, ring: a.ring }, edited: false }));
     case 'avatar':
       return [...player.looks, ...LOOKS].map((l) => ({ tab, id: l.id, name: l.name, doc: player.looks.some((m) => m.id === l.id) ? 'Your goblin.' : 'A ready-made goblin look: pick it, then change any colour.', preview: { kind: 'look', look: l }, edited: player.looks.some((m) => m.id === l.id) }));
     case 'logic':
@@ -107,7 +105,7 @@ export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly
 };
 
 /** The hotbars a new player starts with: the nine most useful presets of each tab. */
-export function defaultHotbars(activities: readonly ActivityInfo[], player: CatalogPlayer): Hotbars {
+export function defaultHotbars(_activities: readonly ActivityInfo[], player: CatalogPlayer): Hotbars {
   const ids = (list: readonly string[]): (string | null)[] => list.slice(0, 9);
   const out = {} as Hotbars;
   for (const tab of TAB_IDS) out[tab] = [];
@@ -119,7 +117,6 @@ export function defaultHotbars(activities: readonly ActivityInfo[], player: Cata
   out.sound = ids(['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']);
   // ways to change the light; the looks are the palette (docs/HOTBAR.md)
   out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds']), null, null, null, null];
-  out.activities = ids(activities.map((a) => a.id));
   out.avatar = ids([...player.looks.map((l) => l.id), ...LOOKS.map((l) => l.id)]);
   // ways to place; the things themselves are in the palette (docs/HOTBAR.md)
   out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];

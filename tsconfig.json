@@ -147,6 +147,15 @@
       "@hm/buildkit": [
         "packages/buildkit/src/index.ts"
       ],
+      "@hm/gizmo": [
+        "packages/gizmo/src/index.ts"
+      ],
+      "@hm/triggers": [
+        "packages/triggers/src/index.ts"
+      ],
+      "@hm/primitives": [
+        "packages/primitives/src/index.ts"
+      ],
       "@hm/voxelnature": [
         "packages/voxelnature/src/index.ts"
       ],

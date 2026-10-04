@@ -1,8 +1,9 @@
 /**
- * The build HUD's tabs. Each tab is a kind of thing you can hold: F1 to F10 switch tabs (F11 and F12 belong to the browser), each tab has nine
- * slots (keys 1 to 9) holding presets of that tab, and E opens the preset window for the tab. Pure data and functions.
+ * The build HUD's tabs, in the order of the owner's hotbar spec V3 (docs/HOTBAR_V3_SPEC.md, docs/ARENA_PLAN.md): F1 to F10 switch tabs (F11 and
+ * F12 belong to the browser, so tabs 11 and 12 will also open with Shift+F1 and Shift+F2), each tab has nine slots (keys 1 to 9) holding presets
+ * of that tab, and E opens the preset window for the tab. Activities are not on the hotbar (the galaxy and the Esc menu open them). Pure data.
  */
-export type TabId = 'select' | 'paint' | 'sculpt' | 'animate' | 'sound' | 'lights' | 'activities' | 'avatar' | 'things' | 'camera' | 'logic';
+export type TabId = 'select' | 'paint' | 'things' | 'animate' | 'sound' | 'lights' | 'logic' | 'camera' | 'avatar' | 'sculpt';
 
 export interface TabDef {
   readonly id: TabId;
@@ -19,21 +20,20 @@ export interface TabDef {
 export const TABS: readonly TabDef[] = [
   { id: 'select', label: 'Select', key: 'F1', icon: 'MousePointer2', doc: 'Select anything and change it (the ground, a plant, the sea, a thing); move, turn, size, copy and delete the things on your island; focus on one and hide the rest.' },
   { id: 'paint', label: 'Paint', key: 'F2', icon: 'Paintbrush', doc: 'Paint the ground with any surface.' },
-  { id: 'sculpt', label: 'Sculpt', key: 'F3', icon: 'Mountain', doc: 'Raise, lower, smooth and shape the ground. The world rules decide what digging uncovers and what the plants do.' },
+  { id: 'things', label: 'Things', key: 'F3', icon: 'Package', doc: 'Place palms, bushes, rocks, flowers, barrels and statues: one, a scatter, a row, or swap one for another.' },
   { id: 'animate', label: 'Animate', key: 'F4', icon: 'Activity', doc: 'Moves for your goblin: play one, or change how it walks, runs and jumps.' },
   { id: 'sound', label: 'Sound', key: 'F5', icon: 'Volume2', doc: 'Every sound is a preset: play it, change it.' },
   { id: 'lights', label: 'Lights', key: 'F6', icon: 'Sun', doc: 'The light of your island: pick a look, change any knob, switch the ground between flat and PBR.' },
-  { id: 'activities', label: 'Activities', key: 'F7', icon: 'Flag', doc: 'Games you can play and host, like Goblin Racing.' },
-  { id: 'avatar', label: 'Avatar', key: 'F8', alt: 'p', icon: 'User', doc: 'Your goblin: how it looks and how it moves.' },
-  { id: 'things', label: 'Things', key: 'F9', icon: 'Package', doc: 'Place palms, bushes, rocks, flowers, barrels and statues.' },
-  { id: 'camera', label: 'Camera', key: 'F10', icon: 'Camera', doc: 'How you see the world: over the shoulder, first person, studio, from above.' },
-  // the coders' tab (MASTER_PLAN 6.4): the backtick key, F11 and F12 being the browser's
-  { id: 'logic', label: 'Logic', key: '`', icon: 'Zap', doc: 'Rules: when something happens (a goblin touches a thing, a timer, night falls), do something (a sound, a spin, a jump, hide, say). Easy drops ready-made rules on things, Pro changes their blocks, Studio shows the script.' },
+  // the coders' tab (MASTER_PLAN 6.4); the backtick key still opens it
+  { id: 'logic', label: 'Logic', key: 'F7', alt: '`', icon: 'Zap', doc: 'Rules: when something happens (a goblin touches a thing, a timer, night falls), do something (a sound, a spin, a jump, hide, say). Easy drops ready-made rules on things, Pro changes their blocks, Studio shows the script.' },
+  { id: 'camera', label: 'Camera', key: 'F8', icon: 'Camera', doc: 'How you see the world: over the shoulder, first person, studio, from above.' },
+  { id: 'avatar', label: 'Avatar', key: 'F9', alt: 'p', icon: 'User', doc: 'Your goblin: how it looks and how it moves.' },
+  { id: 'sculpt', label: 'Terrain', key: 'F10', icon: 'Mountain', doc: 'Raise, lower, smooth and shape the ground. The world rules decide what digging uncovers and what the plants do.' },
 ];
 export const TAB_IDS: readonly TabId[] = TABS.map((t) => t.id);
 export const tabDef = (id: TabId): TabDef => TABS.find((t) => t.id === id) ?? TABS[0]!;
 
-/** The tab a key opens (F1..F10, and P for the avatar), or null. Case-insensitive for letters. */
+/** The tab a key opens (F1..F10, the backtick for Logic and P for the avatar), or null. Case-insensitive for letters. */
 export function tabForKey(key: string): TabId | null {
   if (typeof key !== 'string' || !key) return null;
   const k = key.length === 1 ? key.toLowerCase() : key;

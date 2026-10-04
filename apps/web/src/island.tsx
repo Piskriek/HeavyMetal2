@@ -28,7 +28,7 @@ import { AMBIENCES } from '@hm/soundscape';
 import { audio } from './maker/feedback';
 import { PARTICLE_PRESETS } from '@hm/particles';
 import { Crosshair, Hotbar, ModeBar, TabStrip, ToolSay } from './build/hud';
-import { animOf, catalog, lookOf, soundName, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
+import { CAMERA_WAYS, animOf, catalog, lookOf, soundName, surfaceColours, toolOf, type ActivityInfo, type CatalogItem } from './build/catalog';
 import { SFX_IDS } from '@hm/audio';
 import { PaletteStrip, type StripItem } from './build/palette-strip';
 import { LevelSwitch, ToolPresetsRow } from './build/tool-presets';
@@ -50,6 +50,7 @@ import { PhysicsRuntime, type PhysThing } from './build/physics-runtime';
 import { carvePath, pathPreview, rainOn, ROAD_SURFACE, RIVER_SURFACE } from './build/paths';
 import { WiresRuntime, type PlacedWire, type PlacedZone, type WireEffect } from './build/wires-runtime';
 import { boxSelect, type Item as SelItem } from '@hm/selectset';
+import { SlowMo, orbitShot, sampleTrack, trackDuration, type CamTrack } from '@hm/camtrack';
 import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
@@ -279,7 +280,7 @@ export function IslandWalk(props: {
     else if (tab === 'animate') api.current?.playAnim(id);
     else if (tab === 'sound') { if (!id.startsWith('sound-')) fx(id as SfxId); }
     else if (tab === 'avatar') { wearLook(id); say(`Wearing ${lookOf(pl, id).name}`); }
-    else if (tab === 'camera') switchCamera(id);
+    else if (tab === 'camera') { if (!id.startsWith('cam-')) switchCamera(id); }
   }, [rt, scene.sceneId, say]); // eslint-disable-line react-hooks/exhaustive-deps
   const byIdName = (tab: TabId, id: string): string => catalog(tab, player(), activities).find((c) => c.id === id)?.name ?? id;
   const switchCamera = (id: string): void => {
@@ -630,6 +631,12 @@ export function IslandWalk(props: {
       });
     };
     let groupShown = false;
+    // the Camera tab's ways (F8): an orbit shot playing, a photo asked for, slow motion
+    let shot: { track: CamTrack; t: number } | null = null;
+    let photoNext = false, photos = 0;
+    const slow = new SlowMo();
+    let slowOn = false;
+    (window as unknown as { hmCamera: unknown }).hmCamera = () => ({ shot: !!shot, photos, slow: slowOn, scale: slow.scale });
     /** Shift snaps moves to half metres and sizes to quarter steps, Ctrl snaps turns to 15 degrees (hotbar spec V3). */
     const gizmoSnap = (): { move?: number; turn?: number; scale?: number } => {
       const snap: { move?: number; turn?: number; scale?: number } = {};
@@ -668,7 +675,7 @@ export function IslandWalk(props: {
       if (!g) return null;
       const pr = rt.store.get(g.ref) ? rt.store.resolve(g.ref).params : {};
       const along = (k: 0 | 1 | 2, f: number): readonly [number, number] => { const p: [number, number, number] = [g.pivot[0], g.pivot[1], g.pivot[2]]; p[k] += g.len * f; const q = renderer.camera.project(p), r = el.getBoundingClientRect(); return [q[0] + r.left, q[1] + r.top]; };
-      return { mode: g.mode, hot: g.hot, len: g.len, size: gizmo.size, count: g.count, group: [...group], x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), xArrow: along(0, 0.7), xFar: along(0, 1.4) };
+      return { mode: g.mode, hot: g.hot, len: g.len, size: gizmo.size, count: g.count, group: [...group], x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), xArrow: along(0, 0.7), xFar: along(0, 1.4), arrows: { x: [along(0, 0.7), along(0, 1.4)], y: [along(1, 0.7), along(1, 1.4)], z: [along(2, 0.7), along(2, 1.4)] } };
     };
     let lastLookEvent = 0, lastMoveEvent = 0, lastTourTick = 0;
     const realMove = lookFilter();
@@ -767,6 +774,7 @@ export function IslandWalk(props: {
     /** Esc closes exactly one thing: the wheel, the front window, focus, hide-others, what Move carries; then it opens the menu. */
     const escape = (): void => {
       if (gizmo.dragging) { gizmo.cancel(); return; }
+      if (shot) { shot = null; return; }
       if (path) { path = null; showPath(); say('Let go of the path'); return; }
       if (wireFrom) { wireFrom = null; say('Let go of the wire'); return; }
       if (boxing) { boxing.div.remove(); boxing = null; return; }
@@ -1044,6 +1052,19 @@ export function IslandWalk(props: {
         fx('place', { volume: 0.5 });
         return;
       }
+      // the Camera tab's ways: an orbit shot, a photo, slow motion
+      if (s.tab === 'camera' && id.startsWith('cam-')) {
+        if (!first) return;
+        if (id === 'cam-photo') { photoNext = true; return; }
+        if (id === 'cam-slowmo') { slowOn = !slowOn; slow.setScale(slowOn ? 0.25 : 1, 0.4); say(slowOn ? 'Slow motion' : 'Back to speed'); fx('ui-toggle', { volume: 0.4 }); return; }
+        const a = aim();
+        const m = a ? builder.modelAt(a) : null;
+        const at = m && rt.store.get(m.ref) ? (() => { const pr = rt.store.resolve(m.ref).params as Record<string, unknown>; return [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0) + 1, Number(pr['z'] ?? 0)] as [number, number, number]; })() : [px, py + 1, pz] as [number, number, number];
+        const from = eye ? (Math.atan2(eye[0] - at[0], eye[2] - at[2]) * 180) / Math.PI : 0;
+        shot = { track: orbitShot(at, 6, 2.5, 8, from, 1, 55), t: 0 };
+        say(m ? `Flying round ${rt.store.get(m.ref)?.name ?? 'it'} (Esc stops)` : 'Flying round you (Esc stops)'); fx('ui-toggle', { volume: 0.4 });
+        return;
+      }
       // the Physics tab's ways: give the thing you point at the palette's material, drop it, or swing the push hammer
       if (s.tab === 'physics') {
         if (!first) return;
@@ -1253,9 +1274,11 @@ export function IslandWalk(props: {
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      // slow motion (the Camera tab): the world's time, not yours
+      const worldDt = slow.tick(dt);
       if (physics.active) {
         const ts = rt.binder.terrain();
-        for (const q of physics.step(dt, (x, z) => (ts ? heightAt(ts.terrain, x, z) : 0))) { const i = drawnIndex(q.ref as PresetId); if (i >= 0) renderer.setModelPose(i, q.x, q.y, q.z, Number(rt.store.resolve(q.ref as PresetId).params['yaw'] ?? 0)); }
+        for (const q of physics.step(worldDt, (x, z) => (ts ? heightAt(ts.terrain, x, z) : 0))) { const i = drawnIndex(q.ref as PresetId); if (i >= 0) renderer.setModelPose(i, q.x, q.y, q.z, Number(rt.store.resolve(q.ref as PresetId).params['yaw'] ?? 0)); }
         const done = physics.settled();
         if (done && done.length) {
           const label = physics.label;
@@ -1269,7 +1292,7 @@ export function IslandWalk(props: {
       if (charRefs.length) {
         const list = allChars;
         const ts = rt.binder.terrain(), sea = rulesOf(rt, scene.sceneId).waterLevel;
-        const poses = chars.step(dt, list, [px, py, pz], (x, z) => { if (!ts) return 0; const h = heightAt(ts.terrain, x, z); return h < sea + 0.1 ? null : h; });
+        const poses = chars.step(worldDt, list, [px, py, pz], (x, z) => { if (!ts) return 0; const h = heightAt(ts.terrain, x, z); return h < sea + 0.1 ? null : h; });
         charMoved = 0;
         poses.forEach((q, k) => { lastCharAt.set(q.ref, [q.x, q.z]); const i = charRefs.indexOf(q.ref); if (i >= 0) renderer.setModelPose(charBase + i, q.x, q.y, q.z, q.yaw + 180); const home = list[k]; if (home) charMoved = Math.max(charMoved, Math.hypot(q.x - home.x, q.z - home.z)); });
       }
@@ -1328,7 +1351,7 @@ export function IslandWalk(props: {
           soundOverlay = true;
         } else if (soundOverlay) { renderer.overlay.hide('soundscape'); soundOverlay = false; }
       }
-      effects.step(dt);
+      effects.step(worldDt);
       renderer.setParticles('glow', effects.glow.buffer, effects.glow.count);
       renderer.setParticles('plain', effects.plain.buffer, effects.plain.count);
       if (now - lastTourTick > 250) { lastTourTick = now; tourTick(); }
@@ -1453,6 +1476,11 @@ export function IslandWalk(props: {
       // tests and look reviews: hold the camera at a given eye and target (window.hmPinView = { eye, target }, null lets go)
       const pin = (window as unknown as { hmPinView?: { eye: [number, number, number]; target: [number, number, number] } | null }).hmPinView;
       if (pin) { wantEye = pin.eye; target = pin.target; }
+      if (shot) {
+        shot.t += dt;
+        if (shot.t > trackDuration(shot.track)) shot = null;
+        else { const c = sampleTrack(shot.track, shot.t); wantEye = [c.pos[0], c.pos[1], c.pos[2]]; target = [c.target[0], c.target[1], c.target[2]]; }
+      }
       if (!ft && !live.current.focusId) renderer.setFocus(null);
       if (live.current.showcase) {
         // the main menu's view: the camera sways round your goblin on the side away from the middle of the island, so the goblin stands in
@@ -1515,6 +1543,17 @@ export function IslandWalk(props: {
       if (clipEl && el) { const r = clipEl.getBoundingClientRect(), c = el.getBoundingClientRect(); const full = r.width >= c.width - 2 && r.height >= c.height - 2; renderer.setClip(full ? null : { x: r.left - c.left, y: r.top - c.top, w: r.width, h: r.height }); }
       else renderer.setClip(null);
       renderer.render(1);
+      if (photoNext) {
+        photoNext = false;
+        const canvas = el.querySelector('canvas');
+        if (canvas) {
+          try {
+            const a = document.createElement('a');
+            a.href = canvas.toDataURL('image/png'); a.download = `setmix-photo-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+            a.click(); photos++; say('Photo saved'); fx('ui-success', { volume: 0.5 });
+          } catch { say('The photo could not be saved here'); }
+        }
+      }
       if (++drawn === 4) readyRef.current?.();
       raf = requestAnimationFrame(loop);
     };
@@ -1688,7 +1727,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
     case 'sound': { const w = SOUND_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: item.doc, left: 'Play it', right: 'Play it' }; }
     case 'lights': { const w = LIGHT_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: 'The light of your island. E, Edit to change any knob.', left: 'Use this light', right: 'Use this light' }; }
     case 'avatar': return { title, line: item.doc, left: 'Wear it', right: 'Wear it' };
-    case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
+    case 'camera': { const w = CAMERA_WAYS.find((x) => x.id === item.id); return w ? { title, line: w.doc, left: w.left, right: w.right } : { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' }; }
     case 'logic': { const w = LOGIC_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     case 'effects': { const w = EFFECT_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     case 'physics': { const w = PHYS_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }

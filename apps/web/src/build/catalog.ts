@@ -30,6 +30,13 @@ export type Preview =
 export interface CatalogItem { readonly tab: TabId; readonly id: string; readonly name: string; readonly doc: string; readonly preview: Preview; readonly edited: boolean }
 
 export interface CameraPreset { readonly id: string; readonly name: string; readonly icon: string; readonly doc: string }
+/** The Camera tab's ways (F8; hotbar spec V3, Photo cam): an orbit shot round what you point at, a photo of the view, slow motion. */
+export const CAMERA_WAYS: readonly { readonly id: string; readonly name: string; readonly icon: string; readonly doc: string; readonly left: string; readonly right: string }[] = [
+  { id: 'cam-orbit', name: 'Orbit shot', icon: 'Orbit', doc: 'The camera flies once round the thing you point at (or round you), smooth like a film. Esc stops it.', left: 'Fly round it', right: 'Fly round it' },
+  { id: 'cam-photo', name: 'Photo', icon: 'Camera', doc: 'Save a picture of the view, without the buttons.', left: 'Take the photo', right: 'Take the photo' },
+  { id: 'cam-slowmo', name: 'Slow motion', icon: 'Timer', doc: 'Slow the world down (characters, flying things, effects) or bring it back to speed.', left: 'Slow down or speed up', right: 'Slow down or speed up' },
+];
+
 export const CAMERAS: readonly CameraPreset[] = [
   { id: 'third', name: 'Over the shoulder', icon: 'User', doc: 'The camera follows behind your goblin.' },
   { id: 'first', name: 'First person', icon: 'Focus', doc: 'See the world through your goblin\'s eyes.' },
@@ -96,7 +103,7 @@ export function catalog(tab: TabId, player: CatalogPlayer, _activities: readonly
     case 'logic':
       return LOGIC_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false }));
     case 'camera':
-      return CAMERAS.map((c) => ({ tab, id: c.id, name: c.name, doc: c.doc, preview: { kind: 'icon', icon: c.icon }, edited: false }));
+      return [...CAMERAS.map((c) => ({ tab, id: c.id, name: c.name, doc: c.doc, preview: { kind: 'icon' as const, icon: c.icon }, edited: false })), ...CAMERA_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false }))];
   }
 }
 
@@ -110,6 +117,7 @@ export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly
   sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge'], ['raise', 'lower', 'smooth', 'flatten', 'sculpt-grab', 'sculpt-clay', 'sculpt-crease', 'sculpt-stamp', 'sculpt-terrace']],
   lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
+  camera: [['third', 'first', 'studio', 'island']],
   select: [['inspect', 'move', 'turn', 'resize', 'copy', 'delete', 'focus', 'isolate', null]],
   logic: [['logic-attach', 'logic-remove', 'logic-rules', null, null, null, null, null, null]],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
@@ -131,7 +139,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   out.avatar = ids([...player.looks.map((l) => l.id), ...LOOKS.map((l) => l.id)]);
   // ways to place; the things themselves are in the palette (docs/HOTBAR.md)
   out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];
-  out.camera = ids(CAMERAS.map((c) => c.id));
+  out.camera = ids([...CAMERAS.map((c) => c.id), ...CAMERA_WAYS.map((w) => w.id)]);
   out.logic = [...ids(LOGIC_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   out.physics = [...ids(PHYS_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   out.characters = [...ids(CHAR_WAYS.map((w) => w.id)), null, null, null, null, null, null];

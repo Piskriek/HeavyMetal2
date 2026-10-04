@@ -18,7 +18,7 @@ import { SoundLab } from '../sound/lab';
 import { normalizeRecipe, recipeToJson, type SfxRecipe } from '@hm/soundlab';
 import { ensurePlant, ensureRules, plantsOf, rulesOf } from '../world';
 import { useRev } from '../use-rev';
-import { CAMERAS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
+import { CAMERAS, CAMERA_WAYS, SOUND_IDS, animOf, lookOf, soundName, toolOf, type ActivityInfo } from './catalog';
 import { PresetPreview, avatarWearing } from './cards';
 import { editAnim, editSprite, editTool, resetAnim, resetSprite, resetTool, saveLook, setMove, usePlayer, wearLook } from './player';
 import { spriteOf } from './sprites';
@@ -307,6 +307,6 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
     case 'characters': return <CharactersPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'physics': return <p className="hint">What a thing is made of is on its layer too (Layers, Material). Drop shows how it lands; the push hammer sends things flying and they stay where they land (Ctrl+Z puts them back).</p>;
     case 'avatar': return <LookEditor id={id} actions={props.actions} />;
-    case 'camera': return <CameraEditor id={id} actions={props.actions} />;
+    case 'camera': return id.startsWith('cam-') ? <p className="hint">{CAMERA_WAYS.find((w) => w.id === id)?.doc ?? ''}</p> : <CameraEditor id={id} actions={props.actions} />;
   }
 }

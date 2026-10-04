@@ -19,3 +19,4 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | machines | `docs/handoff/prompts/battle/machines.txt` | **B** | 11/11, strict clean. A: 12/14. |
 | market | `docs/handoff/prompts/battle/market.txt` | **B** | 10/10, strict clean. A: 8/9. |
 | rocket | `docs/handoff/prompts/battle/rocket.txt` | **B** | 10/10, strict clean. A: 12/13 (its floating-part test expects exactly one problem). |
+| ragdoll | `docs/handoff/prompts/battle/ragdoll.txt` | **A** | 9/9, strict clean. B: 8/9 (blend). Cross-run: A fails B's "sticks keep their length" (tolerance; raise iterations or loosen to 2%), B fails A's knee limit. |

@@ -437,7 +437,9 @@ The owner, after "no hybrid": "now is the time to make changes if you feel the h
 - **Save as Toy** (Simplified F1, Group Linker; coming): a linked group becomes one of your toys in the Prop Box, under My Toys.
 - **Undo and Redo buttons** at the end of the hotbar in every mode. Ctrl+Z and Ctrl+Y work as always.
 - **Find a tool**: `/` searches every button of the mode by name, and Enter takes you there.
-- **Dress up**: the goblin mirror (the old Avatar tab) moves to a Dress up button in the top bar and the Esc menu. This frees P for the spec's own P keys.
+- **My avatar**: the goblin mirror (the old Avatar tab, P) is a My avatar button top right, and stays in the Esc menu. This frees P for the spec's own P keys.
+- **World rules and plants** and **How my goblin moves** were reached through the old E window. They move to the Esc menu.
+- **Edit this ground's look** (the surface editor and texture mode, once on the old palette strip) sits beside Ground Material (Simplified F2) and PBR Surface Paint (Advanced F2).
 
 ### Keys changed (a browser game: some of the spec's keys belong to the browser or to walking)
 

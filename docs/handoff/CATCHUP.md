@@ -365,3 +365,34 @@ Animation presets: clips/timelines/curves on any variable (transform, model part
 **Then:** F4 Walk a path (kind walk-path; things walk for show), F2 Paint a thing and F3 Carve (`voxel-hit.ts`: a voxel ray walk to the block under the pointer; one click, one undo step). e2e 138.
 
 **Next glue (in this order):** the wire graph window in Studio (`@hm/wiregraph`), a dope sheet in Studio (`@hm/keyframes`), F3 join/cut in two (`@hm/voxelcsg`). Then the Arena's B6/B7 juice data for Easy mode, B1 decals, C5 remesh.
+
+## 12af. 2026-10-04, evening: the hotbar IS the spec V3 now (no hybrid). READ THIS FIRST (12ad still holds the Arena routine).
+
+**Owner:** "We are not doing a hybrid of the old hotbar and the new hotbar, its the new hotbar and were going with its button names and layouts", then "now is the time to make changes if you feel the hotbar can be improved ... add or adjust and get to work". My changes are the V3.1 section at the end of `docs/HOTBAR_V3_SPEC.md` (the YAML above it stays verbatim).
+
+**State:** pushed to `main` (`d479bbe3`); verify green (1455 unit tests; the 100-balls timing test can fail while the PC is busy and passes idle); e2e 135 checks (`E2E_SHOTS` saves v3-game, v3-simplified, v3-advanced, v3-prop-box, wire-graph and the rest).
+
+**How it is built (three layers):**
+- `packages/buildkit/src/v3.ts`: the spec as data. Every Game preset, Simplified preset and Advanced tool has a `bind` {tab, way, palette} to what the island already does, or `todo`. Sliders carry `drives` (what they change; none means coming). `tests/v3.test.ts` parses the spec's YAML and checks every name, slider, filter and key word for word (the V3.1 additions and changed keys are listed in the test).
+- `apps/web/src/build/player.ts`: the `v3` state (tab, slot per tab per mode, preset per slot, slider values, filters). `holdWay(tab, way, palette)` writes the binding into the old internal register (`hotbars[tab][0]`), so every existing way runs unchanged. The mode is the old `level` (easy = Game, pro = Simplified, studio = Advanced).
+- `apps/web/src/build/v3-hud.tsx` draws it: one column at the bottom (note, panel, tabs, slots, then Find, Undo, Redo and the mode switch). In `island.tsx`: `v3Now`; `applyV3` (holds the binding, applies slider values, and does what picking does: a sky look, a camera, a dance, the wire graph); `useV3Way` (the island's own V3 ways: clay on the ground or a thing, rainbow and sponge, funny sounds, roar, noon and night, doorbell, magic cord, cutter, hierarchy, graph); `v3Drive` (slider values read where things are made: zone size, effect size, lamp brightness, loudness, hearing distance, walk speed and wait, block width, prop size, orbit time).
+
+**Coming (87 of 258 buttons; each carries a pip and says so):**
+- Game, 18: Vacuum Bubble, Freeze Wand, Toss, Glitter Gloss, Glow Paint, both Sticker Stamps, Punch Hole, Live Puppet, Jukebox, Echo Dome, Tripwire Alarm, Launch Pad, Selfie Stick, Go-Kart, Target Practice, Respawn Flag, Shooting Star Trail.
+- Simplified, 37: Group Linker, decals, gloss, neon and chrome, poses, the camera placer and tracks, solid boundaries, mood filters and a few more.
+- Advanced, 32.
+
+To regenerate the list, walk `V3_TABS` for `bind.todo`.
+
+**Pitfalls met:**
+- The Simplified panel is tall, so e2e world clicks are at y = 420, not 470.
+- In studio, the first Esc closes a window before it leaves texture mode.
+- Voxel palettes are 0..1. Paint a thing had written 0..255; that is fixed, and `decodeModel` now reads old 0..255 colours.
+- A soft brush paints the second surface layer, so `hmGround.shows(id)` counts both layers.
+
+**Test hooks added:** `hmSelect(ref | null)`, `hmGround.shows(id)`.
+
+**Next (in order):**
+1. D20: the dither between surfaces in voxel flat (STATUS 00a, `docs/QUESTLINE.md` 5b). A side session planned this at the owner's ask, 18:33: "update the plans in a way that the other claude session picks up on it".
+2. The coming V3 buttons. The Arena takes the big ones first: B1 decals (stickers and decals), B6/B7 juice for Game Mode, C5 remesh (DynMesh, Retopo), and new prompts for Live Puppet, Go-Kart, Echo Dome, mood filters, the camera placer and tracks. The small ones are glue.
+3. The questline, QL1 to QL10, in `docs/QUESTLINE.md` order.

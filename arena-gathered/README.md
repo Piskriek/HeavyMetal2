@@ -23,3 +23,13 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | navgrid | `docs/handoff/prompts/battle/navgrid.txt` | **B** | 9/9, strict clean. A: 10/13 on its own tests (water, box snap, reachable), and A passes B's 9/9. B fails A's water/reachable tests and its cellOf test (A floors; the spec puts cell centres at c*cell, so B rounding is right). Check water handling with a real island before merging. |
 | hull | `docs/handoff/prompts/battle/hull.txt` | **X** | 8/8, strict clean (the other model built in its own project, not collected). Large (1200 lines) but genuine: degenerate cases, Jacobi OBB. |
 | remesh | `docs/handoff/prompts/battle/remesh.txt` | **X** | 13/13, strict clean (the other model built in its own project, not collected). |
+
+## Not gathered yet (2026-10-05)
+
+Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:
+
+- `docs/handoff/prompts/battle/toolanims.txt` (B7)
+- `docs/handoff/prompts/battle/tooljuice.txt` (B6)
+- `docs/handoff/prompts/battle/smoothvox2.txt` (smoothvox rev 2: surfaces, triplanar, tangents, draw groups)
+
+Worth a second answer to compare (only one model answered in chat): hull, remesh, musicbox, chunkworld.

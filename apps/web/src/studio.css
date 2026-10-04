@@ -334,7 +334,13 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .tab-strip button:last-child { border-right: 0; }
 .tab-strip button.on { background: var(--text); color: var(--paper); }
 .tab-strip kbd { font: 600 10px/1 Inter, sans-serif; padding: 2px 3px; border: 1px solid currentColor; opacity: .55; }
-.tab-strip button:hover::after { content: attr(data-label); position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 260px; padding: 5px 8px; background: var(--text); color: var(--paper); font-size: 10px; z-index: 30; white-space: normal; text-align: left; }
+.tab-strip button:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; }
+/* thirteen tabs: the open one always says its name; the others give up their words as the screen narrows (the tooltip still names them) */
+.tab-strip { max-width: calc(100vw - 16px); }
+@media (max-width: 1499px) { .tab-strip button:not(.on) > span { display: none; } }
+@media (max-width: 999px) { .tab-strip button { padding: 6px 8px; } .tab-strip button:not(.on) kbd { display: none; } }
+@media (max-width: 599px) { .tab-strip { flex-wrap: wrap; justify-content: center; } }
+.tab-strip button:hover::after, .tab-strip button:focus-visible::after { content: attr(data-label); position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); width: max-content; max-width: 260px; padding: 5px 8px; background: var(--text); color: var(--paper); font-size: 10px; z-index: 30; white-space: normal; text-align: left; }
 .tool-say { bottom: 156px; }
 .island-note { bottom: 226px; }
 .mode-bar { position: absolute; right: 14px; top: 14px; display: flex; gap: 8px; z-index: 20; }

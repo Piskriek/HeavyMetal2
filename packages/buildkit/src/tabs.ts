@@ -3,7 +3,7 @@
  * F12 belong to the browser, so tabs 11 and 12 will also open with Shift+F1 and Shift+F2), each tab has nine slots (keys 1 to 9) holding presets
  * of that tab, and E opens the preset window for the tab. Activities are not on the hotbar (the galaxy and the Esc menu open them). Pure data.
  */
-export type TabId = 'select' | 'paint' | 'things' | 'animate' | 'sound' | 'lights' | 'logic' | 'camera' | 'avatar' | 'sculpt' | 'effects' | 'characters';
+export type TabId = 'select' | 'paint' | 'things' | 'animate' | 'sound' | 'lights' | 'logic' | 'camera' | 'avatar' | 'sculpt' | 'effects' | 'characters' | 'physics';
 
 export interface TabDef {
   readonly id: TabId;
@@ -31,6 +31,7 @@ export const TABS: readonly TabDef[] = [
   { id: 'camera', label: 'Camera', key: 'F8', icon: 'Camera', doc: 'How you see the world: over the shoulder, first person, studio, from above.' },
   { id: 'characters', label: 'Characters', key: 'F9', icon: 'Users', doc: 'Goblins that go about by themselves: spawn one where you point, and pick how it behaves (wander, patrol, follow you, chase you, run away).' },
   { id: 'sculpt', label: 'Terrain', key: 'F10', icon: 'Mountain', doc: 'Raise, lower, smooth and shape the ground. The world rules decide what digging uncovers and what the plants do.' },
+  { id: 'physics', label: 'Physics', key: 'F11', shift: 'F1', icon: 'Atom', doc: 'What things are made of: make one bouncy, slippery, floaty or heavy, drop it to see, or swing the push hammer.' },
   { id: 'effects', label: 'Effects', key: 'F12', shift: 'F2', icon: 'Sparkles', doc: 'Particle effects: place a campfire, smoke, snow, rain, sparks, fireworks or bubbles where you point, or play one once.' },
   // your own avatar: its mirror opens with P (the hotbar spec V3 gives F9 to the characters)
   { id: 'avatar', label: 'Avatar', key: 'p', icon: 'User', doc: 'Your goblin: how it looks and how it moves.' },

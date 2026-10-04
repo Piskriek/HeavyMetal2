@@ -4,8 +4,9 @@ import { PAINTS, SLOTS, TABS, TAB_IDS, THINGS, TOOLS, TOOL_VARIANTS, assignSlot,
 
 const empty = (): Hotbars => Object.fromEntries(TAB_IDS.map((t) => [t, []])) as unknown as Hotbars;
 
-test('F1 to F10 open the tabs in the order of the hotbar spec V3, the backtick still opens Logic; P opens the avatar; F11 and F12 stay with the browser', () => {
-  assert.deepEqual(TABS.map((t) => t.id), ['select', 'paint', 'things', 'animate', 'sound', 'lights', 'logic', 'camera', 'characters', 'sculpt', 'effects', 'avatar']);
+test('F1 to F12 open the tabs in the order of the hotbar spec V3 (F11 and F12 also with Shift+F1 and Shift+F2), the backtick opens Logic, P the avatar', () => {
+  assert.deepEqual(TABS.map((t) => t.id), ['select', 'paint', 'things', 'animate', 'sound', 'lights', 'logic', 'camera', 'characters', 'sculpt', 'physics', 'effects', 'avatar']);
+  assert.equal(tabForKey('F11'), 'physics'); assert.equal(tabForKey('F1', true), 'physics');
   assert.equal(tabForKey('F9'), 'characters');
   assert.equal(tabForKey('F12'), 'effects'); assert.equal(tabForKey('F2', true), 'effects'); assert.equal(tabForKey('F3', true), 'things');
   assert.equal(tabForKey('F7'), 'logic'); assert.equal(tabForKey('F10'), 'sculpt');
@@ -13,7 +14,6 @@ test('F1 to F10 open the tabs in the order of the hotbar spec V3, the backtick s
   for (let i = 1; i <= 10; i++) assert.equal(tabForKey(`F${i}`), TABS.find((t) => t.key === `F${i}`)!.id);
   assert.equal(tabForKey('p'), 'avatar');
   assert.equal(tabForKey('P'), 'avatar');
-  assert.equal(tabForKey('F11'), null);
   assert.equal(tabForKey('x'), null);
   assert.equal(tabForKey(''), null);
 });

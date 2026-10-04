@@ -88,7 +88,7 @@ const paletteOf = (v: unknown): Partial<Record<TabId | 'lamp', string>> => {
   const lights = typeof o.lights === 'string' && /^[a-z0-9-]{1,40}$/.test(o.lights) ? o.lights : undefined;
   // the rest are plain ids, checked again where they are used
   const plain = (k: string): Record<string, string> => (typeof o[k] === 'string' && /^[a-z0-9-]{1,40}$/.test(o[k] as string) ? { [k]: o[k] as string } : {});
-  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}), ...plain('effects'), ...plain('sound'), ...plain('characters'), ...plain('lamp') };
+  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}), ...plain('effects'), ...plain('sound'), ...plain('characters'), ...plain('physics'), ...plain('lamp') };
 };
 
 let state: PlayerState | null = null;

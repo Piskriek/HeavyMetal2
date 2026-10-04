@@ -3,7 +3,7 @@ import { LIGHT_WAYS } from './light-ways';
 type SfxRecipeLayers = SfxRecipe['layers'];
 import { ANIMATIONS, animById, animToParams, normalizeAnim, type AnimPreset } from '@hm/anim';
 import { LOOKS, normalizeLook, type AvatarLook } from '@hm/avatarlook';
-import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset, LOGIC_WAYS, EFFECT_WAYS, SOUND_WAYS, CHAR_WAYS } from '@hm/buildkit';
+import { TAB_IDS, TOOLS, normalizeTool, toolsFor, type Hotbars, type SpritePreset, type TabId, type ToolPreset, LOGIC_WAYS, EFFECT_WAYS, SOUND_WAYS, CHAR_WAYS, PHYS_WAYS } from '@hm/buildkit';
 import { SETUPS, setupById, type LightSetup } from '@hm/lighting';
 import { STARTER_SURFACES } from '@hm/render';
 
@@ -87,6 +87,8 @@ export function catalog(tab: TabId, player: CatalogPlayer, _activities: readonly
       return [...LIGHT_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false })), ...SETUPS.map((s) => ({ tab, id: s.id, name: s.name, doc: 'A lighting look: sun, sky, haze and picture effects.', preview: { kind: 'sky' as const, top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color }, edited: false }))];
     case 'avatar':
       return [...player.looks, ...LOOKS].map((l) => ({ tab, id: l.id, name: l.name, doc: player.looks.some((m) => m.id === l.id) ? 'Your goblin.' : 'A ready-made goblin look: pick it, then change any colour.', preview: { kind: 'look', look: l }, edited: player.looks.some((m) => m.id === l.id) }));
+    case 'physics':
+      return PHYS_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false }));
     case 'characters':
       return CHAR_WAYS.map((w) => ({ tab, id: w.id, name: w.name, doc: w.doc, preview: { kind: 'icon' as const, icon: w.icon }, edited: false }));
     case 'effects':
@@ -129,6 +131,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];
   out.camera = ids(CAMERAS.map((c) => c.id));
   out.logic = [...ids(LOGIC_WAYS.map((w) => w.id)), null, null, null, null, null, null];
+  out.physics = [...ids(PHYS_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   out.characters = [...ids(CHAR_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   out.effects = [...ids(EFFECT_WAYS.map((w) => w.id)), null, null, null, null, null, null];
   return out;

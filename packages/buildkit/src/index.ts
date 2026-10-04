@@ -130,3 +130,4 @@ export * from './logic';
 export * from './effects';
 export * from './sounds';
 export * from './characters';
+export * from './physics';

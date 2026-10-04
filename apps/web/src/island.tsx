@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { CHAR_BRAINS, CHAR_WAYS, isCharBrain, AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { PHYS_ITEMS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, AMBIENCE_ICONS, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, STAMP_SHAPES, THINGS, shakeById, shakeOffset, stepSlot, tabDef, tabForKey, toolById, variantsOf, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -46,6 +46,8 @@ import { avatarRigged } from './build/cards';
 import { encodeModel } from '@hm/voxel';
 import { rulesOf } from './world';
 import { CharactersRuntime, type PlacedChar } from './build/characters-runtime';
+import { PhysicsRuntime, type PhysThing } from './build/physics-runtime';
+import { decodeModel } from '@hm/voxel';
 import { CharactersPanel } from './build/characters-panel';
 import { kindDef } from './avatar/accessories';
 import { EditorFor, MovesEditor, PlantEditor, SpriteEditor, WorldRulesEditor, type EditorActions } from './build/editors';
@@ -459,6 +461,17 @@ export function IslandWalk(props: {
 
     // characters (the Characters tab, F9): goblins drawn after the placed things, walked by their brains each frame
     const chars = new CharactersRuntime();
+    // things in motion (the Physics tab, F11): dropped or hammered, they fall by their material and settle as one undo step
+    const physics = new PhysicsRuntime();
+    const physThing = (ref: PresetId): PhysThing | null => {
+      if (!rt.store.get(ref)) return null;
+      const pr = rt.store.resolve(ref).params as Record<string, unknown>;
+      const m = typeof pr['data'] === 'string' && pr['data'] ? decodeModel(pr['data'] as string).model : null;
+      const s = Number(pr['scale'] ?? 0.1);
+      const size: [number, number, number] = m ? [m.size[0] * s, m.size[1] * s, m.size[2] * s] : [1, 1, 1];
+      return { ref, base: [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0), Number(pr['z'] ?? 0)], size, material: String(pr['phys'] ?? 'wood') };
+    };
+    let physSettled = 0;
     const lastCharAt = new Map<string, [number, number]>();
     let charBase = 0, charRefs: string[] = [];
     // a character wears a ready-made avatar look (dressed like your own goblin, not a statue): its model, once per look
@@ -568,6 +581,7 @@ export function IslandWalk(props: {
     (window as unknown as { hmLamps: unknown }).hmLamps = () => { const l = placedLamps()[0]; return { placed: placedLamps().length, lit: lampsLit, slots: renderer.lampSlots, first: l ? [l.x, l.y, l.z] : null }; };
     let charMoved = 0;
     (window as unknown as { hmChars: unknown }).hmChars = () => ({ count: placedChars().length, drawn: charRefs.length, moved: charMoved, first: (() => { const at = charRefs[0] ? lastCharAt.get(charRefs[0]) : undefined; const ts = rt.binder.terrain(); return at ? [at[0], ts ? heightAt(ts.terrain, at[0], at[1]) : 0, at[1]] : null; })() });
+    (window as unknown as { hmPhysics: unknown }).hmPhysics = () => ({ moving: physics.active, settled: physSettled });
     (window as unknown as { hmSounds: unknown }).hmSounds = () => ({ placed: placedSounds().length, zones: placedSounds().filter((p) => isAmbience(p.what)).length });
     // tests: what the gizmo shows, where a point along its arrow lands on screen, and the target's place
     (window as unknown as { hmGizmo: unknown }).hmGizmo = () => {
@@ -840,6 +854,33 @@ export function IslandWalk(props: {
         fx('place', { volume: 0.5 });
         return;
       }
+      // the Physics tab's ways: give the thing you point at the palette's material, drop it, or swing the push hammer
+      if (s.tab === 'physics') {
+        if (!first) return;
+        const a = aim();
+        if (!a) { say('Point at something'); return; }
+        const mat = s.palette.physics ?? 'rubber';
+        const matName = PHYS_ITEMS.find((m) => m.id === mat)?.name ?? mat;
+        if (id === 'phys-hammer') {
+          const refs = (rt.store.get(scene.sceneId)?.children['models'] ?? []).map((r) => physThing(r.ref)).filter((t): t is PhysThing => !!t);
+          const n = physics.swing([a.point[0], a.point[1], a.point[2]], 6, alt ? 1 : 4, refs);
+          fx(n ? 'boost' : 'ui-error', { volume: 0.6 });
+          say(n ? `Bonk! ${n === 1 ? 'One thing flies' : `${n} things fly`}` : 'Nothing near enough to push');
+          return;
+        }
+        const m = builder.modelAt(a);
+        if (!m) { say('Point at something you placed'); return; }
+        if (id === 'phys-give') {
+          const give = alt ? 'wood' : mat;
+          rt.commands.execute(cmd.setParam(`${m.ref}.phys`, give as never, `Made of ${give}`));
+          saveMap(rt, scene.sceneId);
+          say(`${rt.store.get(m.ref)?.name ?? 'It'} is ${alt ? 'wood' : matName.toLowerCase()} now: Drop shows how it lands`); fx('select', { volume: 0.5 });
+          return;
+        }
+        const t = physThing(m.ref);
+        if (t) { physics.drop(t, alt ? 6 : 3); fx('jump', { volume: 0.4 }); }
+        return;
+      }
       // the Characters tab's ways: spawn a goblin with the palette's behaviour, give the one you point at that behaviour, take one away
       if (s.tab === 'characters') {
         if (!first) return;
@@ -1022,6 +1063,16 @@ export function IslandWalk(props: {
     let prevX = px, prevZ = pz;
     const loop = (now: number): void => {
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      if (physics.active) {
+        const ts = rt.binder.terrain();
+        for (const q of physics.step(dt, (x, z) => (ts ? heightAt(ts.terrain, x, z) : 0))) { const i = drawnIndex(q.ref as PresetId); if (i >= 0) renderer.setModelPose(i, q.x, q.y, q.z, Number(rt.store.resolve(q.ref as PresetId).params['yaw'] ?? 0)); }
+        const done = physics.settled();
+        if (done && done.length) {
+          const label = physics.label;
+          rt.commands.transaction(label, () => { for (const q of done) { if (!rt.store.get(q.ref as PresetId)) continue; rt.commands.execute(cmd.setParam(`${q.ref}.x`, q.x, label)); rt.commands.execute(cmd.setParam(`${q.ref}.y`, q.y, label)); rt.commands.execute(cmd.setParam(`${q.ref}.z`, q.z, label)); } });
+          physSettled++; saveMap(rt, scene.sceneId); refreshModels();
+        }
+      }
       const allChars = live.current.isolateId ? [] : placedChars();
       // added or taken away (a panel, undo): draw the list again
       if (!live.current.isolateId && (allChars.length !== charRefs.length || allChars.some((c, i) => c.ref !== charRefs[i]))) refreshModels();
@@ -1320,6 +1371,8 @@ export function IslandWalk(props: {
               onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const s = PAINTS.find((x) => x.id === id); if (s) win.open(`surface:${id}`, `Look: ${s.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); }} onPick={(id) => { pickPalette('paint', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'logic'
           ? <PaletteStrip title="Rules" items={LOGIC_PRESETS.map((r) => ({ id: r.id, name: r.name, preview: { kind: 'icon', icon: r.icon } }))} community={[]} selected={p.palette.logic ?? LOGIC_PRESETS[0]!.id} onLayers={openLayers} onPick={(id) => { pickPalette('logic', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'physics'
+          ? <PaletteStrip title="Made of" items={PHYS_ITEMS.map((m) => ({ id: m.id, name: m.name, preview: { kind: 'icon' as const, icon: m.icon } }))} community={[]} selected={p.palette.physics ?? 'rubber'} onLayers={openLayers} onPick={(id) => { pickPalette('physics', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'characters'
           ? <PaletteStrip title="Behaves" items={CHAR_BRAINS.map((b) => ({ id: b.id, name: b.name, preview: { kind: 'icon' as const, icon: b.icon } }))} community={[]} selected={p.palette.characters ?? 'wander'} onLayers={openLayers} onPick={(id) => { pickPalette('characters', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'sound'
@@ -1411,6 +1464,7 @@ function heldWords(tab: TabId, item: CatalogItem, tool: ToolPreset | null): { ti
     case 'camera': return { title, line: item.doc, left: 'Use this camera', right: 'Use this camera' };
     case 'logic': { const w = LOGIC_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     case 'effects': { const w = EFFECT_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
+    case 'physics': { const w = PHYS_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     case 'characters': { const w = CHAR_WAYS.find((x) => x.id === item.id); return { title, line: w?.doc ?? item.doc, left: w?.left ?? 'Use it', right: w?.right ?? 'Use it' }; }
     default: return { title, line: item.doc, left: 'Use it', right: 'The opposite' };
   }

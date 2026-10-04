@@ -189,7 +189,13 @@ try {
   check('Esc leaves avatar mode back to the hotbar', await page.locator('.avatar-dock').count() === 0 && await page.locator('.hotbar').count() === 1);
 
   // the build HUD: ten tabs on F1..F10, slots with previews, the preset window, studio mode, Esc closes one thing at a time
-  check('twelve tabs on the tab strip in the V3 order (F1 to F10, Effects on F12, your Avatar on P)', await page.locator('.tab-strip button').count() === 12);
+  check('thirteen tabs on the tab strip in the V3 order (F1 to F12, your Avatar on P)', await page.locator('.tab-strip button').count() === 13);
+  const stripFits = () => dom(() => { const r = document.querySelector('.tab-strip')?.getBoundingClientRect(); return !!r && r.left >= 0 && r.right <= innerWidth; });
+  check('the tab strip fits a 1280 px screen', await stripFits());
+  await page.setViewportSize({ width: 900, height: 700 }); await page.waitForTimeout(T(400));
+  check('and a 900 px one (the open tab keeps its name)', await stripFits() && await dom(() => { const label = document.querySelector('.tab-strip button.on > span'); return !!label && getComputedStyle(label).display !== 'none'; }));
+  await shot('tabs-900');
+  await page.setViewportSize({ width: 1280, height: 720 }); await page.waitForTimeout(T(400));
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(300));
   check('F2 opens the Paint tab', /Paint/.test(await page.locator('.tab-strip button.on').first().textContent() ?? ''));
@@ -377,6 +383,18 @@ try {
   await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
   await page.keyboard.press('Control+z'); await page.waitForTimeout(T(300));
   check('two Ctrl+Z take the night and the lamp back', (await page.evaluate(() => window.hmLamps?.()))?.placed === 0);
+  // Physics (F11, or Shift+F1): the push hammer sends the barrel flying; it lands for good as one undo step; Ctrl+Z puts it back
+  await page.keyboard.press('Shift+F1');
+  await page.waitForTimeout(T(400));
+  check('Shift+F1 opens Physics, its palette holds nine materials', /Physics/.test(await page.locator('.tab-strip button.on').first().textContent() ?? '') && await page.locator('.palette-strip .ps-frame').count() === 9);
+  await dom(() => { [...document.querySelectorAll('.hotbar > button')].find((b) => /Push hammer/.test(b.textContent ?? ''))?.click(); });
+  await page.mouse.move(640, 470); await page.mouse.down(); await page.waitForTimeout(T(100)); await page.mouse.up();
+  await page.waitForTimeout(T(4500));
+  const ph = await page.evaluate(() => window.hmPhysics?.());
+  const phNote = await dom(() => document.querySelector('.island-note')?.textContent ?? '');
+  check('the push hammer sends things flying and they land for good', ph?.settled === 1 && !ph.moving, JSON.stringify(ph) + ' ' + phNote);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(T(400));
   await page.keyboard.press('F2');
   await page.waitForTimeout(T(200));
   await dom(() => { document.querySelector('.layers .ly-row.on button[aria-label^="Hide"]')?.click(); });

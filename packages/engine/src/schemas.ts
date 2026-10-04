@@ -331,6 +331,7 @@ export const modelSchema = defineSchema({
     { key: 'ao', type: 'boolean', label: 'Soft shading', doc: 'Darken the creases between blocks.', tier: 'play', default: true, group: 'Look' },
     { key: 'greedy', type: 'boolean', label: 'Merge flat faces', doc: 'Fewer triangles for flat areas. Turn off to see every block edge.', tier: 'pro', default: true, group: 'Look' },
     { key: 'castShadow', type: 'boolean', label: 'Casts shadow', doc: 'Whether it throws a shadow.', tier: 'build', default: true, group: 'Look' },
+    { key: 'phys', type: 'enum', label: 'Material', doc: 'What it is made of: how it falls, bounces, slides and floats (the Physics tab, F11).', tier: 'play', default: 'wood', options: ['wood', 'rubber', 'ice', 'metal', 'anvil', 'balloon', 'cork', 'stone', 'jelly'], group: 'Physics' },
     { key: 'skin', type: 'ref', label: 'Skin', doc: 'An optional PBR skin preset drawn over the blocks.', tier: 'build', default: null, refKinds: ['material'], group: 'Look' },
   ],
   slots: [] as readonly ChildSlot[],

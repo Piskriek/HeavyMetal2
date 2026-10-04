@@ -305,6 +305,7 @@ export function EditorFor(props: { readonly tab: TabId; readonly id: string; rea
     case 'logic': return <LogicPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'effects': return <EffectsPanel rt={props.rt} sceneId={props.sceneId} />;
     case 'characters': return <CharactersPanel rt={props.rt} sceneId={props.sceneId} />;
+    case 'physics': return <p className="hint">What a thing is made of is on its layer too (Layers, Material). Drop shows how it lands; the push hammer sends things flying and they stay where they land (Ctrl+Z puts them back).</p>;
     case 'avatar': return <LookEditor id={id} actions={props.actions} />;
     case 'camera': return <CameraEditor id={id} actions={props.actions} />;
   }

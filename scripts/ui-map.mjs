@@ -39,7 +39,7 @@ const text = (page, sel, t) => page.locator(sel, { hasText: t }).first();
 const dom = (page, fn, a) => page.evaluate(fn, a);
 const clickText = (page, sel, t) => dom(page, ([s, x]) => { [...document.querySelectorAll(s)].find((b) => (b.textContent ?? '').trim().startsWith(x))?.click(); }, [sel, t]);
 const settle = (page, ms = 700) => page.waitForTimeout(T(ms));
-const toIsland = async (page) => { await dom(page, () => document.querySelector('.sm-menu .sm-sub')?.click()); await page.waitForSelector('.hotbar, .island-hint', { timeout: T(60000) }); await settle(page, 5000); };
+const toIsland = async (page) => { await dom(page, () => document.querySelector('.sm-menu .sm-sub')?.click()); await page.waitForSelector('.v3, .island-hint', { timeout: T(60000) }); await settle(page, 5000); };
 const toGoblin = async (page) => { await dom(page, () => document.querySelector('.gr-open')?.click()); await page.waitForSelector('.gr-front', { timeout: T(15000) }); await settle(page, 1400); };
 
 /** Each state: the storage it starts from, how to get there from the home, and what tells it is ready. */
@@ -72,7 +72,7 @@ const STATES = [
 function readControls() {
   const SEL = 'button, [role=tab], [role=option], a[href], input[type=checkbox], input[type=radio], input[type=range], input[type=color], input[type=text], input:not([type]), select, summary, [role=button]';
   const AREA_ROLES = new Set(['dialog', 'toolbar', 'tablist', 'group', 'listbox', 'navigation', 'menu', 'region']);
-  const AREA_CLASS = /^(sm-menu|sm-home|gr-preview|gr-front|mode-bar|island-menu|galaxy-bar|hotbar|tab-strip|shell-top|shell-racing|shell-card|cg-panel|cg-kinds|cg-looks|presets|pw-tabs|pw-slots|pw-grid|tool-say|tour-card|fwin|create-goblin|avatar-dock|editor|settings-body)$/;
+  const AREA_CLASS = /^(sm-menu|sm-home|gr-preview|gr-front|mode-bar|island-menu|galaxy-bar|v3|v3-tabs|v3-slots|v3-panel|v3-say|v3-find|v3-options|shell-top|shell-racing|shell-card|cg-panel|cg-kinds|cg-looks|presets|pw-tabs|pw-slots|pw-grid|tool-say|tour-card|fwin|create-goblin|avatar-dock|editor|settings-body)$/;
   const areaOf = (el) => {
     for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
       const role = a.getAttribute('role') ?? (a.tagName === 'NAV' ? 'navigation' : '');
@@ -118,7 +118,7 @@ function readControls() {
 /** Where we are: the shell screen, open windows and overlays, notes, and what is saved (hashed). */
 function readState() {
   const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (!el.checkVisibility || el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })); };
-  const LAYERS = ['.sm-home', '.gr-preview', '.gr-front', '.island-menu', '.tab-palette', '.create-goblin', '.shell-racing', '.hotbar', '.presets', '.tour-card', '.avatar-dock', '.crosshair.on'];
+  const LAYERS = ['.sm-home', '.gr-preview', '.gr-front', '.island-menu', '.create-goblin', '.shell-racing', '.v3', '.tour-card', '.avatar-dock', '.crosshair.on'];
   const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
   const storage = {};
   for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); storage[k] = hash(localStorage.getItem(k) ?? ''); }
@@ -230,7 +230,7 @@ try {
   await page.waitForSelector('.create-goblin', { timeout: T(20000) });
   await page.locator('.cg-name input').fill('Ada');
   await clickText(page, '.cg-panel button', 'Done');
-  await page.waitForSelector('.hotbar', { timeout: T(60000) });
+  await page.waitForSelector('.v3', { timeout: T(60000) });
   await settle(page, 2000);
   const returning = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
   returning['hm.tour.v1'] = JSON.stringify({ mode: 'never', kind: 'build', progress: null });

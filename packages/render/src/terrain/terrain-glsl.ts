@@ -108,6 +108,14 @@ float islLayer(float id) {
   return (i >= 1 && i < ${SURFACE_SLOTS}) ? islLayerOf[i] : -1.0;
 }
 
+// the 4x4 ordered (Bayer) dither threshold of a pixel, 0..1: where two surfaces meet in the voxel look, each pixel of a block shows one
+// of them against this threshold, so a shore reads as a pixel-art blend (D20)
+const float ISL_BAYER4[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
+float islBayer4(vec2 p) {
+  vec2 q = mod(p, 4.0);
+  return (ISL_BAYER4[int(q.x) + int(q.y) * 4] + 0.5) / 16.0;
+}
+
 // a quarter turn k (0..3) of a 2D vector: anti-clockwise, k times
 vec2 islRot(vec2 p, float k) {
   return k < 0.5 ? p : (k < 1.5 ? vec2(-p.y, p.x) : (k < 2.5 ? -p : vec2(p.y, -p.x)));
@@ -261,19 +269,26 @@ export const COLOR_STAGE_GLSL = /* glsl */ `
     float steep = islCliffLayer >= 0.0 ? 1.0 - smoothstep(islCliffNy.y, islCliffNy.x, gnrm.y) : 0.0;
     vec4 tile;
 #ifdef ISL_FLAT
-    // voxel look: every half-metre block shows one face of its surface (one of a few variants, picked per block); where two surfaces meet,
-    // each block picks one of them. The faces are their own pixel-art tiles (the voxel set), not the painted ground's.
+    // voxel look: every half-metre block shows one face of its surface (one of a few variants, picked per block). The faces are their own
+    // pixel-art tiles (the voxel set), not the painted ground's.
     vec3 bk = floor(vTWorld / 0.5);
     float hTone = fract(sin(dot(bk, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
     float hMix = fract(sin(dot(bk, vec3(39.346, 11.135, 83.155))) * 24634.6345);
-    float layer = hMix < lw ? lb : la;
-    if (islCliffLayer >= 0.0 && hMix < steep) layer = islCliffLayer;
     // the face: the plane the ground faces most, in half-metre cells; on walls the tile's top is up
     vec3 an = abs(gnrm);
     bool vTop = an.y > 0.55;
     bool vXdom = an.x > an.z;
     vec2 fp = (vTop ? vTWorld.xz : (vXdom ? vec2(vTWorld.z, -vTWorld.y) : vec2(vTWorld.x, -vTWorld.y))) / 0.5;
     vec2 fdx = dFdx(fp), fdy = dFdy(fp);
+    // where two surfaces meet (and where rock shows on a cliff) the block's pixels dither between them: an ordered 4x4 pattern, 8 pixels
+    // to a face (chunky, like the voxel goblin), on one grid across all blocks (D20; it was one whole surface per block, a scatter of squares). Far away, where a dither
+    // pixel is smaller than a screen pixel and would shimmer, each block picks one surface as before. A block of one surface stays whole.
+    vec2 dpx = floor(fp * 8.0);
+    bool dither = (1.0 / 8.0) / max(max(length(fdx), length(fdy)), 1e-6) > 1.5;
+    // a slow wobble moves the mix about inside the blend, so half and half is a wandering edge, not a checkerboard
+    float lwd = lw > 0.0 && lw < 1.0 ? clamp(lw + (surfNoise(vTWorld.xz * 1.1 + 5.3) - 0.5) * 0.7, 0.02, 0.98) : lw;
+    float layer = (dither ? islBayer4(dpx) : hMix) < (dither ? lwd : lw) ? lb : la;
+    if (islCliffLayer >= 0.0 && (dither ? islBayer4(dpx + vec2(2.0, 1.0)) : hMix) < steep) layer = islCliffLayer;
     float faceLayer = floor(layer + 0.5) * islVoxelVariants + min(floor(hTone * islVoxelVariants), islVoxelVariants - 1.0);
     tile = textureGrad(islVoxel, vec3(fract(fp), faceLayer), fdx, fdy);
     gGlow = islParams[int(layer + 0.5)].w * smoothstep(0.1, 0.3, dot(tile.rgb, vec3(0.2126, 0.7152, 0.0722)));

@@ -85,6 +85,10 @@ try {
   await dom(() => { [...document.querySelectorAll('.cg-panel button')].find((b) => /Done/.test(b.textContent ?? ''))?.click(); });
   await page.waitForSelector('.v3', { timeout: T(60000) });
   check('Done takes you to your island', true);
+  // D20 (the island starts in the voxel look; the tour reveal below switches to painted): in the voxel look, where two surfaces meet the blocks dither between them (a pixel-art blend, not a scatter of whole squares)
+  const edge = await page.evaluate(() => window.hmGround?.edge?.());
+  check('the island has a place where two surfaces meet half and half', !!edge);
+  if (edge) { await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 2.2, p[1] + 2.4, p[2] + 2.2], target: [p[0], p[1], p[2]] }; }, edge); await page.waitForTimeout(T(800)); await shot('flat-shore'); await page.evaluate(() => { window.hmPinView = null; }); }
   await page.waitForSelector('.tour', { timeout: T(15000) }).catch(() => undefined);
   check('the island tour starts on your first visit', await page.locator('.tour h3').count() === 1);
   const missing = await page.evaluate(() => (window.hmTourTargets ?? ['(none published)']).filter((t) => !document.querySelector(`[data-ui="${t}"]`)));
@@ -445,9 +449,10 @@ try {
     await page.waitForTimeout(T(400));
     const scr = await page.evaluate((t) => { const g = (x, z) => window.hmGround?.heightAt?.(x, z) ?? t.y; return [window.hmProject?.(t.x, t.y + 0.05, t.z), window.hmProject?.(t.x + 2, g(t.x + 2, t.z), t.z), window.hmProject?.(t.x + 2, g(t.x + 2, t.z + 2), t.z + 2)]; }, wt);
     for (const p of [scr[0], scr[1], scr[2], scr[2]]) if (p) await clickWorld(p[0], p[1]);
-    await page.waitForTimeout(T(1500));
-    const wk = await page.evaluate(() => window.hmWalks?.());
-    check('Walk Path Creator: the barrel walks its path by itself', wk?.count === 1 && wk.moved > 0.3, JSON.stringify(wk) + ' ' + await note());
+    // it waits a moment at each point (Wait at Stop): watch for a few seconds and keep the farthest it got
+    let wk = null, far = 0;
+    for (let i = 0; i < 8; i++) { await page.waitForTimeout(T(400)); wk = await page.evaluate(() => window.hmWalks?.()); far = Math.max(far, wk?.moved ?? 0); }
+    check('Walk Path Creator: the barrel walks its path by itself', wk?.count === 1 && far > 0.3, JSON.stringify(wk) + ' ' + await note());
     if (wk?.count === 1) await key('Control+z');
     check('and Ctrl+Z stops it', (await page.evaluate(() => window.hmWalks?.()))?.count === 0);
     await page.evaluate(() => { window.hmPinView = null; });

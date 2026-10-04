@@ -90,6 +90,7 @@ export const sceneSchema = defineSchema({
     { key: 'effects', label: 'Effects', doc: 'Particle effects placed on the island: campfires, smoke, snow, rain, sparks, fireworks, bubbles ...', kinds: ['effect'], min: 0, max: null, tier: 'play' },
     { key: 'soundscape', label: 'Placed sounds', doc: 'Sounds placed on the island: ambience zones you hear when you are near (birds, wind, waves ...) and sounds that repeat from a spot.', kinds: ['sound-spot'], min: 0, max: null, tier: 'play' },
     { key: 'characters', label: 'Characters', doc: 'Goblins that go about the island by themselves: wander, patrol, follow you, chase you, run away.', kinds: ['character'], min: 0, max: null, tier: 'play' },
+    { key: 'lamps', label: 'Lamps', doc: 'Lamps placed on the island: bulbs, spotlights, campfire glows, candles, strobes, neon. They shine at dusk and at night.', kinds: ['lamp'], min: 0, max: null, tier: 'play' },
   ] as readonly ChildSlot[],
 });
 
@@ -484,7 +485,26 @@ export const characterSchema = defineSchema({
   slots: [] as readonly ChildSlot[],
 });
 
-export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, soundSpotSchema, characterSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
+export const lampSchema = defineSchema({
+  kind: 'lamp',
+  version: 1,
+  label: 'Lamp',
+  doc: 'A lamp placed in the world (the Lights tab, F6): which one, where, which way a spotlight points, how bright.',
+  icon: 'lightbulb',
+  variables: [
+    { key: 'preset', type: 'enum', label: 'Lamp', doc: 'Which lamp.', tier: 'play', default: 'bulb', options: ['bulb', 'spotlight', 'flashlight-orb', 'campfire', 'candle', 'strobe', 'lantern', 'neon', 'disco', 'torch'] },
+    { key: 'x', type: 'number', label: 'X', doc: 'Where it is, east-west.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'y', type: 'number', label: 'Y', doc: 'Where it is, up.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'z', type: 'number', label: 'Z', doc: 'Where it is, north-south.', tier: 'build', default: 0, step: 0.1, unit: 'm' },
+    { key: 'yaw', type: 'number', label: 'Points to', doc: 'A spotlight: which way it points round (degrees).', tier: 'build', default: 0, min: -180, max: 180, step: 1, unit: 'deg' },
+    { key: 'pitch', type: 'number', label: 'Points down', doc: 'A spotlight: how far down it points (degrees, 90 = straight down).', tier: 'build', default: 90, min: 0, max: 90, step: 1, unit: 'deg' },
+    { key: 'brightness', type: 'number', label: 'Brightness', doc: 'Brighter or dimmer than the lamp is made.', tier: 'play', default: 1, min: 0, max: 3, step: 0.05 },
+    { key: 'on', type: 'boolean', label: 'On', doc: 'Switch it off without taking it away.', tier: 'play', default: true },
+  ],
+  slots: [] as readonly ChildSlot[],
+});
+
+export const CORE_SCHEMAS = [materialSchema, entitySchema, sceneSchema, cameraSchema, mechanicSchema, terrainSchema, trackSchema, decorSchema, modulatorSchema, raceSchema, itemSchema, modelSchema, cameraRigSchema, lightSetupSchema, worldRulesSchema, plantSchema, logicRuleSchema, effectSchema, soundSpotSchema, characterSchema, lampSchema, veilSchema, interfaceSchema, soundSchema, engineSoundSchema, musicSchema, graphicsSchema] as const;
 
 export function registerCoreSchemas(registry: SchemaRegistry): void {
   for (const schema of CORE_SCHEMAS) if (!registry.get(schema.kind)) registry.register(schema);

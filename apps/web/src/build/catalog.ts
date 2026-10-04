@@ -104,9 +104,9 @@ export function validFor(tab: TabId, id: string, player: CatalogPlayer, activiti
 }
 
 /** Rows that were once the ready-made ones: a player who never changed them gets today's (Sculpt held shapes before it held ways). */
-export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly string[])[]>>> = {
+export const OLD_DEFAULT_ROWS: Readonly<Partial<Record<TabId, readonly (readonly (string | null)[])[]>>> = {
   sculpt: [['raise', 'lower', 'smooth', 'flatten', 'dig', 'mound', 'crater', 'plateau', 'ridge']],
-  lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat']],
+  lights: [['noon-clear', 'golden-hour', 'sunset-blaze', 'tropical-dawn', 'overcast', 'storm-front', 'blue-hour', 'moonlit-night', 'toon-flat'], ['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', null, null, null, null]],
   sound: [['place', 'delete', 'select', 'ui-success', 'go', 'boost', 'jump', 'splash', 'finish']],
   things: [['place-palm', 'place-bush', 'place-rock', 'place-flowers', 'place-grass-clump', 'place-barrel', 'place-trophy', 'place-statue-plinth', 'place-goblin']],
 };
@@ -123,7 +123,7 @@ export function defaultHotbars(_activities: readonly ActivityInfo[], player: Cat
   out.animate = ids(['wave', 'dance', 'cheer', 'swing', 'jump', 'walk', 'run', 'waddle', 'idle']);
   out.sound = [...ids(SOUND_WAYS.map((w) => w.id)), null, null, null, null, null];
   // ways to change the light; the looks are the palette (docs/HOTBAR.md)
-  out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds']), null, null, null, null];
+  out.lights = [...ids(['light-look', 'light-sun', 'light-daynight', 'light-haze', 'light-clouds', 'light-lamp', 'light-lamp-remove']), null, null];
   out.avatar = ids([...player.looks.map((l) => l.id), ...LOOKS.map((l) => l.id)]);
   // ways to place; the things themselves are in the palette (docs/HOTBAR.md)
   out.things = [...ids(['things-one', 'things-scatter', 'things-row', 'things-swap']), null, null, null, null, null];

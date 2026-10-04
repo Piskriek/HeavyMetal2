@@ -18,6 +18,7 @@ import { RoadDecalView, type RoadDecalDef } from './road-decals';
 import { ModelsView, type ModelPlacement } from './voxel-view';
 import { Bursts, type BurstDef } from './bursts';
 import { ParticleLayer, type ParticleLayerId } from './particle-view';
+import { LightPool, lampBudget, type LampLight } from './light-pool';
 import { TerrainView, type DirtyRectLike, type TerrainLike } from './terrain/terrain-view';
 import { pickTerrain } from './terrain/terrain-pick';
 import type { SurfaceArray } from './terrain/surface-set';
@@ -46,6 +47,9 @@ export type ThreeRenderer = RenderService & {
   burst(def: BurstDef): void;
   /** Placed particle effects: a particle system's buffer (8 floats a particle) and how many are live; the glow layer adds light. null clears. */
   setParticles(layer: ParticleLayerId, buffer: Float32Array | null, count: number): void;
+  /** Placed lamps, most important first (only as many as the graphics settings afford are lit: `lampSlots`); null or empty: all dark. */
+  setLamps(lamps: readonly LampLight[] | null): void;
+  readonly lampSlots: number;
   /** Lens in degrees for the next camera.set (cameras rigs zoom with speed). */
   setFov(deg: number): void;
   /** Voxel models placed in the world (statues, props, avatars); null clears. */
@@ -184,6 +188,8 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
     bursts = null;
     for (const l of particleLayers.values()) { l.points.removeFromParent(); l.dispose(); }
     particleLayers.clear();
+    lampPool?.dispose();
+    lampPool = null;
     roadView = null;
     sceneSync?.dispose();
     sceneAdapter?.dispose();
@@ -262,6 +268,7 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
   let bursts: Bursts | null = null;
   const particleLayers = new Map<ParticleLayerId, ParticleLayer>();
   const particleCounts = new Map<ParticleLayerId, number>();
+  let lampPool: LightPool | null = null;
   let modelsView: ModelsView | null = null;
   let pendingModels: readonly ModelPlacement[] | null = null;
   const applyModels = (): void => {
@@ -362,6 +369,19 @@ export function createThreeRenderer(opts: RenderOptions = {}): ThreeRenderer {
       applyDecor();
     },
     burst(def: BurstDef): void { bursts?.emit(def); },
+    setLamps(lamps: readonly LampLight[] | null): void {
+      if (!scene) return;
+      if (!lamps || lamps.length === 0) { lampPool?.set([]); return; }
+      const want = lampBudget(graphics);
+      // the pool is made once (one shader compile) and only again when the graphics settings change
+      if (!lampPool || lampPool.budget.points !== want.points || lampPool.budget.spots !== want.spots) {
+        lampPool?.dispose(); lampPool = null;
+        if (want.points + want.spots === 0) return;
+        lampPool = new LightPool(want); scene.add(lampPool.group);
+      }
+      lampPool.set(lamps);
+    },
+    get lampSlots(): number { const b = lampBudget(graphics); return b.points + b.spots; },
     setParticles(layer: ParticleLayerId, buffer: Float32Array | null, count: number): void {
       const old = particleLayers.get(layer);
       if (old && old.buffer !== buffer) { old.points.removeFromParent(); old.dispose(); particleLayers.delete(layer); }

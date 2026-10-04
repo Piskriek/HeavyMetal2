@@ -23,6 +23,7 @@ import { GizmoControl, gizmoModeFor, type GizmoTarget } from './build/gizmo-cont
 import { EffectsRuntime, type PlacedEffect } from './build/effects-runtime';
 import { SoundscapeRuntime, zoneOf, emitterOf, type PlacedSound } from './build/soundscape-runtime';
 import { SoundSpotsPanel } from './build/sound-spots-panel';
+import { LIGHT_PRESETS, flicker, pickLights, presetById as lampById } from '@hm/lightplace';
 import { AMBIENCES } from '@hm/soundscape';
 import { audio } from './maker/feedback';
 import { PARTICLE_PRESETS } from '@hm/particles';
@@ -77,6 +78,7 @@ const SEA = 0.35; // lower ground than this is water: the goblin stays on land
 /** The palette's surfaces for the ways to paint. */
 // the palette shows each surface's own tile (SetMix's graph-made set), its colours until the picture loads
 /** Lights' palette: the looks. */
+const LAMP_ICONS: Readonly<Record<string, string>> = { bulb: 'Lightbulb', spotlight: 'Flashlight', 'flashlight-orb': 'Flashlight', campfire: 'Flame', candle: 'Flame', strobe: 'Zap', lantern: 'Lamp', neon: 'Zap', disco: 'Sparkles', torch: 'Flame' };
 const LIGHT_ITEMS: readonly StripItem[] = SETUPS.map((s) => ({ id: s.id, name: s.name, preview: { kind: 'sky', top: s.sky.top, horizon: s.sky.horizon, ground: s.hemi.ground, sun: s.sun.color } }));
 /** Things' palette: what its ways place. */
 const THING_ITEMS: readonly StripItem[] = THINGS.map((t) => ({ id: t.id, name: t.name, preview: { kind: 'model', model: t.id } }));
@@ -557,6 +559,13 @@ export function IslandWalk(props: {
       return { ref: r.ref, what: String(pr['what'] ?? ''), x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), size: Number(pr['size'] ?? 8), volume: Number(pr['volume'] ?? 0.8), every: Number(pr['every'] ?? 4), on: pr['on'] !== false };
     });
     let soundOverlay = false;
+    // lamps (the Lights tab, F6): the most important ones lit by the renderer's fixed pool, flickering as their preset says
+    const placedLamps = (): { ref: string; preset: string; x: number; y: number; z: number; yaw: number; pitch: number; brightness: number; on: boolean }[] => (rt.store.get(scene.sceneId)?.children['lamps'] ?? []).filter((r) => rt.store.get(r.ref)).map((r) => {
+      const pr = rt.store.resolve(r.ref).params as Record<string, unknown>;
+      return { ref: r.ref, preset: String(pr['preset'] ?? 'bulb'), x: Number(pr['x'] ?? 0), y: Number(pr['y'] ?? 0), z: Number(pr['z'] ?? 0), yaw: Number(pr['yaw'] ?? 0), pitch: Number(pr['pitch'] ?? 90), brightness: Number(pr['brightness'] ?? 1), on: pr['on'] !== false };
+    });
+    let lampsLit = 0;
+    (window as unknown as { hmLamps: unknown }).hmLamps = () => { const l = placedLamps()[0]; return { placed: placedLamps().length, lit: lampsLit, slots: renderer.lampSlots, first: l ? [l.x, l.y, l.z] : null }; };
     let charMoved = 0;
     (window as unknown as { hmChars: unknown }).hmChars = () => ({ count: placedChars().length, drawn: charRefs.length, moved: charMoved, first: (() => { const at = charRefs[0] ? lastCharAt.get(charRefs[0]) : undefined; const ts = rt.binder.terrain(); return at ? [at[0], ts ? heightAt(ts.terrain, at[0], at[1]) : 0, at[1]] : null; })() });
     (window as unknown as { hmSounds: unknown }).hmSounds = () => ({ placed: placedSounds().length, zones: placedSounds().filter((p) => isAmbience(p.what)).length });
@@ -928,6 +937,32 @@ export function IslandWalk(props: {
         return;
       }
       // the Lights tab's ways act on the light where you are (the Sun keeps moving while held)
+      if (s.tab === 'lights' && (id === 'light-lamp' || id === 'light-lamp-remove')) {
+        if (!first) return;
+        const a = aim();
+        if (!a) { say('Point at the ground'); return; }
+        const refs = rt.store.get(scene.sceneId)?.children['lamps'] ?? [];
+        if (id === 'light-lamp-remove' || alt) {
+          let best = -1, bestD = 3;
+          refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
+          if (best < 0) { say('No lamp near there'); return; }
+          rt.commands.execute(cmd.removeChild(scene.sceneId, 'lamps', best, 'Remove a lamp'));
+          saveMap(rt, scene.sceneId); say('Lamp taken away'); fx('delete', { volume: 0.5 });
+          return;
+        }
+        const kind = s.palette.lamp && lampById(s.palette.lamp) ? s.palette.lamp : 'bulb';
+        const lp = lampById(kind)!;
+        // a spotlight hangs high and points down; a campfire or a candle sits low; the rest float at lamp height
+        const lift = lp.kind === 'spot' ? 3 : kind === 'campfire' ? 0.4 : kind === 'candle' ? 0.5 : kind === 'torch' ? 1.6 : 1.2;
+        const lampId = `lamp-${Date.now().toString(36)}`;
+        rt.commands.transaction(`Lamp: ${lp.name}`, () => {
+          rt.commands.execute(cmd.put({ id: lampId, kind: 'lamp', name: lp.name, params: { preset: kind, x: a.point[0], y: a.point[1] + lift, z: a.point[2], yaw: 0, pitch: 90, brightness: 1, on: true } as never, tier: 'play' }, `Lamp: ${lp.name}`));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'lamps', lampId, undefined, `Lamp: ${lp.name}`));
+        });
+        saveMap(rt, scene.sceneId);
+        say(renderer.lampSlots > 0 ? `${lp.name}: it shows best at dusk and at night (Day and night)` : `${lp.name} placed (lamps are not lit on Potato graphics)`); fx('place', { volume: 0.5 });
+        return;
+      }
       if (s.tab === 'lights' && isLightWay(id)) {
         const holds = LIGHT_WAYS.find((w) => w.id === id)?.hold === true;
         if (!first && (!holds || now - lightTick < 120)) return;
@@ -996,6 +1031,18 @@ export function IslandWalk(props: {
         const poses = chars.step(dt, list, [px, py, pz], (x, z) => { if (!ts) return 0; const h = heightAt(ts.terrain, x, z); return h < sea + 0.1 ? null : h; });
         charMoved = 0;
         poses.forEach((q, k) => { lastCharAt.set(q.ref, [q.x, q.z]); const i = charRefs.indexOf(q.ref); if (i >= 0) renderer.setModelPose(charBase + i, q.x, q.y, q.z, q.yaw + 180); const home = list[k]; if (home) charMoved = Math.max(charMoved, Math.hypot(q.x - home.x, q.z - home.z)); });
+      }
+      {
+        const lamps = placedLamps();
+        if (lamps.length || lampsLit) {
+          const t = now / 1000;
+          const lit = lamps.flatMap((l, i) => { const p = l.on ? lampById(l.preset) : undefined; return p ? [{ l, p, intensity: p.intensity * l.brightness * flicker(p.flicker, p.rate, t, i * 7919 + 13) }] : []; });
+          const ear: [number, number, number] = eye ? [eye[0], eye[1], eye[2]] : [px, py, pz];
+          const best = pickLights(lit.map((x) => ({ pos: [x.l.x, x.l.y, x.l.z] as [number, number, number], intensity: x.intensity, range: x.p.range, on: true })), ear, renderer.lampSlots);
+          renderer.setLamps(best.map((i) => { const x = lit[i]!; const yaw = (x.l.yaw * Math.PI) / 180, pitch = (x.l.pitch * Math.PI) / 180;
+            return { kind: x.p.kind, pos: [x.l.x, x.l.y, x.l.z] as const, dir: [Math.cos(pitch) * Math.sin(yaw), -Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)] as const, color: x.p.color, intensity: x.intensity, range: x.p.range, angle: x.p.angle, penumbra: x.p.penumbra }; }));
+          lampsLit = best.length;
+        }
       }
       effects.sync(placedEffects());
       {
@@ -1279,6 +1326,8 @@ export function IslandWalk(props: {
           ? <PaletteStrip title="Sounds" items={[...AMBIENCES.map((a) => ({ id: a.id, name: a.name, preview: { kind: 'icon' as const, icon: AMBIENCE_ICONS[a.id] ?? 'Music' } })), ...SFX_IDS.map((id) => ({ id, name: soundName(id), preview: { kind: 'sound' as const, id } }))]} community={[]} selected={p.palette.sound ?? 'forest-birds'} onLayers={openLayers} onPick={(id) => { pickPalette('sound', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'effects'
           ? <PaletteStrip title="Effects" items={PARTICLE_PRESETS.map((e) => ({ id: e.id, name: e.name, preview: { kind: 'icon', icon: EFFECT_ICONS[e.id] ?? 'Sparkles' } }))} community={[]} selected={p.palette.effects ?? 'campfire'} onLayers={openLayers} onPick={(id) => { pickPalette('effects', id); fx('select', { volume: 0.5 }); }} />
+          : p.tab === 'lights' && (heldItem?.id === 'light-lamp' || heldItem?.id === 'light-lamp-remove')
+          ? <PaletteStrip title="Lamps" items={LIGHT_PRESETS.map((l) => ({ id: l.id, name: l.name, preview: { kind: 'icon' as const, icon: LAMP_ICONS[l.id] ?? 'Lightbulb' } }))} community={[]} selected={p.palette.lamp ?? 'bulb'} onLayers={openLayers} onPick={(id) => { pickPalette('lamp', id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'lights'
           ? <PaletteStrip title="Light" items={LIGHT_ITEMS} community={[]} selected={p.palette.lights} onLayers={openLayers} onPick={(id) => { pickPalette('lights', id); pickLook(rt, scene.sceneId, id); fx('select', { volume: 0.5 }); }} />
           : p.tab === 'things'

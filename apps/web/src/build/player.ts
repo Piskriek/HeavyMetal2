@@ -25,7 +25,7 @@ export interface PlayerState extends CatalogPlayer {
   /** How deep the hotbar goes: Easy, Pro or Studio (docs/HOTBAR.md). */
   readonly level: HotbarLevel;
   /** What each tab's tools apply, picked in the palette strip (Paint: a surface id). */
-  readonly palette: Readonly<Partial<Record<TabId, string>>>;
+  readonly palette: Readonly<Partial<Record<TabId | 'lamp', string>>>;
   /** Sculpt's toggles (Pro, beside the hotbar): mirror every stroke across the island's middle; smooth gently behind it. */
   readonly sculptToggles: { readonly mirror: boolean; readonly smoothAfter: boolean };
 }
@@ -79,14 +79,16 @@ function freshTabs(h: Hotbars, defaults: Hotbars): Hotbars {
   }
   return out;
 }
-const paletteOf = (v: unknown): Partial<Record<TabId, string>> => {
+const paletteOf = (v: unknown): Partial<Record<TabId | 'lamp', string>> => {
   const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
   const paint = typeof o.paint === 'string' && PAINTS.some((s) => String(s.id) === o.paint) ? o.paint : undefined;
   const sculpt = typeof o.sculpt === 'string' && STAMP_SHAPES.some((s) => s.id === o.sculpt) ? o.sculpt : undefined;
   const things = typeof o.things === 'string' && THINGS.some((t) => t.id === o.things) ? o.things : undefined;
   const logic = typeof o.logic === 'string' && LOGIC_PRESETS.some((r) => r.id === o.logic) ? o.logic : undefined;
   const lights = typeof o.lights === 'string' && /^[a-z0-9-]{1,40}$/.test(o.lights) ? o.lights : undefined;
-  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}) };
+  // the rest are plain ids, checked again where they are used
+  const plain = (k: string): Record<string, string> => (typeof o[k] === 'string' && /^[a-z0-9-]{1,40}$/.test(o[k] as string) ? { [k]: o[k] as string } : {});
+  return { ...(paint ? { paint } : {}), ...(sculpt ? { sculpt } : {}), ...(things ? { things } : {}), ...(lights ? { lights } : {}), ...(logic ? { logic } : {}), ...plain('effects'), ...plain('sound'), ...plain('characters'), ...plain('lamp') };
 };
 
 let state: PlayerState | null = null;
@@ -161,7 +163,7 @@ export const setLevel = (level: HotbarLevel): void => { const s = get(); if (s.l
 /** Pick what a tab's tools apply from the palette strip (Paint: a surface). */
 /** Sculpt's toggles: switch one on or off. */
 export const toggleSculpt = (key: 'mirror' | 'smoothAfter'): void => { const s = get(); set({ ...s, sculptToggles: { ...s.sculptToggles, [key]: !s.sculptToggles[key] } }); };
-export const pickPalette = (tab: TabId, id: string): void => { const s = get(); if (s.palette[tab] !== id) set({ ...s, palette: { ...s.palette, [tab]: id } }); };
+export const pickPalette = (tab: TabId | 'lamp', id: string): void => { const s = get(); if (s.palette[tab] !== id) set({ ...s, palette: { ...s.palette, [tab]: id } }); };
 /** Set a tool to one of its presets: its values become your tool's (one change, kept like any edit). */
 export function applyVariant(toolId: string, patch: Readonly<Record<string, unknown>>): void {
   const s = get();

@@ -1,0 +1,86 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the model behind a node-and-wire editor (like a game editor's logic wires: switches and zones wired to doors and lights): checking a graph, putting its nodes in columns with few crossing wires, laying it out, finding the port under the pointer, the curve of a wire, and connecting two ports.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/wiregraph.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Never change an input graph.
+
+## API (implement exactly)
+
+```ts
+export interface GNode { id: string; inputs: string[]; outputs: string[] }   // port names
+export interface End { node: string; port: string }
+export interface Wire { from: End; to: End }                                    // from an output to an input
+export interface Graph { nodes: GNode[]; wires: Wire[] }
+export interface Placed { id: string; x: number; y: number; w: number; h: number }
+
+/** Problems in words (empty when fine): a wire to an unknown node or port, a wire from an input or into an output, an input fed by two wires, a cycle. */
+export function problems(g: Graph): string[];
+/**
+ * Columns, left to right: a node with no wire coming in is in column 0, any other node one column right of the furthest node that feeds it.
+ * Within each column, start in the order of g.nodes, then sweep 4 times (left to right, right to left, left to right, right to left): sort a
+ * column by the mean position of its neighbours in the column just swept from (sources when going right, targets when going left); a node
+ * with no such neighbour keeps its current position as its value; sort stable.
+ */
+export function layers(g: Graph): string[][];
+/** Crossings between neighbouring columns: two wires from column k to column k+1 cross when their ends are in opposite orders. */
+export function crossings(g: Graph, order: string[][]): number;
+/** x = column * (nodeW + colGap), y = position in its column * (nodeH + rowGap); defaults nodeW 160, nodeH 60, colGap 80, rowGap 30. */
+export function layout(g: Graph, opt?: { nodeW?: number; nodeH?: number; colGap?: number; rowGap?: number }): Placed[];
+/** Where a port is: inputs on the left edge, outputs on the right edge; port i of n at y + h * (i + 1) / (n + 1). */
+export function portPos(p: Placed, n: GNode, side: 'in' | 'out', port: string): [number, number] | null;
+/** The port within `radius` (default 8) of (x, y), nearest first; null if none. */
+export function portAt(placed: Placed[], g: Graph, x: number, y: number, radius?: number): (End & { side: 'in' | 'out' }) | null;
+/** A wire's curve as cubic Bezier points [a, c1, c2, b]: c1 = a + (dx, 0), c2 = b - (dx, 0), dx = max(40, |b.x - a.x| / 2). */
+export function wirePath(a: [number, number], b: [number, number]): [[number, number], [number, number], [number, number], [number, number]];
+/** A new graph with the wire from `from` (an output) to `to` (an input); a wire already going into `to` is replaced. */
+export function connect(g: Graph, from: End, to: End): Graph;
+```
+
+## Acceptance tests (copy unchanged into your test file, then add your own below)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { connect, crossings, layers, layout, portAt, portPos, problems, wirePath, type Graph } from '../src/index';
+const n = (id: string, inputs: string[] = ['in'], outputs: string[] = ['out']) => ({ id, inputs, outputs });
+const w = (a: string, b: string, pa = 'out', pb = 'in') => ({ from: { node: a, port: pa }, to: { node: b, port: pb } });
+
+test('problems: unknown ports, two wires into one input, cycles', () => {
+  assert.deepEqual(problems({ nodes: [n('a'), n('b')], wires: [w('a', 'b')] }), []);
+  assert.ok(problems({ nodes: [n('a'), n('b')], wires: [w('a', 'b', 'nope')] }).length > 0);
+  assert.ok(problems({ nodes: [n('a'), n('b'), n('c')], wires: [w('a', 'c'), w('b', 'c')] }).length > 0);
+  assert.ok(problems({ nodes: [n('a'), n('b')], wires: [w('a', 'b'), w('b', 'a')] }).length > 0);
+  assert.ok(problems({ nodes: [n('a'), n('b')], wires: [w('a', 'b', 'in', 'in')] }).length > 0);
+});
+test('columns follow the longest path', () => {
+  const g: Graph = { nodes: [n('a'), n('b'), n('c', ['x', 'y'])], wires: [w('a', 'b'), w('b', 'c', 'out', 'x'), w('a', 'c', 'out', 'y')] };
+  assert.deepEqual(layers(g), [['a'], ['b'], ['c']]);
+});
+test('the sweeps untangle crossing wires', () => {
+  const g: Graph = { nodes: [n('s1', []), n('s2', []), n('t1'), n('t2')], wires: [w('s1', 't2'), w('s2', 't1')] };
+  assert.equal(crossings(g, [['s1', 's2'], ['t1', 't2']]), 1);
+  const order = layers(g);
+  assert.deepEqual(order, [['s1', 's2'], ['t2', 't1']]);
+  assert.equal(crossings(g, order), 0);
+});
+test('layout, ports and finding a port', () => {
+  const g: Graph = { nodes: [n('a', [], ['o1', 'o2']), n('b'), n('c')], wires: [w('a', 'b', 'o1'), w('a', 'c', 'o2')] };
+  const p = layout(g);
+  const b = p.find((q) => q.id === 'c')!;
+  assert.deepEqual([b.x, b.y, b.w, b.h], [240, 90, 160, 60]);
+  const a = p.find((q) => q.id === 'a')!;
+  assert.deepEqual(portPos(a, g.nodes[0]!, 'out', 'o2'), [160, 40]);
+  assert.deepEqual(portPos(a, g.nodes[0]!, 'out', 'o1'), [160, 20]);
+  assert.deepEqual(portAt(p, g, 159, 41, 6), { node: 'a', port: 'o2', side: 'out' });
+  assert.deepEqual(portAt(p, g, 241, 120), { node: 'c', port: 'in', side: 'in' });
+  assert.equal(portAt(p, g, 80, 30), null);
+});
+test('a wire is a gentle S; connecting into a fed input replaces its wire', () => {
+  assert.deepEqual(wirePath([0, 0], [100, 50]), [[0, 0], [50, 0], [50, 50], [100, 50]]);
+  assert.deepEqual(wirePath([0, 0], [20, 0]), [[0, 0], [40, 0], [-20, 0], [20, 0]]);
+  const g: Graph = { nodes: [n('x'), n('y'), n('z')], wires: [w('x', 'y')] };
+  const h = connect(g, { node: 'z', port: 'out' }, { node: 'y', port: 'in' });
+  assert.deepEqual(h.wires, [w('z', 'y')]);
+  assert.deepEqual(g.wires, [w('x', 'y')]);
+});
+```

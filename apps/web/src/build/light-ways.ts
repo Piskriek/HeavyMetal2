@@ -6,13 +6,16 @@ import { ensureLightPreset, pickLook, setupOf } from '../look';
  * The ways of the Lights tab (docs/HOTBAR.md, F6): the looks themselves are the palette; the hotbar holds ways to change the light. Left and
  * right do opposite things, as on every tool. Each change is an undo step; the first change to a knob makes the look your own copy.
  */
-export type LightWayId = 'light-look' | 'light-sun' | 'light-daynight' | 'light-haze' | 'light-clouds';
+export type LightWayId = 'light-look' | 'light-sun' | 'light-daynight' | 'light-haze' | 'light-clouds' | 'light-lamp' | 'light-lamp-remove';
 export const LIGHT_WAYS: readonly { readonly id: LightWayId; readonly name: string; readonly icon: string; readonly doc: string; readonly left: string; readonly right: string; readonly hold?: boolean }[] = [
   { id: 'light-look', name: 'Look', icon: 'Palette', doc: 'Light the island with the look picked in the palette.', left: 'Use the palette\'s look', right: 'Use the palette\'s look' },
   { id: 'light-sun', name: 'Sun', icon: 'Sun', doc: 'Move the sun through the day, an hour a click.', left: 'An hour later', right: 'An hour earlier' },
   { id: 'light-daynight', name: 'Day and night', icon: 'Moon', doc: 'Switch between day and night; the other button lets the look decide again.', left: 'Day or night', right: 'Back to the look\'s own time' },
   { id: 'light-haze', name: 'Haze', icon: 'Wind', doc: 'Thicken or thin the haze in the distance.', left: 'More haze', right: 'Less haze' },
   { id: 'light-clouds', name: 'Clouds', icon: 'Waves', doc: 'More or fewer clouds in the sky.', left: 'More clouds', right: 'Fewer clouds' },
+  // lamps you place (hotbar spec V3, F6): holding one of these, the palette shows the lamps
+  { id: 'light-lamp', name: 'Lamp', icon: 'Lightbulb', doc: 'Put the palette\'s lamp where you point: a bulb, a spotlight, a campfire glow, a candle, a strobe, neon ... They shine at dusk and at night.', left: 'Place the lamp', right: 'Take away the nearest lamp' },
+  { id: 'light-lamp-remove', name: 'Remove lamp', icon: 'LightbulbOff', doc: 'Take away the lamp nearest where you point.', left: 'Take it away', right: 'Take it away' },
 ];
 export const isLightWay = (id: string): id is LightWayId => LIGHT_WAYS.some((w) => w.id === id);
 
@@ -23,6 +26,8 @@ export function applyLightWay(rt: Runtime, sceneId: PresetId, way: LightWayId, a
   const setHour = (h: number, label: string): void => { rt.commands.execute(cmd.setParam(`${sceneId}.timeOfDay`, h, label)); };
   const clock = (h: number): string => `${Math.floor(h).toString().padStart(2, '0')}:${Math.round((h % 1) * 60).toString().padStart(2, '0')}`;
   switch (way) {
+    case 'light-lamp': case 'light-lamp-remove':
+      return null; // the island places and takes away lamps (it knows where you point)
     case 'light-look':
       if (!paletteLook) return 'Pick a look in the palette (Tab)';
       pickLook(rt, sceneId, paletteLook);

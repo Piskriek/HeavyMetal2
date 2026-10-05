@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SetMix UI Layout Architect & Diagram Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #121417;
+      --surface: #1a1d23;
+      --surface-hover: #22262e;
+      --surface-active: #2a303b;
+      --border: #2e3440;
+      --border-focus: #4c566a;
+      --text: #eceff4;
+      --text-dim: #9aa2b1;
+      --accent: #e5a93c;
+      --accent-glow: rgba(229, 169, 60, 0.25);
+      --accent-light: #f3be60;
+      --blue: #88c0d0;
+      --green: #a3be8c;
+      --red: #bf616a;
+      --canvas-bg: #0b0c0e;
+      --grid-line: rgba(255, 255, 255, 0.04);
+      --font-ui: 'Inter', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Header */
+    header {
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand-badge {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent), #d08770);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: #0b0c0e;
+      font-size: 15px;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-left: 4px;
+    }
+
+    .top-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-group {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .btn-group button {
+      background: transparent;
+      border: 0;
+      color: var(--text-dim);
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-group button.active {
+      background: var(--surface-active);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .btn-group button:hover:not(.active) {
+      color: var(--text);
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .action-btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-focus);
+    }
+    .action-btn.primary {
+      background: var(--accent);
+      color: #121417;
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+    .action-btn.primary:hover {
+      background: var(--accent-light);
+    }
+
+    /* Main Workspace */
+    .workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Sidebar: Components Tree & Library */
+    .sidebar-left {
+      width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .widget-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.12s ease;
+      border: 1px solid transparent;
+    }
+    .widget-item:hover {
+      background: var(--surface-hover);
+    }
+    .widget-item.active {
+      background: var(--surface-active);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .widget-item-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .widget-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--blue);
+    }
+    .widget-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .icon-btn {
+      background: transparent;
+      border: 0;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+    }
+    .icon-btn:hover {
+      color: var(--text);
+      background: var(--surface-active);
+    }
+    .icon-btn.muted {
+      opacity: 0.35;
+    }
+
+    /* Center: Diagram Canvas */
+    .canvas-viewport {
+      flex: 1;
+      background: var(--canvas-bg);
+      background-image: 
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 32px 32px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .screen-frame {
+      width: 1066px;
+      height: 600px;
+      background: radial-gradient(circle at 50% 30%, #1e2836 0%, #0d1117 75%, #080a0d 100%);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+      overflow: hidden;
+      transform-origin: center center;
+    }
+
+    /* Screen HUD Grid Guides (Snap targets) */
+    .snap-guide {
+      position: absolute;
+      border: 1px dashed rgba(229, 169, 60, 0.25);
+      pointer-events: none;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: rgba(229, 169, 60, 0.4);
+      opacity: 0;
+    }
+    .snap-guide.show {
+      opacity: 1;
+    }
+    .snap-guide.highlight {
+      border-color: var(--accent);
+      background: rgba(229, 169, 60, 0.08);
+      color: var(--accent);
+    }
+
+    /* Game World Simulation Decor in Mock Screen */
+    .game-world-decor {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.35;
+    }
+    .game-horizon {
+      position: absolute;
+      bottom: 35%;
+      left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(136, 192, 208, 0.3), transparent);
+    }
+    .game-island-shape {
+      position: absolute;
+      bottom: 20%;
+      left: 30%; width: 40%;
+      height: 15%;
+      border-radius: 50% 50% 0 0;
+      background: linear-gradient(180deg, rgba(163, 190, 140, 0.15), rgba(76, 86, 106, 0.2));
+    }
+
+    /* Interactive HUD Widgets on Canvas */
+    .hud-widget {
+      position: absolute;
+      cursor: grab;
+      user-select: none;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      background: rgba(18, 20, 23, 0.85);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      transition: transform 0.05s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+      z-index: 10;
+    }
+    .hud-widget:hover {
+      border-color: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+    }
+    .hud-widget.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow), 0 8px 24px rgba(0, 0, 0, 0.7);
+      z-index: 20;
+    }
+    .hud-widget.dragging {
+      cursor: grabbing;
+      opacity: 0.9;
+      transform: scale(1.02);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+      z-index: 30;
+    }
+
+    /* Widget Drag Badge */
+    .widget-tag {
+      position: absolute;
+      top: -18px;
+      left: 0;
+      background: var(--surface-active);
+      color: var(--text-dim);
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 3px;
+      pointer-events: none;
+      white-space: nowrap;
+      border: 1px solid var(--border);
+    }
+    .hud-widget.selected .widget-tag {
+      background: var(--accent);
+      color: #0b0c0e;
+      border-color: var(--accent);
+    }
+
+    /* Authentic Widget Visuals */
+    /* 1. Hotbar Slots Widget */
+    .widget-hotbar-slots {
+      display: flex;
+      background: rgba(251, 250, 246, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      padding: 2px;
+      gap: 2px;
+    }
+    .slot-box {
+      width: 54px;
+      height: 48px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      font-size: 9.5px;
+      color: #d8dee9;
+      padding-top: 10px;
+    }
+    .slot-box.active {
+      background: rgba(229, 169, 60, 0.2);
+      border-color: var(--accent);
+      color: var(--text);
+      box-shadow: inset 0 -3px 0 var(--accent);
+    }
+    .slot-num {
+      position: absolute;
+      top: 2px; left: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+    .slot-icon {
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    /* 2. Hotbar Tabs Widget */
+    .widget-tabs-bar {
+      display: flex;
+      gap: 2px;
+      background: rgba(20, 23, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      padding: 3px;
+      overflow: hidden;
+    }
+    .tab-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 7px;
+      font-size: 10px;
+      color: var(--text-dim);
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    .tab-pill.active {
+      background: var(--text);
+      color: #121417;
+      font-weight: 600;
+    }
+    .tab-pill kbd {
+      font-size: 8px;
+      padding: 1px 3px;
+      border: 1px solid currentColor;
+      border-radius: 2px;
+      opacity: 0.6;
+    }
+
+    /* 3. Speech Bubble / Active Word */
+    .widget-active-words {
+      padding: 6px 14px;
+      text-align: center;
+      border-radius: 4px;
+      background: rgba(251, 250, 246, 0.94);
+      color: #1a1d23;
+      border: 1px solid #d8dee9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .words-title {
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .words-sub {
+      font-size: 9.5px;
+      color: #4c566a;
+    }
+
+    /* 4. Top Bar Navigation */
+    .widget-top-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(18, 20, 23, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .esc-pill {
+      padding: 3px 8px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .island-title-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #eceff4;
+    }
+    .coords-pill {
+      font-size: 9px;
+      color: var(--blue);
+      font-family: var(--font-mono);
+    }
+
+    /* 5. End Controls */
+    .widget-end-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .ctrl-btn {
+      width: 28px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      color: #d8dee9;
+    }
+    .mode-switch-pill {
+      padding: 4px 8px;
+      background: var(--surface-active);
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* 6. Minimap / Radar */
+    .widget-radar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(136, 192, 208, 0.15) 0%, rgba(18, 20, 23, 0.9) 70%);
+      border: 2px solid rgba(136, 192, 208, 0.4);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+    .radar-blip {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+    .radar-north {
+      position: absolute;
+      top: 4px;
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--red);
+    }
+
+    /* 7. Reticle */
+    .widget-reticle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      display: grid;
+      place-items: center;
+    }
+    .reticle-dot {
+      width: 4px;
+      height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    /* Right Sidebar: Inspector & Diff */
+    .sidebar-right {
+      width: 320px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .inspector-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .inspector-tab {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: 0;
+      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .inspector-tab.active {
+      color: var(--text);
+      border-bottom-color: var(--accent);
+      background: rgba(229, 169, 60, 0.05);
+    }
+    .inspector-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    .form-control {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-family: var(--font-ui);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .form-control:focus {
+      outline: 0;
+      border-color: var(--accent);
+    }
+    .form-row {
+      display: flex;
+      gap: 8px;
+    }
+    .form-row .form-group {
+      flex: 1;
+    }
+
+    /* Anchor Grid Picker */
+    .anchor-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      width: 100%;
+      background: var(--bg);
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .anchor-btn {
+      aspect-ratio: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+      color: var(--text-dim);
+      transition: all 0.12s ease;
+    }
+    .anchor-btn:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+    .anchor-btn.active {
+      background: var(--accent);
+      color: #0b0c0e;
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Diff View */
+    .diff-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+    }
+    .diff-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      line-height: 1.4;
+    }
+    .diff-card.moved {
+      border-left: 3px solid var(--blue);
+    }
+    .diff-card.modified {
+      border-left: 3px solid var(--accent);
+    }
+    .diff-card.added {
+      border-left: 3px solid var(--green);
+    }
+    .diff-card.hidden {
+      border-left: 3px solid var(--red);
+    }
+    .diff-tag {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .diff-card.moved .diff-tag { background: rgba(136, 192, 208, 0.2); color: var(--blue); }
+    .diff-card.modified .diff-tag { background: rgba(229, 169, 60, 0.2); color: var(--accent); }
+    .diff-card.added .diff-tag { background: rgba(163, 190, 140, 0.2); color: var(--green); }
+    .diff-card.hidden .diff-tag { background: rgba(191, 97, 106, 0.2); color: var(--red); }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .toast.success {
+      border-color: var(--green);
+    }
+    .toast-icon {
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Bar -->
+  <header>
+    <div class="brand">
+      <div class="brand-badge">S</div>
+      <div>
+        <span class="brand-title">SetMix UI Layout Architect</span>
+        <span class="brand-sub">Visual HUD & Interface Diagram Editor</span>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <!-- Game Mode Preview -->
+      <div class="btn-group" id="modeGroup">
+        <button class="active" data-mode="game">Game Mode</button>
+        <button data-mode="simplified">Simplified</button>
+        <button data-mode="advanced">Advanced</button>
+      </div>
+
+      <!-- Presets -->
+      <select class="form-control" id="presetSelect" style="width: 160px; font-size: 12px;">
+        <option value="default">Default V3 Layout</option>
+        <option value="side-dock">Pro Side-Dock (MMO)</option>
+        <option value="top-heavy">Flight/Cockpit HUD</option>
+        <option value="minimalist">Minimalist Clean</option>
+      </select>
+
+      <button class="action-btn" id="resetBtn" title="Reset all elements to default game coordinates">
+        ↺ Reset
+      </button>
+
+      <button class="action-btn" id="addWidgetBtn">
+        + Custom Widget
+      </button>
+
+      <button class="action-btn primary" id="saveBtn">
+        💾 Save Layout (Ctrl+S)
+      </button>
+    </div>
+  </header>
+
+  <!-- Workspace -->
+  <div class="workspace">
+
+    <!-- Left Sidebar: Widgets Tree -->
+    <aside class="sidebar-left">
+      <div class="sidebar-header">
+        <span>HUD Elements</span>
+        <span id="widgetCount" style="font-size: 11px; opacity: 0.7;">8 Active</span>
+      </div>
+      <div class="sidebar-content" id="widgetTreeList">
+        <!-- Injected via JavaScript -->
+      </div>
+    </aside>
+
+    <!-- Center Canvas Viewport -->
+    <main class="canvas-viewport" id="viewport">
+      <div class="screen-frame" id="screenFrame">
+        <!-- Game Horizon Decor -->
+        <div class="game-world-decor">
+          <div class="game-horizon"></div>
+          <div class="game-island-shape"></div>
+        </div>
+
+        <!-- Snap Anchor Target Guides (9 zones) -->
+        <div class="snap-guide" id="snap-tl" style="top: 10px; left: 10px; width: 140px; height: 50px;">Top-Left</div>
+        <div class="snap-guide" id="snap-tc" style="top: 10px; left: 50%; transform: translateX(-50%); width: 200px; height: 50px;">Top-Center</div>
+        <div class="snap-guide" id="snap-tr" style="top: 10px; right: 10px; width: 140px; height: 50px;">Top-Right</div>
+        <div class="snap-guide" id="snap-cl" style="top: 50%; left: 10px; transform: translateY(-50%); width: 60px; height: 160px;">Mid-Left</div>
+        <div class="snap-guide" id="snap-cc" style="top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px;">Center</div>
+        <div class="snap-guide" id="snap-cr" style="top: 50%; right: 10px; transform: translateY(-50%); width: 60px; height: 160px;">Mid-Right</div>
+        <div class="snap-guide" id="snap-bl" style="bottom: 10px; left: 10px; width: 160px; height: 60px;">Bottom-Left</div>
+        <div class="snap-guide" id="snap-bc" style="bottom: 10px; left: 50%; transform: translateX(-50%); width: 500px; height: 110px;">Bottom-Center</div>
+        <div class="snap-guide" id="snap-br" style="bottom: 10px; right: 10px; width: 160px; height: 60px;">Bottom-Right</div>
+
+        <!-- HUD Widgets Container -->
+        <div id="widgetsContainer"></div>
+      </div>
+    </main>
+
+    <!-- Right Sidebar: Inspector & Changes Report -->
+    <aside class="sidebar-right">
+      <div class="inspector-tabs">
+        <button class="inspector-tab active" data-tab="props">Properties</button>
+        <button class="inspector-tab" data-tab="diff">Change Report (<span id="diffCount">0</span>)</button>
+      </div>
+
+      <div class="inspector-body" id="inspectorProps">
+        <div id="noSelectionMsg" style="color: var(--text-dim); font-size: 13px; text-align: center; margin-top: 40px;">
+          Click any HUD widget on the screen to adjust its position, anchor, scale, and options.
+        </div>
+
+        <div id="propsForm" style="display: none;">
+          <div class="form-group">
+            <label>Widget Name</label>
+            <input type="text" class="form-control" id="propName">
+          </div>
+
+          <div class="form-group">
+            <label>Screen Anchor Zone</label>
+            <div class="anchor-grid">
+              <button class="anchor-btn" data-anchor="tl">TL</button>
+              <button class="anchor-btn" data-anchor="tc">TC</button>
+              <button class="anchor-btn" data-anchor="tr">TR</button>
+              <button class="anchor-btn" data-anchor="cl">CL</button>
+              <button class="anchor-btn" data-anchor="cc">C</button>
+              <button class="anchor-btn" data-anchor="cr">CR</button>
+              <button class="anchor-btn" data-anchor="bl">BL</button>
+              <button class="anchor-btn" data-anchor="bc">BC</button>
+              <button class="anchor-btn" data-anchor="br">BR</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Offset X (px)</label>
+              <input type="number" class="form-control" id="propX">
+            </div>
+            <div class="form-group">
+              <label>Offset Y (px)</label>
+              <input type="number" class="form-control" id="propY">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Scale Factor</label>
+              <select class="form-control" id="propScale">
+                <option value="0.8">Compact (80%)</option>
+                <option value="0.9">Slight (90%)</option>
+                <option value="1.0">Normal (100%)</option>
+                <option value="1.15">Roomy (115%)</option>
+                <option value="1.25">Large (125%)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Orientation</label>
+              <select class="form-control" id="propOrientation">
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertical</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Visible In Modes</label>
+            <div style="display: flex; gap: 12px; margin-top: 4px; font-size: 12px;">
+              <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; text-transform: none;">
+                <input type="checkbox" id="propModeGame"> Game
+              </label>
+              <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; text-transform: none;">
+                <input type="checkbox" id="propModeSimp"> Simplified
+              </label>
+              <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; text-transform: none;">
+                <input type="checkbox" id="propModeAdv"> Advanced
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Instructions for Claude / Agent</label>
+            <textarea class="form-control" id="propNotes" rows="3" placeholder="e.g. Make this dock on the left, auto-hide during high-speed races..."></textarea>
+          </div>
+
+          <button class="action-btn" id="deleteWidgetBtn" style="color: var(--red); border-color: rgba(191, 97, 106, 0.4); width: 100%;">
+            🗑 Remove Widget
+          </button>
+        </div>
+      </div>
+
+      <!-- Change Report Tab -->
+      <div class="inspector-body" id="inspectorDiff" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase;">Realtime Diff Summary</span>
+          <button class="icon-btn" id="copyDiffBtn" title="Copy Markdown to Clipboard">📋 Copy</button>
+        </div>
+        <div class="diff-list" id="diffContainer">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <span class="toast-icon">✓</span>
+    <span id="toastMsg">Layout saved!</span>
+  </div>
+
+  <script>
+    // --- Initial Baseline Layout Spec (Matches Current Game Code) ---
+    const BASELINE_WIDGETS = [
+      {
+        id: 'hotbar-slots',
+        name: 'V3 Hotbar (Slots 1..8)',
+        anchor: 'bc',
+        x: 0,
+        y: -10,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Main action slots with numbered badges and tool icons',
+        htmlType: 'slots'
+      },
+      {
+        id: 'tabs-bar',
+        name: 'F1..F12 Tabs Bar',
+        anchor: 'bc',
+        x: 0,
+        y: -68,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Keyboard shortcuts F1 through F12 tabs',
+        htmlType: 'tabs'
+      },
+      {
+        id: 'active-words',
+        name: 'Active Tool / Words Box',
+        anchor: 'bc',
+        x: 0,
+        y: -110,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game'],
+        notes: 'Speech bubble explaining the current preset in hand',
+        htmlType: 'words'
+      },
+      {
+        id: 'end-controls',
+        name: 'Mode & End Controls',
+        anchor: 'bc',
+        x: 270,
+        y: -10,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Undo, Redo, Mode Switch, Budget meter and Find button',
+        htmlType: 'endControls'
+      },
+      {
+        id: 'top-nav',
+        name: 'Top Navigation Bar',
+        anchor: 'tl',
+        x: 14,
+        y: 14,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Escape menu button, Island name, and coordinate display',
+        htmlType: 'topNav'
+      },
+      {
+        id: 'minimap',
+        name: 'Minimap & Radar',
+        anchor: 'tr',
+        x: -14,
+        y: 14,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Circular island radar with player orientation',
+        htmlType: 'radar'
+      },
+      {
+        id: 'reticle',
+        name: 'Center Crosshair',
+        anchor: 'cc',
+        x: 0,
+        y: 0,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Targeting reticle for block editing',
+        htmlType: 'reticle'
+      }
+    ];
+
+    // Clone baseline into current state
+    let state = {
+      mode: 'game',
+      selectedId: null,
+      widgets: JSON.parse(JSON.stringify(BASELINE_WIDGETS))
+    };
+
+    const screenFrame = document.getElementById('screenFrame');
+    const container = document.getElementById('widgetsContainer');
+    const treeList = document.getElementById('widgetTreeList');
+    const propsForm = document.getElementById('propsForm');
+    const noSelectionMsg = document.getElementById('noSelectionMsg');
+    const diffContainer = document.getElementById('diffContainer');
+    const diffCount = document.getElementById('diffCount');
+    const widgetCount = document.getElementById('widgetCount');
+
+    // --- Render Authentic HTML for Widget Types ---
+    function renderWidgetContent(widget) {
+      if (widget.htmlType === 'slots') {
+        const slots = [
+          { num: '1', icon: '⛰', name: 'Mound' },
+          { num: '2', icon: '〰', name: 'Ridge' },
+          { num: '3', icon: '▲', name: 'Spike' },
+          { num: '4', icon: '◯', name: 'Crater' },
+          { num: '5', icon: '⚑', name: 'Ramp' },
+          { num: '6', icon: '◼', name: 'Cube' },
+          { num: '7', icon: '🪨', name: 'Rock' },
+          { num: '8', icon: '🌴', name: 'Palm' }
+        ];
+        return `
+          <div class="widget-hotbar-slots" style="flex-direction: ${widget.orientation === 'vertical' ? 'column' : 'row'};">
+            ${slots.map((s, i) => `
+              <div class="slot-box ${i === 0 ? 'active' : ''}">
+                <span class="slot-num">${s.num}</span>
+                <span class="slot-icon">${s.icon}</span>
+                <span>${s.name}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+      if (widget.htmlType === 'tabs') {
+        const tabs = ['Select', 'Terrain', 'Sculpt', 'Paint', 'Water', 'Lights', 'Sound', 'Logic', 'Spawn', 'Physics'];
+        return `
+          <div class="widget-tabs-bar" style="flex-direction: ${widget.orientation === 'vertical' ? 'column' : 'row'};">
+            ${tabs.map((t, i) => `
+              <div class="tab-pill ${i === 2 ? 'active' : ''}">
+                <span>${t}</span>
+                <kbd>F${i + 1}</kbd>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+      if (widget.htmlType === 'words') {
+        return `
+          <div class="widget-active-words">
+            <span class="words-title">Clay Plump</span>
+            <span class="words-sub">Raise ground & clump organic mounds · [LMB] Plump · [RMB] Scoop</span>
+          </div>
+        `;
+      }
+      if (widget.htmlType === 'endControls') {
+        return `
+          <div class="widget-end-controls">
+            <div class="ctrl-btn" title="Undo">↶</div>
+            <div class="ctrl-btn" title="Redo">↷</div>
+            <div class="ctrl-btn" title="Find">🔍</div>
+            <div class="mode-switch-pill">Game</div>
+          </div>
+        `;
+      }
+      if (widget.htmlType === 'topNav') {
+        return `
+          <div class="widget-top-bar">
+            <span class="esc-pill">Esc Menu</span>
+            <span class="island-title-label">Basalt Isle</span>
+            <span class="coords-pill">X: 124 Y: 18 Z: -60</span>
+          </div>
+        `;
+      }
+      if (widget.htmlType === 'radar') {
+        return `
+          <div class="widget-radar">
+            <span class="radar-north">N</span>
+            <div class="radar-blip"></div>
+          </div>
+        `;
+      }
+      if (widget.htmlType === 'reticle') {
+        return `
+          <div class="widget-reticle">
+            <div class="reticle-dot"></div>
+          </div>
+        `;
+      }
+      return `
+        <div style="padding: 10px 14px; font-size: 12px; font-weight: 600; color: var(--accent);">
+          ${widget.name}
+        </div>
+      `;
+    }
+
+    // --- Anchor Positioning Math ---
+    function computeWidgetStyle(w) {
+      let style = `transform: scale(${w.scale});`;
+      const ox = w.x || 0;
+      const oy = w.y || 0;
+
+      switch(w.anchor) {
+        case 'tl': style += `top: ${14 + oy}px; left: ${14 + ox}px;`; break;
+        case 'tc': style += `top: ${14 + oy}px; left: calc(50% + ${ox}px); transform: translateX(-50%) scale(${w.scale});`; break;
+        case 'tr': style += `top: ${14 + oy}px; right: ${14 - ox}px;`; break;
+        case 'cl': style += `top: calc(50% + ${oy}px); left: ${14 + ox}px; transform: translateY(-50%) scale(${w.scale});`; break;
+        case 'cc': style += `top: calc(50% + ${oy}px); left: calc(50% + ${ox}px); transform: translate(-50%, -50%) scale(${w.scale});`; break;
+        case 'cr': style += `top: calc(50% + ${oy}px); right: ${14 - ox}px; transform: translateY(-50%) scale(${w.scale});`; break;
+        case 'bl': style += `bottom: ${14 - oy}px; left: ${14 + ox}px;`; break;
+        case 'bc': style += `bottom: ${14 - oy}px; left: calc(50% + ${ox}px); transform: translateX(-50%) scale(${w.scale});`; break;
+        case 'br': style += `bottom: ${14 - oy}px; right: ${14 - ox}px;`; break;
+      }
+      return style;
+    }
+
+    // --- Render Canvas Widgets ---
+    function renderCanvas() {
+      container.innerHTML = '';
+      state.widgets.forEach(w => {
+        if (!w.visibleModes.includes(state.mode)) return;
+
+        const el = document.createElement('div');
+        el.className = `hud-widget ${w.id === state.selectedId ? 'selected' : ''}`;
+        el.id = `widget-${w.id}`;
+        el.style.cssText = computeWidgetStyle(w);
+
+        el.innerHTML = `
+          <div class="widget-tag">${w.name} (${w.anchor.toUpperCase()})</div>
+          ${renderWidgetContent(w)}
+        `;
+
+        // Click to select
+        el.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          selectWidget(w.id);
+          startDrag(e, w, el);
+        });
+
+        container.appendChild(el);
+      });
+      updateTreeList();
+      updateDiff();
+    }
+
+    // --- Drag and Drop Handling ---
+    let dragCtx = null;
+    function startDrag(e, widget, el) {
+      if (e.button !== 0) return;
+      el.classList.add('dragging');
+      document.querySelectorAll('.snap-guide').forEach(g => g.classList.add('show'));
+
+      const frameRect = screenFrame.getBoundingClientRect();
+      const startMouseX = e.clientX;
+      const startMouseY = e.clientY;
+      const initialX = widget.x;
+      const initialY = widget.y;
+
+      dragCtx = { widget, el, startMouseX, startMouseY, initialX, initialY, frameRect };
+
+      window.addEventListener('mousemove', onDragMove);
+      window.addEventListener('mouseup', onDragEnd);
+    }
+
+    function onDragMove(e) {
+      if (!dragCtx) return;
+      const dx = e.clientX - dragCtx.startMouseX;
+      const dy = e.clientY - dragCtx.startMouseY;
+
+      dragCtx.widget.x = Math.round(dragCtx.initialX + dx);
+      dragCtx.widget.y = Math.round(dragCtx.initialY + dy);
+
+      dragCtx.el.style.cssText = computeWidgetStyle(dragCtx.widget);
+      syncInspectorValues();
+
+      // Check nearest snap guide
+      const widgetRect = dragCtx.el.getBoundingClientRect();
+      const wCenterX = widgetRect.left + widgetRect.width / 2;
+      const wCenterY = widgetRect.top + widgetRect.height / 2;
+
+      let closestAnchor = null;
+      let minDistance = 120;
+
+      document.querySelectorAll('.snap-guide').forEach(guide => {
+        const gRect = guide.getBoundingClientRect();
+        const gCenterX = gRect.left + gRect.width / 2;
+        const gCenterY = gRect.top + gRect.height / 2;
+        const dist = Math.hypot(wCenterX - gCenterX, wCenterY - gCenterY);
+        guide.classList.remove('highlight');
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestAnchor = guide.id.replace('snap-', '');
+          guide.classList.add('highlight');
+        }
+      });
+      dragCtx.closestAnchor = closestAnchor;
+    }
+
+    function onDragEnd() {
+      if (!dragCtx) return;
+      dragCtx.el.classList.remove('dragging');
+      document.querySelectorAll('.snap-guide').forEach(g => {
+        g.classList.remove('show');
+        g.classList.remove('highlight');
+      });
+
+      if (dragCtx.closestAnchor) {
+        dragCtx.widget.anchor = dragCtx.closestAnchor;
+        dragCtx.widget.x = 0;
+        dragCtx.widget.y = (dragCtx.widget.anchor.startsWith('b') ? -10 : 10);
+      }
+
+      window.removeEventListener('mousemove', onDragMove);
+      window.removeEventListener('mouseup', onDragEnd);
+      dragCtx = null;
+      renderCanvas();
+    }
+
+    // --- Selection & Inspector Sync ---
+    function selectWidget(id) {
+      state.selectedId = id;
+      document.querySelectorAll('.hud-widget').forEach(el => el.classList.remove('selected'));
+      const activeEl = document.getElementById(`widget-${id}`);
+      if (activeEl) activeEl.classList.add('selected');
+
+      updateTreeList();
+      populateInspector(state.widgets.find(w => w.id === id));
+    }
+
+    function populateInspector(w) {
+      if (!w) {
+        propsForm.style.display = 'none';
+        noSelectionMsg.style.display = 'block';
+        return;
+      }
+      propsForm.style.display = 'block';
+      noSelectionMsg.style.display = 'none';
+
+      document.getElementById('propName').value = w.name;
+      document.getElementById('propX').value = w.x;
+      document.getElementById('propY').value = w.y;
+      document.getElementById('propScale').value = String(w.scale);
+      document.getElementById('propOrientation').value = w.orientation;
+      document.getElementById('propModeGame').checked = w.visibleModes.includes('game');
+      document.getElementById('propModeSimp').checked = w.visibleModes.includes('simplified');
+      document.getElementById('propModeAdv').checked = w.visibleModes.includes('advanced');
+      document.getElementById('propNotes').value = w.notes || '';
+
+      document.querySelectorAll('.anchor-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.anchor === w.anchor);
+      });
+    }
+
+    function syncInspectorValues() {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (!w) return;
+      document.getElementById('propX').value = w.x;
+      document.getElementById('propY').value = w.y;
+    }
+
+    // --- Form Controls Listeners ---
+    document.getElementById('propName').addEventListener('input', (e) => {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (w) { w.name = e.target.value; renderCanvas(); }
+    });
+    document.getElementById('propX').addEventListener('input', (e) => {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (w) { w.x = Number(e.target.value); renderCanvas(); }
+    });
+    document.getElementById('propY').addEventListener('input', (e) => {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (w) { w.y = Number(e.target.value); renderCanvas(); }
+    });
+    document.getElementById('propScale').addEventListener('change', (e) => {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (w) { w.scale = Number(e.target.value); renderCanvas(); }
+    });
+    document.getElementById('propOrientation').addEventListener('change', (e) => {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (w) { w.orientation = e.target.value; renderCanvas(); }
+    });
+    document.getElementById('propNotes').addEventListener('input', (e) => {
+      const w = state.widgets.find(x => x.id === state.selectedId);
+      if (w) { w.notes = e.target.value; updateDiff(); }
+    });
+
+    ['propModeGame', 'propModeSimp', 'propModeAdv'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => {
+        const w = state.widgets.find(x => x.id === state.selectedId);
+        if (!w) return;
+        const modes = [];
+        if (document.getElementById('propModeGame').checked) modes.push('game');
+        if (document.getElementById('propModeSimp').checked) modes.push('simplified');
+        if (document.getElementById('propModeAdv').checked) modes.push('advanced');
+        w.visibleModes = modes;
+        renderCanvas();
+      });
+    });
+
+    document.querySelectorAll('.anchor-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const w = state.widgets.find(x => x.id === state.selectedId);
+        if (w) {
+          w.anchor = btn.dataset.anchor;
+          w.x = 0;
+          w.y = (w.anchor.startsWith('b') ? -10 : 10);
+          renderCanvas();
+          populateInspector(w);
+        }
+      });
+    });
+
+    document.getElementById('deleteWidgetBtn').addEventListener('click', () => {
+      if (!state.selectedId) return;
+      state.widgets = state.widgets.filter(w => w.id !== state.selectedId);
+      state.selectedId = null;
+      renderCanvas();
+      populateInspector(null);
+    });
+
+    // --- Left Sidebar List ---
+    function updateTreeList() {
+      treeList.innerHTML = '';
+      widgetCount.textContent = `${state.widgets.length} Active`;
+      state.widgets.forEach(w => {
+        const item = document.createElement('div');
+        item.className = `widget-item ${w.id === state.selectedId ? 'active' : ''}`;
+        item.innerHTML = `
+          <div class="widget-item-info">
+            <span class="widget-dot"></span>
+            <span>${w.name}</span>
+          </div>
+          <div class="widget-actions">
+            <span style="font-size: 10px; font-family: var(--font-mono); opacity: 0.6;">${w.anchor.toUpperCase()}</span>
+          </div>
+        `;
+        item.addEventListener('click', () => selectWidget(w.id));
+        treeList.appendChild(item);
+      });
+    }
+
+    // --- Realtime Diff Calculation ---
+    function generateDiffList() {
+      const diffs = [];
+      const baseMap = new Map(BASELINE_WIDGETS.map(b => [b.id, b]));
+      const currentMap = new Map(state.widgets.map(w => [w.id, w]));
+
+      // Check current widgets against baseline
+      state.widgets.forEach(w => {
+        const base = baseMap.get(w.id);
+        if (!base) {
+          diffs.push({
+            type: 'added',
+            id: w.id,
+            title: `[NEW ELEMENT] ${w.name}`,
+            desc: `Added at anchor ${w.anchor.toUpperCase()} (offset ${w.x}px, ${w.y}px, scale ${w.scale}x). ${w.notes ? 'Note: ' + w.notes : ''}`
+          });
+        } else {
+          const moved = base.anchor !== w.anchor || Math.abs(base.x - w.x) > 5 || Math.abs(base.y - w.y) > 5;
+          const reconfigured = base.scale !== w.scale || base.orientation !== w.orientation || JSON.stringify(base.visibleModes) !== JSON.stringify(w.visibleModes) || base.notes !== w.notes;
+
+          if (moved) {
+            diffs.push({
+              type: 'moved',
+              id: w.id,
+              title: `[RELOCATED] ${w.name}`,
+              desc: `Moved from ${base.anchor.toUpperCase()} (offset ${base.x}, ${base.y}) ➔ ${w.anchor.toUpperCase()} (offset ${w.x}, ${w.y})`
+            });
+          }
+          if (reconfigured) {
+            diffs.push({
+              type: 'modified',
+              id: w.id,
+              title: `[CONFIGURED] ${w.name}`,
+              desc: `Scale: ${w.scale}x · Orientation: ${w.orientation} · Modes: [${w.visibleModes.join(', ')}] ${w.notes ? '· Note: ' + w.notes : ''}`
+            });
+          }
+        }
+      });
+
+      // Check for removed/hidden widgets
+      BASELINE_WIDGETS.forEach(b => {
+        if (!currentMap.has(b.id)) {
+          diffs.push({
+            type: 'hidden',
+            id: b.id,
+            title: `[REMOVED] ${b.name}`,
+            desc: `Removed from game interface layout.`
+          });
+        }
+      });
+
+      return diffs;
+    }
+
+    function updateDiff() {
+      const diffs = generateDiffList();
+      diffCount.textContent = diffs.length;
+      diffContainer.innerHTML = '';
+
+      if (diffs.length === 0) {
+        diffContainer.innerHTML = `
+          <div style="color: var(--text-dim); text-align: center; padding: 24px 0;">
+            ✓ Layout is currently identical to the default game baseline.
+          </div>
+        `;
+        return;
+      }
+
+      diffs.forEach(d => {
+        const card = document.createElement('div');
+        card.className = `diff-card ${d.type}`;
+        card.innerHTML = `
+          <span class="diff-tag">${d.type}</span>
+          <div style="font-weight: 600; color: var(--text); margin-bottom: 2px;">${d.title}</div>
+          <div style="color: var(--text-dim); font-size: 11px;">${d.desc}</div>
+        `;
+        diffContainer.appendChild(card);
+      });
+    }
+
+    function generateMarkdownReport() {
+      const diffs = generateDiffList();
+      let md = `# SetMix Game Interface Change Request\n\n`;
+      md += `*Generated by UI Layout Architect on ${new Date().toISOString()}*\n\n`;
+      md += `## Summary of Required Code Changes\n\n`;
+
+      if (diffs.length === 0) {
+        md += `No changes made (identical to baseline).\n`;
+      } else {
+        diffs.forEach(d => {
+          md += `### ${d.title}\n`;
+          md += `- **Element ID**: \`${d.id}\`\n`;
+          md += `- **Change Details**: ${d.desc}\n\n`;
+        });
+      }
+
+      md += `## Target Implementation Files in Repo\n`;
+      md += `- [\`apps/web/src/build/v3-hud.tsx\`](file:///c:/MarbleGp/apps/web/src/build/v3-hud.tsx): Hotbar component structure & slot orientations\n`;
+      md += `- [\`apps/web/src/studio.css\`](file:///c:/MarbleGp/apps/web/src/studio.css): CSS positions, `.v3` layout, dock offsets, and anchors\n`;
+      md += `- [\`apps/web/src/island.tsx\`](file:///c:/MarbleGp/apps/web/src/island.tsx): Top-level HUD assembly & visibility\n\n`;
+      return md;
+    }
+
+    // --- Save & Server Sync ---
+    async function saveLayout() {
+      const specPayload = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        widgets: state.widgets,
+        diffSummary: generateDiffList(),
+        markdownReport: generateMarkdownReport()
+      };
+
+      try {
+        const res = await fetch('/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(specPayload)
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`✓ Saved to docs/UI_LAYOUT_SPEC.json & docs/UI_CHANGES.md!`);
+          return;
+        }
+      } catch (err) {
+        // Fallback for standalone file opening
+        localStorage.setItem('hm_ui_layout_spec', JSON.stringify(specPayload));
+        downloadJson('UI_LAYOUT_SPEC.json', specPayload);
+        showToast(`✓ Downloaded spec file & saved to localStorage!`);
+      }
+    }
+
+    function downloadJson(filename, data) {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.add('show', 'success');
+      setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    // --- Top Bar Buttons & Presets ---
+    document.querySelectorAll('#modeGroup button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#modeGroup button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.mode = btn.dataset.mode;
+        renderCanvas();
+      });
+    });
+
+    document.querySelectorAll('.inspector-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.inspector-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const isProps = tab.dataset.tab === 'props';
+        document.getElementById('inspectorProps').style.display = isProps ? 'block' : 'none';
+        document.getElementById('inspectorDiff').style.display = isProps ? 'none' : 'block';
+      });
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      state.widgets = JSON.parse(JSON.stringify(BASELINE_WIDGETS));
+      state.selectedId = null;
+      renderCanvas();
+      populateInspector(null);
+      showToast('Reset to default game layout');
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', saveLayout);
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        saveLayout();
+      }
+    });
+
+    document.getElementById('copyDiffBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(generateMarkdownReport());
+      showToast('✓ Markdown changes copied to clipboard!');
+    });
+
+    document.getElementById('addWidgetBtn').addEventListener('click', () => {
+      const name = prompt('Enter a name for the new HUD widget:', 'Speedometer');
+      if (!name) return;
+      const id = 'custom-' + name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      state.widgets.push({
+        id,
+        name,
+        anchor: 'br',
+        x: -14,
+        y: -14,
+        scale: 1.0,
+        orientation: 'horizontal',
+        visibleModes: ['game', 'simplified', 'advanced'],
+        notes: 'Custom user HUD widget',
+        htmlType: 'custom'
+      });
+      renderCanvas();
+      selectWidget(id);
+    });
+
+    // Preset Layouts
+    document.getElementById('presetSelect').addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === 'default') {
+        state.widgets = JSON.parse(JSON.stringify(BASELINE_WIDGETS));
+      } else if (val === 'side-dock') {
+        // MMO vertical dock
+        state.widgets = JSON.parse(JSON.stringify(BASELINE_WIDGETS));
+        const hotbar = state.widgets.find(w => w.id === 'hotbar-slots');
+        if (hotbar) { hotbar.anchor = 'cl'; hotbar.orientation = 'vertical'; hotbar.x = 10; hotbar.y = 0; }
+        const tabs = state.widgets.find(w => w.id === 'tabs-bar');
+        if (tabs) { tabs.anchor = 'tc'; tabs.y = 10; }
+        const words = state.widgets.find(w => w.id === 'active-words');
+        if (words) { words.anchor = 'bc'; words.y = -10; }
+      } else if (val === 'top-heavy') {
+        state.widgets = JSON.parse(JSON.stringify(BASELINE_WIDGETS));
+        const tabs = state.widgets.find(w => w.id === 'tabs-bar');
+        if (tabs) { tabs.anchor = 'tc'; tabs.y = 14; }
+        const hotbar = state.widgets.find(w => w.id === 'hotbar-slots');
+        if (hotbar) { hotbar.anchor = 'tc'; hotbar.y = 60; }
+      } else if (val === 'minimalist') {
+        state.widgets = JSON.parse(JSON.stringify(BASELINE_WIDGETS));
+        state.widgets = state.widgets.filter(w => w.id !== 'tabs-bar' && w.id !== 'reticle');
+      }
+      renderCanvas();
+    });
+
+    // Boot
+    renderCanvas();
+  </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "savedAt": "2026-10-05T16:30:00.000Z",
+  "layoutName": "Default V3 Baseline",
+  "widgets": [
+    {
+      "id": "hotbar-slots",
+      "name": "V3 Hotbar (Slots 1..8)",
+      "anchor": "bc",
+      "x": 0,
+      "y": -10,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game", "simplified", "advanced"],
+      "notes": "Main action slots with numbered badges and tool icons",
+      "htmlType": "slots"
+    },
+    {
+      "id": "tabs-bar",
+      "name": "F1..F12 Tabs Bar",
+      "anchor": "bc",
+      "x": 0,
+      "y": -68,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game", "simplified", "advanced"],
+      "notes": "Keyboard shortcuts F1 through F12 tabs",
+      "htmlType": "tabs"
+    },
+    {
+      "id": "active-words",
+      "name": "Active Tool / Words Box",
+      "anchor": "bc",
+      "x": 0,
+      "y": -110,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game"],
+      "notes": "Speech bubble explaining the current preset in hand",
+      "htmlType": "words"
+    },
+    {
+      "id": "end-controls",
+      "name": "Mode & End Controls",
+      "anchor": "bc",
+      "x": 270,
+      "y": -10,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game", "simplified", "advanced"],
+      "notes": "Undo, Redo, Mode Switch, Budget meter and Find button",
+      "htmlType": "endControls"
+    },
+    {
+      "id": "top-nav",
+      "name": "Top Navigation Bar",
+      "anchor": "tl",
+      "x": 14,
+      "y": 14,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game", "simplified", "advanced"],
+      "notes": "Escape menu button, Island name, and coordinate display",
+      "htmlType": "topNav"
+    },
+    {
+      "id": "minimap",
+      "name": "Minimap & Radar",
+      "anchor": "tr",
+      "x": -14,
+      "y": 14,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game", "simplified", "advanced"],
+      "notes": "Circular island radar with player orientation",
+      "htmlType": "radar"
+    },
+    {
+      "id": "reticle",
+      "name": "Center Crosshair",
+      "anchor": "cc",
+      "x": 0,
+      "y": 0,
+      "scale": 1.0,
+      "orientation": "horizontal",
+      "visibleModes": ["game", "simplified", "advanced"],
+      "notes": "Targeting reticle for block editing",
+      "htmlType": "reticle"
+    }
+  ],
+  "diffSummary": [],
+  "markdownReport": "# SetMix Game Interface Change Request\n\n*Baseline initialized on 2026-10-05*\n\nLayout is currently at default baseline."
+}

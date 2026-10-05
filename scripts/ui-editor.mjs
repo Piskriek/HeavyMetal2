@@ -57,14 +57,18 @@ const server = createServer(async (req, res) => {
 
         // 1. Write the structured JSON spec
         await writeFile(specPath, JSON.stringify(payload, null, 2), 'utf-8');
+        const outlinerSpecPath = join(docsDir, 'UI_OUTLINER_SPEC.json');
+        await writeFile(outlinerSpecPath, JSON.stringify(payload, null, 2), 'utf-8');
 
         // 2. Write human- and agent-readable Markdown report
         const markdown = payload.markdownReport || '# UI Changes\n\nSpec updated.\n';
         await writeFile(changesPath, markdown, 'utf-8');
+        const archChangesPath = join(docsDir, 'UI_ARCHITECTURE_CHANGES.md');
+        await writeFile(archChangesPath, markdown, 'utf-8');
 
-        console.log(`\n[UI Editor] ✓ Successfully saved updated interface layout:`);
-        console.log(`  - Spec:    docs/UI_LAYOUT_SPEC.json`);
-        console.log(`  - Changes: docs/UI_CHANGES.md`);
+        console.log(`\n[UI Editor] ✓ Successfully saved updated interface architecture:`);
+        console.log(`  - Spec:         docs/UI_OUTLINER_SPEC.json`);
+        console.log(`  - Architecture: docs/UI_ARCHITECTURE_CHANGES.md`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, savedAt: new Date().toISOString() }));
@@ -103,21 +107,33 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => {
-  const url = `http://localhost:${port}`;
-  console.log(`\n======================================================`);
-  console.log(`  SetMix UI Layout Architect & Diagram Editor`);
-  console.log(`  Running at: ${url}`);
-  console.log(`  Edit the game interface visually, save, and Claude`);
-  console.log(`  will read docs/UI_CHANGES.md to apply the code!`);
-  console.log(`======================================================\n`);
+function startServer(p) {
+  server.listen(p, '0.0.0.0', () => {
+    const url = `http://localhost:${p}`;
+    console.log(`\n======================================================`);
+    console.log(`  SetMix Maya-Style Interface Outliner & Studio`);
+    console.log(`  Running at: ${url}`);
+    console.log(`  Full freedom: rename, rebind, change in-hand props!`);
+    console.log(`  Nothing in game code changes until you hit Save.`);
+    console.log(`======================================================\n`);
 
-  // Auto open browser on Windows
-  if (process.platform === 'win32') {
-    exec(`start ${url}`);
-  } else if (process.platform === 'darwin') {
-    exec(`open ${url}`);
-  } else {
-    exec(`xdg-open ${url}`);
-  }
-});
+    if (process.platform === 'win32') {
+      exec(`start ${url}`);
+    } else if (process.platform === 'darwin') {
+      exec(`open ${url}`);
+    } else {
+      exec(`xdg-open ${url}`);
+    }
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`[UI Editor] Port ${p} in use, trying ${p + 1}...`);
+      startServer(p + 1);
+    } else {
+      console.error('[UI Editor] Server error:', err);
+    }
+  });
+}
+
+startServer(port);

@@ -527,18 +527,15 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
 
 ### 12ah progress: island budgets (Milestone 0.5, third task), and WHERE TO START NEXT
 
-- **Written, typecheck clean, unit tests green, e2e NOT yet confirmed:**
+- **DONE (unit tests and e2e green; the HUD meter not yet e2e-checked):**
   - `apps/web/src/build/budget.ts`: limits per tier (things, voxels, lamps, effects, characters, sounds, imports). Low allows 100 lamps. `overBudget` gives a plain sentence; `meter` gives the fullest kind. 5 tests.
   - The budget tier is the Settings quality, or `guessQuality(device)` on Auto. It is never the moment's adaptive tier.
   - The ways refuse over budget: lamp, effect, sound place, character spawn (`ctx.overBudget`, plus a test). Placing things through the tools checks `things`.
   - Voxels and imports are not counted yet: voxels need a cached voxel count per model; imports come with Milestone 2.
   - A meter in the V3 HUD (`.v3-budget` in `.v3-end`, before Find): always in Simplified and Advanced, in Game Mode only at 85% or more. It turns the accent colour when nearly full and refreshes on store changes (`pushMeter` in `island.tsx`).
   - Test hook `window.hmBudget` (`tier`, `counts`, `meter`, `fillLamps`). New e2e step after Sticky Flashlight: fill the lamps to the tier's budget, the next lamp is refused, one Ctrl+Z takes the test lamps away.
-- **Open issue: the e2e check "Import a file brings it back as a new island" FAILED on the last run.**
-  - The registry names the import "My Island 2". The check was changed to `names.every(n => n.startsWith(first))`, but it still failed on the last run, with no detail in the log line.
-  - Debug first: run the e2e and print `names`; maybe the import finished after the 800 ms wait, or the list did not refresh.
-  - Export works: its check passed.
-- **The last e2e run was cut short by usage.** It covered big store, export and import, and budgets, but not the HUD meter (added after the build). Before anything else, run `npm run verify`, then `E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`, and fix whatever fails (the import check, and possibly the new budget check).
+- **e2e: PASSED** on the build with the big store, export/import and budgets: "Export saves the island as a .setmix file", "Import a file brings it back as a new island" (it comes back as "My Island 2"), "the lamp past the budget is refused", "one Ctrl+Z takes the test lamps away" and "island saves are in IndexedDB" are all ok. The FAIL noted earlier was the previous run's log.
+- **Not yet e2e-checked:** the HUD budget meter (added after that build). Run `npm run verify` and the e2e once, then go on.
 - **Then continue Milestone 0.5:**
   1. The e2e suites split.
   2. Shift + wheel cycles tabs, and rebindable tab keys.

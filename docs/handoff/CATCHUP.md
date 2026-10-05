@@ -541,3 +541,35 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
   2. Shift + wheel cycles tabs, and rebindable tab keys.
   3. Count voxels in the budget.
   4. Then Milestone 1, WP1.1 Game Mode buttons. Each is a handler in `build/ways/` (see "How to add a button now" above). Wire the Arena packages as the plan says (`arena-gathered/README.md` lists each package's caveats).
+
+### 12ai Owner Directives & Reasoning (2026-10-05 afternoon): Candidate Model Found, Retextured Voxel Models, Unreal/Nanite Evaluation & SetMix on run.studio
+
+- **Candidate Model Found in AI Arena**:
+  - The owner tested the open-ended procedural prompt in LM Arena and found a strong winning candidate model.
+  - Follow-up prompt created: `docs/prompts/arena-voxel-retexture-island.md`.
+  - Task given to candidate: Generate procedural math textures (`island-grass`, `island-rock`, `island-sand`, `island-wood-timber`, `island-dark-iron`, `island-goblin-skin`, `island-shallows`) and at least 6 signature island voxel models (`tree-island-palm`, `rock-boulder-mossy`, `starter-kart-goblin`, `shaman-altar-totem`, `goblin-smelter-machine`, `avatar-goblin-hero`). Candidate is authorized to reconstitute and stylize open-source voxel assets (Kenney/MagicaVoxel/Veloren) with our procedural materials.
+
+- **Reasoning: SetMix on run.studio vs Unreal Engine 5 (Nanite/Lumen) & Multi-Platform Strategy**:
+  1. **The Tension**:
+     - `run.studio` / `RUN.world` is our immediate release target: It requires an instant-loading, zero-download, static single-file HTML5/WASM bundle (`apps/web/dist/index.html` ~3.9 MB) running inside an iframe on desktop and phones.
+     - Unreal Engine 5 does NOT support lightweight browser iframes. UE5 HTML5 is deprecated; experimental UE5 WebGPU builds produce 200MB–1GB downloads with 30-second load times that break RUN platform constraints.
+     - However, the owner rightly desires the **Unreal Engine visual ceiling**: Nanite (infinite geometry/micropolygon rendering without manual LODs), Lumen (real-time dynamic bounce lighting and ambient occlusion), and Substrate PBR.
+  2. **Is Unreal Engine Required to be Installed on the User's Machine Now?**:
+     - **No, not on the development laptop.** The user's active development laptop (i7-6700HQ, GTX 950M) is the baseline low-spec machine and will struggle to run UE5 with Nanite/Lumen smoothly (Nanite requires DX12 Agility SDK; GTX 950M gets <15-20 fps in UE5 editor).
+     - The user noted they have another PC (their desktop rig). Unreal Engine 5.4+ (~40-60 GB) and Visual Studio 2022 Community (~15-25 GB) should only be installed on that dedicated desktop PC when ready to build the native client.
+     - **Crucial workflow insight**: The web harness (`hm-harness`) remains the primary, zero-install **Creation Studio / Level Editor**. Because islands are serialized into `.setmix` bundles and `TexGraph` JSON, the web harness exports files that Unreal Engine ingests natively.
+  3. **The Best Course of Action (The "Dual-Horizon" Architecture)**:
+     - **Horizon 1 (Launch Target: run.studio / Web)**:
+       - Keep shipping `hm-harness` as planned (Milestone 0.5, 1, 2, 4) targeting `run.studio`.
+       - High-speed 60fps on integrated mobile/laptop GPUs, single-file bundle, zero friction for players.
+     - **Horizon 2 (The AAA Native / Unreal Engine 5 Edition)**:
+       - Stand up a companion Unreal 5 project on the desktop PC.
+       - Use **Puerts for Unreal** (Tencent's battle-tested V8/TypeScript bridge) or a lightweight C++ `.setmix` importer:
+         - Voxel blocks and smooth meshes feed directly into **Nanite** (infinite polygon ceiling, zero manual decimation needed).
+         - `TexGraph` math DAGs auto-compile into **native HLSL Material Nodes** (GPU evaluation in 0.1ms).
+         - Lighting uses **Lumen** for dramatic voxel cave illumination and atmospheric sun bounce.
+       - Release the Unreal build as the standalone desktop client on Steam / Epic Games Store, fully cross-compatible with `.setmix` islands created on the web.
+  4. **Summary for Owner OK**:
+     - Proceed with web `run.studio` deployment on current laptop without installing Unreal here.
+     - Collect the candidate model's textures and voxel models from Arena.
+     - Set up the Unreal 5 project on the high-spec desktop PC as Horizon 2 once Horizon 1 is locked.

@@ -500,3 +500,47 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
   - `applyNow` (picking an animation, a camera view, a look).
 
   These are optional. The registry's goal (new buttons are small) is met.
+
+### 12ah progress: storage on IndexedDB, and islands as files (Milestone 0.5, second task)
+
+- **DONE: `apps/web/src/storage/big-store.ts`.**
+  - The island list (`hm.islands.v1`), every island's map (`hm.island.*`) and the racetrack (`hm.racing.map.*`) live in IndexedDB (database `hm-store`, store `kv`).
+  - It is loaded into memory once at boot (`initBigStore` in `main.tsx`, after `bootPlatform`), so every read stays synchronous, as before. Writes update memory, then IndexedDB in the background.
+  - Old localStorage saves move over on first boot and are deleted from localStorage only after the IndexedDB write lands.
+  - In RUN it uses the cloud-backed localStorage shim, as before.
+  - A write that fails (the disk is full) shows a plain message in the shell (`onStorageFull`, a `.toast.error` the player closes).
+  - Preferences stay in localStorage.
+  - `island-store.ts` and `maker/storage.ts` no longer touch localStorage.
+  - Tests: 6 unit tests (`storage/big-store.test.ts`). The e2e checks "island saves are in IndexedDB, none in localStorage", and its wipe also deletes `hm-store`.
+- **DONE: islands as `.setmix` files.**
+  - `islands/island-file.ts`: gzipped JSON `{ format: 'setmix-island', version: 1, name, template, bundle }`. The reader never throws: garbage, truncated, empty, too big and newer-version files get plain sentences.
+  - `islands/island-transfer.ts`: export (a browser download) and import (a new island, via `createIslandWithMap`).
+  - My Planet: a download button on each island card ("Export to a file"), and an "Import a file" tile next to "New island".
+  - Tests: 7 unit tests. The e2e exports the island, imports the file, and finds two islands with that name.
+- **Versioned saves:** already there. The kernel's `migrateBundle` upgrades presets by schema version on load and import, and the kernel tests cover it.
+  - Optional later: a real beta save as a fixture.
+- **Next in Milestone 0.5:**
+  1. Island budgets (a meter, refuse over budget).
+  2. The e2e suites split (shell, island-game, island-simplified, island-advanced, import-portal, racing; parallel pages; seeded saves).
+  3. Shift + wheel cycles tabs, and rebindable tab keys.
+  4. The fuzzing rule: already written into the prompts, and `island-file` follows it.
+
+### 12ah progress: island budgets (Milestone 0.5, third task), and WHERE TO START NEXT
+
+- **Written, typecheck clean, unit tests green, e2e NOT yet confirmed:**
+  - `apps/web/src/build/budget.ts`: limits per tier (things, voxels, lamps, effects, characters, sounds, imports). Low allows 100 lamps. `overBudget` gives a plain sentence; `meter` gives the fullest kind. 5 tests.
+  - The budget tier is the Settings quality, or `guessQuality(device)` on Auto. It is never the moment's adaptive tier.
+  - The ways refuse over budget: lamp, effect, sound place, character spawn (`ctx.overBudget`, plus a test). Placing things through the tools checks `things`.
+  - Voxels and imports are not counted yet: voxels need a cached voxel count per model; imports come with Milestone 2.
+  - A meter in the V3 HUD (`.v3-budget` in `.v3-end`, before Find): always in Simplified and Advanced, in Game Mode only at 85% or more. It turns the accent colour when nearly full and refreshes on store changes (`pushMeter` in `island.tsx`).
+  - Test hook `window.hmBudget` (`tier`, `counts`, `meter`, `fillLamps`). New e2e step after Sticky Flashlight: fill the lamps to the tier's budget, the next lamp is refused, one Ctrl+Z takes the test lamps away.
+- **Open issue: the e2e check "Import a file brings it back as a new island" FAILED on the last run.**
+  - The registry names the import "My Island 2". The check was changed to `names.every(n => n.startsWith(first))`, but it still failed on the last run, with no detail in the log line.
+  - Debug first: run the e2e and print `names`; maybe the import finished after the 800 ms wait, or the list did not refresh.
+  - Export works: its check passed.
+- **The last e2e run was cut short by usage.** It covered big store, export and import, and budgets, but not the HUD meter (added after the build). Before anything else, run `npm run verify`, then `E2E_GPU=1 E2E_SLOW=2 node scripts/e2e-smoke.mjs`, and fix whatever fails (the import check, and possibly the new budget check).
+- **Then continue Milestone 0.5:**
+  1. The e2e suites split.
+  2. Shift + wheel cycles tabs, and rebindable tab keys.
+  3. Count voxels in the budget.
+  4. Then Milestone 1, WP1.1 Game Mode buttons. Each is a handler in `build/ways/` (see "How to add a button now" above). Wire the Arena packages as the plan says (`arena-gathered/README.md` lists each package's caveats).

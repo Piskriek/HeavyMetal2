@@ -25,6 +25,8 @@ const lamp: WayHandler = (ctx, { id, alt, first }) => {
     ctx.say('Lamp taken away'); ctx.fx('delete', { volume: 0.5 });
     return;
   }
+  const full = ctx.overBudget('lamps');
+  if (full) { ctx.say(full); ctx.fx('ui-error', { volume: 0.5 }); return; }
   const want = ctx.player().palette.lamp;
   const kind = want && lampById(want) ? want : 'bulb';
   const lp = lampById(kind)!;

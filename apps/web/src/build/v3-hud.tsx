@@ -48,6 +48,8 @@ export interface V3HudProps {
   readonly onComing: (what: string) => void;
   /** What the island just said (it sits on top of the column, above whatever the mode shows). */
   readonly note?: string;
+  /** How full the island's budget is (build/budget.ts): shown in Simplified and Advanced, in Game Mode only when nearly full. */
+  readonly budget?: { readonly share: number; readonly label: string } | null;
   /** The ground material in hand: open its look in the surface editor (Ground Material, PBR Surface Paint). */
   readonly onEditLook?: () => void;
 }
@@ -100,6 +102,12 @@ export function V3Hud(props: V3HudProps): ReactElement {
           })}
         </div>
         <div className="v3-end">
+          {props.budget && (mode !== 'game' || props.budget.share >= 0.85) ? (
+            <div className={`v3-budget${props.budget.share >= 0.85 ? ' full' : ''}`} data-ui="island.budget" role="meter" aria-label="Island budget" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(Math.min(1, props.budget.share) * 100)}
+              data-label={`Island budget: ${props.budget.label}. Over it, nothing more of that kind goes on.`}>
+              <i style={{ width: `${Math.round(Math.min(1, props.budget.share) * 100)}%` }} />
+            </div>
+          ) : null}
           <button className="v3-icon" data-ui="island.find" aria-label="Find a tool" data-label="Find a tool (/)" aria-expanded={props.findOpen} onClick={() => props.onFind(!props.findOpen)}><Search size={16} strokeWidth={1.7} /></button>
           <button className="v3-icon" data-ui="island.undo" aria-label="Undo" data-label="Undo (Ctrl+Z)" onClick={props.onUndo}><Undo2 size={16} strokeWidth={1.7} /></button>
           <button className="v3-icon" data-ui="island.redo" aria-label="Redo" data-label="Redo (Ctrl+Y)" onClick={props.onRedo}><Redo2 size={16} strokeWidth={1.7} /></button>

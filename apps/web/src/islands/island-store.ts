@@ -1,4 +1,5 @@
 import { IslandRegistry, TEMPLATES, type IslandMeta } from '@hm/islands';
+import { bigStore } from '../storage/big-store';
 
 /**
  * My Islands, stored. The registry (names, branches, last visited, undo) lives under one key; each island that has been edited has its map bundle under
@@ -13,8 +14,9 @@ let activeId: string | null = null;
 const listeners = new Set<() => void>();
 const forkListeners = new Set<(meta: IslandMeta) => void>();
 
-const read = (k: string): string | null => { try { return localStorage.getItem(k); } catch { return null; } };
-const write = (k: string, v: string): boolean => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+// in the big store (IndexedDB), not localStorage: storage/big-store.ts
+const read = (k: string): string | null => bigStore().get(k);
+const write = (k: string, v: string): boolean => bigStore().set(k, v);
 
 function save(): void { if (registry) write(REGISTRY_KEY, JSON.stringify(registry.toJSON())); listeners.forEach((l) => l()); }
 

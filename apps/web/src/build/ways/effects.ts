@@ -13,6 +13,8 @@ const effect: WayHandler = (ctx, { id, alt, first }) => {
     ctx.say('Effect taken away'); ctx.fx('delete', { volume: 0.5 });
     return;
   }
+  const full = ctx.overBudget('effects');
+  if (full) { ctx.say(full); ctx.fx('ui-error', { volume: 0.5 }); return; }
   const name = PARTICLE_PRESETS.find((p) => p.id === kind)?.name ?? kind;
   ctx.placeChild('effects', 'effect', 'effect', name, {
     preset: kind, x: a.point[0], y: a.point[1], z: a.point[2],

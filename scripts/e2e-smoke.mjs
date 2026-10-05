@@ -32,7 +32,8 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
   await page.goto(`http://127.0.0.1:${port}/`);
-  await page.evaluate(() => localStorage.clear());
+  // the saves live in IndexedDB too (storage/big-store.ts): the delete waits for this page to close, then the reload starts clean
+  await page.evaluate(() => { localStorage.clear(); indexedDB.deleteDatabase('hm-store'); });
   await page.reload();
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
@@ -170,6 +171,19 @@ try {
   await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
   await page.waitForTimeout(T(300));
   check('Undo takes it away again', await page.locator('[aria-label="My planet"] article.planet-island').count() === 1);
+  // an island to a .setmix file and back (RELEASE_PLAN Milestone 0.5)
+  {
+    const first = await page.locator('[aria-label="My planet"] article.planet-island h4').first().innerText();
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: T(10000) }), page.locator('[aria-label="My planet"] button[title="Export to a file"]').first().click()]);
+    const path = await download.path();
+    check('Export saves the island as a .setmix file', download.suggestedFilename().endsWith('.setmix') && !!path, download.suggestedFilename());
+    await page.locator('input[aria-label="Island file to import"]').setInputFiles(path);
+    await page.waitForTimeout(T(800));
+    const names = await page.locator('[aria-label="My planet"] article.planet-island h4').allInnerTexts();
+    check('Import a file brings it back as a new island', names.length === 2 && names.every((n) => n.startsWith(first)), JSON.stringify(names));
+    await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.getAttribute('aria-label') === 'Undo')?.click(); });
+    await page.waitForTimeout(T(300));
+  }
   await dom(() => { [...document.querySelectorAll('[aria-label="My planet"] button')].find((b) => b.textContent === 'Close')?.click(); });
   await page.waitForSelector('.v3', { timeout: T(30000) });
   check('Close returns to the island', true);
@@ -377,6 +391,15 @@ try {
   await clickWorld(640, 420);
   const lamp = await page.evaluate(() => window.hmLamps?.());
   check('Sticky Flashlight puts a light orb down and it is lit', lamp?.placed === 1 && (lamp.slots === 0 || lamp.lit === 1), JSON.stringify(lamp) + ' ' + await note() + ' ' + errors.join(' / '));
+  // the island budget (RELEASE_PLAN Milestone 0.5): fill the lamps to this tier's budget, and the next one is refused in plain words
+  {
+    const budget = await page.evaluate(() => { const b = window.hmBudget; const tier = b.tier(); const max = { potato: 40, low: 100, medium: 200, high: 400, ultra: 800 }[tier]; b.fillLamps(max - b.counts().lamps); return { tier, max, lamps: b.counts().lamps }; });
+    await clickWorld(640, 420);
+    const after = await page.evaluate(() => window.hmLamps?.());
+    check(`the lamp past the ${budget.tier} budget is refused (${budget.max})`, budget.lamps === budget.max && after?.placed === budget.max && /full of lamps/.test(await note()), JSON.stringify(budget) + ' ' + JSON.stringify(after) + ' ' + await note());
+    await key('Control+z');
+    check('one Ctrl+Z takes the test lamps away', (await page.evaluate(() => window.hmLamps?.()))?.placed === 1);
+  }
   await slot('Turn to Night');
   await clickWorld(640, 420); await page.waitForTimeout(T(1300));
   if (lamp?.first) await page.evaluate((p) => { window.hmPinView = { eye: [p[0] + 5, p[1] + 4, p[2] + 5], target: [p[0], p[1] - 1, p[2]] }; }, lamp.first);
@@ -612,6 +635,13 @@ try {
   check('Back to Goblin Racing returns to its race modes', true);
   for (let i = 0; i < 4 && await page.locator('.sm-home').count() === 0; i++) { await page.keyboard.press('Escape'); await page.waitForTimeout(T(900)); }
   check('Esc steps back out to the SetMix home', await page.locator('.sm-home').count() === 1);
+  // the saves (RELEASE_PLAN Milestone 0.5): islands live in IndexedDB, and nothing big is left in localStorage
+  const saved = await page.evaluate(() => new Promise((ok) => {
+    const r = indexedDB.open('hm-store');
+    r.onsuccess = () => { const q = r.result.transaction('kv', 'readonly').objectStore('kv').getAllKeys(); q.onsuccess = () => { r.result.close(); ok({ idb: q.result.map(String), ls: Object.keys(localStorage).filter((k) => k.startsWith('hm.island')) }); }; q.onerror = () => ok({ idb: [], ls: [] }); };
+    r.onerror = () => ok({ idb: [], ls: [] });
+  }));
+  check('island saves are in IndexedDB, none in localStorage', saved.idb.some((k) => k.startsWith('hm.island.')) && saved.idb.includes('hm.islands.v1') && saved.ls.length === 0, JSON.stringify(saved));
   check('no page errors during the whole tour', errors.length === 0, errors.join(' | '));
 } catch (e) {
   try { const pg = browser.contexts()[0]?.pages()[0]; if (pg) console.log('screen at failure:', await pg.evaluate(() => `${document.querySelector('.shell')?.getAttribute('data-screen')} | ${document.body.innerText.slice(0, 160).split(String.fromCharCode(10)).join(' / ')}`)); } catch { /* ignore */ }

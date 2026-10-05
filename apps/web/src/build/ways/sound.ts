@@ -22,6 +22,8 @@ const place: WayHandler = (ctx, { id, alt, first }) => {
     ctx.say('Sound taken away'); ctx.fx('delete', { volume: 0.5 });
     return;
   }
+  const full = ctx.overBudget('sounds');
+  if (full) { ctx.say(full); ctx.fx('ui-error', { volume: 0.5 }); return; }
   const { what, name, zone } = pick(ctx);
   ctx.placeChild('soundscape', 'sound-spot', 'sound', name, {
     what, x: a.point[0], y: a.point[1], z: a.point[2],

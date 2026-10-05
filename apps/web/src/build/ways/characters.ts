@@ -24,6 +24,8 @@ const characters: WayHandler = (ctx, { id, alt, first }) => {
     ctx.say(`It does this now: ${bname}`); ctx.fx('select', { volume: 0.5 });
     return;
   }
+  const full = ctx.overBudget('characters');
+  if (full) { ctx.say(full); ctx.fx('ui-error', { volume: 0.5 }); return; }
   ctx.chars.spawn(a, brain, `Character: ${bname}`);
   ctx.say(`A goblin: ${b?.doc ?? bname}`); ctx.fx('place', { volume: 0.5 });
 };

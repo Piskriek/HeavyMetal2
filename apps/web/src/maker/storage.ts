@@ -3,6 +3,7 @@ import type { Runtime } from '@hm/engine';
 import type { MakerScene } from './scene';
 
 import { activeIslandId, bundleKey, persistActive } from '../islands/island-store';
+import { bigStore } from '../storage/big-store';
 
 /**
  * Which map the editor, the island and the race read and write. By default it is the active island (see island-store: the first edit of a template
@@ -35,7 +36,7 @@ export function mapBundle(rt: Runtime, sceneId: PresetId): PresetBundle {
   return { ...bundle, presets: [...bundle.presets, ...extra] };
 }
 
-/** Save the map to the player's storage (the cloud save in RUN, localStorage elsewhere). */
+/** Save the map to the player's storage (the big store: IndexedDB, or the cloud save in RUN). */
 export function saveMap(rt: Runtime, sceneId: PresetId): boolean {
   try {
     const home = homeOf.get(rt) ?? { pinned, island: activeIslandId() };
@@ -48,7 +49,7 @@ export function saveMap(rt: Runtime, sceneId: PresetId): boolean {
       homeOf.set(rt, { pinned: null, island: activeIslandId() });
       return ok;
     }
-    localStorage.setItem(home.pinned, json);
+    bigStore().set(home.pinned, json);
     return true;
   } catch {
     return false;
@@ -82,7 +83,7 @@ export async function useMapCode(code: string, rt?: Runtime): Promise<string | n
     const raw = await pipe(fromB64(text.slice(CODE_PREFIX.length)), new DecompressionStream('gzip'));
     const bundle = JSON.parse(new TextDecoder().decode(raw)) as PresetBundle;
     if (!bundle || typeof bundle.root !== 'string' || !Array.isArray(bundle.presets) || !bundle.presets.some((p) => p.id === bundle.root && p.kind === 'scene')) return 'The code is readable but it is not a map.';
-    localStorage.setItem(keyOf(rt), JSON.stringify(bundle));
+    bigStore().set(keyOf(rt), JSON.stringify(bundle));
     return null;
   } catch {
     return 'The code is damaged or incomplete. Copy the whole line, including the start.';
@@ -92,32 +93,32 @@ export async function useMapCode(code: string, rt?: Runtime): Promise<string | n
 /** Put a map (a share code) under a key unless something is saved there already. Resolves true when it was written. */
 export async function seedMap(key: string, code: string): Promise<boolean> {
   try {
-    if (localStorage.getItem(key) !== null || !code.startsWith(CODE_PREFIX)) return false;
+    if (bigStore().has(key) || !code.startsWith(CODE_PREFIX)) return false;
     const raw = await pipe(fromB64(code.slice(CODE_PREFIX.length)), new DecompressionStream('gzip'));
     const bundle = JSON.parse(new TextDecoder().decode(raw)) as PresetBundle;
     if (!bundle || typeof bundle.root !== 'string' || !Array.isArray(bundle.presets)) return false;
-    localStorage.setItem(key, JSON.stringify(bundle));
+    bigStore().set(key, JSON.stringify(bundle));
     return true;
   } catch { return false; }
 }
 
 export function hasSavedMap(): boolean {
-  try { return localStorage.getItem(currentKey()) !== null; } catch { return false; }
+  return bigStore().has(currentKey());
 }
 
 export function clearSavedMap(): void {
-  try { localStorage.removeItem(currentKey()); } catch { /* ignore */ }
+  bigStore().remove(currentKey());
 }
 /** Forget the saved map this runtime was loaded from (its own island or Goblin Racing's), never whichever island happens to be active. */
 export function clearMapOf(rt: Runtime): void {
-  try { localStorage.removeItem(keyOf(rt)); } catch { /* ignore */ }
+  bigStore().remove(keyOf(rt));
 }
 
 /** Import the saved map into the runtime and bind its scene. Returns the scene description, or null when there is none. */
 export function loadMap(rt: Runtime): MakerScene | null {
   homeOf.set(rt, { pinned, island: activeIslandId() });
   try {
-    const raw = localStorage.getItem(currentKey());
+    const raw = bigStore().get(currentKey());
     if (!raw) return null;
     const bundle = JSON.parse(raw) as PresetBundle;
     rt.store.importBundle(bundle, { onConflict: 'keep' });

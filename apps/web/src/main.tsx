@@ -9,6 +9,7 @@ import { createRuntime } from '@hm/engine';
 import { initQuickJS } from '@hm/script';
 import { Shell } from './shell/shell';
 import { bootPlatform } from './platform/boot';
+import { initBigStore } from './storage/big-store';
 import { setSoundResolver } from './maker/feedback';
 import { packSound, resolveSound } from './sound/bank';
 import './shell.css';
@@ -16,7 +17,8 @@ import './studio.css';
 
 async function start(): Promise<void> {
   await initQuickJS(); // the script engine is loaded explicitly: no top-level await in the single-file build
-  await bootPlatform(); // in RUN.world this installs the cloud-backed save store before anything reads a save
+  const platform = await bootPlatform(); // in RUN.world this installs the cloud-backed save store before anything reads a save
+  await initBigStore(platform); // islands and the racetrack: IndexedDB (moved out of localStorage once), all in memory before the first read
   // every island (and the racetrack) gets its own runtime, so their presets can never mix
   let current = createRuntime({ seed: 1, now: () => Date.now() });
   const makeRuntime = (): ReturnType<typeof createRuntime> => {

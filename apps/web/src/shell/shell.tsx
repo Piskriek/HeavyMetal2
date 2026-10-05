@@ -25,6 +25,8 @@ import { GoblinFront, GoblinPreview, SetMixHome } from './goblin-front';
 import { captureMouse } from './capture-mouse';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
+import { bigStore } from '../storage/big-store';
+import { exportIsland, importIsland } from '../islands/island-transfer';
 
 /**
  * The shell of **SetMix Multiverse** (first called SetMix Harness): a world of activities. It opens on the SetMix home: the galaxy, with Goblin Racing selected and its menu live
@@ -71,6 +73,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const [raceRt, setRaceRt] = useState<{ rt: Runtime; fromMap: boolean } | null>(null);
   const [note, setNote] = useState('');
   const registry = useSyncExternalStore(subscribe, () => islands(), () => islands());
+  /** A save that could not be written (the device is out of room), in plain words, until closed. */
+  const [storageFull, setStorageFull] = useState('');
+  useEffect(() => bigStore().onStorageFull(setStorageFull), []);
   /** My islands is making a new island (quick, wizard or manual) instead of listing them. */
   const [newIsland, setNewIsland] = useState(false);
   /** The activities window is making a new activity (quick, wizard or manual). */
@@ -414,6 +419,8 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
               onTry={(t) => makeIsland({ name: t.name, template: t.template, open: true })}
               onRename={(id, name) => { const err = renameIsland(id, name); if (err) setNote(err); }}
               onDuplicate={(id) => { const e = duplicateIsland(id); if (e) setNote(e); }}
+              onExport={(id) => { void exportIsland(id).then(setNote); }}
+              onImport={(f) => { void importIsland(f).then(setNote); }}
               onDelete={(id) => { const e = removeIsland(id); if (e) setNote(e); if (world?.id === id) setWorld(null); }} />
             </>
             )}
@@ -442,6 +449,11 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'racing' && (raceAuto ? editWorld : raceRt) ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
           <App profile={profile} onProfile={update} rt={(raceAuto ? editWorld! : raceRt!).rt} fromMap={raceAuto ? true : raceRt!.fromMap} {...(raceAuto ? { autoStart: true } : { entry: raceEntry })} onExit={() => { pinMapKey(null); go(raceBack); }} />
+        </div>
+      ) : null}
+      {storageFull ? (
+        <div className="toasts" style={{ position: 'fixed', zIndex: 50, pointerEvents: 'auto' }} role="alert">
+          <button type="button" className="toast error" onClick={() => setStorageFull('')}>{storageFull}</button>
         </div>
       ) : null}
     </div>

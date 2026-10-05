@@ -1,5 +1,6 @@
 import type { SfxId } from '@hm/audio';
 import type { PlayerState } from '../player';
+import type { BudgetKind } from '../budget';
 
 /** Where the player points: a spot on the ground or a thing. */
 export interface WayAim { readonly point: readonly [number, number, number]; readonly normal: readonly [number, number, number] | null }
@@ -91,6 +92,8 @@ export interface WayCtx {
   thingName(ref: string): string;
   /** A V3 slider's value for the current tool, or null when it has none. */
   drive(name: string): number | null;
+  /** Null when one more (or `adding` more) of a kind fits the island's budget at this graphics tier; otherwise the plain sentence to show. */
+  overBudget(kind: BudgetKind, adding?: number): string | null;
   /** Save the island now (after edits that do not save themselves). */
   save(): void;
   /** The zone a cord or wire starts from, while the player is laying one (Esc clears it). */

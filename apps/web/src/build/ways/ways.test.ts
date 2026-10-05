@@ -5,7 +5,7 @@ import { runWay, wayIndex, type WayAim, type WayCtx } from './index';
 import { FUNNY } from './sound';
 
 /** A fake island: records what the ways asked for. */
-function fakeCtx(opts: { aim?: WayAim | null; wire?: string; logic?: string; zoneWhen?: string; underThing?: boolean; model?: string | null; lamp?: string | null; zone?: string | null; zones?: number; wiresTo?: number; rulesOn?: number; nearest?: number; lampSlots?: number; sound?: string; effect?: string; lamp_?: string; walks?: boolean; flies?: number; char?: string; brain?: string; physMat?: string; snips?: number; random?: number } = {}) {
+function fakeCtx(opts: { aim?: WayAim | null; wire?: string; logic?: string; zoneWhen?: string; underThing?: boolean; model?: string | null; lamp?: string | null; zone?: string | null; zones?: number; wiresTo?: number; rulesOn?: number; nearest?: number; lampSlots?: number; sound?: string; effect?: string; lamp_?: string; walks?: boolean; flies?: number; char?: string; brain?: string; physMat?: string; full?: string; snips?: number; random?: number } = {}) {
   const log: string[] = [];
   let from: string | null = null;
   let zones = 0;
@@ -78,6 +78,7 @@ function fakeCtx(opts: { aim?: WayAim | null; wire?: string; logic?: string; zon
     thingName: () => 'Barrel',
     drive: (name) => (name === 'zone-size' ? 6 : null),
     save: () => log.push('save'),
+    overBudget: (kind) => (opts.full === kind ? `full of ${kind}` : null),
     wireFrom: () => from,
     setWireFrom: (id) => { from = id; },
     carveUnder: (add, size) => { if (!opts.underThing) return false; log.push(`carve:${add}:${size}`); return true; },
@@ -359,4 +360,16 @@ test('characters: spawn with the palette brain, change the nearest, Alt on Spawn
   const none = fakeCtx();
   runWay(none.ctx, use('chars-remove'));
   assert.ok(none.log.includes('say:Point at a character'));
+});
+
+test('over budget: lamps, effects, sounds and characters are refused with the sentence, nothing placed', () => {
+  for (const [id, kind] of [['light-lamp', 'lamps'], ['effects-place', 'effects'], ['sound-place', 'sounds'], ['chars-spawn', 'characters']] as const) {
+    const f = fakeCtx({ full: kind });
+    runWay(f.ctx, use(id));
+    assert.ok(f.log.includes(`say:full of ${kind}`) && f.log.includes('fx:ui-error'), id);
+    assert.ok(!f.log.some((l) => l.startsWith('place:') || l.startsWith('char-spawn')), `${id} placed nothing`);
+  }
+  const ok = fakeCtx({ full: 'effects' });
+  runWay(ok.ctx, use('light-lamp'));
+  assert.ok(ok.log.some((l) => l.startsWith('place:lamps')), 'another kind being full does not stop lamps');
 });

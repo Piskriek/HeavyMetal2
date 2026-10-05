@@ -68,6 +68,7 @@ import type { Preview } from './build/catalog';
 import { mapBundle, saveMap } from './maker/storage';
 import { spriteDef } from './build/sprites';
 import { runWay, type WayCtx } from './build/ways';
+import { meter, overBudget, tierOf, type BudgetCounts, type BudgetKind, type Tier } from './build/budget';
 import { TourCard } from './tutorial/tour-card';
 import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
 import { captureMouse, lookFilter } from './shell/capture-mouse';
@@ -229,6 +230,8 @@ export function IslandWalk(props: {
   const [menu, setMenu] = useState(false);
   const [locked, setLocked] = useState(false);
   const [note, setNote] = useState('');
+  /** The island budget's meter (build/budget.ts), refreshed when the island changes. */
+  const [budgetMeter, setBudgetMeter] = useState<{ readonly share: number; readonly label: string } | null>(null);
   /**
    * The palette film strip (top middle): Tab opens and closes it like a window (owner: "a toggle, so it doesn't hide when you let go"), and
    * opening it frees the mouse to click it and the buttons round it (the PBR button, the presets); closing it gives the mouse back to looking.
@@ -1146,6 +1149,28 @@ export function IslandWalk(props: {
       saveMap(rt, scene.sceneId);
       return mine.length;
     };
+    /** The island budget (build/budget.ts): the tier chosen in Settings, or the device's own guess on Auto (never the moment's adaptive tier, so the budget does not move while you build). */
+    const budgetTier = (): Tier => { const g = graphicsRef.current; return tierOf(parseQuality(qualityRef.current) ?? (g ? guessQuality(g.device) : 'low')); };
+    const budgetCounts = (): BudgetCounts => {
+      const kids = rt.store.get(scene.sceneId)?.children;
+      const n = (list: string): number => (kids?.[list] ?? []).filter((r) => rt.store.get(r.ref)).length;
+      return { things: n('models'), lamps: n('lamps'), effects: n('effects'), characters: n('characters'), sounds: n('soundscape') };
+    };
+    const budgetSays = (kind: BudgetKind, adding = 1): string | null => overBudget(budgetTier(), budgetCounts(), kind, adding);
+    (window as unknown as { hmBudget: unknown }).hmBudget = {
+      tier: budgetTier, counts: budgetCounts, meter: () => meter(budgetTier(), budgetCounts()),
+      /** Tests: put n plain lamps far off in one undo step. */
+      fillLamps: (count: number) => rt.commands.transaction('Test lamps', () => {
+        for (let i = 0; i < count; i++) {
+          const id = `lamp-test-${i}-${Date.now().toString(36)}`;
+          rt.commands.execute(cmd.put({ id, kind: 'lamp', name: 'Bulb', params: { preset: 'bulb', x: 400 + i, y: -50, z: 400, yaw: 0, pitch: 90, brightness: 1, on: false } as never, tier: 'play' }, 'Test lamps'));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'lamps', id, undefined, 'Test lamps'));
+        }
+      }),
+    };
+    const pushMeter = (): void => { const m = meter(budgetTier(), budgetCounts()); setBudgetMeter((old) => (old && old.label === m.label ? old : { share: m.share, label: m.label })); };
+    const offMeter = rt.store.subscribe(pushMeter);
+    pushMeter();
     /** What the hotbar's ways may do to this island (apps/web/src/build/ways). */
     const wayCtx: WayCtx = {
       player,
@@ -1287,6 +1312,7 @@ export function IslandWalk(props: {
       },
       thingName: (ref) => rt.store.get(ref as PresetId)?.name ?? 'it',
       drive: (name) => v3Drive(player(), name as V3Drive),
+      overBudget: (kind, adding) => budgetSays(kind, adding),
       save: () => saveMap(rt, scene.sceneId),
       putWire,
       snipAt: (a) => snipAt(a as Aim),
@@ -1363,6 +1389,10 @@ export function IslandWalk(props: {
           return;
         }
         if (tool && a) {
+          if (first && !alt && (tool.action === 'things' || tool.action === 'place')) {
+            const full = budgetSays('things');
+            if (full) { say(full); fx('ui-error', { volume: 0.5 }); return; }
+          }
           // Simplified's sliders: a block as wide as Width, a prop at Size
           const block = tool.action === 'things' && tool.placeWay === 'one' && tool.model.startsWith('block-') ? v3Drive(s, 'block-size') : null;
           const prop = tool.action === 'things' && tool.placeWay === 'one' && !tool.model.startsWith('block-') ? v3Drive(s, 'prop-size') : null;
@@ -1734,6 +1764,7 @@ export function IslandWalk(props: {
     };
     raf = requestAnimationFrame(loop);
     return () => {
+      offMeter();
       cancelAnimationFrame(raf);
       document.removeEventListener('pointerlockchange', onLockChange);
       document.removeEventListener('pointerlockerror', onLockError);
@@ -1809,7 +1840,7 @@ export function IslandWalk(props: {
           onOption={(key, id) => { pickPalette(key, id); fx('select', { volume: 0.5 }); }}
           onMode={pickV3Mode} onUndo={() => { api.current?.undo(); }} onRedo={() => { api.current?.redo(); }}
           findOpen={findOpen} onFind={(open) => { setFindOpen(open); if (open) api.current?.unlock(); }} onFound={pickFound}
-          onComing={(what) => say(`${what}: coming`)} note={note && !showcase ? note : ''}
+          onComing={(what) => say(`${what}: coming`)} note={note && !showcase ? note : ''} budget={showcase ? null : budgetMeter}
           onEditLook={props.ground === 'racing' ? undefined : () => { const id = Number(p.palette.paint ?? SURF.grass); const sf = PAINTS.find((x) => x.id === id); if (sf) { api.current?.unlock(); win.open(`surface:${id}`, `Look: ${sf.name}`, { x: Math.max(12, window.innerWidth - 420), y: 70, w: 390, h: 640 }); } }} />
       ) : null}
       {avatarMode && !menu ? <AvatarDock actions={actions} onPreview={(l) => api.current?.previewLook(l)} onDone={leaveAvatar} /> : null}

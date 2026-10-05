@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactElement } from 'react';
-import { Copy, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState, type ReactElement } from 'react';
+import { Copy, Download, Pencil, Plus, Star, Trash2, Upload } from 'lucide-react';
 import { describeIsland, type IslandMeta } from '@hm/islands';
 import { TEMPLATE_SHAPES, type TemplateShape } from '../maker/scene';
 import { readBundle } from './island-store';
@@ -59,8 +59,11 @@ export function PlanetScreen(props: {
   readonly tries: readonly TryIsland[]; readonly favs: readonly string[]; readonly onFav: (id: string) => void; readonly onTry: (t: TryIsland) => void;
   readonly onGo: (id: string) => void; readonly onRename: (id: string, name: string) => void; readonly onDuplicate: (id: string) => void; readonly onDelete: (id: string) => void;
   readonly onNew: () => void;
+  /** Save an island to a .setmix file, and make a new island from one. */
+  readonly onExport: (id: string) => void; readonly onImport: (file: File) => void;
 }): ReactElement {
   const [renaming, setRenaming] = useState<string | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState('');
   const sources = useMemo(() => new Map(props.islands.map((m) => [m.id, sourceOf(m)])), [props.islands]);
   const submit = (): void => { if (renaming) props.onRename(renaming, draft); setRenaming(null); };
@@ -82,11 +85,14 @@ export function PlanetScreen(props: {
                 <button className="go" onClick={() => props.onGo(m.id)}>Go in</button>
                 <button title="Rename" aria-label={`Rename ${m.name}`} onClick={() => { setRenaming(m.id); setDraft(m.name); }}><Pencil size={13} strokeWidth={1.6} /></button>
                 <button title="Copy" aria-label={`Copy ${m.name}`} onClick={() => props.onDuplicate(m.id)}><Copy size={13} strokeWidth={1.6} /></button>
+                <button title="Export to a file" aria-label={`Export ${m.name} to a file`} onClick={() => props.onExport(m.id)}><Download size={13} strokeWidth={1.6} /></button>
                 <button title="Delete (you can undo)" aria-label={`Delete ${m.name}`} onClick={() => props.onDelete(m.id)}><Trash2 size={13} strokeWidth={1.6} /></button>
               </div>
             </article>
           ))}
           <button className="planet-island new" onClick={props.onNew}><Plus size={22} strokeWidth={1.4} /><span>New island</span></button>
+          <button className="planet-island new" onClick={() => picker.current?.click()}><Upload size={22} strokeWidth={1.4} /><span>Import a file</span></button>
+          <input ref={picker} type="file" accept=".setmix" hidden aria-label="Island file to import" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) props.onImport(f); }} />
         </div>
       </section>
       {current ? (

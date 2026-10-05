@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --import tsx --test packages/*/tests/*.test.ts apps/web/src/build/ways/*.test.ts",
+    "test": "node --import tsx --test packages/*/tests/*.test.ts apps/web/src/build/*.test.ts apps/web/src/build/ways/*.test.ts apps/web/src/storage/*.test.ts apps/web/src/islands/*.test.ts",
     "build": "npm run build -w @hm/web",
     "dev": "npm run dev -w @hm/web",
     "verify": "node scripts/verify.mjs",

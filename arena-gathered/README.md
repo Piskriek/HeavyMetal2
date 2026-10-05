@@ -12,8 +12,8 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | decals | `docs/handoff/prompts/battle/decals.txt` | **B** | 11/11 tests after its own slope test was fixed (lifting 1 cm along a tilted normal also moves x: `pos[0]` is `1 - 0.01 * SQRT1_2`); strict typecheck clean. A wrote into its own project (not collected). |
 | kart | `docs/handoff/prompts/battle/kart.txt` | **B** | 9/9 tests, strict typecheck clean (A was still writing when collected). |
 | kinematic | `docs/handoff/prompts/battle/kinematic.txt` | **B** | 11/11 tests, strict typecheck clean. A fails 5 of 10, including the wall acceptance tests (kept for reference). |
-| musicbox | `docs/handoff/prompts/battle/musicbox.txt` | **X** (the one answer posted in the chat) | 9/9 tests, strict typecheck clean. |
-| chunkworld | `docs/handoff/prompts/battle/chunkworld.txt` | **X** (the first answer finished) | 9/9 tests, strict typecheck clean. |
+| musicbox | `docs/handoff/prompts/battle/musicbox.txt` | **A** (rerun 2026-10-05; was X) | A: 8/8 own + X's 9/9, strict clean. X let a lead note run into the last half beat of the loop (against the spec), caught by A's test; packages/musicbox now uses A, with X's tests kept as musicbox-x.test.ts (17/17). The other rerun model's answer was cut short. |
+| chunkworld | `docs/handoff/prompts/battle/chunkworld.txt` | **X** (the first answer finished) | 9/9 tests, strict typecheck clean. Rerun 2026-10-05: X still the pick. B 9/9 strict clean, A 9/9 but 10 strict errors. The one disagreement is "retried at most twice": X and B allow 2 retries (3 attempts), A allows 2 attempts; decide when wiring. |
 | pixels | `docs/handoff/prompts/battle/pixels.txt` | **B** | 9/9 tests, strict typecheck clean. A: 7/8 (its place test fails). |
 | questline | `docs/handoff/prompts/battle/questline.txt` | **A** | 8/8, strict clean; B also 8/8 (A has the larger test file). |
 | machines | `docs/handoff/prompts/battle/machines.txt` | **B** | 11/11, strict clean. A: 12/14. |
@@ -21,19 +21,20 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | rocket | `docs/handoff/prompts/battle/rocket.txt` | **B** | 10/10, strict clean. A: 12/13 (its floating-part test expects exactly one problem). |
 | ragdoll | `docs/handoff/prompts/battle/ragdoll.txt` | **A** | 9/9, strict clean. B: 8/9 (blend). Cross-run: A fails B's "sticks keep their length" (tolerance; raise iterations or loosen to 2%), B fails A's knee limit. |
 | navgrid | `docs/handoff/prompts/battle/navgrid.txt` | **B** | 9/9, strict clean. A: 10/13 on its own tests (water, box snap, reachable), and A passes B's 9/9. B fails A's water/reachable tests and its cellOf test (A floors; the spec puts cell centres at c*cell, so B rounding is right). Check water handling with a real island before merging. |
-| hull | `docs/handoff/prompts/battle/hull.txt` | **X** | 8/8, strict clean (the other model built in its own project, not collected). Large (1200 lines) but genuine: degenerate cases, Jacobi OBB. |
-| remesh | `docs/handoff/prompts/battle/remesh.txt` | **X** | 13/13, strict clean (the other model built in its own project, not collected). |
+| hull | `docs/handoff/prompts/battle/hull.txt` | **X** | 8/8, strict clean (the other model built in its own project, not collected). Large (1200 lines) but genuine: degenerate cases, Jacobi OBB. Rerun 2026-10-05: X also passes A's 9/9 and B's 11/11. A (16k chars, 9/9, strict clean, passes X's tests) is a smaller drop-in if X proves slow; B has 6 strict errors. |
+| remesh | `docs/handoff/prompts/battle/remesh.txt` | **X** | 13/13, strict clean (the other model built in its own project, not collected). Rerun 2026-10-05: B is 5/8 on its own tests, and X fails the same 3 (L shape, two colours, hollow box), so B's expected numbers are likely wrong; X stays. The other model posted only fragments. |
+| smoothvox2 | `docs/handoff/prompts/battle/smoothvox2.txt` | **A** | 20/20, strict clean. B: 6/7. Cross-run: A fails B's "surface blend splits a border" (check the one-ring rule before wiring); B fails 3 of A's. |
+| toolanims | `docs/handoff/prompts/battle/toolanims.txt` | **A** | 23/24, strict clean; its one failure is its own strict check of the can's three shakes (tune the data). B: 19/20; its failing step-key sample test looks wrong (A fails it too). Cross-runs fail on each other's data-specific tests, as expected for hand-made data. Review the motion by eye in the Animate tab. |
+| tooljuice | `docs/handoff/prompts/battle/tooljuice.txt` | **B** | 18/18, strict clean. A: 13/13 but one strict typecheck error. Cross-runs fail on each other's data-specific tests (hand-made data). |
 
 ## Merged (2026-10-05)
 
 All 17 picks above are copied to `packages/<name>/` with `@hm/<name>` in tsconfig.json and apps/web/vite.config.ts. Repo typecheck clean; every package passes its tests. Two fixes for the repo typecheck: hull dropped an unused `add`, and pixels dropped a test line reading a `grid` field that does not exist. None is wired into the game yet (the glue is in RELEASE_PLAN).
 
-## Not gathered yet (2026-10-05)
+## Merged in arena/gather2 (2026-10-05)
 
-Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:
+smoothvox2 (A), toolanims (A) and tooljuice (B) are copied to packages/ with tsconfig paths and vite aliases. toolanims: the can's wiggle keys were made slightly asymmetric (+0.22/-0.2) so its own sign-change test does not land a sample exactly on zero (24/24). musicbox switched to A (see its row).
 
-- `docs/handoff/prompts/battle/toolanims.txt` (B7)
-- `docs/handoff/prompts/battle/tooljuice.txt` (B6)
-- `docs/handoff/prompts/battle/smoothvox2.txt` (smoothvox rev 2: surfaces, triplanar, tangents, draw groups)
+## Arena notes
 
-Worth a second answer to compare (only one model answered in chat): hull, remesh, musicbox, chunkworld.
+Arena sometimes shows a reCAPTCHA; a chat sent while it is up is lost (the link bounces to the home page). The owner completes the check, then resend. Vote buttons only enable once both builds load, so prompts now ask for a small preview page.

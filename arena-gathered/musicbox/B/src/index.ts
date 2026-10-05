@@ -1,0 +1,1 @@
+const loop = song.bars * 4;return song.notes.filter(n => {  let first = Math.ceil((fromBeat - n.beat)/loop);  // careful with float; fine  for (let m = first; n.beat + m*loop < toBeat; m++) if (m*loop + n.beat >= fromBeat) return true;  return false;});

@@ -177,6 +177,15 @@
       "@hm/walkpath": [
         "packages/walkpath/src/index.ts"
       ],
+      "@hm/smoothvox2": [
+        "packages/smoothvox2/src/index.ts"
+      ],
+      "@hm/toolanims": [
+        "packages/toolanims/src/index.ts"
+      ],
+      "@hm/tooljuice": [
+        "packages/tooljuice/src/index.ts"
+      ],
       "@hm/vox": [
         "packages/vox/src/index.ts"
       ],

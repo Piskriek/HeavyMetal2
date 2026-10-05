@@ -177,6 +177,57 @@
       "@hm/walkpath": [
         "packages/walkpath/src/index.ts"
       ],
+      "@hm/vox": [
+        "packages/vox/src/index.ts"
+      ],
+      "@hm/schematic": [
+        "packages/schematic/src/index.ts"
+      ],
+      "@hm/puppet": [
+        "packages/puppet/src/index.ts"
+      ],
+      "@hm/decals": [
+        "packages/decals/src/index.ts"
+      ],
+      "@hm/kart": [
+        "packages/kart/src/index.ts"
+      ],
+      "@hm/kinematic": [
+        "packages/kinematic/src/index.ts"
+      ],
+      "@hm/musicbox": [
+        "packages/musicbox/src/index.ts"
+      ],
+      "@hm/chunkworld": [
+        "packages/chunkworld/src/index.ts"
+      ],
+      "@hm/pixels": [
+        "packages/pixels/src/index.ts"
+      ],
+      "@hm/questline": [
+        "packages/questline/src/index.ts"
+      ],
+      "@hm/machines": [
+        "packages/machines/src/index.ts"
+      ],
+      "@hm/market": [
+        "packages/market/src/index.ts"
+      ],
+      "@hm/rocket": [
+        "packages/rocket/src/index.ts"
+      ],
+      "@hm/ragdoll": [
+        "packages/ragdoll/src/index.ts"
+      ],
+      "@hm/navgrid": [
+        "packages/navgrid/src/index.ts"
+      ],
+      "@hm/hull": [
+        "packages/hull/src/index.ts"
+      ],
+      "@hm/remesh": [
+        "packages/remesh/src/index.ts"
+      ],
       "@hm/lightplace": [
         "packages/lightplace/src/index.ts"
       ],

@@ -1,0 +1,66 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the maths of decals (stickers and splats) for a toy-world game. A decal is a square picture pressed onto a surface where the player clicks: on the ground (a height grid) or on a box-shaped thing. This module decides where and how it lies; the game draws it.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/decals.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (use the given seed), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface Atlas { cols: number; rows: number }              // a sticker sheet: cells numbered row by row from 0
+export interface DecalDef { id: string; cell: number; frames: number; fps: number; size: number; fade: number } // frames > 1: animated, cells cell .. cell+frames-1; fade 0..1 = soft edge width as a share of the size
+export interface Decal { def: string; pos: Vec3; normal: Vec3; up: Vec3; size: number; rotation: number; seed: number } // rotation in degrees about the normal
+export interface Heights { cols: number; rows: number; cell: number; originX: number; originZ: number; heights: Float32Array } // height of (c, r) = heights[r * cols + c], at x = originX + c*cell, z = originZ + r*cell
+
+/** The UV rectangle [u0, v0, u1, v1] of a cell (v down from the top), for frame `frame`. */
+export function cellUv(atlas: Atlas, cell: number): [number, number, number, number];
+/** The frame shown at time t (seconds) of an animated decal (0 for frames <= 1). */
+export function frameAt(def: DecalDef, t: number): number;
+/** A decal placed on the ground at (x, z): pos on the surface (bilinear height) lifted 1 cm along the normal, normal from the height grid's slope (central differences), up = the world z axis projected onto the surface (if parallel, the x axis). */
+export function onGround(h: Heights, x: number, z: number, def: DecalDef, rotation: number, seed: number): Decal;
+/** A decal on the face of an axis-aligned box hit at `point` (the face is the one the point lies on, within 1e-6): normal = that face's outward normal, pos = point + 1 cm along it, up = world y for side faces, world z for top and bottom. */
+export function onBox(min: Vec3, max: Vec3, point: Vec3, def: DecalDef, rotation: number, seed: number): Decal | null;
+/** The four corners of the decal's quad, in order bottom-left, bottom-right, top-right, top-left, rotated by `rotation` about the normal; right = cross(normal, up), so on flat ground with up = +z, right = +x; bottom-left = pos - right*size/2 - up*size/2. */
+export function corners(d: Decal): [Vec3, Vec3, Vec3, Vec3];
+/** The ground decal draped over the height grid: an n x n grid of points (n >= 2), each lifted 1 cm above the bilinear height under it, so it hugs bumps. */
+export function drape(h: Heights, d: Decal, n: number): Vec3[];
+/** How opaque a point is at decal-local coordinates (u, v in 0..1): 1 inside, falling smoothly to 0 across the fade band at the edges: smoothstep(0, fade, min(u, 1-u, v, 1-v)); fade 0 = hard edge. */
+export function alphaAt(def: DecalDef, u: number, v: number): number;
+/** Decals overlapping a new one at the same spot: the ids (indices) of decals whose centres are closer than half the new one's size; the game removes the oldest when more than `max` overlap. */
+export function overlapping(all: readonly Decal[], d: Decal, max: number): number[];
+```
+
+## Acceptance tests (copy unchanged, then add your own: rotation 90 swaps corners, a sloped ground's normal, onBox on each face, alpha at the corner)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { alphaAt, cellUv, corners, frameAt, onBox, onGround, type DecalDef, type Heights } from '../src/index';
+const near = (a: number, b: number, e = 1e-9): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const def: DecalDef = { id: 'smile', cell: 5, frames: 4, fps: 8, size: 2, fade: 0.1 };
+const flat: Heights = { cols: 3, rows: 3, cell: 1, originX: 0, originZ: 0, heights: new Float32Array(9).fill(1) };
+test('atlas cells and frames', () => {
+  assert.deepEqual(cellUv({ cols: 4, rows: 2 }, 5), [0.25, 0.5, 0.5, 1]);
+  assert.equal(frameAt(def, 0), 0);
+  assert.equal(frameAt(def, 0.25), 2);
+  assert.equal(frameAt(def, 0.5), 0);
+});
+test('on flat ground it lies flat, 1 cm up', () => {
+  const d = onGround(flat, 1, 1, def, 0, 1);
+  near(d.pos[1], 1.01); near(d.normal[1], 1); near(d.up[2], 1);
+  const c = corners(d);
+  near(c[0][0], 0); near(c[0][2], 0); near(c[2][0], 2); near(c[2][2], 2);
+});
+test('on a box face', () => {
+  const d = onBox([0, 0, 0], [2, 2, 2], [2, 1, 1], def, 0, 1)!;
+  assert.deepEqual(d.normal, [1, 0, 0]);
+  near(d.pos[0], 2.01); near(d.up[1], 1);
+  assert.equal(onBox([0, 0, 0], [2, 2, 2], [1, 1, 1], def, 0, 1), null);
+});
+test('soft edges', () => {
+  near(alphaAt(def, 0.5, 0.5), 1);
+  near(alphaAt(def, 0, 0.5), 0);
+  assert.ok(alphaAt(def, 0.05, 0.5) > 0 && alphaAt(def, 0.05, 0.5) < 1);
+});
+```

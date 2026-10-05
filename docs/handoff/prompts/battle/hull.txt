@@ -1,0 +1,46 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: collision shapes for a toy-world game. Voxel models and meshes need cheap shapes for physics: a 3D convex hull (quickhull), its simplification to at most N vertices, a box fit, and a split of a voxel model into a few boxes.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/hull.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Robust to duplicate points, flat (coplanar) and collinear input: return a degenerate hull rather than throw.
+
+## API (implement exactly)
+
+```ts
+export type V3 = [number, number, number];
+export interface Hull { vertices: V3[]; faces: [number, number, number][] } // faces wound counter-clockwise seen from outside
+/** Quickhull over the points (tolerance 1e-9 scaled by the size of the cloud). Fewer than 4 non-coplanar points: vertices = the distinct extreme points, faces = []. */
+export function hull(points: readonly V3[]): Hull;
+/** Simplify to at most maxVerts vertices: keep the hull of a subset chosen by farthest point sampling (start at the vertex farthest from the centroid). */
+export function simplify(h: Hull, maxVerts: number): Hull;
+export function volume(h: Hull): number;
+export function contains(h: Hull, p: V3, eps?: number): boolean;
+/** The smallest axis-aligned box and the box of the hull's principal axes (from the covariance of its vertices): centre, half sizes, and the three axes. */
+export interface Box { centre: V3; half: V3; axes: [V3, V3, V3] }
+export function aabb(points: readonly V3[]): Box;
+export function obb(points: readonly V3[]): Box;
+/** Split a voxel model (filled cells, 1 = solid, index x + y*sx + z*sx*sy) into at most maxBoxes axis-aligned boxes that cover every solid cell: greedy merge of runs into the largest boxes first; if more boxes than maxBoxes are needed, the smallest boxes are merged into their neighbours (covering some empty cells). Boxes in cell units [min, max) per axis. */
+export function voxelBoxes(cells: Uint8Array, sx: number, sy: number, sz: number, maxBoxes: number): { min: V3; max: V3 }[];
+```
+
+## Acceptance tests (copy unchanged, then add your own: duplicates, a flat square, collinear points, a sphere cloud's hull contains all points, simplify keeps it inside, obb of a rotated box, voxelBoxes of an L shape and with a small maxBoxes)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { contains, hull, volume, voxelBoxes, type V3 } from '../src/index';
+const cube: V3[] = [];
+for (const x of [0, 1]) for (const y of [0, 1]) for (const z of [0, 1]) cube.push([x, y, z]);
+cube.push([0.5, 0.5, 0.5], [0.2, 0.7, 0.4]);
+test('the hull of a cube', () => {
+  const h = hull(cube);
+  assert.equal(h.vertices.length, 8);
+  assert.equal(h.faces.length, 12);
+  assert.ok(Math.abs(volume(h) - 1) < 1e-9);
+  assert.ok(contains(h, [0.5, 0.5, 0.5]));
+  assert.ok(!contains(h, [1.5, 0.5, 0.5]));
+});
+test('a full 2x2x2 voxel block is one box', () => {
+  assert.deepEqual(voxelBoxes(new Uint8Array(8).fill(1), 2, 2, 2, 4), [{ min: [0, 0, 0], max: [2, 2, 2] }]);
+});
+```

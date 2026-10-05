@@ -1,0 +1,72 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: puppeteering a blocky goblin character by dragging its hands and feet (two-bone inverse kinematics), for a toy-world game's "Live Puppet" tool.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/puppet.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## The rig (y up, metres, the character faces +z)
+Each limb is two bones: a root joint, a middle joint (elbow or knee), an end (hand or foot).
+- armL: shoulder [-0.25, 1.2, 0], upper 0.3, lower 0.3, elbow bends backwards (its pole points to -z).
+- armR: shoulder [0.25, 1.2, 0], same lengths and pole.
+- legL: hip [-0.12, 0.6, 0], upper 0.3, lower 0.3, knee bends forwards (pole +z).
+- legR: hip [0.12, 0.6, 0], same.
+At rest every limb hangs straight down.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export type Limb = 'armL' | 'armR' | 'legL' | 'legR';
+export interface LimbDef { root: Vec3; upper: number; lower: number; pole: Vec3 }
+export const RIG: Readonly<Record<Limb, LimbDef>>;
+export interface LimbPose { mid: Vec3; end: Vec3; reached: boolean }   // reached false = target out of reach, the limb points straight at it
+export interface Pose { limbs: Record<Limb, LimbPose>; offset: Vec3 }    // offset: the whole body moved (see dragBody)
+export function restPose(): Pose;
+/** Two-bone IK: the middle joint lies in the plane of root, target and pole, on the pole's side; lengths are kept exactly. A target nearer than |upper - lower| is pushed out to that distance. */
+export function solveLimb(def: LimbDef, target: Vec3): LimbPose;
+/** Which limb end is nearest a point (within `radius`), or null: what the cursor grabs. */
+export function pickLimb(pose: Pose, point: Vec3, radius: number): Limb | null;
+/** Drag one limb end to a target; the others stay. */
+export function dragLimb(pose: Pose, limb: Limb, target: Vec3): Pose;
+/** Mirror a limb's pose to the other side (x negated): armL <-> armR, legL <-> legR. */
+export function mirror(pose: Pose, from: Limb): Pose;
+/** Bone angles for the game's animation rig, degrees: for each limb, the upper bone's swing about x and z from straight down, and the lower bone's bend (0 = straight). */
+export function toAngles(pose: Pose): Record<Limb, { swingX: number; swingZ: number; bend: number }>;
+/** Blend two poses (t 0..1): joints linearly, then each limb re-solved to its blended end so the bones keep their lengths. */
+export function blend(a: Pose, b: Pose, t: number): Pose;
+```
+
+## Acceptance tests (copy unchanged, then add your own: out of reach, a target at the root, mirror twice is identity, blend keeps lengths, toAngles of a raised arm)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { RIG, dragLimb, pickLimb, restPose, solveLimb, toAngles } from '../src/index';
+const near = (a: number, b: number, e = 1e-6): void => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+const dist = (a: number[], b: number[]): number => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+test('at rest the limbs hang straight down', () => {
+  const p = restPose();
+  assert.deepEqual(p.limbs.armL.end.map((v) => Math.round(v * 1e6) / 1e6), [-0.25, 0.6, 0]);
+  near(toAngles(p).armL.bend, 0);
+});
+test('IK keeps bone lengths and reaches the target', () => {
+  const t: [number, number, number] = [-0.25, 0.9, 0.3];
+  const s = solveLimb(RIG.armL, t);
+  assert.equal(s.reached, true);
+  near(dist(RIG.armL.root, s.mid), 0.3); near(dist(s.mid, s.end), 0.3); near(dist(s.end, t), 0);
+  assert.ok(s.mid[2] < 0.15, 'the elbow bends towards its pole (-z)');
+});
+test('out of reach points straight at the target', () => {
+  const s = solveLimb(RIG.legR, [0.12, 0.6, 5]);
+  assert.equal(s.reached, false);
+  near(s.end[2], 0.6); near(s.end[1], 0.6);
+});
+test('grab and drag', () => {
+  const p = restPose();
+  assert.equal(pickLimb(p, [0.25, 0.62, 0], 0.1), 'armR');
+  assert.equal(pickLimb(p, [0, 2, 0], 0.1), null);
+  const q = dragLimb(p, 'armR', [0.25, 1.2, 0.6]);
+  near(q.limbs.armR.end[2], 0.6);
+  assert.deepEqual(q.limbs.legL, p.limbs.legL);
+});
+```

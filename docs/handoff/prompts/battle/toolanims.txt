@@ -1,0 +1,76 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the holding and using animations for the eleven hand tools of a goblin in a toy-world building game, as data plus a tiny player. The goblin is a blocky character with six bones (body, head, armL, armR, legL, legR), each rotated by rx, ry, rz in radians (rx swings forward/back, rz raises sideways, ry twists), plus `lift` (metres up) and `lean` (radians forward). The tool is held in the right hand. Make each animation readable and funny, cartoon-style: anticipation before the action, overshoot after, settle back.
+
+The tools and what using them looks like:
+- magnet: the goblin points it forward, then it JERKS back toward the chest as if pulling something heavy.
+- can: a spray can, shaken three times fast, then held out spraying with a small side-to-side wiggle.
+- rollingPin: both arms forward, rolling forward and back twice, body leaning into it.
+- baton: a conductor's baton, two quick beats up and down with the head nodding.
+- boombox: lifted to the shoulder and slapped by the left hand; small hop.
+- flashlight: raised to eye level and swept left to right.
+- zapGun: aimed with both hands, a recoil kick back on firing, the body rocks.
+- camera: lifted to the face with both hands, a quick head tilt on the click.
+- windupKey: held out, turned in three ratchet twists (ry steps), then let go.
+- spade: a dig: raised, stabbed down with a foot push (legR), levered back.
+- fairyWand: a little circle in the air, then a flick forward with a hop.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/toolanims.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Bone = 'body' | 'head' | 'armL' | 'armR' | 'legL' | 'legR';
+export interface BonePose { rx: number; ry: number; rz: number }
+export interface Pose { bones: Record<Bone, BonePose>; lift: number; lean: number }
+export type Channel = `${Bone}.${'rx' | 'ry' | 'rz'}` | 'lift' | 'lean';
+export interface Key { t: number; v: number; ease: 'linear' | 'smooth' | 'step' } // ease: from this key to the next
+export interface Clip { duration: number; tracks: Partial<Record<Channel, Key[]>> } // seconds; channels not listed stay at the hold pose
+export type ToolId = 'magnet' | 'can' | 'rollingPin' | 'baton' | 'boombox' | 'flashlight' | 'zapGun' | 'camera' | 'windupKey' | 'spade' | 'fairyWand';
+export const TOOL_IDS: readonly ToolId[];
+export interface ToolAnim { id: ToolId; name: string; hold: Pose; use: Clip; hitAt: number } // hitAt: the second the effect should fire (the jerk, the click, the stab)
+export const TOOL_ANIMS: Readonly<Record<ToolId, ToolAnim>>;
+export function restPose(): Pose;
+/** Value of a track at t (clamped to the first and last key; 'smooth' = smoothstep between keys). */
+export function sample(keys: readonly Key[], t: number): number;
+/** The pose at t seconds into the use clip, starting from the hold pose (listed channels replace the hold value). */
+export function useAt(a: ToolAnim, t: number): Pose;
+/** Blend two poses (w = 0 is a, 1 is b). */
+export function blend(a: Pose, b: Pose, w: number): Pose;
+/** Problems in the data: keys out of time order, keys outside 0..duration, any angle beyond ±2.6 rad, lift beyond 0..0.5, hitAt outside the clip, a clip whose first and last values differ from the hold pose by more than 0.02 (it must start and end at the hold pose so it loops cleanly back to holding). */
+export function check(a: ToolAnim): string[];
+```
+
+## Acceptance tests (copy unchanged, then add your own: sample clamping and smooth, blend at 0, 0.5 and 1, each tool's described motion appears, e.g. the windupKey has three ry steps and the spade moves legR)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { TOOL_ANIMS, TOOL_IDS, check, sample, useAt } from '../src/index';
+test('eleven tools, all clean', () => {
+  assert.equal(TOOL_IDS.length, 11);
+  for (const id of TOOL_IDS) assert.deepEqual(check(TOOL_ANIMS[id]), [], id);
+});
+test('a clip starts and ends at the hold pose', () => {
+  for (const id of TOOL_IDS) {
+    const a = TOOL_ANIMS[id];
+    const s = useAt(a, 0), e = useAt(a, a.use.duration);
+    assert.ok(Math.abs(s.bones.armR.rx - a.hold.bones.armR.rx) <= 0.02, id);
+    assert.ok(Math.abs(e.bones.armR.rx - a.hold.bones.armR.rx) <= 0.02, id);
+  }
+});
+test('sample', () => {
+  const k = [{ t: 0, v: 0, ease: 'linear' as const }, { t: 1, v: 2, ease: 'linear' as const }];
+  assert.equal(sample(k, 0.5), 1);
+  assert.equal(sample(k, -1), 0);
+  assert.equal(sample(k, 5), 2);
+});
+test('the use moves the right arm somewhere in the middle', () => {
+  for (const id of TOOL_IDS) {
+    const a = TOOL_ANIMS[id];
+    const mid = useAt(a, a.hitAt);
+    const d = Math.abs(mid.bones.armR.rx - a.hold.bones.armR.rx) + Math.abs(mid.bones.armR.rz - a.hold.bones.armR.rz) + Math.abs(mid.bones.armR.ry - a.hold.bones.armR.ry) + Math.abs(mid.lift - a.hold.lift) + Math.abs(mid.bones.body.ry - a.hold.bones.body.ry);
+    assert.ok(d > 0.1, id);
+  }
+});
+```

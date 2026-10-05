@@ -1,0 +1,52 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a simulated market where pretend buyers buy the presets (textures, models) players put up for sale in a toy-world game, before real players exist. Buyers like good looks and dislike heavy (costly) items and high prices; everything is deterministic from a seed.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/market.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (a seeded generator such as mulberry32), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export interface Listing { id: string; seller: string; kind: 'texture' | 'model' | 'other'; looks: number; bytes: number; price: number; listedDay: number; license: 'mine' | 'cc0' | 'cc-by' | 'share-alike' | 'only-me' }
+// looks 0..1 (the game's score), bytes when shared, price in whole credits >= 1
+export interface Buyer { id: string; taste: number; budget: number; patience: number } // taste 0..1 (how much looks matter), budget credits per day, patience: days a listing must wait before they consider it
+export interface Sale { day: number; listing: string; buyer: string; price: number }
+/** A deterministic crowd of n buyers from a seed (taste spread over 0..1, budget 5..200, patience 0..3). */
+export function makeBuyers(seed: number, n: number): Buyer[];
+/** Can it be sold at all? 'only-me' and 'share-alike' never (share-alike may only be given away); others yes. */
+export function sellable(l: Listing): boolean;
+/** How much a buyer wants it, 0..1: taste * looks + (1 - taste) * lightness - price penalty, where lightness = 1 / (1 + bytes / 65536) and price penalty = min(1, price / max(1, budget)); clamped to 0..1. */
+export function appeal(b: Buyer, l: Listing): number;
+/** Simulate one day: each buyer (in order) buys at most one listing: the sellable listing they want most with appeal >= 0.5, listed at least `patience` days ago, priced within their remaining budget, ties broken by lower price then id. A listing can sell many times (presets are copies). Returns the sales. */
+export function simulateDay(day: number, buyers: readonly Buyer[], listings: readonly Listing[]): Sale[];
+/** A price that would sell to about the given share of the crowd (0..1): the highest whole price at which at least that share of buyers has appeal >= 0.5 (1 if none). */
+export function suggestPrice(buyers: readonly Buyer[], l: Listing, share: number): number;
+/** Earnings per seller over a list of sales (the market keeps 10%, rounded down per sale). */
+export function earnings(sales: readonly Sale[], listings: readonly Listing[]): Record<string, number>;
+```
+
+## Acceptance tests (copy unchanged, then add your own: patience, budget, only-me and share-alike never sell, ties, earnings, suggestPrice monotonic in share)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { appeal, earnings, makeBuyers, sellable, simulateDay, type Listing } from '../src/index';
+const L = (id: string, looks: number, bytes: number, price: number, license: Listing['license'] = 'mine'): Listing => ({ id, seller: 'p1', kind: 'texture', looks, bytes, price, listedDay: 0, license });
+test('same seed, same crowd', () => {
+  assert.deepEqual(makeBuyers(4, 20), makeBuyers(4, 20));
+  assert.equal(makeBuyers(4, 20).length, 20);
+});
+test('appeal', () => {
+  const b = { id: 'b', taste: 1, budget: 100, patience: 0 };
+  assert.ok(Math.abs(appeal(b, L('a', 0.9, 0, 10)) - 0.8) < 1e-9);
+  assert.ok(Math.abs(appeal({ ...b, taste: 0 }, L('a', 0, 65536, 0 + 1)) - 0.49) < 1e-9);
+});
+test('only sellable things sell, and the market keeps 10%', () => {
+  assert.equal(sellable(L('x', 1, 0, 5, 'only-me')), false);
+  assert.equal(sellable(L('y', 1, 0, 5, 'share-alike')), false);
+  const buyers = [{ id: 'b1', taste: 1, budget: 100, patience: 0 }];
+  const sales = simulateDay(1, buyers, [L('good', 0.95, 0, 10), L('mine-only', 1, 0, 1, 'only-me')]);
+  assert.deepEqual(sales.map((s) => s.listing), ['good']);
+  assert.deepEqual(earnings(sales, [L('good', 0.95, 0, 10)]), { p1: 9 });
+});
+```

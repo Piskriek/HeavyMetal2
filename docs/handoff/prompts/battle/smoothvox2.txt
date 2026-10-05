@@ -1,0 +1,55 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: the second pass for smooth voxel meshes in a toy-world game. A voxel model is already turned into a smooth triangle mesh (positions, normals, and a palette index per vertex). This module gets that mesh ready for textured, lit drawing: it maps palette entries to the game's surfaces (grass, rock, wood...), computes triplanar blend weights, builds tangents, and splits the triangles into one draw group per surface.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/smoothvox2.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Inputs are never mutated.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface VMaterial { color: Vec3; alpha: number; roughness: number; metalness: number; emissive: number } // colour 0..1
+export interface SmoothMesh { positions: Float32Array; normals: Float32Array; paletteIndex: Uint8Array; indices: Uint32Array } // 3 floats per vertex; one palette index per vertex
+export interface Surface { id: number; name: string; color: Vec3 } // the game's surfaces, each with a typical colour
+/** Palette entry -> surface: an explicit map wins; otherwise the surface whose colour is nearest (in a perceptual-ish space: weights 0.3, 0.59, 0.11 on squared differences); metalness > 0.5 picks a surface named 'metal' if there is one; emissive > 0.5 picks 'glow' if there is one. */
+export function surfaceOf(palette: readonly VMaterial[], surfaces: readonly Surface[], explicit?: Readonly<Record<number, number>>): number[]; // per palette entry, a surface id
+/** Per-vertex triplanar weights from the normal: w_i = |n_i|^sharpness, normalised to sum 1 (sharpness >= 1). 3 floats per vertex. */
+export function triplanarWeights(m: SmoothMesh, sharpness: number): Float32Array;
+/** Per-vertex tangents (4 floats: xyz + handedness w = ±1) for triplanar mapping: the tangent is the U axis of the vertex's dominant projection plane (x: U = z, y: U = x, z: U = x), made orthogonal to the normal (Gram-Schmidt) and normalised; w = sign of dot(cross(n, t), the plane's V axis). */
+export function tangents(m: SmoothMesh): Float32Array;
+/** Split triangles into draw groups by surface: a triangle belongs to the surface of the majority of its three vertices (ties: the first vertex). Returns a re-ordered index buffer (groups contiguous, in surface id order, triangle order kept inside a group) and the groups. */
+export function groups(m: SmoothMesh, surfaceByPalette: readonly number[]): { indices: Uint32Array; groups: { surface: number; start: number; count: number }[] }; // start, count in indices
+/** Vertex-weighted blend for soft borders: per vertex, the share of each of up to 4 surfaces among the vertex and its one-ring neighbours (by triangle adjacency). Returns 4 surface ids and 4 weights per vertex (unused slots: id 255, weight 0), weights summing to 1, largest first. */
+export function surfaceBlend(m: SmoothMesh, surfaceByPalette: readonly number[]): { ids: Uint8Array; weights: Float32Array };
+```
+
+## Acceptance tests (copy unchanged, then add your own: explicit map wins, metal and glow, tangents orthogonal to normals and unit length, a two-surface strip gives two groups with every triangle kept, surfaceBlend at a border vertex is split and inside is pure)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { groups, surfaceOf, tangents, triplanarWeights, type SmoothMesh, type VMaterial } from '../src/index';
+const mat = (r: number, g: number, b: number): VMaterial => ({ color: [r, g, b], alpha: 1, roughness: 0.8, metalness: 0, emissive: 0 });
+const surfaces = [{ id: 0, name: 'grass', color: [0.2, 0.6, 0.2] as [number, number, number] }, { id: 1, name: 'rock', color: [0.5, 0.5, 0.5] as [number, number, number] }];
+const quad: SmoothMesh = {
+  positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1]),
+  normals: new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
+  paletteIndex: new Uint8Array([0, 0, 1, 1]),
+  indices: new Uint32Array([0, 2, 1, 0, 3, 2]),
+};
+test('nearest colour picks the surface', () => {
+  assert.deepEqual(surfaceOf([mat(0.1, 0.7, 0.1), mat(0.45, 0.45, 0.5)], surfaces), [0, 1]);
+});
+test('an up normal is all y weight, and its tangent is +x', () => {
+  const w = triplanarWeights(quad, 4);
+  assert.deepEqual([...w.slice(0, 3)], [0, 1, 0]);
+  const t = tangents(quad);
+  assert.ok(Math.abs(t[0]! - 1) < 1e-6 && Math.abs(t[1]!) < 1e-6 && Math.abs(t[2]!) < 1e-6);
+  assert.ok(t[3] === 1 || t[3] === -1);
+});
+test('groups keep every triangle', () => {
+  const g = groups(quad, [0, 1]);
+  assert.equal(g.indices.length, 6);
+  assert.equal(g.groups.reduce((s, x) => s + x.count, 0), 6);
+});
+```

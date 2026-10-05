@@ -1,0 +1,57 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: rockets for a toy-world game. A rocket is a blueprint of parts stacked on a grid; the module checks whether it is "ship ready", works out its numbers (mass, thrust, fuel, range), and simulates a simple straight-up launch. The player can buy a ready-made rocket or build one; both must pass the same check.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/rocket.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type PartKind = 'nose' | 'cabin' | 'tank' | 'engine' | 'fin' | 'hull' | 'button';
+export interface PartDef { kind: PartKind; mass: number; fuel?: number; thrust?: number; burn?: number } // kg; fuel kg held; thrust N; burn kg/s
+export const PARTS: Readonly<Record<PartKind, PartDef>>;
+// nose 50; cabin 300; tank 100 (fuel 900); engine 250 (thrust 60000, burn 30); fin 20; hull 80; button 1
+export interface Part { kind: PartKind; x: number; y: number } // grid cells, y up; one part per cell
+export interface Wire { from: number; to: number }             // indices into parts (the launch button wired to an engine)
+export interface Blueprint { parts: Part[]; wires: Wire[] }
+/** Problems (empty = ship ready): exactly one cabin; at least one engine; at least one tank; every part touches another (4-neighbours, the whole rocket is one piece); every engine is at the bottom of its column (nothing below it); a nose on top of the highest column; at least one launch button wired to every engine; total thrust > total weight at launch (mass * 9.8). */
+export function readiness(b: Blueprint): string[];
+export interface Numbers { dryMass: number; fuel: number; mass: number; thrust: number; burn: number; twr: number; burnTime: number; deltaV: number }
+/** dryMass = sum of masses, fuel = sum of fuel, mass = dry + fuel, thrust and burn summed over engines, twr = thrust / (mass * 9.8), burnTime = fuel / burn (0 if no burn), deltaV = (thrust / burn) * ln(mass / dryMass) (0 if no burn). */
+export function numbers(b: Blueprint): Numbers;
+export interface Flight { t: number; height: number; speed: number; fuel: number }
+/** Simulate a straight-up launch in steps of dt: thrust while fuel lasts, gravity 9.8, drag 0.0005 * speed^2 * sign(speed) per kg; stops after `seconds` or when it falls back to the ground (height <= 0 after leaving it). Returns the samples (one per step, the first at t = 0). */
+export function launch(b: Blueprint, seconds: number, dt: number): Flight[];
+/** A ready-made rocket that passes readiness (the shop's). */
+export function shopRocket(): Blueprint;
+```
+
+## Acceptance tests (copy unchanged, then add your own: a floating part, an engine with a part under it, a missing nose, an unwired engine, too heavy to lift off, launch reaches a height and falls back)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { launch, numbers, readiness, shopRocket, type Blueprint } from '../src/index';
+const r: Blueprint = { parts: [
+  { kind: 'engine', x: 0, y: 0 }, { kind: 'tank', x: 0, y: 1 }, { kind: 'cabin', x: 0, y: 2 }, { kind: 'nose', x: 0, y: 3 }, { kind: 'button', x: 1, y: 2 },
+], wires: [{ from: 4, to: 0 }] };
+test('a simple stack is ship ready', () => {
+  assert.deepEqual(readiness(r), []);
+  assert.deepEqual(readiness(shopRocket()), []);
+});
+test('its numbers', () => {
+  const n = numbers(r);
+  assert.equal(n.dryMass, 701); assert.equal(n.fuel, 900); assert.equal(n.mass, 1601);
+  assert.equal(n.thrust, 60000); assert.equal(n.burnTime, 30);
+  assert.ok(Math.abs(n.twr - 60000 / (1601 * 9.8)) < 1e-9);
+  assert.ok(Math.abs(n.deltaV - 2000 * Math.log(1601 / 701)) < 1e-6);
+});
+test('no cabin, no wire: not ready', () => {
+  assert.ok(readiness({ parts: r.parts.filter((p) => p.kind !== 'cabin'), wires: [] }).length >= 2);
+});
+test('it flies', () => {
+  const f = launch(r, 20, 0.1);
+  assert.equal(f[0]!.height, 0);
+  assert.ok(f[f.length - 1]!.height > 100);
+});
+```

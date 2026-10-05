@@ -1,0 +1,58 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a tiny procedural music box for a toy-world game's Jukebox. It makes looping songs as plain note data (the game's synth plays them): drums, bass, chords and a lead, from a seed, a style and a key. Deterministic: the same seed always gives the same song.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/musicbox.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (write a small seeded generator, e.g. mulberry32), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
+
+## API (implement exactly)
+
+```ts
+export type Style = 'chill' | 'bouncy' | 'spooky' | 'heroic';
+export type Track = 'drums' | 'bass' | 'chords' | 'lead';
+export interface Note { track: Track; beat: number; length: number; pitch: number; velocity: number } // beat from the loop start (quarter notes), pitch as a MIDI number (drums: 36 kick, 38 snare, 42 hat), velocity 0..1
+export interface Song { style: Style; key: number; minor: boolean; bpm: number; bars: number; notes: Note[] } // key: MIDI root of the tonic (e.g. 60 = C)
+/** Style defaults: chill 84 bpm major, bouncy 120 major, spooky 96 minor, heroic 132 major; 8 bars of 4/4. */
+export function makeSong(seed: number, style: Style, key?: number): Song;
+/** The scale degrees in semitones from the root: major [0,2,4,5,7,9,11], natural minor [0,2,3,5,7,8,10]. */
+export function scale(minor: boolean): number[];
+/** The notes that start in [fromBeat, toBeat) of the loop, wrapping round the loop end (for a scheduler that asks a short window ahead). */
+export function window(song: Song, fromBeat: number, toBeat: number): Note[];
+/** Seconds per beat. */
+export const beatSeconds: (song: Song) => number;
+/** Transpose a song by semitones (drums unchanged). */
+export function transpose(song: Song, semitones: number): Song;
+```
+
+## Rules
+- Chords: one chord per bar from a progression picked by the seed among I-V-vi-IV, vi-IV-I-V, I-IV-V-IV (minor styles: i-VI-III-VII, i-iv-v-i), three notes each in the octave above the root, held the whole bar.
+- Bass: the chord root an octave below the key root, on beats 1 and 3 of every bar (bouncy: every beat).
+- Lead: only scale notes of the key, one to two octaves above the root, mostly steps of one or two scale degrees; a phrase of 2 bars repeated with a variation; no note longer than 2 beats; nothing on the last half beat of the loop.
+- Drums: kick on 1 and 3, snare on 2 and 4, hats on eighths (spooky: no hats, kick on 1 only); velocities between 0.4 and 1.
+- Every note lies within the loop (beat + length <= bars * 4).
+
+## Acceptance tests (copy unchanged, then add your own: every style, lead stays in the scale, window wraps, transpose, notes stay inside the loop)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { beatSeconds, makeSong, scale, window } from '../src/index';
+test('same seed, same song; different seed, different lead', () => {
+  assert.deepEqual(makeSong(7, 'chill'), makeSong(7, 'chill'));
+  const a = makeSong(7, 'chill').notes.filter((n) => n.track === 'lead').map((n) => n.pitch);
+  const b = makeSong(8, 'chill').notes.filter((n) => n.track === 'lead').map((n) => n.pitch);
+  assert.notDeepEqual(a, b);
+});
+test('style defaults', () => {
+  const s = makeSong(1, 'spooky', 57);
+  assert.equal(s.bpm, 96); assert.equal(s.minor, true); assert.equal(s.bars, 8); assert.equal(s.key, 57);
+  assert.ok(Math.abs(beatSeconds(s) - 0.625) < 1e-9);
+  assert.deepEqual(scale(false), [0, 2, 4, 5, 7, 9, 11]);
+});
+test('drums on the beat; the window wraps', () => {
+  const s = makeSong(3, 'chill');
+  const kicks = s.notes.filter((n) => n.track === 'drums' && n.pitch === 36).map((n) => n.beat);
+  assert.deepEqual(kicks.slice(0, 4), [0, 2, 4, 6]);
+  const w = window(s, 31.5, 32.5);
+  assert.ok(w.some((n) => n.beat === 0 && n.track === 'drums'));
+});
+```

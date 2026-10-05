@@ -1,0 +1,84 @@
+START FROM A CLEAN SLATE. Write ONE TypeScript module: a reader and writer for MagicaVoxel .vox files that turns them into a simple voxel model for a toy-world game.
+
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/vox.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+
+RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Node APIs in src (only Uint8Array, DataView, TextDecoder/TextEncoder), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. The reader takes untrusted input: it must never throw past `readVox` (return errors instead), never loop forever, and refuse files over 32 MB or claiming more than 16 million voxels.
+
+## API (implement exactly)
+
+```ts
+export type Vec3 = [number, number, number];
+export interface PaletteEntry { name: string; color: Vec3; roughness: number; metalness: number; emissive: number; alpha: number } // color channels 0..1
+export interface VoxelModel { id: string; name: string; size: Vec3; pivot: Vec3; palette: PaletteEntry[]; cells: Uint8Array }
+// cells: index x + size[0] * (y + size[1] * z), Y IS UP; value 0 = empty, v = palette[v - 1]; at most 255 palette entries
+
+export interface VoxResult { models: VoxelModel[]; offsets: Vec3[]; errors: string[]; warnings: string[] }
+/** Read a .vox file. One VoxelModel per SIZE/XYZI pair, in file order; offsets = each model's translation from the scene graph (nTRN `_t`), converted to y-up, [0,0,0] when there is none. */
+export function readVox(bytes: Uint8Array, name?: string): VoxResult;
+/** Write one model as a valid .vox (version 150: VOX header, MAIN with SIZE, XYZI, RGBA). readVox(writeVox(m)) gives back the same cells and colours (to 1/255). */
+export function writeVox(model: VoxelModel): Uint8Array;
+/** Make a model fit a largest size: halve every axis (a 2x2x2 block becomes one cell, the most common non-empty value wins; empty only when all 8 are empty) until every side is <= max. */
+export function fitTo(model: VoxelModel, max: number): VoxelModel;
+```
+
+## The format (little-endian)
+- Header: 4 bytes "VOX ", int32 version (150 or 200; accept any).
+- Chunks: 4-byte id, int32 content size N, int32 children size M, N bytes content, M bytes children. The first chunk is MAIN (content empty, children = all others). Unknown chunks are skipped by their sizes.
+- SIZE: int32 x, y, z (MagicaVoxel is Z-UP). XYZI: int32 count, then count * 4 bytes (x, y, z, colorIndex 1..255).
+- RGBA: 256 * 4 bytes; file entry i (0-based) is the colour of colorIndex i + 1. Without RGBA use a fallback: entry i = grey level (i % 16) / 15 and add the warning "default palette".
+- MATL (optional): int32 id, then a DICT (int32 pair count, then pairs of STRING key and STRING value; STRING = int32 length + bytes). Use `_rough`, `_metal`, `_emit` (numbers as text) for that colour's entry; defaults roughness 0.8, metalness 0, emissive 0, alpha 1 (`_type` "_glass" sets alpha to 1 - `_trans` or 0.5).
+- nTRN: int32 node id, DICT attributes, int32 child id, int32 reserved (-1), int32 layer id, int32 frame count, then frames: DICT each; frame 0's `_t` is "x y z" (Z-up). Map transforms to models in order of their child shape nodes when you can; if you cannot follow the graph, use [0,0,0] and add a warning.
+- Conversion to y-up: game (x, y, z) = vox (x, z, y), so size = [sx, sz, sy]. Pivot = [floor(size[0]/2), 0, floor(size[2]/2)].
+- Palette: only the colours a model uses, in order of first use, renumbered from 1; names "Colour <original index>".
+- id = name (default "vox") plus "-" plus the model's position in the file; name likewise.
+
+## Acceptance tests (copy unchanged, then add your own below: a round trip of a random model, truncated files, a lying chunk size, an oversized count, MATL, fitTo)
+
+```ts
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { fitTo, readVox, writeVox, type VoxelModel } from '../src/index';
+const i32 = (n: number): number[] => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >> 24) & 255];
+const str = (s: string): number[] => [...s].map((c) => c.charCodeAt(0));
+const chunk = (id: string, content: number[], children: number[] = []): number[] => [...str(id), ...i32(content.length), ...i32(children.length), ...content, ...children];
+function file(): Uint8Array {
+  const size = chunk('SIZE', [...i32(2), ...i32(3), ...i32(4)]); // vox x=2, y=3, z=4 (z up)
+  const xyzi = chunk('XYZI', [...i32(2), 0, 0, 0, 5, 1, 2, 3, 9]); // (0,0,0) colour 5, (1,2,3) colour 9
+  const rgba: number[] = []; for (let i = 0; i < 256; i++) rgba.push(i, 0, 0, 255);
+  const main = chunk('MAIN', [], [...size, ...xyzi, ...chunk('RGBA', rgba)]);
+  return new Uint8Array([...str('VOX '), ...i32(150), ...main]);
+}
+test('reads a tiny file and turns it y-up', () => {
+  const r = readVox(file(), 'tiny');
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.models.length, 1);
+  const m = r.models[0]!;
+  assert.deepEqual(m.size, [2, 4, 3]);
+  assert.equal(m.palette.length, 2);
+  assert.ok(Math.abs(m.palette[0]!.color[0] - 4 / 255) < 1e-9, 'colour 5 is file entry 4');
+  assert.equal(m.cells[0 + 2 * (0 + 4 * 0)], 1);
+  assert.equal(m.cells[1 + 2 * (3 + 4 * 2)], 2, 'vox (1,2,3) is game (1,3,2)');
+  assert.equal(m.cells.filter((c) => c > 0).length, 2);
+});
+test('garbage never throws', () => {
+  for (const b of [new Uint8Array(0), new Uint8Array([1, 2, 3]), file().slice(0, 30), new Uint8Array(100).fill(255)]) {
+    const r = readVox(b);
+    assert.equal(r.models.length, 0);
+    assert.ok(r.errors.length > 0);
+  }
+});
+test('write then read gives the same model', () => {
+  const m = readVox(file()).models[0]!;
+  const back = readVox(writeVox(m)).models[0]!;
+  assert.deepEqual(back.size, m.size);
+  assert.deepEqual([...back.cells], [...m.cells]);
+});
+test('fitTo halves until it fits', () => {
+  const m: VoxelModel = { id: 'a', name: 'a', size: [4, 4, 4], pivot: [2, 0, 2], palette: [{ name: 'c', color: [1, 0, 0], roughness: 0.8, metalness: 0, emissive: 0, alpha: 1 }], cells: new Uint8Array(64) };
+  m.cells[0] = 1;
+  const f = fitTo(m, 2);
+  assert.deepEqual(f.size, [2, 2, 2]);
+  assert.equal(f.cells[0], 1);
+  assert.equal(f.cells.filter((c) => c > 0).length, 1);
+});
+```

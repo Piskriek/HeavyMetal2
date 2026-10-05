@@ -31,6 +31,10 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 
 All 17 picks above are copied to `packages/<name>/` with `@hm/<name>` in tsconfig.json and apps/web/vite.config.ts. Repo typecheck clean; every package passes its tests. Two fixes for the repo typecheck: hull dropped an unused `add`, and pixels dropped a test line reading a `grid` field that does not exist. None is wired into the game yet (the glue is in RELEASE_PLAN).
 
+## Merged in arena/gather2 (2026-10-05)
+
+smoothvox2 (A), toolanims (A) and tooljuice (B) are copied to packages/ with tsconfig paths and vite aliases. toolanims: the can's wiggle keys were made slightly asymmetric (+0.22/-0.2) so its own sign-change test does not land a sample exactly on zero (24/24). musicbox switched to A (see its row).
+
 ## Not gathered yet (2026-10-05)
 
 Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:

@@ -13,7 +13,7 @@ The tools and what using them looks like:
 - spade: a dig: raised, stabbed down with a foot push (legR), levered back.
 - fairyWand: a little circle in the air, then a flick forward with a hop.
 
-DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/toolanims.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/toolanims.test.ts`. Put those two code blocks in the chat. Also make one small preview page in your project (index.html that runs the acceptance tests in the browser and lists pass or fail), so the build loads; nothing else. When the tests would pass, STOP; do not explore further.
 
 RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
 

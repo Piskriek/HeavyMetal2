@@ -1,6 +1,6 @@
 START FROM A CLEAN SLATE. Write ONE TypeScript module: a tiny procedural music box for a toy-world game's Jukebox. It makes looping songs as plain note data (the game's synth plays them): drums, bass, chords and a lead, from a seed, a style and a key. Deterministic: the same seed always gives the same song.
 
-DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/musicbox.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/musicbox.test.ts`. Put those two code blocks in the chat. Also make one small preview page in your project (index.html that runs the acceptance tests in the browser and lists pass or fail), so the build loads; nothing else. When the tests would pass, STOP; do not explore further.
 
 RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random (write a small seeded generator, e.g. mulberry32), no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`.
 

@@ -1,6 +1,6 @@
 START FROM A CLEAN SLATE. Write ONE TypeScript module: turn a voxel model into a light triangle mesh for a toy-world game. Greedy meshing merges same-colour faces into big quads; then the mesh is welded and its triangle count reported, so a 32x32x32 model costs hundreds of triangles, not tens of thousands.
 
-DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/remesh.test.ts`. No project, no build, no other files. When the tests would pass, STOP; do not explore further.
+DELIVERY: reply with exactly two fenced code blocks and only a few words around them: first `src/index.ts`, then `tests/remesh.test.ts`. Put those two code blocks in the chat. Also make one small preview page in your project (index.html that runs the acceptance tests in the browser and lists pass or fail), so the build loads; nothing else. When the tests would pass, STOP; do not explore further.
 
 RULES: TypeScript strict with noUncheckedIndexedAccess, no `any`, no DOM, no Date, no Math.random, no imports in src. The test file imports only `node:test`, `node:assert/strict` and `../src/index`. Deterministic output order.
 

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { cmd, type Params, type PresetId } from '@hm/contracts';
 import type { Runtime } from '@hm/engine';
 import { Animator, type MoveSet } from '@hm/anim';
-import { V3_MODES, V3_TABS, levelOfMode, modeOfLevel, nextMode, v3Button, v3Slots, v3TabForKey, v3TabName, type V3Button, type V3Drive, type V3Found, type V3Mode, type V3Slider, type V3Source, type V3SubTool, type V3Tab, WIRE_DOS, PHYS_ITEMS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_PRESETS, LOGIC_WAYS, LogicRunner, normalizeRule, ruleSentence, PAINTS, THINGS, shakeById, shakeOffset, toolById, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
+import { V3_MODES, V3_TABS, levelOfMode, modeOfLevel, nextMode, v3Button, v3Slots, v3TabForKey, v3TabName, type V3Button, type V3Drive, type V3Found, type V3Mode, type V3Slider, type V3Source, type V3SubTool, type V3Tab, WIRE_DOS, PHYS_WAYS, CHAR_BRAINS, CHAR_WAYS, isCharBrain, SOUND_WAYS, isAmbience, EFFECT_ICONS, EFFECT_WAYS, LOGIC_WAYS, LogicRunner, normalizeRule, PAINTS, THINGS, shakeById, shakeOffset, toolById, type ShakePreset, type TabId, type ToolPreset } from '@hm/buildkit';
 import type { Effect } from '@hm/tutorial';
 import { createThreeRenderer, SurfaceArray, tileSizeFor, RACING_SURFACES, SETMIX_FILE, SETMIX_SURFACES, SETMIX_VOXEL, SURF, type ThreeRenderer } from '@hm/render';
 import { evaluateGraph, tileBytes, type TexGraph } from '@hm/texgraph';
@@ -67,6 +67,7 @@ import type { ShareKind } from './share/shares';
 import type { Preview } from './build/catalog';
 import { mapBundle, saveMap } from './maker/storage';
 import { spriteDef } from './build/sprites';
+import { runWay, type WayCtx } from './build/ways';
 import { TourCard } from './tutorial/tour-card';
 import { startTour, stopTour, tourEvent, tourReplay, tourTick, useTour } from './tutorial/tour';
 import { captureMouse, lookFilter } from './shell/capture-mouse';
@@ -143,7 +144,6 @@ function tintRgb(id: string | undefined): [number, number, number] {
   return (TINTS.find((t) => t.id === id) ?? TINTS[0]!).rgb;
 }
 /** Game Mode's Boombox: the funny sounds it picks from. */
-const FUNNY: readonly SfxId[] = ['jump', 'boost', 'splash', 'item-pickup', 'oil', 'respawn', 'freeze', 'snap'];
 /** Reduce motion (the system setting): no screen shakes. */
 const reducedMotion = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const PAINT_ITEMS: readonly StripItem[] = PAINTS.map((s) => ({ id: String(s.id), name: s.name, preview: SETMIX_FILE[s.id] ? { kind: 'image', url: `textures/setmix/${SETMIX_FILE[s.id]}.webp`, colors: surfaceColours(s.id) } : { kind: 'swatch', colors: surfaceColours(s.id) } }));
@@ -1118,10 +1118,10 @@ export function IslandWalk(props: {
       fx('sculpt-tick', { volume: 0.5, minGapMs: 80 });
     };
     /** Put a zone down where you point (a step-pad, a switch, a bell): small, noticing a goblin walking in. */
-    const putZone = (a: Aim, half: number, label: string): PresetId => {
+    const putZone = (a: Aim, half: number, label: string, when: 'enter' | 'leave' = 'enter'): PresetId => {
       const zid = `zone-${Date.now().toString(36)}` as PresetId;
       rt.commands.transaction(label, () => {
-        rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: label, params: { x: a.point[0], y: a.point[1], z: a.point[2], half, when: 'enter' } as never, tier: 'play' }, label));
+        rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: label, params: { x: a.point[0], y: a.point[1], z: a.point[2], half, when } as never, tier: 'play' }, label));
         rt.commands.execute(cmd.addChild(scene.sceneId, 'zones', zid, undefined, label));
       });
       return zid;
@@ -1146,72 +1146,161 @@ export function IslandWalk(props: {
       saveMap(rt, scene.sceneId);
       return mine.length;
     };
-    let clayOn: 'thing' | 'ground' | null = null;
-    /** The V3 buttons the island does itself (docs/HOTBAR_V3_SPEC.md): clay on the ground or a thing, funny sounds and a roar, noon and night, cords, the cutter, a doorbell, the Hierarchy list, the wire graph. */
-    const useV3Way = (id: string, alt: boolean, now: number, first: boolean): void => {
-      const s = player();
-      if (id === 'v3-clay-plump' || id === 'v3-clay-scoop') {
-        const add = (id === 'v3-clay-plump') !== alt;
-        if (first) { const b = blockUnder(); clayOn = b ? 'thing' : 'ground'; if (b) { carveThing(b, add, toolOf(s, 'things-carve')?.size ?? 1); return; } }
-        if (clayOn !== 'ground') return;
-        const a = aim(), base = toolOf(s, add ? 'raise' : 'lower');
-        if (!a || !base) return;
+    /** What the hotbar's ways may do to this island (apps/web/src/build/ways). */
+    const wayCtx: WayCtx = {
+      player,
+      aim,
+      say,
+      fx: (sound, opts) => fx(sound, opts),
+      burst: (sprite, count, at) => renderer.burst({ ...spriteDef(sprite), count, position: [at[0], at[1], at[2]] }),
+      shake: (preset) => { if (reducedMotion()) return; shakes.push({ s: shakeById(preset), t0: performance.now(), amount: 1 }); if (shakes.length > 6) shakes.shift(); },
+      random: () => Math.random(),
+      setTimeOfDay: (hours, label) => rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, hours, label)),
+      openLayers: () => openLayersRef.current(),
+      openWireGraph: () => openWireGraphRef.current(),
+      tourEvent: (e) => tourEvent(e as never),
+      modelAt: (a) => builder.modelAt(a as Aim),
+      lampNear: (a, within) => placedLamps().map((l) => ({ l, d: Math.hypot(l.x - a.point[0], l.z - a.point[2]) })).filter((q) => q.d < within).sort((p1, p2) => p1.d - p2.d)[0]?.l ?? null,
+      putZone: (a, half, label, when) => putZone(a as Aim, half, label, when),
+      zoneNear: (a) => placedZones().map((z) => ({ z, d: Math.hypot(z.x - a.point[0], z.z - a.point[2]) })).filter((q) => q.d <= q.z.half + 1).sort((p1, p2) => p1.d - p2.d)[0]?.z ?? null,
+      zoneCount: () => placedZones().length,
+      removeZone: (ref) => {
+        const zrefs = rt.store.get(scene.sceneId)?.children['zones'] ?? [], wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
+        rt.commands.transaction('Remove a zone', () => {
+          wrefs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['from'] === ref).reverse().forEach(({ i }) => rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Remove a zone')));
+          const zi = zrefs.findIndex((r) => r.ref === ref); if (zi >= 0) rt.commands.execute(cmd.removeChild(scene.sceneId, 'zones', zi, 'Remove a zone'));
+        });
+        saveMap(rt, scene.sceneId);
+      },
+      removeWiresTo: (ref) => {
+        const wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
+        const mine = wrefs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['to'] === ref);
+        if (!mine.length) return 0;
+        rt.commands.transaction('Remove wires', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Remove wires')); });
+        saveMap(rt, scene.sceneId);
+        return mine.length;
+      },
+      addRule: (name, params) => {
+        const ruleId = `rule-${Date.now().toString(36)}`;
+        rt.commands.transaction(`Rule: ${name}`, () => {
+          rt.commands.execute(cmd.put({ id: ruleId, kind: 'logic-rule', name, params: params as never, tier: 'play' }, `Rule: ${name}`));
+          rt.commands.execute(cmd.addChild(scene.sceneId, 'logic', ruleId, undefined, `Rule: ${name}`));
+        });
+        saveMap(rt, scene.sceneId);
+      },
+      removeRulesOn: (thing) => {
+        const refs = rt.store.get(scene.sceneId)?.children['logic'] ?? [];
+        const mine = refs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && String(rt.store.resolve(r.ref).params['thing'] ?? '') === thing);
+        if (!mine.length) return 0;
+        rt.commands.transaction('Remove rules', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'logic', i, 'Remove rules')); });
+        return mine.length;
+      },
+      openWindow: (id, title) => { live.current.win.open(id, title, { x: 60, y: 80, ...WIN.editor }); unlock(); },
+      placeChild: (list, kind, prefix, name, params) => {
+        const cid = `${prefix}-${Date.now().toString(36)}`;
+        const label = `${list === 'soundscape' ? 'Sound' : list === 'effects' ? 'Effect' : 'Lamp'}: ${name}`;
+        rt.commands.transaction(label, () => {
+          rt.commands.execute(cmd.put({ id: cid, kind, name, params: params as never, tier: 'play' }, label));
+          rt.commands.execute(cmd.addChild(scene.sceneId, list, cid, undefined, label));
+        });
+        saveMap(rt, scene.sceneId);
+        return cid;
+      },
+      removeNearest: (list, a, within, label) => {
+        const refs = rt.store.get(scene.sceneId)?.children[list] ?? [];
+        let best = -1, bestD = within;
+        refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
+        if (best < 0) return false;
+        rt.commands.execute(cmd.removeChild(scene.sceneId, list, best, label));
+        saveMap(rt, scene.sceneId);
+        return true;
+      },
+      previewSound: (what) => {
+        if (!isAmbience(what)) { fx(what as SfxId); return; }
+        const amb = AMBIENCES.find((x) => x.id === what), eng = audio();
+        if (amb && eng) { eng.setBed(`preview-${what}`, amb.layers, 0.5); window.setTimeout(() => eng.setBed(`preview-${what}`, amb.layers, 0), 3000); }
+      },
+      soundName: (what) => soundName(what),
+      effectOnce: (kind, at) => effects.once(kind, [at[0], at[1], at[2]]),
+      lampSlots: () => renderer.lampSlots,
+      walk: {
+        drawing: () => !!walkDraw,
+        start: (thing) => { walkDraw = { who: thing as PresetId, pts: [] }; },
+        push: (p) => { if (walkDraw) { walkDraw.pts.push([p[0], p[1]]); showWalkDraw(); } },
+        pop: () => { if (walkDraw) { walkDraw.pts.pop(); showWalkDraw(); } },
+        last: () => walkDraw?.pts[walkDraw.pts.length - 1] ?? null,
+        lay: () => layWalk(),
+        stop: (thing) => {
+          const refs = rt.store.get(scene.sceneId)?.children['paths'] ?? [];
+          const mine = refs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['who'] === thing);
+          if (!mine.length) return false;
+          rt.commands.transaction('Stop walking', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'paths', i, 'Stop walking')); });
+          saveMap(rt, scene.sceneId);
+          return true;
+        },
+      },
+      camera: {
+        photo: () => { photoNext = true; },
+        toggleSlowMo: () => { slowOn = !slowOn; slow.setScale(slowOn ? 0.2 : 1, 0.4); return slowOn; },
+        orbit: (thing, seconds) => {
+          const at: [number, number, number] = thing && rt.store.get(thing as PresetId) ? (() => { const pr = rt.store.resolve(thing as PresetId).params as Record<string, unknown>; return [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0) + 1, Number(pr['z'] ?? 0)] as [number, number, number]; })() : [px, py + 1, pz];
+          const from = eye ? (Math.atan2(eye[0] - at[0], eye[2] - at[2]) * 180) / Math.PI : 0;
+          shot = { track: orbitShot(at, 6, 2.5, seconds, from, 1, 55), t: 0 };
+        },
+      },
+      physics: {
+        swing: (at, power) => {
+          const refs = (rt.store.get(scene.sceneId)?.children['models'] ?? []).map((r) => physThing(r.ref)).filter((t): t is PhysThing => !!t);
+          return physics.swing([at[0], at[1], at[2]], 6, power, refs);
+        },
+        setMaterial: (thing, material) => {
+          rt.commands.execute(cmd.setParam(`${thing}.phys`, material as never, `Made of ${material}`));
+          saveMap(rt, scene.sceneId);
+        },
+        drop: (thing, height) => { const t = physThing(thing as PresetId); if (!t) return false; physics.drop(t, height); return true; },
+      },
+      chars: {
+        near: (a, within) => {
+          const refs = rt.store.get(scene.sceneId)?.children['characters'] ?? [];
+          let near = -1, nearD = within;
+          refs.forEach((r, i) => { const di = charRefs.indexOf(r.ref); const pr = rt.store.get(r.ref) ? rt.store.resolve(r.ref).params : null; if (!pr) return; const at = di >= 0 ? lastCharAt.get(r.ref) : undefined; const x = at?.[0] ?? Number(pr['x'] ?? 0), z = at?.[1] ?? Number(pr['z'] ?? 0); const d = Math.hypot(x - a.point[0], z - a.point[2]); if (d < nearD) { nearD = d; near = i; } });
+          const r = refs[near];
+          return r ? { index: near, ref: r.ref } : null;
+        },
+        remove: (c) => {
+          rt.commands.execute(cmd.removeChild(scene.sceneId, 'characters', c.index, 'Remove a character'));
+          saveMap(rt, scene.sceneId); refreshModels();
+        },
+        setBrain: (c, brain, label) => {
+          rt.commands.execute(cmd.setParam(`${c.ref}.brain`, brain as never, label));
+          saveMap(rt, scene.sceneId);
+        },
+        spawn: (a, brain, label) => {
+          const charId = `char-${Date.now().toString(36)}`;
+          const yaw = (Math.atan2(px - a.point[0], pz - a.point[2]) * 180) / Math.PI;
+          rt.commands.transaction(label, () => {
+            rt.commands.execute(cmd.put({ id: charId, kind: 'character', name: 'Goblin', params: { brain, look: AVATAR_LOOKS[Math.floor(Math.random() * AVATAR_LOOKS.length)]!.id, x: a.point[0], y: a.point[1], z: a.point[2], yaw, size: 1 } as never, tier: 'play' }, label));
+            rt.commands.execute(cmd.addChild(scene.sceneId, 'characters', charId, undefined, label));
+          });
+          saveMap(rt, scene.sceneId); refreshModels();
+        },
+      },
+      thingName: (ref) => rt.store.get(ref as PresetId)?.name ?? 'it',
+      drive: (name) => v3Drive(player(), name as V3Drive),
+      save: () => saveMap(rt, scene.sceneId),
+      putWire,
+      snipAt: (a) => snipAt(a as Aim),
+      wireFrom: () => wireFrom,
+      setWireFrom: (id) => { wireFrom = id; },
+      carveUnder: (add, size) => { const b = blockUnder(); if (!b) return false; carveThing(b, add, size); return true; },
+      sculptGround: (add, now, first) => {
+        const s = player(), a = aim(), base = toolOf(s, add ? 'raise' : 'lower');
+        if (!a || !base) return false;
         builder.use(withSculptPalette(base, s), a, false, now, first);
-        if (first) tourEvent('used-sculpt');
-        return;
-      }
-      if (!first) return;
-      const a = aim();
-      switch (id) {
-        case 'v3-hierarchy': openLayersRef.current(); return;
-        case 'logic-graph': openWireGraphRef.current(); return;
-        case 'v3-noon': case 'v3-night': {
-          const noon = id === 'v3-noon';
-          rt.commands.execute(cmd.setParam(`${scene.sceneId}.timeOfDay`, noon ? 12 : 22, noon ? 'Noon' : 'Night'));
-          say(noon ? 'Noon: the sun is high' : 'Night: the moon is up'); fx(noon ? 'ui-success' : 'ui-toggle', { volume: 0.5 });
-          return;
-        }
-        case 'v3-funny': {
-          fx(FUNNY[Math.floor(Math.random() * FUNNY.length)]!, { volume: 0.7 });
-          if (a) renderer.burst({ ...spriteDef('stars'), count: 12, position: [a.point[0], a.point[1] + 1, a.point[2]] });
-          return;
-        }
-        case 'v3-roar': {
-          fx('shockwave', { volume: 0.9 }); fx('hit-wall', { volume: 0.6 });
-          if (!reducedMotion()) { shakes.push({ s: shakeById('rumble'), t0: performance.now(), amount: 1 }); if (shakes.length > 6) shakes.shift(); }
-          if (a) renderer.burst({ ...spriteDef('embers'), count: 40, position: [a.point[0], a.point[1] + 0.4, a.point[2]] });
-          say('ROAR!');
-          return;
-        }
-        case 'v3-doorbell': {
-          if (!a) { say('Point at the ground'); return; }
-          if (alt) { const n = snipAt(a); say(n ? 'Bell taken off' : 'No bell there'); return; }
-          const zid = putZone(a, 0.8, 'Doorbell');
-          putWire(zid, '', 'sound', 'Doorbell', 'ui-success');
-          say('A doorbell: it chimes when a goblin steps on it'); fx('place', { volume: 0.5 });
-          return;
-        }
-        case 'v3-cord': {
-          if (!a) { say('Point at the ground'); return; }
-          if (alt) { const n = snipAt(a); say(n ? (n === 1 ? 'Snip: one cord cut' : `Snip: ${n} cords cut`) : 'No cords there'); fx(n ? 'delete' : 'ui-error', { volume: 0.5 }); return; }
-          const does = s.palette.wire ?? 'toggle';
-          if (!wireFrom) { wireFrom = putZone(a, 0.9, does === 'light-on' ? 'Switch' : 'Step-pad'); say(does === 'light-on' ? 'Now click the lamp it lights' : 'Now click the thing it opens'); fx('place', { volume: 0.5 }); return; }
-          const m = builder.modelAt(a);
-          const lamp = placedLamps().map((l) => ({ l, d: Math.hypot(l.x - a.point[0], l.z - a.point[2]) })).filter((q) => q.d < 2).sort((p1, p2) => p1.d - p2.d)[0]?.l ?? null;
-          const target = does === 'light-on' ? lamp?.ref ?? null : m?.ref ?? lamp?.ref ?? null;
-          if (!target) { say(does === 'light-on' ? 'Click a lamp (Esc lets go of the cord)' : 'Click a thing (Esc lets go of the cord)'); return; }
-          const from = wireFrom; wireFrom = null;
-          putWire(from, target, does, 'Magic cord');
-          say(does === 'light-on' ? 'ZAP! Step on the switch to light it' : 'ZAP! Step on the pad to open it'); fx('place', { volume: 0.6 });
-          return;
-        }
-        case 'v3-cutter': {
-          if (!a) { say('Point at a pad, a thing or a lamp'); return; }
-          const n = snipAt(a);
-          say(n ? (n === 1 ? 'Snip: one cord cut' : `Snip: ${n} cords cut`) : 'No cords there'); fx(n ? 'delete' : 'ui-error', { volume: 0.5 });
-          return;
-        }
-      }
+        return true;
+      },
+      toolSize: (toolId) => toolOf(player(), toolId)?.size ?? 1,
+      memo: new Map(),
     };
     /** Using what you hold: tools act on the world; the other tabs act on a left click too (play, light, open, wear, switch). */
     const useHeld = (alt: boolean, now: number, first: boolean): void => {
@@ -1219,7 +1308,7 @@ export function IslandWalk(props: {
       const id = s.hotbars[s.tab][s.slots[s.tab]];
       const v3b = v3Now(s).button;
       if (v3b?.bind.todo || !id) { if (first) say(v3b ? `${v3b.name}: coming. ${v3b.doc}` : 'Pick something on the hotbar'); return; }
-      if (id.startsWith('v3-') || id === 'logic-graph') { useV3Way(id, alt, now, first); return; }
+      if (runWay(wayCtx, { id, alt, now, first })) return;
       if (s.tab === 'select' || s.tab === 'paint' || s.tab === 'sculpt' || s.tab === 'things') {
         const own: ToolPreset | null = toolOf(s, id);
         // a way to paint puts down what the palette has picked (top middle)
@@ -1282,280 +1371,7 @@ export function IslandWalk(props: {
         }
         return;
       }
-      // the Logic tab's ways: add the palette's rule to what you point at, take rules off it, open the island's rules
-      if (s.tab === 'logic') {
-        if (!first) return;
-        if (id === 'logic-zone' || id === 'logic-wire') {
-          const a = aim();
-          if (!a) { say('Point at the ground'); return; }
-          const zs = placedZones();
-          const zoneNear = zs.map((z) => ({ z, d: Math.hypot(z.x - a.point[0], z.z - a.point[2]) })).filter((q) => q.d <= q.z.half + 1).sort((p, q) => p.d - q.d)[0]?.z ?? null;
-          if (id === 'logic-zone') {
-            if (alt) {
-              if (!zoneNear) { say('No zone there'); return; }
-              const zrefs = rt.store.get(scene.sceneId)?.children['zones'] ?? [], wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
-              rt.commands.transaction('Remove a zone', () => {
-                wrefs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['from'] === zoneNear.ref).reverse().forEach(({ i }) => rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Remove a zone')));
-                const zi = zrefs.findIndex((r) => r.ref === zoneNear.ref); if (zi >= 0) rt.commands.execute(cmd.removeChild(scene.sceneId, 'zones', zi, 'Remove a zone'));
-              });
-              saveMap(rt, scene.sceneId); say('Zone taken away, with its wires'); fx('delete', { volume: 0.5 });
-              return;
-            }
-            const zid = `zone-${Date.now().toString(36)}`;
-            rt.commands.transaction('Zone', () => {
-              rt.commands.execute(cmd.put({ id: zid, kind: 'logic-zone', name: 'Zone', params: { x: a.point[0], y: a.point[1], z: a.point[2], half: Math.max(0.5, (v3Drive(s, 'zone-size') ?? 4) / 2), when: s.palette.zone === 'leave' ? 'leave' : 'enter' } as never, tier: 'play' }, 'Zone'));
-              rt.commands.execute(cmd.addChild(scene.sceneId, 'zones', zid, undefined, 'Zone'));
-            });
-            saveMap(rt, scene.sceneId); say('A zone: now take Wire, click it, then click what it acts on'); fx('place', { volume: 0.5 });
-            return;
-          }
-          // Wire: the zone first, then what it acts on
-          const m = builder.modelAt(a);
-          const lampNear = placedLamps().map((l) => ({ l, d: Math.hypot(l.x - a.point[0], l.z - a.point[2]) })).filter((q) => q.d < 2).sort((p, q) => p.d - q.d)[0]?.l ?? null;
-          const target = m?.ref ?? lampNear?.ref ?? null;
-          if (alt) {
-            if (!target) { say('Point at a wired thing or lamp'); return; }
-            const wrefs = rt.store.get(scene.sceneId)?.children['wires'] ?? [];
-            const mine = wrefs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['to'] === target);
-            if (!mine.length) { say('No wires to that'); return; }
-            rt.commands.transaction('Remove wires', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'wires', i, 'Remove wires')); });
-            saveMap(rt, scene.sceneId); say(mine.length === 1 ? 'Its wire is off' : `Its ${mine.length} wires are off`); fx('delete', { volume: 0.5 });
-            return;
-          }
-          if (!wireFrom) {
-            if (!zoneNear) { say(zs.length ? 'Click a zone first (the purple boxes)' : 'Put a zone down first (Zone)'); return; }
-            wireFrom = zoneNear.ref; say('Now click the thing or lamp it acts on'); fx('select', { volume: 0.5 });
-            return;
-          }
-          const does = s.palette.wire ?? 'toggle';
-          if (!target) { say('Click a thing or a lamp (Esc lets go of the wire)'); return; }
-          if ((does === 'light-on' || does === 'light-off') && !lampNear) { say('Light on and off need a lamp: click a lamp'); return; }
-          const wid = `wire-${Date.now().toString(36)}`;
-          const from = wireFrom; wireFrom = null;
-          rt.commands.transaction('Wire', () => {
-            rt.commands.execute(cmd.put({ id: wid, kind: 'logic-wire', name: 'Wire', params: { from, when: rt.store.get(from as PresetId) && rt.store.resolve(from as PresetId).params['when'] === 'leave' ? 'leave' : 'enter', every: 3, to: target, do: does, sound: 'item-pickup', text: 'Hello!' } as never, tier: 'play' }, 'Wire'));
-            rt.commands.execute(cmd.addChild(scene.sceneId, 'wires', wid, undefined, 'Wire'));
-          });
-          saveMap(rt, scene.sceneId);
-          say(`Wired: walking into the zone does this: ${WIRE_DOS.find((d) => d.id === does)?.name.toLowerCase() ?? does}`); fx('place', { volume: 0.5 });
-          return;
-        }
-        if (id === 'logic-rules') { live.current.win.open('logic', 'Rules', { x: 60, y: 80, ...WIN.editor }); unlock(); return; }
-        const a = aim();
-        const thing = a ? builder.modelAt(a)?.ref ?? null : null;
-        const refs = rt.store.get(scene.sceneId)?.children['logic'] ?? [];
-        if (id === 'logic-remove' || alt) {
-          if (!thing) { say('Point at a thing to take its rules off'); return; }
-          const mine = refs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && String(rt.store.resolve(r.ref).params['thing'] ?? '') === thing);
-          if (!mine.length) { say('No rules on that'); return; }
-          rt.commands.transaction('Remove rules', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'logic', i, 'Remove rules')); });
-          say(mine.length === 1 ? 'Its rule is off' : `Its ${mine.length} rules are off`); fx('delete', { volume: 0.5 });
-          return;
-        }
-        const preset = LOGIC_PRESETS.find((x) => x.id === s.palette.logic) ?? LOGIC_PRESETS[0]!;
-        if (preset.needsThing && !thing) { say(`${preset.name}: point at a thing you placed`); return; }
-        const rule = normalizeRule({ ...preset.rule, thing: preset.needsThing ? thing : '' }, 'new');
-        const ruleId = `rule-${Date.now().toString(36)}`;
-        const { id: _new, ...params } = rule;
-        rt.commands.transaction(`Rule: ${preset.name}`, () => {
-          rt.commands.execute(cmd.put({ id: ruleId, kind: 'logic-rule', name: preset.name, params: params as never, tier: 'play' }, `Rule: ${preset.name}`));
-          rt.commands.execute(cmd.addChild(scene.sceneId, 'logic', ruleId, undefined, `Rule: ${preset.name}`));
-        });
-        saveMap(rt, scene.sceneId);
-        say(ruleSentence(rule, thing ? (rt.store.get(thing)?.name ?? 'it').toLowerCase() : 'the island'));
-        fx('place', { volume: 0.5 });
-        return;
-      }
-      // the Animate tab's ways: a thing walks a path, or stops
-      if (s.tab === 'animate' && id.startsWith('anim-')) {
-        if (!first) return;
-        const a = aim();
-        if (!a) { say('Point at the ground'); return; }
-        if (id === 'anim-stop') {
-          const m = builder.modelAt(a);
-          const refs = rt.store.get(scene.sceneId)?.children['paths'] ?? [];
-          const mine = m ? refs.map((r, i) => ({ r, i })).filter(({ r }) => rt.store.get(r.ref) && rt.store.resolve(r.ref).params['who'] === m.ref) : [];
-          if (!mine.length) { say('Point at a thing that walks'); return; }
-          rt.commands.transaction('Stop walking', () => { for (const { i } of [...mine].reverse()) rt.commands.execute(cmd.removeChild(scene.sceneId, 'paths', i, 'Stop walking')); });
-          saveMap(rt, scene.sceneId); say('It stays put now'); fx('delete', { volume: 0.5 });
-          return;
-        }
-        if (!walkDraw) {
-          const m = builder.modelAt(a);
-          if (!m) { say('Click the thing that should walk'); return; }
-          walkDraw = { who: m.ref, pts: [] };
-          say(`${rt.store.get(m.ref)?.name ?? 'It'}: now click points along its way, the last one again (or Enter) to go`); fx('select', { volume: 0.5 });
-          return;
-        }
-        if (alt) { walkDraw.pts.pop(); showWalkDraw(); return; }
-        const lastPt = walkDraw.pts[walkDraw.pts.length - 1];
-        if (lastPt && Math.hypot(a.point[0] - lastPt[0], a.point[2] - lastPt[1]) < 1) { layWalk(); return; }
-        walkDraw.pts.push([a.point[0], a.point[2]]); showWalkDraw(); fx('select', { volume: 0.3 });
-        return;
-      }
-      // the Camera tab's ways: an orbit shot, a photo, slow motion
-      if (s.tab === 'camera' && id.startsWith('cam-')) {
-        if (!first) return;
-        if (id === 'cam-photo') { photoNext = true; return; }
-        if (id === 'cam-slowmo') { slowOn = !slowOn; slow.setScale(slowOn ? 0.2 : 1, 0.4); say(slowOn ? 'Slow motion' : 'Back to speed'); fx('ui-toggle', { volume: 0.4 }); return; }
-        const a = aim();
-        const m = a ? builder.modelAt(a) : null;
-        const at = m && rt.store.get(m.ref) ? (() => { const pr = rt.store.resolve(m.ref).params as Record<string, unknown>; return [Number(pr['x'] ?? 0), Number(pr['y'] ?? 0) + 1, Number(pr['z'] ?? 0)] as [number, number, number]; })() : [px, py + 1, pz] as [number, number, number];
-        const from = eye ? (Math.atan2(eye[0] - at[0], eye[2] - at[2]) * 180) / Math.PI : 0;
-        shot = { track: orbitShot(at, 6, 2.5, Math.max(1, v3Drive(s, 'orbit-time') ?? 8), from, 1, 55), t: 0 };
-        say(m ? `Flying round ${rt.store.get(m.ref)?.name ?? 'it'} (Esc stops)` : 'Flying round you (Esc stops)'); fx('ui-toggle', { volume: 0.4 });
-        return;
-      }
-      // the Physics tab's ways: give the thing you point at the palette's material, drop it, or swing the push hammer
-      if (s.tab === 'physics') {
-        if (!first) return;
-        const a = aim();
-        if (!a) { say('Point at something'); return; }
-        const mat = s.palette.physics ?? 'rubber';
-        const matName = PHYS_ITEMS.find((m) => m.id === mat)?.name ?? mat;
-        if (id === 'phys-hammer') {
-          const refs = (rt.store.get(scene.sceneId)?.children['models'] ?? []).map((r) => physThing(r.ref)).filter((t): t is PhysThing => !!t);
-          const n = physics.swing([a.point[0], a.point[1], a.point[2]], 6, alt ? 1 : 4, refs);
-          fx(n ? 'boost' : 'ui-error', { volume: 0.6 });
-          say(n ? `Bonk! ${n === 1 ? 'One thing flies' : `${n} things fly`}` : 'Nothing near enough to push');
-          return;
-        }
-        const m = builder.modelAt(a);
-        if (!m) { say('Point at something you placed'); return; }
-        if (id === 'phys-give') {
-          const give = alt ? 'wood' : mat;
-          rt.commands.execute(cmd.setParam(`${m.ref}.phys`, give as never, `Made of ${give}`));
-          saveMap(rt, scene.sceneId);
-          say(`${rt.store.get(m.ref)?.name ?? 'It'} is ${alt ? 'wood' : matName.toLowerCase()} now: Drop shows how it lands`); fx('select', { volume: 0.5 });
-          return;
-        }
-        const t = physThing(m.ref);
-        if (t) { physics.drop(t, alt ? 6 : 3); fx('jump', { volume: 0.4 }); }
-        return;
-      }
-      // the Characters tab's ways: spawn a goblin with the palette's behaviour, give the one you point at that behaviour, take one away
-      if (s.tab === 'characters') {
-        if (!first) return;
-        const a = aim();
-        if (!a) { say('Point at the ground'); return; }
-        const brain = s.palette.characters && isCharBrain(s.palette.characters) ? s.palette.characters : 'wander';
-        const bname = CHAR_BRAINS.find((b) => b.id === brain)?.name ?? brain;
-        const refs = rt.store.get(scene.sceneId)?.children['characters'] ?? [];
-        // the character nearest where you point (where it walks to now, not where it was put)
-        let near = -1, nearD = 1.6;
-        refs.forEach((r, i) => { const di = charRefs.indexOf(r.ref); const pr = rt.store.get(r.ref) ? rt.store.resolve(r.ref).params : null; if (!pr) return; const at = di >= 0 ? lastCharAt.get(r.ref) : undefined; const x = at?.[0] ?? Number(pr['x'] ?? 0), z = at?.[1] ?? Number(pr['z'] ?? 0); const d = Math.hypot(x - a.point[0], z - a.point[2]); if (d < nearD) { nearD = d; near = i; } });
-        if (id === 'chars-remove' || (alt && id === 'chars-spawn')) {
-          if (near < 0) { say('Point at a character'); return; }
-          rt.commands.execute(cmd.removeChild(scene.sceneId, 'characters', near, 'Remove a character'));
-          saveMap(rt, scene.sceneId); refreshModels(); say('Character taken away'); fx('delete', { volume: 0.5 });
-          return;
-        }
-        if (id === 'chars-change') {
-          const r = refs[near];
-          if (!r) { say('Point at a character'); return; }
-          rt.commands.execute(cmd.setParam(`${r.ref}.brain`, brain as never, `Behaves: ${bname}`));
-          saveMap(rt, scene.sceneId); say(`It does this now: ${bname}`); fx('select', { volume: 0.5 });
-          return;
-        }
-        const charId = `char-${Date.now().toString(36)}`;
-        const yaw = (Math.atan2(px - a.point[0], pz - a.point[2]) * 180) / Math.PI;
-        rt.commands.transaction(`Character: ${bname}`, () => {
-          rt.commands.execute(cmd.put({ id: charId, kind: 'character', name: 'Goblin', params: { brain, look: AVATAR_LOOKS[Math.floor(Math.random() * AVATAR_LOOKS.length)]!.id, x: a.point[0], y: a.point[1], z: a.point[2], yaw, size: 1 } as never, tier: 'play' }, `Character: ${bname}`));
-          rt.commands.execute(cmd.addChild(scene.sceneId, 'characters', charId, undefined, `Character: ${bname}`));
-        });
-        saveMap(rt, scene.sceneId); refreshModels();
-        say(`A goblin: ${CHAR_BRAINS.find((b) => b.id === brain)?.doc ?? bname}`); fx('place', { volume: 0.5 });
-        return;
-      }
-      // the Sound tab's ways: play the palette's pick, place it (an ambience becomes a zone, a sound repeats from its spot), take the nearest away, list them
-      if (s.tab === 'sound' && id.startsWith('sound-')) {
-        if (!first) return;
-        if (id === 'sound-list') { live.current.win.open('soundscape', 'Sounds here', { x: 60, y: 80, ...WIN.editor }); unlock(); return; }
-        const what = s.palette.sound ?? 'forest-birds';
-        const name = isAmbience(what) ? AMBIENCES.find((a) => a.id === what)?.name ?? what : soundName(what);
-        if (id === 'sound-play') {
-          if (isAmbience(what)) {
-            const amb = AMBIENCES.find((a) => a.id === what);
-            const eng = audio();
-            if (amb && eng) { eng.setBed(`preview-${what}`, amb.layers, 0.5); window.setTimeout(() => eng.setBed(`preview-${what}`, amb.layers, 0), 3000); }
-          } else fx(what as SfxId);
-          say(name);
-          return;
-        }
-        const a = aim();
-        if (!a) { say('Point at the ground'); return; }
-        const refs = rt.store.get(scene.sceneId)?.children['soundscape'] ?? [];
-        if (id === 'sound-remove' || alt) {
-          let best = -1, bestD = 4;
-          refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
-          if (best < 0) { say('No placed sound near there'); return; }
-          rt.commands.execute(cmd.removeChild(scene.sceneId, 'soundscape', best, 'Remove a placed sound'));
-          saveMap(rt, scene.sceneId); say('Sound taken away'); fx('delete', { volume: 0.5 });
-          return;
-        }
-        const spotId = `sound-${Date.now().toString(36)}`;
-        const zone = isAmbience(what);
-        rt.commands.transaction(`Sound: ${name}`, () => {
-          rt.commands.execute(cmd.put({ id: spotId, kind: 'sound-spot', name, params: { what, x: a.point[0], y: a.point[1], z: a.point[2], size: zone ? 8 : Math.max(1, v3Drive(s, 'hearing') ?? 10), volume: Math.min(1, Math.max(0, (v3Drive(s, zone ? 'amb-volume' : 'loudness') ?? 80) / 100)), every: 4, on: true } as never, tier: 'play' }, `Sound: ${name}`));
-          rt.commands.execute(cmd.addChild(scene.sceneId, 'soundscape', spotId, undefined, `Sound: ${name}`));
-        });
-        saveMap(rt, scene.sceneId);
-        say(zone ? `${name}: a zone, you hear it when you are near` : `${name}: it plays from here every few seconds`); fx('place', { volume: 0.5 });
-        return;
-      }
-      // the Effects tab's ways: place the palette's effect where you point, play it once, or take the nearest away
-      if (s.tab === 'effects') {
-        if (!first) return;
-        const a = aim();
-        if (!a) { say('Point at the ground'); return; }
-        const kind = s.palette.effects ?? 'campfire';
-        const name = PARTICLE_PRESETS.find((p) => p.id === kind)?.name ?? kind;
-        if (id === 'effects-once') { effects.once(kind, [a.point[0], a.point[1], a.point[2]]); fx('select', { volume: 0.4 }); return; }
-        const refs = rt.store.get(scene.sceneId)?.children['effects'] ?? [];
-        if (id === 'effects-remove' || alt) {
-          let best = -1, bestD = 3;
-          refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
-          if (best < 0) { say('No effect near there'); return; }
-          rt.commands.execute(cmd.removeChild(scene.sceneId, 'effects', best, 'Remove an effect'));
-          saveMap(rt, scene.sceneId); say('Effect taken away'); fx('delete', { volume: 0.5 });
-          return;
-        }
-        const effectId = `effect-${Date.now().toString(36)}`;
-        rt.commands.transaction(`Effect: ${name}`, () => {
-          rt.commands.execute(cmd.put({ id: effectId, kind: 'effect', name, params: { preset: kind, x: a.point[0], y: a.point[1], z: a.point[2], scale: Math.min(5, Math.max(0.2, (v3Drive(s, 'effect-size') ?? 2) / 2)), on: true } as never, tier: 'play' }, `Effect: ${name}`));
-          rt.commands.execute(cmd.addChild(scene.sceneId, 'effects', effectId, undefined, `Effect: ${name}`));
-        });
-        saveMap(rt, scene.sceneId);
-        say(`${name} placed`); fx('place', { volume: 0.5 });
-        return;
-      }
       // the Lights tab's ways act on the light where you are (the Sun keeps moving while held)
-      if (s.tab === 'lights' && (id === 'light-lamp' || id === 'light-lamp-remove')) {
-        if (!first) return;
-        const a = aim();
-        if (!a) { say('Point at the ground'); return; }
-        const refs = rt.store.get(scene.sceneId)?.children['lamps'] ?? [];
-        if (id === 'light-lamp-remove' || alt) {
-          let best = -1, bestD = 3;
-          refs.forEach((r, i) => { if (!rt.store.get(r.ref)) return; const pr = rt.store.resolve(r.ref).params; const d = Math.hypot(Number(pr['x'] ?? 0) - a.point[0], Number(pr['z'] ?? 0) - a.point[2]); if (d < bestD) { bestD = d; best = i; } });
-          if (best < 0) { say('No lamp near there'); return; }
-          rt.commands.execute(cmd.removeChild(scene.sceneId, 'lamps', best, 'Remove a lamp'));
-          saveMap(rt, scene.sceneId); say('Lamp taken away'); fx('delete', { volume: 0.5 });
-          return;
-        }
-        const kind = s.palette.lamp && lampById(s.palette.lamp) ? s.palette.lamp : 'bulb';
-        const lp = lampById(kind)!;
-        // a spotlight hangs high and points down; a campfire or a candle sits low; the rest float at lamp height
-        const lift = lp.kind === 'spot' ? 3 : kind === 'campfire' ? 0.4 : kind === 'candle' ? 0.5 : kind === 'torch' ? 1.6 : 1.2;
-        const lampId = `lamp-${Date.now().toString(36)}`;
-        rt.commands.transaction(`Lamp: ${lp.name}`, () => {
-          rt.commands.execute(cmd.put({ id: lampId, kind: 'lamp', name: lp.name, params: { preset: kind, x: a.point[0], y: a.point[1] + lift, z: a.point[2], yaw: 0, pitch: 90, brightness: Math.min(3, Math.max(0, (v3Drive(s, 'lamp-brightness') ?? 50) / 50)), on: true } as never, tier: 'play' }, `Lamp: ${lp.name}`));
-          rt.commands.execute(cmd.addChild(scene.sceneId, 'lamps', lampId, undefined, `Lamp: ${lp.name}`));
-        });
-        saveMap(rt, scene.sceneId);
-        say(renderer.lampSlots > 0 ? `${lp.name}: it shows best at dusk and at night (Day and night)` : `${lp.name} placed (lamps are not lit on Potato graphics)`); fx('place', { volume: 0.5 });
-        return;
-      }
       if (s.tab === 'lights' && isLightWay(id)) {
         const holds = LIGHT_WAYS.find((w) => w.id === id)?.hold === true;
         if (!first && (!holds || now - lightTick < 120)) return;

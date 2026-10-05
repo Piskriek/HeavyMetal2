@@ -468,3 +468,35 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
 **State:** main, `npm test` 1701 tests (0 failing, 4 skipped), typecheck clean, build OK.
 
 **Next action:** RELEASE_PLAN Milestone 0.5, the ways registry first. Progress on it is logged below as it happens.
+
+### 12ah progress: the ways registry (Milestone 0.5, first task)
+
+- **Step 1 DONE:** `apps/web/src/build/ways/`:
+  - `types.ts`: `WayCtx`, everything a way may do to the island;
+  - one file per V3 tab: `things`, `select`, `lights`, `sound`, `logic`;
+  - `index.ts`: `runWay`, `wayIndex`, `hasWay`;
+  - `ways.test.ts`: 12 unit tests with a fake ctx. One of them fails if a working V3 button bound to a `v3-*` way has no handler.
+  - The island's `useV3Way` is now one `runWay(wayCtx, ...)` call; `wayCtx` is built once next to the helpers it wraps.
+  - `npm test` and `verify` include `apps/web/src/build/ways/*.test.ts`.
+- **How to add a button now:**
+  1. Give it a way id in `packages/buildkit/src/v3.ts` (drop `todo`).
+  2. Write its handler in `ways/<tab>.ts`.
+  3. If it needs something new from the island, add that to `WayCtx` and to `wayCtx` in `island.tsx`.
+  4. Test it with the fake ctx in `ways.test.ts`.
+- **Step 2 DONE:** `useHeld`'s per-tab branches moved into the ways files:
+  - logic (zone, wire, add rule, remove rules, the Rules window);
+  - sound (play, place, remove, list);
+  - effects (place, once, remove);
+  - lights (lamp, remove lamp);
+  - animate (anim-path, anim-stop);
+  - camera (photo, slow motion, orbit);
+  - physics (give, drop, hammer);
+  - characters (spawn, change, remove).
+
+  `WayCtx` grew generic helpers that new buttons reuse: `placeChild` and `removeNearest` (sound spots, effects, lamps), `openWindow`, `drive` (a V3 slider), `save`, and the sub-objects `walk`, `camera`, `physics` and `chars`. `ways.test.ts` has 23 tests; one fails if any working bound way on a migrated tab has no handler.
+- **Still in `useHeld` (on purpose, for now):**
+  - the tool tabs (select, paint, sculpt, things): gizmo picks, tint and carve, road and river, rain, then `builder.use` as the fallback;
+  - the Sun and sky light ways (`light-look`, `light-sun`): `light-ways.ts` imports the render look, so it would drag three.js into the node tests. Move them when `applyLightWay` is behind `WayCtx`;
+  - `applyNow` (picking an animation, a camera view, a look).
+
+  These are optional. The registry's goal (new buttons are small) is met.

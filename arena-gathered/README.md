@@ -12,8 +12,8 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | decals | `docs/handoff/prompts/battle/decals.txt` | **B** | 11/11 tests after its own slope test was fixed (lifting 1 cm along a tilted normal also moves x: `pos[0]` is `1 - 0.01 * SQRT1_2`); strict typecheck clean. A wrote into its own project (not collected). |
 | kart | `docs/handoff/prompts/battle/kart.txt` | **B** | 9/9 tests, strict typecheck clean (A was still writing when collected). |
 | kinematic | `docs/handoff/prompts/battle/kinematic.txt` | **B** | 11/11 tests, strict typecheck clean. A fails 5 of 10, including the wall acceptance tests (kept for reference). |
-| musicbox | `docs/handoff/prompts/battle/musicbox.txt` | **X** (the one answer posted in the chat) | 9/9 tests, strict typecheck clean. |
-| chunkworld | `docs/handoff/prompts/battle/chunkworld.txt` | **X** (the first answer finished) | 9/9 tests, strict typecheck clean. |
+| musicbox | `docs/handoff/prompts/battle/musicbox.txt` | **A** (rerun 2026-10-05; was X) | A: 8/8 own + X's 9/9, strict clean. X let a lead note run into the last half beat of the loop (against the spec), caught by A's test; packages/musicbox now uses A, with X's tests kept as musicbox-x.test.ts (17/17). The other rerun model's answer was cut short. |
+| chunkworld | `docs/handoff/prompts/battle/chunkworld.txt` | **X** (the first answer finished) | 9/9 tests, strict typecheck clean. Rerun 2026-10-05: X still the pick. B 9/9 strict clean, A 9/9 but 10 strict errors. The one disagreement is "retried at most twice": X and B allow 2 retries (3 attempts), A allows 2 attempts; decide when wiring. |
 | pixels | `docs/handoff/prompts/battle/pixels.txt` | **B** | 9/9 tests, strict typecheck clean. A: 7/8 (its place test fails). |
 | questline | `docs/handoff/prompts/battle/questline.txt` | **A** | 8/8, strict clean; B also 8/8 (A has the larger test file). |
 | machines | `docs/handoff/prompts/battle/machines.txt` | **B** | 11/11, strict clean. A: 12/14. |
@@ -36,4 +36,3 @@ All 17 picks above are copied to `packages/<name>/` with `@hm/<name>` in tsconfi
 Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:
 
 
-Worth a second answer to compare (only one model answered in chat): hull, remesh, musicbox, chunkworld.

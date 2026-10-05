@@ -25,6 +25,7 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | remesh | `docs/handoff/prompts/battle/remesh.txt` | **X** | 13/13, strict clean (the other model built in its own project, not collected). |
 | smoothvox2 | `docs/handoff/prompts/battle/smoothvox2.txt` | **A** | 20/20, strict clean. B: 6/7. Cross-run: A fails B's "surface blend splits a border" (check the one-ring rule before wiring); B fails 3 of A's. |
 | toolanims | `docs/handoff/prompts/battle/toolanims.txt` | **A** | 23/24, strict clean; its one failure is its own strict check of the can's three shakes (tune the data). B: 19/20; its failing step-key sample test looks wrong (A fails it too). Cross-runs fail on each other's data-specific tests, as expected for hand-made data. Review the motion by eye in the Animate tab. |
+| tooljuice | `docs/handoff/prompts/battle/tooljuice.txt` | **B** | 18/18, strict clean. A: 13/13 but one strict typecheck error. Cross-runs fail on each other's data-specific tests (hand-made data). |
 
 ## Merged (2026-10-05)
 
@@ -34,6 +35,5 @@ All 17 picks above are copied to `packages/<name>/` with `@hm/<name>` in tsconfi
 
 Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:
 
-- `docs/handoff/prompts/battle/tooljuice.txt` (B6)
 
 Worth a second answer to compare (only one model answered in chat): hull, remesh, musicbox, chunkworld.

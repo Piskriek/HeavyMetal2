@@ -449,3 +449,22 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
 - The first perf run after a heavy job is slow.
 
 **Next action:** RELEASE_PLAN Milestone 0.5, starting with the ways registry (it makes every later button small).
+
+## 12ah. 2026-10-05 (laptop): all Arena battles gathered and merged; Milestone 0.5 started. READ THIS FIRST (12ag still holds the new-PC setup and the memory rules).
+
+**The owner:** "gather code from arena ai and keep a pr updated", then "yea merge it run some tests push to main", then "start with the next steps but update everthing as you go so the catchup is clear on where to next for the afternoon session".
+
+**Arena: done.** Every battle in RELEASE_PLAN section 9 is gathered, tested, and merged into `packages/` on main (20 packages):
+- vox, schematic, puppet, decals, kart, kinematic, musicbox, chunkworld, pixels, questline, machines, market, rocket, ragdoll, navgrid, hull, remesh, smoothvox2, toolanims, tooljuice.
+- `arena-gathered/README.md` has the pick per package, the test numbers, and the open questions found by cross-running answers (read it before wiring a package):
+  - navgrid: check water handling on a real island;
+  - ragdoll: stick-length tolerance;
+  - smoothvox2: the one-ring rule in surfaceBlend;
+  - chunkworld: "retried at most twice" (X allows 3 attempts);
+  - toolanims, tooljuice: hand-made data, judge by eye.
+- **None is wired into the game yet.** Wiring is the release plan.
+- Arena routine notes (also in the README): a reCAPTCHA can appear; a chat sent while it is up is lost (its link bounces to the home page); the owner clicks the check, then resend. Votes only unlock when both builds load, so prompts now ask for a small preview page. Memory: arena-vote-reveal (vote when you can, record model names).
+
+**State:** main, `npm test` 1701 tests (0 failing, 4 skipped), typecheck clean, build OK.
+
+**Next action:** RELEASE_PLAN Milestone 0.5, the ways registry first. Progress on it is logged below as it happens.

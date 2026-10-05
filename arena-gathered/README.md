@@ -35,8 +35,6 @@ All 17 picks above are copied to `packages/<name>/` with `@hm/<name>` in tsconfi
 
 smoothvox2 (A), toolanims (A) and tooljuice (B) are copied to packages/ with tsconfig paths and vite aliases. toolanims: the can's wiggle keys were made slightly asymmetric (+0.22/-0.2) so its own sign-change test does not land a sample exactly on zero (24/24). musicbox switched to A (see its row).
 
-## Not gathered yet (2026-10-05)
+## Arena notes
 
-Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:
-
-
+Arena sometimes shows a reCAPTCHA; a chat sent while it is up is lost (the link bounces to the home page). The owner completes the check, then resend. Vote buttons only enable once both builds load, so prompts now ask for a small preview page.

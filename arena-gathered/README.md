@@ -24,6 +24,10 @@ Collected on the `arena/gather` branch (owner, 2026-10-04: "gather code from are
 | hull | `docs/handoff/prompts/battle/hull.txt` | **X** | 8/8, strict clean (the other model built in its own project, not collected). Large (1200 lines) but genuine: degenerate cases, Jacobi OBB. |
 | remesh | `docs/handoff/prompts/battle/remesh.txt` | **X** | 13/13, strict clean (the other model built in its own project, not collected). |
 
+## Merged (2026-10-05)
+
+All 17 picks above are copied to `packages/<name>/` with `@hm/<name>` in tsconfig.json and apps/web/vite.config.ts. Repo typecheck clean; every package passes its tests. Two fixes for the repo typecheck: hull dropped an unused `add`, and pixels dropped a test line reading a `grid` field that does not exist. None is wired into the game yet (the glue is in RELEASE_PLAN).
+
 ## Not gathered yet (2026-10-05)
 
 Arena started asking for a reCAPTCHA security check, and chats sent after that were never saved. These prompts are written and ready, but have no answers yet:

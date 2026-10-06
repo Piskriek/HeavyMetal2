@@ -214,3 +214,14 @@ Thanks: 01 and 06 are right, and 03 and 04 are much better. Keep going with your
 3. **Loose cables, still.** On 03 the cables leave the rear junction box loose across the floor; on 04 a loose cable runs from the console to the holotable and on to the machines. In the lab, every cable runs inside the steel floor covers or the ceiling trays. On the planet, cables on the ground are fine.
 
 When the set is complete, reply here with the branch name, the list of files and your self-review.
+
+---
+
+## Follow-up 3 (sent 2026-10-07, after reviewing 05, 07, 10 and 11)
+
+05 and 07 are right, and 10 and 11 are much better. Please carry on with 08, 09 and 12, then the contact sheet and the full README, committing as you go. Two more fixes, the first of which matters most for sheet 12:
+
+1. **The exhaust is not the hopper.** On 10 and 11 the pixels rise out of the feed hopper, the same opening the raw material goes into. Material goes in at the hopper; the pixels come out of a separate exhaust vent or stack, on top or at the back, away from the feed. Design every machine on sheet 12 this way, then fix the machines on 10 and 11 to match.
+2. **11's gate is not 06's twin.** On 11 the gate's planet end is a lattice tower with one tall coil column. Redraw it as the planet twin shown on 06 (box-section uprights with the ribbed coil blocks, angled buttresses, the plinth on a cast footing pad, the junction box at its foot), low poly at stage 1. Keep everything else on 11: the land, the neighbours' plots and the beacon are exactly right.
+
+When the set is complete, reply here with the branch name, the list of files and your self-review.

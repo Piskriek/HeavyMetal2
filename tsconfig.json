@@ -302,6 +302,12 @@
       ],
       "@hm/voxelart": [
         "packages/voxelart/src/index.ts"
+      ],
+      "@hm/vault": [
+        "packages/vault/src/index.ts"
+      ],
+      "@hm/fidelity": [
+        "packages/fidelity/src/index.ts"
       ]
     },
     "jsx": "react-jsx"

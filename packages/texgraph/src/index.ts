@@ -58,7 +58,12 @@ function isColorValue(value: unknown): value is [number, number, number] {
  * - cellular: one point per cell at its centre + (hash - 0.5) * jitter, 3 x 3 search, raw distances in cell units clamped to 1
  *   (f1 is 0 at a cell's point and grows outwards); edge = f2 - f1.
  * - stripes: 0.5 + 0.5 sin(2 pi count t), t = u when vertical; softness below 1 sharpens it with a smoothstep of width softness / 2.
+ *   An optional integer tilt leans them: t = count u + tilt v (vertical) or count v + tilt u, still seamless (SetMix vault, 2026-10-06).
  * - warp: u' = u + (w(u, v) - 0.5) amount, v' = v + (w(u + 0.37, v + 0.21) - 0.5) amount, sampled bilinearly.
+ *   With curl: true the offset is the field's gradient turned a quarter (dw/dv, -dw/du), scaled so its largest offset is amount / 2
+ *   like the plain warp: a swirl that never bunches up or thins out (divergence free).
+ * - ramp: interpolation 'linear' (the default), 'smooth' (a smoothstep between stops) or 'constant' (the nearest stop: a hard palette
+ *   in which every stop shows).
  * - blend: lerp(a, op(a, b), amount * mask); overlay = a < 0.5 ? 2ab : 1 - 2(1 - a)(1 - b).
  * - levels: t = clamp((x - inLow) / (inHigh - inLow)), t^gamma, lerp(outLow, outHigh, t).
  * Only the outputs are clamped to 0..1; values in between may leave it (a scaleBias above 1 then a levels brings them back).
@@ -138,17 +143,46 @@ function cellularImage(size: number, scale: number, jitter: number, mode: string
   return out;
 }
 
-function stripesImage(size: number, count: number, softness: number, vertical: boolean): Float32Array {
+function stripesImage(size: number, count: number, softness: number, vertical: boolean, tilt = 0): Float32Array {
   const bands = Math.max(1, Math.round(count)), soft = clamp01(softness), width = Math.max(0.0025, soft * 0.5);
-  const line = new Float32Array(size);
-  for (let i = 0; i < size; i += 1) {
-    const s = 0.5 + 0.5 * Math.sin(Math.PI * 2 * ((i + 0.5) / size) * bands);
-    if (soft >= 0.999) line[i] = s;
-    else { const k = clamp01((s - (0.5 - width)) / (2 * width)); line[i] = k * k * (3 - 2 * k); }
-  }
+  const lean = Math.round(tilt);
+  const shape = (s: number): number => {
+    if (soft >= 0.999) return s;
+    const k = clamp01((s - (0.5 - width)) / (2 * width));
+    return k * k * (3 - 2 * k);
+  };
   const out = new Float32Array(size * size);
+  if (lean !== 0) {
+    // integer counts along both axes keep the leaning stripes seamless
+    for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
+      const u = (x + 0.5) / size, v = (y + 0.5) / size;
+      const t = vertical ? bands * u + lean * v : bands * v + lean * u;
+      out[y * size + x] = shape(0.5 + 0.5 * Math.sin(Math.PI * 2 * t));
+    }
+    return out;
+  }
+  const line = new Float32Array(size);
+  for (let i = 0; i < size; i += 1) line[i] = shape(0.5 + 0.5 * Math.sin(Math.PI * 2 * ((i + 0.5) / size) * bands));
   for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) out[y * size + x] = vertical ? line[x]! : line[y]!;
   return out;
+}
+
+/** The curl of a wrapping scalar field: its gradient turned a quarter, divided by the largest so the biggest offset is 1. */
+function curlOffsets(field: Float32Array, size: number): { dx: Float32Array; dy: Float32Array } {
+  const dx = new Float32Array(size * size), dy = new Float32Array(size * size);
+  let largest = 0;
+  for (let y = 0; y < size; y += 1) {
+    const up = ((y + size - 1) % size) * size, down = ((y + 1) % size) * size, row = y * size;
+    for (let x = 0; x < size; x += 1) {
+      const left = (x + size - 1) % size, right = (x + 1) % size;
+      const gx = (field[row + right]! - field[row + left]!) * 0.5, gy = (field[down + x]! - field[up + x]!) * 0.5;
+      dx[row + x] = gy; dy[row + x] = -gx;
+      const length = Math.sqrt(gx * gx + gy * gy);
+      if (length > largest) largest = length;
+    }
+  }
+  if (largest > 0) for (let i = 0; i < dx.length; i += 1) { dx[i] = dx[i]! / largest; dy[i] = dy[i]! / largest; }
+  return { dx, dy };
 }
 
 /** Bilinear, wrapping sample of an image with `channels` channels at pixel position (sx, sy), written to out[at..]. */
@@ -164,8 +198,11 @@ function sampleInto(image: Float32Array, size: number, channels: number, sx: num
   }
 }
 
+/** How a ramp goes from one stop to the next. */
+export type RampInterpolation = "linear" | "smooth" | "constant";
+
 /** A ramp as a 2048-step lookup (stops sorted by `at`; equal stops make a hard step). */
-function rampTable(stops: readonly NodeRecord[]): Float32Array {
+function rampTable(stops: readonly NodeRecord[], interpolation: RampInterpolation = "linear"): Float32Array {
   const sorted = stops.slice().sort((p, q) => Number(p.at) - Number(q.at));
   const steps = 2048, table = new Float32Array(steps * 3);
   const colour = (s: NodeRecord): Color => [Number(s.r), Number(s.g), Number(s.b)];
@@ -178,7 +215,10 @@ function rampTable(stops: readonly NodeRecord[]): Float32Array {
     else {
       let i = 0;
       while (i < sorted.length - 1 && Number(sorted[i + 1]!.at) < x) i += 1;
-      const a = sorted[i]!, b = sorted[i + 1]!, span = Number(b.at) - Number(a.at), t = span <= 0 ? 1 : (x - Number(a.at)) / span;
+      const a = sorted[i]!, b = sorted[i + 1]!, span = Number(b.at) - Number(a.at);
+      let t = span <= 0 ? 1 : (x - Number(a.at)) / span;
+      if (interpolation === "smooth") t = t * t * (3 - 2 * t);
+      else if (interpolation === "constant") t = t < 0.5 ? 0 : 1;
       const ca = colour(a), cb = colour(b);
       c = [ca[0] + (cb[0] - ca[0]) * t, ca[1] + (cb[1] - ca[1]) * t, ca[2] + (cb[2] - ca[2]) * t];
     }
@@ -288,6 +328,7 @@ function checkNodeParameters(node: NodeRecord, errors: string[]): void {
     if (typeof node.vertical !== "boolean") {
       errors.push(`node '${id}': 'stripes' parameter 'vertical' must be boolean`);
     }
+    if (node.tilt !== undefined) checkedNumber(node, "tilt", errors, -64, 64, true);
     return;
   }
 
@@ -320,6 +361,9 @@ function checkNodeParameters(node: NodeRecord, errors: string[]): void {
 
   if (type === "warp") {
     checkedNumber(node, "amount", errors, 0, 0.3);
+    if (node.curl !== undefined && typeof node.curl !== "boolean") {
+      errors.push(`node '${id}': 'warp' parameter 'curl' must be boolean`);
+    }
     return;
   }
 
@@ -356,6 +400,15 @@ function checkNodeParameters(node: NodeRecord, errors: string[]): void {
   }
 
   if (type === "ramp") {
+    if (
+      node.interpolation !== undefined &&
+      node.interpolation !== "linear" &&
+      node.interpolation !== "smooth" &&
+      node.interpolation !== "constant"
+    ) {
+      errors.push(`node '${id}': 'ramp' parameter 'interpolation' must be 'linear', 'smooth', or 'constant'`);
+    }
+
     if (!Array.isArray(node.stops) || node.stops.length < 2) {
       errors.push(`node '${id}': 'ramp' requires at least two stops`);
       return;
@@ -723,7 +776,10 @@ export function evaluateGraph(graph: TexGraph, opts?: EvaluateOptions): Evaluate
       }
 
       case "stripes":
-        result = { colour: false, data: stripesImage(size, num(params, "count", 1), num(params, "softness", 1), params.vertical === true) };
+        result = {
+          colour: false,
+          data: stripesImage(size, num(params, "count", 1), num(params, "softness", 1), params.vertical === true, num(params, "tilt", 0)),
+        };
         break;
 
       case "checker": {
@@ -755,10 +811,18 @@ export function evaluateGraph(graph: TexGraph, opts?: EvaluateOptions): Evaluate
         const ox = Math.floor(size * 0.37), oy = Math.floor(size * 0.21);
         const channels = source.colour ? 3 : 1;
         const data = new Float32Array(count * channels);
-        for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
-          const i = y * size + x;
-          const w1 = field[i]!, w2 = field[((y + oy) % size) * size + ((x + ox) % size)]!;
-          sampleInto(source.data, size, channels, x + (w1 - 0.5) * amount, y + (w2 - 0.5) * amount, data, i * channels);
+        if (params.curl === true) {
+          const { dx, dy } = curlOffsets(field, size);
+          for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
+            const i = y * size + x;
+            sampleInto(source.data, size, channels, x + dx[i]! * 0.5 * amount, y + dy[i]! * 0.5 * amount, data, i * channels);
+          }
+        } else {
+          for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
+            const i = y * size + x;
+            const w1 = field[i]!, w2 = field[((y + oy) % size) * size + ((x + ox) % size)]!;
+            sampleInto(source.data, size, channels, x + (w1 - 0.5) * amount, y + (w2 - 0.5) * amount, data, i * channels);
+          }
         }
         result = { colour: source.colour, data };
         break;
@@ -817,7 +881,8 @@ export function evaluateGraph(graph: TexGraph, opts?: EvaluateOptions): Evaluate
 
       case "ramp": {
         const input = scalarOf(get(String(params.in)));
-        const table = rampTable(params.stops as NodeRecord[]);
+        const interpolation = params.interpolation === "smooth" || params.interpolation === "constant" ? params.interpolation : "linear";
+        const table = rampTable(params.stops as NodeRecord[], interpolation);
         const data = new Float32Array(count * 3);
         for (let i = 0; i < count; i += 1) {
           const j = Math.round(clamp01(input[i]!) * 2047) * 3;

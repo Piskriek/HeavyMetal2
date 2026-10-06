@@ -86,6 +86,16 @@ export function bakeLook(cart: Cartridge, stage: Stage, device: DeviceProfile, g
   };
 }
 
+const baked = new Map<string, StageLook>();
+
+/** bakeLook, kept for the visit: the lab's vista and the crafter share the looks they both need. */
+export function bakeLookCached(cart: Cartridge, stage: Stage, device: DeviceProfile, gridSpacing: number): StageLook {
+  const key = `${cart.id}@${stage}@${device.id}@${gridSpacing}`;
+  let hit = baked.get(key);
+  if (!hit) { hit = bakeLook(cart, stage, device, gridSpacing); baked.set(key, hit); }
+  return hit;
+}
+
 /** A small lit picture of a cartridge (as authored, not adapted), RGBA bytes, for its button in the cartridge strip. */
 export function cartridgeThumb(cart: Cartridge, size = 40): Uint8ClampedArray {
   return litPreview(evaluateGraph(cart.graph, { size, seed: 1, relief: size * 0.1 }));

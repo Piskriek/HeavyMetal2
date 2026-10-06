@@ -10,7 +10,7 @@ export const SPAN = 128;
 /** The big crater the chimney stands in. */
 export const MAIN_CRATER: Crater = { x: 0, z: 0, r: 26, depth: 5, rim: 2.4 };
 
-function hash(i: number, j: number, seed: number): number {
+export function hash(i: number, j: number, seed: number): number {
   let h = (Math.imul(i | 0, 374761393) + Math.imul(j | 0, 668265263) + Math.imul(seed | 0, 1442695041)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   h ^= h >>> 16;
@@ -18,7 +18,7 @@ function hash(i: number, j: number, seed: number): number {
 }
 
 /** Smooth value noise, 0..1. */
-function valueNoise(x: number, z: number, seed: number): number {
+export function valueNoise(x: number, z: number, seed: number): number {
   const i = Math.floor(x), j = Math.floor(z), fx = x - i, fz = z - j;
   const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
   const a = hash(i, j, seed), b = hash(i + 1, j, seed), c = hash(i, j + 1, seed), d = hash(i + 1, j + 1, seed);

@@ -35,9 +35,9 @@ export const STAGE_NAMES: Readonly<Record<Stage, string>> = {
   6: 'Living world',
 };
 
-/** How fast a wave front travels (metres a second) and how far it goes (past the patch's corners). */
+/** How fast a wave front travels (metres a second) and how far it goes (just past your plot's rim). */
 export const WAVE_SPEED = 15;
-export const WAVE_REACH = 96;
+export const WAVE_REACH = 62;
 /** How wide the band is where the old look swells into the new (metres). */
 export const WAVE_BAND = 7;
 

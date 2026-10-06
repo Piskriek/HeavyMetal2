@@ -6,8 +6,10 @@ import { VAULT, VAULT_BY_ID, type VaultCartridge } from '@hm/vault';
 import { guessQuality, parseQuality, type Quality } from '@hm/game';
 import { pixelRatioFor, resolveGraphics } from '@hm/render';
 import { noteGpu, powerPreferenceOf, type Profile } from '../shell/profile';
-import { bakeLook, cartridgeThumb, type StageLook } from './looks';
+import { bakeLookCached, cartridgeThumb, type StageLook } from './looks';
 import { createMoonScene, type MoonScene } from './moon-scene';
+import { NEIGHBOURS } from './planet';
+import { SMOOTH_IDS, smoothModel } from './smooth-models';
 import { STAGE_NAMES, STAGE_STARTS, WaveQueue, stageAt, stateAt } from './progress';
 import './crafter.css';
 
@@ -19,7 +21,7 @@ const CATEGORY_WORDS: Readonly<Record<VaultCartridge['category'], string>> = {
 };
 
 /** The graphics chip's name, from a throwaway context (it decides the tier on Auto). */
-function gpuName(): string | null {
+export function gpuName(): string | null {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
     const info = gl?.getExtension('WEBGL_debug_renderer_info');
@@ -30,7 +32,7 @@ function gpuName(): string | null {
 }
 
 /** The tier this device draws at: the Settings choice, or the Auto guess. */
-function tierFor(profile: Profile): Quality {
+export function tierFor(profile: Profile): Quality {
   const chosen = parseQuality(profile.quality);
   if (chosen) return chosen;
   const gpu = gpuName();
@@ -51,6 +53,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
   const gridSpacing = tier === 'potato' || tier === 'low' ? 1 : 0.5;
 
   const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState('Building the moon');
   const [failure, setFailure] = useState('');
   const [cartId, setCartId] = useState(FIRST_CARTRIDGE);
   const [hud, setHud] = useState<Hud>({ p: 0, stage: 1, running: false, look: null, preparing: null });
@@ -62,11 +65,11 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
   const lookFor = useCallback((id: string, stage: Stage): StageLook => {
     const key = `${id}@${stage}@${device.id}`;
     let look = looks.current.get(key);
-    if (!look) { look = bakeLook(VAULT_BY_ID.get(id)!, stage, device, gridSpacing); looks.current.set(key, look); }
+    if (!look) { look = bakeLookCached(VAULT_BY_ID.get(id)!, stage, device, gridSpacing); looks.current.set(key, look); }
     return look;
   }, [device, gridSpacing]);
 
-  // build the moon behind the loading bar: the scene, then the first cartridge's six looks
+  // build the planet behind the loading bar: the scene, your moon's first look, the smooth models, the neighbours' looks
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
@@ -147,8 +150,25 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
       raf = requestAnimationFrame(loop);
     };
 
+    // the loading bar's steps, each in its own task so the bar keeps moving between them; the label names what comes next
+    const steps: [string, () => void][] = [
+      ['Building the moon', () => { lookFor(FIRST_CARTRIDGE, 1); }],
+      ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders and trees', () => { smoothModel(id); }]),
+      ...[...new Set(NEIGHBOURS.map((n) => `${n.cartridge}@${n.stage}`))].map((k): [string, () => void] => {
+        const [id, st] = k.split('@') as [string, string];
+        return ['Visiting the neighbours', () => { lookFor(id, Number(st) as Stage); }];
+      }),
+      ['Laying out the plains', () => { scene.setPlanet(lookFor(FIRST_CARTRIDGE, 1), NEIGHBOURS.map((plot) => ({ plot, look: lookFor(plot.cartridge, plot.stage) }))); }],
+    ];
+    let stepAt = 0, boot = 0;
+    const runStep = (): void => {
+      if (cancelled) return;
+      steps[stepAt]![1]();
+      stepAt += 1;
+      if (stepAt < steps.length) { setLoading(steps[stepAt]![0]); boot = window.setTimeout(runStep, 0); } else start();
+    };
     // let the loading bar paint before the first bakes
-    const boot = window.setTimeout(start, 30);
+    boot = window.setTimeout(runStep, 30);
     return () => {
       cancelled = true;
       delete (window as unknown as { hmCrafter?: unknown }).hmCrafter;
@@ -227,7 +247,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
         <div className="rc-brand"><b>SetMix</b><i>Resolution Crafter</i></div>
         <button className="rc-back" onClick={props.onBack}>Back to SetMix</button>
       </header>
-      {!ready && !failure ? <div className="rc-loading gr-loading" role="status"><span>Building the moon</span><i /></div> : null}
+      {!ready && !failure ? <div className="rc-loading gr-loading" role="status"><span>{loading}</span><i /></div> : null}
       {failure ? <p className="rc-failure" role="alert">{failure}</p> : null}
       {ready ? (
         <section ref={consoleRef} className="rc-console" aria-label="Chimney console">

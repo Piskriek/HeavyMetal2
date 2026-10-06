@@ -38,7 +38,7 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['My planet', 'Avatars', 'Community', 'Settings']));
+  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Resolution Crafter', 'My planet', 'Avatars', 'Community', 'Settings']));
   await page.waitForSelector('.gr-preview', { timeout: T(30000) });
   check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings']));
   check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
@@ -71,6 +71,25 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(T(400));
   check('Esc again returns to the SetMix home', await page.locator('.sm-home').count() === 1);
+
+  // the Resolution Crafter (a first look): the moon builds behind a loading bar; a stage jump sends a wave out from the chimney; Esc returns home
+  const crafterErrors = errors.length;
+  await text('.sm-menu button', 'Resolution Crafter').click();
+  await page.waitForFunction(() => window.hmCrafter && window.hmCrafter.frames > 5, null, { timeout: T(30000) });
+  check('the Resolution Crafter builds its moon and draws it', await page.locator('.rc-console').count() === 1 && await dom(() => window.hmCrafter.shown.startsWith('lunar_anorthosite@1@')));
+  await dom(() => [...document.querySelectorAll('.rc-ladder button')][2]?.click());
+  await page.waitForFunction(() => window.hmCrafter.radius > 0 && window.hmCrafter.target.includes('@3@'), null, { timeout: T(15000) });
+  check('a stage jump sends a wave out from the chimney', true);
+  await page.waitForFunction(() => window.hmCrafter.shown.includes('@3@') && window.hmCrafter.radius < 0, null, { timeout: T(30000) });
+  check('the wave crosses the moon and stage 3 settles', /Stage 3 of 6/.test(await page.locator('.rc-stage-line').innerText()));
+  await shot('crafter-stage-3');
+  await dom(() => document.querySelector('.rc-run')?.click());
+  await page.waitForTimeout(T(1200));
+  check('the chimney runs and the world climbs', await dom(() => window.hmCrafter.p > 0.429));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(T(400));
+  check('Esc leaves the Resolution Crafter for the SetMix home', await page.locator('.sm-home').count() === 1 && await dom(() => !window.hmCrafter));
+  check('the Resolution Crafter raised no page error', errors.length === crafterErrors, errors.slice(crafterErrors).join(' | '));
 
   // My planet shows your islands drawn from above; going into one the first time makes your first avatar (look and name), then dives
   await text('.sm-menu button', 'My planet').click();

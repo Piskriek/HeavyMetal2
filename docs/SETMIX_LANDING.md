@@ -54,7 +54,7 @@ Main at the time of writing: typecheck clean, `npm test` 1,743 tests (1,739 pass
 
 ## 4. The waves
 
-**Progress (2026-10-06):** Wave 0 done (`37e31100`). Waves 1 and 2 done: `@hm/fidelity` (38 tests), the texgraph options (6 tests, the 112 existing graphs unchanged byte for byte), `@hm/vault` (14 tests: 50 of 50 cartridges valid, tiling, certified on every tier, every pair fusable). What changed against the plan below and why: `arena-gathered/setmix/README.md`, "Landed". Wardrobe and weather calendar wait until they are wired. Next: the preview (SM7), built as its own SetMix screen.
+**Progress (2026-10-06):** Wave 0 done (`37e31100`). Waves 1 and 2 done: `@hm/fidelity` (38 tests), the texgraph options (6 tests, the 112 existing graphs unchanged byte for byte), `@hm/vault` (14 tests: 50 of 50 cartridges valid, tiling, certified on every tier, every pair fusable). What changed against the plan below and why: `arena-gathered/setmix/README.md`, "Landed". Wardrobe and weather calendar wait until they are wired. The preview (SM7) is built: `apps/web/src/crafter/` (the moon, the Pixel Chimney, the wave through the six stages on `@hm/fidelity` and `@hm/vault`; STATUS SM7). It is a first look, not Wave 3 proper: the wave there is the screen's own (`crafter/progress.ts`), and `@hm/wavefield` from the drop's `field.ts` still waits. Next: the owner's reaction to the preview, then Milestone 0.5, then Wave 3 (the Lab and the portal belong to Wave 5).
 
 ### Wave 0: gather (docs and files only; no game change)
 - Add `zips/` to `.gitignore`.

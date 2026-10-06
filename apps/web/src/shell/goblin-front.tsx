@@ -54,7 +54,8 @@ export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void;
   );
 }
 
-const HARNESS_MENU: readonly { readonly id: 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
+const HARNESS_MENU: readonly { readonly id: 'crafter' | 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
+  { id: 'crafter', label: 'Resolution Crafter', says: "Raise a moon's resolution, stage by stage. A first look." },
   { id: 'island', label: 'My planet', says: 'Your islands: pick one to go in, or make a new one.' },
   { id: 'avatars', label: 'Avatars', says: 'Who you are: goblins, humans and more.' },
   { id: 'community', label: 'Community', says: 'Presets other players share, and yours.' },
@@ -67,13 +68,15 @@ const HARNESS_MENU: readonly { readonly id: 'island' | 'avatars' | 'community' |
  */
 export function SetMixHome(props: {
   readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
+  /** The Resolution Crafter: SetMix's own game mode (a first look for now). */
+  readonly onCrafter: () => void;
   /** Straight into the island you were last on (or your first). */
   readonly onIslandNow: () => void;
   /** The island My island opens, and whether you have been there before (then it says you carry on where you left off). */
   readonly island: { readonly name: string; readonly visited: boolean } | null;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
 }): ReactElement {
-  const act = { island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
+  const act = { crafter: props.onCrafter, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
   return (
     <div className="sm-home">
       <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>

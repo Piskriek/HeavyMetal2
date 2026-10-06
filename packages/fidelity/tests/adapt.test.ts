@@ -56,7 +56,7 @@ test("cellular is drawn as noise where the tier cannot afford it", () => {
   assert.equal(b.allowCellular, false);
   const g = adaptGraph(CART_A.graph, b);
   assert.equal(g.nodes.find((n) => n.id === "cell")?.type, "noise");
-  assert.ok(b.demoted.some((d) => d.includes("cellular")));
+  assert.ok(b.demoted.some((d) => d.includes("cells drawn as plain noise")));
 });
 
 test("warps are skipped where not allowed, and their users read the warp's input", () => {

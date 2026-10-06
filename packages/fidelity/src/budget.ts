@@ -34,22 +34,22 @@ export function deriveBudget(s: FidelityState, dev: DeviceProfile): RenderBudget
   const capIndex = TEXEL_LADDER.indexOf(dev.maxTexel);
   let sizeIndex = wantIndex;
   if (capIndex >= 0 && sizeIndex > capIndex) {
-    demoted.push(`texel ${TEXEL_LADDER[wantIndex]} to ${dev.maxTexel}`);
+    demoted.push(`${TEXEL_LADDER[wantIndex]} px textures drawn at ${dev.maxTexel} px`);
     sizeIndex = capIndex;
   }
 
   let octaves = 1 + Math.floor(n.pxd * 5);
   if (octaves > dev.maxOctaves) {
-    demoted.push(`octaves ${octaves} to ${dev.maxOctaves}`);
+    demoted.push(`noise in ${dev.maxOctaves} layers, not ${octaves}`);
     octaves = dev.maxOctaves;
   }
 
   const normal = n.lx > 0.18 && dev.allowNormal;
-  if (n.lx > 0.18 && !dev.allowNormal) demoted.push("normal maps off: lit by vertex");
+  if (n.lx > 0.18 && !dev.allowNormal) demoted.push("no surface relief (normal maps)");
   const allowWarp = n.pxd > 0.3 && dev.allowWarp;
-  if (n.pxd > 0.3 && !dev.allowWarp) demoted.push("domain warp off");
+  if (n.pxd > 0.3 && !dev.allowWarp) demoted.push("no warping");
   const allowCellular = n.vtx > 0.22 || dev.maxTexel >= 128;
-  if (!allowCellular) demoted.push("cellular drawn as noise");
+  if (!allowCellular) demoted.push("cells drawn as plain noise");
 
   return {
     stage,

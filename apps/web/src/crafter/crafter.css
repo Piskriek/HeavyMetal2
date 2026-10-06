@@ -1,0 +1,74 @@
+/* ---- The Resolution Crafter preview (crafter/crafter.tsx) ------------------------------------------------------------------------
+   The moon is the hero: full bleed, black void with stars at stage 1. The lab's console sits along the bottom in the SetMix voice
+   (paper, hairlines, square, Oxanium numbers, one accent: the Run button and the stage you are on). The only thing that glows is
+   the wave front in the 3D view. Light text appears only where it sits on the sky. */
+.rc { position: absolute; inset: 0; background: #000; overflow: hidden; color: var(--text); }
+.rc-view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+.rc-view:active { cursor: grabbing; }
+
+.rc-top { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: clamp(16px, 3vh, 28px) clamp(16px, 5vw, 72px) 0; pointer-events: none; }
+.rc-top > * { pointer-events: auto; }
+.rc-brand { display: flex; flex-direction: column; gap: 4px; color: #f8f7f2; }
+.rc-brand b { font-family: var(--font-setmix); font-weight: 800; font-size: 22px; line-height: 1; letter-spacing: -0.01em; }
+.rc-brand i { font-family: var(--font-setmix); font-style: normal; font-weight: 500; font-size: 15px; color: rgba(248, 247, 242, 0.72); }
+.rc-back { color: #f8f7f2; border-color: rgba(248, 247, 242, 0.45); background: transparent; }
+.rc-back:hover:not(:disabled) { background: rgba(248, 247, 242, 0.12); border-color: rgba(248, 247, 242, 0.8); }
+.rc-hint { position: absolute; left: clamp(16px, 5vw, 72px); top: calc(clamp(16px, 3vh, 28px) + 52px); margin: 0; max-width: 46ch; font-size: 12px; line-height: 1.45;
+  color: rgba(248, 247, 242, 0.62); pointer-events: none; }
+
+/* once the sky is light, the words on it turn dark (no shadows in this voice) */
+.rc-sky-light .rc-brand { color: var(--text); }
+.rc-sky-light .rc-brand i, .rc-sky-light .rc-hint { color: rgba(36, 39, 34, 0.72); }
+.rc-sky-light .rc-back { color: var(--text); border-color: rgba(36, 39, 34, 0.5); }
+.rc-sky-light .rc-back:hover:not(:disabled) { background: rgba(36, 39, 34, 0.08); border-color: var(--text); }
+.rc-brand, .rc-brand i, .rc-hint, .rc-back { transition: color .6s, border-color .6s; }
+
+.rc-loading span { color: rgba(248, 247, 242, 0.72); }
+.rc-loading i { background: rgba(248, 247, 242, 0.18); }
+.rc-loading i::after { background: #f8f7f2; }
+.rc-failure { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 32px)); margin: 0; padding: 16px 18px;
+  background: var(--paper); border: 1px solid var(--text); font-size: 13px; line-height: 1.5; }
+
+/* the lab's console */
+.rc-console { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: minmax(230px, 0.9fr) minmax(220px, 1fr) minmax(300px, 1.5fr);
+  background: var(--paper); border-top: 1px solid var(--text); }
+.rc-console > div { padding: 14px clamp(16px, 2.2vw, 28px) 16px; min-width: 0; }
+.rc-console > div + div { border-left: 1px solid var(--line); }
+
+.rc-stage-line { margin: 0 0 10px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rc-stage-line b { font-family: var(--font-setmix); font-weight: 600; font-size: 20px; line-height: 1.1; }
+.rc-stage-line span { font-size: 13px; color: var(--dim); }
+.rc-ladder { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; }
+.rc-ladder button { width: 30px; height: 30px; padding: 0; font: 600 12px/1 var(--font-setmix); color: var(--dim); }
+.rc-ladder button.reached { background: var(--text); border-color: var(--text); color: var(--paper); }
+.rc-ladder button.here { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent); }
+.rc-ladder button.reached:hover:not(:disabled) { background: #3a3e38; border-color: #3a3e38; }
+.rc-note { margin: 10px 0 0; font-size: 11px; line-height: 1.4; color: var(--dim); }
+
+.rc-meters { display: grid; align-content: center; gap: 9px; }
+.rc-meter { display: grid; grid-template-columns: 64px 1fr 40px; align-items: center; gap: 10px; font-size: 12px; }
+.rc-meter i { display: block; height: 6px; background: var(--line); position: relative; }
+.rc-meter i b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--text); transition: width .3s linear; }
+.rc-meter em { font: 600 12px/1 var(--font-setmix); font-style: normal; text-align: right; }
+
+.rc-chimney { display: grid; gap: 10px; align-content: start; }
+.rc-cart { margin: 0; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rc-cart b { font-family: var(--font-setmix); font-weight: 600; font-size: 16px; }
+.rc-cart span { font-size: 12px; color: var(--dim); }
+.rc-strip { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.rc-strip button { flex: none; width: 40px; height: 40px; padding: 1px; }
+.rc-strip button img, .rc-strip button span { display: block; width: 36px; height: 36px; }
+.rc-strip button { position: relative; }
+.rc-strip button.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* new at this stage: a small square in the corner */
+.rc-strip button.new::after { content: ''; position: absolute; right: 3px; top: 3px; width: 7px; height: 7px; background: var(--text); border: 1px solid var(--paper); }
+.rc-locked { flex: none; align-self: center; padding: 0 6px; font-size: 11px; color: var(--dim); white-space: nowrap; }
+.rc-run { justify-self: start; min-width: 190px; height: 36px; font: 600 14px/1 var(--font-setmix); letter-spacing: .01em; }
+
+@media (max-width: 900px) {
+  .rc-console { grid-template-columns: 1fr; max-height: 56vh; overflow-y: auto; }
+  .rc-console > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  .rc-hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .rc-meter i b { transition: none; } }

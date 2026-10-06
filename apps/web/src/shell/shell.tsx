@@ -26,6 +26,7 @@ import { captureMouse } from './capture-mouse';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
 import { bigStore } from '../storage/big-store';
+import { ResolutionCrafter } from '../crafter/crafter';
 import { exportIsland, importIsland } from '../islands/island-transfer';
 
 /**
@@ -35,7 +36,7 @@ import { exportIsland, importIsland } from '../islands/island-transfer';
  * brings a bar down from the top (back to galaxy, up one level, into the selected). Everything is a screen of this one shell: there are no
  * separate pages, so nothing can strand you (see ROUTES and the e2e smoke test). Goblin words belong to Goblin Racing; the harness is SetMix.
  */
-export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands';
+export type Screen = 'home' | 'goblin' | 'create' | 'avatars' | 'zoom' | 'island' | 'activities' | 'hub' | 'activity' | 'racing' | 'settings' | 'build' | 'islands' | 'crafter';
 
 /** Where "back" goes from every screen. The e2e test and the unit test walk this table: each screen must have a way home. */
 export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' | null; readonly doc: string }>> = {
@@ -52,6 +53,7 @@ export const ROUTES: Readonly<Record<Screen, { readonly back: Screen | 'origin' 
   settings: { back: 'origin', doc: 'Settings (the settings presets).' },
   islands: { back: 'origin', doc: 'My planet: your islands drawn from above; go into one, rename, copy, delete, undo, make a new one.' },
   build: { back: 'activity', doc: "Goblin Racing's track editor, on the Goblin Racing island. Esc opens its menu; Back to Goblin Racing returns." },
+  crafter: { back: 'home', doc: 'The Resolution Crafter (a first look): the moon, the Pixel Chimney and the resolution wave through the six stages. Esc or Back to SetMix returns.' },
 };
 
 const HOME: PlanetDef = { id: 'home', name: 'My Island', hue: 0.52, size: 1, ring: false, doc: 'Your own planet: walk it as your avatar, build, host.' };
@@ -338,7 +340,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
 
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
-          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onMyIsland={() => { setPicked('home'); toIslands(); }} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
+          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onCrafter={() => { origin.current = 'home'; go('crafter'); }} onMyIsland={() => { setPicked('home'); toIslands(); }} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
             onIslandNow={() => void myIsland()} island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null} />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {/* your planet picked: its islands, drawn from above; pick one to go in, or open the planet for all of them */}
@@ -449,6 +451,11 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {screen === 'racing' && (raceAuto ? editWorld : raceRt) ? (
         <div className="shell-layer" style={{ zIndex: 4 }}>
           <App profile={profile} onProfile={update} rt={(raceAuto ? editWorld! : raceRt!).rt} fromMap={raceAuto ? true : raceRt!.fromMap} {...(raceAuto ? { autoStart: true } : { entry: raceEntry })} onExit={() => { pinMapKey(null); go(raceBack); }} />
+        </div>
+      ) : null}
+      {screen === 'crafter' ? (
+        <div className="shell-layer" style={{ zIndex: 4 }}>
+          <ResolutionCrafter profile={profile} onBack={toHome} />
         </div>
       ) : null}
       {storageFull ? (

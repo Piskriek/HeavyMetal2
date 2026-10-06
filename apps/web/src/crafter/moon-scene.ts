@@ -3,6 +3,7 @@
 // The screen tells it which looks to show and where the wave front is.
 import * as THREE from 'three';
 import type { StageLook } from './looks';
+import { createCreatures, type Creatures, type Herd } from './creatures';
 import { drop, planetHeight } from './planet';
 import { createWorld, type Neighbour } from './world';
 
@@ -45,6 +46,19 @@ export function createMoonScene(o: MoonSceneOptions): MoonScene {
   const camera = new THREE.PerspectiveCamera(48, 1, 0.5, 9000);
   const world = createWorld(scene, { gridSpacing: o.gridSpacing, reducedMotion: o.reducedMotion });
 
+  // ---- animals: once your plot is alive (stage 5 on) a herd grazes on it, crystal tortoises by the lake, mantas overhead
+  const ground = (x: number, z: number): number => planetHeight(x, z) - drop(x, z);
+  const HERDS: readonly Herd[] = [
+    { id: 'MOON_STRIDER', x: -34, z: -26, count: 7, roam: 12 },
+    { id: 'CRYSTAL_TORTOISE', x: 20, z: -30, count: 2, roam: 6 },
+    { id: 'SKY_MANTA', x: 0, z: 0, count: 2, roam: 40 },
+  ];
+  let animals: Creatures | null = null, pendingStage = 0;
+  const animalsFor = (stage: number): void => {
+    if (stage >= 5 && !animals) animals = createCreatures(scene, HERDS, ground, o.reducedMotion);
+    if (stage < 5 && animals) { animals.dispose(); animals = null; }
+  };
+
   // ---- the camera: drag to look round, wheel to come closer; it starts low, looking out over the plains
   const orbit = { yaw: 0.85, pitch: 0.13, distance: 58, idle: 0 };
   const target = new THREE.Vector3(0, world.peakY + 3.5, 0);
@@ -65,10 +79,10 @@ export function createMoonScene(o: MoonSceneOptions): MoonScene {
   o.canvas.addEventListener('wheel', onWheel, { passive: false });
 
   return {
-    show: (look) => world.show(look),
-    setTarget: (look) => world.setTarget(look),
+    show: (look) => { world.show(look); animalsFor(look.stage); },
+    setTarget: (look) => { world.setTarget(look); pendingStage = look.stage; },
     setFront: (radius) => world.setFront(radius),
-    settle: () => world.settle(),
+    settle: () => { world.settle(); if (pendingStage) animalsFor(pendingStage); },
     setChimney: (running, palette) => world.setChimney(running, palette),
     setPlanet: (base, neighbours) => world.setPlanet(base, neighbours),
     frame(now, dt) {
@@ -80,6 +94,7 @@ export function createMoonScene(o: MoonSceneOptions): MoonScene {
       if (camera.position.y < ground) camera.position.y = ground;
       camera.lookAt(target);
       world.update(now, dt, camera.position);
+      animals?.update(now, dt);
       renderer.render(scene, camera);
     },
     resize(width, height, pixelRatio, covered = 0) {
@@ -101,6 +116,7 @@ export function createMoonScene(o: MoonSceneOptions): MoonScene {
       o.canvas.removeEventListener('pointerup', onUp);
       o.canvas.removeEventListener('pointercancel', onUp);
       o.canvas.removeEventListener('wheel', onWheel);
+      animals?.dispose();
       world.dispose();
       renderer.dispose();
     },

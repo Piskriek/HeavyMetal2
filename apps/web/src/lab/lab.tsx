@@ -9,6 +9,7 @@ import { tierFor } from '../crafter/crafter';
 import { bakeLookCached } from '../crafter/looks';
 import { NEIGHBOURS } from '../crafter/planet';
 import { SMOOTH_IDS, smoothModel } from '../crafter/smooth-models';
+import { animalBody } from '../crafter/creatures';
 import { createLabScene, type LabScene } from './lab-scene';
 
 /** The planet when it is finished: its plains in this cartridge's last stage, every neighbour at theirs. */
@@ -53,6 +54,8 @@ export function LabHome(props: { readonly profile: Profile }): ReactElement {
     // each step in its own task, so the bar keeps moving; the label names what comes next
     const steps: [string, () => void][] = [
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Growing the trees', () => { smoothModel(id); }]),
+      ['Waking the goblin', () => { smoothModel('goblin'); }],
+      ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Waking the animals', () => { animalBody(id); }]),
       ...cartridges.map((id): [string, () => void] => ['Finishing the planet', () => { look(id); }]),
       ['Opening the arch', () => { scene.setVista(look(FINISHED), look(FINISHED), NEIGHBOURS.map((plot) => ({ plot, look: look(plot.cartridge) }))); }],
     ];

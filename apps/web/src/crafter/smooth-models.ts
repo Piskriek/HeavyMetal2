@@ -7,11 +7,12 @@ import { createModel, ellipsoid, line, cylinder, sphere, speckle, weld, MODELS, 
 import { meshModel, type Mesh, type VModel } from '@hm/smoothvox';
 import { hash } from './moon';
 
-export type SmoothId = 'boulder0' | 'boulder1' | 'boulder2' | 'broadleaf' | 'conifer' | 'palm';
+export type SmoothId = 'boulder0' | 'boulder1' | 'boulder2' | 'broadleaf' | 'conifer' | 'palm' | 'goblin';
+/** The planet's models (the goblin is built only where one stands: the lab). */
 export const SMOOTH_IDS: readonly SmoothId[] = ['boulder0', 'boulder1', 'boulder2', 'broadleaf', 'conifer', 'palm'];
 
-/** Metres per voxel: a boulder is about 1.5 m across before its own size scales it; the trees stand 9 to 11 m. */
-const METRES: Readonly<Record<SmoothId, number>> = { boulder0: 1 / 12, boulder1: 1 / 12, boulder2: 1 / 12, broadleaf: 0.32, conifer: 0.3, palm: 0.26 };
+/** Metres per voxel: a boulder is about 1.5 m across before its own size scales it; the trees stand 9 to 11 m; a goblin 1.3 m. */
+const METRES: Readonly<Record<SmoothId, number>> = { boulder0: 1 / 12, boulder1: 1 / 12, boulder2: 1 / 12, broadleaf: 0.32, conifer: 0.3, palm: 0.26, goblin: 0.03 };
 
 const entry = (name: string, r: number, g: number, b: number, roughness = 0.9): Entry => ({ name, color: [r, g, b], roughness, metalness: 0, emissive: 0, alpha: 1 });
 
@@ -68,7 +69,7 @@ function toVModel(m: Model): VModel {
 function voxelsOf(id: SmoothId): Model {
   if (id === 'broadleaf') return broadleafModel();
   if (id === 'conifer') return coniferModel();
-  if (id === 'palm') return weld(MODELS.find((x) => x.id === 'palm')!.build());
+  if (id === 'palm' || id === 'goblin') return weld(MODELS.find((x) => x.id === id)!.build());
   return boulderModel(Number(id.slice(-1)));
 }
 

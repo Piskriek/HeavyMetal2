@@ -10,6 +10,7 @@ import { bakeLookCached, cartridgeThumb, type StageLook } from './looks';
 import { createMoonScene, type MoonScene } from './moon-scene';
 import { NEIGHBOURS } from './planet';
 import { SMOOTH_IDS, smoothModel } from './smooth-models';
+import { animalBody } from './creatures';
 import { STAGE_NAMES, STAGE_STARTS, WaveQueue, stageAt, stateAt } from './progress';
 import './crafter.css';
 
@@ -154,6 +155,7 @@ export function ResolutionCrafter(props: { readonly profile: Profile; readonly o
     const steps: [string, () => void][] = [
       ['Building the moon', () => { lookFor(FIRST_CARTRIDGE, 1); }],
       ...SMOOTH_IDS.map((id): [string, () => void] => ['Shaping the boulders and trees', () => { smoothModel(id); }]),
+      ...(['MOON_STRIDER', 'CRYSTAL_TORTOISE', 'SKY_MANTA'] as const).map((id): [string, () => void] => ['Waking the animals', () => { animalBody(id); }]),
       ...[...new Set(NEIGHBOURS.map((n) => `${n.cartridge}@${n.stage}`))].map((k): [string, () => void] => {
         const [id, st] = k.split('@') as [string, string];
         return ['Visiting the neighbours', () => { lookFor(id, Number(st) as Stage); }];

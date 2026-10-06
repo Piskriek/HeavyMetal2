@@ -614,9 +614,11 @@ What landed:
 
 Measured on this laptop (the minimum spec) on Low: the crafter at 59.5 fps, the lab at 60 fps (about 830k triangles).
 
+Later the same evening:
+- **The goblin as a smooth model**, standing on the lab's threshold looking out.
+- **Smooth animals** (`crafter/creatures.ts`): moon striders, crystal tortoises and sky mantas, moved by `@hm/fauna`. They graze in the lab's view and come to your plot at stage 5.
+
 Next:
-- the goblin as a smooth model;
 - `@hm/flora` choosing which trees grow where;
-- smooth creatures from `@hm/fauna`;
 - the shared planet (SM8 to SM10, `docs/SETMIX_WORLD.md` not yet written);
 - a stage-by-stage reveal in the lab.

@@ -9,6 +9,8 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { StageLook } from '../crafter/looks';
 import { hash } from '../crafter/moon';
 import { drop, planetHeight } from '../crafter/planet';
+import { smoothModel } from '../crafter/smooth-models';
+import { createCreatures, type Creatures } from '../crafter/creatures';
 import { createWorld, type Neighbour, type World } from '../crafter/world';
 
 /** Where the lab stands on the planet (just off your plot) and which way its arch looks: over the chimney, towards the goblin planet. */
@@ -205,7 +207,7 @@ export function createLabScene(o: { readonly canvas: HTMLCanvasElement; readonly
 
   // ---- the planet outside
   const outside = new THREE.Scene();
-  let world: World | null = null;
+  let world: World | null = null, animals: Creatures | null = null;
   const eye = new THREE.Vector3(), look = new THREE.Vector3(), leanTo = new THREE.Vector2(), leanNow = new THREE.Vector2();
   let tall = false;
 
@@ -217,6 +219,20 @@ export function createLabScene(o: { readonly canvas: HTMLCanvasElement; readonly
       world.setPlanet(base, neighbours, { lush: true, clear: { x: LAB_AT.x, z: LAB_AT.z, r: 40 }, view: { x: LAB_AT.x, z: LAB_AT.z, dirX: OUT.x, dirZ: OUT.y, halfAngle: 0.5 } });
       world.show(plot);
       world.setChimney(false, ['#ffffff']);
+      // animals in the meadow between the lab and your plot's lake, in the arch's view
+      const right = new THREE.Vector2(-OUT.y, OUT.x);
+      const at = (out: number, side: number) => ({ x: LAB_AT.x + OUT.x * out + right.x * side, z: LAB_AT.z + OUT.y * out + right.y * side });
+      animals = createCreatures(outside, [
+        { id: 'MOON_STRIDER', ...at(56, -5), count: 9, roam: 14 },
+        { id: 'CRYSTAL_TORTOISE', ...at(72, 12), count: 3, roam: 8 },
+        { id: 'SKY_MANTA', ...at(120, 0), count: 3, roam: 45 },
+      ], (x, z) => planetHeight(x, z) - drop(x, z), o.reducedMotion);
+      // a goblin on the threshold, looking out at it
+      const goblin = new THREE.Mesh(smoothModel('goblin').near, keep(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0 })));
+      goblin.position.set(ARCH.x - 0.7, 0, ROOM.back - 0.9);
+      goblin.rotation.y = 0.45;
+      goblin.scale.setScalar(1.15);
+      room.add(goblin);
     },
     lean(x, y) { leanTo.set(x, y); },
     stats: () => ({ triangles: renderer.info.render.triangles, calls: renderer.info.render.calls }),
@@ -230,6 +246,7 @@ export function createLabScene(o: { readonly canvas: HTMLCanvasElement; readonly
       camera.position.copy(room.localToWorld(eye.clone()));
       camera.lookAt(room.localToWorld(look.clone()));
       world?.update(now, dt, camera.position);
+      animals?.update(now, dt);
       renderer.info.autoReset = false;
       renderer.info.reset();
       renderer.clear();
@@ -246,6 +263,7 @@ export function createLabScene(o: { readonly canvas: HTMLCanvasElement; readonly
       camera.updateProjectionMatrix();
     },
     dispose() {
+      animals?.dispose();
       world?.dispose();
       for (const x of owned) x.dispose();
       renderer.dispose();

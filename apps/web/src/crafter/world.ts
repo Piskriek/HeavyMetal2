@@ -81,6 +81,12 @@ function normalAt(height: (x: number, z: number) => number, x: number, z: number
   out[k] = -dx / len; out[k + 1] = 1 / len; out[k + 2] = -dz / len;
 }
 
+/** Distance from a point to the segment a-b, on the ground. */
+function distanceToSegment(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(x - ax - dx * t, z - az - dz * t);
+}
+
 const smooth = (a: number, b: number, x: number): number => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 /** A boulder as a ball for its shadow: centre (on the curved ground) and radius. */
@@ -139,6 +145,8 @@ export interface PlanetOptions {
   readonly lush?: boolean;
   /** A spot kept clear of boulders and trees (where the lab stands). */
   readonly clear?: { readonly x: number; readonly z: number; readonly r: number };
+  /** Seen only from here, looking this way (the lab's arch): trees and boulders outside the view are not built at all. */
+  readonly view?: { readonly x: number; readonly z: number; readonly dirX: number; readonly dirZ: number; readonly halfAngle: number };
 }
 
 export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
@@ -313,7 +321,12 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     if (planetSet) return;
     planetSet = true;
     setLook(base, 'Base', { look: baseLook, colour: keep(texture(baseLook.colour, baseLook.size, true, baseLook.pixelated)), maps: keep(texture(baseLook.maps, baseLook.size, false, baseLook.pixelated)) });
-    const cell = baseLook.facetCell, clear = options.clear;
+    const cell = baseLook.facetCell, clear = options.clear, view = options.view;
+    const seen = (x: number, z: number): boolean => {
+      if (!view) return true;
+      const dx = x - view.x, dz = z - view.z, d = Math.hypot(dx, dz);
+      return d > 1 && (dx * view.dirX + dz * view.dirZ) / d > Math.cos(view.halfAngle);
+    };
     // where the planet is mostly seen from (the lab, or your plot), for choosing each tree's detail
     const eyeX = clear?.x ?? 0, eyeZ = clear?.z ?? 0;
     // the plains' surface: your moon's facets near the plot, the true planet beyond (blended, so no step between)
@@ -403,6 +416,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
         const a = hash(i, tries, 51) * Math.PI * 2, rr = Math.sqrt(hash(i, tries, 52)) * plot.r * 0.95;
         if (rr < 12) continue;
         const x = plot.x + Math.cos(a) * rr, z = plot.z + Math.sin(a) * rr;
+        if (!seen(x, z)) continue;
         const kind = kinds[Math.floor(hash(i, tries, 53) * kinds.length)]!;
         const size = (0.75 + hash(i, tries, 54) * 0.6) * (1 + plot.r / 220);
         let list = byKind.get(kind);
@@ -423,15 +437,20 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     // ---- a finished planet: forest over the plains and round your plot's lake (off the neighbours' plots, which have their own)
     if (options.lush) {
       const byKind = new Map<string, THREE.Matrix4[]>();
-      for (let k = 0, placed = 0; placed < 700 && k < 6000; k++) {
+      // a view sees a slice of the planet: it gets a slice of the trees
+      const most = view ? 240 : 700;
+      for (let k = 0, placed = 0; placed < most && k < 6000; k++) {
         const a = hash(k, 1, 61) * Math.PI * 2, u = hash(k, 2, 61), d = 34 + u * u * 1500;
         const x = Math.cos(a) * d, z = Math.sin(a) * d;
         if (clear && Math.hypot(x - clear.x, z - clear.z) < clear.r) continue;
+        if (!seen(x, z)) continue;
+        // keep the view from the clear spot to your plot open: no trees on the line between them
+        if (clear && distanceToSegment(x, z, clear.x, clear.z, 0, 0) < 34) continue;
         if (neighbours.some(({ plot }) => Math.hypot(x - plot.x, z - plot.z) < plot.r + 30)) continue;
         // clumps: a tree only where a slow noise says woodland
         if (hash(Math.floor(x / 60), Math.floor(z / 60), 62) < 0.3) continue;
         const kind: SmoothId = hash(k, 3, 61) < 0.62 ? 'broadleaf' : 'conifer';
-        const far = Math.hypot(x - eyeX, z - eyeZ), key = `${kind}@${far < 150 ? 'near' : far < 600 ? 'far' : 'tiny'}`;
+        const far = Math.hypot(x - eyeX, z - eyeZ), key = `${kind}@${far < 90 ? 'near' : far < 500 ? 'far' : 'tiny'}`;
         let list = byKind.get(key);
         if (!list) byKind.set(key, (list = []));
         list.push(place(x, planetHeight(x, z) - 0.2, z, hash(k, 4, 61) * 6.28, (hash(k, 5, 61) - 0.5) * 0.08, 0.8 + hash(k, 6, 61) * 0.7, new THREE.Matrix4()));
@@ -451,7 +470,7 @@ export function createWorld(scene: THREE.Scene, o: WorldOptions): World {
     lookTargets.push(rockUniforms);
     const rockMaterial = keep(new THREE.ShaderMaterial({ vertexShader: ROCK_VERTEX, fragmentShader: ROCK_FRAGMENT, uniforms: rockUniforms }));
     for (let shape = 0; shape < 3; shape++) for (const near of [true, false]) {
-      const list = BOULDERS.filter((b) => b.shape === shape && (Math.hypot(b.x, b.z) < 160) === near && !(clear && Math.hypot(b.x - clear.x, b.z - clear.z) < clear.r));
+      const list = BOULDERS.filter((b) => b.shape === shape && (Math.hypot(b.x, b.z) < 160) === near && !(clear && Math.hypot(b.x - clear.x, b.z - clear.z) < clear.r) && seen(b.x, b.z));
       if (!list.length) continue;
       const model = smoothModel(`boulder${shape}` as SmoothId);
       // a copy, so this world's sunlight per boulder does not stick to the kept model

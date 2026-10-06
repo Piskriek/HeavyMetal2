@@ -54,8 +54,9 @@ export function GoblinFront(props: GoblinStatus & { readonly onPlay: () => void;
   );
 }
 
-const HARNESS_MENU: readonly { readonly id: 'crafter' | 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
-  { id: 'crafter', label: 'Resolution Crafter', says: "Raise a moon's resolution, stage by stage. A first look." },
+const HARNESS_MENU: readonly { readonly id: 'crafter' | 'racing' | 'island' | 'avatars' | 'community' | 'settings'; readonly label: string; readonly says: string }[] = [
+  { id: 'crafter', label: 'Resolution Crafter', says: 'Your plot on the planet: terraform it, stage by stage.' },
+  { id: 'racing', label: 'Goblin Racing', says: 'Race goblins in glass balls round an island.' },
   { id: 'island', label: 'My planet', says: 'Your islands: pick one to go in, or make a new one.' },
   { id: 'avatars', label: 'Avatars', says: 'Who you are: goblins, humans and more.' },
   { id: 'community', label: 'Community', says: 'Presets other players share, and yours.' },
@@ -63,22 +64,24 @@ const HARNESS_MENU: readonly { readonly id: 'crafter' | 'island' | 'avatars' | '
 ];
 
 /**
- * The SetMix home's own chrome: the wordmark, the harness menu (your island, the community, settings) and the leader line that ties Goblin
- * Racing's window to its planet on the star chart (drawn by the shell every frame through `leader`).
+ * The SetMix home's own chrome over the lab (lab/lab.tsx): the wordmark and the menu (the Resolution Crafter, Goblin Racing, your island,
+ * the community, settings). The leader line is the star chart's, drawn when a planet is picked there.
  */
 export function SetMixHome(props: {
   readonly onMyIsland: () => void; readonly onAvatars: () => void; readonly onCommunity: () => void; readonly onSettings: () => void; readonly credits: number;
   /** The Resolution Crafter: SetMix's own game mode (a first look for now). */
   readonly onCrafter: () => void;
+  /** Goblin Racing's own menu. */
+  readonly onGoblin: () => void;
   /** Straight into the island you were last on (or your first). */
   readonly onIslandNow: () => void;
   /** The island My island opens, and whether you have been there before (then it says you carry on where you left off). */
   readonly island: { readonly name: string; readonly visited: boolean } | null;
   readonly leader: { readonly line: Ref<SVGLineElement>; readonly ring: Ref<SVGCircleElement> };
 }): ReactElement {
-  const act = { crafter: props.onCrafter, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
+  const act = { crafter: props.onCrafter, racing: props.onGoblin, island: props.onMyIsland, avatars: props.onAvatars, community: props.onCommunity, settings: props.onSettings };
   return (
-    <div className="sm-home">
+    <div className="sm-home lab">
       <svg className="sm-leader" aria-hidden="true"><circle ref={props.leader.ring} r="0" /><line ref={props.leader.line} /></svg>
       <div className="sm-brand"><b>SetMix</b><i>Multiverse</i></div>
       <nav className="sm-menu" aria-label="SetMix">
@@ -89,7 +92,6 @@ export function SetMixHome(props: {
           </Fragment>
         ))}
       </nav>
-      <p className="sm-foot">Drag to look round the galaxy. Pick a planet to see what is played there.</p>
       <span className="sm-credits" title="In-game credits. Never real money.">{props.credits} cr</span>
     </div>
   );

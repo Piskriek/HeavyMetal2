@@ -583,3 +583,40 @@ To regenerate the list, walk `V3_TABS` for `bind.todo`.
 - **The preview:** SetMix home, Resolution Crafter. `apps/web/src/crafter/`: `moon.ts` (crater field, low-poly facets), `progress.ts` (stage ladder, wave queue), `looks.ts` (a cartridge baked per stage and tier), `moon-scene.ts` + `moon-shaders.ts` (three.js), `crafter.tsx` + `crafter.css` (the console). Test hook `window.hmCrafter`. 60 fps on the HD 530 on Low.
 - **Gate at the end:** `npm run verify` green (1808 tests, 4 skipped), the one-file build 4489 KB (+93 KB), `E2E_GPU=1 E2E_SLOW=2` e2e passed with the new crafter steps.
 - **Next:** the owner's reaction to the preview. Then Milestone 0.5 (e2e split, Shift + wheel, voxels in the budget), then SetMix Wave 3 (`@hm/wavefield`, the stage look on the real ground), Wave 4 (machines, cartridges as presets, the portal), Wave 5 (the Lab, Studio and Play). Owner asks waiting: SM4 (ship to the goblin planet), SM5 (galaxy), SM6 (standalone Goblin Racing). Known gaps: bakes on the main thread (a worker before Ultra matters), the recipe table's 9 missing ingredients, the tier-1 starters reach only 1 recipe.
+
+## 12ak. 2026-10-06 evening (Opus 5.5, laptop): a planet to the horizon, smooth models, and the lab home
+
+The owner turned the work three times in an hour (OWNER_ASKS 19:12, 19:20, 19:24):
+- **No low-poly plants and animals in a PBR scene.** The flora and fauna views were taken out; the packages stay.
+- **A desolate planet, not a spotlight in a crater.**
+- **Smooth models now.**
+- **"Make it look fkking good."**
+- **A lab like Portal 2, the planet like the 90s at first, but see far enough to spot other players' finished plots.**
+
+What landed:
+- **`crafter/planet.ts`** (SM13):
+  - a 12 km planet; your 56 m plot; plains out 4.2 km with old craters and far ranges;
+  - eleven sample neighbours (stand-ins until SM8);
+  - sun shadows baked per point, including the boulders' long shadows.
+  - The wave now runs to the plot's rim (62 m); water stays in the crater's bowl.
+- **`crafter/smooth-models.ts`** (D12, first wiring):
+  - boulders, broadleaf, conifer and palm, meshed by `@hm/smoothvox` at near, far (half voxels) and tiny (quarter voxels);
+  - built behind the loading bars and kept for the visit;
+  - the boulders draw triplanar in the ground's cartridge.
+- **`crafter/world.ts`:**
+  - one ground shader with PLOT, DISC and RING defines;
+  - options for the sun, the goblin planet's place, a finished planet (`lush`), a cleared spot, and a view cone (only what is seen is built).
+- **The sky:** black, a faint galaxy, a hard sun, the goblin planet. Through air it pales to a daytime moon.
+- **`lab/`** (SM11): the SetMix home is a test-chamber lab with the arch on the right opening onto the finished planet.
+  - Two scenes share one camera.
+  - Goblin Racing's live window on the home is gone; it is a menu entry now.
+  - The galaxy shows only behind the other screens.
+
+Measured on this laptop (the minimum spec) on Low: the crafter at 59.5 fps, the lab at 60 fps (about 830k triangles).
+
+Next:
+- the goblin as a smooth model;
+- `@hm/flora` choosing which trees grow where;
+- smooth creatures from `@hm/fauna`;
+- the shared planet (SM8 to SM10, `docs/SETMIX_WORLD.md` not yet written);
+- a stage-by-stage reveal in the lab.

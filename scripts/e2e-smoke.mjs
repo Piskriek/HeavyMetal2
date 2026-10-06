@@ -38,10 +38,10 @@ try {
   await page.waitForSelector('.sm-home', { timeout: T(30000) });
   check('boots to the SetMix home with no page error', errors.length === 0, errors.join(' | '));
   console.log(`     renderer: ${await page.evaluate(() => { const g = document.createElement('canvas').getContext('webgl2'); const x = g?.getExtension('WEBGL_debug_renderer_info'); return g && x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'unknown'; })}`);
-  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Resolution Crafter', 'My planet', 'Avatars', 'Community', 'Settings']));
-  await page.waitForSelector('.gr-preview', { timeout: T(30000) });
-  check('Goblin Racing is selected, its menu live in a window', JSON.stringify(await page.$$eval('.gr-preview-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings']));
-  check('the window tells a new player what Play does', /first avatar/.test(await page.locator('.gr-preview-you').innerText()));
+  check('the home is SetMix Multiverse with its menu', (await page.locator('.sm-brand b').innerText()) === 'SetMix' && (await page.locator('.sm-brand i').innerText()) === 'Multiverse' && JSON.stringify(await page.$$eval('.sm-menu button b', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Resolution Crafter', 'Goblin Racing', 'My planet', 'Avatars', 'Community', 'Settings']));
+  // the home is the lab (STATUS SM11): the finished planet shows through its arch once its trees and looks are built
+  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  check('the home is the lab, with the finished planet through its arch', await page.locator('.lab-home.ready').count() === 1);
 
   const text = (sel, t) => page.locator(sel, { hasText: t }).first();
   const shotDir = process.env.E2E_SHOTS;
@@ -57,10 +57,11 @@ try {
   await text('[aria-label="Settings"] button', 'Close').click();
   check('settings closes back to the home', await page.locator('.sm-home').count() === 1);
 
-  // Goblin Racing: its window grows into its own menu; Race modes holds its sections; Esc steps back out to SetMix
-  await dom(() => document.querySelector('.gr-open')?.click());
+  // Goblin Racing: its menu entry opens its own menu; Race modes holds its sections; Esc steps back out to SetMix
+  await dom(() => { [...document.querySelectorAll('.sm-menu button')].find((b) => b.querySelector('b')?.textContent === 'Goblin Racing')?.click(); });
   await page.waitForSelector('.gr-front', { timeout: T(15000) });
-  check('opening the window shows Goblin Racing\'s own menu', JSON.stringify(await page.$$eval('.gr-front .shell-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings', 'Back to SetMix']));
+  check('Goblin Racing opens its own menu', JSON.stringify(await page.$$eval('.gr-front .shell-menu button', (b) => b.map((x) => x.textContent))) === JSON.stringify(['Play', 'Race modes', 'Settings', 'Back to SetMix']));
+  check('its menu tells a new player what Play does', /first avatar/.test(await page.locator('.gr-front .shell-foot').innerText()));
   await dom(() => { [...document.querySelectorAll('.gr-front .shell-menu button')].find((b) => b.textContent === 'Race modes')?.click(); });
   await page.waitForSelector('.shell-racing');
   for (const s of ['Tournaments', 'Spectate', 'Rankings', 'Track editor', 'Settings', 'My goblin', 'The Bookie', 'Quick race']) await dom((t) => { [...document.querySelectorAll('.shell-racing-nav button')].find((b) => b.textContent === t)?.click(); }, s);
@@ -162,11 +163,8 @@ try {
   await text('.shell-top button', 'Home').click();
   await page.waitForSelector('.sm-home');
   check('community returns home', true);
-  const vp = page.viewportSize() ?? { width: 1280, height: 800 };
-  await page.waitForTimeout(T(1500));
-  await page.mouse.move(vp.width * 0.42, vp.height * 0.41);
-  await page.waitForTimeout(T(600));
-  check('a planet near the pointer shows its card', await page.locator('.planet-card').count() === 1);
+  await page.waitForFunction(() => window.hmLab && window.hmLab.ready && window.hmLab.frames > 5, null, { timeout: T(60000) });
+  check('coming home opens the lab again', await page.locator('.lab-home.ready').count() === 1);
 
   await page.locator('.sm-menu .sm-sub').click();
   await page.waitForSelector('.v3', { timeout: T(60000) });

@@ -586,6 +586,17 @@ html .hmi-chip { background: #fff; border-color: var(--line); border-radius: 0; 
 .sm-menu button:hover small, .sm-menu button:focus-visible small { color: var(--text); }
 .sm-menu button:active { padding-left: 16px; }
 .sm-foot { position: absolute; left: clamp(20px, 5vw, 72px); bottom: 18px; margin: 0; font-size: 12px; color: var(--dim); animation: sm-in .6s var(--ease-out) .35s both; }
+/* the lab behind the SetMix home (lab/lab.tsx): revealed once, when the planet outside the arch is ready */
+.lab-home { position: absolute; inset: 0; background: #c8cfd2; }
+.lab-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .9s ease; }
+.lab-home.ready .lab-canvas { opacity: 1; }
+.lab-loading { left: 45%; right: 5%; }
+/* the menu over the lab: light type on the dim room, a soft shadow so seams behind never cut a letter */
+.sm-home.lab::before { content: ""; position: absolute; inset: 0; right: auto; width: min(560px, 70vw); background: linear-gradient(90deg, rgba(12, 16, 20, .42), rgba(12, 16, 20, .2) 60%, transparent); pointer-events: none; }
+.sm-home.lab .sm-brand b, .sm-home.lab .sm-menu button b, .sm-home.lab .sm-credits { color: #f1f4f5; text-shadow: 0 1px 3px rgba(10, 14, 18, .55); }
+.sm-home.lab .sm-brand i, .sm-home.lab .sm-menu button small, .sm-home.lab .sm-menu .sm-sub { color: rgba(232, 238, 241, .78); text-shadow: 0 1px 2px rgba(10, 14, 18, .6); }
+.sm-home.lab .sm-menu button:hover small, .sm-home.lab .sm-menu button:focus-visible small { color: #f1f4f5; }
+@media (prefers-reduced-motion: reduce) { .lab-canvas { transition: none; } }
 .sm-credits { position: absolute; right: 24px; top: 22px; font-family: var(--font-setmix); font-weight: 600; font-size: 14px; color: var(--text); }
 .sm-layer .shell-card { left: clamp(20px, 5vw, 72px); right: auto; top: auto; bottom: 56px; width: min(320px, 80vw); animation: sm-in .35s var(--ease-out) both; }
 .sm-layer .shell-card .quiet { margin-left: 8px; }

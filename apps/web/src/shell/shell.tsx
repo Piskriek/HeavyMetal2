@@ -21,7 +21,8 @@ import { GoblinRacingMenu } from './racing-menu';
 import { COMMUNITY_ISLANDS, Community } from './community';
 import { duplicateActivity, loadProfile, makeActivity, removeActivity, saveProfile, unhideAll, type Profile } from './profile';
 import { SettingsBody } from './settings-body';
-import { GoblinFront, GoblinPreview, SetMixHome } from './goblin-front';
+import { GoblinFront, SetMixHome } from './goblin-front';
+import { LabHome } from '../lab/lab';
 import { captureMouse } from './capture-mouse';
 import { CreateGoblin } from '../avatar/create-goblin';
 import { player } from '../build/player';
@@ -96,8 +97,6 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const [newKind, setNewKind] = useState<AvatarKind>('goblin');
   const createForRef = useRef(createFor);
   createForRef.current = createFor;
-  /** The galaxy stays a moment while Goblin Racing's window grows to fill the screen, then goes (it is a 3D view of its own). */
-  const [growing, setGrowing] = useState(false);
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
   const [session, setSession] = useState(false); // you have been on your island this visit
   const [intro, setIntro] = useState(false);
@@ -116,23 +115,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const leaderLine = useRef<SVGLineElement>(null);
   const leaderRing = useRef<SVGCircleElement>(null);
   const stageEl = useRef<HTMLDivElement>(null);
-  /** Where the goblin should stand on the screen while Goblin Racing is a window on the home: the middle of the window's island. */
-  const windowFrame = (): { x: number; y: number } => (window.innerWidth <= 760 ? { x: 0.5, y: 0.76 } : { x: 0.75, y: 0.47 });
   /** My planet's window on the home (your islands with previews), when your planet is the one picked. */
   const planetWinEl = useRef<HTMLDivElement>(null);
   const pickedRef = useRef<string | null>(null);
-  const drawLeader = useCallback((x: number, y: number, radius: number) => {
-    // the line runs from the picked planet to its window: My planet's, or the live window of Goblin Racing (or another activity)
-    const line = leaderLine.current, ring = leaderRing.current, stage = pickedRef.current === 'home' ? planetWinEl.current : stageEl.current;
-    if (!line || !ring || !stage) return;
-    const r = stage.getBoundingClientRect();
-    const tx = r.left, ty = Math.min(Math.max(y, r.top + 28), r.bottom - 28);
-    const rr = radius + 8, dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy) || 1;
-    const shown = x < r.left - rr - 12 && x > 0 && y > 0 && y < window.innerHeight;
-    ring.setAttribute('cx', String(x)); ring.setAttribute('cy', String(y)); ring.setAttribute('r', String(rr));
-    line.setAttribute('x1', String(x + (dx / d) * rr)); line.setAttribute('y1', String(y + (dy / d) * rr)); line.setAttribute('x2', String(tx)); line.setAttribute('y2', String(ty));
-    ring.style.opacity = line.style.opacity = shown ? '1' : '0';
-  }, []);
   const screenRef = useRef(screen);
   screenRef.current = screen;
   const reduced = useMemo(() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } }, []);
@@ -149,13 +134,9 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const fromGoblin = origin.current === 'goblin';
   pickedRef.current = picked;
   /** The home shows a planet's live island window (Goblin Racing, any activity), or My planet's island previews (no 3D view needed). */
-  const homeLive = picked !== 'home';
-  const stageOn = (screen === 'home' && homeLive) || screen === 'goblin' || (screen === 'create' && createFor === 'race') || (screen === 'settings' && (fromGoblin || (origin.current === 'home' && homeLive)));
-  // the window shows a loading bar until its island has drawn (a planet's view is built when it first shows)
-  const [stageReady, setStageReady] = useState(false);
-  useEffect(() => { if (!stageOn) setStageReady(false); }, [stageOn]);
-  const stageFull = stageOn && screen !== 'home' && !(screen === 'settings' && !fromGoblin);
-  const galaxyOn = screen === 'home' || screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'activity' || screen === 'islands' || growing
+  const stageOn = screen === 'goblin' || (screen === 'create' && createFor === 'race') || (screen === 'settings' && fromGoblin);
+  const stageFull = stageOn && !(screen === 'settings' && !fromGoblin);
+  const galaxyOn = screen === 'zoom' || screen === 'hub' || screen === 'activities' || screen === 'activity' || screen === 'islands'
     || screen === 'avatars' || (screen === 'create' && createFor !== 'race') || (screen === 'settings' && !fromGoblin);
   const islandMounted = world !== null && (screen === 'island' || (screen === 'zoom' && session));
 
@@ -193,7 +174,6 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   const toHome = useCallback(() => { origin.current = 'home'; go('home'); setPicked('goblin-racing'); setIslandMenu(false); }, [go]);
   /** Goblin Racing's window grows into its own menu; the galaxy fades out behind it. */
   const toGoblin = useCallback(() => {
-    if (screenRef.current === 'home') { setGrowing(true); window.setTimeout(() => setGrowing(false), 900); }
     origin.current = 'goblin';
     go('goblin');
   }, [go]);
@@ -241,7 +221,6 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
   }, [back, go, toGoblin, toHome]);
 
   const picks = planets.find((p) => p.id === picked) ?? null;
-  const pickedRow = visible.find((a) => a.id === picked) ?? null;
   /** Goblin Racing races as your goblin (your first avatar of that kind), whatever avatar walks your island. */
   const yourGoblin = (): AvatarLook | null => player().looks.find((l) => kindOf(l) === 'goblin') ?? null;
   /** What Goblin Racing's window and menu say: the game in one line, and what Play does for you (a new player learns it makes their first avatar). */
@@ -297,19 +276,10 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         <div ref={stageEl} className={`gr-stage${stageFull ? ' full' : ''}${arriving ? ' arrive' : ''}`} style={{ zIndex: 3 }}>
           {/* the scene is always screen-sized and stays put: the window is an opening onto it, so growing never resizes the 3D view (no flicker) */}
           <div className="gr-scene">
-            <IslandWalk key={`race-${profile.gpu}`} rt={raceWorld.rt} scene={raceWorld.scene} showcase ground="racing" style="painted" frame={screen === 'home' ? windowFrame() : undefined} clipTo={stageEl} grownUp={profile.grownUp} skin={profile.skin}
+            <IslandWalk key={`race-${profile.gpu}`} rt={raceWorld.rt} scene={raceWorld.scene} showcase ground="racing" style="painted" clipTo={stageEl} grownUp={profile.grownUp} skin={profile.skin}
               quality={profile.quality} fpsTarget={profile.fpsTarget} graphics={profile.graphics} gpu={profile.gpu} controls={profile.controls} activities={activityInfos}
-              onActivities={toActivities} onHub={() => toHub()} onMainMenu={toHome} onReady={() => setStageReady(true)} />
+              onActivities={toActivities} onHub={() => toHub()} onMainMenu={toHome} />
           </div>
-          {screen === 'home' && (!pickedRow || pickedRow.id === 'goblin-racing') ? (
-            <GoblinPreview {...goblinStatus} loading={!stageReady} onOpen={toGoblin}
-              actions={[{ label: 'Play', go: true, onClick: () => { toGoblin(); play(); } }, { label: 'Race modes', onClick: () => { toGoblin(); openSections(); } }, { label: 'Settings', onClick: () => { toGoblin(); toSettings(); } }]} />
-          ) : null}
-          {/* another activity's planet: its own window on the same live island (activities are made from Goblin Racing) */}
-          {screen === 'home' && pickedRow && pickedRow.id !== 'goblin-racing' ? (
-            <GoblinPreview name={pickedRow.name} doc={pickedRow.doc} you={pickedRow.forkOf ? 'Made from Goblin Racing: the same races under its own name and planet.' : 'An activity of your own.'} loading={!stageReady}
-              onOpen={() => openActivity(pickedRow.id)} actions={[{ label: 'Open', go: true, onClick: () => openActivity(pickedRow.id) }, { label: 'Back to Goblin Racing', onClick: () => setPicked('goblin-racing') }]} />
-          ) : null}
           {screen === 'goblin' ? <GoblinFront {...goblinStatus} onPlay={play} onModes={openSections} onSettings={toSettings} onHome={toHome} /> : null}
         </div>
       ) : null}
@@ -319,7 +289,7 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
       {islandMounted ? <div className="hud-top" id="hud-top" /> : null}
       {galaxyOn ? (
         <div className="shell-layer" style={{ zIndex: 2, opacity: galaxyOpacity, transition: 'opacity .9s ease', pointerEvents: galaxyOpacity < 0.5 ? 'none' : 'auto' }}>
-          <GalaxyCanvas ref={galaxy} planets={planets} mode={screen === 'home' ? 'hub' : 'backdrop'} focusId={screen === 'home' ? picked ?? 'goblin-racing' : undefined} highlightId={screen === 'home' ? picked ?? 'goblin-racing' : undefined} reducedMotion={reduced} onPick={(id) => { setPicked(id); }} focusShift={screen === 'home' ? 16 : 0} onFocusScreen={screen === 'home' ? drawLeader : undefined} />
+          <GalaxyCanvas ref={galaxy} planets={planets} mode="backdrop" reducedMotion={reduced} onPick={(id) => { setPicked(id); }} />
         </div>
       ) : null}
 
@@ -338,9 +308,10 @@ export function Shell(props: { readonly makeRuntime: () => Runtime }): ReactElem
         </div>
       ) : null}
 
+      {screen === 'home' ? <div className="shell-layer" style={{ zIndex: 2 }}><LabHome profile={profile} /></div> : null}
       {screen === 'home' ? (
         <div className="shell-layer shell-ui sm-layer" style={{ zIndex: 4 }}>
-          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onCrafter={() => { origin.current = 'home'; go('crafter'); }} onMyIsland={() => { setPicked('home'); toIslands(); }} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
+          <SetMixHome leader={{ line: leaderLine, ring: leaderRing }} credits={profile.credits} onCrafter={() => { origin.current = 'home'; go('crafter'); }} onGoblin={toGoblin} onMyIsland={() => { setPicked('home'); toIslands(); }} onAvatars={toAvatars} onCommunity={() => toHub()} onSettings={toSettings}
             onIslandNow={() => void myIsland()} island={homeIsland ? { name: homeIsland.name, visited: player().created && homeIsland.lastVisitedAt > homeIsland.createdAt + 1000 } : null} />
           {/* another planet picked: what is played there (Goblin Racing shows its live window instead) */}
           {/* your planet picked: its islands, drawn from above; pick one to go in, or open the planet for all of them */}

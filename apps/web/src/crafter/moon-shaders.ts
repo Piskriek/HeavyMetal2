@@ -360,7 +360,7 @@ void main() {
   float sunInAir = pow(cs, 220.0) * 1.2 + pow(cs, 8.0) * 0.18;
   vec3 colour = mix(space, sky + sunInAir * vec3(1.0, 0.95, 0.85) + space * 0.25, uAtmosphere);
   // through air the planet still shows, paled by the sky like a daytime moon
-  colour = mix(colour, planetCol + sky * 0.3, planetA * uAtmosphere * 0.6);
+  colour = mix(colour, planetCol + sky * 0.22, planetA * uAtmosphere * 0.8);
   gl_FragColor = vec4(colour, 1.0);
   #include <colorspace_fragment>
 }`;
